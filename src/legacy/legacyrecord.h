@@ -33,11 +33,11 @@ namespace legacy
         size_t nrecs    () const;
         size_t ncycles  () const;
         size_t nphases  () const;
-        void   cycles(size_t *)         const;
+        void   cycles(int *)           const;
         void   t     (int *)            const;
         void   zmag  (float *)          const;
         void   bead  (size_t, float *)  const;
-        void   cycles(std::vector<size_t> & x) const { x.resize(ncycles()); cycles(x.data()); }
+        void   cycles(std::vector<int>    & x) const { x.resize(nphases()*ncycles()); cycles(x.data()); }
         void   t     (std::vector<int>    & x) const { x.resize(nrecs());   t     (x.data()); }
         void   zmag  (std::vector<float>  & x) const { x.resize(nrecs());   zmag  (x.data()); }
         void   bead  (size_t i, std::vector<float> & x) const
@@ -46,7 +46,7 @@ namespace legacy
         std::vector<float>  bead  (size_t i) const { decltype(bead(0))  x; bead(i, x);  return x; }
         std::vector<float>  zmag  ()         const { decltype(zmag())   x; zmag(x);     return x; }
         std::vector<int  >  t     ()         const { decltype(t   ())   x; t   (x);     return x; }
-        std::vector<size_t> cycles()         const { decltype(cycles()) x; cycles(x);   return x; }
+        std::vector<int>    cycles()         const { decltype(cycles()) x; cycles(x);   return x; }
 
         float  camerafrequency() const;
 

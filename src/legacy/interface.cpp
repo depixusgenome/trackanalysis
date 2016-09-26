@@ -24,9 +24,9 @@ namespace legacy
         res["nphases"] = pybind11::cast(rec.nphases());
 
         auto                cycles  = rec.cycles();
-        std::vector<size_t> shape   = {rec.ncycles(), 2};
-        std::vector<size_t> strides = {2*sizeof(decltype(cycles)::value_type),
-                                         sizeof(decltype(cycles)::value_type)};
+        std::vector<size_t> shape   = {rec.ncycles(), rec.nphases()};
+        std::vector<size_t> strides = {rec.nphases()*sizeof(decltype(cycles)::value_type),
+                                                     sizeof(decltype(cycles)::value_type)};
         res["cycles"]          = pybind11::array(shape, strides, cycles.data());
         res["camerafrequency"] = pybind11::cast(rec.camerafrequency());
         return res;

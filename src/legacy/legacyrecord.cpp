@@ -4593,22 +4593,22 @@ namespace legacy
         return lphase;
     }
 
-    void   GenRecord::cycles(size_t *dt) const
+    void   GenRecord::cycles(int *dt) const
     {
         if(_ptr == nullptr || _ptr->abs_pos < 0)
             return;
         int lmin = 0, lmax = 0, lphase = 0;
         _retrieve_min_max_event_and_phases(_ptr, &lmin, &lmax, &lphase);
 
-        int inds[2] = { -1, -1};
+        int inds[2] = { 0, 0};
         for(int i = lmin; i <= lmax; ++i)
             for(int k = 0; k < lphase; ++k, ++dt)
             {
                 int  _   = 0;
 
                 _retrieve_image_index_of_next_point_phase(_ptr, i, k, inds, inds+1, &_);
-                dt[0]   = size_t(inds[0]);
-                inds[0] = inds[1]-1;
+                dt[0]   = inds[0];
+                inds[0] = inds[1];
             }
     }
 
