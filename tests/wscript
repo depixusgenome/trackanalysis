@@ -1,0 +1,13 @@
+#! /usr/bin/env python
+# encoding: utf-8
+import os
+import builder
+
+def build(bld):
+    bld(features = ['py'], source = bld.path.ant_glob('**/*.py'))
+    for src in bld.path.ant_glob('**/*.py'):
+        node  = bld(features = 'subst',
+                    source   = str(src),
+                    target   = str(src).replace('tests/', 'build/tests'))
+
+builder.addmissing(locals())

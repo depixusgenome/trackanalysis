@@ -1,0 +1,12 @@
+#include <pybind11/pybind11.h>
+namespace @name@ { void pymodule(pybind11::module &); }
+
+using namespace pybind11;
+PYBIND11_PLUGIN(@module@)
+{
+     module m("@module@");
+     m.attr("__version__") = cast("@version@");
+     @name@::pymodule(m);
+
+     return m.ptr();
+}
