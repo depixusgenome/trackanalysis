@@ -35,6 +35,7 @@ namespace legacy
         int    cyclemax () const;
         size_t ncycles  () const;
         size_t nphases  () const;
+        bool   islost(int i) const;
         void   cycles(int *)           const;
         void   t     (int *)            const;
         void   zmag  (float *)          const;

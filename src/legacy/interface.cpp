@@ -20,7 +20,8 @@ namespace legacy
             };
 
         for(size_t ibead = 0, ebead = rec.nbeads(); ibead < ebead; ++ibead)
-            add(ibead, [&]() { return rec.bead(ibead); });
+            if(notall == false || !rec.islost(ibead))
+                add(ibead, [&]() { return rec.bead(ibead); });
 
         add("t",    [&]() { return rec.t(); });
         add("zmag", [&]() { return rec.zmag(); });

@@ -4667,4 +4667,12 @@ namespace legacy
 
     float  GenRecord::camerafrequency() const
     { return _ptr == nullptr ? 0 : _ptr->Pico_param_record.camera_param.camera_frequency_in_Hz; }
+
+    bool GenRecord::islost(int i) const
+    {
+        if(_ptr == nullptr || i < 0 || i >= _ptr->n_bead)
+            return true;
+        return _ptr->b_r[i]->completely_losted;
+            //|| _ptr->b_r[i]->calib_im == NULL && _ptr->SDI_mode == 0;
+    }
 }
