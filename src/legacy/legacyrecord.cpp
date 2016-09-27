@@ -4584,6 +4584,24 @@ namespace legacy
         return lmax-lmin+1;
     }
 
+    int GenRecord::cyclemin  () const
+    {
+        if(_ptr == nullptr || _ptr->abs_pos < 0)
+            return 0;
+        int lmin = 0, lmax = 0, lphase = 0;
+        _retrieve_min_max_event_and_phases(_ptr, &lmin, &lmax, &lphase);
+        return lmin;
+    }
+
+    int GenRecord::cyclemax  () const
+    {
+        if(_ptr == nullptr || _ptr->abs_pos < 0)
+            return 0;
+        int lmin = 0, lmax = 0, lphase = 0;
+        _retrieve_min_max_event_and_phases(_ptr, &lmin, &lmax, &lphase);
+        return lmax;
+    }
+
     size_t GenRecord::nphases  () const
     {
         if(_ptr == nullptr || _ptr->abs_pos < 0)

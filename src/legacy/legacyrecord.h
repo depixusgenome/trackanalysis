@@ -31,6 +31,8 @@ namespace legacy
 
         size_t nbeads   () const;
         size_t nrecs    () const;
+        int    cyclemin () const;
+        int    cyclemax () const;
         size_t ncycles  () const;
         size_t nphases  () const;
         void   cycles(int *)           const;
