@@ -14,12 +14,19 @@ def configure(cnf):
     cnf.recurse(builder.wscripted("src"))
 
 def environment(cnf):
-    print(cnf)
     print(cnf.env)
+
+def _allbuilds():
+    u"relative path to child wscripts"
+    yield from builder.wscripted("src")
+    yield 'tests'
 
 def build(bld):
     builder.build(bld)
-    bld.recurse(builder.wscripted("src"))
-    bld.recurse('tests')
+    for item in _allbuilds():
+        bld.recurse(item)
+
+for item in _allbuilds():
+    builder.addbuild(item, locals())
 
 builder.addmissing(locals())

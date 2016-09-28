@@ -14,6 +14,13 @@ def _add(fcn, name : str):
     fname = getattr(fcn, '__func__', fcn).__name__
     return type(fname[0].upper()+fname[1:]+'Make', (Make,), {name: fcn})
 
+def appname(frame: int  = 1) -> str:
+    u"returns directory"
+    fname = inspect.getouterframes(inspect.currentframe())[frame].filename
+    fname = fname.replace('\\', '/')
+    fname = fname[:fname.rfind('/')]
+    return fname[fname.rfind('/')+1:]
+
 class Make(object):
     u"base class for a given functionnality"
     IS_MAKE = YES

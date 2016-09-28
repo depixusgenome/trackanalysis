@@ -6,12 +6,15 @@ namespace legacy
     pybind11::object _open(std::string name, bool notall = true)
     {
         legacy::GenRecord   rec(name);
+        if((notall && rec.ncycles() <= 4) || rec.ncycles() == 0)
+            return pybind11::none();
+
         pybind11::dict      res;
 
         auto cycles  = rec.cycles();
-        auto first   = notall ? cycles[3*rec.nphases()] : 0;
-        auto last    = cycles[cycles.size()-rec.nphases()];
-        auto sz      = notall ? last-first : rec.nrecs();
+        auto first   = notall ? cycles[3*rec.nphases()]             : 0;
+        auto last    = notall ? cycles[cycles.size()-rec.nphases()] : rec.nrecs();
+        auto sz      = last-first;
 
         auto add = [&](auto key, auto val)
             {

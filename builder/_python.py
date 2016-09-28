@@ -80,31 +80,40 @@ def makemodule(glob:dict, **kw):
     u"returns a method for creating cpp modules"
     def build(bld:Context):
         u"builds a library"
+        src   = bld.path.parent.relpath()
         args  = dict(kw)
         name  = glob['APPNAME']
         csrc  = bld.path.ant_glob('**/*.cpp')
         pysrc = bld.path.ant_glob('**/*.py')
+        if len(pysrc) == 0 and len(csrc) == 0:
+            return
+
+        if len(pysrc):
+            parent = bld.bldnode.make_node('/'+name)
+            parent.mkdir()
+        else:
+            parent = bld.bldnode
+
         haspy = len(pysrc)
         mod   = '_'+name+'_core' if haspy else name
 
         node  = bld(features = 'subst',
-                    source   = '../../builder/_module.template',
-                    target   = './src/{n}/module.cpp'.format(n = name),
+                    source   = bld.srcnode.find_resource('builder/_module.template'),
+                    target   = name+"module.cpp",
                     name     = name,
                     module   = mod,
                     version  = glob['VERSION'])
         csrc.append(node.target)
 
         args.setdefault('source', csrc)
-        args.setdefault('target', "../../"+(name+'/' if haspy else '')+mod)
+        args.setdefault('target', str(parent.make_node(mod)))
         args.setdefault('features', ['pyext'])
         bld.shlib(**args)
 
-        bld(features = ['py'], source = pysrc)
-        for src in pysrc:
+        for item in pysrc:
             node  = bld(features = 'subst',
-                        source   = str(src),
-                        target   = str(src).replace('src/', ''))
+                        source   = item,
+                        target   = parent.make_node(str(src)))
 
     return build
 
