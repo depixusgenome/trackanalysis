@@ -1,32 +1,27 @@
-#! /usr/bin/env python
+#!/usr/bin/env python3
 # encoding: utf-8
 import os
 import builder
 
-APPNAME = 'trackanalyzer'
+_ALL = ('tests',) + tuple(builder.wscripted("src"))
 
-def options(opt):
-    builder.options(opt)
-    opt.recurse(builder.wscripted("src"))
-
-def configure(cnf):
-    builder.configure(cnf)
-    cnf.recurse(builder.wscripted("src"))
+def _recurse(fcn):
+    return builder.recurse(builder, _ALL)(fcn)
 
 def environment(cnf):
     print(cnf.env)
 
-def _allbuilds():
-    u"relative path to child wscripts"
-    yield from builder.wscripted("src")
-    yield 'tests'
+@_recurse
+def options(opt):
+    pass
 
+@_recurse
+def configure(cnf):
+    pass
+
+@_recurse
 def build(bld):
-    builder.build(bld)
-    for item in _allbuilds():
-        bld.recurse(item)
+    builder.findpyext(bld, builder.wscripted('src'))
 
-for item in _allbuilds():
+for item in _ALL:
     builder.addbuild(item, locals())
-
-builder.addmissing(locals())

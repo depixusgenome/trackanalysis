@@ -4,11 +4,9 @@ import os
 import builder
 
 def build(bld):
-    name = builder.appname()
-    bld.bldnode.make_node('/'+name).mkdir()
-    for src in bld.path.ant_glob('**/*.py'):
-        node  = bld(features = 'subst',
-                    source   = src,
-                    target   = src.relpath())
+    name  = builder.appname()
+    pysrc = bld.path.ant_glob('**/*.py')
+    builder.checkpy(bld, pysrc)
+    builder.copypy (bld, builder.appname(), pysrc)
 
-builder.addmissing(locals())
+builder.make(locals())

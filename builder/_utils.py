@@ -14,9 +14,21 @@ def _add(fcn, name : str):
     fname = getattr(fcn, '__func__', fcn).__name__
     return type(fname[0].upper()+fname[1:]+'Make', (Make,), {name: fcn})
 
-def appname(frame: int  = 1) -> str:
+def appname(iframe: int  = None) -> str:
     u"returns directory"
-    fname = inspect.getouterframes(inspect.currentframe())[frame].filename
+    if iframe is None:
+        mymod  = __file__.replace('\\', '/')
+        mymod  = mymod[:mymod.rfind('/')]
+        myroot = mymod[:mymod.rfind('/')]
+        for frame in inspect.getouterframes(inspect.currentframe()):
+            if frame.filename.startswith('<') or mymod in frame.filename:
+                continue
+            if myroot not in frame.filename:
+                continue
+            fname = frame.filename
+            break
+    else:
+        fname = inspect.getouterframes(inspect.currentframe())[iframe].filename
     fname = fname.replace('\\', '/')
     fname = fname[:fname.rfind('/')]
     return fname[fname.rfind('/')+1:]
@@ -96,37 +108,28 @@ def addoptions(fcn):
     u"adds an option element to a context"
     return _add(fcn, 'options')
 
-def addmissing(glob):
+def addmissing(glob, tt = None):
     u"adds functions 'load', 'options', 'configure', 'build' if missing from a module"
     items = tuple(makes(iter(cls for _, cls in glob.items())))
-    if len(items) == 0:
-        return
 
-    if 'load' not in glob:
-        def load(opt:Context):
-            u"applies load from all basic items"
-            opt.load(' '.join(getattr(cls, 'loads', lambda:'')() for cls in items))
-        glob['load'] = load
+    def load(opt:Context):
+        u"applies load from all basic items"
+        opt.load(' '.join(getattr(cls, 'loads', lambda:'')() for cls in items))
 
-    if 'options' not in glob:
-        def options(opt:Context):
-            u"applies options from all basic items"
-            glob.get('load', lambda _: None)(opt)
-            run(opt, 'options', items)
+    def options(opt:Context):
+        u"applies options from all basic items"
+        glob.get('load', lambda _: None)(opt)
+        run(opt, 'options', items)
 
-        glob['options'] = options
+    def configure(cnf:Context):
+        u"applies configure from all basic items"
+        glob.get('load', lambda _: None)(cnf)
+        run(cnf, 'configure', items)
 
-    if 'configure' not in glob:
-        def configure(cnf:Context):
-            u"applies configure from all basic items"
-            glob.get('load', lambda _: None)(cnf)
-            run(cnf, 'configure', items)
+    def build(bld:Context):
+        u"applies build from all basic items"
+        run(bld, 'build', items)
 
-        glob['configure'] = configure
-
-    if 'build' not in glob:
-        def build(bld:Context):
-            u"applies build from all basic items"
-            run(bld, 'build', items)
-
-        glob['build'] = build
+    for val in (load, options, configure, build):
+        val.__module__ = glob['__name__']
+        glob.setdefault(val.__name__, val)

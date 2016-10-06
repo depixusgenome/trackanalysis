@@ -28,12 +28,12 @@ namespace legacy
 
         add("t",    [&]() { return rec.t(); });
         add("zmag", [&]() { return rec.zmag(); });
-        res["nbeads"]   = pybind11::cast(rec.nbeads());
-        res["cyclemin"] = pybind11::cast((notall ?  3 : 0) + rec.cyclemin());
-        res["cyclemax"] = pybind11::cast((notall ? -1 : 0) + rec.cyclemax());
-        res["ncycles"]  = pybind11::cast((notall ? -4 : 0) + rec.ncycles());
-        res["nphases"]  = pybind11::cast(rec.nphases());
-        res["camerafrequency"] = pybind11::cast(rec.camerafrequency());
+        res["nbeads"]    = pybind11::cast(rec.nbeads());
+        res["cyclemin"]  = pybind11::cast((notall ?  3 : 0) + rec.cyclemin());
+        res["cyclemax"]  = pybind11::cast((notall ? -1 : 0) + rec.cyclemax());
+        res["ncycles"]   = pybind11::cast((notall ? -4 : 0) + rec.ncycles());
+        res["nphases"]   = pybind11::cast(rec.nphases());
+        res["frequency"] = pybind11::cast(rec.camerafrequency());
 
         std::vector<size_t> shape   = {rec.ncycles()-(notall ? 4: 0), rec.nphases()};
         std::vector<size_t> strides = {rec.nphases()*sizeof(decltype(cycles)::value_type),

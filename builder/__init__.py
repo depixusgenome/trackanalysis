@@ -3,9 +3,10 @@
 u"Default functions for waf"
 import os
 from typing     import Sequence, Callable
+from functools  import wraps
 
 from ._utils    import addmissing, appname
-from ._python   import makemodule
+from ._python   import makemodule, checkpy, copypy, findpyext
 from .          import _git as gitinfo
 from .          import _cpp
 from .          import _python
@@ -29,7 +30,7 @@ def output() -> str:
     u"returns build path"
     return top() + "/build"
 
-def version(_: int  = 1) -> str:
+def version() -> str:
     u"returns git tag"
     try:    return gitinfo.version()
     except: return "0.0.1"
@@ -63,19 +64,31 @@ def make(glob, **kw):
         u"does nothing"
         pass
 
-    toadd = dict(VERSION   = version(2),
-                 APPNAME   = appname(2),
-                 top       = ".",
-                 out       = output(),
-                 options   = options,
-                 configure = configure,
-                 build     = makemodule(glob, **kw))
+    toadd = dict(VERSION   = lambda: version(),
+                 APPNAME   = lambda: appname(),
+                 top       = lambda: ".",
+                 out       = lambda: output(),
+                 options   = lambda: options,
+                 configure = lambda: configure,
+                 build     = lambda: makemodule(glob, **kw))
 
     for key, fcn in toadd.items():
         if key not in glob:
-            glob[key] = fcn
+            glob[key] = fcn()
 
     if glob['APPNAME'] not in glob:
         register(glob['APPNAME'], glob['build'], glob)
+
+def recurse(builder, items):
+    u"runs over relative path to child wscripts"
+    def _wrapper(fcn):
+        @wraps(fcn)
+        def _wrap(bld):
+            fcn(bld)
+            getattr(builder, fcn.__name__)(bld)
+            for item in items:
+                bld.recurse(item)
+        return _wrap
+    return _wrapper
 
 addmissing(locals())

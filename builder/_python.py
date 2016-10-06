@@ -1,13 +1,17 @@
 #!/usr/bin/env python
 # encoding: utf-8
-
 u"All *basic* python related details"
-import os
 import subprocess
-from ._utils import YES
-from ._utils import Make, addconfigure, runall, addmissing
+import shutil
+import re
 
-from waflib.Context import Context
+from typing     import Sequence, List
+from contextlib import closing
+
+from ._utils    import YES
+from ._utils    import Make, addconfigure, runall, addmissing
+
+from waflib.Context import Context # type: ignore
 
 IS_MAKE = YES
 
@@ -75,46 +79,137 @@ def configure(cnf:Context):
     u"get python headers and modules"
     cnf.check_python_version((3,5))
     cnf.check_python_headers()
+    cnf.find_program("mypy",   var = "MYPY")
+    cnf.find_program("pylint", var = "PYLINT")
+
+def pymoduledependencies(pysrc):
+    u"detects dependencies"
+    patterns = tuple(re.compile(r'^\s*'+pat) for pat in
+                     (r'from\s+(\w+)\s+import\s+', r'import\s*(\w+)'))
+    mods     = set()
+    for item in pysrc:
+        with closing(open(item.abspath(), 'r')) as stream:
+            for line in stream:
+                for pat in patterns:
+                    ans = pat.match(line)
+                    if ans is not None:
+                        mods.add(ans.group(1))
+    return mods
+
+def findpyext(bld:Context, items:Sequence):
+    u"returns a list of pyextension in that module"
+    names = list(items)
+    bld.env.pyextmodules = set()
+    for name in names:
+        path = bld.path.make_node(str(name))
+        if haspyext(path.ant_glob('**/*.cpp')):
+            bld.env.pyextmodules.add(name[name.rfind('/')+1:])
+
+def haspyext(csrc):
+    u"detects whether pybind11 is used"
+    pattern = re.compile(r'\s*#\s*include\s*["<]pybind11')
+    for item in csrc:
+        with closing(open(item.abspath(), 'r')) as stream:
+            if any(pattern.match(line) is not None for line in stream):
+                return True
+    return False
+
+def checkpy(bld:Context, items:Sequence):
+    u"builds tasks for checking code"
+    if len(items) == 0:
+        return
+    deps    = list(pymoduledependencies(items) & bld.env.pyextmodules)
+    def _scan(_):
+        nodes = [bld.get_tgen_by_name(dep+'pyext').tasks[-1].outputs[0] for dep in deps]
+        return (nodes, [])
+
+    plrule  = '${PYLINT} ${SRC} --init-hook="sys.path.append(\'./\')" '
+    plrule += '-f text --reports=no'
+
+    rules  = [dict(color       = 'BLUE',
+                   rule        = '${MYPY} ${SRC} --silent-imports',
+                   scan        = _scan,
+                   cls_keyword = lambda _: 'MyPy'),
+              dict(color       = 'YELLOW',
+                   rule        = plrule,
+                   scan        = _scan,
+                   cls_keyword = lambda _: 'PyLint'),
+             ] # type: List
+
+    for item in items:
+        for kwargs in rules:
+            tsk = bld(source = [item], **kwargs)
+
+def copypy(bld:Context, arg, items:Sequence):
+    u"copy py modules to build root path"
+    if len(items) == 0:
+        return
+
+    def _cpy(tsk):
+        shutil.copy2(tsk.inputs[0].abspath(),
+                     tsk.outputs[0].abspath())
+    def _kword(_):
+        return 'Copying'
+
+    root = bld.bldnode.make_node('/'+arg) if isinstance(arg, str) else arg
+    root.mkdir()
+    for item in items:
+        bld(rule = _cpy, source = item, target = root, cls_keyword = _kword)
+
+def buildpymod(bld:Context, name:str, pysrc:Sequence):
+    u"builds a python module"
+    if len(pysrc) == 0:
+        return
+    bld    (features = "py", source = pysrc)
+    checkpy(bld, pysrc)
+    copypy (bld, name, pysrc)
+
+def buildpyext(bld     : Context,
+               name    : str,
+               version : str,
+               pysrc   : Sequence,
+               csrc    : List,
+               **kwargs):
+    u"builds a python extension"
+    if len(csrc) == 0:
+        return
+
+    if name not in bld.env.pyextmodules and not haspyext(csrc):
+        return
+
+    args    = kwargs
+    bldnode = bld.bldnode.make_node(bld.path.relpath())
+    haspy   = len(pysrc)
+    mod     = '_'+name+'_core'                if haspy else name
+    parent  = bld.bldnode.make_node('/'+name) if haspy else bld.bldnode
+
+    node    = bld(features = 'subst',
+                  source   = bld.srcnode.find_resource('builder/_module.template'),
+                  target   = name+"module.cpp",
+                  nsname   = name,
+                  module   = mod,
+                  version  = version)
+    csrc.append(node.target)
+
+    args.setdefault('source',   csrc)
+    args.setdefault('target',   parent.path_from(bldnode)+"/"+mod)
+    args.setdefault('features', ['pyext'])
+    args.setdefault('name',     name+"pyext")
+    bld.shlib(**args)
+
+def buildpy(bld:Context, name:str, version:str, **kwargs):
+    u"builds a python module"
+    csrc   = bld.path.ant_glob('**/*.cpp')
+    pysrc  = bld.path.ant_glob('**/*.py')
+
+    buildpymod(bld, name, pysrc)
+    buildpyext(bld, name, version, pysrc, csrc, **kwargs)
 
 def makemodule(glob:dict, **kw):
     u"returns a method for creating cpp modules"
     def build(bld:Context):
-        u"builds a library"
-        src   = bld.path.parent.relpath()
-        args  = dict(kw)
-        name  = glob['APPNAME']
-        csrc  = bld.path.ant_glob('**/*.cpp')
-        pysrc = bld.path.ant_glob('**/*.py')
-        if len(pysrc) == 0 and len(csrc) == 0:
-            return
-
-        if len(pysrc):
-            parent = bld.bldnode.make_node('/'+name)
-            parent.mkdir()
-        else:
-            parent = bld.bldnode
-
-        haspy = len(pysrc)
-        mod   = '_'+name+'_core' if haspy else name
-
-        node  = bld(features = 'subst',
-                    source   = bld.srcnode.find_resource('builder/_module.template'),
-                    target   = name+"module.cpp",
-                    name     = name,
-                    module   = mod,
-                    version  = glob['VERSION'])
-        csrc.append(node.target)
-
-        args.setdefault('source', csrc)
-        args.setdefault('target', str(parent.make_node(mod)))
-        args.setdefault('features', ['pyext'])
-        bld.shlib(**args)
-
-        for item in pysrc:
-            node  = bld(features = 'subst',
-                        source   = item,
-                        target   = parent.make_node(str(src)))
-
+        u"builds a python module"
+        buildpy(bld, glob['APPNAME'], glob['VERSION'], **kw)
     return build
 
 addmissing(locals())
