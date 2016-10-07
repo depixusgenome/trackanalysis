@@ -1,5 +1,5 @@
-#!/usr/bin/env python
-# encoding: utf-8
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 u"All *basic* python related details"
 import subprocess
 import shutil
@@ -118,7 +118,8 @@ def checkpy(bld:Context, items:Sequence):
     u"builds tasks for checking code"
     if len(items) == 0:
         return
-    deps    = list(pymoduledependencies(items) & bld.env.pyextmodules)
+
+    deps = list(pymoduledependencies(items) & bld.env.pyextmodules)
     def _scan(_):
         nodes = [bld.get_tgen_by_name(dep+'pyext').tasks[-1].outputs[0] for dep in deps]
         return (nodes, [])
@@ -126,7 +127,28 @@ def checkpy(bld:Context, items:Sequence):
     plrule  = '${PYLINT} ${SRC} --init-hook="sys.path.append(\'./\')" '
     plrule += '-f text --reports=no'
 
-    rules  = [dict(color       = 'BLUE',
+    def _checkencoding(tsk):
+        headers = '#!/usr/bin/env python3\n', '# -*- coding: utf-8 -*-\n'
+
+        with open(tsk.inputs[0].abspath(), 'r') as stream:
+            errs    = [True]*2
+            try:
+                for i, head in enumerate(headers):
+                    errs[i] = next(stream) != head
+            except IOError as ex:
+                bld.fatal("Could not open file", ex)
+            except StopIteration:
+                pass
+
+        tpl = 'Missing or incorrect header line %d: '
+        msg = '\t- '.join((tpl % i + headers[i])  for i in range(len(errs)) if errs[i])
+        if len(msg):
+            bld.fatal('In file %s:\n\t- ' % tsk.inputs[0].abspath()+msg)
+
+    rules  = [dict(color       = 'CYAN',
+                   rule        = _checkencoding,
+                   cls_keyword = lambda _: 'python headers'),
+              dict(color       = 'BLUE',
                    rule        = '${MYPY} ${SRC} --silent-imports',
                    scan        = _scan,
                    cls_keyword = lambda _: 'MyPy'),
@@ -138,7 +160,7 @@ def checkpy(bld:Context, items:Sequence):
 
     for item in items:
         for kwargs in rules:
-            tsk = bld(source = [item], **kwargs)
+            bld(source = [item], **kwargs)
 
 def copypy(bld:Context, arg, items:Sequence):
     u"copy py modules to build root path"
@@ -154,7 +176,7 @@ def copypy(bld:Context, arg, items:Sequence):
     root = bld.bldnode.make_node('/'+arg) if isinstance(arg, str) else arg
     root.mkdir()
     for item in items:
-        bld(rule = _cpy, source = item, target = root, cls_keyword = _kword)
+        bld(rule = _cpy, source = [item], target = [root], cls_keyword = _kword)
 
 def buildpymod(bld:Context, name:str, pysrc:Sequence):
     u"builds a python module"

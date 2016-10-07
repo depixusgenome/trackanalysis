@@ -1,5 +1,5 @@
-#!/usr/bin/env python
-#encoding: utf-8
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 u"git extraction functions"
 import os
 import subprocess

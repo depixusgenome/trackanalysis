@@ -1,5 +1,5 @@
-#!/usr/bin/env python
-# encoding: utf-8
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 u"Default cpp for waf"
 from ._utils import YES, runall, addmissing, Make
 from waflib  import Utils
