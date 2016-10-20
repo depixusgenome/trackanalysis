@@ -124,8 +124,10 @@ def checkpy(bld:Context, items:Sequence):
         nodes = [bld.get_tgen_by_name(dep+'pyext').tasks[-1].outputs[0] for dep in deps]
         return (nodes, [])
 
-    plrule  = '${PYLINT} ${SRC} --init-hook="sys.path.append(\'./\')" '
-    plrule += '-f text --reports=no'
+    plrule  = ('${PYLINT} ${SRC} '
+               +'--init-hook="sys.path.append(\'./\')" '
+               +'--disable=locally-disabled '
+               +'--reports=no')
 
     def _checkencoding(tsk):
         headers = '#!/usr/bin/env python3\n', '# -*- coding: utf-8 -*-\n'
@@ -176,7 +178,9 @@ def copypy(bld:Context, arg, items:Sequence):
     root = bld.bldnode.make_node('/'+arg) if isinstance(arg, str) else arg
     root.mkdir()
     for item in items:
-        bld(rule = _cpy, source = [item], target = [root], cls_keyword = _kword)
+        tgt = item.abspath().replace('\\', '/')
+        tgt = tgt[tgt.rfind('/'+arg+'/')+2+len(arg):]
+        bld(rule = _cpy, source = [item], target = [root.make_node(tgt)], cls_keyword = _kword)
 
 def buildpymod(bld:Context, name:str, pysrc:Sequence):
     u"builds a python module"

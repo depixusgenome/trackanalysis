@@ -4,14 +4,13 @@ u""" Tests legacy data """
 
 import unittest
 import legacy
+from   testdata import path
 
 class RecordIO(unittest.TestCase):
     u"tests opening a trackfile"
     def test_opentrack_big(self):
         u"test a big track file"
-        path = "../tests/data/test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.trk"
-
-        trk  = legacy.readtrack(path)
+        trk  = legacy.readtrack(path("big_legacy"))
         self.assertEqual(trk['cyclemin'], 3)
         self.assertEqual(trk['cyclemax'], 104)
         self.assertEqual(trk['nphases'],  8)
@@ -24,7 +23,7 @@ class RecordIO(unittest.TestCase):
 
     def test_opentrack_small(self):
         u"test a small track file"
-        trk  = legacy.readtrack("../tests/data/test035_5HPs_mix_GATG_5nM_25C_8sec_with_ramp.trk")
+        trk  = legacy.readtrack(path("small_legacy"))
         self.assertEqual(trk['cyclemin'], 3)
         self.assertEqual(trk['cyclemax'], 3)
         self.assertEqual(trk['nphases'],  8)
