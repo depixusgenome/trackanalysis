@@ -52,7 +52,7 @@ class TrackItems:
         npfcn = lambda item: (item[0], numpy.copy(item[1])) # type: ignore
         if cpy:
             self.actions.append(npfcn)
-        else:
+        elif npfcn in self.actions:
             self.actions.remove(npfcn)
         return self
 

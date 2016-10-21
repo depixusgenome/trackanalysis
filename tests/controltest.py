@@ -190,14 +190,16 @@ class TaskControlTest(unittest.TestCase):
             def __init__(self, **kwargs):
                 tasks.Task.__init__(self, tasks.Level.bead)
                 self.toto = kwargs.get('toto', 1)
-            def _iterate(self, cache, gen):
-                fcn(self, cache)
-                yield from gen
+            def _run(self, args):
+                def _xx(frame):
+                    fcn(self, args.data)
+                    return frame
+                args.apply(_xx)
 
             dum  = type('_DummyTask%d' % ind, (tasks.Task,),
                         dict(__init__ = __init__))
             proc = type('_DummyProcess%d' % ind, (Processor,),
-                        dict(iterate   = _iterate, _tasktype = dum))
+                        dict(run   = _run, tasktype = dum))
             return dum, proc
 
         cnt = [0]
@@ -235,42 +237,47 @@ class TaskControlTest(unittest.TestCase):
         self.assertTrue(len(events['addtask']), 3)
         self.assertEqual(tuple(tuple(ite) for ite in ctrl.tasktree), ((read,dum0,dum1,dum2),))
 
-        ctrl.iterate(read, dum1)
-        self.assertEqual(ctrl.cache(read, dum0), None)
-        self.assertEqual(ctrl.cache(read, dum1), None)
-        self.assertEqual(ctrl.cache(read, dum2), None)
+        self.assertEqual(ctrl.cache(read, dum0)(), None)
+        self.assertEqual(ctrl.cache(read, dum1)(), None)
+        self.assertEqual(ctrl.cache(read, dum2)(), None)
 
-        tuple(ctrl.iterate(read, dum1))
-        self.assertEqual(ctrl.cache(read, dum0), [0])
-        self.assertEqual(ctrl.cache(read, dum1), None)
-        self.assertEqual(ctrl.cache(read, dum2), None)
+        ctrl.run(read, dum1)
+
+        self.assertEqual(ctrl.cache(read, dum0)(), None)
+        self.assertEqual(ctrl.cache(read, dum1)(), None)
+        self.assertEqual(ctrl.cache(read, dum2)(), None)
+
+        tuple(ctrl.run(read, dum1))
+        self.assertEqual(ctrl.cache(read, dum0)(), [0])
+        self.assertEqual(ctrl.cache(read, dum1)(), None)
+        self.assertEqual(ctrl.cache(read, dum2)(), None)
 
         cnt[0] = 1
-        tuple(ctrl.iterate(read, dum2))
-        self.assertEqual(ctrl.cache(read, dum0), [0])
-        self.assertEqual(ctrl.cache(read, dum1), None)
-        self.assertEqual(ctrl.cache(read, dum2), [1])
+        tuple(ctrl.run(read, dum2))
+        self.assertEqual(ctrl.cache(read, dum0)(), [0])
+        self.assertEqual(ctrl.cache(read, dum1)(), None)
+        self.assertEqual(ctrl.cache(read, dum2)(), [1])
 
         cnt[0] = 2
-        tuple(ctrl.iterate(read, dum2))
-        self.assertEqual(ctrl.cache(read, dum0), [0])
-        self.assertEqual(ctrl.cache(read, dum1), None)
-        self.assertEqual(ctrl.cache(read, dum2), [2])
+        tuple(ctrl.run(read, dum2))
+        self.assertEqual(ctrl.cache(read, dum0)(), [0])
+        self.assertEqual(ctrl.cache(read, dum1)(), None)
+        self.assertEqual(ctrl.cache(read, dum2)(), [2])
 
         ctrl.updateTask(read, dum1, toto = 2)
         self.assertTrue(len(events['updatetask']), 1)
         self.assertTrue(dum1.toto, 2)
-        self.assertEqual(ctrl.cache(read, dum0), [0])
-        self.assertEqual(ctrl.cache(read, dum1), None)
-        self.assertEqual(ctrl.cache(read, dum2), None)
+        self.assertEqual(ctrl.cache(read, dum0)(), [0])
+        self.assertEqual(ctrl.cache(read, dum1)(), None)
+        self.assertEqual(ctrl.cache(read, dum2)(), None)
 
-        tuple(ctrl.iterate(read, dum2))
-        self.assertEqual(ctrl.cache(read, dum2), [2])
+        tuple(ctrl.run(read, dum2))
+        self.assertEqual(ctrl.cache(read, dum2)(), [2])
 
         ctrl.removeTask(read, dum1)
         self.assertTrue(len(events['removetask']), 1)
         self.assertEqual(tuple(tuple(ite) for ite in ctrl.tasktree), ((read,dum0,dum2),))
-        self.assertEqual(ctrl.cache(read, dum2), None)
+        self.assertEqual(ctrl.cache(read, dum2)(), None)
 
         ctrl.closeTrack(read)
         self.assertTrue(len(events['closetrack']), 1)

@@ -25,6 +25,7 @@ def _version():
 class CacheItem:
     u"Holds cache and its version"
     __slots__ = ('_proc', '_cache')
+    _VERSION  = _version()
     def __init__(self, proc):
         self._proc    = proc         # type: Processor
         self._cache   = (0, None)    # type: Tuple[int,Any]
@@ -52,7 +53,6 @@ class CacheItem:
                 self.setCache(cache, nvers)
         return cache
 
-    _VERSION = _version()
     def setCache(self, cache, version = None):
         u"Sets the cache and its version"
         if version is None:
@@ -66,10 +66,86 @@ class CacheItem:
 
     def getCache(self):
         u"Delayed access to the cache"
-        return self._getCache(self._version[0])
+        return self._getCache(self._cache[0])
 
     cache   = property(lambda self: self.getCache, setCache)
     proc    = property(lambda self: self._proc)
+
+class RunArgs:
+    u"Arguments used for iterating"
+    __slots__ = ('data', 'level', 'gen')
+    def __init__(self, data):
+        self.data  = data    # type: TrackData
+        self.gen   = None    # type: Optional[TrackItems]
+        self.level = 0
+
+    def tolevel(self, proc):
+        u"Changes a generator to fit the processor's level"
+        if proc is None:
+            return
+
+        old  = self.level
+        curr = proc.task.level.value
+        gen  = self.gen
+
+        if gen is None:
+            return
+
+        def collapse(gen):
+            u"""
+            Collapses items from *gen* into a series of *TrackItem*s
+            each of which contain sequential items with similar parents
+            """
+            keyfcn = lambda i: i.parents
+            yield from (TrackItems(data    = {fra.parents: fra for fra in grp},
+                                   parents = key[:-1])
+                        for key, grp in groupby(gen, key = keyfcn))
+
+        def burst(gen):
+            u"Transforms *gen* into *TrackItem*s, one per item in gen"
+            yield from (TrackItems(data    = {key: frame},
+                                   parents = frame.parents+(key,))
+                        for frame in gen for key in frame)
+
+        while old is not curr:
+            gen  = collapse(gen) if old < curr else burst(gen)
+            old += 1             if old < curr else -1
+
+        self.gen   = gen
+        self.level = curr
+
+    @classmethod
+    def checkClosure(cls, fcn):
+        u"""
+        We want the closure to be frozen.
+
+        In this way, changing the task after implementing the iteration
+        should have no effect.
+        """
+        closure = getattr(fcn, '__closure__', None)
+        if closure is None:
+            return
+
+        for cell in closure:
+            if isinstance(cell.cell_contents, Task):
+                raise MemoryError("No including the task itself in the closure!")
+            cls.checkClosure(cell.cell_contents)
+
+    def apply(self, fcn, *_, level = None):
+        u"Applies a function to generator's output"
+        self.tolevel(level)
+        if fcn is None:
+            pass
+        elif hasattr(fcn, '__iter__'):
+            self.gen = fcn
+        elif callable(fcn):
+            self.checkClosure(fcn)
+            gen      = self.gen
+            self.gen = iter(fcn(frame) for frame in gen)
+        else:
+            raise NotImplementedError("What to do with " + str(fcn) + "?")
+
+    first = property(lambda self: self.data.first)
 
 class TrackData:
     u"Contains the track and task-created data"
@@ -95,68 +171,12 @@ class TrackData:
         u"returns the data from the last task"
         return self._order[self.index(tsk)].getCache()
 
-    class RunArgs:
-        u"Arguments used for iterating"
-        __slots__ = ('data', 'level', 'gen')
-        def __init__(self, data):
-            self.data  = data    # type: TrackData
-            self.gen   = None    # type: Optional[TrackItems]
-            self.level = 0
-
-        def tolevel(self, proc):
-            u"Changes a generator to fit the processor's level"
-            if proc is None:
-                return
-
-            old  = self.level
-            curr = proc.task.level.value
-            gen  = self.gen
-
-            if gen is None:
-                return
-
-            def collapse(gen):
-                u"""
-                Collapses items from *gen* into a series of *TrackItem*s
-                each of which contain sequential items with similar parents
-                """
-                keyfcn = lambda i: i.parents
-                yield from (TrackItems(data    = {fra.parents: fra for fra in grp},
-                                       parents = key[:-1])
-                            for key, grp in groupby(gen, key = keyfcn))
-
-            def burst(gen):
-                u"Transforms *gen* into *TrackItem*s, one per item in gen"
-                yield from (TrackItems(data    = {key: frame},
-                                       parents = frame.parents+(key,))
-                            for frame in gen for key in frame)
-
-            while old is not curr:
-                gen  = collapse(gen) if old < curr else burst(gen)
-                old += 1             if old < curr else -1
-
-            self.gen   = gen
-            self.level = curr
-
-        def apply(self, fcn, *_, level = None):
-            u"Applies a function to generator's output"
-            self.tolevel(level)
-            if fcn is None:
-                pass
-            elif hasattr(fcn, '__iter__'):
-                self.gen = fcn
-            else:
-                self.gen = iter(fcn(frame) for frame in self.gen)
-
-        first = property(lambda self: self.data.first)
-
-
     def run(self, tsk = None):
         u"""
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
         """
-        args = self.RunArgs(self)
+        args = RunArgs(self)
         ind  = len(self._order) if tsk is None else self.index(tsk)+1
 
         for item in self._order[:ind]:
@@ -290,12 +310,12 @@ class TaskControler(Controler):
         u"Returns the cache for a given task"
         return self._items[parent].data.getCache(tsk)
 
-    def iterate(self, parent:TrackReaderTask, tsk:Optional[Task]):
+    def run(self, parent:TrackReaderTask, tsk:Optional[Task]):
         u"""
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
         """
-        return self._items[parent].data.iterate(tsk)
+        return self._items[parent].data.run(tsk)
 
     @Controler.emit(returns = Controler.outasdict)
     def openTrack(self, task:TrackReaderTask, model = tuple()):
@@ -353,6 +373,6 @@ class TaskControler(Controler):
         if processor is None:
             processor = Processor
 
-        cls._PROCESSORS[processor.tasktype()] = processor
+        cls._PROCESSORS[processor.tasktype] = processor
         for sclass in processor.__subclasses__():
             cls.register(sclass)

@@ -2,94 +2,118 @@
 # -*- coding: utf-8 -*-
 u"Processors apply tasks to a data flow"
 from abc            import ABCMeta, abstractmethod
-from typing         import (Optional, Iterator, Iterable, # pylint: disable=unused-import
-                            Tuple, Any)
+from typing         import (Optional, Iterator, # pylint: disable=unused-import
+                            Tuple, Iterable, Any)
+from functools      import wraps
 
 from model.task     import Task, TrackReaderTask, CycleCreatorTask, TaggingTask
 from data           import Track, Cycles
 from .lazy          import LazyDict
-from .taskcontrol   import TrackData
+from .taskcontrol   import RunArgs
 
-class Processor(metaclass=ABCMeta):
+_PROTECTED = 'tasktype',
+class ProtectedDict(dict):
+    u"Dictionary with read-only keys"
+    def __setitem__(self, key, val):
+        if key in _PROTECTED and key in self:
+            raise KeyError('"{}" is read-only'.format(key))
+        else:
+            super().__setitem__(key, val)
+
+    def __delitem__(self, key):
+        if key in _PROTECTED:
+            raise KeyError('"{}" is read-only'.format(key))
+        else:
+            super().__delitem__(key)
+
+class MetaProcessor(ABCMeta):
+    u"Protects attribute tasktype"
+    def __new__(mcs, name, bases, nspace):
+        if 'tasktype' not in nspace:
+            raise AttributeError('"tasktype" must be defined')
+        return super().__new__(mcs, name, bases, nspace)
+
+    @staticmethod
+    def __prepare__(*_):
+        return ProtectedDict()
+
+    def __setattr__(cls, key, value):
+        if key in _PROTECTED:
+            raise AttributeError('"{}" is read-only'.format(key))
+        super().__setattr__(key, value)
+
+class Processor(metaclass=MetaProcessor):
     u"""
     Main class for processing tasks
     """
-    _tasktype = Task # type: type
+    tasktype = Task # type: type
     def __init__(self, task: Task) -> None:
+        if not isinstance(task, self.tasktype):
+            raise TypeError('"task" must have type "tasktype"')
         self.task = task
 
     @abstractmethod
-    def run(self, args:TrackData.RunArgs):
+    def run(self, args:RunArgs):
         u"iterates over possible data"
 
-    @classmethod
-    def tasktype(cls):
-        u"returns the task type for this processor"
-        return cls._tasktype
+    @staticmethod
+    def cache(fcn):
+        u"Caches actions "
+        @wraps(fcn)
+        def _run(self, args:RunArgs):
+            cache = args.data.setCacheDefault(self, dict())
 
-class CacheMixin:
-    u"""
-    Cached version of a processor.
-    """
-    def run(self, args:TrackData.RunArgs):
-        u"Iterates through the generator, caching the data"
-        # creates an access to a cache which is possibly internal to the generator
-        cache = args.data.setCacheDefault(self, dict())
-        def _cache(frame):
-            frameact  = frame.getaction()
-            if frameact is None:
-                raise IndexError("Nothing to cache! Set an action prior to mixin")
+            def _cache(frame):
+                frameact  = frame.getaction()
+                if frameact is None:
+                    raise IndexError("Nothing to cache! Set an action prior to mixin")
 
-            dico   = cache.setdefault(frame.parents, LazyDict())
-            cached = lambda item: dico.setdefault(item[0], lambda: frameact(item))
-            frame.withaction(cached, clear = True)
+                dico   = cache.setdefault(frame.parents, LazyDict())
+                cached = lambda item: dico.setdefault(item[0], lambda: frameact(item))
+                frame.withaction(cached, clear = True)
 
-        args.apply(_cache)
+            fcn(self, args)
+            args.apply(_cache)
+        return _run
 
-class ActionMixin:
-    u"""
-    To be used for a task which simply adds an action
-    """
-    def __init__(self, action):
-        self.action = action
-
-    def run(self, args:TrackData.RunArgs):
-        u"Iterates through the generator, caching the data"
-        action = self.action
-        args.apply(lambda frame: frame.withaction(action))
+    @staticmethod
+    def action(fcn):
+        u"Adds an action to the currently yielded TrackItems"
+        @wraps(fcn)
+        def _run(self, args:RunArgs):
+            act = fcn(self, args)
+            args.apply(lambda frame: frame.withaction(act))
+        return _run
 
 class TrackReaderProcessor(Processor):
     u"Generates output from a CycleCreatorTask"
-    _tasktype = TrackReaderTask
+    tasktype = TrackReaderTask
 
-    def run(self, args:TrackData.RunArgs):
+    def run(self, args:RunArgs):
         u"returns a dask delayed item"
-        res        = args.data.setCacheDefault(self, Track(path = self.task.path))
+        res = args.data.setCacheDefault(self, Track(path = self.task.path))
         args.apply((res.beads,), level = self)
 
 class CycleCreatorProcessor(Processor):
     u"Generates output from a CycleCreatorTask"
-    _tasktype = CycleCreatorTask
+    tasktype = CycleCreatorTask
 
-    def run(self, args:TrackData.RunArgs):
+    def run(self, args:RunArgs):
         u"iterates through beads and yields cycles"
-        task  = self.task
-        track = args.first
-        args.apply(lambda frame:Cycles(track = track,
-                                       data  = frame,
-                                       first = task.first,
-                                       last  = task.last),
-                   level = self)
+        kwargs = dict(track = args.first,
+                      first = self.task.first,
+                      last  = self.task.last)
+        args.apply(lambda data: Cycles(data = data, **kwargs), level = self)
 
 class SelectionProcessor(Processor):
     u"Generates output from a TaggingTask"
-    _tasktype = TaggingTask
+    tasktype = TaggingTask
 
-    def run(self, args:TrackData.RunArgs):
+    def run(self, args:RunArgs):
         u"iterates through beads and yields accepted items"
         elems = tuple(self.task.selection)
-        if   self.task.action is self.tasktype().keep:
+        if   self.task.action is self.tasktype.keep:
             args.apply(lambda frame: frame.selecting(elems))
 
-        elif self.task.action is self.tasktype().remove:
+        elif self.task.action is self.tasktype.remove:
             args.apply(lambda frame: frame.discarding(elems))
