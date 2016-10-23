@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Task controler"
+u"""
+Task controler.
+
+The controler stores:
+    - lists of tasks (TaskPair.model),
+    - their associated processors and cache (TaskPair.data).
+
+It can add/delete/update tasks, emitting the corresponding events
+"""
 from typing         import (Union, Iterator, Tuple, # pylint: disable=unused-import
-                            Optional, Any)
+                            Optional, Any, List)
 
 from model.task     import Task, TrackReaderTask, TaskIsUniqueError
 from .event         import Controler, NoEmission
@@ -12,7 +20,7 @@ class TaskPair:
     u"data and model for tasks"
     __slots__ = ('model', 'data')
     def __init__(self):
-        self.model = []
+        self.model = []         # type: List[Task]
         self.data  = Cache()
 
     def task(self, task:Union[Task,int,type], noemission = False) -> Task:
@@ -78,11 +86,11 @@ class TaskControler(Controler):
     @property
     def tasktree(self) -> 'Iterator[Iterator[Task]]':
         u"Returns a data object in memory."
-        yield from (iter(ite.model for ite in self._items.values()))
+        return iter(self.tasks(tsk) for tsk in self._items.keys())
 
     def tasks(self, task:TrackReaderTask) -> 'Iterator[Task]':
         u"Returns a data object in memory."
-        return iter(self._items[task].model)
+        return iter(tsk for tsk in self._items[task].model)
 
     def cache(self, parent:TrackReaderTask, tsk:Optional[Task]):
         u"Returns the cache for a given task"
