@@ -4,4 +4,4 @@ u"""
 Base track file data.
 """
 from .track      import Track
-from .trackitems import Beads, Cycles, TrackItems
+from .trackitems import Beads, Cycles, TrackItems, createTrackItem

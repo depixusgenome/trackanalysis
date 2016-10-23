@@ -97,3 +97,7 @@ class LazyDict:
     def __setitem__(self, key, val) -> None:
         u"as for dict"
         self._data[key] = LazyInstanciator(val)
+
+    def __len__(self) -> int:
+        u"as for dict"
+        return len(self._data)

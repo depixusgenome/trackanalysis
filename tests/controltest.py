@@ -3,13 +3,16 @@
 u"Test control"
 # pylint: disable=import-error
 import  unittest
+import  numpy
 from    control.lazy            import LazyInstError, LazyInstanciator, LazyDict
 from    control.event           import Event, EmitPolicy
 from    control.taskcontrol     import TaskControler
-from    control.processor       import Processor
+from    control.processor       import Processor, Cache, Runner
+from    data                    import Cycles, Beads, TrackItems
 import  model.task           as tasks
 
 from    testdata import path
+
 
 class LazyTest(unittest.TestCase):
     u"test lazy stuff"
@@ -182,22 +185,22 @@ class EventTest(unittest.TestCase):
 
 class TaskControlTest(unittest.TestCase):
     u"testing task control"
-    def test_tasks(self):
+    def test_taskmutations(self):
         u"testing task control"
         # pylint: disable=unused-variable, too-many-locals,invalid-name
         # pylint: disable=too-many-statements
         def _make(ind, fcn):
             def __init__(self, **kwargs):
-                tasks.Task.__init__(self, tasks.Level.bead)
+                tasks.Task.__init__(self, level = tasks.Level.bead)
                 self.toto = kwargs.get('toto', 1)
             def _run(self, args):
                 def _xx(frame):
                     fcn(self, args.data)
                     return frame
-                args.apply(_xx)
+                args.gen = iter(_xx(frame) for frame in args.gen)
 
             dum  = type('_DummyTask%d' % ind, (tasks.Task,),
-                        dict(__init__ = __init__))
+                        dict(__init__ = __init__, level = tasks.Level.bead))
             proc = type('_DummyProcess%d' % ind, (Processor,),
                         dict(run   = _run, tasktype = dum))
             return dum, proc
@@ -282,6 +285,142 @@ class TaskControlTest(unittest.TestCase):
         ctrl.closeTrack(read)
         self.assertTrue(len(events['closetrack']), 1)
         self.assertEqual(tuple(tuple(ite) for ite in ctrl.tasktree), tuple())
+
+    def test_closure(self):
+        u"testing that closures don't include too many side-effects"
+        # pylint: disable=unused-variable, too-many-locals,invalid-name
+        # pylint: disable=too-many-statements,missing-docstring,no-self-use
+        class TCycles1(tasks.Task):
+            level = tasks.Level.cycle
+
+        class TC1Proc(Processor):
+            tasktype = TCycles1
+            @Processor.action
+            def run(self, _):
+                return lambda x: x
+
+        def _testClosure(task):
+            good = []
+            try:
+                Runner.checkClosure(lambda x: (task, x)[1])
+            except MemoryError:
+                good += [1]
+            try:
+                Runner.checkClosure(lambda x: (lambda: task, x)[1])
+            except MemoryError:
+                good += [2]
+
+            try:
+                Runner.checkClosure(lambda x, y = task: x)
+            except MemoryError:
+                good += [3]
+
+            try:
+                Runner.checkClosure(lambda x: (lambda z=task:None,x)[1])
+            except MemoryError:
+                good += [4]
+
+            self.assertEqual(good, [1,2,3,4])
+
+        for task in (TCycles1(), Cache(), TC1Proc(TCycles1())):
+            _testClosure(task)
+
+    def test_cache(self):
+        u"Tests that actions can be cached"
+        # pylint: disable=unused-variable, too-many-locals,invalid-name
+        # pylint: disable=too-many-statements,missing-docstring,no-self-use
+        class TBeads(tasks.Task):
+            level = tasks.Level.bead
+            def __init__(self):
+                super().__init__()
+                self.dummy = None
+
+        calls = []
+        class TBProc(Processor):
+            tasktype = TBeads
+            @Processor.cache
+            def run(self, _):
+                def _outp(x):
+                    calls.append(1)
+                    return x
+                return _outp
+
+        ctrl = TaskControler()
+        read = tasks.TrackReaderTask(path = path("small_legacy"))
+        tb   = TBeads()
+        ctrl.openTrack(read, (read, tb))
+
+        self.assertTrue(ctrl.cache(read, tb)() is None)
+        ctrl.run(read, tb)
+        dt = ctrl.cache(read, tb)()
+        self.assertFalse(dt is None)
+        self.assertEqual(len(dt), 0)
+
+        tuple(ctrl.run(read, tb))
+        self.assertEqual(len(dt), 1)
+        self.assertEqual(len(next(iter(dt.values()))), 0)
+
+        tuple(bead for frame in ctrl.run(read, tb) for bead in frame)
+        sz = len(calls)
+        self.assertEqual(len(next(iter(dt.values()))), sz)
+
+        tuple(ctrl.run(read, tb))
+        self.assertEqual(len(calls), sz)
+
+        ctrl.updateTask(read, tb, dummy = 1)
+        self.assertTrue(ctrl.cache(read, tb)() is None)
+        v1 = next(iter(next(ctrl.run(read, tb))))[1]
+        v2 = next(iter(ctrl.run(read, read)[0]))[1]
+        dt = ctrl.cache(read, tb)()
+        self.assertEqual(len(dt), 1)
+        self.assertEqual(len(next(iter(dt.values()))), 1)
+        self.assertTrue(numpy.array_equal(v1, v2))
+        self.assertFalse(v1 is v2)
+
+    def test_expandandcollapse(self):
+        u"Tests expanding/collapsing a generator one level"
+        # pylint: disable=unused-variable, too-many-locals,invalid-name
+        # pylint: disable=too-many-statements,missing-docstring,no-self-use
+        class TBeads(tasks.Task):
+            level = tasks.Level.bead
+        class TCycle(tasks.Task):
+            levelin = tasks.Level.cycle
+            levelou = tasks.Level.cycle
+
+        class TBProc(Processor):
+            tasktype = TBeads
+            def run(self, args):
+                args.apply(None, levels = self.levels)
+
+        class TCProc(Processor):
+            tasktype = TCycle
+            def run(self, args):
+                args.apply(None, levels = self.levels)
+
+        ctrl = TaskControler()
+        read = tasks.TrackReaderTask(path = path("small_pickle"))
+        tb   = TBeads()
+        tc   = TCycle()
+        ctrl.openTrack(read, (read, tc, tb))
+
+        frames = tuple(ctrl.run(read,read))
+        self.assertEqual(frozenset(type(fra) for fra in frames), frozenset((Beads,)))
+        keys  = tuple(key for frame in frames for key, _ in frame)
+        self.assertEqual(keys, tuple(range(74)))
+
+        frames = tuple(ctrl.run(read,tc))
+        self.assertEqual(frozenset(type(fra) for fra in frames), frozenset((Cycles,)))
+
+        keys  = tuple(key for frame in frames for key, _ in frame)
+        truth = tuple((bead, cyc) for bead in range(74) for cyc in range(15))
+        self.assertEqual(keys, truth)
+
+        frames = tuple(frame for frame in ctrl.run(read, tb))
+        self.assertEqual(frozenset(type(fra) for fra in frames), frozenset((TrackItems,)))
+        keys  = tuple(key for frame in frames for key, _ in frame)
+        self.assertEqual(keys, tuple(range(74)))
+        self.assertEqual(type(frames[0][0]),    numpy.ndarray)
+        self.assertEqual(type(frames[0][0][0]), Cycles)
 
 if __name__ == '__main__':
     unittest.main()

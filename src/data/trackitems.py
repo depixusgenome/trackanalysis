@@ -2,15 +2,15 @@
 # -*- coding: utf-8 -*-
 u"Adds easy access to cycles and events"
 from    types      import LambdaType, MethodType, FunctionType, GeneratorType
-from    typing     import Optional, Tuple, Union, Any # pylint: disable=unused-import
-from    typing     import List, Sequence, Iterable    # pylint: disable=unused-import
-from    typing     import Iterator                    # pylint: disable=unused-import
+from    typing     import (Optional, Tuple, Union, # pylint: disable=unused-import
+                           Any, List, Sequence, Iterable, Iterator)
+from    abc        import ABCMeta, abstractmethod
 from    copy       import copy as shallowcopy
 from    functools  import wraps
 
 import  numpy      # type: ignore
 
-from    model      import levelprop, Level
+from    model      import Level
 
 def setfield(fcn):
     u"provides a setter return self"
@@ -25,8 +25,23 @@ def isfunction(fcn) -> bool:
     u"Returns whether the object is a function"
     return isinstance(fcn, (LambdaType, FunctionType, MethodType))
 
-class TrackItems:
+class Items(metaclass=ABCMeta):
+    u"Class for iterating over data"
+    @abstractmethod
+    def __iter__(self) -> 'Iterator[Tuple[Any,Any]]':
+        u"iterates over keys and data"
+
+    @abstractmethod
+    def __getitem__(self, val):
+        u"can return one item or a copy of self with only the selected keys"
+
+    @abstractmethod
+    def keys(self):
+        u"iterates over keys"
+
+class TrackItems(Items):
     u"Class for iterating over beads or creating a new list of data"
+    level = Level.none
     def __init__(self, **kw) -> None:
         self.track     = kw.get('track',    None)   # type: ignore
         self.data      = kw.get('data',     None)   # type: Optional[Dict]
@@ -35,11 +50,16 @@ class TrackItems:
         self.actions   = kw.get('actions',  [])     # type: List
         self.parents   = kw.get('parents',  tuple())
 
-        self.withdata  (self.data)
-        self.selecting (kw.get('selected',   None))
+        self.withdata   (self.data)
+        self.selecting  (kw.get('selected',  None))
         self.discarding (kw.get('discarded', None))
         self.withcopy   (kw.get('copy',      False))
         self.withsamples(kw.get('samples',   None))
+
+    @staticmethod
+    def copy(item):
+        u"Copies the data"
+        return item[0], numpy.copy(item[1]) # type: ignore
 
     def withsamples(self, samples) -> 'TrackItems':
         u"specifies that only some samples should be taken"
@@ -49,11 +69,10 @@ class TrackItems:
 
     def withcopy(self, cpy:bool) -> 'TrackItems':
         u"specifies that a copy of the data should or shouldn't be made"
-        npfcn = lambda item: (item[0], numpy.copy(item[1])) # type: ignore
         if cpy:
-            self.actions.append(npfcn)
-        elif npfcn in self.actions:
-            self.actions.remove(npfcn)
+            self.actions.append(self.copy)
+        elif self.copy in self.actions:
+            self.actions.remove(self.copy)
         return self
 
     def withaction(self, fcn, clear = False) -> 'TrackItems':
@@ -91,7 +110,7 @@ class TrackItems:
         if getattr(self, attr) is None:
             setattr(self, attr, [])
 
-        if isinstance(cyc, int) or isfunction(cyc):
+        if isinstance(cyc, (int, tuple)) or isfunction(cyc):
             getattr(self, attr).append(cyc)
         else:
             getattr(self, attr).extend(cyc)
@@ -150,13 +169,15 @@ class TrackItems:
             yield from (act(col) for col in self._iter())
 
     def __getitem__(self, keys):
-        self._unlazyfy()
+        cpy = shallowcopy(self)
         if isinstance(keys, slice):
-            return shallowcopy(self).withsamples(keys)
-        elif isinstance(keys, (list, GeneratorType)):
-            return shallowcopy(self).selecting(keys, clear = True)
+            return cpy.withsamples(keys)
         else:
-            return next(shallowcopy(self).selecting(keys, clear = True))[1]
+            item = cpy.selecting(keys, clear = True)
+            if isinstance(keys, (list, GeneratorType)):
+                return item
+            else:
+                return next(iter(item))[1]
 
     def _keys(self, sel:'Optional[Sequence]') -> 'Iterable':
         if sel is None:
@@ -168,8 +189,7 @@ class TrackItems:
     def _iter(self) -> 'Iterator[Tuple[Any,Any]]':
         yield from ((bead, self.data[bead]) for bead in self.keys())
 
-@levelprop(Level.track)
-class Beads(TrackItems):
+class Beads(TrackItems, Items):
     u"""
     Class for iterating over beads:
 
@@ -177,6 +197,7 @@ class Beads(TrackItems):
 
     * providing names or ids: selects only those columns
     """
+    level = Level.bead
     def _keys(self, sel):
         if sel is None:
             isbead = self.track.isbeadname
@@ -187,8 +208,7 @@ class Beads(TrackItems):
     def _iter(self):
         yield from ((bead, self.data[bead]) for bead in self.keys())
 
-@levelprop(Level.bead)
-class Cycles(TrackItems):
+class Cycles(TrackItems, Items):
     u"""
     Class for iterating selected cycles:
 
@@ -199,6 +219,7 @@ class Cycles(TrackItems):
 
     * providing with a unique cycle id will extract all columns for that cycle
     """
+    level = Level.cycle
     def __init__(self, **kw) -> None:
         super().__init__(**kw)
         self.first = kw.get('first', None)   # type: Optional[int]
@@ -255,10 +276,17 @@ class Cycles(TrackItems):
         def _getdata(bid:int, cid:int):
             ind1 = phaseid(cid, first)
             if last == nphases:
-                ind2 = None if cid >= ncycles else phaseid(cid+1, 0)
+                if cid+1 >= ncycles:
+                    return self.name(bid, cid), self.data[bid][ind1:]
+
+                ind2 = phaseid(cid+1, 0)
             else:
                 ind2 = phaseid(cid, last)
 
             return self.name(bid, cid), self.data[bid][ind1:ind2]
 
         yield from (_getdata(bid, cid) for bid, cid in self.keys())
+
+def createTrackItem(level:Optional[Level] = Level.none, **kwargs):
+    u"Returns the item type associated to a level"
+    return next(opt for opt in Items.__subclasses__() if level is opt.level)(**kwargs)

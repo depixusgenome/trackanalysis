@@ -8,12 +8,11 @@ from enum   import Enum, unique
 @unique
 class Level(Enum):
     u"Class containing configuration infos for a task"
-    base    = 0
-    project = 100
-    track   = 200
-    bead    = 300
-    cycle   = 400
-    event   = 500
+    project = 0
+    bead    = 1
+    cycle   = 2
+    event   = 3
+    none    = None # type: ignore
 
 def levelprop(val):
     u"Adds a read-only property"
