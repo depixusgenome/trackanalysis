@@ -1,13 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"List of processes and cache"
-from types          import LambdaType, FunctionType, MethodType
-
 from .base          import Processor # pylint: disable=unused-import
-
-def isfunction(fcn) -> bool:
-    u"Returns whether the object is a function"
-    return isinstance(fcn, (LambdaType, FunctionType, MethodType))
+from utils          import isfunction
 
 def _version():
     i = 0
