@@ -41,14 +41,9 @@ def _tk_run(locs:dict, dialog:'Callable'):
     _parse_filetypes(info)
     _parse_extension(info)
 
-    fcn = info.pop('fcn', None)
-
     _Tk().withdraw()
     ret = dialog(**info)
-    if ret is not None and fcn is not None:
-        return fcn(ret)
-    else:
-        return ret
+    return None if ret is None or len(ret) == 0 else ret
 
 # pylint: disable=unused-argument,too-many-arguments
 def openfile(defaultextension = None,
@@ -57,7 +52,6 @@ def openfile(defaultextension = None,
              initialfile      = None,
              multiple         = None,
              title            = None,
-             fcn              = None
             ):
     u"""
     returns a filepath to be opened.
@@ -75,7 +69,6 @@ def savefile(defaultextension = None,
              initialdir       = None,
              initialfile      = None,
              title            = None,
-             fcn              = None
             ):
     u"""
     returns a filepath to be saved.

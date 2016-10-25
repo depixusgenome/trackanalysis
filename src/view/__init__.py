@@ -6,15 +6,11 @@ from control.event  import Controler    # pylint: disable=unused-import
 
 class View:
     u"Classes to be passed a controler"
-    MainControl = type(None)
-    def mainInit(self):
-        u"creates the views and the session specific controler"
-        super().init()
-        ctrl = self.__class__.MainControl() # py
-        if ctrl is None:
-            return
+    def __init__(self):
+        self._ctrl = None # type: Optional[Controler]
 
-        setattr(self, '_ctrl', ctrl)
+    def setCtrl(self, ctrl:Controler):
+        u"Sets up the controler"
         children = [self]
         while len(children):
             cur = children.pop()

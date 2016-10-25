@@ -7,21 +7,23 @@ from flexx              import ui
 from .                  import View
 from .dialog            import openfile, savefile
 
-class  MenuBar(View, ui.Widget):
+class  MenuBar(ui.Widget, View):
     u"Menu bar"
     def init(self):
         u"initializes gui"
-        with ui.VBox():
-            ui.Button(text = 'open').connect('mouse_down', self._doload)
-            ui.Button(text = 'save').connect('mouse_down', self._dosave)
+        def _onOpen(*_):
+            path = openfile(filetypes = u'trk|*')
+            if path is not None:
+                self._ctrl.openTrack(path)
 
-    def _doopen(self):
-        path = openfile(filetypes = u'trk|*')
-        if path is not None:
-            self.ctrl.openTrack(path)
+        def _onSave(*_):
+            fname = savefile(filetypes = u'ana|*')
+            if fname is not None:
+                raise NotImplementedError("Yet to define an analysis IO")
 
-    @staticmethod
-    def _dosave():
-        fname = savefile(filetypes = u'ana|*')
-        if fname is not None:
-            raise NotImplementedError("Yet to define an analysis IO")
+        with ui.VBox(flex = 0):
+            with ui.HBox(flex = 0):
+                ui.Button(text = u'open', flex=0).connect('mouse_down', _onOpen)
+                ui.Button(text = u'save', flex=0).connect('mouse_down', _onSave)
+                ui.Widget(flex = 1)
+            ui.Widget(flex = 1)

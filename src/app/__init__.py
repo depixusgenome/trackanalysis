@@ -8,8 +8,14 @@ from view           import View
 
 def mainview(view, controls):
     u"Creates a main view"
-    return type(view.__name__, (view,),
-                dict(MainControl = type('MainControl', controls, dict())))
+    class Main(view):
+        u"The main view"
+        MainControl = type('MainControl', controls, dict())
+        def init(self):
+            u"sets up the controler, then initializes the view"
+            super().init()
+            self.setCtrl(self.MainControl())
+    return Main
 
 def setup(locs,
           defaultview     = None,
@@ -19,7 +25,7 @@ def setup(locs,
 
     if defaultcontrols is all:
         defaultcontrols = tuple(cls for cls in locs.values()
-                                if issubclass(cls, Controler))
+                                if isinstance(cls, type) and issubclass(cls, Controler))
     def serve(view = defaultview, *controls):
         u"Creates a browser app"
         if len(controls) == 0:
@@ -34,5 +40,6 @@ def setup(locs,
 
     locs.setdefault('serve',  serve)
     locs.setdefault('launch', launch)
+    locs.setdefault('start',  app.start)
 
 setup(locals())
