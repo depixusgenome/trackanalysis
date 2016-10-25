@@ -105,8 +105,11 @@ class TaskControler(Controler):
         return _runprocessors(self._items[parent].data, tsk)
 
     @Controler.emit(returns = Controler.outasdict)
-    def openTrack(self, task:TrackReaderTask, model = tuple()):
+    def openTrack(self, task: 'Union[str,TrackReaderTask]', model = tuple()):
         u"opens a new file"
+        if isinstance(task, str):
+            task = TrackReaderTask(path = task)
+
         pair  = TaskPair()
         tasks = (model if len(model) else (task,))
         for other in tasks:
