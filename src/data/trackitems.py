@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Adds easy access to cycles and events"
-from    types      import LambdaType, MethodType, FunctionType, GeneratorType
-from    typing     import (Optional, Tuple, Union, # pylint: disable=unused-import
-                           Any, List, Sequence, Iterable, Iterator)
-from    abc        import ABCMeta, abstractmethod
-from    copy       import copy as shallowcopy
-from    functools  import wraps
+from    types       import  GeneratorType
+from    typing      import (Optional, Tuple, Union, # pylint: disable=unused-import
+                            Any, List, Sequence, Iterable, Iterator)
+from    abc         import ABCMeta, abstractmethod
+from    copy        import copy as shallowcopy
+from    functools   import wraps
+import  numpy                           # type: ignore
 
-import  numpy      # type: ignore
-
-from    model      import Level
+from    utils       import isfunction
+from    model       import Level
 
 def setfield(fcn):
     u"provides a setter return self"
@@ -20,10 +20,6 @@ def setfield(fcn):
         setattr(self, name, item)
         return self
     return _wrap
-
-def isfunction(fcn) -> bool:
-    u"Returns whether the object is a function"
-    return isinstance(fcn, (LambdaType, FunctionType, MethodType))
 
 class Items(metaclass=ABCMeta):
     u"Class for iterating over data"

@@ -72,6 +72,7 @@ class TaskPair:
 class TaskControler(Controler):
     u"Data controler class"
     def __init__(self):
+        super().__init__()
         self._items      = dict() # type: Dict[TrackReaderTask, TaskPair]
         self._processors = dict() # type: Dict[Task,Any]
         self.register()
