@@ -80,7 +80,9 @@ def configure(cnf:Context):
     cnf.check_python_version((3,5))
     cnf.check_python_headers()
     cnf.find_program("mypy",   var = "MYPY")
+
     cnf.find_program("pylint", var = "PYLINT")
+
 
 def pymoduledependencies(pysrc):
     u"detects dependencies"
@@ -124,11 +126,6 @@ def checkpy(bld:Context, items:Sequence):
         nodes = [bld.get_tgen_by_name(dep+'pyext').tasks[-1].outputs[0] for dep in deps]
         return (nodes, [])
 
-    plrule  = ('${PYLINT} ${SRC} '
-               +'--init-hook="sys.path.append(\'./\')" '
-               +'--disable=locally-disabled '
-               +'--reports=no')
-
     def _checkencoding(tsk):
         headers = '#!/usr/bin/env python3\n', '# -*- coding: utf-8 -*-\n'
 
@@ -147,15 +144,21 @@ def checkpy(bld:Context, items:Sequence):
         if len(msg):
             bld.fatal('In file %s:\n\t- ' % tsk.inputs[0].abspath()+msg)
 
+    mypy   = '${MYPY} ${SRC} --silent-imports'
+    pylint = ('${PYLINT} ${SRC} '
+              + '--init-hook="sys.path.append(\'./\')" '
+              + '--msg-template="{path}:{line}:{column}:{C}: [{symbol}] {msg}" '
+              + '--disable=locally-disabled '
+              + '--reports=no')
     rules  = [dict(color       = 'CYAN',
                    rule        = _checkencoding,
                    cls_keyword = lambda _: 'python headers'),
               dict(color       = 'BLUE',
-                   rule        = '${MYPY} ${SRC} --silent-imports',
+                   rule        = mypy,
                    scan        = _scan,
                    cls_keyword = lambda _: 'MyPy'),
               dict(color       = 'YELLOW',
-                   rule        = plrule,
+                   rule        = pylint,
                    scan        = _scan,
                    cls_keyword = lambda _: 'PyLint'),
              ] # type: List
