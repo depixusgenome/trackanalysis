@@ -12,6 +12,9 @@ DEFAULTS = {'all': (u'all files',               '.*'),
             'ana': (u'analysis files',          '.ana'),
             'xls': (u'excel files',             '.xlsx'),
             'csv': (u'comma-separated files',   '.csv')}
+DEFAULTS['any'] = DEFAULTS['all']
+DEFAULTS['*']   = DEFAULTS['all']
+
 _KFTYPE = 'filetypes'
 _KEXT = 'defaultextension'
 
@@ -56,7 +59,15 @@ def openfile(defaultextension = None,
              title            = None,
              fcn              = None
             ):
-    u"returns a filepath to be opened"
+    u"""
+    returns a filepath to be opened.
+
+    *defaultextension* is first item in *filetypes* by default.
+
+    *filtypes* is a string with format: "description 1: extension | ...".
+    Default descriptions and extensions exist for usual file types. One can
+    have thus:  *filetypes* = 'trk|*' for track files + any other extension.
+    """
     return _tk_run(locals(), _tkopen)
 
 def savefile(defaultextension = None,
@@ -66,5 +77,13 @@ def savefile(defaultextension = None,
              title            = None,
              fcn              = None
             ):
-    u"returns a filepath where to save"
+    u"""
+    returns a filepath to be saved.
+
+    *defaultextension* is first item in *filetypes* by default.
+
+    *filtypes* is a string with format: "description 1: extension | ...".
+    Default descriptions and extensions exist for usual file types. One can
+    have thus:  *filetypes* = 'trk|*' for track files + any other extension.
+    """
     return _tk_run(locals(), _tksave)

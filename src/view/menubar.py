@@ -4,7 +4,6 @@ u"Menu bar"
 
 from flexx              import ui
 
-from model.task         import TrackReaderTask
 from .                  import View
 from .dialog            import openfile, savefile
 
@@ -17,11 +16,12 @@ class  MenuBar(View, ui.Widget):
             ui.Button(text = 'save').connect('mouse_down', self._dosave)
 
     def _doopen(self):
-        openfile(filetypes = u'trk|all',
-                 fcn       = lambda path: self.ctrl.openTrack(path))
+        path = openfile(filetypes = u'trk|*')
+        if path is not None:
+            self.ctrl.openTrack(path)
 
     @staticmethod
     def _dosave():
-        fname = savefile(filetypes = u'ana|all')
+        fname = savefile(filetypes = u'ana|*')
         if fname is not None:
             raise NotImplementedError("Yet to define an analysis IO")
