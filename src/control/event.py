@@ -7,7 +7,7 @@ from functools      import wraps
 from enum           import Enum, unique
 from typing         import Callable, cast
 
-from utils          import ismethod
+from utils          import ismethod, isfunction
 
 class NoEmission(Exception):
     u"can be raised to stop an emission"
@@ -130,15 +130,16 @@ class Event:
         return cls._returnWrapper(names, _wrapper)
 
     _OBS_NAME = re.compile(r'^_?on_?(\w+)', re.IGNORECASE)
-    def observe(self, *names):
+    def observe(self, *names, **kwargs):
         u"""
         Wrapped method will handle events named in arguments.
 
         This can be called directly:
 
         > event.observe('event 1', 'event 2',  observing_method)
-
         > event.observe(onevent3)
+        > event.observe({'event1': fcn1, 'event2': fcn2})
+        > event.observe(event1 = fcn1, event2 = fcn2)
 
         or as a wrapper:
 
@@ -150,7 +151,6 @@ class Event:
         """
         # Not implemented: could be done by decorating / metaclassing
         # the observer class
-
         def _add(lst, fcn:Callable):
             if isinstance(fcn, cast(type, staticmethod)):
                 fcn = getattr(fcn, '__func__')
@@ -162,27 +162,46 @@ class Event:
             elif not callable(fcn):
                 raise ValueError("observer must be callable")
 
-
             for name in lst:
                 self._handlers.setdefault(name.lower().strip(), set()).add(fcn)
             return fcn
 
-        def _fromfcn(fcn:Callable):
-            match = self._OBS_NAME.match(fcn.__name__)
-            if match is None:
-                raise AttributeError("function name must have format onxx or _onxxx")
-            return _add((match.group(1),), fcn)
+        def _fromfcn(fcn:Callable, name = None):
+            if name is None:
+                name  = fcn.__name__
+            match = self._OBS_NAME.match(name)
 
-        if   len(names) >  1 and callable(names[-1]):
-            return _add(names[:-1], names[-1])
-        elif len(names) == 1 and callable(names[0]):
-            return _fromfcn(names[0])
-        elif len(names) >= 1:
+            if match is None:
+                return _add((name,), fcn)
+            else:
+                return _add((match.group(1),), fcn)
+
+        if len(names) == 1:
+            if hasattr(names[0], 'items'):
+                kwargs.update(names[0])
+                names = tuple()
+            elif isinstance(names[0], (list, tuple)):
+                names = names[0]
+
+        if len(kwargs):
+            for name, val in kwargs.items():
+                _fromfcn(val, name)
+
+        if len(names) == 0:
+            return _fromfcn
+
+        if all(isinstance(name, str) for name in names):
             def _wrapper(fcn):
                 return _add(names, fcn)
             return _wrapper
-        else:
-            return _fromfcn
+
+        if all(isfunction(name) for name in names):
+            # dealing with tuples and lists
+            for val in names:
+                _fromfcn(val)
+            return
+
+        return _add(names[:-1], names[-1])
 
 class Controler(Event):
     u"Main controler class"

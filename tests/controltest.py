@@ -4,7 +4,6 @@ u"Test control"
 # pylint: disable=import-error
 import  unittest
 import  numpy
-from    control.lazy            import LazyInstError, LazyInstanciator, LazyDict
 from    control.event           import Event, EmitPolicy
 from    control.taskcontrol     import TaskControler
 from    control.processor       import Processor, Cache, Runner
@@ -13,90 +12,11 @@ import  model.task           as tasks
 
 from    testdata import path
 
-
-class LazyTest(unittest.TestCase):
-    u"test lazy stuff"
-    def test_instanciator_verify(self):
-        u"test instanciator argument verifications"
-        with self.assertRaises(LazyInstError):
-            LazyInstError.verify(lambda x: None)
-            LazyInstError.verify(1)
-            LazyInstError.verify("")
-        self.assertEqual(LazyInstError.verify(lambda *x, y = 1, **z: None), None)
-        self.assertEqual(LazyInstError.verify(lambda y = 1, **z: None), None)
-        self.assertEqual(LazyInstError.verify(lambda **z: None), None)
-
-    def test_instanciator(self):
-        u"test instanciator"
-        lst = []
-        class _AnyType:
-            def __init__(self):
-                lst.append(1)
-
-        fcn  = lambda: _AnyType() # pylint: disable=unnecessary-lambda
-        lazy = LazyInstanciator(fcn)
-        self.assertEqual(len(lst), 0)
-
-        ans  = lazy()
-        self.assertEqual(len(lst), 1)
-
-        ans2 = lazy()
-        self.assertEqual(len(lst), 1)
-        self.assertTrue(ans is ans2)
-
-    def test_lazydict(self):
-        u"test lazydict"
-        lst = []
-
-        def _create(name):
-            def __init__(_):
-                lst.append(name)
-            return name, type(name, tuple(), dict(__init__ = __init__))
-
-        for fcn in (iter, dict):
-            dico = LazyDict(fcn((_create('l1'), _create('l2'))),
-                            **dict((_create('l3'), _create('l4'))))
-            self.assertEqual(len(lst), 0)
-
-            self.assertTrue(dico['l1'].__class__.__name__, 'l1')
-            self.assertEqual(lst, ['l1'])
-
-            self.assertTrue(dico['l1'].__class__.__name__, 'l1')
-            self.assertEqual(lst, ['l1'])
-
-            self.assertTrue('l2' in dico)
-            del dico['l2']
-            self.assertFalse('l2' in dico)
-
-            self.assertEqual(lst, ['l1'])
-
-            self.assertTrue(dico.pop('l3').__class__.__name__, 'l3')
-            self.assertEqual(lst, ['l1', 'l3'])
-
-            self.assertEqual(dico.pop('l3', lambda:111),  111)
-            self.assertEqual(lst, ['l1', 'l3'])
-
-            self.assertTrue(dico.get(*_create('l7')).__class__.__name__, 'l7')
-            self.assertEqual(lst, ['l1', 'l3', 'l7'])
-            self.assertFalse('l7' in dico)
-
-            self.assertEqual(dico.setdefault('l4', None).__class__.__name__, 'l4')
-            self.assertEqual(lst, ['l1', 'l3', 'l7', 'l4'])
-            self.assertEqual(dico.setdefault('l4', None).__class__.__name__, 'l4')
-            self.assertEqual(lst, ['l1', 'l3', 'l7', 'l4'])
-
-            self.assertEqual(dico.setdefault(*_create('l8')).__class__.__name__, 'l8')
-            self.assertEqual(lst, ['l1', 'l3', 'l7', 'l4', 'l8'])
-            self.assertTrue('l8' in dico)
-            self.assertEqual(dico.setdefault('l8', None).__class__.__name__, 'l8')
-            self.assertEqual(lst, ['l1', 'l3', 'l7', 'l4', 'l8'])
-            self.assertTrue('l8' in dico)
-            lst.clear()
-
 class EventTest(unittest.TestCase):
     u"test event stuff"
     def test_events(self):
         u"test event stuff"
+        # pylint: disable=no-self-use,missing-docstring
         events = Event()
         this   = self
 
@@ -105,33 +25,28 @@ class EventTest(unittest.TestCase):
             @staticmethod
             @events.emit
             def event1(*_1, **_2):
-                u"dummy"
                 calls.append("e1")
                 return 1
 
             @classmethod
             @events.emit(returns = EmitPolicy.outasdict)
             def event2(cls, *_1, **_2):
-                u"dummy"
                 calls.append("e2")
                 return dict(name = 'e2')
 
             @events.emit(returns = EmitPolicy.outastuple)
-            def event3(self, *_1, **_2): # pylint: disable=no-self-use
-                u"dummy"
+            def event3(self, *_1, **_2):
                 calls.append("e3")
                 return ('e3',)
 
             @staticmethod
             @events.emit(returns = EmitPolicy.nothing)
             def event4(*_1, **_2):
-                u"dummy"
                 calls.append("e4")
                 return ('e4',)
 
         @events.emit('event5', 'event6')
         def event5(*_1, **_2):
-            u"dummy"
             calls.append("e5")
             return ('e5',)
 
@@ -141,19 +56,16 @@ class EventTest(unittest.TestCase):
             @staticmethod
             @events.observe
             def onevent1(*args, **kwargs):
-                u"dummy"
                 this.assertEqual((args, kwargs), hdls[-1])
 
             @events.observe
             @staticmethod
             def onevent2(**kwargs):
-                u"dummy"
                 this.assertEqual(kwargs, dict(name = 'e2'))
 
             @events.observe('event3')
             @staticmethod
             def onevent3(arg):
-                u"dummy"
                 this.assertEqual(arg, 'e3')
 
         got = []
@@ -162,7 +74,6 @@ class EventTest(unittest.TestCase):
         events.observe('event4', 'event6', _got)
 
         def onevent5(*args, **kwargs):
-            u"dummy"
             self.assertEqual((args, kwargs), hdls[-1])
 
         events.observe(onevent5)
@@ -182,6 +93,42 @@ class EventTest(unittest.TestCase):
 
         event5(1,2,3, tt = 2)
         self.assertEqual(got, [(tuple(), dict()),hdls[-1]])
+
+    def test_observewithdict(self):
+        u"test event stuff"
+        # pylint: disable=no-self-use,missing-docstring,unnecessary-lambda,multiple-statements
+        events = Event()
+
+        def _add(ind):
+            # pylint: disable=unused-argument
+            def _fcn(self, *_1, **_2):
+                return dict(name = 'e%d' % ind)
+            _fcn.__name__ = _fcn.__name__.replace('_fcn', 'event%d') % ind
+            _fcn.__qualname__ = _fcn.__qualname__.replace('_fcn', 'event%d') % ind
+
+            return _fcn.__name__, events.emit(_fcn, returns = EmitPolicy.outasdict)
+
+        ctrl = type('_Ctrl', tuple(), dict(_add(i) for i in range(8)))()
+
+        got  = []
+        def onEvent3(name = None, **_):
+            got.append(name)
+        def _onEvent4(name = None, **_):
+            got.append(name)
+        def _onEvent6(name = None, **_):
+            got.append(name)
+        def _onEvent7(name = None, **_):
+            got.append(name)
+
+        events.observe({'event1': lambda **_: onEvent3(**_),
+                        'event2': _onEvent4})
+        events.observe(onEvent3, _onEvent4)
+        events.observe(event5 = _onEvent4)
+        events.observe([_onEvent6, _onEvent7])
+
+        for i in range(1, 8):
+            getattr(ctrl, 'event%d' % i)()
+        self.assertEqual(got, ['e%d'% i for i in range(1, 8)])
 
 class TaskControlTest(unittest.TestCase):
     u"testing task control"
