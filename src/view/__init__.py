@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 u"basic view module"
 from typing         import Optional     # pylint: disable=unused-import
-from control.event  import Controler    # pylint: disable=unused-import
+from control.event  import Controller    # pylint: disable=unused-import
 
 class View:
-    u"Classes to be passed a controler"
-    _ctrl = None # type: Controler
-    def setCtrl(self, ctrl:Controler):
-        u"Sets up the controler"
+    u"Classes to be passed a controller"
+    _ctrl = None # type: Controller
+    def setCtrl(self, ctrl:Controller):
+        u"Sets up the controller"
         self._ctrl = ctrl
         children   = list(getattr(self, 'children', []))
         while len(children):

@@ -14,7 +14,7 @@ class UndoView(View):
         super().setCtrl(ctrl)
 
         def _observe(evtname, fcnname, lstfcns = None, dictfcns = None):
-            def _fcn(*_, controler = None, **kwargs):
+            def _fcn(*_, controller = None, **kwargs):
                 if lstfcns is None:
                     elems = tuple()
                 if all(isinstance(key, str)   for key in lstfcns):
@@ -30,7 +30,7 @@ class UndoView(View):
                     dico = dictfcns(**kwargs)
 
                 dico  = dict () if dictfcns is None else dictfcns(**kwargs)
-                self._queue.append(lambda: getattr(controler, fcnname)(*elems, **dico))
+                self._queue.append(lambda: getattr(controller, fcnname)(*elems, **dico))
             self._ctrl.observe(evtname, _fcn)
 
         _observe('openTrack',  'closeTrack', lambda **kwa: (kwa['model'][0],))

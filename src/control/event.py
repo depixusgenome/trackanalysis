@@ -203,11 +203,11 @@ class Event:
 
         return _add(names[:-1], names[-1])
 
-class Controler(Event):
-    u"Main controler class"
+class Controller(Event):
+    u"Main controller class"
     @classmethod
     def emit(cls, *args, **kwargs):
-        u"decorator for emitting signals: can only be applied to *Controler* classes"
+        u"decorator for emitting signals: can only be applied to *Controller* classes"
         return Event.internalemit(*args, **kwargs)
 
     @staticmethod

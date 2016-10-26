@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Updates app manager so as to deal with controlers"
+u"Updates app manager so as to deal with controllers"
 import flexx.app as app
 
-from control.event  import Controler
+from control.event  import Controller
 from view           import View
 
 def _run(main, controls, views, fcn):
     u"Creates a main view"
     def init(self):
-        u"sets up the controler, then initializes the view"
+        u"sets up the controller, then initializes the view"
         main.init(self)
         self.setCtrl(self.MainControl())
 
@@ -29,7 +29,7 @@ def setup(locs,
     get = lambda tpe: tuple(cls for cls in locs.values()
                             if isinstance(cls, type) and issubclass(cls, tpe))
     if defaultcontrols is all:
-        defaultcontrols = get(Controler)
+        defaultcontrols = get(Controller)
 
     if defaultviews is all:
         defaultviews = get(View)

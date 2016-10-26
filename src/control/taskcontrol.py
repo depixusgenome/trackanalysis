@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"""
-Task controler.
+Task controller.
 
-The controler stores:
+The controller stores:
     - lists of tasks (TaskPair.model),
     - their associated processors and cache (TaskPair.data).
 
@@ -13,7 +13,7 @@ from typing         import (Union, Iterator, Tuple, # pylint: disable=unused-imp
                             Optional, Any, List)
 
 from model.task     import Task, TrackReaderTask, TaskIsUniqueError
-from .event         import Controler, NoEmission
+from .event         import Controller, NoEmission
 from .processor     import Cache, Processor, run as _runprocessors
 
 class TaskPair:
@@ -69,8 +69,8 @@ class TaskPair:
         u"clears data starting at *tsk*"
         self.data.clear()
 
-class TaskControler(Controler):
-    u"Data controler class"
+class TaskController(Controller):
+    u"Data controller class"
     def __init__(self):
         super().__init__()
         self._items      = dict() # type: Dict[TrackReaderTask, TaskPair]
@@ -104,7 +104,7 @@ class TaskControler(Controler):
         """
         return _runprocessors(self._items[parent].data, tsk)
 
-    @Controler.emit(returns = Controler.outasdict)
+    @Controller.emit(returns = Controller.outasdict)
     def openTrack(self, task: 'Union[str,TrackReaderTask]', model = tuple()):
         u"opens a new file"
         if isinstance(task, str):
@@ -118,39 +118,39 @@ class TaskControler(Controler):
             pair.add(other, self._processors[type(other)])
 
         self._items[task] = pair
-        return dict(controler = self, model = tasks)
+        return dict(controller = self, model = tasks)
 
-    @Controler.emit(returns = Controler.outasdict)
+    @Controller.emit(returns = Controller.outasdict)
     def closeTrack(self, task:TrackReaderTask):
         u"opens a new file"
         old = tuple(self._items[task].model)
         del self._items[task]
-        return dict(controler = self, task = task, model = old)
+        return dict(controller = self, task = task, model = old)
 
-    @Controler.emit(returns = Controler.outasdict)
+    @Controller.emit(returns = Controller.outasdict)
     def addTask(self, parent:TrackReaderTask, task:Task, index = None):
         u"opens a new file"
         old = tuple(self._items[parent].model)
         self._items[parent].add(task, self._processors[type(task)], index = index)
-        return dict(controler = self, parent = parent, task = task, old = old)
+        return dict(controller = self, parent = parent, task = task, old = old)
 
-    @Controler.emit(returns = Controler.outasdict)
+    @Controller.emit(returns = Controller.outasdict)
     def updateTask(self, parent:TrackReaderTask, task:Union[Task,int,type], **kwargs):
         u"updates a task"
         tsk = self.task(parent, task, noemission = True)
-        old = Controler.updateModel(tsk, **kwargs)
+        old = Controller.updateModel(tsk, **kwargs)
         self._items[parent].update(tsk)
-        return dict(controler = self, parent = parent, task = tsk, old = old)
+        return dict(controller = self, parent = parent, task = tsk, old = old)
 
-    @Controler.emit(returns = Controler.outasdict)
+    @Controller.emit(returns = Controller.outasdict)
     def removeTask(self, parent:TrackReaderTask, task:Union[Task,int,type]):
         u"removes a task"
         tsk = self.task(parent, task, noemission = True)
         old = tuple(self._items[parent].model)
         self._items[parent].remove(tsk)
-        return dict(controler = self, parent = parent, task = tsk, old = old)
+        return dict(controller = self, parent = parent, task = tsk, old = old)
 
-    @Controler.emit
+    @Controller.emit
     def clearData(self, parent:'Optional[TrackReaderTask]' = None):
         "clears all data"
         if parent is None:

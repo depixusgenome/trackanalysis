@@ -5,7 +5,7 @@ u"Test control"
 import  unittest
 import  numpy
 from    control.event           import Event, EmitPolicy
-from    control.taskcontrol     import TaskControler
+from    control.taskcontrol     import TaskController
 from    control.processor       import Processor, Cache, Runner
 from    data                    import Cycles, Beads, TrackItems
 import  model.task           as tasks
@@ -157,7 +157,7 @@ class TaskControlTest(unittest.TestCase):
         _DummyTask1, _DummyProcess1 = _make(1, lambda i, j: None)
         _DummyTask2, _DummyProcess2 = _make(2, lambda i, j: j.setCache(i, list(cnt)))
 
-        ctrl = TaskControler()
+        ctrl = TaskController()
 
         events = dict()
         for evt in 'opentrack', 'closetrack', 'addtask', 'removetask', 'updatetask':
@@ -292,7 +292,7 @@ class TaskControlTest(unittest.TestCase):
                     return x
                 return _outp
 
-        ctrl = TaskControler()
+        ctrl = TaskController()
         read = tasks.TrackReaderTask(path = path("small_legacy"))
         tb   = TBeads()
         ctrl.openTrack(read, (read, tb))
@@ -344,7 +344,7 @@ class TaskControlTest(unittest.TestCase):
             def run(self, args):
                 args.apply(None, levels = self.levels)
 
-        ctrl = TaskControler()
+        ctrl = TaskController()
         read = tasks.TrackReaderTask(path = path("small_pickle"))
         tb   = TBeads()
         tc   = TCycle()

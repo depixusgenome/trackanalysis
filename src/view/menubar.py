@@ -5,7 +5,7 @@ u"Menu bar"
 from typing         import Optional     # pylint: disable=unused-import
 from flexx          import ui
 
-from control.event  import Controler
+from control.event  import Controller
 from .dialog        import openfile, savefile
 from .              import View
 
@@ -14,8 +14,8 @@ class  MenuBar(ui.Widget, View):
     _box  = None # type: Optional[ui.HBox]
     _save = None # type: Optional[ui.Button]
     _open = None # type: Optional[ui.Button]
-    def setCtrl(self, ctrl: Controler):
-        u"Sets up the controler"
+    def setCtrl(self, ctrl: Controller):
+        u"Sets up the controller"
         obs = ctrl is not getattr(self, '_ctrl')
 
         super().setCtrl(ctrl)

@@ -7,17 +7,17 @@ All things global:
     - current view ...
 """
 from collections    import namedtuple
-from .event         import Controler, NoEmission
+from .event         import Controller, NoEmission
 
 ReturnPair = namedtuple('ReturnPair', ['old', 'value'])
 _empty     = type('_None', tuple(), dict())
-class GlobalsControler(Controler):
-    u"Data controler class"
+class GlobalsController(Controller):
+    u"Data controller class"
     def __init__(self):
         super().__init__()
         self._info = dict()
 
-    @Controler.emit(returns = Controler.outasdict)
+    @Controller.emit(returns = Controller.outasdict)
     def updateGlobal(self, **kwargs):
         u"updates view information"
         ret = dict(empty = _empty)
