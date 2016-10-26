@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 u"Test control"
 # pylint: disable=import-error
-import  unittest
 import  numpy
 from    control.event           import Event, EmitPolicy
 from    control.taskcontrol     import TaskController
@@ -12,13 +11,14 @@ import  model.task           as tasks
 
 from    testdata import path
 
-class EventTest(unittest.TestCase):
+# pylint: disable=no-self-use
+
+class TestEvent:
     u"test event stuff"
     def test_events(self):
         u"test event stuff"
         # pylint: disable=no-self-use,missing-docstring
         events = Event()
-        this   = self
 
         calls  = []
         class _Ctrl:
@@ -56,17 +56,17 @@ class EventTest(unittest.TestCase):
             @staticmethod
             @events.observe
             def onevent1(*args, **kwargs):
-                this.assertEqual((args, kwargs), hdls[-1])
+                assert (args, kwargs) == hdls[-1]
 
             @events.observe
             @staticmethod
             def onevent2(**kwargs):
-                this.assertEqual(kwargs, dict(name = 'e2'))
+                assert kwargs == dict(name = 'e2')
 
             @events.observe('event3')
             @staticmethod
             def onevent3(arg):
-                this.assertEqual(arg, 'e3')
+                assert arg == 'e3'
 
         got = []
         def _got(*args, **kwargs):
@@ -74,7 +74,7 @@ class EventTest(unittest.TestCase):
         events.observe('event4', 'event6', _got)
 
         def onevent5(*args, **kwargs):
-            self.assertEqual((args, kwargs), hdls[-1])
+            assert (args, kwargs) == hdls[-1]
 
         events.observe(onevent5)
 
@@ -86,13 +86,13 @@ class EventTest(unittest.TestCase):
         ctrl.event2(1,2,3, tt = 2)
         ctrl.event3(1,2,3, tt = 2)
 
-        self.assertEqual(len(got), 0)
+        assert len(got) == 0
         ctrl.event4(1,2,3, tt = 2)
 
-        self.assertEqual(got, [(tuple(), dict())])
+        assert got == [(tuple(), dict())]
 
         event5(1,2,3, tt = 2)
-        self.assertEqual(got, [(tuple(), dict()),hdls[-1]])
+        assert got == [(tuple(), dict()),hdls[-1]]
 
     def test_observewithdict(self):
         u"test event stuff"
@@ -128,9 +128,9 @@ class EventTest(unittest.TestCase):
 
         for i in range(1, 8):
             getattr(ctrl, 'event%d' % i)()
-        self.assertEqual(got, ['e%d'% i for i in range(1, 8)])
+        assert got == ['e%d'% i for i in range(1, 8)]
 
-class TaskControlTest(unittest.TestCase):
+class TestTaskControl:
     u"testing task control"
     def test_taskmutations(self):
         u"testing task control"
@@ -168,70 +168,70 @@ class TaskControlTest(unittest.TestCase):
 
         read = tasks.TrackReaderTask(path = path("small_legacy"))
         ctrl.openTrack(read)
-        self.assertTrue(len(events['opentrack']), 1)
-        self.assertEqual(tuple(tuple(ite) for ite in ctrl.tasktree), ((read,),))
+        assert len(events['opentrack']) == 1
+        assert tuple(tuple(ite) for ite in ctrl.tasktree) == ((read,),)
 
         dum0  = _DummyTask0()
         dum1  = _DummyTask1()
         dum2  = _DummyTask2()
 
         ctrl.addTask(read, dum0)
-        self.assertTrue (len(events['addtask']), 1)
-        self.assertEqual(tuple(tuple(ite) for ite in ctrl.tasktree), ((read,dum0),))
+        assert len(events['addtask']) == 1
+        assert tuple(tuple(ite) for ite in ctrl.tasktree) == ((read,dum0),)
 
         ctrl.addTask(read, dum1)
-        self.assertTrue(len(events['addtask']), 2)
-        self.assertEqual(tuple(tuple(ite) for ite in ctrl.tasktree), ((read,dum0,dum1),))
+        assert len(events['addtask']) == 2
+        assert tuple(tuple(ite) for ite in ctrl.tasktree) == ((read,dum0,dum1),)
 
         ctrl.addTask(read, dum2)
-        self.assertTrue(len(events['addtask']), 3)
-        self.assertEqual(tuple(tuple(ite) for ite in ctrl.tasktree), ((read,dum0,dum1,dum2),))
+        assert len(events['addtask']) == 3
+        assert tuple(tuple(ite) for ite in ctrl.tasktree) == ((read,dum0,dum1,dum2),)
 
-        self.assertEqual(ctrl.cache(read, dum0)(), None)
-        self.assertEqual(ctrl.cache(read, dum1)(), None)
-        self.assertEqual(ctrl.cache(read, dum2)(), None)
+        assert ctrl.cache(read, dum0)() is None
+        assert ctrl.cache(read, dum1)() is None
+        assert ctrl.cache(read, dum2)() is None
 
         ctrl.run(read, dum1)
 
-        self.assertEqual(ctrl.cache(read, dum0)(), None)
-        self.assertEqual(ctrl.cache(read, dum1)(), None)
-        self.assertEqual(ctrl.cache(read, dum2)(), None)
+        assert ctrl.cache(read, dum0)() is None
+        assert ctrl.cache(read, dum1)() is None
+        assert ctrl.cache(read, dum2)() is None
 
         tuple(ctrl.run(read, dum1))
-        self.assertEqual(ctrl.cache(read, dum0)(), [0])
-        self.assertEqual(ctrl.cache(read, dum1)(), None)
-        self.assertEqual(ctrl.cache(read, dum2)(), None)
+        assert ctrl.cache(read, dum0)() == [0]
+        assert ctrl.cache(read, dum1)() is None
+        assert ctrl.cache(read, dum2)() is None
 
         cnt[0] = 1
         tuple(ctrl.run(read, dum2))
-        self.assertEqual(ctrl.cache(read, dum0)(), [0])
-        self.assertEqual(ctrl.cache(read, dum1)(), None)
-        self.assertEqual(ctrl.cache(read, dum2)(), [1])
+        assert ctrl.cache(read, dum0)() == [0]
+        assert ctrl.cache(read, dum1)() is None
+        assert ctrl.cache(read, dum2)() == [1]
 
         cnt[0] = 2
         tuple(ctrl.run(read, dum2))
-        self.assertEqual(ctrl.cache(read, dum0)(), [0])
-        self.assertEqual(ctrl.cache(read, dum1)(), None)
-        self.assertEqual(ctrl.cache(read, dum2)(), [2])
+        assert ctrl.cache(read, dum0)() == [0]
+        assert ctrl.cache(read, dum1)() is None
+        assert ctrl.cache(read, dum2)() == [2]
 
         ctrl.updateTask(read, dum1, toto = 2)
-        self.assertTrue(len(events['updatetask']), 1)
-        self.assertTrue(dum1.toto, 2)
-        self.assertEqual(ctrl.cache(read, dum0)(), [0])
-        self.assertEqual(ctrl.cache(read, dum1)(), None)
-        self.assertEqual(ctrl.cache(read, dum2)(), None)
+        assert len(events['updatetask']) == 1
+        assert dum1.toto                 == 2
+        assert ctrl.cache(read, dum0)()  == [0]
+        assert ctrl.cache(read, dum1)()  is None
+        assert ctrl.cache(read, dum2)()  is None
 
         tuple(ctrl.run(read, dum2))
-        self.assertEqual(ctrl.cache(read, dum2)(), [2])
+        assert ctrl.cache(read, dum2)() == [2]
 
         ctrl.removeTask(read, dum1)
-        self.assertTrue(len(events['removetask']), 1)
-        self.assertEqual(tuple(tuple(ite) for ite in ctrl.tasktree), ((read,dum0,dum2),))
-        self.assertEqual(ctrl.cache(read, dum2)(), None)
+        assert len(events['removetask'])                  == 1
+        assert tuple(tuple(ite) for ite in ctrl.tasktree) == ((read,dum0,dum2),)
+        assert ctrl.cache(read, dum2)()                   is None
 
         ctrl.closeTrack(read)
-        self.assertTrue(len(events['closetrack']), 1)
-        self.assertEqual(tuple(tuple(ite) for ite in ctrl.tasktree), tuple())
+        assert len(events['closetrack'])                  == 1
+        assert tuple(tuple(ite) for ite in ctrl.tasktree) == tuple()
 
     def test_closure(self):
         u"testing that closures don't include too many side-effects"
@@ -267,7 +267,7 @@ class TaskControlTest(unittest.TestCase):
             except MemoryError:
                 good += [4]
 
-            self.assertEqual(good, [1,2,3,4])
+            assert good == [1,2,3,4]
 
         for task in (TCycles1(), Cache(), TC1Proc(TCycles1())):
             _testClosure(task)
@@ -297,37 +297,38 @@ class TaskControlTest(unittest.TestCase):
         tb   = TBeads()
         ctrl.openTrack(read, (read, tb))
 
-        self.assertTrue(ctrl.cache(read, tb)() is None)
+        assert ctrl.cache(read, tb)() is None
         ctrl.run(read, tb)
         dt = ctrl.cache(read, tb)()
-        self.assertFalse(dt is None)
-        self.assertEqual(len(dt), 0)
+        assert dt                     is not None
+        assert len(dt)                == 0
 
         tuple(ctrl.run(read, tb))
-        self.assertEqual(len(dt), 1)
-        self.assertEqual(len(next(iter(dt.values()))), 0)
+        assert len(dt) == 1
+        assert len(next(iter(dt.values()))) == 0
 
         tuple(bead for frame in ctrl.run(read, tb) for bead in frame)
         sz = len(calls)
-        self.assertEqual(len(next(iter(dt.values()))), sz)
+        assert len(next(iter(dt.values()))) == sz
 
         tuple(ctrl.run(read, tb))
-        self.assertEqual(len(calls), sz)
+        assert len(calls) == sz
 
         ctrl.updateTask(read, tb, dummy = 1)
-        self.assertTrue(ctrl.cache(read, tb)() is None)
+        assert ctrl.cache(read, tb)() is None
         v1 = next(iter(next(ctrl.run(read, tb))))[1]
         v2 = next(iter(ctrl.run(read, read)[0]))[1]
         dt = ctrl.cache(read, tb)()
-        self.assertEqual(len(dt), 1)
-        self.assertEqual(len(next(iter(dt.values()))), 1)
-        self.assertTrue(numpy.array_equal(v1, v2))
-        self.assertFalse(v1 is v2)
+        assert len(dt) == 1
+        assert len(next(iter(dt.values()))) == 1
+        assert numpy.array_equal(v1, v2)
+        assert v1 is not v2
 
     def test_expandandcollapse(self):
         u"Tests expanding/collapsing a generator one level"
         # pylint: disable=unused-variable, too-many-locals,invalid-name
         # pylint: disable=too-many-statements,missing-docstring,no-self-use
+        # pylint: disable=unidiomatic-typecheck
         class TBeads(tasks.Task):
             level = tasks.Level.bead
         class TCycle(tasks.Task):
@@ -351,23 +352,21 @@ class TaskControlTest(unittest.TestCase):
         ctrl.openTrack(read, (read, tc, tb))
 
         frames = tuple(ctrl.run(read,read))
-        self.assertEqual(frozenset(type(fra) for fra in frames), frozenset((Beads,)))
+        assert frozenset(type(fra) for fra in frames) == frozenset((Beads,))
         keys  = tuple(key for frame in frames for key, _ in frame)
-        self.assertEqual(keys, tuple(range(74)))
+        assert keys == tuple(range(74))
 
         frames = tuple(ctrl.run(read,tc))
-        self.assertEqual(frozenset(type(fra) for fra in frames), frozenset((Cycles,)))
+        assert frozenset(type(fra) for fra in frames) == frozenset((Cycles,))
 
         keys  = tuple(key for frame in frames for key, _ in frame)
         truth = tuple((bead, cyc) for bead in range(74) for cyc in range(15))
-        self.assertEqual(keys, truth)
+        assert keys == truth
 
         frames = tuple(frame for frame in ctrl.run(read, tb))
-        self.assertEqual(frozenset(type(fra) for fra in frames), frozenset((TrackItems,)))
+        assert frozenset(type(fra) for fra in frames) == frozenset((TrackItems,))
         keys  = tuple(key for frame in frames for key, _ in frame)
-        self.assertEqual(keys, tuple(range(74)))
-        self.assertEqual(type(frames[0][0]),    numpy.ndarray)
-        self.assertEqual(type(frames[0][0][0]), Cycles)
+        assert keys == tuple(range(74))
 
-if __name__ == '__main__':
-    unittest.main()
+        assert type(frames[0][0])    is numpy.ndarray
+        assert type(frames[0][0][0]) is Cycles
