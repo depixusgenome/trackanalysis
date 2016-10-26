@@ -109,6 +109,8 @@ class TaskControler(Controler):
         u"opens a new file"
         if isinstance(task, str):
             task = TrackReaderTask(path = task)
+            if len(model):
+                raise NotImplementedError()
 
         pair  = TaskPair()
         tasks = (model if len(model) else (task,))

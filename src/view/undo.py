@@ -6,29 +6,39 @@ from .              import View
 
 class UndoView(View):
     u"View listing all undos"
-    def __init__(self, **kwargs):
-        self._queue = deque(maxlen = kwargs.get('maxlen', 1000))
+    _queue = None # type: deque
 
-    def init(self):
+    def setCtrl(self, ctrl):
         u"sets up the observations"
-        def _observe(evtname, fcnname, *args):
-            def _fcn(*_, lst = args, controler = None, **kwargs):
-                elems = tuple(kwargs[name] for name in lst if name[0] != '*')
-                elems+= next (kwargs[name] for name in lst if name[0] == '*' and name[1] != '*')
-                dico  = next (kwargs[name] for name in lst if name[:2] == '**')
+        self._queue = deque(maxlen = 1000)
+        super().setCtrl(ctrl)
+
+        def _observe(evtname, fcnname, lstfcns = None, dictfcns = None):
+            def _fcn(*_, controler = None, **kwargs):
+                if lstfcns is None:
+                    elems = tuple()
+                if all(isinstance(key, str)   for key in lstfcns):
+                    elems = tuple(kwargs[key] for key in lstfcns)
+                else:
+                    elems = lstfcns(**kwargs)
+
+                if dictfcns is None:
+                    dico = dict()
+                if isinstance(dictfcns, str):
+                    dico = kwargs[dictfcns]
+                else:
+                    dico = dictfcns(**kwargs)
+
+                dico  = dict () if dictfcns is None else dictfcns(**kwargs)
                 self._queue.append(lambda: getattr(controler, fcnname)(*elems, **dico))
             self._ctrl.observe(evtname, _fcn)
 
-        _observe('openTrack',  'closeTrack', 'task')
-        _observe('closeTrack', 'openTrack',  'task', 'model')
-        _observe('addTask',    'removeTask', 'parent', 'task')
-        _observe('updateTask', 'updateTask', 'parent', 'task', '**old')
-
-        def onRemoveTask(*_, controler = None, parent = None, task = None, old = None):
-            u"reverses TaskControler.addTrack"
-            ind = old.index(task)
-            self._queue.append(lambda: controler.addTask(parent, task, ind))
-        self._ctrl.observe(onRemoveTask)
+        _observe('openTrack',  'closeTrack', lambda **kwa: (kwa['model'][0],))
+        _observe('closeTrack', 'openTrack',  ('task',   'model'))
+        _observe('addTask',    'removeTask', ('parent', 'task'))
+        _observe('removeTask', 'addTask',
+                 lambda **kwa: (kwa['parent'], kwa['task'], kwa['old'].index(kwa['task'])))
+        _observe('updateTask', 'updateTask', ('parent', 'task'), 'old')
 
     def undo(self):
         u"undoes one action"

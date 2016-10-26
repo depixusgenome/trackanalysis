@@ -6,37 +6,41 @@ import flexx.app as app
 from control.event  import Controler
 from view           import View
 
-def mainview(view, controls):
+def _run(main, controls, views, fcn):
     u"Creates a main view"
-    class Main(view):
-        u"The main view"
-        MainControl = type('MainControl', controls, dict())
-        def init(self):
-            u"sets up the controler, then initializes the view"
-            super().init()
-            self.setCtrl(self.MainControl())
-    return Main
+    def init(self):
+        u"sets up the controler, then initializes the view"
+        main.init(self)
+        self.setCtrl(self.MainControl())
+
+    cls = type('Main', (main,)+views,
+               dict(__doc__     = u"The main view",
+                    MainControl = type('MainControl', controls, dict()),
+                    init        = init))
+    return fcn(cls)
 
 def setup(locs,
-          defaultview     = None,
-          defaultcontrols = tuple()
+          mainview        = None,
+          defaultcontrols = tuple(),
+          defaultviews    = tuple()
          ):
     u"Sets up launch and serve functions for a given app context"
 
+    get = lambda tpe: tuple(cls for cls in locs.values()
+                            if isinstance(cls, type) and issubclass(cls, tpe))
     if defaultcontrols is all:
-        defaultcontrols = tuple(cls for cls in locs.values()
-                                if isinstance(cls, type) and issubclass(cls, Controler))
-    def serve(view = defaultview, *controls):
-        u"Creates a browser app"
-        if len(controls) == 0:
-            controls = defaultcontrols
-        return app.serve(mainview(view, controls))
+        defaultcontrols = get(Controler)
 
-    def launch(view = defaultview, *controls, **kwargs):
+    if defaultviews is all:
+        defaultviews = get(View)
+
+    def serve(main = mainview, controls = defaultcontrols, views = defaultviews):
+        u"Creates a browser app"
+        return _run(main, controls, views, app.serve)
+
+    def launch(main = mainview, controls = defaultcontrols, views = defaultviews):
         u"Creates a desktop app"
-        if len(controls) == 0:
-            controls = defaultcontrols
-        return app.launch(mainview(view, controls), **kwargs)
+        return _run(main, controls, views, app.launch)
 
     locs.setdefault('serve',  serve)
     locs.setdefault('launch', launch)

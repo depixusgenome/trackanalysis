@@ -39,3 +39,9 @@ class GlobalsControler(Controler):
     def deleteGlobal(self, *key):
         u"removes view information"
         return self.updateGlobal(self, **dict.fromkeys(key, _empty))
+
+    def getGlobal(self, *keys):
+        u"returns values associated to the keys"
+        if len(keys) == 1:
+            return self._info[keys[0]]
+        return iter(self._info[key] for key in keys)

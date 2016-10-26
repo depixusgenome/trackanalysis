@@ -1,30 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Deals with global information"
-from utils          import isfunction
 from .              import View
 
 class GlobalsView(View):
     u"View listing all global info"
-    def init(self):
+    def setCtrl(self, ctrl):
         u"sets up the observations"
+        super().setCtrl(ctrl)
+
         # pylint: disable=missing-docstring,unused-variable
         update = self._ctrl.updateGlobal
         delete = self._ctrl.deleteGlobal
         get    = self._ctrl.getGlobal
 
-        def _apply(fcn):
-            for name, fcn in fcn().items():
-                if isfunction(fcn) and name.startswith('on'):
-                    self._ctrl.observe(fcn)
-
-        @_apply
         def _onTasks():
-            def onOpenTrack(**kwargs):
-                update(track = kwargs['task'], task = kwargs['task'])
+            def onOpenTrack(model = None, **_):
+                update(track = model, task = model)
 
-            def onCloseTrack(**kwargs):
-                isold = get('task') is kwargs['old']
+            def onCloseTrack(old = None, **_):
+                isold = get('task') is old
                 try:
                     tsk = next(next(self._ctrl.tasktree()))
                 except StopIteration:
@@ -32,13 +27,13 @@ class GlobalsView(View):
                 else:
                     update(track = tsk, **({'task': tsk} if isold else {}))
 
-            def onAddTask(**kwargs):
-                update(track = kwargs['parent'], task = kwargs['task'])
+            def onDeleteTask(parent = None, **_):
+                update(track = parent, task = parent)
 
-            def onUpdateTask(**kwargs):
-                update(track = kwargs['parent'], task = kwargs['task'])
+            ctrl.observe(locals())
 
-            def onDeleteTask(**kwargs):
-                update(track = kwargs['parent'], task = kwargs['parent'])
+            def onAddTask(parent = None, task = None, **_):
+                update(track = parent, task = task)
 
-            return locals()
+            ctrl.observe('addTask', 'updateTask', onAddTask)
+        _onTasks()

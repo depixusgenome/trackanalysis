@@ -6,15 +6,14 @@ from control.event  import Controler    # pylint: disable=unused-import
 
 class View:
     u"Classes to be passed a controler"
-    def __init__(self):
-        self._ctrl = None # type: Optional[Controler]
-
+    _ctrl = None # type: Controler
     def setCtrl(self, ctrl:Controler):
         u"Sets up the controler"
-        children = [self]
+        self._ctrl = ctrl
+        children   = list(getattr(self, 'children', []))
         while len(children):
             cur = children.pop()
             if isinstance(cur, View):
-                setattr(cur, '_ctrl', ctrl)
-
-            children.extend(getattr(cur, 'children', []))
+                cur.setCtrl(ctrl)
+            else:
+                children.extend(getattr(cur, 'children', []))
