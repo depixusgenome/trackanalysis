@@ -12,6 +12,20 @@ from ._utils    import YES
 from ._utils    import Make, addconfigure, runall, addmissing
 
 from waflib.Context import Context # type: ignore
+from waflib.Tools   import python as pytools # for correcting a bug
+
+pytools.PYTHON_MODULE_TEMPLATE = '''
+import %s as current_module
+version = getattr(current_module, '__version__', None)
+if version is not None:
+    print(str(version))
+else:
+    version = getattr(current_module, 'version', None)
+    if version is not None:
+        print(str(version))
+    else:
+        print('unknown version')
+'''
 
 IS_MAKE = YES
 
@@ -20,10 +34,25 @@ def _store(cnf:Context, flg:str):
         cnf.parse_flags(flg, uselib_store=item)
 
 @addconfigure
+def requirements(cnf:Context):
+    u"tests numpy and obtains its headers"
+    print(cnf.env['PYTHON'])
+    with open('REQUIRE', 'r') as stream:
+        for line in stream:
+            if line.startswith('#'):
+                continue
+
+            vals      = iter(val.strip() for val in line.split(' '))
+            vals      = iter(val         for val in vals if len(val))
+            mod, vers = tuple(vals)[:2]
+            mod       = mod.replace("python-", "")
+            vers      = 'ver >= num(%s)' % vers.replace('.', ',')
+            cnf.check_python_module(mod,  condition = vers)
+
+@addconfigure
 def numpy(cnf:Context):
     u"tests numpy and obtains its headers"
-    cnf.check_python_module('numpy',  condition = 'ver >= num(1,11,0)')
-
+    # modules are checked by parsing REQUIRE
     cmd = cnf.env.PYTHON[0]                                     \
         + ' -c "from numpy.distutils import misc_util as n;'    \
         + ' print(\'-I\'.join([\'\']+n.get_numpy_include_dirs()))"'
