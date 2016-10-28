@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Default cpp for waf"
-from ._utils import YES, runall, addmissing, Make
+from ._utils import YES, runall, addmissing, Make, requirements
 from waflib  import Utils
 
 IS_MAKE = YES
@@ -36,6 +36,18 @@ class Flags(Make):
         if cnf.options.noopenmp:
             cxx   = cxx.replace('-fopenmp', '')
             links = links .replace('-fopenmp', '')
+        elif cnf.env['COMPILER_CXX'] == 'clang++':
+            links = links .replace('-fopenmp', '-fopenmp=libgomp')
+
+        info = requirements("cxx")
+        curr = cnf.env['CC_VERSION']
+        if cnf.env['COMPILER_CXX'] not in info:
+            cnf.fatal(cnf.env['COMPILER_CXX'] +' min version should be set in the REQUIRE file')
+        minv = info[cnf.env['COMPILER_CXX']]
+        if tuple(int(val) for val in curr) < tuple(int(val) for val in minv):
+            cnf.fatal(cnf.env['COMPILER_CXX']
+                      +' version '+'.'.join(curr)
+                      +' should be greater than '+'.'.join(minv))
 
         cnf.check(features  = 'cxx cxxprogram',
                   cxxflags  = cxx,

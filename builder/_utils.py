@@ -144,10 +144,16 @@ def requirements(key):
     > [PYTHON]
     > python    3.5.2
     > tornado   1.9.dev0
-    > [CPP]
+    > [CXX]
     > boost     1.62
     """
     info = dict()
+    def _getkey(line):
+        val  = line.replace('[', '').replace(']', '').strip().lower()
+        return 'cxx' if val == 'cpp' else val
+
+    key = _getkey(key)
+
     with open('REQUIRE', 'r') as stream:
         ignore = True
         for line in stream:
@@ -156,8 +162,7 @@ def requirements(key):
                 continue
 
             if line.startswith("["):
-                curr   = line.replace('[', '').replace(']', '').strip().lower()
-                ignore = curr != key.strip().lower()
+                ignore = _getkey(line) != key
                 continue
 
             if ignore:
