@@ -36,8 +36,6 @@ class Flags(Make):
         if cnf.options.noopenmp:
             cxx   = cxx.replace('-fopenmp', '')
             links = links .replace('-fopenmp', '')
-        elif cnf.env['COMPILER_CXX'] == 'clang++':
-            links = links .replace('-fopenmp', '-fopenmp=libgomp')
 
         info = requirements("cxx")
         curr = cnf.env['CC_VERSION']
