@@ -24,27 +24,27 @@ class Flags(Make):
                         action  = 'store',
                         help    = 'define link flags')
         copt.add_option('--no-openmp',
-                       dest     = 'noopenmp',
-                       default  = False,
-                       action   = 'store_true',
-                       help     = 'disable OpenMP')
+                        dest     = 'noopenmp',
+                        default  = False,
+                        action   = 'store_true',
+                        help     = 'disable OpenMP')
     @staticmethod
     def configure(cnf):
         u"setup configure"
-        cxx = cnf.options.cxxflaglist
-        ld  = cnf.options.linkflaglist
+        cxx   = cnf.options.cxxflaglist
+        links = cnf.options.linkflaglist
         if cnf.options.noopenmp:
-            cxx = cxx.replace('-fopenmp', '')
-            ld  = ld .replace('-fopenmp', '')
+            cxx   = cxx.replace('-fopenmp', '')
+            links = links .replace('-fopenmp', '')
 
         cnf.check(features  = 'cxx cxxprogram',
                   cxxflags  = cxx,
-                  linkflags = ld,
+                  linkflags = links,
                   mandatory = True)
 
         cnf.env.append_unique('CXXFLAGS',  Utils.to_list(cxx))
-        cnf.env.append_unique('LINKFLAGS', Utils.to_list(ld))
-        cnf.env.append_unique('INCLUDES',  ['../']);
+        cnf.env.append_unique('LINKFLAGS', Utils.to_list(links))
+        cnf.env.append_unique('INCLUDES',  ['../'])
 
         warnings = [
             '-Werror=implicit-function-declaration',

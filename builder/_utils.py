@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 u"Default utils for waf"
 import inspect
-from typing         import Iterator, Callable, Iterable, Union, cast
+from typing         import (Iterator, Callable, # pylint: disable=unused-import
+                            Iterable, Union, cast)
 from types          import ModuleType, FunctionType
 from functools      import wraps
 
@@ -84,7 +85,7 @@ def runall(fcn: Callable[[Context], None]):
 
     return _wrapper
 
-def makes(elems:Union[Iterable,dict,type,ModuleType]) -> Iterator[type]:
+def makes(elems:'Union[Iterable,dict,type,ModuleType]') -> 'Iterator[type]':
     u"gets a list of Makes"
     if isinstance(elems, (type, ModuleType)):
         elems = iter(cls for _, cls in inspect.getmembers(elems))
@@ -108,7 +109,7 @@ def addoptions(fcn):
     u"adds an option element to a context"
     return _add(fcn, 'options')
 
-def addmissing(glob, tt = None):
+def addmissing(glob):
     u"adds functions 'load', 'options', 'configure', 'build' if missing from a module"
     items = tuple(makes(iter(cls for _, cls in glob.items())))
 
@@ -133,3 +134,36 @@ def addmissing(glob, tt = None):
     for val in (load, options, configure, build):
         val.__module__ = glob['__name__']
         glob.setdefault(val.__name__, val)
+
+def requirements(key):
+    u"""
+    Parses a REQUIRE file and returns elements associated to one key.
+
+    Such a file should be of the type:
+
+    > [PYTHON]
+    > python    3.5.2
+    > tornado   1.9.dev0
+    > [CPP]
+    > boost     1.62
+    """
+    info = dict()
+    with open('REQUIRE', 'r') as stream:
+        ignore = True
+        for line in stream:
+            line = line.strip()
+            if line.startswith('#') or len(line.strip()) == 0:
+                continue
+
+            if line.startswith("["):
+                curr   = line.replace('[', '').replace(']', '').strip().lower()
+                ignore = curr != key.strip().lower()
+                continue
+
+            if ignore:
+                continue
+
+            vals      = iter(val.strip() for val in line.split(' '))
+            mod, vers = tuple(val        for val in vals if len(val))[:2]
+            info[mod] = vers.split('.')
+    return info

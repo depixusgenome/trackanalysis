@@ -8,8 +8,7 @@ import re
 from typing     import Sequence, List
 from contextlib import closing
 
-from ._utils    import YES
-from ._utils    import Make, addconfigure, runall, addmissing
+from ._utils    import YES, Make, addconfigure, runall, addmissing, requirements
 
 from waflib.Context import Context # type: ignore
 from waflib.Tools   import python as pytools # for correcting a bug
@@ -32,22 +31,6 @@ IS_MAKE = YES
 def _store(cnf:Context, flg:str):
     for item in 'PYEXT', 'PYEMBED':
         cnf.parse_flags(flg, uselib_store=item)
-
-@addconfigure
-def requirements(cnf:Context):
-    u"tests numpy and obtains its headers"
-    print(cnf.env['PYTHON'])
-    with open('REQUIRE', 'r') as stream:
-        for line in stream:
-            if line.startswith('#'):
-                continue
-
-            vals      = iter(val.strip() for val in line.split(' '))
-            vals      = iter(val         for val in vals if len(val))
-            mod, vers = tuple(vals)[:2]
-            mod       = mod.replace("python-", "")
-            vers      = 'ver >= num(%s)' % vers.replace('.', ',')
-            cnf.check_python_module(mod,  condition = vers)
 
 @addconfigure
 def numpy(cnf:Context):
@@ -106,12 +89,17 @@ def loads():
 @runall
 def configure(cnf:Context):
     u"get python headers and modules"
-    cnf.check_python_version((3,5))
+    info   = requirements('python')
+    pyvers = info.pop('python')
+    cnf.check_python_version(tuple(int(val) for val in pyvers))
     cnf.check_python_headers()
+
+    for mod, vers in info.items():
+        cnf.check_python_module(mod.replace("python-", ""),
+                                condition = 'ver >= num('+','.join(vers)+')')
+
     cnf.find_program("mypy",   var = "MYPY")
-
     cnf.find_program("pylint", var = "PYLINT")
-
 
 def pymoduledependencies(pysrc):
     u"detects dependencies"

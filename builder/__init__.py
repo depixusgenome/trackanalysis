@@ -32,8 +32,10 @@ def output() -> str:
 
 def version() -> str:
     u"returns git tag"
-    try:    return gitinfo.version()
-    except: return "0.0.1"
+    try:
+        return gitinfo.version()
+    except:             # pylint: disable=bare-except
+        return "0.0.1"
 
 def register(name:str, fcn:Callable[[Context], None], glob:dict):
     u"Registers a *build* command for building a single module"
@@ -64,6 +66,7 @@ def make(glob, **kw):
         u"does nothing"
         pass
 
+    # pylint: disable=unnecessary-lambda
     toadd = dict(VERSION   = lambda: version(),
                  APPNAME   = lambda: appname(),
                  top       = lambda: ".",

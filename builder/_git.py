@@ -14,26 +14,21 @@ def version() -> str:
     u"returns last tag name"
     return _cmd('describe', '--dirty=+', '--always')
 
-
 def lasthash() -> str:
     u"returns last commit hashtag"
     return _cmd('log', '-n', '1', '--pretty=format:%H')
-
 
 def lastdate() -> str:
     u"returns last commit date"
     return _cmd('log', '-n', '1', '--pretty=format:%cD')
 
-
 def lastauthor() -> str:
     u"returns last commit author"
     return _cmd('log', '-n', '1', '--pretty=format:%an')
 
-
 def branch() -> str:
     u"returns current branch"
     return _cmd('rev-parse', '--abbrev-ref', 'HEAD')
-
 
 def isdirty() -> bool:
     u"returns whether we're sitting in-between tags"
