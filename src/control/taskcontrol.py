@@ -67,7 +67,7 @@ class TaskPair:
 
     def clear(self):
         u"clears data starting at *tsk*"
-        self.data.clear()
+        self.data.delCache()
 
 class TaskController(Controller):
     u"Data controller class"
@@ -154,9 +154,9 @@ class TaskController(Controller):
     def clearData(self, parent:'Optional[TrackReaderTask]' = None):
         "clears all data"
         if parent is None:
-            self._data.clear()
+            self._items.clear()
         else:
-            self._data[parent].clear()
+            self._items[parent].clear()
 
     def register(self, processor = None):
         u"registers a task processor"

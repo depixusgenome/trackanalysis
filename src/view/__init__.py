@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 u"basic view module"
 from typing         import Optional     # pylint: disable=unused-import
-from control.event  import Controller    # pylint: disable=unused-import
+from control.event  import Controller
 
 class View:
     u"Classes to be passed a controller"

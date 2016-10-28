@@ -78,7 +78,10 @@ class TagAction(Enum):
 
 class TaggingTask(Task):
     u"Class for tagging tracks, beads ..."
-    locals().update(TagAction.__members__)                # type: ignore
+    none    = TagAction.none
+    keep    = TagAction.keep
+    remove  = TagAction.remove
+
     def __init__(self, level:Level, **kw) -> None:
         super().__init__(level = level)
         self.tags      = dict(kw.get('tags', []))         # type: Dict[str,Set[int]]

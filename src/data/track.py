@@ -3,11 +3,11 @@
 u"""
 Base track file data.
 """
-from    typing import Optional # pylint: disable=unused-import
+from    typing import Optional  # pylint: disable=unused-import
 import  pickle
-import  numpy   # type: ignore
+import  numpy                   # type: ignore
 
-import  legacy  # type: ignore # pylint: disable=import-error
+import  legacy                  # type: ignore # pylint: disable=import-error
 from    model       import levelprop, Level
 from   .trackitems  import Beads, Cycles
 
@@ -18,6 +18,8 @@ class Track:
         self._path      = kw.get('path', None)  # type: Optional[str]
         self._data      = None                  # type: Optional[Dict]
         self._cycles    = None                  # type: ignore
+        self._frequency = None                  # type: Optional[float]
+        self._nphases   = None                  # type: Optional[int]
 
     @property
     def frequency(self):

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Processors apply tasks to a data flow"
-from typing         import TYPE_CHECKING, Tuple # pylint: disable=unused-import
+from typing         import TYPE_CHECKING
 from abc            import ABCMeta, abstractmethod
 from functools      import wraps
 
@@ -10,8 +10,9 @@ from model.task     import Task, TrackReaderTask, CycleCreatorTask, TaggingTask
 from data           import Track, Cycles
 
 if TYPE_CHECKING:
-    # pylint: disable=unused-import,wrong-import-order
-    from .runner     import Runner
+    # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
+    from typing     import Tuple
+    from .runner    import Runner
 
 _PROTECTED = 'tasktype',
 class ProtectedDict(dict):

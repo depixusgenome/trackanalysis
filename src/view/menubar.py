@@ -6,18 +6,22 @@ from typing         import Optional     # pylint: disable=unused-import
 from flexx          import ui
 
 from control.event  import Controller
-from .dialog        import openfile, savefile
+from .dialog        import FileDialog
 from .              import View
 
 class  MenuBar(ui.Widget, View):
     u"Menu bar"
-    _box  = None # type: Optional[ui.HBox]
-    _save = None # type: Optional[ui.Button]
-    _open = None # type: Optional[ui.Button]
+    _box      = None # type: Optional[ui.HBox]
+    _save     = None # type: Optional[ui.Button]
+    _open     = None # type: Optional[ui.Button]
+    _diagopen = None # type: Optional[FileDialog]
+    _diagsave = None # type: Optional[FileDialog]
     def setCtrl(self, ctrl: Controller):
         u"Sets up the controller"
         obs = ctrl is not getattr(self, '_ctrl')
 
+        self._diagopen = FileDialog(filetypes = u'trk|ana|*')
+        self._diagsave = FileDialog(filetypes = u'ana|*')
         super().setCtrl(ctrl)
         if not obs:
             return
@@ -33,17 +37,18 @@ class  MenuBar(ui.Widget, View):
 
         ctrl.observe(_onUpdateGlobal)
 
+    def _onOpen(self, *_):
+        path = self._diagopen.open()
+        if path is not None:
+            self._ctrl.openTrack(path)
+
+    def _onSave(self,  *_):
+        path = self._diagsave.save()
+        if path is not None:
+            raise NotImplementedError("Yet to define an analysis IO")
+
     def init(self):
         u"initializes gui"
-        def _onOpen(*_):
-            path = openfile(filetypes = u'trk|*')
-            if path is not None:
-                self._ctrl.openTrack(path)
-
-        def _onSave(*_):
-            fname = savefile(filetypes = u'ana|*')
-            if fname is not None:
-                raise NotImplementedError("Yet to define an analysis IO")
 
         with ui.VBox(flex = 0):
             self._box = ui.HBox(flex = 0)
@@ -53,6 +58,6 @@ class  MenuBar(ui.Widget, View):
                 self._spacer = ui.Widget(flex = 1)
             ui.Widget(flex = 1)
 
-        self._open.connect('mouse_down', _onOpen)
-        self._save.connect('mouse_down', _onSave)
+        self._open.connect('mouse_down',  self._onOpen)
+        self._save.connect('mouse_down',  self._onSave)
         self._box.children = (self._open, self._spacer)

@@ -23,7 +23,10 @@ class EmitPolicy(Enum):
 
 class Event:
     u"Event handler class"
-    locals().update(EmitPolicy.__members__) # type: ignore
+    outasdict  = EmitPolicy.outasdict
+    outastuple = EmitPolicy.outastuple
+    inputs     = EmitPolicy.inputs
+    nothing    = EmitPolicy.nothing
 
     def __init__(self):
         self._handlers = dict() # type: Dict
@@ -32,7 +35,7 @@ class Event:
         u"removes an event"
         self._handlers.get(name, set()).discard(fcn)
 
-    def callhandlers(self, lst, policy, ret, args, kwargs): # pylint: disable=too-many-arguments
+    def callhandlers(self, lst, policy, ret):
         u"Call handlers only once: collect them all"
         allfcns = set()
         for name in lst.intersection(self._handlers):
@@ -40,16 +43,16 @@ class Event:
 
         if   policy is EmitPolicy.outasdict:
             for hdl in allfcns:
-                hdl(**ret)
+                hdl(**ret[0])
         elif policy is EmitPolicy.outastuple:
             for hdl in allfcns:
-                hdl(*ret)
+                hdl(*ret[0])
         elif policy is EmitPolicy.nothing:
             for hdl in allfcns:
                 hdl()
         else:
             for hdl in allfcns:
-                hdl(*args, **kwargs)
+                hdl(*ret[1], **ret[2])
         return ret
 
     _EM_NAME = re.compile(r'^_?(\w+)', re.IGNORECASE)
@@ -72,7 +75,7 @@ class Event:
             except NoEmission:
                 return
 
-            return this.callhandlers(lst, myrt, ret, args, kwargs)
+            return this.callhandlers(lst, myrt, (ret, args, kwargs))
         return _wrap
 
     @classmethod
@@ -85,7 +88,7 @@ class Event:
             except NoEmission:
                 return
 
-            return self.callhandlers(lst, myrt, ret, args, kwargs)
+            return self.callhandlers(lst, myrt, (ret, args, kwargs))
         return _wrap
 
     @classmethod
@@ -98,7 +101,7 @@ class Event:
             except NoEmission:
                 return
 
-            return this.callhandlers(lst, myrt, ret, args, kwargs)
+            return this.callhandlers(lst, myrt, (ret, args, kwargs))
         return _wrap
 
     @staticmethod

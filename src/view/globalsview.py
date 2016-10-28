@@ -8,32 +8,26 @@ class GlobalsView(View):
     def setCtrl(self, ctrl):
         u"sets up the observations"
         super().setCtrl(ctrl)
+        ctrl.observe(self._onOpenTrack, self._onCloseTrack,
+                     self._onAddTask,   self._onUpdateTask, self._onDeleteTask)
 
-        # pylint: disable=missing-docstring,unused-variable
-        update = self._ctrl.updateGlobal
-        delete = self._ctrl.deleteGlobal
-        get    = self._ctrl.getGlobal
+    def _onCloseTrack(self, old = None, **_):
+        isold = self._ctrl.getGlobal('task') is old
+        try:
+            tsk = next(next(self._ctrl.tasktree()))
+        except StopIteration:
+            self._ctrl.deleteGlobal('track'+ (('task',) if isold else tuple()))
+        else:
+            self._ctrl.updateGlobal(track = tsk, **({'task': tsk} if isold else {}))
 
-        def _onTasks():
-            def onOpenTrack(model = None, **_):
-                update(track = model, task = model)
+    def _onOpenTrack(self, model = None, **_):
+        self._ctrl.updateGlobal(track = model[0], task = model[0])
 
-            def onCloseTrack(old = None, **_):
-                isold = get('task') is old
-                try:
-                    tsk = next(next(self._ctrl.tasktree()))
-                except StopIteration:
-                    delete('track'+ (('task',) if isold else tuple()))
-                else:
-                    update(track = tsk, **({'task': tsk} if isold else {}))
+    def _onAddTask(self, parent = None, task = None, **_):
+        self._ctrl.updateGlobal(track = parent, task = task)
 
-            def onDeleteTask(parent = None, **_):
-                update(track = parent, task = parent)
+    def _onUpdateTask(self, parent = None, task = None, **_):
+        self._ctrl.updateGlobal(track = parent, task = task)
 
-            ctrl.observe(locals())
-
-            def onAddTask(parent = None, task = None, **_):
-                update(track = parent, task = task)
-
-            ctrl.observe('addTask', 'updateTask', onAddTask)
-        _onTasks()
+    def _onDeleteTask(self, parent = None, **_):
+        self._ctrl.updateGlobal(track = parent, task = parent)
