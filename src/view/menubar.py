@@ -18,19 +18,19 @@ class  MenuBar(ui.Widget, View):
     _diagsave = None # type: Optional[FileDialog]
     def setCtrl(self, ctrl: Controller):
         u"Sets up the controller"
-        obs = ctrl is not getattr(self, '_ctrl')
-
-        self._diagopen = FileDialog(filetypes = u'trk|ana|*')
-        self._diagsave = FileDialog(filetypes = u'ana|*')
+        self._diagopen = FileDialog(filetypes = u'trk|ana|*',
+                                    config    = ctrl,
+                                    title     = u'Open a track or analysis file')
+        self._diagsave = FileDialog(filetypes = u'ana|*',
+                                    config    = ctrl,
+                                    title     = u'Save an analysis file')
         super().setCtrl(ctrl)
-        if not obs:
-            return
 
         def _onUpdateGlobal(**items):
-            if self._box is None or 'track' not in items:
+            if self._box is None or 'current.track' not in items:
                 return
 
-            if items['track'].value is not items['empty']:
+            if items['current.track'].value is not items['empty']:
                 self._box.children = self._open, self._save, self._spacer
             else:
                 self._box.children = self._open, self._spacer

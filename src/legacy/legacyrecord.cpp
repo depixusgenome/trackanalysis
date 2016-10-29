@@ -9,8 +9,6 @@ namespace legacy
 {
     namespace
     {
-        constexpr static int const COMPLETELY_LOST = 1;
-        constexpr static int const XV_FIXED        = 0x100;
         typedef struct _micro_param {
             char* config_microscope_time;
             char* microscope_user_name;         /* the name of the microscope */

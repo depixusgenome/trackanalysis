@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 u""" Tests data access """
 import numpy
-import legacy   # pylint: disable=import-error
-import data     # pylint: disable=import-error
+from   legacy import readtrack   # pylint: disable=import-error,no-name-in-module
+import data
 from   testdata import path
 
 # pylint: disable=no-self-use
@@ -48,7 +48,7 @@ class TestCycleIteration:
                       .keys())
                 == tuple((0,i) for i in range(10)))
 
-        truth = legacy.readtrack(path("big_legacy"))[0]
+        truth = readtrack(path("big_legacy"))[0]
         for _, vals in track.cycles.selecting((0,1)):
             assert numpy.array_equal(vals, truth[1166-678:1654-678])
 
@@ -57,7 +57,7 @@ class TestCycleIteration:
 
     def test_lazy(self):
         u"tests what happens when using lazy mode"
-        truth = legacy.readtrack(path("big_legacy"))[0]
+        truth = readtrack(path("big_legacy"))[0]
         for _, vals in data.Cycles(track    = lambda:data.Track(path = path("big_legacy")),
                                    first    = lambda:2,
                                    last     = lambda:3,

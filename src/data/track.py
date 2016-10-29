@@ -7,7 +7,7 @@ from    typing import Optional  # pylint: disable=unused-import
 import  pickle
 import  numpy                   # type: ignore
 
-import  legacy                  # type: ignore # pylint: disable=import-error
+from    legacy      import readtrack   # pylint: disable=import-error,no-name-in-module
 from    model       import levelprop, Level
 from   .trackitems  import Beads, Cycles
 
@@ -48,7 +48,7 @@ class Track:
                 with open(self._path, 'rb') as stream:
                     kwargs = pickle.load(stream)
             else:
-                kwargs = legacy.readtrack(self._path)
+                kwargs = readtrack(self._path)
 
             for name in ('cycles', 'nphases', 'frequency'):
                 setattr(self, '_'+name, kwargs.pop(name))
