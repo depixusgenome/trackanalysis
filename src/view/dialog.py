@@ -33,6 +33,25 @@ class FileDialog:
         self.initialfile      = kwa.get('initialfile',     None)  # type: Optional[str]
         self.multiple         = kwa.get('multiple',        None)  # type: Optional[bool]
         self.title            = kwa.get('title',           None)  # type: Optional[str]
+        self.config           = None   # type: Tuple[Callable, Callable]
+
+        cnf = kwa.get('config', None)  # type: ignore
+        if hasattr(cnf, 'getConfig'):
+            self.config = self._getconfig(cnf), self._setconfig(cnf)
+        else:
+            self.config = cnf
+
+    @staticmethod
+    def _getconfig(cnf):
+        def _defaultpath(ext):
+            return cnf.getConfig('last.path.'+ext.replace('.', ''), default = None)
+        return _defaultpath
+
+    @staticmethod
+    def _setconfig(cnf):
+        def _defaultpath(ret):
+            return cnf.updateConfig(('last.path.'+ret[ret.rfind('.'):], ret))
+        return _defaultpath
 
     def _parse_filetypes(self, info:dict):
         if self.filetypes is None:
@@ -52,11 +71,28 @@ class FileDialog:
         elif not self.defaultextension.startswith('.'):
             info[self._KEXT] = self.DEFAULTS[self.defaultextension.strip().lower()][1]
 
+    def _parse_path(self, info:dict):
+        if self.config is None:
+            return
+
+        path = None
+        for _, ext in info[self._KFT]:
+            path = self.config[0](ext)
+            if path is None:
+                continue
+
+            info['initialdir']  = path[:path.rfind('/')]
+            info['initialfile'] = path[len(info['initialdir'])+1:]
+            break
+
     def _tk_run(self, keys, dialog:Callable):
         info = {key: getattr(self, key)
                 for key in keys if getattr(self, key) is not None}
+        info.pop('config', None)
+
         self._parse_filetypes(info)
         self._parse_extension(info)
+        self._parse_path(info)
 
         _Tk().withdraw()
         ret = dialog(**info)
@@ -64,7 +100,9 @@ class FileDialog:
             return None
 
         self.initialdir  = ret[:ret.rfind('/')]
-        self.initialfile = ret[len(self.initialdir):]
+        self.initialfile = ret[len(self.initialdir)+1:]
+        if self.config is not None:
+            self.config[1](ret)
         return ret
 
     def open(self):
