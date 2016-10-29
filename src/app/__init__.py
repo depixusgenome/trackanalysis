@@ -3,19 +3,28 @@
 u"Updates app manager so as to deal with controllers"
 import flexx.app as app
 
+from utils          import MetaMixin
 from control.event  import Controller
 from view           import View
 
-def _run(main, controls, views, fcn):
+def _run(main, controls, views, fcn): # pylint: disable=unused-argument
     u"Creates a main view"
     def init(self):
         u"sets up the controller, then initializes the view"
         main.init(self)
         self.setCtrl(self.MainControl())
 
+    class MainControl(metaclass = MetaMixin,
+                      mixins    = controls,
+                      shared    = ('_handlers',)):
+        u"""
+        Main controller: contains all sub-controllers.
+        These share a common dictionnary of handlers
+        """
+
     cls = type('Main', (main,)+views,
                dict(__doc__     = u"The main view",
-                    MainControl = type('MainControl', controls, dict()),
+                    MainControl = MainControl,
                     init        = init))
     return fcn(cls)
 
