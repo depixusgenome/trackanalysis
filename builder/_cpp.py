@@ -59,7 +59,8 @@ class Flags(Make):
         warnings = [
             '-Werror=implicit-function-declaration',
             '-W', '-Wall', '-Wextra','-Wno-write-strings', '-Wunused',
-            '-Wmaybe-uninitialized', '-fno-common', '-Winit-self', '-Winline', '-Wpacked',
+            '-Wuninitialized',
+            '-fno-common', '-Winit-self', '-Winline', '-Wpacked',
             '-Wpointer-arith', '-Wmissing-format-attribute',
             '-Wmissing-noreturn',
             '-Wswitch-enum', '-Wundef',
