@@ -85,15 +85,17 @@ class FileDialog:
             info['initialfile'] = path[len(info['initialdir'])+1:]
             break
 
-    def _tk_run(self, keys, dialog:Callable):
+    def _parse_all(self):
         info = {key: getattr(self, key)
-                for key in keys if getattr(self, key) is not None}
+                for key in self.__dict__ if getattr(self, key) is not None}
         info.pop('config', None)
 
         self._parse_filetypes(info)
         self._parse_extension(info)
         self._parse_path(info)
+        return info
 
+    def _tk_run(self, info:dict, dialog:Callable):
         _Tk().withdraw()
         ret = dialog(**info)
         if ret is None or len(ret) == 0:
@@ -107,8 +109,10 @@ class FileDialog:
 
     def open(self):
         u"Returns a filepath to be opened."
-        return self._tk_run(self.__dict__.keys(), _tkopen)
+        return self._tk_run(self._parse_all(), _tkopen)
 
     def save(self):
         u"Returns a filepath where to save to."
-        return self._tk_run(set(self.__dict__.keys()) - {'multiple'}, _tksave)
+        info = self._parse_all()
+        info.pop('multiple', None)
+        return self._tk_run(info, _tksave)

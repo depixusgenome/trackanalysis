@@ -206,6 +206,11 @@ class Event:
 
         return _add(names[:-1], names[-1])
 
+    def unobserve(self):
+        u"Clear all handlers"
+        self._handlers.clear()
+        self._handlers = dict()
+
 class Controller(Event):
     u"Main controller class"
     @classmethod

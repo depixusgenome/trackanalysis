@@ -16,7 +16,10 @@ class GlobalsController(Controller):
     def __init__(self):
         super().__init__()
         self.__defaults = {"keypress.undo": "Ctrl-z",
-                           "keypress.redo": "Ctrl-y"}
+                           "keypress.redo": "Ctrl-y",
+                           "keypress.open": "Ctrl-o",
+                           "keypress.save": "Ctrl-s",
+                           "keypress.quit": "Ctrl-q"}
         self.__config   = ChainMap(dict(), self.__defaults)
         self.__project  = {}
 

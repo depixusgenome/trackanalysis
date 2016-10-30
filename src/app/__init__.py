@@ -1,18 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Updates app manager so as to deal with controllers"
+from   functools      import wraps
+
 import flexx.app as app
 
 from utils          import MetaMixin
 from control.event  import Controller
 from view           import View
 
-def _run(main, controls, views, fcn): # pylint: disable=unused-argument
+def _create(main, controls, views): # pylint: disable=unused-argument
     u"Creates a main view"
     def init(self):
         u"sets up the controller, then initializes the view"
         main.init(self)
-        self.setCtrl(self.MainControl())
+        self.observe    (self.MainControl())
+        self.addKeyPress(quit = self.close)
+
+    def close(self):
+        u"closes the application"
+        self.popKeyPress(all)
+        self.unobserve()
+        self.session.close()
 
     class MainControl(metaclass = MetaMixin,
                       mixins    = controls,
@@ -25,8 +34,9 @@ def _run(main, controls, views, fcn): # pylint: disable=unused-argument
     cls = type('Main', (main,)+views,
                dict(__doc__     = u"The main view",
                     MainControl = MainControl,
+                    close       = close,
                     init        = init))
-    return fcn(cls)
+    return cls
 
 def setup(locs,
           mainview        = None,
@@ -43,13 +53,32 @@ def setup(locs,
     if defaultviews is all:
         defaultviews = get(View)
 
-    def serve(main = mainview, controls = defaultcontrols, views = defaultviews):
+    def serve(main     = mainview,
+              controls = defaultcontrols,
+              views    = defaultviews,
+              **kwa):
         u"Creates a browser app"
-        return _run(main, controls, views, app.serve)
+        kwa.setdefault("title", 'track analysis')
+        return app.serve(_create(main, controls, views), **kwa)
 
-    def launch(main = mainview, controls = defaultcontrols, views = defaultviews):
+    def launch(main     = mainview,
+               controls = defaultcontrols,
+               views    = defaultviews,
+               **kwa):
         u"Creates a desktop app"
-        return _run(main, controls, views, app.launch)
+        cls = _create(main, controls, views)
+
+        # next is to correct a bug in flexx
+        old = app.session.Session.close
+        @wraps(old)
+        def close(self):
+            u"closes app"
+            old(self)
+            app.call_later(0, app.stop)
+        app.session.Session.close = close
+
+        kwa.setdefault("title", 'track analysis')
+        return app.launch(cls, **kwa)
 
     locs.setdefault('serve',  serve)
     locs.setdefault('launch', launch)

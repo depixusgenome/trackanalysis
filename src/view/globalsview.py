@@ -5,18 +5,14 @@ from .              import View
 
 class GlobalsView(View):
     u"View listing all global info"
-    def setCtrl(self, ctrl):
+    def observe(self, ctrl):
         u"sets up the observations"
-        super().setCtrl(ctrl)
-        self.__observe(ctrl)
-
-    @staticmethod
-    def __observe(ctrl):
-        u"sets-up observer methods: depixus event loop"
-        # pylint: disable=unused-variable
+        super().observe(ctrl)
 
         ctask  = 'current.task'
         ctrack = 'current.track'
+
+        # pylint: disable=unused-variable
         def _onCloseTrack(old = None, **_):
             isold = ctrl.getGlobal(ctask) is old
             try:
