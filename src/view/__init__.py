@@ -25,23 +25,16 @@ class View:
             else:
                 children.extend(getattr(cur, 'children', []))
 
+    def connect(self, *_1, **_2):
+        u"Should be implemetented by flexx.ui.Widget"
+        raise NotImplementedError("View should derive from a flexx app")
+
     def observe(self, ctrl:Controller):
         u"Sets up the controller"
         if '_ctrl' not in self.__dict__:
             self._ctrl = ctrl
             self.addKeyPress()
-
-            keys = self._keys
-            def _onKeyPress(*evt):
-                if len(evt) != 1:
-                    return
-
-                cur = '-'.join(evt[0].modifiers)+'-'+evt[0].key
-                for name, fcn in keys.items():
-                    if cur == ctrl.getConfig("keypress."+name):
-                        fcn()
-                        break
-            getattr(self, 'connect')("key_press", _onKeyPress)
+            self.connect("key_press", self.__onKeyPress)
 
         children   = list(getattr(self, 'children', []))
         while len(children):
@@ -50,6 +43,16 @@ class View:
                 cur.observe(ctrl)
             else:
                 children.extend(getattr(cur, 'children', []))
+
+    def __onKeyPress(self, *evt):
+        if len(evt) != 1:
+            return
+
+        cur = '-'.join(evt[0].modifiers)+'-'+evt[0].key
+        for name, fcn in self._keys.items():
+            if cur == self._ctrl.getConfig("keypress."+name):
+                fcn()
+                break
 
     def addKeyPress(self, *args, **keys):
         u"sets-up keypress methods"
