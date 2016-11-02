@@ -4,7 +4,7 @@ u""" Tests legacy data """
 import  flexx.app       as flexxapp
 
 import  app.default     as defaultapp   # pylint: disable=no-member,import-error
-from    view.menubar    import MenuBar  # pylint: disable=no-member,import-error
+from    view.toolbar    import ToolBar  # pylint: disable=no-member,import-error
 import  view.dialog
 from    testdata        import path
 
@@ -32,7 +32,7 @@ def test_menubar(monkeypatch):
 
     monkeypatch.setattr(view.dialog, '_tkopen', _tkopen)
 
-    elem = defaultapp.launch(MenuBar) # pylint: disable=no-member
+    elem = defaultapp.launch(ToolBar) # pylint: disable=no-member
 
     asserts = []
     def _actions():

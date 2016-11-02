@@ -71,7 +71,6 @@ class View:
             for arg in args:
                 self._keys.pop(arg, None)
 
-
     def button(self, fcn:Callable, keypress:str, **kwa):
         u"creates and connects a button"
         if 'text' not in kwa:

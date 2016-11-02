@@ -8,7 +8,7 @@ from flexx          import ui
 from .dialog        import FileDialog
 from .              import View
 
-class  MenuBar(ui.Widget, View):
+class  ToolBar(ui.Widget, View):
     u"Menu bar"
     _box      = None # type: Optional[ui.HBox]
     _save     = None # type: Optional[ui.Button]
@@ -29,12 +29,12 @@ class  MenuBar(ui.Widget, View):
         def _onUpdateGlobal(**items):
             if 'current.track' not in items:
                 return
-
             children = list(box.children)
             if items['current.track'].value is not items['empty']:
                 children.insert(1, save)
             else:
                 children.pop(1)
+
             box.children = children
 
         ctrl.observe(_onUpdateGlobal)

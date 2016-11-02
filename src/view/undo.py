@@ -63,6 +63,10 @@ class UndoView(View):
 
         ctrl.observe([_do(fcn) for name, fcn in locals().items() if name[:3] == '_on'])
 
+    def connect(self, *_1, **_2):
+        u"Should be implemetented by flexx.ui.Widget"
+        raise NotImplementedError("View should derive from a flexx app")
+
     def undo(self):
         u"undoes one action"
         if len(self.__uqueue) == 0:
