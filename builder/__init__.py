@@ -52,10 +52,36 @@ def register(name:str, fcn:Callable[[Context], None], glob:dict):
 
 def addbuild(name:str, glob:dict):
     u"Registers a command from a child wscript"
-    if '/' in name:
-        glob["build_"+name[name.rfind('/')+1:]] = lambda bld: bld.recurse(name)
-    else:
-        glob["build_"+name] = lambda bld: bld.recurse(name)
+    def _fcn(bld):
+        bld.recurse(name)
+    _fcn.__doc__  = u'Build module "{}"'.format(name)
+    ldoc          = len(_fcn.__doc__)
+    _fcn.__name__ = 'build_'+name[(name.rfind('/')+1) if '/' in name else 0:]
+
+    def _doc(path):
+        if not os.path.exists(path):
+            return
+        with open(path, "r") as stream:
+            bnext = False
+            for line in stream:
+                if bnext:
+                    print(line)
+                    if '.' in line:
+                        line = line[:line.rfind('.')]
+                    _fcn.__doc__  += u": " + line.strip()
+                    break
+                if line.startswith('u"""'):
+                    bnext = True
+                elif line.startswith('u"'):
+                    _fcn.__doc__  += u": " + line[2:-2].strip()
+                    break
+        return ldoc < len(_fcn.__doc__)
+
+    if not _doc(name+'/wscript'):
+        _doc(name+'/__init__.py')
+
+    _fcn.__name__ = 'build_'+name[(name.rfind('/')+1) if '/' in name else 0:]
+    glob[_fcn.__name__] = _fcn
 
 def make(glob, **kw):
     u"sets default values to wscript global variables"
