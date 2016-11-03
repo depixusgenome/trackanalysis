@@ -7,6 +7,7 @@ Classes defining a type of data treatment.
 """
 from typing     import Optional, Sequence # pylint: disable=unused-import
 from enum       import Enum, unique
+from utils      import toenum
 from .level     import Level
 
 class TaskIsUniqueError(Exception):
@@ -29,13 +30,13 @@ class Task:
     u"Class containing high-level configuration infos for a task"
     def __init__(self, **kwargs) -> None:
         if 'level' in kwargs:
-            self.level = kwargs['level'] # type: Level
+            self.level = toenum(Level, kwargs['level']) # type: Level
         else:
             if 'levelin' in kwargs:
-                self.levelin = kwargs['levelin']
+                self.levelin = toenum(Level, kwargs['levelin'])
 
             if 'levelou' in kwargs:
-                self.levelou = kwargs['levelou']
+                self.levelou = toenum(Level, kwargs['levelou'])
 
         if ('levelin' in kwargs or 'levelou' in kwargs) and ('level' in kwargs):
             raise KeyError('Specify only "level" or both "levelin", "levelou"')
@@ -84,9 +85,9 @@ class TaggingTask(Task):
 
     def __init__(self, level:Level, **kw) -> None:
         super().__init__(level = level)
-        self.tags      = dict(kw.get('tags', []))         # type: Dict[str,Set[int]]
-        self.selection = set (kw.get('tags', []))         # type: Set
-        self.action    = kw.get('action', TagAction.none) # type: TagAction
+        self.tags      = dict(kw.get('tags', []))  # type: Dict[str,Set[int]]
+        self.selection = set (kw.get('tags', []))  # type: Set
+        self.action    = toenum(TagAction, kw.get('action', 'none')) # type: TagAction
 
     def selected(self, item) -> bool:
         u"Returns whether an item is selected"

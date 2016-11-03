@@ -7,7 +7,7 @@ from functools      import wraps
 from enum           import Enum, unique
 from typing         import Callable, cast
 
-from utils          import ismethod, isfunction
+from utils          import ismethod, isfunction, toenum
 
 class NoEmission(Exception):
     u"can be raised to stop an emission"
@@ -114,7 +114,7 @@ class Event:
 
     def emit(self, *names, returns = EmitPolicy.inputs):
         u"wrapped methow will fire events named in arguments"
-        def _wrapper(fcn:Callable, myrt = returns):
+        def _wrapper(fcn:Callable, myrt = toenum(EmitPolicy, returns)):
             lst = self._emissionList(names, fcn)
 
             if ismethod(fcn):

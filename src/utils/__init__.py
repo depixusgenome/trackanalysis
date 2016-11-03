@@ -8,6 +8,16 @@ from contextlib     import contextmanager
 from inspect        import signature, ismethod as _ismeth, isfunction as _isfunc, getmembers
 import re
 
+def toenum(tpe, val):
+    u"returns an enum object"
+    if isinstance(val, str):
+        return tpe.__members__[val]
+    elif isinstance(val, int):
+        return tpe(val)
+    elif isinstance(val, tpe):
+        return val
+    elif val is not None:
+        raise TypeError('"level" attribute has incorrect type')
 
 def isfunction(fcn) -> bool:
     u"Returns whether the object is a function"
