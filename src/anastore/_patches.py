@@ -12,4 +12,5 @@ _LOCS = locals()
 def run(info, fromv, tov):
     u"updates json to current version"
     for ind in range(fromv+1, tov+1):
-        _LOCS['to_version_'+str(ind)](info)
+        info = _LOCS['to_version_'+str(ind)](info)
+    return info

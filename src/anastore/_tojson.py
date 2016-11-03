@@ -3,19 +3,18 @@
 u"Track Analysis conversion to json'able items."
 from    abc     import ABCMeta, abstractmethod
 from    enum    import Enum
-import  pickle
 import  numpy
 
 from    ._utils import isjsonable
 
 class _ItemIO(metaclass=ABCMeta):
-    @abstractmethod
     @staticmethod
+    @abstractmethod
     def check(val):
         u"returns wether this class deals with val"
 
-    @abstractmethod
     @staticmethod
+    @abstractmethod
     def run(val, runner):
         u"returns the dict to be dumped"
 
@@ -23,13 +22,23 @@ class _ContainerIO(_ItemIO):
     @staticmethod
     def check(val):
         u"returns wether this class deals with val"
-        return isinstance(val, (set, frozenset, list, tuple))
+        return isinstance(val, (set, frozenset, tuple))
 
     @staticmethod
     def run(val, runner):
         u"returns the dict to be dumped"
-        return {"c": type(val).__name__[0],
-                "v": tuple(runner(ite) for ite in val)}
+        return {"c": type(val).__name__[0], "v": runner(list(val))}
+
+class _ListIO(_ItemIO):
+    @staticmethod
+    def check(val):
+        u"returns wether this class deals with val"
+        return isinstance(val, list)
+
+    @staticmethod
+    def run(val, runner):
+        u"returns the dict to be dumped"
+        return [runner(ite) for ite in val]
 
 class _DictIO(_ItemIO):
     @staticmethod
@@ -40,9 +49,15 @@ class _DictIO(_ItemIO):
     @staticmethod
     def run(val, runner):
         u"returns the dict to be dumped"
-        return {name: runner(ite) for name, ite in val.items()}
+        if all(isinstance(key, str) for key in val):
+            if isjsonable(val):
+                return val
+            else:
+                return {name: runner(ite) for name, ite in val.items()}
+        else:
+            vals = [[runner(name), runner(ite)] for name, ite in val.items()]
+            return {'c': 'd', 'v': vals}
 
-_MAXNPARRAY = 100
 class _NDArrayIO(_ItemIO):
     @staticmethod
     def check(val):
@@ -51,11 +66,9 @@ class _NDArrayIO(_ItemIO):
 
     @staticmethod
     def run(val, runner):
-        u"returns the dict to be dumped"
-        if val.dtype is not numpy.object and len(val) > _MAXNPARRAY:
-            return dict(c = 'pk',                v = pickle.dumps(val))
-        elif val.dtype is numpy.object:
-            vals = tuple(runner(ite) for ite in val)
+        u"returns thishe dict to be dumped"
+        if val.dtype == numpy.object:
+            vals = [runner(ite) for ite in val]
             return dict(c = 'npo',               v = vals)
         else:
             return dict(c = 'np'+str(val.dtype), v = val.tolist())
@@ -69,7 +82,7 @@ class _EnumIO(_ItemIO):
     @staticmethod
     def run(val, runner):
         u"returns the dict to be dumped"
-        return val.name()
+        return val.name
 
 class Runner:
     u"runs item to json'able object"

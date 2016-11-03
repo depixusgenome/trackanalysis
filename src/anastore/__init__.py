@@ -13,13 +13,11 @@ from ._patches  import run    as _patch
 
 __VERSION__ = 0
 def _dump(info):
-    items            = _OutputRunner()(info)
-    items['version'] = __VERSION__
-    return items
+    return [{'version': __VERSION__}, _OutputRunner()(info)]
 
 def _load(info):
-    _patch(info, info.pop('version')+1, __VERSION__)
-    return _InputRunner()(info)
+    patched = _patch(info[1], info[0]['version'], __VERSION__)
+    return _InputRunner()(patched)
 
 def dumps(info, **kwa):
     u"Dumps data to json. This includes the version number"

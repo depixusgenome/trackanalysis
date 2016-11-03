@@ -2,16 +2,16 @@
 # -*- coding: utf-8 -*-
 u"Utils for io"
 
+_LST = frozenset((str, int, float, type(None)))
 def isjsonable(item)-> bool:
     u"Wether this item can be json'ed without conversion"
     tpe = type(item)
-    lst = str, int, float
-    if tpe in (list, tuple):
+    if tpe is list:
         # pylint: disable=unidiomatic-typecheck
-        return all(type(i) in lst for i in item)
+        return all(type(i) in _LST for i in item)
     if tpe is dict:
         # pylint: disable=unidiomatic-typecheck
-        return all(type(i) in lst and type(j) in lst for i, j in item.items())
+        return all(type(i) in _LST and type(j) in _LST for i, j in item.items())
 
-    return tpe in lst
+    return tpe in _LST
 
