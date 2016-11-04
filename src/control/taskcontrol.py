@@ -110,7 +110,7 @@ class TaskController(Controller):
         u"saves the current model"
         _anasave([item.model for item in self._items.values()], path)
 
-    @Controller.emit(returns = Controller.outasdict)
+    @Controller.emit
     def openTrack(self, task: 'Union[str,TrackReaderTask]', model = tuple()):
         u"opens a new file"
         if isinstance(task, str):
@@ -137,21 +137,21 @@ class TaskController(Controller):
         self._items[task] = pair
         return dict(controller = self, model = tasks)
 
-    @Controller.emit(returns = Controller.outasdict)
+    @Controller.emit
     def closeTrack(self, task:TrackReaderTask):
         u"opens a new file"
         old = tuple(self._items[task].model)
         del self._items[task]
         return dict(controller = self, task = task, model = old)
 
-    @Controller.emit(returns = Controller.outasdict)
+    @Controller.emit
     def addTask(self, parent:TrackReaderTask, task:Task, index = None):
         u"opens a new file"
         old = tuple(self._items[parent].model)
         self._items[parent].add(task, self._processors[type(task)], index = index)
         return dict(controller = self, parent = parent, task = task, old = old)
 
-    @Controller.emit(returns = Controller.outasdict)
+    @Controller.emit
     def updateTask(self, parent:TrackReaderTask, task:Union[Task,int,type], **kwargs):
         u"updates a task"
         tsk = self.task(parent, task, noemission = True)
@@ -159,7 +159,7 @@ class TaskController(Controller):
         self._items[parent].update(tsk)
         return dict(controller = self, parent = parent, task = tsk, old = old)
 
-    @Controller.emit(returns = Controller.outasdict)
+    @Controller.emit
     def removeTask(self, parent:TrackReaderTask, task:Union[Task,int,type]):
         u"removes a task"
         tsk = self.task(parent, task, noemission = True)
@@ -174,6 +174,7 @@ class TaskController(Controller):
             self._items.clear()
         else:
             self._items[parent].clear()
+        return dict(controller = self, parent = parent)
 
     def register(self, processor = None):
         u"registers a task processor"
