@@ -65,7 +65,6 @@ def addbuild(name:str, glob:dict):
             bnext = False
             for line in stream:
                 if bnext:
-                    print(line)
                     if '.' in line:
                         line = line[:line.rfind('.')]
                     _fcn.__doc__  += u": " + line.strip()
