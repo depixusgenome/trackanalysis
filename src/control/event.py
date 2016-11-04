@@ -112,7 +112,7 @@ class Event:
         else:
             return fcn
 
-    def emit(self, *names, returns = EmitPolicy.inputs):
+    def emit(self, *names, returns = EmitPolicy.outasdict):
         u"wrapped methow will fire events named in arguments"
         def _wrapper(fcn:Callable, myrt = toenum(EmitPolicy, returns)):
             lst = self._emissionList(names, fcn)
@@ -124,7 +124,7 @@ class Event:
         return self._returnWrapper(names, _wrapper)
 
     @classmethod
-    def internalemit(cls, *names, returns = EmitPolicy.inputs):
+    def internalemit(cls, *names, returns = EmitPolicy.outasdict):
         u"wrapped methow will fire events named in arguments"
         def _wrapper(fcn:Callable, myrt = returns):
             lst = cls._emissionList(names, fcn)

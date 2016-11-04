@@ -23,13 +23,13 @@ class TestEvent:
         calls  = []
         class _Ctrl:
             @staticmethod
-            @events.emit
+            @events.emit(returns = EmitPolicy.inputs)
             def event1(*_1, **_2):
                 calls.append("e1")
                 return 1
 
             @classmethod
-            @events.emit(returns = EmitPolicy.outasdict)
+            @events.emit
             def event2(cls, *_1, **_2):
                 calls.append("e2")
                 return dict(name = 'e2')
@@ -45,7 +45,7 @@ class TestEvent:
                 calls.append("e4")
                 return ('e4',)
 
-        @events.emit('event5', 'event6')
+        @events.emit('event5', 'event6', returns = EmitPolicy.inputs)
         def event5(*_1, **_2):
             calls.append("e5")
             return ('e5',)
