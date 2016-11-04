@@ -5,7 +5,7 @@ from    abc     import ABCMeta, abstractmethod
 from    enum    import Enum
 import  numpy
 
-from    ._utils import isjsonable
+from    ._utils import isjsonable, CNT, TPE
 
 class _ItemIO(metaclass=ABCMeta):
     @staticmethod
@@ -27,7 +27,7 @@ class _ContainerIO(_ItemIO):
     @staticmethod
     def run(val, runner):
         u"returns the dict to be dumped"
-        return {"c": type(val).__name__[0], "v": runner(list(val))}
+        return {TPE: type(val).__name__[0], CNT: runner(list(val))}
 
 class _ListIO(_ItemIO):
     @staticmethod
@@ -56,7 +56,7 @@ class _DictIO(_ItemIO):
                 return {name: runner(ite) for name, ite in val.items()}
         else:
             vals = [[runner(name), runner(ite)] for name, ite in val.items()]
-            return {'c': 'd', 'v': vals}
+            return {TPE: 'd', CNT: vals}
 
 class _NDArrayIO(_ItemIO):
     @staticmethod
@@ -69,9 +69,9 @@ class _NDArrayIO(_ItemIO):
         u"returns thishe dict to be dumped"
         if val.dtype == numpy.object:
             vals = [runner(ite) for ite in val]
-            return dict(c = 'npo',               v = vals)
+            return {TPE: 'npo', CNT: vals}
         else:
-            return dict(c = 'np'+str(val.dtype), v = val.tolist())
+            return {TPE: 'np'+str(val.dtype), CNT: val.tolist()}
 
 class _EnumIO(_ItemIO):
     @staticmethod
@@ -104,5 +104,5 @@ class Runner:
         for name, val in item.__dict__.items():
             dico[name] = self(val)
 
-        dico['c'] = item.__class__.__module__+'.'+item.__class__.__name__
+        dico[TPE] = item.__class__.__module__+'.'+item.__class__.__name__
         return dico

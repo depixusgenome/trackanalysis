@@ -13,6 +13,7 @@ from typing         import (Union, Iterator, Tuple, # pylint: disable=unused-imp
                             Optional, Any, List)
 
 from model.task     import Task, TrackReaderTask, TaskIsUniqueError
+from anastore       import load as _anaopen, dump as _anasave
 from .event         import Controller, NoEmission
 from .processor     import Cache, Processor, run as _runprocessors
 
@@ -104,13 +105,29 @@ class TaskController(Controller):
         """
         return _runprocessors(self._items[parent].data, tsk)
 
+    @Controller.emit
+    def saveTrack(self, path: str):
+        u"saves the current model"
+        _anasave([item.model for item in self._items.values()], path)
+
     @Controller.emit(returns = Controller.outasdict)
     def openTrack(self, task: 'Union[str,TrackReaderTask]', model = tuple()):
         u"opens a new file"
         if isinstance(task, str):
-            task = TrackReaderTask(path = task)
             if len(model):
                 raise NotImplementedError()
+
+            models = _anaopen(task)
+            if models is None:
+                model = tuple()
+                task  = TrackReaderTask(path = task)
+            elif len(models) == 1:
+                model = models[0]
+                task  = model [0]
+            else:
+                for model in models:
+                    self.openTrack(model[0], model)
+                raise NoEmission("Done everything already")
 
         pair  = TaskPair()
         tasks = (model if len(model) else (task,))

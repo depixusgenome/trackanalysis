@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 u"Utils for io"
 
+CNT  = '∈'
+TPE  = '≡'
 _LST = frozenset((str, int, float, type(None)))
 def isjsonable(item)-> bool:
     u"Wether this item can be json'ed without conversion"

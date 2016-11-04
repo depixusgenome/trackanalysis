@@ -6,6 +6,7 @@ Track Analysis inputs and outputs.
 This does not include track files io.
 """
 import json
+import os
 
 from ._fromjson import Runner as _InputRunner
 from ._tojson   import Runner as _OutputRunner
@@ -23,14 +24,33 @@ def dumps(info, **kwa):
     u"Dumps data to json. This includes the version number"
     return json.dumps(_dump(info), **kwa)
 
-def dump(info, stream, **kwa):
+def dump(info, arg, **kwa):
     u"Dumps data to json file. This includes the version number"
-    return json.dump(_dump(info), stream, **kwa)
+    if isinstance(arg, str):
+        with open(arg, 'w') as stream:
+            return json.dump(_dump(info), stream, **kwa)
+    return json.dump(_dump(info), arg, **kwa)
 
 def loads(stream, **kwa):
     u"Dumps data to json. This includes the version number"
     return _load(json.loads(stream, **kwa))
 
-def load(stream, **kwa):
+def load(arg, **kwa):
     u"Dumps data to json file. This includes the version number"
-    return _load(json.load(stream, **kwa))
+    if isinstance(arg, str):
+        if isana(arg):
+            with open(arg) as stream:
+                return _load(json.load(stream, **kwa))
+        return None
+    return _load(json.load(arg, **kwa))
+
+def isana(path):
+    u"Wether the file as an analysis file"
+    if not (os.path.exists(path) and os.path.isfile(path)):
+        return False
+
+    try:
+        with open(path, 'r') as stream:
+            return stream.read(len('[{"version":')) == '[{"version":'
+    except: # pylint: disable=bare-except
+        return False

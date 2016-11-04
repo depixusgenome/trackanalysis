@@ -46,7 +46,7 @@ class  ToolBar(ui.Widget, View):
         del self._diagsave
 
     def _onOpen(self, *_):
-        path = self._diagopen.open()
+        path  = self._diagopen.open()
         if path is not None:
             self._ctrl.openTrack(path)
 
@@ -56,7 +56,7 @@ class  ToolBar(ui.Widget, View):
 
         path = self._diagsave.save()
         if path is not None:
-            raise NotImplementedError("Yet to define an analysis IO")
+            self._ctrl.saveTrack(path)
 
     def close(self):
         u"closes the application"

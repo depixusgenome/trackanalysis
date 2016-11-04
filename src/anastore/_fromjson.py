@@ -3,7 +3,7 @@
 u"Track Analysis conversion from json'able items."
 import  numpy
 
-from    ._utils     import isjsonable
+from    ._utils     import isjsonable, CNT, TPE
 
 _CONTINUE = type('_CONTINUE', tuple(), dict())
 
@@ -12,12 +12,12 @@ class _ItemIO:
     @classmethod
     def check(cls, val):
         u"returns wether this class deals with val"
-        return isinstance(val, dict) and val.get('c', None) in cls._CONTENTS
+        return isinstance(val, dict) and val.get(TPE, None) in cls._CONTENTS
 
     @classmethod
     def run(cls, val, runner):
         u"returns the loaded item"
-        return cls._CONTENTS[val['c']](runner(val['v']))
+        return cls._CONTENTS[val[TPE]](runner(val[CNT]))
 
 class _ListIO(_ItemIO):
     @staticmethod
@@ -34,7 +34,7 @@ class _DictIO(_ItemIO):
     @staticmethod
     def check(val):
         u"returns wether this class deals with val"
-        return isinstance(val, dict) and 'c' not in val
+        return isinstance(val, dict) and TPE not in val
 
     @staticmethod
     def run(val, runner):
@@ -45,15 +45,15 @@ class _NDArrayIO(_ItemIO):
     @staticmethod
     def check(val):
         u"returns wether this class deals with val"
-        return isinstance(val, dict) and val.get('c', None).startswith('np')
+        return isinstance(val, dict) and val.get(TPE, None).startswith('np')
 
     @staticmethod
     def run(val, runner):
         u"returns the loaded item"
-        if val['c'] == 'npo':
-            return numpy.array(tuple(runner(ite) for ite in val['v']),
+        if val[TPE] == 'npo':
+            return numpy.array(tuple(runner(ite) for ite in val[CNT]),
                                dtype = numpy.object)
-        return numpy.array(val['v'], dtype = val['c'][2:])
+        return numpy.array(val[CNT], dtype = val[TPE][2:])
 
 class Runner:
     u"loads json'ables"
@@ -64,16 +64,16 @@ class Runner:
             self.lookups = lookups
 
     def __call__(self, item):
-        if not (isinstance(item, dict) and 'c' in item) and isjsonable(item):
+        if not (isinstance(item, dict) and TPE in item) and isjsonable(item):
             return item
 
         for cls in self.lookups:
             if cls.check(item):
                 return cls.run(item, self)
 
-        assert 'c' in item and '.' in item['c']
+        assert TPE in item and '.' in item[TPE]
 
-        elems = item.pop('c').split('.')
+        elems = item.pop(TPE).split('.')
         cls   = getattr(__import__('.'.join(elems[:-1]), fromlist = elems[-1:]),
                         elems[-1])
 
