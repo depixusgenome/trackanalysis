@@ -2,15 +2,56 @@
 # -*- coding: utf-8 -*-
 u"basic view module"
 from typing         import Optional, Dict, Callable # pylint: disable=unused-import
+from functools      import wraps
 
 from flexx          import ui
 
 from control.event  import Controller
 
+class ActionDescriptor:
+    u"""
+    For user gui action: surrounds controller action with 2 events.
+
+    This can also be as a descriptor, or a decorator
+    """
+    def __call__(self, fcn):
+        @wraps(fcn)
+        def _wrap(this, *args, **kwargs):
+            with Action(this._ctrl): # pylint: disable=protected-access
+                return fcn(this, *args, **kwargs)
+        return _wrap
+
+    def __get__(self, obj, tpe):
+        if obj is None:
+            # called as a class attribute: to be used as a decorator
+            return self
+        else:
+            # called as an instance attribute:
+            # can be used as a context or a decorator
+            return Action(obj._ctrl) # pylint: disable=protected-access
+
+class Action(ActionDescriptor):
+    u"""
+    For user gui action: surrounds controller action with 2 events.
+
+    This can also be as a descriptor, or a decorator
+    """
+    def __init__(self, ctrl = None):
+        self._ctrl = ctrl
+
+    def __enter__(self):
+        self._ctrl.handle("startaction")
+        return self
+
+    def __exit__(self, tpe, val, bkt):
+        self._ctrl.handle("stopaction",
+                          args = {'type': tpe, 'value': val, 'backtrace': bkt})
+        return False
+
 class View:
     u"Classes to be passed a controller"
-    _ctrl = None    # type: Controller
-    _keys = dict()  # type: Dict[str,Callable]
+    _ctrl   = None    # type: Controller
+    _keys   = dict()  # type: Dict[str,Callable]
     def unobserve(self):
         u"Removes the controller"
         if '_ctrl' in self.__dict__:
@@ -32,7 +73,7 @@ class View:
     def observe(self, ctrl:Controller):
         u"Sets up the controller"
         if '_ctrl' not in self.__dict__:
-            self._ctrl = ctrl
+            self._ctrl   = ctrl
             self.addKeyPress()
             self.connect("key_press", self.__onKeyPress)
 
@@ -79,3 +120,5 @@ class View:
         btn = ui.Button(**kwa)
         btn.connect('mouse_down', fcn)
         self.addKeyPress((keypress, fcn))
+
+    action = ActionDescriptor()

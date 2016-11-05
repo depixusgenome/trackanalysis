@@ -45,11 +45,13 @@ class  ToolBar(ui.Widget, View):
         del self._diagopen
         del self._diagsave
 
+    @View.action
     def _onOpen(self, *_):
         path  = self._diagopen.open()
         if path is not None:
             self._ctrl.openTrack(path)
 
+    @View.action
     def _onSave(self,  *_):
         if self._save not in self._box.children:
             return

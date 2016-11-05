@@ -3,7 +3,6 @@
 u"Deals with undos"
 from functools      import wraps
 from collections    import deque
-from time           import sleep
 from .              import View
 
 class UndoView(View):
@@ -29,21 +28,19 @@ class UndoView(View):
         self.__uqueue    = deque(maxlen = 1000)
         self.__rqueue    = deque(maxlen = 1000)
 
+        curr = [None]
         def _do(fcn):
-            isundoing = self.__isundoing
-            uqueue    = self.__uqueue
-            rqueue    = self.__rqueue
             @wraps(fcn)
             def _wrap(**kwargs):
-                if  isundoing[0]:
-                    rqueue.append(fcn(**kwargs))
-                else:
-                    uqueue.append(fcn(**kwargs))
-                    rqueue.clear()
+                curr[0].append(fcn(**kwargs))
             return _wrap
 
-        _1 = None
+        isundoing = self.__isundoing
+        uqueue    = self.__uqueue
+        rqueue    = self.__rqueue
+
         # pylint: disable=unused-variable
+        _1  = None
         def _onOpenTrack(controller = _1, model = _1, **_):
             task = model[0]
             return lambda: controller.closeTrack(task)
@@ -63,30 +60,41 @@ class UndoView(View):
 
         ctrl.observe([_do(fcn) for name, fcn in locals().items() if name[:3] == '_on'])
 
+        @ctrl.observe
+        def _onstartaction():
+            curr[0] = []
+            if not isundoing[0]:
+                rqueue.clear()
+
+        @ctrl.observe
+        def _onstopaction(**_):
+            items   = curr[0]
+            curr[0] = None
+            if len(items) != 0:
+                (rqueue if isundoing[0] else uqueue).append(items)
+
     def connect(self, *_1, **_2):
         u"Should be implemetented by flexx.ui.Widget"
         raise NotImplementedError("View should derive from a flexx app")
 
-    def undo(self):
-        u"undoes one action"
-        if len(self.__uqueue) == 0:
+    def _apply(self):
+        queue = self.__uqueue if self.__isundoing[0] else self.__rqueue
+        if len(queue) == 0:
             return
 
-        while self.__isundoing[0]:
-            sleep(.01)
+        items = queue.pop()
+        with self.action:
+            for fcn in items:
+                fcn()
 
+    def undo(self):
+        u"undoes one action"
+        self.__isundoing[0] = True
         try:
-            self.__isundoing[0] = True
-            nbu, nbr = len(self.__uqueue), len(self.__rqueue)
-
-            self.__uqueue.pop()()
-
-            assert (nbu-1, nbr+1) == (len(self.__uqueue), len(self.__rqueue))
+            self._apply()
         finally:
             self.__isundoing[0] = False
 
     def redo(self):
         u"redoes one action"
-        if len(self.__rqueue) == 0:
-            return
-        self.__rqueue.pop()()
+        self._apply()
