@@ -30,20 +30,19 @@ class TestEvent:
 
             @classmethod
             @events.emit
-            def event2(cls, *_1, **_2):
+            def event2(cls, *_1, **_2) -> dict:
                 calls.append("e2")
                 return dict(name = 'e2')
 
-            @events.emit(returns = EmitPolicy.outastuple)
-            def event3(self, *_1, **_2):
+            @events.emit
+            def event3(self, *_1, **_2) -> tuple:
                 calls.append("e3")
                 return ('e3',)
 
             @staticmethod
-            @events.emit(returns = EmitPolicy.nothing)
-            def event4(*_1, **_2):
+            @events.emit
+            def event4(*_1, **_2) -> None:
                 calls.append("e4")
-                return ('e4',)
 
         @events.emit('event5', 'event6', returns = EmitPolicy.inputs)
         def event5(*_1, **_2):

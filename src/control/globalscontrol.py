@@ -54,13 +54,13 @@ class GlobalsController(Controller):
                 return items[keys[0]]
             return iter(items[key] for key in keys)
 
-    @Controller.emit(returns = Controller.outasdict)
-    def updateGlobal(self, *args, **kwargs):
+    @Controller.emit
+    def updateGlobal(self, *args, **kwargs) -> dict:
         u"updates view information"
         return self.__update(self.__project, args, kwargs)
 
-    @Controller.emit(returns = Controller.outasdict)
-    def updateConfig(self, *args, **kwargs):
+    @Controller.emit
+    def updateConfig(self, *args, **kwargs) -> dict:
         u"updates view information"
         return self.__update(self.__config, args, kwargs)
 

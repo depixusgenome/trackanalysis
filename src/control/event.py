@@ -5,7 +5,8 @@ import re
 
 from functools      import wraps
 from enum           import Enum, unique
-from typing         import Callable, cast
+from typing         import (Dict, Union, Sequence, # pylint: disable=unused-import
+                            Callable, Tuple, Any, Set, Optional, cast)
 
 from utils          import ismethod, isfunction, toenum
 
@@ -16,48 +17,27 @@ class NoEmission(Exception):
 @unique
 class EmitPolicy(Enum):
     u"what elements to add to a fired event"
-    outasdict  = 0
-    outastuple = 1
-    inputs     = 2
-    nothing    = 3
+    outasdict   = 0
+    outastuple  = 1
+    inputs      = 2
+    nothing     = 3
+    annotations = 4
 
 class Event:
     u"Event handler class"
-    outasdict  = EmitPolicy.outasdict
-    outastuple = EmitPolicy.outastuple
-    inputs     = EmitPolicy.inputs
-    nothing    = EmitPolicy.nothing
+    outasdict   = EmitPolicy.outasdict
+    outastuple  = EmitPolicy.outastuple
+    inputs      = EmitPolicy.inputs
+    nothing     = EmitPolicy.nothing
+    annotations = EmitPolicy.annotations
+    _EM_NAME    = re.compile(r'^_?(\w+)',     re.IGNORECASE)
+    _OBS_NAME   = re.compile(r'^_?on_?(\w+)', re.IGNORECASE)
 
     def __init__(self):
         self._handlers = dict() # type: Dict
 
-    def remove(self, name:str, fcn:Callable):
-        u"removes an event"
-        self._handlers.get(name, set()).discard(fcn)
-
-    def callhandlers(self, lst, policy, ret):
-        u"Call handlers only once: collect them all"
-        allfcns = set()
-        for name in lst.intersection(self._handlers):
-            allfcns.update(self._handlers[name])
-
-        if   policy is EmitPolicy.outasdict:
-            for hdl in allfcns:
-                hdl(**ret[0])
-        elif policy is EmitPolicy.outastuple:
-            for hdl in allfcns:
-                hdl(*ret[0])
-        elif policy is EmitPolicy.nothing:
-            for hdl in allfcns:
-                hdl()
-        else:
-            for hdl in allfcns:
-                hdl(*ret[1], **ret[2])
-        return ret
-
-    _EM_NAME = re.compile(r'^_?(\w+)', re.IGNORECASE)
     @classmethod
-    def _emissionList(cls, names, fcn = None) -> 'frozenset':
+    def _emit_list(cls, names, fcn = None) -> 'frozenset':
         u"creates a list of emissions"
         if len(names) == 0 or names[0] is fcn:
             tmp = (cls._EM_NAME.match(fcn.__name__).group(1),)
@@ -66,8 +46,51 @@ class Event:
             return frozenset(name.lower().strip() for name in names)
 
     @classmethod
-    def _wrapEmittingMethod(cls, this, lst, myrt, fcn):
+    def _getpolicy(cls, policy, fcn):
+        if policy not in (cls.annotations, None):
+            return policy
+
+        if policy is cls.annotations:
+            if isinstance(fcn, cast(type, staticmethod)):
+                fcn = getattr(fcn, '__func__')
+            try:
+                rta = fcn.__annotations__['return']
+            except KeyError as exc:
+                raise KeyError("Missing emission policy") from exc
+        elif policy is None:
+            rta = fcn if fcn is None or isinstance(fcn, type) else type(fcn)
+
+        if rta is None:
+            return EmitPolicy.nothing
+        elif issubclass(rta, Dict):
+            return cls.outasdict
+        elif issubclass(rta, (Sequence, Tuple)):
+            return cls.outastuple
+        else:
+            return policy
+
+    @staticmethod
+    def _handle_args(lst, policy, ret, args, kwargs):
+        if policy in (EmitPolicy.outastuple, EmitPolicy.outasdict):
+            return (lst, policy, ret)
+        elif policy == EmitPolicy.nothing:
+            return (lst, policy)
+        else:
+            return (lst, policy, (args, kwargs))
+
+    @staticmethod
+    def _return(names, fcn):
+        u"Applies a wrapVper now or later"
+        if len(names) == 1:
+            return fcn(names[0])
+        else:
+            return fcn
+
+    @classmethod
+    def _decorate_meth(cls, this, lst, myrt, fcn):
         u"returns a decorator for wrapping methods"
+        myrt = cls._getpolicy(myrt, fcn)
+
         @wraps(fcn)
         def _wrap(clsorself, *args, **kwargs):
             try:
@@ -75,12 +98,14 @@ class Event:
             except NoEmission:
                 return
 
-            return this.callhandlers(lst, myrt, (ret, args, kwargs))
+            return this.handle(*cls._handle_args(lst, myrt, ret, args, kwargs))
         return _wrap
 
     @classmethod
-    def _wrapEmittingInternal(cls, lst, myrt, fcn):
+    def _decorate_int(cls, lst, myrt, fcn):
         u"returns a decorator for wrapping methods"
+        myrt = cls._getpolicy(myrt, fcn)
+
         @wraps(fcn)
         def _wrap(self, *args, **kwargs):
             try:
@@ -88,12 +113,14 @@ class Event:
             except NoEmission:
                 return
 
-            return self.callhandlers(lst, myrt, (ret, args, kwargs))
+            return self.handle(*cls._handle_args(lst, myrt, ret, args, kwargs))
         return _wrap
 
     @classmethod
-    def _wrapEmittingFunction(cls, this, lst, myrt, fcn):
+    def _decorate_func(cls, this, lst, myrt, fcn):
         u"returns a decorator for wrapping free functions"
+        myrt = cls._getpolicy(myrt, fcn)
+
         @wraps(fcn)
         def _wrap(*args, **kwargs):
             try:
@@ -101,38 +128,61 @@ class Event:
             except NoEmission:
                 return
 
-            return this.callhandlers(lst, myrt, (ret, args, kwargs))
+            return this.handle(*cls._handle_args(lst, myrt, ret, args, kwargs))
         return _wrap
 
-    @staticmethod
-    def _returnWrapper(names, fcn):
-        u"Applies a wrapper now or later"
-        if len(names) == 1:
-            return fcn(names[0])
-        else:
-            return fcn
+    def remove(self, name:str, fcn:Callable):
+        u"removes an event"
+        self._handlers.get(name, set()).discard(fcn)
 
-    def emit(self, *names, returns = EmitPolicy.outasdict):
+    def handle(self,
+               lst   :'Union[str,Set[str]]',
+               policy:'Optional[EmitPolicy]'                 = None,
+               args  :'Optional[Union[Tuple,Sequence,Dict]]' = None):
+        u"Call handlers only once: collect them all"
+        if isinstance(lst, str):
+            lst = {lst}
+
+        policy = self._getpolicy(policy, args)
+
+        allfcns = set() # type: Set[Callable]
+        for name in lst.intersection(self._handlers):
+            allfcns.update(self._handlers[name])
+
+        if   policy is EmitPolicy.outasdict:
+            for hdl in allfcns:
+                hdl(**cast(Dict, args))
+        elif policy is EmitPolicy.outastuple:
+            for hdl in allfcns:
+                hdl(*args)
+        elif policy is EmitPolicy.nothing:
+            for hdl in allfcns:
+                hdl()
+        else:
+            for hdl in allfcns:
+                hdl(*args[0], **args[1])
+        return args
+
+    def emit(self, *names, returns = EmitPolicy.annotations):
         u"wrapped methow will fire events named in arguments"
         def _wrapper(fcn:Callable, myrt = toenum(EmitPolicy, returns)):
-            lst = self._emissionList(names, fcn)
+            lst = self._emit_list(names, fcn)
 
             if ismethod(fcn):
-                return self._wrapEmittingMethod(self, lst, myrt, fcn)
+                return self._decorate_meth(self, lst, myrt, fcn)
             else:
-                return self._wrapEmittingFunction(self, lst, myrt, fcn)
-        return self._returnWrapper(names, _wrapper)
+                return self._decorate_func(self, lst, myrt, fcn)
+        return self._return(names, _wrapper)
 
     @classmethod
-    def internalemit(cls, *names, returns = EmitPolicy.outasdict):
+    def internalemit(cls, *names, returns = EmitPolicy.annotations):
         u"wrapped methow will fire events named in arguments"
         def _wrapper(fcn:Callable, myrt = returns):
-            lst = cls._emissionList(names, fcn)
-            return cls._wrapEmittingInternal(lst, myrt, fcn)
+            lst = cls._emit_list(names, fcn)
+            return cls._decorate_int(lst, myrt, fcn)
 
-        return cls._returnWrapper(names, _wrapper)
+        return cls._return(names, _wrapper)
 
-    _OBS_NAME = re.compile(r'^_?on_?(\w+)', re.IGNORECASE)
     def observe(self, *names, **kwargs):
         u"""
         Wrapped method will handle events named in arguments.
