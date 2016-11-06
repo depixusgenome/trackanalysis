@@ -6,9 +6,9 @@ from typing         import Optional     # pylint: disable=unused-import
 from flexx          import ui
 
 from .dialog        import FileDialog
-from .              import View
+from .              import FlexxView
 
-class  ToolBar(ui.Widget, View):
+class  ToolBar(FlexxView):
     u"Menu bar"
     _box      = None # type: Optional[ui.HBox]
     _save     = None # type: Optional[ui.Button]
@@ -45,13 +45,13 @@ class  ToolBar(ui.Widget, View):
         del self._diagopen
         del self._diagsave
 
-    @View.action
+    @FlexxView.action
     def _onOpen(self, *_):
         path  = self._diagopen.open()
         if path is not None:
             self._ctrl.openTrack(path)
 
-    @View.action
+    @FlexxView.action
     def _onSave(self,  *_):
         if self._save not in self._box.children:
             return
@@ -60,9 +60,9 @@ class  ToolBar(ui.Widget, View):
         if path is not None:
             self._ctrl.saveTrack(path)
 
-    def close(self):
+    def _onClose(self):
         u"closes the application"
-        raise NotImplementedError("implemented in src/app/__init__.py")
+        self._ctrl.close()
 
     def init(self):
         u"initializes gui"
@@ -72,7 +72,7 @@ class  ToolBar(ui.Widget, View):
                 self.button(self._onOpen, u'open')
                 self.button(self._onSave, u'save')
                 ui.Widget(flex = 1)
-                self.button(lambda *_: self.close(), u'quit')
+                self.button(lambda *_: self._onClose(), u'quit')
             ui.Widget(flex = 1)
 
         children   = list(self._box.children)

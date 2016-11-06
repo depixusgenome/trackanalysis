@@ -10,26 +10,35 @@ from collections    import namedtuple, ChainMap
 from .event         import Controller, NoEmission
 
 ReturnPair = namedtuple('ReturnPair', ['old', 'value'])
-_empty     = type('_None', tuple(), dict())
+delete     = type('delete', tuple(), dict()) # pylint: disable=invalid-name
 class GlobalsController(Controller):
     u"Data controller class"
     def __init__(self):
         super().__init__()
-        self.__defaults = {"keypress.undo": "Ctrl-z",
-                           "keypress.redo": "Ctrl-y",
-                           "keypress.open": "Ctrl-o",
-                           "keypress.save": "Ctrl-s",
-                           "keypress.quit": "Ctrl-q"}
+        self.__defaults = {
+            "keypress.undo": "Ctrl-z",
+            "keypress.redo": "Ctrl-y",
+            "keypress.open": "Ctrl-o",
+            "keypress.save": "Ctrl-s",
+            "keypress.quit": "Ctrl-q",
+            "plot.bead.tools"      : 'pan,wheel_zoom,box_zoom,reset',
+            "plot.bead.z.color"    : 'blue',
+            "plot.bead.z.glyph"    : 'circle',
+            "plot.bead.z.size"     : 1,
+            "plot.bead.zmag.color" : 'red',
+            "plot.bead.zmag.glyph" : 'line',
+            "plot.bead.zmag.size"  : 1,
+            }
         self.__config   = ChainMap(dict(), self.__defaults)
         self.__project  = {}
 
     @staticmethod
     def __update(items, args, kwargs):
         kwargs.update(args)
-        ret = dict(empty = _empty)
+        ret = dict(empty = delete)
         for key, val in kwargs.items():
-            old = items.get(key, _empty)
-            if val is _empty:
+            old = items.get(key, delete)
+            if val is delete:
                 items.pop(key, None)
             else:
                 items[key] = val
@@ -43,9 +52,9 @@ class GlobalsController(Controller):
             raise NoEmission()
 
     @staticmethod
-    def __get(items, keys, default = _empty):
+    def __get(items, keys, default = delete):
         u"returns values associated to the keys"
-        if default is not _empty:
+        if default is not delete:
             if len(keys) == 1:
                 return items.get(keys[0], default)
             return iter(items.get(key, val) for key, val in zip(keys, default))
@@ -66,16 +75,16 @@ class GlobalsController(Controller):
 
     def deleteGlobal(self, *key):
         u"removes view information"
-        return self.updateGlobal(**dict.fromkeys(key, _empty))
+        return self.updateGlobal(**dict.fromkeys(key, delete))
 
     def deleteConfig(self, *key):
         u"removes view information"
-        return self.updateConfig(**dict.fromkeys(key, _empty))
+        return self.updateConfig(**dict.fromkeys(key, delete))
 
-    def getGlobal(self, *keys, default = _empty):
+    def getGlobal(self, *keys, default = delete):
         u"returns values associated to the keys"
         return self.__get(self.__project, keys, default)
 
-    def getConfig(self, *keys, default = _empty):
+    def getConfig(self, *keys, default = delete):
         u"returns values associated to the keys"
         return self.__get(self.__config, keys, default)

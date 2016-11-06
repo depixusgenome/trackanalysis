@@ -106,7 +106,7 @@ class TrackItems(Items):
         if getattr(self, attr) is None:
             setattr(self, attr, [])
 
-        if isinstance(cyc, (int, tuple)) or isfunction(cyc):
+        if isinstance(cyc, (int, str, tuple)) or isfunction(cyc):
             getattr(self, attr).append(cyc)
         else:
             getattr(self, attr).extend(cyc)

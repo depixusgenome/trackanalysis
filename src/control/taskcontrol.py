@@ -98,7 +98,7 @@ class TaskController(Controller):
         u"Returns the cache for a given task"
         return self._items[parent].data.getCache(tsk)
 
-    def run(self, parent:TrackReaderTask, tsk:Optional[Task]):
+    def run(self, parent:TrackReaderTask, tsk:Task):
         u"""
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None

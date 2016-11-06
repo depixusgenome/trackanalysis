@@ -122,3 +122,15 @@ class View:
         self.addKeyPress((keypress, fcn))
 
     action = ActionDescriptor()
+
+class FlexxView(ui.Widget, View):
+    u"A view with a gui"
+    def init(self):
+        u"initializes the gui"
+        raise NotImplementedError("Use this to create the gui")
+
+    def close(self):
+        u"closes the application"
+        self.popKeyPress(all)
+        self.unobserve()
+        self.session.close()

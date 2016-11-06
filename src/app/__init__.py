@@ -7,21 +7,18 @@ import flexx.app as app
 
 from utils          import MetaMixin
 from control.event  import Controller
-from view           import View
+from view           import View, FlexxView
 
 def _create(main, controls, views): # pylint: disable=unused-argument
     u"Creates a main view"
     def init(self):
         u"sets up the controller, then initializes the view"
         main.init(self)
-        self.observe    (self.MainControl())
-        self.addKeyPress(quit = self.close)
+        ctrl         = self.MainControl()
+        ctrl.topview = self
 
-    def close(self):
-        u"closes the application"
-        self.popKeyPress(all)
-        self.unobserve()
-        self.session.close()
+        self.observe    (ctrl)
+        self.addKeyPress(quit = self.close)
 
     class MainControl(metaclass = MetaMixin,
                       mixins    = controls,
@@ -30,43 +27,54 @@ def _create(main, controls, views): # pylint: disable=unused-argument
         Main controller: contains all sub-controllers.
         These share a common dictionnary of handlers
         """
+        def __init__(self):
+            self.topview = None # type: Optional[FlexxView]
+
+        def close(self):
+            u"closes the application"
+            main, self.topview = self.topview, None
+            main.close()
 
     cls = type('Main', (main,)+views,
                dict(__doc__     = u"The main view",
                     MainControl = MainControl,
-                    close       = close,
                     init        = init))
     return cls
 
 def setup(locs,
           mainview        = None,
+          creator         = lambda _: _,
           defaultcontrols = tuple(),
           defaultviews    = tuple()
          ):
     u"Sets up launch and serve functions for a given app context"
 
-    get = lambda tpe: tuple(cls for cls in locs.values()
-                            if isinstance(cls, type) and issubclass(cls, tpe))
+    classes = set(cls for cls in locs.values() if isinstance(cls, type))
+    classes.difference_update((Controller, View, FlexxView))
     if defaultcontrols is all:
-        defaultcontrols = get(Controller)
+        defaultcontrols = tuple(i for i in classes if issubclass(i, Controller))
 
     if defaultviews is all:
-        defaultviews = get(View)
+        defaultviews = tuple(i for i in classes
+                             if (issubclass(i, View)
+                                 and not issubclass(i, FlexxView)))
 
     def serve(main     = mainview,
               controls = defaultcontrols,
               views    = defaultviews,
+              creator  = creator,
               **kwa):
         u"Creates a browser app"
         kwa.setdefault("title", 'track analysis')
-        return app.serve(_create(main, controls, views), **kwa)
+        return app.serve(_create(creator(main), controls, views), **kwa)
 
     def launch(main     = mainview,
                controls = defaultcontrols,
                views    = defaultviews,
+               creator  = creator,
                **kwa):
         u"Creates a desktop app"
-        cls = _create(main, controls, views)
+        cls = _create(creator(main), controls, views)
 
         # next is to correct a bug in flexx
         old = app.session.Session.close

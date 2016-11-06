@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Deals with global information"
-from .              import View
+from . import View
 
 class GlobalsView(View):
     u"View listing all global info"
@@ -9,8 +9,8 @@ class GlobalsView(View):
         u"sets up the observations"
         super().observe(ctrl)
 
-        ctask  = 'current.task'
         ctrack = 'current.track'
+        ctask  = 'current.task'
 
         # pylint: disable=unused-variable
         def _onCloseTrack(model = None, **_):
@@ -20,10 +20,11 @@ class GlobalsView(View):
             except StopIteration:
                 ctrl.deleteGlobal(ctrack, *((ctask,) if isold else tuple()))
             else:
-                ctrl.updateGlobal((ctrack, tsk), *((ctask, tsk),) if isold else tuple())
+                ctrl.updateGlobal((ctrack, tsk),
+                                  *((ctask, tsk),) if isold else tuple())
 
         def _onOpenTrack(model = None, **_):
-            ctrl.updateGlobal(**{ctrack: model[0], ctask : model[0]})
+            ctrl.updateGlobal((ctrack, model[0]), (ctask, model[0]))
 
         def _onAddTask(parent = None, task = None, **_):
             ctrl.updateGlobal(**{ctrack: parent, ctask : task})
