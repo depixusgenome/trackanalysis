@@ -86,6 +86,7 @@ def setup(locs,
         app.session.Session.close = close
 
         kwa.setdefault("title", 'track analysis')
+        kwa.setdefault("size",  (1000, 1000))
         return app.launch(cls, **kwa)
 
     locs.setdefault('serve',  serve)
