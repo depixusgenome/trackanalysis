@@ -21,7 +21,7 @@ class GlobalsController(Controller):
             "keypress.open": "Ctrl-o",
             "keypress.save": "Ctrl-s",
             "keypress.quit": "Ctrl-q",
-            "plot.bead.tools"      : 'pan,wheel_zoom,box_zoom,reset',
+            "plot.bead.tools"      : 'xpan,box_zoom,undo,redo,reset,save',
             "plot.bead.z.color"    : 'blue',
             "plot.bead.z.glyph"    : 'circle',
             "plot.bead.z.size"     : 1,
