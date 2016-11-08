@@ -12,30 +12,31 @@ from .event         import Controller, NoEmission
 ReturnPair = namedtuple('ReturnPair', ['old', 'value'])
 delete     = type('delete', tuple(), dict()) # pylint: disable=invalid-name
 
-class DefaultsMap(ChainMap):
+class DefaultsMapController(ChainMap):
     u"Dictionnary with defaults values. It can be reset to these."
     def __init__(self, cnt = 2):
-        self._versions = [dict() for i in range(cnt)]
-        super().__init__(*self._versions)
+        super().__init__(*(dict() for i in range(cnt)))
 
     def updateVersion(self, *args, version = None, **kwargs):
         u"adds defaults to the config"
         if version is None:
             version = -1
-        self._versions[version].update(*args, **kwargs)
+        self.maps[version].update(*args, **kwargs)
 
     def reset(self, version = None):
         u"resets to default values"
         if version is None:
             version = -1
         for i in range(version):
-            self._versions[i].clear()
+            self.maps[i].clear()
 
-class DefaultsMapController(DefaultsMap): # pylint: disable=too-many-ancestors
-    u"Controller aspects of the defaultmap"
     def update(self, *args, **kwargs):
         u"updates keys or raises NoEmission"
-        kwargs.update(args)
+        if len(args) == 1 and isinstance(args[0], dict):
+            kwargs.update(*args)
+        else:
+            kwargs.update(args)
+
         ret = dict(empty = delete)
         for key, val in kwargs.items():
             old = super().get(key, delete)
@@ -56,7 +57,12 @@ class DefaultsMapController(DefaultsMap): # pylint: disable=too-many-ancestors
         if default is not delete:
             if len(keys) == 1:
                 return super().get(keys[0], default)
-            return iter(super().get(key, val) for key, val in zip(keys, default))
+
+            elif isinstance(default, list):
+                return iter(super().get(key, val) for key, val in zip(keys, default))
+
+            else:
+                return iter(super().get(key, default) for key in keys)
         else:
             if len(keys) == 1:
                 return self[keys[0]]

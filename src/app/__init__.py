@@ -7,7 +7,7 @@ import flexx.app as app
 
 from utils          import MetaMixin
 from control.event  import Controller
-from view           import View, FlexxView
+from view           import View, FlexxView, ui
 
 def _create(main, controls, views): # pylint: disable=unused-argument
     u"Creates a main view"
@@ -50,14 +50,14 @@ def setup(locs,
     u"Sets up launch and serve functions for a given app context"
 
     classes = set(cls for cls in locs.values() if isinstance(cls, type))
-    classes.difference_update((Controller, View, FlexxView))
+    classes.difference_update((Controller, View, FlexxView, ui.Widget))
     if defaultcontrols is all:
         defaultcontrols = tuple(i for i in classes if issubclass(i, Controller))
 
     if defaultviews is all:
         defaultviews = tuple(i for i in classes
                              if (issubclass(i, View)
-                                 and not issubclass(i, FlexxView)))
+                                 and not issubclass(i, ui.Widget)))
 
     def serve(main     = mainview,
               controls = defaultcontrols,
@@ -65,7 +65,6 @@ def setup(locs,
               creator  = creator,
               **kwa):
         u"Creates a browser app"
-        kwa.setdefault("title", 'track analysis')
         return app.serve(_create(creator(main), controls, views), **kwa)
 
     def launch(main     = mainview,

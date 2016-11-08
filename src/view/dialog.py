@@ -50,7 +50,7 @@ class FileDialog:
     @staticmethod
     def _setconfig(cnf):
         def _defaultpath(ret):
-            return cnf.updateConfig(('last.path.'+ret[ret.rfind('.'):], ret))
+            return cnf.updateConfig(('last.path.'+ret[ret.rfind('.')+1:], ret))
         return _defaultpath
 
     def _parse_filetypes(self, info:dict):
