@@ -6,8 +6,8 @@ from bokeh.plotting import figure
 from bokeh.models   import LinearAxis, Range1d, ColumnDataSource, CustomJS
 from flexx          import app, event, ui
 
-from .              import FlexxView
 from control.event  import Controller # pylint: disable=unused-import
+from .              import FlexxView
 
 class BeadPlotter(app.Model):
     u"Plots a default bead"

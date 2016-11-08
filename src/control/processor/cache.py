@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"List of processes and cache"
-from .base          import Processor # pylint: disable=unused-import
 from utils          import isfunction
+from .base          import Processor # pylint: disable=unused-import
 
 def _version():
     i = 0

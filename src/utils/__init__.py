@@ -114,4 +114,3 @@ class MetaMixin(type):
                 else lambda self: prop.fdel(self.getMixin(base)))
 
         return property(fget, fset, fdel, prop.__doc__)
-

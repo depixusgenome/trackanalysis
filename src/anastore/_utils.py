@@ -16,4 +16,3 @@ def isjsonable(item)-> bool:
         return all(type(i) in _LST and type(j) in _LST for i, j in item.items())
 
     return tpe in _LST
-
