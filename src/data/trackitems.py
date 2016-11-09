@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Adds easy access to cycles and events"
-from    types       import  GeneratorType
 from    typing      import (Optional, Tuple, Union, # pylint: disable=unused-import
                             Any, List, Sequence, Iterable, Iterator)
 from    abc         import ABCMeta, abstractmethod
@@ -169,11 +168,7 @@ class TrackItems(Items):
         if isinstance(keys, slice):
             return cpy.withsamples(keys)
         else:
-            item = cpy.selecting(keys, clear = True)
-            if isinstance(keys, (list, GeneratorType)):
-                return item
-            else:
-                return next(iter(item))[1]
+            return cpy.selecting(keys, clear = True)
 
     def _keys(self, sel:'Optional[Sequence]') -> 'Iterable':
         if sel is None:
@@ -196,13 +191,19 @@ class Beads(TrackItems, Items):
     level = Level.bead
     def _keys(self, sel):
         if sel is None:
-            isbead = self.track.isbeadname
-            yield from (i for i in self.data.keys() if isbead(i))
+            yield from self.data.keys()
         else:
             yield from (i for i in sel              if i in self.data.keys())
 
     def _iter(self):
         yield from ((bead, self.data[bead]) for bead in self.keys())
+
+    def __getitem__(self, keys):
+        item = super().__getitem__(keys)
+        if isinstance(keys, (int, str)):
+            return next(iter(item))[1]
+        else:
+            return item
 
 class Cycles(TrackItems, Items):
     u"""
@@ -258,6 +259,13 @@ class Cycles(TrackItems, Items):
             elif thisid is all:
                 yield from ((col, cid) for col in beads for cid in allcycles())
 
+            elif isinstance(thisid, str):
+                try:
+                    bid = int(thisid)
+                except ValueError:
+                    yield from ((thisid, cid) for cid in allcycles())
+                else:
+                    yield from ((bid, cid) for cid in allcycles())
             else:
                 yield from ((col, thisid) for col in beads)
 
@@ -282,6 +290,13 @@ class Cycles(TrackItems, Items):
             return self.name(bid, cid), self.data[bid][ind1:ind2]
 
         yield from (_getdata(bid, cid) for bid, cid in self.keys())
+
+    def __getitem__(self, keys):
+        item = super().__getitem__(keys)
+        if isinstance(keys, tuple) and len(keys) == 2 and isinstance(keys[1], int):
+            return next(iter(item))[1]
+        else:
+            return item
 
 def createTrackItem(level:Optional[Level] = Level.none, **kwargs):
     u"Returns the item type associated to a level"

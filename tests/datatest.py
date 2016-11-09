@@ -13,10 +13,13 @@ class TestBeadIteration:
     def test_iterkeys(self):
         u"tests wether keys are well listed"
         track = data.Track(path = path("small_legacy"))
-        assert tuple(track.beads.keys())                    == tuple(range(92))
-        assert tuple(i for i, _ in track.beads)             == tuple(range(92))
-        assert tuple(track.beads.selecting(all).keys())     ==  tuple(range(92))
-        assert tuple(track.beads.selecting(None).keys())    == tuple(range(92))
+        vals = set(tuple(range(92)) + ('zmag', 't'))
+        assert set(track.beads.keys())                 == vals
+        assert set(i for i, _ in track.beads)          == vals
+        assert set(track.beads.selecting(all).keys())  == vals
+        assert set(track.beads.selecting(None).keys()) == vals
+        assert isinstance(track.beads['t'], numpy.ndarray)
+        assert isinstance(track.beads[0],   numpy.ndarray)
 
         sel = track.beads
         assert tuple(track.beads.selecting([2,3,2]).keys()) == (2,3,2)
@@ -36,17 +39,21 @@ class TestCycleIteration:
     def test_iterkeys(self):
         u"tests wether keys are well listed"
         track = data.Track(path = path("big_legacy"))
-        assert (tuple(track.cycles.selecting(0).keys())
-                == tuple((i,0) for i in range(39)))
-        assert (tuple(track.cycles.selecting((0,0)).keys())
-                == ((0,0),))
-        assert (tuple(track.cycles.selecting([(0,all)]).keys())
-                == tuple((0,i) for i in range(102)))
+        cids  = lambda _: set(tuple((i,_) for i in range(39)) + (('zmag', _), ('t', _)))
+        bids  = lambda _: set((_,i) for i in range(102))
+        assert set  (track.cycles.selecting(0).keys())         == cids(0)
+        assert tuple(track.cycles.selecting((0,0)).keys())     == ((0,0),)
+        assert set  (track.cycles.selecting([(0,all)]).keys()) == bids(0)
+        assert set  (track.cycles['0'].keys())                 == bids(0)
+        assert set  (track.cycles['zmag'].keys())              == bids('zmag')
+
         assert (tuple(track.cycles
                       .selecting((0,all))
                       .discarding((0,i) for i in range(10, 200))
                       .keys())
                 == tuple((0,i) for i in range(10)))
+
+        assert isinstance(track.cycles[('zmag',0)], numpy.ndarray)
 
         truth = readtrack(path("big_legacy"))[0]
         for _, vals in track.cycles.selecting((0,1)):
@@ -54,6 +61,7 @@ class TestCycleIteration:
 
         for _, vals in track.cycles.withfirst(2).withlast(3).selecting((0,1)):
             assert numpy.array_equal(vals, truth[1206-678:1275-678])
+
 
     def test_lazy(self):
         u"tests what happens when using lazy mode"
