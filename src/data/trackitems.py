@@ -196,8 +196,7 @@ class Beads(TrackItems, Items):
     level = Level.bead
     def _keys(self, sel):
         if sel is None:
-            isbead = self.track.isbeadname
-            yield from (i for i in self.data.keys() if isbead(i))
+            yield from (i for i in self.data.keys())
         else:
             yield from (i for i in sel              if i in self.data.keys())
 
