@@ -6,6 +6,7 @@ from types          import LambdaType, FunctionType, MethodType
 from enum           import Enum
 from contextlib     import contextmanager
 from inspect        import signature, ismethod as _ismeth, isfunction as _isfunc, getmembers
+from functools      import wraps
 import re
 
 def toenum(tpe, val):
@@ -91,17 +92,17 @@ class MetaMixin(type):
 
     @staticmethod
     def __createstatic(fcn):
+        @wraps(fcn)
         def _wrap(*args, **kwa):
             return fcn(*args, **kwa)
-        _wrap.__name__ = fcn.__name__
         return staticmethod(_wrap)
 
     @staticmethod
     def __createmethod(base, fcn):
         cname = base.__name__.lower()
+        @wraps(fcn)
         def _wrap(self, *args, **kwa):
             return fcn(getattr(self, cname), *args, **kwa)
-        _wrap.__name__ = fcn.__name__
         return _wrap
 
     @staticmethod

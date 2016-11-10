@@ -50,11 +50,15 @@ class Track:
             else:
                 kwargs = readtrack(self._path)
 
-            for name in ('cycles', 'nphases', 'frequency'):
-                setattr(self, '_'+name, kwargs.pop(name))
+            if kwargs is None:
+                self._data = dict()
 
-            self._data = dict(ite for ite in kwargs.items()
-                              if isinstance(ite[1], numpy.ndarray))
+            else:
+                for name in ('cycles', 'nphases', 'frequency'):
+                    setattr(self, '_'+name, kwargs.pop(name))
+
+                self._data = dict(ite for ite in kwargs.items()
+                                  if isinstance(ite[1], numpy.ndarray))
         return self._data
 
     @staticmethod
