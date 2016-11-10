@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=unused-import
 u"Updates app manager so as to deal with controllers"
+from flexx                  import ui
 from control.taskcontrol    import TaskController
 from control.globalscontrol import GlobalsController
-from view                   import FlexxView, ui
+from view                   import FlexxView
 from view.undo              import UndoView
 from view.globalsview       import GlobalsView
 from view.toolbar           import ToolBar

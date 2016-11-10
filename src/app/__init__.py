@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Updates app manager so as to deal with controllers"
-from   functools      import wraps
+from functools  import wraps
+from flexx      import app, ui
 
-import flexx.app as app
-
-from utils          import MetaMixin
-from control.event  import Controller
-from view           import View, FlexxView, ui
+from utils      import MetaMixin
+from control    import Controller
+from view       import View, FlexxView
 
 def _create(main, controls, views): # pylint: disable=unused-argument
     u"Creates a main view"
@@ -16,9 +15,7 @@ def _create(main, controls, views): # pylint: disable=unused-argument
         main.init(self)
         ctrl         = self.MainControl()
         ctrl.topview = self
-
-        self.observe    (ctrl)
-        self.addKeyPress(quit = self.close)
+        self.open(ctrl)
 
     class MainControl(metaclass = MetaMixin,
                       mixins    = controls,
@@ -86,10 +83,19 @@ def setup(locs,
 
         kwa.setdefault("title", 'track analysis')
         kwa.setdefault("size",  (1000, 1000))
-        return app.launch(cls, **kwa)
 
+        locs['TOPVIEW'] = app.launch(cls, **kwa)
+        return locs['TOPVIEW']
+
+    def start(path = None, script = None):
+        u"starts the server"
+        if locs['TOPVIEW'] is not None and (path, script) != (None, None):
+            app.call_later(1, lambda: locs['TOPVIEW'].startup(path, script))
+        app.start()
+
+    locs.setdefault('TOPVIEW', None)
     locs.setdefault('serve',  serve)
     locs.setdefault('launch', launch)
-    locs.setdefault('start',  app.start)
+    locs.setdefault('start',  start)
 
 setup(locals())
