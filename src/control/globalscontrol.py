@@ -5,6 +5,24 @@ All things global:
     - current track
     - current task
     - current view ...
+
+A global map can be added by any view, although one should take care not
+to mix both project-specific and project-generic info. For example, there
+are different maps for storing the key mappings from the current track being
+displayed.
+
+Maps default values are memorized. The user can change the values then return
+to the default settings. It is also possible to configure a map to hold
+default, loaded (saved from a previous session) and current values.
+
+A child map is a specialization of a parent map. It is specidied using a key
+with "parent.child". A child map has access to all parent items. It can overload
+the values but cannot change the parent's.
+
+Such a parent/child relationship can be used to specialize default values. For
+example, the "plot" map will contain items for all plot types. The "plot.bead"
+map only needs specify those default values that should be changed for this type
+of plot.
 """
 from typing         import Dict, Union          # pylint: disable=unused-import
 from collections    import namedtuple, ChainMap
