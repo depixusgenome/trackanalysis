@@ -24,9 +24,10 @@ class KeyPressManager:
         if len(evt) != 1 or len(self._keys) == 0:
             return
 
-        cur = '-'.join(evt[0].modifiers)+'-'+evt[0].key
+        cur   = '-'.join(evt[0].modifiers)+'-'+evt[0].key
+        items = self._ctrl.getGlobal('keypress')
         for name, fcn in self._keys.items():
-            if cur == self._ctrl.getConfig("keypress."+name):
+            if cur == items.get(name):
                 fcn()
                 break
 

@@ -12,7 +12,7 @@ from .              import FlexxView
 
 class BeadPlotter(app.Model):
     u"Plots a default bead"
-    _KEY    = 'plot.bead.'
+    _KEY    = 'plot.bead'
     _ctrl   = None # type: Controller
     def unobserve(self):
         u"Removes the controller"
@@ -20,28 +20,22 @@ class BeadPlotter(app.Model):
 
     def observe(self,  ctrl:Controller):
         u"sets up this plotter's info"
-        ctrl.updateConfigDefault({
-            self._KEY+"tools"      : 'xpan,wheel_zoom,box_zoom,undo,redo,reset,save',
-            self._KEY+"z.color"    : 'blue',
-            self._KEY+"z.glyph"    : 'circle',
-            self._KEY+"z.size"     : 1,
-            self._KEY+"zmag.color" : 'red',
-            self._KEY+"zmag.glyph" : 'line',
-            self._KEY+"zmag.size"  : 1,
-            'panning.speed'        : .2,
-            'zooming.speed'        : .2,
-            'keypress.pan.left'    : 'Left',
-            'keypress.pan.right'   : 'Rigth',
-            })
+        ctrl.addGlobalMap(self._KEY,
+                          {"z.color"    : 'blue',
+                           "z.glyph"    : 'circle',
+                           "z.size"     : 1,
+                           "zmag.color" : 'red',
+                           "zmag.glyph" : 'line',
+                           "zmag.size"  : 1})
         self._ctrl = ctrl
 
     def get(self, *key, **kwa):
         u"returns config values"
-        return self._ctrl.getConfig(self._KEY+'.'.join(key), **kwa)
+        return self._ctrl.getGlobal(self._KEY, '.'.join(key), **kwa)
 
     def _createdata(self, task):
         items = next(iter(self._ctrl.run(task, task)))
-        bead  = self._ctrl.getGlobal("current.bead", default = None)
+        bead  = self._ctrl.getGlobal("current", "bead", default = None)
         if bead is None:
             bead = next(iter(items.keys()))
 
@@ -57,7 +51,7 @@ class BeadPlotter(app.Model):
                     y_axis_label = 'z')
 
         for i in ('x', 'y'):
-            rng  = self.get(i, default = None)
+            rng  = self._ctrl.getGlobal('current', self._KEY+'.'+i, default = None)
             if rng is not None:
                 args[i+'_range'] = rng
         return args
@@ -121,7 +115,7 @@ class BeadPlotter(app.Model):
 
     def __call__(self):
         u"sets-up the figure"
-        task = self._ctrl.getGlobal("current.track", default = None)
+        task = self._ctrl.getGlobal("current", "track", default = None)
         if task is None:
             return figure(tools = [])
 
@@ -133,16 +127,16 @@ class BeadPlotter(app.Model):
         self._addglyph    (source, "zmag", fig, y_range_name = 'zmag')
         self._addcallbacks(fig)
 
-        return fig, dict(pan  = self._ctrl.getConfig("panning.speed"),
-                         zoom = self._ctrl.getConfig("zooming.speed"))
+        return fig, dict(pan  = self.get("panningspeed"),
+                         zoom = self.get("zoomingspeed"))
 
     @event.connect("change")
     def _on_change(self, *events):
         evt          = events[-1]
         xstart, xend = evt["xstart"], evt['xend']
         ystart, yend = evt["ystart"], evt['yend']
-        self._ctrl.updateGlobal({self._KEY+'x': (xstart, xend),
-                                 self._KEY+'y': (ystart, yend)})
+        self._ctrl.updateGlobal('current', { self._KEY+'.x': (xstart, xend),
+                                             self._KEY+'.y': (ystart, yend)})
 
     class JS: # pylint: disable=missing-docstring,no-self-use
         @event.emitter
@@ -200,12 +194,12 @@ class TrackPlot(FlexxView):
         self._plotter.observe(ctrl)
 
         children = self.children[0], self._plotter  # pylint: disable=no-member
-        def _onUpdateGlobal(**items):
-            if 'current.track' in items or 'current.bead' in items:
+        def _onUpdateCurrent(**items):
+            if 'track' in items or 'bead' in items:
                 children[0].plot, args = children[1]()
                 self._plotted(children[1], args)
 
-        ctrl.observe(_onUpdateGlobal)
+        ctrl.observe(_onUpdateCurrent)
 
     class JS: # pylint: disable=no-member,missing-docstring
         @event.connect("_plotted")

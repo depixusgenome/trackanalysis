@@ -42,7 +42,7 @@ def test_storenumpy():
     vals = dict(a = numpy.array([None]*5), b = numpy.zeros((200,), dtype = numpy.int8),
                 c = numpy.arange(5, dtype = numpy.float32))
     loaded = anastore.loads(anastore.dumps(vals))
-    assert tuple(vals.keys()) == tuple(loaded.keys())
+    assert set(vals.keys()) == set(loaded.keys())
     assert numpy.array_equal(vals['a'], loaded['a'])
     assert numpy.array_equal(vals['b'], loaded['b'])
     assert numpy.array_equal(vals['c'], loaded['c'])

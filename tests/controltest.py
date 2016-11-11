@@ -352,20 +352,22 @@ class TestTaskControl:
 
         frames = tuple(ctrl.run(read,read))
         assert frozenset(type(fra) for fra in frames) == frozenset((Beads,))
-        keys  = tuple(key for frame in frames for key, _ in frame)
-        assert keys == tuple(range(74))
+        keys  = set(key for frame in frames for key, _ in frame)
+        beads = set(tuple(range(74))+('t', 'zmag'))
+        assert keys == beads
 
         frames = tuple(ctrl.run(read,tc))
         assert frozenset(type(fra) for fra in frames) == frozenset((Cycles,))
 
-        keys  = tuple(key for frame in frames for key, _ in frame)
-        truth = tuple((bead, cyc) for bead in range(74) for cyc in range(15))
+        keys  = set(key for frame in frames for key, _ in frame)
+        truth = set((bead, cyc) for bead in beads for cyc in range(15))
         assert keys == truth
 
         frames = tuple(frame for frame in ctrl.run(read, tb))
         assert frozenset(type(fra) for fra in frames) == frozenset((TrackItems,))
-        keys  = tuple(key for frame in frames for key, _ in frame)
-        assert keys == tuple(range(74))
+        keys  = set(key for frame in frames for key, _ in frame)
+        assert keys == beads
 
-        assert type(frames[0][0])    is numpy.ndarray
-        assert type(frames[0][0][0]) is Cycles
+        val = tuple(frames[0][0])[0][1]
+        assert type(val)    is numpy.ndarray
+        assert type(val[0]) is Cycles

@@ -9,31 +9,29 @@ class GlobalsView(View):
         u"sets up the observations"
         super().observe(ctrl)
 
-        ctrack = 'current.track'
-        ctask  = 'current.task'
-
+        items = ctrl.getGlobal('current')
         # pylint: disable=unused-variable
         def _onCloseTrack(model = None, **_):
-            isold = ctrl.getGlobal(ctrack) is model[0]
+            isold = items.get('track') is model[0]
             try:
                 tsk = next(next(ctrl.tasktree))
             except StopIteration:
-                ctrl.deleteGlobal(ctrack, *((ctask,) if isold else tuple()))
+                items.delete('track', *(('task',) if isold else tuple()))
             else:
-                ctrl.updateGlobal((ctrack, tsk),
-                                  *((ctask, tsk),) if isold else tuple())
+                items.update(('track', tsk),
+                             *(('task', tsk),) if isold else tuple())
 
         def _onOpenTrack(model = None, **_):
-            ctrl.updateGlobal((ctrack, model[0]), (ctask, model[0]))
+            items.update(('track', model[0]), ('task', model[0]))
 
         def _onAddTask(parent = None, task = None, **_):
-            ctrl.updateGlobal(**{ctrack: parent, ctask : task})
+            items.update(**{'track': parent, 'task' : task})
 
         def _onUpdateTask(parent = None, task = None, **_):
-            ctrl.updateGlobal(**{ctrack: parent, ctask : task})
+            items.update(**{'track': parent, 'task' : task})
 
         def _onDeleteTask(parent = None, **_):
-            ctrl.updateGlobal(**{ctrack: parent, ctask : parent})
+            items.update(**{'track': parent, 'task' : parent})
 
         ctrl.observe([fcn for name, fcn in locals().items() if name[:3] == '_on'])
 

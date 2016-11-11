@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 u"Different file dialogs."
 
+import os
 from typing             import Callable
 from tkinter            import Tk as _Tk
 from tkinter.filedialog import (askopenfilename   as _tkopen,
@@ -36,7 +37,9 @@ class FileDialog:
         self.config           = None   # type: Tuple[Callable, Callable]
 
         cnf = kwa.get('config', None)  # type: ignore
-        if hasattr(cnf, 'getConfig'):
+        if hasattr(cnf, 'getGlobal'):
+            cnf = cnf.getGlobal('config')
+        if hasattr(cnf, 'get'):
             self.config = self._getconfig(cnf), self._setconfig(cnf)
         else:
             self.config = cnf
@@ -44,13 +47,14 @@ class FileDialog:
     @staticmethod
     def _getconfig(cnf):
         def _defaultpath(ext):
-            return cnf.getConfig('last.path.'+ext.replace('.', ''), default = None)
+            return cnf.get('last.path'+ext.replace('.', ''), default = None)
         return _defaultpath
 
     @staticmethod
     def _setconfig(cnf):
         def _defaultpath(ret):
-            return cnf.updateConfig(('last.path.'+ret[ret.rfind('.')+1:], ret))
+            ret = os.path.abspath(ret)
+            return cnf.update(('last.path.'+ret[ret.rfind('.')+1:], ret))
         return _defaultpath
 
     def _parse_filetypes(self, info:dict):

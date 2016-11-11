@@ -33,8 +33,8 @@ class Event:
     _EM_NAME    = re.compile(r'^_?(\w+)',     re.IGNORECASE)
     _OBS_NAME   = re.compile(r'^_?on_?(\w+)', re.IGNORECASE)
 
-    def __init__(self):
-        self._handlers = dict() # type: Dict
+    def __init__(self, **kwargs):
+        self._handlers = kwargs.get('handlers', dict()) # type: Dict
 
     @classmethod
     def _emit_list(cls, names, fcn = None) -> 'frozenset':

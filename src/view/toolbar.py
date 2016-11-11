@@ -26,18 +26,18 @@ class  ToolBar(FlexxView):
 
         box  = self._box
         save = self._save
-        def _onUpdateGlobal(**items):
-            if 'current.track' not in items:
+        def _onUpdateCurrent(**items):
+            if 'track' not in items:
                 return
             children = list(box.children)
-            if items['current.track'].value is not items['empty']:
+            if items['track'].value is not items['empty']:
                 children.insert(1, save)
             else:
                 children.pop(1)
 
             box.children = children
 
-        ctrl.observe(_onUpdateGlobal)
+        ctrl.observe(_onUpdateCurrent)
 
     def unobserve(self):
         u"Sets up the controller"
