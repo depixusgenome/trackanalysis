@@ -25,7 +25,7 @@ class KeyPressManager:
             return
 
         cur   = '-'.join(evt[0].modifiers)+'-'+evt[0].key
-        items = self._ctrl.getGlobal('keypress')
+        items = self._ctrl.getGlobal('config')
         for name, fcn in self._keys.items():
             if cur == items.get(name):
                 fcn()

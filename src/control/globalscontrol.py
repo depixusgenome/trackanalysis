@@ -12,12 +12,11 @@ are different maps for storing the key mappings from the current track being
 displayed.
 
 Maps default values are memorized. The user can change the values then return
-to the default settings. It is also possible to configure a map to hold
-default, loaded (saved from a previous session) and current values.
+to the default settings.
 
-A child map is a specialization of a parent map. It is specidied using a key
-with "parent.child". A child map has access to all parent items. It can overload
-the values but cannot change the parent's.
+A child map is a specialization of a parent map. It is specidied using a key in
+the form of "parent.child". A child map has access to all parent items. It can
+overload the values but cannot change the parent's.
 
 Such a parent/child relationship can be used to specialize default values. For
 example, the "plot" map will contain items for all plot types. The "plot.bead"
@@ -33,27 +32,27 @@ delete     = type('delete', tuple(), dict())    # pylint: disable=invalid-name
 
 class DefaultsMap(Controller):
     u"Dictionnary with defaults values. It can be reset to these."
-    def __init__(self, name, cnt = 2, maps = None, **kwargs):
+    _CNT = 2
+    def __init__(self, name, parent = None, **kwargs):
+        maps = tuple(dict() for i in range(self._CNT))
+        if parent is not None:
+            maps += (parent,)
+
         super().__init__(**kwargs)
         self.__name  = name.replace('.', '')
-        if maps is not None:
-            self.__items = ChainMap(dict(), *maps)
-        else:
-            self.__items = ChainMap(*(dict() for i in range(cnt)))
+        self.__items = ChainMap(*maps)
 
     def createChild(self, name, **kwargs):
         u"returns a child map"
-        return DefaultsMap(name, maps = self.__items.maps, **kwargs)
+        return DefaultsMap(name, parent = self.__items, **kwargs)
 
-    def setdefaults(self, *args, version = None, **kwargs):
+    def setdefaults(self, *args, version = 1, **kwargs):
         u"adds defaults to the config"
         if len(args) == 1 and isinstance(args[0], dict):
             kwargs.update(*args)
         else:
             kwargs.update(args)
 
-        if version is None:
-            version = -1
         self.__items.maps[version].update(**kwargs)
 
     def reset(self, version = None):
@@ -109,19 +108,27 @@ class GlobalsController(Controller):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.__maps = dict()
-        self.addGlobalMap('config')
-        self.addGlobalMap('plot',
-                          panningspeed = .2,
-                          zoomingspeed = .2,
-                          tools        = 'xpan,wheel_zoom,box_zoom,reset,save')
-        self.addGlobalMap('keypress',
-                          undo = "Ctrl-z",
-                          redo = "Ctrl-y",
-                          open = "Ctrl-o",
-                          save = "Ctrl-s",
-                          quit = "Ctrl-q")
-
+        self.addGlobalMap('config',
+                          **{'keypress.undo' : "Ctrl-z",
+                             'keypress.redo' : "Ctrl-y",
+                             'keypress.open' : "Ctrl-o",
+                             'keypress.save' : "Ctrl-s",
+                             'keypress.quit' : "Ctrl-q"})
+        self.addGlobalMap('config.plot',
+                          tools = 'xpan,wheel_zoom,box_zoom,reset,save',
+                          **{'panning.speed'       : .2,
+                             'zooming.speed'       : .2,
+                             'keypress.x.pan.low'  : 'ArrowLeft',
+                             'keypress.x.pan.high' : 'ArrowRight',
+                             'keypress.x.zoom.in'  : 'Shift-ArrowLeft',
+                             'keypress.x.zoom.out' : 'Shift-ArrowRight',
+                             'keypress.y.pan.low'  : 'ArrowDown',
+                             'keypress.y.pan.high' : 'ArrowUp',
+                             'keypress.y.zoom.in'  : 'Shift-ArrowDown',
+                             'keypress.y.zoom.out' : 'Shift-ArrowUp',
+                             'keypress.reset'      : ' '})
         self.addGlobalMap('current')
+        self.addGlobalMap('current.plot')
 
     def addGlobalMap(self, key, *args, **kwargs):
         u"adds a map"

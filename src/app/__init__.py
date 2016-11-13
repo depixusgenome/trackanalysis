@@ -13,18 +13,17 @@ def _create(main, controls, views): # pylint: disable=unused-argument
     def init(self):
         u"sets up the controller, then initializes the view"
         main.init(self)
-        ctrl         = self.MainControl()
+        ctrl         = self.MainControl(handlers = dict())
         ctrl.topview = self
         self.open(ctrl)
 
     class MainControl(metaclass = MetaMixin,
-                      mixins    = controls,
-                      shared    = ('_handlers',)):
+                      mixins    = controls):
         u"""
         Main controller: contains all sub-controllers.
         These share a common dictionnary of handlers
         """
-        def __init__(self):
+        def __init__(self, **_):
             self.topview = None # type: Optional[FlexxView]
 
         def close(self):

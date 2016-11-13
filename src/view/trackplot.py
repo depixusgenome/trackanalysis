@@ -3,35 +3,22 @@
 u"Track plot view"
 
 from bokeh.plotting import figure, Figure # pylint: disable=unused-import
-from bokeh.models   import LinearAxis, Range1d, ColumnDataSource, CustomJS
-from flexx          import app, event, ui, pyscript
+from bokeh.models   import LinearAxis, Range1d, ColumnDataSource
 from flexx.pyscript import window
+from flexx          import event, ui
 
 from control        import Controller
+from .jsutils       import SinglePlotter, PlotAttrs
 from .              import FlexxView
 
-class BeadPlotter(app.Model):
+class BeadPlotter(SinglePlotter):
     u"Plots a default bead"
-    _KEY    = 'plot.bead'
-    _ctrl   = None # type: Controller
-    def unobserve(self):
-        u"Removes the controller"
-        del self._ctrl
-
     def observe(self,  ctrl:Controller):
         u"sets up this plotter's info"
-        ctrl.addGlobalMap(self._KEY,
-                          {"z.color"    : 'blue',
-                           "z.glyph"    : 'circle',
-                           "z.size"     : 1,
-                           "zmag.color" : 'red',
-                           "zmag.glyph" : 'line',
-                           "zmag.size"  : 1})
-        self._ctrl = ctrl
-
-    def get(self, *key, **kwa):
-        u"returns config values"
-        return self._ctrl.getGlobal(self._KEY, '.'.join(key), **kwa)
+        super().observe(ctrl)
+        ctrl.setGlobalDefaults(self.key(),
+                               z    = PlotAttrs('blue', 'circle', 1),
+                               zmag = PlotAttrs('red',  'line',   1))
 
     def _createdata(self, task):
         items = next(iter(self._ctrl.run(task, task)))
@@ -39,61 +26,40 @@ class BeadPlotter(app.Model):
         if bead is None:
             bead = next(iter(items.keys()))
 
-        data   = data=dict(t    = items['t'],
-                           zmag = items['zmag'],
-                           z    = items[bead])
+        data   = data = dict(t    = items['t'],
+                             zmag = items['zmag'],
+                             z    = items[bead])
         source = ColumnDataSource(data = data)
         return data, source
 
     def _figargs(self):
-        args = dict(tools        = self.get("tools"),
-                    x_axis_label = 'Time',
-                    y_axis_label = 'z')
+        args = dict(tools        = self.getConfig("tools"),
+                    x_axis_label = u'Time',
+                    y_axis_label = u'z')
 
         for i in ('x', 'y'):
-            rng  = self._ctrl.getGlobal('current', self._KEY+'.'+i, default = None)
+            rng  = self.getCurrent(i, default = None)
             if rng is not None:
                 args[i+'_range'] = rng
         return args
 
     def _addglyph(self, source, beadname, fig, **kwa):
-        glyph = self.get(beadname, "glyph")
-        args  = dict(x      = 't',
-                     y      = beadname,
-                     source = source,
-                     color  = self.get(beadname,"color"),
-                     size   = self.get(beadname,"size"),
-                     **kwa
-                    )
-        if glyph == 'line':
-            args['line_width'] = args.pop('size')
-
-        getattr(fig, glyph)(**args)
+        self.getConfig(beadname).addto(fig, x = 't', y = beadname, source = source, **kwa)
 
     @staticmethod
-    def _addylayout(data, fig):
-        vmin  = data['zmag'].min()
-        vmax  = data['zmag'].max()
-        delta = (vmax-vmin)*.02
+    def _bounds(arr):
+        vmin  = arr.min()
+        vmax  = arr.max()
+        delta = (vmax-vmin)*.005
         vmin -= delta
         vmax += delta
+        return vmin, vmax
 
+    @classmethod
+    def _addylayout(cls, data, fig):
+        vmin, vmax = cls._bounds(data['zmag'])
         fig.extra_y_ranges = {'zmag': Range1d(start = vmin, end = vmax)}
-        fig.add_layout(LinearAxis(y_range_name='zmag'), 'right')
-
-    @staticmethod
-    def _jscode(pyfcn):
-        string = pyscript.py2js(pyfcn)
-        for name, val in pyfcn.__closure__[0].cell_contents.items():
-            string = string.replace('jsobj["%s"]' % name, str(val))
-        return string
-
-    @staticmethod
-    def _callback(pyfcn):
-        fcn = CustomJS.from_py_func(pyfcn)
-        for name, val in pyfcn.__closure__[0].cell_contents.items():
-            fcn.code = fcn.code.replace('jsobj["%s"]' % name, str(val))
-        return fcn
+        fig.add_layout(LinearAxis(y_range_name='zmag', axis_label = u'zmag'), 'right')
 
     def _addcallbacks(self, fig):
         rng   = fig.extra_y_ranges['zmag']
@@ -111,9 +77,9 @@ class BeadPlotter(app.Model):
             window.flexx.instances[jsobj['key']].change(xrng.start, xrng.end,
                                                         yrng.start, yrng.end)
 
-        rng.callback = self._callback(_onRangeChange)
+        rng.callback = self.callbackCode(_onRangeChange)
 
-    def __call__(self):
+    def create(self):
         u"sets-up the figure"
         task = self._ctrl.getGlobal("current", "track", default = None)
         if task is None:
@@ -122,55 +88,14 @@ class BeadPlotter(app.Model):
         data, source = self._createdata(task)
 
         fig = figure(**self._figargs())
+        fig.x_range.bounds = self._bounds(data['t'])
+        fig.y_range.bounds = self._bounds(data['z'])
         self._addylayout  (data, fig)
         self._addglyph    (source, "z",    fig)
         self._addglyph    (source, "zmag", fig, y_range_name = 'zmag')
         self._addcallbacks(fig)
 
-        return fig, dict(pan  = self.get("panningspeed"),
-                         zoom = self.get("zoomingspeed"))
-
-    @event.connect("change")
-    def _on_change(self, *events):
-        evt          = events[-1]
-        xstart, xend = evt["xstart"], evt['xend']
-        ystart, yend = evt["ystart"], evt['yend']
-        self._ctrl.updateGlobal('current', { self._KEY+'.x': (xstart, xend),
-                                             self._KEY+'.y': (ystart, yend)})
-
-    class JS: # pylint: disable=missing-docstring,no-self-use
-        @event.emitter
-        def change(self, xstart, xend, ystart, yend):
-            return dict(xstart = xstart, xend = xend,
-                        ystart = ystart, yend = yend)
-
-        def onkeydown(self, fig, jsobj, evt):
-            if evt.shiftKey:
-                rng = fig.y_range
-            else:
-                rng = fig.x_range
-
-            delta = (rng.end-rng.start)*jsobj['pan']
-            if evt.keyCode == 37:
-                rng.start = rng.start - delta
-                rng.end   = rng.end   - delta
-
-            elif evt.keyCode == 38:
-                rng.start = rng.start + delta
-                rng.end   = rng.end   - delta
-
-            elif evt.keyCode == 39:
-                rng.start = rng.start + delta
-                rng.end   = rng.end   + delta
-
-            elif evt.keyCode == 40:
-                rng.start = rng.start - delta
-                rng.end   = rng.end   + delta
-
-            else:
-                return
-
-            fig.trigger("change")
+        return fig, self.keyargs()
 
 class TrackPlot(FlexxView):
     u"Track plot view"
@@ -185,7 +110,7 @@ class TrackPlot(FlexxView):
         del self._plotter
 
     @event.emitter
-    def _plotted(self, plotter, args):                       # pylint: disable=no-self-use
+    def _plotted(self, plotter, args):              # pylint: disable=no-self-use
         args['class'] = plotter.__class__.__name__
         return args
 
@@ -196,7 +121,7 @@ class TrackPlot(FlexxView):
         children = self.children[0], self._plotter  # pylint: disable=no-member
         def _onUpdateCurrent(**items):
             if 'track' in items or 'bead' in items:
-                children[0].plot, args = children[1]()
+                children[0].plot, args = children[1].create()
                 self._plotted(children[1], args)
 
         ctrl.observe(_onUpdateCurrent)
