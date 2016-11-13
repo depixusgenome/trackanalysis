@@ -43,21 +43,18 @@ class MetaMixin(type):
     def __new__(mcs, name, bases, nspace, **kw):
         match  = re.compile(kw.get('match', r'^[a-z][a-zA-Z0-9]+$')).match
         mixins = kw['mixins']
-        shared = kw.get('shared', tuple())
 
-        def setMixins(self, items = tuple(), shared = tuple()):
+        def setMixins(self, instances = None, initargs = None):
             u"sets-up composed mixins"
             for base in mixins:
                 name =  base.__name__.lower()
-                if name in items:
-                    setattr(self, name, items[name])
+                if instances is not None and name in instances:
+                    setattr(self, name, instances[name])
                 elif getattr(self, name, None) is None:
-                    setattr(self, name, base())
-
-            for name in shared:
-                attr = getattr(self.getMixin(mixins[0]), name)
-                for base in mixins[1:]:
-                    setattr(self.getMixin(base), name, attr)
+                    if initargs is not None:
+                        setattr(self, name, base(**initargs))
+                    else:
+                        setattr(self, name, base())
 
         nspace['setMixins'] = setMixins
 
@@ -67,10 +64,12 @@ class MetaMixin(type):
 
         nspace['getMixin'] = getMixin
 
-        def __init__(self, *args, **kwa):
+        init = nspace.get('__init__', lambda *_1, **_2: None)
+        def __init__(self, **kwa):
+            init(self, **kwa)
             for base in bases:
-                base.__init__(self, *args, **kwa)
-            self.setMixins(mixins, shared)
+                base.__init__(self, **kwa)
+            self.setMixins(mixins, initargs = kwa)
 
         nspace['__init__'] = __init__
 
