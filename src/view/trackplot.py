@@ -3,7 +3,7 @@
 u"Track plot view"
 
 from bokeh.plotting import figure, Figure # pylint: disable=unused-import
-from bokeh.models   import LinearAxis, Range1d, ColumnDataSource
+from bokeh.models   import LinearAxis, Range1d, ColumnDataSource, HoverTool
 from flexx.pyscript import window
 from flexx          import event, ui
 
@@ -17,8 +17,11 @@ class BeadPlotter(SinglePlotter):
         u"sets up this plotter's info"
         super().observe(ctrl)
         ctrl.setGlobalDefaults(self.key(),
-                               z    = PlotAttrs('blue', 'circle', 1),
-                               zmag = PlotAttrs('red',  'line',   1))
+                               z       = PlotAttrs('blue', 'circle', 1),
+                               zmag    = PlotAttrs('red',  'line',   1),
+                               tooltip = [(u'Index',  '$index'),
+                                          (u'(t, z, zmag)', '($x, @z, @zmag)')]
+                              )
 
     def _createdata(self, task):
         items = next(iter(self._ctrl.run(task, task)))
@@ -90,9 +93,12 @@ class BeadPlotter(SinglePlotter):
         fig = figure(**self._figargs())
         fig.x_range.bounds = self._bounds(data['t'])
         fig.y_range.bounds = self._bounds(data['z'])
+        fig.add_tools(HoverTool(tooltips = self.getConfig("tooltip")))
+
         self._addylayout  (data, fig)
         self._addglyph    (source, "z",    fig)
         self._addglyph    (source, "zmag", fig, y_range_name = 'zmag')
+
         self._addcallbacks(fig)
 
         return fig, self.keyargs()
