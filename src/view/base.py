@@ -115,7 +115,7 @@ class FlexxView(ui.Widget, View):
 
     def open(self, ctrl):
         u"starts up the controller stuff"
-        View._keys.observe(ctrl, quit = self.close)
+        View._keys.observe(ctrl, 'keypress', quit = self.close)
         self.connect("key_press", View._keys.onKeyPress)
         self.observe(ctrl)
 
@@ -125,11 +125,11 @@ class FlexxView(ui.Widget, View):
         self.unobserve()
         self.session.close()
 
-    def button(self, fcn:Callable, keypress:str, **kwa):
+    def button(self, fcn:Callable, title:str, prefix = 'keypress', **kwa):
         u"creates and connects a button"
         if 'text' not in kwa:
-            kwa['text'] = '<u>{}</u>{}'.format(keypress[0].upper(), keypress[1:])
+            kwa['text'] = u'<u>{}</u>{}'.format(title[0].upper(), title[1:])
 
         btn = ui.Button(**kwa)
         btn.connect('mouse_down', fcn)
-        self._keys.addKeyPress((keypress, fcn))
+        self._keys.addKeyPress((prefix+'.'+title.lower(), fcn))

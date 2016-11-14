@@ -9,10 +9,10 @@ class KeyPressManager:
         self._keys = kwargs.get('keys', dict()) # type: Dict[str,Callable]
         self._ctrl = kwargs.get('ctrl', None)   # type: Optional[Controller]
 
-    def observe(self, ctrl, **kwargs):
+    def observe(self, ctrl, *args, **kwargs):
         u"Sets-up the controller"
         self._ctrl = ctrl
-        self.addKeyPress(**kwargs)
+        self.addKeyPress(*args, **kwargs)
 
     def unobserve(self):
         u"Removes the controller"
@@ -31,11 +31,22 @@ class KeyPressManager:
                 fcn()
                 break
 
-    def addKeyPress(self, *args, **keys):
-        u"sets-up keypress methods"
-        keys.update(args)
-        self._keys.update(keys)
-        if not all(isinstance(i, Callable) for i in keys.values()) :
+    def addKeyPress(self, *args, **kwargs):
+        u"""
+        Sets-up keypress methods.
+
+        if args is one string, then that string is used as a prefix to all
+        keys in kwargs.
+
+        Otherwise args must be valid arguments to dict.update.
+        """
+        if len(args) == 1 and isinstance(args[0], str) and len(kwargs):
+            kwargs = {args[0]+'.'+name: val for name, val in kwargs.items()}
+        else:
+            kwargs.update(args)
+
+        self._keys.update(kwargs)
+        if not all(isinstance(i, Callable) for i in kwargs.values()) :
             raise TypeError("keypress values should be callable")
 
     def popKeyPress(self, *args):

@@ -16,7 +16,7 @@ class GlobalsView(View):
             try:
                 tsk = next(next(ctrl.tasktree))
             except StopIteration:
-                items.delete('track', *(('task',) if isold else tuple()))
+                items.pop('track', *(('task',) if isold else tuple()))
             else:
                 items.update(('track', tsk),
                              *(('task', tsk),) if isold else tuple())

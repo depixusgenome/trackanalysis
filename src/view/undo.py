@@ -30,7 +30,7 @@ class UndoView(View):
     def observe(self, ctrl):
         u"sets up the observations"
         super().observe(ctrl)
-        View._keys.addKeyPress(undo = self.undo, redo = self.redo)
+        View._keys.addKeyPress('keypress', undo = self.undo, redo = self.redo)
 
         self.__isundoing = [False]
         self.__uqueue    = deque(maxlen = 1000)

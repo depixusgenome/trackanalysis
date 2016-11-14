@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Menu bar"
+u"Toolbar"
 
 from typing         import Optional     # pylint: disable=unused-import
 from flexx          import ui

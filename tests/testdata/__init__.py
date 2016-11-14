@@ -12,4 +12,4 @@ def path(name:str) -> str:
     val = "../tests/testdata/"+PATHS.get(name.lower().strip(), name)
     if not os.path.exists(val):
         raise KeyError("Check your file name!!!")
-    return val
+    return os.path.abspath(val)

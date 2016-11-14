@@ -83,7 +83,7 @@ class DefaultsMap(Controller):
         if len(ret):
             return self.handle("update"+self.__name, self.outasdict, ret)
 
-    def delete(self, *args):
+    def pop(self, *args):
         u"removes view information"
         return self.update(dict.fromkeys(args, delete))
 
@@ -94,8 +94,8 @@ class DefaultsMap(Controller):
                 return self.__items.get(keys[0], default)
 
             elif isinstance(default, list):
-                return iter(self.__items.get(key, val) for key, val in zip(keys, default))
-
+                return iter(self.__items.get(key, val)
+                            for key, val in zip(keys, default))
             else:
                 return iter(self.__items.get(key, default) for key in keys)
         else:
@@ -154,7 +154,7 @@ class GlobalsController(Controller):
 
     def deleteGlobal(self, key, *args):
         u"removes view information"
-        return self.__maps[key].delete(*args)
+        return self.__maps[key].pop(*args)
 
     def getGlobal(self, key, *args, default = delete):
         u"returns values associated to the keys"
