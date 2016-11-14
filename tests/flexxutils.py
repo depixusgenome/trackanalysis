@@ -48,6 +48,7 @@ class FlexxAction:
 
     def init(self, launch, item):
         u"creates and returns the model"
+        flexxapp.create_server(new_loop = True)
         launcher  = __import__("app."+launch, fromlist = ['launch'])
         self.view = launcher.launch(item)
         return self
@@ -89,7 +90,7 @@ class FlexxAction:
             self.monkeypatch.setattr(view.dialog, '_tkopen', _tkopen)
 
         flexxapp.call_later(1, _run)
-        flexxapp.start()
+        flexxapp.run()
         if count is not None:
             self.test(count)
         return self

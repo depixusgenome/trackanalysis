@@ -92,9 +92,16 @@ def setup(locs,
             app.call_later(1, lambda: locs['TOPVIEW'].startup(path, script))
         app.start()
 
+    def run(path = None, script = None):
+        u"starts the server"
+        if locs['TOPVIEW'] is not None and (path, script) != (None, None):
+            app.call_later(1, lambda: locs['TOPVIEW'].startup(path, script))
+        app.run()
+
     locs.setdefault('TOPVIEW', None)
     locs.setdefault('serve',  serve)
     locs.setdefault('launch', launch)
     locs.setdefault('start',  start)
+    locs.setdefault('run',  run)
 
 setup(locals())

@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u""" Tests toolbar """
-from flexxutils   import flexxaction # pylint: disable=unused-import
-from view.toolbar import ToolBar     # pylint: disable=no-member,import-error
-from testdata     import path
+import time
+from flexxutils     import flexxaction # pylint: disable=unused-import
+from view.trackplot import TrackPlot   # pylint: disable=no-member,import-error
+from view.toolbar   import ToolBar     # pylint: disable=no-member,import-error
+from testdata       import path
 
-def test_toolbar(flexxaction):       # pylint: disable=redefined-outer-name
+def test_toolbar(flexxaction):         # pylint: disable=redefined-outer-name
     u"tests that the menubar works"
     def _checknone(fact):
         curr = fact.ctrl.getGlobal('current')
@@ -29,3 +31,13 @@ def test_toolbar(flexxaction):       # pylint: disable=redefined-outer-name
                     flexxaction.pypress('Ctrl-y'), _checkopen,
                     path = 'small_legacy')
     flexxaction.test(14)
+    print(flexxaction)
+
+def test_trackplot(flexxaction):       # pylint: disable=redefined-outer-name
+    u"test plot"
+    flexxaction.init('withtoolbar', TrackPlot)
+    print(flexxaction.view)
+    flexxaction.run(flexxaction.pypress('Ctrl-o'),
+                    lambda _: time.sleep(5),
+                    #flexxaction.pypress('Ctrl-z'),
+                    path = 'small_pickle')
