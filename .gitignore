@@ -3,4 +3,6 @@
 .waf*
 .*.un~
 build/
+wafbuilder/
+waf
 pyenv/
