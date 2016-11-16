@@ -57,6 +57,11 @@ class FlexxAction:
         u"press one key in python server"
         return pypress(key, self) if now else pypress(key)
 
+    @staticmethod
+    def jspress(val):
+        u"press one key in the browser"
+        return lambda fact: fact.mainview._keys_(val) # pylint: disable=protected-access
+
     def quit(self, now = True):
         u"stops server"
         self.pypress('Ctrl-q', now)
@@ -89,7 +94,7 @@ class FlexxAction:
                 return _path(path)
             self.monkeypatch.setattr(view.dialog, '_tkopen', _tkopen)
 
-        flexxapp.call_later(1, _run)
+        flexxapp.call_later(.5, _run)
         flexxapp.run()
         if count is not None:
             self.test(count)
@@ -101,7 +106,10 @@ class FlexxAction:
         if cnt:
             assert len(self.info) == cnt
             for i, (val, msg) in enumerate(self.info):
-                assert val is True, str(i) if msg is None else str(i)+': '+str(msg)
+                if msg is None or len(msg) == 0:
+                    assert val is True, str(i)
+                else:
+                    assert val is True, str(i)+': '+str(msg)
 
 @pytest.fixture()
 def flexxaction(monkeypatch):

@@ -65,28 +65,21 @@ class BeadPlotter(SinglePlotter):
         fig.add_layout(LinearAxis(y_range_name='zmag', axis_label = u'zmag'), 'right')
 
     def _addcallbacks(self, fig):
+        super()._addcallbacks(fig)
         rng   = fig.extra_y_ranges['zmag']
         jsobj = dict(start = rng.start,
-                     end   = rng.end,
-                     key   = '"'+self.id+'"')
-        def _onRangeChange(fig    = fig,
-                           rng    = rng):
+                     end   = rng.end)
+        def _onRangeChange(rng = rng):
             rng.start = jsobj['start']
             rng.end   = jsobj['end']
-            xrng      = fig.x_range
-            yrng      = fig.y_range
-
-            # pylint: disable=no-member
-            window.flexx.instances[jsobj['key']].change(xrng.start, xrng.end,
-                                                        yrng.start, yrng.end)
 
         rng.callback = self.callbackCode(_onRangeChange)
 
-    def create(self):
+    def _create(self):
         u"sets-up the figure"
         task = self._ctrl.getGlobal("current", "track", default = None)
         if task is None:
-            return figure(tools = [])
+            return
 
         data, source = self._createdata(task)
 
@@ -98,16 +91,14 @@ class BeadPlotter(SinglePlotter):
         self._addylayout  (data, fig)
         self._addglyph    (source, "z",    fig)
         self._addglyph    (source, "zmag", fig, y_range_name = 'zmag')
-
-        self._addcallbacks(fig)
-
-        return fig, self.keyargs()
+        return fig
 
 class TrackPlot(FlexxView):
     u"Track plot view"
+    _bokeh   = None # type: ui.BokehWidget
     _plotter = None # type: BeadPlotter
     def init(self):
-        ui.BokehWidget()
+        self._bokeh   = ui.BokehWidget()
         self._plotter = BeadPlotter() # must change this to a Plot Factory
 
     def unobserve(self):
@@ -116,21 +107,26 @@ class TrackPlot(FlexxView):
         del self._plotter
 
     @event.emitter
-    def _plotted(self, plotter, args):              # pylint: disable=no-self-use
-        args['class'] = plotter.__class__.__name__
-        return args
+    def _plotted(self) -> dict:
+        return self._plotter.keyargs()
+
+    def _onUpdateCurrent(self, **items):
+        if 'track' not in items and 'bead' not in items:
+            return
+
+        self._bokeh.plot = self._plotter.create()
+        # pylint: disable=attribute-defined-outside-init
+        if self._bokeh.plot is None:
+            self.children = tuple()
+        else:
+            if len(self.children) == 0:
+                self.children = self._bokeh, self._plotter
+            self._plotted()
 
     def observe(self, ctrl):
         super().observe(ctrl)
         self._plotter.observe(ctrl)
-
-        children = self.children[0], self._plotter  # pylint: disable=no-member
-        def _onUpdateCurrent(**items):
-            if 'track' in items or 'bead' in items:
-                children[0].plot, args = children[1].create()
-                self._plotted(children[1], args)
-
-        ctrl.observe(_onUpdateCurrent)
+        ctrl.observe(self._onUpdateCurrent)
 
     class JS: # pylint: disable=no-member,missing-docstring
         @event.connect("_plotted")

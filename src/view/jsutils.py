@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 u"Utils for dealing with the JS side of the view"
 from flexx          import pyscript, app, event
+from flexx.pyscript import window
 from bokeh.models   import CustomJS
 
 from control        import Controller
@@ -90,6 +91,8 @@ class Plotter(app.Model):
             # https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent
             # key: chrome 51, ff 23, ie 9
             # code: chrome ok, ff 32, ie no
+            if isinstance(evt, str):
+                return evt
             modifiers = '-'.join([_ for _ in ('Alt', 'Shift', 'Ctrl', 'Meta')
                                   if evt[_.lower()+'Key']])
             key = evt.key
@@ -111,61 +114,84 @@ class Plotter(app.Model):
 
 class SinglePlotter(Plotter):
     u"Base plotter class with single figure"
-    def keyargs(self):
+    def keyargs(self) -> dict:
         u"args to be passed to JS.onkeydown"
         vals = self._ctrl.getGlobal(self.key())
-        return dict(pan   = vals.get("panning.speed"),
-                    zoom  = vals.get("zooming.speed"),
-                    reset = vals.get("keypress.reset"),
-                    **{'keypress.'+axis+'.'+func: vals.get('keypress.'+axis+'.'+func)
-                       for axis in ('x', 'y')
-                       for func in ('pan.low', 'pan.high', 'zoom.in', 'zoom.out')})
+        args = {'class'   : self.__class__.__name__,
+                'pan'     : vals.get("panning.speed"),
+                'zoom'    : (1.-2.*vals.get("zooming.speed")),
+                'reset'   : vals.get("keypress.reset"),
+                'flexxid' : self.id}
+        args.update({'keypress.'+axis+'.'+func: vals.get('keypress.'+axis+'.'+func)
+                     for axis in ('x', 'y')
+                     for func in ('pan.low', 'pan.high', 'zoom.in', 'zoom.out')})
+        return args
 
-    @event.connect("change")
+    @event.connect("range_change")
     def _on_change(self, *events):
         evt   = events[-1]
         xvals = evt["xstart"], evt['xend']
         yvals = evt["ystart"], evt['yend']
         self._ctrl.updateGlobal(self.key('current'), x = xvals, y = yvals)
 
+    def _addcallbacks(self, fig):
+        u"adds Range callbacks"
+        jsobj = dict(flexxid = '"'+self.id+'"')
+        def _onRangeChange(fig = fig):
+            # pylint: disable=no-member
+            elem = window.flexx.instances[jsobj['flexxid']]
+            elem.range_change(fig)
+
+        fig.x_range.callback = self.callbackCode(_onRangeChange)
+        fig.y_range.callback = self.callbackCode(_onRangeChange)
+        return fig
+
     def create(self):
         u"returns the figure"
-        raise NotImplementedError("need to create")
+        fig = self._create()
+        if fig is not None:
+            self._addcallbacks(fig)
+        return fig
+
+    def _create(self):
+        u"Specified by child class. Returns figure"
+        raise NotImplementedError()
 
     class JS: # pylint: disable=missing-docstring,no-self-use
         @event.emitter
-        def change(self, xstart, xend, ystart, yend):
-            return dict(xstart = xstart, xend = xend,
-                        ystart = ystart, yend = yend)
+        def range_change(self, fig):
+            return dict(xstart = fig.x_range.start, xend = fig.x_range.end,
+                        ystart = fig.y_range.start, yend = fig.y_range.end)
 
         def _dozoom(self, jsobj, found, rng):
-            delta = (rng.end-rng.start)*jsobj['zoom']
+            center = (rng.end+rng.start)*.5
+            delta  = (rng.end-rng.start)
             if found.endswith('.in'):
-                rng.start = rng.start - delta
-                rng.end   = rng.end   + delta
-            elif found.endswith('.out'):
-                rng.start = rng.start + delta
-                if rng.start > rng.bounds[0]:
-                    rng.start = rng.bounds[0]
+                delta  *= jsobj['zoom']
+            else:
+                delta  /= jsobj['zoom']
 
-                rng.end   = rng.end   - delta
-                if rng.end > rng.bounds[1]:
-                    rng.end   = rng.bounds[1]
+            rng.start = center - delta*.5
+            if rng.start < rng.bounds[0]:
+                rng.start = rng.bounds[0]
+
+            rng.end   = center + delta*.5
+            if rng.end > rng.bounds[1]:
+                rng.end   = rng.bounds[1]
 
         def _dopan(self, jsobj, found, rng):
             delta = (rng.end-rng.start)*jsobj['pan']
             if found.endswith('.low'):
-                rng.start = rng.start - delta
-                rng.end   = rng.end   - delta
-                if rng.start < rng.bounds[0]:
-                    rng.end   = rng.bounds[0] + rng.end-rng.start
-                    rng.start = rng.bounds[0]
-            elif found.endswith('.high'):
-                rng.start = rng.start + delta
-                rng.end   = rng.end   + delta
-                if rng.end > rng.bounds[1]:
-                    rng.start = rng.bounds[1] + rng.start-rng.end
-                    rng.end   = rng.bounds[1]
+                delta *= -1.
+
+            rng.start = rng.start + delta
+            rng.end   = rng.end   + delta
+            if rng.start < rng.bounds[0]:
+                rng.end   = rng.bounds[0] + rng.end-rng.start
+                rng.start = rng.bounds[0]
+            elif rng.end > rng.bounds[1]:
+                rng.start = rng.bounds[1] + rng.start-rng.end
+                rng.end   = rng.bounds[1]
 
         def onkeydown(self, fig, jsobj, evt):
             found = None
@@ -183,6 +209,10 @@ class SinglePlotter(Plotter):
                 fig.x_range.end   = fig.x_range.bounds[1]
                 fig.y_range.start = fig.y_range.bounds[0]
                 fig.y_range.end   = fig.y_range.bounds[1]
+                fig.x_range.trigger("change")
+                fig.y_range.trigger("change")
+                # pylint: disable=no-member
+                window.flexx.instances[jsobj['flexxid']].range_change(fig)
                 return
 
             rng = getattr(fig, found[9]+'_range')
@@ -190,5 +220,6 @@ class SinglePlotter(Plotter):
                 self._dozoom(jsobj, found, rng)
             elif "pan" in found:
                 self._dopan(jsobj, found, rng)
-
-            fig.trigger("change")
+            rng.trigger("change")
+            # pylint: disable=no-member
+            window.flexx.instances[jsobj['flexxid']].range_change(fig)

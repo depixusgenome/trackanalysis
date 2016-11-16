@@ -14,10 +14,11 @@ from .                      import setup
 def _withtoolbar(main):
     class ViewWithToolbar(FlexxView):
         u"A view with the toolbar on top"
+        _mainview = None # type: ignore
         def init(self):
             with ui.VBox(flex = 0):
                 ToolBar(flex = 0)
-                main   (flex = 1)
+                self._mainview = main(flex = 1)
     return ViewWithToolbar
 
 setup(locals(), creator = _withtoolbar, defaultcontrols = all, defaultviews = all)

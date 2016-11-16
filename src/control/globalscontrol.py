@@ -120,12 +120,12 @@ class GlobalsController(Controller):
                              'zooming.speed'       : .2,
                              'keypress.x.pan.low'  : 'ArrowLeft',
                              'keypress.x.pan.high' : 'ArrowRight',
-                             'keypress.x.zoom.in'  : 'Shift-ArrowLeft',
-                             'keypress.x.zoom.out' : 'Shift-ArrowRight',
+                             'keypress.x.zoom.out' : 'Shift-ArrowLeft',
+                             'keypress.x.zoom.in'  : 'Shift-ArrowRight',
                              'keypress.y.pan.low'  : 'ArrowDown',
                              'keypress.y.pan.high' : 'ArrowUp',
-                             'keypress.y.zoom.in'  : 'Shift-ArrowDown',
-                             'keypress.y.zoom.out' : 'Shift-ArrowUp',
+                             'keypress.y.zoom.out' : 'Shift-ArrowDown',
+                             'keypress.y.zoom.in'  : 'Shift-ArrowUp',
                              'keypress.reset'      : ' '})
         self.addGlobalMap('current')
         self.addGlobalMap('current.plot')
