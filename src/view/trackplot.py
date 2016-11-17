@@ -126,7 +126,7 @@ class TrackPlot(FlexxView):
     def observe(self, ctrl):
         super().observe(ctrl)
         self._plotter.observe(ctrl)
-        ctrl.observe(self._onUpdateCurrent)
+        ctrl.observe("globals.current", self._onUpdateCurrent)
 
     class JS: # pylint: disable=no-member,missing-docstring
         @event.connect("_plotted")

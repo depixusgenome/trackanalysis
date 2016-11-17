@@ -39,7 +39,7 @@ class DefaultsMap(Controller):
             maps += (parent,)
 
         super().__init__(**kwargs)
-        self.__name  = name.replace('.', '')
+        self.__name  = "globals."+name
         self.__items = ChainMap(*maps)
 
     def createChild(self, name, **kwargs):
@@ -81,7 +81,7 @@ class DefaultsMap(Controller):
                 ret[key] = ReturnPair(old, val)
 
         if len(ret):
-            return self.handle("update"+self.__name, self.outasdict, ret)
+            return self.handle(self.__name, self.outasdict, ret)
 
     def pop(self, *args):
         u"removes view information"

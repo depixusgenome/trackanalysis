@@ -37,7 +37,7 @@ class  ToolBar(FlexxView):
 
             box.children = children
 
-        ctrl.observe(_onUpdateCurrent)
+        ctrl.observe("globals.current", _onUpdateCurrent)
 
     def unobserve(self):
         u"Sets up the controller"

@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u""" Tests toolbar """
-from pytest         import approx                   # pylint: disable=no-name-in-module
+import time
+from pytest         import approx       # pylint: disable=no-name-in-module
 from flexx          import event
-from flexxutils     import flexxaction              # pylint: disable=unused-import
-from view.trackplot import TrackPlot, BeadPlotter   # pylint: disable=no-member,import-error
-from view.toolbar   import ToolBar                  # pylint: disable=no-member,import-error
+from flexxutils     import flexxaction  # pylint: disable=unused-import
+from view.trackplot import TrackPlot    # pylint: disable=no-member,import-error
+from view.toolbar   import ToolBar      # pylint: disable=no-member,import-error
 from testdata       import path
 
-def test_toolbar(flexxaction):                      # pylint: disable=redefined-outer-name
+def test_toolbar(flexxaction):         # pylint: disable=redefined-outer-name
     u"tests that the menubar works"
     def _checknone(fact):
         curr = fact.ctrl.getGlobal('current')
@@ -48,38 +49,48 @@ def test_trackplot(flexxaction):        # pylint: disable=redefined-outer-name
 
     valx = []
     valy = []
-    def _printrng(fact):
-        dico  = fact.ctrl.getGlobal(BeadPlotter.key("current"))
-        valx.append(dico.get("x"))
-        valy.append(dico.get("y"))
-
+    vals = []
     flexxaction.init('withtoolbar', _TrackPlotTest)
+    def _printrng(**evts):
+        if 'x' in evts:
+            valx.append(evts['x'].value)
+        if 'y' in evts:
+            valy.append(evts['y'].value)
+        vals.append((valx[-1], valy[-1]))
+    flexxaction.ctrl.observe("globals.current.plot.bead", _printrng)
+
     flexxaction.run(flexxaction.pypress('Ctrl-o'),
-                    flexxaction.jspress(' '),                _printrng,
-                    flexxaction.jspress('Shift-ArrowUp'),    _printrng,
-                    flexxaction.jspress('Shift-ArrowRight'), _printrng,
-                    flexxaction.jspress('ArrowLeft'),        _printrng,
-                    flexxaction.jspress('ArrowUp'),          _printrng,
-                    flexxaction.jspress('ArrowRight'),       _printrng,
-                    flexxaction.jspress('ArrowDown'),        _printrng,
-                    flexxaction.jspress('Shift-ArrowLeft'),  _printrng,
-                    flexxaction.jspress('Shift-ArrowDown'),  _printrng,
-                    flexxaction.jspress('Shift-ArrowUp'),    _printrng,
-                    flexxaction.jspress('Shift-ArrowRight'), _printrng,
-                    flexxaction.jspress(' '),                _printrng,
+                    lambda _: time.sleep(2),
+                    flexxaction.jspress(' '),
+                    flexxaction.jspress('Shift-ArrowUp'),
+                    flexxaction.jspress('Shift-ArrowRight'),
+                    flexxaction.jspress('ArrowLeft'),
+                    flexxaction.jspress('ArrowUp'),
+                    flexxaction.jspress('ArrowRight'),
+                    flexxaction.jspress('ArrowDown'),
+                    flexxaction.jspress('Shift-ArrowLeft'),
+                    flexxaction.jspress('Shift-ArrowDown'),
+                    flexxaction.jspress('Shift-ArrowUp'),
+                    flexxaction.jspress('Shift-ArrowRight'),
+                    flexxaction.jspress(' '),
                     flexxaction.pypress('Ctrl-z'),
                     path = 'small_legacy')
 
-    for i in range(2):
-        for j in (-4, -1):
-            assert valx[0][i] == approx(valx[j][i])
-            assert valy[0][i] == approx(valy[j][i])
-        assert valx[0][i] == approx(valx[1][i])
-        assert valx[3][i] == approx(valx[4][i])
-        assert valx[2][i] == approx(valx[5][i])
-        assert valx[2][i] == approx(valx[6][i])
+    truths = (((650.515,  1152.485),    (-0.0489966, 1.1207037013)),
+              ((650.515,  1152.485),    (0.18494344, 0.8867636370)),
+              ((750.909,  1052.091),    (0.18494344, 0.8867636370)),
+              ((690.6726, 991.8546),   (0.18494344, 0.8867636370)),
+              ((690.6726, 991.8546),   (0.32530748, 1.0271276756)),
+              ((750.909,  1052.091),    (0.32530748, 1.0271276756)),
+              ((750.909,  1052.091),    (0.18494344, 0.8867636370)),
+              ((650.515,  1152.485),    (0.18494344, 0.8867636370)),
+              ((650.515,  1152.485),    (-0.0489966, 1.1207037013)),
+              ((650.515,  1152.485),    (0.18494344, 0.8867636370)),
+              ((750.909,  1052.091),    (0.18494344, 0.8867636370)),
+              ((650.515,  1152.485),    (-0.0489966, 1.1207037013)))
 
-        assert valy[1][i] == approx(valy[2][i])
-        assert valy[1][i] == approx(valy[3][i])
-        assert valy[4][i] == approx(valy[5][i])
-        assert valy[1][i] == approx(valy[6][i])
+    assert len(truths) == len(vals)
+    for i, truth1 in enumerate(truths):
+        for j, truth2 in enumerate(truth1):
+            for k, truth3 in enumerate(truth2):
+                assert vals[i][j][k] == approx(truth3)
