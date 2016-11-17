@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Utils for testing views"
+import time
 import traceback
 import flexx.app as flexxapp
+import flexx.event as flexxevent
 import pytest
 
 class PyPressEvent:
@@ -46,9 +48,23 @@ class FlexxAction:
         self.monkeypatch.setattr(*args, **kwargs)
         return self
 
-    def init(self, launch, item):
+    def init(self, launch, item, keyaccess = None):
         u"creates and returns the model"
         flexxapp.create_server(new_loop = True)
+
+        if keyaccess is not None:
+            # pylint: disable=too-many-ancestors,no-self-use,no-member,missing-docstring
+            class _PlotTest(item):
+                @flexxevent.emitter
+                def _keys_(self, val = '')-> dict:
+                    return {'value': val}
+
+                class JS:
+                    @flexxevent.connect("_keys_")
+                    def _onkeypress(self, *events):
+                        keyaccess(self).onkeydown(events[-1]['value'])
+            item = _PlotTest
+
         launcher  = __import__("app."+launch, fromlist = ['launch'])
         self.view = launcher.launch(item)
         return self
@@ -57,10 +73,13 @@ class FlexxAction:
         u"press one key in python server"
         return pypress(key, self) if now else pypress(key)
 
-    @staticmethod
-    def jspress(val):
+    def jspress(self, val, now = False):
         u"press one key in the browser"
-        return lambda fact: fact.mainview._keys_(val) # pylint: disable=protected-access
+        # pylint: disable=protected-access
+        if now:
+            self.mainview._keys_(val)
+        else:
+            return lambda fact: fact.mainview._keys_(val)
 
     def quit(self, now = True):
         u"stops server"
@@ -71,12 +90,24 @@ class FlexxAction:
         u"accumulates assertions: pytest doesn't work otherwise"
         self.info.append((val, msg))
 
+    @staticmethod
+    def sleep(i):
+        u"returns a  method to wait n seconds for the gui to update"
+        return lambda _: time.sleep(i)
+
     def run(self, *actions, path = None, count = None):
         u"Runs a series of actions"
         def _run():
             self.ind += 1
             try:
-                actions[self.ind-1](self)
+                act = actions[self.ind-1]
+                if isinstance(act, str):
+                    if act.startswith('Js-'):
+                        self.jspress(act[3:], now = True)
+                    elif act.startswith('Py-'):
+                        self.pypress(act[3:], now = True)
+                else:
+                    actions[self.ind-1](self)
             except Exception as exc:             # pylint: disable=broad-except
                 self.exc = exc
                 traceback.print_exc()
