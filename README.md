@@ -3,6 +3,15 @@
 * User-friendly, platform agnostic data analysis tools.
 * Batch *and* GUI modes must both function.
 
+# Installing
+
+* Copy or clone the wafbuilder library at the project's root.
+* Link or copy wafbuilder/bin/waf to the project's root.
+* Then do:
+
+`python3 waf configure`
+`python3 waf build`
+
 # Architecture
 
 The global architecture principle is *Model-View-Controller*.
