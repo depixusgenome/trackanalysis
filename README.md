@@ -5,12 +5,26 @@
 
 # Installing
 
+* Check that you have all dependencies listed in REQUIRE. The better method
+  is to create a conda environment "pyenv/" at the project's root:
+
+```
+conda create -p pyenv/ pandas flexx bokeh pybind11
+```
+
 * Copy or clone the wafbuilder library at the project's root.
 * Link or copy wafbuilder/bin/waf to the project's root.
 * Then do:
 
-`python3 waf configure`
-`python3 waf build`
+```
+conda activate pyenv/
+python3 waf configure
+python3 waf build
+```
+
+The *configure* step is required only once. The *conda activate* step is required
+once per shell. It sets the path such that the python used is the one in *pyenv*.
+The *build* step is required any time sources are changed.
 
 # Architecture
 
