@@ -40,7 +40,7 @@ class MetaMixin(type):
 
     Mixin classes are actually composed. That way there are fewer name conflicts
     """
-    def __new__(mcs, name, bases, nspace, **kw):
+    def __new__(mcs, clsname, bases, nspace, **kw):
         match  = re.compile(kw.get('match', r'^[a-z][a-zA-Z0-9]+$')).match
         mixins = kw['mixins']
 
@@ -87,7 +87,7 @@ class MetaMixin(type):
                 elif isinstance(fcn, property):
                     nspace[name] = mcs.__createprop(base, fcn)
 
-        return type(name, bases, nspace)
+        return type(clsname, bases, nspace)
 
     @staticmethod
     def __createstatic(fcn):
