@@ -67,7 +67,7 @@ class Plotter(app.Model):
         u"Removes the controller"
         del self._ctrl
 
-    def observe(self,  ctrl:Controller):
+    def observe(self, ctrl:Controller, _):
         u"sets up this plotter's info"
         ctrl.addGlobalMap(self.key())
         ctrl.addGlobalMap(self.key('current'))

@@ -5,10 +5,9 @@ from . import View
 
 class GlobalsView(View):
     u"View listing all global info"
-    def observe(self, ctrl):
+    @staticmethod
+    def observe(ctrl, _):
         u"sets up the observations"
-        super().observe(ctrl)
-
         items = ctrl.getGlobal('current')
         # pylint: disable=unused-variable
         def _onCloseTrack(model = None, **_):
@@ -34,7 +33,3 @@ class GlobalsView(View):
             items.update(**{'track': parent, 'task' : parent})
 
         ctrl.observe([fcn for name, fcn in locals().items() if name[:3] == '_on'])
-
-    def connect(self, *_1, **_2):
-        u"Should be implemetented by flexx.ui.Widget"
-        raise NotImplementedError("View should derive from a flexx app")

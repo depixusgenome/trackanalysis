@@ -22,15 +22,13 @@ class UndoView(View):
 
     def unobserve(self):
         u"Removes the controller"
-        super().unobserve()
         del self.__isundoing
         del self.__uqueue
         del self.__rqueue
 
-    def observe(self, ctrl):
+    def observe(self, ctrl, keys): # pylint: disable=too-many-locals
         u"sets up the observations"
-        super().observe(ctrl)
-        View._keys.addKeyPress('keypress', undo = self.undo, redo = self.redo)
+        keys.addKeyPress('keypress', undo = self.undo, redo = self.redo)
 
         self.__isundoing = [False]
         self.__uqueue    = deque(maxlen = 1000)
@@ -93,15 +91,6 @@ class UndoView(View):
 
             if len(items) != 0:
                 (rqueue if isundoing[0] else uqueue).append(items)
-
-    def connect(self, *_1, **_2):
-        u"Should be implemetented by flexx.ui.Widget"
-        raise NotImplementedError("View should derive from a flexx app")
-
-    def startup(self, path, script):
-        u"runs a script or opens a file on startup"
-        with self.action:
-            super().startup(path, script)
 
     def _apply(self):
         queue = self.__uqueue if self.__isundoing[0] else self.__rqueue

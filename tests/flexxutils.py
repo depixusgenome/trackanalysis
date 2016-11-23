@@ -60,9 +60,11 @@ class FlexxAction:
                     return {'value': val}
 
                 class JS:
+                    _keyaccess = keyaccess
                     @flexxevent.connect("_keys_")
                     def _onkeypress(self, *events):
-                        keyaccess(self).onkeydown(events[-1]['value'])
+                        self._keyaccess().onkeydown(events[-1]['value'])
+            print(_PlotTest.JS.CODE)
             item = _PlotTest
 
         launcher  = __import__("app."+launch, fromlist = ['launch'])

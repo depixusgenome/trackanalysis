@@ -7,7 +7,7 @@ from view.trackplot import TrackPlot    # pylint: disable=no-member,import-error
 from view.toolbar   import ToolBar      # pylint: disable=no-member,import-error
 from testdata       import path
 
-def test_toolbar(flexxaction):         # pylint: disable=redefined-outer-name
+def _test_toolbar(flexxaction):         # pylint: disable=redefined-outer-name
     u"tests that the menubar works"
     def _checknone(fact):
         curr = fact.ctrl.getGlobal('current')
@@ -44,10 +44,10 @@ def test_trackplot(flexxaction):        # pylint: disable=redefined-outer-name
             valy.append(evts['y'].value)
         vals.append((valx[-1], valy[-1]))
 
-    flexxaction.init('withtoolbar',
-                     TrackPlot,
-                     lambda _: _.children[0].node.children[0].onkeydown
-                    )
+    def _get():
+        return self.children[0].node.children[0] # pylint: disable=undefined-variable
+
+    flexxaction.init('withtoolbar', TrackPlot, _get)
     flexxaction.ctrl.observe("globals.current.plot.bead", _printrng)
 
     flexxaction.run('Py-Ctrl-o',        flexxaction.sleep(2),

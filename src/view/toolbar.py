@@ -14,9 +14,8 @@ class  ToolBar(FlexxView):
     _save     = None # type: Optional[ui.Button]
     _diagopen = None # type: Optional[FileDialog]
     _diagsave = None # type: Optional[FileDialog]
-    def observe(self, ctrl):
+    def observe(self, ctrl, _):
         u"Sets up the controller"
-        super().observe(ctrl)
         self._diagopen = FileDialog(filetypes = u'trk|ana|*',
                                     config    = ctrl,
                                     title     = u'Open a track or analysis file')

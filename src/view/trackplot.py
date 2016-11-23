@@ -13,9 +13,9 @@ from .              import FlexxView
 
 class BeadPlotter(SinglePlotter):
     u"Plots a default bead"
-    def observe(self,  ctrl:Controller):
+    def observe(self,  ctrl:Controller, _):
         u"sets up this plotter's info"
-        super().observe(ctrl)
+        super().observe(ctrl, _)
         ctrl.setGlobalDefaults(self.key(),
                                z       = PlotAttrs('blue', 'circle', 1),
                                zmag    = PlotAttrs('red',  'line',   1),
@@ -38,7 +38,8 @@ class BeadPlotter(SinglePlotter):
     def _figargs(self):
         args = dict(tools        = self.getConfig("tools"),
                     x_axis_label = u'Time',
-                    y_axis_label = u'z')
+                    y_axis_label = u'z',
+                    sizing_mode  = 'scale_height')
 
         for i in ('x', 'y'):
             rng  = self.getCurrent(i, default = None)
@@ -83,7 +84,7 @@ class BeadPlotter(SinglePlotter):
 
         data, source = self._createdata(task)
 
-        fig = figure(**self._figargs())
+        fig = figure()
         fig.x_range.bounds = self._bounds(data['t'])
         fig.y_range.bounds = self._bounds(data['z'])
         fig.add_tools(HoverTool(tooltips = self.getConfig("tooltip")))
@@ -98,11 +99,12 @@ class TrackPlot(FlexxView):
     _bokeh   = None # type: ui.BokehWidget
     _plotter = None # type: BeadPlotter
     def init(self):
-        self._bokeh   = ui.BokehWidget()
+        plt = figure(sizing_mode = 'scale_height')
+        self._bokeh   = ui.BokehWidget(plot = plt, title ="MMM")
         self._plotter = BeadPlotter() # must change this to a Plot Factory
 
     def unobserve(self):
-        super().unobserve()
+        u"remove controller"
         self._plotter.unobserve()
         del self._plotter
 
@@ -116,16 +118,11 @@ class TrackPlot(FlexxView):
 
         self._bokeh.plot = self._plotter.create()
         # pylint: disable=attribute-defined-outside-init
-        if self._bokeh.plot is None:
-            self.children = tuple()
-        else:
-            if len(self.children) == 0:
-                self.children = self._bokeh, self._plotter
-            self._plotted()
+        self._plotted()
 
-    def observe(self, ctrl):
-        super().observe(ctrl)
-        self._plotter.observe(ctrl)
+    def observe(self, ctrl, _):
+        u"sets-up the controller"
+        self._plotter.observe(ctrl, _)
         ctrl.observe("globals.current", self._onUpdateCurrent)
 
     class JS: # pylint: disable=no-member,missing-docstring

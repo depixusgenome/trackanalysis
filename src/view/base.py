@@ -49,79 +49,83 @@ class Action(ActionDescriptor):
                           args = {'type': tpe, 'value': val, 'backtrace': bkt})
         return False
 
-class BaseView:
-    u"View interface"
-    def observe(self, ctrl:Controller):
-        u"Sets up the controller"
-        raise NotImplementedError()
+def _iterate(item, fcn, *args):
+    curr = getattr(item.__class__, fcn)
+    for base in item.__class__.__bases__:
+        other = getattr(base, fcn, curr)
+        if other is not curr and other not in (observe, unobserve):
+            other(item, *args)
 
-    def unobserve(self):
-        u"removes up the controller"
-        raise NotImplementedError()
+    children = list(getattr(item, 'children', []))
+    while len(children):
+        cur = children.pop()
+        if isinstance(cur, (View, FlexxView)):
+            getattr(cur, fcn)(*args)
+        else:
+            children.extend(getattr(cur, 'children', []))
 
-class View(BaseView):
-    u"Classes to be passed a controller"
-    _ctrl = None    # type: Controller
-    _keys = KeyPressManager()
-    def unobserve(self):
-        u"Removes the controller"
-        if '_ctrl' in self.__dict__:
-            self._ctrl.unobserve()
-            del self._ctrl
+def unobserve(item):
+    u"Removes the controller"
+    if '_ctrl' in item.__dict__:
+        getattr(item, '_ctrl').unobserve()
+        item.__dict__.pop('_ctrl')
 
-        if '_keys' in self.__dict__:
-            self._keys.popKeyPress(all)
-            del self._keys
+    if 'keys' in item.__dict__:
+        item.keys.popKeyPress(all)
+        del item.keys
+    _iterate(item, 'unobserve')
 
-        children = list(getattr(self, 'children', []))
-        while len(children):
-            cur = children.pop()
-            if isinstance(cur, View):
-                cur.unobserve()
-            else:
-                children.extend(getattr(cur, 'children', []))
+def observe(item, ctrl:Controller, keys:KeyPressManager):
+    u"Sets up the controller"
+    if '_ctrl' not in item.__dict__:
+        setattr(item, '_ctrl', ctrl)
 
-    def connect(self, *_1, **_2):
-        u"Should be implemetented by flexx.ui.Widget"
-        raise NotImplementedError("View should derive from a flexx app")
+    if 'keys' not in item.__dict__:
+        item.keys = keys
 
-    def observe(self, ctrl:Controller):
-        u"Sets up the controller"
-        if '_ctrl' not in self.__dict__:
-            self._ctrl   = ctrl
+    _iterate(item, 'observe', ctrl, keys)
 
-        children = list(getattr(self, 'children', []))
-        while len(children):
-            cur = children.pop()
-            if isinstance(cur, View):
-                cur.observe(ctrl)
-            else:
-                children.extend(getattr(cur, 'children', []))
-
-    def startup(self, path, script):
-        u"runs a script or opens a file on startup"
+def startup(item, path, script):
+    u"runs a script or opens a file on startup"
+    with item.action:
         if path is not None:
-            self._ctrl.openTrack(path)
+            getattr(item, '_ctrl').openTrack(path)
         if script is not None:
-            script(self, self._ctrl)
+            script(item, getattr(item, '_ctrl'))
 
-    action = ActionDescriptor()
 
-class FlexxView(ui.Widget, View):
+class View:
+    u"Classes to be passed a controller"
+    _ctrl     = None    # type: Controller
+    keys      = None    # type: KeyPressManager
+    action    = ActionDescriptor()
+    observe   = observe
+    unobserve = unobserve
+    startup   = startup
+
+class FlexxView(ui.Widget):
     u"A view with a gui"
+    _ctrl     = None    # type: Controller
+    keys      = None    # type: KeyPressManager
+    action    = ActionDescriptor()
+    observe   = observe
+    unobserve = unobserve
+    startup   = startup
+
     def init(self):
         u"initializes the gui"
         raise NotImplementedError("Use this to create the gui")
 
     def open(self, ctrl):
         u"starts up the controller stuff"
-        View._keys.observe(ctrl, 'keypress', quit = self.close)
-        self.connect("key_press", View._keys.onKeyPress)
-        self.observe(ctrl)
+        keys = KeyPressManager()
+        keys.observe(ctrl, 'keypress', quit = self.close)
+        self.connect("key_press", keys.onKeyPress)
+        self.observe(ctrl, keys)
 
     def close(self):
         u"closes the application"
-        View._keys.unobserve()
+        self.keys.unobserve()
         self.unobserve()
         self.session.close()
 
@@ -132,4 +136,4 @@ class FlexxView(ui.Widget, View):
 
         btn = ui.Button(**kwa)
         btn.connect('mouse_down', fcn)
-        self._keys.addKeyPress((prefix+'.'+title.lower(), fcn))
+        self.keys.addKeyPress((prefix+'.'+title.lower(), fcn))
