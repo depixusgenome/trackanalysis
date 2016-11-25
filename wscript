@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 # encoding: utf-8
 import os
-import wafbuilder as builder
+try:
+    import wafbuilder as builder
+except ImportError:
+    raise ImportError("Don't forget to clone wafbuilder!!")
 
 _ALL = ('tests',) + tuple(builder.wscripted("src"))
 

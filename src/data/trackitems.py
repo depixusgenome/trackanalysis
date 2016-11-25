@@ -22,6 +22,9 @@ def setfield(fcn):
 
 class Items(metaclass=ABCMeta):
     u"Class for iterating over data"
+
+    def __init__(self, **_) -> None:
+        super().__init__()
     @abstractmethod
     def __iter__(self) -> 'Iterator[Tuple[Any,Any]]':
         u"iterates over keys and data"
@@ -38,6 +41,7 @@ class TrackItems(Items):
     u"Class for iterating over beads or creating a new list of data"
     level = Level.none
     def __init__(self, **kw) -> None:
+        super().__init__()
         self.track     = kw.get('track',    None)   # type: ignore
         self.data      = kw.get('data',     None)   # type: Optional[Dict]
         self.selected  = None                       # type: Optional[List]
