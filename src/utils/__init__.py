@@ -41,9 +41,7 @@ class MetaMixin(type):
     Mixin classes are actually composed. That way there are fewer name conflicts
     """
     def __new__(mcs, clsname, bases, nspace, **kw):
-        match  = re.compile(kw.get('match', r'^[a-z][a-zA-Z0-9]+$')).match
         mixins = kw['mixins']
-
         def setMixins(self, instances = None, initargs = None):
             u"sets-up composed mixins"
             for base in mixins:
@@ -72,22 +70,42 @@ class MetaMixin(type):
             self.setMixins(mixins, initargs = kwa)
 
         nspace['__init__'] = __init__
+        nspace.update(mcs.__addaccesses(mixins, nspace, kw))
 
-        for base in mixins:
-            for name, fcn in getmembers(base):
-                if match(name) is None:
-                    continue
+        mnames = tuple(base.__name__.lower() for base in mixins)
+        nspace['_mixins'] = property(lambda self: (getattr(self, i) for i in mnames))
 
-                if _ismeth(fcn) or (_isfunc(fcn) and not ismethod(fcn)):
-                    nspace[name] = mcs.__createstatic(fcn)
-                elif _isfunc(fcn):
-                    nspace[name] = mcs.__createmethod(base, fcn)
-                elif isinstance(fcn, Enum):
-                    nspace[name] = fcn
-                elif isinstance(fcn, property):
-                    nspace[name] = mcs.__createprop(base, fcn)
+        def _callmixins(self, name, *args, **kwa):
+            for mixin in getattr(self, '_mixins'):
+                getattr(mixin, name, lambda *_1, **_2: None)(*args, **kwa)
+        nspace['_callmixins'] = _callmixins
 
         return type(clsname, bases, nspace)
+
+    @classmethod
+    def __addaccesses(mcs, mixins, nspace, kwa):
+        match   = re.compile(kwa.get('match', r'^[a-z][a-zA-Z0-9]+$')).match
+        members = dict()
+        for base in mixins:
+            for name, fcn in getmembers(base):
+                if match(name) is None or name in nspace:
+                    continue
+                members.setdefault(name, []).append((base, fcn))
+
+        for name, fcns in members.items():
+            if len(set(j for _, j in fcns)) > 1:
+                if not kwa.get('selectfirst', False):
+                    raise NotImplementedError("Multiple funcs: "+str(fcns))
+
+            base, fcn = fcns[0]
+            if _ismeth(fcn) or (_isfunc(fcn) and not ismethod(fcn)):
+                yield (name, mcs.__createstatic(fcn))
+            elif _isfunc(fcn):
+                yield (name, mcs.__createmethod(base, fcn))
+            elif isinstance(fcn, Enum):
+                yield (name, fcn)
+            elif isinstance(fcn, property):
+                yield (name, mcs.__createprop(base, fcn))
 
     @staticmethod
     def __createstatic(fcn):
@@ -97,7 +115,7 @@ class MetaMixin(type):
         return staticmethod(_wrap)
 
     @staticmethod
-    def __createmethod(base, fcn):
+    def __createmethod(base, fcn, ):
         cname = base.__name__.lower()
         @wraps(fcn)
         def _wrap(self, *args, **kwa):
