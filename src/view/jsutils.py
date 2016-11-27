@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Utils for dealing with the JS side of the view"
-from flexx          import pyscript, app, event
+from flexx          import pyscript, event
 from flexx.pyscript import window
 from bokeh.models   import CustomJS
 
@@ -25,9 +25,13 @@ class PlotAttrs:
 
         getattr(fig, self.glyph)(**args)
 
-class Plotter(app.Model):
+class Plotter:
     u"Base plotter class"
-    _ctrl   = None # type: Controller
+    def __init__(self, ctrl:Controller) -> None:
+        u"sets up this plotter's info"
+        ctrl.addGlobalMap(self.key())
+        ctrl.addGlobalMap(self.key('current'))
+        self._ctrl = ctrl
 
     @staticmethod
     def jsCode(pyfcn, dictname = 'jsobj') -> str:
@@ -63,15 +67,9 @@ class Plotter(app.Model):
         u"Returns the key used by the global variables"
         return base+".plot."+cls.__name__[:-len('Plotter')].lower()
 
-    def unobserve(self):
+    def close(self):
         u"Removes the controller"
         del self._ctrl
-
-    def observe(self, ctrl:Controller, _):
-        u"sets up this plotter's info"
-        ctrl.addGlobalMap(self.key())
-        ctrl.addGlobalMap(self.key('current'))
-        self._ctrl = ctrl
 
     def getConfig(self, *key, **kwa):
         u"returns config values"
@@ -120,8 +118,8 @@ class SinglePlotter(Plotter):
         args = {'class'   : self.__class__.__name__,
                 'pan'     : vals.get("panning.speed"),
                 'zoom'    : (1.-2.*vals.get("zooming.speed")),
-                'reset'   : vals.get("keypress.reset"),
-                'flexxid' : self.id}
+                'reset'   : vals.get("keypress.reset")
+               }
         args.update({'keypress.'+axis+'.'+func: vals.get('keypress.'+axis+'.'+func)
                      for axis in ('x', 'y')
                      for func in ('pan.low', 'pan.high', 'zoom.in', 'zoom.out')})
@@ -136,7 +134,7 @@ class SinglePlotter(Plotter):
 
     def _addcallbacks(self, fig):
         u"adds Range callbacks"
-        jsobj = dict(flexxid = '"'+self.id+'"')
+        jsobj = dict()
         def _onRangeChange(fig = fig):
             # pylint: disable=no-member
             elem = window.flexx.instances[jsobj['flexxid']]

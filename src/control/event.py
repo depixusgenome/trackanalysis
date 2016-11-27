@@ -256,7 +256,7 @@ class Event:
 
         return _add(names[:-1], names[-1])
 
-    def unobserve(self):
+    def close(self):
         u"Clear all handlers"
         self._handlers.clear()
         self._handlers = dict()

@@ -2,20 +2,20 @@
 # -*- coding: utf-8 -*-
 u"Track plot view"
 
-from bokeh.plotting import figure, Figure # pylint: disable=unused-import
+from typing         import Optional  # pylint: disable=unused-import
+from bokeh.plotting import figure
 from bokeh.models   import LinearAxis, Range1d, ColumnDataSource, HoverTool
-from flexx.pyscript import window
-from flexx          import event, ui
 
 from control        import Controller
 from .jsutils       import SinglePlotter, PlotAttrs
-from .              import FlexxView
+from .              import BokehView
 
 class BeadPlotter(SinglePlotter):
     u"Plots a default bead"
-    def observe(self,  ctrl:Controller, _):
+    def __init__(self,  ctrl:Controller) -> None:
         u"sets up this plotter's info"
-        super().observe(ctrl, _)
+        super().__init__(ctrl)
+        self._source = ColumnDataSource()
         ctrl.setGlobalDefaults(self.key(),
                                z       = PlotAttrs('blue', 'circle', 1),
                                zmag    = PlotAttrs('red',  'line',   1),
@@ -23,17 +23,27 @@ class BeadPlotter(SinglePlotter):
                                           (u'(t, z, zmag)', '($x, @z, @zmag)')]
                               )
 
-    def _createdata(self, task):
+    def _get(self, name):
+        return self._source.data[name] # pylint: disable=unsubscriptable-object
+
+    def _createdata(self, name = all):
+        task = self._ctrl.getGlobal("current", "track", default = None)
+        if task is None:
+            return dict.fromkeys(('t', 'zmag', 'z'), [])
+
         items = next(iter(self._ctrl.run(task, task)))
         bead  = self._ctrl.getGlobal("current", "bead", default = None)
         if bead is None:
             bead = next(iter(items.keys()))
 
-        data   = data = dict(t    = items['t'],
-                             zmag = items['zmag'],
-                             z    = items[bead])
-        source = ColumnDataSource(data = data)
-        return data, source
+        if name == 'all':
+            return dict(t    = items['t'],
+                        zmag = items['zmag'],
+                        z    = items[bead])
+        elif name == 'z':
+            return {'z': items[bead]}
+        else:
+            return {name: items[name]}
 
     def _figargs(self):
         args = dict(tools        = self.getConfig("tools"),
@@ -47,11 +57,15 @@ class BeadPlotter(SinglePlotter):
                 args[i+'_range'] = rng
         return args
 
-    def _addglyph(self, source, beadname, fig, **kwa):
-        self.getConfig(beadname).addto(fig, x = 't', y = beadname, source = source, **kwa)
+    def _addglyph(self, beadname, fig, **kwa):
+        self.getConfig(beadname).addto(fig,
+                                       x      = 't',
+                                       y      = beadname,
+                                       source = self._source,
+                                       **kwa)
 
-    @staticmethod
-    def _bounds(arr):
+    def _bounds(self, name:str):
+        arr   = self._get(name)
         vmin  = arr.min()
         vmax  = arr.max()
         delta = (vmax-vmin)*.005
@@ -59,9 +73,8 @@ class BeadPlotter(SinglePlotter):
         vmax += delta
         return vmin, vmax
 
-    @classmethod
-    def _addylayout(cls, data, fig):
-        vmin, vmax = cls._bounds(data['zmag'])
+    def _addylayout(self, fig):
+        vmin, vmax = self._bounds('zmag')
         fig.extra_y_ranges = {'zmag': Range1d(start = vmin, end = vmax)}
         fig.add_layout(LinearAxis(y_range_name='zmag', axis_label = u'zmag'), 'right')
 
@@ -78,61 +91,49 @@ class BeadPlotter(SinglePlotter):
 
     def _create(self):
         u"sets-up the figure"
-        task = self._ctrl.getGlobal("current", "track", default = None)
-        if task is None:
-            return
+        self._source = ColumnDataSource(data = self._createdata())
 
-        data, source = self._createdata(task)
-
-        fig = figure()
-        fig.x_range.bounds = self._bounds(data['t'])
-        fig.y_range.bounds = self._bounds(data['z'])
+        fig                = figure()
+        fig.x_range.bounds = self._bounds('t')
+        fig.y_range.bounds = self._bounds('z')
         fig.add_tools(HoverTool(tooltips = self.getConfig("tooltip")))
 
-        self._addylayout  (data, fig)
-        self._addglyph    (source, "z",    fig)
-        self._addglyph    (source, "zmag", fig, y_range_name = 'zmag')
+        self._addylayout  (fig)
+        self._addglyph    ("z",    fig)
+        self._addglyph    ("zmag", fig, y_range_name = 'zmag')
         return fig
 
-class TrackPlot(FlexxView):
-    u"Track plot view"
-    _bokeh   = None # type: ui.BokehWidget
-    _plotter = None # type: BeadPlotter
-    def init(self):
-        plt = figure(sizing_mode = 'scale_height')
-        self._bokeh   = ui.BokehWidget(plot = plt, title ="MMM")
-        self._plotter = BeadPlotter() # must change this to a Plot Factory
-
-    def unobserve(self):
-        u"remove controller"
-        self._plotter.unobserve()
-        del self._plotter
-
-    @event.emitter
-    def _plotted(self) -> dict:
-        return self._plotter.keyargs()
-
-    def _onUpdateCurrent(self, **items):
-        if 'track' not in items and 'bead' not in items:
+    def update(self, items:dict):
+        u"Updates the data"
+        name = 'all'  # type: ignore
+        if 'track' in items:
+            pass
+        elif 'bead' in items:
+            name = 'z'
+        else:
             return
 
-        self._bokeh.plot = self._plotter.create()
-        # pylint: disable=attribute-defined-outside-init
-        self._plotted()
+        length = len(self._get('t'))
+        if length == 0:
+            length = None
+        self._source.stream(self._createdata(name), rollover = length)
 
-    def observe(self, ctrl, _):
-        u"sets-up the controller"
-        self._plotter.observe(ctrl, _)
-        ctrl.observe("globals.current", self._onUpdateCurrent)
+class TrackPlot(BokehView):
+    u"Track plot view"
+    def __init__(self, **kwa):
+        super().__init__(self, **kwa)
+        self._plotter = BeadPlotter(self._ctrl) # must change this to a Plot Factory
+        self._ctrl.observe("globals.current", self._onUpdateCurrent)
 
-    class JS: # pylint: disable=no-member,missing-docstring
-        @event.connect("_plotted")
-        def __get_plot_div(self, *events):
-            obj = events[-1]
-            def _onkeypress(evt):
-                fig = self.children[0].plot.model
-                fcn = getattr(window.flexx.classes, obj['class'])
-                fcn.prototype.onkeydown(fig, obj, evt)
+    def close(self):
+        u"remove controller"
+        super().close()
+        self._plotter.close()
+        self._plotter = None
 
-            self.children[0].node.children[0].tabIndex  = 1
-            self.children[0].node.children[0].onkeydown = _onkeypress
+    def _onUpdateCurrent(self, **items):
+        self._plotter.update(items)
+
+    def getroots(self):
+        u"adds items to doc"
+        return self._plotter.create(),
