@@ -2,78 +2,59 @@
 # -*- coding: utf-8 -*-
 u"Toolbar"
 
-from typing         import Optional     # pylint: disable=unused-import
-from flexx          import ui
+from typing               import Optional       # pylint: disable=unused-import
+from bokeh.layouts        import Row
+from bokeh.models.widgets import Widget, Button # pylint: disable=unused-import
 
-from .dialog        import FileDialog
-from .              import FlexxView
+from .dialog                        import FileDialog
+from .                              import BokehView
 
-class  ToolBar(FlexxView):
+class  ToolBar(BokehView): # pylint: disable=too-many-ancestors
     u"Menu bar"
-    _box      = None # type: Optional[ui.HBox]
-    _save     = None # type: Optional[ui.Button]
-    _diagopen = None # type: Optional[FileDialog]
-    _diagsave = None # type: Optional[FileDialog]
-    def observe(self, ctrl, _):
+    def __init__(self, **kwa):
         u"Sets up the controller"
+        super().__init__(**kwa)
+        self._tools    = [self.button(self._onOpen,  u'open'),
+                          self.button(self._onSave,  u'save', disabled = True)]
+        if self.ISAPP:
+            self._tools.append(self.button(self._ctrl.close, u'quit'))
+
         self._diagopen = FileDialog(filetypes = u'trk|ana|*',
-                                    config    = ctrl,
+                                    config    = self._ctrl,
                                     title     = u'Open a track or analysis file')
         self._diagsave = FileDialog(filetypes = u'ana|*',
-                                    config    = ctrl,
+                                    config    = self._ctrl,
                                     title     = u'Save an analysis file')
 
-        box  = self._box
-        save = self._save
-        def _onUpdateCurrent(**items):
-            if 'track' not in items:
-                return
-            children = list(box.children)
-            if items['track'].value is not items['empty']:
-                children.insert(1, save)
-            else:
-                children.pop(1)
+        self._ctrl.observe("globals.current", self._onUpdateCurrent)
 
-            box.children = children
+    def getroots(self):
+        u"adds items to doc"
+        return Row(children = self._tools, sizing_mode = 'fixed'),
 
-        ctrl.observe("globals.current", _onUpdateCurrent)
-
-    def unobserve(self):
+    def close(self):
         u"Sets up the controller"
-        super().unobserve()
+        super().close()
+        del self._tools
         del self._diagopen
         del self._diagsave
 
-    @FlexxView.action
+    def _onUpdateCurrent(self, **items):
+        if 'track' not in items:
+            return
+        self._tools[1].disabled = items['track'].value is items['empty']
+
+    @BokehView.action
     def _onOpen(self, *_):
         path  = self._diagopen.open()
         if path is not None:
             self._ctrl.openTrack(path)
 
-    @FlexxView.action
+    @BokehView.action
     def _onSave(self,  *_):
-        if self._save not in self._box.children:
+        if self._tools[1].disabled:
             return
 
         path = self._diagsave.save()
         if path is not None:
             self._ctrl.saveTrack(path)
-
-    def _onClose(self):
-        u"closes the application"
-        self._ctrl.close()
-
-    def init(self):
-        u"initializes gui"
-        with ui.VBox(flex = 0):
-            self._box = ui.HBox(flex = 0)
-            with self._box:
-                self.button(self._onOpen, u'open')
-                self.button(self._onSave, u'save')
-                ui.Widget(flex = 1)
-                self.button(lambda *_: self._onClose(), u'quit')
-            ui.Widget(flex = 1)
-
-        children   = list(self._box.children)
-        self._save = children.pop(1)
-        self._box.children = children

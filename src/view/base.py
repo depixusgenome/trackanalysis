@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"basic view module"
-from typing         import Callable
-from functools      import wraps
+from typing               import Callable
+from functools            import wraps
+from bokeh.models.widgets import Button
+from bokeh.layouts        import layout
 
-from flexx          import ui
-
-from control        import Controller
-from .keypress      import KeyPressManager
+from control     import Controller      # pylint: disable=unused-import
+from .keypress   import KeyPressManager # pylint: disable=unused-import
 
 class ActionDescriptor:
     u"""
@@ -49,91 +49,67 @@ class Action(ActionDescriptor):
                           args = {'type': tpe, 'value': val, 'backtrace': bkt})
         return False
 
-def _iterate(item, fcn, *args):
-    curr = getattr(item.__class__, fcn)
-    for base in item.__class__.__bases__:
-        other = getattr(base, fcn, curr)
-        if other is not curr and other not in (observe, unobserve):
-            other(item, *args)
-
-    children = list(getattr(item, 'children', []))
-    while len(children):
-        cur = children.pop()
-        if isinstance(cur, (View, FlexxView)):
-            getattr(cur, fcn)(*args)
-        else:
-            children.extend(getattr(cur, 'children', []))
-
-def unobserve(item):
-    u"Removes the controller"
-    if '_ctrl' in item.__dict__:
-        getattr(item, '_ctrl').unobserve()
-        item.__dict__.pop('_ctrl')
-
-    if 'keys' in item.__dict__:
-        item.keys.popKeyPress(all)
-        del item.keys
-    _iterate(item, 'unobserve')
-
-def observe(item, ctrl:Controller, keys:KeyPressManager):
-    u"Sets up the controller"
-    if '_ctrl' not in item.__dict__:
-        setattr(item, '_ctrl', ctrl)
-
-    if 'keys' not in item.__dict__:
-        item.keys = keys
-
-    _iterate(item, 'observe', ctrl, keys)
-
-def startup(item, path, script):
-    u"runs a script or opens a file on startup"
-    with item.action:
-        if path is not None:
-            getattr(item, '_ctrl').openTrack(path)
-        if script is not None:
-            script(item, getattr(item, '_ctrl'))
-
-
 class View:
     u"Classes to be passed a controller"
-    _ctrl     = None    # type: Controller
-    keys      = None    # type: KeyPressManager
-    action    = ActionDescriptor()
-    observe   = observe
-    unobserve = unobserve
-    startup   = startup
-
-class FlexxView(ui.Widget):
-    u"A view with a gui"
-    _ctrl     = None    # type: Controller
-    keys      = None    # type: KeyPressManager
-    action    = ActionDescriptor()
-    observe   = observe
-    unobserve = unobserve
-    startup   = startup
-
-    def init(self):
+    action = ActionDescriptor()
+    ISAPP  = False
+    def __init__(self, **kwargs):
         u"initializes the gui"
-        raise NotImplementedError("Use this to create the gui")
+        self._ctrl  = kwargs['ctrl']  # type: Controller
 
-    def open(self, ctrl):
-        u"starts up the controller stuff"
-        keys = KeyPressManager()
-        keys.observe(ctrl, 'keypress', quit = self.close)
-        self.connect("key_press", keys.onKeyPress)
-        self.observe(ctrl, keys)
+    def startup(self, path, script):
+        u"runs a script or opens a file on startup"
+        with self.action:
+            if path is not None:
+                self._ctrl.openTrack(path)
+            if script is not None:
+                script(self, self._ctrl)
 
     def close(self):
         u"closes the application"
-        self.keys.unobserve()
-        self.unobserve()
-        self.session.close()
+        self._ctrl.close()
+        self._ctrl = None
+
+class BokehView(View):
+    u"A view with a gui"
+    def __init__(self, **kwargs):
+        u"initializes the gui"
+        super().__init__(**kwargs)
+        self._keys = kwargs['keys']  # type: KeyPressManager
+
+    def close(self):
+        u"closes the application"
+        super().close()
+        self._keys.close()
+        self._keys = None
+
+    @classmethod
+    def open(cls, doc, **kwa):
+        u"starts the application"
+        self = cls(**kwa)
+        self.addtodoc(doc)
+        return self
+
+    def addtodoc(self, doc):
+        u"Adds one's self to doc"
+        doc.add_root(self._keys.getroots()[0])
+
+        roots = self.getroots()
+        if len(roots) == 1:
+            doc.add_root(roots[0])
+        else:
+            doc.add_root(layout(roots, sizing_mode = 'stretch_both'))
+
+    def getroots(self):
+        u"returns object root"
+        raise NotImplementedError("Add items to doc")
 
     def button(self, fcn:Callable, title:str, prefix = 'keypress', **kwa):
         u"creates and connects a button"
-        if 'text' not in kwa:
-            kwa['text'] = u'<u>{}</u>{}'.format(title[0].upper(), title[1:])
+        kwa.setdefault('label', title.capitalize())
+        kwa.setdefault('width', self._ctrl.getGlobal('css', 'button.width'))
 
-        btn = ui.Button(**kwa)
-        btn.connect('mouse_down', fcn)
-        self.keys.addKeyPress((prefix+'.'+title.lower(), fcn))
+        btn = Button(**kwa)
+        btn.on_click(fcn)
+        self._keys.addKeyPress((prefix+'.'+title.lower(), fcn))
+        return btn

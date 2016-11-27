@@ -302,4 +302,4 @@ def createTrackItem(level:Optional[Level] = Level.none, **kwargs):
     u"Returns the item type associated to a level"
     subs = Items.__subclasses__()
     cls  = next(opt for opt in subs if level is opt.level)
-    return cls(**kwargs)
+    return cls(**kwargs) # type: ignore

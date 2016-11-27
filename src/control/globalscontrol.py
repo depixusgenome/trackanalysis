@@ -108,12 +108,14 @@ class GlobalsController(Controller):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.__maps = dict()
+        self.addGlobalMap('css',
+                          **{'button.width' : 90})
         self.addGlobalMap('config',
-                          **{'keypress.undo' : "Ctrl-z",
-                             'keypress.redo' : "Ctrl-y",
-                             'keypress.open' : "Ctrl-o",
-                             'keypress.save' : "Ctrl-s",
-                             'keypress.quit' : "Ctrl-q"})
+                          **{'keypress.undo' : "Control-z",
+                             'keypress.redo' : "Control-y",
+                             'keypress.open' : "Control-o",
+                             'keypress.save' : "Control-s",
+                             'keypress.quit' : "Control-q"})
         self.addGlobalMap('config.plot',
                           tools = 'xpan,wheel_zoom,box_zoom,reset,save',
                           **{'panning.speed'       : .2,
