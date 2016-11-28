@@ -7,3 +7,5 @@ build/
 wafbuilder/
 waf
 pyenv/
+*.py~
+.ipynb_checkpoints*
