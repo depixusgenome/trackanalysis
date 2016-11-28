@@ -5,14 +5,14 @@ from data import Track
 class RampModel():
     u''' holds instruction to handle the data'''
     def __init__(self): 
-        self.scale=5.0
-        self.needsCleaning=True
+        self.scale = 5.0
+        self.needsCleaning = True
        
 class RampControler():
     u'''sets up ramp analysis using RampModel for parametrisation'''
     def __init__(self, datf:pd.DataFrame, model:RampModel):
-        self.dataz=datf
-        self.model=model
+        self.dataz = datf
+        self.model = model
         self.dzdt = None
         self.bcids = None
         self.beads = None
@@ -21,13 +21,15 @@ class RampControler():
 
     @classmethod
     def fromFile(cls,filename:str,model:RampModel):
-        trks=Track(path=filename)
-        datf=pd.DataFrame({k:pd.Series(v) for k, v in dict(trks.cycles).items()})
+        u''' reads RampControler from track file'''
+        trks = Track(path = filename)
+        datf = pd.DataFrame({k:pd.Series(v) for k, v in dict(trks.cycles).items()})
         return cls(datf, model)
 
     @classmethod
     def FromTrack(cls,trks:Track, model:RampModel):
-        datf=pd.DataFrame({k:pd.Series(v) for k, v in dict(trks.cycles).items()})
+        u'''  '''
+        datf = pd.DataFrame({k:pd.Series(v) for k, v in dict(trks.cycles).items()})
         return cls(datf, model)
         
     def _setup(self):
@@ -36,14 +38,14 @@ class RampControler():
         self.beads = {i[0] for i in self.bcids}
         self.ncycles = max(i[1] for i in self.bcids) +1
         if self.model.needsCleaning:
-            self.model.needsCleaning=False
+            self.model.needsCleaning = False
             self.stripBadBeads()
 
         self.det = _detectOutliers(self.dzdt,self.model.scale)
         
 
     def zmagClose(self, reverse_time:bool = False):
-        u''''''
+        u'''estimate value of zmag to close the hairpin'''
         if reverse_time:
             ids = self.dzdt[self.dzdt[self.det]<0].apply(lambda x:x.last_valid_index())    
         else:
@@ -57,9 +59,7 @@ class RampControler():
 
 
     def zmagOpen(self)->pd.DataFrame:
-        u'''
-        alternative approach to estimate the zmag_open
-        '''
+        u''' estimate value of zmag to open the hairpin'''
         ids = self.dzdt[self.dzdt[self.det]>0].apply(lambda x:x.last_valid_index())    
         zmop = pd.DataFrame(index = self.beads, columns = range(self.ncycles))
         for bcid in self.bcids:
@@ -69,7 +69,7 @@ class RampControler():
 
     def stripBadBeads(self):
         u'''good beads open and close with zmag'''
-        good=self.dzdt.apply(lambda x: _isGoodBead(x,scale=self.model.scale))
+        good = self.dzdt.apply(lambda x: _isGoodBead(x,scale = self.model.scale))
         todel = {k[0] for k in self.bcids if not good[k]}
         keys = [k for k in self.dataz.keys() if k[0] not in todel]
 
@@ -84,7 +84,7 @@ class RampControler():
     
 def _isGoodBead(dzdt:pd.Series,scale:int):
     u'''test a single bead over a single cycle'''
-    det=_detectOutliers(dzdt,scale)
+    det = _detectOutliers(dzdt,scale)
     # at least one opening and closing
     if not (any(dzdt[det]>0) and any(dzdt[det]<0)):
         return False
@@ -137,33 +137,11 @@ def can_be_structure_event(dz, detected):
     canbe_se = ~detected&dz.apply(lambda x:x.index>(st_rezip[x.name]))&dz.apply(lambda x:x.index<(ed_rezip[x.name]))
     return canbe_se
 
-def find_attached_beads(df, scale = 5.0, min_corr = 0.2, maxzmag_err = 0.01):
-    u'''
-    uses the the sanitise_beads_collection and returns the indices of kept beads
-    '''
-    df = sanitise_beads_collection(df, scale = scale, min_corr = min_corr, maxzmag_err = maxzmag_err)[0]
-    beadids = list(set([k[0] for k in df.keys() if isinstance(k[0], int)]))
-    beadids.sort()
-    return beadids
-
-def find_fixed_beads(df):
-    u'''
-    TO IMPLEMENT
-    '''
-    
-    return
-
-def find_untracked_beads(df):
-    u'''
-    TO IMPLEMENT
-    '''
-    
-    return
 """
 
-if __name__=="__main__":
-    path="../../tests/testdata/ramp_5HPs_mix.trk"
-    track=Track(path=path)
-    mod=RampModel()
-    ramp=RampControler.FromTrack(track,model=mod)    
+if __name__ == "__main__":
+    path = "../../tests/testdata/ramp_5HPs_mix.trk"
+    track = Track(path = path)
+    mod = RampModel()
+    ramp = RampControler.FromTrack(track,model = mod)    
     print(ramp.beads)
