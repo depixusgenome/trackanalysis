@@ -125,23 +125,17 @@ class SinglePlotter(Plotter):
                      for func in ('pan.low', 'pan.high', 'zoom.in', 'zoom.out')})
         return args
 
-    @event.connect("range_change")
-    def _on_change(self, *events):
-        evt   = events[-1]
-        xvals = evt["xstart"], evt['xend']
-        yvals = evt["ystart"], evt['yend']
-        self._ctrl.updateGlobal(self.key('current'), x = xvals, y = yvals)
-
     def _addcallbacks(self, fig):
         u"adds Range callbacks"
-        jsobj = dict()
-        def _onRangeChange(fig = fig):
-            # pylint: disable=no-member
-            elem = window.flexx.instances[jsobj['flexxid']]
-            elem.range_change(fig)
+        def _onchange(attr, old, new): # pylint: disable=unused-argument
+            self._ctrl.updateGlobal(self.key('current'),
+                                    x = (fig.x_range.start, fig.x_range.end),
+                                    y = (fig.y_range.start, fig.y_range.end))
 
-        fig.x_range.callback = self.callbackCode(_onRangeChange)
-        fig.y_range.callback = self.callbackCode(_onRangeChange)
+        fig.x_range.on_change('start', _onchange)
+        fig.x_range.on_change('end',   _onchange)
+        fig.y_range.on_change('start', _onchange)
+        fig.y_range.on_change('end',   _onchange)
         return fig
 
     def create(self):

@@ -16,7 +16,7 @@ class  ToolBar(BokehView): # pylint: disable=too-many-ancestors
         super().__init__(**kwa)
         self._tools    = [self.button(self._onOpen,  u'open'),
                           self.button(self._onSave,  u'save', disabled = True)]
-        if self.ISAPP:
+        if self._ctrl.ISAPP:
             self._tools.append(self.button(self._ctrl.close, u'quit'))
 
         self._diagopen = FileDialog(filetypes = u'trk|ana|*',
