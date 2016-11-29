@@ -1,8 +1,9 @@
-#! /usr/bin/env python
-# encoding: utf-8
-u"Small library for computing ramp characteristics"
-import pandas as pd
-from numpy import nan, isfinite # type: ignore
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+u"Small library for computing ramp characteristics : zmag open, zmag close"
+from typing import Optional, Tuple # pylint: disable=unused-import
+import pandas as pd # type: ignore
 from data import Track
 
 class RampModel():
@@ -16,10 +17,10 @@ class RampControler():
     def __init__(self, datf:pd.DataFrame, model:RampModel) -> None:
         self.dataz = datf
         self.model = model
-        self.dzdt = None
-        self.bcids = None
-        self.beads = None
-        self.ncycles = None
+        self.dzdt = None # type: Optional[pd.DataFrame]
+        self.bcids = None # type: Tuple[Tuple[int,int]]
+        self.beads = None # type: Set[int]
+        self.ncycles = None # type: int
         self._setup()
 
     @classmethod
@@ -30,7 +31,7 @@ class RampControler():
         return cls(datf, model)
 
     @classmethod
-    def FromTrack(cls,trks:Track, model:RampModel):
+    def fromTrack(cls,trks:Track, model:RampModel):
         u'''Uses a Track to initialise the RampControler'''
         datf = pd.DataFrame({k:pd.Series(v) for k, v in dict(trks.cycles).items()})
         return cls(datf, model)
@@ -56,7 +57,7 @@ class RampControler():
 
         zmcl = pd.DataFrame(index = self.beads, columns = range(self.ncycles))
         for bcid in self.bcids:
-            zmcl.loc[bcid[0], bcid[1]] = self.dataz[("zmag", bcid[1])][ids[bcid]] if isfinite(ids[bcid]) else nan
+            zmcl.loc[bcid[0], bcid[1]] = self.dataz[("zmag", bcid[1])][ids[bcid]]
 
         return zmcl
 
@@ -66,7 +67,7 @@ class RampControler():
         ids = self.dzdt[self.dzdt[self.det]>0].apply(lambda x:x.last_valid_index())
         zmop = pd.DataFrame(index = self.beads, columns = range(self.ncycles))
         for bcid in self.bcids:
-            zmop.loc[bcid[0], bcid[1]] = self.dataz[("zmag", bcid[1])][ids[bcid]] if isfinite(ids[bcid]) else nan
+            zmop.loc[bcid[0], bcid[1]] = self.dataz[("zmag", bcid[1])][ids[bcid]]
 
         return zmop
 
@@ -77,7 +78,7 @@ class RampControler():
         '''
         good = self.dzdt.apply(lambda x: _isGoodBead(x,scale = self.model.scale))
         todel = {k[0] for k in self.bcids if not good[k]}
-        keys = [k for k in self.dataz.keys() if k[0] not in todel] # harsh condition (relax? modify? additional test?) see bead 19 cycle 11 from test ramp file
+        keys = [k for k in self.dataz.keys() if k[0] not in todel] # harsh
 
         self.dataz = self.dataz[keys]
         self.dzdt = self.dzdt[keys]
