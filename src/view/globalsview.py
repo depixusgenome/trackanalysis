@@ -5,10 +5,11 @@ from . import View
 
 class GlobalsView(View):
     u"View listing all global info"
-    @staticmethod
-    def observe(ctrl, _):
-        u"sets up the observations"
-        items = ctrl.getGlobal('current')
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
+        ctrl  = self._ctrl
+        items = self._ctrl.getGlobal('current')
         # pylint: disable=unused-variable
         def _onCloseTrack(model = None, **_):
             isold = items.get('track') is model[0]

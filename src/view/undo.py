@@ -20,20 +20,17 @@ class UndoView(View):
     __rqueue    = None # type: deque
     __isundoing = None # type: List[bool]
 
-    def unobserve(self):
-        u"Removes the controller"
-        del self.__isundoing
-        del self.__uqueue
-        del self.__rqueue
-
-    def observe(self, ctrl, keys): # pylint: disable=too-many-locals
-        u"sets up the observations"
-        keys.addKeyPress('keypress', undo = self.undo, redo = self.redo)
-
+    def __init__(self, **kwa): # pylint: disable=too-many-locals
+        super().__init__(**kwa)
         self.__isundoing = [False]
         self.__uqueue    = deque(maxlen = 1000)
         self.__rqueue    = deque(maxlen = 1000)
+        self._observe()
+        if 'keys' in kwa:
+            kwa['keys'].addKeyPress('keypress', undo = self.undo, redo = self.redo)
 
+    def _observe(self):
+        u"sets up the observations"
         curr = [None, 0]
         def _do(fcn):
             @wraps(fcn)
@@ -45,10 +42,12 @@ class UndoView(View):
                 curr[0].append(fcn(**kwargs))
             return _wrap
 
-        isundoing = self.__isundoing
-        uqueue    = self.__uqueue
-        rqueue    = self.__rqueue
+        self._ctrl.observe([_do(fcn) for fcn in self.__gettrackobservers()])
+        self.__onstartstop(curr)
 
+    @staticmethod
+    def __gettrackobservers():
+        u"Returns the methods for observing tasks"
         # pylint: disable=unused-variable
         _1  = None
         def _onOpenTrack(controller = _1, model = _1, **_):
@@ -68,9 +67,12 @@ class UndoView(View):
             ind = old.index(task)
             return lambda: controller.addTask(parent, task, ind)
 
-        ctrl.observe([_do(fcn) for name, fcn in locals().items() if name[:3] == '_on'])
+        return iter(fcn for name, fcn in locals().items() if name[:3] == '_on')
 
-        @ctrl.observe
+    def __onstartstop(self, curr):
+        u"Returns the methods for observing user start & stop action delimiters"
+        # pylint: disable=unused-variable
+        @self._ctrl.observe
         def _onstartaction():
             if curr[0] is None:
                 curr[0] = []
@@ -78,10 +80,10 @@ class UndoView(View):
             else:
                 curr[1] = curr[1]+1 # count nested 'startaction'
 
-            if not isundoing[0]:
-                rqueue.clear()
+            if not self.__isundoing[0]:
+                self.__rqueue.clear()
 
-        @ctrl.observe
+        @self._ctrl.observe
         def _onstopaction(**_):
             items   = curr[0]
             if curr[1] == 0:
@@ -90,7 +92,13 @@ class UndoView(View):
                 curr[1] = curr[1]-1 # count nested 'stopaction'
 
             if len(items) != 0:
-                (rqueue if isundoing[0] else uqueue).append(items)
+                (self.__rqueue if self.__isundoing[0] else self.__uqueue).append(items)
+
+    def close(self):
+        u"Removes the controller"
+        del self.__isundoing
+        del self.__uqueue
+        del self.__rqueue
 
     def _apply(self):
         queue = self.__uqueue if self.__isundoing[0] else self.__rqueue

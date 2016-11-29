@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=unused-import
 u"Updates app manager so as to deal with controllers"
-from bokeh.models.layouts   import Column
+from bokeh.layouts          import layout
 from control.taskcontrol    import TaskController
 from control.globalscontrol import GlobalsController
 from view                   import BokehView
@@ -15,7 +15,7 @@ def _withtoolbar(main):
     class ViewWithToolbar(BokehView):
         u"A view with the toolbar on top"
         def __init__(self, **kwa):
-            self._bar      = ToolBar(*kwa)
+            self._bar      = ToolBar(**kwa)
             self._mainview = main(**kwa)
             super().__init__(**kwa)
 
@@ -27,7 +27,8 @@ def _withtoolbar(main):
 
         def getroots(self):
             u"adds items to doc"
-            return Column(self._bar.getroots()+self._mainview.getroots())
+            children = [self._bar.getroots(), self._mainview.getroots()]
+            return layout(children, sizing_mode = 'scale_width'),
 
     return ViewWithToolbar
 
