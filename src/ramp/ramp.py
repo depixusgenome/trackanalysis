@@ -6,7 +6,7 @@ class RampModel():
     u''' holds instruction to handle the data'''
     def __init__(self): 
         self.scale = 5.0
-        self.needsCleaning = True
+        self.needsCleaning = False
        
 class RampControler():
     u'''sets up ramp analysis using RampModel for parametrisation'''
@@ -28,7 +28,7 @@ class RampControler():
 
     @classmethod
     def FromTrack(cls,trks:Track, model:RampModel):
-        u'''  '''
+        u'''Uses a Track to initialise the RampControler'''
         datf = pd.DataFrame({k:pd.Series(v) for k, v in dict(trks.cycles).items()})
         return cls(datf, model)
         
@@ -41,7 +41,7 @@ class RampControler():
             self.model.needsCleaning = False
             self.stripBadBeads()
 
-        self.det = _detectOutliers(self.dzdt,self.model.scale)
+        self.det = detectOutliers(self.dzdt,self.model.scale)
         
 
     def zmagClose(self, reverse_time:bool = False):
@@ -68,10 +68,13 @@ class RampControler():
         return zmop
 
     def stripBadBeads(self):
-        u'''good beads open and close with zmag'''
+        u'''good beads open and close with zmag
+        All cycles of a bead  must match the conditions for qualification as good bead.
+        This condition may be too harsh for some track files (will improve).
+        '''
         good = self.dzdt.apply(lambda x: _isGoodBead(x,scale = self.model.scale))
         todel = {k[0] for k in self.bcids if not good[k]}
-        keys = [k for k in self.dataz.keys() if k[0] not in todel]
+        keys = [k for k in self.dataz.keys() if k[0] not in todel] # harsh condition (relax? modify? additional test?) see bead 19 cycle 11 from test ramp file
 
         self.dataz = self.dataz[keys]
         self.dzdt = self.dzdt[keys]
@@ -84,7 +87,7 @@ class RampControler():
     
 def _isGoodBead(dzdt:pd.Series,scale:int):
     u'''test a single bead over a single cycle'''
-    det = _detectOutliers(dzdt,scale)
+    det = detectOutliers(dzdt,scale)
     # at least one opening and closing
     if not (any(dzdt[det]>0) and any(dzdt[det]<0)):
         return False
@@ -92,11 +95,11 @@ def _isGoodBead(dzdt:pd.Series,scale:int):
     # last index of positive detected dzdt
     lposid = dzdt[(dzdt>0)&det].last_valid_index()
     negids = dzdt[(dzdt<0)&det].index
-    
+
     return not any((negids-lposid)<0)
 
 
-def _detectOutliers(dzdt,scale:int):
+def detectOutliers(dzdt,scale:int):
     u'''detects opening and closing '''
     # quantile detection
     quant1 = dzdt.quantile(0.25)
@@ -140,8 +143,9 @@ def can_be_structure_event(dz, detected):
 """
 
 if __name__ == "__main__":
-    path = "../../tests/testdata/ramp_5HPs_mix.trk"
-    track = Track(path = path)
-    mod = RampModel()
-    ramp = RampControler.FromTrack(track,model = mod)    
-    print(ramp.beads)
+    pass
+    #path = "../../tests/testdata/ramp_5HPs_mix.trk"
+    #track = Track(path = path)
+    #mod = RampModel()
+    #ramp = RampControler.FromTrack(track,model = mod)    
+    #print(ramp.beads)
