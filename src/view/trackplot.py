@@ -74,7 +74,7 @@ class BeadPlotter(SinglePlotter):
 
         vmin  = min(arr)
         vmax  = max(arr)
-        delta = (vmax-vmin)*.005
+        delta = (vmax-vmin)*self.getConfig("boundary.overshoot")
         vmin -= delta
         vmax += delta
         return vmin, vmax
@@ -122,10 +122,8 @@ class BeadPlotter(SinglePlotter):
         else:
             return
 
-        length = len(self._get('t'))
-        if length == 0:
-            length = None
-        self._source.stream(self._createdata(name), rollover = 1)
+        length = -len(self._get('t'))
+        self._source.stream(self._createdata(name), rollover = length)
         self._setbounds()
 
 class TrackPlot(BokehView):

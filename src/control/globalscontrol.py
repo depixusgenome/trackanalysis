@@ -120,6 +120,7 @@ class GlobalsController(Controller):
                           tools = 'xpan,wheel_zoom,box_zoom,reset,save',
                           **{'panning.speed'       : .2,
                              'zooming.speed'       : .2,
+                             'boundary.overshoot'  : .005,
                              'keypress.x.pan.low'  : 'ArrowLeft',
                              'keypress.x.pan.high' : 'ArrowRight',
                              'keypress.x.zoom.out' : 'Shift-ArrowLeft',
