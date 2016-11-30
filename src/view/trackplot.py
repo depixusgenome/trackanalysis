@@ -125,7 +125,7 @@ class BeadPlotter(SinglePlotter):
         length = len(self._get('t'))
         if length == 0:
             length = None
-        self._source.stream(self._createdata(name), rollover = length)
+        self._source.stream(self._createdata(name), rollover = 1)
         self._setbounds()
 
 class TrackPlot(BokehView):
