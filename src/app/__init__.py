@@ -75,8 +75,6 @@ def _create(main, controls, views): # pylint: disable=unused-argument
         ctrl = MainControl(handlers = dict(), topview = self)
         keys = KeyPressManager(ctrl = ctrl)
         main.__init__(self, ctrl = ctrl, keys = keys)
-        for view in views:
-            view.__init__(self, ctrl = ctrl, keys = keys)
 
     return type('Main', (main,)+views,
                 dict(__doc__     = u"The main view",
