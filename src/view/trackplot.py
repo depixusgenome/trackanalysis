@@ -49,10 +49,9 @@ class BeadPlotter(SinglePlotter):
             return {name: items[name]}
 
     def _figargs(self):
-        args = dict(tools        = self.getConfig("tools"),
-                    x_axis_label = u'Time',
-                    y_axis_label = u'z',
-                    sizing_mode  = 'scale_height')
+        args = super()._figargs()
+        args.update(x_axis_label = u'Time',
+                    y_axis_label = u'z')
 
         for i in ('x', 'y'):
             rng  = self.getCurrent(i, default = None)
