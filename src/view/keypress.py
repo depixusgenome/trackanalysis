@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"controls keypress actions"
-from typing import Callable, Optional # pylint: disable=unused-import
+from typing                import Callable, Optional # pylint: disable=unused-import
 from bokeh.core.properties import String, Int
-from bokeh.model import Model
+from bokeh.model           import Model
 
 class KeyPressManager(Model):
     u"controls keypress actions"
@@ -36,7 +36,6 @@ class KeyPressManager(Model):
                 else
                     val += evt.key
 
-                console.log(val)
                 @model.value = val
                 @model.count = @model.count+1
         
