@@ -5,7 +5,13 @@
 .*.un~
 build/
 wafbuilder/
-waf
+waf*
 pyenv/
 *.py~
 .ipynb_checkpoints*
+.dep*
+.vs
+*.VC.*
+*.sln
+*.lastbuild
+*.lastbuildstate

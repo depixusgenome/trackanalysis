@@ -31,5 +31,6 @@ yaml                      0.1.6                         0
 #zlib                      1.2.8                         3  
 
 [CXX]
+msvc			 14.0
 clang++                   3.8
 g++                       4.9
