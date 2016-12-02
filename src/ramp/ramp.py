@@ -1,39 +1,53 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-u"Small library for computing ramp characteristics : zmag open, zmag close"
-from typing import Optional, Tuple # pylint: disable=unused-import
+u'''Small library for computing ramp characteristics : zmag open, zmag close
+needs more structure'''
+from typing import Optional, Tuple , Set # pylint: disable=unused-import
 import pandas as pd # type: ignore
 from data import Track
 
-class RampModel():
-    u''' holds instruction to handle the data'''
+class RampModel:
+    u''' holds instruction to handle the data
+    If values change in the Model the Controller must be notified and act accordingly
+    '''
     def __init__(self):
         self.scale = 5.0
         self.needsCleaning = False
+        self.corrThreshold = 0.5
 
-class RampControler():
+class RampTask:
+    u'''
+    will define a set of action called by RampController
+    '''
+    pass
+class RampController:
+    u'''
+    will dictate changes to RampData relative to a ramp
+    '''
+    pass
+
+class RampData:
     u'''sets up ramp analysis using RampModel for parametrisation'''
     def __init__(self, datf:pd.DataFrame, model:RampModel) -> None:
         self.dataz = datf
         self.model = model
         self.dzdt = None # type: Optional[pd.DataFrame]
-        self.bcids = None # type: Tuple[Tuple[int,int]]
+        self.bcids = None # type: Set[Tuple[int,int]]
         self.beads = None # type: Set[int]
         self.ncycles = None # type: int
         self._setup()
 
     @classmethod
-    def fromFile(cls,filename:str,model:RampModel):
-        u''' reads RampControler from track file'''
-        trks = Track(path = filename)
-        datf = pd.DataFrame({k:pd.Series(v) for k, v in dict(trks.cycles).items()})
-        return cls(datf, model)
+    def openTrack(cls,trk,model:RampModel):
+        u''' creates ramp from track
+        '''
+        if isinstance(trk,str):
+            trkd = Track(path = trk)
+        else:
+            trkd = trk
 
-    @classmethod
-    def fromTrack(cls,trks:Track, model:RampModel):
-        u'''Uses a Track to initialise the RampControler'''
-        datf = pd.DataFrame({k:pd.Series(v) for k, v in dict(trks.cycles).items()})
+        datf = pd.DataFrame({k:pd.Series(v) for k, v in dict(trkd.cycles).items()})
         return cls(datf, model)
 
     def _setup(self):
@@ -56,7 +70,7 @@ class RampControler():
             ids = self.dzdt[self.dzdt[self.det]<0].apply(lambda x:x.first_valid_index())
 
         zmcl = pd.DataFrame(index = self.beads, columns = range(self.ncycles))
-        for bcid in self.bcids:
+        for bcid in ids.valid().index:
             zmcl.loc[bcid[0], bcid[1]] = self.dataz[("zmag", bcid[1])][ids[bcid]]
 
         return zmcl
@@ -66,28 +80,56 @@ class RampControler():
         u''' estimate value of zmag to open the hairpin'''
         ids = self.dzdt[self.dzdt[self.det]>0].apply(lambda x:x.last_valid_index())
         zmop = pd.DataFrame(index = self.beads, columns = range(self.ncycles))
-        for bcid in self.bcids:
+        for bcid in ids.valid().index:
             zmop.loc[bcid[0], bcid[1]] = self.dataz[("zmag", bcid[1])][ids[bcid]]
 
         return zmop
 
-    def stripBadBeads(self):
-        u'''good beads open and close with zmag
+    def keepBeadIds(self,bids:set)->None:
+        u'''
+        pops all unwanted beads
+        '''
+
+        self.bcids = {k for k in self.bcids if k[0] in bids}
+        self.beads = {i[0] for i in self.bcids}
+        self.ncycles = max(i[1] for i in self.bcids) +1
+
+        keys = [k for k in self.dataz.keys() if not isinstance(k[0],int)]
+        keys += list(self.bcids)
+        self.dataz = self.dataz[keys]
+        self.dzdt = self.dzdt[keys]
+
+
+    def getGoodBeadIds(self)->set:
+        u'''
+        rewrite to be faster
+        returns the list of beads selected by _isGoodBead
         All cycles of a bead  must match the conditions for qualification as good bead.
         This condition may be too harsh for some track files (will improve).
         '''
-        good = self.dzdt.apply(lambda x: _isGoodBead(x,scale = self.model.scale))
-        todel = {k[0] for k in self.bcids if not good[k]}
-        keys = [k for k in self.dataz.keys() if k[0] not in todel] # harsh
+        gbk = self.dzdt.apply(lambda x: _isGoodBead(x,scale = self.model.scale))
+        todel = {i[0] for i in self.bcids if not gbk[i]}  # harsh
 
-        self.dataz = self.dataz[keys]
-        self.dzdt = self.dzdt[keys]
-        self.bcids = {k for k in self.dzdt.keys() if isinstance(k[0], int)}
-        self.beads = {i[0] for i in self.bcids}
-        self.ncycles = max(i[1] for i in self.bcids) +1
+        return {i for i in self.beads if i not in todel}
+
+    def stripBadBeads(self):
+        u'''good beads open and close with zmag
+        '''
+        gids = self.getGoodBeadIds()
+        self.keepBeadIds(gids)
         return
 
 
+    def noBeadCrossIds(self)->set:
+        u'''
+        returns cross ids who does not have a match with a bead
+        '''
+        corr=self.dataz.corr()<self.model.corrThreshold
+        nobead=[]
+        for bid in self.beads:
+            if any(corr[(bid,cid)][("zmag",cid)] for cid in range(self.ncycles)):
+                nobead.append(bid)
+        return set(nobead)
 
 def _isGoodBead(dzdt:pd.Series,scale:int):
     u'''test a single bead over a single cycle'''
@@ -116,10 +158,19 @@ def detectOutliers(dzdt,scale:int):
 def crossHasBead():
     u'''Check whether there is a bead under the cross'''
     # to implement
-    return
-
+    pass
 
 def fixedBead():
     u''' bead does not open/close '''
     # to implement
-    return
+    pass
+
+def fixedBeadIds():
+    u'''
+    returns the set of beads supposedly fixed :
+    z correlated with zmag
+    '''
+    # to finish implementing
+    # corr=self.dataz.corr()>self.model.corrThreshold
+    # need more conditions to qualify as fixed bead
+    pass
