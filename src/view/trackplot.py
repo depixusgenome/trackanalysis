@@ -29,7 +29,7 @@ class BeadPlotter(SinglePlotter):
     def _get(self, name):
         return self._source.data[name] # pylint: disable=unsubscriptable-object
 
-    def _createdata(self, name = all):
+    def _createdata(self):
         task = self._ctrl.getGlobal("current", "track", default = None)
         if task is None:
             arr = numpy.array([], dtype = numpy.float)
@@ -39,14 +39,10 @@ class BeadPlotter(SinglePlotter):
         bead  = self._ctrl.getGlobal("current", "bead", default = None)
         if bead is None:
             bead = next(iter(items.keys()))
-        if name == 'all':
-            return dict(t    = items['t'],
-                        zmag = items['zmag'],
-                        z    = items[bead])
-        elif name == 'z':
-            return {'z': items[bead]}
-        else:
-            return {name: items[name]}
+
+        return dict(t    = items['t'],
+                    zmag = items['zmag'],
+                    z    = items[bead])
 
     def _figargs(self):
         args = super()._figargs()
@@ -113,16 +109,10 @@ class BeadPlotter(SinglePlotter):
 
     def update(self, items:dict):
         u"Updates the data"
-        name = 'all'  # type: ignore
-        if 'track' in items:
-            pass
-        elif 'bead' in items:
-            name = 'z'
-        else:
+        if not ('track' in items or 'bead' in items):
             return
 
-        length = -len(self._get('t'))
-        self._source.stream(self._createdata(name), rollover = length)
+        self._source.data = self._createdata()
         self._setbounds()
 
 class TrackPlot(BokehView):
