@@ -16,7 +16,8 @@ def environment(cnf):
 
 @_recurse
 def options(opt):
-    pass
+    if os.sys.platform == "win32":
+        opt.load("msvs")
 
 @_recurse
 def configure(cnf):

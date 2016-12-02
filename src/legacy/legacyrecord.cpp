@@ -1,4 +1,12 @@
 #include "legacy/legacyrecord.h"
+#ifdef _MSC_VER
+# include <Windows.h>
+# define fseeko64 _fseeki64
+# define ftello64 _ftelli64 
+# undef max
+# undef min
+#endif
+
 #include <cstdlib>
 #include <cstdio>
 #include <cmath>
