@@ -32,60 +32,88 @@ delete     = type('delete', tuple(), dict())    # pylint: disable=invalid-name
 
 def _tokwargs(args, kwargs):
     if len(args) == 1 and isinstance(args[0], dict):
-        kwargs.update(args)
+        kwargs.update(args[0])
     else:
-        kwargs.update(*args)
+        kwargs.update(args)
     return kwargs
 
 class _MapGetter:
-    value    = property(lambda self: self._ctrl.get(self._key),
-                        lambda self, val: self._ctrl.update(self._base, val),
-                        lambda self: self._ctrl.pop(self._base))
-    values   = property(lambda self: self._ctrl.values(self._key),
-                        lambda self, val: self.set(**val),
-                        lambda self: self._ctrl.update(*self.values))
-    defaults = property(None, lambda self, val: self.setdefaults(**val))
+    value    = property(lambda self:        self._ctrl.get(self._key),
+                        lambda self, val:   self._ctrl.update((self._key, val)),
+                        lambda self:        self._ctrl.pop(self._key))
+    values   = property(lambda self:        self._ctrl.values(self._key),
+                        lambda self, val:   self.update(**val),
+                        lambda self:        self._ctrl.pop(*self.values))
+    defaults = property(None,
+                        lambda self, val:   self.setdefaults(**val))
 
+    _key  = ''      # type: str
+    _ctrl = None    # type: DefaultsMap
     def __init__(self, ctrl, key):
-        self._ctrl  = ctrl
-        self._key   = key
+        self.__dict__.update(_ctrl = ctrl, _key = key)
 
     def __getattr__(self, name):
-        if self._key == '':
-            return _MapGetter(self._ctrl, name)
+        if name[0] == '_' or name in ('value', 'values', 'defaults'):
+            return super().__getattribute__(name)
+        elif self._key == '':
+            return _MapGetter(self.__dict__['_ctrl'], name)
         else:
             self._key += '.'+name
             return self
-    __getitem__ = __getattr__
+
+    def __getitem__(self, name):
+        if isinstance(name, (tuple, list)):
+            return self._ctrl.get(*name)
+        else:
+            return self.__getattr__(name)
+
+    def __eq__(self, other):
+        return self._ctrl.get(self._key) == other
 
     def __setattr__(self, name, value):
-        self._ctrl.update(self._base+'.'+name, value)
+        if name[0] == '_' or name in ('value', 'values', 'defaults'):
+            return super().__setattr__(name, value)
+        else:
+            return self._ctrl.update((self._key+'.'+name, value))
+
     __setitem__ = __setattr__
 
     def __delattr__(self, name):
-        self._ctrl.pop(self._base+'.'+name)
-    __delitem__ = __delattr__
+        if name[0] == '_' or name in ('value', 'values', 'defaults'):
+            return super().__delattr__(name)
+        else:
+            return self._ctrl.pop(self._key+'.'+name)
+
+    def __delitem__(self, name):
+        if isinstance(name, (tuple, list)):
+            return self.pop(*name)
+        else:
+            return self.pop(name)
 
 
     def __kwargs(self, args, kwargs):
-        kwargs = {self._key+'.'+name: value
-                  for name, value in _tokwargs(args, kwargs).items()}
+        key   = self._key
+        items = _tokwargs(args, kwargs).items()
+        if len(key) == 0:
+            return items
+        else:
+            return ((self._key+'.'+i, j) for i, j in items)
 
     def setdefaults(self, *args, version = 1, **kwargs):
         u"Calls update using the current base key"
-        self._ctrl.setdefaults(self.__kwargs(args, kwargs), version = version)
+        return self._ctrl.setdefaults(*self.__kwargs(args, kwargs), version = version)
 
-    def set(self, *args, **kwargs):
+    def update(self, *args, **kwargs):
         u"Calls update using the current base key"
-        self._ctrl.update(self.__kwargs(args, kwargs))
+        return self._ctrl.update(*self.__kwargs(args, kwargs))
 
     def pop(self, *keys):
         u"Calls get using the current base key"
-        self._ctrl.pop(*(self._key+'.'+i for i in keys))
+        return self._ctrl.pop(*(self._key+'.'+i for i in keys))
 
     def get(self, *keys, default = delete):
         u"Calls get using the current base key"
-        self._ctrl.get(*(self._key+'.'+i for i in keys), default = default)
+        return self._ctrl.get(*(self._key+'.'+i for i in keys), default = default)
 
 class DefaultsMap(Controller):
     u"Dictionnary with defaults values. It can be reset to these."
@@ -213,7 +241,7 @@ class GlobalsController(Controller):
             self.__maps[key] = DefaultsMap(key, handlers = self._handlers)
 
         self.__maps[key].setdefaults(*args, **kwargs)
-        return self.__maps[key]
+        return _MapGetter(self.__maps[key], '')
 
     def removeGlobalMap(self, key):
         u"removes a map"

@@ -9,7 +9,7 @@ from bokeh.models   import (LinearAxis, Range1d, ColumnDataSource, HoverTool,
 import numpy
 
 from control        import Controller
-from .jsutils       import SinglePlotter, PlotAttrs
+from .plotutils     import SinglePlotter, PlotAttrs
 from .              import BokehView
 
 class BeadPlotter(SinglePlotter):

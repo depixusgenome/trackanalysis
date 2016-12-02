@@ -10,9 +10,9 @@ from control                import Controller
 class ToolWithKeys(HasProps):
     u"Base class for controlling gestures with keyboard"
     @staticmethod
-    def jscode(**kwa) -> str:
+    def jscode(name, fname, meta) -> str:
         u"returns the javascript implementation code"
-        return u"""
+        return (u"""
         p     = require "core/properties"
         {name} = require "models/tools/gestures/{fname}"
         $      = require "jquery"
@@ -54,7 +54,9 @@ class ToolWithKeys(HasProps):
         module.exports =
             Model: Dpx{name}
             View:  Dpx{name}View
-            """.format(**kwa)
+             """.replace('{name}',  name)
+                .replace('{fname}', fname)
+                .replace('{meta}',  meta))
 
     _KEY     = None # type: str
     keyXLow  = String()
@@ -83,18 +85,14 @@ class ToolWithKeys(HasProps):
 
 class DpxPanTool(PanTool, ToolWithKeys):        # pylint: disable=too-many-ancestors
     u"Adds keypress controls to the default PanTool"
-    __implementation__ = ToolWithKeys.jscode(name  = 'DpxPanTool',
-                                             fname = 'pan_tool',
-                                             meta  = '')
+    __implementation__ = ToolWithKeys.jscode('DpxPanTool', 'pan_tool', '')
     _KEY               = 'pan'
     def __init__(self, ctrl = None, **kwa):
         super().__init__(**self.fromconfig(ctrl, **kwa))
 
 class DpxBoxZoomTool(BoxZoomTool, ToolWithKeys): # pylint: disable=too-many-ancestors
     u"Adds keypress controls to the default BoxZoomTool"
-    __implementation__ = ToolWithKeys.jscode(name  = 'DpxBoxZoomTool',
-                                             fname = 'box_zoom_tool',
-                                             meta  = 'Shift')
+    __implementation__ = ToolWithKeys.jscode('DpxBoxZoomTool', 'box_zoom_tool', 'Shift')
     _KEY               = 'zoom'
     def __init__(self, ctrl = None, **kwa):
         super().__init__(**self.fromconfig(ctrl, **kwa))

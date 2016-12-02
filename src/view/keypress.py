@@ -65,7 +65,7 @@ class KeyPressManager(Model):
         u"Method to be connected to the gui"
         items = self._ctrl.getGlobal('config')
         for name, fcn in self._keys.items():
-            if self.value == items.get(name):
+            if self.value == items[name].value:
                 fcn()
                 break
 
