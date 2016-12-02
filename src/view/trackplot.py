@@ -2,20 +2,23 @@
 # -*- coding: utf-8 -*-
 u"Track plot view"
 
-from bokeh.plotting import figure, Figure # pylint: disable=unused-import
-from bokeh.models   import LinearAxis, Range1d, ColumnDataSource, HoverTool
-from flexx.pyscript import window
-from flexx          import event, ui
+from typing         import Optional  # pylint: disable=unused-import
+from bokeh.plotting import figure
+from bokeh.models   import (LinearAxis, Range1d, ColumnDataSource, HoverTool,
+                            CustomJS)
+import numpy
 
 from control        import Controller
-from .jsutils       import SinglePlotter, PlotAttrs
-from .              import FlexxView
+from .plotutils     import SinglePlotter, PlotAttrs
+from .              import BokehView
 
 class BeadPlotter(SinglePlotter):
     u"Plots a default bead"
-    def observe(self,  ctrl:Controller, _):
+    def __init__(self,  ctrl:Controller) -> None:
         u"sets up this plotter's info"
-        super().observe(ctrl, _)
+        super().__init__(ctrl)
+        self._source = ColumnDataSource()
+        self._fig    = figure(sizing_mode = 'stretch_both')
         ctrl.setGlobalDefaults(self.key(),
                                z       = PlotAttrs('blue', 'circle', 1),
                                zmag    = PlotAttrs('red',  'line',   1),
@@ -23,23 +26,28 @@ class BeadPlotter(SinglePlotter):
                                           (u'(t, z, zmag)', '($x, @z, @zmag)')]
                               )
 
-    def _createdata(self, task):
+    def _get(self, name):
+        return self._source.data[name] # pylint: disable=unsubscriptable-object
+
+    def _createdata(self):
+        task = self._ctrl.getGlobal("current", "track", default = None)
+        if task is None:
+            arr = numpy.array([], dtype = numpy.float)
+            return dict.fromkeys(('t', 'zmag', 'z'), arr)
+
         items = next(iter(self._ctrl.run(task, task)))
         bead  = self._ctrl.getGlobal("current", "bead", default = None)
         if bead is None:
             bead = next(iter(items.keys()))
 
-        data   = data = dict(t    = items['t'],
-                             zmag = items['zmag'],
-                             z    = items[bead])
-        source = ColumnDataSource(data = data)
-        return data, source
+        return dict(t    = items['t'],
+                    zmag = items['zmag'],
+                    z    = items[bead])
 
     def _figargs(self):
-        args = dict(tools        = self.getConfig("tools"),
-                    x_axis_label = u'Time',
-                    y_axis_label = u'z',
-                    sizing_mode  = 'scale_height')
+        args = super()._figargs()
+        args.update(x_axis_label = u'Time',
+                    y_axis_label = u'z')
 
         for i in ('x', 'y'):
             rng  = self.getCurrent(i, default = None)
@@ -47,92 +55,82 @@ class BeadPlotter(SinglePlotter):
                 args[i+'_range'] = rng
         return args
 
-    def _addglyph(self, source, beadname, fig, **kwa):
-        self.getConfig(beadname).addto(fig, x = 't', y = beadname, source = source, **kwa)
+    def _addglyph(self, beadname, **kwa):
+        self.getConfig(beadname).addto(self._fig,
+                                       x      = 't',
+                                       y      = beadname,
+                                       source = self._source,
+                                       **kwa)
 
-    @staticmethod
-    def _bounds(arr):
-        vmin  = arr.min()
-        vmax  = arr.max()
-        delta = (vmax-vmin)*.005
+    def _bounds(self, name:str):
+        arr   = self._get(name)
+        if len(arr) == 0:
+            return 0., 1.
+
+        vmin  = min(arr)
+        vmax  = max(arr)
+        delta = (vmax-vmin)*self.getConfig("boundary.overshoot")
         vmin -= delta
         vmax += delta
         return vmin, vmax
 
-    @classmethod
-    def _addylayout(cls, data, fig):
-        vmin, vmax = cls._bounds(data['zmag'])
-        fig.extra_y_ranges = {'zmag': Range1d(start = vmin, end = vmax)}
-        fig.add_layout(LinearAxis(y_range_name='zmag', axis_label = u'zmag'), 'right')
+    def _addylayout(self):
+        vmin, vmax = self._bounds('zmag')
+        self._fig.extra_y_ranges = {'zmag': Range1d(start = vmin, end = vmax)}
+        self._fig.add_layout(LinearAxis(y_range_name='zmag', axis_label = u'zmag'), 'right')
 
     def _addcallbacks(self, fig):
         super()._addcallbacks(fig)
-        rng   = fig.extra_y_ranges['zmag']
-        jsobj = dict(start = rng.start,
-                     end   = rng.end)
+        rng   = self._fig.extra_y_ranges['zmag']
         def _onRangeChange(rng = rng):
-            rng.start = jsobj['start']
-            rng.end   = jsobj['end']
+            rng.start = rng.bounds[0]
+            rng.end   = rng.bounds[1]
 
-        rng.callback = self.callbackCode(_onRangeChange)
+        rng.callback = CustomJS.from_py_func(_onRangeChange)
+
+    def _setbounds(self):
+        self._fig.x_range.bounds = self._bounds('t')
+        self._fig.y_range.bounds = self._bounds('z')
+
+        bnds = self._bounds("zmag")
+        self._fig.extra_y_ranges['zmag'].bounds = bnds
+        self._fig.extra_y_ranges['zmag'].start  = bnds[0]
+        self._fig.extra_y_ranges['zmag'].end    = bnds[1]
 
     def _create(self):
         u"sets-up the figure"
-        task = self._ctrl.getGlobal("current", "track", default = None)
-        if task is None:
+        self._source = ColumnDataSource(data = self._createdata())
+        self._fig.add_tools(HoverTool(tooltips = self.getConfig("tooltip")))
+
+        self._addylayout  ()
+        self._addglyph    ("z")
+        self._addglyph    ("zmag", y_range_name = 'zmag')
+        return self._fig
+
+    def update(self, items:dict):
+        u"Updates the data"
+        if not ('track' in items or 'bead' in items):
             return
 
-        data, source = self._createdata(task)
+        self._source.data = self._createdata()
+        self._setbounds()
 
-        fig = figure()
-        fig.x_range.bounds = self._bounds(data['t'])
-        fig.y_range.bounds = self._bounds(data['z'])
-        fig.add_tools(HoverTool(tooltips = self.getConfig("tooltip")))
-
-        self._addylayout  (data, fig)
-        self._addglyph    (source, "z",    fig)
-        self._addglyph    (source, "zmag", fig, y_range_name = 'zmag')
-        return fig
-
-class TrackPlot(FlexxView):
+class TrackPlot(BokehView):
     u"Track plot view"
-    _bokeh   = None # type: ui.BokehWidget
-    _plotter = None # type: BeadPlotter
-    def init(self):
-        plt = figure(sizing_mode = 'scale_height')
-        self._bokeh   = ui.BokehWidget(plot = plt, title ="MMM")
-        self._plotter = BeadPlotter() # must change this to a Plot Factory
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+        self._plotter = BeadPlotter(self._ctrl) # must change this to a Plot Factory
+        self._ctrl.observe("globals.current", self._onUpdateCurrent)
 
-    def unobserve(self):
+    def close(self):
         u"remove controller"
-        self._plotter.unobserve()
-        del self._plotter
-
-    @event.emitter
-    def _plotted(self) -> dict:
-        return self._plotter.keyargs()
+        super().close()
+        self._plotter.close()
+        self._plotter = None
 
     def _onUpdateCurrent(self, **items):
-        if 'track' not in items and 'bead' not in items:
-            return
+        self._plotter.update(items)
 
-        self._bokeh.plot = self._plotter.create()
-        # pylint: disable=attribute-defined-outside-init
-        self._plotted()
-
-    def observe(self, ctrl, _):
-        u"sets-up the controller"
-        self._plotter.observe(ctrl, _)
-        ctrl.observe("globals.current", self._onUpdateCurrent)
-
-    class JS: # pylint: disable=no-member,missing-docstring
-        @event.connect("_plotted")
-        def __get_plot_div(self, *events):
-            obj = events[-1]
-            def _onkeypress(evt):
-                fig = self.children[0].plot.model
-                fcn = getattr(window.flexx.classes, obj['class'])
-                fcn.prototype.onkeydown(fig, obj, evt)
-
-            self.children[0].node.children[0].tabIndex  = 1
-            self.children[0].node.children[0].onkeydown = _onkeypress
+    def getroots(self):
+        u"adds items to doc"
+        return self._plotter.create(),

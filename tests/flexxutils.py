@@ -85,7 +85,7 @@ class FlexxAction:
 
     def quit(self, now = True):
         u"stops server"
-        self.pypress('Ctrl-q', now)
+        self.pypress('Control-q', now)
         return self
 
     def asserts(self, val, msg = None):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u""" Tests toolbar """
+u""" Tests toolbar
 from pytest         import approx       # pylint: disable=no-name-in-module
 from flexxutils     import flexxaction  # pylint: disable=unused-import
 from view.trackplot import TrackPlot    # pylint: disable=no-member,import-error
@@ -26,9 +26,9 @@ def _test_toolbar(flexxaction):         # pylint: disable=redefined-outer-name
 
     flexxaction.init('default', ToolBar)
     flexxaction.run(_checknone,
-                    'Py-Ctrl-o', _checkopen,
-                    'Py-Ctrl-z', _checknone,
-                    'Py-Ctrl-y', _checkopen,
+                    'Py-Control-o', _checkopen,
+                    'Py-Control-z', _checknone,
+                    'Py-Control-y', _checkopen,
                     path = 'small_legacy')
     flexxaction.test(14)
 
@@ -50,12 +50,12 @@ def test_trackplot(flexxaction):        # pylint: disable=redefined-outer-name
     flexxaction.init('withtoolbar', TrackPlot, _get)
     flexxaction.ctrl.observe("globals.current.plot.bead", _printrng)
 
-    flexxaction.run('Py-Ctrl-o',        flexxaction.sleep(2),
+    flexxaction.run('Py-Control-o',        flexxaction.sleep(2),
                     'Js- ',             'Js-Shift-ArrowUp',    'Js-Shift-ArrowRight',
                     'Js-ArrowLeft',     'Js-ArrowUp',          'Js-ArrowRight',
                     'Js-ArrowDown',     'Js-Shift-ArrowLeft',  'Js-Shift-ArrowDown',
                     'Js-Shift-ArrowUp', 'Js-Shift-ArrowRight', 'Js- ',
-                    'Py-Ctrl-z',        path = 'small_legacy')
+                    'Py-Control-z',        path = 'small_legacy')
 
     truths = (((650.515,  1152.485),    (-0.0489966, 1.1207037013)),
               ((650.515,  1152.485),    (0.18494344, 0.8867636370)),
@@ -72,3 +72,4 @@ def test_trackplot(flexxaction):        # pylint: disable=redefined-outer-name
 
     assert len(truths) == len(vals)
     assert vals == approx(truths)
+"""
