@@ -38,12 +38,15 @@ def _tokwargs(args, kwargs):
     return kwargs
 
 class _MapGetter:
-    value    = property(lambda self:        self._ctrl.get(self._key),
-                        lambda self, val:   self._ctrl.update((self._key, val)),
-                        lambda self:        self._ctrl.pop(self._key))
-    values   = property(lambda self:        self._ctrl.values(self._key),
+    PROPS    = ('items', 'default', 'defaults')
+    value    = property(lambda self:        self.get(),
+                        lambda self, val:   self.set(val),
+                        lambda self:        self.pop())
+    items    = property(lambda self:        self._ctrl.items(self._key),
                         lambda self, val:   self.update(**val),
-                        lambda self:        self._ctrl.pop(*self.values))
+                        lambda self:        self._ctrl.pop(*self.items))
+    default  = property(None,
+                        lambda self, val:   self.setdefault(val))
     defaults = property(None,
                         lambda self, val:   self.setdefaults(**val))
 
@@ -53,13 +56,21 @@ class _MapGetter:
         self.__dict__.update(_ctrl = ctrl, _key = key)
 
     def __getattr__(self, name):
-        if name[0] == '_' or name in ('value', 'values', 'defaults'):
+        if name[0] == '_' or name in _MapGetter.PROPS:
             return super().__getattribute__(name)
         elif self._key == '':
             return _MapGetter(self.__dict__['_ctrl'], name)
         else:
-            self._key += '.'+name
-            return self
+            return _MapGetter(self.__dict__['_ctrl'], self._key+'.'+name)
+
+    def __call__(self, *args, **kwargs):
+        if self._key == '':
+            raise TypeError("_MapGetter is not callable")
+        else:
+            key = self._key
+            ind = key.rfind('.')
+            val = self._ctrl.get(key[:ind])
+            return getattr(val, key[ind+1:])(*args, **kwargs)
 
     def __getitem__(self, name):
         if isinstance(name, (tuple, list)):
@@ -68,19 +79,23 @@ class _MapGetter:
             return self.__getattr__(name)
 
     def __eq__(self, other):
-        return self._ctrl.get(self._key) == other
+        return self.get() == other
 
     def __setattr__(self, name, value):
-        if name[0] == '_' or name in ('value', 'values', 'defaults'):
+        if name[0] == '_' or name in _MapGetter.PROPS:
             return super().__setattr__(name, value)
+        elif self._key == '':
+            return self._ctrl.update((name, value))
         else:
             return self._ctrl.update((self._key+'.'+name, value))
 
     __setitem__ = __setattr__
 
     def __delattr__(self, name):
-        if name[0] == '_' or name in ('value', 'values', 'defaults'):
+        if name[0] == '_' or name in _MapGetter.PROPS:
             return super().__delattr__(name)
+        elif self._key == '':
+            return self._ctrl.pop(name)
         else:
             return self._ctrl.pop(self._key+'.'+name)
 
@@ -90,7 +105,6 @@ class _MapGetter:
         else:
             return self.pop(name)
 
-
     def __kwargs(self, args, kwargs):
         key   = self._key
         items = _tokwargs(args, kwargs).items()
@@ -99,21 +113,69 @@ class _MapGetter:
         else:
             return ((self._key+'.'+i, j) for i, j in items)
 
-    def setdefaults(self, *args, version = 1, **kwargs):
+    def setdefault(self, arg):
         u"Calls update using the current base key"
+        return self._ctrl.setdefaults((self._key, arg))
+
+    def setdefaults(self, *args, version = 1, **kwargs):
+        u"""
+        Sets the defaults using the current base key.
+        - *args*   is a sequence of pairs (key, value)
+        - *kwargs* is similar.
+        The keys in argument are appended to the current key.
+
+        >> ctrl.keypress.setdefaults(('zoom', 'Ctrl-z'))
+        >> assert ctrl.keypress.zoom == 'Ctrl-z'
+
+        One can also do:
+
+        >> ctrl.keypress.defaults = {'zoom': 'Ctrl-z', 'pan': 'Ctrl-p'}
+        >> assert ctrl.keypress.zoom == 'Ctrl-z'
+
+        Or, for a single key:
+
+        >> ctrl.keypress.zoom.default = 'Ctrl-z'
+        >> assert ctrl.keypress.zoom == 'Ctrl-z'
+        """
         return self._ctrl.setdefaults(*self.__kwargs(args, kwargs), version = version)
 
-    def update(self, *args, **kwargs):
+    def get(self, *keys, default = delete):
+        u"Calls get using the current base key"
+        if len(keys) == 0:
+            return self._ctrl.get(self._key, default = default)
+        return self._ctrl.get(*(self._key+'.'+i for i in keys), default = default)
+
+    def set(self, arg):
         u"Calls update using the current base key"
+        return self._ctrl.update((self._key, arg))
+
+    def update(self, *args, **kwargs):
+        u"""
+        Calls update using the current base key.
+        - *args*   is a sequence of pairs (key, value)
+        - *kwargs* is similar.
+        The keys in argument are appended to the current key.
+
+        >> ctrl.keypress.update(('zoom', 'Ctrl-z'))
+        >> assert ctrl.keypress.zoom == 'Ctrl-z'
+
+        One can also do:
+
+        >> ctrl.keypress.items = {'zoom': 'Ctrl-z', 'pan': 'Ctrl-p'}
+        >> assert ctrl.keypress.zoom == 'Ctrl-z'
+
+        Or, for a single key:
+
+        >> ctrl.keypress.zoom.item = 'Ctrl-z'
+        >> assert ctrl.keypress.zoom == 'Ctrl-z'
+        """
         return self._ctrl.update(*self.__kwargs(args, kwargs))
 
     def pop(self, *keys):
         u"Calls get using the current base key"
+        if len(keys) == 0:
+            return self._ctrl.pop(self._key)
         return self._ctrl.pop(*(self._key+'.'+i for i in keys))
-
-    def get(self, *keys, default = delete):
-        u"Calls get using the current base key"
-        return self._ctrl.get(*(self._key+'.'+i for i in keys), default = default)
 
 class DefaultsMap(Controller):
     u"Dictionnary with defaults values. It can be reset to these."
@@ -138,7 +200,7 @@ class DefaultsMap(Controller):
     def reset(self, version = None):
         u"resets to default values"
         if version is None:
-            version = -1
+            version = 1
         for i in range(version):
             self.__items.maps[i].clear()
 
@@ -196,13 +258,13 @@ class GlobalsController(Controller):
     These can be accessed using a main key and secondary keys:
 
     >> # Get the secondary key 'keypress.pan.x' in 'plot'
-    >> ctrl.getGlobal('plot').keypress.pan.x.low.value
+    >> ctrl.getGlobal('plot').keypress.pan.x.low.get()
 
     >> # Get the secondary keys 'keypress.pan.x.low' and 'high'
     >> ctrl.getGlobal('plot').keypress.pan.x.get('low', 'high')
 
     >> # Get secondary keys starting with 'keypress.pan.x'
-    >> ctrl.getGlobal('plot').keypress.pan.x.values
+    >> ctrl.getGlobal('plot').keypress.pan.x.items
     """
 
     def __init__(self, **kwargs):
@@ -215,19 +277,19 @@ class GlobalsController(Controller):
                                                          'save' : "Control-s",
                                                          'quit' : "Control-q"}
         def _gesture(meta):
-            return {'speed'   : .2,
-                    'activate': meta,
+            return {'rate'    : .2,
+                    'activate': meta[:-1],
                     'x.low'   : meta+'ArrowLeft',
                     'x.high'  : meta+'ArrowRight',
                     'y.low'   : meta+'ArrowDown',
                     'y.high'  : meta+'ArrowUp'}
 
         item = self.addGlobalMap('config.plot')
-        item.tools              = 'xpan,box_zoom,reset,save'
-        item.boundary.overshoot = .005
-        item.keypress.reset     = ' '
-        item.keypress.pan       =  _gesture('')
-        item.keypress.zoom      =  _gesture('Shift')
+        item.tools              .default  ='xpan,box_zoom,reset,save'
+        item.boundary.overshoot .default  =.005
+        item.keypress.reset     .default  ='Shift- '
+        item.keypress.pan       .defaults = _gesture('Alt-')
+        item.keypress.zoom      .defaults = _gesture('Shift-')
 
         self.addGlobalMap('current')
         self.addGlobalMap('current.plot')

@@ -9,7 +9,7 @@ from bokeh.models   import (LinearAxis, Range1d, ColumnDataSource, HoverTool,
 import numpy
 
 from control        import Controller
-from .plotutils     import SinglePlotter, PlotAttrs
+from .plotutils     import SinglePlotter, PlotAttrs, KeyedRow
 from .              import BokehView
 
 class BeadPlotter(SinglePlotter):
@@ -18,25 +18,26 @@ class BeadPlotter(SinglePlotter):
         u"sets up this plotter's info"
         super().__init__(ctrl)
         self._source = ColumnDataSource()
-        self._fig    = figure(sizing_mode = 'stretch_both')
-        ctrl.setGlobalDefaults(self.key(),
-                               z       = PlotAttrs('blue', 'circle', 1),
-                               zmag    = PlotAttrs('red',  'line',   1),
-                               tooltip = [(u'Index',  '$index'),
-                                          (u'(t, z, zmag)', '($x, @z, @zmag)')]
-                              )
+        self._fig    = figure(**self._figargs())
+
+        cnf = ctrl.getGlobal(self.key())
+        cnf.defaults = dict(z        = PlotAttrs('blue', 'circle', 1),
+                            zmag     = PlotAttrs('red',  'line',   1),
+                            tooltips = [(u'Index',  '$index'),
+                                        (u'(t, z, zmag)', '($x, @z, @zmag)')])
 
     def _get(self, name):
         return self._source.data[name] # pylint: disable=unsubscriptable-object
 
     def _createdata(self):
-        task = self._ctrl.getGlobal("current", "track", default = None)
+        cnf  = self._ctrl.getGlobal("current")
+        task = cnf.track.get(default = None)
         if task is None:
             arr = numpy.array([], dtype = numpy.float)
             return dict.fromkeys(('t', 'zmag', 'z'), arr)
 
         items = next(iter(self._ctrl.run(task, task)))
-        bead  = self._ctrl.getGlobal("current", "bead", default = None)
+        bead  = cnf.bead.get(default = None)
         if bead is None:
             bead = next(iter(items.keys()))
 
@@ -48,35 +49,17 @@ class BeadPlotter(SinglePlotter):
         args = super()._figargs()
         args.update(x_axis_label = u'Time',
                     y_axis_label = u'z')
-
-        for i in ('x', 'y'):
-            rng  = self.getCurrent(i, default = None)
-            if rng is not None:
-                args[i+'_range'] = rng
         return args
 
     def _addglyph(self, beadname, **kwa):
-        self.getConfig(beadname).addto(self._fig,
-                                       x      = 't',
-                                       y      = beadname,
-                                       source = self._source,
-                                       **kwa)
-
-    def _bounds(self, name:str):
-        arr   = self._get(name)
-        if len(arr) == 0:
-            return 0., 1.
-
-        vmin  = min(arr)
-        vmax  = max(arr)
-        delta = (vmax-vmin)*self.getConfig("boundary.overshoot")
-        vmin -= delta
-        vmax += delta
-        return vmin, vmax
+        self.getConfig()[beadname].addto(self._fig,
+                                         x      = 't',
+                                         y      = beadname,
+                                         source = self._source,
+                                         **kwa)
 
     def _addylayout(self):
-        vmin, vmax = self._bounds('zmag')
-        self._fig.extra_y_ranges = {'zmag': Range1d(start = vmin, end = vmax)}
+        self._fig.extra_y_ranges = {'zmag': Range1d(start = 0., end = 1.)}
         self._fig.add_layout(LinearAxis(y_range_name='zmag', axis_label = u'zmag'), 'right')
 
     def _addcallbacks(self, fig):
@@ -89,18 +72,23 @@ class BeadPlotter(SinglePlotter):
         rng.callback = CustomJS.from_py_func(_onRangeChange)
 
     def _setbounds(self):
-        self._fig.x_range.bounds = self._bounds('t')
-        self._fig.y_range.bounds = self._bounds('z')
-
-        bnds = self._bounds("zmag")
+        bnds = self.bounds(self._get("zmag"))
         self._fig.extra_y_ranges['zmag'].bounds = bnds
         self._fig.extra_y_ranges['zmag'].start  = bnds[0]
         self._fig.extra_y_ranges['zmag'].end    = bnds[1]
 
+        for i, j in (('x', 't'), ('y', 'z')):
+            rng        = getattr(self._fig, i+'_range')
+            rng.bounds = self.bounds(self._get(j))
+            inter      = self.getCurrent(i, default = None)
+            if inter is not None:
+                rng.start = inter[0]
+                rng.end   = inter[1]
+
     def _create(self):
         u"sets-up the figure"
         self._source = ColumnDataSource(data = self._createdata())
-        self._fig.add_tools(HoverTool(tooltips = self.getConfig("tooltip")))
+        self._fig.add_tools(HoverTool(tooltips = self.getConfig().tooltips.get()))
 
         self._addylayout  ()
         self._addglyph    ("z")
@@ -133,4 +121,4 @@ class TrackPlot(BokehView):
 
     def getroots(self):
         u"adds items to doc"
-        return self._plotter.create(),
+        return KeyedRow(self._plotter),

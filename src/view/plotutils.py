@@ -1,101 +1,35 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Utils for dealing with the JS side of the view"
-from typing                 import Dict, Optional, Union # pylint: disable=unused-import
-from bokeh.models           import PanTool, BoxZoomTool
-from bokeh.core.properties  import String, Float, HasProps
+from bokeh.models           import Row
+from bokeh.core.properties  import Dict, String, Float
 
 from control                import Controller
+from utils                  import coffee
 
-class ToolWithKeys(HasProps):
-    u"Base class for controlling gestures with keyboard"
-    @staticmethod
-    def jscode(name, fname, meta) -> str:
-        u"returns the javascript implementation code"
-        return (u"""
-        p     = require "core/properties"
-        {name} = require "models/tools/gestures/{fname}"
-        $      = require "jquery"
+class KeyedRow(Row):
+    u"define div with tabIndex"
+    keys               = Dict(String, String, help = u'keys and their action')
+    zoomrate           = Float()
+    panrate            = Float()
+    __implementation__ = coffee(__file__, 'keyedrow')
+    def __init__(self, plotter, **kwa):
+        vals = ('.'.join((tool, axis, edge))
+                for tool in ('pan', 'zoom')
+                for axis in ('x', 'y')
+                for edge in ('low', 'high'))
 
-        class Dpx{name}View extends {name}.View
-            _kdact: false
-            _keytostr: (evt) ->
-                val = ""
-                cnv = alt: 'Alt', shift: 'Shift', ctrl: 'Control', meta: 'Meta'
-                for name, kw of cnv
-                    if evt[name+'Key']
-                         val += "#{kw}-"
+        cnf   = plotter.getConfig().keypress
+        keys  = dict((cnf[key].get(), key) for key in vals)
+        keys[cnf.reset.get()] = 'reset'
+        keys.update({cnf[tool].activate.get(): tool for tool in ('pan', 'zoom')})
 
-                val = if val == (evt.key+'-') then evt.key else val+evt.key
-
-            _keydown: (evt) ->
-                val = @_keytostr(evt)
-
-                frame = @plot_view.frame
-                isx   = val == @keyXLow or val == @keyXHigh
-                e1    = {bokeh: {sx: 1, sy: if isx then 1 else frame.height*@rate+1}}
-                e2    = {bokeh: {sx: if isx then frame.width*@rate+1 else 1, sy: 1}}
-
-                islow = val == @keyXLow or val == @keyYLow
-                @_pan_start(if islow then e1 else e2)
-                @_pan_end(if islow then e2 else e1)
-
-        class Dpx{name} extends {name}.Model
-            default_view: Dpx{name}View
-            type: 'Dpx{name}'
-            @define {
-                keyXLow:   [p.String, "{meta}ArrowLeft"],
-                keyXHigh:  [p.String, "{meta}ArrowRight"],
-                keyYLow:   [p.String, "{meta}ArrowDown"],
-                keyYHigh:  [p.String, "{meta}ArrowUp"],
-                rate:      [p.Float,  0.2]
-            }
-
-        module.exports =
-            Model: Dpx{name}
-            View:  Dpx{name}View
-             """.replace('{name}',  name)
-                .replace('{fname}', fname)
-                .replace('{meta}',  meta))
-
-    _KEY     = None # type: str
-    keyXLow  = String()
-    keyXHigh = String()
-    keyYLow  = String()
-    keyYHigh = String()
-    rate     = Float ()
-
-    @classmethod
-    def fromconfig(cls, ctrl: 'Optional[Plotter]' = None, **kwa) \
-            -> 'Dict[str,Union[str,float]]':
-        u"returns dictionnary with attribute values extracted from the controller"
-        items = dict()  # type: Dict[str,Union[str,float]]
-        if ctrl is not None:
-            key   = 'keypress.'+cls._KEY+'.'
-            items = dict(keyXLow  = ctrl.getConfig(key+"x.low"),
-                         keyXHigh = ctrl.getConfig(key+"x.high"),
-                         keyYLow  = ctrl.getConfig(key+"y.low"),
-                         keyYHigh = ctrl.getConfig(key+"y.high"),
-                         rate     = ctrl.getConfig(key+"speed"))
-        items.update(**kwa)
-        return items
-
-    def update(self, ctrl = None, **kwa):
-        super().update(**self.fromconfig(ctrl, **kwa))
-
-class DpxPanTool(PanTool, ToolWithKeys):        # pylint: disable=too-many-ancestors
-    u"Adds keypress controls to the default PanTool"
-    __implementation__ = ToolWithKeys.jscode('DpxPanTool', 'pan_tool', '')
-    _KEY               = 'pan'
-    def __init__(self, ctrl = None, **kwa):
-        super().__init__(**self.fromconfig(ctrl, **kwa))
-
-class DpxBoxZoomTool(BoxZoomTool, ToolWithKeys): # pylint: disable=too-many-ancestors
-    u"Adds keypress controls to the default BoxZoomTool"
-    __implementation__ = ToolWithKeys.jscode('DpxBoxZoomTool', 'box_zoom_tool', 'Shift')
-    _KEY               = 'zoom'
-    def __init__(self, ctrl = None, **kwa):
-        super().__init__(**self.fromconfig(ctrl, **kwa))
+        kwa.setdefault('sizing_mode', 'stretch_both')
+        super().__init__(children = [plotter.create()],
+                         keys     = keys,
+                         zoomrate = cnf.zoom.rate.get(),
+                         panrate  = cnf.pan.rate.get(),
+                         **kwa)
 
 class PlotAttrs:
     u"Plot Attributes for one variable"
@@ -132,9 +66,9 @@ class Plotter:
         u"Removes the controller"
         del self._ctrl
 
-    def getConfig(self, *key, **kwa):
+    def getConfig(self):
         u"returns config values"
-        return self._ctrl.getGlobal(self.key(), '.'.join(key), **kwa)
+        return self._ctrl.getGlobal(self.key())
 
     def getCurrent(self, *key, **kwa):
         u"returns config values"
@@ -145,13 +79,20 @@ class Plotter:
         raise NotImplementedError("need to create")
 
     def _figargs(self):
-        imp   = dict(pan  = lambda: DpxPanTool(self),
-                     xpan = lambda: DpxPanTool(self, dimensions = 'width'),
-                     ypan = lambda: DpxPanTool(self, dimensions = 'height'),
-                     zoom = lambda: DpxBoxZoomTool(self))
-        tools = [i if i.strip() not in imp else imp[i.strip()]()
-                 for i in self.getConfig("tools").split(',')]
-        return dict(tools = tools, sizing_mode = 'scale_height')
+        return dict(tools       = self.getConfig().tools.get(),
+                    sizing_mode = 'stretch_both')
+
+    def bounds(self, arr):
+        u"Returns boundaries for a column"
+        if len(arr) == 0:
+            return 0., 1.
+
+        vmin  = min(arr)
+        vmax  = max(arr)
+        delta = (vmax-vmin)*self.getConfig().boundary.overshoot.get()
+        vmin -= delta
+        vmax += delta
+        return vmin, vmax
 
 class SinglePlotter(Plotter):
     u"Base plotter class with single figure"
@@ -178,34 +119,3 @@ class SinglePlotter(Plotter):
     def _create(self):
         u"Specified by child class. Returns figure"
         raise NotImplementedError()
-
-    class JS: # pylint: disable=missing-docstring,no-self-use
-        def _dozoom(self, jsobj, found, rng):
-            center = (rng.end+rng.start)*.5
-            delta  = (rng.end-rng.start)
-            if found.endswith('.in'):
-                delta  *= jsobj['zoom']
-            else:
-                delta  /= jsobj['zoom']
-
-            rng.start = center - delta*.5
-            if rng.start < rng.bounds[0]:
-                rng.start = rng.bounds[0]
-
-            rng.end   = center + delta*.5
-            if rng.end > rng.bounds[1]:
-                rng.end   = rng.bounds[1]
-
-        def _dopan(self, jsobj, found, rng):
-            delta = (rng.end-rng.start)*jsobj['pan']
-            if found.endswith('.low'):
-                delta *= -1.
-
-            rng.start = rng.start + delta
-            rng.end   = rng.end   + delta
-            if rng.start < rng.bounds[0]:
-                rng.end   = rng.bounds[0] + rng.end-rng.start
-                rng.start = rng.bounds[0]
-            elif rng.end > rng.bounds[1]:
-                rng.start = rng.bounds[1] + rng.start-rng.end
-                rng.end   = rng.bounds[1]

@@ -1,5 +1,10 @@
 #! /usr/bin/env python
 # encoding: utf-8
+from waflib.Context import Context
 import wafbuilder as builder
 
-builder.make(locals())
+def configure(cnf:Context):
+    u"add coffeescript support"
+    cnf.load("coffee", builder.__path__, 'find_coffee') 
+
+builder.make(locals(), builders = ['py', 'coffee'])

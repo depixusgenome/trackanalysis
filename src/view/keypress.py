@@ -1,54 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"controls keypress actions"
-from typing                import Callable, Optional # pylint: disable=unused-import
-from bokeh.core.properties import String, Int
-from bokeh.model           import Model
+from typing                 import Callable, Optional # pylint: disable=unused-import
+from bokeh.core.properties  import String, Int, List
+from bokeh.model            import Model
+
+from utils                  import coffee
 
 class KeyPressManager(Model):
     u"controls keypress actions"
+    keys               = List(String)
     value              = String("")
     count              = Int(0)
-    __implementation__ = u"""
-        p         = require "core/properties"
-        BokehView = require "core/bokeh_view"
-        Model     = require "model"
-        $         = require "jquery"
-        
-        class DpxKeyEventView extends BokehView
-            initialize: (options) ->
-                super(options)
-                console.log("keyevt: rendering")
-                $(document).keydown((e) => @_key_down(e))
-
-            _key_down: (evt) ->
-                if evt.target != document.body then return
-
-                val = ""
-
-                cnv = alt: 'Alt', shift: 'Shift', ctrl: 'Control', meta: 'Meta'
-                for name, kw of cnv
-                    if evt[name+'Key']
-                         val += "#{kw}-"
-
-                if val == (evt.key+'-')
-                    val = evt.key
-                else
-                    val += evt.key
-
-                @model.value = val
-                @model.count = @model.count+1
-        
-        class DpxKeyEvent extends Model
-            default_view: DpxKeyEventView
-            type:"DpxKeyEvent"
-        
-            @define { value: [p.String, ""], count: [p.Int, 0] }
-        
-        module.exports =
-          Model: DpxKeyEvent
-          View:  DpxKeyEventView
-        """
+    __implementation__ = coffee(__file__)
 
     def __init__(self, **kwargs):
         super().__init__()
@@ -61,11 +25,15 @@ class KeyPressManager(Model):
         self.popKeyPress(all)
         self._ctrl = None
 
+    def _setkeys(self):
+        items     = self._ctrl.getGlobal('config')
+        self.keys = [items[name].get() for name in self._keys]
+
     def onKeyPress(self):
         u"Method to be connected to the gui"
         items = self._ctrl.getGlobal('config')
         for name, fcn in self._keys.items():
-            if self.value == items[name].value:
+            if self.value == items[name].get():
                 fcn()
                 break
 
@@ -86,6 +54,7 @@ class KeyPressManager(Model):
         self._keys.update(kwargs)
         if not all(isinstance(i, Callable) for i in kwargs.values()) :
             raise TypeError("keypress values should be callable")
+        self._setkeys()
 
     def popKeyPress(self, *args):
         u"removes keypress method"
@@ -95,6 +64,7 @@ class KeyPressManager(Model):
         else:
             for arg in args:
                 self._keys.pop(arg, None)
+        self._setkeys()
 
     def getroots(self):
         u"returns object root"
