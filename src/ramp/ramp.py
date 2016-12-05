@@ -11,10 +11,13 @@ class RampModel:
     u''' holds instruction to handle the data
     If values change in the Model the Controller must be notified and act accordingly
     '''
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.scale = 5.0
         self.needsCleaning = False
         self.corrThreshold = 0.5
+        self.minExt = None
+        if "minExtension" in kwargs:
+            self.minExt=kwargs["minExtension"]
 
 class RampTask:
     u'''
@@ -124,12 +127,49 @@ class RampData:
         u'''
         returns cross ids who does not have a match with a bead
         '''
-        corr=self.dataz.corr()<self.model.corrThreshold
-        nobead=[]
-        for bid in self.beads:
-            if any(corr[(bid,cid)][("zmag",cid)] for cid in range(self.ncycles)):
-                nobead.append(bid)
-        return set(nobead)
+        # could do with more thorough testing but a couple of checks showed correct behaviour
+        corrids = self._beadIdsCorr2zmag(toconsider = None)
+        return {i for i in self.beads if i not in corrids}
+
+    def getFixedBeadIds(self)->set:
+        u'''
+        PROBLEM RETURNS UNEXPECTED RESULTS
+        returns set of bead ids considered fixed
+
+        '''
+        # check that the bead never opens
+        if self.model.minExt is None:
+            print("model.minExt must be initialised before use! Returning")
+            return set()
+
+        closed = self.dataz < self.model.minExt
+        clids = {i[0] for i in self.bcids if all(closed[i]) }
+        return self._beadIdsCorr2zmag(toconsider = clids)
+
+
+    def _beadIdsCorr2zmag(self,toconsider:set=None):
+        u'''
+        returns the list of bead ids which whose z value correlates with zmag for each cycle
+        to check
+        '''
+
+        if toconsider is None:
+            toconsider = self.beads
+            data = self.dataz
+        else:
+            # why is "zmag" not in keys
+            data = self.dataz[[bcid for bcid in self.dataz.keys()
+                               if bcid[0] in toconsider or isinstance(bcid[0],str)]]
+
+
+        corr = data.corr()
+        beadids=[]
+        for bid in toconsider:
+            if all(corr[(bid,cid)][("zmag",cid)]>self.model.corrThreshold
+                   for cid in range(self.ncycles) ):
+                beadids.append(bid)
+
+        return set(beadids)
 
 def _isGoodBead(dzdt:pd.Series,scale:int):
     u'''test a single bead over a single cycle'''
