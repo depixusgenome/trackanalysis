@@ -34,3 +34,6 @@ yaml                      0.1.6                         0
 msvc			 14.0
 clang++                   3.8
 g++                       4.9
+
+[COFFEE]
+coffee                    1.10.0
