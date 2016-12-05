@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"utils"
-from typing         import Callable, cast
+from typing         import Union, Optional, Callable, cast # pylint: disable=unused-import
 from types          import LambdaType, FunctionType, MethodType
 from enum           import Enum
 from contextlib     import contextmanager
 from inspect        import signature, ismethod as _ismeth, isfunction as _isfunc, getmembers
 from functools      import wraps
 import re
+import pathlib
 
 def toenum(tpe, val):
     u"returns an enum object"
@@ -33,6 +34,17 @@ def ismethod(fcn) -> bool:
         return True
 
     return False
+
+def coffee(apath:'Union[str,pathlib.Path]', name:'Optional[str]' = None, **kwa) -> str:
+    u"returns the javascript implementation code"
+    path = pathlib.Path(apath)
+    if name is not None:
+        path = path.parent / name # type: ignore
+
+    src = pathlib.Path(path.with_suffix(".coffee")).read_text()
+    for name, val in kwa.items():
+        src = src.replace("$$"+name, val)
+    return src.replace('$$', '')
 
 class MetaMixin(type):
     u"""
