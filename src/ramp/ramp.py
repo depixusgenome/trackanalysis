@@ -4,6 +4,8 @@
 u'''Small library for computing ramp characteristics : zmag open, zmag close
 needs more structure'''
 from typing import Optional, Tuple , Set # pylint: disable=unused-import
+import warnings
+import numpy
 import pandas as pd # type: ignore
 from data import Track
 
@@ -15,9 +17,25 @@ class RampModel:
         self.scale = 5.0
         self.needsCleaning = False
         self.corrThreshold = 0.5
-        self.minExt = None
+        self._minExt = None
+        self.window = 5
         if "minExtension" in kwargs:
-            self.minExt=kwargs["minExtension"]
+            self._minExt=kwargs["minExtension"]
+
+    def setMinExt(self,value):
+        u'''
+        set _minExt
+        '''
+        self._minExt = value
+
+    def getMinExt(self):
+        u'''
+        Returns _minExt value.
+        Warns User if _minExt has not be set.
+        '''
+        if self._minExt is None:
+            warnings.warn(UserWarning("minimal extension minExt has no value assigned"))
+        return self._minExt
 
 class RampTask:
     u'''
@@ -88,6 +106,19 @@ class RampData:
 
         return zmop
 
+    def _estZAtOpening(self)-> pd.Series:
+        u'''
+        detect indices of changes in dzdt
+        take the previous index in dataz
+        '''
+        ids = self.dzdt[self.dzdt[self.det]>0].apply(lambda x:x.first_valid_index())
+        ids = ids[list(self.bcids)]
+        zest = pd.Series([numpy.nan for i in ids.keys()], index = ids.keys())
+        ids = ids[ids.notnull()]
+        for k, val in ids.items():
+            zest[k] = self.dataz[k][int(val - 1)]
+        return zest
+
     def keepBeadIds(self,bids:set)->None:
         u'''
         pops all unwanted beads
@@ -120,7 +151,6 @@ class RampData:
         '''
         gids = self.getGoodBeadIds()
         self.keepBeadIds(gids)
-        return
 
 
     def noBeadCrossIds(self)->set:
@@ -131,18 +161,20 @@ class RampData:
         corrids = self._beadIdsCorr2zmag(toconsider = None)
         return {i for i in self.beads if i not in corrids}
 
+    def _estimateZPhase3(self):
+        u''' estimate the z value corresponding to phase 3
+        '''
+
+        return self.dataz[list(self.bcids)].apply(
+            lambda x:x.rolling(window=self.model.window,center=True).median()).max()
+
     def getFixedBeadIds(self)->set:
         u'''
-        PROBLEM RETURNS UNEXPECTED RESULTS
         returns set of bead ids considered fixed
-
+        must be modified to use estMolExt instead of dataz
         '''
         # check that the bead never opens
-        if self.model.minExt is None:
-            print("model.minExt must be initialised before use! Returning")
-            return set()
-
-        closed = self.dataz < self.model.minExt
+        closed = self.dataz < self.model.getMinExt()
         clids = {i[0] for i in self.bcids if all(closed[i]) }
         return self._beadIdsCorr2zmag(toconsider = clids)
 
@@ -170,6 +202,17 @@ class RampData:
                 beadids.append(bid)
 
         return set(beadids)
+
+
+    def estMolExt(self):
+        u''' estimates molecule extension from z
+        before opening () to its value in phase 3'''
+
+
+        zph3 = self._estimateZPhase3()
+
+        zop = self._estZAtOpening() # problem here with the creation of the dict using a tuple
+        return zph3-zop
 
 def _isGoodBead(dzdt:pd.Series,scale:int):
     u'''test a single bead over a single cycle'''
