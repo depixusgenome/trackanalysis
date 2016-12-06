@@ -131,7 +131,6 @@ class SinglePlotter(Plotter):
         u"adds Range callbacks"
         def _onchange(attr, old, new): # pylint: disable=unused-argument
             if self._ready:
-                print(attr, old, new)
                 self._ctrl.updateGlobal(self.key('current'),
                                         x = (fig.x_range.start, fig.x_range.end),
                                         y = (fig.y_range.start, fig.y_range.end))
