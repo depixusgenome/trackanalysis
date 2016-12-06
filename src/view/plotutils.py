@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 u"Utils for dealing with the JS side of the view"
 from contextlib             import contextmanager
-from bokeh.models           import Row, Range1d
+from bokeh.models           import Row
 from bokeh.core.properties  import Dict, String, Float
 
 from control                import Controller
