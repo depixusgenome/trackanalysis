@@ -286,7 +286,7 @@ class GlobalsController(Controller):
 
         item = self.addGlobalMap('config.plot')
         item.tools              .default  ='xpan,box_zoom,reset,save'
-        item.boundary.overshoot .default  =.005
+        item.boundary.overshoot .default  =.001
         item.keypress.reset     .default  ='Shift- '
         item.keypress.pan       .defaults = _gesture('Alt-')
         item.keypress.zoom      .defaults = _gesture('Shift-')
@@ -323,6 +323,6 @@ class GlobalsController(Controller):
 
     def getGlobal(self, key, *args, default = delete):
         u"returns values associated to the keys"
-        if len(args) == 0:
+        if len(args) == 0 or len(args) == 1 and args[0] == '':
             return _MapGetter(self.__maps[key], '')
         return self.__maps[key].get(*args, default = default)

@@ -6,7 +6,6 @@ from typing         import Optional  # pylint: disable=unused-import
 from bokeh.plotting import figure
 from bokeh.models   import (LinearAxis, Range1d, ColumnDataSource, HoverTool,
                             CustomJS)
-import numpy
 
 from control        import Controller
 from .plotutils     import SinglePlotter, PlotAttrs, KeyedRow
@@ -30,11 +29,10 @@ class BeadPlotter(SinglePlotter):
         return self._source.data[name] # pylint: disable=unsubscriptable-object
 
     def _createdata(self):
-        cnf  = self._ctrl.getGlobal("current")
-        task = cnf.track.get(default = None)
+        cnf         = self._ctrl.getGlobal("current")
+        task        = cnf.track.get(default = None)
         if task is None:
-            arr = numpy.array([], dtype = numpy.float)
-            return dict.fromkeys(('t', 'zmag', 'z'), arr)
+            return dict.fromkeys(('t', 'zmag', 'z'), [0., 1.])
 
         items = next(iter(self._ctrl.run(task, task)))
         bead  = cnf.bead.get(default = None)
@@ -64,7 +62,7 @@ class BeadPlotter(SinglePlotter):
 
     def _addcallbacks(self, fig):
         super()._addcallbacks(fig)
-        rng   = self._fig.extra_y_ranges['zmag']
+        rng = self._fig.extra_y_ranges['zmag']
         def _onRangeChange(rng = rng):
             rng.start = rng.bounds[0]
             rng.end   = rng.bounds[1]
@@ -72,18 +70,9 @@ class BeadPlotter(SinglePlotter):
         rng.callback = CustomJS.from_py_func(_onRangeChange)
 
     def _setbounds(self):
-        bnds = self.bounds(self._get("zmag"))
-        self._fig.extra_y_ranges['zmag'].bounds = bnds
-        self._fig.extra_y_ranges['zmag'].start  = bnds[0]
-        self._fig.extra_y_ranges['zmag'].end    = bnds[1]
-
-        for i, j in (('x', 't'), ('y', 'z')):
-            rng        = getattr(self._fig, i+'_range')
-            rng.bounds = self.bounds(self._get(j))
-            inter      = self.getCurrent(i, default = None)
-            if inter is not None:
-                rng.start = inter[0]
-                rng.end   = inter[1]
+        self.setbounds(self._fig.extra_y_ranges['zmag'], None, self._get('zmag'))
+        self.setbounds(self._fig.x_range, 'x', self._get('t'))
+        self.setbounds(self._fig.y_range, 'y', self._get('z'))
 
     def _create(self):
         u"sets-up the figure"
@@ -91,8 +80,8 @@ class BeadPlotter(SinglePlotter):
         self._fig.add_tools(HoverTool(tooltips = self.getConfig().tooltips.get()))
 
         self._addylayout  ()
-        self._addglyph    ("z")
         self._addglyph    ("zmag", y_range_name = 'zmag')
+        self._addglyph    ("z")
         return self._fig
 
     def update(self, items:dict):
@@ -100,8 +89,9 @@ class BeadPlotter(SinglePlotter):
         if not ('track' in items or 'bead' in items):
             return
 
-        self._source.data = self._createdata()
-        self._setbounds()
+        with self.updating():
+            self._source.data = self._createdata()
+            self._setbounds()
 
 class TrackPlot(BokehView):
     u"Track plot view"

@@ -9,8 +9,6 @@ class DpxKeyEventView extends BokehView
         $(document).keydown((e) => @_key_down(e))
 
     _key_down: (evt) ->
-        if evt.target != document.body then return
-
         val = ""
         for name, kw of {alt: 'Alt'; shift: 'Shift'; ctrl: 'Control'; meta: 'Meta'}
             if evt[name+'Key']

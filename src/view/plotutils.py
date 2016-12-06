@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Utils for dealing with the JS side of the view"
-from bokeh.models           import Row
+from contextlib             import contextmanager
+from bokeh.models           import Row, Range1d
 from bokeh.core.properties  import Dict, String, Float
 
 from control                import Controller
 from utils                  import coffee
+
 
 class KeyedRow(Row):
     u"define div with tabIndex"
@@ -55,7 +57,15 @@ class Plotter:
         u"sets up this plotter's info"
         ctrl.addGlobalMap(self.key())
         ctrl.addGlobalMap(self.key('current'))
-        self._ctrl = ctrl
+        self._ctrl  = ctrl
+        self._ready = False
+
+    @contextmanager
+    def updating(self):
+        u"Stops on_change events for a time"
+        self._ready = False
+        yield self
+        self._ready = True
 
     @classmethod
     def key(cls, base = 'config'):
@@ -82,6 +92,27 @@ class Plotter:
         return dict(tools       = self.getConfig().tools.get(),
                     sizing_mode = 'stretch_both')
 
+    def setbounds(self, rng, axis, arr):
+        u"Sets the range boundaries"
+        over  = self.getConfig().boundary.overshoot.get()
+
+        vmin  = min(arr)
+        vmax  = max(arr)
+        delta = (vmax-vmin)*over*.5
+        vmin -= delta
+        vmax += delta
+
+        if axis is None:
+            curr  = None, None
+        else:
+            curr  = self.getCurrent(axis, default = (vmin, vmax))
+
+        rng.start  = vmin if curr[0]  is None else curr[0]
+        rng.end    = vmax if curr[1]  is None else curr[1]
+        rng.bounds = (vmin, vmax)
+        if hasattr(rng, 'range_padding'):
+            rng.range_padding = over*100.
+
     def bounds(self, arr):
         u"Returns boundaries for a column"
         if len(arr) == 0:
@@ -99,9 +130,11 @@ class SinglePlotter(Plotter):
     def _addcallbacks(self, fig):
         u"adds Range callbacks"
         def _onchange(attr, old, new): # pylint: disable=unused-argument
-            self._ctrl.updateGlobal(self.key('current'),
-                                    x = (fig.x_range.start, fig.x_range.end),
-                                    y = (fig.y_range.start, fig.y_range.end))
+            if self._ready:
+                print(attr, old, new)
+                self._ctrl.updateGlobal(self.key('current'),
+                                        x = (fig.x_range.start, fig.x_range.end),
+                                        y = (fig.y_range.start, fig.y_range.end))
 
         fig.x_range.on_change('start', _onchange)
         fig.x_range.on_change('end',   _onchange)

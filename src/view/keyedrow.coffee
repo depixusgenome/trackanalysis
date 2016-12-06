@@ -16,15 +16,19 @@ class DpxKeyedRow extends Row.Model
 
     _fig:      ()     -> @children[0]
     _get_tool: (name) ->
-        for attr in @_fig().toolbar.tools
-            if attr.constructor.name == name
+        tools = @_fig().toolbar.tools
+        for attr in tools
+            if attr.type == name
                 return attr
         return null
 
     _set_active: (name) ->
-        @_curr                   = @_fig().toolbar.gestures.pan.active
-        @_curr?.active           = false
-        @_get_tool(name)?.active = true
+        tool               = @_get_tool(name)
+
+        if tool?
+            @_curr         = @_fig().toolbar.gestures.pan.active
+            @_curr?.active = false
+            tool.active    = true
 
     _do_zoom: (zoomin, rng) ->
         center = (rng.end+rng.start)*.5
@@ -51,6 +55,7 @@ class DpxKeyedRow extends Row.Model
             if evt[name+"Key"]
                  val += "#{kw}-"
         val = if val == (evt.key+"-") then evt.key else val + evt.key
+
 
         if @keys[val]?
             evt.preventDefault()
