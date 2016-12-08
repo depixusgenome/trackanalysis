@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Toolbar"
-
-from typing               import Optional       # pylint: disable=unused-import
 from bokeh.layouts        import Row
-from bokeh.models.widgets import Widget, Button # pylint: disable=unused-import
 
-from .dialog                        import FileDialog
-from .                              import BokehView
+from .dialog              import FileDialog
+from .                    import BokehView
 
-class  ToolBar(BokehView): # pylint: disable=too-many-ancestors
-    u"Menu bar"
+class  ToolBar(BokehView):
+    u"Toolbar"
     def __init__(self, **kwa):
         u"Sets up the controller"
         super().__init__(**kwa)
