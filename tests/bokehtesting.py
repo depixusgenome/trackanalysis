@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Utils for testing views"
+from typing                import Optional  # pylint: disable=unused-import
+
 import pytest
 
 from tornado.ioloop        import IOLoop
-from bokeh.core.properties import Int, String, Dict, Any
+from bokeh.core.properties import Int, String, Dict, Any, Instance
 from bokeh.model           import Model
 from bokeh.document        import Document  # pylint: disable=unused-import
 from bokeh.server.server   import Server    # pylint: disable=unused-import
@@ -14,6 +16,7 @@ from view.keypress         import KeyPressManager
 class _OnLoadModel(Model):
     done  = Int(0)
     event = Dict(String, Any)
+    model = Instance(Model)
 
     __implementation__ = u"""
         p         = require "core/properties"
@@ -41,36 +44,30 @@ class _OnLoadModel(Model):
                 return evt
 
             _press: () ->
-                @event.model.dokeydown?(@_create_evt('keydown'))
-                @event.model.dokeyup?(@_create_evt('keyup'))
+                if @model?
+                    @model.dokeydown?(@_create_evt('keydown'))
+                    @model.dokeyup?(@_create_evt('keyup'))
 
             @define {
                 done:  [p.Number, 0]
-                event: [p.Any, {}]
+                event: [p.Any,   {}]
+                model: [p.Any,   {}]
             }
 
         module.exports =
           View: DpxTestLoadedView
           Model: DpxTestLoaded
                           """
-
-    def start(self, ioloop):
-        u"Waiting for the document to load"
-        if self.done:
-            ioloop.stop()
-        else:
-            ioloop.call_later(0.5, self.start, ioloop)
-
-    def press(self, key, model = ''):
+    def press(self, key, model):
         u"Sets-up a new keyevent in JS"
         val = '-' if key == '-' else key.split('-')[-1]
-        evt = dict(model   = model,
-                   alt     = 'Alt-'     in key,
+        evt = dict(alt     = 'Alt-'     in key,
                    shift   = 'Shift-'   in key,
                    ctrl    = 'Control-' in key,
                    meta    = 'Meta-'    in key,
                    key     = val,
                    keyCode = ord(val))
+        self.model = model
         self.event = evt
 
 class _ManagedServerLoop:
@@ -81,15 +78,23 @@ class _ManagedServerLoop:
     loop = property(lambda self: self.server.io_loop)
     ctrl = property(lambda self: getattr(self.view, '_ctrl'))
 
-    def __init__(self, mkpatch, application:type, module:str, kwa:dict) -> None:
-        self.monkeypatch = mkpatch
+    @property
+    def loading(self) -> 'Optional[_OnLoadModel]':
+        u"returns the model which allows tests to javascript"
+        return next(iter(getattr(self.doc, 'roots', [])), None)
+
+    class _Dummy:
+        @staticmethod
+        def setattr(*args):
+            u"dummy"
+            return setattr(*args)
+
+    def __init__(self, mkpatch, kwa:dict) -> None:
+        self.monkeypatch = self._Dummy() if mkpatch is None else mkpatch # type: ignore
         self.server  = None # type: Server
         self.view    = None # type: ignore
-        self.loading = None # type: _OnLoadModel
         self.doc     = None # type: Document
         self.kwa     = kwa
-        kwa['__app__'] = application
-        kwa['__mod__'] = module
 
     def __exit__(self, *_):
         if self.server is not None:
@@ -101,14 +106,14 @@ class _ManagedServerLoop:
         kwa['io_loop'] = IOLoop()
         kwa['io_loop'].make_current()
 
-        mod     = self.kwa.pop('__mod__')
-        launch  = getattr(__import__("app."+mod), mod).serve
-        server  = launch(kwa.pop("__app__"), server = kwa)
+        app, mod, fcn = self.kwa.pop('_args_')
+        launch        = getattr(getattr(__import__("app."+mod), mod), fcn)
+        server        = launch(app, server = kwa)
 
         @classmethod
         def _open(_, doc, _func_ = server.MainView.open):
             self.doc = doc
-            doc.add_root(self.loading)
+            doc.add_root(_OnLoadModel())
             self.view = _func_(doc)
             return self.view
         server.MainView.open = _open
@@ -122,9 +127,16 @@ class _ManagedServerLoop:
         return server
 
     def __enter__(self):
-        self.server  = self.__buildserver(self.kwa)
-        self.loading = _OnLoadModel()
-        self.loading.start(self.loop)
+        self.server = self.__buildserver(self.kwa)
+
+        def _start():
+            u"Waiting for the document to load"
+            if getattr(self.loading, 'done', False):
+                self.loop.stop()
+            else:
+                self.loop.call_later(0.5, _start)
+        _start()
+
         self.server.start()
         return self
 
@@ -157,6 +169,18 @@ class _ManagedServerLoop:
         self.monkeypatch.setattr(view.dialog, '_tkopen', _tkopen)
         self.press('Control-o')
 
+    def get(self, clsname, attr):
+        u"Returns a private attribute in the view"
+        key = '_'+clsname+'__'+attr
+        if key in self.view.__dict__:
+            return self.view.__dict__[key]
+
+        key = '_'+attr
+        if key in self.view.__dict__:
+            return self.view.__dict__[key]
+
+        return self.view.__dict__[attr]
+
     def press(self, key:str, src = None):
         u"press one key in python server"
         if src is None:
@@ -174,9 +198,15 @@ class BokehAction:
     def __init__(self, mkpatch):
         self.monkeypatch = mkpatch
 
-    def server(self, app:type, mod:str, **kwa) -> _ManagedServerLoop:
+    def serve(self, app:type, mod:str  = 'default', **kwa) -> _ManagedServerLoop:
         u"Returns a server managing context"
-        return _ManagedServerLoop(self.monkeypatch, app, mod, kwa)
+        kwa['_args_'] = app, mod, 'serve'
+        return _ManagedServerLoop(self.monkeypatch, kwa)
+
+    def launch(self, app:type, mod:str  = 'default', **kwa) -> _ManagedServerLoop:
+        u"Returns a server managing context"
+        kwa['_args_'] = app, mod, 'launch'
+        return _ManagedServerLoop(self.monkeypatch, kwa)
 
     def setattr(self, *args, **kwargs):
         u"apply monkey patch"

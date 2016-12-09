@@ -1,12 +1,8 @@
 p         = require "core/properties"
-#LayoutDOM = require "models/layouts/layout_dom"
 Model     = require "model"
 $         = require "jquery"
 
-class DpxKeyEventView#extends LayoutDOM.View
-    #    initialize: (options) ->
-    #        super(options)
-    #        $(document).keydown((e) => @model.dokeydown(e))
+class DpxKeyEventView
 
 class DpxKeyEvent extends Model
     default_view: DpxKeyEventView
@@ -26,7 +22,6 @@ class DpxKeyEvent extends Model
             evt.stopPropagation()
             @value = val
             @count = @count+1
-
 
     @define {
         keys:  [p.Array, []]
