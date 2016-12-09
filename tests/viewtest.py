@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u""" Tests views """
+from pytest         import approx       # pylint: disable=no-name-in-module
 from bokehtesting   import bokehaction  # pylint: disable=unused-import
+
 from view.toolbar   import ToolBar
+from view.trackplot import TrackPlot
 
 def test_toolbar(bokehaction):          # pylint: disable=redefined-outer-name
     u"test the toolbar"
@@ -31,5 +34,31 @@ def test_toolbar(bokehaction):          # pylint: disable=redefined-outer-name
         _checkopen()
         server.quit()
 
-if __name__ == '__main__':
-    test_toolbar(bokehaction(None))
+def test_trackplot(bokehaction):        # pylint: disable=redefined-outer-name
+    u"test plot"
+    vals = [0.]*4
+    def _printrng(**evts):
+        if 'x' in evts:
+            vals[:2] = evts['x'].value
+        if 'y' in evts:
+            vals[2:] = evts['y'].value
+
+    with bokehaction.launch(TrackPlot, 'withtoolbar') as server:
+        server.ctrl.observe("globals.current.plot.bead", _printrng)
+        server.load('small_legacy')
+
+        def _press(val, *truth):
+            server.press(val, server.doc.roots[-1].children[-1].children[-1])
+            assert vals == approx(truth, rel = 1e-2)
+
+        _press('Shift- ',          652.7515, 1150.2485, -0.04378, 1.11549)
+        _press('Shift-ArrowUp',    652.7515, 1150.2485,  0.41992, 0.65178)
+        _press('Shift-ArrowRight', 851.7503, 951.2497,   0.41992, 0.65178)
+        _press('Alt-ArrowLeft',    831.8504, 931.34982,  0.41992, 0.65178)
+        _press('Alt-ArrowUp',      831.8504, 931.34982,  0.46629, 0.69815)
+        _press('Alt-ArrowRight',   851.7503, 951.2497,   0.46629, 0.69815)
+        _press('Alt-ArrowDown',    851.7503, 951.2497,   0.41992, 0.65178)
+        _press('Shift-ArrowLeft',  652.7515, 1150.2484,  0.41992, 0.65178)
+        _press('Shift-ArrowDown',  652.7515, 1150.2484, -0.04378, 1.11549)
+        _press('Shift-ArrowUp',    652.7515, 1150.2484,  0.41992, 0.65178)
+        server.press('Ctrl-z')

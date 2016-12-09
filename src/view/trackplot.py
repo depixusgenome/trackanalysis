@@ -8,7 +8,7 @@ from bokeh.models   import (LinearAxis, Range1d, ColumnDataSource, HoverTool,
                             CustomJS)
 
 from control        import Controller
-from .plotutils     import SinglePlotter, PlotAttrs, KeyedRow
+from .plotutils     import SinglePlotter, PlotAttrs
 from .              import BokehView
 
 class BeadPlotter(SinglePlotter):
@@ -50,11 +50,11 @@ class BeadPlotter(SinglePlotter):
         return args
 
     def _addglyph(self, beadname, **kwa):
-        self.getConfig()[beadname].addto(self._fig,
-                                         x      = 't',
-                                         y      = beadname,
-                                         source = self._source,
-                                         **kwa)
+        return self.getConfig()[beadname].addto(self._fig,
+                                                x      = 't',
+                                                y      = beadname,
+                                                source = self._source,
+                                                **kwa)
 
     def _addylayout(self):
         self._fig.extra_y_ranges = {'zmag': Range1d(start = 0., end = 1.)}
@@ -81,7 +81,10 @@ class BeadPlotter(SinglePlotter):
 
         self._addylayout  ()
         self._addglyph    ("zmag", y_range_name = 'zmag')
-        self._addglyph    ("z")
+
+        glyph = self._addglyph    ("z")
+        self._fig.x_range.renderers = [glyph]
+        self._fig.y_range.renderers = [glyph]
         return self._fig
 
     def update(self, items:dict):
@@ -111,4 +114,4 @@ class TrackPlot(BokehView):
 
     def getroots(self):
         u"adds items to doc"
-        return KeyedRow(self._plotter),
+        return self._plotter.create(),

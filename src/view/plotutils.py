@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 u"Utils for dealing with the JS side of the view"
 from contextlib             import contextmanager
+from itertools              import product
 from bokeh.models           import Row
 from bokeh.core.properties  import Dict, String, Float
 
@@ -9,25 +10,22 @@ from control                import Controller
 from utils                  import coffee
 
 
-class KeyedRow(Row):
+class DpxKeyedRow(Row):
     u"define div with tabIndex"
     keys               = Dict(String, String, help = u'keys and their action')
     zoomrate           = Float()
     panrate            = Float()
     __implementation__ = coffee(__file__, 'keyedrow')
-    def __init__(self, plotter, **kwa):
-        vals = ('.'.join((tool, axis, edge))
-                for tool in ('pan', 'zoom')
-                for axis in ('x', 'y')
-                for edge in ('low', 'high'))
-
+    def __init__(self, plotter, fig, **kwa):
+        vals = ('.'.join(i) for i in product(('pan', 'zoom'), ('x', 'y'), ('low', 'high')))
         cnf   = plotter.getConfig().keypress
+
         keys  = dict((cnf[key].get(), key) for key in vals)
         keys[cnf.reset.get()] = 'reset'
         keys.update({cnf[tool].activate.get(): tool for tool in ('pan', 'zoom')})
 
         kwa.setdefault('sizing_mode', 'stretch_both')
-        super().__init__(children = [plotter.create()],
+        super().__init__(children = [fig],
                          keys     = keys,
                          zoomrate = cnf.zoom.rate.get(),
                          panrate  = cnf.pan.rate.get(),
@@ -49,7 +47,7 @@ class PlotAttrs:
         if self.glyph == 'line':
             args['line_width'] = args.pop('size')
 
-        getattr(fig, self.glyph)(**args)
+        return getattr(fig, self.glyph)(**args)
 
 class Plotter:
     u"Base plotter class"
@@ -107,11 +105,12 @@ class Plotter:
         else:
             curr  = self.getCurrent(axis, default = (vmin, vmax))
 
-        rng.start  = vmin if curr[0]  is None else curr[0]
-        rng.end    = vmax if curr[1]  is None else curr[1]
-        rng.bounds = (vmin, vmax)
         if hasattr(rng, 'range_padding'):
             rng.range_padding = over*100.
+
+        rng.bounds = (vmin, vmax)
+        rng.start  = vmin if curr[0]  is None else curr[0]
+        rng.end    = vmax if curr[1]  is None else curr[1]
 
     def bounds(self, arr):
         u"Returns boundaries for a column"
@@ -141,12 +140,12 @@ class SinglePlotter(Plotter):
         fig.y_range.on_change('end',   _onchange)
         return fig
 
-    def create(self):
+    def create(self) -> DpxKeyedRow:
         u"returns the figure"
         fig = self._create()
         if fig is not None:
             self._addcallbacks(fig)
-        return fig
+        return DpxKeyedRow(self, fig)
 
     def _create(self):
         u"Specified by child class. Returns figure"

@@ -40,7 +40,7 @@ def _launch(view, **kwa):
     if isinstance(view, Server):
         server = view
     else:
-        server = _serve(view, **kwa.pop('server'))
+        server = _serve(view, **kwa.pop('server', {}))
 
     old        = StreamReader.run
     def run(self):

@@ -41,10 +41,30 @@ class DpxKeyedRow extends Row.Model
         rng.start = center - delta*.5
         rng.end   = center + delta*.5
 
+        if rng.bounds[0] > rng.start
+            rng.start = rng.bounds[0]
+        if rng.bounds[1] < rng.end
+            rng.end   = rng.bounds[1]
+
     _do_pan: (panlow, rng) ->
         delta     = (rng.end-rng.start)*@panrate*(if panlow then -1 else 1)
+        if rng.bounds[0] > rng.start + delta
+            delta = rng.bounds[0]-rng.start
+        if rng.bounds[1] < rng.end   + delta
+            delta = rng.bounds[1]-rng.end
+
         rng.start = rng.start + delta
         rng.end   = rng.end   + delta
+
+    _do_reset: () ->
+        fig       = @_fig()
+        rng       = fig.x_range
+        rng.start = rng.bounds[0]
+        rng.end   = rng.bounds[1]
+
+        rng       = fig.y_range
+        rng.start = rng.bounds[0]
+        rng.end   = rng.bounds[1]
 
     dokeydown: (evt) ->
         if not (@_fig()?)
@@ -56,13 +76,12 @@ class DpxKeyedRow extends Row.Model
                  val += "#{kw}-"
         val = if val == (evt.key+"-") then evt.key else val + evt.key
 
-
         if @keys[val]?
             evt.preventDefault()
             evt.stopPropagation()
             val = @keys[val]
             if val == "reset"
-                @_get_tool("ResetTool")?.trigger('do')
+                @_do_reset()
 
             else if val == "zoom"
                 @_set_active("BoxZoomTool")
