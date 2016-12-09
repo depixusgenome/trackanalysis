@@ -7,7 +7,7 @@ from bokeh.model            import Model
 
 from utils                  import coffee
 
-class KeyPressManager(Model):
+class DpxKeyEvent(Model):
     u"controls keypress actions"
     keys               = List(String)
     value              = String("")
@@ -18,11 +18,11 @@ class KeyPressManager(Model):
         super().__init__()
         self._keys = kwargs.pop('keys', dict()) # type: Dict[str,Callable]
         self._ctrl = kwargs.pop('ctrl', None)   # type: Optional[Controller]
-        self.addKeyPress(**kwargs)
 
     def close(self):
         u"Removes the controller"
-        self.popKeyPress(all)
+        self._keys.clear()
+        self._keys = dict()
         self._ctrl = None
 
     def _setkeys(self):
@@ -51,14 +51,15 @@ class KeyPressManager(Model):
         else:
             kwargs.update(args)
 
-        self._keys.update(kwargs)
         if not all(isinstance(i, Callable) for i in kwargs.values()) :
-            raise TypeError("keypress values should be callable")
+            raise TypeError("keypress values should be callable: "+str(kwargs))
+        self._keys.update(kwargs)
         self._setkeys()
 
     def popKeyPress(self, *args):
         u"removes keypress method"
         if len(args) == 1 and args[0] is all:
+            self._keys.clear()
             self._keys = dict()
 
         else:
@@ -70,3 +71,5 @@ class KeyPressManager(Model):
         u"returns object root"
         self.on_change("count", lambda attr, old, value: self.onKeyPress())
         return self,
+
+KeyPressManager = DpxKeyEvent

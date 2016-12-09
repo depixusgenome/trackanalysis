@@ -1,28 +1,32 @@
 p         = require "core/properties"
-BokehView = require "core/bokeh_view"
+#LayoutDOM = require "models/layouts/layout_dom"
 Model     = require "model"
 $         = require "jquery"
 
-class DpxKeyEventView extends BokehView
-    initialize: (options) ->
-        super(options)
-        $(document).keydown((e) => @_key_down(e))
+class DpxKeyEventView#extends LayoutDOM.View
+    #    initialize: (options) ->
+    #        super(options)
+    #        $(document).keydown((e) => @model.dokeydown(e))
 
-    _key_down: (evt) ->
+class DpxKeyEvent extends Model
+    default_view: DpxKeyEventView
+    type:"DpxKeyEvent"
+    constructor: (attrs, opts) ->
+        super(attrs, opts)
+        $(document).keydown((e) => @dokeydown(e))
+
+    dokeydown: (evt) ->
         val = ""
         for name, kw of {alt: 'Alt'; shift: 'Shift'; ctrl: 'Control'; meta: 'Meta'}
             if evt[name+'Key']
                  val += "#{kw}-"
         val = if val == (evt.key+'-') then evt.key else val + evt.key
-        if val in @model.keys
+        if val in @keys
             evt.preventDefault()
             evt.stopPropagation()
-            @model.value = val
-            @model.count = @model.count+1
+            @value = val
+            @count = @count+1
 
-class DpxKeyEvent extends Model
-    default_view: DpxKeyEventView
-    type:"DpxKeyEvent"
 
     @define {
         keys:  [p.Array, []]

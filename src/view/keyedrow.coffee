@@ -8,8 +8,8 @@ class DpxKeyedRowView extends Row.View
     initialize: (options) ->
         super()
         @$el.attr("tabindex", 1)
-        @$el.keydown((evt) => @model._keydown(evt))
-        @$el.keyup((evt) => @model._keyup(evt))
+        @$el.keydown((evt) => @model.dokeydown(evt))
+        @$el.keyup((evt) => @model.dokeyup(evt))
 
 class DpxKeyedRow extends Row.Model
     default_view: DpxKeyedRowView
@@ -46,7 +46,7 @@ class DpxKeyedRow extends Row.Model
         rng.start = rng.start + delta
         rng.end   = rng.end   + delta
 
-    _keydown: (evt) ->
+    dokeydown: (evt) ->
         if not (@_fig()?)
             return
 
@@ -74,7 +74,7 @@ class DpxKeyedRow extends Row.Model
                 [tool,axis,dir] = val.split(".")
                 @["_do_"+tool](dir == "low", @_fig()[axis+"_range"])
 
-    _keyup: (evt) ->
+    dokeyup: (evt) ->
         @_curr?.active = true
         @_curr         = null
 

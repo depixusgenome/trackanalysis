@@ -16,8 +16,8 @@ from control        import Controller
 from view           import View, BokehView
 from view.keypress  import KeyPressManager
 
-def _serverkwargs():
-    server_kwargs                         = dict()
+def _serverkwargs(kwa):
+    server_kwargs                         = dict(kwa)
     server_kwargs['sign_sessions']        = settings.sign_sessions()
     server_kwargs['secret_key']           = settings.secret_key_bytes()
     server_kwargs['generate_session_ids'] = True
@@ -25,19 +25,23 @@ def _serverkwargs():
     server_kwargs['redirect_root']        = True
     return server_kwargs
 
-def _serve(view):
+def _serve(view, **kwa):
     u"Launches a bokeh server"
     def start(doc):
         u"Starts the application and adds itself to the document"
-        self = view() # pylint: disable=no-value-for-parameter
-        self.open(doc)
-        return self
+        return view.open(doc)
 
-    return Server(Application(FunctionHandler(start)), **_serverkwargs())
+    server = Server(Application(FunctionHandler(start)), **_serverkwargs(kwa))
+    server.MainView = view
+    return server
 
 def _launch(view, **kwa):
     u"Launches a bokeh server"
-    server     = _serve(view)
+    if isinstance(view, Server):
+        server = view
+    else:
+        server = _serve(view, **kwa.pop('server'))
+
     old        = StreamReader.run
     def run(self):
         u"Stop the stream reader"
@@ -45,7 +49,7 @@ def _launch(view, **kwa):
         server.stop()
     StreamReader.run = run
 
-    rtime                  = _flexxlaunch('http://localhost:5006/', **kwa)
+    rtime = _flexxlaunch('http://localhost:5006/', **kwa)
     def close(self):
         u"closes the application"
         top, self.topview = self.topview, None
@@ -89,15 +93,22 @@ def setup(locs,
          ):
     u"Sets up launch and serve functions for a given app context"
 
-    classes = set(cls for cls in locs.values() if isinstance(cls, type))
-    classes.difference_update((Controller, View))
-    if defaultcontrols is all:
-        defaultcontrols = tuple(i for i in classes if issubclass(i, Controller))
 
-    if defaultviews is all:
-        defaultviews = tuple(i for i in classes
-                             if (issubclass(i, View)
-                                 and not issubclass(i, BokehView)))
+    def application(main     = mainview,
+                    controls = defaultcontrols,
+                    views    = defaultviews,
+                    creator  = creator):
+        u"Creates a main view"
+        classes = set(cls for cls in locs.values() if isinstance(cls, type))
+        classes.difference_update((Controller, View))
+        if controls is all:
+            controls = tuple(i for i in classes if issubclass(i, Controller))
+
+        if views is all:
+            views = tuple(i for i in classes
+                          if (issubclass(i, View)
+                              and not issubclass(i, BokehView)))
+        return _create(creator(main), controls, views)
 
     def serve(main     = mainview,
               controls = defaultcontrols,
@@ -105,7 +116,7 @@ def setup(locs,
               creator  = creator,
               **kwa):
         u"Creates a browser app"
-        return _serve(_create(creator(main), controls, views), **kwa)
+        return _serve(application(main, controls, views, creator), **kwa)
 
     def launch(main     = mainview,
                controls = defaultcontrols,
@@ -115,7 +126,7 @@ def setup(locs,
         u"Creates a desktop app"
         kwa.setdefault("title", 'track analysis')
         kwa.setdefault("size",  (1000, 1000))
-        return _launch(_create(creator(main), controls, views), **kwa)
+        return _launch(application(main, controls, views, creator), **kwa)
 
     locs.setdefault('serve',   serve)
     locs.setdefault('launch',  launch)

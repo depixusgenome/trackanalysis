@@ -54,8 +54,8 @@ class FileDialog:
     @staticmethod
     def _setconfig(cnf):
         def _defaultpath(ret):
-            ret             = pathlib.Path(ret)
-            cnf[ret.suffix] = str(ret.absolute())
+            ret                 = pathlib.Path(ret)
+            cnf[ret.suffix[1:]] = str(ret.absolute())
         return _defaultpath
 
     def _parse_filetypes(self, info:dict):
