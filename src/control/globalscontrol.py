@@ -42,7 +42,7 @@ class _MapGetter:
     value    = property(lambda self:        self.get(),
                         lambda self, val:   self.set(val),
                         lambda self:        self.pop())
-    items    = property(lambda self:        self._ctrl.items(self._key),
+    items    = property(lambda self:        self._ctrl.items(self._base),
                         lambda self, val:   self.update(**val),
                         lambda self:        self._ctrl.pop(*self.items))
     default  = property(None,
@@ -51,26 +51,24 @@ class _MapGetter:
                         lambda self, val:   self.setdefaults(**val))
 
     _key  = ''      # type: str
+    _base = property(lambda self: (self._key[:-1] if len(self._key) else ''))
     _ctrl = None    # type: DefaultsMap
     def __init__(self, ctrl, key):
         self.__dict__.update(_ctrl = ctrl, _key = key)
-
-    def __getattr__(self, name):
-        if name[0] == '_' or name in _MapGetter.PROPS:
-            return super().__getattribute__(name)
-        elif self._key == '':
-            return _MapGetter(self.__dict__['_ctrl'], name)
-        else:
-            return _MapGetter(self.__dict__['_ctrl'], self._key+'.'+name)
 
     def __call__(self, *args, **kwargs):
         if self._key == '':
             raise TypeError("_MapGetter is not callable")
         else:
-            key = self._key
+            key = self._base
             ind = key.rfind('.')
             val = self._ctrl.get(key[:ind])
             return getattr(val, key[ind+1:])(*args, **kwargs)
+
+    def __getattr__(self, name):
+        if name[0] == '_' or name in _MapGetter.PROPS:
+            return super().__getattribute__(name)
+        return _MapGetter(self.__dict__['_ctrl'], self._key+name+'.')
 
     def __getitem__(self, name):
         if isinstance(name, (tuple, list)):
@@ -84,20 +82,15 @@ class _MapGetter:
     def __setattr__(self, name, value):
         if name[0] == '_' or name in _MapGetter.PROPS:
             return super().__setattr__(name, value)
-        elif self._key == '':
-            return self._ctrl.update((name, value))
-        else:
-            return self._ctrl.update((self._key+'.'+name, value))
+        return self._ctrl.update((self._key+name, value))
 
     __setitem__ = __setattr__
 
     def __delattr__(self, name):
         if name[0] == '_' or name in _MapGetter.PROPS:
             return super().__delattr__(name)
-        elif self._key == '':
-            return self._ctrl.pop(name)
         else:
-            return self._ctrl.pop(self._key+'.'+name)
+            return self._ctrl.pop(self._key+name)
 
     def __delitem__(self, name):
         if isinstance(name, (tuple, list)):
@@ -106,16 +99,12 @@ class _MapGetter:
             return self.pop(name)
 
     def __kwargs(self, args, kwargs):
-        key   = self._key
         items = _tokwargs(args, kwargs).items()
-        if len(key) == 0:
-            return items
-        else:
-            return ((self._key+'.'+i, j) for i, j in items)
+        return iter((self._key+i, j) for i, j in items)
 
     def setdefault(self, arg):
         u"Calls update using the current base key"
-        return self._ctrl.setdefaults((self._key, arg))
+        return self._ctrl.setdefaults((self._base, arg))
 
     def setdefaults(self, *args, version = 1, **kwargs):
         u"""
@@ -142,12 +131,12 @@ class _MapGetter:
     def get(self, *keys, default = delete):
         u"Calls get using the current base key"
         if len(keys) == 0:
-            return self._ctrl.get(self._key, default = default)
-        return self._ctrl.get(*(self._key+'.'+i for i in keys), default = default)
+            return self._ctrl.get(self._base, default = default)
+        return self._ctrl.get(*(self._key+i for i in keys), default = default)
 
     def set(self, arg):
         u"Calls update using the current base key"
-        return self._ctrl.update((self._key, arg))
+        return self._ctrl.update((self._base, arg))
 
     def update(self, *args, **kwargs):
         u"""
@@ -174,8 +163,8 @@ class _MapGetter:
     def pop(self, *keys):
         u"Calls get using the current base key"
         if len(keys) == 0:
-            return self._ctrl.pop(self._key)
-        return self._ctrl.pop(*(self._key+'.'+i for i in keys))
+            return self._ctrl.pop(self._base)
+        return self._ctrl.pop(*(self._key+i for i in keys))
 
 class DefaultsMap(Controller):
     u"Dictionnary with defaults values. It can be reset to these."
@@ -217,7 +206,7 @@ class DefaultsMap(Controller):
             if old != val:
                 ret[key] = ReturnPair(old, val)
 
-        if len(ret):
+        if len(ret) > 1:
             return self.handle(self.__name, self.outasdict, ret)
 
     def pop(self, *args):
