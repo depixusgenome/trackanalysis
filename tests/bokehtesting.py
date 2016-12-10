@@ -154,7 +154,12 @@ class _ManagedServerLoop:
 
     def quit(self):
         u"close the view"
-        self.cmd(self.ctrl.close, andstop = False)
+        def _quit():
+            loop = self.server.io_loop
+            self.server.unlisten()
+            self.ctrl.close()
+
+        self.cmd(_quit, andstop = False)
 
     def load(self, path:str):
         u"loads a path"
