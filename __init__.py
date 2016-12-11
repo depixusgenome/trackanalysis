@@ -87,10 +87,17 @@ class MetaMixin(type):
         mnames = tuple(base.__name__.lower() for base in mixins)
         nspace['_mixins'] = property(lambda self: (getattr(self, i) for i in mnames))
 
+        dummy = lambda *_1, **_2: tuple()
+
         def _callmixins(self, name, *args, **kwa):
             for mixin in getattr(self, '_mixins'):
-                getattr(mixin, name, lambda *_1, **_2: None)(*args, **kwa)
+                getattr(mixin, name, dummy)(*args, **kwa)
         nspace['_callmixins'] = _callmixins
+
+        def _yieldovermixins(self, name, *args, **kwa):
+            for mixin in getattr(self, '_mixins'):
+                yield from getattr(mixin, name, dummy)(*args, **kwa)
+        nspace['_yieldovermixins'] = _yieldovermixins
 
         return type(clsname, bases, nspace)
 
