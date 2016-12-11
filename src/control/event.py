@@ -56,7 +56,7 @@ class Event:
             try:
                 rta = fcn.__annotations__['return']
             except KeyError as exc:
-                raise KeyError("Missing emission policy") from exc
+                raise KeyError("Missing emission policy: "+str(fcn)) from exc
         elif policy is None:
             rta = fcn if fcn is None or isinstance(fcn, type) else type(fcn)
 

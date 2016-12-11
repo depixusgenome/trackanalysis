@@ -179,6 +179,30 @@ class TaskController(Controller):
             self.__items[parent].clear()
         return dict(controller = self, parent = parent)
 
+    @staticmethod
+    def __undos__():
+        u"yields all undoable user actions"
+        # pylint: disable=unused-variable
+        _1  = None
+        def _onOpenTrack(controller = _1, model = _1, **_):
+            task = model[0]
+            return lambda: controller.closeTrack(task)
+
+        def _onCloseTrack(controller = _1, model = _1, **_):
+            return lambda: controller.openTrack(model[0], model)
+
+        def _onAddTask(controller = _1, parent = _1, task = _1, **_):
+            return lambda: controller.removeTask(parent, task)
+
+        def _onUpdateTask(controller = _1, parent = _1, task = _1,  old = _1, **_):
+            return lambda: controller.updateTask(parent, task, **old)
+
+        def _onDeleteTask(controller = _1, parent = _1, task = _1,  old = _1, **_):
+            ind = old.index(task)
+            return lambda: controller.addTask(parent, task, ind)
+
+        yield from (fcn for name, fcn in locals().items() if name[:3] == '_on')
+
     def register(self, processor = None):
         u"registers a task processor"
         if processor is None:

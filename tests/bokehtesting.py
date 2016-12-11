@@ -155,7 +155,6 @@ class _ManagedServerLoop:
     def quit(self):
         u"close the view"
         def _quit():
-            loop = self.server.io_loop
             self.server.unlisten()
             self.ctrl.close()
 

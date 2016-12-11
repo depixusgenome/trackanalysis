@@ -4,7 +4,8 @@
 u"Updates app manager so as to deal with controllers"
 from control.taskcontrol    import TaskController
 from control.globalscontrol import GlobalsController
-from view.undo              import UndoView
+from undo                   import UndoController, UndoView
+
 from view.globalsview       import GlobalsView
 from .                      import setup
 

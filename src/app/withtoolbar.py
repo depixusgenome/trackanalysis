@@ -3,10 +3,13 @@
 # pylint: disable=unused-import
 u"Updates app manager so as to deal with controllers"
 from bokeh.layouts          import layout
+
 from control.taskcontrol    import TaskController
 from control.globalscontrol import GlobalsController
+
+from undo                   import UndoController, UndoView
+
 from view                   import BokehView
-from view.undo              import UndoView
 from view.globalsview       import GlobalsView
 from view.toolbar           import ToolBar
 from .                      import setup

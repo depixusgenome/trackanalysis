@@ -74,6 +74,10 @@ def _create(main, controls, views): # pylint: disable=unused-argument
         def __init__(self, **kwa):
             self.topview = kwa['topview']
 
+        def __undos__(self):
+            u"yields all undoable user actions"
+            yield from self._yieldovermixins('__undos__') # pylint: disable=no-member
+
     def __init__(self):
         u"sets up the controller, then initializes the view"
         ctrl = MainControl(handlers = dict(), topview = self)
