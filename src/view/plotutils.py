@@ -3,6 +3,7 @@
 u"Utils for dealing with the JS side of the view"
 from contextlib             import contextmanager
 from itertools              import product
+
 from bokeh.models           import Row
 from bokeh.core.properties  import Dict, String, Float
 
