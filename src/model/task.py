@@ -5,10 +5,12 @@ Classes defining a type of data treatment.
 
 **Warning** Those definitions must remain data-independant.
 """
-from typing     import Optional, Sequence # pylint: disable=unused-import
-from enum       import Enum, unique
-from utils      import toenum
-from .level     import Level
+from typing         import Optional, Sequence # pylint: disable=unused-import
+from enum           import Enum, unique
+from utils          import toenum
+from .level         import Level
+from signalfilter   import (ForwardBackwardFilter, # pylint: disable=no-name-in-module
+                            NonLinearFilter)
 
 class TaskIsUniqueError(Exception):
     u"verifies that the list contains no unique task of type task"
@@ -144,3 +146,22 @@ class FormulaTask(Task):
     def __init__(self, **kw) -> None:
         super().__init__(**kw)
         self.formula = str(kw.get('formula', ''))
+
+class SignalFilterTask(Task):
+    u"Filters time series"
+
+class ForwardBackwardFilterTask(Task, ForwardBackwardFilter):
+    u"Filters time series using the forward-backward algorithm"
+    level = Level.none
+    def __init__(self, **kwa):
+        super().__init__()
+        for name in set(self.__dict__).intersection(set(kwa)):
+            setattr(self, name, kwa[name])
+
+class NonLinearFilterTask(Task, NonLinearFilter):
+    u"Filters time series using the forward-backward algorithm"
+    level = Level.none
+    def __init__(self, **kwa):
+        super().__init__()
+        for name in set(self.__dict__).intersection(set(kwa)):
+            setattr(self, name, kwa[name])
