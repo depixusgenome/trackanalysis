@@ -55,7 +55,6 @@ class Data:
     def __init__(self):
         u''' initialise  rampData, RampModel
         '''
-
         self.rpmod = ramp.RampModel()
         self.rpmod.setMinExt(0.0)
         self.rpdata = ramp.RampData()
@@ -83,18 +82,19 @@ class Select:
         sets a Button label and a file dialog
         '''
 
-        self.select = Button(label = label)
+        self.button = Button(label = label)
         self.dial = view.dialog.FileDialog(filetypes = filetypes,
                                            title = "diag title")
 
 class MyDisplay:
     u'''
-    My personal Display
+    My display
     '''
 
     def __init__(self, data = Data(), doc = curdoc()):
         u'''create all widgets
         '''
+        print("create all widgets")
         self.data = data
         self.divs = {"good":DisplayText("good beads are : "),
                      "ugly":DisplayText("ugly beads are : "),
@@ -109,30 +109,47 @@ class MyDisplay:
 
         def tmp(attr,old,new): # pylint: disable=unused-argument
             u''' bokeh requires attr, old, new'''
+            print("in tmp")
             return self.changeminext()
 
-        self.txt_inputs["minext"].on_change(tmp)
+        self.txt_inputs["minext"].on_change("value",tmp)
 
 
         self.sel = {"rpfile":Select(label = "Select file", filetypes = "trk")}
-        self.sel["rpfile"].select.on_click(self.change_data_file)
+        self.sel["rpfile"].button.on_click(self.change_data_file)
 
         self.doc = doc
-
+        print("done up to here")
         self.set_mylayout()
 
     def set_mylayout(self):
         u''' specific layout of widgets
         '''
         docrows = []
-        docrows.append(widgetbox(self.sel["rpfile"]))
-        docrows.append(self.divs["good"])
-        docrows.append(self.divs["ugly"])
+        docrows.append(widgetbox(self.sel["rpfile"].button))
+        docrows.append(self.divs["good"].div)
+        docrows.append(self.divs["ugly"].div)
         docrows.append(widgetbox(self.txt_inputs["minext"]))
-        docrows.append(self.divs["fixed"])
+        docrows.append(self.divs["fixed"].div)
         # docrows.append(row(column(fightop,tableop), column(fightcl,tablecl)) )
-        docrows.append(row(column(self.hists["zmop"]), column(self.hists["zmcl"])) )
-        self.doc().add_root(column(*docrows))
+        docrows.append(row(column(self.hists["zmop"].fig), column(self.hists["zmcl"].fig)) )
+        self.doc.add_root(column(*docrows))
+
+
+    def get_mylayout(self):
+        u'''
+        returns docrows
+        '''
+        docrows = []
+        docrows.append(widgetbox(self.sel["rpfile"].button))
+        docrows.append(self.divs["good"].div)
+        docrows.append(self.divs["ugly"].div)
+        docrows.append(widgetbox(self.txt_inputs["minext"]))
+        docrows.append(self.divs["fixed"].div)
+        # docrows.append(row(column(fightop,tableop), column(fightcl,tablecl)) )
+        docrows.append(row(column(self.hists["zmop"].fig), column(self.hists["zmcl"].fig)) )
+
+        return docrows
 
     def changeminext(self):
         u'''
@@ -160,7 +177,6 @@ class MyDisplay:
         '''
 
         return self.doc
-
 
     def _update_rpdata_from_file(self,filename:str)->None:
         print("in _update_rpdata_from_file")
@@ -207,4 +223,23 @@ class MyDisplay:
         #tcldata.data = {"quantiles":quantiles,
         #                "zmag":[round(zmcseries.quantile(i),2) for i  in quantiles]}
         print("out _update_zmag_info")
+
+
+print("__name__=",__name__)
+if __name__=="__main__":
+    doc = MyDisplay().open()
+    docrows = MyDisplay(doc = curdoc()).get_mylayout()
+    curdoc().add_root(column(*docrows))
+    data = Data()
+    data.update_data("/home/david/work/trackanalysis/tests/testdata/ramp_5HPs_mix.trk")
+    display = MyDisplay(data = data, doc = curdoc())
+    docrows = display.get_mylayout()
+
+
+else:
+    data = Data()
+    data.update_data("/home/david/work/trackanalysis/tests/testdata/ramp_5HPs_mix.trk")
+    display = MyDisplay(data = data, doc = curdoc())
+    docrows = display.get_mylayout()
+
 
