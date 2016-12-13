@@ -4,10 +4,11 @@
 namespace signalfilter
 {
     template<typename T, void (*run)(T, size_t, float*)>
-    void _run(T const & self, pybind11::array_t<float> input)
+    pybind11::array & _run(T const & self, pybind11::array_t<float> & input)
     {
-        auto buf = input.request(true);
+        auto buf = input.request();
         (*run)(self, buf.size, (float*) buf.ptr);
+        return input;
     }
 
     namespace forwardbackward
@@ -15,6 +16,7 @@ namespace signalfilter
         void pymodule(pybind11::module & mod)
         {
             pybind11::class_<Args>(mod,"ForwardBackwardFilter")
+                .def(pybind11::init<>())
                 .def_readwrite("derivate",      &Args::derivate)
                 .def_readwrite("normalize",     &Args::normalize)
                 .def_readwrite("precision",     &Args::precision)
@@ -31,6 +33,7 @@ namespace signalfilter
         void pymodule(pybind11::module & mod)
         {
             pybind11::class_<Args>(mod, "NonLinearFilter")
+                .def(pybind11::init<>())
                 .def_readwrite("derivate",      &Args::derivate)
                 .def_readwrite("precision",     &Args::precision)
                 .def_readwrite("power",         &Args::power)
