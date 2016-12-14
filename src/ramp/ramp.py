@@ -25,6 +25,7 @@ class RampModel:
     def setMinExt(self,value):
         u'''
         set _minExt
+        if _minExt is changed call controller and apply changes in RampData
         '''
         self._minExt = value
 
@@ -50,38 +51,44 @@ class RampController:
 
 class RampData:
     u'''sets up ramp analysis using RampModel for parametrisation'''
-    def __init__(self, datf:pd.DataFrame, model:RampModel) -> None:
-        self.dataz = datf
-        self.model = model
+
+    def __init__(self, **kwargs) -> None:
+        self.dataz = kwargs.get("data", None)
+        self.model = kwargs.get("model", None)
         self.dzdt = None # type: Optional[pd.DataFrame]
         self.bcids = None # type: Set[Tuple[int,int]]
         self.beads = None # type: Set[int]
         self.ncycles = None # type: int
-        self._setup()
+        self.det = None # type: Optional[pd.DataFrame]
+        if self.dataz is not None :
+            self._setup()
+            if self.model is not None :
+                self.det = detectOutliers(self.dzdt,self.model.scale)
 
     @classmethod
     def openTrack(cls,trk,model:RampModel):
         u''' creates ramp from track
         '''
-        if isinstance(trk,str):
-            trkd = Track(path = trk)
-        else:
-            trkd = trk
+        trkd = Track(path = trk) if isinstance(trk,str) else trk
+        return cls(data = pd.DataFrame({k:pd.Series(v) for k, v in dict(trkd.cycles).items()})
+                   , model = model)
 
-        datf = pd.DataFrame({k:pd.Series(v) for k, v in dict(trkd.cycles).items()})
-        return cls(datf, model)
+
+    def setTrack(self,trk):
+        u'''
+        changes the data using trk
+        '''
+        trkd = Track(path = trk) if isinstance(trk,str) else trk
+        self.dataz = pd.DataFrame({k:pd.Series(v) for k, v in dict(trkd.cycles).items()})
+        self._setup()
+        if self.model is not None :
+            self.det = detectOutliers(self.dzdt,self.model.scale)
 
     def _setup(self):
         self.dzdt = self.dataz.rename_axis(lambda x:x-1)-self.dataz.rename_axis(lambda x:x+1)
         self.bcids = {k for k in self.dzdt.keys() if isinstance(k[0], int)}
         self.beads = {i[0] for i in self.bcids}
         self.ncycles = max(i[1] for i in self.bcids) +1
-        if self.model.needsCleaning:
-            self.model.needsCleaning = False
-            self.stripBadBeads()
-
-        self.det = detectOutliers(self.dzdt,self.model.scale)
-
 
     def zmagClose(self, reverse_time:bool = False):
         u'''estimate value of zmag to close the hairpin'''
@@ -132,6 +139,7 @@ class RampData:
         keys += list(self.bcids)
         self.dataz = self.dataz[keys]
         self.dzdt = self.dzdt[keys]
+        self.det = detectOutliers(self.dzdt,self.model.scale)
 
 
     def getGoodBeadIds(self)->set:
@@ -146,7 +154,7 @@ class RampData:
 
         return {i for i in self.beads if i not in todel}
 
-    def stripBadBeads(self):
+    def clean(self):
         u'''good beads open and close with zmag
         '''
         gids = self.getGoodBeadIds()
@@ -257,3 +265,22 @@ def fixedBeadIds():
     # corr=self.dataz.corr()>self.model.corrThreshold
     # need more conditions to qualify as fixed bead
     pass
+
+
+def can_be_structure_event(dzdt,detected):
+    u'''
+    args : dzdt and detected (output of detect_outliers(dzdt))
+    '''
+    # find when rezipping starts
+    st_rezip = dzdt[dzdt[detected]<0].apply(lambda x: x.first_valid_index())
+    # find when rezipping stops
+    ed_rezip = dzdt[dzdt[detected]<0].apply(lambda x: x.last_valid_index())
+    # create a map :
+    # If not detected by the sanitising algorithm,
+    # after z_closing (first dzdt[detected]>0,
+    # and before last dzdt[detected]<0
+    canbe_se = ~detected&dzdt.apply(
+        lambda x:x.index>(st_rezip[x.name]))&dzdt.apply(lambda x:x.index<(ed_rezip[x.name]))
+
+    return canbe_se
+
