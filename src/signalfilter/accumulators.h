@@ -2,6 +2,16 @@
 #include <boost/accumulators/accumulators.hpp>
 #include <valarray>
 
+namespace boost { namespace accumulators { namespace tag {
+    struct mediandeviation;
+    struct rolling_min;
+    struct rolling_argmin;
+    struct rolling_max;
+    struct rolling_argmax;
+    struct exact_median;
+    struct approx_median;
+}}}
+
 namespace signalfilter { namespace stats
 {
     namespace ba  = boost::accumulators;
