@@ -91,11 +91,15 @@ class MyDisplay:
     My display
     '''
 
-    def __init__(self, data = Data(), doc = curdoc()):
+    def __init__(self, *args, **kwargs): # pylint: disable=unused-argument
         u'''create all widgets
         '''
-        print("create all widgets")
-        self.data = data
+        self.data = kwargs.get("data", None)
+        self.doc = kwargs.get("doc", None)
+        if self.data is None:
+            self.data = Data()
+        if self.doc is None:
+            self.doc = curdoc()
         self.divs = {"good":DisplayText("good beads are : "),
                      "ugly":DisplayText("ugly beads are : "),
                      "fixed":DisplayText("fixed beads are : ")}
@@ -109,7 +113,6 @@ class MyDisplay:
 
         def tmp(attr,old,new): # pylint: disable=unused-argument
             u''' bokeh requires attr, old, new'''
-            print("in tmp")
             return self.changeminext()
 
         self.txt_inputs["minext"].on_change("value",tmp)
@@ -118,8 +121,6 @@ class MyDisplay:
         self.sel = {"rpfile":Select(label = "Select file", filetypes = "trk")}
         self.sel["rpfile"].button.on_click(self.change_data_file)
 
-        self.doc = doc
-        print("done up to here")
         self.set_mylayout()
 
     def set_mylayout(self):
@@ -155,7 +156,6 @@ class MyDisplay:
         u'''
         Called when minimal extension value is changed
         '''
-        print("changing min mol extension")
         self.data.rpmod.setMinExt(float(self.txt_inputs["minext"].value))
         fixed =  {} if self.data.rpfulldata is None\
                  else self.data.rpfulldata.getFixedBeadIds()
@@ -171,23 +171,21 @@ class MyDisplay:
         self._update_text_info()
         self._update_zmag_info()
 
-    def open(self):
+    @classmethod
+    def open(cls,doc):
         u'''
-        returns the Bokeh doc
+        returns a bokeh doc view a set up layout
         '''
-
+        self = cls(doc = doc)
         return self.doc
 
     def _update_rpdata_from_file(self,filename:str)->None:
-        print("in _update_rpdata_from_file")
         self.data.rpdata.setTrack(filename)
         self.data.rpdata.clean()
         self.data.rpfulldata.setTrack(filename)
-        print("out _update_rpdata_from_file")
 
 
     def _update_text_info(self):
-        print ("in _update_text_info")
         good = {} if self.data.rpfulldata is None\
                   else self.data.rpfulldata.getGoodBeadIds()
         ugly = {} if self.data.rpfulldata is None\
@@ -197,11 +195,9 @@ class MyDisplay:
         self.divs["good"].update(good)
         self.divs["ugly"].update(ugly)
         self.divs["fixed"].update(fixed)
-        print ("out _update_text_info")
 
 
     def _update_zmag_info(self):
-        print("in _update_zmag_info")
         #global topdata, tcldata, src_fightop, src_fightcl
         zmagop = pd.DataFrame() if self.data.rpdata is \
                  None else self.data.rpdata.zmagOpen()
@@ -225,21 +221,12 @@ class MyDisplay:
         print("out _update_zmag_info")
 
 
-print("__name__=",__name__)
 if __name__=="__main__":
-    doc = MyDisplay().open()
-    docrows = MyDisplay(doc = curdoc()).get_mylayout()
-    curdoc().add_root(column(*docrows))
-    data = Data()
-    data.update_data("/home/david/work/trackanalysis/tests/testdata/ramp_5HPs_mix.trk")
-    display = MyDisplay(data = data, doc = curdoc())
-    docrows = display.get_mylayout()
-
-
-else:
-    data = Data()
-    data.update_data("/home/david/work/trackanalysis/tests/testdata/ramp_5HPs_mix.trk")
-    display = MyDisplay(data = data, doc = curdoc())
-    docrows = display.get_mylayout()
-
+    BOKEHDOC = MyDisplay().open(curdoc())
+    ROWS = MyDisplay(doc = curdoc()).get_mylayout()
+    curdoc().add_root(column(*ROWS))
+    RPDATA = Data()
+    RPDATA.update_data("/home/david/work/trackanalysis/tests/testdata/ramp_5HPs_mix.trk")
+    DISPLAY = MyDisplay(data = RPDATA, doc = curdoc())
+    ROWS = DISPLAY.get_mylayout()
 

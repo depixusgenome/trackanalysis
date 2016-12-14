@@ -224,6 +224,13 @@ class RampData:
 
 def _isGoodBead(dzdt:pd.Series,scale:int):
     u'''test a single bead over a single cycle'''
+    return _isGooddzdt(dzdt,scale)
+
+
+def _isGooddzdt(dzdt:pd.Series,scale:int):
+    u'''
+    tests whether a bead opens and close using only information on dzdt
+    '''
     det = detectOutliers(dzdt,scale)
     # at least one opening and closing
     if not (any(dzdt[det]>0) and any(dzdt[det]<0)):
@@ -235,6 +242,12 @@ def _isGoodBead(dzdt:pd.Series,scale:int):
 
     return not any((negids-lposid)<0)
 
+def isGoodBeadCycle(dzdt:pd.Series, scale:int, phase3time:float):
+    u'''
+    returns a pd.DataFrame which is a boolean applicable to data.dataz
+    '''
+    print("need to implement test on ", phase3time)
+    return _isGooddzdt(dzdt,scale)
 
 def detectOutliers(dzdt,scale:int):
     u'''detects opening and closing '''
