@@ -196,13 +196,8 @@ namespace legacy { namespace { // ds
     [[noreturn]] void xvin_ptr_error(char const *) { throw ErrorInFile(); }
     [[noreturn]] void error_in_file( char *, ...) { throw ErrorInFile(); }
 
-    int     *data_color;
-    int     max_data_color;
-    /*
-# include "color.h"
-    int     data_color[] = {Yellow, Lightgreen, Lightred, Lightblue};
+    int     data_color[4] =  {Yellow, Lightgreen, Lightred, Lightblue};
     int     max_data_color = 4;
-    */
 
     struct plot_label
     {
@@ -992,14 +987,7 @@ namespace legacy { namespace { // ds
     }
 }}
 
-namespace legacy { namespace {
-    struct IFile
-    {
-        int n_line;
-        char const * filename;
-        FILE *fpi;
-    };
-
+namespace legacy {
     struct one_plot
     {
         int type;
@@ -1030,8 +1018,20 @@ namespace legacy { namespace {
         int user_ispare[16];
         float user_fspare[16];
     };
+}
 
-    int add_data_to_one_plot (one_plot *op, int type, void *stuff)
+namespace legacy { namespace {
+    constexpr int I_F_SIZE = 256;
+    struct
+    {
+        int n_line;
+        char const * filename;
+        FILE *fpi;
+    } i_f[I_F_SIZE];
+    int cur_i_f = 0;
+
+
+    int add_one_plot_data (one_plot *op, int type, void *stuff)
     {
         int i = 0;
         data_set *ds;
@@ -1114,11 +1114,6 @@ namespace legacy { namespace {
         return i;
     }
 
-    int add_one_plot_data (one_plot *op, int type, void *stuff)
-    {
-        return add_data_to_one_plot (op, type, stuff);
-    }
-
     int init_data_set(one_plot *op)
     {
         data_set *ds;
@@ -1172,7 +1167,7 @@ namespace legacy { namespace {
         return 0;
     }
 
-    char *get_next_line(IFile & ifile, char *line)
+    char *get_next_line(char *line)
     {
         char *c = NULL;
         int get_out = 0;
@@ -1180,8 +1175,8 @@ namespace legacy { namespace {
         do
         {
             get_out = 0;
-            ifile.n_line++;
-            c = fgets(line,B_LINE,ifile.fpi);
+            i_f[cur_i_f].n_line++;
+            c = fgets(line,B_LINE,i_f[cur_i_f].fpi);
             if ( c == NULL)			get_out = 0;
             else if (strlen(c) == 1)	// added 2005-10-04, to compensate from MacOS behavior
                 {	if (c[0]==10) 	get_out = 1;	// only if a blank line is encountered we continue
@@ -1192,7 +1187,7 @@ namespace legacy { namespace {
         return(c); 
     }
 
-    int get_label(IFile & ifile, char **c1, char **c2, char *line)
+    int get_label(char **c1, char **c2, char *line)
     {
         register int j = 0;
         int  k = 0, out_loop = 1;
@@ -1205,7 +1200,7 @@ namespace legacy { namespace {
         {
             if((*c1)[j] == 0)	/* label extend to next line */
             {
-                if (((*c1) = get_next_line(ifile, line)) == NULL )
+                if (((*c1) = get_next_line(line)) == NULL )
                 {
                     error_in_file("EOF reached before label ended");
                     k = -1;
@@ -1535,7 +1530,7 @@ namespace legacy { namespace {
         op->iopt2 |= Y_LIM;
         return 2;
     }
-    int set_plot_opts(IFile & ifile, one_plot *op, int argc, char **argv, char *line, int check)
+    int set_plot_opts(one_plot *op, int argc, char **argv, char *line, int check)
     {
         char file_name[66], *cmd, *tmpch;
         float templ, temp1;
@@ -1562,7 +1557,7 @@ namespace legacy { namespace {
                     if (!gr_numbi(&n_item, &argc, &argv))   break;
 
                     if (check == 0)
-                        push_bin_float_data_z(op, ifile.filename, offset, n_item);
+                        push_bin_float_data_z(op, i_f[cur_i_f].filename, offset, n_item);
                 }
                 else if ( argv[0][1] == 'b' && argv[0][2] == 'f'  )
                 {
@@ -1602,16 +1597,21 @@ namespace legacy { namespace {
                 {
                     argc--;
                     argv++;
-                    if (plt_data_path[0] != 0)
-                        snprintf(file_name, sizeof(file_name), "%s%s", plt_data_path, argv[0]);
-                    else snprintf(file_name, sizeof(file_name), "%s", argv[0]);
-                    ifile.n_line = 0;
-                    ifile.filename = strdup(file_name);
-                    ifile.fpi = fopen(ifile.filename, "r");
-                    if ( ifile.fpi == NULL)
+                    cur_i_f++;
+                    if (cur_i_f < I_F_SIZE)
                     {
-                        error_in_file("cannot open file\n %s", ifile.filename);
-                        return MAX_ERROR;
+                        if (plt_data_path[0] != 0)
+                            snprintf(file_name, sizeof(file_name), "%s%s", plt_data_path, argv[0]);
+                        else snprintf(file_name, sizeof(file_name), "%s", argv[0]);
+                        i_f[cur_i_f].n_line = 0;
+                        i_f[cur_i_f].filename = strdup(file_name);
+                        i_f[cur_i_f].fpi = fopen(i_f[cur_i_f].filename, "r");
+                        if ( i_f[cur_i_f].fpi == NULL)
+                            error_in_file("cannot open file\n %s", i_f[cur_i_f].filename);
+                    }
+                    else
+                    {
+                        error_in_file("I cannot handle more\nthan %d nested files", I_F_SIZE);
                     }
                 }
                 break;
@@ -1624,7 +1624,7 @@ namespace legacy { namespace {
                     if (!gr_numbi(&n_item, &argc, &argv))   break;
 
                     if (check == 0)
-                        push_bin_float_error_z(op, ifile.filename, offset, n_item, X_AXIS);
+                        push_bin_float_error_z(op, i_f[cur_i_f].filename, offset, n_item, X_AXIS);
                 }
                 if ( argv[0][1] == 'y' && argv[0][2] == 'b' && argv[0][3] == 'f' && argv[0][4] == 'z')
                 {
@@ -1632,7 +1632,7 @@ namespace legacy { namespace {
                     if (!gr_numbi(&n_item, &argc, &argv))   break;
 
                     if (check == 0)
-                        push_bin_float_error_z(op, ifile.filename, offset, n_item, Y_AXIS);
+                        push_bin_float_error_z(op, i_f[cur_i_f].filename, offset, n_item, Y_AXIS);
                 }
 
 
@@ -2397,7 +2397,7 @@ namespace legacy { namespace {
         //setlocale(LC_ALL, "C");
 
         if (op == NULL)    return MAX_ERROR;
-        absf = n_error =  0;
+        absf = cur_i_f = n_error =  0;
         counter = 0;
         abslow = 0;
         dx = 1;
@@ -2410,11 +2410,10 @@ namespace legacy { namespace {
         }
 
 
-        IFile ifile;
-        ifile.n_line = 0;
-        ifile.filename = file_name;
-        ifile.fpi = fopen(file_name, "r");
-        if ( ifile.fpi == NULL)
+        i_f[cur_i_f].n_line = 0;
+        i_f[cur_i_f].filename = file_name;
+        i_f[cur_i_f].fpi = fopen(file_name, "r");
+        if ( i_f[cur_i_f].fpi == NULL)
         {
             error_in_file("cannot open file\n");
             return MAX_ERROR;
@@ -2433,10 +2432,12 @@ namespace legacy { namespace {
 
         while (load_abort < MAX_ERROR && total_line_read <= check)
         {
-            while ((c1 = get_next_line(ifile, line)) == NULL)
+            while ((c1 = get_next_line(line)) == NULL && (cur_i_f > 0))
             {
-                if (ifile.fpi != NULL)
-                    fclose(ifile.fpi);
+                if (i_f[cur_i_f].fpi != NULL)
+                    fclose(i_f[cur_i_f].fpi);
+                i_f[cur_i_f].fpi = NULL;
+                cur_i_f--;
             }
 
             if (check)    total_line_read++;
@@ -2456,7 +2457,7 @@ namespace legacy { namespace {
                 {
                     c1 = strchr(line, '"');
                     c2 = line1;
-                    j = get_label(ifile, &c1, &c2, line);
+                    j = get_label(&c1, &c2, line);
                 }
                 else
                 {
@@ -2536,7 +2537,7 @@ namespace legacy { namespace {
                     {
                         c2 = line1;
                         c2[0] = 0;
-                        if (get_label(ifile, &c1, &c2, line))
+                        if (get_label(&c1, &c2, line))
                         {
                             agvk[agc] = agv[agc] = strdup(c2);
                             agc++;
@@ -2554,7 +2555,7 @@ namespace legacy { namespace {
                 }
                 if (agc > 1)
                 {
-                    if (set_plot_opts(ifile, op, agc, agv, line, check) == MAX_ERROR)
+                    if (set_plot_opts(op, agc, agv, line, check) == MAX_ERROR)
                         load_abort = MAX_ERROR;
                 }
                 for (k = 0 ; k < agc ; k++)
@@ -2569,6 +2570,12 @@ namespace legacy { namespace {
         if (line1) free(line1);
         if (agv) free(agv);
         if (agvk) free(agvk);
+        while ( cur_i_f >= 0 )
+        {
+            if (i_f[cur_i_f].fpi != NULL)     fclose( i_f[cur_i_f].fpi);
+            //if (i_f[cur_i_f].filename != NULL)    free(i_f[cur_i_f].filename);
+            cur_i_f--;
+        }
         if (check == 0)
         {
             for (i = 0, j = 1, op->c_xu = 0; i < op->n_xu && j != 0 ; i++)
@@ -2601,33 +2608,56 @@ namespace legacy { namespace {
         }
         return n_error;
     }
+
+    data_set* create_and_attach_one_ds(one_plot *op,int nx, int ny, int)
+    {
+        data_set *ds;
+        if ( op == NULL || nx <= 0 || ny <= 0)
+            xvin_ptr_error(Out_Of_Memory);
+        ds = build_data_set(nx, ny);
+        if (ds == NULL)	
+            xvin_ptr_error(Out_Of_Memory);
+        ds->nx = nx;	ds->ny = ny;
+        if (add_one_plot_data(op, IS_DATA_SET, (void*)ds))
+            xvin_ptr_error(Out_Of_Memory);
+        op->cur_dat = op->n_dat - 1;
+        op->need_to_refresh = 1;
+        return ds;
+    }
 }}
 
 namespace legacy
 {
-    GrData readgr(std::string fname)
+    GrData::GrData(std::string fname)
+        : _op((one_plot *)calloc(1, sizeof(one_plot)))
     {
-        one_plot * op = (one_plot *)calloc(1, sizeof(one_plot));
-        init_one_plot(op);
-        pltreadfile(op, fname.c_str(), 0);
+        init_one_plot(_op);
 
-        GrData result;
-        if(op->title != nullptr)
-            result.title = op->title;
-        for (int i = 0; i< op->n_dat ; i++)
+        auto ds = create_and_attach_one_ds(_op, GR_SIZE, GR_SIZE, 0);
+        ds->nx = ds->ny = 0;
+        try { pltreadfile(_op, fname.c_str(), 0); }
+        catch(...) 
         {
-            DsData ds;
-            ds.xd.resize(op->dat[i]->nx);
-            for(int k = 0; k < op->dat[i]->nx; ++k)
-                ds.xd[k] = op->dat[i]->xd[i];
-            ds.yd.resize(op->dat[i]->ny);
-            for(int k = 0; k < op->dat[i]->ny; ++k)
-                ds.yd[k] = op->dat[i]->yd[i];
-            if(op->title != nullptr)
-                ds.title = op->dat[i]->source;
-            result.items.emplace_back(ds);
+            free_one_plot(_op);
+            _op = nullptr;
+            return;
         }
-        free_one_plot(op);
-        return result;
     }
+
+    std::string GrData::title() const
+    { return _op == nullptr || _op->title == nullptr ? "" : _op->title; }
+
+    std::string GrData::title(size_t i) const
+    { return i >= size() ? "" : _op->dat[i]->source; }
+
+    size_t      GrData::size() const
+    { return _op == nullptr ? 0 : _op->n_dat; }
+
+    size_t      GrData::size(bool isx, size_t i) const
+    { return i >= size() ? 0 : (isx ? _op->dat[i]->nx : _op->dat[i]->ny); }
+
+    float*      GrData::data(bool isx, size_t i) const
+    { return i >= size() ? nullptr : (isx ? _op->dat[i]->xd : _op->dat[i]->yd); }
+
+    GrData::~GrData() { if(_op != nullptr) free_one_plot(_op); }
 }

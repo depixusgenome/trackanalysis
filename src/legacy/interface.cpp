@@ -1,9 +1,10 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include "legacy/legacyrecord.h"
+#include "legacy/legacygr.h"
 namespace legacy
 {
-    pybind11::object _open(std::string name, bool notall = true)
+    pybind11::object _readtrack(std::string name, bool notall = true)
     {
         legacy::GenRecord   rec(name);
         if((notall && rec.ncycles() <= 4) || rec.ncycles() == 0)
@@ -41,13 +42,32 @@ namespace legacy
         res["cycles"]          = pybind11::array(shape, strides, 
                                                  cycles.data()+(notall ? 3*rec.nphases() : 0));
         return res;
-    };
+    }
+
+    pybind11::object _readgr(std::string name)
+    {
+        GrData gr(name);
+        if(gr.isnone())
+            return pybind11::none();
+        pybind11::dict res;
+        res["title"] = pybind11::cast(gr.title());
+
+        auto get = [&](bool isx, size_t i)
+                    { return pybind11::array(gr.size(isx, i), gr.data(isx, i)); };
+
+        for(size_t i = 0; i < gr.size(); ++i)
+            res[pybind11::cast(gr.title(i))] = pybind11::make_tuple(get(true, i),
+                                                                    get(false, i));
+        return res;
+    }
 
     void pymodule(pybind11::module & mod)
     {
         using namespace pybind11::literals;
-        mod.def("readtrack", _open, "path"_a, "clipcycles"_a = true,
-                "Reads a trackfile and returns a dictionnary of beads,\n"
+        mod.def("readtrack", _readtrack, "path"_a, "clipcycles"_a = true,
+                "Reads a '.trk' file and returns a dictionnary of beads,\n"
                 "possibly removing the first 3 cycles and the last one");
+        mod.def("readgr", _readgr, "path"_a,
+                "Reads a '.gr' file and returns a dictionnary of datasets");
     }
 }

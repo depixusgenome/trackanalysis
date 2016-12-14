@@ -2,8 +2,28 @@
 # -*- coding: utf-8 -*-
 u""" Tests legacy data """
 
-from legacy     import readtrack   # pylint: disable=import-error,no-name-in-module
+from legacy     import readtrack, readgr # pylint: disable=import-error,no-name-in-module
 from testdata   import path
+
+def test_opengr():
+    u"test a .gr file"
+    ret = readgr(path("grfile.gr"))
+    assert ret['title'] == ('\\stack{{Bead 0 Z(t) 10}'
+                            +'{\\pt7 Cycles:[3,104] phase(s) [1,2,3,4,5,6,7]}}')
+    assert len(ret) == 101
+    key = ('Bead Cycle 95 phase(s): [1,2,3,4,5,6,7] '
+           +'tracking at xx Hz Acquistion 10 for bead 0 \n'
+           +' Z coordinate l = xx, w = xx, nim = xx\n')
+    assert len(ret[key]) == 2
+    assert len(ret[key][0]) == 448
+    assert len(ret[key][1]) == 448
+    assert str(ret[key][0].dtype) == 'float32'
+    assert str(ret[key][1].dtype) == 'float32'
+
+def test_opengr_bugged():
+    u"tests opening incorrect or missing grs"
+    assert readgr("does_not_exist.gr") is None
+    assert readgr(path("small_legacy")) is None
 
 def test_opentrack_big():
     u"test a big track file"
@@ -31,7 +51,7 @@ def test_opentrack_small():
     assert (frozenset(x for x in trk if isinstance(x, int))
             == frozenset([x for x in range(92)]))
 
-def test_opentrack_missing():
-    u"test a missing track file"
-    trk  = readtrack("___non__existant__track.trk")
-    assert trk is None
+def test_opentrack_bugged():
+    u"tests opening incorrect or missing trks"
+    assert readtrack("does_not_exist.trk") is None
+    assert readtrack(path("grfile.gr")) is None

@@ -1,20 +1,19 @@
 #pragma once
-#include <vector>
 #include <string>
 namespace legacy
 {
-    struct DsData
-    {
-        std::string        title;
-        std::vector<float> xd;
-        std::vector<float> yd;
-    };
-
+    struct one_plot;
     struct GrData
     {
-        std::string         title;
-        std::vector<DsData> items;
+        GrData(std::string fname);
+        ~GrData();
+        bool        isnone()            const { return _op == nullptr; }
+        std::string title()             const;
+        std::string title(size_t)       const;
+        size_t      size ()             const;
+        size_t      size (bool, size_t) const;
+        float *     data (bool, size_t) const;
+        private:
+            one_plot *_op;
     };
-
-    GrData readgr(std::string fname);
 }
