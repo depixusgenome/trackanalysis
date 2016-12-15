@@ -88,8 +88,9 @@ class Plotter:
         raise NotImplementedError("need to create")
 
     def _figargs(self):
-        return dict(tools       = self.getConfig().tools.get(),
-                    sizing_mode = 'stretch_both')
+        return dict(tools          = self.getConfig().tools.get(),
+                    toolbar_sticky = False,
+                    sizing_mode    = 'stretch_both')
 
     def setbounds(self, rng, axis, arr):
         u"Sets the range boundaries"
