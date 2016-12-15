@@ -1,31 +1,10 @@
-name: trackenv
+name: trackanalysis
 channels: !!python/tuple
 - defaults
 dependencies:
 - bokeh=0.12.3=py35_0
+- click=6.6=py35_0
 - conda-forge::flexx=0.4.1=py35_0
+- conda-forge::pandas=0.19.1=np111py35_0
 - fklab::pybind11=1.9a1=py35_0
-- jinja2=2.8=py35_1
-- markupsafe=0.23=py35_2
-- mkl=11.3.3=0
-- numpy=1.11.2=py35_0
-- openssl=1.0.2j=0
-- pandas=0.19.1=np111py35_0
-- pip=9.0.1=py35_1
 - python=3.5.2=0
-- python-dateutil=2.6.0=py35_0
-- pytz=2016.10=py35_0
-- pyyaml=3.12=py35_0
-- readline=6.2=2
-- requests=2.12.3=py35_0
-- setuptools=27.2.0=py35_0
-- six=1.10.0=py35_0
-- sqlite=3.13.0=0
-- tk=8.5.18=0
-- tornado=4.4.2=py35_0
-- wheel=0.29.0=py35_0
-- xz=5.2.2=0
-- yaml=0.1.6=0
-- zlib=1.2.8=3
-prefix: /home/david/miniconda3/envs/trackenv
-
