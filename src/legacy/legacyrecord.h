@@ -23,7 +23,8 @@ namespace legacy
             close();
             char tmp[2048];
             strncpy(tmp, x.c_str(), sizeof(tmp));
-            _ptr = load(tmp);
+            _ptr  = load(tmp);
+            _name = x;
         }
 
         void close()
@@ -36,25 +37,34 @@ namespace legacy
         size_t ncycles  () const;
         size_t nphases  () const;
         bool   islost(int i) const;
-        void   cycles(int *)           const;
+        void   cycles(int *)            const;
         void   t     (int *)            const;
         void   zmag  (float *)          const;
+        void   rot   (float *)          const;
+        void   pos   (float *)          const;
         void   bead  (size_t, float *)  const;
         void   cycles(std::vector<int>    & x) const { x.resize(nphases()*ncycles()); cycles(x.data()); }
         void   t     (std::vector<int>    & x) const { x.resize(nrecs());   t     (x.data()); }
         void   zmag  (std::vector<float>  & x) const { x.resize(nrecs());   zmag  (x.data()); }
+        void   rot   (std::vector<float>  & x) const { x.resize(nrecs());   rot   (x.data()); }
+        void   pos   (std::vector<float>  & x) const { x.resize(nbeads()*2);pos   (x.data()); }
         void   bead  (size_t i, std::vector<float> & x) const
         { x.resize(nrecs()); bead(i, x.data()); }
 
-        std::vector<float>  bead  (size_t i) const { decltype(bead(0))  x; bead(i, x);  return x; }
-        std::vector<float>  zmag  ()         const { decltype(zmag())   x; zmag(x);     return x; }
         std::vector<int  >  t     ()         const { decltype(t   ())   x; t   (x);     return x; }
+        std::vector<float>  zmag  ()         const { decltype(zmag())   x; zmag(x);     return x; }
+        std::vector<float>  rot   ()         const { decltype(rot ())   x; rot (x);     return x; }
+        std::vector<float>  pos   ()         const { decltype(pos ())   x; pos (x);     return x; }
+        std::vector<float>  bead  (size_t i) const { decltype(bead(0))  x; bead(i, x);  return x; }
         std::vector<int>    cycles()         const { decltype(cycles()) x; cycles(x);   return x; }
 
         float  camerafrequency() const;
 
         private:
-            gen_record * _ptr = nullptr;
+            template <typename T>
+            void _get(T **, T, T, T *) const;
+            gen_record *        _ptr = nullptr;
+            std::string         _name;
     };
 
     struct TrackIOException: public std::exception

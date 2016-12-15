@@ -44,6 +44,19 @@ namespace legacy
         return res;
     }
 
+    pybind11::object _readtrackrotation(std::string name)
+    {
+        legacy::GenRecord   rec(name);
+        if(rec.ncycles() == 0)
+            return pybind11::none();
+
+        auto cycles = rec.cycles();
+        auto first  = cycles[3*rec.nphases()];
+        auto last   = cycles[cycles.size()-rec.nphases()];
+        auto mem    = rec.rot();
+        return pybind11::array(last-first, mem.data()+first);
+    }
+
     pybind11::object _readgr(std::string name)
     {
         GrData gr(name);
@@ -67,6 +80,8 @@ namespace legacy
         mod.def("readtrack", _readtrack, "path"_a, "clipcycles"_a = true,
                 "Reads a '.trk' file and returns a dictionnary of beads,\n"
                 "possibly removing the first 3 cycles and the last one");
+        mod.def("readtrackrotation", _readtrackrotation, "path"_a,
+                "Reads a '.trk' file's rotation");
         mod.def("readgr", _readgr, "path"_a,
                 "Reads a '.gr' file and returns a dictionnary of datasets");
     }

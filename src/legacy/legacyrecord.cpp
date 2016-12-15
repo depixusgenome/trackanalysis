@@ -7,6 +7,8 @@
 # undef min
 #endif
 
+#include <regex>
+#include <fstream>
 #include <cstdlib>
 #include <cstdio>
 #include <cmath>
@@ -4636,39 +4638,63 @@ namespace legacy
             }
     }
 
-    void   GenRecord::t     (int  * dt)  const
+    template <typename T>
+    void GenRecord::_get(T ** ptr, T corr, T bias, T * out) const
     {
         if(_ptr == nullptr)
             return;
-        size_t               psz  = size_t(_ptr->page_size);
-        int const * const *tptr = _ptr->imi;
-        int i0 = tptr[0][0];
-        for(size_t i = 0, e = nrecs(); i < e; i += psz, dt += psz, ++tptr)
-            for(size_t k = 0, ke = i+psz > e ? e-i : psz; k < ke; ++k)
-                dt[k] = tptr[0][k]-i0;
+        size_t psz  = size_t(_ptr->page_size);
+#           define ITER(CODE)                                                   \
+            for(size_t i = 0, e = nrecs(); i < e; i += psz, out += psz, ++ptr)  \
+                for(size_t k = 0, ke = i+psz > e ? e-i : psz; k < ke; ++k)      \
+                    out[k] = CODE ptr[0][k];
+        if(corr == 1 && bias == 0)
+            ITER()
+        else if(corr == 1)
+            ITER(bias+)
+        else if(bias == 0)
+            ITER(corr*)
+        else
+            ITER(bias+corr*)
+#           undef ITER
     }
 
+    void   GenRecord::t     (int  * dt)  const
+    { _get(_ptr->imi, 1, -_ptr->imi[0][0], dt); }
+
     void   GenRecord::zmag  (float *dt)  const
+    { _get(_ptr->zmag, 1.0f, 0.0f, dt); }
+
+    void   GenRecord::rot   (float *dt)  const
+    { _get(_ptr->rot_mag, 1.0f, 0.0f, dt); }
+
+    void   GenRecord::pos(float *dt)  const
     {
-        if(_ptr == nullptr)
-            return;
-        size_t               psz  = size_t(_ptr->page_size);
-        float const * const *tptr = _ptr->zmag;
-        for(size_t i = 0, e = nrecs(); i < e; i += psz, dt += psz, ++tptr)
-            for(size_t k = 0, ke = i+psz > e ? e-i : psz; k < ke; ++k)
-                dt[k] = tptr[0][k];
+        for(size_t i = 0; i < nbeads(); ++i)
+            dt[2*i] = dt[2*i+1] = -1;
+
+        std::smatch val;
+        std::string flt = "[-+]?(?:\\d+(?:[.,]\\d*)?|[.,]\\d+)(?:[eE][-+]?\\d+)?'\n";
+        std::string tmp = "^Bead(\\d+) xcb ("+flt+") ycb ("+flt+") zcb ("+flt+") .*";
+        std::regex  patt(tmp.c_str());
+
+        std::string line;
+        std::ifstream stream(_name.c_str(), std::ios_base::in | std::ios_base::binary);
+        while(std::getline(stream, line))
+            if(std::regex_match(line, val, patt) && val.size() == 5)
+            {
+                int   bid = 2*std::stoi(val[1]);
+                dt[bid]   = std::stof(val[2]);
+                dt[bid+1] = std::stof(val[3]);
+            }
+        stream.close();
     }
 
     void   GenRecord::bead  (size_t ibead, float *dt) const
     {
         if(_ptr == nullptr || ibead >= size_t(_ptr->n_bead))
             return;
-        float                zc   = _ptr->z_cor;
-        size_t               psz  = size_t(_ptr->page_size);
-        float const * const *zptr = _ptr->b_r[ibead]->z;
-        for(size_t i = 0, e = nrecs(); i < e; i += psz, dt += psz, ++zptr)
-            for(size_t k = 0, ke = i+psz > e ? e-i : psz; k < ke; ++k)
-                dt[k] = zptr[0][k]*zc;
+        _get(_ptr->b_r[ibead]->z, _ptr->z_cor, 0.0f, dt);
     }
 
     float  GenRecord::camerafrequency() const
