@@ -5,8 +5,12 @@ Classes defining a type of data treatment.
 
 **Warning** Those definitions must remain data-independant.
 """
-from typing         import Optional, Sequence # pylint: disable=unused-import
+from typing         import (Optional, Sequence,  # pylint: disable=unused-import
+                            Dict, Any)
 from enum           import Enum, unique
+
+import numpy
+
 from utils          import toenum
 from .level         import Level
 from signalfilter   import (ForwardBackwardFilter, # pylint: disable=no-name-in-module
@@ -119,49 +123,30 @@ class CycleCreatorTask(Task):
         u"returns class or parent task if must remain unique"
         return cls
 
-class FlatEventsExtractionTask(Task):
-    u"Task for extracting flat events from a cycle"
-    levelin = Level.cycle
-    levelou = Level.event
-
-    @classmethod
-    def unique(cls):
-        u"returns class or parent task if must remain unique"
-        return cls
-
-class DriftComputationTask(Task):
-    u"All tasks related to drift removal"
-
-class DCTFlatEventsCollapseTask(DriftComputationTask):
-    u"Task that uses flat events to estimate the correlated drift"
-
-class DCTMedianDynamicsTask(DriftComputationTask):
-    u"""
-    Task that estimates drifts using the integral of the median derivate
-    between all cycles or beads"
-    """
-
-class FormulaTask(Task):
-    u"Task that transforms data using whatever function"
-    def __init__(self, **kw) -> None:
-        super().__init__(**kw)
-        self.formula = str(kw.get('formula', ''))
-
 class SignalFilterTask(Task):
     u"Filters time series"
-
-class ForwardBackwardFilterTask(Task, ForwardBackwardFilter):
-    u"Filters time series using the forward-backward algorithm"
     level = Level.none
+    _COPY = True
     def __init__(self, **kwa):
-        super().__init__()
+        super().__init__(self, **kwa)
         for name in set(self.__dict__).intersection(set(kwa)):
-            setattr(self, name, kwa[name])
+            setattr(self, name, kwa.get(name))
+        self.copy = kwa.get('copy', self._COPY) # type: bool
 
-class NonLinearFilterTask(Task, NonLinearFilter):
+    def __processor__(self):
+        cpy =  self.__class__.__bases__[1]()
+        for name, val in self.__dict__.items():
+            if hasattr(cpy, name):
+                setattr(cpy, name, val)
+
+        if self.copy:
+            fcn = lambda val: cpy(numpy.copy(val))
+        else:
+            fcn = cpy
+        return lambda dat: dat.withfunction(fcn, beadonly = True)
+
+class ForwardBackwardFilterTask(SignalFilterTask, ForwardBackwardFilter):
     u"Filters time series using the forward-backward algorithm"
-    level = Level.none
-    def __init__(self, **kwa):
-        super().__init__()
-        for name in set(self.__dict__).intersection(set(kwa)):
-            setattr(self, name, kwa[name])
+
+class NonLinearFilterTask(SignalFilterTask, NonLinearFilter):
+    u"Filters time series using the forward-backward algorithm"

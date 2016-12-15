@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Processors apply tasks to a data flow"
-from typing         import TYPE_CHECKING
-from abc            import ABCMeta, abstractmethod
-from functools      import wraps
+from    typing         import TYPE_CHECKING
+from    abc            import ABCMeta, abstractmethod
+from    functools      import wraps
 
-from model.level    import Level
-from model.task     import Task, TrackReaderTask, CycleCreatorTask, TaggingTask
-from data           import Track, Cycles
+import  model.task   as     _tasks
+from    model.level    import Level
+from    data           import Track, Cycles
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
-    from typing     import Tuple
+    from typing     import Tuple, Union
     from .runner    import Runner
 
 _PROTECTED = 'tasktype',
@@ -32,13 +32,17 @@ class ProtectedDict(dict):
 class MetaProcessor(ABCMeta):
     u"Protects attribute tasktype"
     def __new__(mcs, name, bases, nspace):
-        if 'tasktype' not in nspace:
-            raise AttributeError('"tasktype" must be defined')
+        if isinstance(nspace['tasktype'], type):
+            if not issubclass(nspace['tasktype'], _tasks.Task):
+                raise TypeError('Only Task classes in the tasktype attribute')
+        elif hasattr(nspace['tasktype'], '__iter__'):
+            nspace['tasktype'] = tuple(set(nspace['tasktype']))
+            if not all(isinstance(tsk, type) and issubclass(tsk, _tasks.Task)
+                       for tsk in nspace['tasktype']):
+                raise TypeError('"tasktype" should all be Task classes', str(nspace['tasktype']))
+        elif name != 'Processor':
+            raise AttributeError('"tasktype" must be defined in '+name)
         return super().__new__(mcs, name, bases, nspace)
-
-    @staticmethod
-    def __prepare__(*_):
-        return ProtectedDict()
 
     def __setattr__(cls, key, value):
         if key in _PROTECTED:
@@ -49,10 +53,10 @@ class Processor(metaclass=MetaProcessor):
     u"""
     Main class for processing tasks
     """
-    tasktype = Task # type: type
-    def __init__(self, task: Task) -> None:
+    tasktype = None # type: Union[type,Tuple[type]]
+    def __init__(self, task: _tasks.Task) -> None:
         if not isinstance(task, self.tasktype):
-            raise TypeError('"task" must have type "tasktype"')
+            raise TypeError('"task" must have type '+ str(self.tasktype))
         self.task = task
 
     @property
@@ -140,8 +144,8 @@ class Processor(metaclass=MetaProcessor):
         return _run
 
 class TrackReaderProcessor(Processor):
-    u"Generates output from a CycleCreatorTask"
-    tasktype = TrackReaderTask
+    u"Generates output from a _tasks.CycleCreatorTask"
+    tasktype = _tasks.TrackReaderTask
 
     def run(self, args:'Runner'):
         u"returns a dask delayed item"
@@ -149,8 +153,8 @@ class TrackReaderProcessor(Processor):
         args.apply((res.beads,), levels = self.levels)
 
 class CycleCreatorProcessor(Processor):
-    u"Generates output from a CycleCreatorTask"
-    tasktype = CycleCreatorTask
+    u"Generates output from a _tasks.CycleCreatorTask"
+    tasktype = _tasks.CycleCreatorTask
 
     def run(self, args:'Runner'):
         u"iterates through beads and yields cycles"
@@ -162,7 +166,7 @@ class CycleCreatorProcessor(Processor):
 
 class SelectionProcessor(Processor):
     u"Generates output from a TaggingTask"
-    tasktype = TaggingTask
+    tasktype = _tasks.TaggingTask
 
     def run(self, args:'Runner'):
         u"iterates through beads and yields accepted items"
@@ -172,3 +176,10 @@ class SelectionProcessor(Processor):
 
         elif self.task.action is self.tasktype.remove:
             args.apply(lambda frame: frame.discarding(elems))
+
+class ProtocolProcessor(Processor):
+    u"A processor that can deal with any task having the __processor__ attribute"
+    tasktype = _tasks.SignalFilterTask.__subclasses__()
+    def run(self, args:'Runner'):
+        fcn = self.task.__processor__()
+        args.apply(iter(fcn(dat) for dat in fcn))

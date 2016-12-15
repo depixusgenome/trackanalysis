@@ -74,12 +74,38 @@ class TrackItems(Items):
             self.actions.remove(self.copy)
         return self
 
-    def withaction(self, fcn, clear = False) -> 'TrackItems':
-        u"specifies that a copy of the data should or shouldn't be made"
+    def withfunction(self, fcn = None, clear = False, beadonly = False) -> 'TrackItems':
+        u"Adds an action with fcn taking a value as single argument"
         if clear:
             self.actions = []
 
-        self.actions.append(fcn)
+        if fcn is None:
+            return self
+
+        if beadonly:
+            @wraps(fcn)
+            def _action(key, val):
+                return fcn(val) if self._isbead(key) else val
+            self.actions.append(_action)
+        else:
+            self.actions.append(lambda key, val: fcn(val))
+        return self
+
+    def withaction(self, fcn = None, clear = False, beadonly = False) -> 'TrackItems':
+        u"Adds an action with fcn taking a key and its values  as arguments"
+        if clear:
+            self.actions = []
+
+        if fcn is None:
+            return self
+
+        if beadonly:
+            @wraps(fcn)
+            def _action(key, val):
+                return fcn(key, val) if self._isbead(key) else val
+            self.actions.append(_action)
+        else:
+            self.actions.append(fcn)
         return self
 
     def getaction(self):
@@ -97,6 +123,10 @@ class TrackItems(Items):
     @setfield
     def withdata(self, dat) -> 'TrackItems':
         u"sets the data"
+
+    @staticmethod
+    def _isbead(_):
+        return True
 
     def _selection(self, attr, cyc, clear) -> 'TrackItems':
         if cyc is None or cyc is all:
@@ -202,6 +232,10 @@ class Beads(TrackItems, Items):
     def _iter(self):
         yield from ((bead, self.data[bead]) for bead in self.keys())
 
+    @staticmethod
+    def _isbead(key):
+        return isinstance(key, int)
+
     def __getitem__(self, keys):
         item = super().__getitem__(keys)
         if isinstance(keys, (int, str)):
@@ -239,6 +273,10 @@ class Cycles(TrackItems, Items):
     @setfield
     def withlast(self, last) -> 'Cycles':
         u"specifies the phase to extract: None for all"
+
+    @staticmethod
+    def _isbead(key):
+        return isinstance(key, int)
 
     def _keys(self, sel) -> 'Iterable[Tuple[Union[str,int], int]]':
         allcycles = lambda: range(self.track.ncycles)

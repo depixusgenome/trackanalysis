@@ -208,6 +208,9 @@ class TaskController(Controller):
         if processor is None:
             processor = Processor
 
-        self.__procs[processor.tasktype] = processor
+        if isinstance(processor.tasktype, tuple):
+            self.__procs.update(dict.fromkeys(processor.tasktype, processor))
+        else:
+            self.__procs[processor.tasktype] = processor
         for sclass in processor.__subclasses__():
             self.register(sclass)
