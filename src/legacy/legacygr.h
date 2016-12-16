@@ -16,4 +16,19 @@ namespace legacy
         private:
             one_plot *_op;
     };
+
+    struct one_image;
+    struct ImData
+    {
+        ImData(std::string fname);
+        ~ImData();
+        bool                      isnone ()       const { return _op == nullptr; }
+        std::string               title  ()       const;
+        std::pair<size_t,size_t>  dims   ()       const;
+        bool                      isfloat()       const;
+        bool                      ischar ()       const;
+        void                      data   (void *) const;
+        private:
+            one_image *_op;
+    };
 }

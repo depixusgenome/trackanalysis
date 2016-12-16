@@ -4,6 +4,7 @@
 #include <cstring>
 #include <cmath>
 #include "legacy/legacygr.h"
+
 namespace legacy { namespace { // unitset
     long    counter = 0, n_error = 0;
     float   abslow, dx;     /* offset and scale for automatic abscissas */
@@ -29,7 +30,9 @@ namespace legacy { namespace { // unitset
     int	Yellow			= BUILD_COLOR(255,255,  0);
     int	White 			= BUILD_COLOR(255,255,255);
 
+    # define 	WHITE_LABEL		16
     # define B_LINE 	65536
+    # define CMID		27
     # define MAX_ERROR 	20
     # define OP_SIZE 	32
     # define CRT_Z 		26
@@ -1021,7 +1024,7 @@ namespace legacy {
 }
 
 namespace legacy { namespace {
-    constexpr int I_F_SIZE = 256;
+    constexpr int I_F_SIZE = 8;
     struct
     {
         int n_line;
@@ -1604,7 +1607,7 @@ namespace legacy { namespace {
                             snprintf(file_name, sizeof(file_name), "%s%s", plt_data_path, argv[0]);
                         else snprintf(file_name, sizeof(file_name), "%s", argv[0]);
                         i_f[cur_i_f].n_line = 0;
-                        i_f[cur_i_f].filename = strdup(file_name);
+                        i_f[cur_i_f].filename = file_name;
                         i_f[cur_i_f].fpi = fopen(i_f[cur_i_f].filename, "r");
                         if ( i_f[cur_i_f].fpi == NULL)
                             error_in_file("cannot open file\n %s", i_f[cur_i_f].filename);
@@ -2573,7 +2576,6 @@ namespace legacy { namespace {
         while ( cur_i_f >= 0 )
         {
             if (i_f[cur_i_f].fpi != NULL)     fclose( i_f[cur_i_f].fpi);
-            //if (i_f[cur_i_f].filename != NULL)    free(i_f[cur_i_f].filename);
             cur_i_f--;
         }
         if (check == 0)
@@ -2660,4 +2662,2590 @@ namespace legacy
     { return i >= size() ? nullptr : (isx ? _op->dat[i]->xd : _op->dat[i]->yd); }
 
     GrData::~GrData() { if(_op != nullptr) free_one_plot(_op); }
+}
+
+namespace legacy { namespace {
+    # define 	IS_ONE_PLOT		1024
+    # define 	IS_Z_UNIT_SET		18
+    # define    IS_INT_IMAGE        128
+    # define    IS_CHAR_IMAGE       256
+    # define    IS_FLOAT_IMAGE      512
+    # define    IS_COMPLEX_IMAGE    64
+    # define    IS_RGB_PICTURE      16384   // 0x4000
+    # define    IS_BW_PICTURE       32768  // 0x8000
+    # define    IS_UINT_IMAGE       131072  // 0x20000
+    # define    IS_LINT_IMAGE       262144  // 0x40000
+    # define    IS_RGBA_PICTURE     524288  // 0x80000
+    # define    IS_DOUBLE_IMAGE     0x200000
+    # define    IS_COMPLEX_DOUBLE_IMAGE 0x400000
+    # define    IS_RGB16_PICTURE    0x800000
+    # define    IS_RGBA16_PICTURE   0x100000
+    
+    # define    IS_BITMAP           65636
+    
+    
+    # define    IS_INT          256
+    # define    IS_CHAR         128
+    # define    IS_FLOAT        512
+    
+    # define    PLOT_NEED_REFRESH       0x1
+    # define    EXTRA_PLOT_NEED_REFRESH         0x2
+    # define    PLOTS_NEED_REFRESH      0x3
+    # define    BITMAP_NEED_REFRESH     0x4
+    # define    INTERNAL_BITMAP_NEED_REFRESH    0x8
+    # define    ALL_NEED_REFRESH        0xF
+    typedef struct _mcomplex
+    {
+        float re, im;
+    } mcomplex;
+
+    typedef struct _mdcomplex
+    {
+        double dre, dim;
+    } mdcomplex;
+
+
+    typedef struct _rgb
+    {
+        unsigned char r, g, b;
+    } rgb_t;
+
+    typedef struct _rgba
+    {
+        unsigned char r, g, b, a;
+    } rgba_t;
+
+    typedef struct _rgb16
+    {
+        short int r, g, b;
+    } rgb16_t;
+
+    typedef struct _rgba16
+    {
+        short int r, g, b, a;
+    } rgba16_t;
+
+    union pix                   /* data pointer to pixel */
+    {
+        unsigned char *ch;
+        short int *in;
+        unsigned short int *ui;
+        int *li;
+        float *fl;
+        double *db;
+        mcomplex *cp;
+        mdcomplex *dcp;
+        rgb_t *rgb;
+        rgba_t *rgba;
+        rgb16_t *rgb16;
+        rgba16_t *rgba16;
+    };
+
+    struct image_data
+    {
+        int data_type, mode;            /* char, int or float */
+        int nx, nxs, nxe;           /* nb of x pixels */
+        int ny , nys, nye;          /* nb of y pixels */
+        union pix *pixel;           /* the image data */
+        union pix **pxl;            /* the array for movie */
+        void **mem;                             /* the array containing the starting point of memory of each image */
+        int n_f, m_f, c_f;          /* the number of images */
+        unsigned char **over;           /* overwrite plane 1 bit */
+        time_t time;                    /* date of creation */
+        char *source;
+        char *history;
+        char *treatement;
+        char **special;             /* strings for special infos*/
+        int n_special, m_special;
+        unsigned char win_flag;         /* boundary conditions */
+        int movie_on_disk;                      /* specify if in memory or on disk */
+        double record_duration;                 /* duration of data acquisition in micro seconds */
+        long long record_start;                 /* start of duration of data */
+        struct screen_label ** *s_l;             /* an array of screen object with first index
+                                                   related to image number in a movie */
+        int *n_sl, *m_sl;
+
+        int **user_ispare;                      // integer paramters specific for each image
+        float **user_fspare;                      // float paramters specific for each image
+        int user_nipar;                         // nb integer paramters specific for each image
+        int user_nfpar;                         // nb float paramters specific for each image
+        int multi_page;                        // if set memory is cut one chunck per image for movie
+        int has_sqaure_pixel;
+        float src_parameter[8];        // numerical value of parameter characterizing data (ex. temperature ...)
+        char *src_parameter_type[8];   // the description of these parameters
+    };
+
+    /* possible mode values */
+    # define    LOG_AMP     8
+    # define    AMP_2       16
+    # define    AMP     32
+    # define    RE      64
+    # define    IM      128
+    # define    KX      256
+    # define    KY      512
+    # define    PHI     1024
+    # define    GREY_LEVEL  0
+    # define    R_LEVEL     2048
+    # define    RED_ONLY    2049
+    # define    G_LEVEL     4096
+    # define    GREEN_ONLY  4097
+    # define    B_LEVEL     8192
+    # define    BLUE_ONLY   8193
+    # define    ALPHA_LEVEL 16384
+    # define        TRUE_RGB        32768
+    
+        /* data treatement */
+    # define    LOW_PASS    32
+    # define    BAND_PASS   64
+    # define    HIGH_PASS   128
+    # define    BRICK_WALL  8192
+    # define    REAL_MODE   512
+    # define    COMPLEX_MODE    1024
+    
+        /* define boundary conditions */
+    # define    X_PER       1
+    # define    Y_PER       2
+    # define    X_NOT_PER   ~X_PER
+    # define    Y_NOT_PER   ~Y_PER
+    
+    # define    DATA_IN_USE 1
+    # define    BITMAP_IN_USE   2
+
+
+}}
+
+namespace legacy {
+    typedef struct one_image
+    {
+        int type;
+        char *filename, *dir, *title;   /* The strings defining the titles */
+        char *x_title, *y_title, *x_prime_title, *y_prime_title;
+        char *x_prefix, *y_prefix, *x_unit, *y_unit;
+        char *z_prefix, *t_prefix, *z_unit, *t_unit;
+        float width, height, right, up;
+        int iopt, iopt2;
+        float tick_len;
+        float x_lo, x_hi, y_lo, y_hi;
+        float z_black, z_white;     /* grey-scale def */
+        float z_min, z_max;     /* grey-scale limit */
+        float z_Rmin, z_Rmax;     /* Red scale limit */
+        float z_Gmin, z_Gmax;     /* Green scale limit */
+        float z_Bmin, z_Bmax;     /* Blue scale limit */
+        float ax, dx;           /* conversion factor and offset */
+        float ay, dy;           /* between pixels and user dim */
+        float az, dz;           /* between pixels and user dim */
+        float at, dt;           /* between frames and time */
+        struct image_data im;
+        struct plot_label **lab;    /* labelling in the plot */
+        int n_lab, m_lab;
+        one_plot **o_p;          /* the series of plot */
+        int n_op, m_op;         /* the number of plot */
+        int cur_op;         /* the current one */
+        unit_set    **xu;           /* x unit set */
+        int n_xu, m_xu, c_xu;
+        unit_set    **yu;           /* y unit set */
+        int n_yu, m_yu, c_yu;
+        unit_set    **zu;           /* z unit set */
+        int n_zu, m_zu, c_zu;
+        unit_set    **tu;           /* t unit set (for movies) */
+        int n_tu, m_tu, c_tu;
+        int need_to_refresh;
+        int buisy_in_thread;
+        int data_changing;
+        int transfering_data_to_box;
+    } O_i;
+}
+
+namespace legacy { namespace {
+    typedef struct screen_label
+    {
+        int type;           /* absolute or user defined */
+        float xla, yla;     /* the position of label */
+        char *text;         /* the text of it */
+        float user_val;
+    } S_l;
+
+
+
+    typedef struct im_max
+    {
+        int x0, x1, y0, y1, xm, ym, np, inb;            // a rectangle containing the max in pixels
+        double xpos, ypos, weight, zmax, dnb, chi2, sigma;      // trap size
+    } im_ext;
+
+
+    typedef struct im_max_array
+    {
+        struct im_max *ie;
+        unsigned int n_ie, m_ie, c_ie;
+    } im_ext_ar;
+
+    # define    SET_DATA_IN_USE(oi)         (oi)->buisy_in_thread |= DATA_IN_USE
+    # define    SET_BITMAP_IN_USE(oi)           (oi)->buisy_in_thread |= BITMAP_IN_USE
+    # define    SET_DATA_NO_MORE_IN_USE(oi) (oi)->buisy_in_thread &= ~DATA_IN_USE
+    # define    SET_BITMAP_NO_MORE_IN_USE(oi)   (oi)->buisy_in_thread &= ~BITMAP_IN_USE
+    
+    # define    IS_DATA_IN_USE(oi)          ((oi)->buisy_in_thread & DATA_IN_USE)
+    # define    IS_BITMAP_IN_USE(oi)            ((oi)->buisy_in_thread & BITMAP_IN_USE)
+    
+    
+    
+    # define    SET_PLOT_NEED_REFRESH(oi)          (oi)->need_to_refresh |= PLOT_NEED_REFRESH
+    # define    SET_EXTRA_PLOT_NEED_REFRESH(oi)        (oi)->need_to_refresh |= EXTRA_PLOT_NEED_REFRESH
+    # define    SET_PLOTS_NEED_REFRESH(oi)         (oi)->need_to_refresh |= PLOTS_NEED_REFRESH
+    # define    SET_BITMAP_NEED_REFRESH(oi)        (oi)->need_to_refresh |= BITMAP_NEED_REFRESH
+    # define    SET_INTERNAL_BITMAP_NEED_REFRESH(oi)   (oi)->need_to_refresh |= INTERNALBITMAP_NEED_REFRESH
+    # define    SET_ALL_NEED_REFRESH(oi)           (oi)->need_to_refresh |= ALL_NEED_REFRESH
+    
+    # define    UNSET_PLOT_NEED_REFRESH(oi)        (oi)->need_to_refresh &= ~PLOT_NEED_REFRESH
+    # define    UNSET_EXTRA_PLOT_NEED_REFRESH(oi)      (oi)->need_to_refresh &= ~EXTRA_PLOT_NEED_REFRESH
+    # define    UNSET_PLOTS_NEED_REFRESH(oi)           (oi)->need_to_refresh &= ~PLOTS_NEED_REFRESH
+    # define    UNSET_BITMAP_NEED_REFRESH(oi)          (oi)->need_to_refresh &= ~BITMAP_NEED_REFRESH
+    # define    UNSET_INTERNAL_BITMAP_NEED_REFRESH(oi) (oi)->need_to_refresh &= ~INTERNALBITMAP_NEED_REFRESH
+    # define    UNSET_ALL_NEED_REFRESH(oi)         (oi)->need_to_refresh &= ~ALL_NEED_REFRESH
+    
+    
+    
+    # define    OI_TYPE_IS_UNSIGNED_CHAR(oi)        (get_oi_type(oi) == \
+                                                         IS_CHAR_IMAGE)) ? 1 : 0;
+    # define    OI_TYPE_IS_RGB(oi)              (get_oi_type(oi) == \
+                                                     IS_RGB_PICTURE)) ? 1 : 0;
+    # define    OI_TYPE_IS_RGBA(oi)             (get_oi_type(oi) == \
+                                                     IS_RGBA_PICTURE)) ? 1 : 0;
+    # define    OI_TYPE_IS_RGB16(oi)                (get_oi_type(oi) == \
+                                                         IS_RGB16_PICTURE)) ? 1 : 0;
+    # define    OI_TYPE_IS_RGBA16(oi)               (get_oi_type(oi) == \
+                                                         IS_RGBA16_PICTURE)) ? 1 : 0;
+    # define    OI_TYPE_IS_INT(oi)          (get_oi_type(oi) == \
+                                                 IS_INT_IMAGE)) ? 1 : 0;
+    # define    OI_TYPE_IS_UNSIGNED_SHORT_INT(oi)   (get_oi_type(oi) == \
+                                                         IS_UINT_IMAGE)) ? 1 : 0;
+    # define    OI_TYPE_IS_LONG_INT(oi)     (get_oi_type(oi) == \
+                                                 IS_LINT_IMAGE)) ? 1 : 0;
+    # define    OI_TYPE_IS_FLOAT(oi)            (get_oi_type(oi) == \
+                                                     IS_FLOAT_IMAGE)) ? 1 : 0;
+    # define    OI_TYPE_IS_DOUBLE(oi)       (get_oi_type(oi) == \
+                                                 IS_DOUBLE_IMAGE)) ? 1 : 0;
+    # define    OI_TYPE_IS_COMPLEX(oi)      (get_oi_type(oi) == \
+                                                 IS_COMPLEX_IMAGE)) ? 1 : 0;
+    # define    OI_TYPE_IS_COMPLEX_DOUBLE(oi)   (get_oi_type(oi) == \
+                                                     IS_COMPLEX_DOUBLE_IMAGE)) ? 1 : 0;
+    
+    
+    # define    IS_INT_IMAGE        128
+    # define    IS_CHAR_IMAGE       256
+    # define    IS_FLOAT_IMAGE      512
+    # define    IS_COMPLEX_IMAGE    64
+    # define    IS_RGB_PICTURE      16384
+    # define    IS_BW_PICTURE       32768
+    # define    IS_UINT_IMAGE       131072
+    # define    IS_LINT_IMAGE       262144
+    # define    IS_RGBA_PICTURE     524288
+    # define    IS_DOUBLE_IMAGE     0x200000
+    # define    IS_COMPLEX_DOUBLE_IMAGE 0x400000
+    # define    IS_RGB16_PICTURE    0x800000
+    # define    IS_RGBA16_PICTURE   0x100000
+    
+    # define        UCHAR_LINE_PTR(oi,line)     (oi)->im.pixel[(line)].ch
+    # define        SINT_LINE_PTR(oi,line)      (oi)->im.pixel[(line)].in
+    # define        UINT_LINE_PTR(oi,line)      (oi)->im.pixel[(line)].ui
+    # define        LINT_LINE_PTR(oi,line)      (oi)->im.pixel[(line)].li
+    # define        FLT_LINE_PTR(oi,line)       (oi)->im.pixel[(line)].fl
+    # define        DBL_LINE_PTR(oi,line)       (oi)->im.pixel[(line)].db
+    # define        RGB_LINE_PTR(oi,line)       (oi)->im.pixel[(line)].rgb
+    # define        RGBA_LINE_PTR(oi,line)      (oi)->im.pixel[(line)].rgba
+    # define        RGB16_LINE_PTR(oi,line)     (oi)->im.pixel[(line)].rgb16
+    # define        RGBA16_LINE_PTR(oi,line)    (oi)->im.pixel[(line)].rgba16
+    # define        CFLT_LINE_PTR(oi,line)      (oi)->im.pixel[(line)].mcomplex
+    # define        CDBL_LINE_PTR(oi,line)      (oi)->im.pixel[(line)].mdcomplex
+    
+    
+    # define        UCHAR_PIXEL(oi,line,col)     (oi)->im.pixel[(line)].ch[(col)]
+    # define        SINT_PIXEL(oi,line,col)      (oi)->im.pixel[(line)].in[(col)]
+    # define        UINT_PIXEL(oi,line,col)      (oi)->im.pixel[(line)].ui[(col)]
+    # define        LINT_PIXEL(oi,line,col)      (oi)->im.pixel[(line)].li[(col)]
+    # define        FLT_PIXEL(oi,line,col)       (oi)->im.pixel[(line)].fl[(col)]
+    # define        DBL_PIXEL(oi,line,col)       (oi)->im.pixel[(line)].db[(col)]
+    # define        RGB_PIXEL(oi,line,col)       (oi)->im.pixel[(line)].rgb[(col)]
+    # define        RGBA_PIXEL(oi,line,col)      (oi)->im.pixel[(line)].rgba[(col)]
+    # define        RGB16_PIXEL(oi,line,col)     (oi)->im.pixel[(line)].rgb16[(col)]
+    # define        RGBA16_PIXEL(oi,line,col)    (oi)->im.pixel[(line)].rgba16[(col)]
+    # define        CFLT_PIXEL(oi,line,col)      (oi)->im.pixel[(line)].mcomplex[(col)]
+    # define        CDBL_PIXEL(oi,line,col)      (oi)->im.pixel[(line)].mdcomplex[(col)]
+    # define    get_oi_horizontal_extend(oi) ((oi) == NULL) ? \
+                                                xvin_ptr_error(Wrong_Argument) : (oi)->width
+    # define    get_oi_vertical_extend(oi) ((oi) == NULL) ? \
+                                              xvin_ptr_error(Wrong_Argument) : (oi)->height
+
+    # define    get_oi_x_user_coordinate(x) (oi)->ax + (oi)->dx * (x)
+    # define    get_oi_y_user_coordinate(y) (oi)->ay + (oi)->dy * (y)
+    # define    get_oi_z_user_coordinate(z) (oi)->az + (oi)->dz * (z)
+
+    # define    set_oi_grid(oi,on_off)      (oi)->iopt = ((on_off) == ON)\
+                                                         ? (oi)->iopt & ~NOAXES :\
+                                                                                (oi)->iopt | NOAXES
+    # define    get_oi_grid(oi)         (((oi)->opt & NOAXES) \
+                                         ? OFF : ON)
+    
+    
+    
+    # define    USER        0
+    # define    PIXEL       1
+    # define    NO_NUMBER   2
+
+
+
+
+    # define    remove_cur_op_from_oi(oi)   remove_from_one_image ((oi),\
+                                                                   IS_ONE_PLOT, \
+                                                                   (void*)  find_oi_cur_op(oi))
+    # define    remove_op_from_oi(oi,op)    remove_from_one_image ((oi),\
+                                                                   IS_ONE_PLOT, (void*)(op))
+    
+    # define    remove_label_from_oi(oi,pl) remove_from_one_image ((oi),\
+                                                                   IS_PLOT_LABEL, (void*)(pl))
+    # define    remove_x_unit_set_from_oi(oi,un)    \
+                                                                                remove_from_one_image ((oi),\
+                                                                                                       IS_X_UNIT_SET, (void*)(un))
+    # define    remove_y_unit_set_from_oi(oi,un)    \
+                                                                                remove_from_one_image ((oi),\
+                                                                                                       IS_Y_UNIT_SET, (void*)(un))
+    # define    remove_z_unit_set_from_oi(oi,un)    \
+                                                                                remove_from_one_image ((oi),\
+                                                                                                       IS_Z_UNIT_SET, (void*)(un))
+    
+    
+    # define    get_oi_float_dat(oi, row, line)     (oi)->im.pixel[\
+                                                                                (line)].fl[(row)]
+    # define    set_oi_float_dat(oi, row, line, val)    (oi)->im.pixel[(line)]\
+                                                                                .fl[(row)] = val
+    # define    get_oi_int_dat(oi, row, line)       (oi)->im.pixel[(line)]\
+                                                                                .in[(row)]
+    # define    set_oi_int_dat(oi, row, line, val)  (oi)->im.pixel[(line)]\
+                                                                                .in[(row)] = val
+    # define    get_oi_char_dat(oi, row, line)      (oi)->im.pixel[(line)]\
+                                                                                .ch[(row)]
+    # define    set_oi_char_dat(oi, row, line, val)     (oi)->im.pixel[(line)]\
+                                                                            .ch[(row)] = val
+
+    # define    inherit_from_oi_to_oi       inherit_from_im_to_im
+    # define    inherit_from_oi_to_ds       inherit_from_im_to_ds
+
+    # define PIXEL_0    14
+    # define PIXEL_1    28
+    # define PIXEL_2    56
+    # define Z_MIN      128
+    # define Z_MAX      256
+    
+    
+    # define    IM_USR_COOR_LB  0x4000  /* uses im units not pixels(left,bot)*/
+    # define    IM_USR_COOR_RT  0x2000  /* uses im units not pixels (rigt,top)*/
+    
+    # define    IM_SAME_X_AXIS  8
+    # define    IM_SAME_Y_AXIS  16
+    # define    IM_Z_SAME_AS_X_PLOT_AXIS    32
+    # define    IM_Z_SAME_AS_Y_PLOT_AXIS    64
+    char data_path[512];
+    char f_in[256];
+    int add_to_one_image(O_i *oi, int type, void *stuff)
+    {
+        int i = 0;
+
+        if (stuff == NULL || oi == NULL)  xvin_ptr_error(Wrong_Argument);
+
+        if (type == IS_PLOT_LABEL)
+        {
+            if (oi->n_lab == oi->m_lab)
+            {
+                oi->m_lab += MAX_DATA;
+                oi->lab = (plot_label **)realloc(oi->lab, oi->m_lab * sizeof(plot_label *));
+
+                if (oi->lab == NULL)  xvin_ptr_error(Out_Of_Memory);
+            }
+
+            if (((plot_label *)stuff)->text != NULL)   /* no empty label */
+            {
+                oi->lab[oi->n_lab] = (plot_label *)stuff;
+                oi->n_lab++;
+            }
+
+            oi->need_to_refresh |= PLOT_NEED_REFRESH;
+        }
+        else    if (type == IS_ONE_PLOT)
+        {
+            if (oi->n_op >=  oi->m_op)
+            {
+                oi->m_op += MAX_DATA;
+                oi->o_p = (one_plot **)realloc(oi->o_p, oi->m_op * sizeof(one_plot *));
+
+                if (oi->o_p == NULL) xvin_ptr_error(Out_Of_Memory);
+            }
+
+            oi->o_p[oi->n_op] = (one_plot *)stuff;
+            oi->cur_op = oi->n_op;
+            oi->n_op++;
+            oi->need_to_refresh |= EXTRA_PLOT_NEED_REFRESH | PLOT_NEED_REFRESH;         ;
+        }
+        else    if (type == IS_SPECIAL)
+        {
+            if (oi->im.n_special >=  oi->im.m_special)
+            {
+                oi->im.m_special++;
+                oi->im.special = (char **)realloc(oi->im.special, oi->im.m_special * sizeof(char *));
+
+                if (oi->im.special == NULL) xvin_ptr_error(Out_Of_Memory);
+            }
+
+            oi->im.special[oi->im.n_special] = Mystrdup((char *)stuff);
+            oi->im.n_special++;
+            oi->need_to_refresh |= PLOT_NEED_REFRESH;
+        }
+        else if (type == IS_X_UNIT_SET)
+        {
+            if (oi->n_xu >= oi->m_xu)
+            {
+                oi->m_xu += MAX_DATA;
+                oi->xu = (unit_set **)realloc(oi->xu, oi->m_xu * sizeof(unit_set *));
+
+                if (oi->xu == NULL) xvin_ptr_error(Out_Of_Memory);
+            }
+
+            oi->xu[oi->n_xu] = (unit_set *)stuff;
+            ((unit_set *)stuff)->axis = IS_X_UNIT_SET;
+            oi->n_xu++;
+            oi->need_to_refresh |= PLOT_NEED_REFRESH;
+        }
+        else if (type == IS_Y_UNIT_SET)
+        {
+            if (oi->n_yu >= oi->m_yu)
+            {
+                oi->m_yu += MAX_DATA;
+                oi->yu = (unit_set **)realloc(oi->yu, oi->m_yu * sizeof(unit_set *));
+
+                if (oi->yu == NULL) xvin_ptr_error(Out_Of_Memory);
+            }
+
+            oi->yu[oi->n_yu] = (unit_set *)stuff;
+            ((unit_set *)stuff)->axis = IS_Y_UNIT_SET;
+            oi->n_yu++;
+            oi->need_to_refresh |= PLOT_NEED_REFRESH;
+        }
+        else if (type == IS_Z_UNIT_SET)
+        {
+            if (oi->n_zu >= oi->m_zu)
+            {
+                oi->m_zu += MAX_DATA;
+                oi->zu = (unit_set **)realloc(oi->zu, oi->m_zu * sizeof(unit_set *));
+
+                if (oi->zu == NULL) xvin_ptr_error(Out_Of_Memory);
+            }
+
+            oi->zu[oi->n_zu] = (unit_set *)stuff;
+            ((unit_set *)stuff)->axis = IS_Z_UNIT_SET;
+            oi->n_zu++;
+            oi->need_to_refresh |= PLOT_NEED_REFRESH;
+        }
+        else if (type == IS_T_UNIT_SET)
+        {
+            if (oi->n_tu >= oi->m_tu)
+            {
+                oi->m_tu += MAX_DATA;
+                oi->tu = (unit_set **) realloc(oi->tu, oi->m_tu * sizeof(unit_set *));
+
+                if (oi->tu == NULL) xvin_ptr_error(Out_Of_Memory);
+            }
+
+            oi->tu[oi->n_tu] = (unit_set *)stuff;
+            ((unit_set *)stuff)->axis = IS_T_UNIT_SET;
+            oi->n_tu++;
+            oi->need_to_refresh |= PLOT_NEED_REFRESH;
+        }
+        else    i = 1;
+
+        return i;
+    }
+
+    int add_one_image(O_i *oi, int type, void *stuff)
+    {
+        if (oi == NULL)  xvin_ptr_error(Wrong_Argument);
+
+        return add_to_one_image(oi, type, stuff);
+    }
+
+    int push_image_label(O_i *oi, float tx, float ty, char *label, int type)
+    {
+        plot_label *pl;
+
+        if (oi == NULL || label == NULL) xvin_ptr_error(Wrong_Argument);
+
+        pl = (plot_label *)calloc(1, sizeof(struct plot_label));
+
+        if (pl == NULL) xvin_ptr_error(Out_Of_Memory);
+
+        pl->xla = tx;
+        pl->yla = ty;
+        pl->text = strdup(label);
+        pl->type = type;
+
+        if (pl->text == NULL) xvin_ptr_error(Out_Of_Memory);
+
+        return  add_one_image(oi, IS_PLOT_LABEL, (void *)pl);
+    }
+
+
+    int imxlimread(O_i *oi, int *argcp, char ***argvp)
+    {
+      if (oi == NULL || argcp == NULL)      return 1;
+        if(!gr_numb(&(oi->x_lo),argcp,argvp))		return 1;
+        if(!gr_numb(&(oi->x_hi),argcp,argvp))		return 1;
+        oi->iopt2 |= X_LIM;
+        return 0;
+    }
+    int imylimread(O_i *oi, int *argcp, char ***argvp)
+    {
+      if (oi == NULL || argcp == NULL)      return 1;
+        if(!gr_numb(&(oi->y_lo),argcp,argvp))		return 1;
+        if(!gr_numb(&(oi->y_hi),argcp,argvp))		return 1;
+        oi->iopt2 |= Y_LIM;
+        return 0;	
+    }
+    int imzlimread(O_i *oi, int *argcp, char ***argvp)
+    {
+      if (oi == NULL || argcp == NULL)      return 1;
+        if(!gr_numb(&(oi->z_black),argcp,argvp))	return 1;
+        if(!gr_numb(&(oi->z_white),argcp,argvp))	return 1;
+        return 0;	
+    }
+
+    int find_zmin_zmax(O_i *oi)
+    {
+        int i, j;
+        int mode, *li;
+        unsigned char *ch;
+        rgba_t *rgba;
+        rgb_t *rgb;
+        rgba16_t *rgba16;
+        rgb16_t *rgb16;
+        short int *in;
+        unsigned short int *ui;
+        float *fl, zmin , zmax, t, zr, zi;
+        double *db;
+
+        if (oi == NULL) xvin_ptr_error(Wrong_Argument);
+
+        mode = oi->im.mode;
+
+        if (oi->im.data_type == IS_CHAR_IMAGE)
+        {
+            zmax = zmin = (float)oi->im.pixel[oi->im.nys].ch[oi->im.nxs];
+
+            for (i = oi->im.nys ; i < oi->im.nye ; i++)
+            {
+                ch = oi->im.pixel[i].ch;
+
+                for (j = oi->im.nxs ; j < oi->im.nxe ; j++)
+                {
+                    t = (float)(ch[j]);
+
+                    if (t > zmax)   zmax = t;
+
+                    if (t < zmin)   zmin = t;
+                }
+            }
+
+            zmax = oi->az + oi->dz * (zmax == zmin) ? zmax + 1 : zmax;
+            zmin = oi->az + oi->dz * zmin;
+        }
+        else    if (oi->im.data_type == IS_RGB_PICTURE)
+        {    //YUV conversion
+             zmax = zmin = 0.299 * oi->im.pixel[oi->im.nys].rgb[oi->im.nxs].r
+                     + 0.587 * oi->im.pixel[oi->im.nys].rgb[oi->im.nxs].g
+                     +  0.114 * oi->im.pixel[oi->im.nys].rgb[oi->im.nxs].b;
+
+            for (i = oi->im.nys ; i < oi->im.nye ; i++)
+            {
+                rgb = oi->im.pixel[i].rgb;
+
+                for (j = oi->im.nxs ; j < oi->im.nxe ; j++)
+                {
+                    t = 0.299 * rgb[j].r + 0.587 * rgb[j].g +  0.114 *  rgb[j].b;
+
+                    if (t > zmax)   zmax = t;
+
+                    if (t < zmin)   zmin = t;
+                }
+            }
+
+            zmax = oi->az + oi->dz * (zmax / 3 == zmin / 3) ? (zmax / 3) + 1 : zmax / 3;
+            zmin = oi->az + oi->dz * zmin / 3;
+        }
+        else    if (oi->im.data_type == IS_RGBA_PICTURE)
+        {
+                zmax = zmin = 0.299 * oi->im.pixel[oi->im.nys].rgba[oi->im.nxs].r
+                        + 0.587 * oi->im.pixel[oi->im.nys].rgba[oi->im.nxs].g
+                        +  0.114 * oi->im.pixel[oi->im.nys].rgba[oi->im.nxs].b;
+            for (i = oi->im.nys ; i < oi->im.nye ; i++)
+            {
+                rgba = oi->im.pixel[i].rgba;
+
+                for (j = oi->im.nxs ; j < oi->im.nxe ; j++)
+                {
+                    t = 0.299 * rgba[j].r + 0.587 * rgba[j].g +  0.114 *  rgba[j].b;
+
+                    if (t > zmax)   zmax = t;
+
+                    if (t < zmin)   zmin = t;
+                }
+            }
+
+            zmax = oi->az + oi->dz * (zmax / 3 == zmin / 3) ? (zmax / 3) + 1 : zmax / 3;
+            zmin = oi->az + oi->dz * zmin / 3;
+        }
+        else    if (oi->im.data_type == IS_RGB16_PICTURE)
+        {
+             zmax = zmin = 0.299 * oi->im.pixel[oi->im.nys].rgb16[oi->im.nxs].r
+                     + 0.587 * oi->im.pixel[oi->im.nys].rgb16[oi->im.nxs].g
+                     +  0.114 * oi->im.pixel[oi->im.nys].rgb16[oi->im.nxs].b;
+
+            for (i = oi->im.nys ; i < oi->im.nye ; i++)
+            {
+                in = oi->im.pixel[i].in;
+                rgb16 = oi->im.pixel[i].rgb16;
+
+                for (j = oi->im.nxs ; j < oi->im.nxe ; j++)
+                {
+                    t = 0.299 * rgb16[j].r + 0.587 * rgb16[j].g +  0.114 *  rgb16[j].b;
+
+                    if (t > zmax)   zmax = t;
+
+                    if (t < zmin)   zmin = t;
+                }
+            }
+
+            zmax = oi->az + oi->dz * (zmax / 3 == zmin / 3) ? (zmax / 3) + 1 : zmax / 3;
+            zmin = oi->az + oi->dz * zmin / 3;
+        }
+        else    if (oi->im.data_type == IS_RGBA16_PICTURE)
+        {
+             zmax = zmin = 0.299 * oi->im.pixel[oi->im.nys].rgba16[oi->im.nxs].r
+                     + 0.587 * oi->im.pixel[oi->im.nys].rgba16[oi->im.nxs].g
+                     +  0.114 * oi->im.pixel[oi->im.nys].rgba16[oi->im.nxs].b;
+
+            for (i = oi->im.nys ; i < oi->im.nye ; i++)
+            {
+                rgba16 = oi->im.pixel[i].rgba16;
+
+                for (j = oi->im.nxs ; j < oi->im.nxe ; j++)
+                {
+                     t = 0.299 * rgba16[j].r + 0.587 * rgba16[j].g +  0.114 *  rgba16[j].b;
+
+                    if (t > zmax)   zmax = t;
+
+                    if (t < zmin)   zmin = t;
+                }
+            }
+
+            zmax = oi->az + oi->dz * (zmax / 3 == zmin / 3) ? (zmax / 3) + 1 : zmax / 3;
+            zmin = oi->az + oi->dz * zmin / 3;
+        }
+        else if (oi->im.data_type == IS_INT_IMAGE)
+        {
+            zmax = zmin = oi->im.pixel[oi->im.nys].in[oi->im.nxs];
+
+            for (i = oi->im.nys ; i < oi->im.nye ; i++)
+            {
+                in = oi->im.pixel[i].in;
+
+                for (j = oi->im.nxs ; j < oi->im.nxe ; j++)
+                {
+                    t = (float)(in[j]);
+
+                    if (t > zmax)   zmax = t;
+
+                    if (t < zmin)   zmin = t;
+                }
+            }
+
+            zmax = oi->az + oi->dz * (zmax == zmin) ? zmax + 1 : zmax;
+            zmin = oi->az + oi->dz * zmin;
+        }
+        else if (oi->im.data_type == IS_UINT_IMAGE)
+        {
+            zmax = zmin = oi->im.pixel[oi->im.nys].ui[oi->im.nxs];
+
+            for (i = oi->im.nys ; i < oi->im.nye ; i++)
+            {
+                ui = oi->im.pixel[i].ui;
+
+                for (j = oi->im.nxs ; j < oi->im.nxe ; j++)
+                {
+                    t = (float)(ui[j]);
+
+                    if (t > zmax)   zmax = t;
+
+                    if (t < zmin)   zmin = t;
+                }
+            }
+
+            zmax = oi->az + oi->dz * (zmax == zmin) ? zmax + 1 : zmax;
+            zmin = oi->az + oi->dz * zmin;
+        }
+        else if (oi->im.data_type == IS_LINT_IMAGE)
+        {
+            zmax = zmin = oi->im.pixel[oi->im.nys].li[oi->im.nxs];
+
+            for (i = oi->im.nys ; i < oi->im.nye ; i++)
+            {
+                li = oi->im.pixel[i].li;
+
+                for (j = oi->im.nxs ; j < oi->im.nxe ; j++)
+                {
+                    t = (float)(li[j]);
+
+                    if (t > zmax)   zmax = t;
+
+                    if (t < zmin)   zmin = t;
+                }
+            }
+
+            zmax = oi->az + oi->dz * (zmax == zmin) ? zmax + 1 : zmax;
+            zmin = oi->az + oi->dz * zmin;
+        }
+        else if (oi->im.data_type == IS_FLOAT_IMAGE)
+        {
+            zmax = zmin = oi->im.pixel[oi->im.nys].fl[oi->im.nxs];
+
+            for (i = oi->im.nys ; i < oi->im.nye ; i++)
+            {
+                fl = oi->im.pixel[i].fl;
+
+                for (j = oi->im.nxs ; j < oi->im.nxe ; j++)
+                {
+                    t = fl[j];
+
+                    if (t > zmax)   zmax = t;
+
+                    if (t < zmin)   zmin = t;
+                }
+            }
+        }
+        else if (oi->im.data_type == IS_DOUBLE_IMAGE)
+        {
+            zmax = zmin = oi->im.pixel[oi->im.nys].db[oi->im.nxs];
+
+            for (i = oi->im.nys ; i < oi->im.nye ; i++)
+            {
+                db = oi->im.pixel[i].db;
+
+                for (j = oi->im.nxs ; j < oi->im.nxe ; j++)
+                {
+                    t = db[j];
+
+                    if (t > zmax)   zmax = t;
+
+                    if (t < zmin)   zmin = t;
+                }
+            }
+        }
+        else if (oi->im.data_type == IS_COMPLEX_IMAGE)
+        {
+            zr = oi->im.pixel[oi->im.nys].fl[2 * oi->im.nxs];
+            zi = oi->im.pixel[oi->im.nys].fl[2 * oi->im.nxs + 1];
+
+            if (mode == RE)             zmin = zr;
+            else if (mode == IM)        zmin = zi;
+            else if (mode == AMP)       zmin = sqrt(zr * zr + zi * zi);
+            else if (mode == AMP_2)     zmin = zr * zr + zi * zi;
+            else if (mode == LOG_AMP)   zmin = (zr * zr + zi * zi > 0) ? log10(zr * zr + zi * zi) : -40.0;
+            else return -1;
+
+            zmax = zmin;
+
+            for (i = oi->im.nys ; i < oi->im.nye ; i++)
+            {
+                fl = oi->im.pixel[i].fl;
+
+                for (j = oi->im.nxs ; j < oi->im.nxe ; j++)
+                {
+                    zr = fl[2 * j];
+                    zi = fl[2 * j + 1];
+
+                    if (mode == RE)     t = zr;
+                    else if (mode == IM)    t = zi;
+                    else if (mode == AMP)   t = sqrt(zr * zr + zi * zi);
+                    else if (mode == AMP_2) t = zr * zr + zi * zi;
+                    else if (mode == LOG_AMP)   t = (zr * zr + zi * zi > 0) ? log10(zr * zr + zi * zi) : -40.0;
+                    else return 1;
+
+                    if (t > zmax)   zmax = t;
+
+                    if (t < zmin)   zmin = t;
+                }
+            }
+        }
+        else if (oi->im.data_type == IS_COMPLEX_DOUBLE_IMAGE)
+        {
+            zr = oi->im.pixel[oi->im.nys].db[2 * oi->im.nxs];
+            zi = oi->im.pixel[oi->im.nys].db[2 * oi->im.nxs + 1];
+
+            if (mode == RE)             zmin = zr;
+            else if (mode == IM)        zmin = zi;
+            else if (mode == AMP)       zmin = sqrt(zr * zr + zi * zi);
+            else if (mode == AMP_2)     zmin = zr * zr + zi * zi;
+            else if (mode == LOG_AMP)   zmin = (zr * zr + zi * zi > 0) ? log10(zr * zr + zi * zi) : -40.0;
+            else return -1;
+
+            zmax = zmin;
+
+            for (i = oi->im.nys ; i < oi->im.nye ; i++)
+            {
+                db = oi->im.pixel[i].db;
+
+                for (j = oi->im.nxs ; j < oi->im.nxe ; j++)
+                {
+                    zr = db[2 * j];
+                    zi = db[2 * j + 1];
+
+                    if (mode == RE)     t = zr;
+                    else if (mode == IM)    t = zi;
+                    else if (mode == AMP)   t = sqrt(zr * zr + zi * zi);
+                    else if (mode == AMP_2) t = zr * zr + zi * zi;
+                    else if (mode == LOG_AMP)   t = (zr * zr + zi * zi > 0) ? log10(zr * zr + zi * zi) : -40.0;
+                    else return 1;
+
+                    if (t > zmax)   zmax = t;
+
+                    if (t < zmin)   zmin = t;
+                }
+            }
+        }
+        else return 1;
+
+        oi->z_black = oi->z_min = zmin;
+        oi->z_white = oi->z_max = (zmax == zmin) ? zmax + 1 : zmax;
+        oi->need_to_refresh |= BITMAP_NEED_REFRESH;
+        return 0;
+    }
+
+    int alloc_one_image(O_i *oi, int nx, int ny, int type)
+    {
+        int i = 0, j;
+        int data_len = 1, nf = 0;
+        char *buf = NULL;
+
+
+        if (oi == NULL) xvin_ptr_error(Wrong_Argument);
+
+        switch (type)
+        {
+        case IS_CHAR_IMAGE:
+            oi->z_min = 0;
+            oi->z_max = 255;
+            data_len = 1;
+            break;
+
+        case IS_RGB_PICTURE:
+            oi->z_min = 0;
+            oi->z_max = 255;
+            oi->z_Rmin = 0;
+            oi->z_Rmax = 255;
+            oi->z_Gmin = 0;
+            oi->z_Gmax = 255;
+            oi->z_Bmin = 0;
+            oi->z_Bmax = 255;
+            oi->im.mode = TRUE_RGB;
+            data_len = 3;
+            break;
+
+        case IS_RGBA_PICTURE:
+            oi->z_min = 0;
+            oi->z_max = 255;
+            oi->z_Rmin = 0;
+            oi->z_Rmax = 255;
+            oi->z_Gmin = 0;
+            oi->z_Gmax = 255;
+            oi->z_Bmin = 0;
+            oi->z_Bmax = 255;
+            oi->im.mode = TRUE_RGB;
+            data_len = 4;
+            break;
+
+        case IS_RGB16_PICTURE:
+            oi->z_min = -32768;
+            oi->z_max = 32767;
+            oi->z_Rmin = -32768;
+            oi->z_Rmax = 32767;
+            oi->z_Gmin = -32768;
+            oi->z_Gmax = 32767;
+            oi->z_Bmin = -32768;
+            oi->z_Bmax = 32767;
+            oi->im.mode = TRUE_RGB;
+            data_len = 6;
+            break;
+
+        case IS_RGBA16_PICTURE:
+            oi->z_min = -32768;
+            oi->z_max = 32767;
+            oi->z_Rmin = -32768;
+            oi->z_Rmax = 32767;
+            oi->z_Gmin = -32768;
+            oi->z_Gmax = 32767;
+            oi->z_Bmin = -32768;
+            oi->z_Bmax = 32767;
+            oi->im.mode = TRUE_RGB;
+            data_len = 8;
+            break;
+
+        case IS_INT_IMAGE:
+            oi->z_min = -32768;
+            oi->z_max = 32767;
+            data_len = 2;
+            break;
+
+        case IS_UINT_IMAGE:
+            oi->z_min = 0;
+            oi->z_max = 65536;
+            data_len = 2;
+            break;
+
+        case IS_LINT_IMAGE:
+            oi->z_min = -2e30;
+            oi->z_max = 2e30;
+            data_len = 4;
+            break;
+
+        case IS_FLOAT_IMAGE:
+            oi->z_min = -1;
+            oi->z_max = 1;
+            data_len = 4;
+            break;
+
+        case IS_COMPLEX_IMAGE:
+            oi->z_min = -1;
+            oi->z_max = 1;
+            data_len = 8;
+            break;
+
+        case IS_DOUBLE_IMAGE:
+            oi->z_min = -1;
+            oi->z_max = 1;
+            data_len = 8;
+            break;
+
+        case IS_COMPLEX_DOUBLE_IMAGE:
+            oi->z_min = -1;
+            oi->z_max = 1;
+            data_len = 16;
+            break;
+
+        default:
+            return 1;
+            break;
+        };
+
+        if (oi->im.pixel != NULL && oi->im.ny != 0 && oi->im.nx != 0)
+            buf = (char *)oi->im.mem[0]; //oi->im.pixel[0].ch;
+
+        if (oi->im.movie_on_disk) nf = 1;
+        else nf = (oi->im.n_f > 0) ? oi->im.n_f : 1;
+
+        oi->im.pixel = (union pix *)realloc(oi->im.pixel, ny * nf * sizeof(union pix));
+
+        if (oi->im.pixel == NULL) xvin_ptr_error(Out_Of_Memory);
+
+        if (nf > 1) //oi->im.n_f > 1)
+        {
+            oi->im.pxl = (union pix **)realloc(oi->im.pxl, nf * sizeof(union pix *));
+            oi->im.mem = (void **)realloc(oi->im.mem, nf * sizeof(void *));
+
+            if (oi->im.pxl == NULL  || oi->im.mem == NULL)
+                xvin_ptr_error(Out_Of_Memory);
+        }
+        else
+        {
+            oi->im.mem = (void **)realloc(oi->im.mem, sizeof(void *));
+            oi->im.pxl = (union pix **)realloc(oi->im.pxl, sizeof(union pix *));
+
+            if (oi->im.pxl == NULL  || oi->im.mem == NULL)
+                xvin_ptr_error(Out_Of_Memory);
+        }
+
+        oi->im.m_f = nf;
+
+        if (oi->im.multi_page == 0)
+        {
+            buf = (char *) realloc(buf, nf * nx * ny * data_len * sizeof(char));
+
+            if (oi->im.pixel == NULL || buf == NULL)    xvin_ptr_error(Out_Of_Memory);
+
+            oi->im.mem[0] = buf;
+        }
+        else
+        {
+            for (i = 0 ; i < nf ; i++)
+            {
+                buf = (char *) calloc(nx * ny, data_len * sizeof(char));
+
+                if (buf == NULL)    xvin_ptr_error(Out_Of_Memory);
+
+                oi->im.mem[i] = buf;
+            }
+        }
+
+
+
+        for (i = 0 ; i < ny * nf ; i++)
+        {
+            if (oi->im.multi_page)
+                buf = (char *) oi->im.mem[i / ny] + (i % ny) * nx * data_len;
+
+            switch (type)
+            {
+            case IS_CHAR_IMAGE:
+                oi->im.pixel[i].ch = (unsigned char *)buf;
+
+                for (j = 0 ; j < nx ; j++) oi->im.pixel[i].ch[j] = 0;
+
+                break;
+
+            case IS_RGB_PICTURE:
+                oi->im.pixel[i].ch = (unsigned char *)buf;
+
+                for (j = 0 ; j < 3 * nx ; j++)   oi->im.pixel[i].ch[j] = 0;
+
+                break;
+
+            case IS_RGBA_PICTURE:
+                oi->im.pixel[i].ch = (unsigned char *)buf;
+
+                for (j = 0 ; j < 4 * nx ; j++)   oi->im.pixel[i].ch[j] = 0;
+
+                break;
+
+            case IS_RGB16_PICTURE:
+                oi->im.pixel[i].in = (short int *)buf;
+
+                for (j = 0 ; j < 3 * nx ; j++)   oi->im.pixel[i].in[j] = 0;
+
+                break;
+
+            case IS_RGBA16_PICTURE:
+                oi->im.pixel[i].in = (short int *)buf;
+
+                for (j = 0 ; j < 4 * nx ; j++)   oi->im.pixel[i].in[j] = 0;
+
+                break;
+
+            case IS_INT_IMAGE:
+                oi->im.pixel[i].in = (short int *)buf;
+
+                for (j = 0 ; j < nx ; j++) oi->im.pixel[i].in[j] = 0;
+
+                break;
+
+            case IS_UINT_IMAGE:
+                oi->im.pixel[i].ui = (unsigned short int *)buf;
+
+                for (j = 0 ; j < nx ; j++) oi->im.pixel[i].ui[j] = 0;
+
+                break;
+
+            case IS_LINT_IMAGE:
+                oi->im.pixel[i].li = (int *)buf;
+
+                for (j = 0 ; j < nx ; j++) oi->im.pixel[i].li[j] = 0;
+
+                break;
+
+            case IS_FLOAT_IMAGE:
+                oi->im.pixel[i].fl = (float *)buf;
+
+                for (j = 0 ; j < nx ; j++) oi->im.pixel[i].fl[j] = 0;
+
+                break;
+
+            case IS_COMPLEX_IMAGE:
+                oi->im.pixel[i].fl = (float *)buf;
+
+                for (j = 0; j < 2 * nx; j++) oi->im.pixel[i].fl[j] = 0;
+
+                break;
+
+            case IS_DOUBLE_IMAGE:
+                oi->im.pixel[i].db = (double *)buf;
+
+                for (j = 0 ; j < nx ; j++) oi->im.pixel[i].db[j] = 0;
+
+                break;
+
+            case IS_COMPLEX_DOUBLE_IMAGE:
+                oi->im.pixel[i].db = (double *)buf;
+
+                for (j = 0; j < 2 * nx; j++) oi->im.pixel[i].db[j] = 0;
+
+                break;
+
+            };
+
+            if ((i % ny == 0) && (oi->im.n_f > 0))
+            {
+                oi->im.pxl[i / ny] = oi->im.pixel + i;
+
+                if (oi->im.multi_page == 0) oi->im.mem[i / ny] = (char *)buf;
+            }
+
+            buf += nx * data_len;
+        }
+
+        if (oi->im.n_f == 0)        oi->im.pxl[0] = oi->im.pixel;
+
+        oi->im.nxs = oi->im.nys = 0;
+        oi->im.nxe = oi->im.nx = nx;
+        oi->im.nye = oi->im.ny = ny;
+        oi->im.data_type = type;
+
+        if (type == IS_COMPLEX_IMAGE  || type == IS_COMPLEX_DOUBLE_IMAGE)
+            oi->im.mode = RE;
+
+        oi->im.s_l = (S_l ** *)calloc(nf, sizeof(S_l **));
+        oi->im.m_sl = (int *)calloc(nf, sizeof(int));
+        oi->im.n_sl = (int *)calloc(nf, sizeof(int));
+
+        if (oi->im.s_l == NULL || oi->im.n_sl == NULL || oi->im.m_sl == NULL)
+            xvin_ptr_error(Out_Of_Memory);
+
+        for (i = 0; i < nf; i++)
+        {
+            oi->im.s_l[i] = NULL;
+            oi->im.n_sl[i] = oi->im.m_sl[i] = 0;
+        }
+
+        oi->im.user_ispare = (int **)calloc(nf, sizeof(int *));
+        oi->im.user_fspare = (float **)calloc(nf, sizeof(float *));
+
+        if (oi->im.user_ispare == NULL || oi->im.user_fspare == NULL)
+            xvin_ptr_error(Out_Of_Memory);
+
+        oi->im.user_nfpar = oi->im.user_nipar = 4;
+
+        for (i = 0; i < nf; i++)
+        {
+            oi->im.user_ispare[i] = (int *)calloc(oi->im.user_nipar, sizeof(int));
+            oi->im.user_fspare[i] = (float *)calloc(oi->im.user_nfpar, sizeof(float));
+
+            if (oi->im.user_ispare[i] == NULL || oi->im.user_fspare[i] == NULL)
+                xvin_ptr_error(Out_Of_Memory);
+        }
+
+        oi->need_to_refresh |= ALL_NEED_REFRESH;
+        return 0;
+    }
+
+    int     switch_frame(O_i *oi, int n)
+    {
+        if (oi == NULL) xvin_ptr_error(Wrong_Argument);
+
+        if (oi->im.movie_on_disk > 0)
+            xvin_ptr_error(Wrong_Argument);
+        else if (oi->im.n_f <= 1) return -1;
+        else
+        {
+            n = (n >= oi->im.n_f) ? oi->im.n_f - 1 : n;
+            n = (n < 0) ? 0 : n;
+            oi->im.pixel = oi->im.pxl[n];
+        }
+
+        oi->im.c_f = n;
+        oi->need_to_refresh |= BITMAP_NEED_REFRESH;
+        return n;
+    }
+
+    int 	push_image(O_i *oi, char *filename, int type, int mode)
+    {
+        register int i, j;
+        char ch;
+        int knx, knxs, knxe, kny, knys, knye, nf = 1;
+        float kz_black, kz_white;
+        FILE *fp;
+        union pix *p;	
+        
+        if (oi == NULL)		return -1;
+        if (oi->im.nx <= 0 || oi->im.ny <= 0)	return -1;
+        knx = oi->im.nx;
+        knxs = oi->im.nxs;
+        knxe = oi->im.nxe;
+        kny = oi->im.ny;
+        knys = oi->im.nys;
+        knye = oi->im.nye;	
+        nf = (oi->im.n_f > 0) ? oi->im.n_f : 1;
+        kz_white = oi->z_white;
+        kz_black = oi->z_black;
+        fp = fopen (filename, "rb");
+        if ( fp == NULL )
+        {
+            error_in_file("%s\nfile not found!...",filename);
+            return -1;
+        }
+        if (alloc_one_image(oi, oi->im.nx, oi->im.ny, type))
+        {
+            return -1;
+        }
+        if (oi->im.movie_on_disk)	
+        {
+            nf = 1;
+        }
+        if ( mode == CRT_Z)
+        {
+            while (fread (&ch, sizeof (char), 1, fp) == 1 && ch != CRT_Z);
+            if ( ch != CRT_Z)
+            {
+                error_in_file("no CRT_Z in %s\nbefore file EOF!...",filename);
+                return -1;
+            }
+        }
+        else if ( mode == CMID)
+        {
+            for (i = 0; i < 4 && (fread (&ch, sizeof (char), 1, fp) == 1); i++); 
+        }	
+
+        if (type & IS_CHAR_IMAGE)
+        {
+            p = oi->im.pixel;
+            for (i=0; i< kny * nf ; i++)
+            {
+                if ( (j = fread ( p[i].ch , sizeof (unsigned char), knx, fp)) != knx)
+                    return -1;
+            }
+        }
+        else if (type & IS_RGB_PICTURE)
+        {
+            p = oi->im.pixel;
+            for (i=0; i< kny * nf ; i++)
+            {
+                if ( (j = fread ( p[i].ch , sizeof (unsigned char), 3*knx, fp)) != 3*knx)
+                    return -1;
+            }
+        }
+        else if (type & IS_RGBA_PICTURE)
+        {
+            p = oi->im.pixel;
+            for (i=0 ; i< kny * nf ; i++)
+            {
+                if ( (j = fread ( p[i].ch , sizeof (unsigned char), 4*knx, fp)) != 4*knx)
+                    return -1;
+            }
+        }
+        else if (type & IS_RGB16_PICTURE)
+        {
+            p = oi->im.pixel;
+            for (i=0; i< kny * nf ; i++)
+            {
+                if ( (j = fread ( p[i].in , sizeof (short int), 3*knx, fp)) != 3*knx)
+                    return -1;
+            }
+        }
+        else if (type & IS_RGBA16_PICTURE)
+        {
+            p = oi->im.pixel;
+            for (i=0; i< kny * nf ; i++)
+            {
+                if ( (j = fread ( p[i].in , sizeof (short int), 4*knx, fp)) != 4*knx)
+                    return -1;
+            }
+        }
+        else if (type & IS_FLOAT_IMAGE)
+        {
+            p = oi->im.pixel;			
+            for (i=0; i< kny * nf; i++)
+            {
+                if ( (j = fread ( p[i].fl , sizeof (float), knx, fp)) != knx)
+                    return -1;
+            }
+        }
+        else if (type & IS_DOUBLE_IMAGE)
+        {
+            p = oi->im.pixel;			
+            for (i=0; i< kny * nf; i++)
+            {
+                if ( (j = fread ( p[i].db , sizeof (double), knx, fp)) != knx)
+                    return -1;
+            }
+        }
+        else if (type & IS_COMPLEX_IMAGE)
+        {
+            p = oi->im.pixel;			
+            for (i=0; i< kny * nf ; i++)
+            {
+                if ( (j = fread ( p[i].fl , sizeof (float), 2*knx, fp)) != 2*knx)
+                    return -1;
+            }
+        }
+        else if (type & IS_COMPLEX_DOUBLE_IMAGE)
+        {
+            p = oi->im.pixel;			
+            for (i=0; i< kny * nf ; i++)
+            {
+                if ( (j = fread ( p[i].db , sizeof (double), 2*knx, fp)) != 2*knx)
+                    return -1;
+            }
+        }
+        else if (type & IS_INT_IMAGE)
+        {	
+            p = oi->im.pixel;			
+            for (i=0; i< kny * nf; i++)
+            {
+                if ( (j = fread ( p[i].in , sizeof (short int), knx, fp)) != knx)
+                    return -1;				
+            }
+        }
+        else if (type & IS_UINT_IMAGE)
+        {	
+            p = oi->im.pixel;			
+            for (i=0; i< kny * nf; i++)
+            {
+                if ( (j = fread ( p[i].ui , sizeof (unsigned short int), knx, fp)) != knx)
+                    return -1;				
+            }
+        }
+        else if (type & IS_LINT_IMAGE)
+        {	
+            p = oi->im.pixel;			
+            for (i=0; i< kny * nf; i++)
+            {
+                if ( (j = fread ( p[i].li , sizeof (int), knx, fp)) != knx)
+                    return -1;				
+            }
+        }
+        else
+        {
+            error_in_file("Unknown type of image !");
+            return -1;						
+        }
+        oi->im.nx = knx;
+        oi->im.nxs = (knxs <= 0) ? 0 : knxs;
+        oi->im.nxe = (knxe <= 0) ? oi->im.nx : knxe;	
+        oi->im.ny = kny;
+        oi->im.nys = (knys <= 0) ? 0 : knys;
+        oi->im.nye = (knye <= 0) ? oi->im.ny : knye;		
+        if (kz_white != 0)	oi->z_white = kz_white;
+        if (kz_black != 0)	oi->z_black = kz_black;	
+        if (oi->im.n_f > 1)	switch_frame(oi,oi->im.c_f);
+        if (kz_white == 0 && kz_black == 0) 
+        {
+            find_zmin_zmax(oi);
+            oi->z_black = oi->z_min;
+            oi->z_white = oi->z_max;	
+        }
+        if (oi->dx != 1 || oi->dy != 1) oi->iopt2 |= IM_USR_COOR_RT;
+        if (oi->ax != 0 || oi->ay != 0) oi->iopt2 |= IM_USR_COOR_RT;	
+        fclose(fp);
+        return 0;
+    }
+
+    int set_image_opts(O_i *oi, int argc, char **argv)
+    {
+        char file_name[512], *cmd, *tmpch;
+        float temp, temp1;
+        int itemp, decade = 0, type = 0, subtype = 0;
+        unit_set *un;
+        
+        if (oi == NULL) return MAX_ERROR;
+        file_name[0] = 0;
+        while(--argc > 0)
+        {
+            argv++;
+            cmd = argv[0];
+    again:		switch(argv[0][0])
+            {
+                case '-':		/* option delimeter */
+                argv[0]++;
+                goto again;	
+                case 'i':		/* input file */
+                if ( strncmp(argv[0],"imzz",4) == 0 )
+                {
+                    push_image(oi,f_in,IS_COMPLEX_IMAGE,CRT_Z);
+                }		
+                if ( strncmp(argv[0],"imzdbz",6) == 0 )
+                {
+                    push_image(oi,f_in,IS_COMPLEX_DOUBLE_IMAGE,CRT_Z);
+                }		
+                else if ( strncmp(argv[0],"imzdb",5) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        if (data_path[0] != 0)
+                          snprintf(file_name,sizeof(file_name),"%s%s",data_path,argv[0]);
+                        else snprintf(file_name,sizeof(file_name),"%s",argv[0]);
+                        push_image(oi,file_name,IS_COMPLEX_DOUBLE_IMAGE,0);
+                    }
+                }
+                else if ( strncmp(argv[0],"imz",3) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        if (data_path[0] != 0)
+                          snprintf(file_name,sizeof(file_name),"%s%s",data_path,argv[0]);
+                        else snprintf(file_name,sizeof(file_name),"%s",argv[0]);
+                        push_image(oi,file_name,IS_COMPLEX_IMAGE,0);
+                    }
+                }
+                if ( strncmp(argv[0],"imfz",4) == 0 )
+                {
+                    push_image(oi,f_in,IS_FLOAT_IMAGE,CRT_Z);
+                }		
+                else if ( strncmp(argv[0],"imf",3) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        if (data_path[0] != 0)
+                          snprintf(file_name,sizeof(file_name),"%s%s",data_path,argv[0]);
+                        else snprintf(file_name,sizeof(file_name),"%s",argv[0]);
+                        push_image(oi,file_name,IS_FLOAT_IMAGE,0);
+                    }
+                }
+                if ( strncmp(argv[0],"imdbz",5) == 0 )
+                {
+                    push_image(oi,f_in,IS_DOUBLE_IMAGE,CRT_Z);
+                }		
+                else if ( strncmp(argv[0],"imdb",4) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        if (data_path[0] != 0)
+                          snprintf(file_name,sizeof(file_name),"%s%s",data_path,argv[0]);
+                        else snprintf(file_name,sizeof(file_name),"%s",argv[0]);
+                        push_image(oi,file_name,IS_DOUBLE_IMAGE,0);
+                    }
+                }
+                else 	if ( strncmp(argv[0],"imiz",4) == 0 )
+                {
+                    push_image(oi,f_in,IS_INT_IMAGE,CRT_Z);
+                }		
+                else 	if ( strncmp(argv[0],"imi",3) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        if (data_path[0] != 0)
+                          snprintf(file_name,sizeof(file_name),"%s%s",data_path,argv[0]);
+                        else snprintf(file_name,sizeof(file_name),"%s",argv[0]);
+                        push_image(oi,file_name,IS_INT_IMAGE,0);
+                    }
+                }			
+                else 	if ( strncmp(argv[0],"imuiz",4) == 0 )
+                {
+                    push_image(oi,f_in,IS_UINT_IMAGE,CRT_Z);
+                }		
+                else 	if ( strncmp(argv[0],"imui",3) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        if (data_path[0] != 0)
+                          snprintf(file_name,sizeof(file_name),"%s%s",data_path,argv[0]);
+                        else snprintf(file_name,sizeof(file_name),"%s",argv[0]);
+                        push_image(oi,file_name,IS_UINT_IMAGE,0);
+                    }
+                }			
+                else 	if ( strncmp(argv[0],"imliz",4) == 0 )
+                {
+                    push_image(oi,f_in,IS_LINT_IMAGE,CRT_Z);
+                }		
+                else 	if ( strncmp(argv[0],"imli",3) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        if (data_path[0] != 0)
+                          snprintf(file_name,sizeof(file_name),"%s%s",data_path,argv[0]);
+                        else snprintf(file_name,sizeof(file_name),"%s",argv[0]);
+                        push_image(oi,file_name,IS_LINT_IMAGE,0);
+                    }
+                }			
+                else 	if ( strncmp(argv[0],"imcz",4) == 0 )
+                {
+                    push_image(oi,f_in,IS_CHAR_IMAGE,CRT_Z);
+                }		
+                else 	if ( strncmp(argv[0],"imc",3) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        if (data_path[0] != 0)
+                          snprintf(file_name,sizeof(file_name),"%s%s",data_path,argv[0]);
+                        else snprintf(file_name,sizeof(file_name),"%s",argv[0]);
+                        push_image(oi,file_name,IS_CHAR_IMAGE,0);
+                    }
+                }			
+                else 	if ( strncmp(argv[0],"imrgbz",6) == 0 )
+                {
+                    push_image(oi,f_in,IS_RGB_PICTURE,CRT_Z);
+                }		
+                else 	if ( strncmp(argv[0],"imrgb16z",8) == 0 )
+                {
+                    push_image(oi,f_in,IS_RGB16_PICTURE,CRT_Z);
+                }		
+                else 	if ( strncmp(argv[0],"imrgbaz",7) == 0 )
+                {
+                    push_image(oi,f_in,IS_RGBA_PICTURE,CRT_Z);
+                }		
+                else 	if ( strncmp(argv[0],"imrgba16z",9) == 0 )
+                {
+                    push_image(oi,f_in,IS_RGBA16_PICTURE,CRT_Z);
+                }		
+                else 	if ( strncmp(argv[0],"imrgba",6) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        if (data_path[0] != 0)
+                          snprintf(file_name,sizeof(file_name),"%s%s",data_path,argv[0]);
+                        else snprintf(file_name,sizeof(file_name),"%s",argv[0]);
+                        push_image(oi,file_name,IS_RGBA_PICTURE,0);
+                    }
+                }			
+                else 	if ( strncmp(argv[0],"imrgb",5) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        if (data_path[0] != 0)
+                          snprintf(file_name,sizeof(file_name),"%s%s",data_path,argv[0]);
+                        else snprintf(file_name,sizeof(file_name),"%s",argv[0]);
+                        push_image(oi,file_name,IS_RGB_PICTURE,0);
+                    }
+                }			
+                else 	if ( strncmp(argv[0],"imrgba16",8) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        if (data_path[0] != 0)
+                          snprintf(file_name,sizeof(file_name),"%s%s",data_path,argv[0]);
+                        else snprintf(file_name,sizeof(file_name),"%s",argv[0]);
+                        push_image(oi,file_name,IS_RGBA16_PICTURE,0);
+                    }
+                }			
+                else 	if ( strncmp(argv[0],"imrgb16",7) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        if (data_path[0] != 0)
+                          snprintf(file_name,sizeof(file_name),"%s%s",data_path,argv[0]);
+                        else snprintf(file_name,sizeof(file_name),"%s",argv[0]);
+                        push_image(oi,file_name,IS_RGB16_PICTURE,0);
+                    }
+                }			
+
+                else if (argc >= 2)
+                {
+                    argc--;
+                    argv++;
+                    cur_i_f++;
+                    if (cur_i_f < I_F_SIZE)
+                    {
+                        if (data_path[0] != 0)
+                          snprintf(file_name,sizeof(file_name),"%s%s",data_path,argv[0]);
+                        else snprintf(file_name,sizeof(file_name),"%s",argv[0]);
+                        i_f[cur_i_f].n_line = 0;
+                        i_f[cur_i_f].filename = file_name;
+                        i_f[cur_i_f].fpi = fopen(i_f[cur_i_f].filename,"r");
+                        if ( i_f[cur_i_f].fpi == NULL)
+                        {
+                            error_in_file("cannot open file\n%s",i_f[cur_i_f].filename);
+                            return MAX_ERROR;
+                        }
+                    }
+                    else
+                    {
+                        error_in_file("I cannot handle more\nthan %d nested files",I_F_SIZE);
+                        return MAX_ERROR;	
+                    }
+                }
+                break;
+                case 'l':		/* label for plot */
+                if ( strncmp(argv[0],"lxp",3) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        oi->x_prime_title = Mystrdupre(oi->x_prime_title, argv[0]);
+                    }
+                }
+                else if ( strncmp(argv[0],"lx",2) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        oi->x_title = Mystrdupre(oi->x_title, argv[0]);
+                    }
+                }
+                else if ( strncmp(argv[0],"lyp",3) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        oi->y_prime_title = Mystrdupre(oi->y_prime_title, argv[0]);
+                    }
+                }
+                else if ( strncmp(argv[0],"ly",2) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        oi->y_title = Mystrdupre(oi->y_title, argv[0]);
+                    }
+                }
+                else if ( strncmp(argv[0],"luw",3) == 0 )
+                {
+                    if (argc >= 4)
+                    {
+                        if(!gr_numb(&temp,&argc,&argv))	break;
+                        if(!gr_numb(&temp1,&argc,&argv)) break;						
+                        argc--;
+                        argv++;
+                        push_image_label(oi,temp,temp1,argv[0],USR_COORD+WHITE_LABEL);			
+                    }
+                }
+                else if ( strncmp(argv[0],"lrw",3) == 0 )
+                {
+                    if (argc >= 4)
+                    {
+                        if(!gr_numb(&temp,&argc,&argv))	break;
+                        if(!gr_numb(&temp1,&argc,&argv)) break;						
+                        argc--;
+                        argv++;
+                        push_image_label(oi,temp,temp1,argv[0],ABS_COORD+WHITE_LABEL);
+                    }
+                }	
+                else if ( strncmp(argv[0],"lvw",3) == 0 )
+                {
+                    if (argc >= 4)
+                    {
+                        if(!gr_numb(&temp,&argc,&argv))	break;
+                        if(!gr_numb(&temp1,&argc,&argv)) break;						
+                        argc--;
+                        argv++;
+                        push_image_label(oi,temp,temp1,argv[0],VERT_LABEL_USR+WHITE_LABEL);
+                    }
+                }		
+                else if ( strncmp(argv[0],"lv",2) == 0 )
+                {
+                    if (argc >= 4)
+                    {
+                        if(!gr_numb(&temp,&argc,&argv))	break;
+                        if(!gr_numb(&temp1,&argc,&argv)) break;						
+                        argc--;
+                        argv++;
+                        push_image_label(oi,temp,temp1,argv[0],VERT_LABEL_USR);
+                    }
+                }									
+                else if ( strncmp(argv[0],"lr",2) == 0 )
+                {
+                    if (argc >= 4)
+                    {
+                        if(!gr_numb(&temp,&argc,&argv))	break;
+                        if(!gr_numb(&temp1,&argc,&argv)) break;						
+                        argc--;
+                        argv++;
+                        push_image_label(oi,temp,temp1,argv[0],ABS_COORD);
+                    }
+                }
+                else 
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        oi->title = Mystrdupre(oi->title, argv[0]);
+                    }
+                }
+                break;
+                case 's':				
+                if ( strncmp(argv[0],"src",3) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        oi->im.source = Mystrdupre(oi->im.source, argv[0]);
+                    }
+                }
+                if ( strncmp(argv[0],"special",7) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        add_one_image(oi,IS_SPECIAL,(void*)argv[0]);
+                    }
+                }
+                break;
+                case 'n':
+                if ( argv[0][1] == 'x')
+                {
+                    if (!gr_numbi(&(oi->im.nx),&argc,&argv))	break;
+                    if (!gr_numbi(&(oi->im.nxs),&argc,&argv))	break;
+                    if (!gr_numbi(&(oi->im.nxe),&argc,&argv))	break;
+                }
+                else if ( argv[0][1] == 'y')
+                {
+                    if (!gr_numbi(&(oi->im.ny),&argc,&argv))		break;
+                    if (!gr_numbi(&(oi->im.nys),&argc,&argv))		break;
+                    if (!gr_numbi(&(oi->im.nye),&argc,&argv))		break;
+                }
+                else if ( argv[0][1] == 'f')
+                {
+                    if (!gr_numbi(&(oi->im.n_f),&argc,&argv))		break;
+                    if (oi->im.movie_on_disk) oi->im.n_f = -abs(oi->im.n_f);
+                    if (!gr_numbi(&(oi->im.c_f),&argc,&argv))		break;
+                }			
+                else
+                {
+                    error_in_file("%s :Invalid argument\n",cmd);
+                }
+                break;				
+                case 'p':		/* prefix and unit */
+                if ( argv[0][1] == 'x' )
+                {
+                    if (argc >= 3)
+                    {
+                        argc--;
+                        argv++;
+                        if (argv[0][0] != '!') 
+                            oi->x_prefix = Mystrdupre(oi->x_prefix, argv[0]);
+                        argc--;
+                        argv++;
+                        if (argv[0][0] != '!') 
+                            oi->x_unit = Mystrdupre(oi->x_unit, argv[0]);
+                    }
+                    else
+                    {
+                        error_in_file("-p prefix unit:\nInvalid argument\n%s",cmd);
+                    }
+                }	
+                else if ( argv[0][1] == 'y' )
+                {
+                    if (argc >= 3)
+                    {
+                        argc--;
+                        argv++;
+                        if ( argv[0][0] != '!' )
+                            oi->y_prefix = Mystrdupre(oi->y_prefix, argv[0]);
+                        argc--;
+                        argv++;
+                        if ( argv[0][0] != '!' )
+                            oi->y_unit = Mystrdupre(oi->y_unit, argv[0]);
+                    }
+                    else
+                    {
+                        error_in_file("-p prefix unit:\nInvalid argument\n%s",cmd);
+                    }				
+                }
+                break;
+                case 'd':		/* output device */
+                if ( strncmp(argv[0],"duration",8) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        if (sscanf(argv[0],"%lf",&(oi->im.record_duration)) != 1)
+                        {
+                            error_in_file("Improper duration\n\\it %s %s",cmd,argv[0]);
+                        }
+                    }
+                }
+
+                else if ( argv[0][1] == 'p' )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        if (strncpy(data_path,argv[0],sizeof(data_path)) == NULL)
+                            fprintf(stderr,"not a valid path %s\n",argv[0]);
+                    }
+                    else
+                    {
+                        error_in_file("-dp data_path:\nInvalid argument\n%s",cmd);	
+                    }
+                }	
+                break;
+                case 'a':		/* automatic abscissas */
+                if ( argv[0][1] == 'x')
+                {
+                    oi->dx = 1;
+                    if (!gr_numb(&(oi->dx),&argc,&argv))	break;
+                    if (!gr_numb(&(oi->ax),&argc,&argv))	break;
+                }
+                else if ( argv[0][1] == 'y')
+                {
+                    oi->dy = 1;
+                    if (!gr_numb(&(oi->dy),&argc,&argv))	break;
+                    if (!gr_numb(&(oi->ay),&argc,&argv))	break;
+                }
+                else if ( argv[0][1] == 'z')
+                {
+                    oi->dz = 1;
+                    if (!gr_numb(&(oi->dz),&argc,&argv))	break;
+                    if (!gr_numb(&(oi->az),&argc,&argv))	break;
+                }
+                else 
+                {
+                    error_in_file("Invalid option\n%s",cmd);
+                }
+                break;
+                case 'g':		/* grid style */
+                if (!gr_numb(&temp,&argc,&argv))
+                    itemp = argv[0][1]-'0';
+                else
+                    itemp = temp;
+                switch (itemp)
+                {
+                    case -'0':	/* null character */
+                    case 0:
+                        oi->iopt |= NOAXES;/*ioit+=NOAXES;*/
+                        break;
+                    case 1:
+                        oi->iopt |= TRIM;/*ioit += TRIM;*/
+                        break;
+                    case 3:
+                        oi->iopt |= AXES_PRIME;
+                        break;		
+                }
+                break;
+                case 't':		/* transpose x and y */
+                if ( strncmp(argv[0],"tus",3) == 0 )
+                {
+                    if (argc < 4)
+                        error_in_file("-tus :\nInvalid argument\n%s",cmd);
+                    itemp = 0; temp = 1; temp1 = 0;
+                    if (!gr_numb(&temp,&argc,&argv))		itemp = 1;
+                    if (!gr_numb(&temp1,&argc,&argv))		itemp = 1;
+                    if(itemp)		
+                        error_in_file("-tus :\nInvalid argument\n%s",cmd);
+                    argc--;				argv++;
+                    tmpch = strdup(argv[0]);
+                    type = 0; decade = 0; subtype = 0;
+                    if (argc >= 3)
+                    {
+                        if (!gr_numbi(&type,&argc,&argv))		itemp = 1;
+                        if (!gr_numbi(&decade,&argc,&argv))	itemp = 1;
+                        if (!gr_numbi(&subtype,&argc,&argv))	itemp = 2;
+                        if (itemp == 1)		
+                            error_in_file("-tus :\nInvalid argument\n%s",cmd);											
+                    }
+                    else if (unit_to_type(tmpch,&type,&decade))
+                        error_in_file("-tus :\nInvalid argument\n%s",cmd);
+                    un = build_unit_set(type, temp1, temp, (char)decade, 0, tmpch);
+                    if (tmpch)  {free(tmpch); tmpch = NULL;}
+                    if (un == NULL)		error_in_file("-tus :\ncant create\n%s",cmd);
+                    un->sub_type = subtype;
+                    add_one_image (oi, IS_T_UNIT_SET, (void *)un);
+                }
+
+                if ( argv[0][1] == 'k')	
+                    gr_numb(&(oi->tick_len),&argc,&argv);
+                else	if ( strncmp(argv[0],"treat",5) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        oi->im.treatement = Mystrdupre(oi->im.treatement, argv[0]);
+                    }
+                }
+                else	if ( strncmp(argv[0],"time",5) == 0 )
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        if (sscanf(argv[0],"%lu",&(oi->im.time)) != 1)
+                        {
+                            error_in_file("Improper time\n\\it %s %s",cmd,argv[0]);
+                        }
+                    }
+                }
+                else		oi->iopt |= CROSS;
+                break;
+                case 'x':		/* x limits */
+                if ( strncmp(argv[0],"x-periodic",10) == 0 )
+                {	
+                    oi->im.win_flag |= X_PER;
+                }		
+                else if ( strncmp(argv[0],"xus",3) == 0 )
+                {
+                    if (argc < 4)
+                        error_in_file("-xus :\nInvalid argument\n%s",cmd);
+                    itemp = 0; temp = 1; temp1 = 0;
+                    if (!gr_numb(&temp,&argc,&argv))		itemp = 1;
+                    if (!gr_numb(&temp1,&argc,&argv))		itemp = 1;
+                    if(itemp)		
+                        error_in_file("-xus :\nInvalid argument\n%s",cmd);
+                    argc--;				argv++;
+                    tmpch = strdup(argv[0]);
+                    type = 0; decade = 0; subtype = 0;
+                    if (argc >= 3)
+                    {
+                        if (!gr_numbi(&type,&argc,&argv))		itemp = 1;
+                        if (!gr_numbi(&decade,&argc,&argv))	itemp = 1;
+                        if (!gr_numbi(&subtype,&argc,&argv))	itemp = 2;
+                        if (itemp == 1)		
+                            error_in_file("-xus :\nInvalid argument\n%s",cmd);											
+                    }
+                    else if (unit_to_type(tmpch,&type,&decade))
+                        error_in_file("-xus :\nInvalid argument\n%s",cmd);
+                    un = build_unit_set(type, temp1, temp, (char)decade, 0, tmpch);
+                    if (tmpch) {free(tmpch);  tmpch = NULL;}
+                    if (un == NULL)		error_in_file("-xus :\ncant create\n%s",cmd);
+                    un->sub_type = subtype;
+                    add_one_image (oi, IS_X_UNIT_SET, (void *)un);
+                }
+                else 
+                {
+                    if ( argv[0][1] == 'n')	oi->iopt2 &= ~X_NUM;
+                    else			oi->iopt2 |= X_NUM;
+                    imxlimread(oi,&argc,&argv);
+                }
+                break;
+                case 'y':		/* y limits */
+                if ( strncmp(argv[0],"y-periodic",10) == 0 )
+                {	
+                    oi->im.win_flag |= Y_PER;
+                }		
+                else if ( strncmp(argv[0],"yus",3) == 0 )
+                {
+                    if (argc < 4)
+                        error_in_file("-yus :\nInvalid argument\n%s",cmd);
+                    itemp = 0; temp = 1; temp1 = 0;
+                    if (!gr_numb(&temp,&argc,&argv))	itemp = 1;
+                    if (!gr_numb(&temp1,&argc,&argv))	itemp = 1;
+                    if(itemp)		
+                        error_in_file("-yus :\nInvalid argument\n%s",cmd);
+                    argc--;				argv++;
+                    tmpch = strdup(argv[0]);
+                    type = 0; decade = 0; subtype = 0;
+                    if (argc >= 3)
+                    {
+                        if (!gr_numbi(&type,&argc,&argv))		itemp = 1;
+                        if (!gr_numbi(&decade,&argc,&argv))	itemp = 1;
+                        if (!gr_numbi(&subtype,&argc,&argv))	itemp = 2;
+                        if (itemp == 1)		
+                            error_in_file("-yus :\nInvalid argument\n%s",cmd);											
+                    }
+                    else if (unit_to_type(tmpch,&type,&decade))
+                        error_in_file("-yus :\nInvalid argument\n%s",cmd);
+                    un = build_unit_set(type, temp1, temp, (char)decade, 0, tmpch);
+                    if (tmpch) {free(tmpch);  tmpch = NULL;}
+                    if (un == NULL)		error_in_file("-yus :\ncant create\n%s",cmd);
+                    un->sub_type = subtype;
+                    add_one_image (oi, IS_Y_UNIT_SET, (void *)un);
+                }
+                else 
+                {
+                    if ( argv[0][1] == 'n')	oi->iopt2 &= ~Y_NUM;
+                    else			oi->iopt2 |= Y_NUM;
+                    imylimread(oi,&argc,&argv);	
+                }
+                break;
+                case 'z':		/* y limits */
+                if ( strncmp(argv[0],"zus",3) == 0 )
+                {
+                    if (argc < 4)
+                        error_in_file("-zus :\nInvalid argument\n%s",cmd);
+                    itemp = 0; temp = 1; temp1 = 0;
+                    if (!gr_numb(&temp,&argc,&argv))		itemp = 1;
+                    if (!gr_numb(&temp1,&argc,&argv))		itemp = 1;
+                    if(itemp)		
+                        error_in_file("-zus :\nInvalid argument\n%s",cmd);
+                    argc--;				argv++;
+                    tmpch = strdup(argv[0]);
+                    type = 0; decade = 0; subtype = 0;
+                    if (argc >= 3)
+                    {
+                        if (!gr_numbi(&type,&argc,&argv))		itemp = 1;
+                        if (!gr_numbi(&decade,&argc,&argv))	itemp = 1;
+                        if (!gr_numbi(&subtype,&argc,&argv))	itemp = 2;
+                        if (itemp == 1)		
+                            error_in_file("-zus :\nInvalid argument\n%s",cmd);											
+                    }
+                    else if (unit_to_type(tmpch,&type,&decade))
+                        error_in_file("-zus :\nInvalid argument\n%s",cmd);
+                    un = build_unit_set(type, temp1, temp, (char)decade, 0, tmpch);
+                    if (tmpch) {free(tmpch);  tmpch = NULL;}
+                    if (un == NULL)		error_in_file("-zus :\ncant create\n%s",cmd);
+                    un->sub_type = subtype;
+                    add_one_image (oi, IS_Z_UNIT_SET, (void *)un);
+                }
+                else 		imzlimread(oi,&argc,&argv);
+                break;
+                case 'h':
+                if (strncmp(argv[0],"his",3) == 0)
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        oi->im.history = Mystrdupre(oi->im.history, argv[0]);
+                    }
+                }
+                else gr_numb(&(oi->height),&argc,&argv);
+                break;
+                case 'w':
+                gr_numb(&(oi->width),&argc,&argv);
+                break;
+                case 'r':
+                gr_numb(&(oi->right),&argc,&argv);
+                break;
+                case 'u':
+                gr_numb(&(oi->up),&argc,&argv);
+                break;
+                default:
+                error_in_file("image Invalid argument\n%s",cmd);
+            }
+        }
+        return 0;
+    }
+
+    int imreadfile(O_i *oi, char const *file_name)
+    {
+        register int i, j, k;
+        int load_abort = 0;
+        float tmpx, tmpy;
+        char *c1 = NULL;
+        char *c2 = NULL;
+        char *line = NULL;
+        char *line1 = NULL;
+        char 	**agv = NULL;
+        char **agvk = NULL;
+        int 	agc = 0;
+        
+        //setlocale(LC_ALL, "C");
+        if (oi == NULL) return MAX_ERROR;
+        cur_i_f = 0;
+        n_error = 0;
+        oi->z_black = oi->z_white = 0;
+        i_f[cur_i_f].n_line = 0;
+        i_f[cur_i_f].filename = file_name;
+        i_f[cur_i_f].fpi = fopen(i_f[cur_i_f].filename,"r");
+        if ( i_f[cur_i_f].fpi == NULL)
+        {
+            return MAX_ERROR;
+        }
+        line = (char *)calloc(B_LINE,sizeof(char));
+        line1 = (char *)calloc(B_LINE,sizeof(char));	
+        agv = (char **)calloc(OP_SIZE,sizeof(char*));		
+        agvk = (char **)calloc(OP_SIZE,sizeof(char*));		
+
+        if ( line == NULL || line1 == NULL || agv == NULL || agvk == NULL)
+            return MAX_ERROR;
+
+        while ( load_abort < MAX_ERROR) 
+        {
+            while ((c1 = get_next_line(line)) == NULL && (cur_i_f > 0))
+            {
+                if (i_f[cur_i_f].fpi != NULL)
+                    fclose(i_f[cur_i_f].fpi);
+                i_f[cur_i_f].fpi = NULL;
+                cur_i_f--;
+            }
+            if ( c1 == NULL)	break;
+            line1[0]=0;
+            i = sscanf(line,"%f", &tmpx);
+            if (i == 1)	i = sscanf(line,"%f%f", &tmpx, &tmpy);
+            if (i == 2)	i = sscanf(line,"%f%f%s",&tmpx,&tmpy,line1);
+            if (i == 3) /* may be a label */
+            {
+                if ( line1[0] == '%') /* start a comment */
+                {
+                    i = 2;
+                    j = 0;
+                }
+                else if ( line1[0] == '"')/*start as a label*/
+                {
+                    c1 = strchr(line,'"');
+                    c2 = line1;
+                    j = get_label(&c1, &c2, line);
+                }
+                else
+                {
+                    error_in_file ("a label must start and end\nwith a double quote !...\n->%s",line);
+                    j = 0;
+                }
+                if ( j ) push_image_label(oi,tmpx,tmpy,c2,USR_COORD);
+                else if ( i == 3 )
+                {
+                    error_in_file("empty label !...\n->%s\n",line);
+                }
+            }
+            if ( i == 2 || i == 1)	/* may be a data point x,y !*/
+            {
+                error_in_file("you can't input an x,y data point\nfor an image... use a gr region\n->%s",line);
+            }
+            if ( i == 0 )	/* a command line */
+            {
+                /* advance to 1st item */
+              if (c1 != NULL)
+                {
+                while (*c1 == ' '||*c1 == '\t'||*c1 == '#') c1++;
+                for (k = 0 ; k < agc ; k++)	
+                {
+                    if (agvk[k] != NULL) 		free(agvk[k]);	
+                    agvk[k] = NULL;
+                }			
+                agc = 1;
+                while (  (*c1 != 0) )
+                {
+                    if ( *c1 == '%')	*c1 = 0;
+                    else if ( *c1 != '"')
+                    {
+                        if (sscanf(c1,"%s",line1) == 1)
+                        {
+                            agvk[agc] = agv[agc] = strdup(line1);
+                            agc++;
+                        }
+                        if (agc >= OP_SIZE)
+                        {
+                            error_in_file("too many options\nin input line\n->%s",line);
+                            load_abort = MAX_ERROR;
+                        }
+                        if (c1 != NULL && strchr(c1,' ') !=NULL)	c1 = strchr ( c1,' ');
+                        else if (c1 != NULL && strchr(c1,'\t') !=NULL) c1 = strchr (c1,'\t');
+                        else	*c1 = 0;
+                    }
+                    else
+                    {
+                        c2 = line1;
+                        c2[0] = 0;
+                        if (get_label(&c1,&c2, line))
+                        {
+                            agvk[agc] = agv[agc] = strdup(c2);
+                            agc++;
+                        }
+                        if (agc >= OP_SIZE)
+                        {
+                            error_in_file("too many options\nin input line\n->%s",line);
+                            load_abort = MAX_ERROR;
+                        }
+                    }
+                    if (c1 != NULL)
+                      {
+                        while ( *c1 == ' ' || *c1 == '\t' || *c1 == '\n' )
+                        c1++;
+                      }
+                }
+                }
+              if (agc > 1)
+                {
+                  if (set_image_opts(oi, agc, agv) == MAX_ERROR)
+                load_abort = MAX_ERROR;
+                }
+              for (k = 0 ; k < agc ; k++)	
+                {
+                  if (agvk[k] != NULL) 		free(agvk[k]);	
+                  agvk[k] = NULL;
+                }				
+              
+              /*			for ( ; agc > 0 ; agc--)	free(agvk[agc]);*/
+              agc = 1;
+            }
+        }
+        if (line) free(line);
+        if (line1) free(line1);	
+        if (agv) free(agv);
+        if (agvk) free(agvk);	
+
+        while ( cur_i_f >= 0 )
+        {
+            if (i_f[cur_i_f].fpi != NULL)		fclose(	i_f[cur_i_f].fpi);
+            if (i_f[cur_i_f].filename != NULL)	
+              {
+                i_f[cur_i_f].filename = NULL;
+              }
+            cur_i_f--;		
+        }
+        for (i = 0, j = 1, oi->c_xu = 0; i < oi->n_xu && j != 0 ; i++)
+        {
+            j = 0;
+            if (oi->ax != oi->xu[i]->ax) 	j = 1;
+            if (oi->dx != oi->xu[i]->dx) 	j = 1;
+            if (oi->x_unit == NULL || oi->xu[i]->name == NULL)	j = 1;
+            else if (strncmp(oi->xu[i]->name,oi->x_unit,strlen(oi->x_unit)) != 0)	j = 1;
+            if (j == 0) 	oi->c_xu = i;
+        }
+        for (i = 0, j = 1, oi->c_yu = 0; i < oi->n_yu && j != 0 ; i++)
+        {
+            j = 0;
+            if (oi->ay != oi->yu[i]->ax) 	j = 1;
+            if (oi->dy != oi->yu[i]->dx) 	j = 1;
+            if (oi->y_unit == NULL || oi->yu[i]->name == NULL)	j = 1;
+            else if (strncmp(oi->yu[i]->name,oi->y_unit,strlen(oi->y_unit)) != 0)	j = 1;
+            if (j == 0) 	oi->c_yu = i;
+        }
+        for (i = 0, j = 1, oi->c_zu = 0; i < oi->n_zu && j != 0 ; i++)
+        {
+            j = 0;
+            if (oi->az != oi->zu[i]->ax) 	j = 1;
+            if (oi->dz != oi->zu[i]->dx) 	j = 1;
+            if (oi->z_unit == NULL || oi->zu[i]->name == NULL)	j = 1;
+            else if (strncmp(oi->zu[i]->name,oi->z_unit,strlen(oi->z_unit)) != 0)	j = 1;
+            if (j == 0) 	oi->c_zu = i;
+        }
+        for (i = 0, j = 1, oi->c_tu = 0; i < oi->n_tu && j != 0 ; i++)
+        {
+            j = 0;
+            if (oi->at != oi->tu[i]->ax) 	j = 1;
+            if (oi->dt != oi->tu[i]->dx) 	j = 1;
+            if (oi->t_unit == NULL || oi->tu[i]->name == NULL)	j = 1;
+            else if (strncmp(oi->tu[i]->name,oi->t_unit,strlen(oi->t_unit)) != 0)	j = 1;
+            if (j == 0) 	oi->c_tu = i;
+        }
+        return n_error;
+    }
+
+    int init_one_image(O_i *oi, int type)
+    {
+        unit_set    *un;
+        int i;
+
+        if (oi == NULL) xvin_ptr_error(Wrong_Argument);
+
+        oi->type = type;
+        oi->width = oi->height = 1;
+        oi->right = oi->up = 0;
+        oi->iopt = 0;
+        oi->iopt2 = X_NUM | Y_NUM | IM_USR_COOR_RT;
+        oi->tick_len = -1;
+        oi->x_lo = oi->x_hi = oi->y_lo = oi->y_hi = 0;
+        oi->z_black = oi->z_white = 0;
+        oi->dx = oi->dy = oi->dz = oi->dt = 1;
+        oi->m_lab = MAX_DATA;
+        oi->n_lab = oi->im.nx = oi->im.ny = oi->im.nxs = 0;
+        oi->im.nys = oi->im.nxe = oi->im.nye = 0;
+        time(&(oi->im.time));
+        oi->filename = oi->dir = oi->title = NULL;
+        oi->x_title = oi->y_title = oi->x_prime_title = oi->y_prime_title = NULL;
+        oi->x_prefix = oi->y_prefix = oi->x_unit = oi->y_unit  = NULL;
+        oi->z_prefix = oi->t_prefix = oi->z_unit = oi->t_unit  = NULL;
+
+        oi->im.n_special = oi->im.m_special = 0;
+        oi->im.special = NULL;
+        oi->im.win_flag = X_NOT_PER & Y_NOT_PER;
+        oi->im.has_sqaure_pixel = 0;
+        oi->lab = (plot_label **)calloc(MAX_DATA, sizeof(plot_label *));
+
+        if (oi->lab == NULL) xvin_ptr_error(Out_Of_Memory);
+
+        oi->n_op = oi->m_op = 0;
+        oi->cur_op = -1;
+        oi->o_p = NULL;
+        oi->im.n_f = oi->im.m_f = oi->im.c_f = 0;
+        oi->im.pxl = NULL;
+        oi->im.pixel = NULL;
+        oi->im.mem = NULL;
+        oi->at = oi->ax = oi->ay = oi->az = 0;
+        oi->n_xu = oi->m_xu = oi->c_xu = 0;
+        oi->n_yu = oi->m_yu = oi->c_yu = 0;
+        oi->n_zu = oi->m_zu = oi->c_zu = 0;
+        oi->n_tu = oi->m_tu = oi->c_tu = 0;
+        oi->xu = NULL;
+        oi->yu = NULL;
+        oi->zu = NULL;
+        oi->tu = NULL;
+        un = build_unit_set(IS_RAW_U, 0, 1, 0, 0, NULL);
+
+        if (un == NULL) xvin_ptr_error(Out_Of_Memory);
+
+        add_to_one_image(oi, IS_X_UNIT_SET, (void *)un);
+        un = build_unit_set(IS_RAW_U, 0, 1, 0, 0, NULL);
+
+        if (un == NULL) xvin_ptr_error(Out_Of_Memory);
+
+        add_to_one_image(oi, IS_Y_UNIT_SET, (void *)un);
+        un = build_unit_set(IS_RAW_U, 0, 1, 0, 0, NULL);
+
+        if (un == NULL) xvin_ptr_error(Out_Of_Memory);
+
+        add_to_one_image(oi, IS_Z_UNIT_SET, (void *)un);
+        un = build_unit_set(IS_RAW_U, 0, 1, 0, 0, NULL);
+
+        if (un == NULL) xvin_ptr_error(Out_Of_Memory);
+
+        add_to_one_image(oi, IS_T_UNIT_SET, (void *)un);
+        oi->need_to_refresh |= ALL_NEED_REFRESH;
+        oi->buisy_in_thread = 0;
+        oi->data_changing = 0;
+        oi->transfering_data_to_box = 0;
+        oi->im.movie_on_disk = 0;
+        oi->im.source = NULL;
+        oi->im.record_duration = 0;
+        oi->im.s_l = NULL;
+        oi->im.m_sl = NULL;
+        oi->im.n_sl = NULL;
+        oi->im.user_ispare = NULL;
+        oi->im.user_fspare = NULL;
+        oi->im.user_nfpar = oi->im.user_nipar = 0;
+        oi->im.multi_page = 0;
+
+        for (i = 0 ; i < 8 ; i++)
+        {
+            oi->im.src_parameter_type[i] = NULL;
+            oi->im.src_parameter[i] = 0;
+        }
+
+        return 0;
+    }
+
+    int free_one_image(O_i *oi)
+    {
+        int i, j;
+        int data, nf;
+        union pix *p;
+
+        if (oi == NULL)     xvin_ptr_error(Wrong_Argument);
+
+        if (oi->im.n_f > 0 && oi->im.pxl != NULL)   p = oi->im.pxl[0];
+        else                        p = oi->im.pixel;
+
+        data = oi->im.data_type;
+
+        if (p != NULL)
+        {
+            if (data == IS_CHAR_IMAGE && p[0].ch != NULL)       free(p[0].ch);
+            else if (data == IS_INT_IMAGE && p[0].in != NULL)   free(p[0].in);
+            else if (data == IS_RGB_PICTURE && p[0].ch != NULL) free(p[0].ch);
+            else if (data == IS_RGB16_PICTURE && p[0].ch != NULL)   free(p[0].ch);
+            else if (data == IS_FLOAT_IMAGE && p[0].fl != NULL) free(p[0].fl);
+            else if (data == IS_COMPLEX_IMAGE && p[0].fl != NULL)   free(p[0].fl);
+            else if (data == IS_UINT_IMAGE && p[0].ui != NULL)  free(p[0].ui);
+            else if (data == IS_LINT_IMAGE && p[0].li != NULL)  free(p[0].li);
+            else if (data == IS_RGBA_PICTURE && p[0].ch != NULL)    free(p[0].ch);
+            else if (data == IS_RGBA16_PICTURE && p[0].ch != NULL)  free(p[0].ch);
+            else if (data == IS_DOUBLE_IMAGE && p[0].db != NULL)    free(p[0].db);
+            else if (data == IS_COMPLEX_DOUBLE_IMAGE && p[0].db != NULL)    free(p[0].db);
+        }
+
+        if (p != NULL)  free(p);
+
+        if (oi->im.pxl != NULL)             free(oi->im.pxl);
+
+        if (oi->im.mem != NULL)             free(oi->im.mem);
+
+        if (oi->im.over != NULL)
+        {
+            if (oi->im.over[0] != NULL)     free(oi->im.over[0]);
+
+            free(oi->im.over);
+        }
+
+        if (oi->im.special != NULL)
+        {
+            for (i = 0 ; i < oi->im.n_special ; i++)
+            {
+                if (oi->im.special[i] != NULL)
+                    free(oi->im.special[i]);
+            }
+
+            if (oi->im.special)  free(oi->im.special);
+        }
+
+        if (oi->im.source != NULL)          free(oi->im.source);
+
+        if (oi->im.history != NULL)         free(oi->im.history);
+
+        if (oi->im.treatement != NULL)      free(oi->im.treatement);
+
+        if (oi->filename != NULL)           free(oi->filename);
+
+        if (oi->dir != NULL)                free(oi->dir);
+
+        if (oi->title != NULL)          free(oi->title);
+
+        if (oi->x_title != NULL)            free(oi->x_title);
+
+        if (oi->y_title != NULL)            free(oi->y_title);
+
+        if (oi->x_prime_title != NULL)  free(oi->x_prime_title);
+
+        if (oi->y_prime_title != NULL)  free(oi->y_prime_title);
+
+        if (oi->x_prefix != NULL)       free(oi->x_prefix);
+
+        if (oi->y_prefix != NULL)       free(oi->y_prefix);
+
+        if (oi->x_unit != NULL)         free(oi->x_unit);
+
+        if (oi->y_unit != NULL)         free(oi->y_unit);
+
+        if (oi->z_prefix != NULL)       free(oi->z_prefix);
+
+        if (oi->t_prefix != NULL)       free(oi->t_prefix);
+
+        if (oi->z_unit != NULL)         free(oi->z_unit);
+
+        if (oi->t_unit != NULL)         free(oi->t_unit);
+
+        for (i = 0 ; i < oi->n_lab ; i++)
+            if (oi->lab[i]->text != NULL)   free(oi->lab[i]->text);
+
+        free(oi->lab);
+
+        for (i = 0 ; i < oi->n_op ; i++)
+            if (oi->o_p[i] != NULL)         free_one_plot(oi->o_p[i]);
+
+        if (oi->o_p != NULL)    free(oi->o_p);
+
+        nf = (oi->im.n_f > 0) ? oi->im.n_f : 1;
+
+        for (i = 0 ; i < nf ; i++)
+        {
+            if (oi->im.user_ispare != NULL && oi->im.user_ispare[i] != NULL)
+            {
+                free(oi->im.user_ispare[i]);
+                oi->im.user_ispare[i] = NULL;
+            }
+
+            if (oi->im.user_fspare != NULL && oi->im.user_fspare[i] != NULL)
+            {
+                free(oi->im.user_fspare[i]);
+                oi->im.user_fspare[i] = NULL;
+            }
+        }
+
+        if (oi->im.user_ispare != NULL) free(oi->im.user_ispare);
+
+        oi->im.user_ispare = NULL;
+
+        if (oi->im.user_fspare != NULL) free(oi->im.user_fspare);
+
+        oi->im.user_fspare = NULL;
+
+
+
+
+        if (oi->im.s_l != NULL && oi->im.m_sl != NULL && oi->im.n_sl != NULL)
+        {
+            for (i = 0 ; i < nf ; i++)
+            {
+                for (j = 0 ; j < oi->im.n_sl[i] ; j++)
+                {
+                    if (oi->im.s_l[i][j]->text != NULL)  free(oi->im.s_l[i][j]->text);
+
+                    free(oi->im.s_l[i][j]);
+                }
+
+                if (oi->im.s_l[i])  free(oi->im.s_l[i]);
+            }
+
+            free(oi->im.s_l);
+            free(oi->im.m_sl);
+            free(oi->im.n_sl);
+        }
+
+        if (oi->xu != NULL)
+        {
+            for (i = 0 ; i < oi->n_xu ; i++)   free_unit_set(oi->xu[i]);
+
+            free(oi->xu);
+        }
+
+        if (oi->yu != NULL)
+        {
+            for (i = 0 ; i < oi->n_yu ; i++)   free_unit_set(oi->yu[i]);
+
+            free(oi->yu);
+        }
+
+        if (oi->zu != NULL)
+        {
+            for (i = 0 ; i < oi->n_zu ; i++)   free_unit_set(oi->zu[i]);
+
+            free(oi->zu);
+        }
+
+        for (i = 0 ; i < 8 ; i++)
+        {
+            if (oi->im.src_parameter_type[i] != NULL)
+            {
+                free(oi->im.src_parameter_type[i]);
+                oi->im.src_parameter_type[i] = NULL;
+            }
+        }
+
+        free(oi);
+        oi = NULL;
+        return 0;
+    }
+}}
+
+namespace legacy
+{
+    ImData::ImData(std::string fname)
+        : _op((one_image *)calloc(1, sizeof(one_image)))
+    {
+        snprintf(f_in, 256, "%s", fname.c_str());
+        init_one_image(_op, 0);
+        try { imreadfile(_op, fname.c_str()); }
+        catch(...) 
+        {
+            free_one_image(_op);
+            _op = nullptr;
+            return;
+        }
+    }
+
+    std::string ImData::title() const
+    { return _op == nullptr || _op->title == nullptr ? "" : _op->title; }
+
+    std::pair<size_t, size_t> ImData::dims() const
+    { return {size_t(_op->im.nx), size_t(_op->im.ny)}; }
+
+    bool ImData::isfloat() const { return _op->im.data_type == IS_FLOAT_IMAGE; }
+    bool ImData::ischar () const { return _op->im.data_type == IS_CHAR_IMAGE; }
+    void ImData::data(void * vout) const
+    {
+        if (_op->im.data_type == IS_CHAR_IMAGE)
+        {
+            char * out = (char *) vout;
+            for (int i = _op->im.nys ; i < _op->im.nye ; i++)
+            {
+                auto ch = _op->im.pixel[i].ch;
+                for (int j = _op->im.nxs ; j < _op->im.nxe ; j++, ++out)
+                    out[0] = ch[j];
+            }
+        } else if(_op->im.data_type == IS_FLOAT_IMAGE) {
+            float * out = (float *) vout;
+            for (int i = _op->im.nys ; i < _op->im.nye ; i++)
+            {
+                float const * ch = _op->im.pixel[i].fl;
+                for (int j = _op->im.nxs ; j < _op->im.nxe ; j++, ++out)
+                    out[0] = ch[j];
+            }
+        }
+    }
+
+    ImData::~ImData() { if(_op != nullptr) free_one_image(_op); }
 }

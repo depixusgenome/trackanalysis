@@ -74,6 +74,35 @@ namespace legacy
         return res;
     }
 
+    pybind11::object _readim(std::string name)
+    {
+        ImData gr(name);
+        if(gr.isnone())
+            return pybind11::none();
+        pybind11::dict res;
+        res["title"] = pybind11::cast(gr.title());
+
+        auto dims = gr.dims();
+
+        std::vector<size_t> shape   = {dims.second, dims.first };
+        std::vector<size_t> strides(2);
+        if(gr.isfloat())
+        {
+            strides = { dims.first*sizeof(float), sizeof(float) };
+            std::vector<float> dt(dims.first*dims.second);
+            gr.data((void*)dt.data());
+            res["image"] = pybind11::array(shape, strides, dt.data());
+        }
+        else if(gr.ischar())
+        {
+            strides = { dims.first*sizeof(char), sizeof(char) };
+            std::vector<char> dt(dims.first*dims.second);
+            gr.data((void*)dt.data());
+            res["image"] = pybind11::array(shape, strides, dt.data());
+        }
+        return res;
+    }
+
     void pymodule(pybind11::module & mod)
     {
         using namespace pybind11::literals;
@@ -84,5 +113,7 @@ namespace legacy
                 "Reads a '.trk' file's rotation");
         mod.def("readgr", _readgr, "path"_a,
                 "Reads a '.gr' file and returns a dictionnary of datasets");
+        mod.def("readim", _readim, "path"_a,
+                "Reads a '.gr' file and returns an image");
     }
 }
