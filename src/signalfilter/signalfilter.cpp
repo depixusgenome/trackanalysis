@@ -198,18 +198,9 @@ namespace signalfilter
             fcn.finish();
         }
 
-        void run(Args cf, size_t nx, float *xd)
+        void run(Args const & cf, size_t nx, float *xd)
         {
             _BaseFunc func(nx, xd, nx);
-            if(cf.derivate)
-                run<_BaseFunc,_CovQuality<_Quality>>(cf, func);
-            else
-                run<_BaseFunc,_Quality>(cf, func);
-        }
-
-        void run(Args cf, std::valarray<float> & dt)
-        {
-            _BaseFunc func(dt.size(), &dt[0], dt.size());
             if(cf.derivate)
                 run<_BaseFunc,_CovQuality<_Quality>>(cf, func);
             else
@@ -327,7 +318,7 @@ namespace signalfilter
             fcn.finish();
         }
 
-        void run(Args cf, size_t nx, float * xd)
+        void run(Args const & cf, size_t nx, float * xd)
         {
             _MovingFunc fcn(cf, nx, xd);
             if(cf.derivate)
@@ -335,14 +326,35 @@ namespace signalfilter
             else
                 run<_MovingFunc,_Quality>(cf, fcn);
         }
+    }
 
-        void run(Args cf, std::valarray<float> & dt)
+    namespace clip
+    {
+        void run(Args const & cf, size_t sz, float * data)
         {
-            _MovingFunc func(cf, dt.size(), &dt[0]);
-            if(cf.derivate)
-                run<_MovingFunc,_CovQuality<_Quality>>(cf, func);
-            else
-                run<_MovingFunc,_Quality>(cf, func);
+            bool    looking = true;
+            float * start   = nullptr;
+            auto    y       = data;
+            for(auto e = y+sz; y != e; ++y)
+                if((y[0] >= cf.minval && y[0] <= cf.maxval) ^ looking)
+                {
+                    if(looking)
+                        start = y-1;
+                    else
+                    {
+                        if(y >= data)
+                            for(auto yc = start+1; yc != y; ++yc)
+                                *yc = *start;
+                        else
+                            for(auto yc = start+1; yc != y; ++yc)
+                                *yc = *y;
+                        start = nullptr;
+                    }
+                }
+
+            if(start >= data)
+                for(auto yc = start+1; yc != y; ++yc)
+                    *yc = *start;
         }
     }
 }

@@ -15,7 +15,7 @@ namespace signalfilter
                                                   19, 21, 23, 25, 27, 29, 31, 33};
         };
 
-        void run(Args, size_t, float *);
+        void run(Args const &, size_t, float *);
     }
 
     namespace nonlinear
@@ -29,6 +29,17 @@ namespace signalfilter
                                                   19, 21, 23, 25, 27, 29, 31, 33};
         };
 
-        void run(Args, size_t, float *);
+        void run(Args const &, size_t, float *);
+    }
+
+    namespace clip
+    {
+        struct Args
+        {
+            float minval;
+            float maxval;
+        };
+
+        void run(Args const & cf, size_t, float *);
     }
 }
