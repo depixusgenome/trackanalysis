@@ -1,7 +1,5 @@
 #ifndef SIGNALFILTER_ACCUMULATORS_HPP
 #   define SIGNALFILTER_ACCUMULATORS_HPP
-#include <boost/accumulators/accumulators.hpp>
-#include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/rolling_mean.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/accumulators/statistics/min.hpp>
@@ -445,5 +443,14 @@ namespace signalfilter { namespace stats
     template <typename T>
     inline auto compute(acc_t<T> const & x)
     { return ba::extract_result<T>(x);  };
+
+    template <typename T>
+    inline T hfsigma(size_t sz, T const * dt)
+    {
+        acc_t<bat::mediandeviation> quant;
+        for(size_t i = 1; i < sz; ++i)
+            quant(dt[i]-dt[i-1]);
+        return compute(quant);
+    }
 }}
 #endif

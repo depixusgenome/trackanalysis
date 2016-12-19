@@ -1,5 +1,6 @@
 #pragma once
 #include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
 #include <valarray>
 
 namespace boost { namespace accumulators { namespace tag {
@@ -146,4 +147,7 @@ namespace signalfilter { namespace stats
 
     template <typename T>
     inline auto compute(acc_t<T> const & x);
+
+    template <typename T>
+    T hfsigma(size_t sz, T const * dt);
 }}

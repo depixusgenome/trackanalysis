@@ -2,6 +2,7 @@
 #include <pybind11/numpy.h>
 #include "signalfilter/signalfilter.h"
 #include "signalfilter/stattests.h"
+#include "signalfilter/accumulators.hpp"
 namespace
 {
     template<typename T>
@@ -132,6 +133,23 @@ namespace samples { namespace normal {
     }
 }}
 
+namespace signalfilter { namespace stats {
+    void pymodule(pybind11::module & mod)
+    {
+        auto smod  = mod.def_submodule("stats");
+        smod.def("hfsigma", [](pybind11::array_t<float> & input)
+                            {
+                                auto buf = input.request();
+                                return hfsigma(buf.size, (float const *) buf.ptr);
+                            });
+        smod.def("hfsigma", [](pybind11::array_t<double> & input)
+                            {
+                                auto buf = input.request();
+                                return hfsigma(buf.size, (double const *) buf.ptr);
+                            });
+    }
+}}
+
 namespace signalfilter {
     void pymodule(pybind11::module & mod)
     {
@@ -139,5 +157,6 @@ namespace signalfilter {
         nonlinear      ::pymodule(mod);
         clip           ::pymodule(mod);
         samples::normal::pymodule(mod);
+        stats          ::pymodule(mod);
     }
 }
