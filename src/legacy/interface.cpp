@@ -96,7 +96,7 @@ namespace legacy
         else if(gr.ischar())
         {
             strides = { dims.first*sizeof(char), sizeof(char) };
-            std::vector<char> dt(dims.first*dims.second);
+            std::vector<unsigned char> dt(dims.first*dims.second);
             gr.data((void*)dt.data());
             res["image"] = pybind11::array(shape, strides, dt.data());
         }
