@@ -6,7 +6,7 @@ import wafbuilder as builder
 def build(bld):
     name  = builder.appname()
     pysrc = bld.path.ant_glob('**/*.py')
-    builder.checkpy  (bld, pysrc)
+    builder.checkpy  (bld, 'tests', pysrc)
     builder.copyfiles(bld, builder.appname(), pysrc)
 
 builder.make(locals())
