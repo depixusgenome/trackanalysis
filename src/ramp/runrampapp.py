@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u'''Runs the rampapp using flexx framwork'''
+import os
 import click
 from bokeh.server.server import Server
 from bokeh.application import Application
@@ -8,7 +9,8 @@ from bokeh.settings import settings
 from bokeh.application.handlers import FunctionHandler
 from flexx.webruntime import launch as _flexxlaunch
 from flexx.webruntime.common import StreamReader
-
+print("in runrampapp",os.getcwd())
+from ramp.rampapp import MyDisplay
 
 def _serverkwargs(kwa):
     server_kwargs = dict(kwa)
@@ -32,28 +34,9 @@ def _serverkwargs(kwa):
 
 def run(view, app, desktop, show): # pylint: disable=unused-argument
     u"Launches an view"
-    print("view = ",view) # ramp.rampapp.MyDisplay
-    if view.startswith('view.'):
-        view = view[5:]
-
-    if '.' not in view:
-        view = view.lower()+'.'+view
-
-    if view == 'toolbar.ToolBar':
-        app = 'default'
-
-    print("view =",view)
-    viewmod  = __import__(view[:view.rfind('.')], # pylint: disable=unused-variable
-                          fromlist = view[view.rfind('.')+1:])
-    #viewcls  = getattr(viewmod, view[view.rfind('.')+1:])
-
-    if app.startswith('app.'):
-        app = app[5:]
-
-    import ramp.rampapp
-    start = ramp.rampapp.MyDisplay.open
+    start = MyDisplay.open
     spec_server = {"title" : "Ramp analysis",
-                   "size" : (2000,2000)}
+                   "size" : (1000,1000)}
     server = Server(Application(FunctionHandler(start)), **spec_server)
 
     old = StreamReader.run
