@@ -3,12 +3,16 @@
 u'''
 first simple version
 Will need rewritting to use Event()
+add : 
+set size of the display in width such that both plots can be seen at once
+structural blocking (occurs 90 per cent of time) or oligo binding (appears less frequently, to estimate)
+legend cdf 
 '''
 
 from typing import Sequence
 from bokeh.plotting import curdoc, figure
 from bokeh.layouts import widgetbox, column, row
-from bokeh.models import ColumnDataSource
+from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.models import TextInput, Div, Button
 import pandas as pd
 import numpy
@@ -23,7 +27,7 @@ class DisplayText:
 
         self.prefix = prefix
         self.div = Div(text = prefix, render_as_text = True,
-                       width=300, height=50)
+                       width=500, height=50)
 
     def update(self, data:Sequence):
         u''' update shown data
@@ -39,16 +43,59 @@ class DisplayHist:
         title = kwargs.get("title", None)
         x_label = kwargs.get("x_label", None)
         y_label = kwargs.get("y_label", None)
-        self.fig = figure(title = title, x_axis_label = x_label,
-                          y_axis_label = y_label)
-        self.datasrc = ColumnDataSource({"top":[0], "left":[0], "right":[0]})
-        self.fig.quad(top = "top", bottom = 0,
-                      left = "left", right = "right", source = self.datasrc)
+        circle_size = kwargs.get("circle_size", 10)
+        fig_width = kwargs.get("fig_width", 600)
+        fig_height = kwargs.get("fig_height", 600)
+        fill_color = kwargs.get("fill_color", "red")
+        self.with_cdf = kwargs.get("with_cdf", False) # bool
 
-    def update(self,data:dict)->None:
-        u''' updates columnDataSource
+        self.fig = figure(title = title,
+                          x_axis_label = x_label,
+                          y_axis_label = y_label,
+                          width = fig_width,
+                          height = fig_height)
+
+
+        hover = HoverTool(tooltips=[("(x,y)", "(@x, @cdf)")])
+        self.fig.add_tools(hover)
+        self.rawdata = pd.Series()
+
+        self.cdfdata = ColumnDataSource({"x" : [], "cdf" : [] }) if \
+                       self.with_cdf else None
+
+        self.histdata = ColumnDataSource({"top":[0], "left":[0], "right":[0]})
+        self.fig.quad(top = "top", bottom = 0,
+                      left = "left", right = "right", source = self.histdata)
+
+
+        if self.with_cdf :
+            self.fig.circle(x="x",
+                            y="cdf",
+                            source = self.cdfdata,
+                            size = circle_size,
+                            fill_color = fill_color)
+
+    def update(self, data)->None:
+        u'''
+        updates the values displayed
         '''
-        self.datasrc.data = data
+        self.rawdata = pd.Series(numpy.sort(data))
+
+        hist, edges = numpy.histogram(data)
+        self.histdata.data = {"top" : hist/hist.sum(),
+                              "left" : edges[:-1], "right" : edges[1:]}
+
+        if self.cdfdata is not None:
+            # to correct for bokeh indices there is duplicates in cdf: set(tuple(x,y))
+            cdf = numpy.array([(self.rawdata<=i).sum() for i in self.rawdata])
+            cdf = cdf/float(cdf.size)
+            xycoords = set([(self.rawdata.values[i], cdf[i]) for i in range(len(cdf))])
+
+            self.cdfdata.data = {"x" : [i[0] for i in xycoords],
+                                 "cdf" : [i[1] for i in xycoords]}
+
+        return
+
 class Data:
     u''' Manages the data
     '''
@@ -67,11 +114,9 @@ class Data:
         u'''
         updates data if the filename changes
         '''
-        print("updating rpdata from file")
         self.rpdata.setTrack(filename)
         self.rpdata.clean()
         self.rpfulldata.setTrack(filename)
-        print("updating rpdata from file : Done")
 
 class Select:
     u'''
@@ -84,7 +129,7 @@ class Select:
 
         self.button = Button(label = label)
         self.dial = view.dialog.FileDialog(filetypes = filetypes,
-                                           title = "diag title")
+                                           title = "please choose a ramp file")
 
 class MyDisplay:
     u'''
@@ -100,16 +145,20 @@ class MyDisplay:
             self.data = Data()
         if self.doc is None:
             self.doc = curdoc()
-        self.divs = {"good":DisplayText("good beads are : "),
+        self.divs = {"ngoods":DisplayText("number of good beads : "),
+                     "good":DisplayText("good beads are : "),
                      "ugly":DisplayText("ugly beads are : "),
                      "fixed":DisplayText("fixed beads are : ")}
 
         self.hists = {"zmop": DisplayHist(x_label = "zmag_open",
-                                          y_label ="Probability"),
+                                          y_label ="Probability",
+                                          with_cdf = True),
                       "zmcl": DisplayHist(x_label = "zmag_close",
-                                          y_label ="Probability")}
+                                          y_label ="Probability",
+                                          with_cdf = True)}
         self.txt_inputs = {"minext" : \
-                           TextInput(value = "0.0", title = "min molecule extension")}
+                           TextInput(value = "0.0",
+                                     title = "min molecule extension")}
 
         def tmp(attr,old,new): # pylint: disable=unused-argument
             u''' bokeh requires attr, old, new'''
@@ -121,33 +170,25 @@ class MyDisplay:
         self.sel = {"rpfile":Select(label = "Select file", filetypes = "trk")}
         self.sel["rpfile"].button.on_click(self.change_data_file)
 
-        self.set_mylayout()
+        self.set_layout()
 
-    def set_mylayout(self):
+    def set_layout(self):
         u''' specific layout of widgets
         '''
-        docrows = []
-        docrows.append(widgetbox(self.sel["rpfile"].button))
-        docrows.append(self.divs["good"].div)
-        docrows.append(self.divs["ugly"].div)
-        docrows.append(widgetbox(self.txt_inputs["minext"]))
-        docrows.append(self.divs["fixed"].div)
-        # docrows.append(row(column(fightop,tableop), column(fightcl,tablecl)) )
-        docrows.append(row(column(self.hists["zmop"].fig), column(self.hists["zmcl"].fig)) )
-        self.doc.add_root(column(*docrows))
+        self.doc.add_root(column(*self.get_layout()))
 
 
-    def get_mylayout(self):
+    def get_layout(self):
         u'''
         returns docrows
         '''
         docrows = []
         docrows.append(widgetbox(self.sel["rpfile"].button))
+        docrows.append(self.divs["ngoods"].div)
         docrows.append(self.divs["good"].div)
         docrows.append(self.divs["ugly"].div)
         docrows.append(widgetbox(self.txt_inputs["minext"]))
         docrows.append(self.divs["fixed"].div)
-        # docrows.append(row(column(fightop,tableop), column(fightcl,tablecl)) )
         docrows.append(row(column(self.hists["zmop"].fig), column(self.hists["zmcl"].fig)) )
 
         return docrows
@@ -165,7 +206,7 @@ class MyDisplay:
         u'''
         called when User selects a new file
         '''
-        file_diag = view.dialog.FileDialog(filetypes = "trk", title = "diag title")
+        file_diag = view.dialog.FileDialog(filetypes = "trk", title = "please choose a ramp file")
         filename = file_diag.open()
         self._update_rpdata_from_file(filename)
         self._update_text_info()
@@ -192,41 +233,30 @@ class MyDisplay:
                else self.data.rpfulldata.noBeadCrossIds()
         fixed =  {} if self.data.rpfulldata is None\
                  else self.data.rpfulldata.getFixedBeadIds()
+        self.divs["ngoods"].update(len(good))
         self.divs["good"].update(good)
         self.divs["ugly"].update(ugly)
         self.divs["fixed"].update(fixed)
 
 
     def _update_zmag_info(self):
-        #global topdata, tcldata, src_fightop, src_fightcl
         zmagop = pd.DataFrame() if self.data.rpdata is \
                  None else self.data.rpdata.zmagOpen()
         zmagcl = pd.DataFrame() if self.data.rpdata is \
                  None else self.data.rpdata.zmagClose()
-        #zmoseries = pd.Series(zmagop.values.flatten())
-        histop, edgesop = numpy.histogram(zmagop.values.flatten())
-        dataop = {"top" : histop/histop.sum(),
-                  "left" : edgesop[:-1], "right" : edgesop[1:]}
-        self.hists["zmop"].update(dataop)
 
-        #topdata.data = {"quantiles":quantiles,
-        #                "zmag":[round(zmoseries.quantile(i),2) for i  in quantiles]}
-        #print("updated topdata.data")
-        #zmcseries = pd.Series(zmagcl.values.flatten())
-        histcl, edgescl = numpy.histogram(zmagcl.values.flatten())
-        datacl = {"top":histcl/histcl.sum(), "left":edgescl[:-1], "right":edgescl[1:]}
-        self.hists["zmcl"].update(datacl)
-        #tcldata.data = {"quantiles":quantiles,
-        #                "zmag":[round(zmcseries.quantile(i),2) for i  in quantiles]}
-        print("out _update_zmag_info")
+        self.hists["zmop"].update(zmagop.values.flatten())
+
+        self.hists["zmcl"].update(zmagcl.values.flatten())
 
 
 if __name__=="__main__":
+    # should move this to unit test
     BOKEHDOC = MyDisplay().open(curdoc())
-    ROWS = MyDisplay(doc = curdoc()).get_mylayout()
+    ROWS = MyDisplay(doc = curdoc()).get_layout()
     curdoc().add_root(column(*ROWS))
     RPDATA = Data()
     RPDATA.update_data("/home/david/work/trackanalysis/tests/testdata/ramp_5HPs_mix.trk")
     DISPLAY = MyDisplay(data = RPDATA, doc = curdoc())
-    ROWS = DISPLAY.get_mylayout()
+    ROWS = DISPLAY.get_layout()
 
