@@ -3,13 +3,10 @@
 u'''
 first simple version
 Will need rewritting to use Event()
-add : 
+add :
 set size of the display in width such that both plots can be seen at once
-structural blocking (occurs 90 per cent of time) or oligo binding (appears less frequently, to estimate)
-legend cdf 
 '''
 
-from typing import Sequence
 from bokeh.plotting import curdoc, figure
 from bokeh.layouts import widgetbox, column, row
 from bokeh.models import ColumnDataSource, HoverTool
@@ -23,16 +20,18 @@ import view.dialog
 class DisplayText:
     u''' Manages the Display : widgets, bokeh doc
     '''
-    def __init__(self, prefix):
+    def __init__(self,**kwargs):
 
-        self.prefix = prefix
-        self.div = Div(text = prefix, render_as_text = True,
-                       width=500, height=50)
+        self.prefix = kwargs.get("prefix","")
+        width = kwargs.get("width",500)
+        height = kwargs.get("height",50)
+        self.div = Div(text = self.prefix, render_as_text = True,
+                       width=width, height=height)
 
-    def update(self, data:Sequence):
-        u''' update shown data
+    def update(self, newstr:str):
+        u''' update shown text
         '''
-        self.div.text = self.prefix + str(data)
+        self.div.text = self.prefix + str(newstr)
 
 class DisplayHist:
     u''' Contains fig and ColumnDataSource
@@ -145,10 +144,11 @@ class MyDisplay:
             self.data = Data()
         if self.doc is None:
             self.doc = curdoc()
-        self.divs = {"ngoods":DisplayText("number of good beads : "),
-                     "good":DisplayText("good beads are : "),
-                     "ugly":DisplayText("ugly beads are : "),
-                     "fixed":DisplayText("fixed beads are : ")}
+        self.divs = {"ngoods":DisplayText(prefix="number of good beads : "),
+                     "good":DisplayText(prefix="good beads are : "),
+                     "ugly":DisplayText(prefix="ugly beads are : "),
+                     "fixed":DisplayText(prefix="fixed beads are : "),
+                     "filestatus":DisplayText(prefix="")}
 
         self.hists = {"zmop": DisplayHist(x_label = "zmag_open",
                                           y_label ="Probability",
@@ -183,7 +183,8 @@ class MyDisplay:
         returns docrows
         '''
         docrows = []
-        docrows.append(widgetbox(self.sel["rpfile"].button))
+        #docrows.append(widgetbox(self.sel["rpfile"].button,self.divs["filestatus"].div))
+        docrows.append(row(widgetbox(self.sel["rpfile"].button),self.divs["filestatus"].div))
         docrows.append(self.divs["ngoods"].div)
         docrows.append(self.divs["good"].div)
         docrows.append(self.divs["ugly"].div)
@@ -200,7 +201,7 @@ class MyDisplay:
         self.data.rpmod.setMinExt(float(self.txt_inputs["minext"].value))
         fixed =  {} if self.data.rpfulldata is None\
                  else self.data.rpfulldata.getFixedBeadIds()
-        self.divs["fixed"].update(fixed)
+        self.divs["fixed"].update(str(fixed))
 
     def change_data_file(self):
         u'''
@@ -208,9 +209,11 @@ class MyDisplay:
         '''
         file_diag = view.dialog.FileDialog(filetypes = "trk", title = "please choose a ramp file")
         filename = file_diag.open()
+        self.divs["filestatus"].update("Loading new file..")
         self._update_rpdata_from_file(filename)
         self._update_text_info()
         self._update_zmag_info()
+        self.divs["filestatus"].update("New file  loaded!")
 
     @classmethod
     def open(cls,doc):
@@ -233,10 +236,10 @@ class MyDisplay:
                else self.data.rpfulldata.noBeadCrossIds()
         fixed =  {} if self.data.rpfulldata is None\
                  else self.data.rpfulldata.getFixedBeadIds()
-        self.divs["ngoods"].update(len(good))
-        self.divs["good"].update(good)
-        self.divs["ugly"].update(ugly)
-        self.divs["fixed"].update(fixed)
+        self.divs["ngoods"].update(str(len(good)))
+        self.divs["good"].update(str(good))
+        self.divs["ugly"].update(str(ugly))
+        self.divs["fixed"].update(str(fixed))
 
 
     def _update_zmag_info(self):

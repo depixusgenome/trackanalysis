@@ -8,10 +8,9 @@ need to add a little marker specifying when the data is loaded
 Add a test : if min molextension is too big
 '''
 import functools
-from typing import Optional, Tuple , Set # pylint: disable=unused-import
-import warnings
+from typing import Optional, Tuple , Set, List # pylint: disable=unused-import
 import numpy
-import pandas as pd # type: ignore
+import pandas as pd
 from data import Track
 
 class RampModel:
@@ -22,10 +21,8 @@ class RampModel:
         self.scale = 5.0
         self.needsCleaning = False
         self.corrThreshold = 0.5
-        self._minExt = None
+        self._minExt = kwargs.get("minExtension",0.0)
         self.window = 5
-        if "minExtension" in kwargs:
-            self._minExt=kwargs["minExtension"]
 
     def setMinExt(self,value):
         u'''
@@ -39,8 +36,6 @@ class RampModel:
         Returns _minExt value.
         Warns User if _minExt has not be set.
         '''
-        if self._minExt is None:
-            warnings.warn(UserWarning("minimal extension minExt has no value assigned"))
         return self._minExt
 
 class RampTask:
@@ -54,14 +49,14 @@ class RampController:
     '''
     pass
 
-class RampData:
+class RampData: # pylint: disable=too-many-public-methods
     u'''sets up ramp analysis using RampModel for parametrisation'''
 
     def __init__(self, **kwargs) -> None:
         self.dataz = kwargs.get("data", None)
         self.model = kwargs.get("model", None)
         self.dzdt = None # type: Optional[pd.DataFrame]
-        self.bcids = None # type: Set[Tuple[int,int]]
+        self.bcids = None # type: List[Tuple[int,int]]
         self.ncycles = None # type: int
         self.det = None # type: Optional[pd.DataFrame]
         if self.dataz is not None :
@@ -107,7 +102,7 @@ class RampData:
 
     def _setup(self):
         self.dzdt = self.dataz.rename_axis(lambda x:x-1)-self.dataz.rename_axis(lambda x:x+1)
-        self.bcids = {k for k in self.dzdt.keys() if isinstance(k[0], int)}
+        self.bcids = [k for k in self.dzdt.keys() if isinstance(k[0], int)]
         self.ncycles = max(i[1] for i in self.bcids) +1
 
     def zmagClose(self, reverse_time:bool = False):
@@ -136,14 +131,27 @@ class RampData:
     def _estZAtOpening(self)-> pd.Series:
         u'''
         detect indices of changes in dzdt
-        take the previous index in dataz
+        take the index preceding the first in dataz
         '''
         ids = self.dzdt[self.dzdt[self.det]>0].apply(lambda x:x.first_valid_index())
-        ids = ids[list(self.bcids)]
+        ids = ids[self.bcids]
         zest = pd.Series([numpy.nan for i in ids.keys()], index = ids.keys())
         ids = ids[ids.notnull()]
         for k, val in ids.items():
             zest[k] = self.dataz[k][int(val - 1)]
+        return zest
+
+    def _estZWhenOpened(self)-> pd.Series:
+        u'''
+        detect indices of changes in dzdt
+        take the last index in dataz
+        '''
+        ids = self.dzdt[self.dzdt[self.det]>0].apply(lambda x:x.last_valid_index())
+        ids = ids[self.bcids]
+        zest = pd.Series([numpy.nan for i in ids.keys()], index = ids.keys())
+        ids = ids[ids.notnull()]
+        for k, val in ids.items():
+            zest[k] = self.dataz[k][int(val)]
         return zest
 
     def keepBeadIds(self,bids:set)->None:
@@ -151,11 +159,11 @@ class RampData:
         pops all unwanted beads
         '''
 
-        self.bcids = {k for k in self.bcids if k[0] in bids}
+        self.bcids = [k for k in self.bcids if k[0] in bids]
         self.ncycles = max(i[1] for i in self.bcids) +1
 
         keys = [k for k in self.dataz.keys() if not isinstance(k[0],int)]
-        keys += list(self.bcids)
+        keys += self.bcids
         self.dataz = self.dataz[keys]
         self.dzdt = self.dzdt[keys]
         self.det = detectOutliers(self.dzdt,self.model.scale)
@@ -209,7 +217,7 @@ class RampData:
         u''' estimate the z value corresponding to phase 3
         '''
 
-        return self.dataz[list(self.bcids)].apply(
+        return self.dataz[self.bcids].apply(
             lambda x:x.rolling(window=self.model.window,center=True).median()).max()
 
     def _estimateUnitScale(self)->int:
@@ -226,11 +234,12 @@ class RampData:
     def getFixedBeadIds(self)->set:
         u'''
         returns set of bead ids considered fixed
-        must be modified to use estMolExt instead of dataz
+        must be modified to use estExtHPsize instead of dataz
         '''
         # check that the bead never opens
-        closed = self.dataz < self.model.getMinExt()
-        clids = {i[0] for i in self.bcids if all(closed[i]) }
+        closed = (self.dataz[self.bcids].max()-self.dataz[self.bcids].min()) <self.model.getMinExt()
+        clids = {i[0] for i in self.bcids if\
+                 all([closed[bcid] for bcid in self.bcids if bcid[0]==i[0]]) }
         return self._beadIdsCorr2zmag(toconsider = clids)
 
 
@@ -259,14 +268,92 @@ class RampData:
         return set(beadids)
 
 
-    def estMolExt(self):
-        u''' estimates molecule extension from z
-        before opening () to its value in phase 3'''
+    def estExtHPsize(self):
+        u''' estimates the size of the extended HP
+        diff of z before opening () to its value in phase 3'''
         zph3 = self._estimateZPhase3()
 
         zop = self._estZAtOpening()
         return zph3-zop
 
+    def estHPsize(self)->pd.DataFrame:
+        u''' estimates HP size before extension
+        from z before opening () to its value when opened but before stretching
+        bead ids are rows and cycleids are in column
+        '''
+        diff_op = self._estZWhenOpened() - self._estZAtOpening()
+        nbeads = len(self.beads())
+        size_est = pd.DataFrame({i:[numpy.nan]*nbeads\
+                                  for i in range(self.ncycles)}, index = self.beads())
+        for key,val in diff_op.items():
+            size_est.loc[key[0],key[1]]=val
+        return size_est
+
+
+    def can_be_structure_event(self):
+        u'''
+        returns a boolean map. True if a plateau in z(t) is detected. False otherwise.
+        '''
+        se_map = self.dzdt[(self.det) & (self.dzdt<0)].apply(_se_map)
+        return (se_map) & (~self.det)
+
+    def z_blockings(self):
+        u'''
+        for each bead, return the values of z where a blocking has occured
+        '''
+        se_map = self.can_be_structure_event()
+        return self.dataz[se_map]
+
+    def count_z_blockings(self):
+        u'''
+        returns a value of z and the number of times the bead has blocked at this value.
+        Questions : can we use this differentiate between hairpins ?
+        If this is provides a way to fingerprint the hairpin then
+        we can use this to align the different cycles (replacement to phase 5 alignement
+        (optimistic))
+        '''
+        # over estimating each z counts
+        # take the histogram of each cycles, if there is overlap between bins, merge
+        zvalues = {i:[] for i in self.beads()}
+        zblocks = self.z_blockings()
+        for bcid in self.bcids:
+            zvalues[bcid[0]].extend(zblocks[bcid].dropna().values)
+        return [numpy.array(zvalues[i]) for i in zvalues.keys()]
+
+def cluster1D_dbscan(values,eps=0.2,min_samples=3,**kwargs):
+    u'''
+    use DBSCAN algorithm to define clusters. Assumes a drop in density
+    values is a numpy array of 1D-values
+    applies the dbscan algorithm to cluster values
+    handles the same optional arguments as sklearn.cluster.dbscan
+    '''
+    if values.size==0:
+        return []
+    try:
+        from sklearn.cluster import dbscan
+    except ImportError as err:
+        print("Cannot import sklearn.cluster (not available in windows).")
+        print(err)
+        print("returning")
+    return dbscan(values.reshape(-1,1),
+                  eps,
+                  min_samples,
+                  kwargs)[1]
+
+
+def _se_map(data:pd.Series):
+    u'''
+    return True for values whose index>first_valid_index()
+    and index<last_valid_index()
+    '''
+    fid = data.first_valid_index()
+    if fid is None:
+        fid = data.index[-1]
+    lid = data.last_valid_index()
+    if lid is None:
+        lid = data.index[0]
+    return (data.index> fid) &\
+        (data.index<lid)
 
 class Dubious:
     u'''
@@ -338,7 +425,6 @@ def isGoodBeadCycle(dzdt:pd.Series, scale:float, unit_scale:int):
         return False
     return _isdzdt_unit_consistent(dzdt,scale,unit_scale)
 
-
 def detectOutliers(dzdt,scale:float):
     u'''detects opening and closing '''
     # quantile detection
@@ -348,31 +434,10 @@ def detectOutliers(dzdt,scale:float):
     min_outlier = quant1-scale*(quant3-quant1)
     return (dzdt>max_outlier)|(dzdt<min_outlier)
 
-
-def crossHasBead():
-    u'''Check whether there is a bead under the cross'''
-    # to implement
-    pass
-
-def fixedBead():
-    u''' bead does not open/close '''
-    # to implement
-    pass
-
-def fixedBeadIds():
-    u'''
-    returns the set of beads supposedly fixed :
-    z correlated with zmag
-    '''
-    # to finish implementing
-    # corr=self.dataz.corr()>self.model.corrThreshold
-    # need more conditions to qualify as fixed bead
-    pass
-
-
 def can_be_structure_event(dzdt,detected):
     u'''
     args : dzdt and detected (output of detect_outliers(dzdt))
+    Need to apply this to the full data set and not on each cycle
     '''
     # find when rezipping starts
     st_rezip = dzdt[dzdt[detected]<0].apply(lambda x: x.first_valid_index())
