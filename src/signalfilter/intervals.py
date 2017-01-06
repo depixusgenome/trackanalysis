@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Interval detection"
+u"Interval detection: finding flat sections in the signal"
 
 from    typing import NamedTuple
 import  numpy

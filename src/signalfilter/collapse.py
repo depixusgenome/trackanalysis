@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Collapses intervals"
+u"""
+Collapse intervals. The idea is to measure the behaviour common to all
+stretches of data. This should be removed as it's source is either a (thermal,
+electric, ...) drift or a mechanical vibration.
+"""
 from typing import Optional
 import numpy as np # type: ignore
 
