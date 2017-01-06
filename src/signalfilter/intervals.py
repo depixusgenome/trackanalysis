@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 u"Interval detection"
 
+from    typing import NamedTuple
 import  numpy
 
 # pylint: disable=no-name-in-module,import-error
@@ -33,7 +34,7 @@ class DetectFlats:
         self._kern   = numpy.ones((self._window*2,))
         self._kern[-self._window:] = -1.
         self._lrng   = numpy.arange(self._window+1)[-1:0:-1]
-        self._hrng   = numpy.arange(self._window+1)[1:]
+        self._hrng   = numpy.arange(self._window)[1:]
 
     window = property(lambda self: self._window, _setwindow)
 
@@ -63,6 +64,11 @@ class DetectFlats:
                 start = end
             if start+1 < len(data):
                 yield slice(start, len(data))
+
+    @classmethod
+    def run(cls, data, **kwa):
+        u"instantiates and calls class"
+        return cls(**kwa)(data)
 
 class MergeFlats:
     u"""
@@ -99,7 +105,7 @@ class MergeFlats:
 
         statslast = last.stop-last.start, data[last].mean(), 0.
         for cur in iinter:
-            statscur = (len(data[cur]), data[cur].mean(), 0.)
+            statscur = cur.stop - cur.start, data[cur].mean(), 0.
             if check(statscur, statslast):
                 last      = slice(last.start, cur.stop)
                 statslast = last.stop-last.start, data[last].mean(), 0.
@@ -108,6 +114,11 @@ class MergeFlats:
                 last      = cur
                 statslast = statscur
         yield last
+
+    @classmethod
+    def run(cls, *args, **kwa):
+        u"instantiates and calls class"
+        return cls(**kwa)(*args)
 
 class FilterFlats:
     u"""
@@ -130,3 +141,19 @@ class FilterFlats:
         else:
             yield from (slice(i.start+edx,i.stop-edx) for i in intervals
                         if i.stop-i.start >= minl)
+
+    @classmethod
+    def run(cls, *args, **kwa):
+        u"instantiates and calls class"
+        return cls(**kwa)(*args)
+
+IdRange = NamedTuple('IdRange', (('start', int), ('stop', int), ('cycle', int)))
+def tocycles(starts, inters):
+    u"Takes intervals on a bead to intervals on cycles"
+    if hasattr(starts, 'phaseid'):
+        starts = starts.phaseid(all,0)
+
+    for cur in inters:
+        cyc  = numpy.searchsorted(starts, cur.start)
+        bias = starts[max(0,cyc-1)]
+        yield IdRange(cur.start-bias, cur.stop-bias, cyc)

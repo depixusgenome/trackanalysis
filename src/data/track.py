@@ -22,23 +22,32 @@ class Track:
         self._nphases   = None                  # type: Optional[int]
 
     @property
-    def frequency(self):
+    def frequency(self) -> 'Optional[float]':
         u"returns the camera frequency"
         return self._frequency
 
     @property
-    def nphases(self):
+    def nphases(self) -> 'Optional[int]':
         u"returns the number of phases in the track"
         return self._nphases
 
     @property
-    def path(self):
+    def path(self) -> 'Optional[str]':
         u"returns the path to the trackfile"
         return self._path
 
-    def phaseid(self, cid:int, pid:int) -> int:
-        u"returns the path to the trackfile"
-        return self._cycles[cid,pid]-self._cycles[0,0] # pylint: disable=unsubscriptable-object
+    def phaseid(self, cid:int, pid:int):
+        u"returns the starttime of the cycle and phase"
+        # pylint: disable=unsubscriptable-object
+        if cid in (all, None):
+            if pid in (all, None):
+                return self._cycles - self._cycles[0,0]
+            else:
+                return self._cycles[:,pid]-self._cycles[0,0]
+        elif pid in (all, None):
+            return self._cycles[cid,:]-self._cycles[0,0]
+        else:
+            return self._cycles[cid,pid]-self._cycles[0,0]
 
     @property
     def data(self):
