@@ -76,9 +76,9 @@ def derivate(inter, maxder = np.inf, mode: DerivateMode = DerivateMode.median) -
     inter = tuple(inter)
     prof  = Profile(inter)
 
-    vals  = np.full((prof.xmax-prof.xmin, max(_occupation(inter, prof.xmin, prof.xmax))),
+    vals  = np.full((prof.count.shape[0], max(_occupation(inter, prof.xmin, prof.xmax))),
                     np.inf, dtype = np.float32)
-    occ   = np.zeros(vals.shape[0], dtype = np.int32)
+    occ   = prof.count
 
     # compactify all derivatives into a single 2D table
     # missing values are coded as NaN
@@ -90,8 +90,6 @@ def derivate(inter, maxder = np.inf, mode: DerivateMode = DerivateMode.median) -
         occ[inds]                 += 1
     vals[vals >= maxder] = np.NaN
 
-    np.sum(np.isfinite(vals), axis = 1, out = prof.count)
-
-    vals[np.where(prof.count == 0), 0] = 0 # suppress all NaN warning
+    vals[np.where(occ == 0), 0] = 0 # suppress all NaN warning
     prof.value = pandas.Series(mode(vals, axis = 1)[::-1]).cumsum().values[::-1]
     return prof
