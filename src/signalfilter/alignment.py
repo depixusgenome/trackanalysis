@@ -4,7 +4,7 @@ u"Cycle alignment: define an absolute zero common to all cycles"
 from   typing       import Callable, Union, Any # pylint: disable=unused-import
 from   enum         import Enum
 from   scipy.signal import fftconvolve
-import numpy; np = numpy # type: Any # pylint: disable=multiple-statements,invalid-name
+import numpy as np
 
 class AlignmentMode(Enum):
     u"Computation modes for the derivate method."
@@ -52,22 +52,23 @@ def correlation(data,                       # pylint: disable=too-many-arguments
     * *kernel_width*: the distribution size of the smearing kernel
     """
     oversampling = (oversampling//2) * 2 + 1
+    maxcorr     *= oversampling
 
-    kern  = np.arange(2*kernel_window*oversampling+1, dtype = np.float32)
-    kern  = np.exp(-.5*((kern-kernel_window)/(oversampling*kernel_width))**2)
+    kern  = np.arange(2*kernel_window*oversampling+1, dtype = np.float32) / oversampling
+    kern  = np.exp(-.5*((kern-kernel_window)/kernel_width)**2)
     kern /= kern.sum()
 
-    ref   = np.empty(((max(len(i) for i in data)+maxcorr*2)*oversampling),
+    ref   = np.empty((max(len(i) for i in data)*oversampling+maxcorr*2,),
                      dtype = np.float32)
     hists = []
 
-    cur   = ref[:-oversampling*2*maxcorr]
+    cur   = ref[:-2*maxcorr]
     for rng in data:
         cur.fill(0.)
         cur[oversampling//2:len(rng)*oversampling:oversampling] = rng
         hists.append(fftconvolve(cur, kern, 'same'))
 
-    bias = numpy.full((len(hists),), maxcorr+oversampling//2, dtype = numpy.float32)
+    bias = numpy.full((len(hists),), maxcorr+oversampling//2, dtype = numpy.int32)
     for _ in range(nrepeats):
         ref.fill(0.)
         for start, hist in zip(bias, data):

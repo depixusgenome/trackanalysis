@@ -5,7 +5,7 @@ import numpy as np
 
 import signalfilter.alignment as alignment
 
-def test_minmaxalign():
+def t_est_minmaxalign():
     u"align on min/max value"
     data = np.zeros((5,25), dtype = np.float32)
     for i in range(5):
@@ -25,5 +25,5 @@ def test_correlationalignment():
     biases = alignment.correlation(data, 1, 2, 1, 0, .1)
     np.testing.assert_allclose(biases, [1., 0., -1.])
 
-    biases = alignment.correlation(data, 5, 2, 1, 2, 3.)
+    biases = alignment.correlation(data, 5, 2, 1, 3, 2.)
     np.testing.assert_allclose(biases, [1., 0., -1.], rtol = 1e-4, atol = 1e-4)
