@@ -5,7 +5,7 @@ Collapse intervals. The idea is to measure the behaviour common to all
 stretches of data. This should be removed as it's source is either a (thermal,
 electric, ...) drift or a mechanical vibration.
 """
-from typing import Optional, Any # pylint: disable=unused-import
+from typing import Optional, Union, Any # pylint: disable=unused-import
 from enum   import Enum
 import pandas
 import numpy; np = numpy # type: Any # pylint: disable=multiple-statements,invalid-name
@@ -64,10 +64,10 @@ class DerivateMode(Enum):
     u"Computation modes for the derivate method."
     median = 'median'
     mean   = 'mean'
-    def __call__(self, vals, **kwa):
-        return getattr(np, 'nan'+self.value)(vals, **kwa)
 
-def derivate(inter, maxder = np.inf, mode: DerivateMode = DerivateMode.median) -> Profile:
+def derivate(inter,
+             maxder                          = np.inf,
+             mode: 'Union[str,DerivateMode]' = DerivateMode.median) -> Profile:
     u"""
     Behaviour common to all is measured using the distribution of derivates at
     each time frame. Either the mean or the median is defined as the profile
@@ -91,5 +91,7 @@ def derivate(inter, maxder = np.inf, mode: DerivateMode = DerivateMode.median) -
     vals[vals >= maxder] = np.NaN
 
     vals[np.where(occ == 0), 0] = 0 # suppress all NaN warning
-    prof.value = pandas.Series(mode(vals, axis = 1)[::-1]).cumsum().values[::-1]
+
+    fcn        = getattr(np, 'nan'+DerivateMode(mode).value)
+    prof.value = pandas.Series(fcn(vals, axis = 1)[::-1]).cumsum().values[::-1]
     return prof
