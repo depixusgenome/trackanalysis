@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"utils"
-from typing         import Union, Optional, Callable, cast # pylint: disable=unused-import
+from typing         import Union, Optional, Callable, IO, cast # pylint: disable=unused-import
 from types          import LambdaType, FunctionType, MethodType
 from enum           import Enum
 from contextlib     import contextmanager
-from inspect        import signature, ismethod as _ismeth, isfunction as _isfunc, getmembers
+from inspect        import (signature, ismethod as _ismeth, isfunction as _isfunc,
+                            getmembers, isgeneratorfunction)
 from functools      import wraps
 import re
 import pathlib
@@ -151,3 +152,42 @@ class MetaMixin(type):
                 else lambda self: prop.fdel(self.getMixin(base)))
 
         return property(fget, fset, fdel, prop.__doc__)
+
+def fromstream(streamopts = ''):
+    u"wraps a method using a stream as first input: it can now use str, Path or streams"
+    if callable(streamopts):
+        return fromstream()(streamopts)
+
+    def _wrapper(fcn):
+        tpe   = 'Union[str,pathlib.Path,IO]'
+        first = next(iter(signature(fcn).parameters))
+        if isgeneratorfunction(fcn):
+            @wraps(fcn)
+            def _wrapgen(path, *args, **kwa):
+                if isinstance(path, pathlib.Path):
+                    path = str(path)
+
+                if isinstance(path, str):
+                    with open(path, streamopts) as stream:
+                        yield from fcn(stream, *args, **kwa)
+                else:
+                    yield from fcn(path, *args, **kwa)
+
+            _wrapgen.__annotations__[first] = tpe
+            return _wrapgen
+        else:
+            @wraps(fcn)
+            def _wrapfcn(path, *args, **kwa):
+                if isinstance(path, pathlib.Path):
+                    path = str(path)
+
+                if isinstance(path, str):
+                    with open(path, streamopts) as stream:
+                        return fcn(stream, *args, **kwa)
+                else:
+                    return fcn(path, *args, **kwa)
+
+            _wrapfcn.__annotations__[first] = tpe
+            return _wrapfcn
+    return _wrapper
+
