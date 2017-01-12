@@ -47,6 +47,7 @@ class DisplayHist:
         fig_height = kwargs.get("fig_height", 600)
         fill_color = kwargs.get("fill_color", "red")
         self.with_cdf = kwargs.get("with_cdf", False) # bool
+        self.normed = kwargs.get("normed", False) # bool
 
         self.fig = figure(title = title,
                           x_axis_label = x_label,
@@ -81,8 +82,13 @@ class DisplayHist:
         self.rawdata = pd.Series(numpy.sort(data))
 
         hist, edges = numpy.histogram(data)
-        self.histdata.data = {"top" : hist/hist.sum(),
-                              "left" : edges[:-1], "right" : edges[1:]}
+        if self.normed:
+            self.histdata.data = {"top" : hist/float(hist.sum()),
+                                  "left" : edges[:-1], "right" : edges[1:]}
+        else:
+            self.histdata.data = {"top" : hist,
+                                  "left" : edges[:-1], "right" : edges[1:]}
+
 
         if self.cdfdata is not None:
             # to correct for bokeh indices there is duplicates in cdf: set(tuple(x,y))
@@ -150,15 +156,24 @@ class MyDisplay:
                      "fixed":DisplayText(prefix="fixed beads are : "),
                      "filestatus":DisplayText(prefix="")}
 
-        self.hists = {"zmop": DisplayHist(x_label = "zmag_open",
+        self.hists = {"zmop": DisplayHist(title = "Phase 3",
+                                          x_label = "zmag_open",
                                           y_label ="Probability",
+                                          normed = True,
                                           with_cdf = True),
-                      "zmcl": DisplayHist(x_label = "zmag_close",
+                      "zmcl": DisplayHist(title = "Phase 5",
+                                          x_label = "zmag_close",
                                           y_label ="Probability",
-                                          with_cdf = True)}
+                                          normed = True,
+                                          with_cdf = True),
+                      "HPsize": DisplayHist(title = "HP size estimate of good beads",
+                                            x_label = "size (micrometer unit)",
+                                            y_label ="number of estimates",
+                                            normed = False,
+                                            with_cdf = False)}
         self.txt_inputs = {"minext" : \
                            TextInput(value = "0.0",
-                                     title = "min molecule extension")}
+                                     title = "min molecule extension (micrometer unit)")}
 
         def tmp(attr,old,new): # pylint: disable=unused-argument
             u''' bokeh requires attr, old, new'''
@@ -183,7 +198,6 @@ class MyDisplay:
         returns docrows
         '''
         docrows = []
-        #docrows.append(widgetbox(self.sel["rpfile"].button,self.divs["filestatus"].div))
         docrows.append(row(widgetbox(self.sel["rpfile"].button),self.divs["filestatus"].div))
         docrows.append(self.divs["ngoods"].div)
         docrows.append(self.divs["good"].div)
@@ -191,6 +205,7 @@ class MyDisplay:
         docrows.append(widgetbox(self.txt_inputs["minext"]))
         docrows.append(self.divs["fixed"].div)
         docrows.append(row(column(self.hists["zmop"].fig), column(self.hists["zmcl"].fig)) )
+        docrows.append(self.hists["HPsize"].fig)
 
         return docrows
 
@@ -213,7 +228,8 @@ class MyDisplay:
         self._update_rpdata_from_file(filename)
         self._update_text_info()
         self._update_zmag_info()
-        self.divs["filestatus"].update("New file  loaded!")
+        self._update_HP_info()
+        self.divs["filestatus"].update("New file loaded!")
 
     @classmethod
     def open(cls,doc):
@@ -252,6 +268,10 @@ class MyDisplay:
 
         self.hists["zmcl"].update(zmagcl.values.flatten())
 
+    def _update_HP_info(self):
+        hp_est = pd.DataFrame() if self.data.rpdata is \
+                 None else self.data.rpdata.estHPsize()
+        self.hists["HPsize"].update(hp_est.values.flatten())
 
 if __name__=="__main__":
     # should move this to unit test
