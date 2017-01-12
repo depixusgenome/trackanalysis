@@ -18,10 +18,10 @@ def read(stream:TextIO) -> 'Iterator[Tuple[str,str]]':
 def peaks(seq:str, oligs:'Sequence[str]') -> np.ndarray:
     u"""
     Returns the peak positions and orientation associated to a sequence.
-    
+
     A peak position is the end position of a match. With indexes starting at 0,
     that's the indexe of the first base *after* the match.
-    
+
     The orientation is *True* if the oligo was matched and false otherwise. Palindromic
     cases are *True*.
 
