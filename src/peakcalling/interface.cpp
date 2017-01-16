@@ -1,7 +1,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include "peakcalling/costfunction.h"
-#include "peakcalling/costfunction.h"
+#include "peakcalling/listmatching.h"
 namespace peakcalling
 {
     namespace cost
@@ -56,7 +56,35 @@ namespace peakcalling
                     "stopval"_a             = 1e-8,
                     "maxeval"_a             = size_t(100),
                     "Optimizes the cost function value for given parameters."
-                    "Returns a tuple (stretch value, bias value)");
+                    "Returns a tuple (min cost, best stretch, best bias)");
+        }
+    }
+
+    namespace match
+    {
+        void pymodule(pybind11::module & mod)
+        {
+            using namespace pybind11::literals;
+
+            auto ht = mod.def_submodule("match");
+            ht.def("compute", [](pybind11::array_t<float> & bead1,
+                                 pybind11::array_t<float> & bead2,
+                                 float s)
+                    {
+                        auto b1  = bead1.request();
+                        auto b2  = bead2.request();
+                        auto ret = compute(s,
+                                       (float const*) b1.ptr, b1.size,
+                                       (float const*) b2.ptr, b2.size);
+
+                        std::vector<size_t> shape   = {ret.size(), 2};
+                        std::vector<size_t> strides = {2*sizeof(int), sizeof(int) };
+                        return pybind11::array(shape, strides, ret.data());
+                    },
+                    "reference"_a,   "experiment"_a, "sigma"_a = 20.,
+                    "Matches peaks from the experiment to the reference, with a\n"
+                    "max distance of *sigma*.\n\n"
+                    "Output is a array of indexes");
         }
     }
 
@@ -64,5 +92,6 @@ namespace peakcalling
     void pymodule(pybind11::module & mod)
     {
         cost::pymodule(mod);
+        match::pymodule(mod);
     }
 }
