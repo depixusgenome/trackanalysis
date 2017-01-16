@@ -28,8 +28,8 @@ def run(width,height): # pylint: disable=unused-argument
     u"Launches an view"
     from . import rampapp
     viewcls = rampapp.MyDisplay
-    spec_server = {"title" : "Ramp analysis",
-                   "size" : (width,height)}
+    spec_server=_serverkwargs({"title":"Ramp analysis",
+                               "size":(width,height)})
     start = viewcls.open
     server = Server(Application(FunctionHandler(start)), **spec_server)
 
@@ -43,7 +43,6 @@ def run(width,height): # pylint: disable=unused-argument
     StreamReader.run = reader_run
 
     rtime = _flexxlaunch("http://localhost:5006/", **spec_server) # pylint: disable=unused-variable
-
     server.start()
 
 

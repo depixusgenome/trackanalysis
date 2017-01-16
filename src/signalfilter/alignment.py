@@ -25,7 +25,7 @@ def extremum(data, mode: 'Union[str,AlignmentMode]', binsize:int = 5) -> np.ndar
     itr = (np.median(j[len(j) % binsize:].reshape((len(j)//binsize, binsize)), axis = 0)
            for j in data) if binsize > 2 else data
     fcn = getattr(np, AlignmentMode(mode).value)
-    res = numpy.fromiter((-fcn(i) for i in itr), dtype = numpy.float32)
+    res = np.fromiter((-fcn(i) for i in itr), dtype = np.float32)
     return np.subtract(res, np.median(res), out = res)
 
 def correlation(data,                       # pylint: disable=too-many-arguments
@@ -68,7 +68,7 @@ def correlation(data,                       # pylint: disable=too-many-arguments
         cur[oversampling//2:len(rng)*oversampling:oversampling] = rng
         hists.append(fftconvolve(cur, kern, 'same'))
 
-    bias = numpy.full((len(hists),), maxcorr+oversampling//2, dtype = numpy.int32)
+    bias = np.full((len(hists),), maxcorr+oversampling//2, dtype = np.int32)
     for _ in range(nrepeats):
         ref.fill(0.)
         for start, hist in zip(bias, data):

@@ -22,7 +22,7 @@ class RampModel:
         self.needsCleaning = False
         self.corrThreshold = 0.5
         self._minExt = kwargs.get("minExtension",0.0)
-        self.window = 5
+        self.window = 7
 
     def setMinExt(self,value):
         u'''
@@ -214,11 +214,19 @@ class RampData: # pylint: disable=too-many-public-methods
         return {i for i in self.beads() if i not in corrids}
 
     def _estimateZPhase3(self):
-        u''' estimate the z value corresponding to phase 3
+        u''' estimate the z value corresponding to phase 3 (i.e. highest value of zmag)
         '''
 
         return self.dataz[self.bcids].apply(
             lambda x:x.rolling(window=self.model.window,center=True).median()).max()
+
+    def _estimateZPhase1(self):
+        u''' estimate the z value corresponding to phase 1
+        (i.e. lower value of zmag IN CASE OF RAMP ANALYSIS)
+        '''
+
+        return self.dataz[self.bcids].apply(
+            lambda x:x.rolling(window=self.model.window,center=True).median()).min()
 
     def _estimateUnitScale(self)->int:
         u'''
@@ -320,6 +328,38 @@ class RampData: # pylint: disable=too-many-public-methods
             zvalues[bcid[0]].extend(zblocks[bcid].dropna().values)
         return [numpy.array(zvalues[i]) for i in zvalues.keys()]
 
+
+def _continuous_indices(ser:pd.Series)->list:
+    u'''
+    To finish
+    returns the list of continuous indices.
+    e.g: [2,3,7,8,9,10] returns [[2,3],[7,10]]
+    '''
+    ite=ser[0]
+    while ite!=ser[-1]:
+        boud=[ite]
+
+    return boud
+def map_boundaries(bdata:pd.DataFrame)->pd.DataFrame:
+    u'''
+    To finish
+    If bdata is a data frame which contains cluster of True values
+    returns the boundaries of these clusters
+    '''
+    indices = bdata.apply(lambda x:pd.Series(x.dropna().index))
+    # apply dbscan algorithm with eps=1, min_samples=1
+
+    return indices
+
+def probability_false_positive(data:RampData):
+    u'''
+    To finish
+    For each bead compute the probability (frequentist approach) of observing a
+    blocking during the ramp stage
+    '''
+
+    return data
+
 def cluster1D_dbscan(values,eps=0.2,min_samples=3,**kwargs):
     u'''
     use DBSCAN algorithm to define clusters. Assumes a drop in density
@@ -332,13 +372,13 @@ def cluster1D_dbscan(values,eps=0.2,min_samples=3,**kwargs):
     try:
         from sklearn.cluster import dbscan
     except ImportError as err:
-        print("Cannot import sklearn.cluster (not available in windows).")
+        print("Cannot import sklearn.cluster (not available on Windows).")
         print(err)
         print("returning")
     return dbscan(values.reshape(-1,1),
-                  eps,
-                  min_samples,
-                  kwargs)[1]
+                  eps=eps,
+                  min_samples=min_samples,
+                  **kwargs)[1]
 
 
 def _se_map(data:pd.Series):
@@ -434,7 +474,8 @@ def detectOutliers(dzdt,scale:float):
     min_outlier = quant1-scale*(quant3-quant1)
     return (dzdt>max_outlier)|(dzdt<min_outlier)
 
-def can_be_structure_event(dzdt,detected):
+@OLDTOOSLOW
+def obsolete_can_be_structure_event(dzdt,detected):
     u'''
     args : dzdt and detected (output of detect_outliers(dzdt))
     Need to apply this to the full data set and not on each cycle
