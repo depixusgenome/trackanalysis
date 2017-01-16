@@ -31,9 +31,10 @@ yaml                      0.1.6                         0
 #zlib                      1.2.8                         3  
 
 [CXX]
-msvc			 14.0
+msvc			          14.0
 clang++                   3.8
-g++                       4.9
+g++                       5.4
+nlopt                     2.4.2
 
 [COFFEE]
 coffee                    1.10.0

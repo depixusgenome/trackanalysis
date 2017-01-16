@@ -1,1 +1,1 @@
-make(locals())
+make(locals(), use = ["nlopt"])
