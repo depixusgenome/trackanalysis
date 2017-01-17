@@ -62,18 +62,16 @@ namespace peakcalling
             using namespace pybind11::literals;
 
             auto ht = mod.def_submodule("match");
-            ht.def("compute", [](pybind11::array_t<float> & bead1,
-                                 pybind11::array_t<float> & bead2,
+            ht.def("compute", [](pybind11::array_t<float> const & bead1,
+                                 pybind11::array_t<float> const & bead2,
                                  float s)
                     {
-                        auto b1  = bead1.request();
-                        auto b2  = bead2.request();
-                        auto ret = compute(s,
-                                       (float const*) b1.ptr, b1.size,
-                                       (float const*) b2.ptr, b2.size);
+                        auto ret = compute(s, bead1.data(), bead1.size(),
+                                              bead2.data(), bead2.size());
 
-                        std::vector<size_t> shape   = {ret.size(), 2};
-                        std::vector<size_t> strides = {2*sizeof(int), sizeof(int) };
+                        std::vector<size_t> shape   = {ret.size()/2, 2};
+                        std::vector<size_t> strides = {2*sizeof(decltype(ret[0])),
+                                                         sizeof(decltype(ret[0])) };
                         return pybind11::array(shape, strides, ret.data());
                     },
                     "reference"_a,   "experiment"_a, "sigma"_a = 20.,

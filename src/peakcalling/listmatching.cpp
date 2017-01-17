@@ -128,11 +128,20 @@ namespace peakcalling { namespace match
                   , size_t         size2
                   )
     {
-        Output m;
+        size_t cnt = 0;
+        std::vector<size_t> out(size1, std::numeric_limits<size_t>::max());
         _matched(bead1, size1, bead2, size2, sigma,
                  [&](auto const & a, auto const & b)
-                    { m.push_back(a.ind); m.push_back(b.ind); },
+                    { out[a.ind] = b.ind; ++cnt; },
                  [](...) { return false; });
+
+        Output m(cnt*2);
+        for(size_t i = 0, j = 0, e = out.size(); i < e; ++i)
+            if(out[i] != std::numeric_limits<size_t>::max())
+            {
+                m[j++] = i;
+                m[j++] = out[i];
+            }
         return m;
     }
 }}
