@@ -73,7 +73,10 @@ namespace peakcalling { namespace cost
         if(!cf.symmetric)
             return r1;
 
-        auto r2 = cost(bead2, size2, bead1, size1, cf.stretch, cf.bias, cf.sigma);
+        auto r2 = cost(bead2, size2, bead1, size1,
+                       1./cf.stretch,
+                       -cf.bias/cf.stretch,
+                       cf.sigma);
         return {std::get<0>(r1) +std::get<0>(r2),
                 std::get<1>(r1)-(std::get<1>(r2)-std::get<2>(r2)*cf.bias)/(cf.stretch*cf.stretch),
                 std::get<2>(r1) -std::get<2>(r2)/cf.stretch};
