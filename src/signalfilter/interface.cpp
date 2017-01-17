@@ -6,12 +6,8 @@
 namespace
 {
     template<typename T>
-    pybind11::array & _run(T const & self, pybind11::array_t<float> & input)
-    {
-        auto buf = input.request();
-        run(self, buf.size, (float*) buf.ptr);
-        return input;
-    }
+    pybind11::array & _run(T const & self, pybind11::array_t<float> & inp)
+    { run(self, inp.size(), inp.mutable_data()); return inp; }
 }
 
 namespace signalfilter {
@@ -137,16 +133,10 @@ namespace signalfilter { namespace stats {
     void pymodule(pybind11::module & mod)
     {
         auto smod  = mod.def_submodule("stats");
-        smod.def("hfsigma", [](pybind11::array_t<float> & input)
-                            {
-                                auto buf = input.request();
-                                return hfsigma(buf.size, (float const *) buf.ptr);
-                            });
-        smod.def("hfsigma", [](pybind11::array_t<double> & input)
-                            {
-                                auto buf = input.request();
-                                return hfsigma(buf.size, (double const *) buf.ptr);
-                            });
+        smod.def("hfsigma", [](pybind11::array_t<float> & inp)
+                            { return hfsigma(inp.size(), inp.data()); });
+        smod.def("hfsigma", [](pybind11::array_t<double> & inp)
+                            { return hfsigma(inp.size(), inp.data()); });
     }
 }}
 
