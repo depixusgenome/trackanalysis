@@ -13,11 +13,11 @@ namespace peakcalling
             auto ht = mod.def_submodule("cost");
             ht.def("compute", [](pybind11::array_t<float> & bead1,
                                  pybind11::array_t<float> & bead2,
-                                 bool d, float c, float a, float b)
+                                 bool a, float b, float c, float d)
                     {
                         auto b1 = bead1.request();
                         auto b2 = bead2.request();
-                        return compute({d, a, b, c},
+                        return compute({a, b, c, d},
                                        (float const*) b1.ptr, b1.size,
                                        (float const*) b2.ptr, b2.size);
                     },

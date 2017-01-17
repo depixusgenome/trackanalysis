@@ -24,20 +24,20 @@ namespace peakcalling { namespace cost
     {
         auto cost = [](float const * pos1, size_t size1,
                        float const * pos2, size_t size2,
-                       float alpha, float beta, float sig)
+                       double alpha, double beta, double sig)
                     -> std::tuple<float, float, float>
             {
-                float sum       = 0.0f;
-                float norm1     = 0.0f;
-                float grsum [2] = {0.f, 0.f};
-                float grnorm    = 0.f;
+                double sum       = 0.;
+                double norm1     = 0.;
+                double grsum [2] = {0., 0.};
+                double grnorm    = 0.;
                 for(size_t i2 = 0; i2 < size2; ++i2)
                 {
                     for(size_t i1 = 0; i1 < size1; ++i1)
                     {
-                        auto d = (pos1[i1]-alpha*pos2[i2]-beta)/sig;
-                        auto e = std::exp(-.5*d*d);
-                        auto c = e*d/sig;
+                        double d = (pos1[i1]-alpha*pos2[i2]-beta)/sig;
+                        double e = std::exp(-.5*d*d);
+                        double c = e*d/sig;
 
                         sum      += e;
                         grsum[0] += c*pos2[i2];
@@ -46,25 +46,27 @@ namespace peakcalling { namespace cost
 
                     for(size_t i1 = 0; i1 < size2; ++i1)
                     {
-                        auto d = (pos2[i1]-pos2[i2])*alpha/sig;
-                        auto e = std::exp(-.5*d*d);
+                        double d = (pos2[i1]-pos2[i2])*alpha/sig;
+                        double e = std::exp(-.5*d*d);
 
                         norm1  += e;
                         grnorm += e*d/sig*(pos2[i2]-pos2[i1]);
                     }
                 }
 
-                float norm2 = 0.0f;
+                double norm2 = 0.0;
                 for(size_t i1 = 0; i1 < size1; ++i1)
                     for(size_t i2 = 0; i2 < size1; ++i2)
                     {
-                        auto d = (pos1[i1]-pos1[i2])*alpha/sig;
+                        double d = (pos1[i1]-pos1[i2])*alpha/sig;
                         norm2 += std::exp(-.5*d*d);
                     }
 
-                auto c = std::sqrt(norm1*norm2);
-                auto x = sum/c;
-                return {1.-x, (.5*grnorm*x/c-grsum[0])/c, -grsum[1]/c};
+                double c = std::sqrt(norm1*norm2);
+                double x = sum/c;
+                return {float(1.-x),
+                        float((.5*grnorm*sum/norm1-grsum[0])/c),
+                        float(-grsum[1]/c)};
             };
 
         auto r1 = cost(bead1, size1, bead2, size2, cf.stretch, cf.bias, cf.sigma);
