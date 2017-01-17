@@ -65,7 +65,7 @@ namespace boost { namespace accumulators {
         {
             using result_type = Sample;
             _MedianDeviation()
-                : _quant(extended_p_square_probabilities = boost::array<double,2>{1./3., 2./3.})
+                : _quant(extended_p_square_probabilities = boost::array<double,2>{{1./3., 2./3.}})
             {}
             _MedianDeviation(dont_care) : _MedianDeviation() {}
 

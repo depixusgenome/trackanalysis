@@ -143,7 +143,7 @@ namespace legacy { namespace { // unitset
 
     int	unit_to_type(char *unit, int *type, int *decade)
     {
-        register int t, d;
+        int t, d;
         int adv = 1;
         
         if (unit == NULL)	return 1;
@@ -1192,7 +1192,7 @@ namespace legacy { namespace {
 
     int get_label(char **c1, char **c2, char *line)
     {
-        register int j = 0;
+        int j = 0;
         int  k = 0, out_loop = 1;
         char  ch = '"', last_ch = 0;
 
@@ -1204,12 +1204,7 @@ namespace legacy { namespace {
             if((*c1)[j] == 0)	/* label extend to next line */
             {
                 if (((*c1) = get_next_line(line)) == NULL )
-                {
                     error_in_file("EOF reached before label ended");
-                    k = -1;
-                    out_loop = 0;
-                    return k;
-                }
                 j=0;
             }
             if ( (*c1)[j] == 0) 				out_loop = 0;
@@ -1220,12 +1215,7 @@ namespace legacy { namespace {
                 (*c2)[k++] = (*c1)[j++];
             }
             if ( k >= B_LINE )
-            {
                 error_in_file("this label is too long !...\n%s",(*c2));
-                k = -1;
-                out_loop = 0;
-                return k;
-            }
         }
         (*c2)[k]=0;
         (*c1) = (*c1)+j+1;
@@ -1234,7 +1224,7 @@ namespace legacy { namespace {
 
     int gr_numb(float *np, int *argcp, char ***argvp)
     {
-        register int i;
+        int i;
 
         if (*argcp <= 1)		return(0);
         i = sscanf((*argvp)[1],"%f",np);
@@ -1245,7 +1235,7 @@ namespace legacy { namespace {
 
     int gr_numbi(int *np, int *argcp, char ***argvp)
     {
-        register int i;
+        int i;
 
         if (*argcp <= 1)		return(0);
         i = sscanf((*argvp)[1],"%d",np);
@@ -1256,7 +1246,7 @@ namespace legacy { namespace {
 
     int push_bin_float_data_z(one_plot *op, char const *filename, int offset, int nx)
     {
-        register int i, j;
+        int i, j;
         char ch;
         int ret = 0;
         size_t len;
@@ -1336,7 +1326,6 @@ namespace legacy { namespace {
 
     int push_bin_float_error_z(one_plot *op, const char *filename, int offset, int nx, int axis)
     {
-        //register int i;
         char ch;
         int ret = 0;
         size_t len;
@@ -1399,7 +1388,7 @@ namespace legacy { namespace {
 
     int push_bin_float_data(one_plot *op, const char *filename)
     {
-        register int i;
+        int i;
         int n_read, ntot = 0;
         float *tmp_y;
         FILE *binfp;
@@ -1450,7 +1439,7 @@ namespace legacy { namespace {
 
     int push_bin_int_data(one_plot *op, const char *filename)
     {
-        register int i;
+        int i;
         int n_read, ntot = 0;
         short int *tmp_y;
         FILE *binfp;
@@ -2389,7 +2378,7 @@ namespace legacy { namespace {
     }
     int pltreadfile(one_plot *op, char const  *file_name, int check)
     {
-        register int i, j, k;
+        int i, j, k;
         int load_abort = 0, total_line_read = 0;
         float tmpx, tmpy;
         char *c1, *c2;
@@ -3862,7 +3851,7 @@ namespace legacy { namespace {
 
     int 	push_image(O_i *oi, char *filename, int type, int mode)
     {
-        register int i, j;
+        int i, j;
         char ch;
         int knx, knxs, knxe, kny, knys, knye, nf = 1;
         float kz_black, kz_white;
@@ -4732,7 +4721,7 @@ namespace legacy { namespace {
 
     int imreadfile(O_i *oi, char const *file_name)
     {
-        register int i, j, k;
+        int i, j, k;
         int load_abort = 0;
         float tmpx, tmpy;
         char *c1 = NULL;
@@ -4791,20 +4780,13 @@ namespace legacy { namespace {
                     j = get_label(&c1, &c2, line);
                 }
                 else
-                {
                     error_in_file ("a label must start and end\nwith a double quote !...\n->%s",line);
-                    j = 0;
-                }
                 if ( j ) push_image_label(oi,tmpx,tmpy,c2,USR_COORD);
                 else if ( i == 3 )
-                {
                     error_in_file("empty label !...\n->%s\n",line);
-                }
             }
             if ( i == 2 || i == 1)	/* may be a data point x,y !*/
-            {
                 error_in_file("you can't input an x,y data point\nfor an image... use a gr region\n->%s",line);
-            }
             if ( i == 0 )	/* a command line */
             {
                 /* advance to 1st item */
@@ -4828,10 +4810,7 @@ namespace legacy { namespace {
                             agc++;
                         }
                         if (agc >= OP_SIZE)
-                        {
                             error_in_file("too many options\nin input line\n->%s",line);
-                            load_abort = MAX_ERROR;
-                        }
                         if (c1 != NULL && strchr(c1,' ') !=NULL)	c1 = strchr ( c1,' ');
                         else if (c1 != NULL && strchr(c1,'\t') !=NULL) c1 = strchr (c1,'\t');
                         else	*c1 = 0;
@@ -4846,10 +4825,7 @@ namespace legacy { namespace {
                             agc++;
                         }
                         if (agc >= OP_SIZE)
-                        {
                             error_in_file("too many options\nin input line\n->%s",line);
-                            load_abort = MAX_ERROR;
-                        }
                     }
                     if (c1 != NULL)
                       {
