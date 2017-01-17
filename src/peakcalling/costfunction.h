@@ -8,16 +8,6 @@ namespace peakcalling { namespace cost
     {
         bool  symmetric;
         float sigma;
-        float stretch;
-        float bias;
-    };
-
-    struct NLOptCall
-    {
-        bool  symmetric;
-        float sigma;
-        float const * beads[2];
-        size_t        sizes[2];
 
         std::vector<double> lower, current, upper;
 
@@ -30,6 +20,6 @@ namespace peakcalling { namespace cost
 
     using Output = std::tuple<float,float,float>;
 
-    Output compute(Parameters, float const *, size_t, float const *, size_t);
-    Output optimize(NLOptCall const & cf);
+    Output compute (Parameters const &, float const *, size_t, float const *, size_t);
+    Output optimize(Parameters const &, float const *, size_t, float const *, size_t);
 }}
