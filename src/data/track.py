@@ -36,7 +36,7 @@ class Track:
         u"returns the path to the trackfile"
         return self._path
 
-    def phaseid(self, cid:int, pid:int):
+    def phaseid(self, cid:'Optional[int]' = None, pid:'Optional[int]' = None):
         u"returns the starttime of the cycle and phase"
         # pylint: disable=unsubscriptable-object
         if cid in (all, None):

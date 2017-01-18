@@ -29,8 +29,17 @@ class ProtectedDict(dict):
         else:
             super().__delitem__(key)
 
+class TaskTypeDescriptor:
+    u"""
+    Dynamically finds all Task subclasses implementing
+    the __processor__ protocol.
+    """
+    def __get__(self, obj, tpe):
+        return getattr(tpe, '_tasktypes')()
+
 class MetaProcessor(ABCMeta):
     u"Protects attribute tasktype"
+
     def __new__(mcs, name, bases, nspace):
         if isinstance(nspace['tasktype'], type):
             if not issubclass(nspace['tasktype'], _tasks.Task):
@@ -40,7 +49,7 @@ class MetaProcessor(ABCMeta):
             if not all(isinstance(tsk, type) and issubclass(tsk, _tasks.Task)
                        for tsk in nspace['tasktype']):
                 raise TypeError('"tasktype" should all be Task classes', str(nspace['tasktype']))
-        elif name != 'Processor':
+        elif name != 'Processor' and not isinstance(nspace['tasktype'], TaskTypeDescriptor):
             raise AttributeError('"tasktype" must be defined in '+name)
         return super().__new__(mcs, name, bases, nspace)
 
@@ -179,7 +188,20 @@ class SelectionProcessor(Processor):
 
 class ProtocolProcessor(Processor):
     u"A processor that can deal with any task having the __processor__ attribute"
-    tasktype = _tasks.SignalFilterTask.__subclasses__()
+
+    tasktype = TaskTypeDescriptor()
+
+    @staticmethod
+    def _tasktypes():
+        treating = _tasks.Task.__subclasses__()
+        def _run():
+            while len(treating):
+                cur = treating.pop()
+                if hasattr(cur, '__processor__'):
+                    yield cur
+                treating.extend(cur.__subclasses__())
+        return tuple(_run())
+
     def run(self, args:'Runner'):
         fcn = self.task.__processor__()
         args.apply(iter(fcn(dat) for dat in fcn))

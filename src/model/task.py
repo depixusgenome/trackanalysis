@@ -6,15 +6,11 @@ Classes defining a type of data treatment.
 **Warning** Those definitions must remain data-independant.
 """
 from typing         import (Optional, Sequence,  # pylint: disable=unused-import
-                            Dict, Any)
+                            Dict)
 from enum           import Enum, unique
-
-import numpy
 
 from utils          import toenum
 from .level         import Level
-from signalfilter   import (ForwardBackwardFilter, # pylint: disable=no-name-in-module
-                            NonLinearFilter)
 
 class TaskIsUniqueError(Exception):
     u"verifies that the list contains no unique task of type task"
