@@ -9,11 +9,11 @@ import signalfilter.collapse as collapse
 
 def test_detectflats():
     u"Tests flat stretches detection"
-    inst  = DetectFlats(uncertainty = 1., confidence = 0.1, window = 1)
+    inst  = DetectFlats(precision = 1., confidence = 0.1, window = 1)
     det   = lambda  i: tuple(inst(i))
     mksl  = lambda *i: tuple(slice(*j) for j in i)
     items = numpy.zeros((30,))
-    thr   = knownsigma.threshold(True, inst.confidence, inst.uncertainty,
+    thr   = knownsigma.threshold(True, inst.confidence, inst.precision,
                                  inst.window, inst.window)
 
     assert det([])    == tuple()
@@ -31,7 +31,7 @@ def test_detectflats():
 
 def test_mergeflats():
     u"Tests flat stretches merging"
-    inst  = MergeFlats(uncertainty = 1., confidence = 0.1, isequal = True)
+    inst  = MergeFlats(precision = 1., confidence = 0.1, isequal = True)
     det   = lambda  i, j: tuple(inst(i, j))
     mksl  = lambda *i: tuple(slice(*j) for j in i)
     items = numpy.zeros((30,))

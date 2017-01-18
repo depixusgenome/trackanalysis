@@ -17,11 +17,11 @@ class DetectFlats:
     other. This closeness is defined using a p-value for 2 points belonging to
     the same normal distribution with a known sigma.
 
-    The sigma (uncertainty) is either provided or measured. In the latter case,
+    The sigma (precision) is either provided or measured. In the latter case,
     the estimation used is the median-deviation of the derivate of the data.
     """
     def __init__(self, **kwa):
-        self.uncertainty = kwa.get('uncertainty', 0.)
+        self.precision = kwa.get('precision', 0.)
         self.confidence  = kwa.get('confidence',  0.1)
         self._window     = 1
         self._kern       = numpy.ones((2,))
@@ -42,10 +42,10 @@ class DetectFlats:
         if len(data) <= 1:
             return
 
-        window      = self._window
-        uncertainty = hfsigma(data) if self.uncertainty == 0 else self.uncertainty
-        thr         = knownsigma.threshold(True, self.confidence, uncertainty,
-                                           window, window)
+        window    = self._window
+        precision = hfsigma(data) if self.precision == 0 else self.precision
+        thr       = knownsigma.threshold(True, self.confidence, precision,
+                                         window, window)
 
         delta           = numpy.convolve(data, self._kern, mode = 'same')
         delta[:window] -= self._lrng * data[0]
@@ -79,11 +79,11 @@ class MergeFlats:
     considering that distributions for both stretches are normal with a know
     sigma.
 
-    The sigma (uncertainty) is either provided or measured. In the latter case,
+    The sigma (precision) is either provided or measured. In the latter case,
     the estimation used is the median-deviation of the derivate of the data.
     """
     def __init__(self, **kwa):
-        self.uncertainty = kwa.get('uncertainty', 0.)
+        self.precision = kwa.get('precision', 0.)
         self.confidence  = kwa.get('confidence',  0.1)
         self.isequal     = kwa.get('isequal',     True)
 
@@ -96,8 +96,8 @@ class MergeFlats:
         if last is None:
             return
 
-        uncertainty = hfsigma(data) if self.uncertainty == 0 else self.uncertainty
-        thr         = knownsigma.threshold(self.isequal, self.confidence, uncertainty)
+        precision = hfsigma(data) if self.precision == 0 else self.precision
+        thr       = knownsigma.threshold(self.isequal, self.confidence, precision)
         if self.isequal:
             check = lambda i, j: knownsigma.value(True,  i, j) < thr
         else:
