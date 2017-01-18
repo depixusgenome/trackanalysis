@@ -19,22 +19,6 @@ class Profile:
         self.count = np.zeros((length,), dtype = np.int32)
         self.value = np.zeros((length,), dtype = np.float32)
 
-def _indexes(rng, xmin:Optional[int] = None, xmax:Optional[int] = None) -> np.ndarray:
-    u'returns indexes linked to this range'
-    if xmax is None:
-        return rng[rng >= xmin] - xmin
-    elif xmin is None:
-        return rng[rng < xmax]
-    else:
-        return rng[np.logical_and(rng >= xmin, rng < xmax)] - xmin
-
-def _occupation(inter, xmin:int, xmax:int) -> np.ndarray:
-    u"returns the number of overlapping intervals in the [xmin, xmax] range"
-    ret = np.zeros((xmax-xmin,), dtype = np.int32)
-    for rng in inter:
-        ret[_indexes(rng[0], xmin, xmax)] += 1
-    return ret
-
 def _iter_ranges(xmin, inter):
     for rng in inter:
         cur = rng[0] >= xmin
@@ -42,56 +26,91 @@ def _iter_ranges(xmin, inter):
             continue
         yield (rng[0][cur]-xmin, rng[1][cur])
 
-def intervals(inter) -> Profile:
+class CollapseToMean:
     u"Collapses intervals together using their mean values"
-    inter = tuple(inter)
-    prof  = Profile(inter)
-    key   = lambda i: (-i[0][-1], len(i[0]))
+    def __init__(self, **_):
+        pass
 
-    for inds, cur in _iter_ranges(prof.xmin, sorted(inter, key = key)):
-        if all(prof.count[inds] == 0):
-            prof.value[inds] -= cur.mean()
-        else:
-            prof.value[inds] += (np.average(prof.value[inds], weights = prof.count[inds])
-                                 - cur.mean())
-        prof.value[inds] += cur
-        prof.count[inds] += 1
+    def __call__(self, inter) -> Profile:
+        return self.run(inter)
 
-    prof.value[prof.count > 0] /= prof.count[prof.count > 0]
-    return prof
+    @staticmethod
+    def run(inter, **_) -> Profile:
+        u"creates the configuration and runs the algorithm"
+        inter = tuple(inter)
+        prof  = Profile(inter)
+        key   = lambda i: (-i[0][-1], len(i[0]))
+
+        for inds, cur in _iter_ranges(prof.xmin, sorted(inter, key = key)):
+            if all(prof.count[inds] == 0):
+                prof.value[inds] -= cur.mean()
+            else:
+                prof.value[inds] += (np.average(prof.value[inds], weights = prof.count[inds])
+                                     - cur.mean())
+            prof.value[inds] += cur
+            prof.count[inds] += 1
+
+        prof.value[prof.count > 0] /= prof.count[prof.count > 0]
+        return prof
 
 class DerivateMode(Enum):
     u"Computation modes for the derivate method."
     median = 'median'
     mean   = 'mean'
 
-def derivate(inter,
-             maxder                          = np.inf,
-             mode: 'Union[str,DerivateMode]' = DerivateMode.median) -> Profile:
+class CollapseByDerivate:
     u"""
     Behaviour common to all is measured using the distribution of derivates at
     each time frame. Either the mean or the median is defined as the profile
     derivate.
     """
-    inter = tuple(inter)
-    prof  = Profile(inter)
+    def __init__(self, **kwa):
+        self.maxder = kwa.get('maxder', np.inf)
+        self.mode   = kwa.get('mode',   'median') # type: Union[str,DerivateMode]
 
-    vals  = np.full((prof.count.shape[0], max(_occupation(inter, prof.xmin, prof.xmax))),
-                    np.inf, dtype = np.float32)
-    occ   = prof.count
+    @staticmethod
+    def __indexes(rng, xmin:Optional[int] = None, xmax:Optional[int] = None) -> np.ndarray:
+        u'returns indexes linked to this range'
+        if xmax is None:
+            return rng[rng >= xmin] - xmin
+        elif xmin is None:
+            return rng[rng < xmax]
+        else:
+            return rng[np.logical_and(rng >= xmin, rng < xmax)] - xmin
 
-    # compactify all derivatives into a single 2D table
-    # missing values are coded as NaN
-    for inds, cur in _iter_ranges(prof.xmin, inter):
-        sel  = np.where(np.diff(inds) == 1)
-        inds = inds[sel]
+    @classmethod
+    def __occupation(cls, inter, xmin:int, xmax:int) -> np.ndarray:
+        u"returns the number of overlapping intervals in the [xmin, xmax] range"
+        ret = np.zeros((xmax-xmin,), dtype = np.int32)
+        for rng in inter:
+            ret[cls.__indexes(rng[0], xmin, xmax)] += 1
+        return ret
 
-        vals[inds, max(occ[inds])] = tuple(cur[i]-cur[i+1] for i in sel)
-        occ[inds]                 += 1
-    vals[vals >= maxder] = np.NaN
+    def __call__(self, inter) -> Profile:
+        inter = tuple(inter)
+        prof  = Profile(inter)
 
-    vals[np.where(occ == 0), 0] = 0 # suppress all NaN warning
+        vals  = np.full((prof.count.shape[0], max(self.__occupation(inter, prof.xmin, prof.xmax))),
+                        np.inf, dtype = np.float32)
+        occ   = prof.count
 
-    fcn        = getattr(np, 'nan'+DerivateMode(mode).value)
-    prof.value = pandas.Series(fcn(vals, axis = 1)[::-1]).cumsum().values[::-1]
-    return prof
+        # compactify all derivatives into a single 2D table
+        # missing values are coded as NaN
+        for inds, cur in _iter_ranges(prof.xmin, inter):
+            sel  = np.where(np.diff(inds) == 1)
+            inds = inds[sel]
+
+            vals[inds, max(occ[inds])] = tuple(cur[i]-cur[i+1] for i in sel)
+            occ[inds]                 += 1
+        vals[vals >= self.maxder] = np.NaN
+
+        vals[np.where(occ == 0), 0] = 0 # suppress all NaN warning
+
+        fcn        = getattr(np, 'nan'+DerivateMode(self.mode).value)
+        prof.value = pandas.Series(fcn(vals, axis = 1)[::-1]).cumsum().values[::-1]
+        return prof
+
+    @classmethod
+    def run(cls, inter, **kwa) -> Profile:
+        u"creates the configuration and runs the algorithm"
+        return cls(**kwa)(inter)

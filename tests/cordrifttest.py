@@ -1,6 +1,10 @@
-import cordrift.collapse as collapse
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+u"Tests cordrift"
+import numpy
+from cordrift.collapse import CollapseToMean, CollapseByDerivate
 
-def test_collapse_intervals():
+def test_collapse_to_mean():
     u"Tests interval collapses"
     yvals  = numpy.zeros((100,5), dtype = numpy.float32)
     for i in range(yvals.shape[1]):
@@ -9,31 +13,31 @@ def test_collapse_intervals():
 
     # test horizontal lines
     inters  = [(xvals[5:10], yvals[5:10,i]) for i in range(yvals.shape[1])]
-    prof    = collapse.intervals(iter(inters))
+    prof    = CollapseToMean.run(iter(inters))
     assert all(prof.count == 5)
     assert all(prof.value == 0.)
 
     # test slanted lines
     yvals[5:10,:] = numpy.arange(25).reshape((5,5))  # pylint: disable=no-member
-    prof          = collapse.intervals(iter(inters[1:-1]))
+    prof          = CollapseToMean.run(iter(inters[1:-1]))
     assert all(prof.count == 3)
     numpy.testing.assert_allclose([-10,-5,0,5,10], prof.value, rtol = 1e-4)
 
     # test slanted lines + noise
     yvals[5:10,:] += numpy.random.rand(25).reshape((5,5))  # pylint: disable=no-member
-    prof  = collapse.intervals(iter(inters[1:-1]))
+    prof  = CollapseToMean.run(iter(inters[1:-1]))
     assert all(prof.count == 3)
     truth = numpy.mean(yvals[5:10,1:-1] - numpy.mean(yvals[5:10,1:-1], axis = 0), axis = 1)
     numpy.testing.assert_allclose(truth, prof.value, rtol = 1e-4)
 
     # test non-overlapping intervals
     inters[0] = (xvals[15:25], yvals[15:25,1])
-    prof      = collapse.intervals(iter(inters[:-1]))
+    prof      = CollapseToMean.run(iter(inters[:-1]))
     assert all(prof.count == ([3]*5+[0]*5+[1]*10))
     numpy.testing.assert_allclose(truth, prof.value[:5], rtol = 1e-5)
     assert all(prof.value[5:] == 0.)
 
-def test_collapse_derivate():
+def test_collapse_by_derivate():
     u"Tests derivate collapses"
     yvals  = numpy.zeros((100,5), dtype = numpy.float32)
     for i in range(yvals.shape[1]):
@@ -42,19 +46,19 @@ def test_collapse_derivate():
 
     # test horizontal lines
     inters  = [(xvals[5:10], yvals[5:10,i]) for i in range(yvals.shape[1])]
-    prof    = collapse.derivate(iter(inters))
+    prof    = CollapseByDerivate.run(iter(inters))
     assert all(prof.count == ([5]*4+[0]))
     assert all(prof.value == 0.)
 
     # test slanted lines
     yvals[5:10,:] = numpy.arange(25).reshape((5,5))  # pylint: disable=no-member
-    prof          = collapse.derivate(iter(inters[1:-1]))
+    prof          = CollapseByDerivate.run(iter(inters[1:-1]))
     assert all(prof.count == ([3]*4+[0]))
     numpy.testing.assert_allclose([-20,-15,-10,-5,0], prof.value, rtol = 1e-4)
 
     # test non-overlapping intervals
     inters[0] = (xvals[15:25], yvals[15:25,1])
-    prof      = collapse.derivate(iter(inters[:-1]))
+    prof      = CollapseByDerivate.run(iter(inters[:-1]))
     assert all(prof.count == ([3]*4+[0]*6+[1]*9+[0]))
     numpy.testing.assert_allclose([-20,-15,-10,-5,0], prof.value[:5], rtol = 1e-4)
     assert all(prof.value[5:] == 0.)
