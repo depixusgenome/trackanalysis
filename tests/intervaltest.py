@@ -3,12 +3,12 @@
 u"Tests interval detection"
 
 import numpy    # type: ignore
-from signalfilter.intervals import (DetectFlats, MergeFlats, FilterFlats,
+from signalfilter.intervals import (EventsDetector, EventsMerger, EventsSelector,
                                     knownsigma)
 
 def test_detectflats():
     u"Tests flat stretches detection"
-    inst  = DetectFlats(precision = 1., confidence = 0.1, window = 1)
+    inst  = EventsDetector(precision = 1., confidence = 0.1, window = 1)
     det   = lambda  i: tuple(inst(i))
     mksl  = lambda *i: tuple(slice(*j) for j in i)
     items = numpy.zeros((30,))
@@ -30,7 +30,7 @@ def test_detectflats():
 
 def test_mergeflats():
     u"Tests flat stretches merging"
-    inst  = MergeFlats(precision = 1., confidence = 0.1, isequal = True)
+    inst  = EventsMerger(precision = 1., confidence = 0.1, isequal = True)
     det   = lambda  i, j: tuple(inst(i, j))
     mksl  = lambda *i: tuple(slice(*j) for j in i)
     items = numpy.zeros((30,))
@@ -52,7 +52,7 @@ def test_mergeflats():
 
 def test_filterflats():
     u"Tests flat stretches filtering"
-    det   = lambda  i, j, k: tuple(FilterFlats(edgelength = i, minlength = j)(k))
+    det   = lambda  i, j, k: tuple(EventsSelector(edgelength = i, minlength = j)(k))
     mksl = lambda *i: tuple(slice(*j) for j in i)
     assert det(0, 0, mksl((0,0),(1,1)))                 == mksl((0,0), (1,1))
     assert det(0, 5, mksl((0,0),(1,1),(5,10)))          == mksl((5,10))

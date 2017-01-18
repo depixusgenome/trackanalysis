@@ -3,13 +3,14 @@
 u"Interval detection: finding flat sections in the signal"
 
 from    typing import NamedTuple
+from    copy   import deepcopy
 import  numpy
 
 # pylint: disable=no-name-in-module,import-error
 from  ._core.samples.normal import knownsigma
 from  ._core.stats          import hfsigma
 
-class DetectFlats:
+class EventsDetector:
     u"""
     Detects flat stretches of value.
 
@@ -21,12 +22,12 @@ class DetectFlats:
     the estimation used is the median-deviation of the derivate of the data.
     """
     def __init__(self, **kwa):
-        self.precision = kwa.get('precision', 0.)
-        self.confidence  = kwa.get('confidence',  0.1)
-        self._window     = 1
-        self._kern       = numpy.ones((2,))
-        self._lrng       = numpy.arange(1)
-        self._hrng       = numpy.arange(1)
+        self.precision  = kwa.get('precision', 0.)
+        self.confidence = kwa.get('confidence',  0.1)
+        self._window    = 1
+        self._kern      = numpy.ones((2,))
+        self._lrng      = numpy.arange(1)
+        self._hrng      = numpy.arange(1)
         self._setwindow(kwa.get('window', 1))
 
     def _setwindow(self, window):
@@ -70,7 +71,7 @@ class DetectFlats:
         u"instantiates and calls class"
         return cls(**kwa)(data)
 
-class MergeFlats:
+class EventsMerger:
     u"""
     Merges neighbouring stretches of data.
 
@@ -120,7 +121,7 @@ class MergeFlats:
         u"instantiates and calls class"
         return cls(**kwa)(*args)
 
-class FilterFlats:
+class EventsSelector:
     u"""
     Filters flat stretches:
 
@@ -141,6 +142,40 @@ class FilterFlats:
         else:
             yield from (slice(i.start+edx,i.stop-edx) for i in intervals
                         if i.stop-i.start >= minl)
+
+    @classmethod
+    def run(cls, *args, **kwa):
+        u"instantiates and calls class"
+        return cls(**kwa)(*args)
+
+class EventsFinder:
+    u"detects, mergers and selects intervals"
+    def __init__(self, **kwa):
+        self._precision = kwa.get('precision', 0.)
+        self.detecting  = kwa.get('detecting', EventsDetector())
+        self.merging    = kwa.get('merging',   EventsMerger())
+        self.selecting  = kwa.get('selecting', EventsSelector())
+
+    precision = property(lambda self: getattr(self, '_precision'),
+                         lambda self, i: self._setprecision(i))
+
+    def _setprecision(self, val):
+        self._precision = val
+        for attr in (self.detecting, self.merging, self.selecting):
+            if hasattr(attr, 'precision'):
+                setattr(attr, 'precision', val)
+
+    def __call__(self, data, precision = None):
+        if precision is None:
+            precision = self.precision
+        if precision == 0:
+            data = tuple(data)
+            prec = numpy.median(hfsigma(bead) for bead in data)
+            if prec == 0:
+                raise ValueError()
+            return deepcopy(self)(data, precision = prec)
+
+        return self.selecting(self.merging(data, self.detecting(data)))
 
     @classmethod
     def run(cls, *args, **kwa):
