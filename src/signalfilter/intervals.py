@@ -4,7 +4,7 @@ u"Interval detection: finding flat sections in the signal"
 
 from    typing import NamedTuple
 from    copy   import deepcopy
-import  numpy
+import  numpy  as     np
 
 # pylint: disable=no-name-in-module,import-error
 from  ._core.samples.normal import knownsigma
@@ -25,17 +25,17 @@ class EventsDetector:
         self.precision  = kwa.get('precision', 0.)
         self.confidence = kwa.get('confidence',  0.1)
         self._window    = 1
-        self._kern      = numpy.ones((2,))
-        self._lrng      = numpy.arange(1)
-        self._hrng      = numpy.arange(1)
+        self._kern      = np.ones((2,))
+        self._lrng      = np.arange(1)
+        self._hrng      = np.arange(1)
         self._setwindow(kwa.get('window', 1))
 
     def _setwindow(self, window):
         self._window = max(window, 1)
-        self._kern   = numpy.ones((self._window*2,))
+        self._kern   = np.ones((self._window*2,))
         self._kern[-self._window:] = -1.
-        self._lrng   = numpy.arange(self._window+1)[-1:0:-1]
-        self._hrng   = numpy.arange(self._window)[1:]
+        self._lrng   = np.arange(self._window+1)[-1:0:-1]
+        self._hrng   = np.arange(self._window)[1:]
 
     window = property(lambda self: self._window, _setwindow)
 
@@ -48,12 +48,12 @@ class EventsDetector:
         thr       = knownsigma.threshold(True, self.confidence, precision,
                                          window, window)
 
-        delta           = numpy.convolve(data, self._kern, mode = 'same')
+        delta           = np.convolve(data, self._kern, mode = 'same')
         delta[:window] -= self._lrng * data[0]
         if window > 1:
             delta[1-window:] += self._hrng * data[-1]
 
-        ends = (numpy.abs(delta) >= (thr*window)).nonzero()[0]
+        ends = (np.abs(delta) >= (thr*window)).nonzero()[0]
 
         if len(ends) == 0:
             yield slice(0, len(data))
@@ -170,7 +170,7 @@ class EventsFinder:
             precision = self.precision
         if precision == 0:
             data = tuple(data)
-            prec = numpy.median(hfsigma(bead) for bead in data)
+            prec = np.median(hfsigma(bead) for bead in data)
             if prec == 0:
                 raise ValueError()
             return deepcopy(self)(data, precision = prec)
@@ -184,11 +184,49 @@ class EventsFinder:
 
 IdRange = NamedTuple('IdRange', (('start', int), ('stop', int), ('cycle', int)))
 def tocycles(starts, inters):
-    u"Takes intervals on a bead to intervals on cycles"
+    u"""
+    Assigns a cycle id to intervals. If the interval is over multiple cycles,
+    one of those with the maximum number of points is chosen.
+
+    Parameters:
+
+    * *starts*: array of starting indexes for each cycle or track from which
+    to extract that information.
+    """
     if hasattr(starts, 'phaseid'):
-        starts = starts.phaseid(all,0)
+        starts = starts.phaseid(all, 0)
 
     for cur in inters:
-        cyc  = numpy.searchsorted(starts, cur.start)
-        bias = starts[max(0,cyc-1)]
-        yield IdRange(cur.start-bias, cur.stop-bias, cyc)
+        cstart = np.searchsorted(starts,            cur.start, 'right')
+        cstop  = np.searchsorted(starts[cstart-1:], cur.stop,  'right')+cstart-1
+
+        if cstop == cstart:
+            cyc = cstart
+        elif cstop == cstart+1:
+            cyc = cstart + (starts[cstart]-cur.start < cur.stop - starts[cstart])
+        else:
+            cnt    = np.diff(starts[cstart-1:cstop])
+            cnt[0] = starts[cstart]-cur.start
+            imax   = np.argmax(cnt)
+            cyc    = cstop if cur.stop-starts[cstop-1] > cnt[imax] else cstart+imax
+
+        yield IdRange(cur.start, cur.stop, cyc-1)
+
+PIdRange = NamedTuple('IdRange', (('start', int), ('stop', int),
+                                  ('cycle', int), ('phase', int)))
+def tophaseandcycles(starts, inters):
+    u"""
+    Assigns a cycle and phase id to intervals. If the interval is over multiple
+    cycles or phases, one of those with the maximum number of points is chosen.
+
+    Parameters:
+
+    * *starts*: 2D array of starting indexes for each cycle and phase, or track
+    from which to extract that information.
+    """
+    if hasattr(starts, 'phaseid'):
+        starts = starts.phaseid(all, all)
+
+    nphases = starts.shape[1]
+    yield from (PIdRange(start, stop, cycle//nphases, cycle % nphases)
+                for start, stop, cycle in tocycles(starts.ravel(), inters))
