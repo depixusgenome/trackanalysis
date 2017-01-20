@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Tests cordrift"
+import random
 import numpy
 from cordrift.collapse import (CollapseToMean, CollapseByDerivate,
-                               StitchByInterpolation, Profile)
+                               StitchByInterpolation, Profile, _getintervals)
 
 def test_collapse_to_mean():
     u"Tests interval collapses"
@@ -64,24 +65,46 @@ def test_collapse_by_derivate():
     numpy.testing.assert_allclose([-20,-15,-10,-5,0], prof.value[:5], rtol = 1e-4)
     assert all(prof.value[5:] == 0.)
 
+def test_getinter():
+    u"Tests _getintervals"
+    fge = lambda x: _getintervals(numpy.array(x), 2, numpy.greater_equal)
+    flt = lambda x: _getintervals(numpy.array(x), 2, numpy.less)
+    numpy.testing.assert_equal(flt([2]*5+[1]*5),       [[5,10]])
+    numpy.testing.assert_equal(fge([2]*5+[1]*5),       [[0,5]])
+    numpy.testing.assert_equal(flt([1]*5+[2]*5+[1]*5), [[0,5], [10,15]])
+    numpy.testing.assert_equal(fge([1]*5+[2]*5+[1]*5), [[5,10]])
+
 def test_stitchbyinterpolation():
     u"Tests StitchByInterpolation"
-    prof          = Profile(60)
-    prof.count[:] = 10
-    prof.value    = numpy.arange(len(prof), dtype = 'f4')
-    for i in range(10, len(prof), 10):
-        prof.value[i:]                += 10
-        prof.count[i-i//10:i+i//10-1]  = 0
+    def _test(power = 1, left = False, right = False):
+        prof          = Profile(60)
+        prof.count[:] = 10
+        prof.value = numpy.arange(len(prof), dtype = 'f4') ** power
+        if left:
+            prof.value[0] = 1
+            prof.count[0] = 0
+        if right:
+            prof.value[-1] = prof.value[-2]
+            prof.count[-1] = 0
 
-    stitched = StitchByInterpolation.run(prof, fitlength = 3, fitorder = 1, minoverlaps = 5)
-    numpy.testing.assert_allclose(stitched.value, 1.*numpy.arange(len(stitched)))
+        truth = numpy.array(prof.value)
 
-    prof.value = numpy.arange(len(prof), dtype = 'f4')**2
-    for i in range(10, len(prof), 10):
-        prof.value[i:] += 10
+        for i in range(10, len(prof), 10):
+            prof.value[i:]                += random.randint(-100, 100)
+            prof.count[i-i//10:i+i//10-1]  = 0
 
-    stitched = StitchByInterpolation.run(prof, fitlength = 3, fitorder = 2, minoverlaps = 5)
-    numpy.testing.assert_allclose(stitched.value, 1.*numpy.arange(len(stitched))**2)
+        stitched = StitchByInterpolation.run(prof,
+                                             fitlength   = 3,
+                                             fitorder    = power,
+                                             minoverlaps = 5)
+        numpy.testing.assert_allclose(stitched.value, truth)
+
+
+    _test(1, True, False)
+    for order in (1, 2):
+        for left in (False, True):
+            for right in (False, True):
+                _test(order, left, right)
 
 if __name__ == '__main__':
     test_stitchbyinterpolation()

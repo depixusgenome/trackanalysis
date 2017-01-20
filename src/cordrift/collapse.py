@@ -140,12 +140,9 @@ class CollapseByDerivate(CollapseAlg):
 
 def _getintervals(cnt:np.ndarray, minv:int, neq:Callable) -> numpy.ndarray:
     u"returns a 2D array containing ranges with prof.count < minv"
-    lt0, ltm1 = np.int32(neq(cnt[[0,-1]], minv))
-
-    holes     = np.zeros((len(cnt)+lt0+ltm1,), dtype = 'bool')
-    neq(cnt, minv, out = holes[lt0:lt0+len(cnt)])
-
-    inters    = np.nonzero(np.diff(holes))[0]
+    holes  = np.zeros((len(cnt)+2,), dtype = 'bool')
+    neq(cnt, minv, out = holes[1:len(cnt)+1])
+    inters = np.nonzero(np.diff(holes))[0]
     return inters.reshape((len(inters)//2,2))
 
 class StitchByDerivate(CollapseByDerivate):
@@ -233,10 +230,10 @@ class StitchByInterpolation:
             prof.value[last:filled[-1,-1]] += delta
 
         if filled[0][0] != 0:           # extrapolate around 0
-            prof.value[:filled[0][0]] = prof.value[filled[0][0]]
+            prof.value[:filled[0][0]]   = prof.value[filled[0][0]]
 
         if filled[-1][-1] < len(prof):  # extrapolate around the end
-            prof.value[filled[-1][-1]:] = prof.value[filled[-1][-1]]
+            prof.value[filled[-1][-1]:] = prof.value[filled[-1][-1]-1]
         return prof
 
     @classmethod
