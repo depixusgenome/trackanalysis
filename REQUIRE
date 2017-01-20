@@ -3,7 +3,7 @@
 # COMMENTED OUT modules I should not need
 bokeh                     0.12.3                   py35_0  
 flexx                     0.4.1                    py35_0    conda-forge
-pybind11                  1.9                      py35_0    fklab
+pybind11                  2.0.1                    py35_0    conda-forge
 jinja2                    2.8                      py35_1  
 #markupsafe                0.23                     py35_2  
 #mkl                       11.3.3                        0  

@@ -64,28 +64,26 @@ namespace pybind11 { namespace detail {
         using Input = samples::normal::Input;
         PYBIND11_TYPE_CASTER(Input, _("Input"));
 
-        bool load(handle obj, bool) 
+        bool load(handle obj, bool)
         {
+            pybind11::str const keys[3] = { "count", "mean", "sigma"};
             bool err   = false;
             auto check = [&err]() { return !(err || (err = PyErr_Occurred())); };
 
             pybind11::object   items[3];
-
-            pybind11::sequence seq(obj, true);
-            if(seq.check())
+            if(pybind11::isinstance<pybind11::sequence>(obj))
+            {
+                auto seq = pybind11::reinterpret_borrow<pybind11::sequence>(obj);
                 for(size_t i = 0; i < 3 && check(); ++i)
                     items[i] = seq[i];
-            else
+            } else if(pybind11::isinstance<pybind11::dict>(obj))
             {
-                pybind11::str keys[3] = { "count", "mean", "sigma"};
-                pybind11::dict dico(obj, true);
-                if(dico.check())
-                    for(size_t i = 0; i < 3 &&  check(); ++i)
-                        items[i] = dico[keys[i]];
-                else
-                    for(size_t i = 0; i < 3 &&  check(); ++i)
-                        items[i] = obj.attr(keys[i]);
-            }
+                auto dico = pybind11::reinterpret_borrow<pybind11::dict>(obj);
+                for(size_t i = 0; i < 3 &&  check(); ++i)
+                    items[i] = dico[keys[i]];
+            } else
+                for(size_t i = 0; i < 3 &&  check(); ++i)
+                    items[i] = obj.attr(keys[i]);
 
             if(check())
                 value.count = items[0].cast<size_t>();
@@ -97,7 +95,7 @@ namespace pybind11 { namespace detail {
             return check();
         }
 
-        static handle cast(Input src, return_value_policy, handle) 
+        static handle cast(Input src, return_value_policy, handle)
         { return make_tuple(src.count, src.mean, src.sigma); }
     };
 }}
@@ -109,9 +107,9 @@ namespace samples { namespace normal {
         auto nmod  = smod.def_submodule("normal");
         auto ksmod = nmod.def_submodule("knownsigma");
         ksmod.def("value",     knownsigma::value);
-        ksmod.def("threshold", (float (*)(bool, float, float)) 
+        ksmod.def("threshold", (float (*)(bool, float, float))
                                 (knownsigma::threshold));
-        ksmod.def("threshold", (float (*)(bool, float, float, size_t, size_t)) 
+        ksmod.def("threshold", (float (*)(bool, float, float, size_t, size_t))
                                 (knownsigma::threshold));
         ksmod.def("isequal",   knownsigma::isequal);
 
