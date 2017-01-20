@@ -191,14 +191,16 @@ class StitchByInterpolation:
     def __fit(self, rng, side, vals):
         if side:
             imin, imax = rng[0], min(rng[0]+self.fitlength, rng[1])
+            xvals      = range(0, imax-imin)
         else:
             imin, imax = max(rng[0], rng[1]-self.fitlength), rng[1]
-        return np.polyfit(range(imin, imax), vals[imin:imax], self.fitorder)
+            xvals      = range(imin-imax+1, 1)
+        return np.polyfit(xvals, vals[imin:imax], self.fitorder)
 
     def __call__(self, prof) -> Profile:
         # get intervals with enough overlaps and enough points to do a fit
         filled    = _getintervals(prof.count, self.minoverlaps, np.greater_equal)
-        filled    = filled[np.dot(filled, [-1, 1]) >= self.fitorder]
+        filled    = filled[np.dot(filled, [-1, 1]) >= (self.fitorder+1)]
 
         # now fit a polynomial to each end of these intervals
         leftpars  = np.apply_along_axis(self.__fit, 1, filled, False, prof.value)
@@ -217,15 +219,15 @@ class StitchByInterpolation:
             params[-len(left):] = left
 
             params[-1]  += delta
-            coeff        = np.polyval(np.polyder(right, 1), stop)
-            coeff       -= np.polyval(np.polyder(left,  1), stop)
+            coeff        = np.polyval(np.polyder(right, 1), 0)
+            coeff       -= np.polyval(np.polyder(left,  1), stop-start+1)
             coeff       /= 2.*(stop-start+1)
-            params[-3:] += (coeff, -2.*(start-1)*coeff, coeff*(start-1)**2)
+            params[-3]  += coeff
 
-            vals       = tuple(np.polyval(params, i) for i in range(start, stop+1))
+            vals       = tuple(np.polyval(params, i) for i in range(1, stop-start+2))
             prof.value[start:stop] = vals[:-1]
 
-            delta, last = vals[-1]-np.polyval(right, stop), stop
+            delta, last = vals[-1]-np.polyval(right, 0), stop
 
         if last is not None:
             prof.value[last:filled[-1,-1]] += delta

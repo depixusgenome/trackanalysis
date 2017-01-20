@@ -73,17 +73,15 @@ def test_stitchbyinterpolation():
         prof.value[i:]                += 10
         prof.count[i-i//10:i+i//10-1]  = 0
 
-    #stitched = StitchByInterpolation.run(prof, fitlength = 3, fitorder = 1, minoverlaps = 5)
-    #numpy.testing.assert_allclose(stitched.value, 1.*numpy.arange(len(stitched)))
+    stitched = StitchByInterpolation.run(prof, fitlength = 3, fitorder = 1, minoverlaps = 5)
+    numpy.testing.assert_allclose(stitched.value, 1.*numpy.arange(len(stitched)))
 
     prof.value = numpy.arange(len(prof), dtype = 'f4')**2
     for i in range(10, len(prof), 10):
         prof.value[i:] += 10
 
     stitched = StitchByInterpolation.run(prof, fitlength = 3, fitorder = 2, minoverlaps = 5)
-    print(stitched.value- 1.*numpy.arange(len(stitched))**2)
-    numpy.testing.assert_allclose(stitched.value, 1.*numpy.arange(len(stitched))**2,
-                                  atol = 1e-5, rtol = 1e-5)
+    numpy.testing.assert_allclose(stitched.value, 1.*numpy.arange(len(stitched))**2)
 
 if __name__ == '__main__':
     test_stitchbyinterpolation()
