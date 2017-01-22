@@ -20,28 +20,35 @@ require(python = {'pybind11' : '2.0.1',
                   'mypy'     : '0.4.4'},
         rtime  = False)
 
-_ALL = ('tests',) + tuple(builder.wscripted("src"))
+_ALL   = ('tests',) + tuple(builder.wscripted("src"))
 
-def _recurse(fcn):
-    return builder.recurse(builder, _ALL)(fcn)
+def options(opt):
+    builder.options(opt)
+    for item in _ALL:
+        opt.recurse(item)
+
+def configure(cnf):
+    builder.configure(cnf)
+    for item in _ALL:
+        cnf.recurse(item)
+
+def build(bld):
+    builder.build(bld)
+    builder.findpyext(bld, _ALL[1:])
+    for item in _ALL:
+        bld.recurse(item)
 
 def environment(cnf):
+    u"prints the environment variables for current configuration"
     print(cnf.env)
 
-@_recurse
-def options(opt):
-    pass
+def condaenv(_):
+    u"prints the conda yaml recipe"
+    builder.condaenv('trackanalysis')
 
-@_recurse
-def configure(cnf):
-    pass
-
-@_recurse
-def build(bld):
-    builder.findpyext(bld, builder.wscripted('src'))
-
-def condaenv(cnf):
-    builder.condaenv(open('tmp.yaml', "w"), 'trackanalysis')
+def requirements(_):
+    u"prints requirements"
+    builder.requirements()
 
 for item in _ALL:
     builder.addbuild(item, locals())
