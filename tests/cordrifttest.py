@@ -99,8 +99,6 @@ def test_stitchbyinterpolation():
                                              minoverlaps = 5)
         numpy.testing.assert_allclose(stitched.value, truth)
 
-
-    _test(1, True, False)
     for order in (1, 2):
         for left in (False, True):
             for right in (False, True):
