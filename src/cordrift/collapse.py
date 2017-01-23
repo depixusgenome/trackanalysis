@@ -41,9 +41,8 @@ class CollapseAlg:
         self.edge   = kwa.get('edge', 1) # type: Optional[int]
 
     @property
-    def _inner(self):
-        edge  = None if self.edge is None or self.edge < 1 else int(self.edge)
-        return slice(edge, None if edge is None else -edge)
+    def _edge(self):
+        return None if self.edge is None or self.edge < 1 else int(self.edge)
 
     def __call__(self, inter:Iterable) -> Profile:
         if hasattr(inter, '__next__'):
@@ -65,7 +64,8 @@ class CollapseToMean(CollapseAlg):
 
         cnt   = np.zeros_like(prof.count)
         vals  = prof.value
-        inner = self._inner
+        edge  = self._edge
+        inner = slice(edge, None if edge is None else -edge)
         for inds, cur in _iter_ranges(prof.xmin, sorted(inter, key = key)):
             if all(cnt[inds] == 0):
                 vals[inds] -= cur.mean()
@@ -119,7 +119,7 @@ class CollapseByDerivate(CollapseAlg):
                         np.inf, dtype = np.float32)
         cnt   = np.zeros_like(prof.count)
         occ   = prof.count
-        inner = self._inner
+        inner = slice(self._edge, None)
 
         # compactify all derivatives into a single 2D table
         # missing values are coded as NaN
@@ -166,15 +166,24 @@ class StitchByDerivate(CollapseByDerivate):
             if tmp is not None:
                 prof.value[last:start] += tmp.value[-1]-prof.value[last]
 
-            tmp        = der((bead[max(start-1, 0):stop+1] for bead in data))
-            tmp.value += prof.value[max(start-1, 0)]-tmp.value[0]
+            sli        = slice(max(start-1, 0), stop+1)
+            tmp        = der(((i[sli], j[sli]) for i, j in data))
+            tmp.value += prof.value[sli.start]-tmp.value[0]
 
-            prof.value[start:stop] = tmp.value[1:1+stop-start]
-            prof.count[start:stop] = tmp.count[1:1+stop-start]
+            ind        = 0 if start == 0 else 1
+            prof.value[start:stop] = tmp.value[ind:ind+stop-start]
+            prof.count[start:stop] = tmp.count[ind:ind+stop-start]
 
             last  = stop
 
+        if tmp is not None and last < len(prof):
+            prof.value[last:] += tmp.value[-1]-prof.value[last]
         return prof
+
+    @classmethod
+    def run(cls, data:Iterable, prof:Profile, **kwa) -> Profile: # type: ignore
+        u"creates the configuration and runs the algorithm"
+        return cls(**kwa)(data, prof)
 
 class StitchByInterpolation:
     u"""
