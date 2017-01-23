@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # encoding: utf-8
+from waflib.Build import BuildContext
 try:
     import wafbuilder as builder
 except ImportError:
@@ -23,17 +24,35 @@ require(python = {'pybind11' : '2.0.1',
 _ALL   = ('tests',) + tuple(builder.wscripted("src"))
 
 def options(opt):
+    opt.load('waf_unit_test pytest')
     builder.options(opt)
+    opt.add_option('--mod', dest = 'modules', action = 'store', help=u"modules to build")
     for item in _ALL:
         opt.recurse(item)
 
+def _get(base, defaults, requested):
+    if len(defaults) == 0:
+        defaults = base
+    if requested is None or len(requested) == 0:
+        return defaults
+
+    else:
+        names = {val.split('/')[-1]: val for val in defaults}
+        return tuple(names[req] for req in requested.split(',') if req in names)
+
 def configure(cnf):
     builder.configure(cnf)
-    for item in _ALL:
+    builder.env.MODULES = _get(_ALL, _ALL, cnf.options.modules)
+    for item in builder.env.MODULES:
         cnf.recurse(item)
 
 def build(bld):
     builder.build(bld)
+
+    mods = _get(_ALL, bld.env.MODULES, bld.options.modules)
+    if len(mods) < len(bld.env.MODULES if len(bld.env.MODULES) else _ALL):
+        print('building:', *mods)
+
     builder.findpyext(bld, _ALL[1:])
     for item in _ALL:
         bld.recurse(item)
@@ -49,6 +68,18 @@ def condaenv(_):
 def requirements(_):
     u"prints requirements"
     builder.requirements()
+
+def test(bld):
+    u"runs pytests"
+    mods  = tuple('/'+i.split('/')[-1] for i in _get(_ALL, bld.env.MODULES, bld.options.modules))
+    names = (path for path in bld.path.ant_glob('tests/*test.py'))
+    names = (str(name) for name in names if any(i in str(name) for i in mods))
+    builder.runtest(bld, *(name[name.rfind('tests'):] for name in names))
+
+class Tester(BuildContext):
+    u"runs pytests"
+    cmd = 'test'
+    fun = 'test'
 
 for item in _ALL:
     builder.addbuild(item, locals())
