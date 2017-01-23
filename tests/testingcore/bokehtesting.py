@@ -138,7 +138,7 @@ class _ManagedServerLoop:
     @staticmethod
     def path(path:str) -> str:
         u"returns the path to testing data"
-        from testdata       import path as _testpath
+        from testingcore import path as _testpath
         return _testpath(path)
 
     def cmd(self, fcn, *args, andstop = True, **kwargs):
