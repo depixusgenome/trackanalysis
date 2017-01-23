@@ -23,6 +23,21 @@ class RampModel:
         self.corrThreshold = 0.5
         self._minExt = kwargs.get("minExtension",0.0)
         self.window = 7
+        self._zclthreshold = 0.0
+
+    def set_zclthreshold(self,value):
+        u'''
+        sets _zclthreshold
+        if _minExt is changed call controller and apply changes in RampData
+        '''
+        print("changing _zclthreshold")
+        self._zclthreshold = value
+
+    def get_zclthreshold(self):
+        u'''
+        returns  _zclthreshold
+        '''
+        return self._zclthreshold
 
     def setMinExt(self,value):
         u'''
@@ -113,7 +128,7 @@ class RampData: # pylint: disable=too-many-public-methods
             ids = self.dzdt[self.dzdt[self.det]<0].apply(lambda x:x.first_valid_index())
 
         zmcl = pd.DataFrame(index = self.beads(), columns = range(self.ncycles))
-        for bcid in ids.valid().index:
+        for bcid in ids.valid().index: # use enumerate
             zmcl.loc[bcid[0], bcid[1]] = self.dataz[("zmag", bcid[1])][ids[bcid]]
 
         return zmcl
@@ -340,6 +355,7 @@ def _continuous_indices(ser:pd.Series)->list:
         boud=[ite]
 
     return boud
+
 def map_boundaries(bdata:pd.DataFrame)->pd.DataFrame:
     u'''
     To finish

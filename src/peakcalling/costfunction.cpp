@@ -61,9 +61,9 @@ namespace peakcalling { namespace cost
 
                     double c = std::sqrt(norm1*norm2);
                     double x = sum/c;
-                    return {float(1.-x),
-                            float((.5*grnorm*sum/norm1-grsum[0])/c),
-                            float(-grsum[1]/c)};
+                    return std::make_tuple(float(1.-x),
+					   float((.5*grnorm*sum/norm1-grsum[0])/c),
+					   float(-grsum[1]/c));
                 };
 
             auto r1 = cost(bead1, size1, bead2, size2, stretch, bias, cf.sigma);
@@ -72,10 +72,9 @@ namespace peakcalling { namespace cost
 
             auto r2 = cost(bead2, size2, bead1, size1, 1./stretch, -bias/stretch,
                            cf.sigma);
-            return {std::get<0>(r1) +std::get<0>(r2),
-                    std::get<1>(r1)-(std::get<1>(r2)-std::get<2>(r2)*bias)
-                        /(stretch*stretch),
-                    std::get<2>(r1) -std::get<2>(r2)/stretch};
+            return std::make_tuple(std::get<0>(r1) +std::get<0>(r2),
+				   std::get<1>(r1)-(std::get<1>(r2)-std::get<2>(r2)*bias)/(stretch*stretch),
+				   std::get<2>(r1) -std::get<2>(r2)/stretch);
         }
 
         double  _compute(unsigned, double const * x, double * g, void * d)
@@ -129,6 +128,6 @@ namespace peakcalling { namespace cost
         double minf = std::numeric_limits<double>::max();
         std::vector<double> tmp = cf.current;
         opt.optimize(tmp, minf);
-        return {float(minf), float(tmp[0]), float(tmp[1])};
+        return std::make_tuple(float(minf), float(tmp[0]), float(tmp[1]));
     }
 }}

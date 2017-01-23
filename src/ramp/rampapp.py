@@ -3,10 +3,8 @@
 u'''
 first simple version
 Will need rewritting to use Event()
-add :
-set size of the display in width such that both plots can be seen at once
 '''
-
+import os
 from bokeh.plotting import curdoc, figure
 from bokeh.layouts import widgetbox, column, row
 from bokeh.models import ColumnDataSource, HoverTool
@@ -14,6 +12,7 @@ from bokeh.models import TextInput, Div, Button
 import pandas as pd
 import numpy
 import ramp
+import ramp.ramp_utils as utils
 import view.dialog
 
 
@@ -136,7 +135,7 @@ class Select:
         self.dial = view.dialog.FileDialog(filetypes = filetypes,
                                            title = "please choose a ramp file")
 
-class MyDisplay:
+class MyDisplay: # pylint: disable=too-many-instance-attributes
     u'''
     My display
     '''
@@ -146,6 +145,7 @@ class MyDisplay:
         '''
         self.data = kwargs.get("data", None)
         self.doc = kwargs.get("doc", None)
+        self.filename = kwargs.get("filename", None)
         if self.data is None:
             self.data = Data()
         if self.doc is None:
@@ -166,6 +166,11 @@ class MyDisplay:
                                           y_label ="Probability",
                                           normed = True,
                                           with_cdf = True),
+                      "zmcl_reverse": DisplayHist(title = "Ratio of closed hairpin",
+                                                  x_label = "zmag_close",
+                                                  y_label ="Probability",
+                                                  normed = True,
+                                                  with_cdf = True),
                       "HPsize": DisplayHist(title = "HP size estimate of good beads",
                                             x_label = "size (micrometer unit)",
                                             y_label ="number of estimates",
@@ -173,14 +178,26 @@ class MyDisplay:
                                             with_cdf = False)}
         self.txt_inputs = {"minext" : \
                            TextInput(value = "0.0",
-                                     title = "min molecule extension (micrometer unit)")}
+                                     title = "min molecule extension (micrometer unit)"),
+                           "zcl_threshold":\
+                           TextInput(value = "0.0",
+                                     title = "keep bead if zmag close is above :")}
 
-        def tmp(attr,old,new): # pylint: disable=unused-argument
+        def call_changeminext(attr,old,new): # pylint: disable=unused-argument
             u''' bokeh requires attr, old, new'''
             return self.changeminext()
 
-        self.txt_inputs["minext"].on_change("value",tmp)
+        def call_changezclthreshold(attr,old,new): # pylint: disable=unused-argument
+            u''' bokeh requires attr, old, new'''
+            return self.changezclthreshold()
 
+        self.txt_inputs["minext"].on_change("value",call_changeminext)
+
+        self.txt_inputs["zcl_threshold"].on_change("value",call_changezclthreshold)
+
+
+        self.buttons = {"gen_rpdiscard":Button(label=" Generate ramp_discard file")}
+        self.buttons["gen_rpdiscard"].on_click(self.generate_rpdiscard)
 
         self.sel = {"rpfile":Select(label = "Select file", filetypes = "trk")}
         self.sel["rpfile"].button.on_click(self.change_data_file)
@@ -205,9 +222,21 @@ class MyDisplay:
         docrows.append(widgetbox(self.txt_inputs["minext"]))
         docrows.append(self.divs["fixed"].div)
         docrows.append(row(column(self.hists["zmop"].fig), column(self.hists["zmcl"].fig)) )
-        docrows.append(self.hists["HPsize"].fig)
 
+        # add file which generates a ramp_discarded.csv (including a list of fixed and ugly beads)
+        # (and beads which are not yet closed at zcl_threshold)
+        docrows.append(row(self.hists["zmcl_reverse"].fig,
+                           widgetbox(self.txt_inputs["zcl_threshold"],
+                                     self.buttons["gen_rpdiscard"])))
+        docrows.append(self.hists["HPsize"].fig)
         return docrows
+
+    def changezclthreshold(self):
+        u'''
+        Called when the threshold of zcl value is changed
+        '''
+        self.data.rpmod.set_zclthreshold(float(self.txt_inputs["zcl_threshold"].value))
+
 
     def changeminext(self):
         u'''
@@ -223,13 +252,24 @@ class MyDisplay:
         called when User selects a new file
         '''
         file_diag = view.dialog.FileDialog(filetypes = "trk", title = "please choose a ramp file")
-        filename = file_diag.open()
+        self.filename = file_diag.open()
         self.divs["filestatus"].update("Loading new file..")
-        self._update_rpdata_from_file(filename)
+        self._update_rpdata_from_file(self.filename)
         self._update_text_info()
         self._update_zmag_info()
         self._update_HP_info()
         self.divs["filestatus"].update("New file loaded!")
+
+    def generate_rpdiscard(self):
+        u'''
+        Generates the ramp_discard.csv file for pias input
+        '''
+        beads = {"Too noisy":self.data.rpfulldata.noBeadCrossIds(),
+                 "Fixed":self.data.rpfulldata.getFixedBeadIds(),
+                 "HP not closing at the test force":\
+                 utils.get_beadids_not_closing(self.data.rpdata,self.data.rpmod.get_zclthreshold())}
+        # add "HP not closing at the test force" key values
+        _gen_ramp_discard(beads,os.path.basename(self.filename))
 
     @classmethod
     def open(cls,doc):
@@ -264,14 +304,33 @@ class MyDisplay:
         zmagcl = pd.DataFrame() if self.data.rpdata is \
                  None else self.data.rpdata.zmagClose()
 
+        rzmagcl = pd.DataFrame() if self.data.rpdata is \
+                  None else self.data.rpdata.zmagClose(reverse_time=True)
+
         self.hists["zmop"].update(zmagop.values.flatten())
 
         self.hists["zmcl"].update(zmagcl.values.flatten())
+
+        self.hists["zmcl_reverse"].update(rzmagcl.values.flatten())
 
     def _update_HP_info(self):
         hp_est = pd.DataFrame() if self.data.rpdata is \
                  None else self.data.rpdata.estHPsize()
         self.hists["HPsize"].update(hp_est.values.flatten())
+
+
+
+def _gen_ramp_discard(beads:dict,rpfile):
+    u'''
+    outputs a csv with the same format as ramp_discard.csv
+    '''
+    with open("ramp_discarded.csv","w") as outfile:
+        outfile.write("Bead Id;\tPath;\tReason\n")
+        for key,values in beads.items():
+            for value in values:
+                outfile.write(str(value)+";\t"+rpfile+";\t"+str(key)+"\n")
+
+    outfile.close()
 
 if __name__=="__main__":
     # should move this to unit test
