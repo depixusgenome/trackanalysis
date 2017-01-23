@@ -9,7 +9,7 @@ from    control.processor       import Processor, Cache, Runner
 from    data                    import Cycles, Beads, TrackItems
 import  model.task           as tasks
 
-from    testdata import path
+from    testingcore             import path
 
 # pylint: disable=no-self-use
 

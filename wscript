@@ -42,8 +42,8 @@ def _get(base, defaults, requested):
 
 def configure(cnf):
     builder.configure(cnf)
-    builder.env.MODULES = _get(_ALL, _ALL, cnf.options.modules)
-    for item in builder.env.MODULES:
+    cnf.env.MODULES = _get(_ALL, _ALL, cnf.options.modules)
+    for item in cnf.env.MODULES:
         cnf.recurse(item)
 
 def build(bld):
@@ -71,9 +71,9 @@ def requirements(_):
 
 def test(bld):
     u"runs pytests"
-    mods  = tuple('/'+i.split('/')[-1] for i in _get(_ALL, bld.env.MODULES, bld.options.modules))
-    names = (path for path in bld.path.ant_glob('tests/*test.py'))
-    names = (str(name) for name in names if any(i in str(name) for i in mods))
+    mods   = tuple('/'+i.split('/')[-1] for i in _get(_ALL, bld.env.MODULES, bld.options.modules))
+    names  = tuple(path for path in bld.path.ant_glob(('tests/*test.py', 'tests/*/*test.py')))
+    names  = tuple(str(name) for name in names if any(i in str(name) for i in mods))
     builder.runtest(bld, *(name[name.rfind('tests'):] for name in names))
 
 class Tester(BuildContext):

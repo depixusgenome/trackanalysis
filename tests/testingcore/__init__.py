@@ -10,7 +10,7 @@ PATHS = dict(small_pickle = "small_pickle.pk",
 
 def path(name:str) -> str:
     u"returns the path to the data"
-    val = "../tests/testdata/"+PATHS.get(name.lower().strip(), name)
+    val = "../tests/"+__package__+"/"+PATHS.get(name.lower().strip(), name)
     if not os.path.exists(val):
-        raise KeyError("Check your file name!!!")
+        raise KeyError("Check your file name!!! "+val)
     return os.path.abspath(val)

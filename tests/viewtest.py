@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u""" Tests views """
-from pytest         import approx       # pylint: disable=no-name-in-module
-from bokehtesting   import bokehaction  # pylint: disable=unused-import
+from pytest                     import approx       # pylint: disable=no-name-in-module
+from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 
-from view.toolbar   import ToolBar
-from view.trackplot import TrackPlot
+from view.toolbar               import ToolBar
+from view.trackplot             import TrackPlot
 
 def test_toolbar(bokehaction):          # pylint: disable=redefined-outer-name
     u"test the toolbar"

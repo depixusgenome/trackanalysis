@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 u""" Tests data access """
 import numpy
-from   legacy import readtrack   # pylint: disable=import-error,no-name-in-module
+from   legacy       import readtrack   # pylint: disable=import-error,no-name-in-module
 import data
-from   testdata import path
+from   testingcore  import path
 
 # pylint: disable=no-self-use
 

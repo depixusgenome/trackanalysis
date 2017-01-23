@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 u""" Tests ramp analysis """
 #from   legacy import readtrack   # pylint: disable=import-error,no-name-in-module
-from data import Track
-from ramp import RampModel, RampControler
-from testdata import path
+from data           import Track
+from ramp           import RampModel, RampControler
+from testingcore    import path
 
 # pylint: disable=no-self-use
 
