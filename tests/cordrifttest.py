@@ -5,24 +5,29 @@ import random
 import numpy
 from cordrift.collapse import (CollapseToMean,        CollapseByDerivate,
                                StitchByInterpolation, Profile, _getintervals,
-                               StitchByDerivate)
+                               StitchByDerivate, Range)
 
 def test_collapse_to_mean():
     u"Tests interval collapses"
     yvals  = numpy.zeros((100,5), dtype = numpy.float32)
     for i in range(yvals.shape[1]):
         yvals[:,i] = i
-    xvals   = numpy.arange(100)+100
 
     # test horizontal lines
-    inters  = [(xvals[5:10], yvals[5:10,i]) for i in range(yvals.shape[1])]
+    inters  = [Range(5, yvals[5:10,i]) for i in range(yvals.shape[1])]
     prof    = CollapseToMean.run(iter(inters), edge = None)
+    assert prof.xmin == 5
+    assert prof.xmax == 10
+    assert len(prof) == 5
     assert all(prof.count == 5)
     assert all(prof.value == 0.)
 
     # test slanted lines
     yvals[5:10,:] = numpy.arange(25).reshape((5,5))  # pylint: disable=no-member
     prof          = CollapseToMean.run(iter(inters[1:-1]), edge = None)
+    assert prof.xmin == 5
+    assert prof.xmax == 10
+    assert len(prof) == 5
     assert all(prof.count == 3)
     numpy.testing.assert_allclose([-10,-5,0,5,10], prof.value, rtol = 1e-4)
 
@@ -34,7 +39,7 @@ def test_collapse_to_mean():
     numpy.testing.assert_allclose(truth, prof.value, rtol = 1e-4)
 
     # test non-overlapping intervals
-    inters[0] = (xvals[15:25], yvals[15:25,1])
+    inters[0] = Range(15, yvals[15:25,1])
     prof      = CollapseToMean.run(iter(inters[:-1]), edge = None)
     assert all(prof.count == ([3]*5+[0]*5+[1]*10))
     numpy.testing.assert_allclose(truth, prof.value[:5], rtol = 1e-5)
@@ -45,10 +50,9 @@ def test_collapse_by_derivate():
     yvals  = numpy.zeros((100,5), dtype = numpy.float32)
     for i in range(yvals.shape[1]):
         yvals[:,i] = i
-    xvals   = numpy.arange(100)+100
 
     # test horizontal lines
-    inters  = [(xvals[5:10], yvals[5:10,i]) for i in range(yvals.shape[1])]
+    inters  = [Range(5, yvals[5:10,i]) for i in range(yvals.shape[1])]
     prof    = CollapseByDerivate.run(iter(inters), edge = None)
     assert all(prof.count == ([5]*4+[0]))
     assert all(prof.value == 0.)
@@ -60,7 +64,7 @@ def test_collapse_by_derivate():
     numpy.testing.assert_allclose([-20,-15,-10,-5,0], prof.value, rtol = 1e-4)
 
     # test non-overlapping intervals
-    inters[0] = (xvals[15:25], yvals[15:25,1])
+    inters[0] = Range(15, yvals[15:25,1])
     prof      = CollapseByDerivate.run(iter(inters[:-1]), edge = None)
     assert all(prof.count == ([3]*4+[0]*6+[1]*9+[0]))
     numpy.testing.assert_allclose([-20,-15,-10,-5,0], prof.value[:5], rtol = 1e-4)
@@ -106,7 +110,7 @@ def test_stitchbyinterpolation():
                 _test(order, left, right)
 
 def test_stitchbyderivate():
-    u"Tests StitchByInterpolation"
+    u"Tests StitchByDerivate"
 
     def _test(left = False, right = False):
         prof          = Profile(60)
@@ -116,9 +120,8 @@ def test_stitchbyderivate():
         data[:4]  = numpy.arange(60)**2
         data[4,:] = numpy.arange(len(prof), dtype = 'f4')
         data[-4:] = -numpy.arange(60)**3
-        xvals     = numpy.arange(60)
 
-        items     = [(xvals, i) for i in data]
+        items     = [Range(0, i) for i in data]
         if left:
             prof.count[0] = 0
         if right:
@@ -130,7 +133,7 @@ def test_stitchbyderivate():
             prof.value[i:]                += random.randint(-100, 100)
             prof.count[i-i//10:i+i//10-1]  = 0
 
-        stitched = StitchByDerivate.run(items, prof, minoverlaps = 5)
+        stitched = StitchByDerivate.run(prof, items, minoverlaps = 5)
         numpy.testing.assert_allclose(stitched.value, truth)
 
     _test(True, False)
@@ -139,4 +142,5 @@ def test_stitchbyderivate():
             _test(left, right)
 
 if __name__ == '__main__':
-    test_stitchbyderivate()
+    test_stitchbyinterpolation()
+    #test_collapse_by_derivate()
