@@ -53,8 +53,8 @@ def build(bld):
     if len(mods) < len(bld.env.MODULES if len(bld.env.MODULES) else _ALL):
         print('building:', *mods)
 
-    builder.findpyext(bld, _ALL[1:])
-    for item in _ALL:
+    builder.findpyext(bld, set(mod for mod in mods if mod != 'tests'))
+    for item in mods:
         bld.recurse(item)
 
 def environment(cnf):
