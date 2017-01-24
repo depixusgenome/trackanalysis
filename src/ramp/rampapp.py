@@ -11,10 +11,10 @@ from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.models import TextInput, Div, Button
 import pandas as pd
 import numpy
-import ramp
-import ramp.ramp_utils as utils
 import view.dialog
 
+import ramp
+from . import _utils as utils
 
 class DisplayText:
     u''' Manages the Display : widgets, bokeh doc
