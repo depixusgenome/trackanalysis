@@ -85,10 +85,10 @@ class TrackItems(Items):
         if beadonly:
             @wraps(fcn)
             def _action(key, val):
-                return fcn(val) if self._isbead(key) else val
+                return key, (fcn(val) if self._isbead(key) else val)
             self.actions.append(_action)
         else:
-            self.actions.append(lambda key, val: fcn(val))
+            self.actions.append(lambda key, val: (key, fcn(val)))
         return self
 
     def withaction(self, fcn = None, clear = False, beadonly = False) -> 'TrackItems':

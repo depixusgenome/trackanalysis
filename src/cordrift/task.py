@@ -1,22 +1,38 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Removing correlated drifts"
+# pylint: disable=unused-import
+u"Task for removing correlated drifts"
 
-from typing                 import Union       # pylint: disable=unused-import
+from typing                 import Union, Optional
 from model                  import Task, Level
+from signalfilter           import NonLinearFilter, ForwardBackwardFilter
 from signalfilter.intervals import EventsDetector
+from .collapse              import (CollapseByDerivate, CollapseToMean,
+                                    StitchByInterpolation, StitchByDerivate)
 
 class BeadDriftTask(Task):
     u"Removes correlations between cycles"
-    level = Level.bead
+    level     = Level.cycle
+    filter    = None # type: Optional[Union[ForwardBackwardFilter, NonLinearFilter]]
+    events    = None # type: Optional[EventsDetector]
+    collapse  = None # type: Optional[Union[CollapseToMean, CollapseByDerivate]]
+    stitch    = None # type: Optional[Union[StitchByDerivate, StitchByInterpolation]]
+    precision = property(lambda self: self._precision,
+                         lambda self, val: self.setprecision(val))
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.filter        = None # Union[ForwardBackwardFilter,NonLinearFilter,type(None)]
+        self._precision = kwa.get('precision',  0.)
+        self.phases     = kwa.get('phases',    (5, 5))
+        self.filter     = kwa.get('filter',    NonLinearFilter())
+        self.events     = kwa.get('intervals', EventsDetector())
+        self.collapse   = kwa.get('collapse',  CollapseByDerivate())
+        self.stitch     = kwa.get('stitch',    StitchByDerivate())
+        self.zero       = kwa.get('zero',      10)
+        self.setprecision(self._precision)
 
-        self.eventsfinder = kwa.get('eventsfinder', EventsDetector())
-        self.precision    = kwa.get('precision',   0.)
-        self.confidence   = kwa.get('confidence',  0.1)
-        self.isequal      = kwa.get('isequal',     True)
-        self.edgelength   = kwa.get('edgelength',  0)
-        self.minlength    = kwa.get('minlength',   5)
-
+    def setprecision(self, val):
+        u"sets the precision to all"
+        self._precision = val
+        for item in ('filter', 'events'):
+            if getattr(self, item) is not None:
+                setattr(self, item, val)
