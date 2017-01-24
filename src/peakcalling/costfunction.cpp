@@ -62,8 +62,8 @@ namespace peakcalling { namespace cost
                     double c = std::sqrt(norm1*norm2);
                     double x = sum/c;
                     return std::make_tuple(float(1.-x),
-					                       float((.5*grnorm*sum/norm1-grsum[0])/c),
-					                       float(-grsum[1]/c));
+                                           float((.5*grnorm*sum/norm1-grsum[0])/c),
+                                           float(-grsum[1]/c));
                 };
 
             auto r1 = cost(bead1, size1, bead2, size2, stretch, bias, cf.sigma);
