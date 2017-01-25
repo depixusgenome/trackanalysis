@@ -14,12 +14,11 @@ from   .trackitems  import Beads, Cycles
 @levelprop(Level.project)
 class Track:
     "Model for track files. This must not contain actual data."
-    def __init__(self, **kw) -> None:
-        self._path      = kw.get('path', None)  # type: Optional[str]
-        self._data      = None                  # type: Optional[Dict]
-        self._cycles    = None                  # type: ignore
-        self._frequency = None                  # type: Optional[float]
-        self._nphases   = None                  # type: Optional[int]
+    def __init__(self, **kwa) -> None:
+        self._path      = kwa.get('path',       None) # type: Optional[str]
+        self._data      = kwa.get('data',       None) # type: Optional[Dict]
+        self._cycles    = kwa.get('cycles',     None) # type: ignore
+        self._frequency = kwa.get('frequency',  None) # type: Optional[float]
 
     @property
     def frequency(self) -> 'Optional[float]':
@@ -29,7 +28,7 @@ class Track:
     @property
     def nphases(self) -> 'Optional[int]':
         u"returns the number of phases in the track"
-        return self._nphases
+        return None if self._cycles is None else self._cycles.shape[1]
 
     @property
     def path(self) -> 'Optional[str]':
@@ -63,7 +62,7 @@ class Track:
                 self._data = dict()
 
             else:
-                for name in ('cycles', 'nphases', 'frequency'):
+                for name in ('cycles', 'frequency'):
                     setattr(self, '_'+name, kwargs.pop(name))
 
                 self._data = dict(ite for ite in kwargs.items()
