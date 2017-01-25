@@ -11,8 +11,9 @@ class BeadSimulator:
     """
     def __init__(self, **kwa):
         self.ncycles   = kwa.get('ncycles',  15)
-        self.phases    = kwa.get('phases',   [  1, 15,  1, 15,  1, 100,  1,  15])
-        self.zmax      = kwa.get('zmax',     [-.3, 0., 0., 1., 1., 0., 0., -.3])
+        self.phases    = kwa.get('phases',   [ 1,  15,  1, 15,  1, 100,  1,  15])
+        self.zmax      = kwa.get('zmax',     [ 0., 0., 1., 1., 0., 0., -.3, -.3])
+        self.brownian  = kwa.get('brownian', [.003] * 8)
         self.randzargs = kwa.get('randz',   (0., .1, .9))
         self.randtargs = kwa.get('randt',   (10, 100))
         self.driftargs = kwa.get('drift',   (.1, 29.))
@@ -56,8 +57,11 @@ class BeadSimulator:
         rng  = [self.zmax[-1]]+list(self.zmax)
         ends = np.insert(np.cumsum(self.phases), 0, 0)
         for i in range(len(self.phases)):
-            rho = (rng[i+1]-rng[i])/(ends[i+1]-ends[i])
-            cycles[:,ends[i]:ends[i+1]] = rho * np.arange(ends[i+1]-ends[i])+rng[i]
+            rho    = (rng[i+1]-rng[i])/(ends[i+1]-ends[i])
+            dat    = cycles[:,ends[i]:ends[i+1]]
+            dat[:] = rho * np.arange(ends[i+1]-ends[i])+rng[i]
+            if self.brownian[i] > 0.:
+                dat[:] += np.random.normal(0., self.brownian[i], dat.shape)
 
     def addevents(self, cycles):
         u"add events to the cycles"
@@ -75,10 +79,15 @@ class BeadSimulator:
         ends = np.repeat([list(self.phases)], self.ncycles, axis = 0).cumsum()
         return np.insert(ends, 0, 0)[:-1].reshape((self.ncycles, len(self.phases)))
 
-    def __call__(self, seed = None):
+    @staticmethod
+    def seed(seed):
+        u"sets the random seeds to a single value"
         if seed is not None:
+            np.random.seed(seed)
             random.seed(seed)
 
+    def __call__(self, seed = None):
+        self.seed(seed)
         cycles = np.zeros((self.ncycles, sum(self.phases)), dtype = 'f4')
         self.addbasic(cycles)
         self.adddrift(cycles)
@@ -87,7 +96,6 @@ class BeadSimulator:
 
     def track(self, nbeads = 1., seed = None):
         u"creates a simulated track"
-        if seed is not None:
-            random.seed(seed)
+        self.seed(seed)
         return Track(data   = {i: self() for i in range(nbeads)},
                      cycles = self.cycles)
