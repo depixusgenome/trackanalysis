@@ -24,36 +24,37 @@ class BeadDriftProcessor(Processor):
         assert not (task.events is None and isinstance(task.collapse, CollapseToMean))
         assert task.zero is None or task.zero > 2
 
-        frame = (copy(frame)
-                 .withphases(*task.phases)
-                 .withcopy(task.filter is not None))
-        data  = tuple(val for _, val in frame)
+        frame = copy(frame).withphases(*task.phases)
+        raw   = tuple(val for _, val in frame)
         if task.precision in (0, None) and {task.filter, task.events} != {None}:
-            task.precision = np.median(tuple(hfsigma(bead) for bead in data))
-        return task, data
+            task.precision = np.median(tuple(hfsigma(bead) for bead in raw))
+        return task, raw
 
     @staticmethod
-    def __filter(task, data):
+    def __filter(task, raw):
         if task.filter is not None:
             task.filter.precision = task.precision
-            data = tuple(task.filter(cycle) for cycle in data)
-        return task, data
+            clean = tuple(task.filter(np.copy(cycle)) for cycle in raw)
+            return task, raw, clean
+        return task, raw, raw
+
 
     @staticmethod
-    def __collapse(task, data):
+    def __collapse(task, raw, clean):
         if task.events is None:
-            events = (Range(0, cycle) for cycle in data)
+            events = (Range(0, cycle) for cycle in raw)
         else:
             task.events.precision = task.precision
-            events = (Range(evt.start, cycle[evt])
-                      for cycle in data for evt in task.events(cycle))
+            events = (Range(evt.start, rdt[evt])
+                      for rdt, fdt in zip(raw, clean)
+                      for evt      in task.events(fdt))
 
         return task.collapse(events)
 
     @staticmethod
-    def __stitch(task, data, prof):
+    def __stitch(task, raw, prof):
         if task.stitch is not None:
-            task.stitch(prof, (Range(0, cycle) for cycle in data))
+            task.stitch(prof, (Range(0, cycle) for cycle in raw))
 
         if task.zero is not None:
             prof.value -= np.nanmedian(prof.value[-task.zero:]) # type: ignore
@@ -63,10 +64,10 @@ class BeadDriftProcessor(Processor):
     @classmethod
     def profile(cls, frame:Cycles, kwa:dict) -> Profile:
         u"action for removing bead drift"
-        task, data = cls.__setup(frame, kwa)
-        task, data = cls.__filter(task, data)
-        prof       = cls.__collapse(task, data)
-        return cls.__stitch(task, data, prof)
+        task, raw        = cls.__setup(frame, kwa)
+        task, raw, clean = cls.__filter(task, raw)
+        prof             = cls.__collapse(task, raw, clean)
+        return cls.__stitch(task, raw, prof)
 
     def run(self, args):
         cpy   = deepcopy(self.task)
