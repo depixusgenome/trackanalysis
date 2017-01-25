@@ -55,6 +55,11 @@ class TrackItems(Items):
         self.withcopy   (kw.get('copy',      False))
         self.withsamples(kw.get('samples',   None))
 
+    def __copy__(self):
+        return self.__class__(track = self.track,
+                              **{i: shallowcopy(j)
+                                 for i, j in self.__dict__.items() if i != 'track'})
+
     @staticmethod
     def copy(item):
         u"Copies the data"
@@ -332,6 +337,18 @@ class Cycles(TrackItems, Items):
             return self.name(bid, cid), self.data[bid][ind1:ind2]
 
         yield from (_getdata(bid, cid) for bid, cid in self.keys())
+
+    def phaseid(self, cid:'Optional[int]' = None, pid:'Optional[int]' = None):
+        u"returns phase ids for the given cycle"
+        vect = self.track.phaseids
+        if {cid, pid}.issubset({all, None}):
+            return vect         - vect[:,0]
+        elif cid in (all, None):
+            return vect[:,pid]  - vect[:,0]
+        elif pid in (all, None):
+            return vect[cid,:]  - vect[cid,0]
+        else:
+            return vect[cid,pid]- vect[cid,0]
 
     def __getitem__(self, keys):
         item = super().__getitem__(keys)

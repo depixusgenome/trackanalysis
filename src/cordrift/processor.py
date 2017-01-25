@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 u"Processor for removing correlated drifts"
 import time
-from copy               import deepcopy, copy
+import threading
+from   copy               import deepcopy, copy
 
 import numpy as np
 
@@ -10,66 +11,90 @@ from control.processor  import Processor
 from signalfilter       import hfsigma
 from data               import Cycles
 from .task              import BeadDriftTask
-from .collapse          import Range, Profile
+from .collapse          import Range, Profile, CollapseToMean
 
 class BeadDriftProcessor(Processor):
     u"Deals with bead drift"
     tasktype = BeadDriftTask
     _SLEEP   = 0.01
-    @classmethod
-    def copytask(cls, frame, kwa):
-        u"copies the task and initializes its precision"
-        task = cls.tasktype(**kwa)
-        prec = task.precision
-        if prec in (0, None):
-            prec = np.median(hfsigma(bead) for bead in frame)
 
-        for item in ('filter', 'events'):
-            if getattr(task, item) is not None:
-                setattr(task, item, prec)
-        return task
+    @classmethod
+    def __setup(cls, frame, kwa):
+        task = kwa if isinstance(kwa, cls.tasktype) else cls.tasktype(**kwa)
+        assert not (task.events is None and isinstance(task.collapse, CollapseToMean))
+        assert task.zero is None or task.zero > 2
+
+        frame = (copy(frame)
+                 .withphases(*task.phases)
+                 .withcopy(task.filter is not None))
+        data  = tuple(val for _, val in frame)
+        if task.precision in (0, None) and {task.filter, task.events} != {None}:
+            task.precision = np.median(tuple(hfsigma(bead) for bead in data))
+        return task, data
+
+    @staticmethod
+    def __filter(task, data):
+        if task.filter is not None:
+            task.filter.precision = task.precision
+            data = tuple(task.filter(cycle) for cycle in data)
+        return task, data
+
+    @staticmethod
+    def __collapse(task, data):
+        if task.events is None:
+            events = (Range(0, cycle) for cycle in data)
+        else:
+            task.events.precision = task.precision
+            events = (Range(evt.start, cycle[evt])
+                      for cycle in data for evt in task.events(cycle))
+
+        return task.collapse(events)
+
+    @staticmethod
+    def __stitch(task, data, prof):
+        if task.stitch is not None:
+            task.stitch(prof, (Range(0, cycle) for cycle in data))
+
+        if task.zero is not None:
+            prof.value -= np.nanmedian(prof.value[-task.zero:]) # type: ignore
+
+        return prof
 
     @classmethod
     def profile(cls, frame:Cycles, kwa:dict) -> Profile:
         u"action for removing bead drift"
-        task  = cls.copytask(frame, kwa)
-        data  = dict(copy(frame)
-                     .withcopy    (task.filter is not None)
-                     .withfunction(task.filter, beadonly = True)
-                     .withphases  (*task.phases))
-
-        if task.events is None:
-            events = (Range(0, cycle) for cycle in data.values())
-        else:
-            events = (Range(evt.start, cycle[evt])
-                      for cycle in data.values()
-                      for evt   in task.events(cycle))
-
-        prof = task.collapse(events)
-        if task.stitch is not None:
-            events = (Range(0, cycle) for cycle in data.values())
-            prof   = task.stitch(prof, events)
-
-        if task.zero is not None:
-            assert task.zero > 2
-            prof.value -= np.nanmedian(prof.value[-task.zero:]) # type: ignore
-        return prof
+        task, data = cls.__setup(frame, kwa)
+        task, data = cls.__filter(task, data)
+        prof       = cls.__collapse(task, data)
+        return cls.__stitch(task, data, prof)
 
     def run(self, args):
         cpy   = deepcopy(self.task)
         cache = dict()
+        lock  = threading.Lock()
         def _creator(frame):
             def _action(key, cycle):
-                cache.setdefault(key[:-1], cycle)
-                if cache[key[:-1]] is cycle:
-                    cache[key[:-1]] = BeadDriftProcessor.profile(frame, cpy)
+                parent = key[:-1]
+                prof   = None
 
-                while not isinstance(cache[key[:-1]], Profile):
+                with lock:
+                    cache.setdefault(parent, parent)
+
+                if cache[parent] is parent:
+                    cache[parent] = prof = BeadDriftProcessor.profile(frame, cpy)
+
+                while not isinstance(prof, Profile):
                     time.sleep(self._SLEEP)
+                    prof = cache[parent]
 
-                prof = cache[key[:-1]]
+                if cpy.phases:
+                    ind1 = frame.phaseid(key[-1], cpy.phases[0])
+                    ind2 = frame.phaseid(key[-1], cpy.phases[1])
+                    cycle[ind1:ind2] -= prof.value[:ind2-ind1]
+                else:
+                    cycle -= prof.value[:len(cycle)]
+                return key, cycle
 
-                cycle[prof.xmin:prof.xmax] -= prof.value
-                yield key, cycle
             return frame.withaction(_action)
+
         args.apply(_creator)

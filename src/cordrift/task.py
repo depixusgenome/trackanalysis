@@ -17,8 +17,6 @@ class BeadDriftTask(Task):
     events    = None # type: Optional[EventsDetector]
     collapse  = None # type: Optional[Union[CollapseToMean, CollapseByDerivate]]
     stitch    = None # type: Optional[Union[StitchByDerivate, StitchByInterpolation]]
-    precision = property(lambda self: self.__dict__['precision'],
-                         lambda self, val: self.setprecision(val))
     def __init__(self, **kwa):
         super().__init__(**kwa)
         self.phases     = kwa.get('phases',    (5, 5))

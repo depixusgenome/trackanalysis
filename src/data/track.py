@@ -35,18 +35,23 @@ class Track:
         u"returns the path to the trackfile"
         return self._path
 
+    @property
+    def phaseids(self):
+        u"returns all phase ids, undoctored"
+        return self._cycles[:]
+
     def phaseid(self, cid:'Optional[int]' = None, pid:'Optional[int]' = None):
         u"returns the starttime of the cycle and phase"
-        # pylint: disable=unsubscriptable-object
-        if cid in (all, None):
-            if pid in (all, None):
-                return self._cycles - self._cycles[0,0]
-            else:
-                return self._cycles[:,pid]-self._cycles[0,0]
+        vect = self._cycles
+        if {cid, pid}.issubset((all, None)):
+            pass
+        elif cid in (all, None):
+            vect = vect[:,pid]
         elif pid in (all, None):
-            return self._cycles[cid,:]-self._cycles[0,0]
+            vect = vect[cid,:]
         else:
-            return self._cycles[cid,pid]-self._cycles[0,0]
+            vect = vect[cid,pid]
+        return vect - vect[0,0]
 
     @property
     def data(self):

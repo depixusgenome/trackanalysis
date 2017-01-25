@@ -4,21 +4,28 @@ u"Tests cordrift"
 
 import random
 import numpy as np
+from pytest             import approx # pylint: disable = no-name-in-module
 
 from simulator          import BeadSimulator
 from cordrift.processor import BeadDriftProcessor
 
 def test_cordrift_task():
     u"testing the cordrift processor"
-    bead   = BeadSimulator(zmax    = [-.3, 0., 0., 1., 1., -.2, -.2, -.3],
-                           ncycles = 10)
+    bead   = BeadSimulator(zmax    = [0., 0., 1., 1., -.2, -.2, -.3, -.3],
+                           ncycles = 10,
+                           drift   = (.05, 29.))
     cycles = bead.cycles[0][[5,6]]
-    frame  = bead.track(nbeads = 1, seed = 0).cycles
+    frame  = bead.track(nbeads = 1).cycles
 
-    prof   = BeadDriftProcessor.profile(frame, {})
-    assert prof.xmin == cycles[0]
-    assert prof.xmax == cycles[1]
-    assert all(prof.count == 10)
+    task = BeadDriftProcessor.tasktype(precision = 0.008,
+                                       filter    = None)
+    task.events.confidence = .05
+    prof = BeadDriftProcessor.profile(frame, task)
+    assert prof.xmin == 0
+    assert prof.xmax == 100
+    assert all(prof.count[1:-1] == 10)
+    assert all(prof.count[[0,-1]] == 0)
+    assert np.median(prof.value[-task.zero:]) == approx(0.)
     np.testing.assert_allclose(prof.value, bead.drift[cycles[0]:cycles[1]])
 
 if __name__ == '__main__':
