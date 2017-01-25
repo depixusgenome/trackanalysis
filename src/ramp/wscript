@@ -1,22 +1,2 @@
-#! /usr/bin/env python
-# encoding: utf-8
-import wafbuilder as builder
 require('python', click = 6.6)
 make(locals())
-
-def options(opt, __old__= locals().pop('options')):
-    __old__(opt)
-    opt.add_option("--rampapp",
-                   action = "store_true",
-                   default = False,
-                   help = u"allows building of the application for ramp analysis")
-
-def build(bld, __old__= locals().pop('build')):
-    __old__(bld)
-    if bld.options.rampapp :
-        bld.program(source       = ["mainramp.cpp"],
-                    name         = 'ramp:app',
-                    includes     = ["."],
-                    target       = "../../ramp/mainramp.exe",
-                    install_path = "",
-                    vnum         = builder.version())
