@@ -186,7 +186,7 @@ class EventSelector:
         if minl <= 0:
             return intervals
         else:
-            intervals = intervals[np.nonzero(np.diff(intervals, 1) <= minl)[0]] # type: ignore
+            intervals = intervals[np.nonzero(np.diff(intervals, 1) >= minl)[0]] # type: ignore
             if edx != 0:
                 intervals[:,0] += edx
                 intervals[:,1] -= edx
