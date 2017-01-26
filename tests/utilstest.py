@@ -4,7 +4,9 @@ u"Test utils"
 # pylint: disable=import-error
 # pylint: disable=no-self-use
 import pytest
-from   utils.lazy import LazyInstError, LazyInstanciator, LazyDict
+import numpy as np
+from   utils.lazy   import LazyInstError, LazyInstanciator, LazyDict
+from   utils        import escapenans
 
 
 class TestLazy:
@@ -85,3 +87,18 @@ class TestLazy:
             assert lst == ['l1', 'l3', 'l7', 'l4', 'l8']
             assert 'l8' in dico
             lst.clear()
+
+def test_escapenans():
+    u"tests that we can remove and add nans again"
+    array1, array2 = np.arange(10)*1., np.ones((10,))*1.
+    array1[[0,5]] = np.nan
+    array2[[1,6]] = np.nan
+    with escapenans(array1, array2) as (cur1, cur2):
+        assert not any(np.isnan(cur1)) and not any(np.isnan(cur2))
+        cur1 += cur2
+    inds = [2,3,4,7,8,9]
+    assert all(array1[inds] ==  (np.arange(10)+ np.ones((10,)))[inds])
+    assert all(np.isnan(array1[[0,5]]))
+    assert all(array1[[1,6]] == [1,6])
+    assert all(np.isnan(array2[[1,6]]))
+    assert all(array2[[0,5]] == 1)

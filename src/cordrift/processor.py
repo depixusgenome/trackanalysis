@@ -3,13 +3,15 @@
 u"Processor for removing correlated drifts"
 import time
 import threading
-from   copy               import deepcopy, copy
+from   copy             import deepcopy, copy
+from   functools        import wraps
 
 import numpy as np
 
 from control.processor  import Processor
 from signalfilter       import hfsigma
 from data               import Cycles
+from utils              import escapenans
 from .task              import BeadDriftTask
 from .collapse          import Range, Profile, CollapseToMean
 
@@ -31,11 +33,21 @@ class BeadDriftProcessor(Processor):
         return task, raw
 
     @staticmethod
-    def __filter(task, raw):
+    def __escapenans(fcn):
+        @wraps(fcn)
+        def _fcn(cycle):
+            cycle = np.copy(cycle)
+            with escapenans(cycle) as arr:
+                fcn(arr)
+            return cycle
+        return _fcn
+
+    @classmethod
+    def __filter(cls, task, raw):
         if task.filter is not None:
             task.filter.precision = task.precision
-            clean = tuple(task.filter(np.copy(cycle)) for cycle in raw)
-            return task, raw, clean
+            fcn                   = cls.__escapenans(task.filter)
+            return task, raw, tuple(fcn(cycle) for cycle in raw)
         return task, raw, raw
 
 

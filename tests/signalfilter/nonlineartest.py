@@ -5,7 +5,7 @@ u"all view aspects here"
 import numpy
 from numpy.testing import assert_allclose
 
-from signalfilter import ForwardBackwardFilter, NonLinearFilter
+from signalfilter  import ForwardBackwardFilter, NonLinearFilter, hfsigma, nanhfsigma
 
 def test_nl_bf_filters():
     u"Tests ForwardBackwardFilter, NonLinearFilter"
@@ -33,3 +33,17 @@ def test_nl_bf_filters():
         assert_allclose(truth[:45], arr[:45])
         assert_allclose(truth[47:53], arr[47:53], atol = 1e-5)
         assert_allclose(truth[55:], arr[55:])
+
+def test_hfsigma():
+    u"Tests ForwardBackwardFilter, NonLinearFilter"
+    arr = numpy.arange(10)*1.
+    assert hfsigma(arr) == 0.
+
+    arr[0] = numpy.nan
+    assert nanhfsigma(arr) == 0.
+
+    arr = 1.*numpy.arange(20)**2
+    assert hfsigma(arr) == 6.
+
+    arr = numpy.insert(arr, range(0, 20, 2), numpy.nan)
+    assert nanhfsigma(arr) == 6.

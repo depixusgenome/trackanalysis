@@ -2,15 +2,45 @@
 # -*- coding: utf-8 -*-
 u"Interval detection: finding flat sections in the signal"
 
-from    typing import NamedTuple
-from    copy   import deepcopy
-import  numpy  as     np
+from    typing import (NamedTuple, Optional, # pylint: disable=unused-import
+                       Iterator, Iterable, Sequence, Union, Callable, cast)
+import  numpy as np
 
+from  .                     import nanhfsigma
 # pylint: disable=no-name-in-module,import-error
-from  ._core.samples.normal import knownsigma
-from  ._core.stats          import hfsigma
+from  ._core.samples.normal import knownsigma as norm
 
-class EventsDetector:
+class PrecisionAlg:
+    u"Implements precision extraction from data"
+    DATATYPE = Optional[Union[Sequence[np.ndarray],np.ndarray]]
+    def __init__(self, **kwa):
+        self.precision = kwa.get('precision', None) # type: Optional[float]
+
+    def getprecision(self,
+                     data     :DATATYPE        = tuple(),
+                     precision:Optional[float] = None) -> float:
+        u"""
+        Returns the precision, possibly extracted from the data.
+        Raises AttributeError if the precision was neither set nor could be
+        extracted
+        """
+        if precision is None:
+            precision = self.precision
+
+        if precision > 0.:
+            return float(precision)
+        elif isinstance(data, (float, int)):
+            return float(data)
+        elif isinstance(data, Sequence[np.ndarray]):
+            return hfsigma(data)
+        elif isinstance(data, np.ndarray):
+            if len(data) == 1:
+                return hfsigma(data[0])
+            return np.median(tuple(hfsigma(i) for i in data))
+
+        raise AttributeError('Could not extract precision: no data or set value')
+
+class SplitDetector(PrecisionAlg):
     u"""
     Detects flat stretches of value.
 
@@ -22,7 +52,7 @@ class EventsDetector:
     the estimation used is the median-deviation of the derivate of the data.
     """
     def __init__(self, **kwa):
-        self.precision  = kwa.get('precision', 0.)
+        super().__init__(self, **kwa)
         self.confidence = kwa.get('confidence',  0.1)
         self._window    = 1
         self._kern      = np.ones((2,))
@@ -39,14 +69,20 @@ class EventsDetector:
 
     window = property(lambda self: self._window, _setwindow)
 
-    def __call__(self, data):
+    def __call__(self,
+                 data     : np.ndarray,
+                 precision: Optional[float] = None
+                ) -> np.ndarray:
         if len(data) <= 1:
             return
 
+        precision = self.getprecision(precision, data)
         window    = self._window
-        precision = hfsigma(data) if self.precision == 0 else self.precision
-        thr       = knownsigma.threshold(True, self.confidence, precision,
-                                         window, window)
+        thr       = norm.threshold(True, self.confidence, precision, window, window)
+
+        nans      = np.isnan(data)
+        if any(nans):
+            data = data[nans]
 
         delta           = np.convolve(data, self._kern, mode = 'same')
         delta[:window] -= self._lrng * data[0]
@@ -56,22 +92,24 @@ class EventsDetector:
         ends = (np.abs(delta) >= (thr*window)).nonzero()[0]
 
         if len(ends) == 0:
-            yield slice(0, len(data))
-        else:
-            start = 0
-            for end in ends:
-                if start+1 < end:
-                    yield slice(start, end)
-                start = end
-            if start+1 < len(data):
-                yield slice(start, len(data))
+            yield slice(0, len(nans))
+            return
+
+        if len(data) < len(nans):
+            # increase indexes back to former data
+            ends += nans.cumsum()[~nans][ends]
+
+        ends = np.repeat(ends, 2)
+        ends = np.insert(ends, [0, len(ends)], [0, len(data)])
+        ends = ends.reshape((len(ends)//2, 2))
+        return ends[np.nonzero(np.diff(ends, 1).ravel() < -1)[0]]
 
     @classmethod
     def run(cls, data, **kwa):
         u"instantiates and calls class"
         return cls(**kwa)(data)
 
-class EventsMerger:
+class EventMerger(PrecisionAlg):
     u"""
     Merges neighbouring stretches of data.
 
@@ -84,44 +122,57 @@ class EventsMerger:
     the estimation used is the median-deviation of the derivate of the data.
     """
     def __init__(self, **kwa):
-        self.precision = kwa.get('precision', 0.)
-        self.confidence  = kwa.get('confidence',  0.1)
-        self.isequal     = kwa.get('isequal',     True)
+        super().__init__(self, **kwa)
+        self.confidence = kwa.get('confidence',  0.1)
+        self.isequal    = kwa.get('isequal',     True)
 
-    def __call__(self, data, intervals):
+    def __call__(self,
+                 data     : np.ndarray,
+                 intervals: np.ndarray,
+                 precision: Optional[float] = None
+                ) -> np.ndarray:
         if len(data) == 0:
             return
 
-        iinter      = iter(intervals)
-        last        = next(iinter, None)
+        iinter = iter(intervals)
+        last   = next(iinter, None)
         if last is None:
             return
 
-        precision = hfsigma(data) if self.precision == 0 else self.precision
-        thr       = knownsigma.threshold(self.isequal, self.confidence, precision)
-        if self.isequal:
-            check = lambda i, j: knownsigma.value(True,  i, j) < thr
-        else:
-            check = lambda i, j: knownsigma.value(False, i, j) > thr
+        thr       = norm.threshold(self.isequal, self.confidence,
+                                   self.getprecision(precision, data))
+        nanmean   = lambda i: np.nanmean(data[i[0]:i[1]]) # type: ignore
+        merge     = np.zeros(len(intervals)+1, dtype = 'bool')
 
-        statslast = last.stop-last.start, data[last].mean(), 0.
-        for cur in iinter:
-            statscur = cur.stop - cur.start, data[cur].mean(), 0.
-            if check(statscur, statslast):
-                last      = slice(last.start, cur.stop)
-                statslast = last.stop-last.start, data[last].mean(), 0.
+        while len(intervals) > 1:
+            vals = np.apply_along_axis(nanmean, 1, intervals) # type: ignore
+            if self.isequal:
+                check = lambda i, j: norm.value(True,  vals[i], vals[i+1]) < thr
             else:
-                yield last
-                last      = cur
-                statslast = statscur
-        yield last
+                check = lambda i, j: norm.value(False, vals[i], vals[i+1]) < thr
+
+            # merge == True: interval needs to be merged with next one
+            merge       = merge[:len(intervals)+1]
+            merge[0]    = merge[-1] = False
+            merge[1:-1] = np.fromfunction(check, len(merge)-2, dtype = 'bool')
+
+            if not any(merge[1:-1]):
+                break
+
+            # inds: range of intervals to be merged
+            inds      = np.nonzero(merge)[0]
+            tmp       = intervals[inds[::2]]
+            tmp[:,1]  = intervals[inds[1::2],1]
+
+            intervals = tmp
+        return intervals
 
     @classmethod
     def run(cls, *args, **kwa):
         u"instantiates and calls class"
         return cls(**kwa)(*args)
 
-class EventsSelector:
+class EventSelector:
     u"""
     Filters flat stretches:
 
@@ -132,50 +183,34 @@ class EventsSelector:
         self.edgelength = kwa.get('edgelength', 0)
         self.minlength  = kwa.get('minlength',  5)
 
-    def __call__(self, intervals):
+    def __call__(self, intervals: np.ndarray) -> np.ndarray:
         edx  = self.edgelength
         minl = 2*edx+self.minlength
         if minl <= 0:
-            yield from intervals
-        elif edx == 0:
-            yield from (i for i in intervals if i.stop-i.start >= minl)
+            return intervals
         else:
-            yield from (slice(i.start+edx,i.stop-edx) for i in intervals
-                        if i.stop-i.start >= minl)
+            intervals = intervals[np.nonzero(np.diff(intervals, 1) <= minl)[0]] # type: ignore
+            if edx != 0:
+                intervals[:,0] += edx
+                intervals[:,1] -= edx
+            return intervals
 
     @classmethod
     def run(cls, *args, **kwa):
         u"instantiates and calls class"
         return cls(**kwa)(*args)
 
-class EventsFinder:
+class EventDetector(PrecisionAlg):
     u"detects, mergers and selects intervals"
     def __init__(self, **kwa):
-        self._precision = kwa.get('precision', 0.)
-        self.detecting  = kwa.get('detecting', EventsDetector())
-        self.merging    = kwa.get('merging',   EventsMerger())
-        self.selecting  = kwa.get('selecting', EventsSelector())
+        super().__init__(self, **kwa)
+        self.split  = kwa.get('split',  None) or SplitDetector(**kwa)
+        self.merge  = kwa.get('merge',  None) or EventMerger  (**kwa)
+        self.select = kwa.get('select', None) or EventSelector(**kwa)
 
-    precision = property(lambda self: getattr(self, '_precision'),
-                         lambda self, i: self._setprecision(i))
-
-    def _setprecision(self, val):
-        self._precision = val
-        for attr in (self.detecting, self.merging, self.selecting):
-            if hasattr(attr, 'precision'):
-                setattr(attr, 'precision', val)
-
-    def __call__(self, data, precision = None):
-        if precision is None:
-            precision = self.precision
-        if precision == 0:
-            data = tuple(data)
-            prec = np.median(hfsigma(bead) for bead in data)
-            if prec == 0:
-                raise ValueError()
-            return deepcopy(self)(data, precision = prec)
-
-        return self.selecting(self.merging(data, self.detecting(data)))
+    def __call__(self, data:np.ndarray, precision: Optional[float] = None):
+        precision = self.getprecision(precision, data)
+        yield from self.select(self.merge(data, self.split(data, precision), precision))
 
     @classmethod
     def run(cls, *args, **kwa):
