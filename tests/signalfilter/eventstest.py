@@ -10,9 +10,9 @@ from signalfilter        import samples
 def test_detectsplits():
     u"Tests flat stretches detection"
     inst  = SplitDetector(precision = 1., confidence = 0.1, window = 1)
-    det   = lambda  i: tuple(inst(i))
+    det   = lambda  i: tuple(tuple(j) for j in inst(i))
     items = numpy.zeros((30,))
-    thr   = samples.knownsigma.normal.threshold(True, inst.confidence, inst.precision,
+    thr   = samples.normal.knownsigma.threshold(True, inst.confidence, inst.precision,
                                                 inst.window, inst.window)
 
     assert det([])    == tuple()
@@ -28,10 +28,17 @@ def test_detectsplits():
     items[29:] += thr
     assert det(items) == ((2, 10), (10,20), (21,28))
 
+    items       = numpy.zeros((30,))
+    items[10:] += thr
+    items[20:] += thr
+    items[21:] += thr
+    items[[0, 10, 25, 29]] = numpy.nan
+    assert det(items) == ((0, 11), (11,20), (21,30))
+
 def test_merge():
     u"Tests flat stretches merging"
     inst  = EventMerger(precision = 1., confidence = 0.1, isequal = True)
-    det   = lambda  i, j: tuple(inst(i, numpy.array(j)))
+    det   = lambda  i, j: tuple(tuple(_) for _ in inst(i, numpy.array(j)))
     items = numpy.zeros((30,))
 
     assert det([], ((0,30),)) == tuple()
@@ -51,7 +58,8 @@ def test_merge():
 
 def test_select():
     u"Tests flat stretches filtering"
-    det   = lambda  i, j, k: tuple(EventSelector(edgelength = i, minlength = j)
+    det   = lambda  i, j, k: tuple(tuple(_)
+                                   for _ in EventSelector(edgelength = i, minlength = j)
                                    (numpy.array(k)))
     assert det(0, 0, ((0,0),(1,1)))                 == ((0,0), (1,1))
     assert det(0, 5, ((0,0),(1,1),(5,10)))          == ((5,10),)
@@ -70,4 +78,4 @@ def test_tocycles():
     assert vals == truth
 
 if __name__ == '__main__':
-    test_tocycles()
+    test_detectsplits()

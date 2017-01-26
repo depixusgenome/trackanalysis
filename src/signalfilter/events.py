@@ -17,8 +17,8 @@ class PrecisionAlg:
         self.precision = kwa.get('precision', None) # type: Optional[float]
 
     def getprecision(self,
-                     data     :DATATYPE        = tuple(),
-                     precision:Optional[float] = None) -> float:
+                     precision:Optional[float] = None,
+                     data     :DATATYPE        = tuple()) -> float:
         u"""
         Returns the precision, possibly extracted from the data.
         Raises AttributeError if the precision was neither set nor could be
@@ -32,17 +32,17 @@ class PrecisionAlg:
         elif isinstance(data, (float, int)):
             return float(data)
         elif isinstance(data, Sequence[np.ndarray]):
-            return hfsigma(data)
+            return nanhfsigma(data)
         elif isinstance(data, np.ndarray):
             if len(data) == 1:
-                return hfsigma(data[0])
-            return np.median(tuple(hfsigma(i) for i in data))
+                return nanhfsigma(data[0])
+            return np.median(tuple(nanhfsigma(i) for i in data))
 
         raise AttributeError('Could not extract precision: no data or set value')
 
 class SplitDetector(PrecisionAlg):
     u"""
-    Detects flat stretches of value.
+    Detects flat stretches of value
 
     Flatness is defined pointwise: 2 points are flat if close enough one to the
     other. This closeness is defined using a p-value for 2 points belonging to
@@ -52,7 +52,7 @@ class SplitDetector(PrecisionAlg):
     the estimation used is the median-deviation of the derivate of the data.
     """
     def __init__(self, **kwa):
-        super().__init__(self, **kwa)
+        super().__init__(**kwa)
         self.confidence = kwa.get('confidence',  0.1)
         self._window    = 1
         self._kern      = np.ones((2,))
@@ -74,7 +74,7 @@ class SplitDetector(PrecisionAlg):
                  precision: Optional[float] = None
                 ) -> np.ndarray:
         if len(data) <= 1:
-            return
+            return np.empty((0,2), dtype = 'i4')
 
         precision = self.getprecision(precision, data)
         window    = self._window
@@ -82,7 +82,7 @@ class SplitDetector(PrecisionAlg):
 
         nans      = np.isnan(data)
         if any(nans):
-            data = data[nans]
+            data = data[~nans]
 
         delta           = np.convolve(data, self._kern, mode = 'same')
         delta[:window] -= self._lrng * data[0]
@@ -92,17 +92,16 @@ class SplitDetector(PrecisionAlg):
         ends = (np.abs(delta) >= (thr*window)).nonzero()[0]
 
         if len(ends) == 0:
-            yield slice(0, len(nans))
-            return
+            return np.array(((0,len(nans)),), dtype = 'i4')
 
         if len(data) < len(nans):
             # increase indexes back to former data
             ends += nans.cumsum()[~nans][ends]
 
         ends = np.repeat(ends, 2)
-        ends = np.insert(ends, [0, len(ends)], [0, len(data)])
+        ends = np.insert(ends, [0, len(ends)], [0, len(nans)])
         ends = ends.reshape((len(ends)//2, 2))
-        return ends[np.nonzero(np.diff(ends, 1).ravel() < -1)[0]]
+        return ends[np.nonzero(np.diff(ends, 1).ravel() > 1)[0]]
 
     @classmethod
     def run(cls, data, **kwa):
@@ -122,7 +121,7 @@ class EventMerger(PrecisionAlg):
     the estimation used is the median-deviation of the derivate of the data.
     """
     def __init__(self, **kwa):
-        super().__init__(self, **kwa)
+        super().__init__(**kwa)
         self.confidence = kwa.get('confidence',  0.1)
         self.isequal    = kwa.get('isequal',     True)
 
@@ -132,12 +131,12 @@ class EventMerger(PrecisionAlg):
                  precision: Optional[float] = None
                 ) -> np.ndarray:
         if len(data) == 0:
-            return
+            return np.empty((0,2), dtype = 'i4')
 
         iinter = iter(intervals)
         last   = next(iinter, None)
         if last is None:
-            return
+            return np.empty((0,2), dtype = 'i4')
 
         thr       = norm.threshold(self.isequal, self.confidence,
                                    self.getprecision(precision, data))
@@ -203,7 +202,7 @@ class EventSelector:
 class EventDetector(PrecisionAlg):
     u"detects, mergers and selects intervals"
     def __init__(self, **kwa):
-        super().__init__(self, **kwa)
+        super().__init__(**kwa)
         self.split  = kwa.get('split',  None) or SplitDetector(**kwa)
         self.merge  = kwa.get('merge',  None) or EventMerger  (**kwa)
         self.select = kwa.get('select', None) or EventSelector(**kwa)
