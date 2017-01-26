@@ -56,6 +56,10 @@ def test_merge():
     items[11:] = 0.
     assert det(items, ((0, 10),(11,20),(22,30))) == ((0,10),(11,30))
 
+    items[11:] = 0.
+    items[25]  = numpy.nan
+    assert det(items, ((0, 10),(11,20),(22,30))) == ((0,10),(11,30))
+
 def test_select():
     u"Tests flat stretches filtering"
     det   = lambda  i, j, k: tuple(tuple(_)

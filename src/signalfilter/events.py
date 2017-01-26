@@ -130,47 +130,38 @@ class EventMerger(PrecisionAlg):
                  intervals: np.ndarray,
                  precision: Optional[float] = None
                 ) -> np.ndarray:
-        if len(data) == 0:
+        if len(data) == 0 or len(intervals) == 0:
             return np.empty((0,2), dtype = 'i4')
 
-        iinter = iter(intervals)
-        last   = next(iinter, None)
-        if last is None:
-            return np.empty((0,2), dtype = 'i4')
+        thr     = norm.threshold(self.isequal, self.confidence,
+                                 self.getprecision(precision, data))
 
-        thr       = norm.threshold(self.isequal, self.confidence,
-                                   self.getprecision(precision, data))
-        nanmean   = lambda i: np.nanmean(data[i[0]:i[1]]) # type: ignore
-        merge     = np.zeros(len(intervals)+1, dtype = 'bool')
+        cnts    = np.isnan(data)
+        sums    = np.insert(np.where(cnts, 0., data).cumsum(), 0, 0)
+        cnts    = np.insert((~cnts).cumsum(), 0, 0)
+
+        def _stats(ix0, ix1):
+            cnt  = cnts[ix1] - cnts[ix0]
+            mean = (1e5 if cnt == 0 else (sums[ix1]-sums[ix0])/cnt)
+            return (cnt, mean, 0.)
+
+        def _test(rngs, i):
+            prob = norm.value(self.isequal, _stats(*rngs[i]), _stats(*rngs[i+1]))
+            return prob < thr
 
         while len(intervals) > 1:
-            vals = np.apply_along_axis(nanmean, 1, intervals) # type: ignore
-            cnt  = np.diff(intervals, 1)
-            if self.isequal:
-                check = lambda i: norm.value(True,
-                                             (cnt[i],   vals[i],    0.),
-                                             (cnt[i+1], vals[i+1],  0.)) < thr
-            else:
-                check = lambda i: norm.value(False,
-                                             (cnt[i],   vals[i],    0.),
-                                             (cnt[i+1], vals[i+1],  0.)) < thr
-
             # merge == True: interval needs to be merged with next one
-            merge       = merge[:len(intervals)+1]
-            merge[0]    = merge[-1] = False
-            merge[1:-1] = np.fromiter((check(i) for i in range(len(merge)-2)),
-                            dtype = 'bool',
-                            count = len(merge)-2)
+            merge       = np.zeros(len(intervals)+1, dtype = 'bool')
+            merge[1:-1] = tuple(_test(intervals, i) for i in range(len(merge)-2))
 
             if not any(merge[1:-1]):
                 break
 
             # inds: range of intervals to be merged
-            inds      = np.nonzero(merge)[0]
-            tmp       = intervals[inds[::2]]
-            tmp[:,1]  = intervals[inds[1::2],1]
+            inds                   = np.nonzero(np.diff(merge))[0]
+            intervals[inds[::2],1] = intervals[inds[1::2],1]
+            intervals              = intervals[np.nonzero(~merge[:-1])[0]]
 
-            intervals = tmp
         return intervals
 
     @classmethod
