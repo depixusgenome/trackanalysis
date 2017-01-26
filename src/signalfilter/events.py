@@ -145,15 +145,22 @@ class EventMerger(PrecisionAlg):
 
         while len(intervals) > 1:
             vals = np.apply_along_axis(nanmean, 1, intervals) # type: ignore
+            cnt  = np.diff(intervals, 1)
             if self.isequal:
-                check = lambda i, j: norm.value(True,  vals[i], vals[i+1]) < thr
+                check = lambda i: norm.value(True,
+                                             (cnt[i],   vals[i],    0.),
+                                             (cnt[i+1], vals[i+1],  0.)) < thr
             else:
-                check = lambda i, j: norm.value(False, vals[i], vals[i+1]) < thr
+                check = lambda i: norm.value(False,
+                                             (cnt[i],   vals[i],    0.),
+                                             (cnt[i+1], vals[i+1],  0.)) < thr
 
             # merge == True: interval needs to be merged with next one
             merge       = merge[:len(intervals)+1]
             merge[0]    = merge[-1] = False
-            merge[1:-1] = np.fromfunction(check, len(merge)-2, dtype = 'bool')
+            merge[1:-1] = np.fromiter((check(i) for i in range(len(merge)-2)),
+                            dtype = 'bool',
+                            count = len(merge)-2)
 
             if not any(merge[1:-1]):
                 break

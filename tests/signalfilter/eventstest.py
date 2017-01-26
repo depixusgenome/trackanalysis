@@ -78,4 +78,4 @@ def test_tocycles():
     assert vals == truth
 
 if __name__ == '__main__':
-    test_detectsplits()
+    test_merge()
