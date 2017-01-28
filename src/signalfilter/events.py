@@ -140,16 +140,9 @@ class EventMerger(PrecisionAlg):
         return np.apply_along_axis(_stats, 1, inds).reshape(intervals.shape)
 
     def __initprobs(self, stats):
-        def _test(i):
-            rng0, rng1 = stats[i,0], stats[i+1,0]
-            return norm.value(self.isequal,
-                              (rng0[0], rng0[1],   0.),
-                              (rng1[0], rng1[1],   0.))
-
-        size = len(stats)-1
-        return np.fromiter((_test(i) for i in range(size)),
-                           dtype = 'f4',
-                           count = size)
+        fcn = lambda i: norm.value(self.isequal, stats[i,0], stats[i+1,0])
+        siz = len(stats)-1
+        return np.fromiter((fcn(i) for i in range(siz)), dtype = 'f4', count = siz)
 
     def __intervalstomerge(self, merge, probs):
         if not any(merge):

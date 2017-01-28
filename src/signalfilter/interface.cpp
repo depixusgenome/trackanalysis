@@ -58,6 +58,10 @@ namespace signalfilter {
     }
 }
 
+namespace samples { namespace normal { 
+    struct SimpleInput : public Input { using Input::Input; };
+}}
+
 namespace pybind11 { namespace detail {
     template <> struct type_caster<samples::normal::Input> {
     public:
@@ -91,7 +95,44 @@ namespace pybind11 { namespace detail {
                 value.mean  = items[1].cast<float>();
             if(check())
                 value.sigma = items[2].cast<float>();
+            return check();
+        }
 
+        static handle cast(Input src, return_value_policy, handle)
+        { return make_tuple(src.count, src.mean, src.sigma); }
+    };
+
+    template <> struct type_caster<samples::normal::SimpleInput> {
+    public:
+        using Input = samples::normal::SimpleInput;
+        PYBIND11_TYPE_CASTER(Input, _("SimpleInput"));
+
+        bool load(handle obj, bool)
+        {
+            pybind11::str const keys[2] = { "count", "mean"};
+            bool err   = false;
+            auto check = [&err]() { return !(err || (err = PyErr_Occurred())); };
+
+            pybind11::object   items[2];
+            if(pybind11::isinstance<pybind11::sequence>(obj))
+            {
+                auto seq = pybind11::reinterpret_borrow<pybind11::sequence>(obj);
+                for(size_t i = 0; i < 2 && check(); ++i)
+                    items[i] = seq[i];
+            } else if(pybind11::isinstance<pybind11::dict>(obj))
+            {
+                auto dico = pybind11::reinterpret_borrow<pybind11::dict>(obj);
+                for(size_t i = 0; i < 2 &&  check(); ++i)
+                    items[i] = dico[keys[i]];
+            } else
+                for(size_t i = 0; i < 2 &&  check(); ++i)
+                    items[i] = obj.attr(keys[i]);
+
+            if(check())
+                value.count =  items[0].cast<size_t>();
+            if(check())
+                value.mean  = items[1].cast<float>();
+            value.sigma = 0.f;
             return check();
         }
 
@@ -106,7 +147,8 @@ namespace samples { namespace normal {
         auto smod  = mod.def_submodule("samples");
         auto nmod  = smod.def_submodule("normal");
         auto ksmod = nmod.def_submodule("knownsigma");
-        ksmod.def("value",     knownsigma::value);
+        ksmod.def("value",     [](bool a, SimpleInput const & b, SimpleInput const & c)
+                               { return knownsigma::value(a,b,c); });
         ksmod.def("threshold", (float (*)(bool, float, float))
                                 (knownsigma::threshold));
         ksmod.def("threshold", (float (*)(bool, float, float, size_t, size_t))
