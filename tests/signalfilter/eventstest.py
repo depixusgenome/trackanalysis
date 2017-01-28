@@ -35,9 +35,10 @@ def test_detectsplits():
     items[[0, 10, 25, 29]] = numpy.nan
     assert det(items) == ((0, 11), (11,20), (21,30))
 
-def test_merge():
+def _merges(oneperrange):
     u"Tests flat stretches merging"
-    inst  = EventMerger(precision = 1., confidence = 0.1, isequal = True)
+    inst  = EventMerger(precision = 1., confidence = 0.1, isequal = True,
+                        oneperrange = oneperrange)
     det   = lambda  i, j: tuple(tuple(_) for _ in inst(i, numpy.array(j)))
     items = numpy.zeros((30,))
 
@@ -60,6 +61,14 @@ def test_merge():
     items[25]  = numpy.nan
     assert det(items, ((0, 10),(11,20),(22,30))) == ((0,10),(11,30))
 
+def test_fastmerge():
+    u"Tests merging events, all at a time"
+    _merges(False)
+
+def test_slowmerge():
+    u"Tests merging events, one by one"
+    _merges(True)
+
 def test_select():
     u"Tests flat stretches filtering"
     det   = lambda  i, j, k: tuple(tuple(_)
@@ -80,6 +89,3 @@ def test_tocycles():
     truth  = (0, 0, 0, 1, 1, 1, 2, 8, 8, 8, 9, 9, 9, 9, 8)
     vals   = tuple(i.cycle for i in tocycles(starts, inters))
     assert vals == truth
-
-if __name__ == '__main__':
-    test_merge()

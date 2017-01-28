@@ -122,8 +122,9 @@ class EventMerger(PrecisionAlg):
     """
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.confidence = kwa.get('confidence',  0.1)
-        self.isequal    = kwa.get('isequal',     True)
+        self.confidence  = kwa.get('confidence',  0.1)
+        self.isequal     = kwa.get('isequal',     True)
+        self.oneperrange = kwa.get('oneperrange', True)
 
     @staticmethod
     def __initstats(data : np.ndarray, intervals: np.ndarray):
@@ -138,22 +139,32 @@ class EventMerger(PrecisionAlg):
 
         return np.apply_along_axis(_stats, 1, inds).reshape(intervals.shape)
 
-    def __maketest(self, precision, data):
-        thr   = norm.threshold(self.isequal, self.confidence,
-                               self.getprecision(precision, data))
-
-        def _test(stats, i):
+    def __initprobs(self, stats):
+        def _test(i):
             rng0, rng1 = stats[i,0], stats[i+1,0]
-            prob       = norm.value(self.isequal,
-                                    (rng0[0], rng0[1],   0.),
-                                    (rng1[0], rng1[1],   0.))
-            return prob < thr
-        return _test
+            return norm.value(self.isequal,
+                              (rng0[0], rng0[1],   0.),
+                              (rng1[0], rng1[1],   0.))
 
-    @staticmethod
-    def __intervalstomerge(merge):
-        inds = np.nonzero(np.diff(merge))[0]
-        return inds.reshape((len(inds)//2, 2))
+        size = len(stats)-1
+        return np.fromiter((_test(i) for i in range(size)),
+                           dtype = 'f4',
+                           count = size)
+
+    def __intervalstomerge(self, merge, probs):
+        if not any(merge):
+            return np.empty(0, dtype = 'i4')
+
+        tomerge = np.nonzero(np.diff(merge))[0]
+        tomerge = tomerge.reshape((len(tomerge)//2, 2))
+
+        if self.oneperrange:
+            fcn           = lambda x: np.argmin(probs[x[0]:x[1]])+x[0]
+            tomerge[:,0]  = np.apply_along_axis(fcn, 1, tomerge)
+            tomerge[:,1]  = tomerge[:,0]+1
+            merge  [1:-1]             = False
+            merge  [1:][tomerge[:,0]] = True
+        return tomerge
 
     @staticmethod
     def __updatestats(tomerge, tokeep, stats):
@@ -181,19 +192,20 @@ class EventMerger(PrecisionAlg):
         if len(data) == 0 or len(intervals) == 0:
             return np.empty((0,2), dtype = 'i4')
 
-        test  = self.__maketest    (precision, data)
+        thr   = norm.threshold(self.isequal, self.confidence,
+                               self.getprecision(precision, data))
         stats = self.__initstats(data, intervals)
         while len(intervals) > 1:
-            # merge == True: interval needs to be merged with next one
+            probs       = self.__initprobs(stats)
             merge       = np.zeros(len(intervals)+1, dtype = 'bool')
-            merge[1:-1] = tuple(test(stats, i) for i in range(len(merge)-2))
+            merge[1:-1] = probs < thr
 
-            if not any(merge[1:-1]):
+
+            tomerge     = self.__intervalstomerge(merge, probs)
+            if len(tomerge) == 0:
                 break
 
-            tomerge   = self.__intervalstomerge(merge)
             tokeep    = np.nonzero(~merge[:-1])[0]
-
             intervals = self.__updateintervals(tomerge, tokeep, intervals)
             stats     = self.__updatestats    (tomerge, tokeep, stats)
 
