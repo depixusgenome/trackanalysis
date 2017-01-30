@@ -32,11 +32,11 @@ class PrecisionAlg:
         elif isinstance(data, (float, int)):
             return float(data)
         elif isinstance(data, Sequence[np.ndarray]):
-            return nanhfsigma(data)
-        elif isinstance(data, np.ndarray):
             if len(data) == 1:
                 return nanhfsigma(data[0])
             return np.median(tuple(nanhfsigma(i) for i in data))
+        elif isinstance(data, np.ndarray):
+            return nanhfsigma(data)
 
         raise AttributeError('Could not extract precision: no data or set value')
 
@@ -168,7 +168,7 @@ class EventMerger(PrecisionAlg):
             return np.array([(cnt.sum(), np.average(sel['m'], weights = cnt))],
                             dtype = dtype)
 
-        stats[tomerge[:,0],0] = np.apply_along_axis(_update, 1, tomerge)
+        stats[tomerge[:,0],0] = np.apply_along_axis(_update, 1, tomerge).ravel()
         stats[tomerge[:,0],1] = stats[tomerge[:,1],1]
         return stats[tokeep]
 
