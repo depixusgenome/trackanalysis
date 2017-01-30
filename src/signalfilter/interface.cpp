@@ -58,7 +58,7 @@ namespace signalfilter {
     }
 }
 
-namespace samples { namespace normal { 
+namespace samples { namespace normal {
     struct SimpleInput : public Input { using Input::Input; };
 }}
 
@@ -177,6 +177,10 @@ namespace signalfilter { namespace stats {
                             { return hfsigma(inp.size(), inp.data()); });
         smod.def("hfsigma", [](pybind11::array_t<double> & inp)
                             { return hfsigma(inp.size(), inp.data()); });
+        smod.def("mediandeviation", [](pybind11::array_t<float> & inp)
+                            { return mediandeviation(inp.size(), inp.data()); });
+        smod.def("mediandeviation", [](pybind11::array_t<double> & inp)
+                            { return mediandeviation(inp.size(), inp.data()); });
     }
 }}
 

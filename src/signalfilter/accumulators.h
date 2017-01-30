@@ -150,4 +150,7 @@ namespace signalfilter { namespace stats
 
     template <typename T>
     T hfsigma(size_t sz, T const * dt);
+
+    template <typename T>
+    inline T mediandeviation(size_t sz, T const * dt);
 }}
