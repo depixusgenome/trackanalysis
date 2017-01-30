@@ -154,11 +154,8 @@ class MetaMixin(type):
 
         return property(fget, fset, fdel, prop.__doc__)
 
-def fromstream(streamopts = ''):
+def fromstream(streamopts):
     u"wraps a method using a stream as first input: it can now use str, Path or streams"
-    if callable(streamopts):
-        return fromstream()(streamopts)
-
     def _wrapper(fcn):
         tpe   = 'Union[str,pathlib.Path,IO]'
         first = next(iter(signature(fcn).parameters))
@@ -208,13 +205,19 @@ def _escapenans(*arrays: np.ndarray, reset = True):
     if any(nans):
         yielded = tuple(arr[~nans] for arr in arrays)
 
-        yield yielded
+        if len(yielded) == 1:
+            yield yielded[0]
+        else:
+            yield yielded
 
         if reset:
             for cur, arr in zip(yielded, arrays):
                 arr[~nans] = cur
     else:
-        yield arrays
+        if len(arrays) == 1:
+            yield arrays[0]
+        else:
+            yield arrays
 
 def escapenans(*arrays: np.ndarray, reset = True):
     u"""
