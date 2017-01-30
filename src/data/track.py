@@ -43,6 +43,7 @@ class Track:
     def phaseid(self, cid:'Optional[int]' = None, pid:'Optional[int]' = None):
         u"returns the starttime of the cycle and phase"
         vect = self._cycles
+        orig = vect[0,0]
         if {cid, pid}.issubset((all, None)):
             pass
         elif cid in (all, None):
@@ -51,7 +52,7 @@ class Track:
             vect = vect[cid,:]
         else:
             vect = vect[cid,pid]
-        return vect - vect[0,0]
+        return vect - orig
 
     @property
     def data(self):
