@@ -6,7 +6,6 @@ try:
 except ImportError:
     raise ImportError("Don't forget to clone wafbuilder!!")
 
-
 require(cxx    = {'msvc'     : 14.0,
                   'clang++'  : 3.8,
                   'g++'      : 5.4},
@@ -21,71 +20,89 @@ require(python = {'pybind11' : '2.0.1',
                   'mypy'     : '0.4.4'},
         rtime  = False)
 
+class _Tester(BuildContext):
+    u"runs pytests"
+    cmd = 'test'
+    fun = 'test'
+
 _ALL   = ('tests',) + tuple(builder.wscripted("src"))
 
-def options(opt):
-    opt.load('waf_unit_test pytest')
-    builder.options(opt)
-    opt.add_option('--mod',   dest = 'modules', action = 'store', help=u"modules to build")
-    opt.add_option('--nodyn', dest = 'dyn',
-                   action  = 'store_false',
-                   default = True,
-                   help    = (u"consider only modules which were here"
-                              +u" when configure was last launched"))
-    for item in _ALL:
-        opt.recurse(item)
+for item in _ALL:
+    builder.addbuild(item, locals())
 
-def _get(dyn, base, defaults, requested):
-    if len(defaults) == 0 or dyn:
-        defaults = base
+def _getmodules(bld):
+    defaults  = getattr(bld.env, 'MODULES', tuple())
+    if bld.options.dyn is True or defaults is None or len(defaults) == 0:
+        defaults = _ALL
+
+    requested = bld.options.modules
     if requested is None or len(requested) == 0:
-        return defaults
+        mods = defaults
 
     else:
         names = {val.split('/')[-1]: val for val in defaults}
-        return tuple(names[req] for req in requested.split(',') if req in names)
+        mods  = tuple(names[req] for req in requested.split(',') if req in names)
+
+    builder.requirements.reload(('',)+tuple(mods))
+    return mods
+
+def options(opt):
+    builder.load(opt)
+    for item in _ALL:
+        opt.recurse(item)
+    builder.options(opt)
+
+    opt.add_option('--mod',
+                   dest    = 'modules',
+                   default = '',
+                   action  = 'store',
+                   help    = u"modules to build")
+    opt.add_option('--dyn',
+                   dest    = 'dyn',
+                   action  = 'store_true',
+                   default = None,
+                   help    = (u"consider only modules which were here"
+                              +u" when configure was last launched"))
 
 def configure(cnf):
+    if cnf.options.dyn is None and len(cnf.options.modules) == 0:
+        cnf.env.MODULES = tuple()
+        mods            = _getmodules(cnf)
+    else:
+        cnf.env.MODULES = _getmodules(cnf)
+        mods            = cnf.env.MODULES
+
     builder.configure(cnf)
-    cnf.env.MODULES = _get(cnf.options.dyn, _ALL, _ALL, cnf.options.modules)
-    for item in cnf.env.MODULES:
+    for item in mods:
         cnf.recurse(item)
 
 def build(bld):
+    mods = _getmodules(bld)
     builder.build(bld)
-
-    mods = _get(bld.options.dyn, _ALL, bld.env.MODULES, bld.options.modules)
-    if len(mods) < len(bld.env.MODULES if len(bld.env.MODULES) else _ALL):
+    if len(bld.options.modules):
         print('building:', *mods)
 
     builder.findpyext(bld, set(mod for mod in mods if mod != 'tests'))
     for item in mods:
         bld.recurse(item)
 
+def test(bld):
+    u"runs pytests"
+    mods  = ('/'+i.split('/')[-1] for i in _getmodules(bld))
+    names = (path for path in bld.path.ant_glob(('tests/*test.py', 'tests/*/*test.py')))
+    names = (str(name) for name in names if any(i in str(name) for i in mods))
+    builder.runtest(bld, *(name[name.rfind('tests'):] for name in names))
+
 def environment(cnf):
     u"prints the environment variables for current configuration"
     print(cnf.env)
 
-def condaenv(_):
+def condaenv(cnf):
     u"prints the conda yaml recipe"
+    _getmodules(cnf)
     builder.condaenv('trackanalysis')
 
-def requirements(_):
+def requirements(cnf):
     u"prints requirements"
-    builder.requirements()
-
-def test(bld):
-    u"runs pytests"
-    mods   = _get(bld.options.dyn, _ALL, bld.env.MODULES, bld.options.modules)
-    mods   = ('/'+i.split('/')[-1] for i in mods)
-    names  = (path for path in bld.path.ant_glob(('tests/*test.py', 'tests/*/*test.py')))
-    names  = (str(name) for name in names if any(i in str(name) for i in mods))
-    builder.runtest(bld, *(name[name.rfind('tests'):] for name in names))
-
-class Tester(BuildContext):
-    u"runs pytests"
-    cmd = 'test'
-    fun = 'test'
-
-for item in _ALL:
-    builder.addbuild(item, locals())
+    _getmodules(cnf)
+    builder.requirements.tostream()
