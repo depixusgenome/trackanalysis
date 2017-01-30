@@ -15,7 +15,7 @@ def read(stream:TextIO) -> 'Iterator[Tuple[str,str]]':
     u"reads a path and yields pairs (name, sequence)"
     yield from seqio.FastaIO.SimpleFastaParser(stream)
 
-def peaks(seq:str, oligs:'Sequence[str]') -> np.ndarray:
+def peaks(seq:str, oligs:'Union[Sequence[str], str]') -> np.ndarray:
     u"""
     Returns the peak positions and orientation associated to a sequence.
 
@@ -30,13 +30,19 @@ def peaks(seq:str, oligs:'Sequence[str]') -> np.ndarray:
     Example:
 
         >>> import numpy as np
-        >>> seq   = "atcgATATATatcgCCCaaGGG"
-        >>> peaks = peaks(seq, ('ATAT', 'CCC'))
-        >>> assert len(peaks) == 4
-        >>> assert all(a == b for a, b in zip(peaks['position'],    [8, 10, 17, 22]))
-        >>> assert all(a == b for a, b in zip(peaks['orientation'], [True]*3+[False]))
+        >>> seq = "atcgATATATatcgCCCaaGGG"
+        >>> res = peaks(seq, ('ATAT', 'CCC'))
+        >>> assert len(res) == 4
+        >>> assert all(a == b for a, b in zip(res['position'],    [8, 10, 17, 22]))
+        >>> assert all(a == b for a, b in zip(res['orientation'], [True]*3+[False]))
+        >>> res = peaks(seq, 'ATAT')
+        >>> assert len(res) == 2
+        >>> assert all(a == b for a, b in zip(res['position'],    [8, 10]))
+        >>> assert all(a == b for a, b in zip(res['orientation'], [True]*2))
 
     """
+    if isinstance(oligs, str):
+        oligs = (oligs,)
     def _get(elems, state):
         reg = re.compile('|'.join(elems))
         val = reg.search(seq, 0)
@@ -58,6 +64,7 @@ def overlap(ol1:str, ol2:str, minoverlap = None):
     Example:
 
         >>> import numpy as np
+        >>> assert  not overlap('ATAT', '')
         >>> assert  overlap('ATAT', 'ATAT')
         >>> assert  overlap('ATAT', 'CATA')
         >>> assert  overlap('ATAT', 'CCAT')
@@ -70,6 +77,8 @@ def overlap(ol1:str, ol2:str, minoverlap = None):
         >>> assert  not overlap('ATAT', 'CATA', minoverlap = 4)
         >>> assert  not overlap('ATAT', 'CCAT', minoverlap = 3)
         >>> assert  not overlap('ATAT', 'CCCA', minoverlap = 2)
+
+        >>> assert  not overlap('', 'ATAT')
         >>> assert  overlap('ATAT', 'ATAT')
         >>> assert  overlap('CATA', 'ATAT')
         >>> assert  overlap('CCAT', 'ATAT')
@@ -87,15 +96,13 @@ def overlap(ol1:str, ol2:str, minoverlap = None):
     if len(ol1) < len(ol2):
         ol1, ol2 = ol2, ol1
 
-    if minoverlap is None:
-        rng = range(len(ol2))
+    if minoverlap is None or minoverlap <= 0:
+        minoverlap = 1
 
-    elif minoverlap > len(ol2):
+    if minoverlap > len(ol2):
         return False
 
-    else:
-        rng = range(minoverlap, len(ol2))
-
+    rng = range(minoverlap, len(ol2))
     if ol2 in ol1:
         return True
     return any(ol1.endswith(ol2[:i]) or ol1.startswith(ol2[-i:]) for i in rng)
