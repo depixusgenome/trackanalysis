@@ -15,7 +15,7 @@ def test_collapse_to_mean():
 
     # test horizontal lines
     inters  = [Range(5, yvals[5:10,i]) for i in range(yvals.shape[1])]
-    prof    = CollapseToMean.run(iter(inters), edge = None)
+    prof    = CollapseToMean.run(iter(inters), edge = None, filter = None)
     assert prof.xmin == 5
     assert prof.xmax == 10
     assert len(prof) == 5
@@ -53,7 +53,7 @@ def test_collapse_by_derivate():
 
     # test horizontal lines
     inters  = [Range(5, yvals[5:10,i]) for i in range(yvals.shape[1])]
-    prof    = CollapseByDerivate.run(iter(inters), edge = None)
+    prof    = CollapseByDerivate.run(iter(inters), edge = None, filter = None)
     assert all(prof.count == ([5]*4+[0]))
     assert all(prof.value == 0.)
 
@@ -142,5 +142,5 @@ def test_stitchbyderivate():
             _test(left, right)
 
 if __name__ == '__main__':
-    test_stitchbyinterpolation()
+    test_collapse_to_mean()
     #test_collapse_by_derivate()

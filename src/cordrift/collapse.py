@@ -9,7 +9,8 @@ from typing import (Optional, Union, Sized, Any, # pylint: disable=unused-import
                     Callable, NamedTuple, Sequence, cast, Iterable, Tuple)
 from enum   import Enum
 import pandas
-import numpy; np = numpy # type: Any # pylint: disable=multiple-statements,invalid-name
+import numpy as np
+from signalfilter import Filter, NonLinearFilter # pylint: disable=unused-import
 
 Range = NamedTuple('Range', [('start', int), ('values', np.ndarray)])
 
@@ -38,14 +39,14 @@ def _iter_ranges(xmin:int, inter:Sequence[Range]) -> 'Iterable[Tuple[np.ndarray,
         vals = rng.values[max(xmin-rng.start, 0):]
         good = np.isfinite(vals)
         if any(good):
-            good  = np.nonzero(good)[0]
-            good += max(rng.start-xmin, 0)
-            yield (good, vals)
+            good = np.nonzero(good)[0]
+            yield (good+max(rng.start-xmin, 0), vals[good])
 
-class CollapseAlg:
+class _CollapseAlg:
     u"base class for collapse. Deals with stitching as well"
     def __init__(self, **kwa):
-        self.edge   = kwa.get('edge', 1) # type: Optional[int]
+        self.edge   = kwa.get('edge', 0)                   # type: Optional[int]
+        self.filter = kwa.get('filter', NonLinearFilter()) # type: Optional[Filter]
 
     @property
     def _edge(self):
@@ -65,27 +66,31 @@ class CollapseAlg:
         u"creates the configuration and runs the algorithm"
         return cls(**kwa)(inter)
 
-class CollapseToMean(CollapseAlg):
+class CollapseToMean(_CollapseAlg):
     u"Collapses intervals together using their mean values"
     def _run(self, inter:Sequence[Range], prof:Profile) -> Profile:
         key   = lambda i: (-i.start-len(i.values), len(i.values))
 
-        cnt   = np.zeros_like(prof.count)
-        vals  = prof.value
-        edge  = self._edge
-        inner = slice(edge, None if edge is None else -edge)
+        cnt    = np.zeros_like(prof.count)
+        edge   = self._edge
+        inner  = slice(edge, None if edge is None else -edge)
         for inds, cur in _iter_ranges(prof.xmin, sorted(inter, key = key)):
-            if all(cnt[inds] == 0):
-                vals[inds] -= cur.mean()
-            else:
-                vals[inds] += np.average(vals[inds], weights = cnt[inds]) - cur.mean()
+            vals  = prof.value[inds]
+            rho   = 1.*cnt[inds]
 
-            cnt [inds]              += 1
-            prof.value[inds]        += cur
+            delta = cur.mean()
+            if any(rho):
+                delta -= np.average(vals, weights = rho)
+
+            np.subtract(cur, delta, out = cur)
+
+            rho                     /= rho+1
+            prof.value[inds]         = rho * (vals-cur) + cur
+            cnt       [inds]        += 1
             prof.count[inds[inner]] += 1
 
-        inds        = cnt > 0
-        vals[inds] /= cnt[inds]
+        if self.filter is not None:
+            self.filter(prof.value)
         return prof
 
 class DerivateMode(Enum):
@@ -93,7 +98,7 @@ class DerivateMode(Enum):
     median = 'median'
     mean   = 'mean'
 
-class CollapseByDerivate(CollapseAlg):
+class CollapseByDerivate(_CollapseAlg):
     u"""
     Behaviour common to all is measured using the distribution of derivates at
     each time frame. Either the mean or the median is defined as the profile
@@ -101,7 +106,7 @@ class CollapseByDerivate(CollapseAlg):
     """
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.maxder = kwa.get('maxder', np.inf)
+        self.maxder = kwa.get('maxder', np.inf)   # type: float
         self.mode   = kwa.get('mode',   'median') # type: Union[str,DerivateMode]
 
     @classmethod
@@ -132,11 +137,14 @@ class CollapseByDerivate(CollapseAlg):
         vals[vals >= self.maxder] = np.NaN
         vals[:,0][cnt == 0]       = 0 # suppress all NaN warning
 
-        fcn        = getattr(np, 'nan'+DerivateMode(self.mode).value)
-        prof.value = pandas.Series(fcn(vals, axis = 1)[::-1]).cumsum().values[::-1]
+        fcn    = getattr(np, 'nan'+DerivateMode(self.mode).value)
+        values = fcn(vals, axis = 1)
+        if self.filter is not None:
+            self.filter(values)
+        prof.value = pandas.Series(values[::-1]).cumsum().values[::-1]
         return prof
 
-def _getintervals(cnt:np.ndarray, minv:int, neq:Callable) -> numpy.ndarray:
+def _getintervals(cnt:np.ndarray, minv:int, neq:Callable) -> np.ndarray:
     u"returns a 2D array containing ranges with prof.count < minv"
     holes  = np.zeros((len(cnt)+2,), dtype = 'bool')
     neq(cnt, minv, out = holes[1:len(cnt)+1])
@@ -259,3 +267,6 @@ class StitchByInterpolation:
     def run(cls, prof:Profile, *_, **kwa) -> Profile:
         u"creates the configuration and runs the algorithm"
         return cls(**kwa)(prof)
+
+CollapseAlg = Union[CollapseByDerivate, CollapseToMean]
+StitchAlg   = Union[StitchByDerivate,   StitchByInterpolation]
