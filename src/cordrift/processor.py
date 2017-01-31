@@ -44,11 +44,15 @@ class BeadDriftProcessor(Processor):
 
     @classmethod
     def __filter(cls, task, raw):
-        if task.filter is not None:
-            task.filter.precision = task.precision
-            fcn                   = cls.__escapenans(task.filter)
-            return task, raw, tuple(fcn(cycle) for cycle in raw)
-        return task, raw, raw
+        if task.filter is None:
+            return task, raw, raw
+
+        if {getattr(task, name) for name in task.filtered} == {None}:
+            return task, raw, raw
+
+        task.filter.precision = task.precision
+        fcn                   = cls.__escapenans(task.filter)
+        return task, raw, tuple(fcn(cycle) for cycle in raw)
 
 
     @staticmethod
@@ -57,9 +61,13 @@ class BeadDriftProcessor(Processor):
             events = (Range(0, cycle) for cycle in raw)
         else:
             task.events.precision = task.precision
-            events = (Range(evt.start, rdt[evt])
+            choices = (lambda x, y: x), (lambda x, y: y)
+            echoice =  choices['events'     in task.filtered]
+            cchoice =  choices['collapse'   in task.filtered]
+
+            events = (Range(evt[0], cchoice(rdt, fdt)[evt[0]:evt[1]])
                       for rdt, fdt in zip(raw, clean)
-                      for evt      in task.events(fdt))
+                      for evt      in task.events(echoice(rdt, fdt)))
 
         return task.collapse(events)
 

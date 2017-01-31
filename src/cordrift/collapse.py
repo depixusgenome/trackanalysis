@@ -45,9 +45,10 @@ def _iter_ranges(xmin:int, inter:Sequence[Range]) -> 'Iterable[Tuple[np.ndarray,
 
 class _CollapseAlg:
     u"base class for collapse. Deals with stitching as well"
+    _FILTER = NonLinearFilter                           # type: type
     def __init__(self, **kwa):
-        self.edge   = kwa.get('edge', 0)                   # type: Optional[int]
-        self.filter = kwa.get('filter', NonLinearFilter()) # type: Optional[Filter]
+        self.edge   = kwa.get('edge', 0)                # type: Optional[int]
+        self.filter = kwa.get('filter', self._FILTER()) # type: Optional[Filter]
 
     @property
     def _edge(self):
@@ -73,24 +74,23 @@ class CollapseToMean(_CollapseAlg):
 
     The collapse starts from the right-most interval and moves left.
     """
+    _FILTER = type(None) # type: type
     def _run(self, inter:Sequence[Range], prof:Profile) -> Profile:
-        key   = lambda i: (-i.start-len(i.values), len(i.values))
-
-        cnt    = np.zeros_like(prof.count)
-        edge   = self._edge
-        inner  = slice(edge, None if edge is None else -edge)
+        key   = lambda i: (-i.start-len(i.values), -len(i.values))
+        cnt   = np.zeros_like(prof.count)
+        edge  = self._edge
+        inner = slice(edge, None if edge is None else -edge)
         for inds, cur in _iter_ranges(prof.xmin, sorted(inter, key = key)):
-            vals  = prof.value[inds]
-            rho   = 1.*cnt[inds]
+            rho                      = cnt[inds]*1.
+            vals                     = prof.value[inds]
 
-            delta = cur.mean()
             if any(rho):
-                delta -= np.average(vals, weights = rho)
+                cur                 += (vals-cur)[rho>0].mean()
+                rho                 /= rho+1.
+                prof.value[inds]     = rho*vals + (1.-rho)*cur
+            else:
+                prof.value[inds]     = cur - cur.mean()
 
-            np.subtract(cur, delta, out = cur)
-
-            rho                     /= rho+1
-            prof.value[inds]         = rho * (vals-cur) + cur
             cnt       [inds]        += 1
             prof.count[inds[inner]] += 1
 
@@ -104,6 +104,8 @@ class CollapseByMerging(_CollapseAlg):
 
     The collapse is done by merging intervals sharing the maximum number of points.
     """
+    _FILTER = type(None) # type: type
+
     @staticmethod
     def __init_inters(inter):
         inters = []
@@ -133,18 +135,33 @@ class CollapseByMerging(_CollapseAlg):
         return rngs, common
 
     @staticmethod
-    def __merge(rng1, rng2):
-        start = min(rng1[0], rng2[0])
-        stop  = max(rng1[0]+len(rng1[1]), rng2[0]+len(rng2[1]))
-        vals  = np.zeros((stop-start,), dtype = 'f4')
-        cnt   = np.zeros((stop-start,), dtype = 'i4')
+    def __delta(rng1, rng2):
+        start  = rng1[0], rng2[0]
+        stop   = rng1[0]+len(rng1[1]), rng2[0]+len(rng2[1])
 
-        cnt[rng1[0]-start:][:len(rng1[2])]  = rng1[2]
-        cnt[rng2[0]-start:][:len(rng2[2])] += rng2[2]
+        sli    = slice(max(*start)-start[0], min(*stop)-start[0])
+        both   = np.isfinite(rng1[1][sli])
+        return rng1[1][sli][both][rng1[2][sli][both] > 0].mean()
 
-        vals[rng1[0]-start:][:len(rng1[1])]  = rng1[1] * rng1[2]
-        vals[rng2[0]-start:][:len(rng2[1])] += rng2[1] * rng2[2]
-        vals[cnt > 0] /= cnt[cnt > 0]
+    @classmethod
+    def __merge(cls, rng1, rng2):
+        start     = min(rng1[0], rng2[0])
+        stop      = max(rng1[0]+len(rng1[1]), rng2[0]+len(rng2[1]))
+
+        sl1       = slice(rng1[0]-start, rng1[0]-start + len(rng1[2]))
+        sl2       = slice(rng2[0]-start, rng2[0]-start + len(rng2[2]))
+
+        cnt       = np.zeros((stop-start,), dtype = 'i4')
+        cnt[sl1]  = rng1[2]
+        cnt[sl2] += rng2[2]
+
+        rho       = np.zeros((stop-start,), dtype = 'f4')
+        rho[sl1]  = rng1[2]
+        rho      /= cnt
+
+        vals        = np.copy(rho)
+        vals[sl1]  *=  rng1[1] - cls.__delta(rng1, rng2)
+        vals[sl2]  += (rng2[1] - cls.__delta(rng2, rng1)) * (1.-rho[sl2])
         return start, vals, cnt
 
     def __update_prof(self, prof, inters, rngs):
