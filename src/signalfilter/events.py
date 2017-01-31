@@ -53,7 +53,7 @@ class SplitDetector(PrecisionAlg):
     """
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.confidence = kwa.get('confidence',  0.1)
+        self.confidence = kwa.get('confidence',  0.1) # type: Optional[float]
         self._window    = 1
         self._kern      = np.ones((2,))
         self._lrng      = np.arange(1)
@@ -78,7 +78,10 @@ class SplitDetector(PrecisionAlg):
 
         precision = self.getprecision(precision, data)
         window    = self._window
-        thr       = norm.threshold(True, self.confidence, precision, window, window)
+        if self.confidence is None or self.confidence <= 0.:
+            thr   = precision
+        else:
+            thr   = norm.threshold(True, self.confidence, precision, window, window)
 
         nans      = np.isnan(data)
         if any(nans):
@@ -122,7 +125,7 @@ class EventMerger(PrecisionAlg):
     """
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.confidence  = kwa.get('confidence',  0.1)
+        self.confidence  = kwa.get('confidence',  0.1) # type: Optional[float]
         self.isequal     = kwa.get('isequal',     True)
         self.oneperrange = kwa.get('oneperrange', True)
 
@@ -185,8 +188,11 @@ class EventMerger(PrecisionAlg):
         if len(data) == 0 or len(intervals) == 0:
             return np.empty((0,2), dtype = 'i4')
 
-        thr   = norm.threshold(self.isequal, self.confidence,
-                               self.getprecision(precision, data))
+        if self.confidence is None or self.confidence <= 0.:
+            thr = precision
+        else:
+            thr = norm.threshold(self.isequal, self.confidence,
+                                 self.getprecision(precision, data))
         stats = self.__initstats(data, intervals)
         while len(intervals) > 1:
             probs       = self.__initprobs(stats)
