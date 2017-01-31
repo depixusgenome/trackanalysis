@@ -5,12 +5,13 @@ Collapse intervals. The idea is to measure the behaviour common to all
 stretches of data. This should be removed as it's source is either a (thermal,
 electric, ...) drift or a mechanical vibration.
 """
-from typing import (Optional, Union, Sized, Any, # pylint: disable=unused-import
-                    Callable, NamedTuple, Sequence, cast, Iterable, Tuple)
-from enum   import Enum
-import pandas
-import numpy as np
-from signalfilter import Filter, NonLinearFilter # pylint: disable=unused-import
+from    typing          import (Optional, Union, Sized, # pylint: disable=unused-import
+                                Callable, NamedTuple, Sequence, cast, Iterable,
+                                Any, Tuple)
+from    enum            import Enum
+import  pandas
+import  numpy as np
+from    signalfilter    import Filter, NonLinearFilter  # pylint: disable=unused-import
 
 Range = NamedTuple('Range', [('start', int), ('values', np.ndarray)])
 
@@ -67,7 +68,11 @@ class _CollapseAlg:
         return cls(**kwa)(inter)
 
 class CollapseToMean(_CollapseAlg):
-    u"Collapses intervals together using their mean values"
+    u"""
+    Collapses intervals together using their mean values.
+
+    The collapse starts from the right-most interval and moves left.
+    """
     def _run(self, inter:Sequence[Range], prof:Profile) -> Profile:
         key   = lambda i: (-i.start-len(i.values), len(i.values))
 
@@ -88,6 +93,97 @@ class CollapseToMean(_CollapseAlg):
             prof.value[inds]         = rho * (vals-cur) + cur
             cnt       [inds]        += 1
             prof.count[inds[inner]] += 1
+
+        if self.filter is not None:
+            self.filter(prof.value)
+        return prof
+
+class CollapseByMerging(_CollapseAlg):
+    u"""
+    Collapses intervals together using their mean values
+
+    The collapse is done by merging intervals sharing the maximum number of points.
+    """
+    @staticmethod
+    def __init_inters(inter):
+        inters = []
+        for start, vals in inter:
+            fin = np.isfinite(vals)
+            inters.append((start,
+                           np.where(fin, vals, 0.) - np.nanmean(vals),
+                           np.int32(fin))) # type: ignore
+        return inters
+
+    @staticmethod
+    def __compute_commons(common, rngs, i):
+        cur  = common[:,i]
+        rng  = rngs[i]
+
+        np.minimum (rngs[:,1], rng[1],                        out = cur)
+        np.subtract(cur,       np.maximum(rngs[:,0], rng[0]), out = cur)
+        np.maximum (cur,       0,                             out = cur)
+        cur[i] = 0
+
+    @classmethod
+    def __init_common(cls, inters):
+        rngs   = np.array([[start, start+len(vals)] for start, vals, _ in inters])
+        common = np.zeros((len(rngs), len(rngs)), dtype = 'i4')
+        for i in range(len(rngs)):
+            cls.__compute_commons(common, rngs, i)
+        return rngs, common
+
+    @staticmethod
+    def __merge(rng1, rng2):
+        start = min(rng1[0], rng2[0])
+        stop  = max(rng1[0]+len(rng1[1]), rng2[0]+len(rng2[1]))
+        vals  = np.zeros((stop-start,), dtype = 'f4')
+        cnt   = np.zeros((stop-start,), dtype = 'i4')
+
+        cnt[rng1[0]-start:][:len(rng1[2])]  = rng1[2]
+        cnt[rng2[0]-start:][:len(rng2[2])] += rng2[2]
+
+        vals[rng1[0]-start:][:len(rng1[1])]  = rng1[1] * rng1[2]
+        vals[rng2[0]-start:][:len(rng2[1])] += rng2[1] * rng2[2]
+        vals[cnt > 0] /= cnt[cnt > 0]
+        return start, vals, cnt
+
+    def __update_prof(self, prof, inters, rngs):
+        for i, rng in enumerate(rngs):
+            if rng[0] == rng[1]:
+                continue
+
+            start, vals, cnt = inters[i]
+            ix1  = max(start, prof.xmin)
+            ix2  = min(start+len(vals), prof.xmax)
+            prof.value[ix1-prof.xmin:ix2-prof.xmin] = vals[ix1-start:ix2-start]
+
+            ix1 += self.edge or 0
+            ix2 -= self.edge or 0
+            if ix2 > ix1:
+                prof.count[ix1-prof.xmin:ix2-prof.xmin] = cnt [ix1-start:ix2-start]
+
+    def _run(self, inter:Sequence[Range], prof:Profile) -> Profile:
+        inters       = self.__init_inters(inter)
+        rngs, common = self.__init_common(inters)
+        ncols        = common.shape[1]
+
+        for _ in range(len(inters)-1):
+            imax = np.argmax(common)
+            ind  = imax // ncols, imax % ncols
+            if common[ind[0],ind[1]] <= 0:
+                break
+
+            start, vals, cnt = self.__merge(inters[ind[0]], inters[ind[1]])
+
+            inters[ind[0]] = start, vals, cnt
+            rngs  [ind[0]] = start, start + len(vals)
+            rngs  [ind[1]] = 0, 0
+
+            self.__compute_commons(common, rngs, ind[0])
+            common [ind[1],:] = 0
+            common [:,ind[1]] = 0
+
+        self.__update_prof(prof, inters, rngs)
 
         if self.filter is not None:
             self.filter(prof.value)
@@ -268,5 +364,5 @@ class StitchByInterpolation:
         u"creates the configuration and runs the algorithm"
         return cls(**kwa)(prof)
 
-CollapseAlg = Union[CollapseByDerivate, CollapseToMean]
+CollapseAlg = Union[CollapseByDerivate, CollapseToMean, CollapseByMerging]
 StitchAlg   = Union[StitchByDerivate,   StitchByInterpolation]
