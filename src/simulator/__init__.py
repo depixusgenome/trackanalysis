@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Tests cordrift"
-import random
-import numpy as np
-from   data import Track
+from    typing import Sequence, Union
+import  random
+import  numpy as np
+
+from    data import Track
 
 class BeadSimulator:
     u"""
@@ -60,8 +62,6 @@ class BeadSimulator:
             rho    = (rng[i+1]-rng[i])/(ends[i+1]-ends[i])
             dat    = cycles[:,ends[i]:ends[i+1]]
             dat[:] = rho * np.arange(ends[i+1]-ends[i])+rng[i]
-            if self.brownian[i] > 0.:
-                dat[:] += np.random.normal(0., self.brownian[i], dat.shape)
 
     def addevents(self, cycles):
         u"add events to the cycles"
@@ -72,6 +72,27 @@ class BeadSimulator:
                 ind        = self.randt(pos)
                 cyc[:ind] += pos
                 cyc        = cyc[len(cyc[:ind]):]
+
+    _NONE = '__none__'
+    def addbrownian(self, cycles, brownian = _NONE):
+        u"add brownian noise to the cycles"
+        if brownian is self._NONE:
+            brownian = self.brownian
+
+        if brownian is None:
+            return
+
+        elif isinstance(brownian, (float, int)):
+            if brownian > 0.:
+                cycles[:] += np.random.normal(0., brownian, cycles.shape)
+
+        elif isinstance(brownian, Sequence[Union[float,int]]):
+            ends = np.insert(np.cumsum(self.phases), 0, 0)
+            for i in range(len(self.phases)):
+                self.addbrownian(cycles[:,ends[i]:ends[i+1]], brownian[i])
+
+        elif callable(brownian):
+            cycles[:] += np.random.normal(0., brownian(cycles), cycles.shape)
 
     @property
     def cycles  (self):
@@ -92,6 +113,7 @@ class BeadSimulator:
         self.addbasic(cycles)
         self.adddrift(cycles)
         self.addevents(cycles)
+        self.addbrownian(cycles)
         return cycles.ravel()
 
     def track(self, nbeads = 1., seed = None):
