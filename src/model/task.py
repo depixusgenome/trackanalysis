@@ -59,18 +59,31 @@ class Task:
         u"returns class or parent task if must remain unique"
         return cls
 
-class TrackReaderTask(Task):
-    u"Class indicating that a track file should be added to memory"
+    @classmethod
+    def isroot(cls):
+        u"returns whether the class should be a root"
+        return False
+
+class RootTask(Task):
+    u"Class indicating that a track file should be created/loaded to memory"
     levelin = Level.project
     levelou = Level.bead
-    def __init__(self, path: Optional[str] = None) -> None:
-        super().__init__()
-        self.path = path # Optional[str]
 
     @classmethod
     def unique(cls):
         u"returns class or parent task if must remain unique"
         return cls
+
+    @classmethod
+    def isroot(cls):
+        u"returns whether the class should be a root"
+        return True
+
+class TrackReaderTask(RootTask):
+    u"Class indicating that a track file should be added to memory"
+    def __init__(self, path: Optional[str] = None) -> None:
+        super().__init__()
+        self.path = path # Optional[str]
 
 @unique
 class TagAction(Enum):

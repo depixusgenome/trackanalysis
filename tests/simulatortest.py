@@ -3,11 +3,11 @@
 u"Tests the simulator"
 
 import numpy as np
-from simulator     import BeadSimulator
+from simulator import TrackSimulator
 
 def test_bead_simulator():
     u"testing the cordrift processor"
-    bead  = BeadSimulator(ncycles = 1)
+    bead  = TrackSimulator(ncycles = 1)
     drift = bead.drift
     data  = bead(seed = 0)
 
@@ -18,7 +18,7 @@ def test_bead_simulator():
     assert data.shape ==  (149,)
     assert all(data == bead(seed = 0))
 
-    data = BeadSimulator(ncycles = 5)()
+    data = TrackSimulator(ncycles = 5)()
     assert data.shape == (149*5,)
     assert any(data[:149] != data[149:149*2])
 

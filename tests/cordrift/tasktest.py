@@ -7,16 +7,16 @@ import  numpy as np
 from    numpy.testing       import assert_allclose
 from    pytest              import approx # pylint: disable = no-name-in-module
 
-from simulator              import BeadSimulator
+from simulator              import TrackSimulator
 from cordrift.processor     import BeadDriftProcessor
 from cordrift.collapse      import (CollapseByMerging, CollapseToMean,
                                     CollapseByDerivate, StitchByDerivate,
                                     StitchByInterpolation)
 def _run(coll, stitch, brown):
-    bead   = BeadSimulator(zmax     = [0., 0., 1., 1., -.2, -.2, -.3, -.3],
-                           brownian = brown,
-                           ncycles  = 30,
-                           drift    = (.05, 29.))
+    bead   = TrackSimulator(zmax     = [0., 0., 1., 1., -.2, -.2, -.3, -.3],
+                            brownian = brown,
+                            ncycles  = 30,
+                            drift    = (.05, 29.))
     cycles = bead.cycles[0][[5,6]]
     frame  = bead.track(nbeads = 1, seed = 0).cycles
     drift  = bead.drift[cycles[0]:cycles[1]]
