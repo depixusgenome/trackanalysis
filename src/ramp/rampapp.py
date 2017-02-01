@@ -341,4 +341,3 @@ if __name__=="__main__":
     RPDATA.update_data("/home/david/work/trackanalysis/tests/testdata/ramp_5HPs_mix.trk")
     DISPLAY = MyDisplay(data = RPDATA, doc = curdoc())
     ROWS = DISPLAY.get_layout()
-
