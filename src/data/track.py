@@ -3,8 +3,8 @@
 u"""
 Base track file data.
 """
-from    typing import Optional  # pylint: disable=unused-import
 import  pickle
+from    typing import Optional  # pylint: disable=unused-import
 import  numpy                   # type: ignore
 
 from    legacy      import readtrack   # pylint: disable=import-error,no-name-in-module

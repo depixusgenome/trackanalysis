@@ -3,6 +3,7 @@
 .lock-*
 .waf*
 .*.un~
+.*.swp
 build/
 wafbuilder/
 waf*

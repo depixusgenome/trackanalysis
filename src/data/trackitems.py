@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Adds easy access to cycles and events"
+from    copy        import copy as shallowcopy
+from    abc         import ABCMeta, abstractmethod
+from    functools   import wraps
 from    typing      import (Optional, Tuple, Union, # pylint: disable=unused-import
                             Any, List, Sequence, Iterable, Iterator)
-from    abc         import ABCMeta, abstractmethod
-from    copy        import copy as shallowcopy
-from    functools   import wraps
 import  numpy                           # type: ignore
 
 from    utils       import isfunction
