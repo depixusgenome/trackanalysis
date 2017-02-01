@@ -12,7 +12,7 @@ It can add/delete/update tasks, emitting the corresponding events
 from typing         import (Union, Iterator, Tuple, # pylint: disable=unused-import
                             Optional, Any, List)
 
-from model.task     import Task, TrackReaderTask, TaskIsUniqueError
+from model.task     import Task, RootTask, TrackReaderTask, TaskIsUniqueError
 from anastore       import load as _anaopen, dump as _anasave
 from .event         import Controller, NoEmission
 from .processor     import Cache, Processor, run as _runprocessors
@@ -74,12 +74,12 @@ class TaskController(Controller):
     u"Data controller class"
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.__items = dict() # type: Dict[TrackReaderTask, TaskPair]
+        self.__items = dict() # type: Dict[RootTask, TaskPair]
         self.__procs = dict() # type: Dict[Task,Any]
         self.register()
 
     def task(self,
-             parent : TrackReaderTask,
+             parent : RootTask,
              task   : Union[Task,int,type],
              noemission = False) -> Task:
         u"returns a task"
@@ -90,15 +90,15 @@ class TaskController(Controller):
         u"Returns a data object in memory."
         return iter(self.tasks(tsk) for tsk in self.__items.keys())
 
-    def tasks(self, task:TrackReaderTask) -> 'Iterator[Task]':
+    def tasks(self, task:RootTask) -> 'Iterator[Task]':
         u"Returns a data object in memory."
         return iter(tsk for tsk in self.__items[task].model)
 
-    def cache(self, parent:TrackReaderTask, tsk:Optional[Task]):
+    def cache(self, parent:RootTask, tsk:Optional[Task]):
         u"Returns the cache for a given task"
         return self.__items[parent].data.getCache(tsk)
 
-    def run(self, parent:TrackReaderTask, tsk:Task):
+    def run(self, parent:RootTask, tsk:Task):
         u"""
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
@@ -111,7 +111,7 @@ class TaskController(Controller):
         _anasave([item.model for item in self.__items.values()], path)
 
     @Controller.emit
-    def openTrack(self, task: 'Union[str,TrackReaderTask]', model = tuple()) -> dict:
+    def openTrack(self, task: 'Union[str,RootTask]', model = tuple()) -> dict:
         u"opens a new file"
         if isinstance(task, str):
             if len(model):
@@ -138,24 +138,21 @@ class TaskController(Controller):
         return dict(controller = self, model = tasks)
 
     @Controller.emit
-    def closeTrack(self, task:TrackReaderTask) -> dict:
+    def closeTrack(self, task:RootTask) -> dict:
         u"opens a new file"
         old = tuple(self.__items[task].model)
         del self.__items[task]
         return dict(controller = self, task = task, model = old)
 
     @Controller.emit
-    def addTask(self, parent:TrackReaderTask, task:Task, index = None) -> dict:
+    def addTask(self, parent:RootTask, task:Task, index = None) -> dict:
         u"opens a new file"
         old = tuple(self.__items[parent].model)
         self.__items[parent].add(task, self.__procs[type(task)], index = index)
         return dict(controller = self, parent = parent, task = task, old = old)
 
     @Controller.emit
-    def updateTask(self,
-                   parent:TrackReaderTask,
-                   task:Union[Task,int,type],
-                   **kwargs) -> dict:
+    def updateTask(self, parent:RootTask, task:Union[Task,int,type], **kwargs) -> dict:
         u"updates a task"
         tsk = self.task(parent, task, noemission = True)
         old = Controller.updateModel(tsk, **kwargs)
@@ -163,7 +160,7 @@ class TaskController(Controller):
         return dict(controller = self, parent = parent, task = tsk, old = old)
 
     @Controller.emit
-    def removeTask(self, parent:TrackReaderTask, task:Union[Task,int,type]) -> dict:
+    def removeTask(self, parent:RootTask, task:Union[Task,int,type]) -> dict:
         u"removes a task"
         tsk = self.task(parent, task, noemission = True)
         old = tuple(self.__items[parent].model)
@@ -171,7 +168,7 @@ class TaskController(Controller):
         return dict(controller = self, parent = parent, task = tsk, old = old)
 
     @Controller.emit
-    def clearData(self, parent:'Optional[TrackReaderTask]' = None) -> dict:
+    def clearData(self, parent:'Optional[RootTask]' = None) -> dict:
         "clears all data"
         if parent is None:
             self.__items.clear()
