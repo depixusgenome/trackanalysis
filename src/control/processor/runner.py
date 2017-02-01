@@ -68,6 +68,35 @@ class Runner:
         self.gen   = gen
         self.level = curr[1]
 
+    _REFUSED = (Task, Processor, Cache)
+
+    @classmethod
+    def _test(cls, item):
+        if isinstance(item, cls._REFUSED) or isinstance(item, cls):
+            raise MemoryError("Beware of closure side-effecs:"
+                              +" exclude {} from it".format(cls._REFUSED))
+        cls._check(item)
+
+    @classmethod
+    def _check(cls, arg):
+        if arg is None:
+            return
+
+        if callable(arg):
+            for param in signature(arg).parameters.values():
+                if param.default != param.empty:
+                    cls._test(param.default)
+
+        closure = getattr(arg, '__closure__', None)
+        if closure is not None:
+            for cell in closure:
+                cls._test(cell.cell_contents)
+
+        givars = getattr(getattr(arg,    'gi_code', None), 'co_freevars', tuple())
+        giloc  = getattr(getattr(arg, 'gi_frame', None), 'f_locals', {})
+        for var in givars:
+            cls._test(giloc.get(var, None))
+
     @classmethod
     def checkClosure(cls, fcn):
         u"""
@@ -76,24 +105,7 @@ class Runner:
         In this way, changing the task after implementing the iteration
         should have no effect.
         """
-        def _test(item):
-            refused = (Task, Processor, Cache, cls)
-
-            if isinstance(item, refused):
-                raise MemoryError("Beware of closure side-effecs:"
-                                  +" exclude {} from it".format(refused))
-
-            cls.checkClosure(item)
-
-        if callable(fcn):
-            for param in signature(fcn).parameters.values():
-                if param.default != param.empty:
-                    _test(param.default)
-
-        closure = getattr(fcn, '__closure__', None)
-        if closure is not None:
-            for cell in closure:
-                _test(cell.cell_contents)
+        cls._check(fcn)
 
     def apply(self, fcn, *_, levels = None):
         u"Applies a function to generator's output"

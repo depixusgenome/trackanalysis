@@ -266,7 +266,14 @@ class TestTaskControl:
             except MemoryError:
                 good += [4]
 
-            assert good == [1,2,3,4]
+            try:
+                def _gen():
+                    yield task
+                Runner.checkClosure(_gen())
+            except MemoryError:
+                good += [5]
+
+            assert good == [1,2,3,4,5]
 
         for task in (TCycles1(), Cache(), TC1Proc(TCycles1())):
             _testClosure(task)
