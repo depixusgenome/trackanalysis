@@ -40,6 +40,9 @@ class TrackSimulator(TrackSimulatorConfig):
 
     def adddrift(self, cycles):
         u"adds a drift to cycles"
+        if self.driftargs is None:
+            return
+
         amp, scale = self.driftargs
         size       = sum(self.phases[:4])
 
@@ -65,6 +68,9 @@ class TrackSimulator(TrackSimulatorConfig):
 
     def addevents(self, cycles):
         u"add events to the cycles"
+        if None in (self.randtargs, self.randzargs) is None:
+            return
+
         for cyc in cycles[:,sum(self.phases[:5]) : sum(self.phases[:6])]:
             pos = None
             while len(cyc):
