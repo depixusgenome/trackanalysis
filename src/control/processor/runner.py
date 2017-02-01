@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Deals with running a list of processes"
-from typing         import (Callable, Optional,     # pylint: disable=unused-import
-                            Iterable, Tuple)
 from inspect        import signature
 from itertools      import groupby
+from typing         import (Callable, Optional,     # pylint: disable=unused-import
+                            Iterable, Tuple)
 import numpy
 
 from data           import TrackItems, createTrackItem

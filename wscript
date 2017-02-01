@@ -26,7 +26,7 @@ class _Tester(BuildContext):
     fun = 'test'
 
 _ALL   = ('tests',) + tuple(builder.wscripted("src"))
-
+_RAMPMODS = tuple('src/'+i for i in['data','view','legacy','ramp','model','control'])
 for item in _ALL:
     builder.addbuild(item, locals())
 
@@ -39,10 +39,13 @@ def _getmodules(bld):
     if requested is None or len(requested) == 0:
         mods = defaults
 
+    if bld.options.app is True:
+        mods = _RAMPMODS
     else:
         names = {val.split('/')[-1]: val for val in defaults}
         mods  = tuple(names[req] for req in requested.split(',') if req in names)
-
+    
+        
     builder.requirements.reload(('',)+tuple(mods))
     return mods
 
@@ -63,6 +66,12 @@ def options(opt):
                    default = None,
                    help    = (u"consider only modules which were here"
                               +u" when configure was last launched"))
+    opt.add_option('--app',
+                   dest    = 'app',
+                   action  = 'store_true',
+                   default = False,
+                   help    = (u"consider only modules which are "
+                              +u" necessary for rampapp"))
 
 def configure(cnf):
     if cnf.options.dyn is None and len(cnf.options.modules) == 0:
