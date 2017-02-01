@@ -10,7 +10,7 @@ The controller stores:
 It can add/delete/update tasks, emitting the corresponding events
 """
 from typing         import (Union, Iterator, Tuple, # pylint: disable=unused-import
-                            Optional, Any, List, Iterable)
+                            Optional, Any, List, Iterable, Dict)
 
 from model.task     import Task, RootTask, TrackReaderTask, TaskIsUniqueError
 from .event         import Controller, NoEmission
@@ -80,12 +80,13 @@ class TaskPair:
     @classmethod
     def create(cls,
                model     : Iterable[Task],
-               processors: Optional[dict] = None) -> 'TaskPair':
-        u"opens a new file"
+               processors: 'Union[Dict,Iterable[type],type,None]' = Processor
+              ) -> 'TaskPair':
+        u"creates a task pair for this model"
         tasks = tuple(model)
         pair  = cls()
-        if not isinstance(processors, dict):
-            processors = cls.register(None, processors or Processor)
+        if not isinstance(processors, Dict):
+            processors = cls.register(processors)
 
         for other in tasks:
             pair.add(other, processors[type(other)])
@@ -94,7 +95,8 @@ class TaskPair:
     @classmethod
     def register(cls,
                  processor: Union[Iterable[type], Processor, None] = None,
-                 cache:     Optional[dict]                         = None):
+                 cache:     Optional[dict]                         = None
+                ) -> 'Dict[type,Any]':
         u"registers a task processor"
         if cache is None:
             cache = dict()
@@ -121,7 +123,7 @@ class TaskController(Controller):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.__items   = dict() # type: Dict[RootTask, TaskPair]
-        self.__procs   = dict() # type: Dict[Task,Any]
+        self.__procs   = dict() # type: Dict[type,Any]
         self.__procs   = TaskPair.register(kwargs.get('processors', Processor))
         self.__openers = kwargs.get("openers", self.defaultopener)
         self.__savers  = kwargs.get("savers",  self.defaultsaver)
