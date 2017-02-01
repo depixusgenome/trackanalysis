@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Deals with running a list of processes"
-from typing         import (Callable, Optional, Tuple) # pylint: disable=unused-import
+from typing         import (Callable, Optional,     # pylint: disable=unused-import
+                            Iterable, Tuple)
 from inspect        import signature
 from itertools      import groupby
 import numpy
@@ -99,7 +100,7 @@ class Runner:
         self.tolevel(levels)
         if fcn is None:
             pass
-        elif hasattr(fcn, '__iter__'):
+        elif isinstance(fcn, Iterable):
             self.gen = fcn
         elif callable(fcn):
             self.checkClosure(fcn)
