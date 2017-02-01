@@ -79,7 +79,7 @@ class TaskController(Controller):
         self.__openers = kwargs.get("openers", self.defaultopener)
         self.__savers  = kwargs.get("savers",  self.defaultsaver)
 
-        self.register()
+        self.register(kwargs.get('processors', Processor))
 
     @staticmethod
     def defaultopener():
@@ -229,10 +229,15 @@ class TaskController(Controller):
 
         yield from (fcn for name, fcn in locals().items() if name[:3] == '_on')
 
-    def register(self, processor = None):
+    def register(self, processor: Union[Iterable[type], Processor, None] = None):
         u"registers a task processor"
-        if processor is None:
-            processor = Processor
+        if isinstance(processor, Iterable[Processor]):
+            for proc in processor:
+                self.register(proc)
+            return
+
+        elif processor is None:
+            return
 
         if isinstance(processor.tasktype, tuple):
             self.__procs.update(dict.fromkeys(processor.tasktype, processor))
