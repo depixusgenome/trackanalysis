@@ -10,7 +10,7 @@ The controller stores:
 It can add/delete/update tasks, emitting the corresponding events
 """
 from typing         import (Union, Iterator, Tuple, # pylint: disable=unused-import
-                            Optional, Any, List)
+                            Optional, Any, List, Iterable)
 
 from model.task     import Task, RootTask, TrackReaderTask, TaskIsUniqueError
 from .event         import Controller, NoEmission
@@ -129,15 +129,23 @@ class TaskController(Controller):
                 break
 
     @Controller.emit
-    def openTrack(self, task: 'Union[str,RootTask]', model = tuple()) -> dict:
+    def openTrack(self,
+                  task : 'Union[None,str,RootTask]' = None,
+                  model: Iterable[Task]             = tuple()) -> dict:
         u"opens a new file"
-        if not isinstance(task, Task):
+        tasks = tuple(model)
+        if task is None:
+            if len(tasks) == 0:
+                raise NoEmission("Nothing to do")
+            task = tasks[0]
+
+        if not isinstance(task, RootTask):
             for opening in self.__openers():
-                models = opening(task, model)
+                models = opening(task, tasks)
                 if models is not None:
                     break
             else:
-                if len(model):
+                if len(tasks):
                     raise NotImplementedError()
                 models = [(TrackReaderTask(path = task),)]
 
@@ -145,11 +153,13 @@ class TaskController(Controller):
                 self.openTrack(elem[0], elem)
             raise NoEmission("Done everything already")
 
-        if len(model) and model[0] is not task:
+        if len(tasks) == 0:
+            tasks = (task,)
+
+        elif tasks[0] is not task:
             raise ValueError("model and root task does'nt coincide")
 
         pair  = TaskPair()
-        tasks = (model if len(model) else (task,))
         for other in tasks:
             pair.add(other, self.__procs[type(other)])
 
