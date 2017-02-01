@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"utils"
-from typing         import Union, Optional, Callable, IO, cast # pylint: disable=unused-import
-from types          import LambdaType, FunctionType, MethodType
-from enum           import Enum
 from contextlib     import contextmanager
 from inspect        import (signature, ismethod as _ismeth, isfunction as _isfunc,
                             getmembers, isgeneratorfunction)
 from functools      import wraps
 import re
 import pathlib
+from typing         import Union, Optional, Callable, IO, cast # pylint: disable=unused-import
+from types          import LambdaType, FunctionType, MethodType
+from enum           import Enum
 import numpy as np
 
 def toenum(tpe, val):
