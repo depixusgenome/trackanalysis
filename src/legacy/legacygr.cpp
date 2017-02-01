@@ -4921,7 +4921,6 @@ namespace legacy { namespace {
         oi->m_lab = MAX_DATA;
         oi->n_lab = oi->im.nx = oi->im.ny = oi->im.nxs = 0;
         oi->im.nys = oi->im.nxe = oi->im.nye = 0;
-        time(&(oi->im.time));
         oi->filename = oi->dir = oi->title = NULL;
         oi->x_title = oi->y_title = oi->x_prime_title = oi->y_prime_title = NULL;
         oi->x_prefix = oi->y_prefix = oi->x_unit = oi->y_unit  = NULL;
