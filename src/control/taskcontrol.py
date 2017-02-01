@@ -13,16 +13,16 @@ from typing         import (Union, Iterator, Tuple, # pylint: disable=unused-imp
                             Optional, Any, List)
 
 from model.task     import Task, RootTask, TrackReaderTask, TaskIsUniqueError
-from anastore       import load as _anaopen, dump as _anasave
 from .event         import Controller, NoEmission
 from .processor     import Cache, Processor, run as _runprocessors
+from .              import FileIO
 
 class TaskPair:
     u"data and model for tasks"
     __slots__ = ('model', 'data')
     def __init__(self):
-        self.model = []         # type: List[Task]
-        self.data  = Cache()
+        self.model   = []         # type: List[Task]
+        self.data    = Cache()
 
     def task(self, task:Union[Task,int,type], noemission = False) -> Task:
         u"returns a task"
@@ -74,9 +74,24 @@ class TaskController(Controller):
     u"Data controller class"
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.__items = dict() # type: Dict[RootTask, TaskPair]
-        self.__procs = dict() # type: Dict[Task,Any]
+        self.__items   = dict() # type: Dict[RootTask, TaskPair]
+        self.__procs   = dict() # type: Dict[Task,Any]
+        self.__openers = kwargs.get("openers", self.defaultopener)
+        self.__savers  = kwargs.get("savers",  self.defaultsaver)
+
         self.register()
+
+    @staticmethod
+    def defaultopener():
+        u"yields default openers"
+        for cls in FileIO.__subclasses__:
+            yield cls().open
+
+    @staticmethod
+    def defaultsaver():
+        u"yields default openers"
+        for cls in FileIO.__subclasses__:
+            yield cls().save
 
     def task(self,
              parent : RootTask,
@@ -108,26 +123,30 @@ class TaskController(Controller):
     @Controller.emit
     def saveTrack(self, path: str) -> None:
         u"saves the current model"
-        _anasave([item.model for item in self.__items.values()], path)
+        items = [item.model for item in self.__items.values()]
+        for closing in self.__savers():
+            if closing(path, items):
+                break
 
     @Controller.emit
     def openTrack(self, task: 'Union[str,RootTask]', model = tuple()) -> dict:
         u"opens a new file"
-        if isinstance(task, str):
-            if len(model):
-                raise NotImplementedError()
-
-            models = _anaopen(task)
-            if models is None:
-                model = tuple()
-                task  = TrackReaderTask(path = task)
-            elif len(models) == 1:
-                model = models[0]
-                task  = model [0]
+        if not isinstance(task, Task):
+            for opening in self.__openers():
+                models = opening(task, model)
+                if models is not None:
+                    break
             else:
-                for model in models:
-                    self.openTrack(model[0], model)
-                raise NoEmission("Done everything already")
+                if len(model):
+                    raise NotImplementedError()
+                models = [(TrackReaderTask(path = task),)]
+
+            for elem in models:
+                self.openTrack(elem[0], elem)
+            raise NoEmission("Done everything already")
+
+        if len(model) and model[0] is not task:
+            raise ValueError("model and root task does'nt coincide")
 
         pair  = TaskPair()
         tasks = (model if len(model) else (task,))

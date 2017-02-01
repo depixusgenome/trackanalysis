@@ -4,6 +4,8 @@ u""" Tests views """
 from pytest                     import approx       # pylint: disable=no-name-in-module
 from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 
+import anastore.control # pylint: disable=unused-import
+
 from view.toolbar               import ToolBar
 from view.trackplot             import TrackPlot
 
