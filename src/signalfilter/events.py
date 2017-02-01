@@ -54,20 +54,7 @@ class SplitDetector(PrecisionAlg):
     def __init__(self, **kwa):
         super().__init__(**kwa)
         self.confidence = kwa.get('confidence',  0.1) # type: Optional[float]
-        self._window    = 1
-        self._kern      = np.ones((2,))
-        self._lrng      = np.arange(1)
-        self._hrng      = np.arange(1)
-        self._setwindow(kwa.get('window', 1))
-
-    def _setwindow(self, window):
-        self._window = max(window, 1)
-        self._kern   = np.ones((self._window*2,))
-        self._kern[-self._window:] = -1.
-        self._lrng   = np.arange(self._window+1)[-1:0:-1]
-        self._hrng   = np.arange(self._window)[1:]
-
-    window = property(lambda self: self._window, _setwindow)
+        self.window     = kwa.get('window',      1)
 
     def __call__(self,
                  data     : np.ndarray,
@@ -77,7 +64,7 @@ class SplitDetector(PrecisionAlg):
             return np.empty((0,2), dtype = 'i4')
 
         precision = self.getprecision(precision, data)
-        window    = self._window
+        window    = self.window
         if self.confidence is None or self.confidence <= 0.:
             thr   = precision
         else:
@@ -87,10 +74,13 @@ class SplitDetector(PrecisionAlg):
         if any(nans):
             data = data[~nans]
 
-        delta           = np.convolve(data, self._kern, mode = 'same')
-        delta[:window] -= self._lrng * data[0]
+        kern = np.ones((window*2,))
+        kern[-window:] = -1.
+
+        delta           = np.convolve(data, kern, mode = 'same')
+        delta[:window] -= np.arange(window+1)[-1:0:-1] * data[0]
         if window > 1:
-            delta[1-window:] += self._hrng * data[-1]
+            delta[1-window:] += np.arange(window)[1:] * data[-1]
 
         ends = (np.abs(delta) >= (thr*window)).nonzero()[0]
 
