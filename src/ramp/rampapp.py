@@ -45,6 +45,8 @@ class DisplayHist:
         fig_width = kwargs.get("fig_width", 600)
         fig_height = kwargs.get("fig_height", 600)
         fill_color = kwargs.get("fill_color", "red")
+        with_hover = kwargs.get("hover",False)
+
         self.with_cdf = kwargs.get("with_cdf", False) # bool
         self.normed = kwargs.get("normed", False) # bool
 
@@ -54,9 +56,10 @@ class DisplayHist:
                           width = fig_width,
                           height = fig_height)
 
+        if with_hover:
+            hover = HoverTool(tooltips=[("(x,y)", "(@x, @cdf)")])
+            self.fig.add_tools(hover)
 
-        hover = HoverTool(tooltips=[("(x,y)", "(@x, @cdf)")])
-        self.fig.add_tools(hover)
         self.rawdata = pd.Series()
 
         self.cdfdata = ColumnDataSource({"x" : [], "cdf" : [] }) if \
@@ -160,18 +163,21 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
                                           x_label = "zmag_open",
                                           y_label ="Probability",
                                           normed = True,
-                                          with_cdf = True),
+                                          with_cdf = True,
+                                          with_hover = True),
                       "zmcl": DisplayHist(title = "Phase 5",
                                           x_label = "zmag_close",
                                           y_label ="Probability",
                                           normed = True,
-                                          with_cdf = True),
+                                          with_cdf = True,
+                                          with_hover = True),
                       "zmcl_reverse": DisplayHist(title = "Ratio of closed hairpin",
                                                   x_label = "zmag_close",
                                                   y_label ="Probability",
                                                   normed = True,
-                                                  with_cdf = True),
-                      "HPsize": DisplayHist(title = "HP size estimate of good beads",
+                                                  with_cdf = True,
+                                                  with_hover = True),
+                      "HPsize": DisplayHist(title = "HP size estimates using good beads",
                                             x_label = "size (micrometer unit)",
                                             y_label ="number of estimates",
                                             normed = False,
@@ -180,7 +186,7 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
                            TextInput(value = "0.0",
                                      title = "min molecule extension (micrometer unit)"),
                            "zcl_threshold":\
-                           TextInput(value = "0.0",
+                           TextInput(value = "",
                                      title = "keep bead if zmag close is above :")}
 
         def call_changeminext(attr,old,new): # pylint: disable=unused-argument
@@ -221,13 +227,13 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
         docrows.append(self.divs["ugly"].div)
         docrows.append(widgetbox(self.txt_inputs["minext"]))
         docrows.append(self.divs["fixed"].div)
+        docrows.append(widgetbox(self.txt_inputs["zcl_threshold"],
+                                 self.buttons["gen_rpdiscard"]))
         docrows.append(row(column(self.hists["zmop"].fig), column(self.hists["zmcl"].fig)) )
 
         # add file which generates a ramp_discarded.csv (including a list of fixed and ugly beads)
         # (and beads which are not yet closed at zcl_threshold)
-        docrows.append(row(self.hists["zmcl_reverse"].fig,
-                           widgetbox(self.txt_inputs["zcl_threshold"],
-                                     self.buttons["gen_rpdiscard"])))
+
         docrows.append(self.hists["HPsize"].fig)
         return docrows
 
@@ -264,12 +270,18 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
         u'''
         Generates the ramp_discard.csv file for pias input
         '''
-        beads = {"Too noisy":self.data.rpfulldata.noBeadCrossIds(),
-                 "Fixed":self.data.rpfulldata.getFixedBeadIds(),
+        noisy = self.data.rpfulldata.noBeadCrossIds()
+        fixed = self.data.rpfulldata.getFixedBeadIds()
+        goods = self.data.rpdata.beads()
+        # find beads who do not have defined behaviour
+        undef = list(set(goods)-set(noisy)-set(fixed))
+        beads = {"Too noisy":noisy,
+                 "Fixed":fixed,
                  "HP not closing at the test force":\
-                 utils.get_beadids_not_closing(self.data.rpdata,self.data.rpmod.get_zclthreshold())}
+                 utils.get_beadids_not_closing(self.data.rpdata,self.data.rpmod.get_zclthreshold()),
+                 "undefined behavior":undef}
         # add "HP not closing at the test force" key values
-        _gen_ramp_discard(beads,os.path.basename(self.filename))
+        _gen_ramp_discard(beads,self.filename)
 
     @classmethod
     def open(cls,doc):
@@ -324,11 +336,11 @@ def _gen_ramp_discard(beads:dict,rpfile):
     u'''
     outputs a csv with the same format as ramp_discard.csv
     '''
-    with open("ramp_discarded.csv","w") as outfile:
+    with open(os.path.join(os.path.dirname(rpfile),"ramp_discarded.csv"),"w") as outfile:
         outfile.write("Bead Id;\tPath;\tReason\n")
         for key,values in beads.items():
             for value in values:
-                outfile.write(str(value)+";\t"+rpfile+";\t"+str(key)+"\n")
+                outfile.write(str(value)+";\t"+os.path.basename(rpfile)+";\t"+str(key)+"\n")
 
     outfile.close()
 
