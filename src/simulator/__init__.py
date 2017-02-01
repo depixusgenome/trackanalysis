@@ -73,7 +73,7 @@ class BeadSimulator:
                 cyc[:ind] += pos
                 cyc        = cyc[len(cyc[:ind]):]
 
-    _NONE = '__none__'
+    _NONE = type('__none__', tuple(), {})
     def addbrownian(self, cycles, brownian = _NONE):
         u"add brownian noise to the cycles"
         if brownian is self._NONE:

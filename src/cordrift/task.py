@@ -8,7 +8,7 @@ from model                import Task, Level
 from signalfilter         import NonLinearFilter, Filter
 from signalfilter.events  import EventDetector
 from .collapse            import (CollapseAlg, StitchAlg,
-                                  CollapseToMean, StitchByDerivate)
+                                  CollapseByMerging, StitchByDerivate)
 
 class BeadDriftTask(Task): # pylint: disable=too-many-instance-attributes
     u"Removes correlations between cycles"
@@ -23,7 +23,7 @@ class BeadDriftTask(Task): # pylint: disable=too-many-instance-attributes
         self.filter     = kwa.get('filter',    NonLinearFilter())
         self.filtered   = kwa.get('filtered',  ('events',))
         self.events     = kwa.get('intervals', EventDetector())
-        self.collapse   = kwa.get('collapse',  CollapseToMean())
+        self.collapse   = kwa.get('collapse',  CollapseByMerging())
         self.stitch     = kwa.get('stitch',    StitchByDerivate())
         self.zero       = kwa.get('zero',      10)
         self.precision  = kwa.get('precision',  0.)
