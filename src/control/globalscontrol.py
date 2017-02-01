@@ -23,8 +23,8 @@ example, the "plot" map will contain items for all plot types. The "plot.bead"
 map only needs specify those default values that should be changed for this type
 of plot.
 """
-from typing         import Dict, Union          # pylint: disable=unused-import
 from collections    import namedtuple, ChainMap
+from typing         import Dict, Union          # pylint: disable=unused-import
 from .event         import Controller
 
 ReturnPair = namedtuple('ReturnPair', ['old', 'value'])

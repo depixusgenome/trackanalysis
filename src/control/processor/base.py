@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Processors apply tasks to a data flow"
-from    typing         import TYPE_CHECKING
 from    abc            import ABCMeta, abstractmethod
 from    functools      import wraps
+from    typing         import TYPE_CHECKING
 
 import  model.task   as     _tasks
 from    model.level    import Level

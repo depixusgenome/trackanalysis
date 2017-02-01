@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"basic view module"
-from typing               import Callable
 from functools            import wraps
+from typing               import Callable
 from bokeh.models.widgets import Button
 from bokeh.layouts        import layout
 
