@@ -223,16 +223,13 @@ class TrackItems(Items):
 
     def __getitem__(self, keys):
         if isinstance(keys, slice):
-            cpy = shallowcopy(self)
-            return cpy.withsamples(keys)
+            # could be a slice of beads or a slice of bead data ...
+            raise NotImplementedError()
 
         elif (isinstance(keys, (str, int))
               or (isinstance(keys, tuple) and _ALL.isdisjoint(keys))):
             # this is NOT a slice
             return self.get(keys)
-
-        elif isinstance(keys, list) and len(keys) == 1:
-            return self.__getitem__(keys[0])
 
         else:
             # consider this a slice
@@ -266,6 +263,13 @@ class Beads(TrackItems, Items):
 
     def _iter(self, sel = None):
         yield from ((bead, self.data[bead]) for bead in self.keys(sel))
+
+    def __getitem__(self, keys):
+        if isinstance(keys, tuple):
+            if len(keys) == 2:
+                return Cycles(track = self.data, data = self)[keys]
+            raise NotImplementedError()
+        return super().__getitem__(keys)
 
     @staticmethod
     def _isbead(key):
