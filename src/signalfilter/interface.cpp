@@ -1,13 +1,48 @@
+#include <type_traits>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include "signalfilter/signalfilter.h"
 #include "signalfilter/stattests.h"
 #include "signalfilter/accumulators.hpp"
+
 namespace
 {
     template<typename T>
     pybind11::array & _run(T const & self, pybind11::array_t<float> & inp)
     { run(self, inp.size(), inp.mutable_data()); return inp; }
+
+    template <typename T>
+    pybind11::object _get_est(T const & est)
+    {
+        pybind11::tuple tup(est.estimators.size());
+        for(size_t i = 0, e = est.estimators.size(); i < e; ++i)
+            tup[i] = int(est.estimators[i]);
+        return tup;
+    }
+
+    template <typename T>
+    void _set_est(T & est, pybind11::object obj)
+    {
+        auto seq = pybind11::reinterpret_borrow<pybind11::sequence>(obj);
+        bool err   = false;
+        auto check = [&err]() { return !(err || (err = PyErr_Occurred())); };
+
+        est.estimators.resize(seq.size());
+        for(size_t i = 0; i < est.estimators.size() && check(); ++i)
+            est.estimators[i] = seq[i].cast<size_t>();
+    }
+
+    template <typename T, typename K>
+    void    _apply(K & cls)
+    {
+        cls.def(pybind11::init<>())
+           .def_readwrite("derivate",  &T::derivate)
+           .def_readwrite("precision", &T::precision)
+           .def_readwrite("power",     &T::power)
+           .def_property("estimators", _get_est<T>, _set_est<T>)
+           .def("__call__",            _run<T>)
+           ;
+    }
 }
 
 namespace signalfilter {
@@ -16,16 +51,35 @@ namespace signalfilter {
     {
         void pymodule(pybind11::module & mod)
         {
-            pybind11::class_<Args>(mod,"ForwardBackwardFilter")
-                .def(pybind11::init<>())
-                .def_readwrite("derivate",      &Args::derivate)
-                .def_readwrite("normalize",     &Args::normalize)
-                .def_readwrite("precision",     &Args::precision)
-                .def_readwrite("window",        &Args::window)
-                .def_readwrite("power",         &Args::power)
-                .def_readwrite("estimators",    &Args::estimators)
-                .def("__call__",                _run<Args>)
-                ;
+            pybind11::class_<Args> cls(mod,"ForwardBackwardFilter");
+            cls.def_readwrite("normalize",     &Args::normalize)
+               .def_readwrite("window",        &Args::window)
+               .def("__getstate__",        [](Args const &p) 
+                    { 
+                        return pybind11::make_tuple(p.derivate, p.precision, p.power,
+                                                   _get_est(p), p.normalize, p.window);
+                    })
+               .def("__setstate__",        [](Args &p, pybind11::tuple t)
+                    { 
+                        if (t.size() != 6)
+                            throw std::runtime_error("Invalid state!");
+                        new (&p) Args();
+                        int i = 0;
+                        auto set = [&](auto & x)
+                                { 
+                                    using tpe = typename std::remove_reference<decltype(x)>::type;
+                                    x = t[i++].cast<tpe>();
+                                };
+                        set(p.derivate);
+                        set(p.precision);
+                        set(p.power);
+                        _set_est(p, t[i++]);
+                        set(p.normalize);
+                        set(p.window);
+                    })
+               ;
+
+            _apply<Args>(cls);
         }
     }
 
@@ -33,14 +87,30 @@ namespace signalfilter {
     {
         void pymodule(pybind11::module & mod)
         {
-            pybind11::class_<Args>(mod, "NonLinearFilter")
-                .def(pybind11::init<>())
-                .def_readwrite("derivate",      &Args::derivate)
-                .def_readwrite("precision",     &Args::precision)
-                .def_readwrite("power",         &Args::power)
-                .def_readwrite("estimators",    &Args::estimators)
-                .def("__call__", _run<Args>)
-                ;
+            pybind11::class_<Args> cls(mod, "NonLinearFilter");
+            cls.def("__getstate__",        [](const Args &p) 
+                    { 
+                        return pybind11::make_tuple(p.derivate, p.precision, p.power,
+                                                   _get_est(p));
+                    })
+               .def("__setstate__",        [](Args &p, pybind11::tuple t)
+                    { 
+                        if (t.size() != 4)
+                            throw std::runtime_error("Invalid state!");
+                        new (&p) Args();
+                        int i = 0;
+                        auto set = [&](auto & x)
+                                { 
+                                    using tpe = typename std::remove_reference<decltype(x)>::type;
+                                    x = t[i++].cast<tpe>();
+                                };
+                        set(p.derivate);
+                        set(p.precision);
+                        set(p.power);
+                        _set_est(p, t[i++]);
+                    })
+               ;
+            _apply<Args>(cls);
         }
     }
 
