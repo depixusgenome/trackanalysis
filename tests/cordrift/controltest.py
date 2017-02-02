@@ -11,7 +11,7 @@ def test_process():
     pair = TaskPair.create((TrackSimulatorTask(brownian  = 0., randtargs = None),
                             BeadDriftTask()))
     elems = tuple(pair.run())
-    print(elems)
+    print(tuple(tuple(x) for x in elems))
 
 if __name__ == '__main__':
     test_process()

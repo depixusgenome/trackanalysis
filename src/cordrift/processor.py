@@ -3,8 +3,9 @@
 u"Processor for removing correlated drifts"
 import time
 import threading
-from   copy             import copy
-from   functools        import wraps
+from   copy             import copy, deepcopy
+from   functools        import wraps, partial
+from   typing           import (Dict, Union, Sequence, Any) # pylint: disable=unused-import
 
 import numpy as np
 
@@ -15,20 +16,45 @@ from utils              import escapenans
 from .task              import BeadDriftTask
 from .collapse          import Range, Profile, CollapseToMean
 
-class BeadDriftProcessor(Processor):
-    u"Deals with bead drift"
-    tasktype = BeadDriftTask
+class BeadDriftAction:
+    u"Action to be passed to a Cycles"
     _SLEEP   = 0.01
+    tasktype = BeadDriftTask
+    def __init__(self, args: dict) -> None:
+        self.cache = {} # type: Dict[Union[int,Sequence[int]], Any]
+        self.lock  = threading.Lock()
+        self.task  = args if isinstance(args, self.tasktype) else self.tasktype(**args)
+        assert not (self.task.events is None
+                    and isinstance(self.task.collapse, CollapseToMean))
+        assert self.task.zero is None or self.task.zero > 2
 
-    @classmethod
-    def __setup(cls, frame, kwa):
-        task = kwa if isinstance(kwa, cls.tasktype) else cls.tasktype(**kwa)
-        assert not (task.events is None and isinstance(task.collapse, CollapseToMean))
-        assert task.zero is None or task.zero > 2
+    def __call__(self, frame, info):
+        parent = info[0][:-1]
+        prof   = None
+        with self.lock:
+            self.cache.setdefault(parent, parent)
 
+        if self.cache[parent] is parent:
+            self.cache[parent] = prof = self.profile(frame)
+
+        while not isinstance(prof, Profile):
+            time.sleep(self._SLEEP)
+            prof = self.cache[parent]
+
+        if self.task.phases:
+            ind1 = frame.phaseid(info[0][-1], self.task.phases[0])
+            ind2 = frame.phaseid(info[0][-1], self.task.phases[1])
+            info[1][ind1:ind2] -= prof.value[:ind2-ind1]
+        else:
+            info[1] -= prof.value[:len(info[1])]
+        return info
+
+    def __setup(self, frame):
+        task  = self.task
         frame = copy(frame).withphases(*task.phases)
         raw   = tuple(val for _, val in frame)
         if task.precision in (0, None) and {task.filter, task.events} != {None}:
+            task = deepcopy(task)
             task.precision = np.median(tuple(hfsigma(bead) for bead in raw))
         return task, raw
 
@@ -81,42 +107,24 @@ class BeadDriftProcessor(Processor):
 
         return prof
 
-    @classmethod
-    def profile(cls, frame:Cycles, kwa:dict) -> Profile:
+    def profile(self, frame:Cycles) -> Profile:
         u"action for removing bead drift"
-        task, raw        = cls.__setup(frame, kwa)
-        task, raw, clean = cls.__filter(task, raw)
-        prof             = cls.__collapse(task, raw, clean)
-        return cls.__stitch(task, raw, prof)
+        task, raw        = self.__setup(frame)
+        task, raw, clean = self.__filter(task, raw)
+        prof             = self.__collapse(task, raw, clean)
+        return self.__stitch(task, raw, prof)
 
+class BeadDriftProcessor(Processor):
+    u"Deals with bead drift"
+    tasktype = BeadDriftTask
     def run(self, args):
-        cpy   = self.task.config()
-        cache = dict()
-        lock  = threading.Lock()
-        sleep = self._SLEEP
-        def _creator(frame):
-            def _action(key, cycle):
-                parent = key[:-1]
-                prof   = None
+        action = BeadDriftAction(self.task.config())
+        fcn    = lambda frame: (frame
+                                .new()
+                                .withaction(partial(action, frame), beadonly = True))
+        args.apply(fcn, levels = self.levels)
 
-                with lock:
-                    cache.setdefault(parent, parent)
-
-                if cache[parent] is parent:
-                    cache[parent] = prof = BeadDriftProcessor.profile(frame, cpy)
-
-                while not isinstance(prof, Profile):
-                    time.sleep(sleep)
-                    prof = cache[parent]
-
-                if cpy.phases:
-                    ind1 = frame.phaseid(key[-1], cpy.phases[0])
-                    ind2 = frame.phaseid(key[-1], cpy.phases[1])
-                    cycle[ind1:ind2] -= prof.value[:ind2-ind1]
-                else:
-                    cycle -= prof.value[:len(cycle)]
-                return key, cycle
-
-            return frame.withaction(_action)
-
-        args.apply(_creator)
+    @staticmethod
+    def profile(frame, kwa):
+        u"action for removing bead drift"
+        return BeadDriftAction(kwa).profile(frame)

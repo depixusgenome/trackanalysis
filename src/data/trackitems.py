@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Adds easy access to cycles and events"
+import  inspect
 from    copy        import copy as shallowcopy
 from    abc         import ABCMeta, abstractmethod
 from    functools   import wraps
@@ -63,6 +64,10 @@ class TrackItems(Items):
                               **{i: shallowcopy(j)
                                  for i, j in self.__dict__.items() if i != 'track'})
 
+    def new(self) -> 'TrackItems':
+        u"returns a item containing self in the data field"
+        return self.__class__(track = self.track, data = self)
+
     @staticmethod
     def copy(item):
         u"Copies the data"
@@ -82,6 +87,15 @@ class TrackItems(Items):
             self.actions.remove(self.copy)
         return self
 
+    @staticmethod
+    def _check_action_sig(fcn):
+        sig = inspect.signature(fcn)
+        try:
+            sig.bind(1)
+        except TypeError as exc:
+            msg = 'Function should have a single positional argument'
+            raise TypeError(msg) from exc
+
     def withfunction(self, fcn = None, clear = False, beadonly = False) -> 'TrackItems':
         u"Adds an action with fcn taking a value as single argument"
         if clear:
@@ -90,27 +104,29 @@ class TrackItems(Items):
         if fcn is None:
             return self
 
+        self._check_action_sig(fcn)
         if beadonly:
             @wraps(fcn)
-            def _action(key, val):
-                return key, (fcn(val) if self._isbead(key) else val)
+            def _action(col):
+                return col[0], (fcn(col[1]) if self._isbead(col[0]) else col[1])
             self.actions.append(_action)
         else:
-            self.actions.append(lambda key, val: (key, fcn(val)))
+            self.actions.append(lambda col: (col[0], fcn(col[1])))
         return self
 
     def withaction(self, fcn = None, clear = False, beadonly = False) -> 'TrackItems':
-        u"Adds an action with fcn taking a key and its values  as arguments"
+        u"Adds an action with fcn taking a (key, value) pair as single argument"
         if clear:
             self.actions = []
 
         if fcn is None:
             return self
 
+        self._check_action_sig(fcn)
         if beadonly:
             @wraps(fcn)
-            def _action(key, val):
-                return fcn(key, val) if self._isbead(key) else val
+            def _action(col):
+                return fcn(col) if self._isbead(col[0]) else col
             self.actions.append(_action)
         else:
             self.actions.append(fcn)
@@ -133,8 +149,11 @@ class TrackItems(Items):
         u"sets the data"
 
     @staticmethod
-    def _isbead(_):
-        return True
+    def _isbead(key):
+        return ((isinstance(key, tuple)
+                 and len(key)
+                 and isinstance(key[0], int)
+                ) or isinstance(key, int))
 
     def _selection(self, attr, cyc, clear) -> 'TrackItems':
         if not isinstance(cyc, list) and cyc in _ALL:
@@ -281,10 +300,6 @@ class Beads(TrackItems, Items):
             raise NotImplementedError()
         return super().__getitem__(keys)
 
-    @staticmethod
-    def _isbead(key):
-        return isinstance(key, int)
-
 class Cycles(TrackItems, Items):
     u"""
     Class for iterating selected cycles:
@@ -315,10 +330,6 @@ class Cycles(TrackItems, Items):
     @setfield
     def withlast(self, last) -> 'Cycles':
         u"specifies the phase to extract: None for all"
-
-    @staticmethod
-    def _isbead(key):
-        return isinstance(key, int)
 
     def _keys(self, sel) -> 'Iterable[Tuple[Union[str,int], int]]':
         if isinstance(self.data, Cycles):
