@@ -1,2 +1,11 @@
 require('python', click = 6.6)
 make(locals())
+
+def defaultmodules(opt):
+    mods             = 'data','view','legacy','ramp','model','control'
+    opt.env.modules += tuple(opt.options.all_modules[i] for i in mods)
+
+def build(bld, __old = locals().pop('build')):
+    __old(bld)
+    if bld.cmd == 'install':
+        pass
