@@ -23,14 +23,13 @@ class RampModel:
         self.corrThreshold = 0.5
         self._minExt = kwargs.get("minExtension",0.0)
         self.window = 7
-        self._zclthreshold = 0.0
+        self._zclthreshold = kwargs.get("zclthreshold",None)
 
     def set_zclthreshold(self,value):
         u'''
         sets _zclthreshold
         if _minExt is changed call controller and apply changes in RampData
         '''
-        print("changing _zclthreshold")
         self._zclthreshold = value
 
     def get_zclthreshold(self):
