@@ -62,6 +62,25 @@ class TestCycleIteration:
         for _, vals in track.cycles.withfirst(2).withlast(3).selecting((0,1)):
             assert numpy.array_equal(vals, truth[1206-678:1275-678])
 
+    def test_cancyclefromcycle(self):
+        u"A cycle can contain a cycle as data"
+        track = data.Track(path = path("big_legacy"))
+        cyc = data.Cycles(track = track, data = track.cycles)
+        assert set(cyc.keys()) == set(track.cycles.keys())
+        assert set(cyc[...,0].keys()) == set(track.cycles[...,0].keys())
+        assert numpy.array_equal(cyc[0,0], track.cycles[0,0])
+
+        def _act1(col):
+            col[1][:] = 5.
+            return col
+
+        def _act2(col):
+            col[1][:] = all(x == 5. for x in col[1])
+            return col
+
+        cyc = (data.Cycles(track = track, data = track.cycles.withaction(_act1))
+               .withaction(_act2))
+        assert all(x == 1. for x in cyc[0,0])
 
     def test_lazy(self):
         u"tests what happens when using lazy mode"

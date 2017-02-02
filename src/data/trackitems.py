@@ -258,10 +258,20 @@ class Beads(TrackItems, Items):
     def _keys(self, sel):
         if sel is None:
             yield from self.data.keys()
+        elif isinstance(self.data, Beads):
+            yield from self.data.keys(sel)
         else:
-            yield from (i for i in sel              if i in self.data.keys())
+            keys = frozenset(self.data.keys())
+            yield from (i for i in sel if i in keys)
 
     def _iter(self, sel = None):
+        if isinstance(self.data, Beads):
+            if sel is None:
+                yield from self.data
+            else:
+                yield from shallowcopy(self.data).selecting(sel)
+            return
+
         yield from ((bead, self.data[bead]) for bead in self.keys(sel))
 
     def __getitem__(self, keys):
@@ -311,6 +321,10 @@ class Cycles(TrackItems, Items):
         return isinstance(key, int)
 
     def _keys(self, sel) -> 'Iterable[Tuple[Union[str,int], int]]':
+        if isinstance(self.data, Cycles):
+            yield from self.data.keys(sel)
+            return
+
         allcycles = range(self.track.ncycles)
         beads     = tuple(Beads(track = self.track, data = self.data).keys())
         if sel is None:
@@ -338,26 +352,33 @@ class Cycles(TrackItems, Items):
                 yield from ((col, thisid) for col in beads)
 
     def _iter(self, sel = None):
-        ncycles = self.track.ncycles
-        nphases = self.track.nphases
-        phaseid = self.track.phaseid
-
-        first   = 0       if self.first is None else self.first
-        last    = nphases if self.last  is None else self.last+1
-
-        def _getdata(bid:int, cid:int):
-            ind1 = phaseid(cid, first)
-            if last == nphases:
-                if cid+1 >= ncycles:
-                    return self.name(bid, cid), self.data[bid][ind1:]
-
-                ind2 = phaseid(cid+1, 0)
+        if isinstance(self.data, Cycles):
+            if sel is None:
+                yield from self.data
             else:
-                ind2 = phaseid(cid, last)
+                yield from shallowcopy(self.data).selecting(sel)
 
-            return self.name(bid, cid), self.data[bid][ind1:ind2]
+        else:
+            ncycles = self.track.ncycles
+            nphases = self.track.nphases
+            phaseid = self.track.phaseid
 
-        yield from (_getdata(bid, cid) for bid, cid in self.keys(sel))
+            first   = 0       if self.first is None else self.first
+            last    = nphases if self.last  is None else self.last+1
+
+            def _getdata(bid:int, cid:int):
+                ind1 = phaseid(cid, first)
+                if last == nphases:
+                    if cid+1 >= ncycles:
+                        return self.name(bid, cid), self.data[bid][ind1:]
+
+                    ind2 = phaseid(cid+1, 0)
+                else:
+                    ind2 = phaseid(cid, last)
+
+                return self.name(bid, cid), self.data[bid][ind1:ind2]
+
+            yield from (_getdata(bid, cid) for bid, cid in self.keys(sel))
 
     def phaseid(self, cid:'Optional[int]' = None, pid:'Optional[int]' = None):
         u"returns phase ids for the given cycle"
