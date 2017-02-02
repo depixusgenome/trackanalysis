@@ -28,8 +28,11 @@ def run(width,height): # pylint: disable=unused-argument
     u"Launches an view"
     from . import rampapp
     viewcls = rampapp.MyDisplay
-    spec_server=_serverkwargs({"title":"Ramp analysis",
-                               "size":(width,height)})
+    #spec_server=_serverkwargs({"title":"Ramp analysis",
+    #                           "size":(width,height)})
+
+    spec_server=_serverkwargs({"title":"Ramp analysis"})
+    #                           "size":(width,height)})
     start = viewcls.open
     server = Server(Application(FunctionHandler(start)), **spec_server)
 
