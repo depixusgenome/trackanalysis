@@ -3,13 +3,11 @@
 u"""
 Task for simulating tracks
 """
-from model.task     import RootTask, Level
+from model.task     import RootTask
 from .track         import TrackSimulatorConfig
 
 class TrackSimulatorTask(RootTask, TrackSimulatorConfig):
     u"Class indicating that a track file should be added to memory"
-    levelin = Level.project
-    levelou = Level.bead
     def __init__(self, **kwa) -> None:
         RootTask.__init__(self)
         TrackSimulatorConfig.__init__(self, **kwa)
