@@ -10,7 +10,7 @@ The controller stores:
 It can add/delete/update tasks, emitting the corresponding events
 """
 from typing         import (Union, Iterator, Tuple, # pylint: disable=unused-import
-                            Optional, Any, List, Iterable)
+                            Optional, Any, List, Iterable, Dict)
 
 from model.task     import Task, RootTask, TrackReaderTask, TaskIsUniqueError
 from .event         import Controller, NoEmission
@@ -70,16 +70,63 @@ class TaskPair:
         u"clears data starting at *tsk*"
         self.data.delCache()
 
+    def run(self, tsk:Optional[Task] = None):
+        u"""
+        Iterates through the list up to and including *tsk*.
+        Iterates through all if *tsk* is None
+        """
+        return _runprocessors(self.data, tsk)
+
+    @classmethod
+    def create(cls,
+               model     : Iterable[Task],
+               processors: 'Union[Dict,Iterable[type],type,None]' = Processor
+              ) -> 'TaskPair':
+        u"creates a task pair for this model"
+        tasks = tuple(model)
+        pair  = cls()
+        if not isinstance(processors, Dict):
+            processors = cls.register(processors)
+
+        for other in tasks:
+            pair.add(other, processors[type(other)])
+        return pair
+
+    @classmethod
+    def register(cls,
+                 processor: Union[Iterable[type], Processor, None] = None,
+                 cache:     Optional[dict]                         = None
+                ) -> 'Dict[type,Any]':
+        u"registers a task processor"
+        if cache is None:
+            cache = dict()
+
+        if isinstance(processor, Iterable[Processor]):
+            for proc in processor:
+                cls.register(proc, cache)
+            return cache
+
+        elif processor is None:
+            return cache
+
+        if isinstance(processor.tasktype, tuple):
+            cache.update(dict.fromkeys(processor.tasktype, processor))
+        elif processor.tasktype is not None:
+            cache[processor.tasktype] = processor
+
+        for sclass in processor.__subclasses__():
+            cls.register(sclass, cache)
+        return cache
+
 class TaskController(Controller):
     u"Data controller class"
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.__items   = dict() # type: Dict[RootTask, TaskPair]
-        self.__procs   = dict() # type: Dict[Task,Any]
+        self.__procs   = dict() # type: Dict[type,Any]
+        self.__procs   = TaskPair.register(kwargs.get('processors', Processor))
         self.__openers = kwargs.get("openers", self.defaultopener)
         self.__savers  = kwargs.get("savers",  self.defaultsaver)
-
-        self.register(kwargs.get('processors', Processor))
 
     @staticmethod
     def defaultopener():
@@ -118,7 +165,7 @@ class TaskController(Controller):
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
         """
-        return _runprocessors(self.__items[parent].data, tsk)
+        return self.__items[parent].run(tsk)
 
     @Controller.emit
     def saveTrack(self, path: str) -> None:
@@ -159,11 +206,7 @@ class TaskController(Controller):
         elif tasks[0] is not task:
             raise ValueError("model and root task does'nt coincide")
 
-        pair  = TaskPair()
-        for other in tasks:
-            pair.add(other, self.__procs[type(other)])
-
-        self.__items[task] = pair
+        self.__items[task] = TaskPair.create(tasks, self.__procs)
         return dict(controller = self, model = tasks)
 
     @Controller.emit
@@ -228,20 +271,3 @@ class TaskController(Controller):
             return lambda: controller.addTask(parent, task, ind)
 
         yield from (fcn for name, fcn in locals().items() if name[:3] == '_on')
-
-    def register(self, processor: Union[Iterable[type], Processor, None] = None):
-        u"registers a task processor"
-        if isinstance(processor, Iterable[Processor]):
-            for proc in processor:
-                self.register(proc)
-            return
-
-        elif processor is None:
-            return
-
-        if isinstance(processor.tasktype, tuple):
-            self.__procs.update(dict.fromkeys(processor.tasktype, processor))
-        else:
-            self.__procs[processor.tasktype] = processor
-        for sclass in processor.__subclasses__():
-            self.register(sclass)

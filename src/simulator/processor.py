@@ -11,10 +11,8 @@ class TrackSimulatorProcessor(Processor):
     tasktype = TrackSimulatorTask
     def run(self, args):
         u"returns a dask delayed item"
-        cpy =  TrackSimulator(**self.task.__dict__)
-        def _gen(cpy    = cpy,
-                 nbeads = self.task.nbeads,
-                 seed   = self.task.seed):
-            yield cpy.track(nbeads, seed)
+        cpy = self.task.config()
+        def _gen():
+            yield TrackSimulator(**cpy).track(cpy['nbeads'], cpy['seed']).beads
 
         args.apply(_gen(), levels = self.levels)

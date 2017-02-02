@@ -3,7 +3,7 @@
 u"Processor for removing correlated drifts"
 import time
 import threading
-from   copy             import deepcopy, copy
+from   copy             import copy
 from   functools        import wraps
 
 import numpy as np
@@ -90,9 +90,10 @@ class BeadDriftProcessor(Processor):
         return cls.__stitch(task, raw, prof)
 
     def run(self, args):
-        cpy   = deepcopy(self.task)
+        cpy   = self.task.config()
         cache = dict()
         lock  = threading.Lock()
+        sleep = self._SLEEP
         def _creator(frame):
             def _action(key, cycle):
                 parent = key[:-1]
@@ -105,7 +106,7 @@ class BeadDriftProcessor(Processor):
                     cache[parent] = prof = BeadDriftProcessor.profile(frame, cpy)
 
                 while not isinstance(prof, Profile):
-                    time.sleep(self._SLEEP)
+                    time.sleep(sleep)
                     prof = cache[parent]
 
                 if cpy.phases:

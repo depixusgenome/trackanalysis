@@ -7,6 +7,7 @@ Classes defining a type of data treatment.
 """
 from typing         import (Optional, Sequence,  # pylint: disable=unused-import
                             Dict)
+from copy           import deepcopy
 from enum           import Enum, unique
 
 from utils          import toenum
@@ -63,6 +64,10 @@ class Task:
     def isroot(cls):
         u"returns whether the class should be a root"
         return False
+
+    def config(self) -> dict:
+        u"returns a deepcopy of its dict which can be safely used in generators"
+        return deepcopy(self.__dict__)
 
 class RootTask(Task):
     u"Class indicating that a track file should be created/loaded to memory"

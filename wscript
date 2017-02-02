@@ -16,7 +16,6 @@ require(python = {'python': 3.5, 'numpy': '1.11.2', 'pandas': '0.19.0'},
 
 require(python = {'pybind11' : '2.0.1',
                   'pylint'   : '1.5.4',
-                  'pytest'   : '3.0.4',
                   'mypy'     : '0.4.4'},
         rtime  = False)
 
@@ -25,27 +24,33 @@ class _Tester(BuildContext):
     cmd = 'test'
     fun = 'test'
 
-_ALL   = ('tests',) + tuple(builder.wscripted("src"))
-_RAMPMODS = tuple('src/'+i for i in['data','view','legacy','ramp','model','control'])
+_ALL      = ('tests',) + tuple(builder.wscripted("src"))
 for item in _ALL:
     builder.addbuild(item, locals())
 
 def _getmodules(bld):
-    defaults  = getattr(bld.env, 'MODULES', tuple())
+    defaults  = getattr(bld.env, 'modules', tuple())
     if bld.options.dyn is True or defaults is None or len(defaults) == 0:
-        defaults = _ALL
+        names = {val.split('/')[-1]: val for val in _ALL}
 
-    requested = bld.options.modules
+        bld.options.all_modules = names
+        bld.env.modules         = tuple()
+        if len(bld.options.app):
+            for item in bld.options.app.split(','):
+                bld.recurse(names[item], 'defaultmodules', mandatory = False)
+
+        defaults = bld.env.modules
+        if len(defaults) == 0:
+            defaults = _ALL
+        else:
+            print("Selected modules:", defaults)
+
+    requested   = bld.options.modules
     if requested is None or len(requested) == 0:
-        mods = defaults
-
-    if bld.options.app is True:
-        mods = _RAMPMODS
+        mods  = defaults
     else:
-        names = {val.split('/')[-1]: val for val in defaults}
         mods  = tuple(names[req] for req in requested.split(',') if req in names)
-    
-        
+
     builder.requirements.reload(('',)+tuple(mods))
     return mods
 
@@ -68,18 +73,20 @@ def options(opt):
                               +u" when configure was last launched"))
     opt.add_option('--app',
                    dest    = 'app',
-                   action  = 'store_true',
-                   default = False,
+                   action  = 'store',
+                   default = '',
                    help    = (u"consider only modules which are "
-                              +u" necessary for rampapp"))
+                              +u" necessary for provided applications"))
 
 def configure(cnf):
+    cnf.env.app = cnf.options.app.split(',') if len(cnf.options.app) else []
+
     if cnf.options.dyn is None and len(cnf.options.modules) == 0:
-        cnf.env.MODULES = tuple()
+        cnf.env.modules = tuple()
         mods            = _getmodules(cnf)
     else:
-        cnf.env.MODULES = _getmodules(cnf)
-        mods            = cnf.env.MODULES
+        cnf.env.modules = _getmodules(cnf)
+        mods            = cnf.env.modules
 
     builder.configure(cnf)
     for item in mods:
@@ -88,9 +95,6 @@ def configure(cnf):
 def build(bld):
     mods = _getmodules(bld)
     builder.build(bld)
-    if len(bld.options.modules):
-        print('building:', *mods)
-
     builder.findpyext(bld, set(mod for mod in mods if mod != 'tests'))
     for item in mods:
         bld.recurse(item)
