@@ -6,10 +6,13 @@ from    abc         import ABCMeta, abstractmethod
 from    functools   import wraps
 from    typing      import (Optional, Tuple, Union, # pylint: disable=unused-import
                             Any, List, Sequence, Iterable, Iterator)
-import  numpy                           # type: ignore
+import  numpy as np          # type: ignore
 
 from    utils       import isfunction
 from    model       import Level
+
+_ALL   = frozenset((None, all, Ellipsis))
+_INDEX = (tuple, int, str)
 
 def setfield(fcn):
     u"provides a setter return self"
@@ -34,7 +37,7 @@ class Items(metaclass=ABCMeta):
         u"can return one item or a copy of self with only the selected keys"
 
     @abstractmethod
-    def keys(self):
+    def keys(self, sel = None):
         u"iterates over keys"
 
 class TrackItems(Items):
@@ -63,7 +66,7 @@ class TrackItems(Items):
     @staticmethod
     def copy(item):
         u"Copies the data"
-        return item[0], numpy.copy(item[1]) # type: ignore
+        return item[0], np.copy(item[1])
 
     def withsamples(self, samples) -> 'TrackItems':
         u"specifies that only some samples should be taken"
@@ -134,7 +137,7 @@ class TrackItems(Items):
         return True
 
     def _selection(self, attr, cyc, clear) -> 'TrackItems':
-        if cyc is None or cyc is all:
+        if not isinstance(cyc, list) and cyc in _ALL:
             setattr(self, attr, None)
             return self
 
@@ -144,7 +147,7 @@ class TrackItems(Items):
         if getattr(self, attr) is None:
             setattr(self, attr, [])
 
-        if isinstance(cyc, (int, str, tuple)) or isfunction(cyc):
+        if isinstance(cyc, _INDEX) or isfunction(cyc):
             getattr(self, attr).append(cyc)
         else:
             getattr(self, attr).extend(cyc)
@@ -184,15 +187,16 @@ class TrackItems(Items):
         if self.data is None:
             self.data = self.track.data
 
-    def keys(self) -> 'Iterator':
+    def keys(self, sel = None) -> 'Iterator':
         u"returns accepted keys"
         self._unlazyfy()
-
+        if sel is None:
+            sel = self.selected
         if self.discarded is None:
-            yield from (key for key in self._keys(self.selected))
+            yield from (key for key in self._keys(sel))
         else:
             disc = frozenset(self._keys(self.discarded))
-            yield from (key for key in self._keys(self.selected) if key not in disc)
+            yield from (key for key in self._keys(sel) if key not in disc)
 
     def __iter__(self) -> 'Iterator[Tuple[Any, Sequence[float]]]':
         self._unlazyfy()
@@ -202,11 +206,37 @@ class TrackItems(Items):
         else:
             yield from (act(col) for col in self._iter())
 
-    def __getitem__(self, keys):
-        cpy = shallowcopy(self)
-        if isinstance(keys, slice):
-            return cpy.withsamples(keys)
+    __NONE = type('__NONE', (), {})
+    def get(self, key, default = __NONE):
+        u"get an item"
+        if default is not self.__NONE:
+            vals = next(self._iter(sel = [key]))
         else:
+            vals = next(self._iter(sel = [key]), default)
+            if vals is default:
+                return default
+
+        act = self.getaction()
+        if act is not None:
+            return act(vals)[1]
+        return vals[1]
+
+    def __getitem__(self, keys):
+        if isinstance(keys, slice):
+            cpy = shallowcopy(self)
+            return cpy.withsamples(keys)
+
+        elif (isinstance(keys, (str, int))
+              or (isinstance(keys, tuple) and _ALL.isdisjoint(keys))):
+            # this is NOT a slice
+            return self.get(keys)
+
+        elif isinstance(keys, list) and len(keys) == 1:
+            return self.__getitem__(keys[0])
+
+        else:
+            # consider this a slice
+            cpy = shallowcopy(self)
             return cpy.selecting(keys, clear = True)
 
     def _keys(self, sel:'Optional[Sequence]') -> 'Iterable':
@@ -216,8 +246,8 @@ class TrackItems(Items):
             keys = frozenset(self.data.keys())
             yield from (i for i in sel if i in keys)
 
-    def _iter(self) -> 'Iterator[Tuple[Any,Any]]':
-        yield from ((bead, self.data[bead]) for bead in self.keys())
+    def _iter(self, sel = None) -> 'Iterator[Tuple[Any,Any]]':
+        yield from ((bead, self.data[bead]) for bead in self.keys(sel))
 
 class Beads(TrackItems, Items):
     u"""
@@ -234,19 +264,12 @@ class Beads(TrackItems, Items):
         else:
             yield from (i for i in sel              if i in self.data.keys())
 
-    def _iter(self):
-        yield from ((bead, self.data[bead]) for bead in self.keys())
+    def _iter(self, sel = None):
+        yield from ((bead, self.data[bead]) for bead in self.keys(sel))
 
     @staticmethod
     def _isbead(key):
         return isinstance(key, int)
-
-    def __getitem__(self, keys):
-        item = super().__getitem__(keys)
-        if isinstance(keys, (int, str)):
-            return next(iter(item))[1]
-        else:
-            return item
 
 class Cycles(TrackItems, Items):
     u"""
@@ -284,39 +307,33 @@ class Cycles(TrackItems, Items):
         return isinstance(key, int)
 
     def _keys(self, sel) -> 'Iterable[Tuple[Union[str,int], int]]':
-        allcycles = lambda: range(self.track.ncycles)
+        allcycles = range(self.track.ncycles)
         beads     = tuple(Beads(track = self.track, data = self.data).keys())
-        allcols   = frozenset(self.data.keys())
         if sel is None:
-            yield from ((col, cid) for col in beads for cid in allcycles())
+            yield from ((col, cid) for col in beads for cid in allcycles)
             return
 
         for thisid in sel:
             if isinstance(thisid, (tuple, list)):
                 bid, tmp = thisid[0], thisid[1] # type: Union[str,int], Any
-                if bid not in allcols:
+                if bid in _ALL and tmp in _ALL:
+                    thisid = ...
+                elif bid in _ALL:
+                    thisid = tmp
+                elif tmp in _ALL:
+                    yield from ((bid, cid) for cid in allcycles)
+                    continue
+                else:
+                    yield (bid, tmp)
                     continue
 
-                if tmp is all:
-                    yield from ((bid, cid) for cid in allcycles())
+            if thisid in _ALL:
+                yield from ((col, cid) for col in beads for cid in allcycles)
 
-                elif isinstance(tmp, int):
-                    yield (bid, tmp)
-
-            elif thisid is all:
-                yield from ((col, cid) for col in beads for cid in allcycles())
-
-            elif isinstance(thisid, str):
-                try:
-                    bid = int(thisid)
-                except ValueError:
-                    yield from ((thisid, cid) for cid in allcycles())
-                else:
-                    yield from ((bid, cid) for cid in allcycles())
             else:
                 yield from ((col, thisid) for col in beads)
 
-    def _iter(self):
+    def _iter(self, sel = None):
         ncycles = self.track.ncycles
         nphases = self.track.nphases
         phaseid = self.track.phaseid
@@ -336,26 +353,19 @@ class Cycles(TrackItems, Items):
 
             return self.name(bid, cid), self.data[bid][ind1:ind2]
 
-        yield from (_getdata(bid, cid) for bid, cid in self.keys())
+        yield from (_getdata(bid, cid) for bid, cid in self.keys(sel))
 
     def phaseid(self, cid:'Optional[int]' = None, pid:'Optional[int]' = None):
         u"returns phase ids for the given cycle"
         vect = self.track.phaseids
-        if {cid, pid}.issubset({all, None}):
+        if {cid, pid}.issubset(_ALL):
             return vect         - vect[:,0]
-        elif cid in (all, None):
+        elif cid in _ALL:
             return vect[:,pid]  - vect[:,0]
-        elif pid in (all, None):
+        elif pid in _ALL:
             return vect[cid,:]  - vect[cid,0]
         else:
             return vect[cid,pid]- vect[cid,0]
-
-    def __getitem__(self, keys):
-        item = super().__getitem__(keys)
-        if isinstance(keys, tuple) and len(keys) == 2 and isinstance(keys[1], int):
-            return next(iter(item))[1]
-        else:
-            return item
 
 def createTrackItem(level:Optional[Level] = Level.none, **kwargs):
     u"Returns the item type associated to a level"

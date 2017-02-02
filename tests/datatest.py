@@ -43,9 +43,9 @@ class TestCycleIteration:
         bids  = lambda _: set((_,i) for i in range(102))
         assert set  (track.cycles.selecting(0).keys())         == cids(0)
         assert tuple(track.cycles.selecting((0,0)).keys())     == ((0,0),)
-        assert set  (track.cycles.selecting([(0,all)]).keys()) == bids(0)
-        assert set  (track.cycles['0'].keys())                 == bids(0)
-        assert set  (track.cycles['zmag'].keys())              == bids('zmag')
+        assert set  (track.cycles[...,0].keys())               == cids(0)
+        assert set  (track.cycles[0,...].keys())               == bids(0)
+        assert set  (track.cycles['zmag',...].keys())          == bids('zmag')
 
         assert (tuple(track.cycles
                       .selecting((0,all))
@@ -114,3 +114,6 @@ class TestCycleIteration:
         assert numpy.array_equal(vals1, vals2)
         vals1[:] = 0
         assert not numpy.array_equal(vals1, vals2)
+
+if __name__ == '__main__':
+    TestCycleIteration().test_iterkeys()
