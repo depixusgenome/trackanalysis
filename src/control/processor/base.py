@@ -7,7 +7,7 @@ from    typing         import TYPE_CHECKING
 
 import  model.task   as     _tasks
 from    model.level    import Level
-from    data           import Track, Cycles
+from    data           import Track
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
@@ -167,11 +167,8 @@ class CycleCreatorProcessor(Processor):
 
     def run(self, args:'Runner'):
         u"iterates through beads and yields cycles"
-        kwargs = dict(track = args.first,
-                      first = self.task.first,
-                      last  = self.task.last)
-        args.apply(lambda data: Cycles(data = data, **kwargs),
-                   levels = self.levels)
+        kwargs = self.task.first, self.task.last
+        args.apply(lambda data: data[...,...].withphases(*kwargs), levels = self.levels)
 
 class SelectionProcessor(Processor):
     u"Generates output from a TaggingTask"

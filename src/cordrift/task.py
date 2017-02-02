@@ -12,7 +12,7 @@ from .collapse            import (CollapseAlg, StitchAlg,
 
 class BeadDriftTask(Task): # pylint: disable=too-many-instance-attributes
     u"Removes correlations between cycles"
-    level     = Level.cycle
+    level     = Level.bead
     filter    = None # type: Optional[Filter]
     events    = None # type: Optional[EventDetector]
     collapse  = None # type: Optional[CollapseAlg]
