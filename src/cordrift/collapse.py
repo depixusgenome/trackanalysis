@@ -6,24 +6,25 @@ stretches of data. This should be removed as it's source is either a (thermal,
 electric, ...) drift or a mechanical vibration.
 """
 from    typing          import (Optional, Union, Sized, # pylint: disable=unused-import
-                                Callable, NamedTuple, Sequence, cast, Iterable,
-                                Any, Tuple, Iterator)
+                                Callable, NamedTuple, Sequence, Iterable,
+                                Any, Tuple, Iterator, cast)
 from    enum            import Enum
 import  pandas
 import  numpy as np
 from    signalfilter    import Filter, NonLinearFilter  # pylint: disable=unused-import
 
-Range = NamedTuple('Range', [('start', int), ('values', np.ndarray)])
+Range   = NamedTuple('Range', [('start', int), ('values', np.ndarray)])
+_m_INTS = (int, cast(type, np.integer))
 
 class Profile(Sized):
     u"A bead profile: the behaviour common to all stretches of data"
     def __init__(self, inter:Union[Sequence[Range],int]) -> None:
-        if isinstance(inter, int):
-            self.xmin  = 0      # type: int
-            self.xmax  = inter  # type: int
+        if isinstance(inter, _m_INTS):
+            self.xmin = 0      # type: int
+            self.xmax = inter  # type: int
         else:
-            self.xmin  = min(i.start               for i in inter)
-            self.xmax  = max(i.start+len(i.values) for i in inter)
+            self.xmin = min(i.start               for i in inter)
+            self.xmax = max(i.start+len(i.values) for i in inter)
 
         length     = self.xmax-self.xmin
         self.count = np.zeros((length,), dtype = np.int32)
@@ -243,6 +244,8 @@ class CollapseByDerivate(_CollapseAlg):
         for inds, cur in _iter_ranges(prof.xmin, inter):
             sel  = np.where(np.diff(inds) == 1)
             inds = inds[sel]
+            if len(inds) == 0:
+                continue
 
             vals[inds, max(cnt[inds])] = tuple(cur[i]-cur[i+1] for i in sel)
             cnt[inds]                 += 1

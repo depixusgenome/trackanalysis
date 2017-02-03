@@ -37,7 +37,7 @@ class _BeadDriftAction:
         if task.precision in (0, None) and {task.filter, task.events} != {None}:
             task           = deepcopy(task)
             task.precision = np.median(tuple(hfsigma(bead) for bead in raw))
-        return task, raw
+        return frame, task, raw
 
     @staticmethod
     def __escapenans(fcn):
@@ -89,9 +89,9 @@ class _BeadDriftAction:
 
     def profile(self, frame:Cycles, bcopy:bool) -> Profile:
         u"action for removing bead drift"
-        task, raw        = self.__setup(frame, bcopy)
-        task, raw, clean = self.__filter(task, raw)
-        prof             = self.__collapse(frame, task, raw, clean)
+        frame, task, raw   = self.__setup(frame, bcopy)
+        task,  raw,  clean = self.__filter(task, raw)
+        prof               = self.__collapse(frame, task, raw, clean)
         return self.__stitch(task, raw, prof)
 
     def __call__(self, track:Track, info:Tuple[Any,np.ndarray]):
