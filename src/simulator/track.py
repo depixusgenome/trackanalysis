@@ -10,13 +10,13 @@ from    data    import Track
 class TrackSimulatorConfig:
     u"Config for simulating bead data over a number of cycles"
     def __init__(self, **kwa):
-        self.ncycles   = kwa.get('ncycles',  15)
-        self.phases    = kwa.get('phases',   [ 1,  15,  1, 15,  1, 100,  1,  15])
-        self.zmax      = kwa.get('zmax',     [ 0., 0., 1., 1., 0., 0., -.3, -.3])
-        self.brownian  = kwa.get('brownian', [.003] * 8)
-        self.randzargs = kwa.get('randz',   (0., .1, .9))
-        self.randtargs = kwa.get('randt',   (10, 100))
-        self.driftargs = kwa.get('drift',   (.1, 29.))
+        self.ncycles   = kwa.get('ncycles',   15)
+        self.phases    = kwa.get('phases',    [ 1,  15,  1, 15,  1, 100,  1,  15])
+        self.zmax      = kwa.get('zmax',      [ 0., 0., 1., 1., 0., 0., -.3, -.3])
+        self.brownian  = kwa.get('brownian',  [.003] * 8)
+        self.randzargs = kwa.get('randzargs', (0., .1, .9))
+        self.randtargs = kwa.get('randtargs', (10, 100))
+        self.driftargs = kwa.get('driftargs', (.1, 29.))
 
 class TrackSimulator(TrackSimulatorConfig):
     u"Simulates bead data over a number of cycles"
