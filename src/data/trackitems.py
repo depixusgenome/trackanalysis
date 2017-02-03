@@ -85,9 +85,24 @@ def _m_copy(item):
     u"Copies the data"
     return item[0], np.copy(item[1])
 
+class Items(metaclass=ABCMeta):
+    u"Class for iterating over data"
+
+    def __init__(self, **_) -> None:
+        super().__init__()
+
+    @abstractmethod
+    def __getitem__(self, val):
+        u"can return one item or a copy of self with only the selected keys"
+
+    @abstractmethod
+    def keys(self, _ = None):
+        u"iterates over keys"
+        assert _ is None # should not be necessary: dicts can't do that
+
 class _m_ConfigMixin: # pylint: disable=invalid-name
     def __init__(self, **kw) -> None:
-        self.data      = kw.get('data',     None)   # type: Optional[Dict]
+        self.data      = kw.get('data',     None)   # type: Union[Items,Dict,None]
         self.selected  = None                       # type: Optional[List]
         self.discarded = None                       # type: Optional[List]
         self.actions   = kw.get('actions',  [])     # type: List
@@ -172,23 +187,6 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
             return self.actions[0]
         else:
             return None
-
-class Items(metaclass=ABCMeta):
-    u"Class for iterating over data"
-
-    def __init__(self, **_) -> None:
-        super().__init__()
-    @abstractmethod
-    def __iter__(self) -> Iterator[Tuple[Any,Any]]:
-        u"iterates over keys and data"
-
-    @abstractmethod
-    def __getitem__(self, val):
-        u"can return one item or a copy of self with only the selected keys"
-
-    @abstractmethod
-    def keys(self, sel = None):
-        u"iterates over keys"
 
 class TrackItems(Items, _m_ConfigMixin):
     u"Class for iterating over beads or creating a new list of data"
