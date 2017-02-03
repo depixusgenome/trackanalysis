@@ -3,9 +3,9 @@
 u"Tests cycle alignments"
 import numpy as np
 
-import signalfilter.alignment as alignment
+from signalfilter.alignment import ExtremumAlignment, CorrelationAlignment
 
-def t_est_minmaxalign():
+def test_minmaxalign():
     u"align on min/max value"
     data = np.zeros((5,25), dtype = np.float32)
     for i in range(5):
@@ -13,7 +13,7 @@ def t_est_minmaxalign():
     truth  = np.array([2., 1., 0., -1., -2.])
 
     for tpe in 'min', 'max':
-        np.testing.assert_allclose(alignment.extremum(data, tpe), truth)
+        np.testing.assert_allclose(ExtremumAlignment.run(data, mode = tpe), truth)
 
 def test_correlationalignment():
     u"align on best correlation"
@@ -22,8 +22,15 @@ def test_correlationalignment():
         data[i][20+i] = 1.
         data[i][50+i] = 1.
 
-    biases = alignment.correlation(data, 1, 2, 1, 0, .1)
+    corr = lambda f, a, b, c, d, e: (CorrelationAlignment.run(f,
+                                                              oversampling  = a,
+                                                              maxcorr       = b,
+                                                              nrepeats      = c,
+                                                              kernel_window = d,
+                                                              kernel_width  = e))
+
+    biases = corr(data, 1, 2, 1, 0, .1)
     np.testing.assert_allclose(biases, [1., 0., -1.])
 
-    biases = alignment.correlation(data, 5, 2, 1, 3, 2.)
+    biases = corr(data, 5, 2, 1, 3, 2.)
     np.testing.assert_allclose(biases, [1., 0., -1.], rtol = 1e-4, atol = 1e-4)
