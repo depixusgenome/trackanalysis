@@ -7,7 +7,7 @@ electric, ...) drift or a mechanical vibration.
 """
 from    typing          import (Optional, Union, Sized, # pylint: disable=unused-import
                                 Callable, NamedTuple, Sequence, cast, Iterable,
-                                Any, Tuple)
+                                Any, Tuple, Iterator)
 from    enum            import Enum
 import  pandas
 import  numpy as np
@@ -54,11 +54,12 @@ class _CollapseAlg:
     def _edge(self):
         return None if self.edge is None or self.edge < 1 else int(self.edge)
 
-    def __call__(self, inter:Iterable[Range]) -> Profile:
-        if hasattr(inter, '__next__'):
-            inter  = tuple(inter)
+    def __call__(self, inter:Iterable[Range], prof: Optional[Profile] = None) -> Profile:
+        if isinstance(inter, Iterator):
+            inter = tuple(inter)
         inter = cast(Sequence[Range], inter)
-        return self._run(inter, Profile(inter))
+        prof  = Profile(inter) if prof is None else prof
+        return self._run(inter, prof)
 
     def _run(self, inter:Sequence[Range], prof:Profile) -> Profile:
         raise NotImplementedError()
@@ -273,8 +274,8 @@ class StitchByDerivate(CollapseByDerivate):
         super().__init__(**kwa)
         self.minoverlaps = kwa.get('minoverlaps', 10)
 
-    # pylint: disable=arguments-differ
-    def __call__(self, prof: Profile, data: 'Iterable[Range]') -> Profile: # type: ignore
+    # pylint: disable=arguments-differ,signature-differs
+    def __call__(self, prof:Profile, data:Iterable[Range]) -> Profile: # type: ignore
         if hasattr(data, '__next__'):
             data = tuple(data)
         data  = cast(Sequence[Range], data)

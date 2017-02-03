@@ -68,7 +68,7 @@ class TrackSimulator(TrackSimulatorConfig):
 
     def addevents(self, cycles):
         u"add events to the cycles"
-        if None in (self.randtargs, self.randzargs) is None:
+        if None in (self.randtargs, self.randzargs):
             return
 
         for cyc in cycles[:,sum(self.phases[:5]) : sum(self.phases[:6])]:

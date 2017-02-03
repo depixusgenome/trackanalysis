@@ -2,32 +2,35 @@
 # -*- coding: utf-8 -*-
 u"Processor for removing correlated drifts"
 
-from copy             import copy, deepcopy
-from functools        import wraps, partial
-from typing           import (Dict, Union, Sequence,  # pylint: disable=unused-import
-                              Any)
+from copy              import copy, deepcopy
+from functools         import wraps, partial
+from typing            import (Dict, Union, Sequence,  # pylint: disable=unused-import
+                               Tuple, Any, cast)
 
 import numpy as np
 
-from control.processor  import Processor
-from signalfilter       import hfsigma
-from data               import Cycles
-from utils              import escapenans
-from .task              import BeadDriftTask
-from .collapse          import Range, Profile, CollapseToMean
+from control.processor import Processor
+from signalfilter      import hfsigma
+from data              import Cycles, Track
+from utils             import escapenans
+from .task             import BeadDriftTask
+from .collapse         import Range, Profile, CollapseToMean
 
 class _BeadDriftAction:
     u"Action to be passed to a Cycles"
-    _SLEEP   = 0.01
+    _DATA    = Sequence[np.ndarray]
     tasktype = BeadDriftTask
-    def __init__(self, args: dict) -> None:
-        self.cache = {} # type: Dict[Union[int,Sequence[int]], Any]
-        self.task  = args if isinstance(args, self.tasktype) else self.tasktype(**args)
+    def __init__(self, args: Union[dict,BeadDriftTask]) -> None:
+        self.cache = {}     # type: Dict[Union[int,Sequence[int]], Any]
+        self.task  = cast(BeadDriftTask,
+                          args if isinstance(args, self.tasktype)
+                          else self.tasktype(**args))
+
         assert not (self.task.events is None
                     and isinstance(self.task.collapse, CollapseToMean))
         assert self.task.zero is None or self.task.zero > 2
 
-    def __setup(self, frame, bcopy):
+    def __setup(self, frame:Cycles, bcopy:bool):
         task  = self.task
         frame = copy(frame).withphases(*task.phases) if bcopy else frame
         raw   = tuple(val for _, val in frame)
@@ -47,7 +50,7 @@ class _BeadDriftAction:
         return _fcn
 
     @classmethod
-    def __filter(cls, task, raw):
+    def __filter(cls, task:BeadDriftTask, raw:_DATA):
         if task.filter is None:
             return task, raw, raw
 
@@ -59,23 +62,23 @@ class _BeadDriftAction:
         return task, raw, tuple(fcn(cycle) for cycle in raw)
 
     @staticmethod
-    def __collapse(task, raw, clean):
+    def __collapse(frame:Cycles, task:BeadDriftTask, raw:_DATA, clean:_DATA) -> Profile:
         if task.events is None:
-            events = (Range(0, cycle) for cycle in raw)
+            events  = (Range(0, cycle) for cycle in raw)
         else:
             task.events.precision = task.precision
             choices = (lambda x, y: x), (lambda x, y: y)
-            echoice =  choices['events'     in task.filtered]
-            cchoice =  choices['collapse'   in task.filtered]
+            echoice = choices[1] if 'events'   in task.filtered else choices[0]
+            cchoice = choices[1] if 'collapse' in task.filtered else choices[0]
 
-            events = (Range(evt[0], cchoice(rdt, fdt)[evt[0]:evt[1]])
-                      for rdt, fdt in zip(raw, clean)
-                      for evt      in task.events(echoice(rdt, fdt)))
+            events  = (Range(evt[0], cchoice(rdt, fdt)[evt[0]:evt[1]])
+                       for rdt, fdt in zip(raw, clean)
+                       for evt      in task.events(echoice(rdt, fdt)))
 
-        return task.collapse(events)
+        return task.collapse(events, Profile(frame.maxsize()))
 
     @staticmethod
-    def __stitch(task, raw, prof):
+    def __stitch(task:BeadDriftTask, raw, prof:Profile) -> Profile:
         if task.stitch is not None:
             task.stitch(prof, (Range(0, cycle) for cycle in raw))
 
@@ -84,14 +87,14 @@ class _BeadDriftAction:
 
         return prof
 
-    def profile(self, frame:Cycles, bcopy) -> Profile:
+    def profile(self, frame:Cycles, bcopy:bool) -> Profile:
         u"action for removing bead drift"
         task, raw        = self.__setup(frame, bcopy)
         task, raw, clean = self.__filter(task, raw)
-        prof             = self.__collapse(task, raw, clean)
+        prof             = self.__collapse(frame, task, raw, clean)
         return self.__stitch(task, raw, prof)
 
-    def __call__(self, track, info):
+    def __call__(self, track:Track, info:Tuple[Any,np.ndarray]):
         cycle = Cycles(track = track, data = dict((info,)))
         cycle.withphases(*self.task.phases)
 
@@ -113,6 +116,6 @@ class BeadDriftProcessor(Processor):
         args.apply(fcn, levels = self.levels)
 
     @staticmethod
-    def profile(frame, kwa):
+    def profile(frame:Cycles, kwa:Union[dict,BeadDriftTask]):
         u"action for removing bead drift"
         return _BeadDriftAction(kwa).profile(frame, True)
