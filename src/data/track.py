@@ -4,12 +4,14 @@ u"""
 Base track file data.
 """
 import  pickle
-from    typing import Optional  # pylint: disable=unused-import
-import  numpy                   # type: ignore
+from    typing      import Optional
+import  numpy       as     np
 
 from    legacy      import readtrack   # pylint: disable=import-error,no-name-in-module
 from    model       import levelprop, Level
 from   .trackitems  import Beads, Cycles
+
+_m_ALL = frozenset((None, all, Ellipsis))
 
 @levelprop(Level.project)
 class Track:
@@ -17,38 +19,38 @@ class Track:
     def __init__(self, **kwa) -> None:
         self._path      = kwa.get('path',       None) # type: Optional[str]
         self._data      = kwa.get('data',       None) # type: Optional[Dict]
-        self._cycles    = kwa.get('cycles',     None) # type: ignore
+        self._cycles    = kwa.get('cycles',     None) # type: Optional[np.ndarray]
         self._frequency = kwa.get('frequency',  None) # type: Optional[float]
 
     @property
-    def frequency(self) -> 'Optional[float]':
+    def frequency(self) -> Optional[float]:
         u"returns the camera frequency"
         return self._frequency
 
     @property
-    def nphases(self) -> 'Optional[int]':
+    def nphases(self) -> Optional[int]:
         u"returns the number of phases in the track"
         return None if self._cycles is None else self._cycles.shape[1]
 
     @property
-    def path(self) -> 'Optional[str]':
+    def path(self) -> Optional[str]:
         u"returns the path to the trackfile"
         return self._path
 
     @property
-    def phaseids(self):
+    def phaseids(self) -> np.ndarray:
         u"returns all phase ids, undoctored"
         return self._cycles[:]
 
-    def phaseid(self, cid:'Optional[int]' = None, pid:'Optional[int]' = None):
+    def phaseid(self, cid:Optional[int] = None, pid:Optional[int] = None) -> int:
         u"returns the starttime of the cycle and phase"
         vect = self._cycles
         orig = vect[0,0]
-        if {cid, pid}.issubset((all, None)):
+        if {cid, pid}.issubset(_m_ALL):
             pass
-        elif cid in (all, None):
+        elif cid in _m_ALL:
             vect = vect[:,pid]
-        elif pid in (all, None):
+        elif pid in _m_ALL:
             vect = vect[cid,:]
         else:
             vect = vect[cid,pid]
@@ -72,7 +74,7 @@ class Track:
                     setattr(self, '_'+name, kwargs.pop(name))
 
                 self._data = dict(ite for ite in kwargs.items()
-                                  if isinstance(ite[1], numpy.ndarray))
+                                  if isinstance(ite[1], np.ndarray))
         return self._data
 
     @staticmethod
@@ -81,7 +83,7 @@ class Track:
         return isinstance(key, int)
 
     @property
-    def ncycles(self):
+    def ncycles(self) -> int:
         u"returns the number of cycles in the track file"
         return len(self._cycles)
 
