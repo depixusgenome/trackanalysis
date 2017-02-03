@@ -26,4 +26,5 @@ class BeadDriftTask(Task): # pylint: disable=too-many-instance-attributes
         self.collapse   = kwa.get('collapse',  CollapseByMerging())
         self.stitch     = kwa.get('stitch',    StitchByDerivate())
         self.zero       = kwa.get('zero',      10)
-        self.precision  = kwa.get('precision',  0.)
+        self.precision  = kwa.get('precision', 0.)
+        self.onbeads    = kwa.get('onbeads',   True)

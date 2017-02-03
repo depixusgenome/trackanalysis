@@ -87,7 +87,6 @@ def _m_copy(item):
 
 class Items(metaclass=ABCMeta):
     u"Class for iterating over data"
-
     def __init__(self, **_) -> None:
         super().__init__()
 
@@ -99,6 +98,27 @@ class Items(metaclass=ABCMeta):
     def keys(self, _ = None):
         u"iterates over keys"
         assert _ is None # should not be necessary: dicts can't do that
+
+class TransformedItems(Items):
+    u"Dictionnary that will transform its data when a value is requested"
+    __slots__ = ('_data', '_once', '_first', '_fcn')
+    def __init__(self, fcn, data, once = True) -> None:
+        super().__init__()
+        self._data   = data
+        self._always = not once
+        self._first  = True
+        self._fcn    = fcn
+
+    def __getitem__(self, val):
+        if self._first or self._always:
+            self._fcn(self._data, self._first)
+            self._first = False
+        return self._data[val]
+
+    def keys(self, _ = None):
+        u"iterates over keys"
+        assert _ is None
+        yield from self._data.keys()
 
 class _m_ConfigMixin: # pylint: disable=invalid-name
     def __init__(self, **kw) -> None:
@@ -164,9 +184,10 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
             self.actions.append(fcn)
         return self
 
-    @_m_setfield
-    def withdata(self:Self, dat) -> Self:
+    def withdata(self:Self, dat, fcn = None, once = True) -> Self:
         u"sets the data"
+        self.data = dat if fcn is None else TransformedItems(fcn, dat, once)
+        return self
 
     def selecting(self:Self, cyc, clear = False) -> Self:
         u"selects ids over which to iterate. See class doc."

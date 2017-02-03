@@ -94,28 +94,45 @@ class _BeadDriftAction:
         prof               = self.__collapse(frame, task, raw, clean)
         return self.__stitch(task, raw, prof)
 
-    def __call__(self, track:Track, info:Tuple[Any,np.ndarray]):
-        cycle = Cycles(track = track, data = dict((info,)))
-        cycle.withphases(*self.task.phases)
+    def run(self, key, cycle:Cycles):
+        u"Applies the cordrift subtraction to a bead"
+        prof  = self.cache.get(key, None)
+        if prof is  not None:
+            return
 
-        prof  = self.cache.get(info[0], None)
-        if prof is None:
-            self.cache[info[0]] = prof = self.profile(cycle, False)
-
+        self.cache[key] = prof = self.profile(cycle, False)
         for _, vals in cycle:
             vals[prof.xmin:prof.xmax] -= prof.value[:len(vals)-prof.xmin]
+
+    def onBead(self, track:Track, info:Tuple[Any,np.ndarray]):
+        u"Applies the cordrift subtraction to a bead"
+        cyc = Cycles(track = track, data = dict((info,)))
+        self.run((track.path, info[0]), cyc.withphases(*self.task.phases))
         return info
+
+    def onCycles(self, frame, first):
+        u"Applies the cordrift subtraction to parallel cycles"
+        assert first
+        for icyc in range(frame.track.ncycles):
+            cyc = frame[...,icyc]
+            self.run(frame.parents+(icyc,), cyc.withphases(*self.task.phases))
 
 class BeadDriftProcessor(Processor):
     u"Deals with bead drift"
-    tasktype = _BeadDriftAction.tasktype
+    _ACTION  = _BeadDriftAction
+    tasktype = _ACTION.tasktype
     def run(self, args):
-        action = _BeadDriftAction(self.task.config())
-        fcn    = lambda frame: frame.new().withaction(partial(action, frame.track),
-                                                      beadonly = True)
+        action = self._ACTION(self.task.config())
+        if self.task.onbeads:
+            fcn = lambda frame: (frame
+                                 .new()
+                                 .withaction(partial(action.onBead, frame.track),
+                                             beadonly = True))
+        else:
+            fcn = lambda frame: frame.new().withdata(frame, action.onCycles)
         args.apply(fcn, levels = self.levels)
 
-    @staticmethod
-    def profile(frame:Cycles, kwa:Union[dict,BeadDriftTask]):
+    @classmethod
+    def profile(cls, frame:Cycles, kwa:Union[dict,BeadDriftTask]):
         u"action for removing bead drift"
-        return _BeadDriftAction(kwa).profile(frame, True)
+        return cls._ACTION(kwa).profile(frame, True)

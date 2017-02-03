@@ -7,22 +7,42 @@ from cordrift.processor     import BeadDriftTask
 from simulator.processor    import TrackSimulatorTask
 from control.taskcontrol    import TaskPair
 
-def test_process():
+def test_beadprocess():
     u"tests that tracks are well simulated"
     pair = TaskPair.create((TrackSimulatorTask(brownian  = 0., randtargs = None),
                             BeadDriftTask()))
     cycs = next(i[...,...] for i in pair.run()).withphases(5,5)
     for _, val in cycs:
-        val -= val[-1]
-        assert_allclose(val, 0., atol = 1e-8)
+        assert_allclose(val, val.mean(), atol = 1e-8)
 
     pair = TaskPair.create((TrackSimulatorTask(brownian  = 0.),
                             BeadDriftTask()))
     cycs = next(i[...,...] for i in pair.run()).withphases(5,5)
     for _, val in cycs:
-        val -= val[-1]
         val -= np.round(val, 1)
-        assert_allclose(val, 0., atol = 1e-6)
+        assert_allclose(val-val[0], 0., atol = 1e-4)
+
+def test_cycleprocess():
+    u"tests that tracks are well simulated"
+    pair = TaskPair.create((TrackSimulatorTask(brownian  = 0.,
+                                               randtargs = None,
+                                               nbeads    = 30,
+                                               ncycles   = 1),
+                            BeadDriftTask(onbeads = False)))
+    cycs = next(i for i in pair.run())
+    for _, val in cycs:
+        val  = val[33:133]
+        assert_allclose(val, val.mean(), atol = 1e-8)
+
+    pair = TaskPair.create((TrackSimulatorTask(brownian  = 0.,
+                                               nbeads    = 30,
+                                               ncycles   = 1),
+                            BeadDriftTask(onbeads = False)))
+    cycs = next(i for i in pair.run())
+    for _, val in cycs:
+        val  = val[33:133]
+        val -= np.round(val, 1)
+        assert_allclose(val-val[0], 0., atol = 1e-4)
 
 if __name__ == '__main__':
-    test_process()
+    test_cycleprocess()
