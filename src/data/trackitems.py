@@ -5,17 +5,22 @@ import  inspect
 from    copy        import copy as shallowcopy
 from    abc         import ABCMeta, abstractmethod
 from    functools   import wraps
-from    typing      import (Optional, Tuple, Union, # pylint: disable=unused-import
-                            Any, List, Sequence, Iterable, Iterator)
-import  numpy as np          # type: ignore
+from    typing      import (Optional, Tuple, Union,
+                            Any, List, Sequence, Iterable, Iterator,
+                            TypeVar, cast)
+import  numpy as np
 
 from    utils       import isfunction
 from    model       import Level
 
-_ALL   = frozenset((None, all, Ellipsis))
-_INDEX = (tuple, int, str)
+_m_ALL   = frozenset((None, all, Ellipsis))
+_m_INTS  = int, cast(type, np.integer)
+_m_INDEX = (tuple, str) + _m_INTS
+_m_NONE  = '_m_NONE'
+Self     = TypeVar('Self',  bound = '_m_ConfigMixin')
+TSelf    = TypeVar('TSelf', bound = 'TrackItems')
 
-def setfield(fcn):
+def _m_setfield(fcn):
     u"provides a setter return self"
     @wraps(fcn)
     def _wrap(self, item):
@@ -24,29 +29,64 @@ def setfield(fcn):
         return self
     return _wrap
 
-class Items(metaclass=ABCMeta):
-    u"Class for iterating over data"
+def _m_selection(self:Self, attr, cyc, clear) -> Self:
+    if not isinstance(cyc, List) and cyc in _m_ALL:
+        setattr(self, attr, None)
+        return self
 
-    def __init__(self, **_) -> None:
-        super().__init__()
-    @abstractmethod
-    def __iter__(self) -> 'Iterator[Tuple[Any,Any]]':
-        u"iterates over keys and data"
+    if clear:
+        setattr(self, attr, None)
 
-    @abstractmethod
-    def __getitem__(self, val):
-        u"can return one item or a copy of self with only the selected keys"
+    if getattr(self, attr) is None:
+        setattr(self, attr, [])
 
-    @abstractmethod
-    def keys(self, sel = None):
-        u"iterates over keys"
+    if isinstance(cyc, _m_INDEX) or isfunction(cyc):
+        getattr(self, attr).append(cyc)
+    else:
+        getattr(self, attr).extend(cyc)
 
-class TrackItems(Items):
-    u"Class for iterating over beads or creating a new list of data"
-    level = Level.none
+    if len(getattr(self, attr)) == 0:
+        setattr(self, attr, None)
+    return self
+
+def _m_unlazyfy(self:'TrackItems'):
+    for name, val in self.__dict__.items():
+        if isfunction(val):
+            setattr(self, name, val())
+
+    for attr in ('selected', 'discarded'):
+        old = getattr(self, attr)
+        if old is None or all(not isfunction(i) for i in old):
+            continue
+
+        method = getattr(self, attr[:-2]+'ing')
+        method(None)
+        for i in old:
+            method(i() if isfunction(i) else i)
+
+    if self.data is None:
+        self.data = self.track.data
+
+def _m_isbead(key):
+    return ((isinstance(key, tuple)
+             and len(key)
+             and isinstance(key[0], _m_INTS)
+            ) or isinstance(key,    _m_INTS))
+
+def _m_check_action_sig(fcn):
+    sig = inspect.signature(fcn)
+    try:
+        sig.bind(1)
+    except TypeError as exc:
+        msg = 'Function should have a single positional argument'
+        raise TypeError(msg) from exc
+
+def _m_copy(item):
+    u"Copies the data"
+    return item[0], np.copy(item[1])
+
+class _m_ConfigMixin: # pylint: disable=invalid-name
     def __init__(self, **kw) -> None:
-        super().__init__()
-        self.track     = kw.get('track',    None)   # type: ignore
         self.data      = kw.get('data',     None)   # type: Optional[Dict]
         self.selected  = None                       # type: Optional[List]
         self.discarded = None                       # type: Optional[List]
@@ -59,44 +99,21 @@ class TrackItems(Items):
         self.withcopy   (kw.get('copy',      False))
         self.withsamples(kw.get('samples',   None))
 
-    def __copy__(self):
-        return self.__class__(track = self.track,
-                              **{i: shallowcopy(j)
-                                 for i, j in self.__dict__.items() if i != 'track'})
-
-    def new(self) -> 'TrackItems':
-        u"returns a item containing self in the data field"
-        return self.__class__(track = self.track, data = self)
-
-    @staticmethod
-    def copy(item):
-        u"Copies the data"
-        return item[0], np.copy(item[1])
-
-    def withsamples(self, samples) -> 'TrackItems':
+    def withsamples(self:Self, samples) -> Self:
         u"specifies that only some samples should be taken"
         if samples is not None:
             self.actions.append(lambda item: (item[0], item[1][samples]))
         return self
 
-    def withcopy(self, cpy:bool) -> 'TrackItems':
+    def withcopy(self:Self, cpy:bool) -> Self:
         u"specifies that a copy of the data should or shouldn't be made"
         if cpy:
-            self.actions.append(self.copy)
-        elif self.copy in self.actions:
-            self.actions.remove(self.copy)
+            self.actions.append(_m_copy)
+        elif _m_copy in self.actions:
+            self.actions.remove(_m_copy)
         return self
 
-    @staticmethod
-    def _check_action_sig(fcn):
-        sig = inspect.signature(fcn)
-        try:
-            sig.bind(1)
-        except TypeError as exc:
-            msg = 'Function should have a single positional argument'
-            raise TypeError(msg) from exc
-
-    def withfunction(self, fcn = None, clear = False, beadonly = False) -> 'TrackItems':
+    def withfunction(self:Self, fcn = None, clear = False, beadonly = False) -> Self:
         u"Adds an action with fcn taking a value as single argument"
         if clear:
             self.actions = []
@@ -104,17 +121,17 @@ class TrackItems(Items):
         if fcn is None:
             return self
 
-        self._check_action_sig(fcn)
+        _m_check_action_sig(fcn)
         if beadonly:
             @wraps(fcn)
             def _action(col):
-                return col[0], (fcn(col[1]) if self._isbead(col[0]) else col[1])
+                return col[0], (fcn(col[1]) if _m_isbead(col[0]) else col[1])
             self.actions.append(_action)
         else:
             self.actions.append(lambda col: (col[0], fcn(col[1])))
         return self
 
-    def withaction(self, fcn = None, clear = False, beadonly = False) -> 'TrackItems':
+    def withaction(self:Self, fcn = None, clear = False, beadonly = False) -> Self:
         u"Adds an action with fcn taking a (key, value) pair as single argument"
         if clear:
             self.actions = []
@@ -122,15 +139,27 @@ class TrackItems(Items):
         if fcn is None:
             return self
 
-        self._check_action_sig(fcn)
+        _m_check_action_sig(fcn)
         if beadonly:
             @wraps(fcn)
             def _action(col):
-                return fcn(col) if self._isbead(col[0]) else col
+                return fcn(col) if _m_isbead(col[0]) else col
             self.actions.append(_action)
         else:
             self.actions.append(fcn)
         return self
+
+    @_m_setfield
+    def withdata(self:Self, dat) -> Self:
+        u"sets the data"
+
+    def selecting(self:Self, cyc, clear = False) -> Self:
+        u"selects ids over which to iterate. See class doc."
+        return _m_selection(self, 'selected', cyc, clear)
+
+    def discarding(self:Self, cyc, clear = False) -> Self:
+        u"selects ids to discard. See class doc."
+        return _m_selection(self, 'discarded', cyc, clear)
 
     def getaction(self):
         u"returns a function performing all actions"
@@ -144,71 +173,76 @@ class TrackItems(Items):
         else:
             return None
 
-    @setfield
-    def withdata(self, dat) -> 'TrackItems':
-        u"sets the data"
+class Items(metaclass=ABCMeta):
+    u"Class for iterating over data"
 
-    @staticmethod
-    def _isbead(key):
-        return ((isinstance(key, tuple)
-                 and len(key)
-                 and isinstance(key[0], int)
-                ) or isinstance(key, int))
+    def __init__(self, **_) -> None:
+        super().__init__()
+    @abstractmethod
+    def __iter__(self) -> Iterator[Tuple[Any,Any]]:
+        u"iterates over keys and data"
 
-    def _selection(self, attr, cyc, clear) -> 'TrackItems':
-        if not isinstance(cyc, list) and cyc in _ALL:
-            setattr(self, attr, None)
-            return self
+    @abstractmethod
+    def __getitem__(self, val):
+        u"can return one item or a copy of self with only the selected keys"
 
-        if clear:
-            setattr(self, attr, None)
+    @abstractmethod
+    def keys(self, sel = None):
+        u"iterates over keys"
 
-        if getattr(self, attr) is None:
-            setattr(self, attr, [])
+class TrackItems(Items, _m_ConfigMixin):
+    u"Class for iterating over beads or creating a new list of data"
+    level   = Level.none
+    def __init__(self, **kw) -> None:
+        Items.__init__(self)
+        self.track = kw.get('track', None) # type: ignore
+        _m_ConfigMixin.__init__(self, **kw)
 
-        if isinstance(cyc, _INDEX) or isfunction(cyc):
-            getattr(self, attr).append(cyc)
+    def _keys(self, sel:Optional[Sequence]) -> Iterable:
+        if sel is None:
+            yield from (i for i in self.data.keys())
         else:
-            getattr(self, attr).extend(cyc)
+            keys = frozenset(self.data.keys())
+            yield from (i for i in sel if i in keys)
 
-        if len(getattr(self, attr)) == 0:
-            setattr(self, attr, None)
-        return self
+    def _iter(self, sel = None) -> Iterator[Tuple[Any,Any]]:
+        yield from ((bead, self.data[bead]) for bead in self.keys(sel))
 
-    def selecting(self, cyc, clear = False) -> 'TrackItems':
-        u"selects ids over which to iterate. See class doc."
-        return self._selection('selected', cyc, clear)
+    def __copy__(self):
+        return self.__class__(track = self.track,
+                              **{i: shallowcopy(j)
+                                 for i, j in self.__dict__.items() if i != 'track'})
 
-    def discarding(self, cyc, clear = False) -> 'TrackItems':
-        u"selects ids to discard. See class doc."
-        return self._selection('discarded', cyc, clear)
+    def __iter__(self) -> Iterator[Tuple[Any, Sequence[float]]]:
+        _m_unlazyfy(self)
+        act = self.getaction()
+        if act is None:
+            yield from (col      for col in self._iter())
+        else:
+            yield from (act(col) for col in self._iter())
 
-    @staticmethod
-    def name(*args):
-        u"returns a column name for a given id"
-        return args
+    def __getitem__(self, keys):
+        if isinstance(keys, slice):
+            # could be a slice of beads or a slice of bead data ...
+            raise NotImplementedError()
 
-    def _unlazyfy(self):
-        for name, val in self.__dict__.items():
-            if isfunction(val):
-                setattr(self, name, val())
+        elif (isinstance(keys, (str,)+_m_INTS)
+              or (isinstance(keys, tuple) and _m_ALL.isdisjoint(keys))):
+            # this is NOT a slice
+            return self.get(keys)
 
-        for attr in ('selected', 'discarded'):
-            old = getattr(self, attr)
-            if old is None or all(not isfunction(i) for i in old):
-                continue
+        else:
+            # consider this a slice
+            cpy = shallowcopy(self)
+            return cpy.selecting(keys, clear = True)
 
-            method = getattr(self, attr[:-2]+'ing')
-            method(None)
-            for i in old:
-                method(i() if isfunction(i) else i)
+    def new(self:TSelf) -> TSelf:
+        u"returns a item containing self in the data field"
+        return self.__class__(track = self.track, data = self)
 
-        if self.data is None:
-            self.data = self.track.data
-
-    def keys(self, sel = None) -> 'Iterator':
+    def keys(self, sel = None) -> Iterator:
         u"returns accepted keys"
-        self._unlazyfy()
+        _m_unlazyfy(self)
         if sel is None:
             sel = self.selected
         if self.discarded is None:
@@ -217,18 +251,9 @@ class TrackItems(Items):
             disc = frozenset(self._keys(self.discarded))
             yield from (key for key in self._keys(sel) if key not in disc)
 
-    def __iter__(self) -> 'Iterator[Tuple[Any, Sequence[float]]]':
-        self._unlazyfy()
-        act = self.getaction()
-        if act is None:
-            yield from (col      for col in self._iter())
-        else:
-            yield from (act(col) for col in self._iter())
-
-    __NONE = type('__NONE', (), {})
-    def get(self, key, default = __NONE):
+    def get(self, key, default = _m_NONE):
         u"get an item"
-        if default is not self.__NONE:
+        if default is not _m_NONE:
             vals = next(self._iter(sel = [key]))
         else:
             vals = next(self._iter(sel = [key]), default)
@@ -239,31 +264,6 @@ class TrackItems(Items):
         if act is not None:
             return act(vals)[1]
         return vals[1]
-
-    def __getitem__(self, keys):
-        if isinstance(keys, slice):
-            # could be a slice of beads or a slice of bead data ...
-            raise NotImplementedError()
-
-        elif (isinstance(keys, (str, int))
-              or (isinstance(keys, tuple) and _ALL.isdisjoint(keys))):
-            # this is NOT a slice
-            return self.get(keys)
-
-        else:
-            # consider this a slice
-            cpy = shallowcopy(self)
-            return cpy.selecting(keys, clear = True)
-
-    def _keys(self, sel:'Optional[Sequence]') -> 'Iterable':
-        if sel is None:
-            yield from (i for i in self.data.keys())
-        else:
-            keys = frozenset(self.data.keys())
-            yield from (i for i in sel if i in keys)
-
-    def _iter(self, sel = None) -> 'Iterator[Tuple[Any,Any]]':
-        yield from ((bead, self.data[bead]) for bead in self.keys(sel))
 
 class Beads(TrackItems, Items):
     u"""
@@ -296,7 +296,7 @@ class Beads(TrackItems, Items):
     def __getitem__(self, keys):
         if isinstance(keys, tuple):
             if len(keys) == 2:
-                return Cycles(track = self.data, data = self)[keys]
+                return Cycles(track = self.track, data = self)[keys]
             raise NotImplementedError()
         return super().__getitem__(keys)
 
@@ -317,21 +317,7 @@ class Cycles(TrackItems, Items):
         self.first = kw.get('first', None)   # type: Optional[int]
         self.last  = kw.get('last',  None)   # type: Optional[int]
 
-    def withphases(self, first, last) -> 'Cycles':
-        u"specifies the phase to extract: None for all"
-        self.first = first
-        self.last  = last
-        return self
-
-    @setfield
-    def withfirst(self, first) -> 'Cycles':
-        u"specifies the phase to extract: None for all"
-
-    @setfield
-    def withlast(self, last) -> 'Cycles':
-        u"specifies the phase to extract: None for all"
-
-    def _keys(self, sel) -> 'Iterable[Tuple[Union[str,int], int]]':
+    def _keys(self, sel) -> Iterable[Tuple[Union[str,int], int]]:
         if isinstance(self.data, Cycles):
             yield from self.data.keys(sel)
             return
@@ -345,18 +331,18 @@ class Cycles(TrackItems, Items):
         for thisid in sel:
             if isinstance(thisid, (tuple, list)):
                 bid, tmp = thisid[0], thisid[1] # type: Union[str,int], Any
-                if bid in _ALL and tmp in _ALL:
+                if bid in _m_ALL and tmp in _m_ALL:
                     thisid = ...
-                elif bid in _ALL:
+                elif bid in _m_ALL:
                     thisid = tmp
-                elif tmp in _ALL:
+                elif tmp in _m_ALL:
                     yield from ((bid, cid) for cid in allcycles)
                     continue
                 else:
                     yield (bid, tmp)
                     continue
 
-            if thisid in _ALL:
+            if thisid in _m_ALL:
                 yield from ((col, cid) for col in beads for cid in allcycles)
 
             else:
@@ -377,31 +363,57 @@ class Cycles(TrackItems, Items):
             first   = 0       if self.first is None else self.first
             last    = nphases if self.last  is None else self.last+1
 
+            data    = {}
             def _getdata(bid:int, cid:int):
+                bead = data.get(bid, None)
+                if bead is None:
+                    data[bid] = bead = self.data[bid]
+
                 ind1 = phaseid(cid, first)
-                if last == nphases:
-                    if cid+1 >= ncycles:
-                        return self.name(bid, cid), self.data[bid][ind1:]
+                ind2 = (phaseid(cid, last) if last  < nphases else
+                        (phaseid(cid+1, 0) if cid+1 < ncycles else None))
 
-                    ind2 = phaseid(cid+1, 0)
-                else:
-                    ind2 = phaseid(cid, last)
-
-                return self.name(bid, cid), self.data[bid][ind1:ind2]
+                return (bid, cid), bead[ind1:ind2]
 
             yield from (_getdata(bid, cid) for bid, cid in self.keys(sel))
 
-    def phaseid(self, cid:'Optional[int]' = None, pid:'Optional[int]' = None):
+    def withphases(self, first:Optional[int], last:Optional[int]) -> 'Cycles':
+        u"specifies the phase to extract: None for all"
+        self.first = first
+        self.last  = last
+        return self
+
+    @_m_setfield
+    def withfirst(self, first:Optional[int]) -> 'Cycles':
+        u"specifies the phase to extract: None for all"
+
+    @_m_setfield
+    def withlast(self, last:Optional[int]) -> 'Cycles':
+        u"specifies the phase to extract: None for all"
+
+    def phaseid(self, cid:Optional[int] = None, pid:Optional[int] = None):
         u"returns phase ids for the given cycle"
         vect = self.track.phaseids
-        if {cid, pid}.issubset(_ALL):
+        if {cid, pid}.issubset(_m_ALL):
             return vect         - vect[:,0]
-        elif cid in _ALL:
+        elif cid in _m_ALL:
             return vect[:,pid]  - vect[:,0]
-        elif pid in _ALL:
+        elif pid in _m_ALL:
             return vect[cid,:]  - vect[cid,0]
         else:
             return vect[cid,pid]- vect[cid,0]
+
+    def maxsize(self):
+        u"returns the max size of cycles"
+        if isfunction(self.track):
+            self.track = self.track()
+
+        first = self.track.phaseid(..., 0 if self.first is None else self.first)
+        if self.last is None or self.last == self.track.nphases-1:
+            return np.max(np.diff(first))
+        else:
+            last = self.track.phaseid(..., self.last+1)
+            return np.max(last - first)
 
 def createTrackItem(level:Optional[Level] = Level.none, **kwargs):
     u"Returns the item type associated to a level"
