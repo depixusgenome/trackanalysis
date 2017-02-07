@@ -2,7 +2,7 @@ require('python', click = 6.6)
 make(locals())
 
 def defaultmodules(opt):
-    mods             = 'data','view','legacy','ramp','model','control'
+    mods             = 'data','view','legacy','ramp','model','control','utils'
     opt.env.modules += tuple(opt.options.all_modules[i] for i in mods)
 
 def build(bld, __old = locals().pop('build')):
