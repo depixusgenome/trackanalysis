@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 u"Creates a histogram from available events"
 from    typing import (Optional, Iterator, # pylint: disable=unused-import
-                       Iterable, Union, Sequence, Callable, cast)
+                       Iterable, Union, Sequence, Callable, Tuple, cast)
 import  itertools
 import  numpy  as     np
 from    scipy.signal          import find_peaks_cwt
@@ -66,10 +66,9 @@ class Histogram:
         if fcn is None:
             return events
         else:
-            return np.fromiter((np.fromiter((fcn(i) for i in evts),
-                                            dtype = 'f4', count = len(evts))
-                                for evts in events),
-                               dtype = 'O', count = len(events))
+            return np.array([np.fromiter((fcn(i) for i in evts),
+                                         dtype = 'f4', count = len(evts))
+                             for evts in events], dtype = 'O')
 
     def eventpositions(self,
                        events   : Iterable[Iterable[np.ndarray]],
@@ -100,11 +99,13 @@ class Histogram:
             return (fcn(evts) for evts in events)
 
     @staticmethod
-    def __generate(lenv, kern, zmeas, weight):
-        for pos, height in zip(zmeas, weight):
-            cnts       = np.zeros((lenv,), dtype = 'i4')
-            cnts[pos] += height
-            yield kern(cnts)
+    def __generate(lenv, kern, zmeas, weights):
+        for pos, weight in zip(zmeas, weights):
+            if np.isscalar(weight):
+                cnt = np.bincount(pos, minlength = lenv) * weight
+            else:
+                cnt = np.bincount(pos, minlength = lenv, weights = weight)
+            yield kern(cnt)
 
     def __compute(self,
                   events   : Sequence[Sequence[np.ndarray]],
@@ -122,7 +123,9 @@ class Histogram:
             minv = min(np.nanmin(evt) for evts in events for evt in evts)
             maxv = max(np.nanmax(evt) for evts in events for evt in evts)
 
-        lenv = int(((maxv-minv)/bwidth+get('edge')*2*osamp))+1
+        minv -= get('edge')*bwidth*osamp
+        maxv += get('edge')*bwidth*osamp
+        lenv  = int((maxv-minv)/bwidth)+1
 
         if get('kernel') is not None:
             kern = get('kernel')(oversampling = osamp, range = 'same')
@@ -132,28 +135,31 @@ class Histogram:
         zmeas  = self.__eventpositions(events, get('zmeasure'))
         if delta is not None:
             zmeas += delta
-        zmeas  = np.int32((zmeas-minv)/bwidth) # type: ignore
-        weight = self.__weights  (get('weight'),   events)
+        zmeas  -= minv
+        zmeas  /= bwidth
+        items   = (np.int32(i) for i in zmeas)      # type: ignore
+
+        weight  = self.__weights  (get('weight'),   events)
 
         if not separate:
-            zmeas = zmeas.ravel()[np.newaxis]
+            items = iter((np.concatenate(tuple(items)),))
             if isinstance(weight, np.ndarray):
                 weight = weight.ravel()[np.newaxis] # pylint: disable=no-member
 
         yield (minv, bwidth)
-        yield from self.__generate(lenv, kern, zmeas, weight)
+        yield from self.__generate(lenv, kern, items, weight)
 
     def __call__(self,
                  events   : Iterable[Iterable[np.ndarray]],
                  delta    : Union[None,float,np.ndarray] = None,
                  separate : bool                         = False,
-                 **kwa):
+                 **kwa) -> Tuple[Iterator[np.ndarray], float, float]:
         if isinstance(events, Iterator):
             events = tuple(events)
         events = cast(Sequence[Iterable[np.ndarray]], events)
 
         if len(events) == 0:
-            return np.empty((0,), dtype = 'f4'), np.inf
+            return np.empty((0,), dtype = 'f4'), np.inf, 0.
 
         if isinstance(events[0], Iterator):
             events = tuple(tuple(evts) for evts in events)
