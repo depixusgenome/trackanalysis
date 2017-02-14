@@ -274,7 +274,7 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
         fixed = self.data.rpfulldata.getFixedBeadIds()
         goods = self.data.rpdata.beads()
         # find beads who do not have defined behaviour
-        undef = list(set(goods)-set(noisy)-set(fixed))
+        undef = list(set(self.data.rpfulldata.beads())-set(goods)-set(noisy)-set(fixed))
         beads = {"Too noisy":noisy,
                  "Fixed":fixed,
                  "HP not closing at the test force":\

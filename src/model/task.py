@@ -5,9 +5,9 @@ Classes defining a type of data treatment.
 
 **Warning** Those definitions must remain data-independant.
 """
+from copy           import deepcopy
 from typing         import (Optional, Sequence,  # pylint: disable=unused-import
                             Dict)
-from copy           import deepcopy
 from enum           import Enum, unique
 
 from utils          import toenum
