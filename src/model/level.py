@@ -12,6 +12,7 @@ class Level(Enum):
     bead    = 1
     cycle   = 2
     event   = 3
+    peak    = 4
     none    = None # type: ignore
 
 def levelprop(val):

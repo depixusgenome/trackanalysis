@@ -6,9 +6,8 @@ from    typing import (NamedTuple, Optional, # pylint: disable=unused-import
                        Iterator, Iterable, Sequence, Union, Callable, cast)
 import  numpy as np
 
-from  .                     import nanhfsigma
-# pylint: disable=no-name-in-module,import-error
-from  ._core.samples.normal import knownsigma as norm
+from    signalfilter import nanhfsigma, samples as _samples
+norm = _samples.normal.knownsigma # pylint: disable=invalid-name
 
 class PrecisionAlg:
     u"Implements precision extraction from data"
@@ -243,7 +242,7 @@ class EventDetector(PrecisionAlg):
 
     def __call__(self, data:np.ndarray, precision: Optional[float] = None):
         precision = self.getprecision(precision, data)
-        yield from self.select(self.merge(data, self.split(data, precision), precision))
+        return self.select(self.merge(data, self.split(data, precision), precision))
 
     @classmethod
     def run(cls, *args, **kwa):

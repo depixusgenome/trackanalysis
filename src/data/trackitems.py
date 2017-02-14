@@ -87,9 +87,6 @@ def _m_copy(item):
 
 class Items(metaclass=ABCMeta):
     u"Class for iterating over data"
-    def __init__(self, **_) -> None:
-        super().__init__()
-
     @abstractmethod
     def __getitem__(self, val):
         u"can return one item or a copy of self with only the selected keys"
@@ -197,25 +194,26 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
         u"selects ids to discard. See class doc."
         return _m_selection(self, 'discarded', cyc, clear)
 
-    def getaction(self):
+    def getaction(self, actions = None):
         u"returns a function performing all actions"
-        if len(self.actions) > 1:
+        if actions is None:
+            actions = self.actions
+        if len(actions) > 1:
             def _act(item):
-                for action in self.actions:
+                for action in actions:
                     item = action(item)
             return _act
-        elif len(self.actions) == 1:
-            return self.actions[0]
+        elif len(actions) == 1:
+            return actions[0]
         else:
             return None
 
-class TrackItems(Items, _m_ConfigMixin):
+class TrackItems(_m_ConfigMixin, Items):
     u"Class for iterating over beads or creating a new list of data"
     level   = Level.none
     def __init__(self, **kw) -> None:
-        Items.__init__(self)
         self.track = kw.get('track', None) # type: ignore
-        _m_ConfigMixin.__init__(self, **kw)
+        super().__init__(**kw)
 
     def _keys(self, sel:Optional[Sequence]) -> Iterable:
         if sel is None:
@@ -321,7 +319,7 @@ class Beads(TrackItems, Items):
 
 class Cycles(TrackItems, Items):
     u"""
-    Class for iterating selected cycles:
+    Class for iterating over selected cycles:
 
     * providing a pair (column name, cycle id) will extract a cycle on
       this column only.
@@ -438,4 +436,4 @@ def createTrackItem(level:Optional[Level] = Level.none, **kwargs):
     u"Returns the item type associated to a level"
     subs = Items.__subclasses__()
     cls  = next(opt for opt in subs if level is opt.level)
-    return cls(**kwargs)
+    return cls(**kwargs) # type: ignore

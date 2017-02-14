@@ -3,7 +3,7 @@
 u"Tests cycle alignments"
 import numpy as np
 
-from signalfilter.alignment import ExtremumAlignment, CorrelationAlignment
+from eventdetection.alignment import ExtremumAlignment, CorrelationAlignment
 
 def test_minmaxalign():
     u"align on min/max value"

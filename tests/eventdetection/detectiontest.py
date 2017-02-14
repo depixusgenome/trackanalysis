@@ -3,9 +3,9 @@
 u"Tests interval detection"
 
 import numpy    # type: ignore
-from signalfilter.events import (SplitDetector, EventMerger, EventSelector,
-                                 tocycles)
-from signalfilter        import samples
+from eventdetection.detection import (SplitDetector, EventMerger, EventSelector,
+                                      tocycles)
+from signalfilter             import samples
 
 def test_detectsplits():
     u"Tests flat stretches detection"
