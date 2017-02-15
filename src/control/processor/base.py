@@ -115,8 +115,8 @@ class Processor(metaclass=MetaProcessor):
             def _cache(frame):
                 if action is not None:
                     frame.withaction(action)
-                fcn = frame.getaction()
-                if fcn is None:
+                act = frame.getaction()
+                if act is None:
                     raise IndexError("Nothing to cache! Set an action prior to mixin")
 
                 dico = cache.setdefault(frame.parents, dict())
@@ -126,7 +126,7 @@ class Processor(metaclass=MetaProcessor):
                     if ans:
                         return item[0], ans
 
-                    item          = cpy(fcn(item))
+                    item          = cpy(act(item))
                     dico[item[0]] = item[1]
                     return item
 

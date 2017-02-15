@@ -5,9 +5,9 @@ import  inspect
 from    copy        import copy as shallowcopy
 from    abc         import ABCMeta, abstractmethod
 from    functools   import wraps
-from    typing      import (Optional, Tuple, Union,
+from    typing      import (Optional, Tuple, Union, # pylint: disable=unused-import
                             Any, List, Sequence, Iterable, Iterator,
-                            TypeVar, cast)
+                            TypeVar, Hashable, cast)
 import  numpy as np
 
 from    utils       import isfunction
@@ -96,9 +96,9 @@ class Items(metaclass=ABCMeta):
         u"iterates over keys"
         assert _ is None # should not be necessary: dicts can't do that
 
-class TransformedItems(Items):
+class TransformedItems:
     u"Dictionnary that will transform its data when a value is requested"
-    __slots__ = ('_data', '_once', '_first', '_fcn')
+    __slots__ = ('_data', '_always', '_first', '_fcn')
     def __init__(self, fcn, data, once = True) -> None:
         super().__init__()
         self._data   = data
@@ -118,18 +118,24 @@ class TransformedItems(Items):
         yield from self._data.keys()
 
 class _m_ConfigMixin: # pylint: disable=invalid-name
+    data      = None    # type: Union[Items,TransformedItems,Dict,None]
+    selected  = None    # type: Optional[List]
+    discarded = None    # type: Optional[List]
+    actions   = []      # type: List
+    parents   = tuple() # type: Union[Tuple,Hashable]
     def __init__(self, **kw) -> None:
-        self.data      = kw.get('data',     None)   # type: Union[Items,Dict,None]
-        self.selected  = None                       # type: Optional[List]
-        self.discarded = None                       # type: Optional[List]
-        self.actions   = kw.get('actions',  [])     # type: List
-        self.parents   = kw.get('parents',  tuple())
+        get = lambda x: kw.get(x, shallowcopy(getattr(self.__class__, x)))
+        self.data      = get('data')
+        self.actions   = get('actions')
+        self.parents   = get('parents')
+        self.actions   = get('actions')
 
-        self.withdata   (self.data)
-        self.selecting  (kw.get('selected',  None))
-        self.discarding (kw.get('discarded', None))
+        self.selecting  (get('selected'))
+        self.discarding (get('discarded'))
         self.withcopy   (kw.get('copy',      False))
         self.withsamples(kw.get('samples',   None))
+
+    copy = staticmethod(_m_copy)    # type: ignore
 
     def withsamples(self:Self, samples) -> Self:
         u"specifies that only some samples should be taken"
@@ -139,10 +145,11 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
 
     def withcopy(self:Self, cpy:bool) -> Self:
         u"specifies that a copy of the data should or shouldn't be made"
+        fcn = getattr(self, 'copy', _m_copy)
         if cpy:
-            self.actions.append(_m_copy)
-        elif _m_copy in self.actions:
-            self.actions.remove(_m_copy)
+            self.actions.append(fcn)
+        elif fcn in self.actions:
+            self.actions.remove(fcn)
         return self
 
     def withfunction(self:Self, fcn = None, clear = False, beadonly = False) -> Self:
@@ -202,6 +209,7 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
             def _act(item):
                 for action in actions:
                     item = action(item)
+                return item
             return _act
         elif len(actions) == 1:
             return actions[0]
@@ -435,5 +443,5 @@ class Cycles(TrackItems, Items):
 def createTrackItem(level:Optional[Level] = Level.none, **kwargs):
     u"Returns the item type associated to a level"
     subs = Items.__subclasses__()
-    cls  = next(opt for opt in subs if level is opt.level)
+    cls  = next(opt for opt in subs if level is getattr(opt, 'level', '--NONE--'))
     return cls(**kwargs) # type: ignore
