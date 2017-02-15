@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"utils"
+from copy           import deepcopy
 from contextlib     import contextmanager
 from inspect        import (signature, ismethod as _ismeth, isfunction as _isfunc,
                             getmembers, isgeneratorfunction)
@@ -260,3 +261,83 @@ def escapenans(*arrays: np.ndarray, reset = True):
         return _wrap
     else:
         return _escapenans(*arrays, reset = reset)
+
+@contextmanager
+def changefields(self, __items__ = None, **items):
+    u"Context within which given fields are momentarily changed"
+    if __items__ is not None:
+        items.update(__items__)
+
+    olds = {}
+    for name, kwdef in items.items():
+        olds[name] = old = getattr(self, name)
+
+        if isinstance(old, Enum):
+            kwdef  = old.__class__(kwdef)
+
+        setattr(self, name, kwdef)
+
+    yield olds
+
+    for i, j in olds.items():
+        setattr(self, i , j)
+
+def kwargsdefaults(*items):
+    u"""
+    Keyword arguments are used for changing an object's fields before running
+    the method
+    """
+    if len(items) == 1 and isinstance(items[0], tuple):
+        items = items[0]
+
+    if len(items) == 1 and callable(items[0]):
+        fields   = lambda x: frozenset(i for i in x.__dict__ if i[0] != '_')
+    else:
+        assert len(items) and all(isinstance(i, str) for i in items)
+        accepted = frozenset(items)
+        fields   = lambda _: accepted
+
+    def _wrapper(fcn):
+        @wraps(fcn)
+        def _wrap(self, *args, **kwargs):
+            tochange = {i: kwargs.pop(i) for i in fields(self) & frozenset(kwargs)}
+            with changefields(self, tochange):
+                return fcn(self, *args, **kwargs)
+        return _wrap
+
+    if len(items) == 1 and callable(items[0]):
+        return _wrapper(items[0])
+    return _wrapper
+
+def initdefaults(*attrs, roots = ('',)):
+    u"""
+    Uses the class attribute to initialize the object's fields if no keyword
+    arguments were provided.
+    """
+    if len(attrs) == 1 and isinstance(attrs[0], tuple):
+        attrs = attrs[0]
+    assert len(attrs) and all(isinstance(i, str) for i in attrs)
+
+    none = type('None', (), {})
+    def _wrapper(fcn):
+        @wraps(fcn)
+        def __init__(self, *args, **kwargs):
+            fcn(self, *args, **kwargs)
+            for name in attrs:
+                clsdef = getattr(self.__class__, name)
+                for root in roots:
+                    kwdef = kwargs.get(root+name, none)
+
+                    if kwdef is none:
+                        continue
+
+                    if isinstance(clsdef, Enum):
+                        setattr(self, name, clsdef.__class__(kwdef))
+                    else:
+                        setattr(self, name, kwdef)
+                        break
+                else:
+                    setattr(self, name, deepcopy(clsdef))
+        return __init__
+
+    return _wrapper
