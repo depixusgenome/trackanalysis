@@ -4,6 +4,7 @@
 u"Task for removing correlated drifts"
 
 from typing         import Union, Optional, Tuple
+from utils          import initdefaults
 from model          import Task, Level
 from eventdetection import EventDetectionConfig
 from .collapse      import (CollapseAlg, StitchAlg,
@@ -18,13 +19,7 @@ class BeadDriftTask(Task, EventDetectionConfig):
     zero      = 10
     precision = 0.
     onbeads   = True
+    @initdefaults('phases', 'collapse', 'stitch', 'zero', 'precision', 'onbeads')
     def __init__(self, **kwa):
         Task.__init__(self)
         EventDetectionConfig.__init__(self, **kwa)
-        get             = lambda x: kwa.get(x, getattr(self.__class__, x))
-        self.phases     = get('phases')
-        self.collapse   = get('collapse')
-        self.stitch     = get('stitch')
-        self.zero       = get('zero')
-        self.precision  = get('precision')
-        self.onbeads    = get('onbeads')

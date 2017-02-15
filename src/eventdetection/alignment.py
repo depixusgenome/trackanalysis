@@ -6,6 +6,7 @@ from   typing import (Union, Optional, # pylint: disable=unused-import
 from   enum   import Enum
 import numpy  as     np
 
+from   utils                    import initdefaults, kwargsdefaults, changefields
 from   signalfilter.convolve    import KernelConvolution
 
 class AlignmentMode(Enum):
@@ -24,9 +25,11 @@ class ExtremumAlignment:
     * *binsize*: if > 2, the extremum is computed over the median of values binned
         by *binsize*.
     """
-    def __init__(self, **kwa):
-        self.mode    = AlignmentMode(kwa['mode'])
-        self.binsize = kwa.get('binsize', 5)
+    binsize = 5
+    mode    = AlignmentMode.min
+    @initdefaults('binsize', 'mode')
+    def __init__(self, **_):
+        pass
 
     def __get(self, elem):
         bsize  = self.binsize
@@ -76,28 +79,31 @@ class CorrelationAlignment:
     maxcorr      = 4
     nrepeats     = 6
     kernel       = KernelConvolution() # type: Optional[KernelConvolution]
+    __DEFAULTS   = 'oversampling', 'maxcorr', 'nrepeats'
+    @initdefaults(__DEFAULTS)
     def __init__(self, **kwa):
-        get               = lambda x: kwa.get(x, getattr(self.__class__, x))
-        self.oversampling = get("oversampling")
-        self.maxcorr      = get("maxcorr")
-        self.nrepeats     = get("nrepeats")
-        self.kernel       = kwa.get("kernel", KernelConvolution(**kwa))
+        self.kernel = kwa.get("kernel", KernelConvolution(**kwa))
 
     @property
     def exact_oversampling(self) -> float:
         u"The exact oversampling used: int(oversampling)//2 * 2 +1"
         return (int(self.oversampling)//2) * 2 + 1
 
+    @kwargsdefaults(__DEFAULTS+('kernel',))
     def __call__(self, data: Iterable[np.ndarray], **kwa) -> np.ndarray:
+        if len(kwa):
+            kwa = {i.replace('kernel_', ''):j for i, j in kwa.items()}
+            with changefields(self.kernel, kwa):
+                return self.__call__(data)
+
         if isinstance(data, Iterator):
             data = tuple(data)
         data    = cast(Sequence[np.ndarray], data)
 
-        get     = lambda x: kwa.get(x, getattr(self, x))
-        osamp   = (int(get('oversampling'))//2) * 2 + 1
-        maxcorr = get('maxcorr')*osamp
+        osamp   = (int(self.oversampling)//2) * 2 + 1
+        maxcorr = self.maxcorr*osamp
 
-        kern  = get('kernel')(oversampling = osamp, range = 'same')
+        kern  = self.kernel(oversampling = osamp, range = 'same')
         ref   = np.empty((max(len(i) for i in data)*osamp+maxcorr*2,), dtype = 'f4')
         hists = []
 
@@ -108,7 +114,7 @@ class CorrelationAlignment:
             hists.append(kern(cur))
 
         bias = np.full((len(hists),), maxcorr+osamp//2, dtype = np.int32)
-        for _ in range(get('nrepeats')):
+        for _ in range(self.nrepeats):
             ref.fill(0.)
             for start, hist in zip(bias, hists):
                 ref[start:start+len(hist)] += hist

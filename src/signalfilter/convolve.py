@@ -6,6 +6,8 @@ from   enum         import Enum
 from   scipy.signal import fftconvolve
 import numpy as np
 
+from   utils        import initdefaults, kwargsdefaults
+
 class KernelMode(Enum):
     u"Kernel modes"
     normal   = 'normal'
@@ -25,30 +27,30 @@ class KernelConvolution:
 
     Keynames "kernel_"+name are synonims
     """
-    def __init__(self, **kwa):
-        get = lambda name, dlt: kwa.get("kernel_"+name, kwa.get(name, dlt))
+    window       = 4
+    width        = 1.
+    mode         = KernelMode.normal
+    range        = 'same'
+    oversampling = 1
+    __DEFAULTS   = "window", "width", 'range', "oversampling", "mode"
+    @initdefaults(__DEFAULTS)
+    def __init__(self, **_):
+        pass
 
-        self.window       = get("window", 4)
-        self.width        = get("width",  3)
-        self.mode         = KernelMode(get("mode", 'normal'))
-        self.range        = get('range', 'same')
-        self.oversampling = get("oversampling", 1)
-
+    @kwargsdefaults(__DEFAULTS)
     def __call__(self, **kwa) -> Callable[[np.ndarray], np.ndarray]:
-        get    = lambda x: kwa.get(x, getattr(self, x))
+        window = self.window
+        rng    = self.range
+        osamp  = int(self.oversampling//2) * 2 + 1
+        size   = int(2*self.width*window*osamp)+1
 
-        mode   = KernelMode(get("mode"))
-        window = get('window')
-        osamp  = int(get('oversampling')//2) * 2 + 1
-        size   = 2*window*osamp+1
-
-        if mode is KernelMode.normal:
+        if self.mode is KernelMode.normal:
             kern  = np.arange(size, dtype = 'f4') / osamp
-            kern  = np.exp(-.5*((kern-window)/ get('width'))**2)
+            kern  = np.exp(-.5*((kern-kern[size//2])/ self.width)**2)
             kern /= kern.sum()
 
-        elif mode is KernelMode.square:
+        elif self.mode is KernelMode.square:
             kern  = np.ones((size,), dtype = 'f4') / size
             kern /= len(kern)
 
-        return lambda x: fftconvolve(x, kern, get('range'))
+        return lambda x: np.float32(fftconvolve(x, kern, rng)) # type: ignore

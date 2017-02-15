@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Deals with event detection tasks"
+from utils          import initdefaults
 from model          import Task, Level
 from .              import EventDetectionConfig
 from .alignment     import CorrelationAlignment
@@ -18,11 +19,9 @@ class ExtremumAlignmentTask(Task):
     level   = Level.cycle
     binsize = 5
     phase   = 1
-    def __init__(self, **kwa):
+    @initdefaults('binsize', 'phase')
+    def __init__(self, **_):
         super().__init__()
-        get          = lambda x: kwa.get(x, getattr(self.__class__, x))
-        self.binsize = get('binsize')
-        self.phase   = get('phase')
 
 class CorrelationAlignmentTask(Task, CorrelationAlignment):
     u""" Task for aligning on peaks """

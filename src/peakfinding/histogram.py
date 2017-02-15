@@ -3,11 +3,14 @@
 u"Creates a histogram from available events"
 from    typing import (Optional, Iterator, # pylint: disable=unused-import
                        Iterable, Union, Sequence, Callable, Tuple, cast)
+from    enum   import Enum
 import  itertools
 import  numpy  as     np
-from    scipy.signal          import find_peaks_cwt
+from    numpy.lib.stride_tricks import as_strided
+from    scipy.signal            import find_peaks_cwt
 
-from    signalfilter.convolve import KernelConvolution # pylint: disable=unused-import
+from    utils                   import kwargsdefaults, initdefaults
+from    signalfilter.convolve   import KernelConvolution # pylint: disable=unused-import
 
 class Histogram:
     u"""
@@ -42,14 +45,10 @@ class Histogram:
     zmeasure     = np.nanmean           # type: Optional[Callable]
     weight       = None                 # type: Optional[Callable]
     kernel       = KernelConvolution()  # type: Optional[KernelConvolution]
+
+    @initdefaults('edge', 'oversampling', 'precision', 'zmeasure', 'weight')
     def __init__(self, **kwa):
-        get               = lambda x: kwa.get(x, getattr(self.__class__, x))
-        self.edge         = get('edge')
-        self.oversampling = get('oversampling')
-        self.precision    = get('precision')
-        self.zmeasure     = get('zmeasure')
-        self.weight       = get('weight')
-        self.kernel       = kwa.get("kernel", KernelConvolution(**kwa))
+        self.kernel = kwa.get("kernel", KernelConvolution(**kwa))
 
     @property
     def exact_oversampling(self) -> float:
@@ -107,39 +106,38 @@ class Histogram:
                 cnt = np.bincount(pos, minlength = lenv, weights = weight)
             yield kern(cnt)
 
+    @kwargsdefaults
     def __compute(self,
                   events   : Sequence[Sequence[np.ndarray]],
                   delta    : Union[None,float,np.ndarray],
-                  separate : bool,
-                  kwa      : dict):
-        get    = lambda x: kwa.get(x, getattr(self, x))
-        osamp  = (int(get('oversampling'))//2) * 2 + 1
-        bwidth = get('precision')/osamp
+                  separate : bool):
+        osamp  = (int(self.oversampling)//2) * 2 + 1
+        bwidth = self.precision/osamp
 
-        if get('zmeasure') is None:
+        if self.zmeasure is None:
             minv = np.min(events)
             maxv = np.max(events)
         else:
             minv = min(np.nanmin(evt) for evts in events for evt in evts)
             maxv = max(np.nanmax(evt) for evts in events for evt in evts)
 
-        minv -= get('edge')*bwidth*osamp
-        maxv += get('edge')*bwidth*osamp
+        minv -= self.edge*bwidth*osamp
+        maxv += self.edge*bwidth*osamp
         lenv  = int((maxv-minv)/bwidth)+1
 
-        if get('kernel') is not None:
-            kern = get('kernel')(oversampling = osamp, range = 'same')
+        if self.kernel is not None:
+            kern = self.kernel(oversampling = osamp, range = 'same')
         else:
             kern = lambda x: x
 
-        zmeas  = self.__eventpositions(events, get('zmeasure'))
+        zmeas  = self.__eventpositions(events, self.zmeasure)
         if delta is not None:
             zmeas += delta
         zmeas  -= minv
         zmeas  /= bwidth
         items   = (np.int32(i) for i in zmeas)      # type: ignore
 
-        weight  = self.__weights  (get('weight'),   events)
+        weight  = self.__weights  (self.weight,   events)
 
         if not separate:
             items = iter((np.concatenate(tuple(items)),))
@@ -168,7 +166,7 @@ class Histogram:
         if np.isscalar(events[0][0]):
             events = events,
 
-        gen          = self.__compute(events, delta, separate, kwa)
+        gen          = self.__compute(events, delta, separate, **kwa)
         minv, bwidth = next(gen)
         return gen, minv, bwidth
 
@@ -177,30 +175,99 @@ class Histogram:
         u"runs the algorithm"
         return cls()(*args, **kwa)
 
-class CWTPeakFinder:
-    u"Finds peaks using scipy's find_peaks_cwt. See the latter's documentation"
-    def __init__(self, **kwa):
-        self.widths        = kwa.get("widths", [2., 5., 11.]) # type: Sequence[int]
-        self.wavelet       = kwa.get("wavelet",       None)   # type: Optional[Callable]
-        self.max_distances = kwa.get("max_distances", None)   # type: Optional[Sequence[int]]
-        self.gap_tresh     = kwa.get("gap_tresh",     None)   # type: Optional[float]
-        self.min_length    = kwa.get("min_length",    None)   # type: Optional[int]
-        self.min_snr       = kwa.get("min_snr", 1.)
-        self.noise_perc    = kwa.get("noise_perc",  10.)
+class FitMode(Enum):
+    u"Fit mode for sub-pixel peak finding"
+    quadratic = 'quadratic'
+    gaussian  = 'gaussian'
 
-    def __call__(self, hist, xmin:float = 0.0, width: float = 1.0):
-        return find_peaks_cwt(hist, self.wavelet, self.max_distances,
+class _m_SubPixelPeakMixin: # pylint: disable=invalid-name
+    u"""
+    Refines the peak position using a quadratic fit
+    """
+    fitwidth = 1 # type: Optional[int]
+    fitcount = 2
+    fitmode  = FitMode.quadratic
+    @initdefaults('fitwidth', 'fitcount', 'fitmode')
+    def __init__(self, **_):
+        pass
+
+    def _inds(self, hist):
+        raise NotImplementedError()
+
+    def __call__(self, hist, bias:float, rho: float):
+        inds = self._inds(hist)
+        if self.fitwidth is None or self.fitwidth < 1:
+            return inds
+
+        if self.fitmode is FitMode.quadratic:
+            def _fitfcn(i, j):
+                fit = np.polyfit(range(i,j), hist[i:j], 2)
+                return (False, 0.) if fit[0] >= 0. else (True, -fit[1]/fit[0]*.5)
+            fitfcn = _fitfcn
+        else:
+            fitfcn = lambda i, j: (True, np.average(range(i,j), weights = hist[i:j]))
+
+        for _ in range(self.fitcount):
+            rngs = tuple((max(0,         i-self.fitwidth),
+                          min(len(hist), i+self.fitwidth+1)
+                         ) for i in inds)
+
+            fits = tuple(fitfcn(i, j) for i, j in rngs if i+2 < j)
+            vals = np.array([fit[1] for fit in fits if fit[0]])
+            inds = np.int32(vals+.5) # type: ignore
+        return vals * rho + bias
+
+class CWTPeakFinder(_m_SubPixelPeakMixin):
+    u"Finds peaks using scipy's find_peaks_cwt. See the latter's documentation"
+    widths        = np.arange(5, 11) # type: Sequence[int]
+    wavelet       = None             # type: Optional[Callable]
+    max_distances = None             # type: Optional[Sequence[int]]
+    gap_tresh     = None             # type: Optional[float]
+    min_length    = None             # type: Optional[int]
+    min_snr       = 1.
+    noise_perc    = 10.
+    @initdefaults('widths', 'wavelet', 'max_distances', 'gap_tresh',
+                  'min_length', 'min_snr', 'noise_perc')
+    def __init__(self, **_):
+        super().__init__(**_)
+
+    def _inds(self, hist):
+        vals = find_peaks_cwt(hist, self.widths, self.wavelet, self.max_distances,
                               self.gap_tresh, self.min_length, self.min_snr,
-                              self.noise_perc)*width+xmin
+                              self.noise_perc)
+        return np.array(vals)
+
+class ZeroCrossingPeakFinder(_m_SubPixelPeakMixin):
+    u"""
+    Finds peaks with a minimum *half*width and threshold
+    """
+    peakwidth = 1
+    threshold = getattr(np.finfo('f4'), 'resolution') # type: float
+    @initdefaults('peakwidth', 'threshold')
+    def __init__(self, **_):
+        super().__init__(**_)
+
+    def _inds(self, hist):
+        roll                 = np.pad(hist, self.peakwidth, 'edge')
+        roll[np.isnan(roll)] = -np.inf
+
+        roll = as_strided(roll,
+                          shape    = (len(hist), 2*self.peakwidth+1),
+                          strides  = (hist.strides[0],)*2)
+
+        maxes = np.apply_along_axis(np.argmax, 1, roll) == self.peakwidth
+        inds  = np.where(maxes)[0]
+        return inds[hist[inds] > self.threshold]
+
+PeakFinder = Union[CWTPeakFinder, ZeroCrossingPeakFinder]
 
 class GroupByPeak:
     u"Groups events by peak position"
     window   = 10
     mincount = 5
-    def __init__(self, **kwa):
-        get           = lambda x: kwa.get(x, getattr(self.__class__, x))
-        self.window   = get("window")
-        self.mincount = get("mincount")
+    @initdefaults('window', 'mincount')
+    def __init__(self, **_):
+        pass
 
     def __call__(self, peaks, elems):
         bins  = np.copy(peaks)

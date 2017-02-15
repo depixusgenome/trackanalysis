@@ -4,22 +4,20 @@ u"Tasks related to peakfinding"
 from   typing   import  Optional # pylint: disable=unused-import
 import numpy    as      np
 
-from eventdetection.alignment   import CorrelationAlignment
-from .histogram                 import Histogram, CWTPeakFinder, GroupByPeak
+from utils                    import initdefaults
+from eventdetection.alignment import CorrelationAlignment
+from .histogram               import (Histogram,  # pylint: disable=unused-import
+                                      PeakFinder, ZeroCrossingPeakFinder, GroupByPeak)
 
 class FindPeaks:
     u"Groups events per peak"
     histogram = Histogram()
-    align     = CorrelationAlignment() # type: Optional[CorrelationAlignment]
-    find      = CWTPeakFinder()        # type: CWTPeakFinder
-    group     = GroupByPeak()          # type: GroupByPeak
-    def __init__(self, **kwa):
+    align     = CorrelationAlignment()
+    find      = ZeroCrossingPeakFinder() # type: PeakFinder
+    group     = GroupByPeak()
+    @initdefaults('histogram', 'align', 'find', 'group')
+    def __init__(self, **_):
         super().__init__()
-        get = lambda x: kwa.get(x, getattr(self.__class__, x))
-        self.histogram = get('histogram')
-        self.align     = get('align')
-        self.find      = get('find')
-        self.group     = get('group')
 
     def __call__(self, data):
         events = np.array([[i for _, i in evts] for _, evts in data], dtype = 'O')

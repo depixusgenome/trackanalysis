@@ -34,3 +34,6 @@ def test_correlationalignment():
 
     biases = corr(data, 5, 2, 1, 3, 2.)
     np.testing.assert_allclose(biases, [1., 0., -1.], rtol = 1e-4, atol = 1e-4)
+
+if __name__ == '__main__':
+    test_minmaxalign()
