@@ -4,10 +4,10 @@ u"Tests the simulator"
 
 import numpy as np
 from   numpy.testing import assert_allclose
-from simulator import TrackSimulator
+from   simulator import TrackSimulator, PeakSimulator
 
-def test_bead_simulator():
-    u"testing the cordrift processor"
+def test_track_simulator():
+    u"testing raw data simulation"
     bead  = TrackSimulator(ncycles = 1, baselineargs = None)
     drift = bead.drift
     data  = bead(seed = 0)
@@ -43,5 +43,12 @@ def test_bead_simulator():
     assert_allclose(bline[0], [1.]*149)
     assert_allclose(bline[1], [np.cos(.4*np.pi)]*149)
 
+def test_peak_simulator():
+    u"testing peak data simulation"
+    res = PeakSimulator()(100, seed = 0)
+    assert len(res) == 100
+    assert {len(i) for i in res} == {0, 1, 2, 3}
+    assert max(*(i.max()-i.min() for i in res)) > 10.
+
 if __name__ == '__main__':
-    test_bead_simulator()
+    test_peak_simulator()
