@@ -89,3 +89,6 @@ def test_tocycles():
     truth  = (0, 0, 0, 1, 1, 1, 2, 8, 8, 8, 9, 9, 9, 9, 8)
     vals   = tuple(i.cycle for i in tocycles(starts, inters))
     assert vals == truth
+
+if __name__ == '__main__':
+    test_fastmerge()

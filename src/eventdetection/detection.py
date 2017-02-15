@@ -5,6 +5,7 @@ u"Interval detection: finding flat sections in the signal"
 from    typing import (NamedTuple, Optional, # pylint: disable=unused-import
                        Iterator, Iterable, Sequence, Union, Callable, cast)
 import  numpy as np
+from    numpy.lib.stride_tricks import as_strided
 
 from    signalfilter import nanhfsigma, samples as _samples
 norm = _samples.normal.knownsigma # pylint: disable=invalid-name
@@ -90,9 +91,10 @@ class SplitDetector(PrecisionAlg):
             # increase indexes back to former data
             ends += nans.cumsum()[~nans][ends]
 
-        ends = np.repeat(ends, 2)
         ends = np.insert(ends, [0, len(ends)], [0, len(nans)])
-        ends = ends.reshape((len(ends)//2, 2))
+        ends = as_strided(ends,
+                          shape   = (len(ends)-1, 2),
+                          strides = (ends.strides[0],)*2)
         return ends[np.nonzero(np.diff(ends, 1).ravel() > 1)[0]]
 
     @classmethod
@@ -120,16 +122,19 @@ class EventMerger(PrecisionAlg):
 
     @staticmethod
     def __initstats(data : np.ndarray, intervals: np.ndarray):
-        inds     = np.roll(np.repeat(intervals.ravel(), 2), -1)
-        inds[-1] = len(data)
-        inds     = inds.reshape((len(inds)//2, 2))
+        inds     = np.insert(intervals.ravel(), intervals.size-1, len(data))
+        inds     = as_strided(inds,
+                              shape   = (len(inds)-1, 2),
+                              strides = (inds.strides[0],)*2)
+
         dtype    = np.dtype([('c', 'i4'), ('m', 'f4')])
         def _stats(i):
             count = (~np.isnan(data[i[0]:i[1]])).sum()
             mean  = 0. if count == 0 else np.nanmean(data[i[0]:i[1]])
             return np.array([(count, mean)], dtype = dtype)
 
-        return np.apply_along_axis(_stats, 1, inds).reshape(intervals.shape)
+        tmp = np.apply_along_axis(_stats, 1, inds)
+        return tmp.reshape(intervals.shape)
 
     def __initprobs(self, stats):
         fcn = lambda i: norm.value(self.isequal, stats[i,0], stats[i+1,0])
