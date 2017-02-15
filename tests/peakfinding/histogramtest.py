@@ -4,7 +4,8 @@ u"Tests histogram  creation and analysis"
 import numpy as np
 from numpy.testing import assert_equal, assert_allclose
 
-from peakfinding.histogram import Histogram, CWTPeakFinder, ZeroCrossingPeakFinder
+from peakfinding.histogram import (Histogram, CWTPeakFinder,
+                                   ZeroCrossingPeakFinder, GroupByPeak)
 
 def test_histogram():
     u"tests histogram creation"
@@ -56,5 +57,21 @@ def test_peakfinder():
     peaks = ZeroCrossingPeakFinder(fitmode = 'gaussian')(out, xmin, bwidth)
     assert_allclose(peaks, truth, rtol = 1e-2)
 
+def test_peakgroupby():
+    u"testing group by peaks"
+    events = [[1.0, 2.0, 10.0, 20.],
+              [1.1, 2.1, 10.1, 20.],
+              [1.2, 2.2, 10.2, 20.],
+              [0.9, 1.9, 9.9,  15.],
+              [0.8, 1.8, 9.8,  20.],
+              [15.]]
+
+    peaks = [1., 2., 10., 20.]
+    res   = GroupByPeak(window = 1, mincount = 5)(peaks, events)
+
+    inf   = np.iinfo('i4').max
+    assert_equal([len(i) for i in res], [4]*5+[1])
+    assert_equal(np.concatenate(res), [0, 1, 2, inf]*5+[inf])
+
 if __name__ == '__main__':
-    test_peakfinder()
+    test_peakgroupby()

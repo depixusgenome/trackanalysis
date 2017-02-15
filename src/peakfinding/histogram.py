@@ -269,27 +269,31 @@ class GroupByPeak:
     def __init__(self, **_):
         pass
 
+    def _bins(self, peaks:np.ndarray):
+        bins      = (np.repeat(peaks, 2).reshape((len(peaks), 2))
+                     + [-self.window, self.window]).ravel()
+        diff      = bins[1:-1].reshape((len(peaks)-1,2))
+        div       = np.where(np.diff(diff, 1) < 0)[0]
+        diff[div] = np.mean(diff[div], 1)
+        bins      = np.delete(bins, 2*div+1)
+
+        inds      = np.full((len(bins)+1,), len(peaks), dtype = 'i4')
+        inds[np.searchsorted(bins, peaks)] = np.arange(len(peaks))
+        return bins, inds
+
     def __call__(self, peaks, elems):
-        bins  = np.copy(peaks)
-        diff  = np.diff(bins)
-        todiv = diff < self.window*2.
-        toadd = np.nonzero(~todiv)[0]+1
+        bins, inds = self._bins(peaks)
 
-        bins[todiv]  += diff[todiv]*.5
-        bins[~todiv] += self.window
-        bins         = np.insert(bins, toadd, peaks[toadd] - self.window)
-        bins         = np.insert(bins,
-                                 [0, len(bins)],
-                                 (peaks[0]-self.window, peaks[-1]+self.window))
-        bins        += self.window
+        ids      = inds[np.digitize(np.concatenate(elems), bins)]
 
-        inds         = np.arange(len(peaks), dytpe = 'bool')
-        inds         = np.insert(inds, toadd, len(peaks))
-        inds         = np.insert(inds, [0, len(inds)], len(peaks))
+        cnts     = np.bincount(ids)
+        cnts[-1] = 0
+        bad      = np.where(cnts < self.mincount)[0]
 
-        digitized    = inds[np.digitize(elems)]
-        cnts         = np.bincount(digitized.ravel())[:-1]
-        bad          = cnts[cnts < self.mincount]
+        ids[np.in1d(ids, bad)] = np.iinfo('i4').max
 
-        digitized[np.in1d(digitized, bad)] = len(peaks)+2
-        return digitized
+        sizes    = np.insert(np.cumsum([len(i) for i in elems]), 0, 0)
+        sizes    = as_strided(sizes,
+                              shape   = (len(sizes)-1, 2),
+                              strides = (sizes.strides[0],)*2)
+        return np.array([ids[i:j] for i, j in sizes], dtype = 'O')
