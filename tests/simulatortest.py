@@ -3,11 +3,12 @@
 u"Tests the simulator"
 
 import numpy as np
+from   numpy.testing import assert_allclose
 from simulator import TrackSimulator
 
 def test_bead_simulator():
     u"testing the cordrift processor"
-    bead  = TrackSimulator(ncycles = 1)
+    bead  = TrackSimulator(ncycles = 1, baselineargs = None)
     drift = bead.drift
     data  = bead(seed = 0)
 
@@ -18,17 +19,29 @@ def test_bead_simulator():
     assert data.shape ==  (149,)
     assert all(data == bead(seed = 0))
 
-    data = TrackSimulator(ncycles = 5)()
+    data = TrackSimulator(ncycles = 5, baselineargs = None)()
     assert data.shape == (149*5,)
     assert any(data[:149] != data[149:149*2])
 
-    sim    = TrackSimulator(brownian  = 0., randtargs = None, ncycles = 2)
+    sim    = TrackSimulator(ncycles      = 2,
+                            brownian     = None,
+                            randtargs    = None,
+                            baselineargs = None)
     data   = sim()
     cycles = slice(*sim.cycles[0][[5,6]])
     drift  = sim.drift[cycles]
     assert data.shape == (149*2,)
     assert all(data[:149] == data[149:149*2])
-    np.testing.assert_allclose(data[cycles], drift)
+    assert_allclose(data[cycles], drift)
+
+    bline  = TrackSimulator(baselineargs = (1., 5, False)).baseline(10)
+    assert bline.shape == (10, 149)
+    assert_allclose(bline.ravel(), np.cos(np.arange(1490)*.4*np.pi/149.))
+
+    bline  = TrackSimulator(baselineargs = (1., 5, True)).baseline(2)
+    assert bline.shape == (2, 149)
+    assert_allclose(bline[0], [1.]*149)
+    assert_allclose(bline[1], [np.cos(.4*np.pi)]*149)
 
 if __name__ == '__main__':
     test_bead_simulator()

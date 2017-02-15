@@ -1,25 +1,39 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Simulates track files"
-from    typing import Sequence, Union
+from    typing import Sequence, Union, Tuple, Optional # pylint: disable=unused-import
 import  random
 import  numpy as np
 
+from    utils   import initdefaults
 from    data    import Track
 
 class TrackSimulatorConfig:
     u"Config for simulating bead data over a number of cycles"
-    def __init__(self, **kwa):
-        self.ncycles   = kwa.get('ncycles',   15)
-        self.phases    = kwa.get('phases',    [ 1,  15,  1, 15,  1, 100,  1,  15])
-        self.zmax      = kwa.get('zmax',      [ 0., 0., 1., 1., 0., 0., -.3, -.3])
-        self.brownian  = kwa.get('brownian',  [.003] * 8)
-        self.randzargs = kwa.get('randzargs', (0., .1, .9))
-        self.randtargs = kwa.get('randtargs', (10, 100))
-        self.driftargs = kwa.get('driftargs', (.1, 29.))
+    ncycles      = 15
+    phases       = [ 1,  15,  1, 15,  1, 100,  1,  15]
+    zmax         = [ 0., 0., 1., 1., 0., 0., -.3, -.3]
+    brownian     = [.003] * 8       # type: Union[None, float, Sequence[float]]
+    randzargs    = (0., .1, .9)     # type: Optional[Tuple[float, float, float]]
+    randtargs    = (10, 100)        # type: Optional[Tuple[int, int]]
+    baselineargs = (.1, 10.1, True) # type: Optional[Tuple[float, float, bool]]
+    driftargs    = (.1, 29.)        # type: Optional[Tuple[float, float]]
+    @initdefaults('ncycles', 'phases', 'zmax', 'brownian', 'randzargs',
+                  'randtargs', 'baselineargs', 'driftargs')
+    def __init__(self, **_):
+        pass
 
 class TrackSimulator(TrackSimulatorConfig):
     u"Simulates bead data over a number of cycles"
+    def addtemplate(self, cycles):
+        u"basic shape of a cycle, without drift or events"
+        rng  = [self.zmax[-1]]+list(self.zmax)
+        ends = np.insert(np.cumsum(self.phases), 0, 0)
+        for i in range(len(self.phases)):
+            rho    = (rng[i+1]-rng[i])/(ends[i+1]-ends[i])
+            dat    = cycles[:,ends[i]:ends[i+1]]
+            dat[:] = rho * np.arange(ends[i+1]-ends[i])+rng[i]
+
     def randz(self, pos):
         u"Random z value for an event."
         floor, scale, maxz = self.randzargs
@@ -30,6 +44,41 @@ class TrackSimulator(TrackSimulatorConfig):
     def randt(self, _):
         u"random event duration"
         return random.randint(*self.randtargs)
+
+    def addevents(self, cycles):
+        u"add events to the cycles"
+        if None in (self.randtargs, self.randzargs):
+            return
+
+        for cyc in cycles[:,sum(self.phases[:5]) : sum(self.phases[:6])]:
+            pos = None
+            while len(cyc):
+                pos        = self.randz(pos)
+                ind        = self.randt(pos)
+                cyc[:ind] += pos
+                cyc        = cyc[len(cyc[:ind]):]
+
+    def baseline(self, ncycles):
+        u"The shape of the baseline"
+        size = sum(self.phases)
+        if self.baselineargs is None:
+            return np.zeros((ncycles, size), dtype = 'f4')
+
+        amp, scale, stairs = self.baselineargs
+        if stairs:
+            base = np.repeat(np.cos(np.arange(ncycles)*2.*np.pi/scale) * amp, size)
+        else:
+            base = np.cos(np.arange(ncycles*size)*2.*np.pi/(size*scale)) * amp
+
+        base = base.reshape((ncycles, size))
+        return base
+
+    def addbaseline(self, cycles):
+        u"add events to the cycles"
+        if self.baselineargs is None:
+            return
+
+        cycles += self.baseline(len(cycles))
 
     @property
     def drift(self):
@@ -56,28 +105,6 @@ class TrackSimulator(TrackSimulatorConfig):
 
         cycles[:,:size] += driftup
         cycles[:,size:] += driftdown[1:]
-
-    def addbasic(self, cycles):
-        u"basic shape of a cycle, without drift or events"
-        rng  = [self.zmax[-1]]+list(self.zmax)
-        ends = np.insert(np.cumsum(self.phases), 0, 0)
-        for i in range(len(self.phases)):
-            rho    = (rng[i+1]-rng[i])/(ends[i+1]-ends[i])
-            dat    = cycles[:,ends[i]:ends[i+1]]
-            dat[:] = rho * np.arange(ends[i+1]-ends[i])+rng[i]
-
-    def addevents(self, cycles):
-        u"add events to the cycles"
-        if None in (self.randtargs, self.randzargs):
-            return
-
-        for cyc in cycles[:,sum(self.phases[:5]) : sum(self.phases[:6])]:
-            pos = None
-            while len(cyc):
-                pos        = self.randz(pos)
-                ind        = self.randt(pos)
-                cyc[:ind] += pos
-                cyc        = cyc[len(cyc[:ind]):]
 
     _NONE = type('__none__', tuple(), {})
     def addbrownian(self, cycles, brownian = _NONE):
@@ -116,9 +143,10 @@ class TrackSimulator(TrackSimulatorConfig):
     def __call__(self, seed = None):
         self.seed(seed)
         cycles = np.zeros((self.ncycles, sum(self.phases)), dtype = 'f4')
-        self.addbasic(cycles)
-        self.adddrift(cycles)
-        self.addevents(cycles)
+        self.addtemplate(cycles)
+        self.addevents  (cycles)
+        self.addbaseline(cycles)
+        self.adddrift   (cycles)
         self.addbrownian(cycles)
         return cycles.ravel()
 
