@@ -4,7 +4,7 @@ u"Tests the simulator"
 
 import numpy as np
 from   numpy.testing import assert_allclose
-from   simulator import TrackSimulator, PeakSimulator
+from   simulator import TrackSimulator, randpeaks, randbead
 
 def test_track_simulator():
     u"testing raw data simulation"
@@ -19,7 +19,7 @@ def test_track_simulator():
     assert data.shape ==  (149,)
     assert all(data == bead(seed = 0))
 
-    data = TrackSimulator(ncycles = 5, baselineargs = None)()
+    data = randbead(ncycles = 5, baselineargs = None)
     assert data.shape == (149*5,)
     assert any(data[:149] != data[149:149*2])
 
@@ -45,10 +45,12 @@ def test_track_simulator():
 
 def test_peak_simulator():
     u"testing peak data simulation"
-    res = PeakSimulator()(100, seed = 0)
+    res = randpeaks(100, peaks = np.array([10, 20, 30]), rates = .5, seed = 0)
     assert len(res) == 100
     assert {len(i) for i in res} == {0, 1, 2, 3}
-    assert max(*(i.max()-i.min() for i in res)) > 10.
+    vals = [i.max()-i.min() for i in res if len(i) == 3]
+    assert max(*vals) > 20.
+    assert min(*vals) < 20.
 
 if __name__ == '__main__':
-    test_peak_simulator()
+    test_track_simulator()
