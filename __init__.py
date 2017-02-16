@@ -291,7 +291,7 @@ def kwargsdefaults(*items):
         items = items[0]
 
     if len(items) == 1 and callable(items[0]):
-        fields   = lambda x: frozenset(i for i in x.__dict__ if i[0] != '_')
+        fields   = lambda x: frozenset(i for i in x.__dict__ if i[0] != i[0].upper())
     else:
         assert len(items) and all(isinstance(i, str) for i in items)
         accepted = frozenset(items)
@@ -323,9 +323,10 @@ def initdefaults(*attrs, roots = ('',)):
         attrs = ()
 
     if len(attrs) == 0:
-        attrs = tuple(i for i in _stack()[1][0].f_locals.keys() if i[0] != '_')
+        attrs = tuple(i for i in _stack()[1][0].f_locals.keys())
 
     assert len(attrs) and all(isinstance(i, str) for i in attrs)
+    attrs = tuple(i for i in attrs if i[0].upper() != i[0])
 
     none = type('None', (), {})
     def _wrapper(fcn):
