@@ -7,24 +7,18 @@ regroups functions and classes to assemble a sequence
 
 import sys
 from itertools import combinations
-import random
 from copy import deepcopy
+from typing import Callable # pylint: disable=unused-import
 import numpy
 from scipy.optimize import basinhopping,OptimizeResult
 from scipy.stats import truncnorm
 from sequences import OligoHit
-
+from utils import initdefaults
 
 # Fixed parameters
 # bp_to_nm = 1.100
 # error_in_z = 3, in nanometers
 # (rounded) error_in_bp = 3
-
-# to do :
-#    * include a position in base pairs
-#    * check the overlap
-#    * change the steps from permutations to gaussian scale
-#    * make unit tests
 
 # to benchmark:
 #    * fix size of sequences, vary size of oligos and overlap
@@ -43,31 +37,25 @@ def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argumen
     '''
     return OptimizeResult(x=xinit, fun=fun(xinit), success=True, nfev=1)
 
-def gen_sequence(length=1000): # move to simulation file
-    u'''
-    generates a sequence of defined length
-    '''
-    return "".join(random.choice("atcg") for i in range(length))
-
 class HoppingSteps:
     u'''
     Class to define boundaries, steps for basinhopping
     Can forbid flipping of peaks within the same batch
     '''
     def __init__(self,**kwargs):
-        self.min_bpos = kwargs.get("min_bpos",0) # in number of bases
-        self.max_bpos = kwargs.get("max_bpos",sys.maxsize) # in number of bases
+        self.min_x = kwargs.get("min_x",0) # in number of bases
+        self.max_x = kwargs.get("max_x",sys.maxsize) # in number of bases
         self.scale = kwargs.get("scale",1) # in number of bases
     def __call__(self,xstate):
-        pass
+        return rtruncnorm_step(self,xstate)
 
 def rtruncnorm_step(obj:HoppingSteps,xstate):
     u'''
     rounded and truncated normal step
     '''
     assert isinstance(obj,HoppingSteps)
-    xstate = numpy.round([truncnorm.rvs(a=(obj.min_bpos-i)/obj.scale,
-                                        b=(obj.max_bpos-i)/obj.scale,
+    xstate = numpy.round([truncnorm.rvs(a=(obj.min_x-i)/obj.scale,
+                                        b=(obj.max_x-i)/obj.scale,
                                         loc=i,
                                         scale=obj.scale) for i in xstate])
     return xstate
@@ -112,16 +100,16 @@ def oligos_from_bpos(olis,bpos):
         oligos[idx].bpos=val
     return oligos
 
-def noverlap_bpos_energy(oligos): # to optimize
+def noverlaps_energy(oligos):
     u'''use noverlap_bpos to compute energy
     '''
     energy=0
-    for it1,it2 in combinations(oligos,2):
-        energy-=OligoHit.noverlap_bpos(it1,it2)**2
+    for ol1,ol2 in combinations(oligos,2):
+        energy-=ol1.noverlaps(ol2)**2
 
     return energy
 
-def tail_overlap_energy(oligos)->float: # ok-ish
+def tail_overlap_energy(oligos)->float:
     u'''
     sort by bpos and apply tail_overlap
     '''
@@ -146,3 +134,46 @@ def fit_oligos(oligos,energy_func,**kwargs):
     xstate0 = numpy.array([i.pos for i in oligos])
     hopp = basinhopping(energy_func,xstate0,**kwargs)
     return hopp
+
+
+class AssembleSimulator():
+    u'''Simulator class for assembling sequences
+    '''
+    callback = None # type: Callable
+    minimizer = no_minimizer # type: Callable
+    state_init = None # type: numpy.ndarray
+    state = None # type: numpy.ndarray
+    func = None # type: Callable[[numpy.ndarray],float]
+    acceptance = None # type: Callable
+    niter = 1000
+    result = None
+    step = HoppingSteps()
+
+    @initdefaults
+    def __init__(self,**_):
+        pass
+
+    def run_nsteps(self,nsteps:int,**_)->None:
+        u'''runs a specified number of steps
+        '''
+        if self.state is None:
+            self.state=self.state_init
+        self.result = basinhopping(self.func,
+                                   self.state,
+                                   take_step=self.step,
+                                   accept_test=self.acceptance,
+                                   minimizer_kwargs=dict(method=self.minimizer),
+                                   callback=self.callback,
+                                   niter=nsteps,
+                                   **_)
+        self.update(self.result)
+
+    def run(self):
+        u'runs niter steps'
+        self.run_nsteps(self.niter)
+
+    def update(self,result:OptimizeResult):
+        u'''
+        update the simulator from result
+        '''
+        self.state = result.x
