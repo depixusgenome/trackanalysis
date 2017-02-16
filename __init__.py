@@ -4,7 +4,7 @@ u"utils"
 from copy           import deepcopy
 from contextlib     import contextmanager
 from inspect        import (signature, ismethod as _ismeth, isfunction as _isfunc,
-                            getmembers, isgeneratorfunction)
+                            getmembers, isgeneratorfunction, stack as _stack)
 from functools      import wraps
 import re
 import pathlib
@@ -314,8 +314,17 @@ def initdefaults(*attrs, roots = ('',)):
     Uses the class attribute to initialize the object's fields if no keyword
     arguments were provided.
     """
+    fcn = None
     if len(attrs) == 1 and isinstance(attrs[0], tuple):
         attrs = attrs[0]
+
+    if len(attrs) == 1 and callable(attrs[0]):
+        fcn   = attrs[0]
+        attrs = ()
+
+    if len(attrs) == 0:
+        attrs = tuple(i for i in _stack()[1][0].f_locals.keys() if i[0] != '_')
+
     assert len(attrs) and all(isinstance(i, str) for i in attrs)
 
     none = type('None', (), {})
@@ -340,4 +349,4 @@ def initdefaults(*attrs, roots = ('',)):
                     setattr(self, name, deepcopy(clsdef))
         return __init__
 
-    return _wrapper
+    return _wrapper if fcn is None else _wrapper(fcn)
