@@ -5,7 +5,7 @@ from    typing import Sequence, Union, Tuple, Optional # pylint: disable=unused-
 import  random
 import  numpy as np
 
-from    utils   import initdefaults
+from    utils   import initdefaults, kwargsdefaults
 from    data    import Track
 
 class TrackSimulatorConfig:
@@ -18,8 +18,7 @@ class TrackSimulatorConfig:
     randtargs    = (10, 100)        # type: Optional[Tuple[int, int]]
     baselineargs = (.1, 10.1, True) # type: Optional[Tuple[float, float, bool]]
     driftargs    = (.1, 29.)        # type: Optional[Tuple[float, float]]
-    @initdefaults('ncycles', 'phases', 'zmax', 'brownian', 'randzargs',
-                  'randtargs', 'baselineargs', 'driftargs')
+    @initdefaults
     def __init__(self, **_):
         pass
 
@@ -150,6 +149,7 @@ class TrackSimulator(TrackSimulatorConfig):
         self.addbrownian(cycles)
         return cycles.ravel()
 
+    @kwargsdefaults
     def track(self, nbeads = 1., seed = None):
         u"creates a simulated track"
         self.seed(seed)

@@ -375,6 +375,9 @@ class TestTaskControl:
         keys  = set(key for frame in frames for key, _ in frame)
         assert keys == beads
 
-        val = tuple(frames[0][0])[0][1]
+        val = frames[0][0]
         assert type(val)    is numpy.ndarray
         assert type(val[0]) is Cycles
+
+if __name__ == '__main__':
+    TestTaskControl().test_cache()
