@@ -7,38 +7,9 @@ from    typing import (NamedTuple, Optional, # pylint: disable=unused-import
 import  numpy as np
 from    numpy.lib.stride_tricks import as_strided
 
-from    signalfilter import nanhfsigma, samples as _samples
+from    utils        import initdefaults
+from    signalfilter import samples as _samples, PrecisionAlg
 norm = _samples.normal.knownsigma # pylint: disable=invalid-name
-
-class PrecisionAlg:
-    u"Implements precision extraction from data"
-    DATATYPE = Optional[Union[Sequence[np.ndarray],np.ndarray]]
-    def __init__(self, **kwa):
-        self.precision = kwa.get('precision', None) # type: Optional[float]
-
-    def getprecision(self,
-                     precision:Optional[float] = None,
-                     data     :DATATYPE        = tuple()) -> float:
-        u"""
-        Returns the precision, possibly extracted from the data.
-        Raises AttributeError if the precision was neither set nor could be
-        extracted
-        """
-        if precision is None:
-            precision = self.precision
-
-        if precision > 0.:
-            return float(precision)
-        elif isinstance(data, (float, int)):
-            return float(data)
-        elif isinstance(data, Sequence[np.ndarray]):
-            if len(data) == 1:
-                return nanhfsigma(data[0])
-            return np.median(tuple(nanhfsigma(i) for i in data))
-        elif isinstance(data, np.ndarray):
-            return nanhfsigma(data)
-
-        raise AttributeError('Could not extract precision: no data or set value')
 
 class SplitDetector(PrecisionAlg):
     u"""
@@ -51,10 +22,11 @@ class SplitDetector(PrecisionAlg):
     The sigma (precision) is either provided or measured. In the latter case,
     the estimation used is the median-deviation of the derivate of the data.
     """
+    confidence = 0.1 # type: Optional[float]
+    window     = 1
+    @initdefaults
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.confidence = kwa.get('confidence',  0.1) # type: Optional[float]
-        self.window     = kwa.get('window',      1)
 
     def __call__(self,
                  data     : np.ndarray,
@@ -114,11 +86,12 @@ class EventMerger(PrecisionAlg):
     The sigma (precision) is either provided or measured. In the latter case,
     the estimation used is the median-deviation of the derivate of the data.
     """
+    confidence  = 0.1  # type: Optional[float]
+    isequal     = True
+    oneperrange = True
+    @initdefaults
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.confidence  = kwa.get('confidence',  0.1) # type: Optional[float]
-        self.isequal     = kwa.get('isequal',     True)
-        self.oneperrange = kwa.get('oneperrange', True)
 
     @staticmethod
     def __initstats(data : np.ndarray, intervals: np.ndarray):
@@ -216,9 +189,11 @@ class EventSelector:
     * clips the edges
     * makes sure their length is enough
     """
-    def __init__(self, **kwa):
-        self.edgelength = kwa.get('edgelength', 0)
-        self.minlength  = kwa.get('minlength',  5)
+    edgelength = 0
+    minlength  = 5
+    @initdefaults
+    def __init__(self, **_):
+        pass
 
     def __call__(self, intervals: np.ndarray) -> np.ndarray:
         edx  = self.edgelength
@@ -239,11 +214,12 @@ class EventSelector:
 
 class EventDetector(PrecisionAlg):
     u"detects, mergers and selects intervals"
+    split  = SplitDetector()
+    merge  = EventMerger  ()
+    select = EventSelector()
+    @initdefaults
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.split  = kwa.get('split',  None) or SplitDetector(**kwa)
-        self.merge  = kwa.get('merge',  None) or EventMerger  (**kwa)
-        self.select = kwa.get('select', None) or EventSelector(**kwa)
 
     def __call__(self, data:np.ndarray, precision: Optional[float] = None):
         precision = self.getprecision(precision, data)

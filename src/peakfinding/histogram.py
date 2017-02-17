@@ -9,10 +9,11 @@ import  numpy  as     np
 from    numpy.lib.stride_tricks import as_strided
 from    scipy.signal            import find_peaks_cwt
 
-from    utils                   import kwargsdefaults, initdefaults
+from    utils                   import kwargsdefaults, initdefaults, NoArgs
+from    signalfilter            import PrecisionAlg
 from    signalfilter.convolve   import KernelConvolution # pylint: disable=unused-import
 
-class Histogram:
+class Histogram(PrecisionAlg):
     u"""
     Creates a gaussian smeared histogram of events.
 
@@ -29,7 +30,7 @@ class Histogram:
 
     * *events*: A sequence of events, or a sequence of sequence of events. Each event is
       an array of floats.
-    * *delta*: a correction factor on the z-measure to be added to each sequence of events.
+    * *bias*: a correction factor on the z-measure to be added to each sequence of events.
       This can be a float or a sequence of floats. It must then have the same size as *events*.
     * *separate*: whether to produce one histogram for each sequence of sequences of events
       or the sum of all.
@@ -41,37 +42,50 @@ class Histogram:
     """
     edge         = 0
     oversampling = 5
-    precision    = None                 # type: Optional[float]
     zmeasure     = np.nanmean           # type: Optional[Callable]
     weight       = None                 # type: Optional[Callable]
     kernel       = KernelConvolution()  # type: Optional[KernelConvolution]
 
-    @initdefaults('edge', 'oversampling', 'precision', 'zmeasure', 'weight')
+    @initdefaults(set(locals().keys()) - {'kernel'})
     def __init__(self, **kwa):
+        super().__init__(**kwa)
         self.kernel = kwa.get("kernel", KernelConvolution(**kwa))
 
+    @kwargsdefaults
+    def __call__(self,
+                 events   : Union[Iterable[Iterable[float]],
+                                  Iterable[Iterable[np.ndarray]]],
+                 bias     : Union[None,float,np.ndarray] = None,
+                 separate : bool                         = False,
+                ) -> Tuple[Iterator[np.ndarray], float, float]:
+        if isinstance(events, Iterator):
+            events = tuple(events)
+        events = cast(Sequence[Iterable[np.ndarray]], events)
+
+        if len(events) == 0:
+            return np.empty((0,), dtype = 'f4'), np.inf, 0.
+
+        if isinstance(events[0], Iterator):
+            events = tuple(tuple(evts) for evts in events)
+        events = cast(Sequence[Sequence[np.ndarray]], events)
+
+        if np.isscalar(events[0][0]) and self.zmeasure is not None:
+            events = events,
+
+        gen          = self.__compute(events, bias, separate)
+        minv, bwidth = next(gen)
+        return gen, minv, bwidth
+
     @property
-    def exact_oversampling(self) -> float:
-        u"The exact oversampling used: int(oversampling)//2 * 2 +1"
+    def exactoversampling(self) -> int:
+        u"returns the exact oversampling used"
         return (int(self.oversampling)//2) * 2 + 1
 
-    @property
-    def binwidth(self) -> float:
-        u"The width of one bin: precision / exact_oversampling"
-        return self.precision / self.exact_oversampling
-
-    @staticmethod
-    def __eventpositions(events, fcn):
-        if fcn is None:
-            return events
-        else:
-            return np.array([np.fromiter((fcn(i) for i in evts),
-                                         dtype = 'f4', count = len(evts))
-                             for evts in events], dtype = 'O')
-
     def eventpositions(self,
-                       events   : Iterable[Iterable[np.ndarray]],
-                       zmeasure : Union[str,None,Callable] = '--none--') -> np.ndarray:
+                       events   : Union[Iterable[Iterable[float]],
+                                        Iterable[Iterable[np.ndarray]]],
+                       bias     : Union[None,float,np.ndarray] = None,
+                       zmeasure : Union[None,type,Callable]    = NoArgs) -> np.ndarray:
         u"Returns event positions as will be added to the histogram"
         if isinstance(events, Iterator):
             events = tuple(events)
@@ -87,8 +101,27 @@ class Histogram:
         if np.isscalar(events[0][0]):
             events = events,
 
-        fcn = self.zmeasure if zmeasure is '--none--' else zmeasure
-        return self.__eventpositions(events, fcn)
+        fcn = self.zmeasure if zmeasure is NoArgs else zmeasure
+        return self.__eventpositions(events, bias, fcn)
+
+    @classmethod
+    def run(cls, *args, **kwa):
+        u"runs the algorithm"
+        return cls()(*args, **kwa)
+
+    @staticmethod
+    def __eventpositions(events, bias, fcn):
+        if fcn is None or np.isscalar(events[0][0]):
+            res = np.array([np.asarray(evts, dtype = 'f4')
+                            for evts in events], dtype = 'O')
+        else:
+            res = np.array([np.fromiter((fcn(i) for i in evts),
+                                        dtype = 'f4', count = len(evts))
+                            for evts in events], dtype = 'O')
+
+        if bias is not None:
+            return res + np.asarray(bias, dtype = 'f4')
+        return res
 
     @staticmethod
     def __weights(fcn, events):
@@ -106,38 +139,32 @@ class Histogram:
                 cnt = np.bincount(pos, minlength = lenv, weights = weight)
             yield kern(cnt)
 
-    @kwargsdefaults
     def __compute(self,
                   events   : Sequence[Sequence[np.ndarray]],
-                  delta    : Union[None,float,np.ndarray],
+                  bias     : Union[None,float,np.ndarray],
                   separate : bool):
         osamp  = (int(self.oversampling)//2) * 2 + 1
-        bwidth = self.precision/osamp
+        bwidth = self.getprecision(self.precision, events)/osamp
 
-        if self.zmeasure is None:
-            minv = np.min(events)
-            maxv = np.max(events)
-        else:
-            minv = min(np.nanmin(evt) for evts in events for evt in evts)
-            maxv = max(np.nanmax(evt) for evts in events for evt in evts)
+        zmeas  = self.__eventpositions(events, bias, self.zmeasure)
+        if not any(len(i) for i in zmeas):
+            yield (np.inf, 0.)
+            return
 
-        minv -= self.edge*bwidth*osamp
-        maxv += self.edge*bwidth*osamp
-        lenv  = int((maxv-minv)/bwidth)+1
+        minv   = min(min(i) for i in zmeas if len(i)) - self.edge*bwidth*osamp
+        maxv   = max(max(i) for i in zmeas if len(i)) + self.edge*bwidth*osamp
+        lenv   = int((maxv-minv)/bwidth)+1
+
+        zmeas -= minv
+        zmeas /= bwidth
 
         if self.kernel is not None:
             kern = self.kernel(oversampling = osamp, range = 'same')
         else:
             kern = lambda x: x
 
-        zmeas  = self.__eventpositions(events, self.zmeasure)
-        if delta is not None:
-            zmeas += delta
-        zmeas  -= minv
-        zmeas  /= bwidth
         items   = (np.int32(i) for i in zmeas)      # type: ignore
-
-        weight  = self.__weights  (self.weight,   events)
+        weight  = self.__weights(self.weight,   events)
 
         if not separate:
             items = iter((np.concatenate(tuple(items)),))
@@ -146,34 +173,6 @@ class Histogram:
 
         yield (minv, bwidth)
         yield from self.__generate(lenv, kern, items, weight)
-
-    def __call__(self,
-                 events   : Iterable[Iterable[np.ndarray]],
-                 delta    : Union[None,float,np.ndarray] = None,
-                 separate : bool                         = False,
-                 **kwa) -> Tuple[Iterator[np.ndarray], float, float]:
-        if isinstance(events, Iterator):
-            events = tuple(events)
-        events = cast(Sequence[Iterable[np.ndarray]], events)
-
-        if len(events) == 0:
-            return np.empty((0,), dtype = 'f4'), np.inf, 0.
-
-        if isinstance(events[0], Iterator):
-            events = tuple(tuple(evts) for evts in events)
-        events = cast(Sequence[Sequence[np.ndarray]], events)
-
-        if np.isscalar(events[0][0]):
-            events = events,
-
-        gen          = self.__compute(events, delta, separate, **kwa)
-        minv, bwidth = next(gen)
-        return gen, minv, bwidth
-
-    @classmethod
-    def run(cls, *args, **kwa):
-        u"runs the algorithm"
-        return cls()(*args, **kwa)
 
 class FitMode(Enum):
     u"Fit mode for sub-pixel peak finding"
@@ -194,7 +193,7 @@ class _m_SubPixelPeakMixin: # pylint: disable=invalid-name
     def _inds(self, hist):
         raise NotImplementedError()
 
-    def __call__(self, hist, bias:float, rho: float):
+    def __call__(self, hist, bias:float, rho:float):
         inds = self._inds(hist)
         if self.fitwidth is None or self.fitwidth < 1:
             return inds

@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+u"Cycle alignment: define an absolute zero common to all cycles"
+from   typing                   import (Union, Optional, # pylint: disable=unused-import
+                                        Sequence, Iterable, Iterator, cast)
+from   copy                     import copy
+
+import numpy  as     np
+from   numpy.lib.stride_tricks  import as_strided
+
+from   utils                    import kwargsdefaults, setdefault, update, pipe
+from   .histogram               import Histogram
+
+class CorrelationAlignment:
+    u"""
+    Finds biases which correlate best a cycle's histogram to the histogram of
+    all cycles. This repeated multiple times with the latter histogram taking
+    prior biases into account.
+
+    Biases are furthermore centered at zero around their median
+
+    Attributes:
+
+    * *maxmove*:   max amount by which a cycle may be translated.
+    * *nrepeats*:  the number of times the procedure is repeated
+    * *projector*: how to project cycles unto an axis
+    """
+    nrepeats   = 6
+    projector  = Histogram(edge = 5, zmeasure = None)
+    maxmove    = cast(int, pipe('projector.edge'))
+    def __init__(self, **kwa):
+        setdefault(self, 'nrepeats',  kwa)
+        setdefault(self, 'projector', kwa)
+        update    (self.projector,  **kwa)
+        setdefault(self, 'maxmove',   kwa)
+
+    @kwargsdefaults
+    def __call__(self, data: Union[np.ndarray, Iterable[np.ndarray]]) -> np.ndarray:
+        bias         = None
+        osamp        = self.projector.exactoversampling
+        maxt         = 2*self.maxmove*osamp
+
+        project      = copy(self.projector)
+        project.edge = (self.maxmove+project.kernel.width)*2
+        for _ in range(self.nrepeats):
+            hists = project(data, bias = bias, separate = True)[0]
+            hists = tuple(as_strided(cur,
+                                     shape   = (maxt, len(cur)-maxt),
+                                     strides = (cur.strides[0],)*2)
+                          for cur in hists)
+
+            ref   = np.sum  ([cur[maxt//2] for cur in hists], 0)
+
+            cur   = np.array([np.argmax(np.dot(cur, ref)) for cur in hists])
+            cur   = (np.median(cur)-cur) / osamp
+
+            bias  = cur if bias is None else np.add(bias, cur, out = bias)
+
+        return bias
+
+    @classmethod
+    def run(cls, data: Iterable[np.ndarray], **kwa):
+        u"runs the algorithm"
+        return cls(**kwa)(data)

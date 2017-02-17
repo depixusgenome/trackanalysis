@@ -17,7 +17,9 @@ class PeakSimulatorConfig:
     Fields:
 
     * *peaks*:  list of peak positions that can occur
-    * *labels*: list of peak labels. Can be None in which case labels are not returned
+    * *labels*: list of peak labels. Can be None in which case labels are not returned.
+        Can be "peaks" in which case the exact peak positions used as labels.
+        Can be "range" in which case the peak indexes are used as labels.
     * *rates*: peak rates between 0 and 1. This can be a single value in which
         case all peaks have the same rate, or it can be one value per peak. Setting
         this field to *None* is the same as setting it to *1*.
@@ -32,7 +34,7 @@ class PeakSimulatorConfig:
         changing baseline from cycle to cycle or experiment to experiment.
     """
     peaks    = np.arange(10)*10.
-    labels   = None # type: Optional[Sequence]
+    labels   = None # type: Union[None, Sequence, str]
     rates    = .1   # type: Union[None, float, Sequence[float]]
     brownian = .1   # type: Optional[float]
     bias     = .1   # type: Optional[float]
@@ -56,7 +58,11 @@ class PeakSimulator(PeakSimulatorConfig):
             return slice(None, None)
         npeaks = len(self.peaks)
         vals   = np.random.rand(ncycles*npeaks).reshape((ncycles, npeaks))
-        return vals < self.rates
+
+        if np.isscalar(self.rates):
+            return vals < self.rates
+        else:
+            return vals < np.asarray(self.rates)
 
     @staticmethod
     def __shaped(sizes, val):
@@ -68,8 +74,10 @@ class PeakSimulator(PeakSimulatorConfig):
     @classmethod
     def rand(cls, shape, factor):
         u"returns a flat random value"
-        vals = 0. if factor is None else (np.random.rand(shape[-1,-1])*2.-1.)*factor
-        return cls.__shaped(shape, vals)
+        if factor is None:
+            return np.zeros(len(shape), dtype = 'f4')
+        else:
+            return (np.random.rand(len(shape))*2.-1.)*factor
 
     def normal(self, shape):
         u"returns a flat random value"
@@ -82,7 +90,8 @@ class PeakSimulator(PeakSimulatorConfig):
     def __call__(self, ncycles, seed = None):
         self.seed(seed)
         occs   = self.occurence(ncycles)
-        peaks  = np.array([self.peaks[i] for i in occs], dtype = 'O')
+        pos    = np.asarray(self.peaks, dtype = 'f4')
+        peaks  = np.array([pos[i] for i in occs], dtype = 'O')
 
         rngs   = np.concatenate(([0], np.cumsum([len(i) for i in peaks])))
         rngs   = as_strided(rngs, shape = (len(rngs)-1, 2), strides = (rngs.strides[0],)*2)
@@ -90,8 +99,13 @@ class PeakSimulator(PeakSimulatorConfig):
         peaks *= 1.+self.rand(rngs, self.stretch)
         peaks += self.rand(rngs, self.bias)
 
-        if isinstance(self.labels, Sequence):
-            # pylint: disable=unsubscriptable-object
-            return peaks, np.array([self.labels[i] for i in occs], dtype = 'O')
+        if   isinstance(self.labels, str) and self.labels.lower() == 'peaks':
+            pos = np.asarray(self.peaks) # notice that dtype is not specified
+        elif isinstance(self.labels, str) and self.labels.lower() == 'range':
+            pos = np.arange(len(self.peaks))
+        elif isinstance(self.labels, Sequence):
+            pos = np.asarray(self.labels)
         else:
             return peaks
+
+        return peaks, np.array([pos[i] for i in occs], dtype = 'O')
