@@ -131,13 +131,13 @@ class TaskController(Controller):
     @staticmethod
     def defaultopener():
         u"yields default openers"
-        for cls in FileIO.__subclasses__:
+        for cls in FileIO.__subclasses__():
             yield cls().open
 
     @staticmethod
     def defaultsaver():
         u"yields default openers"
-        for cls in FileIO.__subclasses__:
+        for cls in FileIO.__subclasses__():
             yield cls().save
 
     def task(self,
