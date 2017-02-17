@@ -46,10 +46,9 @@ class Histogram(PrecisionAlg):
     weight       = None                 # type: Optional[Callable]
     kernel       = KernelConvolution()  # type: Optional[KernelConvolution]
 
-    @initdefaults(set(locals().keys()) - {'kernel'})
+    @initdefaults(kernel = 'update')
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.kernel = kwa.get("kernel", KernelConvolution(**kwa))
 
     @kwargsdefaults
     def __call__(self,
@@ -179,24 +178,24 @@ class FitMode(Enum):
     quadratic = 'quadratic'
     gaussian  = 'gaussian'
 
-class _m_SubPixelPeakMixin: # pylint: disable=invalid-name
+class SubPixelPeakPosition:
     u"""
     Refines the peak position using a quadratic fit
     """
     fitwidth = 1 # type: Optional[int]
     fitcount = 2
     fitmode  = FitMode.quadratic
-    @initdefaults('fitwidth', 'fitcount', 'fitmode')
+    @initdefaults
     def __init__(self, **_):
         pass
 
-    def _inds(self, hist):
-        raise NotImplementedError()
-
-    def __call__(self, hist, bias:float, rho:float):
-        inds = self._inds(hist)
+    def __call__(self,
+                 hist :Sequence[float],
+                 ainds:Union[int, Sequence[int]],
+                 bias :float = 0.,
+                 rho  :float = 1.):
         if self.fitwidth is None or self.fitwidth < 1:
-            return inds
+            return ainds
 
         if self.fitmode is FitMode.quadratic:
             def _fitfcn(i, j):
@@ -206,18 +205,19 @@ class _m_SubPixelPeakMixin: # pylint: disable=invalid-name
         else:
             fitfcn = lambda i, j: (True, np.average(range(i,j), weights = hist[i:j]))
 
+        inds = (ainds,) if np.isscalar(ainds) else ainds
         for _ in range(self.fitcount):
-            rngs = tuple((max(0,         i-self.fitwidth),
-                          min(len(hist), i+self.fitwidth+1)
-                         ) for i in inds)
+            rngs = ((max(0, i-self.fitwidth), min(len(hist), i+self.fitwidth+1))
+                    for i in cast(Iterable, inds))
 
             fits = tuple(fitfcn(i, j) for i, j in rngs if i+2 < j)
             vals = np.array([fit[1] for fit in fits if fit[0]])
             inds = np.int32(vals+.5) # type: ignore
-        return vals * rho + bias
+        return (vals[0] if np.isscalar(ainds) else vals) * rho + bias
 
-class CWTPeakFinder(_m_SubPixelPeakMixin):
+class CWTPeakFinder:
     u"Finds peaks using scipy's find_peaks_cwt. See the latter's documentation"
+    subpixel      = SubPixelPeakPosition()
     widths        = np.arange(5, 11) # type: Sequence[int]
     wavelet       = None             # type: Optional[Callable]
     max_distances = None             # type: Optional[Sequence[int]]
@@ -225,28 +225,31 @@ class CWTPeakFinder(_m_SubPixelPeakMixin):
     min_length    = None             # type: Optional[int]
     min_snr       = 1.
     noise_perc    = 10.
-    @initdefaults('widths', 'wavelet', 'max_distances', 'gap_tresh',
-                  'min_length', 'min_snr', 'noise_perc')
+    @initdefaults(subpixel = 'update')
     def __init__(self, **_):
-        super().__init__(**_)
+        pass
 
-    def _inds(self, hist):
+    def __call__(self, hist: np.ndarray, bias:float = 0., slope:float = 1.):
         vals = find_peaks_cwt(hist, self.widths, self.wavelet, self.max_distances,
                               self.gap_tresh, self.min_length, self.min_snr,
                               self.noise_perc)
-        return np.array(vals)
+        if self.subpixel:
+            vals = self.subpixel(hist, vals)
 
-class ZeroCrossingPeakFinder(_m_SubPixelPeakMixin):
+        return np.asarray(vals) * slope + bias
+
+class ZeroCrossingPeakFinder:
     u"""
     Finds peaks with a minimum *half*width and threshold
     """
+    subpixel  = SubPixelPeakPosition()
     peakwidth = 1
     threshold = getattr(np.finfo('f4'), 'resolution') # type: float
-    @initdefaults('peakwidth', 'threshold')
+    @initdefaults(subpixel = 'update')
     def __init__(self, **_):
-        super().__init__(**_)
+        pass
 
-    def _inds(self, hist):
+    def __call__(self, hist: np.ndarray, bias:float = 0., slope:float = 1.):
         roll                 = np.pad(hist, self.peakwidth, 'edge')
         roll[np.isnan(roll)] = -np.inf
 
@@ -256,7 +259,11 @@ class ZeroCrossingPeakFinder(_m_SubPixelPeakMixin):
 
         maxes = np.apply_along_axis(np.argmax, 1, roll) == self.peakwidth
         inds  = np.where(maxes)[0]
-        return inds[hist[inds] > self.threshold]
+        inds  = inds[hist[inds] > self.threshold]
+
+        if self.subpixel:
+            inds = self.subpixel(hist, inds)
+        return inds * slope + bias
 
 PeakFinder = Union[CWTPeakFinder, ZeroCrossingPeakFinder]
 
@@ -264,7 +271,7 @@ class GroupByPeak:
     u"Groups events by peak position"
     window   = 10
     mincount = 5
-    @initdefaults('window', 'mincount')
+    @initdefaults
     def __init__(self, **_):
         pass
 

@@ -4,7 +4,7 @@ u"utils"
 
 from copy           import deepcopy
 from functools      import wraps
-from typing         import Sequence
+from typing         import Iterable
 from enum           import Enum
 from .inspection    import getlocals
 
@@ -12,7 +12,12 @@ NoArgs = type('NoArgs', (), {})
 
 def toenum(tpe, val):
     u"returns an enum object"
-    if isinstance(val, str):
+    if not isinstance(tpe, type):
+        tpe = type(tpe)
+
+    if not isinstance(tpe, Enum):
+        return val
+    elif isinstance(val, str):
         return tpe.__members__[val]
     elif isinstance(val, int):
         return tpe(val)
@@ -34,8 +39,7 @@ class ChangeFields:
         for name, kwdef in self.items.items():
             self.olds[name] = old = getattr(self.obj, name)
 
-            if isinstance(old, Enum):
-                kwdef  = toenum(old.__class__, kwdef)
+            kwdef = toenum(old, kwdef)
 
             setattr(self.obj, name, kwdef)
         return self.olds
@@ -81,28 +85,25 @@ def setdefault(self, name, kwargs, roots = ('',)):
     Uses the class attribute to initialize the object's fields if no keyword
     arguments were provided.
     """
-    clsdef = getattr(self.__class__, name)
+    clsdef = getattr(type(self), name)
     for root in roots:
         kwdef = kwargs.get(root+name, NoArgs)
 
         if kwdef is NoArgs:
             continue
 
-        if isinstance(clsdef, Enum):
-            setattr(self, name, toenum(clsdef.__class__, kwdef))
-        else:
-            setattr(self, name, kwdef)
-            break
+        setattr(self, name, toenum(clsdef, kwdef))
+        break
     else:
         setattr(self, name, deepcopy(clsdef))
 
-def initdefaults(*attrs, roots = ('',)):
+def initdefaults(*attrs, roots = ('',), **kwa):
     u"""
     Uses the class attribute to initialize the object's fields if no keyword
     arguments were provided.
     """
     fcn = None
-    if len(attrs) == 1 and isinstance(attrs[0], (Sequence, set, frozenset)):
+    if len(attrs) == 1 and isinstance(attrs[0], Iterable):
         attrs = attrs[0]
 
     if len(attrs) == 1 and callable(attrs[0]):
@@ -119,15 +120,32 @@ def initdefaults(*attrs, roots = ('',)):
         @wraps(fcn)
         def __init__(self, *args, **kwargs):
             fcn(self, *args, **kwargs)
+            pipes = []
+            cls   = type(self)
             for name in attrs:
-                setdefault(self, name, kwargs, roots)
+                if isinstance(cls.__dict__.get(name, None), AttrPipe):
+                    val = kwargs.get(name, NoArgs)
+                    if val is not NoArgs:
+                        pipes.append((name, kwargs[name]))
+                else:
+                    setdefault(self, name, kwargs, roots)
+
+            for name, val in kwa.items():
+                if val.lower() == 'update':
+                    update(getattr(self, name), **kwargs)
+                elif val.lower() == 'set':
+                    setdefault(self, name, kwargs, roots)
+
+            for name, val in pipes:
+                setattr(self, name, toenum(getattr(cls, name), val))
+
         return __init__
 
     return _wrapper if fcn is None else _wrapper(fcn)
 
 def update(obj, **attrs):
     u"Sets field to provided values"
-    for name in frozenset(obj.__dict__) & frozenset(attrs):
+    for name in frozenset(getattr(obj, '__dict__', ())) & frozenset(attrs):
         setattr(obj, name, attrs[name])
 
 class AttrPipe:

@@ -8,10 +8,11 @@ from   copy                     import copy
 import numpy  as     np
 from   numpy.lib.stride_tricks  import as_strided
 
-from   utils                    import kwargsdefaults, setdefault, update, pipe
-from   .histogram               import Histogram
+from   utils                    import kwargsdefaults, pipe, initdefaults
+from   .histogram               import (Histogram,       # pylint: disable=unused-import
+                                        SubPixelPeakPosition)
 
-class CorrelationAlignment:
+class PeakCorrelationAlignment:
     u"""
     Finds biases which correlate best a cycle's histogram to the histogram of
     all cycles. This repeated multiple times with the latter histogram taking
@@ -28,11 +29,19 @@ class CorrelationAlignment:
     nrepeats   = 6
     projector  = Histogram(edge = 5, zmeasure = None)
     maxmove    = cast(int, pipe('projector.edge'))
-    def __init__(self, **kwa):
-        setdefault(self, 'nrepeats',  kwa)
-        setdefault(self, 'projector', kwa)
-        update    (self.projector,  **kwa)
-        setdefault(self, 'maxmove',   kwa)
+    subpixel   = None                               # type: Optional[SubPixelPeakPosition]
+    @initdefaults(locals().keys(), projector = 'update')
+    def __init__(self, **_):
+        pass
+
+    def __argmax(self, cur, ref):
+        arr = np.dot(cur, ref)
+        ind = np.argmax(arr)
+        if self.subpixel is None:
+            return ind
+
+        subp = self.subpixel(arr, ind)              # pylint: disable=not-callable
+        return ind if subp is None else subp
 
     @kwargsdefaults
     def __call__(self, data: Union[np.ndarray, Iterable[np.ndarray]]) -> np.ndarray:
@@ -51,11 +60,10 @@ class CorrelationAlignment:
 
             ref   = np.sum  ([cur[maxt//2] for cur in hists], 0)
 
-            cur   = np.array([np.argmax(np.dot(cur, ref)) for cur in hists])
+            cur   = np.array([self.__argmax(cur, ref) for cur in hists])
             cur   = (np.median(cur)-cur) / osamp
 
             bias  = cur if bias is None else np.add(bias, cur, out = bias)
-
         return bias
 
     @classmethod

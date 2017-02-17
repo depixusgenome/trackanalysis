@@ -74,4 +74,4 @@ def test_peakgroupby():
     assert_equal(np.concatenate(res), [0, 1, 2, inf]*5+[inf])
 
 if __name__ == '__main__':
-    test_peakgroupby()
+    test_peakfinder()

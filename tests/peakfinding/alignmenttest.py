@@ -3,16 +3,17 @@
 u"Tests cycle alignments"
 import numpy as np
 
-from peakfinding.alignment  import CorrelationAlignment
+from peakfinding.alignment  import PeakCorrelationAlignment
 from simulator              import randpeaks
 
-CORR = lambda f, a, b, c, d, e: (CorrelationAlignment.run(f,
-                                                          precision     = 1.,
-                                                          oversampling  = a,
-                                                          maxmove       = b,
-                                                          nrepeats      = c,
-                                                          kernel_window = d,
-                                                          kernel_width  = e))
+CORR = lambda f, a, b, c, d, e: (PeakCorrelationAlignment.run(f,
+                                                              subpixel      = None,
+                                                              precision     = 1.,
+                                                              oversampling  = a,
+                                                              maxmove       = b,
+                                                              nrepeats      = c,
+                                                              kernel_window = d,
+                                                              kernel_width  = e))
 
 def test_correlationalignment():
     u"align on best correlation"
