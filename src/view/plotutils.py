@@ -8,7 +8,7 @@ from bokeh.models           import Row
 from bokeh.core.properties  import Dict, String, Float
 
 from control                import Controller
-from utils                  import coffee
+from utils.gui              import coffee
 
 
 class DpxKeyedRow(Row):

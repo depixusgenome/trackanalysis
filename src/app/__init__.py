@@ -3,18 +3,18 @@
 u"Updates app manager so as to deal with controllers"
 from functools  import wraps
 
-from flexx.webruntime               import launch as _flexxlaunch
-from flexx.webruntime.common        import StreamReader
-from bokeh.server.server            import Server
-from bokeh.application              import Application
-from bokeh.application.handlers     import FunctionHandler
-from bokeh.command.util             import build_single_handler_application
-from bokeh.settings                 import settings
+from flexx.webruntime           import launch as _flexxlaunch
+from flexx.webruntime.common    import StreamReader
+from bokeh.server.server        import Server
+from bokeh.application          import Application
+from bokeh.application.handlers import FunctionHandler
+from bokeh.command.util         import build_single_handler_application
+from bokeh.settings             import settings
 
-from utils          import MetaMixin
-from control        import Controller
-from view           import View, BokehView
-from view.keypress  import KeyPressManager
+from utils.gui     import MetaMixin
+from control       import Controller
+from view          import View, BokehView
+from view.keypress import KeyPressManager
 
 def _serverkwargs(kwa):
     server_kwargs                         = dict(kwa)
