@@ -13,7 +13,7 @@ def test_beadprocess():
                             BeadDriftTask()))
     cycs = next(i[...,...] for i in pair.run()).withphases(5,5)
     for _, val in cycs:
-        assert_allclose(val, val.mean(), atol = 1e-8)
+        assert_allclose(val, val.mean(), rtol = 1e-5, atol = 1e-8)
 
     pair = TaskPair.create((TrackSimulatorTask(brownian  = 0.),
                             BeadDriftTask()))
@@ -45,4 +45,4 @@ def test_cycleprocess():
         assert_allclose(val-val[0], 0., atol = 1e-4)
 
 if __name__ == '__main__':
-    test_cycleprocess()
+    test_beadprocess()
