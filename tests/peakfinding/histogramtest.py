@@ -73,5 +73,15 @@ def test_peakgroupby():
     assert_equal([len(i) for i in res], [4]*5+[1])
     assert_equal(np.concatenate(res), [0, 1, 2, inf]*5+[inf])
 
+    peaks = [1.35869305, 9.76442809, 19.65128766]
+    elems = [np.array([0.954, 1.798, 9.984, 20.033], dtype='f4'),
+             np.array([0.564, 1.907, 10.06, 20.072], dtype='f4'),
+             np.array([1.185, 1.794, 9.708, 19.396], dtype='f4'),
+             np.array([1.159, 2.116, 9.692, 19.343], dtype='f4'),
+             np.array([1.054, 1.928, 9.941, 19.806], dtype='f4')]
+    ret   = GroupByPeak(window = 10, mincount = 5)(peaks, elems)
+    for i in ret:
+        assert all(i == np.array([0, 0, 1, 2]))
+
 if __name__ == '__main__':
     test_peakfinder()

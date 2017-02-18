@@ -8,7 +8,7 @@ from   copy                     import copy
 import numpy  as     np
 from   numpy.lib.stride_tricks  import as_strided
 
-from   utils                    import kwargsdefaults, pipe, initdefaults
+from   utils                    import kwargsdefaults, initdefaults
 from   .histogram               import (Histogram,       # pylint: disable=unused-import
                                         SubPixelPeakPosition)
 
@@ -27,8 +27,8 @@ class PeakCorrelationAlignment:
     * *projector*: how to project cycles unto an axis
     """
     nrepeats   = 6
-    projector  = Histogram(edge = 5, zmeasure = None)
-    maxmove    = cast(int, pipe('projector.edge'))
+    maxmove    = 5
+    projector  = Histogram(zmeasure = None)
     subpixel   = None                               # type: Optional[SubPixelPeakPosition]
     @initdefaults(locals().keys(), projector = 'update')
     def __init__(self, **_):
@@ -45,12 +45,14 @@ class PeakCorrelationAlignment:
 
     @kwargsdefaults
     def __call__(self, data: Union[np.ndarray, Iterable[np.ndarray]]) -> np.ndarray:
-        bias         = None
-        osamp        = self.projector.exactoversampling
-        maxt         = 2*self.maxmove*osamp
+        bias  = None
+        osamp = self.projector.exactoversampling
+        maxt  = 2*self.maxmove*osamp
 
-        project      = copy(self.projector)
-        project.edge = (self.maxmove+project.kernel.width)*2
+        project          = copy(self.projector)
+        project.edge     = (self.maxmove+project.kernel.width)*2
+        project.zmeasure = None
+
         for _ in range(self.nrepeats):
             hists = project(data, bias = bias, separate = True)[0]
             hists = tuple(as_strided(cur,

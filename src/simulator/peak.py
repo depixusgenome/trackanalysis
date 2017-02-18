@@ -52,60 +52,80 @@ class PeakSimulator(PeakSimulatorConfig):
             np.random.seed(seed)
             random.seed(seed)
 
-    def occurence(self, ncycles):
-        u"returns a flat random value"
-        if self.rates is None:
-            return slice(None, None)
+    def selectpeaks(self, ncycles):
+        u"Selects peaks for each cycle"
         npeaks = len(self.peaks)
-        vals   = np.random.rand(ncycles*npeaks).reshape((ncycles, npeaks))
-
-        if np.isscalar(self.rates):
-            return vals < self.rates
+        if self.rates is None:
+            occs = np.ones((ncycles, npeaks), dtype = 'bool')
         else:
-            return vals < np.asarray(self.rates)
+            vals = np.random.rand(ncycles*npeaks).reshape((ncycles, npeaks))
 
-    @staticmethod
-    def __shaped(sizes, val):
-        if np.isscalar(val):
-            return np.full((len(sizes),), val, dtype = 'f4')
-        else:
-            return np.array([val[i:j] for i, j in sizes], dtype = 'O')
+            if np.isscalar(self.rates):
+                occs = vals < self.rates
+            else:
+                occs = vals < np.asarray(self.rates)
 
-    @classmethod
-    def rand(cls, shape, factor):
+        peaks    = np.empty((ncycles,), dtype = 'O')
+        pos      = np.asarray(self.peaks, dtype = 'f4')
+        peaks[:] = [pos[i] for i in occs]
+        return occs, peaks
+
+    def addstretch(self, peaks):
+        u"changes the stretch for each cycle"
+        if self.stretch is None:
+            return
+
+        peaks[:] *= 1. + (np.random.rand(len(peaks))*2.-1.)*self.stretch
+
+    def addbias(self, peaks):
+        u"moves each cycle a bit"
+        if self.bias is None:
+            return
+
+        peaks[:] += (np.random.rand(len(peaks))*2.-1.)*self.bias
+
+    def addbrownian(self, peaks):
         u"returns a flat random value"
-        if factor is None:
-            return np.zeros(len(shape), dtype = 'f4')
-        else:
-            return (np.random.rand(len(shape))*2.-1.)*factor
+        if self.brownian is None:
+            return
 
-    def normal(self, shape):
-        u"returns a flat random value"
-        vals = 0.
-        if self.brownian is not None:
-            vals = np.random.normal(0., self.brownian, shape[-1,-1])
-        return self.__shaped(shape, vals)
+        rngs = np.concatenate(([0], np.cumsum([len(i) for i in peaks])))
+        rngs = as_strided(rngs,
+                          shape   = (len(rngs)-1, 2),
+                          strides = (rngs.strides[0],)*2)
+
+        vals = np.random.normal(0., self.brownian, rngs[-1,-1])
+        for i, sli in enumerate(rngs):
+            peaks[i] += vals[sli[0]:sli[1]]
 
     @kwargsdefaults
     def __call__(self, ncycles, seed = None):
         self.seed(seed)
-        occs   = self.occurence(ncycles)
-        pos    = np.asarray(self.peaks, dtype = 'f4')
-        peaks  = np.array([pos[i] for i in occs], dtype = 'O')
 
-        rngs   = np.concatenate(([0], np.cumsum([len(i) for i in peaks])))
-        rngs   = as_strided(rngs, shape = (len(rngs)-1, 2), strides = (rngs.strides[0],)*2)
-        peaks += self.normal(rngs)
-        peaks *= 1.+self.rand(rngs, self.stretch)
-        peaks += self.rand(rngs, self.bias)
+        occs, peaks = self.selectpeaks(ncycles)
 
-        if   isinstance(self.labels, str) and self.labels.lower() == 'peaks':
-            pos = np.asarray(self.peaks) # notice that dtype is not specified
-        elif isinstance(self.labels, str) and self.labels.lower() == 'range':
-            pos = np.arange(len(self.peaks))
+        self.addbrownian(peaks)
+        self.addstretch (peaks)
+        self.addbias    (peaks)
+
+        return self.__return(occs, peaks)
+
+    def __return(self, occs, peaks):
+        if   isinstance(self.labels, str):
+            flag = self.labels.lower()
+            if flag == 'peaks':
+                pos = np.asarray(self.peaks) # notice that dtype is not specified
+            elif flag == 'range':
+                pos = np.arange(len(self.peaks))
+            else:
+                raise KeyError()
+
         elif isinstance(self.labels, Sequence):
             pos = np.asarray(self.labels)
+
         else:
             return peaks
 
-        return peaks, np.array([pos[i] for i in occs], dtype = 'O')
+        labels    = np.empty_like(peaks)
+        labels[:] = [pos[i] for i in occs]
+        return peaks, labels

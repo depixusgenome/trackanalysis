@@ -110,16 +110,18 @@ class Histogram(PrecisionAlg):
 
     @staticmethod
     def __eventpositions(events, bias, fcn):
-        if fcn is None or np.isscalar(events[0][0]):
-            res = np.array([np.asarray(evts, dtype = 'f4')
-                            for evts in events], dtype = 'O')
-        else:
-            res = np.array([np.fromiter((fcn(i) for i in evts),
-                                        dtype = 'f4', count = len(evts))
-                            for evts in events], dtype = 'O')
+        res = np.empty((len(events),), dtype = 'O')
 
-        if bias is not None:
-            return res + np.asarray(bias, dtype = 'f4')
+        if fcn is None or np.isscalar(events[0][0]):
+            res[:] = [np.asarray(evts, dtype = 'f4') for evts in events]
+            if bias is not None:
+                res[:]  = res + np.asarray(bias, dtype = 'f4')
+        else:
+            res[:] = [np.array([fcn(i) for i in evts], dtype = 'f4')
+                      for evts in events]
+
+            if bias is not None:
+                res[:] += np.asarray(bias, dtype = 'f4')
         return res
 
     @staticmethod
@@ -269,21 +271,21 @@ PeakFinder = Union[CWTPeakFinder, ZeroCrossingPeakFinder]
 
 class GroupByPeak:
     u"Groups events by peak position"
-    window   = 10
-    mincount = 5
+    window    = 10
+    mincount  = 5
     @initdefaults
     def __init__(self, **_):
         pass
 
     def _bins(self, peaks:np.ndarray):
-        bins      = (np.repeat(peaks, 2).reshape((len(peaks), 2))
-                     + [-self.window, self.window]).ravel()
-        diff      = bins[1:-1].reshape((len(peaks)-1,2))
-        div       = np.where(np.diff(diff, 1) < 0)[0]
-        diff[div] = np.mean(diff[div], 1)
-        bins      = np.delete(bins, 2*div+1)
+        bins          = (np.repeat(peaks, 2).reshape((len(peaks), 2))
+                         + [-self.window, self.window]).ravel()
+        diff          = bins[1:-1].reshape((len(peaks)-1,2))
+        div           = np.where(np.diff(diff, 1) < 0)[0]
+        bins[2*div+1] = np.mean(diff[div], 1)
+        bins          = np.delete(bins, 2*div+2)
 
-        inds      = np.full((len(bins)+1,), len(peaks), dtype = 'i4')
+        inds          = np.full((len(bins)+1,), len(peaks), dtype = 'i4')
         inds[np.searchsorted(bins, peaks)] = np.arange(len(peaks))
         return bins, inds
 
@@ -293,7 +295,8 @@ class GroupByPeak:
         ids      = inds[np.digitize(np.concatenate(elems), bins)]
 
         cnts     = np.bincount(ids)
-        cnts[-1] = 0
+        if len(cnts) == ids[0]:
+            cnts[-1] = 0
         bad      = np.where(cnts < self.mincount)[0]
 
         ids[np.in1d(ids, bad)] = np.iinfo('i4').max
@@ -302,4 +305,6 @@ class GroupByPeak:
         sizes    = as_strided(sizes,
                               shape   = (len(sizes)-1, 2),
                               strides = (sizes.strides[0],)*2)
-        return np.array([ids[i:j] for i, j in sizes], dtype = 'O')
+        ret      = np.empty((len(sizes),), dtype = 'O')
+        ret[:]   = [ids[i:j] for i, j in sizes]
+        return ret
