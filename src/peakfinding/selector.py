@@ -10,7 +10,7 @@ from .alignment import PeakCorrelationAlignment
 from .histogram import (Histogram, PeakFinder, # pylint: disable=unused-import
                         ZeroCrossingPeakFinder, GroupByPeak)
 
-class PeakSelector:
+class PeakSelectorConfig:
     u"Selects peaks and yields all events related to each peak"
     histogram = Histogram(edge = 2)
     align     = PeakCorrelationAlignment()
@@ -20,6 +20,8 @@ class PeakSelector:
     def __init__(self, **_):
         pass
 
+class PeakSelector(PeakSelectorConfig):
+    u"Selects peaks and yields all events related to each peak"
     def __call__(self, events, precision = None):
         projector = copy(self.histogram)
         projector.precision = projector.getprecision(precision, events)
