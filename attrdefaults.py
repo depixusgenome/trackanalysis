@@ -15,7 +15,7 @@ def toenum(tpe, val):
     if not isinstance(tpe, type):
         tpe = type(tpe)
 
-    if not isinstance(tpe, Enum):
+    if not issubclass(tpe, Enum):
         return val
     elif isinstance(val, str):
         return tpe.__members__[val]
