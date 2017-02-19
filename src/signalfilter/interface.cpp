@@ -7,9 +7,19 @@
 
 namespace
 {
-    template<typename T>
-    pybind11::array & _run(T const & self, pybind11::array_t<float> & inp)
-    { run(self, inp.size(), inp.mutable_data()); return inp; }
+
+    template <typename T>
+    pybind11::object _get_prec(T const & est)
+    { return est.precision <= 0. ? pybind11::object() : pybind11::cast(est.precision); }
+
+    template <typename T>
+    void _set_prec(T & est, pybind11::object obj)
+    {
+        if(obj.is_none())
+            est.precision = 0.;
+        else
+            est.precision = pybind11::cast<float>(obj);
+    }
 
     template <typename T>
     pybind11::object _get_est(T const & est)
@@ -32,15 +42,66 @@ namespace
             est.estimators[i] = seq[i].cast<size_t>();
     }
 
+    template <typename T>
+    void _get(T & inst, char const * name, pybind11::dict & kwa)
+    {
+        if(kwa.contains(name)) 
+            inst = kwa[name].cast<T>();
+    }
+
+    template <typename T>
+    void _init_other(T &, pybind11::dict) {}
+
+    void _init_other(signalfilter::forwardbackward::Args & inst,
+                     pybind11::dict kwa) 
+    {
+        _get(inst.normalize, "normalize", kwa);
+        _get(inst.window,    "window", kwa);
+    }
+
+    template <typename T>
+    void _init(T & inst, pybind11::kwargs kwa)
+    {
+        new (&inst) T();
+        _get(inst.derivate, "derivate",     kwa);
+        _get(inst.power,    "power",        kwa);
+        if(kwa.contains("precision"))
+            _set_prec(inst, kwa["precision"]);
+        _get(inst.derivate, "derivate",    kwa);
+        if(kwa.contains("estimators"))
+            _set_est(inst, kwa["estimators"]);
+        _init_other(inst, kwa);
+    };
+
+    template <>
+    void _init<signalfilter::clip::Args>(signalfilter::clip::Args & inst,
+                                         pybind11::kwargs kwa)
+    {
+        new (&inst) signalfilter::clip::Args();
+        _get(inst.minval, "minval", kwa);
+        _get(inst.maxval, "maxval", kwa);
+    };
+
+    template<typename T>
+    pybind11::array & _run(T                  const & self,
+                           pybind11::array_t<float> & inp,
+                           pybind11::kwargs           kwa)
+    { 
+        T cpy = self;
+        _init(cpy, kwa);
+        run(cpy, inp.size(), inp.mutable_data());
+        return inp;
+    }
+
     template <typename T, typename K>
     void    _apply(K & cls)
     {
-        cls.def(pybind11::init<>())
+        cls.def("__init__", &_init<T>)
            .def_readwrite("derivate",  &T::derivate)
-           .def_readwrite("precision", &T::precision)
            .def_readwrite("power",     &T::power)
-           .def_property("estimators", _get_est<T>, _set_est<T>)
-           .def("__call__",            _run<T>)
+           .def_property("precision",  _get_prec<T>, _set_prec<T>)
+           .def_property("estimators", _get_est<T>,  _set_est<T>)
+           .def("__call__",            &_run<T>)
            ;
     }
 }
@@ -119,10 +180,10 @@ namespace signalfilter {
         void pymodule(pybind11::module & mod)
         {
             pybind11::class_<Args>(mod, "Clip")
-                .def(pybind11::init<>())
+                .def("__init__", &_init<Args>)
                 .def_readwrite("minval", &Args::minval)
                 .def_readwrite("maxval", &Args::maxval)
-                .def("__call__", _run<Args>)
+                .def("__call__", &_run<Args>)
                 ;
         }
     }

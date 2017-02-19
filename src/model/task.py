@@ -7,10 +7,12 @@ Classes defining a type of data treatment.
 """
 from copy           import deepcopy
 from typing         import (Optional, Sequence,  # pylint: disable=unused-import
-                            Dict)
+                            Dict, Callable)
+from functools      import partial
 from enum           import Enum, unique
+import numpy        as     np
 
-from utils          import toenum
+from utils          import toenum, initdefaults
 from .level         import Level
 
 class TaskIsUniqueError(Exception):
@@ -136,3 +138,37 @@ class CycleCreatorTask(Task):
     def unique(cls):
         u"returns class or parent task if must remain unique"
         return cls
+
+class DataFunctorTask(Task):
+    u"Adds it's task to the TrackItem using *withfunction*"
+    copy     = False
+    beadonly = True
+    @initdefaults
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
+    def __processor__(self):
+        for cls in self.__class__.__bases__:
+            if hasattr(cls, '__call__') and not issubclass(cls, Task):
+                cpy = cls(**self.config())
+                break
+        else:
+            raise TypeError("Could not find a functor base type in "+str(self.__class__))
+
+        if self.copy:
+            fcn = lambda val: cpy(np.copy(val)) # pylint: disable=not-callable
+            return lambda dat: dat.withfunction(fcn, beadonly = self.beadonly)
+        else:
+            return lambda dat: dat.withfunction(cpy, beadonly = self.beadonly)
+
+class ItemFunctorTask(Task):
+    u"Calls it's task with the TrackItem as an argument"
+    @staticmethod
+    def __functor__(cnf, data):
+        raise NotImplementedError()
+
+    def __processor__(self):
+        for cls in self.__class__.__bases__:
+            if hasattr(cls, '__call__') and not issubclass(cls, Task):
+                return partial(self.__functor__, cls(**self.config()))
+        raise TypeError("Could not find a functor base type in "+str(self.__class__))

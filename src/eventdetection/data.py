@@ -7,7 +7,6 @@ import numpy          as     np
 
 from data.trackitems  import Items, Cycles, Level
 from utils            import escapenans
-from signalfilter     import nanhfsigma
 from .                import EventDetectionConfig
 
 class Events(Cycles, EventDetectionConfig, Items):
@@ -27,36 +26,30 @@ class Events(Cycles, EventDetectionConfig, Items):
         super().__init__(**kw)
         EventDetectionConfig.__init__(self, **kw)
 
-    @staticmethod
-    def __escapenans(fcn):
+    def __filterfcn(self):
+        if self.filter is None:
+            return lambda x, _: x
+
+        fcn = deepcopy(self.filter)
+
         @wraps(fcn)
-        def _fcn(cycle):
+        def _fcn(cycle, precision):
             cycle = np.copy(cycle)
             with escapenans(cycle) as arr:
-                fcn(arr)
+                fcn(arr, precision = precision)
             return cycle
         return _fcn
 
     def _iter(self, sel = None):
-        itr  = super()._iter(sel)
-        prec = self.precision
-        if prec in (0, None):
-            data = dict(itr)
-            itr  = iter(data.items())
-            prec = np.median(tuple(nanhfsigma(bead) for bead in data.values()))
+        dtype = np.dtype([('start', 'i4'), ('data', 'O')])
+        prec  = None if self.precision in (0., None) else self.precision
+        track = self.track
+        fcn   = self.__filterfcn()
+        evts  = deepcopy(self.events)
 
-        if self.filter is not None:
-            filt           = deepcopy(self.filter)
-            filt.precision = prec
-            fcn            = self.__escapenans(filt)
-        else:
-            fcn            = lambda x:x
-
-        evts           = deepcopy(self.events)
-        evts.precision = prec
-
-        dtype          = np.dtype([('start', 'i4'), ('data', 'O')])
-        for key, cycle in itr:
-            fdt = fcn(cycle)
-            gen = np.array([(i, cycle[i:j]) for i, j in evts(fdt)], dtype = dtype)
+        for key, cycle in super()._iter(sel):
+            val = evts.rawprecision(track, key[0]) if prec is None else prec
+            fdt = fcn(cycle, val)
+            gen = np.array([(i, cycle[i:j]) for i, j in evts(fdt, precision = val)],
+                           dtype = dtype)
             yield (key, gen)

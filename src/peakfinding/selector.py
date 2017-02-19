@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Selects peaks and yields all events related to each peak"
-from   typing   import  Optional # pylint: disable=unused-import
+from   typing   import  Iterable, Optional
 from   copy     import  copy
 import numpy    as      np
 
 from utils      import initdefaults
 from .alignment import PeakCorrelationAlignment
 from .histogram import (Histogram, PeakFinder, # pylint: disable=unused-import
-                        ZeroCrossingPeakFinder, GroupByPeak)
+                        ZeroCrossingPeakFinder, GroupByPeak, asarray)
 
-class PeakSelectorConfig:
+class PeakSelector:
     u"Selects peaks and yields all events related to each peak"
     histogram = Histogram(edge = 2)
     align     = PeakCorrelationAlignment()
@@ -20,9 +20,10 @@ class PeakSelectorConfig:
     def __init__(self, **_):
         pass
 
-class PeakSelector(PeakSelectorConfig):
-    u"Selects peaks and yields all events related to each peak"
-    def __call__(self, events, precision = None):
+    def __call__(self,
+                 aevents  : Iterable[Iterable[np.ndarray]],
+                 precision: Optional[float] = None):
+        events    = asarray(aevents)
         projector = copy(self.histogram)
         projector.precision = projector.getprecision(precision, events)
 

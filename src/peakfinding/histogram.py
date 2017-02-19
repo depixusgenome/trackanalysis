@@ -13,6 +13,37 @@ from    utils                   import kwargsdefaults, initdefaults, NoArgs
 from    signalfilter            import PrecisionAlg
 from    signalfilter.convolve   import KernelConvolution # pylint: disable=unused-import
 
+
+def _m_asarray(arr:Iterable)-> np.array:
+    tmp = None # type: Optional[Sequence]
+    if isinstance(arr, Iterator):
+        tmp = tuple(arr)
+    elif getattr(arr, 'dtype', '') != 'O':
+        tmp = cast(Sequence, arr)
+    elif getattr(arr, 'dtype', '') == 'O' and len(getattr(arr, 'shape', '')) > 1:
+        tmp = tuple(arr)
+
+    if tmp is None:
+        return arr
+
+    vals    = np.empty((len(tmp),), dtype = 'O')
+    vals[:] = tmp
+    return vals
+
+def asarray(aevents:Iterable[Iterable])->np.ndarray:
+    u"converts  an Iterable[Iterable] to a np.array"
+    events = _m_asarray(aevents)
+    if len(events) == 0:
+        return
+
+    if not np.isscalar(events[0][0]):
+        for i, evt in enumerate(events):
+            events[i] = _m_asarray(evt)
+
+    if not any(len(i) for i in events):
+        return None
+    return events
+
 class Histogram(PrecisionAlg):
     u"""
     Creates a gaussian smeared histogram of events.
@@ -52,21 +83,14 @@ class Histogram(PrecisionAlg):
 
     @kwargsdefaults
     def __call__(self,
-                 events   : Union[Iterable[Iterable[float]],
+                 aevents  : Union[Iterable[Iterable[float]],
                                   Iterable[Iterable[np.ndarray]]],
                  bias     : Union[None,float,np.ndarray] = None,
                  separate : bool                         = False,
                 ) -> Tuple[Iterator[np.ndarray], float, float]:
-        if isinstance(events, Iterator):
-            events = tuple(events)
-        events = cast(Sequence[Iterable[np.ndarray]], events)
-
-        if len(events) == 0:
+        events = asarray(aevents)
+        if events is None:
             return np.empty((0,), dtype = 'f4'), np.inf, 0.
-
-        if isinstance(events[0], Iterator):
-            events = tuple(tuple(evts) for evts in events)
-        events = cast(Sequence[Sequence[np.ndarray]], events)
 
         if np.isscalar(events[0][0]) and self.zmeasure is not None:
             events = events,
@@ -81,21 +105,14 @@ class Histogram(PrecisionAlg):
         return (int(self.oversampling)//2) * 2 + 1
 
     def eventpositions(self,
-                       events   : Union[Iterable[Iterable[float]],
+                       aevents  : Union[Iterable[Iterable[float]],
                                         Iterable[Iterable[np.ndarray]]],
                        bias     : Union[None,float,np.ndarray] = None,
                        zmeasure : Union[None,type,Callable]    = NoArgs) -> np.ndarray:
         u"Returns event positions as will be added to the histogram"
-        if isinstance(events, Iterator):
-            events = tuple(events)
-        events = cast(Sequence[Iterable[np.ndarray]], events)
-
-        if len(events) == 0:
+        events = asarray(aevents)
+        if events is None:
             return np.empty((0,), dtype = 'f4')
-
-        if isinstance(events[0], Iterator):
-            events = tuple(tuple(evts) for evts in events)
-        events = cast(Sequence[Sequence[np.ndarray]], events)
 
         if np.isscalar(events[0][0]):
             events = events,
@@ -292,19 +309,19 @@ class GroupByPeak:
     def __call__(self, peaks, elems):
         bins, inds = self._bins(peaks)
 
-        ids      = inds[np.digitize(np.concatenate(elems), bins)]
-
-        cnts     = np.bincount(ids)
+        ids  = inds[np.digitize(np.concatenate(elems), bins)]
+        cnts = np.bincount(ids)
         if len(cnts) == ids[0]:
             cnts[-1] = 0
-        bad      = np.where(cnts < self.mincount)[0]
+
+        bad  = np.where(cnts < self.mincount)[0]
 
         ids[np.in1d(ids, bad)] = np.iinfo('i4').max
 
-        sizes    = np.insert(np.cumsum([len(i) for i in elems]), 0, 0)
-        sizes    = as_strided(sizes,
-                              shape   = (len(sizes)-1, 2),
-                              strides = (sizes.strides[0],)*2)
-        ret      = np.empty((len(sizes),), dtype = 'O')
-        ret[:]   = [ids[i:j] for i, j in sizes]
+        sizes  = np.insert(np.cumsum([len(i) for i in elems]), 0, 0)
+        sizes  = as_strided(sizes,
+                            shape   = (len(sizes)-1, 2),
+                            strides = (sizes.strides[0],)*2)
+        ret    = np.empty((len(sizes),), dtype = 'O')
+        ret[:] = [ids[i:j] for i, j in sizes]
         return ret

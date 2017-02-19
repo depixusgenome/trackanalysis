@@ -200,5 +200,4 @@ class ProtocolProcessor(Processor):
         return tuple(_run())
 
     def run(self, args:'Runner'):
-        fcn = self.task.__processor__()
-        args.apply(iter(fcn(dat) for dat in fcn))
+        args.apply(self.task.__processor__())
