@@ -9,12 +9,13 @@ from   numpy.lib.stride_tricks import as_strided
 
 from utils              import initdefaults, kwargsdefaults
 from model              import Level
-from data.trackitems    import TrackItems
+from data.trackitems    import Cycles
 
 class FakeTrack:
     u"Placeholder"
     def __init__(self):
-        self.data = dict()
+        self.data  = dict()
+        self.beads = self.data
 
 class PeakSimulatorConfig:
     u"""
@@ -191,7 +192,7 @@ class PeakSimulator(PeakSimulatorConfig):
 
         return self.__return(occs, peaks)
 
-    def events(self, nbeads, ncycles, seed = None) -> TrackItems:
+    def events(self, nbeads, ncycles, seed = None) -> Cycles:
         u"Creates events in a Events object"
         self.seed(seed)
         track = FakeTrack()
@@ -199,4 +200,4 @@ class PeakSimulator(PeakSimulatorConfig):
         for bead in range(nbeads):
             track.data[bead], allevts = self.peakstoevents(self(ncycles))
             evts.update(((bead, cid), evts) for cid, evts in enumerate(allevts))
-        return TrackItems(track = track, data = evts, level = Level.event)
+        return Cycles(track = track, data = evts, direct = True, level = Level.event)

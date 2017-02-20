@@ -40,7 +40,8 @@ class PeakSelector:
         peaks = self.find (next(hist[0]), *hist[1:])
         ids   = self.group(peaks, pos)
         for i, peak in enumerate(peaks):
-            evts = np.array([evts[ind == i] for evts, ind in zip(events, ids)],
+            evts = np.array([np.concatenate(tuple(elems[ind == i]))
+                             for elems, ind in zip(events, ids)],
                             dtype = 'O')
             if any(len(i) for i in evts):
                 yield (peak, evts+delta)

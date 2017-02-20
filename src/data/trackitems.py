@@ -376,15 +376,37 @@ class Cycles(TrackItems, Items):
             else:
                 yield from ((col, thisid) for col in beads)
 
+    def __keysdirect(self, sel):
+        if sel is None:
+            yield from self.data.keys()
+            return
+
+        for thisid in sel:
+            if isinstance(thisid, (tuple, list)):
+                bid, tmp = thisid[0], thisid[1] # type: Union[str,int], Any
+                if bid in _m_ALL and tmp in _m_ALL:
+                    thisid = ...
+                elif bid in _m_ALL:
+                    thisid = tmp
+                elif tmp in _m_ALL:
+                    yield from (i for i in self.data.keys() if i[0] == bid)
+                    continue
+                else:
+                    yield (bid, tmp)
+                    continue
+
+            if thisid in _m_ALL:
+                yield from self.data.keys()
+
+            else:
+                yield from (i for i in self.data.keys() if i[1] == thisid)
+
     def _keys(self, sel) -> Iterable[Tuple[Union[str,int], int]]:
         if isinstance(self.data, Cycles):
             yield from cast(Cycles, self.data).keys(sel)
 
         elif self.direct:
-            if sel is None:
-                yield from self.data.keys()
-            else:
-                yield from iter(frozenset(self.data.keys()) & frozenset(sel))
+            yield from self.__keysdirect(sel)
         else:
             yield from self.__keysfrombeads(sel)
 
@@ -418,7 +440,7 @@ class Cycles(TrackItems, Items):
                 yield from shallowcopy(self.data).selecting(sel)
 
         elif self.direct:
-            yield from (self.data[key] for key in self.keys(sel))
+            yield from ((key, self.data[key]) for key in self.keys(sel))
 
         else:
             yield from self.__iterfrombeads(sel)

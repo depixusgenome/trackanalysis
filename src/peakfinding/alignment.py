@@ -54,7 +54,7 @@ class PeakCorrelationAlignment:
         project.zmeasure = None
 
         for _ in range(self.nrepeats):
-            hists = project(data, bias = bias, separate = True)[0]
+            hists, _, width = project(data, bias = bias, separate = True)
             hists = tuple(as_strided(cur,
                                      shape   = (maxt, len(cur)-maxt),
                                      strides = (cur.strides[0],)*2)
@@ -63,7 +63,7 @@ class PeakCorrelationAlignment:
             ref   = np.sum  ([cur[maxt//2] for cur in hists], 0)
 
             cur   = np.array([self.__argmax(cur, ref) for cur in hists])
-            cur   = (np.median(cur)-cur) / osamp
+            cur   = (np.median(cur)-cur) * width
 
             bias  = cur if bias is None else np.add(bias, cur, out = bias)
         return bias

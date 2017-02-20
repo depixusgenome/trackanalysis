@@ -2,9 +2,13 @@
 # -*- coding: utf-8 -*-
 u"Tests peak finding"
 import numpy as np
+from numpy.testing              import assert_allclose
 from numpy.lib.stride_tricks    import as_strided
+from control.taskcontrol        import create
 from simulator                  import randpeaks
+from simulator.processor        import EventSimulatorTask
 from peakfinding.selector       import PeakSelector
+from peakfinding.task           import PeakSelectorTask
 
 def test_peakselector():
     u"tests peak finding"
@@ -26,5 +30,28 @@ def test_peakselector():
     emin   = np.array([np.min([j[0] for j in i]) for _, i in res])
     assert all(emax[:-1] < emin[1:])
 
+def test_control():
+    u"tests task controller"
+    peaks = [1., 5., 10., 20.]
+    pair  = create((EventSimulatorTask(peaks    = peaks,
+                                       brownian = .01,
+                                       stretch  = None,
+                                       bias     = None,
+                                       rates    = None,
+                                       nbeads   = 2,
+                                       ncycles  = 20),
+                    PeakSelectorTask()))
+    beads = tuple(tuple(i) for i in pair.run())[0]
+    assert tuple(i[0] for i in beads) == (0, 1)
+
+    vals = tuple(beads[0][1])
+    assert_allclose([i for i, _ in vals], peaks, atol = .02)
+    for peak, evts in vals:
+        assert evts.dtype == 'O'
+        tmp = [i.min() for i in evts]
+        assert_allclose(tmp, (peak,)*20, atol = 0.1)
+        tmp = [i.max() for i in evts]
+        assert_allclose(tmp, (peak,)*20, atol = 0.1)
+
 if __name__ == '__main__':
-    test_peakselector()
+    test_control()

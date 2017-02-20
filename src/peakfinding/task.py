@@ -17,8 +17,8 @@ class PeakSelectorTask(PeakSelector, ItemFunctorTask):
     @staticmethod
     def __functor__(cnf, data):
         def _run(ibead):
-            vals = iter(i for _, i in data[ibead,:])
-            return cnf(vals, cnf.rawprecision(data.track, ibead))
+            vals = iter(i for _, i in data[ibead,...])
+            prec = cnf.histogram.rawprecision(data.track, ibead)
+            yield from cnf(vals, prec)
 
-        for bead in frozenset(i[0] for i in data.keys()):
-            yield (bead, _run(bead))
+        return ((bead, _run(bead)) for bead in frozenset(i[0] for i in data.keys()))
