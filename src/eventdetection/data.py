@@ -48,8 +48,11 @@ class Events(Cycles, EventDetectionConfig, Items):
         evts  = deepcopy(self.events)
 
         for key, cycle in super()._iter(sel):
-            val = evts.rawprecision(track, key[0]) if prec is None else prec
-            fdt = fcn(cycle, val)
-            gen = np.array([(i, cycle[i:j]) for i, j in evts(fdt, precision = val)],
-                           dtype = dtype)
+            if cycle.dtype == 'O':
+                gen = cycle
+            else:
+                val = evts.rawprecision(track, key[0]) if prec is None else prec
+                fdt = fcn(cycle, val)
+                gen = np.array([(i, cycle[i:j]) for i, j in evts(fdt, precision = val)],
+                               dtype = dtype)
             yield (key, gen)

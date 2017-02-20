@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Tests the simulator"
-
-import numpy as np
-from   numpy.testing import assert_allclose
-from   simulator import TrackSimulator, randpeaks, randbead
+from    itertools       import product
+import  numpy as np
+from    numpy.testing   import assert_allclose
+from    simulator       import TrackSimulator, randpeaks, randbead, randevents
 
 def test_track_simulator():
     u"testing raw data simulation"
@@ -52,5 +52,15 @@ def test_peak_simulator():
     assert max(*vals) > 20.
     assert min(*vals) < 20.
 
+def test_events_simulator():
+    u"testing event simulation"
+    ares = randevents(2, 100, peaks = np.array([10, 20, 30]), rates = .5, seed = 0)
+    assert frozenset(ares.keys()) == frozenset(product(range(2), range(100)))
+
+    res  = tuple(ares[0,i] for i in range(100))
+    assert {len(i) for i in res} == {0, 1, 2, 3}
+    elem = next(i[0] for i in res if len(i))
+    assert elem.dtype == 'f4'
+
 if __name__ == '__main__':
-    test_track_simulator()
+    test_events_simulator()

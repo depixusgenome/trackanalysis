@@ -4,8 +4,8 @@ u"""
 Task controller.
 
 The controller stores:
-    - lists of tasks (TaskPair.model),
-    - their associated processors and cache (TaskPair.data).
+    - lists of tasks (ProcessorController.model),
+    - their associated processors and cache (ProcessorController.data).
 
 It can add/delete/update tasks, emitting the corresponding events
 """
@@ -17,7 +17,7 @@ from .event         import Controller, NoEmission
 from .processor     import Cache, Processor, run as _runprocessors
 from .              import FileIO
 
-class TaskPair:
+class ProcessorController:
     u"data and model for tasks"
     __slots__ = ('model', 'data')
     def __init__(self):
@@ -81,7 +81,7 @@ class TaskPair:
     def create(cls,
                model     : Iterable[Task],
                processors: 'Union[Dict,Iterable[type],type,None]' = Processor
-              ) -> 'TaskPair':
+              ) -> 'ProcessorController':
         u"creates a task pair for this model"
         tasks = tuple(model)
         pair  = cls()
@@ -118,13 +118,19 @@ class TaskPair:
             cls.register(sclass, cache)
         return cache
 
+def create(model     : Iterable[Task],
+           processors: 'Union[Dict,Iterable[type],type,None]' = Processor
+          ) -> 'ProcessorController':
+    u"creates a task pair for this model"
+    return ProcessorController.create(model, processors)
+
 class TaskController(Controller):
     u"Data controller class"
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.__items   = dict() # type: Dict[RootTask, TaskPair]
+        self.__items   = dict() # type: Dict[RootTask, ProcessorController]
         self.__procs   = dict() # type: Dict[type,Any]
-        self.__procs   = TaskPair.register(kwargs.get('processors', Processor))
+        self.__procs   = ProcessorController.register(kwargs.get('processors', Processor))
         self.__openers = kwargs.get("openers", self.defaultopener)
         self.__savers  = kwargs.get("savers",  self.defaultsaver)
 
@@ -206,7 +212,7 @@ class TaskController(Controller):
         elif tasks[0] is not task:
             raise ValueError("model and root task does'nt coincide")
 
-        self.__items[task] = TaskPair.create(tasks, self.__procs)
+        self.__items[task] = ProcessorController.create(tasks, self.__procs)
         return dict(controller = self, model = tasks)
 
     @Controller.emit

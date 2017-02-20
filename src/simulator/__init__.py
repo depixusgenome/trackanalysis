@@ -15,3 +15,7 @@ def randtrack(nbeads = 1, seed = None, **kwa):
 def randpeaks(ncycles = 1, seed = None, **kwa):
     u"Random peaks. See PeakSimulator documentation"
     return PeakSimulator(**kwa)(ncycles, seed)
+
+def randevents(nbeads = 1, ncycles = 20, seed = None, **kwa):
+    u"Random events. See PeakSimulator documentation"
+    return PeakSimulator(**kwa).events(nbeads, ncycles, seed)

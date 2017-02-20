@@ -10,7 +10,7 @@ from    typing      import (Optional, Tuple, Union, # pylint: disable=unused-imp
                             TypeVar, Hashable, cast)
 import  numpy as np
 
-from    utils       import isfunction
+from    utils       import isfunction, initdefaults
 from    model       import Level
 
 _m_ALL   = frozenset((None, all, Ellipsis))
@@ -118,7 +118,7 @@ class TransformedItems:
         yield from self._data.keys()
 
 class _m_ConfigMixin: # pylint: disable=invalid-name
-    data      = None    # type: Union[Items,TransformedItems,Dict,None]
+    data      = None    # type: Union[Items,TrackItems,TransformedItems,Dict,None]
     selected  = None    # type: Optional[List]
     discarded = None    # type: Optional[List]
     actions   = []      # type: List
@@ -218,9 +218,10 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
 
 class TrackItems(_m_ConfigMixin, Items):
     u"Class for iterating over beads or creating a new list of data"
-    level   = Level.none
+    level = Level.none
+    track = None      # type: Any
+    @initdefaults
     def __init__(self, **kw) -> None:
-        self.track = kw.get('track', None) # type: ignore
         super().__init__(**kw)
 
     def _keys(self, sel:Optional[Sequence]) -> Iterable:
@@ -231,7 +232,10 @@ class TrackItems(_m_ConfigMixin, Items):
             yield from (i for i in sel if i in keys)
 
     def _iter(self, sel = None) -> Iterator[Tuple[Any,Any]]:
-        yield from ((bead, self.data[bead]) for bead in self.keys(sel))
+        if sel is None and isinstance(self.data, dict):
+            yield from self.data.items()
+        else:
+            yield from ((bead, self.data[bead]) for bead in self.keys(sel))
 
     def __copy__(self):
         return self.__class__(track = self.track,
@@ -336,17 +340,16 @@ class Cycles(TrackItems, Items):
 
     * providing with a unique cycle id will extract all columns for that cycle
     """
-    level = Level.cycle
-    def __init__(self, **kw) -> None:
+    level  = Level.cycle
+    first  = None   # type: Optional[int]
+    last   = None   # type: Optional[int]
+    direct = False  # type: bool
+
+    @initdefaults
+    def __init__(self, **kw):
         super().__init__(**kw)
-        self.first = kw.get('first', None)   # type: Optional[int]
-        self.last  = kw.get('last',  None)   # type: Optional[int]
 
-    def _keys(self, sel) -> Iterable[Tuple[Union[str,int], int]]:
-        if isinstance(self.data, Cycles):
-            yield from self.data.keys(sel)
-            return
-
+    def __keysfrombeads(self, sel):
         allcycles = range(self.track.ncycles)
         beads     = tuple(Beads(track = self.track, data = self.data).keys())
         if sel is None:
@@ -373,6 +376,40 @@ class Cycles(TrackItems, Items):
             else:
                 yield from ((col, thisid) for col in beads)
 
+    def _keys(self, sel) -> Iterable[Tuple[Union[str,int], int]]:
+        if isinstance(self.data, Cycles):
+            yield from cast(Cycles, self.data).keys(sel)
+
+        elif self.direct:
+            if sel is None:
+                yield from self.data.keys()
+            else:
+                yield from iter(frozenset(self.data.keys()) & frozenset(sel))
+        else:
+            yield from self.__keysfrombeads(sel)
+
+    def __iterfrombeads(self, sel = None):
+        ncycles = self.track.ncycles
+        nphases = self.track.nphases
+        phaseid = self.track.phaseid
+
+        first   = 0       if self.first is None else self.first
+        last    = nphases if self.last  is None else self.last+1
+
+        data    = {}
+        def _getdata(bid:int, cid:int):
+            bead = data.get(bid, None)
+            if bead is None:
+                data[bid] = bead = self.data[bid]
+
+            ind1 = phaseid(cid, first)
+            ind2 = (phaseid(cid, last) if last  < nphases else
+                    (phaseid(cid+1, 0) if cid+1 < ncycles else None))
+
+            return (bid, cid), bead[ind1:ind2]
+
+        yield from (_getdata(bid, cid) for bid, cid in self.keys(sel))
+
     def _iter(self, sel = None):
         if isinstance(self.data, Cycles):
             if sel is None:
@@ -380,27 +417,11 @@ class Cycles(TrackItems, Items):
             else:
                 yield from shallowcopy(self.data).selecting(sel)
 
+        elif self.direct:
+            yield from (self.data[key] for key in self.keys(sel))
+
         else:
-            ncycles = self.track.ncycles
-            nphases = self.track.nphases
-            phaseid = self.track.phaseid
-
-            first   = 0       if self.first is None else self.first
-            last    = nphases if self.last  is None else self.last+1
-
-            data    = {}
-            def _getdata(bid:int, cid:int):
-                bead = data.get(bid, None)
-                if bead is None:
-                    data[bid] = bead = self.data[bid]
-
-                ind1 = phaseid(cid, first)
-                ind2 = (phaseid(cid, last) if last  < nphases else
-                        (phaseid(cid+1, 0) if cid+1 < ncycles else None))
-
-                return (bid, cid), bead[ind1:ind2]
-
-            yield from (_getdata(bid, cid) for bid, cid in self.keys(sel))
+            yield from self.__iterfrombeads(sel)
 
     def withphases(self, first:Optional[int], last:Optional[int]) -> 'Cycles':
         u"specifies the phase to extract: None for all"
