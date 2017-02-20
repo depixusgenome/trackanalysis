@@ -12,8 +12,8 @@ from typing import Callable # pylint: disable=unused-import
 import numpy
 from scipy.optimize import basinhopping,OptimizeResult
 from scipy.stats import truncnorm
-from sequences import OligoHit
 from utils import initdefaults
+from . import oligohit
 
 # Fixed parameters
 # bp_to_nm = 1.100
@@ -46,8 +46,25 @@ class HoppingSteps:
         self.min_x = kwargs.get("min_x",0) # in number of bases
         self.max_x = kwargs.get("max_x",sys.maxsize) # in number of bases
         self.scale = kwargs.get("scale",1) # in number of bases
-    def __call__(self,xstate):
-        return rtruncnorm_step(self,xstate)
+        self.rvs = kwargs.get("rvs",[]) # list of distributions
+
+    def __call__(self,xstate): # should be overriden
+        pass
+
+
+
+class PreFixedSteps(HoppingSteps):
+    u'''
+    calls predefined fixed distributions
+    '''
+    def __call__(self,*args):
+        return call_rvs(self,*args)
+
+def call_rvs(obj:HoppingSteps,*args): # pylint: disable=unused-argument
+    u'''
+    call predefined distributions
+    '''
+    return numpy.array([i() for i in obj.rvs])
 
 def rtruncnorm_step(obj:HoppingSteps,xstate):
     u'''
@@ -71,7 +88,7 @@ def flip_step(obj:HoppingSteps,xstate):
 
 class OligoWrap:
     u'''
-    decorator for use of bpos array instead of list of OligoHit
+    decorator for use of bpos array instead of list of oligohit
     '''
     def __init__(self,oligos):
         self.oligos=oligos
@@ -97,7 +114,7 @@ def oligos_from_bpos(olis,bpos):
     assert len(olis)==len(bpos)
     oligos = [deepcopy(i) for i in olis]
     for idx,val in enumerate(bpos):
-        oligos[idx].bpos=val
+        oligos[idx].bpos=numpy.round(val)
     return oligos
 
 def noverlaps_energy(oligos):
@@ -114,7 +131,7 @@ def tail_overlap_energy(oligos)->float:
     sort by bpos and apply tail_overlap
     '''
     oligo_sort = sorted(oligos,key=lambda x :x.bpos)
-    overlaps = numpy.array([len(OligoHit.tail_overlap(oli.seq,oligo_sort[idx+1].seq))\
+    overlaps = numpy.array([len(oligohit.tail_overlap(oli.seq,oligo_sort[idx+1].seq))\
                         for idx,oli in enumerate(oligo_sort[:-1])])
     return -sum(overlaps[overlaps!=numpy.array(None)]**2)
 
@@ -136,8 +153,8 @@ def fit_oligos(oligos,energy_func,**kwargs):
     return hopp
 
 
-class AssembleSimulator():
-    u'''Simulator class for assembling sequences
+class MCAssemble():
+    u'''Monte Carlo for assembling sequences from oligohits
     '''
     callback = None # type: Callable
     minimizer = no_minimizer # type: Callable
