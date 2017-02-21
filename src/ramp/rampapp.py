@@ -45,7 +45,7 @@ class DisplayHist:
         fig_width = kwargs.get("fig_width", 600)
         fig_height = kwargs.get("fig_height", 600)
         fill_color = kwargs.get("fill_color", "red")
-        with_hover = kwargs.get("hover",False)
+        with_hover = kwargs.get("with_hover",False)
 
         self.with_cdf = kwargs.get("with_cdf", False) # bool
         self.normed = kwargs.get("normed", False) # bool
@@ -153,8 +153,12 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
             self.data = Data()
         if self.doc is None:
             self.doc = curdoc()
-        self.divs = {"ngoods":DisplayText(prefix="number of good beads : "),
-                     "good":DisplayText(prefix="good beads are : "),
+        self.divs = {"ngoods":DisplayText(prefix="number of good beads : ",
+                                          width=200,
+                                          height=30),
+                     "good":DisplayText(prefix="good beads are : ",
+                                        width=1000,
+                                        height=100),
                      "ugly":DisplayText(prefix="ugly beads are : "),
                      "fixed":DisplayText(prefix="fixed beads are : "),
                      "filestatus":DisplayText(prefix="")}
@@ -312,22 +316,18 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
 
     def _update_zmag_info(self):
         zmagop = pd.DataFrame() if self.data.rpdata is \
-                 None else self.data.rpdata.zmagOpen()
+                 None else self.data.rpdata.zmagOpen().dropna()
         zmagcl = pd.DataFrame() if self.data.rpdata is \
-                 None else self.data.rpdata.zmagClose()
-
+                 None else self.data.rpdata.zmagClose().dropna()
         rzmagcl = pd.DataFrame() if self.data.rpdata is \
-                  None else self.data.rpdata.zmagClose(reverse_time=True)
-
+                  None else self.data.rpdata.zmagClose(reverse_time=True).dropna()
         self.hists["zmop"].update(zmagop.values.flatten())
-
         self.hists["zmcl"].update(zmagcl.values.flatten())
-
         self.hists["zmcl_reverse"].update(rzmagcl.values.flatten())
 
     def _update_HP_info(self):
         hp_est = pd.DataFrame() if self.data.rpdata is \
-                 None else self.data.rpdata.estHPsize()
+                 None else self.data.rpdata.estHPsize().dropna()
         self.hists["HPsize"].update(hp_est.values.flatten())
 
 

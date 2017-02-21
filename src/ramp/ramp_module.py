@@ -20,10 +20,11 @@ class RampModel:
     def __init__(self, **kwargs):
         self.scale = 5.0
         self.needsCleaning = False
-        self.corrThreshold = 0.5
+        self.corrThreshold = 0.5 # if above then correlation
         self._minExt = kwargs.get("minExtension",0.0)
         self.window = 7
         self._zclthreshold = kwargs.get("zclthreshold",None)
+        self.good_ratio = kwargs.get("good_ratio",0.8) # if good_cycles/cycles above, then good
 
     def set_zclthreshold(self,value):
         u'''
@@ -185,15 +186,15 @@ class RampData: # pylint: disable=too-many-public-methods
 
     def getGoodBeadIds(self)->set:
         u'''
-        rewrite to be faster
         returns the list of beads selected by _isGoodBead
         All cycles of a bead  must match the conditions for qualification as good bead.
         This condition may be too harsh for some track files (will improve).
         '''
         are_good = self.areGoodBeadCycle()
-        todel = {i[0] for i in self.bcids if not are_good[i]} # harsh
-
-        return {i for i in self.beads() if i not in todel}
+        pbead = {bead:[bcid for bcid in self.bcids if bcid[0]==bead] for bead in self.beads()}
+        gpbead = {bead:[bc for bc in bcids if are_good[bc]] for bead,bcids in pbead.items()}
+        goods ={i for i in self.beads() if len(gpbead[i])/len(pbead[i])>self.model.good_ratio}
+        return goods&self._beadIdsCorr2zmag(toconsider = goods)
 
     def clean(self):
         u'''good beads open and close with zmag
@@ -268,7 +269,6 @@ class RampData: # pylint: disable=too-many-public-methods
     def _beadIdsCorr2zmag(self,toconsider:set=None):
         u'''
         returns the list of bead ids whose z value correlates with zmag for each cycle
-        to check
         '''
 
         if toconsider is None:

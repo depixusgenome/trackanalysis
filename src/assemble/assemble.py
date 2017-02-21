@@ -9,6 +9,7 @@ import sys
 from itertools import combinations
 from copy import deepcopy
 from typing import Callable # pylint: disable=unused-import
+import pickle
 import numpy
 from scipy.optimize import basinhopping,OptimizeResult
 from scipy.stats import truncnorm
@@ -135,7 +136,7 @@ def tail_overlap_energy(oligos)->float:
                         for idx,oli in enumerate(oligo_sort[:-1])])
     return -sum(overlaps[overlaps!=numpy.array(None)]**2)
 
-def acceptance(): # to implement
+def acceptance(): # could implement
     u'''
     provides arg for accept_test
     complements MH-acceptance ratio
@@ -162,8 +163,8 @@ class MCAssemble():
     state = None # type: numpy.ndarray
     func = None # type: Callable[[numpy.ndarray],float]
     acceptance = None # type: Callable
-    niter = 1000
-    result = None
+    niter = 1000 # type: int
+    result = OptimizeResult()
     step = HoppingSteps()
 
     @initdefaults
@@ -175,6 +176,9 @@ class MCAssemble():
         '''
         if self.state is None:
             self.state=self.state_init
+
+        count = self.result.it if hasattr(self.result,"it") else 0
+
         self.result = basinhopping(self.func,
                                    self.state,
                                    take_step=self.step,
@@ -183,6 +187,7 @@ class MCAssemble():
                                    callback=self.callback,
                                    niter=nsteps,
                                    **_)
+        self.result.it = count+nsteps
         self.update(self.result)
 
     def run(self):
@@ -194,3 +199,75 @@ class MCAssemble():
         update the simulator from result
         '''
         self.state = result.x
+
+    def __getstate__(self):
+        u'to implement to pickle MCAssemble'
+        pass
+
+    def __setstate__(self,*args,**kwargs):
+        u'to implement to pickle MCAssemble'
+        pass
+
+class Recorder:
+    u'''
+    keeps the results the assembler at each time step
+    '''
+    def __init__(self,**kwargs):
+        self.assembler = kwargs.get("assembler",None)
+        self.rec = kwargs.get("rec",[]) # list of results
+        self.filename = kwargs.get("filename","recorder_default")
+
+    def run(self):
+        u'calls assembler and save the result'
+        self.assembler.run()
+        self.rec.append(self.assembler.result)
+
+    def to_pickle(self):
+        u'saves the rec list to pickle file'
+        with open(self.filename,"wb") as out_file:
+            pickle.dump(self.rec,out_file)
+
+    @classmethod
+    def from_pickle(cls,filename):
+        u'loads a rec list from pickle file'
+        with open(filename,"rb") as in_file:
+            return cls(rec=pickle.load(in_file))
+
+
+class Benchmark: # pylint: disable=too-many-instance-attributes
+    u'''
+    creates a class to benchmark chosen values of the assembler class
+    not finished
+    '''
+
+    def __init__(self,**kwargs):
+        self.assemble_class=kwargs.get("assemble_class",MCAssemble)
+        self.rec_class=kwargs.get("rec_class",Recorder)
+        self.step_class=kwargs.get("step_class",HoppingSteps)
+        self.seq=kwargs.get("seq","")
+        self.overlaps=kwargs.get("overlaps",[2])
+        self.sizes=kwargs.get("sizes",[10])
+        self.name=kwargs.get("name","benchmark")
+        self._setup()
+
+    def _setup(self):
+        self.olihits = []
+        self.inits = []
+        self.assembles = []
+        self.recs = []
+        for size,overlap in zip(self.sizes,self.overlaps):
+            olih=oligohit.sequence2oligohits(self.seq,size,overlap)
+            init=[i.bpos for i in olih]
+            self.olihits.append(olih)
+            self.inits.append(init)
+            step = self.step_class()
+            self.assembles.append([self.assemble_class(state_init=init,
+                                                       func=None,
+                                                       niter=None,
+                                                       step=step)])
+            self.recs.append([])
+
+    def run(self):
+        u'run each recorder'
+        for recit in self.recs:
+            recit.run()
