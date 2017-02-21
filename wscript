@@ -25,6 +25,7 @@ class _Tester(BuildContext):
     cmd = 'test'
     fun = 'test'
 
+builder.defaultwscript("src", "make()")
 _ALL      = ('tests',) + tuple(builder.wscripted("src"))
 builder.addbuild(_ALL)
 
