@@ -1,0 +1,3 @@
+[submodule "wafbuilder"]
+	path = wafbuilder
+	url = http://gitlab.picoseq.org/build-system/wafbuilder.git

@@ -5,7 +5,6 @@
 .*.un~
 .*.swp
 build/
-wafbuilder/
 waf*
 pyenv/
 *.py~
