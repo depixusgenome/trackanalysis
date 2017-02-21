@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Selects peaks and yields all events related to each peak"
-from   typing   import  Iterable, Optional
+from   typing   import  Iterable, Iterator, Tuple, Optional
 from   copy     import  copy
 import numpy    as      np
 
@@ -16,13 +16,15 @@ class PeakSelector:
     align     = PeakCorrelationAlignment()
     find      = ZeroCrossingPeakFinder() # type: PeakFinder
     group     = GroupByPeak()
+    Output    = Iterator[Tuple[float, np.ndarray]]
     @initdefaults
     def __init__(self, **_):
         pass
 
     def __call__(self,
                  aevents  : Iterable[Iterable[np.ndarray]],
-                 precision: Optional[float] = None):
+                 precision: Optional[float] = None
+                ) -> 'PeakSelector.Output':
         events    = asarray(aevents)
         projector = copy(self.histogram)
         projector.precision = projector.getprecision(precision, events)
@@ -39,9 +41,13 @@ class PeakSelector:
 
         peaks = self.find (next(hist[0]), *hist[1:])
         ids   = self.group(peaks, pos)
+        zmeas = self.histogram.zmeasure
         for i, peak in enumerate(peaks):
             evts = np.array([np.concatenate(tuple(elems[ind == i]))
                              for elems, ind in zip(events, ids)],
                             dtype = 'O')
             if any(len(i) for i in evts):
-                yield (peak, evts+delta)
+                evts = evts + delta
+                if zmeas is not None:
+                    peak = zmeas([zmeas(i) for i in evts if len(i)])
+                yield (peak, evts)

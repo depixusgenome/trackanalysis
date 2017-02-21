@@ -8,7 +8,7 @@ from control.taskcontrol        import create
 from simulator                  import randpeaks
 from simulator.processor        import EventSimulatorTask
 from peakfinding.selector       import PeakSelector
-from peakfinding.task           import PeakSelectorTask
+from peakfinding.processor      import PeakSelectorTask
 
 def test_peakselector():
     u"tests peak finding"

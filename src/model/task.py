@@ -8,7 +8,6 @@ Classes defining a type of data treatment.
 from copy           import deepcopy
 from typing         import (Optional, Sequence,  # pylint: disable=unused-import
                             Dict, Callable)
-from functools      import partial
 from enum           import Enum, unique
 import numpy        as     np
 
@@ -160,15 +159,3 @@ class DataFunctorTask(Task):
             return lambda dat: dat.withfunction(fcn, beadonly = self.beadonly)
         else:
             return lambda dat: dat.withfunction(cpy, beadonly = self.beadonly)
-
-class ItemFunctorTask(Task):
-    u"Calls it's task with the TrackItem as an argument"
-    @staticmethod
-    def __functor__(cnf, data):
-        raise NotImplementedError()
-
-    def __processor__(self):
-        for cls in self.__class__.__bases__:
-            if hasattr(cls, '__call__') and not issubclass(cls, Task):
-                return partial(self.__functor__, cls(**self.config()))
-        raise TypeError("Could not find a functor base type in "+str(self.__class__))

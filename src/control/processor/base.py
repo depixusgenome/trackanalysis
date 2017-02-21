@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Processors apply tasks to a data flow"
-from    abc            import ABCMeta, abstractmethod
-from    functools      import wraps
-from    typing         import TYPE_CHECKING
+from    abc         import ABCMeta, abstractmethod
+from    functools   import wraps
+from    typing      import TYPE_CHECKING, Callable, Tuple
 
 import  model.task   as     _tasks
-from    model.level    import Level
-from    data           import Track
+from    model.level import Level
+from    data        import Track
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
-    from typing     import Tuple, Union
+    from typing     import Union
     from .runner    import Runner
 
 _PROTECTED = 'tasktype',
@@ -83,13 +83,25 @@ class Processor(metaclass=MetaProcessor):
         return self.task.levelou
 
     @property
-    def levels(self) -> 'Tuple[Level,Level]':
+    def levels(self) -> Tuple[Level,Level]:
         u"returns the task's level"
         return (self.levelin, self.levelou)
 
     @abstractmethod
     def run(self, args:'Runner'):
         u"iterates over possible data"
+
+    def config(self) -> dict:
+        u"Returns a copy of a task's dict"
+        return self.task.config()
+
+    def caller(self) -> Callable:
+        u"Returns an instance of the task's first callable parent class"
+        tpe = type(self.task)
+        for cls in tpe.__bases__:
+            if hasattr(cls, '__call__') and not issubclass(cls, _tasks.Task):
+                return cls(**self.task.config())
+        raise TypeError("Could not find a functor base type in "+str(tpe))
 
     @staticmethod
     def cache(fcn):
