@@ -5,6 +5,15 @@ Creates Classes and function to use with assemble sequence
 '''
 
 
+def sequence2oligohits(seq,size,overlap):
+    u'''given a sequence, size and overlap of oligos returns a list corresponding oligohits'''
+    # compute sequences of oligos
+    oliseqs = [seq[i:i+size]for i in range(0,len(seq),size-overlap)]
+    return [OligoHit(val,
+                     idx*(size-overlap),
+                     idx*(size-overlap)) for idx,val in enumerate(oliseqs)]
+
+
 def shifted_overlap(ol1:str,ol2:str,shift=0)->str:
     u'''
     returns '-' when the two strings mismatch
@@ -49,7 +58,6 @@ class OligoHit:
         given the position (bpos) of each oligo
         return the number overlapping bases (str) between the two
         '''
-
         shift=other.bpos-self.bpos
 
         return noverlaps(self.seq,other.seq,shift=shift)
