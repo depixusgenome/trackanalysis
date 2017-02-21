@@ -9,38 +9,56 @@ from    typing     import Union, IO
 from    inspect    import signature, isgeneratorfunction
 import  numpy as np
 
+StreamUnion = Union[str,pathlib.Path,IO]
+
 def fromstream(streamopts):
-    u"wraps a method using a stream as first input: it can now use str, Path or streams"
+    u"""
+    wraps a method using a stream as input so it can use str, Path or stream
+
+    The stream attribute will be identified as:
+    1. the first one named *stream* or *path*
+    2. the first which is **not** named *self* or *cls*
+    """
     def _wrapper(fcn):
-        tpe   = Union[str,pathlib.Path,IO]
-        first = next(iter(signature(fcn).parameters))
+        bad        = {'self', 'cls', 'mcs'}
+        good       = {'path', 'stream'}
+        sig        = signature(fcn).parameters
+        ind, first = next((i for i in enumerate(sig) if i[1] in good),
+                          next((i for i in enumerate(sig) if i[1] not in bad),
+                               (0, next(iter(sig)))))
         if isgeneratorfunction(fcn):
             @wraps(fcn)
-            def _wrapgen(path, *args, **kwa):
+            def _wrapgen(*args, **kwa):
+                path = args[ind]
                 if isinstance(path, pathlib.Path):
                     path = str(path)
 
                 if isinstance(path, str):
                     with open(path, streamopts) as stream:
-                        yield from fcn(stream, *args, **kwa)
+                        args = args[:ind] + (stream,) + args[ind+1:]
+                        yield from fcn(*args, **kwa)
                 else:
-                    yield from fcn(path, *args, **kwa)
+                    args = args[:ind] + (path,) + args[ind+1:]
+                    yield from fcn(*args, **kwa)
 
-            _wrapgen.__annotations__[first] = tpe
+            _wrapgen.__annotations__[first] = StreamUnion
             return _wrapgen
         else:
             @wraps(fcn)
-            def _wrapfcn(path, *args, **kwa):
+            def _wrapfcn(*args, **kwa):
+                path = args[ind]
                 if isinstance(path, pathlib.Path):
                     path = str(path)
 
                 if isinstance(path, str):
                     with open(path, streamopts) as stream:
-                        return fcn(stream, *args, **kwa)
+                        args = args[:ind] + (stream,) + args[ind+1:]
+                        return fcn(*args, **kwa)
                 else:
-                    return fcn(path, *args, **kwa)
+                    args = args[:ind] + (path,) + args[ind+1:]
+                    return fcn(*args, **kwa)
 
-            _wrapfcn.__annotations__[first] = tpe
+            _wrapfcn.__annotations__[first] = StreamUnion
             return _wrapfcn
     return _wrapper
 

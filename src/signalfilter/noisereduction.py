@@ -5,7 +5,6 @@ u"Signal Analysis: filters for removing noise"
 from typing     import Union
 from functools  import wraps
 from pandas     import Series
-from utils      import kwargsdefaults
 from ._core     import ForwardBackwardFilter, NonLinearFilter
 
 def _m_correct_pybind11_bug(cls):

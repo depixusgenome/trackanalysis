@@ -17,7 +17,7 @@ def nanhfsigma(arr: np.ndarray):
     if len(arr) == 0:
         return
 
-    if not np.iscalar(arr[0]):
+    if not np.isscalar(arr[0]):
         arr = np.float32(arr) # type: ignore
     return hfsigma(arr[~np.isnan(arr)])
 

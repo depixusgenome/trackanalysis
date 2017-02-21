@@ -7,4 +7,4 @@ from .inspection    import (signature, ismethod, isfunction,
 from .attrdefaults  import (toenum, changefields, kwargsdefaults, setdefault,
                             initdefaults, update, pipe, NoArgs)
 
-from .decoration    import fromstream, escapenans
+from .decoration    import fromstream, escapenans, StreamUnion

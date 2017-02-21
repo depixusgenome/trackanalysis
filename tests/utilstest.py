@@ -3,10 +3,11 @@
 u"Test utils"
 # pylint: disable=import-error
 # pylint: disable=no-self-use
+import pathlib
 import pytest
 import numpy as np
 from   utils.lazy   import LazyInstError, LazyInstanciator, LazyDict
-from   utils        import escapenans
+from   utils        import escapenans, fromstream
 
 
 class TestLazy:
@@ -102,3 +103,22 @@ def test_escapenans():
     assert all(array1[[1,6]] == [1,6])
     assert all(np.isnan(array2[[1,6]]))
     assert all(array2[[0,5]] == 1)
+
+def test_fromstream():
+    u"tests fromstream"
+    with open("/tmp/__utils__test.txt", "w") as stream:
+        print("found", file = stream)
+
+    @fromstream("r")
+    def _read(dummy, self, path, another): # pylint: disable=unused-argument
+        line = path.readlines()
+        assert len(line) == 1
+        assert line[0].startswith('found')
+
+    _read(1, 2, pathlib.Path('/tmp/__utils__test.txt'), 3)
+    _read(1, 2, '/tmp/__utils__test.txt', 3)
+    with open('/tmp/__utils__test.txt', 'r') as stream:
+        _read(1, 2, stream, 3)
+
+if __name__ == '__main__':
+    test_fromstream()
