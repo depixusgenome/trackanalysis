@@ -1,4 +1,4 @@
 #! /usr/bin/env python
 # encoding: utf-8
 require('python', biopython = 1.68, rtime = True)
-make(locals()) 
+make()

@@ -26,8 +26,7 @@ class _Tester(BuildContext):
     fun = 'test'
 
 _ALL      = ('tests',) + tuple(builder.wscripted("src"))
-for item in _ALL:
-    builder.addbuild(item, locals())
+builder.addbuild(_ALL)
 
 def _getmodules(bld):
     defaults  = getattr(bld.env, 'modules', tuple())
@@ -37,8 +36,8 @@ def _getmodules(bld):
         bld.options.all_modules = names
         bld.env.modules         = tuple()
         if len(bld.options.app):
-            for item in bld.options.app.split(','):
-                bld.recurse(names[item], 'defaultmodules', mandatory = False)
+            vals = tuple(names[i] for i in bld.options.app.split(','))
+            bld.recurse(vals, 'defaultmodules', mandatory = False)
 
         defaults = bld.env.modules
         if len(defaults) == 0:
@@ -57,8 +56,7 @@ def _getmodules(bld):
 
 def options(opt):
     builder.load(opt)
-    for item in _ALL:
-        opt.recurse(item)
+    opt.recurse(_ALL)
     builder.options(opt)
 
     opt.add_option('--mod',
@@ -90,15 +88,13 @@ def configure(cnf):
         mods            = cnf.env.modules
 
     builder.configure(cnf)
-    for item in mods:
-        cnf.recurse(item)
+    cnf.recurse(mods)
 
 def build(bld):
     mods = _getmodules(bld)
     builder.build(bld)
     builder.findpyext(bld, set(mod for mod in mods if mod != 'tests'))
-    for item in mods:
-        bld.recurse(item)
+    bld.recurse(mods)
 
 def test(bld):
     u"runs pytests"

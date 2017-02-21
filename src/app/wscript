@@ -1,1 +1,1 @@
-make(locals())
+make()

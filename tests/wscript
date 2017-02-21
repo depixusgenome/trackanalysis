@@ -8,4 +8,4 @@ def build(bld):
     builder.checkpy  (bld, 'tests', pysrc)
     builder.copyfiles(bld, builder.appname(), pysrc)
 
-make(locals())
+make()

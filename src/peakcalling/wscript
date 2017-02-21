@@ -1,2 +1,2 @@
 require('cpp', python_nlopt = '2.4.2', rtime = True)
-make(locals(), use = ["nlopt"])
+make(use = ["nlopt"])

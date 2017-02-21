@@ -1,2 +1,2 @@
 require('cxx', ('boost_math', 'boost_accumulators'), 1.58, False)
-make(locals(), use = ['BOOST'])
+make(use = ['BOOST'])
