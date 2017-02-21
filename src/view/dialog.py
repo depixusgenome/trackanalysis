@@ -101,8 +101,10 @@ class FileDialog:
         return info
 
     def _tk_run(self, info:dict, dialog:Callable):
-        _Tk().withdraw()
-        ret = dialog(**info)
+        root = _Tk()
+        root.withdraw()
+        root.wm_attributes("-topmost",1)
+        ret = dialog(**info,parent=root)
         if ret is None or len(ret) == 0:
             return None
 
