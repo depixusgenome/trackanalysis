@@ -156,7 +156,7 @@ def fieldnames(obj) -> FrozenSet[str]:
                          and not getattr(tpe, 'fset', '') is None))
     return dico | desc # type: ignore
 
-def _update(cpy: Optional[Callable[[T], T]], obj:T, attrs:dict) -> T:
+def _update(cpy: Optional[Callable[[T], T]], obj:T, **attrs) -> T:
     u"Sets field to provided values"
     fields = fieldnames(obj) & frozenset(attrs)
     if len(fields):
