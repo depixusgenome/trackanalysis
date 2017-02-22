@@ -5,7 +5,7 @@
 .*.un~
 .*.swp
 build/
-waf*
+waf*-*
 pyenv/
 *.py~
 .ipynb_checkpoints*
