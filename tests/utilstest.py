@@ -6,9 +6,9 @@ u"Test utils"
 import pathlib
 import pytest
 import numpy as np
-from   utils.lazy   import LazyInstError, LazyInstanciator, LazyDict
-from   utils        import escapenans, fromstream
-
+from   utils                import escapenans, fromstream
+from   utils.lazy           import LazyInstError, LazyInstanciator, LazyDict
+from   utils.attrdefaults   import fieldnames
 
 class TestLazy:
     u"test lazy stuff"
@@ -119,6 +119,33 @@ def test_fromstream():
     _read(1, 2, '/tmp/__utils__test.txt', 3)
     with open('/tmp/__utils__test.txt', 'r') as stream:
         _read(1, 2, stream, 3)
+
+def test_fieldnames():
+    u"tests field names"
+    # pylint: disable=missing-docstring,invalid-name
+    class DescriptorSet:
+        def __set__(self, *_):
+            return 1
+
+    class DescriptorGet:
+        def __get__(self, *_):
+            return 2
+
+    class A:
+        def __init__(self):
+            self._name = 1
+            self.name  = 2
+
+        descget = DescriptorGet()
+        descset = DescriptorSet()
+        propset = property(None, lambda *_: None)
+        propget = property(lambda _: 1)
+
+        _descget = DescriptorGet()
+        _descset = DescriptorSet()
+        _propset = property(None, lambda *_: None)
+        _propget = property(lambda _: 1)
+    assert fieldnames(A()) == {'name', 'descset', 'propset'}
 
 if __name__ == '__main__':
     test_fromstream()

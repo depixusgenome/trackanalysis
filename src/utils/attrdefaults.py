@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 u"utils"
 
-from copy           import deepcopy
-from functools      import wraps
-from typing         import Iterable
+from typing         import TypeVar, Iterable, FrozenSet, Optional, Callable
+from copy           import deepcopy, copy
+from functools      import wraps, partial
 from enum           import Enum
 from .inspection    import getlocals
 
@@ -61,7 +61,7 @@ def kwargsdefaults(*items):
         items = items[0]
 
     if len(items) == 1 and callable(items[0]):
-        fields   = lambda x: frozenset(i for i in x.__dict__ if i[0] != i[0].upper())
+        fields   = fieldnames
     else:
         assert len(items) and all(isinstance(i, str) for i in items)
         accepted = frozenset(items)
@@ -143,10 +143,32 @@ def initdefaults(*attrs, roots = ('',), **kwa):
 
     return _wrapper if fcn is None else _wrapper(fcn)
 
-def update(obj, **attrs):
+T = TypeVar('T')
+def fieldnames(obj) -> FrozenSet[str]:
+    u"Returns attribute and property names of the object"
+    dico = frozenset(name
+                     for name in getattr(obj, '__dict__', ())
+                     if 'a' <= name[0] <= 'z')
+    desc = frozenset(name
+                     for name, tpe in obj.__class__.__dict__.items()
+                     if ('a' <= name[0] <= 'z'
+                         and callable(getattr(tpe, '__set__', None))
+                         and not getattr(tpe, 'fset', '') is None))
+    return dico | desc # type: ignore
+
+def _update(cpy: Optional[Callable[[T], T]], obj:T, attrs:dict) -> T:
     u"Sets field to provided values"
-    for name in frozenset(getattr(obj, '__dict__', ())) & frozenset(attrs):
-        setattr(obj, name, attrs[name])
+    fields = fieldnames(obj) & frozenset(attrs)
+    if len(fields):
+        if cpy:
+            obj = cpy(obj)
+        for name in fieldnames(obj) & frozenset(attrs):
+            setattr(obj, name, attrs[name])
+    return obj
+
+update         = partial(_update, None)         # pylint: disable=invalid-name
+updatecopy     = partial(_update, copy)         # pylint: disable=invalid-name
+updatedeepcopy = partial(_update, deepcopy)     # pylint: disable=invalid-name
 
 class AttrPipe:
     u"Pipes a field to a parent"
