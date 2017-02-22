@@ -4,31 +4,34 @@ u"""
 Task for simulating tracks
 """
 from typing         import Optional     # pylint: disable=unused-import
-from utils          import initdefaults
+from utils          import setdefault
 from model.task     import RootTask, Level
 from .track         import TrackSimulatorConfig
 from .peak          import PeakSimulatorConfig
 
-class SimulatorTask(RootTask):
+class SimulatorTaskMixin:
     u"Class indicating that a track file should be added to memory"
     nbeads = 1      # type: int
     seed   = None   # type: Optional[int]
-    @initdefaults
     def __init__(self, **kwa):
-        super().__init__(**kwa)
+        setdefault(self, 'nbeads', kwa)
+        setdefault(self, 'seed',   kwa)
+        if hasattr(self.__class__, 'ncycles'):
+            setdefault(self, 'ncycles',   kwa)
 
-class TrackSimulatorTask(SimulatorTask, TrackSimulatorConfig):
-    u"Class indicating that a track file should be added to memory"
-    def __init__(self, **kwa) -> None:
-        SimulatorTask.__init__(self, **kwa)
-        TrackSimulatorConfig.__init__(self, **kwa)
+        # pylint: disable=non-parent-init-called
+        RootTask.__init__(self, **kwa)
+        self.__class__.__bases__[1].__init__(self, **kwa)
 
-class EventSimulatorTask(SimulatorTask, PeakSimulatorConfig):
-    u"Class indicating that a track file should be added to memory"
+class TrackSimulatorTask(SimulatorTaskMixin, TrackSimulatorConfig, RootTask):
+    u"Class that creates fake track data each time it is called upon"
+
+class EventSimulatorTask(SimulatorTaskMixin, PeakSimulatorConfig, RootTask):
+    u"Class that creates fake event data each time it is called upon"
     ncycles = 20    # type: int
-    levelin = Level.project
     levelou = Level.event
-    @initdefaults
-    def __init__(self, **kwa) -> None:
-        SimulatorTask.__init__(self,        **kwa)
-        PeakSimulatorConfig.__init__(self,  **kwa)
+
+class PeakSimulatorTask(SimulatorTaskMixin, PeakSimulatorConfig, RootTask):
+    u"Class that creates fake peak data each time it is called upon"
+    ncycles = 20    # type: int
+    levelou = Level.peak

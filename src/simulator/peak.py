@@ -192,6 +192,21 @@ class PeakSimulator(PeakSimulatorConfig):
 
         return self.__return(occs, peaks)
 
+    def groupedbypeaks(self, nbeads, ncycles, seed = None):
+        u"Creates events grouped by peaks"
+        self.seed(seed)
+        def _create():
+            peaks, labels = self(ncycles, labels = 'range')
+            allevts       = self.peakstoevents(peaks)[1]
+            for lab in np.unique(np.concatenate(tuple(labels))):
+                events = np.concatenate([evts[labs == lab]
+                                         for evts, labs in zip(allevts, labels)])
+                peak   = np.concatenate(tuple(events)).mean()
+                yield (peak, events)
+
+        for bead in range(nbeads):
+            yield (bead, _create())
+
     def events(self, nbeads, ncycles, seed = None) -> Cycles:
         u"Creates events in a Events object"
         self.seed(seed)
