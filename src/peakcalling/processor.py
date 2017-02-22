@@ -8,15 +8,18 @@ from   typing       import (Dict, Sequence, NamedTuple, # pylint: disable=unused
 from   functools    import partial
 import numpy        as np
 
-from utils              import StreamUnion, initdefaults
+from utils              import StreamUnion, initdefaults, updatecopy
 from model              import Task, Level
 from control.processor  import Processor
 from .tohairpin         import HairpinDistance, HairpinDistanceResults
 
+DistanceConstraint = NamedTuple('DistanceConstraint',
+                                [('hairpin', str), ('constraints', dict)])
 class BeadsByHairpinTask(Task):
     u"Groups beads per hairpin"
-    level    = Level.peak
-    hairpins = dict()     # type: Dict[str, HairpinDistance]
+    level       = Level.peak
+    hairpins    = dict()    # type: Dict[str, HairpinDistance]
+    constraints = dict()    # type: Dict[Any, DistanceConstraint]
     @initdefaults
     def __init__(self, **_):
         super().__init__()
@@ -29,7 +32,7 @@ class BeadsByHairpinTask(Task):
 BeadsByHairpinResults = NamedTuple('BeadsByHairpinResults',
                                    [('key',        Any),
                                     ('silhouette', float),
-                                    ('distances',  Dict[str, HairpinDistanceResults]),
+                                    ('distance',   HairpinDistanceResults),
                                     ('events',     np.ndarray)])
 
 class BeadsByHairpinProcessor(Processor):
@@ -57,29 +60,47 @@ class BeadsByHairpinProcessor(Processor):
     @staticmethod
     def silhouette(best:str, results:dict) -> float:
         u"Returns a grade for these results"
+        if len(results) == 0:
+            return -3.
+        if len(results) == 1:
+            return 1.
         aval = results[best].value
         bval = min(i[0] for k, i in results.items() if k != best)
         return ((bval-aval)/max(aval, bval)-.5)*2.
 
     @classmethod
-    def apply(cls, hpins, frame) -> 'BeadsByHairpinProcessor.Output':
+    def apply(cls, hpins:Dict, constraints:Dict, frame) -> 'BeadsByHairpinProcessor.Output':
         u"Regroups the beads from a frame by hairpin"
         peaks = cls.topeaks(frame)
-        dist  = {key: {name: calc(bead) for name, calc in hpins.items()}
-                 for key, (bead, _) in peaks.items() if len(bead) > 1}
+
+        dist  = cls.__distances(hpins, constraints, peaks)
         best  = {key: min(vals, key = vals.__getitem__)
                  for key, vals in dist.items()}
 
-        args  = lambda i, k: (k, cls.silhouette(i, dist[k]), dist[k], peaks[k][1])
+        _res  = BeadsByHairpinResults
+        res   = lambda i, k, d: _res(k, cls.silhouette(i, d), d[i], peaks[k][1])
 
-        for name in frozenset(tuple(best.values())):
-            vals = [BeadsByHairpinResults(*args(i, k))
-                    for k, i in best.items() if i == name]
+        for name in sorted(set(best.values())-{None})+[None][:int(None in best)]:
+            vals = [res(i, k, dist[k]) for k, i in best.items() if i == name]
             yield (name, sorted(vals, key = lambda i: i[1], reverse = True))
 
-        vals = [BeadsByHairpinResults(k, -1., {}, peaks[k])
-                for k in frozenset(peaks) - frozenset(best)]
-        yield (None, vals)
-
     def run(self, args):
-        args.apply(partial(self.apply, self.config()['hairpins']))
+        cnf = self.config()
+        args.apply(partial(self.apply, cnf['hairpins'], cnf['constraints']))
+
+    @staticmethod
+    def __distances(hpins, constraints, peaks):
+        def _compute(key, bead):
+            cstr = constraints.get(key, None)
+            if cstr is not None:
+                hpin = hpins.get(cstr[0], None)
+                if hpin is not None:
+                    return {cstr[0]: updatecopy(hpin, **cstr[1])(bead)}
+
+            if len(bead) > 0:
+                return {name: calc(bead) for name, calc in hpins.items()}
+
+            else:
+                return {None: next(iter(hpins.values()))(bead)}
+
+        return {key: _compute(key, bead) for key, (bead, _) in peaks.items()}
