@@ -5,8 +5,8 @@ u"decoration utils"
 import  pathlib
 from    contextlib import contextmanager
 from    functools  import wraps
-from    typing     import Union, IO
 from    inspect    import signature, isgeneratorfunction
+from    typing     import Union, IO
 import  numpy as np
 
 StreamUnion = Union[str,pathlib.Path,IO]
