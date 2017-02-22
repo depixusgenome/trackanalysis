@@ -3,7 +3,10 @@
 u"gui related utils"
 
 import re
+import sys
+import os
 import pathlib
+import subprocess
 from   functools   import wraps
 from   inspect     import ismethod as _ismeth, isfunction as _isfunc, getmembers
 from   enum        import Enum
@@ -126,3 +129,16 @@ class MetaMixin(type):
                 else lambda self: prop.fdel(self.getMixin(base)))
 
         return property(fget, fset, fdel, prop.__doc__)
+
+def startfile(filepath:str):
+    u"launches default application for given file"
+    if sys.platform.startswith('darwin'):
+        subprocess.Popen(('open', filepath))
+    elif os.name == 'nt':
+        old      = os.path.abspath(os.path.curdir)
+        filepath = os.path.abspath(filepath)
+        os.chdir(os.path.dirname(filepath))
+        os.startfile(os.path.split(filepath)[-1])  # pylint: disable=no-member
+        os.chdir(old)
+    elif os.name == 'posix':
+        subprocess.Popen(('xdg-open', filepath))
