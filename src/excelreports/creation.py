@@ -3,6 +3,7 @@
 u"Creates excel of csv files for reporting any type of data"
 from typing                 import (Sequence, Iterator, Union, TypeVar,
                                     Callable, Optional, cast)
+from contextlib             import closing
 from abc                    import ABCMeta, abstractmethod
 from inspect                import getmembers
 from xlsxwriter             import Workbook
@@ -336,3 +337,28 @@ def fileobj(filename:str):
         return Workbook(filename)
     else:
         return open(filename, 'w')
+
+def writecolumns(filename, sheetname, items):
+    u"Writes columns to an excel/csv file"
+
+    def _get(lst):
+        return lambda i: lst[i] if len(lst) > i else None
+
+    cols = list(column_method(name)(_get(lst)) for name, lst in items)
+
+    def iterate(_):
+        u"Iterates through sheet's base objects and their hierarchy"
+        for i in range(max(len(lst) for _, lst in items)):
+            yield (i,)
+
+    def columns(_):
+        u"list of columns in table"
+        return cols
+
+    sheet = type("Sheet", (Reporter,),
+                 dict(iterate    = iterate,
+                      columns    = columns,
+                      sheet_name = sheetname))
+
+    with closing(fileobj(filename)) as book:
+        sheet(book).table() # pylint: disable=abstract-class-instantiated

@@ -5,6 +5,7 @@ try:
     import wafbuilder as builder
 except ImportError:
     raise ImportError("Don't forget to clone wafbuilder!!")
+import wafbuilder.git as git
 
 require(cxx    = {'msvc'     : 14.0,
                   'clang++'  : 3.8,
@@ -92,6 +93,21 @@ def configure(cnf):
     cnf.recurse(mods)
 
 def build(bld):
+    lines  = '#!/usr/bin/env python3\n'
+    lines += '# encoding: utf-8\n'
+    lines += 'u"Build information"'
+    lines += '\n'
+    lines += 'def version():\n    u"git version"\n    return "%s"\n\n'
+    lines += 'def lasthash():\n   u"git hash"\n    return "%s"\n\n'
+    lines += 'def hashdate():\n   u"git hash date"\n    return "%s"\n\n'
+    lines += 'def isdirty():\n   u"git hash"\n    return %s\n\n'
+    lines += 'def compiler():\n   u"compiler used"\n    return "%s"'
+    lines %= (git.version(), git.lasthash(),
+              git.lastdate(), str(git.isdirty()), bld.cpp_compiler_name())
+
+    with open(bld.bldnode.make_node('version.py').abspath(), 'w') as stream:
+        print(lines, file = stream)
+
     mods = _getmodules(bld)
     builder.build(bld)
     builder.findpyext(bld, set(mod for mod in mods if mod != 'tests'))
