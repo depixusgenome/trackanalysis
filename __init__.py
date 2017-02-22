@@ -5,6 +5,7 @@ from .inspection    import (signature, ismethod, isfunction,
                             getmembers, isgeneratorfunction, getlocals)
 
 from .attrdefaults  import (toenum, changefields, kwargsdefaults, setdefault,
-                            initdefaults, update, pipe, NoArgs)
+                            initdefaults, update, updatecopy, updatedeepcopy,
+                            pipe, NoArgs)
 
 from .decoration    import fromstream, escapenans, StreamUnion
