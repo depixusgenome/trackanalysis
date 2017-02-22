@@ -5,6 +5,9 @@ u"all view aspects here"
 import numpy as np
 from numpy.testing          import assert_allclose
 from pytest                 import approx
+
+from control.taskcontrol    import create
+from simulator.processor    import PeakSimulatorTask
 from peakcalling            import cost, match
 from peakcalling.processor  import (BeadsByHairpinProcessor, BeadsByHairpinTask,
                                     HairpinDistance, DistanceConstraint)
@@ -94,5 +97,25 @@ def test_constrainedhairpincost():
     assert len(results) == 1
     assert len(results['hp101']) == 3
 
+def test_control():
+    u"tests BeadsByHairpinTask using the controller"
+    peaks = np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')
+    truth = [peaks/8.8e-4,
+             np.array([0., .1,     .5, 1.2, 1.5], dtype = 'f4')/8.8e-4]
+    hpins = {'hp100': HairpinDistance(peaks = truth[0]),
+             'hp101': HairpinDistance(peaks = truth[1])}
+    pair  = create((PeakSimulatorTask(peaks    = peaks,
+                                      brownian = .01,
+                                      stretch  = None,
+                                      bias     = None,
+                                      rates    = None,
+                                      nbeads   = 1,
+                                      ncycles  = 5),
+                    BeadsByHairpinTask(hairpins = hpins)))
+
+    beads = tuple(tuple(i) for i in pair.run())[0]
+    assert len(beads) == 1
+    assert beads[0][0] == 'hp100'
+
 if __name__ == '__main__':
-    test_constrainedhairpincost()
+    test_hairpincost()

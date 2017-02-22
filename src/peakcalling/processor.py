@@ -80,7 +80,7 @@ class BeadsByHairpinProcessor(Processor):
         _res  = BeadsByHairpinResults
         res   = lambda i, k, d: _res(k, cls.silhouette(i, d), d[i], peaks[k][1])
 
-        for name in sorted(set(best.values())-{None})+[None][:int(None in best)]:
+        for name in sorted(set(best.values()), key = lambda x: x or chr(255)):
             vals = [res(i, k, dist[k]) for k, i in best.items() if i == name]
             yield (name, sorted(vals, key = lambda i: i[1], reverse = True))
 
