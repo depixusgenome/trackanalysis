@@ -13,10 +13,11 @@ from cordrift.collapse      import (CollapseByMerging, CollapseToMean,
                                     CollapseByDerivate, StitchByDerivate,
                                     StitchByInterpolation)
 def _run(coll, stitch, brown):
-    bead   = TrackSimulator(zmax     = [0., 0., 1., 1., -.2, -.2, -.3, -.3],
-                            brownian = brown,
-                            ncycles  = 30,
-                            drift    = (.05, 29.))
+    bead   = TrackSimulator(zmax      = [0., 0., 1., 1., -.2, -.2, -.3, -.3],
+                            brownian  = brown,
+                            durations = 20,
+                            ncycles   = 30,
+                            drift     = (.05, 29.))
     cycles = bead.cycles[0][[5,6]]
     frame  = bead.track(nbeads = 1, seed = 0).cycles
     drift  = bead.drift()[cycles[0]:cycles[1]]
@@ -36,9 +37,9 @@ def _run(coll, stitch, brown):
         return
 
     if brown == 0.:
-        assert_allclose(prof.value - prof.value[-1],
-                        drift      - drift[-1],
-                        atol = 1e-7)
+        assert_allclose(prof.value[1:-1] - prof.value[-2],
+                        drift[1:-1]      - drift[-2],
+                        atol = 1e-5)
     else:
         diff  = prof.value-drift
         assert np.abs(diff).std() <= 1.5*brown
@@ -58,4 +59,4 @@ for args in product((CollapseToMean, CollapseByDerivate, CollapseByMerging),
 del _create
 
 if __name__ == '__main__':
-    _run(CollapseByMerging, StitchByDerivate, 0.003)
+    _run(CollapseToMean, StitchByDerivate, 0.0)

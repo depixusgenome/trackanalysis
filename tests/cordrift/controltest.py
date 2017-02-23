@@ -31,7 +31,7 @@ def test_cycleprocess():
     cycs = next(i for i in pair.run())
     for _, val in cycs:
         val  = val[33:133]
-        assert_allclose(val, val.mean(), atol = 1e-8)
+        assert_allclose(val, val.mean(), atol = 1e-5)
 
     pair = create((TrackSimulatorTask(brownian  = 0.,
                                       nbeads    = 30,

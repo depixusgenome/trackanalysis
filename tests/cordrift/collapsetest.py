@@ -185,5 +185,4 @@ def test_stitchbyderivate():
             _test(left, right)
 
 if __name__ == '__main__':
-    test_collapse_by_merging()
-    #test_collapse_by_derivate()
+    test_stitchbyinterpolation()

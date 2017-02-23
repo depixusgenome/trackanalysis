@@ -14,7 +14,7 @@ class _SimulatorTask(TrackSimulator):
     seed   = None   # type: Optional[int]
     @initdefaults
     def __init__(self, **kwa):
-        super().__init__(self)
+        super().__init__(**kwa)
         RootTask.__init__(self, **kwa) # pylint: disable=non-parent-init-called
 
 class TrackSimulatorTask(_SimulatorTask, RootTask):

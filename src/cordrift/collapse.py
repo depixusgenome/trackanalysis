@@ -11,6 +11,7 @@ from    typing          import (Optional, Union, Sized, # pylint: disable=unused
 from    enum            import Enum
 import  pandas
 import  numpy as np
+from    utils           import initdefaults
 from    signalfilter    import Filter, NonLinearFilter  # pylint: disable=unused-import
 
 Range   = NamedTuple('Range', [('start', int), ('values', np.ndarray)])
@@ -46,10 +47,11 @@ def _iter_ranges(xmin:int, inter:Sequence[Range]) -> 'Iterable[Tuple[np.ndarray,
 
 class _CollapseAlg:
     u"base class for collapse. Deals with stitching as well"
-    _FILTER = NonLinearFilter                           # type: type
+    edge   = 1    # type: Optional[int]
+    filter = None # type: Optional[Filter]
+    @initdefaults
     def __init__(self, **kwa):
-        self.edge   = kwa.get('edge', 0)                # type: Optional[int]
-        self.filter = kwa.get('filter', self._FILTER()) # type: Optional[Filter]
+        pass
 
     @property
     def _edge(self):
@@ -76,7 +78,6 @@ class CollapseToMean(_CollapseAlg):
 
     The collapse starts from the right-most interval and moves left.
     """
-    _FILTER = type(None) # type: type
     def _run(self, inter:Sequence[Range], prof:Profile) -> Profile:
         key   = lambda i: (-i.start-len(i.values), -len(i.values))
         cnt   = np.zeros_like(prof.count)
@@ -96,8 +97,8 @@ class CollapseToMean(_CollapseAlg):
             cnt       [inds]        += 1
             prof.count[inds[inner]] += 1
 
-        if self.filter is not None:
-            self.filter(prof.value)
+        if callable(self.filter):
+            self.filter(prof.value)     # pylint: disable=not-callable
         return prof
 
 class CollapseByMerging(_CollapseAlg):
@@ -106,8 +107,6 @@ class CollapseByMerging(_CollapseAlg):
 
     The collapse is done by merging intervals sharing the maximum number of points.
     """
-    _FILTER = type(None) # type: type
-
     @staticmethod
     def __init_inters(inter):
         inters = []
@@ -204,8 +203,8 @@ class CollapseByMerging(_CollapseAlg):
 
         self.__update_prof(prof, inters, rngs)
 
-        if self.filter is not None:
-            self.filter(prof.value)
+        if callable(self.filter):
+            self.filter(prof.value) # pylint: disable=not-callable
         return prof
 
 class DerivateMode(Enum):
@@ -219,10 +218,11 @@ class CollapseByDerivate(_CollapseAlg):
     each time frame. Either the mean or the median is defined as the profile
     derivate.
     """
-    def __init__(self, **kwa):
-        super().__init__(**kwa)
-        self.maxder = kwa.get('maxder', np.inf)   # type: float
-        self.mode   = kwa.get('mode',   'median') # type: Union[str,DerivateMode]
+    maxder =np.inf    # type: float
+    mode   ='median'  # type: Union[str,DerivateMode]
+    @initdefaults
+    def __init__(self, **_):
+        super().__init__(**_)
 
     @classmethod
     def __occupation(cls, inter:Sequence[Range], xmin:int, xmax:int) -> np.ndarray:
@@ -233,8 +233,10 @@ class CollapseByDerivate(_CollapseAlg):
         return ret
 
     def _run(self, inter:Sequence[Range], prof:Profile) -> Profile:
-        vals  = np.full((prof.count.shape[0], max(self.__occupation(inter, prof.xmin, prof.xmax))),
-                        np.inf, dtype = np.float32)
+        vals  = np.full((prof.count.shape[0],
+                         max(self.__occupation(inter, prof.xmin, prof.xmax))),
+                        np.inf,
+                        dtype = np.float32)
         cnt   = np.zeros_like(prof.count)
         occ   = prof.count
         inner = slice(self._edge, None)
@@ -256,8 +258,8 @@ class CollapseByDerivate(_CollapseAlg):
 
         fcn    = getattr(np, 'nan'+DerivateMode(self.mode).value)
         values = fcn(vals, axis = 1)
-        if self.filter is not None:
-            self.filter(values)
+        if callable(self.filter):
+            self.filter(values)     # pylint: disable=not-callable
         prof.value = pandas.Series(values[::-1]).cumsum().values[::-1]
         return prof
 

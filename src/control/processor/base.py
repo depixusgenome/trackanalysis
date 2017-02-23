@@ -97,10 +97,18 @@ class Processor(metaclass=MetaProcessor):
 
     def caller(self) -> Callable:
         u"Returns an instance of the task's first callable parent class"
-        tpe = type(self.task)
-        for cls in tpe.__bases__:
-            if hasattr(cls, '__call__') and not issubclass(cls, _tasks.Task):
+        tpe   = type(self.task)
+        bases = list(tpe.__bases__)
+        while len(bases):
+            cls = bases.pop(0)
+
+            if (hasattr(cls, '__call__')
+                    and cls.__name__[0] != '_'
+                    and not issubclass(cls, _tasks.Task)):
                 return cls(**self.task.config())
+
+            bases.extend(cls.__bases__)
+
         raise TypeError("Could not find a functor base type in "+str(tpe))
 
     @staticmethod
