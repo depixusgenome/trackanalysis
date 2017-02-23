@@ -4,12 +4,13 @@ u"Tests the simulator"
 from    itertools       import product
 import  numpy as np
 from    numpy.testing   import assert_allclose
-from    simulator       import TrackSimulator, randpeaks, randbead, randevents
+from    simulator       import (TrackSimulator, randpeaks, randbead, randevents,
+                                randbypeakevents)
 
 def test_track_simulator():
     u"testing raw data simulation"
     bead  = TrackSimulator(ncycles = 1, baselineargs = None)
-    drift = bead.drift
+    drift = bead.drift()
     data  = bead(seed = 0)
 
     assert len(drift)       == 149
@@ -25,11 +26,11 @@ def test_track_simulator():
 
     sim    = TrackSimulator(ncycles      = 2,
                             brownian     = None,
-                            randtargs    = None,
+                            events       = None,
                             baselineargs = None)
     data   = sim()
     cycles = slice(*sim.cycles[0][[5,6]])
-    drift  = sim.drift[cycles]
+    drift  = sim.drift()[cycles]
     assert data.shape == (149*2,)
     assert all(data[:149] == data[149:149*2])
     assert_allclose(data[cycles], drift)
@@ -54,13 +55,33 @@ def test_peak_simulator():
 
 def test_events_simulator():
     u"testing event simulation"
-    ares = randevents(2, 100, peaks = np.array([10, 20, 30]), rates = .5, seed = 0)
+    ares = randevents(2, ncycles = 100, peaks = np.array([.1, .2, .5]), rates = .5, seed = 0)
     assert frozenset(ares.keys()) == frozenset(product(range(2), range(100)))
 
     res  = tuple(ares[0,i] for i in range(100))
-    assert {len(i) for i in res} == {0, 1, 2, 3}
-    elem = next(i[0] for i in res if len(i))
-    assert elem.dtype == 'f4'
+    assert {len(i) for i in res} == {1, 2, 3, 4}
+    elem = next(i for i in res if len(i))
+    assert elem.dtype == np.dtype([('start', 'i4'), ('data', 'O')])
+
+def test_bypeaksevents_simulator():
+    u"testing event simulation"
+    ares = randbypeakevents(1, seed      = 0,
+                            ncycles      = 100,
+                            peaks        = np.array([.1, .2, .5]),
+                            rates        = .5,
+                            brownian     = None,
+                            driftargs    = None,
+                            baselineargs = None)
+    res  = tuple(ares)
+    assert len(res) == 1
+    assert res[0][0] == 0
+    res2 = tuple(res[0][1])
+    assert_allclose([i for i, _ in res2], [.0, .1, .2, .5], atol = 1e-5)
+    for i, j in res2:
+        for k in j['data']:
+            if k is None:
+                continue
+            assert np.abs(k-i).sum() < 1e-3
 
 if __name__ == '__main__':
-    test_events_simulator()
+    test_bypeaksevents_simulator()

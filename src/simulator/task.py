@@ -4,34 +4,28 @@ u"""
 Task for simulating tracks
 """
 from typing         import Optional     # pylint: disable=unused-import
-from utils          import setdefault
+from utils          import initdefaults
 from model.task     import RootTask, Level
-from .track         import TrackSimulatorConfig
-from .peak          import PeakSimulatorConfig
+from .track         import TrackSimulator
 
-class SimulatorTaskMixin:
+class _SimulatorTask(TrackSimulator):
     u"Class indicating that a track file should be added to memory"
     nbeads = 1      # type: int
     seed   = None   # type: Optional[int]
+    @initdefaults
     def __init__(self, **kwa):
-        setdefault(self, 'nbeads', kwa)
-        setdefault(self, 'seed',   kwa)
-        if hasattr(self.__class__, 'ncycles'):
-            setdefault(self, 'ncycles',   kwa)
+        super().__init__(self)
+        RootTask.__init__(self, **kwa) # pylint: disable=non-parent-init-called
 
-        # pylint: disable=non-parent-init-called
-        RootTask.__init__(self, **kwa)
-        self.__class__.__bases__[1].__init__(self, **kwa)
-
-class TrackSimulatorTask(SimulatorTaskMixin, TrackSimulatorConfig, RootTask):
+class TrackSimulatorTask(_SimulatorTask, RootTask):
     u"Class that creates fake track data each time it is called upon"
 
-class EventSimulatorTask(SimulatorTaskMixin, PeakSimulatorConfig, RootTask):
+class EventSimulatorTask(_SimulatorTask, RootTask):
     u"Class that creates fake event data each time it is called upon"
     ncycles = 20    # type: int
     levelou = Level.event
 
-class PeakSimulatorTask(SimulatorTaskMixin, PeakSimulatorConfig, RootTask):
+class ByPeaksEventSimulatorTask(_SimulatorTask, RootTask):
     u"Class that creates fake peak data each time it is called upon"
     ncycles = 20    # type: int
     levelou = Level.peak

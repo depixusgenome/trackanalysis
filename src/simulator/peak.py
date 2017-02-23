@@ -5,11 +5,9 @@ from   typing   import (Union, Sequence, Optional, # pylint: disable=unused-impo
                         Dict, Tuple)
 import random
 import numpy as np
-from   numpy.lib.stride_tricks import as_strided
+from   numpy.lib.stride_tricks  import as_strided
 
-from utils              import initdefaults, kwargsdefaults
-from model              import Level
-from data.trackitems    import Cycles
+from   utils                    import initdefaults, kwargsdefaults
 
 class FakeTrack:
     u"Placeholder"
@@ -17,7 +15,7 @@ class FakeTrack:
         self.data  = dict()
         self.beads = self.data
 
-class PeakSimulatorConfig:
+class PeakSimulator:
     u"""
     Configuration for simulating cycle peaks. Calling this functor will return
     a list containing a list of peak positions. If labels are provided, these are
@@ -56,8 +54,6 @@ class PeakSimulatorConfig:
     def __init__(self, **_):
         pass
 
-class PeakSimulator(PeakSimulatorConfig):
-    u"Simulates cycles peaks"
     def __return(self, occs, peaks):
         if   isinstance(self.labels, str):
             flag = self.labels.lower()
@@ -191,28 +187,3 @@ class PeakSimulator(PeakSimulatorConfig):
         self.addbias    (peaks)
 
         return self.__return(occs, peaks)
-
-    def groupedbypeaks(self, nbeads, ncycles, seed = None):
-        u"Creates events grouped by peaks"
-        self.seed(seed)
-        def _create():
-            peaks, labels = self(ncycles, labels = 'range')
-            allevts       = self.peakstoevents(peaks)[1]
-            for lab in np.unique(np.concatenate(tuple(labels))):
-                events = np.concatenate([evts[labs == lab]
-                                         for evts, labs in zip(allevts, labels)])
-                peak   = np.concatenate(tuple(events)).mean()
-                yield (peak, events)
-
-        for bead in range(nbeads):
-            yield (bead, _create())
-
-    def events(self, nbeads, ncycles, seed = None) -> Cycles:
-        u"Creates events in a Events object"
-        self.seed(seed)
-        track = FakeTrack()
-        evts  = dict()      # type: Dict[Tuple[int,int], np.ndarray]
-        for bead in range(nbeads):
-            track.data[bead], allevts = self.peakstoevents(self(ncycles))
-            evts.update(((bead, cid), evts) for cid, evts in enumerate(allevts))
-        return Cycles(track = track, data = evts, direct = True, level = Level.event)
