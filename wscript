@@ -97,11 +97,11 @@ def build(bld):
     lines += '# encoding: utf-8\n'
     lines += 'u"Build information"'
     lines += '\n'
-    lines += 'def version():\n    u"git version"\n    return "%s"\n\n'
-    lines += 'def lasthash():\n   u"git hash"\n    return "%s"\n\n'
-    lines += 'def hashdate():\n   u"git hash date"\n    return "%s"\n\n'
-    lines += 'def isdirty():\n   u"git hash"\n    return %s\n\n'
-    lines += 'def compiler():\n   u"compiler used"\n    return "%s"'
+    lines += 'def version ():\n    u"git version"\n    return "%s"\n\n'
+    lines += 'def lasthash():\n    u"git hash"\n    return "%s"\n\n'
+    lines += 'def hashdate():\n    u"git hash date"\n    return "%s"\n\n'
+    lines += 'def isdirty ():\n    u"git hash"\n    return %s\n\n'
+    lines += 'def compiler():\n    u"compiler used"\n    return "%s"'
     lines %= (git.version(), git.lasthash(),
               git.lastdate(), str(git.isdirty()), bld.cpp_compiler_name())
 
