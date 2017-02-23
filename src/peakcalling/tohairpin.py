@@ -44,10 +44,7 @@ class Hairpin:
         return (cls(peaks = cls.topeaks(seq, oligos))
                 for name, seq in _read(path))
 
-HairpinDistanceResults = NamedTuple('HairpinDistanceResults',
-                                    [('value',   float),
-                                     ('stretch', float),
-                                     ('bias',    float)])
+Distance = NamedTuple('Distance', [('value', float), ('stretch', float), ('bias', float)])
 
 class HairpinDistance(Hairpin):
     u"Matching experimental peaks to hairpins"
@@ -62,7 +59,7 @@ class HairpinDistance(Hairpin):
         super().__init__(**kwa)
 
     @kwargsdefaults('precision', 'stretch', 'bias', 'lastpeak')
-    def __call__(self, peaks : np.ndarray) -> HairpinDistanceResults:
+    def __call__(self, peaks : np.ndarray) -> Distance:
         best  = self.DEFAULT_BEST, sum(self.stretch[:2])*.5, sum(self.bias[:2])*.5
         delta = 0.
         if len(peaks) > 1:
@@ -90,7 +87,7 @@ class HairpinDistance(Hairpin):
                 else:
                     if out[0] < best[0]:
                         best = out
-        return HairpinDistanceResults(best[0], best[1], best[2]-best[1]*delta)
+        return Distance(best[0], best[1], best[2]-best[1]*delta)
 
 class PeakIdentifier(Hairpin):
     u"Identifying experimental peaks with the theoretical ones"

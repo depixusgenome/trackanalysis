@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Finds peak positions on a bead"
+from typing           import Iterator, Tuple, Any, Sequence
 from copy             import deepcopy
 from functools        import wraps
 import numpy          as     np
@@ -8,6 +9,8 @@ import numpy          as     np
 from data.trackitems  import Items, Cycles, Level
 from utils            import escapenans
 from .                import EventDetectionConfig
+
+EventType = Tuple[Any,Sequence[Tuple[int,np.ndarray]]]
 
 class Events(Cycles, EventDetectionConfig, Items):
     u"""
@@ -40,7 +43,7 @@ class Events(Cycles, EventDetectionConfig, Items):
             return cycle
         return _fcn
 
-    def _iter(self, sel = None):
+    def _iter(self, sel = None) -> Iterator[EventType]:
         dtype = np.dtype([('start', 'i4'), ('data', 'O')])
         prec  = None if self.precision in (0., None) else self.precision
         track = self.track

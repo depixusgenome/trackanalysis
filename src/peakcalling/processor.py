@@ -11,7 +11,7 @@ import numpy        as np
 from utils              import StreamUnion, initdefaults, updatecopy
 from model              import Task, Level
 from control.processor  import Processor
-from .tohairpin         import HairpinDistance, HairpinDistanceResults
+from .tohairpin         import HairpinDistance, Distance
 
 DistanceConstraint = NamedTuple('DistanceConstraint',
                                 [('hairpin', str), ('constraints', dict)])
@@ -32,7 +32,7 @@ class BeadsByHairpinTask(Task):
 BeadsByHairpinResults = NamedTuple('BeadsByHairpinResults',
                                    [('key',        Any),
                                     ('silhouette', float),
-                                    ('distance',   HairpinDistanceResults),
+                                    ('distance',   Distance),
                                     ('events',     np.ndarray)])
 
 class BeadsByHairpinProcessor(Processor):
