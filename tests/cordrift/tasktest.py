@@ -19,7 +19,7 @@ def _run(coll, stitch, brown):
                             drift    = (.05, 29.))
     cycles = bead.cycles[0][[5,6]]
     frame  = bead.track(nbeads = 1, seed = 0).cycles
-    drift  = bead.drift[cycles[0]:cycles[1]]
+    drift  = bead.drift()[cycles[0]:cycles[1]]
 
     task = BeadDriftProcessor.tasktype(filter   = None, precision = 8e-3,
                                        collapse = coll(),
