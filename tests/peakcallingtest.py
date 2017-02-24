@@ -7,7 +7,7 @@ from numpy.testing          import assert_allclose
 from pytest                 import approx
 
 from control.taskcontrol    import create
-from simulator.processor    import PeakSimulatorTask
+from simulator.processor    import ByPeaksEventSimulatorTask
 from peakcalling            import cost, match
 from peakcalling.processor  import (BeadsByHairpinProcessor, BeadsByHairpinTask,
                                     HairpinDistance, DistanceConstraint)
@@ -104,13 +104,13 @@ def test_control():
              np.array([0., .1,     .5, 1.2, 1.5], dtype = 'f4')/8.8e-4]
     hpins = {'hp100': HairpinDistance(peaks = truth[0]),
              'hp101': HairpinDistance(peaks = truth[1])}
-    pair  = create((PeakSimulatorTask(peaks    = peaks,
-                                      brownian = .01,
-                                      stretch  = None,
-                                      bias     = None,
-                                      rates    = None,
-                                      nbeads   = 1,
-                                      ncycles  = 5),
+    pair  = create((ByPeaksEventSimulatorTask(peaks    = peaks,
+                                              brownian = .01,
+                                              stretch  = None,
+                                              bias     = None,
+                                              rates    = None,
+                                              nbeads   = 1,
+                                              ncycles  = 5),
                     BeadsByHairpinTask(hairpins = hpins)))
 
     beads = tuple(tuple(i) for i in pair.run())[0]
