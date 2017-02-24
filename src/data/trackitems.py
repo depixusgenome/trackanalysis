@@ -7,7 +7,7 @@ from    abc         import ABCMeta, abstractmethod
 from    functools   import wraps
 from    typing      import (Optional, Tuple, Union, # pylint: disable=unused-import
                             Any, List, Sequence, Iterable, Iterator,
-                            TypeVar, Hashable, cast)
+                            TypeVar, Hashable, TYPE_CHECKING, cast)
 import  numpy as np
 
 from    utils       import isfunction, initdefaults
@@ -15,8 +15,12 @@ from    model       import Level
 
 _m_ALL   = frozenset((None, all, Ellipsis))
 _m_INTS  = int, cast(type, np.integer)
-_m_INDEX = (tuple, str) + _m_INTS
+_m_KEYS  = int, cast(type, np.integer), str
+_m_INDEX = int, cast(type, np.integer), str, tuple
 _m_NONE  = '_m_NONE'
+
+BEADKEY  = Union[str,int]
+CYCLEKEY = Tuple[BEADKEY,int]
 Self     = TypeVar('Self',  bound = '_m_ConfigMixin')
 TSelf    = TypeVar('TSelf', bound = 'TrackItems')
 
@@ -85,14 +89,15 @@ def _m_copy(item):
     u"Copies the data"
     return item[0], np.copy(item[1])
 
+ISelf = TypeVar('ISelf', bound = 'Items')
 class Items(metaclass=ABCMeta):
     u"Class for iterating over data"
     @abstractmethod
-    def __getitem__(self, val):
+    def __getitem__(self:ISelf, val) -> Union[ISelf, np.ndarray]:
         u"can return one item or a copy of self with only the selected keys"
 
     @abstractmethod
-    def keys(self, _ = None):
+    def keys(self, _ = None) -> Iterator:
         u"iterates over keys"
         assert _ is None # should not be necessary: dicts can't do that
 
@@ -112,7 +117,7 @@ class TransformedItems:
             self._first = False
         return self._data[val]
 
-    def keys(self, _ = None):
+    def keys(self, _ = None) -> Iterator:
         u"iterates over keys"
         assert _ is None
         yield from self._data.keys()
@@ -242,7 +247,7 @@ class TrackItems(_m_ConfigMixin, Items):
                               **{i: shallowcopy(j)
                                  for i, j in self.__dict__.items() if i != 'track'})
 
-    def __iter__(self) -> Iterator[Tuple[Any, Sequence[float]]]:
+    def __iter__(self) -> Iterator[Tuple[Any, np.ndarray]]:
         _m_unlazyfy(self)
         act = self.getaction()
         if act is None:
@@ -250,12 +255,12 @@ class TrackItems(_m_ConfigMixin, Items):
         else:
             yield from (act(col) for col in self._iter())
 
-    def __getitem__(self, keys):
+    def __getitem__(self:TSelf, keys) -> Union[TSelf, np.ndarray]:
         if isinstance(keys, slice):
             # could be a slice of beads or a slice of bead data ...
             raise NotImplementedError()
 
-        elif (isinstance(keys, (str,)+_m_INTS)
+        elif (isinstance(keys, _m_KEYS)
               or (isinstance(keys, tuple) and _m_ALL.isdisjoint(keys))):
             # this is NOT a slice
             return self.get(keys)
@@ -303,31 +308,39 @@ class Beads(TrackItems, Items):
     * providing names or ids: selects only those columns
     """
     level = Level.bead
-    def _keys(self, sel):
+    def _keys(self, sel) -> Iterator[BEADKEY]:
         if sel is None:
-            yield from self.data.keys()
+            yield from iter(self.data.keys())
         elif isinstance(self.data, Beads):
-            yield from self.data.keys(sel)
+            yield from iter(cast(Beads, self.data).keys(sel))
         else:
             keys = frozenset(self.data.keys())
             yield from (i for i in sel if i in keys)
 
-    def _iter(self, sel = None):
+    def _iter(self, sel = None) -> Iterator[Tuple[BEADKEY, np.ndarray]]:
         if isinstance(self.data, Beads):
+            beads = cast(Beads, self.data)
             if sel is None:
-                yield from self.data
+                yield from beads.__iter__()
             else:
-                yield from shallowcopy(self.data).selecting(sel)
+                yield from shallowcopy(beads).selecting(sel).__iter__()
             return
 
         yield from ((bead, self.data[bead]) for bead in self.keys(sel))
 
-    def __getitem__(self, keys):
+    def __getitem__(self, keys) -> Union['Beads',np.ndarray]:
         if isinstance(keys, tuple):
             if len(keys) == 2:
                 return Cycles(track = self.track, data = self)[keys]
             raise NotImplementedError()
         return super().__getitem__(keys)
+
+    if TYPE_CHECKING:
+        def keys(self, sel = None) -> Iterator[BEADKEY]:
+            yield from super().keys(sel)
+
+        def __iter__(self) -> Iterator[Tuple[BEADKEY, np.ndarray]]:
+            yield from super().__iter__()
 
 class Cycles(TrackItems, Items):
     u"""
@@ -358,7 +371,7 @@ class Cycles(TrackItems, Items):
 
         for thisid in sel:
             if isinstance(thisid, (tuple, list)):
-                bid, tmp = thisid[0], thisid[1] # type: Union[str,int], Any
+                bid, tmp = thisid[0], thisid[1] # type: BEADKEY, Any
                 if bid in _m_ALL and tmp in _m_ALL:
                     thisid = ...
                 elif bid in _m_ALL:
@@ -383,7 +396,7 @@ class Cycles(TrackItems, Items):
 
         for thisid in sel:
             if isinstance(thisid, (tuple, list)):
-                bid, tmp = thisid[0], thisid[1] # type: Union[str,int], Any
+                bid, tmp = thisid[0], thisid[1] # type: BEADKEY, Any
                 if bid in _m_ALL and tmp in _m_ALL:
                     thisid = ...
                 elif bid in _m_ALL:
@@ -401,7 +414,7 @@ class Cycles(TrackItems, Items):
             else:
                 yield from (i for i in self.data.keys() if i[1] == thisid)
 
-    def _keys(self, sel) -> Iterable[Tuple[Union[str,int], int]]:
+    def _keys(self, sel) -> Iterable[CYCLEKEY]:
         if isinstance(self.data, Cycles):
             yield from cast(Cycles, self.data).keys(sel)
 
@@ -432,12 +445,13 @@ class Cycles(TrackItems, Items):
 
         yield from (_getdata(bid, cid) for bid, cid in self.keys(sel))
 
-    def _iter(self, sel = None):
+    def _iter(self, sel = None) -> Iterator[Tuple[CYCLEKEY, np.ndarray]]:
         if isinstance(self.data, Cycles):
+            cycles = cast(Cycles, self.data)
             if sel is None:
-                yield from self.data
+                yield from cycles.__iter__()
             else:
-                yield from shallowcopy(self.data).selecting(sel)
+                yield from shallowcopy(cycles).selecting(sel).__iter__()
 
         elif self.direct:
             yield from ((key, self.data[key]) for key in self.keys(sel))
@@ -482,6 +496,16 @@ class Cycles(TrackItems, Items):
         else:
             last = self.track.phaseid(..., self.last+1)
             return np.max(last - first)
+
+    if TYPE_CHECKING:
+        def keys(self, sel = None) -> Iterator[CYCLEKEY]:
+            yield from super().keys(sel)
+
+        def __getitem__(self, keys) -> Union['Cycles',np.ndarray]:
+            return super().__getitem__(keys)
+
+        def __iter__(self) -> Iterator[Tuple[CYCLEKEY, np.ndarray]]:
+            yield from super().__iter__()
 
 def createTrackItem(level:Optional[Level] = Level.none, **kwargs):
     u"Returns the item type associated to a level"

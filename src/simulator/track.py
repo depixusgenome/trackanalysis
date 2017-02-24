@@ -13,6 +13,8 @@ from    utils           import initdefaults, kwargsdefaults
 from    data            import Track
 from    data.trackitems import Cycles, Level
 
+EVENTS_DTYPE = np.dtype([('start', 'i4'), ('data', 'O')])
+
 class LadderEvents:
     u""" Creates events on a given range """
     randzargs    = (0., .1, .9)     # type: Optional[Tuple[float, float, float]]
@@ -102,7 +104,6 @@ class PoissonEvents:
 
 class TrackSimulator:
     u"Simulates bead data over a number of cycles"
-    DTYPE        = np.dtype([('start', 'i4'), ('data', 'O')])
     ncycles      = 15
     phases       = [ 1,  15,  1, 15,  1, 100,  1,  15]
     zmax         = [ 0., 0., 1., 1., 0., 0., -.3, -.3]
@@ -202,7 +203,7 @@ class TrackSimulator:
             labels = [np.array([i[0] for i in evt['data']]) for evt in events]
             curs   = []
             for lab in np.unique(np.concatenate(labels)):
-                cur          = np.empty((len(events),), dtype = self.DTYPE)
+                cur          = np.empty((len(events),), dtype = EVENTS_DTYPE)
                 cur['start'] = sum(self.phases[:5])
                 cur['data']  = None
                 for i, (cevt, clab) in enumerate(zip(events, labels)):
@@ -221,7 +222,7 @@ class TrackSimulator:
             yield (bead, _generator())
 
     def __events(self, cycles: np.ndarray) -> Iterator[np.ndarray]:
-        dtpe  = self.DTYPE
+        dtpe  = EVENTS_DTYPE
         start = np.sum(self.phases[:5])
         for cyc in self.__cyclephase(cycles, 5):
             rng  = np.nonzero(np.diff(cyc))[0]+1
