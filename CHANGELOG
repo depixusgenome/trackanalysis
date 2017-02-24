@@ -1,1 +1,14 @@
-TODO
+# tag ramp_v1.2 
+## Tagger: David Salthouse <david.salthouse@depixus.com>
+    ### rampapp_v1.2
+        * Definition of a good bead has changed:
+            For a given bead, if less than 20% of cycles do not open and close has expected
+            the bead is tagged good. 
+            Earlier versions of rampapp discarded a bead as soon
+            as one of its cycle misbehaved.
+        * creates a local server:
+            once open the application runs in your webbrowser,
+            to open another instance of rampapp, copy the address of rampapp (usually: http://localhost:5006/call_display)
+            into a new window 
+                
+                
