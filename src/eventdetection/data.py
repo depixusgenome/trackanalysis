@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Finds peak positions on a bead"
-from typing           import Iterator, Tuple, Sequence, Union, TYPE_CHECKING
+from typing           import Iterator, Tuple, Union, Sequence, TYPE_CHECKING
 from copy             import deepcopy
 from functools        import wraps
 import numpy          as     np
 
 from data.trackitems  import Items, Cycles, Level, CYCLEKEY
-from utils            import escapenans
+from utils            import escapenans, EVENTS_TYPE, EVENTS_DTYPE
 from .                import EventDetectionConfig
-
-EVENTS_DTYPE = np.dtype([('start', 'i4'), ('data', 'O')])
-EVENTS_TYPE  = Sequence[Tuple[int,np.ndarray]]
 
 class Events(Cycles, EventDetectionConfig, Items):
     u"""
@@ -44,7 +41,7 @@ class Events(Cycles, EventDetectionConfig, Items):
             return cycle
         return _fcn
 
-    def _iter(self, sel = None) -> Iterator[Tuple[CYCLEKEY, EVENTS_TYPE]]:
+    def _iter(self, sel = None) -> Iterator[Tuple[CYCLEKEY, Sequence[EVENTS_TYPE]]]:
         prec  = None if self.precision in (0., None) else self.precision
         track = self.track
         fcn   = self.__filterfcn()
@@ -64,8 +61,8 @@ class Events(Cycles, EventDetectionConfig, Items):
         def keys(self, sel = None) -> Iterator[CYCLEKEY]:
             yield from super().keys(sel)
 
-        def __getitem__(self, keys) -> Union['Events', EVENTS_TYPE]:
+        def __getitem__(self, keys) -> Union['Events', Sequence[EVENTS_TYPE]]:
             return super().__getitem__(keys)
 
-        def __iter__(self) -> Iterator[Tuple[CYCLEKEY, EVENTS_TYPE]]:
+        def __iter__(self) -> Iterator[Tuple[CYCLEKEY, Sequence[EVENTS_TYPE]]]:
             yield from super().__iter__()

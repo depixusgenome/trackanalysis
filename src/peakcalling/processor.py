@@ -4,11 +4,13 @@ u"""
 Matching experimental peaks to hairpins: tasks and processors
 """
 from   typing       import (Dict, Sequence, NamedTuple, # pylint: disable=unused-import
-                            Iterator, Tuple, Any, cast)
+                            Iterator, Tuple, Union, Any, Iterable, cast)
 from   functools    import partial
 import numpy        as np
 
-from utils              import StreamUnion, initdefaults, updatecopy
+from utils                  import StreamUnion, initdefaults, updatecopy
+from data.trackitems        import BEADKEY
+from peakfinding.selector   import Output as PeakFindingOutput
 from model              import Task, Level
 from control.processor  import Processor
 from .tohairpin         import HairpinDistance, Distance
@@ -18,8 +20,8 @@ DistanceConstraint = NamedTuple('DistanceConstraint',
 class BeadsByHairpinTask(Task):
     u"Groups beads per hairpin"
     level       = Level.peak
-    hairpins    = dict()    # type: Dict[str, HairpinDistance]
-    constraints = dict()    # type: Dict[Any, DistanceConstraint]
+    hairpins    = dict()    # type: Dict[str,     HairpinDistance]
+    constraints = dict()    # type: Dict[BEADKEY, DistanceConstraint]
     @initdefaults
     def __init__(self, **_):
         super().__init__()
@@ -33,14 +35,16 @@ BeadsByHairpinResults = NamedTuple('BeadsByHairpinResults',
                                    [('key',        Any),
                                     ('silhouette', float),
                                     ('distance',   Distance),
-                                    ('events',     np.ndarray)])
+                                    ('events',     Sequence[PeakFindingOutput])])
 
+Input  = Tuple[BEADKEY, Iterable[PeakFindingOutput]]
+Output = Tuple[str, Sequence[BeadsByHairpinResults]]
 class BeadsByHairpinProcessor(Processor):
     u"Groups beads per hairpin"
     tasktype = BeadsByHairpinTask
-    Output   = Iterator[Tuple[str, Sequence[BeadsByHairpinResults]]]
     @classmethod
-    def topeaks(cls, frame):
+    def topeaks(cls, frame:Iterable[Input]
+               ) -> Dict[BEADKEY, Tuple[Sequence[float], Sequence[PeakFindingOutput]]]:
         u"Regroups the beads from a frame by hairpin"
         def _get(evts):
             if isinstance(evts, Iterator):
@@ -52,8 +56,7 @@ class BeadsByHairpinProcessor(Processor):
             if getattr(evts, 'dtype', 'O') == 'f4':
                 return evts, np.empty((0,), dtype = 'O')
             else:
-                return (np.array([i for i, _ in evts], dtype = 'f4'),
-                        np.array([i for _, i in evts], dtype = 'O'))
+                return (np.array([i for i, _ in evts], dtype = 'f4'), evts)
 
         return {key: _get(evts) for key, evts in frame}
 
@@ -69,7 +72,11 @@ class BeadsByHairpinProcessor(Processor):
         return ((bval-aval)/max(aval, bval)-.5)*2.
 
     @classmethod
-    def apply(cls, hpins:Dict, constraints:Dict, frame) -> 'BeadsByHairpinProcessor.Output':
+    def apply(cls,
+              hpins         : Dict,
+              constraints   : Dict[BEADKEY, DistanceConstraint],
+              frame         : Iterable[Tuple[BEADKEY, Iterable[Input]]]
+             ) -> Iterator[Output]:
         u"Regroups the beads from a frame by hairpin"
         peaks = cls.topeaks(frame)
 

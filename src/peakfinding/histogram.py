@@ -9,40 +9,10 @@ import  numpy  as     np
 from    numpy.lib.stride_tricks import as_strided
 from    scipy.signal            import find_peaks_cwt
 
-from    utils                   import kwargsdefaults, initdefaults, NoArgs
+from    utils                   import (kwargsdefaults, initdefaults, NoArgs,
+                                        asdataarrays)
 from    signalfilter            import PrecisionAlg
 from    signalfilter.convolve   import KernelConvolution # pylint: disable=unused-import
-
-
-def _m_asarray(arr:Iterable)-> np.array:
-    tmp = None # type: Optional[Sequence]
-    if isinstance(arr, Iterator):
-        tmp = tuple(arr)
-    elif getattr(arr, 'dtype', '') != 'O':
-        tmp = cast(Sequence, arr)
-    elif getattr(arr, 'dtype', '') == 'O' and len(getattr(arr, 'shape', '')) > 1:
-        tmp = tuple(arr)
-
-    if tmp is None:
-        return arr
-
-    vals    = np.empty((len(tmp),), dtype = 'O')
-    vals[:] = tmp
-    return vals
-
-def asarray(aevents:Iterable[Iterable])->np.ndarray:
-    u"converts  an Iterable[Iterable] to a np.array"
-    events = _m_asarray(aevents)
-    if len(events) == 0:
-        return
-
-    if not np.isscalar(events[0][0]):
-        for i, evt in enumerate(events):
-            events[i] = _m_asarray(evt)
-
-    if not any(len(i) for i in events):
-        return None
-    return events
 
 class Histogram(PrecisionAlg):
     u"""
@@ -88,7 +58,7 @@ class Histogram(PrecisionAlg):
                  bias     : Union[None,float,np.ndarray] = None,
                  separate : bool                         = False,
                 ) -> Tuple[Iterator[np.ndarray], float, float]:
-        events = asarray(aevents)
+        events = asdataarrays(aevents)
         if events is None:
             return np.empty((0,), dtype = 'f4'), np.inf, 0.
 
@@ -110,7 +80,7 @@ class Histogram(PrecisionAlg):
                        bias     : Union[None,float,np.ndarray] = None,
                        zmeasure : Union[None,type,Callable]    = NoArgs) -> np.ndarray:
         u"Returns event positions as will be added to the histogram"
-        events = asarray(aevents)
+        events = asdataarrays(aevents)
         if events is None:
             return np.empty((0,), dtype = 'f4')
 

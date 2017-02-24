@@ -9,3 +9,4 @@ from .attrdefaults  import (toenum, changefields, kwargsdefaults, setdefault,
                             pipe, NoArgs)
 
 from .decoration    import fromstream, escapenans, StreamUnion
+from .array         import asdataarrays, asobjarray, EVENTS_DTYPE, EVENTS_TYPE

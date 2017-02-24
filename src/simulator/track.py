@@ -9,11 +9,9 @@ from    itertools       import chain
 
 import  numpy as np
 
-from    utils           import initdefaults, kwargsdefaults
+from    utils           import initdefaults, kwargsdefaults, EVENTS_DTYPE
 from    data            import Track
 from    data.trackitems import Cycles, Level
-
-EVENTS_DTYPE = np.dtype([('start', 'i4'), ('data', 'O')])
 
 class LadderEvents:
     u""" Creates events on a given range """
