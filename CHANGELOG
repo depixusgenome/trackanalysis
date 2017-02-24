@@ -10,5 +10,6 @@
             once open the application runs in your webbrowser,
             to open another instance of rampapp, copy the address of rampapp (usually: http://localhost:5006/call_display)
             into a new window 
-                
-                
+        * generates a ramp_discard.csv file for pias
+        * added a third graph to display the estimated size of each hairpin in the trk files 
+        
