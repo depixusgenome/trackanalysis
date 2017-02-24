@@ -7,7 +7,7 @@ from numpy.lib.stride_tricks    import as_strided
 from control.taskcontrol        import create
 from simulator                  import randpeaks
 from simulator.processor        import EventSimulatorTask
-from peakfinding.selector       import PeakSelector
+from peakfinding.selector       import PeakSelector, EVENTS_DTYPE
 from peakfinding.processor      import PeakSelectorTask
 
 def test_peakselector():
@@ -45,12 +45,12 @@ def test_control():
     assert tuple(i[0] for i in beads) == (0, 1)
 
     vals = tuple(beads[0][1])
-    assert_allclose([i for i, _ in vals], peaks, atol = .02)
+    assert_allclose([i for i, _ in vals], [0.]+peaks, atol = .01, rtol = 1e-2)
     for peak, evts in vals:
-        assert evts.dtype == 'O'
-        tmp = [i.min() for i in evts]
+        assert evts.dtype == EVENTS_DTYPE
+        tmp = [i.min() for i in evts['data']]
         assert_allclose(tmp, (peak,)*20, atol = 0.1)
-        tmp = [i.max() for i in evts]
+        tmp = [i.max() for i in evts['data']]
         assert_allclose(tmp, (peak,)*20, atol = 0.1)
 
 if __name__ == '__main__':
