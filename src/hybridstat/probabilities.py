@@ -49,8 +49,9 @@ u"""
     Moving back to time, with F the frame rate,
     we have (1-p)^{t*F} = exp(t * F ln(1-p)) ⇒ T = 1/(F ln(1-p))
 """
-import numpy as np
-from utils import initdefaults
+from    typing  import Union, Sequence
+import  numpy   as np
+from    utils   import initdefaults, EVENTS_TYPE
 
 class Probability:
     u"Computes probabilities"
@@ -65,26 +66,38 @@ class Probability:
     def __init__(self, **_):
         pass
 
-    def __call__(self, events, maxdurs) -> 'Probability':
+    def __apply(self, arrevents, arrmaxdurs):
+        dur  = np.array([len(i) for i in arrevents['data']])
+        last = arrevents['start']+dur
+        good = dur < self.minduration
+
+        self.nevents         += good.sum()
+        self.ntoolong        += (last[good] > arrmaxdurs).sum()
+        self.totalduration   += dur[good].sum()
+
+    def update(self,
+               events : Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]],
+               maxdurs: Sequence[int]
+              ) -> None:
+        u"Updates stats"
+        arrs = np.array([isinstance(i, np.ndarray) for i in events])
+        if any(arrs):
+            evts  = events [arrs]
+            mdurs = np.repeat(maxdurs[arrs], [len(i) for i in evts])
+            self.__apply(np.concatenate(tuple(evts)), mdurs)
+
+        arrs = np.array([isinstance(i, (tuple, np.void)) for i in events])
+        if not all(arrs):
+            self.__apply(events[~arrs], maxdurs[~arrs])
+
+    def __call__(self,
+                 events : Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]],
+                 maxdurs: Sequence[int]
+                ) -> 'Probability':
         u"Returns an object containing stats related to provided events"
-        obj = Probability(minduration = self.minduration, framerate = self.framerate)
-        for evts, maxdur in zip(events, maxdurs):
-            if evts is None:
-                continue
-
-            if isinstance(evts, np.ndarray):
-                last = evts[-1][0]+len(evts[-1][0])
-                dur  = last - evts[0][0]
-            else:
-                last = evts[0]+len(evts[0])
-                dur  = len(evts[1])
-
-            if dur < self.minduration:
-                continue
-
-            obj.nevents       += 1
-            obj.ntoolong      += last >= maxdur
-            obj.totalduration += dur
+        obj = Probability(minduration = self.minduration,
+                          framerate   = self.framerate)
+        obj.update(events, maxdurs)
         return obj
 
     @property
