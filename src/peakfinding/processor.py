@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Tasks related to peakfinding"
-from typing             import Iterator, Tuple, Any
+from typing             import Iterator, Tuple
 from functools          import partial
 
 from model.task         import Task, Level
 from control.processor  import Processor
-from .selector          import PeakSelector
+from data.trackitems    import BEADKEY
+from .selector          import PeakSelector, Output as PeakOutput
 
 class PeakSelectorTask(PeakSelector, Task):
     u"Groups events per peak"
@@ -16,12 +17,13 @@ class PeakSelectorTask(PeakSelector, Task):
         Task.__init__(self)
         PeakSelector.__init__(self, **kwa)
 
+Output = Tuple[BEADKEY, Iterator[PeakOutput]]
 class PeakSelectorProcessor(Processor):
     u"Groups events per peak"
     tasktype = PeakSelectorTask
 
     @staticmethod
-    def apply(cnf, data) -> Iterator[Tuple[Any, PeakSelector.Output]]:
+    def apply(cnf, data) -> Iterator[Output]:
         u"runs over one frame"
         def _run(ibead):
             vals = iter(i for _, i in data[ibead,...])
