@@ -11,7 +11,7 @@ CORR = lambda f, a, b, c, d, e: (PeakCorrelationAlignment.run(f,
                                                               precision     = 1.,
                                                               oversampling  = a,
                                                               maxmove       = b,
-                                                              nrepeats      = c,
+                                                              factors       = [1.]*c,
                                                               kernel_window = d,
                                                               kernel_width  = e))
 

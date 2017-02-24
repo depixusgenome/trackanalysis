@@ -23,10 +23,10 @@ class PeakCorrelationAlignment:
     Attributes:
 
     * *maxmove*:   max amount by which a cycle may be translated.
-    * *nrepeats*:  the number of times the procedure is repeated
+    * *factors*:   the factor to apply to the precision at each iteration.
     * *projector*: how to project cycles unto an axis
     """
-    nrepeats   = 6
+    factors    = np.repeat(np.arange(3)[::-1]+1, 1)
     maxmove    = 5
     projector  = Histogram(zmeasure = None)
     subpixel   = None                               # type: Optional[SubPixelPeakPosition]
@@ -53,8 +53,11 @@ class PeakCorrelationAlignment:
         project.edge     = (self.maxmove+project.kernel.width)*2
         project.zmeasure = None
 
-        for _ in range(self.nrepeats):
-            hists, _, width = project(data, bias = bias, separate = True)
+        for fact in self.factors:
+            hists, _, width = project(data,
+                                      bias      = bias,
+                                      separate  = True,
+                                      precision = project.precision*fact)
             hists = tuple(as_strided(cur,
                                      shape   = (maxt, len(cur)-maxt),
                                      strides = (cur.strides[0],)*2)
@@ -66,7 +69,7 @@ class PeakCorrelationAlignment:
             cur   = (np.median(cur)-cur) * width
 
             bias  = cur if bias is None else np.add(bias, cur, out = bias)
-        return bias
+        return bias-np.median(bias)
 
     @classmethod
     def run(cls, data: Iterable[np.ndarray], **kwa):
