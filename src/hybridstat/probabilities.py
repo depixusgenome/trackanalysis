@@ -51,7 +51,7 @@ u"""
 """
 from    typing  import Union, Sequence
 import  numpy   as np
-from    utils   import initdefaults, EVENTS_TYPE
+from    utils   import initdefaults, EVENTS_TYPE, EVENTS_DTYPE
 
 class Probability:
     u"Computes probabilities"
@@ -69,26 +69,24 @@ class Probability:
     def __apply(self, arrevents, arrmaxdurs):
         dur  = np.array([len(i) for i in arrevents['data']])
         last = arrevents['start']+dur
-        good = dur < self.minduration
-
-        self.nevents         += good.sum()
-        self.ntoolong        += (last[good] > arrmaxdurs).sum()
-        self.totalduration   += dur[good].sum()
+        self.nevents       += len(dur)
+        self.ntoolong      += (last > arrmaxdurs).sum()
+        self.totalduration += dur.sum()
 
     def update(self,
                events : Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]],
                maxdurs: Sequence[int]
               ) -> None:
         u"Updates stats"
-        arrs = np.array([isinstance(i, np.ndarray) for i in events])
+        arrs = np.array([isinstance(i, (list, np.ndarray)) for i in events])
         if any(arrs):
             evts  = events [arrs]
             mdurs = np.repeat(maxdurs[arrs], [len(i) for i in evts])
             self.__apply(np.concatenate(tuple(evts)), mdurs)
 
         arrs = np.array([isinstance(i, (tuple, np.void)) for i in events])
-        if not all(arrs):
-            self.__apply(events[~arrs], maxdurs[~arrs])
+        if any(arrs):
+            self.__apply(np.array(events[arrs], dtype = EVENTS_DTYPE), maxdurs[arrs])
 
     def __call__(self,
                  events : Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]],

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"all view aspects here"
+u"testing peakcalling"
 # pylint: disable=import-error,no-name-in-module
 import numpy as np
-from numpy.testing          import assert_allclose
+from numpy.testing          import assert_allclose, assert_equal
 from pytest                 import approx
 
 from control.taskcontrol    import create
@@ -64,7 +64,7 @@ def test_onehairpinid():
     bead  = np.array([0., 0.01, .1, .2, .5, 1.], dtype = 'f4') - .88e-4
     res   = PeakIdentifier(peaks = truth)(bead, 1./8.8e-4, 10.)
     assert_allclose(res['zvalue'], bead)
-    assert_allclose(res['key'], np.insert(truth[:-1], 1, np.NaN))
+    assert_allclose(res['key'], np.insert(np.int32(truth[:-1]+.1), 1, np.iinfo('i4').min))
 
 def test_hairpincost():
     u"tests hairpin cost method"
@@ -86,9 +86,9 @@ def test_hairpincost():
     assert len(results[None])    == 1
     assert results['hp100'][0].key == 100
     assert results['hp101'][0].key == 101
-    assert_allclose(results['hp100'][0].peaks['key'],
-                    np.insert(truth[0][:-1], 1, np.NaN))
-    assert_allclose(results['hp101'][0].peaks['key'], truth[1][:-1])
+    assert_equal(results['hp100'][0].peaks['key'],
+                 np.insert(np.int32(truth[0][:-1]+.1), 1, np.iinfo('i4').min))
+    assert_equal(results['hp101'][0].peaks['key'], np.int32(truth[1][:-1]+.1))
     assert results[None][0].key    == 110
 
 def test_constrainedhairpincost():

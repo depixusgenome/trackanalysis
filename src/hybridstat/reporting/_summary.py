@@ -9,21 +9,18 @@ import numpy as np
 import version
 
 from excelreports.creation  import column_method, sheet_class
-from ._base                 import Bead, Reporter
+from ._base                 import Bead, Reporter, Group
 
 @sheet_class(u"Summary")
 class SummarySheet(Reporter):
     u"creates the summary sheet"
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     @staticmethod
     def tablerow():
         u"start row of the table"
         return 6
 
     @staticmethod
-    def chartheight(bead:Bead) -> int:
+    def chartheight(npeaks:int) -> int:
         u"Returns the chart height"
         return 1
 
@@ -33,15 +30,12 @@ class SummarySheet(Reporter):
         Whether the bead was clustered now or whether its reference comes from
         a previous report
         """
-        return not any(bead.key.bead in ref.beads for ref in self.hpins)
+        return None if bead is None else bead.key not in self.config.knownbeads
 
-    @staticmethod
     @column_method(u"Signal Noise", units = u'µm')
-    def _uncert(_, bead:Bead) -> float:
-        u"""
-        Standard deviation of the signal in events after drift removal.
-        """
-        return bead.uncertainty
+    def _uncert(self, _, bead:Bead) -> Optional[float]:
+        u"Standard deviation of the signal"
+        return None if bead is None else self.uncertainty(bead)
 
     @staticmethod
     @column_method(u"Silhouette", cond = dict(type = 'data_bar'))
@@ -55,7 +49,7 @@ class SummarySheet(Reporter):
             - b = minimum distance to other reference beads
             => silhouette = 2.*(b-a)/max(a,b)-1.
         """
-        return bead.silhouette
+        return None if bead is None else bead.silhouette
 
     @staticmethod
     @column_method(u"Distance")
@@ -64,13 +58,13 @@ class SummarySheet(Reporter):
         distance to group's central bead:
         how likely this beads belongs to the group
         """
-        return 0. if bead is None else bead.distance.value
+        return None if bead is None else bead.distance.value
 
     @staticmethod
     @column_method(u"Cycle Count")
     def _ccount(_, bead:Bead) -> Optional[int]:
         u"Number of good cycles for this bead"
-        return None if bead is None else bead.ncycles
+        return None if bead is None else len(bead.events)
 
     @staticmethod
     @column_method(u"Stretch",
@@ -99,30 +93,46 @@ class SummarySheet(Reporter):
         if bead is None:
             return None
 
-        dist  = bead.distance
-        good  = np.isfinite(bead.peaks[:,1])
-        chi2  = (bead.peaks[good,0]*dist.stretch+dist.bias-bead.peaks[good,1])**2
-        count = good.sum()
-        if count > 0:
-            return chi2/(count*((dist.stretch*self.uncertainty(bead))**2))
+        good = bead.peaks['key'] >= 0
+        if any(good):
+            dist = bead.distance
+            chi2 = ((bead.peaks['zvalue'][good]*dist.stretch
+                     +dist.bias-bead.peaks['key'][good])**2).mean()
+            return chi2/((dist.stretch*self.uncertainty(bead))**2)
         else:
             return None
 
-    @staticmethod
     @column_method(u"Peak Count")
-    def _npeaks(_, bead:Bead) -> Optional[int]:
+    def _npeaks(self, ref:Group, bead:Bead) -> Optional[int]:
         u""" Number of peaks detected for that bead."""
+        if bead is None:
+            return None if ref.key is None else len(self.config.hpins[ref.key].peaks[:-1])
         return len(bead.peaks)
 
-    @staticmethod
     @column_method(u"Unidentified Peak Count", exclude = Reporter.nohairpin)
-    def _unidentifiedpeaks(_, bead:Bead) -> Optional[int]:
+    def _unidentifiedpeaks(self, ref, bead:Bead) -> Optional[int]:
         u"""
-        Number of peaks detected for that bead
-        that were not found in the reference.
+        For an experimental bead:
+
+            Number of peaks detected for that bead
+            that were not found in the reference.
+
+        For a reference:
+
+            Number of peaks never seen
         """
         # ignore first peak which is always set to zero in the ref
-        return np.isnan(bead.peaks[1:,1]).sum()
+        if bead is None:
+            if ref.key is None:
+                return None
+
+            peaks = self.config.hpins[ref.key].peaks[1:-1]
+            theor = set(np.int32(peaks+.1)) # type: ignore
+            for bead in ref.beads:
+                theor.difference_update(bead.peaks['key'])
+            return len(theor)
+        else:
+            return (bead.peaks['key'][1:] < 0).sum()
 
     @column_method(u"", exclude = lambda x: not x.isxlsx())
     def _chart(self, *args):
@@ -130,7 +140,7 @@ class SummarySheet(Reporter):
 
     def iterate(self):
         u"Iterates through sheet's base objects and their hierarchy"
-        for group in self.groups:
+        for group in self.config.groups:
             yield (group, None)
             yield from ((group, bead) for bead in group.beads)
 
@@ -144,6 +154,7 @@ class SummarySheet(Reporter):
                   ("Config:",       cnf),
                   ("Median Noise:", np.median(sigmas))
                  ]
-        if len(self.oligos) > 0:
-            items.append(("Oligos:", ','.join(self.oligos)))
+        if len(self.config.oligos) > 0:
+            items.append(("Oligos:", ','.join(self.config.oligos)))
+        items.append(("Track", self.config.track.path))
         self.header(items)

@@ -40,11 +40,11 @@ class BeadsByHairpinTask(Task):
                                for key, value in items.items()})
 
 ByHairpinBead  = NamedTuple('ByHairpinBead',
-                            [('key',        BEADKEY),
-                             ('silhouette', float),
-                             ('distance',   Distance),
-                             ('peaks',      PEAKS_TYPE),
-                             ('events',     PeakFindingOutput)])
+                            [('key',         BEADKEY),
+                             ('silhouette',  float),
+                             ('distance',    Distance),
+                             ('peaks',       PEAKS_TYPE),
+                             ('events',      PeakFindingOutput)])
 
 ByHairpinGroup = NamedTuple('ByHairpinGroup',
                             [('key',       str),

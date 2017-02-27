@@ -89,8 +89,8 @@ class HairpinDistance(Hairpin):
                         best = out
         return Distance(best[0], best[1], best[2]-best[1]*delta)
 
-PEAKS_DTYPE = np.dtype([('zvalue', 'f4'), ('key', 'f4')])
-PEAKS_TYPE  = Union[Sequence[Tuple[float,float]],np.ndarray]
+PEAKS_DTYPE = np.dtype([('zvalue', 'f4'), ('key', 'i4')])
+PEAKS_TYPE  = Union[Sequence[Tuple[float,int]],np.ndarray]
 class PeakIdentifier(Hairpin):
     u"Identifying experimental peaks with the theoretical ones"
     window   = 10.
@@ -101,11 +101,12 @@ class PeakIdentifier(Hairpin):
 
     def __call__(self, peaks:np.ndarray, stretch = 1., bias = 0.) -> PEAKS_TYPE:
         hpin           = self.peaks if self.lastpeak else self.peaks[:-1]
-        ided           = np.full((len(peaks),), np.NaN, dtype = PEAKS_DTYPE)
+        ided           = np.empty((len(peaks),), dtype = PEAKS_DTYPE)
         ided['zvalue'] = peaks
+        ided['key']    = np.iinfo('i4').min
 
         if len(peaks) > 0 and len(hpin) > 0:
             peaks = stretch*peaks+bias-(stretch*peaks[0]+bias)
             ids   = _match.compute(hpin, peaks, self.window)
-            ided['key'][ids[:,1]] = hpin[ids[:,0]]
+            ided['key'][ids[:,1]] = np.int32(hpin[ids[:,0]]) # type: ignore
         return ided

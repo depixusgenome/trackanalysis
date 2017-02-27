@@ -103,10 +103,10 @@ class PoissonEvents:
 class TrackSimulator:
     u"Simulates bead data over a number of cycles"
     ncycles      = 15
-    phases       = [ 1,  15,  1, 15,  1, 100,  1,  15]
-    zmax         = [ 0., 0., 1., 1., 0., 0., -.3, -.3]
+    phases       = [ 1,  15,  1,  15,  1,  100,  1,  15]
+    zmax         = [ 0., 0.,  1., 1.,  0., 0., -.3, -.3]
     events       = PoissonEvents()      # type: Callable[..., np.ndarray]
-    brownian     = [.003] * 8           # type: Union[None, float, Sequence[float]]
+    brownian     = [.003] * 9           # type: Union[None, float, Sequence[float]]
     baselineargs = (.1, 10.1, True)     # type: Optional[Tuple[float, float, bool]]
     driftargs    = (.1, 29.)            # type: Optional[Tuple[float, float]]
     @initdefaults(events = 'update')
@@ -202,7 +202,7 @@ class TrackSimulator:
             curs   = []
             for lab in np.unique(np.concatenate(labels)):
                 cur          = np.empty((len(events),), dtype = EVENTS_DTYPE)
-                cur['start'] = sum(self.phases[:5])
+                cur['start'] = 0
                 cur['data']  = None
                 for i, (cevt, clab) in enumerate(zip(events, labels)):
                     val = cevt[clab == lab]
@@ -221,10 +221,9 @@ class TrackSimulator:
 
     def __events(self, cycles: np.ndarray) -> Iterator[np.ndarray]:
         dtpe  = EVENTS_DTYPE
-        start = np.sum(self.phases[:5])
         for cyc in self.__cyclephase(cycles, 5):
             rng  = np.nonzero(np.diff(cyc))[0]+1
-            evts = [(i+start, evt) for i, evt in zip(chain((0,), rng), np.split(cyc, rng))]
+            evts = [(i, evt) for i, evt in zip(chain((0,), rng), np.split(cyc, rng))]
             yield np.array(evts, dtype = dtpe)
 
     def __apply(self, fcn:Callable[...,Any], *args):
