@@ -10,58 +10,97 @@ from xlsxwriter.utility     import xl_col_to_name
 import numpy as np
 
 from excelreports.creation  import column_method, sheet_class, Columns
-from ._base                 import (Peak, Key, Bead, Base,
-                                    ChartCreator, sheettype, isref)
+from data.trackitems        import BEADKEY                   # pylint: disable=unused-import
+from ..probabilities        import Probability
+from ._base                 import Reporter, HasLengthPeak, Group, Bead
 
-class _Neighbours: # pylint: disable=too-many-instance-attributes
+class Probabilities(HasLengthPeak):
+    u"Computes and caches probabilities"
+    def __init__(self, base:Reporter) -> None:
+        super().__init__(base)
+        self._proba  = Probability(framerate = base.track.frequency)
+        self._values = dict()   # type: Dict[Tuple[BEADKEY,int], Probability]
+
+    def __cache(self, bead:Bead, ipk:int) -> Probability:
+        if self._isstructural(bead, ipk):
+            return None
+
+        key = (bead.key, ipk)
+        val = self._values.get(key, None)
+        if val is not None:
+            return val
+
+        self._values[key] = val = self._proba(bead.events[ipk][1])
+        return val
+
+    def __call__(self, name: str, group:Group, bead:Bead, ipk:int):
+        u"returns a probability value for a bead or the median for a hairpin"
+        if self._isstructural(bead, ipk):
+            return None
+        elif bead is None:
+            pkkey = bead.peaks[0]
+            ite = iter(self.__cache(i, j)
+                       for i in group.beads for j in range(len(i.peaks))
+                       if i.peaks[j][1] == pkkey)
+            ite = iter(getattr(prob,name) for prob  in ite if prob is not None)
+            arr = np.array([getattr(i, name) for i in ite], dtype = 'f4')
+            if len(arr) == 0:
+                return None
+            return np.median(arr)
+        else:
+            return getattr(self._values[(bead.key, ipk)], name)
+
+class Neighbours(HasLengthPeak):
     u"Peak bases and neighbours"
     _NEI = 3
-    def __init__(self, base:Base) -> None:
-        self._pins = iter(base.hpins)
-        self._ref  = None # type: Key
-        self._hpin = None # type: str
-        self._sz   = max(len(x) for x in base.oligos)
-        self._pos  = frozenset(base.oligos)
-        self._haslengthpeak = base.haslengthpeak
+    def __init__(self, base:Reporter) -> None:
+        super().__init__(base)
+        self._pins     = base.sequences
+        self._oldbead  = (None, None)   # type: Tuple[Optional[Group], Optional[Bead]]
+        self._hpin     = None           # type: str
+        self._sz       = max(len(x) for x in base.oligos)
+        self._pos      = frozenset(base.oligos)
 
         trans      = str.maketrans('atgc', 'tacg')
         self._neg  = frozenset(oli.translate(trans)[::-1] for oli in base.oligos) \
                    - self._pos
         self._all  = self._neg | self._pos
 
-    def _compute(self, ref:Key, bead:Bead, peak:Peak):
+    def __compute(self, ref:Group, bead:Bead, ipk:int):
         u"Peak bases and neighbours"
-        if ref != self._ref:
-            self._hpin = next(self._pins).value
-            self._ref  = ref
-        if peak.ref is not None:
-            i = peak.ref
+        if ref is not self._oldbead[0] or bead is not self._oldbead[1]:
+            self._hpin    = self._pins[ref.key]
+            self._oldbead = (ref, bead)
+
+        if np.isnan(bead.peaks[ipk][1]):
+            i = self._basevalue(bead, ipk)
         else:
-            dist = bead.distance
-            i    = peak.pos.x * dist.stretch + dist.bias
+            i = bead.peaks[ipk][1]
 
-        return int(floor(i-.5)) # -.5 because i starts at 1
+        return int(floor(i+.5))
 
-    def _get(self, tot, oli):
+    def __get(self, tot, oli):
         loli = -len(oli)-self._NEI
         return tot[loli-self._NEI:loli] + oli.upper() + tot[-self._NEI:]
 
-    def neighbours(self, ref:Key, bead:Bead, peak:Peak) -> Optional[str]:
+    def neighbours(self, ref:Group, bead:Bead, ipk:int) -> Optional[str]:
         u"Peak bases and neighbours"
-        if peak is bead.peaks[0] or (self._haslengthpeak and peak is bead.peaks[-1]):
+        if self._isstructural(bead, ipk):
             return None
-        ind = max(0, self._compute(ref, bead, peak)-self._sz)
+
+        ind = max(0, self.__compute(ref, bead, ipk)-self._sz)
         tot = self._hpin[ind-self._NEI:ind+self._sz+self._NEI]
         val = tot[:-self._NEI]
 
         oli = next((oli for oli in self._all if val.endswith(oli)), None)
-        return tot if oli is None else self._get(tot, oli)
+        return tot if oli is None else self.__get(tot, oli)
 
-    def orientation(self, ref:Key, bead:Bead, peak:Peak) -> Optional[bool]:
+    def orientation(self, ref:Group, bead:Bead, ipk:int) -> Optional[bool]:
         u"Oligo Orientation"
-        if peak is bead.peaks[0] or (self._haslengthpeak and peak is bead.peaks[-1]):
+        if self._isstructural(bead, ipk):
             return None
-        ind = max(0, self._compute(ref, bead, peak)-self._sz)
+
+        ind = max(0, self.__compute(ref, bead, ipk)-self._sz)
         val = self._hpin[ind:ind+self._sz]
         pos = sum(1 if val.endswith(oli) else 0 for oli in self._pos)
         neg = sum(1 if val.endswith(oli) else 0 for oli in self._neg)
@@ -70,14 +109,15 @@ class _Neighbours: # pylint: disable=too-many-instance-attributes
         else:
             return pos >= neg
 
-class _PositionInRef:
-    def __init__(self, peaks:Base, peakcols: Columns) -> None:
-        summ          = sheettype('summary')(peaks)
+class PositionInRef(HasLengthPeak):
+    u"Deals with positions"
+    def __init__(self, peaks:Reporter, peakcols: Columns) -> None:
+        super().__init__(peaks)
+        summ          = peaks.sheettype('summary')(peaks)
         self._isxlsx  = peaks.isxlsx()
         self._peakrow = 1+peaks.tablerow()
         self._beadrow = 1+summ.tablerow()
-        self._oldbead = None                # type: Optional[Bead]
-        self._haslengthpeak = peaks.haslengthpeak
+        self._oldbead = None                # type: Optional[Tuple[Group, Bead]]
 
         def _cell(name):
             for i, col in enumerate(summ.columns()):
@@ -98,58 +138,54 @@ class _PositionInRef:
         ref  = _colname(u'Reference Peak')
         self._disfmt  = u'=IF(ISBLANK({0}), "", {0} - {1})'.format(ref, peak)
 
-    def position(self, ref:Key, bead:Bead, peak:Peak):
+    def position(self, ref:Group, bead:Bead, ipk:int):
         u"computes a formula for that peak"
         if self._isxlsx:
             self._peakrow += 1
-            if bead != self._oldbead:
-                self._oldbead  = bead
+            if ref is not self._oldbead[0] or bead is not self._oldbead[1]:
+                self._oldbead  = ref, bead
                 self._beadrow += 1
-            if bead.key != ref:
+            if bead is not None:
                 return self._posfmt.format(self._peakrow, self._beadrow, self._beadrow)
 
-        dist = bead.distance
-        return peak.pos.x*dist.stretch+dist.bias
+        return self._basevalue(bead, ipk)
 
-    def distance(self, ref:Key, bead:Bead, peak:Peak):
+    def distance(self, _, bead:Bead, ipk:int):
         u"computes distance to that peak"
-        if bead.key == ref:
-            return None
-        if peak is bead.peaks[0] or (self._haslengthpeak and peak is bead.peaks[-1]):
+        if bead is None or self._isstructural(bead, ipk):
             return None
         elif self._isxlsx:
             return self._disfmt.format(self._peakrow, self._peakrow, self._peakrow)
-        elif peak.ref is not None:
-            dist = bead.distance
-            return peak.ref-(peak.pos.x*dist.stretch+dist.bias)
+        else:
+            key = bead.peaks[ipk][1]
+            if np.isfinite(key):
+                return key - self._basevalue(bead, ipk)
 
 @sheet_class(u"Peaks")
-class PeaksSheet(Base):
+class PeaksSheet(Reporter, HasLengthPeak):
     u"Creates peaks sheet"
+    _MINCHARTHEIGHT = 10
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._neig = None
-        self._pos  = None
-        self._charting = ChartCreator(self, lambda bead: min(10,len(bead.peaks)))
+        super().__init__(*args, height = lambda bead: min(10, len(bead.peaks)), **kwargs)
+        self._neig  = None
+        self._pos   = None
+        self._proba = Probabilities(self)
 
-    def iterate(self) -> 'Iterator[Tuple[Key,Bead,Peak]]':
+    @classmethod
+    def chartheight(cls, bead:Bead) -> int:
+        u"Returns the chart height"
+        return min(cls._MINCHARTHEIGHT, len(bead.peaks))
+
+    def iterate(self) -> Iterator[Tuple[Group, Bead, int]]:
         u"Iterates through peaks of each bead"
-        for k, bead in self.beads():
-            for peak in bead.peaks:
-                yield k, bead, peak
-
-    def linemark(self, info) -> bool: # pylint: disable=no-self-use
-        u"group id (medoid, a.k.a central bead id)"
-        return info[1].peaks[0] is info[2]
+        for group in self.groups():
+            hpin = self.hpins[group.key]
+            yield from ((group, None, i) for i in range(len(hpin.peaks)))
+            for bead in group.beads:
+                yield from ((group, bead, i) for i in range(len(bead.peaks)))
 
     def _disttoref_conditional(self):
-        if len(self.hpins):
-            sigmas = iter(bead.uncertainty*bead.distance.stretch for _, bead in self.beads())
-            sigmas = np.fromiter(sigmas, dtype = 'f4')
-        else:
-            sigmas = np.fromiter((bead.uncertainty for _, bead in self.beads()),
-                                 dtype = 'f4')
-        sigma  = np.median(sigmas)
+        sigma  = np.median(self.uncertainties())
 
         def __get(fmt, val1, val2):
             val1 = val1*sigma
@@ -171,115 +207,75 @@ class PeaksSheet(Base):
 
         return _get("#FFFFBF", 2.5, 5.)+_get("#FFC7CE", 5.)
 
-    def _prob_median(self, name:str, ref:Key, bead:Bead, peak:Peak):
-        if peak is bead.peaks[0] or (self.haslengthpeak and peak is bead.peaks[-1]):
-            return None
-        elif isref(bead):
-            ite = iter(pk.prob            for _, pk in self.peaks(ref, peak.pos.x))
-            ite = iter(getattr(prob,name) for prob  in ite if prob is not None)
-            arr = np.fromiter(ite, np.float32)
-            if len(arr) == 0:
-                return None
-            return np.median(arr)
-        else:
-            return None if peak.prob is None else getattr(peak.prob, name)
-
-    def columns(self):
+    def columns(self) -> Columns:
         u"list of columns in table"
         cols       = super().columns()
-        self._pos  = _PositionInRef(self, cols)
-        self._neig = None if self.nohairpin() else _Neighbours(self)
+        self._pos  = PositionInRef(self, cols)
+        self._neig = None if self.nohairpin() else Neighbours(self)
         return cols
 
-    @staticmethod
-    @column_method(u"Bead")
-    def _beadid(_, bead:Bead, _2) -> str:
-        u"Bead id"
-        return str(bead.key)
-
-    @staticmethod
-    @column_method(u"Reference")
-    def _refid(ref:Key, *_) -> str:
-        u"Group id (medoid, a.k.a central bead id)"
-        return str(ref)
-
-    @staticmethod
-    @column_method(u"Reference Peak", units = Base.baseunits, fmt = int)
-    def _refpos(_, bead:Bead, peak:Peak) -> Optional[float]:
+    @column_method(u"Reference Peak", units = Reporter.baseunits, fmt = int)
+    def _refpos(self, ref:Group, bead:Bead, ipk:int) -> Optional[float]:
         u"Position of the same peak in the reference (if found)"
-        if peak is bead.peaks[0]:
+        if ipk == 0:
             return 0
-        return peak.ref
+        if bead is None:
+            return self.hpins[ref.key].peaks[ipk]
+        else:
+            val = bead.peaks[ipk][1]
+            return val if np.isfinite(val) else None
 
     @column_method(u"Peak Position in Reference",
-                   units = Base.baseunits,
-                   fmt   = Base.basefmt)
+                   units = Reporter.baseunits,
+                   fmt   = Reporter.basefmt)
     def _peakref(self, *args) -> Optional[float]:
         u"Position of the peak in the reference's frame"
         return self._pos.position(*args)
 
     @column_method(u"Distance to Reference",
-                   units = Base.baseunits,
+                   units = Reporter.baseunits,
                    cond  = _disttoref_conditional,
-                   fmt   = Base.basefmt)
-    def _disttoref(self, ref:Key, bead:Bead, peak:Peak) -> Optional[str]:
+                   fmt   = Reporter.basefmt)
+    def _disttoref(self, *args) -> Optional[str]:
         u"Difference: reference peak position minus the bead's peak position"
-        return self._pos.distance(ref, bead, peak)
+        return self._pos.distance(*args)
 
     @staticmethod
     @column_method(u"Peak Position")
-    def _peakpos(_1, _2, peak:Peak) -> float:
+    def _peakpos(_, bead:Bead, ipk:int) -> float:
         u"Peak position as measured (µm)"
-        return peak.pos.x
+        return bead.peaks[ipk][0]
 
     @column_method(u"Peak Height")
-    def _nevt(self, ref:Key, bead:Bead, peak:Peak) -> int:
+    def _nevt(self, ref:Group, bead:Bead, ipk:int) -> int:
         u"""
         Number of hybridizations in that peak.
 
         For a hairpin, this is set to the median of values
         found in its group for that peak.
         """
-        if peak is bead.peaks[0] or (self.haslengthpeak and peak is bead.peaks[-1]):
-            return None
-        elif isref(bead):
-            ite = iter(len(pk.events) for _, pk in self.peaks(ref, peak.pos.x))
-            arr = np.fromiter(ite, np.int32)
-            if len(arr) == 0:
-                return 0
-            return np.median(arr)
-        else:
-            return len(peak.events)
+        return self._proba('nevents', ref, bead, ipk)
 
-    @column_method(u"Neighbours", exclude = Base.nohairpin)
+    @column_method(u"Neighbours", exclude = Reporter.nohairpin)
     def _neighbours(self, *args) -> Optional[str]:
         return self._neig.neighbours(*args)
 
-    @column_method(u"Orientation", exclude = Base.nohairpin)
+    @column_method(u"Orientation", exclude = Reporter.nohairpin)
     def _orientation(self, *args) -> Optional[bool]:
         return self._neig.orientation(*args)
 
     @column_method(u"Hybridisation Rate")
-    def _hrate(self, ref:Key, bead:Bead, peak:Peak) -> Optional[float]:
+    def _hrate(self, *args) -> Optional[float]:
         u"""
         Peak height divided by number of cycles.
 
         For a hairpin, this is set to the median of values
         found in its group for that peak.
         """
-        if peak is bead.peaks[0] or (self.haslengthpeak and peak is bead.peaks[-1]):
-            return 0.
-        elif isref(bead):
-            ite = iter(len(pk.events)/bd.ncycles for bd, pk in self.peaks(ref, peak.pos.x))
-            arr = np.fromiter(ite, np.float32)
-            if len(arr) == 0:
-                return 0
-            return np.median(arr)
-        else:
-            return len(peak.events)/bead.ncycles
+        return self._proba('nevents', *args)/self.track.ncycles
 
     @column_method(u"Hybridisation Time", units = 'seconds')
-    def _time(self, *args) -> Optional[float]:
+    def _averageduration(self, *args) -> Optional[float]:
         u"""
         Average time to de-hybridization, for a frame rate of 30Hz.
         Note that: TIME = -1/(RATE * log(1.-PROBABILITY)
@@ -287,7 +283,7 @@ class PeaksSheet(Base):
         For a hairpin, this is set to the median of values
         found in its group for that peak.
         """
-        return self._prob_median('time', *args)
+        return self._proba('averageduration', *args)
 
     @column_method(u"Hybridisation Time Probability")
     def _prob(self, *args) -> Optional[float]:
@@ -298,7 +294,7 @@ class PeaksSheet(Base):
         For a hairpin, this is set to the median of values
         found in its group for that peak.
         """
-        return self._prob_median('probability', *args)
+        return self._proba('probability', *args)
 
     @column_method(u"Hybridisation Time Uncertainty", units = 'seconds')
     def _uncert(self, *args) -> Optional[float]:
@@ -309,8 +305,9 @@ class PeaksSheet(Base):
         For a hairpin, this is set to the median of values
         found in its group for that peak.
         """
-        return self._prob_median('uncertainty', *args)
+        return self._proba('uncertainty', *args)
 
     @column_method(u"", exclude = lambda x: not x.isxlsx())
-    def _chart(self, *args):
-        return self._charting.peaks(*args)
+    def _chart(self, ref:Group, bead:Bead, ipk:int):
+        if ipk == 0:
+            return self.charting(ref, bead)

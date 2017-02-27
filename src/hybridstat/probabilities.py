@@ -56,7 +56,7 @@ from    utils   import initdefaults, EVENTS_TYPE
 class Probability:
     u"Computes probabilities"
     minduration   = 5
-    framerate     = 5
+    framerate     = 30.
     nevents       = 0
     ntoolong      = 0
     totalduration = 0

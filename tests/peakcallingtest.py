@@ -10,7 +10,8 @@ from control.taskcontrol    import create
 from simulator.processor    import ByPeaksEventSimulatorTask
 from peakcalling            import cost, match
 from peakcalling.processor  import (BeadsByHairpinProcessor, BeadsByHairpinTask,
-                                    HairpinDistance, DistanceConstraint)
+                                    PeakIdentifier, HairpinDistance,
+                                    DistanceConstraint)
 
 def test_cost_value():
     u"Tests peakcalling.cost.compute"
@@ -57,26 +58,38 @@ def test_onehairpincost():
     res   = HairpinDistance(peaks = truth)(bead[:-1])
     assert_allclose(bead*res[1]+res[2], truth, rtol = 1e-4)
 
+def test_onehairpinid():
+    u"tests haipin id method"
+    truth = np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')/8.8e-4
+    bead  = np.array([0., 0.01, .1, .2, .5, 1.], dtype = 'f4') - .88e-4
+    res   = PeakIdentifier(peaks = truth)(bead, 1./8.8e-4, 10.)
+    assert_allclose(res['zvalue'], bead)
+    assert_allclose(res['key'], np.insert(truth[:-1], 1, np.NaN))
+
 def test_hairpincost():
     u"tests hairpin cost method"
     truth = [np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')/8.8e-4,
              np.array([0., .1,     .5, 1.2, 1.5], dtype = 'f4')/8.8e-4]
 
-    beads = [(100, (truth[0][:-1]*1.03+1.)*8.8e-4),
+    beads = [(100, np.array([0., 0.01, .1, .2, .5, 1.], dtype = 'f4') - .88e-4),
              (101, (truth[1][:-1]*.97-1) *8.8e-4),
              (110, np.empty((0,), dtype = 'f4'))]
 
     hpins   = {'hp100': HairpinDistance(peaks = truth[0]),
                'hp101': HairpinDistance(peaks = truth[1])}
-    proc    = BeadsByHairpinProcessor(BeadsByHairpinTask(hairpins = hpins))
-    results = dict(proc.apply(hpins, {}, beads))
+    ids     = {'hp100': PeakIdentifier(peaks = truth[0]),
+               'hp101': PeakIdentifier(peaks = truth[1])}
+    results = dict(BeadsByHairpinProcessor.apply(hpins, {}, ids, beads))
     assert len(results) == 3
     assert len(results['hp100']) == 1
     assert len(results['hp101']) == 1
     assert len(results[None])    == 1
-    assert results['hp100'][0][0] == 100
-    assert results['hp101'][0][0] == 101
-    assert results[None][0][0]    == 110
+    assert results['hp100'][0].key == 100
+    assert results['hp101'][0].key == 101
+    assert_allclose(results['hp100'][0].peaks['key'],
+                    np.insert(truth[0][:-1], 1, np.NaN))
+    assert_allclose(results['hp101'][0].peaks['key'], truth[1][:-1])
+    assert results[None][0].key    == 110
 
 def test_constrainedhairpincost():
     u"tests hairpin cost method with constraints"
@@ -90,10 +103,8 @@ def test_constrainedhairpincost():
     hpins   = {'hp100': HairpinDistance(peaks = truth[0]),
                'hp101': HairpinDistance(peaks = truth[1])}
     cstrs   = dict.fromkeys((100, 110), DistanceConstraint('hp101', {}))
-    tsk     = BeadsByHairpinTask(hairpins    = hpins, constraints = cstrs)
 
-    proc    = BeadsByHairpinProcessor(tsk)
-    results = dict(proc.apply(hpins, cstrs, beads))
+    results = dict(BeadsByHairpinProcessor.apply(hpins, cstrs, {}, beads))
     assert len(results) == 1
     assert len(results['hp101']) == 3
 
@@ -111,11 +122,11 @@ def test_control():
                                               rates    = None,
                                               nbeads   = 1,
                                               ncycles  = 5),
-                    BeadsByHairpinTask(hairpins = hpins)))
+                    BeadsByHairpinTask(distances = hpins)))
 
     beads = tuple(tuple(i) for i in pair.run())[0]
     assert len(beads) == 1
-    assert beads[0][0] == 'hp100'
+    assert beads[0].key == 'hp100'
 
 if __name__ == '__main__':
     test_hairpincost()

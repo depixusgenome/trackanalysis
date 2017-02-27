@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 u"Creates excel of csv files for reporting any type of data"
 from typing                 import (Sequence, Iterator, Union, TypeVar,
-                                    Callable, Optional, cast)
-from contextlib             import closing
+                                    Callable, Optional, cast, IO)
+from pathlib                import Path
+from contextlib             import closing, contextmanager
 from abc                    import ABCMeta, abstractmethod
 from inspect                import getmembers
 from xlsxwriter             import Workbook
@@ -331,12 +332,17 @@ class Reporter(XlsReporter, CsvReporter):
     def iterate(self):
         u"Iterates through sheet's base objects and their hierarchy"
 
-def fileobj(filename:str):
+FILENAME = Union[Path, str]
+FILEOBJ  = Union[IO,Workbook]
+@contextmanager
+def fileobj(fname:FILENAME) -> Iterator[FILEOBJ]:
     u"Context manager for opening xlsx or text file"
-    if filename.endswith('.xlsx') or filename.endswith('.xls'):
-        return Workbook(filename)
+    if Path(str(fname)).suffix in ('.xlsx', '.xls'):
+        with closing(Workbook(str(fname))) as book:
+            yield book
     else:
-        return open(filename, 'w')
+        with open(str(fname), 'w') as stream:
+            yield stream
 
 def writecolumns(filename, sheetname, items):
     u"Writes columns to an excel/csv file"
