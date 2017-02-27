@@ -70,5 +70,10 @@ def test_reporting():
     fcn(fname)
     assert os.path.exists(fname)
 
+    fname = mktemp()+"_hybridstattest.pkz"
+    assert not os.path.exists(fname)
+    fcn(fname)
+    assert os.path.exists(fname)
+
 if __name__ == '__main__':
     test_reporting()

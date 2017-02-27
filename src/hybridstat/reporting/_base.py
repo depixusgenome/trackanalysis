@@ -121,6 +121,26 @@ class ReporterInfo(HasLengthPeak):
             self.knownbeads  = kwargs['knownbeads']   # type: sequence[beadkey]
             self.minduration = kwargs['minduration']  # type: int
 
+    def state(self):
+        u"For pickling (missing __setstate__ for full protocol)"
+        info = dict(groups      = self.groups,
+                    hpins       = self.hpins,
+                    sequences   = self.sequences,
+                    oligos      = self.oligos,
+                    knownbeads  = self.knownbeads,
+                    minduration = self.minduration)
+
+        fcn = lambda bead: PrecisionAlg.rawprecision(self.track, bead.key)
+        arr = np.array([fcn(bead)
+                        for group in self.groups
+                        for bead  in group.beads],
+                       dtype = 'f4')
+        dur = self.track.phaseid(...,6)-self.track.phaseid(...,5)
+        info['track'] = dict(path          = self.track.path,
+                             framerate     = self.track.frequency,
+                             uncertainties = arr,
+                             durations     = dur)
+
     @staticmethod
     def sheettype(name:str):
         u"Returns the columns associated with another sheet"
@@ -148,18 +168,6 @@ class Reporter(_Reporter):
         u"returns true if no hairpin was provided"
         return len(self.config.hpins) == 0
 
-    @staticmethod
-    @column_method(u"Bead")
-    def _beadid(ref:Group, bead:Bead, *_) -> str:
-        u"bead id"
-        return str((ref if bead is None else bead).key)
-
-    @staticmethod
-    @column_method(u"Reference")
-    def _refid(ref:Group, *_) -> str:
-        u"group id (medoid, a.k.a central bead id)"
-        return str(ref.key)
-
     def uncertainty(self, bead:Bead):
         u"returns uncertainties for all beads"
         return PrecisionAlg.rawprecision(self.config.track, bead.key)
@@ -171,6 +179,18 @@ class Reporter(_Reporter):
                          for group in self.config.groups
                          for bead  in group.beads],
                         dtype = 'f4')
+
+    @staticmethod
+    @column_method(u"Bead")
+    def _beadid(ref:Group, bead:Bead, *_) -> str:
+        u"bead id"
+        return str((ref if bead is None else bead).key)
+
+    @staticmethod
+    @column_method(u"Reference")
+    def _refid(ref:Group, *_) -> str:
+        u"group id (medoid, a.k.a central bead id)"
+        return str(ref.key)
 
     @abstractmethod
     def iterate(self):
