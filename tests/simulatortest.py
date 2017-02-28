@@ -29,7 +29,7 @@ def test_track_simulator():
                             events       = None,
                             baselineargs = None)
     data   = sim()
-    cycles = slice(*sim.cycles[0][[5,6]])
+    cycles = slice(*sim.phases[0][[5,6]])
     drift  = sim.drift()[cycles]
     assert data.shape == (149*2,)
     assert all(data[:149] == data[149:149*2])

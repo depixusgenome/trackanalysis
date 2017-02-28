@@ -69,7 +69,11 @@ def _m_unlazyfy(self:'TrackItems'):
             method(i() if isfunction(i) else i)
 
     if self.data is None:
-        self.data = self.track.data
+        if self.beadsonly:
+            self.data = {i:j for i, j in self.track.data.items()
+                         if self.track.isbeadname(i)}
+        else:
+            self.data = shallowcopy(self.track.data)
 
 def _m_isbead(key):
     return ((isinstance(key, tuple)
@@ -223,8 +227,9 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
 
 class TrackItems(_m_ConfigMixin, Items):
     u"Class for iterating over beads or creating a new list of data"
-    level = Level.none
-    track = None      # type: Any
+    level     = Level.none
+    track     = None  # type: Any
+    beadsonly = False
     @initdefaults
     def __init__(self, **kw) -> None:
         super().__init__(**kw)
@@ -307,7 +312,7 @@ class Beads(TrackItems, Items):
 
     * providing names or ids: selects only those columns
     """
-    level = Level.bead
+    level     = Level.bead
     def _keys(self, sel) -> Iterator[BEADKEY]:
         if sel is None:
             yield from iter(self.data.keys())
@@ -426,7 +431,7 @@ class Cycles(TrackItems, Items):
     def __iterfrombeads(self, sel = None):
         ncycles = self.track.ncycles
         nphases = self.track.nphases
-        phaseid = self.track.phaseid
+        phase   = self.track.phase
 
         first   = 0       if self.first is None else self.first
         last    = nphases if self.last  is None else self.last+1
@@ -437,9 +442,9 @@ class Cycles(TrackItems, Items):
             if bead is None:
                 data[bid] = bead = self.data[bid]
 
-            ind1 = phaseid(cid, first)
-            ind2 = (phaseid(cid, last) if last  < nphases else
-                    (phaseid(cid+1, 0) if cid+1 < ncycles else None))
+            ind1 = phase(cid, first)
+            ind2 = (phase(cid, last) if last  < nphases else
+                    (phase(cid+1, 0) if cid+1 < ncycles else None))
 
             return (bid, cid), bead[ind1:ind2]
 
@@ -473,9 +478,9 @@ class Cycles(TrackItems, Items):
     def withlast(self, last:Optional[int]) -> 'Cycles':
         u"specifies the phase to extract: None for all"
 
-    def phaseid(self, cid:Optional[int] = None, pid:Optional[int] = None):
+    def phase(self, cid:Optional[int] = None, pid:Optional[int] = None):
         u"returns phase ids for the given cycle"
-        vect = self.track.phaseids
+        vect = self.track.phases
         if {cid, pid}.issubset(_m_ALL):
             return vect         - vect[:,0]
         elif cid in _m_ALL:
@@ -490,11 +495,11 @@ class Cycles(TrackItems, Items):
         if isfunction(self.track):
             self.track = self.track()
 
-        first = self.track.phaseid(..., 0 if self.first is None else self.first)
+        first = self.track.phase(..., 0 if self.first is None else self.first)
         if self.last is None or self.last == self.track.nphases-1:
             return np.max(np.diff(first))
         else:
-            last = self.track.phaseid(..., self.last+1)
+            last = self.track.phase(..., self.last+1)
             return np.max(last - first)
 
     if TYPE_CHECKING:

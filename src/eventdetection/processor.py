@@ -16,7 +16,7 @@ class ExtremumAlignmentProcessor(Processor):
                                   mode    = 'max' if phase == 3 else 'min'
                                  ).one
         def _action(frame, info):
-            i, j  = frame.phaseid(info[0][-1], [phase,phase+1])
+            i, j  = frame.phase(info[0][-1], [phase,phase+1])
             delta = align(info[1][i:j])
             return info[0], info[1]+delta
         args.apply(lambda frame: frame.withaction(partial(_action, frame)))

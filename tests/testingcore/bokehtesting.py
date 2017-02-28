@@ -228,4 +228,9 @@ def bokehaction(monkeypatch):
     be accessed directly, for example BokehAction.view._ctrl  can be accessed
     through BokehAction.ctrl.
     """
+    if monkeypatch is None:
+        from _pytest.monkeypatch import MonkeyPatch
+        import warnings
+        warnings.warn("Unsafe call to MonkeyPatch. Use only for manual debugging")
+        return BokehAction(MonkeyPatch())
     return BokehAction(monkeypatch)

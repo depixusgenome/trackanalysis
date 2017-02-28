@@ -64,3 +64,6 @@ def test_trackplot(bokehaction):        # pylint: disable=redefined-outer-name
         _press('Shift-ArrowDown',  652.7515, 1150.2484, -0.04378, 1.11549)
         _press('Shift-ArrowUp',    652.7515, 1150.2484,  0.41992, 0.65178)
         server.press('Ctrl-z')
+
+if __name__ == '__main__':
+    test_trackplot(bokehaction(None))

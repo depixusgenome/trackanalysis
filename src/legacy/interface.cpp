@@ -34,13 +34,13 @@ namespace legacy
         res["cyclemax"]  = pybind11::cast((notall ? -1 : 0) + rec.cyclemax());
         res["ncycles"]   = pybind11::cast((notall ? -4 : 0) + rec.ncycles());
         res["nphases"]   = pybind11::cast(rec.nphases());
-        res["frequency"] = pybind11::cast(rec.camerafrequency());
+        res["framerate"] = pybind11::cast(rec.camerafrequency());
 
         std::vector<size_t> shape   = {rec.ncycles()-(notall ? 4: 0), rec.nphases()};
         std::vector<size_t> strides = {rec.nphases()*sizeof(decltype(cycles)::value_type),
                                                      sizeof(decltype(cycles)::value_type)};
-        res["cycles"]          = pybind11::array(shape, strides, 
-                                                 cycles.data()+(notall ? 3*rec.nphases() : 0));
+        res["phases"]    = pybind11::array(shape, strides,
+                                           cycles.data()+(notall ? 3*rec.nphases() : 0));
         return res;
     }
 

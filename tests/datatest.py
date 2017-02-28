@@ -24,9 +24,9 @@ class TestBeadIteration:
     u"tests opening a trackfile"
     def test_iterkeys(self):
         u"tests wether keys are well listed"
-        track = data.Track(path = path("small_legacy"))
+        track = data.Track(path = path("small_legacy"), beadsonly = False)
         beads = lambda: data.Beads(track = track, data = _MyItem(track.data))
-        vals = set(tuple(range(92)) + ('zmag', 't'))
+        vals = set(tuple(range(92))+ ('zmag', 't'))
         assert set(beads().keys())                 == vals
         assert set(i for i, _ in beads())          == vals
         assert set(beads().selecting(all).keys())  == vals
@@ -51,7 +51,7 @@ class TestCycleIteration:
     u"tests opening a trackfile"
     def test_iterkeys(self):
         u"tests wether keys are well listed"
-        track = data.Track(path = path("big_legacy"))
+        track = data.Track(path = path("big_legacy"), beadsonly = False)
         cycs  = lambda: data.Cycles(track = track, data = _MyItem(track.data))
         cids  = lambda _: set(tuple((i,_) for i in range(39)) + (('zmag', _), ('t', _)))
         bids  = lambda _: set((_,i) for i in range(102))

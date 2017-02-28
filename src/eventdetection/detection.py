@@ -241,8 +241,8 @@ def tocycles(starts, inters):
     * *starts*: array of starting indexes for each cycle or track from which
     to extract that information.
     """
-    if hasattr(starts, 'phaseid'):
-        starts = starts.phaseid(all, 0)
+    if hasattr(starts, 'phase'):
+        starts = starts.phase(all, 0)
 
     for cur in inters:
         cstart = np.searchsorted(starts,            cur.start, 'right')
@@ -272,8 +272,8 @@ def tophaseandcycles(starts, inters):
     * *starts*: 2D array of starting indexes for each cycle and phase, or track
     from which to extract that information.
     """
-    if hasattr(starts, 'phaseid'):
-        starts = starts.phaseid(all, all)
+    if hasattr(starts, 'phase'):
+        starts = starts.phase(all, all)
 
     nphases = starts.shape[1]
     yield from (PIdRange(start, stop, cycle//nphases, cycle % nphases)

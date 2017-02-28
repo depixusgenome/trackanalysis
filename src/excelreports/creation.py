@@ -341,7 +341,7 @@ def fileobj(fname:FILENAME) -> Iterator[FILEOBJ]:
         with closing(Workbook(str(fname))) as book:
             yield book
     else:
-        with open(str(fname), 'w') as stream:
+        with open(str(fname), 'w', encoding = 'utf-8') as stream:
             yield stream
 
 def writecolumns(filename, sheetname, items):

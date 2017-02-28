@@ -83,7 +83,7 @@ class RampData: # pylint: disable=too-many-public-methods
     def openTrack(cls,trk,model:RampModel):
         u''' creates ramp from track
         '''
-        trkd = Track(path = trk) if isinstance(trk,str) else trk
+        trkd = Track(path = trk, beadsonly = False) if isinstance(trk,str) else trk
         return cls(data = pd.DataFrame({k:pd.Series(v) for k, v in dict(trkd.cycles).items()})
                    , model = model)
 
@@ -109,7 +109,7 @@ class RampData: # pylint: disable=too-many-public-methods
         u'''
         changes the data using trk
         '''
-        trkd = Track(path = trk) if isinstance(trk,str) else trk
+        trkd = Track(path = trk, beadsonly = False) if isinstance(trk,str) else trk
         self.dataz = pd.DataFrame({k:pd.Series(v) for k, v in dict(trkd.cycles).items()})
         self._setup()
         if self.model is not None :

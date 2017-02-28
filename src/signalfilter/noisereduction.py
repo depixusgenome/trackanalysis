@@ -17,7 +17,7 @@ def _m_correct_pybind11_bug(cls):
     old = cls.__call__
     @wraps(old)
     def __call__(self, inp, __old__ = old, **kwa):
-        __old__(self, inp, kwa)
+        return __old__(self, inp, kwa)
     cls.__call__ = __call__
 
 _m_correct_pybind11_bug(ForwardBackwardFilter)

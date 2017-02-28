@@ -110,9 +110,9 @@ def test_constrainedhairpincost():
 
 def test_control():
     u"tests BeadsByHairpinTask using the controller"
-    peaks = np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')
-    truth = [peaks/8.8e-4,
-             np.array([0., .1,     .5, 1.2, 1.5], dtype = 'f4')/8.8e-4]
+    peaks = np.array([0.,  .1, .5, .6, 1.], dtype = 'f4')
+    truth = [np.array([0., .1, .5, 1.,       1.5], dtype = 'f4')/8.8e-4,
+             np.array([0.,     .5,      1.2, 1.5], dtype = 'f4')/8.8e-4]
     hpins = {'hp100': HairpinDistance(peaks = truth[0]),
              'hp101': HairpinDistance(peaks = truth[1])}
     pair  = create((ByPeaksEventSimulatorTask(peaks    = peaks,
@@ -129,4 +129,4 @@ def test_control():
     assert beads[0].key == 'hp100'
 
 if __name__ == '__main__':
-    test_hairpincost()
+    test_control()

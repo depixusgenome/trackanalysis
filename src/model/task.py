@@ -87,9 +87,10 @@ class RootTask(Task):
 
 class TrackReaderTask(RootTask):
     u"Class indicating that a track file should be added to memory"
-    def __init__(self, path: Optional[str] = None) -> None:
+    def __init__(self, path: Optional[str] = None, beadsonly:bool = False) -> None:
         super().__init__()
-        self.path = path # Optional[str]
+        self.path      = path # Optional[str]
+        self.beadsonly = beadsonly
 
 @unique
 class TagAction(Enum):

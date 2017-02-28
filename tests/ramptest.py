@@ -25,7 +25,7 @@ def test_readFromTrk():
     assert ramp.beads()==beads
     assert ramp.ncycles==13
 
-def test_sanitise():
+def test_sanitize():
     u''' check that some beads are excluded from further analysis '''
     mod = RampModel()
     ramp = RampData.openTrack(path("ramp_legacy"),mod)
@@ -36,3 +36,6 @@ def test_sanitise():
     print("lgoodbeads=",lgoodbeads)
     print("ramp.beads()=",ramp.beads())
     assert ramp.beads()&lgoodbeads == ramp.beads()
+
+if __name__ == '__main__':
+    test_sanitize()

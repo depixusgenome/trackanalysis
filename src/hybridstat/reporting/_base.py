@@ -135,9 +135,9 @@ class ReporterInfo(HasLengthPeak):
                         for group in self.groups
                         for bead  in group.beads],
                        dtype = 'f4')
-        dur = self.track.phaseid(...,6)-self.track.phaseid(...,5)
+        dur = self.track.phaseduration(...,5)
         info['track'] = dict(path          = self.track.path,
-                             framerate     = self.track.frequency,
+                             framerate     = self.track.framerate,
                              uncertainties = arr,
                              durations     = dur)
 

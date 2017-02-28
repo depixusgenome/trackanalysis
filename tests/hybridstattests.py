@@ -47,8 +47,8 @@ def test_reporting():
     cyc   = np.array([0,10,5,10,5,100,5,10,5]*3)
     track = Track(path      = "mypath",
                   data      = dat,
-                  frequency = 1./30.,
-                  cycles    = (np.cumsum(cyc)-10).reshape((3,9)))
+                  framerate = 1./30.,
+                  phases    = (np.cumsum(cyc)-10).reshape((3,9)))
     fcn = lambda x: run(fname     = x,
                         track     = track,
                         config    = "myconfig",

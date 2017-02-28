@@ -18,10 +18,10 @@ class Probabilities(HasLengthPeak):
     u"Computes and caches probabilities"
     def __init__(self, base:Reporter) -> None:
         super().__init__(base.config)
-        self._proba  = Probability(framerate   = base.config.track.frequency,
+        self._proba  = Probability(framerate   = base.config.track.framerate,
                                    minduration = base.config.minduration)
         self._values = dict()   # type: Dict[Tuple[BEADKEY,int], Probability]
-        self._ends   = base.config.track.phaseids[:,7]-base.config.track.phaseids[:,6]
+        self._ends   = base.config.track.phaseduration(...,5)
 
     def __cache(self, bead:Bead, ipk:int) -> Probability:
         key = (bead.key, ipk)

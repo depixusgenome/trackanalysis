@@ -15,10 +15,10 @@ from cordrift.collapse      import (CollapseByMerging, CollapseToMean,
 def _run(coll, stitch, brown):
     bead   = TrackSimulator(zmax      = [0., 0., 1., 1., -.2, -.2, -.3, -.3],
                             brownian  = brown,
-                            durations = 20,
+                            sizes     = 20,
                             ncycles   = 30,
                             drift     = (.05, 29.))
-    cycles = bead.cycles[0][[5,6]]
+    cycles = bead.phases[0][[5,6]]
     frame  = bead.track(nbeads = 1, seed = 0).cycles
     drift  = bead.drift()[cycles[0]:cycles[1]]
 
