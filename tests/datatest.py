@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u""" Tests data access """
-import numpy
+import numpy as np
+
 from   legacy       import readtrack   # pylint: disable=import-error,no-name-in-module
 import data
 from   data.trackitems  import Items
@@ -31,8 +32,8 @@ class TestBeadIteration:
         assert set(i for i, _ in beads())          == vals
         assert set(beads().selecting(all).keys())  == vals
         assert set(beads().selecting(None).keys()) == vals
-        assert isinstance(beads()['t'], numpy.ndarray)
-        assert isinstance(beads()[0],   numpy.ndarray)
+        assert isinstance(beads()['t'], np.ndarray)
+        assert isinstance(beads()[0],   np.ndarray)
 
         sel = track.beads
         assert tuple(beads().selecting([2,3,2]).keys()) == (2,3,2)
@@ -67,14 +68,14 @@ class TestCycleIteration:
                       .keys())
                 == tuple((0,i) for i in range(10)))
 
-        assert isinstance(cycs()[('zmag',0)], numpy.ndarray)
+        assert isinstance(cycs()[('zmag',0)], np.ndarray)
 
         truth = readtrack(path("big_legacy"))[0]
         for _, vals in cycs().selecting((0,1)):
-            assert numpy.array_equal(vals, truth[1166-678:1654-678])
+            assert np.array_equal(vals, truth[1166-678:1654-678])
 
         for _, vals in cycs().withfirst(2).withlast(3).selecting((0,1)):
-            assert numpy.array_equal(vals, truth[1206-678:1275-678])
+            assert np.array_equal(vals, truth[1206-678:1275-678])
 
     def test_cancyclefromcycle(self):
         u"A cycle can contain a cycle as data"
@@ -83,7 +84,7 @@ class TestCycleIteration:
         cyc   = data.Cycles(track = track, data = cycs)
         assert set(cyc.keys()) == set(track.cycles.keys())
         assert set(cyc[...,0].keys()) == set(track.cycles[...,0].keys())
-        assert numpy.array_equal(cyc[0,0], track.cycles[0,0])
+        assert np.array_equal(cyc[0,0], track.cycles[0,0])
 
         def _act1(col):
             col[1][:] = 5.
@@ -104,40 +105,40 @@ class TestCycleIteration:
                                    first    = lambda:2,
                                    last     = lambda:3,
                                    selected = lambda:[(0,1)]):
-            assert numpy.array_equal(vals, truth[1206-678:1275-678])
+            assert np.array_equal(vals, truth[1206-678:1275-678])
 
     def test_nocopy(self):
         u"tests that data by default is not copied"
         track = data.Track(path = path("big_legacy"))
-        vals1 = numpy.arange(1)
+        vals1 = np.arange(1)
         for _, vals1 in data.Cycles(track   = track,
                                     first    = 2,
                                     last     = 3,
                                     selected = (0,1)):
             pass
 
-        vals2 = numpy.arange(2)
+        vals2 = np.arange(2)
         for _, vals2 in data.Cycles(track    = track,
                                     first    = 2,
                                     last     = 3,
                                     selected = (0,1)):
             pass
 
-        assert numpy.array_equal(vals1, vals2)
+        assert np.array_equal(vals1, vals2)
         vals1[:] = 0
-        assert numpy.array_equal(vals1, vals2)
+        assert np.array_equal(vals1, vals2)
 
     def test_copy(self):
         u"tests that data can be copied"
         track = data.Track(path = path("big_legacy"))
-        vals1 = numpy.arange(1)
+        vals1 = np.arange(1)
         for _, vals1 in data.Cycles(track   = track,
                                     first    = 2,
                                     last     = 3,
                                     selected = (0,1)):
             pass
 
-        vals2 = numpy.arange(2)
+        vals2 = np.arange(2)
         for _, vals2 in data.Cycles(track    = track,
                                     first    = 2,
                                     last     = 3,
@@ -145,9 +146,24 @@ class TestCycleIteration:
                                     selected = (0,1)):
             pass
 
-        assert numpy.array_equal(vals1, vals2)
+        assert np.array_equal(vals1, vals2)
         vals1[:] = 0
-        assert not numpy.array_equal(vals1, vals2)
+        assert not np.array_equal(vals1, vals2)
+
+def test_loadgrdir():
+    paths = path("big_legacy"), path("big_grlegacy")
+    track = data.Track(path = paths)
+    keys  = {0, 10, 12, 13, 14, 16, 17, 18, 1, 21, 22, 23,
+             24, 25, 26, 27, 28, 29, 2, 34, 35, 37, 3, 4, 6, 7}
+    assert set(track.beadsonly.keys()) == keys
+
+    keys  = {17, 23, 41, 14, 31, 45, 18, 37, 44,  7, 32,  6, 48, 22, 24, 47, 28,
+             19, 30, 25, 43, 42,  8, 26, 16, 12,  9, 33, 35, 27,  3, 10, 21, 15,
+             34, 29, 13,  5,  4, 20, 46, 11}
+    keys  = {i-3 for i in keys}
+    good  = {i[1] for i, j in track.cycles[28,...] if not np.all(np.isnan(j))}
+    assert good == keys
+    assert len(good) < track.ncycles
 
 if __name__ == '__main__':
-    TestCycleIteration().test_iterkeys()
+    test_loadgrdir()
