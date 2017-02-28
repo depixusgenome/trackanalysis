@@ -4,16 +4,6 @@ u'''
 Creates Classes and function to use with assemble sequence
 '''
 
-
-def sequence2oligohits(seq,size,overlap):
-    u'''given a sequence, size and overlap of oligos returns a list corresponding oligohits'''
-    # compute sequences of oligos
-    oliseqs = [seq[i:i+size]for i in range(0,len(seq),size-overlap)]
-    return [OligoHit(val,
-                     idx*(size-overlap),
-                     idx*(size-overlap)) for idx,val in enumerate(oliseqs)]
-
-
 def shifted_overlap(ol1:str,ol2:str,shift=0)->str:
     u'''
     returns '-' when the two strings mismatch
@@ -40,18 +30,35 @@ def tail_overlap(ol1:str, ol2:str)->str:
             return ol1[i:]
     return ""
 
+def pile_oligo(seq:str,oligo,shift:int=0)->str:
+    u'''
+    complement sequence with matching given by oligo
+    '''
+    osh = oligo.bpos+shift
+    for idx,val in enumerate(oligo.seq):
+        rep = seq[idx+osh]
+        if rep=="?":
+            continue
+        if rep=="-":
+            seq = seq[:idx+osh]+val+seq[idx+osh+1:]
+        else:
+            if rep!=val:
+                seq = seq[:idx+osh]+"?"+seq[idx+osh+1:]
+    return seq
 
 class OligoHit:
     u'''
     container for an oligo sequence, a position in nanometer
     and a position in base
     '''
-    def __init__(self,seq:str,pos:float,bpos:int,**kwargs)->None:
-        self.pos=pos # position in nanometer
-        self.bpos=int(bpos) # base position
-        self.seq=seq # the oligo sequence
-        self.size=len(seq)
-        self.batch_id=kwargs.get("batch_id",None)
+    def __init__(self,**kwa)->None:
+        self.seq=kwa.get("seq","") # the oligo sequence
+        self.pos=kwa.get("pos",0) # position in nanometer
+        self.bpos=int(kwa.get("bpos",0)) # base position
+        self.pos0=kwa.get("pos0",0) # initial (experimental) position in nanometer
+        self.bpos0=int(kwa.get("bpos0",0)) # initial (experimental) base position
+        self.size=len(self.seq)
+        self.batch_id=kwa.get("batch_id",None)
 
     def noverlaps(self,other)->int:
         u'''

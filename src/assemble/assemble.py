@@ -14,12 +14,11 @@ import numpy
 from scipy.optimize import basinhopping,OptimizeResult
 from scipy.stats import truncnorm
 from utils import initdefaults
+from Bio import pairwise2
 from . import oligohit
 
 # Fixed parameters
 # bp_to_nm = 1.100
-# error_in_z = 3, in nanometers
-# (rounded) error_in_bp = 3
 
 # to benchmark:
 #    * fix size of sequences, vary size of oligos and overlap
@@ -47,8 +46,7 @@ class HoppingSteps:
         self.min_x = kwargs.get("min_x",0) # in number of bases
         self.max_x = kwargs.get("max_x",sys.maxsize) # in number of bases
         self.scale = kwargs.get("scale",1) # in number of bases
-        self.rvs = kwargs.get("rvs",[]) # list of distributions
-
+        self.dists = kwargs.get("dists",[]) # list of distributions
     def __call__(self,xstate): # should be overriden
         pass
 
@@ -65,7 +63,7 @@ def call_rvs(obj:HoppingSteps,*args): # pylint: disable=unused-argument
     u'''
     call predefined distributions
     '''
-    return numpy.array([i() for i in obj.rvs])
+    return numpy.array([i.rvs() for i in obj.dists])
 
 def rtruncnorm_step(obj:HoppingSteps,xstate):
     u'''
@@ -91,24 +89,38 @@ class OligoWrap:
     u'''
     decorator for use of bpos array instead of list of oligohit
     '''
-    def __init__(self,oligos):
+    def __init__(self,oligos,wrapping):
+        u'''
+        wrapping is a function whci returns new oligos from *args
+        ex: wrapping = bpos2oligos, pos2oligos
+        '''
         self.oligos=oligos
+        self.wrapping=wrapping
 
     def __call__(self,func):
         u'''returns a function which takes new positions of oligos
         instead of new oligos
         required for basinhopping
         '''
-        def wrapped_func(bpos):
+        def wrapped_func(*args):
             u'''
             wrapper
             '''
-            oligos=oligos_from_bpos(self.oligos,bpos)
+            oligos=self.wrapping(self.oligos,*args)
             return func(oligos)
         return wrapped_func
 
+def pos2oligos(olis,pos): # formerly oligos_from_pos
+    u'''
+    returns a function which takes an array of pos instead of oligos
+    '''
+    assert len(olis)==len(pos)
+    oligos = [deepcopy(i) for i in olis]
+    for idx,val in enumerate(pos):
+        oligos[idx].pos=val
+    return oligos
 
-def oligos_from_bpos(olis,bpos):
+def bpos2oligos(olis,bpos): # oligos_from_bpos
     u'''
     returns a function which takes an array of pos instead of oligos
     '''
@@ -124,14 +136,45 @@ def noverlaps_energy(oligos):
     energy=0
     for ol1,ol2 in combinations(oligos,2):
         energy-=ol1.noverlaps(ol2)**2
+    return energy
 
+def tsl_energy(oligos):
+    u'''
+    energy cost related to translation of oligos away from its experimental position
+    '''
+    energy = 0
+    for oli in oligos:
+        energy+=(oli.pos-oli.pos0)**4
+    return energy
+
+def noverlaps_tsl_energy(oligos,ratio=0.01):
+    # can't use as is because of relationship between bpos and pos
+    u'''
+    computes the energy of overlapping oligos
+    and a penalty for translation of oligos position
+    ratio=0.01, is the ratio between the two energies
+    ratio is such that tsl/noverlaps should be comparable
+    '''
+    energy = noverlaps_energy(oligos)
+    energy += ratio*tsl_energy(oligos)
+    return energy
+
+def tail_tsl_energy(oligos,ratio=0.01):
+    u'''
+    computes the energy of tail overlapping oligos
+    and a penalty for translation of oligos position
+    ratio=0.01, is the ratio between the two energies
+    ratio is such that tsl/noverlaps should be comparable
+    '''
+    energy = tail_overlap_energy(oligos)
+    energy += ratio*tsl_energy(oligos)
     return energy
 
 def tail_overlap_energy(oligos)->float:
     u'''
-    sort by bpos and apply tail_overlap
+    sort by pos and apply tail_overlap
     '''
-    oligo_sort = sorted(oligos,key=lambda x :x.bpos)
+    oligo_sort = sorted(oligos,key=lambda x :x.pos)
     overlaps = numpy.array([len(oligohit.tail_overlap(oli.seq,oligo_sort[idx+1].seq))\
                         for idx,oli in enumerate(oligo_sort[:-1])])
     return -sum(overlaps[overlaps!=numpy.array(None)]**2)
@@ -153,7 +196,6 @@ def fit_oligos(oligos,energy_func,**kwargs):
     hopp = basinhopping(energy_func,xstate0,**kwargs)
     return hopp
 
-
 class MCAssemble():
     u'''Monte Carlo for assembling sequences from oligohits
     '''
@@ -163,7 +205,7 @@ class MCAssemble():
     state = None # type: numpy.ndarray
     func = None # type: Callable[[numpy.ndarray],float]
     acceptance = None # type: Callable
-    niter = 1000 # type: int
+    niter = 1 # type: int
     result = OptimizeResult()
     step = HoppingSteps()
 
@@ -178,7 +220,6 @@ class MCAssemble():
             self.state=self.state_init
 
         count = self.result.it if hasattr(self.result,"it") else 0
-
         self.result = basinhopping(self.func,
                                    self.state,
                                    take_step=self.step,
@@ -200,22 +241,17 @@ class MCAssemble():
         '''
         self.state = result.x
 
-    def __getstate__(self):
-        u'to implement to pickle MCAssemble'
-        pass
-
-    def __setstate__(self,*args,**kwargs):
-        u'to implement to pickle MCAssemble'
-        pass
 
 class Recorder:
     u'''
     keeps the results the assembler at each time step
     '''
-    def __init__(self,**kwargs):
+    def __init__(self,*args,**kwargs):
         self.assembler = kwargs.get("assembler",None)
         self.rec = kwargs.get("rec",[]) # list of results
         self.filename = kwargs.get("filename","recorder_default")
+        self.args = args # for subsequent analysis
+        self.kwargs = kwargs # for subsequent analysis
 
     def run(self):
         u'calls assembler and save the result'
@@ -227,47 +263,154 @@ class Recorder:
         with open(self.filename,"wb") as out_file:
             pickle.dump(self.rec,out_file)
 
-    @classmethod
-    def from_pickle(cls,filename):
-        u'loads a rec list from pickle file'
-        with open(filename,"rb") as in_file:
-            return cls(rec=pickle.load(in_file))
+    def get_curr_state(self):
+        u'returns the current state of the simulation'
+        return self.rec[-1].x
 
 
-class Benchmark: # pylint: disable=too-many-instance-attributes
+    #@classmethod
+    #def from_pickle(cls,filename,*args,**kwargs):
+    #    u'loads a rec list from pickle file'
+    #    with open(filename,"rb") as in_file:
+    #        return cls(rec=pickle.load(in_file))
+
+
+class SeqRecorder(Recorder):
     u'''
-    creates a class to benchmark chosen values of the assembler class
-    not finished
+    adds information (sequence, oligohits) to a Recorder
+    '''
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.sequence = kwargs.get("sequence","")
+        self.oligohits = kwargs.get("oligohits",[])
+
+    def to_pickle(self):
+        u'''
+        temp solution to deal with wrapped function not pickling
+        pickles information to reconstruct the SeqRecorder
+        '''
+        sr_pickler = _SeqRecPickler(seqr=self)
+        sr_pickler.to_pickle(self.filename)
+
+    def get_curr_oligohits(self):
+        u' returns olighits with the current state value'
+        pos = self.get_curr_state()
+        return [oligohit.OligoHit(seq=val.seq,
+                                  pos=pos[idx],
+                                  pos0=val.pos0,
+                                  bpos=val.bpos,
+                                  bpos0=val.bpos0)\
+                for idx,val in enumerate(self.oligohits)]
+
+    @classmethod
+    def from_pickle(cls,picklename,energy_func):
+        u'''
+        temp function to deal with wrapped function not pickling.
+        Creates a new seqRecorder object
+        '''
+        with open(picklename,"rb") as outfile:
+            sr_pickler = pickle.load(outfile)
+        # reconstruct class from loaded class
+        return sr_pickler.to_seqrecorder(energy_func)
+
+    def assembled_sequence(self): # to check
+        u'''
+        returns the assembled sequence and the shift corresponding to the oligo with lowest bpos
+        '''
+        curr_olis = self.get_curr_oligohits()
+        bposes = [i.bpos for i in curr_olis]
+        shift = min(bposes)
+        size_rseq = max([i.bpos+len(i.seq) for i in curr_olis])-shift
+        rseq = size_rseq*"-"
+        for oli in curr_olis:
+            rseq = oligohit.pile_oligo(rseq,oli,-shift)
+        return rseq,shift
+
+def match_with_sequence(seqrec:SeqRecorder):
+    u'''
+    given a SeqRecorder object, reconstructs the sequence given by oligos.
+    return the overlap between reconstructed sequence and the sequence.
+    '''
+    exp_seq,shift = seqrec.assembled_sequence()
+    known_seq = seqrec.sequence
+    return oligohit.shifted_overlap(known_seq,exp_seq,shift)
+
+def match_score(seqrec:SeqRecorder):
+    u'''
+    returns the ratio of characters in match_with_sequence not "-"
+    '''
+    match = match_with_sequence(seqrec)
+    return 1-(match.count("-")+match.count("?"))/len(match)
+
+class ScaleGap:
+    u'rescales _gap_penalities to forbid gaps in known sequence'
+    def __init__(self,value):
+        self.val=value
+    def __call__(self,func):
+        def wrapped(*args,**kwargs):
+            u'scales the output'
+            return self.val*func(*args,**kwargs)
+        return wrapped
+
+def _gap_penalties(x,y): # pylint:disable=unused-argument,invalid-name
+    u'''
+    x, gap position in seq
+    y, gap length
+    '''
+    if y==0:
+        return 0
+    return -1
+
+def pairwise2_alignment(seqrec:SeqRecorder):
+    u'''uses Bio.pairwise2 alignment to compute the best score of
+    sequence from oligohits and known sequence'''
+    exp_seq = seqrec.assembled_sequence()[0]
+    gap_exp = ScaleGap(1)(_gap_penalties)
+    gap_known = ScaleGap(1000)(_gap_penalties)
+    return pairwise2.align.globalxc(seqrec.sequence,exp_seq,gap_known,gap_exp,score_only=True) # pylint: disable=no-member
+
+class _SeqRecPickler:
+    u'''
+    temp class used as a work around unpicklable function
     '''
 
-    def __init__(self,**kwargs):
-        self.assemble_class=kwargs.get("assemble_class",MCAssemble)
-        self.rec_class=kwargs.get("rec_class",Recorder)
-        self.step_class=kwargs.get("step_class",HoppingSteps)
-        self.seq=kwargs.get("seq","")
-        self.overlaps=kwargs.get("overlaps",[2])
-        self.sizes=kwargs.get("sizes",[10])
-        self.name=kwargs.get("name","benchmark")
-        self._setup()
+    def __init__(self,seqr:SeqRecorder)->None:
+        self.rec = deepcopy(seqr.rec) # list of results
+        self.filename = seqr.filename
+        self.sequence = seqr.sequence
+        self.oligohits =  deepcopy(seqr.oligohits)
+        self.args=seqr.args
+        self.kwargs=seqr.kwargs
+        # pop func which does not pickle
+        asr_atr =  deepcopy(seqr.assembler.__dict__)
+        asr_atr.pop("func")
+        self.assembler = seqr.assembler.__class__(**asr_atr)
 
-    def _setup(self):
-        self.olihits = []
-        self.inits = []
-        self.assembles = []
-        self.recs = []
-        for size,overlap in zip(self.sizes,self.overlaps):
-            olih=oligohit.sequence2oligohits(self.seq,size,overlap)
-            init=[i.bpos for i in olih]
-            self.olihits.append(olih)
-            self.inits.append(init)
-            step = self.step_class()
-            self.assembles.append([self.assemble_class(state_init=init,
-                                                       func=None,
-                                                       niter=None,
-                                                       step=step)])
-            self.recs.append([])
+    def to_pickle(self,picklename):
+        u''' simple pickle
+        '''
+        with open(picklename,"wb") as outfile:
+            pickle.dump(self,outfile)
 
-    def run(self):
-        u'run each recorder'
-        for recit in self.recs:
-            recit.run()
+    @classmethod
+    def from_pickle(cls,picklename):
+        u'''
+        simple load from pickle
+        '''
+        with open(picklename,"rb") as outfile:
+            seqrpickler=pickle.load(outfile)
+        return seqrpickler
+
+    def to_seqrecorder(self,energy_func)->SeqRecorder:
+        u'''
+        reconstructs a SeqRecorder object
+        '''
+        asr_atr = self.assembler.__dict__
+        # update asr_dict with wrapped func
+        wrapper = OligoWrap(self.oligohits,energy_func)
+        wrpfunc = wrapper(energy_func) # eg noverlaps_energy
+        asr_atr.update({"func":wrpfunc})
+        assembler = self.assembler.__class__(**asr_atr)
+        seqr_atr = self.__dict__
+        seqr_atr["assembler"] = assembler
+        return SeqRecorder(**seqr_atr)
