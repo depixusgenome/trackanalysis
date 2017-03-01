@@ -194,7 +194,8 @@ class RampData: # pylint: disable=too-many-public-methods
         pbead = {bead:[bcid for bcid in self.bcids if bcid[0]==bead] for bead in self.beads()}
         gpbead = {bead:[bc for bc in bcids if are_good[bc]] for bead,bcids in pbead.items()}
         goods ={i for i in self.beads() if len(gpbead[i])/len(pbead[i])>self.model.good_ratio}
-        return goods&self._beadIdsCorr2zmag(toconsider = goods)
+        goods = goods & self._beadIdsCorr2zmag(toconsider = goods)
+        return goods - self.getFixedBeadIds() - self.noBeadCrossIds()
 
     def clean(self):
         u'''good beads open and close with zmag
@@ -257,7 +258,7 @@ class RampData: # pylint: disable=too-many-public-methods
     def getFixedBeadIds(self)->set:
         u'''
         returns set of bead ids considered fixed
-        must be modified to use estExtHPsize instead of dataz
+        could be modified to use estExtHPsize instead of dataz
         '''
         # check that the bead never opens
         closed = (self.dataz[self.bcids].max()-self.dataz[self.bcids].min()) <self.model.getMinExt()

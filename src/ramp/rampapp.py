@@ -9,6 +9,7 @@ from bokeh.plotting import curdoc, figure
 from bokeh.layouts import widgetbox, column, row
 from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.models import TextInput, Div, Button
+from bokeh.models.widgets import Slider
 import pandas as pd
 import numpy
 import view.dialog
@@ -17,7 +18,7 @@ import ramp
 from . import _utils as utils
 
 class DisplayText:
-    u''' Manages the Display : widgets, bokeh doc
+    u''' Manages the Display: div widgets, bokeh doc
     '''
     def __init__(self,**kwargs):
 
@@ -31,6 +32,22 @@ class DisplayText:
         u''' update shown text
         '''
         self.div.text = self.prefix + str(newstr)
+
+
+class DisplaySlider:
+    u'''Manages slides
+    '''
+    def __init__(self,**kwargs):
+        title = kwargs.get("title","")
+        start = kwargs.get("start",0)
+        end = kwargs.get("end",100)
+        value = kwargs.get("value",0)
+        step = kwargs.get("step",10)
+        self.slider = Slider(title=title,
+                             start=start,
+                             end=end,
+                             value=value,
+                             step=step)
 
 class DisplayHist:
     u''' Contains fig and ColumnDataSource
@@ -153,6 +170,8 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
             self.data = Data()
         if self.doc is None:
             self.doc = curdoc()
+
+
         self.divs = {"ngoods":DisplayText(prefix="number of good beads : ",
                                           width=200,
                                           height=30),
@@ -161,7 +180,10 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
                                         height=100),
                      "ugly":DisplayText(prefix="ugly beads are : "),
                      "fixed":DisplayText(prefix="fixed beads are : "),
-                     "filestatus":DisplayText(prefix="")}
+                     "undef":DisplayText(prefix="undefined beads are : "),
+                     "filestatus":DisplayText(prefix="",
+                                              width=200,
+                                              height=100)}
 
         self.hists = {"zmop": DisplayHist(title = "Phase 3",
                                           x_label = "zmag_open",
@@ -186,12 +208,26 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
                                             y_label ="number of estimates",
                                             normed = False,
                                             with_cdf = False)}
+
+        def call_changegratio(attr,old,new): # pylint: disable=unused-argument
+            u''' bokeh requires attr, old, new'''
+            return self.changegratio()
+
+        self.sliders = {"gratio":Slider(title="ratio of clean cycles for good beads",
+                                        start=0,
+                                        end=1,
+                                        value=self.data.rpmod.good_ratio,
+                                        step=.1)}
+
+        self.sliders["gratio"].on_change("value",call_changegratio)
+
         self.txt_inputs = {"minext" : \
                            TextInput(value = "0.0",
                                      title = "min molecule extension (micrometer unit)"),
                            "zcl_threshold":\
                            TextInput(value = "",
-                                     title = "keep bead if zmag close is above :")}
+                                     title = "add to ramp_discard if \
+                                     zmag close is below :")}
 
         def call_changeminext(attr,old,new): # pylint: disable=unused-argument
             u''' bokeh requires attr, old, new'''
@@ -225,21 +261,29 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
         returns docrows
         '''
         docrows = []
-        docrows.append(row(widgetbox(self.sel["rpfile"].button),self.divs["filestatus"].div))
+        docrows.append(row(widgetbox(self.sel["rpfile"].button),
+                           self.divs["filestatus"].div,
+                           self.sliders["gratio"]))
         docrows.append(self.divs["ngoods"].div)
         docrows.append(self.divs["good"].div)
         docrows.append(self.divs["ugly"].div)
         docrows.append(widgetbox(self.txt_inputs["minext"]))
         docrows.append(self.divs["fixed"].div)
-        docrows.append(widgetbox(self.txt_inputs["zcl_threshold"],
-                                 self.buttons["gen_rpdiscard"]))
+        docrows.append(self.divs["undef"].div)
+        docrows.append(column(self.txt_inputs["zcl_threshold"],
+                              self.buttons["gen_rpdiscard"]))
         docrows.append(row(column(self.hists["zmop"].fig), column(self.hists["zmcl"].fig)) )
-
-        # add file which generates a ramp_discarded.csv (including a list of fixed and ugly beads)
-        # (and beads which are not yet closed at zcl_threshold)
 
         docrows.append(self.hists["HPsize"].fig)
         return docrows
+
+    def changegratio(self):
+        u'Called when the minimal ratio of good cycles is modified'
+        self.data.rpmod.good_ratio = self.sliders["gratio"].value
+        self._update_rpdata_from_file(self.filename)
+        self._update_text_info()
+        self._update_zmag_info()
+        self._update_HP_info()
 
     def changezclthreshold(self):
         u'''
@@ -253,9 +297,10 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
         Called when minimal extension value is changed
         '''
         self.data.rpmod.setMinExt(float(self.txt_inputs["minext"].value))
-        fixed =  {} if self.data.rpfulldata is None\
-                 else self.data.rpfulldata.getFixedBeadIds()
-        self.divs["fixed"].update(str(fixed))
+        self._update_rpdata_from_file(self.filename)
+        self._update_text_info()
+        self._update_zmag_info()
+        self._update_HP_info()
 
     def change_data_file(self):
         u'''
@@ -300,7 +345,6 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
         self.data.rpdata.clean()
         self.data.rpfulldata.setTrack(filename)
 
-
     def _update_text_info(self):
         good = {} if self.data.rpfulldata is None\
                   else self.data.rpfulldata.getGoodBeadIds()
@@ -308,11 +352,13 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
                else self.data.rpfulldata.noBeadCrossIds()
         fixed =  {} if self.data.rpfulldata is None\
                  else self.data.rpfulldata.getFixedBeadIds()
+        undef =  {} if self.data.rpfulldata is None\
+                 else self.data.rpfulldata.beads()-good-ugly-fixed
         self.divs["ngoods"].update(str(len(good)))
         self.divs["good"].update(str(good))
         self.divs["ugly"].update(str(ugly))
         self.divs["fixed"].update(str(fixed))
-
+        self.divs["undef"].update(str(undef))
 
     def _update_zmag_info(self):
         zmagop = pd.DataFrame() if self.data.rpdata is \
