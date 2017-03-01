@@ -55,8 +55,6 @@ Input  = Tuple[BEADKEY, Iterable[PeakFindingOutput]]
 _PEAKS = Dict[BEADKEY, Tuple[Sequence[float], Sequence[PeakFindingOutput]]]
 class BeadsByHairpinProcessor(Processor):
     u"Groups beads per hairpin"
-    tasktype = BeadsByHairpinTask
-
     @classmethod
     def apply(cls,
               distances     : Distances,

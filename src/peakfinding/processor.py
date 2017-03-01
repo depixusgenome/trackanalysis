@@ -20,8 +20,6 @@ class PeakSelectorTask(PeakSelector, Task):
 Output = Tuple[BEADKEY, Iterator[PeakOutput]]
 class PeakSelectorProcessor(Processor):
     u"Groups events per peak"
-    tasktype = PeakSelectorTask
-
     @staticmethod
     def apply(cnf, data) -> Iterator[Output]:
         u"runs over one frame"

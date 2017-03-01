@@ -3,8 +3,9 @@
 u"Processors apply tasks to a data flow"
 from    abc         import ABCMeta, abstractmethod
 from    functools   import wraps
-from    typing      import TYPE_CHECKING, Callable, Tuple
+from    typing      import TYPE_CHECKING, Callable, Tuple, Iterable
 
+from    utils       import getlocals
 import  model.task   as     _tasks
 from    model.level import Level
 from    data        import Track
@@ -41,10 +42,14 @@ class MetaProcessor(ABCMeta):
     u"Protects attribute tasktype"
 
     def __new__(mcs, name, bases, nspace):
+        if name != 'Processor' and 'tasktype' not in nspace:
+            locs = getlocals(1)
+            nspace['tasktype'] = locs[name.replace('Processor', 'Task')]
+
         if isinstance(nspace['tasktype'], type):
             if not issubclass(nspace['tasktype'], _tasks.Task):
                 raise TypeError('Only Task classes in the tasktype attribute')
-        elif hasattr(nspace['tasktype'], '__iter__'):
+        elif isinstance(nspace['tasktype'], Iterable):
             nspace['tasktype'] = tuple(set(nspace['tasktype']))
             if not all(isinstance(tsk, type) and issubclass(tsk, _tasks.Task)
                        for tsk in nspace['tasktype']):
