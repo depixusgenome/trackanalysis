@@ -3,7 +3,7 @@
 u"Track Analysis conversion from json'able items."
 import  numpy
 
-from    ._utils     import isjsonable, CNT, TPE
+from    ._utils     import isjsonable, CNT, TPE, STATE
 
 _CONTINUE = type('_CONTINUE', tuple(), dict())
 
@@ -77,4 +77,18 @@ class Runner:
         cls   = getattr(__import__('.'.join(elems[:-1]), fromlist = elems[-1:]),
                         elems[-1])
 
-        return cls(**{name: self(val) for name, val in item.items()})
+        if hasattr(cls, '__getnewargs_ex__'):
+            i, j = cls.__getnewargs_ex__()
+            obj = cls.__new__(*i, **j)
+        elif hasattr(cls, '__getnewargs__'):
+            obj = cls.__new__(*cls.__getnewargs__())
+        else:
+            obj = cls.__new__(cls)
+
+        state = {name: self(val) for name, val in item.items()}
+        state = state.get(STATE, state)
+        if hasattr(obj, '__setstate__'):
+            getattr(obj, '__setstate__')(state)
+        else:
+            obj.__dict__.update(state)
+        return obj

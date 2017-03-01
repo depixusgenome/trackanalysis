@@ -13,16 +13,18 @@ from ._tojson   import Runner as _OutputRunner
 from ._patches  import run    as _patch
 
 __VERSION__ = 0
-def _dump(info):
-    return [{'version': __VERSION__}, _OutputRunner()(info)]
+def _dump(info, addversion = True):
+    if addversion:
+        return [{'version': __VERSION__}, _OutputRunner()(info)]
+    return _OutputRunner()(info)
 
 def _load(info):
     patched = _patch(info[1], info[0]['version'], __VERSION__)
     return _InputRunner()(patched)
 
-def dumps(info, **kwa):
+def dumps(info, addversion = True, **kwa):
     u"Dumps data to json. This includes the version number"
-    return json.dumps(_dump(info), **kwa)
+    return json.dumps(_dump(info, addversion), **kwa)
 
 def dump(info, arg, **kwa):
     u"Dumps data to json file. This includes the version number"

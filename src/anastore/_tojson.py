@@ -5,7 +5,7 @@ from    abc     import ABCMeta, abstractmethod
 from    enum    import Enum
 import  numpy
 
-from    ._utils import isjsonable, CNT, TPE
+from    ._utils import isjsonable, CNT, TPE, STATE
 
 class _ItemIO(metaclass=ABCMeta):
     @staticmethod
@@ -100,8 +100,16 @@ class Runner:
             if cls.check(item):
                 return cls.run(item, self)
 
-        dico = dict()
-        for name, val in item.__dict__.items():
+        dico  = dict()
+        attrs = getattr(item, '__dict__', {}).items()
+        if hasattr(item, '__getstate__'):
+            state = item.__getstate__()
+            if isinstance(state, dict):
+                attrs = state.items()
+            else:
+                attrs = (STATE, state),
+
+        for name, val in attrs:
             dico[name] = self(val)
 
         dico[TPE] = item.__class__.__module__+'.'+item.__class__.__name__

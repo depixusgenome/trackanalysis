@@ -45,7 +45,7 @@ namespace
     template <typename T>
     void _get(T & inst, char const * name, pybind11::dict & kwa)
     {
-        if(kwa.contains(name)) 
+        if(kwa.contains(name))
             inst = kwa[name].cast<T>();
     }
 
@@ -53,7 +53,7 @@ namespace
     void _init_other(T &, pybind11::dict) {}
 
     void _init_other(signalfilter::forwardbackward::Args & inst,
-                     pybind11::dict kwa) 
+                     pybind11::dict kwa)
     {
         _get(inst.normalize, "normalize", kwa);
         _get(inst.window,    "window", kwa);
@@ -86,7 +86,7 @@ namespace
     pybind11::array & _run(T                  const & self,
                            pybind11::array_t<float> & inp,
                            pybind11::kwargs           kwa)
-    { 
+    {
         T cpy = self;
         _init(cpy, kwa);
         run(cpy, inp.size(), inp.mutable_data());
@@ -104,6 +104,32 @@ namespace
            .def("__call__",            &_run<T>)
            ;
     }
+
+    template <typename T>
+    pybind11::dict _getdict(T const & p)
+    {
+        using namespace pybind11::literals;
+        return pybind11::dict("derivate"_a   = p.derivate,
+                              "precision"_a  = p.precision,
+                              "power"_a      = p.power,
+                              "estimators"_a = _get_est(p));
+    };
+
+    template <typename T>
+    void _set(pybind11::object n, T & p)
+    {
+        using tpe = typename std::remove_reference<decltype(p)>::type;
+        p = n.cast<tpe>();
+    };
+
+    template <typename T>
+    void _setdict(T & p, pybind11::dict d)
+    {
+        _set(d["derivate"], p.derivate);
+        _set(d["precision"], p.precision);
+        _set(d["power"], p.power);
+        _set_est(p, d["estimators"]);
+    };
 }
 
 namespace signalfilter {
@@ -115,31 +141,20 @@ namespace signalfilter {
             pybind11::class_<Args> cls(mod,"ForwardBackwardFilter");
             cls.def_readwrite("normalize",     &Args::normalize)
                .def_readwrite("window",        &Args::window)
-               .def("__getstate__",        [](Args const &p) 
-                    { 
-                        return pybind11::make_tuple(p.derivate, p.precision, p.power,
-                                                   _get_est(p), p.normalize, p.window);
+               .def("__getstate__",  [](Args const & p)
+                    {
+                        auto d = _getdict(p);
+                        d["normalize"] = p.normalize;
+                        d["window"]    = p.window;
+                        return d;
                     })
-               .def("__setstate__",        [](Args &p, pybind11::tuple t)
-                    { 
-                        if (t.size() != 6)
-                            throw std::runtime_error("Invalid state!");
-                        new (&p) Args();
-                        int i = 0;
-                        auto set = [&](auto & x)
-                                { 
-                                    using tpe = typename std::remove_reference<decltype(x)>::type;
-                                    x = t[i++].cast<tpe>();
-                                };
-                        set(p.derivate);
-                        set(p.precision);
-                        set(p.power);
-                        _set_est(p, t[i++]);
-                        set(p.normalize);
-                        set(p.window);
+               .def("__setstate__",  [](Args & p, pybind11::kwargs d)
+                    {
+                        _setdict(p, d);
+                        _set(d["normalize"], p.normalize);
+                        _set(d["window"]   , p.window);
                     })
                ;
-
             _apply<Args>(cls);
         }
     }
@@ -149,27 +164,8 @@ namespace signalfilter {
         void pymodule(pybind11::module & mod)
         {
             pybind11::class_<Args> cls(mod, "NonLinearFilter");
-            cls.def("__getstate__",        [](const Args &p) 
-                    { 
-                        return pybind11::make_tuple(p.derivate, p.precision, p.power,
-                                                   _get_est(p));
-                    })
-               .def("__setstate__",        [](Args &p, pybind11::tuple t)
-                    { 
-                        if (t.size() != 4)
-                            throw std::runtime_error("Invalid state!");
-                        new (&p) Args();
-                        int i = 0;
-                        auto set = [&](auto & x)
-                                { 
-                                    using tpe = typename std::remove_reference<decltype(x)>::type;
-                                    x = t[i++].cast<tpe>();
-                                };
-                        set(p.derivate);
-                        set(p.precision);
-                        set(p.power);
-                        _set_est(p, t[i++]);
-                    })
+            cls.def("__getstate__",  _getdict<Args>)
+               .def("__setstate__",  _setdict<Args>)
                ;
             _apply<Args>(cls);
         }

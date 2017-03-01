@@ -56,6 +56,9 @@ class Task:
             if not isinstance(getattr(self, name), Level):
                 raise TypeError('"{}" must be of type Level'.format(name))
 
+    def __setstate__(self, kwargs):
+        self.__dict__.update(self.__class__(**kwargs).__dict__)
+
     @classmethod
     def unique(cls):
         u"returns class or parent task if must remain unique"
