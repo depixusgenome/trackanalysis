@@ -106,7 +106,7 @@ class SummarySheet(Reporter):
     def _npeaks(self, ref:Group, bead:Bead) -> Optional[int]:
         u""" Number of peaks detected for that bead."""
         if bead is None:
-            return None if ref.key is None else len(self.config.hpins[ref.key].peaks[:-1])
+            return None if ref.key is None else len(self.config.hairpins[ref.key].peaks[:-1])
         return len(bead.peaks)
 
     @column_method(u"Unidentified Peak Count", exclude = Reporter.nohairpin)
@@ -126,7 +126,7 @@ class SummarySheet(Reporter):
             if ref.key is None:
                 return None
 
-            peaks = self.config.hpins[ref.key].peaks[1:-1]
+            peaks = self.config.hairpins[ref.key].peaks[1:-1]
             theor = set(np.int32(peaks+.1)) # type: ignore
             for bead in ref.beads:
                 theor.difference_update(bead.peaks['key'])

@@ -21,7 +21,7 @@ class Probabilities(HasLengthPeak):
         self._proba  = Probability(framerate   = base.config.track.framerate,
                                    minduration = base.config.minduration)
         self._values = dict()   # type: Dict[Tuple[BEADKEY,int], Probability]
-        self._ends   = base.config.track.phaseduration(...,5)
+        self._ends   = base.config.track.durations
 
     def __cache(self, bead:Bead, ipk:int) -> Probability:
         key = (bead.key, ipk)
@@ -35,7 +35,7 @@ class Probabilities(HasLengthPeak):
     def __call__(self, name: str, ref:Group, bead:Bead, ipk:int):
         u"returns a probability value for a bead or the median for a hairpin"
         if bead is None:
-            pkkey = np.int32(self.hpins[ref.key].peaks[ipk]+.1) # type: ignore
+            pkkey = np.int32(self.hairpins[ref.key].peaks[ipk]+.1) # type: ignore
             ite = iter(self.__cache(i, j)
                        for i in ref.beads for j in range(len(i.peaks))
                        if i.peaks['key'][j] == pkkey)
@@ -67,7 +67,7 @@ class Neighbours(HasLengthPeak):
             self._oldbead = (ref, bead)
 
         if bead is None:
-            i = int(self.hpins[ref.key].peaks[ipk]+1)
+            i = int(self.hairpins[ref.key].peaks[ipk]+1)
         elif bead.peaks['key'][ipk] < 0:
             i = int(floor(self.basevalue(bead, ipk)+1.5))
         else:
@@ -110,7 +110,7 @@ class PositionInRef(HasLengthPeak):
     def __init__(self, peaks:Reporter, peakcols: Columns) -> None:
         super().__init__(peaks)
         summ          = peaks.config.sheettype('summary')(peaks.book, peaks.config)
-        self._hpins   = peaks.config.hpins
+        self._hpins   = peaks.config.hairpins
         self._isxlsx  = peaks.isxlsx()
         self._peakrow = 1+peaks.tablerow()
         self._beadrow = 1+summ.tablerow()
@@ -182,7 +182,7 @@ class PeaksSheet(Reporter):
             if group.key is None:
                 continue
 
-            hpin = self.config.hpins[group.key]
+            hpin = self.config.hairpins[group.key]
             yield from ((group, None, i) for i in range(len(hpin.peaks)))
             for bead in group.beads:
                 yield from ((group, bead, i) for i in range(len(bead.peaks)))
@@ -223,7 +223,7 @@ class PeaksSheet(Reporter):
         if ipk == 0:
             return 0
         if bead is None:
-            return self.config.hpins[ref.key].peaks[ipk]
+            return self.config.hairpins[ref.key].peaks[ipk]
         else:
             val = bead.peaks['key'][ipk]
             return val if val >= 0 else None

@@ -3,13 +3,15 @@
 """
 Defines basic hybridstat related report objects and functions
 """
-from typing                 import Sequence, Callable, Dict # pylint:disable= unused-import
+from typing                 import (Optional, Sequence, # pylint:disable= unused-import
+                                    Callable, Dict)
 from abc                    import abstractmethod
 
 import numpy as np
 
+from utils                  import initdefaults
 from excelreports.creation  import Reporter as _Reporter, column_method, FILEOBJ
-from data.track             import Track                     # pylint: disable=unused-import
+from data.track             import Track, BEADKEY            # pylint: disable=unused-import
 from signalfilter           import PrecisionAlg
 from peakcalling.tohairpin  import Hairpin                   # pylint: disable=unused-import
 from peakcalling.processor  import (ByHairpinGroup as Group, # pylint: disable=unused-import
@@ -21,7 +23,7 @@ class HasLengthPeak:
     haslengthpeak = False
     def __init__(self, base:'HasLengthPeak') -> None:
         self.haslengthpeak = getattr(base, 'haslengthpeak', False)
-        self.hpins         = getattr(base, 'hpins', {}) # type: Dict[str, Hairpin]
+        self.hairpins      = getattr(base, 'hairpins', {}) # type: Dict[str, Hairpin]
 
     def isstructural(self, ref:Group, bead:Bead, ipk:int) -> bool:
         u"not peak 0 or size of hairpin"
@@ -29,7 +31,7 @@ class HasLengthPeak:
             return True
 
         if bead is None:
-            return len(self.hpins[ref.key].peaks) == ipk+1
+            return len(self.hairpins[ref.key].peaks) == ipk+1
         else:
             return ipk == 0 or (self.haslengthpeak and ipk == len(bead.peaks)-1)
 
@@ -74,7 +76,7 @@ class ChartCreator(object):
 
     def _peaks(self, ref:Group, bead:Bead):
         if bead is None:
-            return self._parent.config.hpins[ref.key].peaks
+            return self._parent.config.hairpins[ref.key].peaks
         else:
             return bead.peaks['zvalue']
 
@@ -105,41 +107,38 @@ class ChartCreator(object):
         self._row += size
         return chart
 
+class TrackInfo:
+    u"""
+    All info in Track which is relevant to Reporter.
+    This allows pickling ReporterInfo and producing reports later.
+    """
+    path            = ''
+    framerate       = 0.
+    ncycles         = 0
+    uncertainties   = {}    # type: Dict[BEADKEY,float]
+    durations       = []    # type: Sequence[int]
+    def __init__(self, track: Optional[Track]) -> None:
+        if track is not None:
+            self.path          = track.path
+            self.framerate     = track.framerate
+            self.ncycles       = track.ncycles
+            self.durations     = track.phaseduration(...,5)
+            self.uncertainties = {i: PrecisionAlg.rawprecision(track, i)
+                                  for i in track.beads.keys()}
+
 class ReporterInfo(HasLengthPeak):
     u"All info relevant to the current analysis report"
-    def __init__(self, arg = None, **kwargs):
-        super().__init__(arg)
-        if isinstance(arg, ReporterInfo):
-            for name in ('groups', 'hpins', 'oligos', 'config', 'track'):
-                setattr(self, name, getattr(arg, name))
-        else:
-            self.track       = kwargs['track']        # type: Track
-            self.groups      = kwargs['groups']       # type: Sequence[Group]
-            self.hpins       = kwargs['hairpins']     # type: Dict[str, Hairpin]
-            self.sequences   = kwargs['sequences']    # type: Dict[str, str]
-            self.oligos      = kwargs['oligos']       # type: Sequence[str]
-            self.knownbeads  = kwargs['knownbeads']   # type: sequence[beadkey]
-            self.minduration = kwargs['minduration']  # type: int
-
-    def state(self):
-        u"For pickling (missing __setstate__ for full protocol)"
-        info = dict(groups      = self.groups,
-                    hpins       = self.hpins,
-                    sequences   = self.sequences,
-                    oligos      = self.oligos,
-                    knownbeads  = self.knownbeads,
-                    minduration = self.minduration)
-
-        fcn = lambda bead: PrecisionAlg.rawprecision(self.track, bead.key)
-        arr = np.array([fcn(bead)
-                        for group in self.groups
-                        for bead  in group.beads],
-                       dtype = 'f4')
-        dur = self.track.phaseduration(...,5)
-        info['track'] = dict(path          = self.track.path,
-                             framerate     = self.track.framerate,
-                             uncertainties = arr,
-                             durations     = dur)
+    groups      = [] # type: Sequence[Group]
+    hairpins    = {} # type: Dict[str, Hairpin]
+    sequences   = {} # type: Dict[str, str]
+    oligos      = [] # type: Sequence[str]
+    knownbeads  = [] # type: Sequence[BEADKEY]
+    minduration = 1
+    track       = TrackInfo(None)
+    @initdefaults(track = 'ignore')
+    def __init__(self, **kwa):
+        super().__init__(kwa)
+        self.track = TrackInfo(kwa['track'])
 
     @staticmethod
     def sheettype(name:str):
@@ -166,16 +165,16 @@ class Reporter(_Reporter):
 
     def nohairpin(self)-> bool:
         u"returns true if no hairpin was provided"
-        return len(self.config.hpins) == 0
+        return len(self.config.hairpins) == 0
 
     def uncertainty(self, bead:Bead):
         u"returns uncertainties for all beads"
-        return PrecisionAlg.rawprecision(self.config.track, bead.key)
+        return self.config.track.uncertainties[bead.key]
 
     def uncertainties(self):
         u"returns uncertainties for all beads"
-        fcn = self.uncertainty
-        return np.array([fcn(bead)*bead.distance.stretch
+        fcn = self.config.track.uncertainties.__getitem__
+        return np.array([fcn(bead.key)*bead.distance.stretch
                          for group in self.config.groups
                          for bead  in group.beads],
                         dtype = 'f4')

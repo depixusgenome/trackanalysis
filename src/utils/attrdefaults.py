@@ -2,11 +2,13 @@
 # -*- coding: utf-8 -*-
 u"utils"
 
-from typing         import TypeVar, Iterable, FrozenSet, Optional, Callable
-from copy           import deepcopy, copy
-from functools      import wraps, partial
-from enum           import Enum
-from .inspection    import getlocals
+from    typing         import TypeVar, Iterable, FrozenSet, Optional, Callable
+import  inspect
+from    copy           import deepcopy, copy
+from    functools      import wraps, partial
+from    enum           import Enum
+
+from   .inspection     import getlocals
 
 NoArgs = type('NoArgs', (), {})
 
@@ -80,7 +82,8 @@ def kwargsdefaults(*items):
         return _wrapper(items[0])
     return _wrapper
 
-def setdefault(self, name, kwargs, roots = ('',)):
+def setdefault(self, name, kwargs, roots = ('',), # pylint: disable=too-many-arguments
+               cpy = None, deepcpy = None):
     u"""
     Uses the class attribute to initialize the object's fields if no keyword
     arguments were provided.
@@ -95,9 +98,14 @@ def setdefault(self, name, kwargs, roots = ('',)):
         setattr(self, name, toenum(clsdef, kwdef))
         break
     else:
-        setattr(self, name, deepcopy(clsdef))
+        if deepcpy is not None:
+            setattr(self, name, deepcopy(getattr(cpy, name)))
+        elif cpy is not None:
+            setattr(self, name, getattr(cpy, name))
+        else:
+            setattr(self, name, deepcopy(clsdef))
 
-def initdefaults(*attrs, roots = ('',), **kwa):
+def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
     u"""
     Uses the class attribute to initialize the object's fields if no keyword
     arguments were provided.
@@ -116,30 +124,51 @@ def initdefaults(*attrs, roots = ('',), **kwa):
     assert len(attrs) and all(isinstance(i, str) for i in attrs)
     attrs = tuple(i for i in attrs if i[0].upper() != i[0])
 
-    def _wrapper(fcn):
-        @wraps(fcn)
-        def __init__(self, *args, **kwargs):
-            fcn(self, *args, **kwargs)
-            pipes = []
-            cls   = type(self)
-            for name in attrs:
-                if isinstance(cls.__dict__.get(name, None), AttrPipe):
-                    val = kwargs.get(name, NoArgs)
-                    if val is not NoArgs:
-                        pipes.append((name, kwargs[name]))
+    def __update__(self, kwargs, cpy = None, deepcpy = None):
+        pipes = []
+        cls   = type(self)
+        for name in attrs:
+            if isinstance(cls.__dict__.get(name, None), AttrPipe):
+                val = kwargs.get(name, NoArgs)
+                if val is not NoArgs:
+                    pipes.append((name, kwargs[name]))
+            elif kwa.get(name, '').lower() != 'ignore':
+                if mandatory and cpy is None and deepcpy is None and name not in kwa:
+                    raise KeyError("Missing keyword '%s' in __init__" % name)
                 else:
-                    setdefault(self, name, kwargs, roots)
+                    setdefault(self, name, kwargs, roots, cpy, deepcpy)
 
-            for name, val in kwa.items():
-                if val.lower() == 'update':
-                    update(getattr(self, name), **kwargs)
-                elif val.lower() == 'set':
-                    setdefault(self, name, kwargs, roots)
+        for name, val in kwa.items():
+            if val.lower() == 'update':
+                update(getattr(self, name), **kwargs)
+            elif val.lower() == 'set':
+                setdefault(self, name, kwargs, roots, cpy, deepcpy)
 
-            for name, val in pipes:
-                setattr(self, name, toenum(getattr(cls, name), val))
+        for name, val in pipes:
+            setattr(self, name, toenum(getattr(cls, name), val))
 
-        return __init__
+    def _wrapper(fcn):
+        val = tuple(inspect.signature(fcn).parameters.values())[1]
+        if val.kind  == val.VAR_KEYWORD:
+            @wraps(fcn)
+            def __init__(self, *args, **kwargs):
+                fcn(self, **kwargs)
+                if len(args) > 1:
+                    raise TypeError("__init__ takes at most a single positional"
+                                    +" argument as a copy constructor")
+                elif len(args) == 1:
+                    __update__(self, kwargs, cpy = args[0])
+                else:
+                    __update__(self, kwargs)
+
+            return __init__
+        else:
+            @wraps(fcn)
+            def __init__(self, *args, **kwargs):
+                fcn(self, *args, **kwargs)
+                __update__(self, kwargs)
+
+            return __init__
 
     return _wrapper if fcn is None else _wrapper(fcn)
 

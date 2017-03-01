@@ -26,7 +26,7 @@ def run(**kwa):
     self = ReporterInfo(**kwa)
     if str(kwa['fname']).endswith('.pkz'):
         with open(kwa['fname'], 'wb') as book:
-            pickle.dump(('hybridstat data', self.state()), book)
+            pickle.dump(self, book)
     else:
         with fileobj(kwa['fname']) as book:
             summ = SummarySheet(book, self)
