@@ -2,12 +2,21 @@
 # -*- coding: utf-8 -*-
 u'''
 a series of functions, classes to call from notebooks
+test oligohits created
+import pickle
+import copy
+testoligohits=[copy.deepcopy(i) for i in oligohits] # to del
+for idx,oli in enumerate(testoligohits):# to del
+oli.pos=init[idx]# to del
+print("oligoseq=",oli.seq)# to del
+print("experimental position=",oli.pos)# to del
+with open("./oligohits_for_Vincent.pickle","wb") as outfile:# to del
+pickle.dump(testoligohits,outfile) # to del
+return # to del
 '''
 import random
 import scipy.stats
-import numpy
 from assemble import oligohit, assemble
-
 
 def random_sequence(length=100):
     u'generates a random sequence'
@@ -30,6 +39,7 @@ def create_benchmark(nrecs=1,  # pylint: disable=too-many-arguments,too-many-loc
                      overlap=2,
                      seq_length=100,
                      energy_func=None,
+                     tooligo_func=None,
                      pname="benchmark"):
     u'''
     returns a list of nrecs recorders with the same random sequence
@@ -41,16 +51,16 @@ def create_benchmark(nrecs=1,  # pylint: disable=too-many-arguments,too-many-loc
     sequence = random_sequence(seq_length)
     # create oligohits
     oligohits = sequence2oligohits(seq=sequence,size=oli_size,overlap=overlap)
-    wrapper = assemble.OligoWrap(oligohits,energy_func)
+    wrapper = assemble.OligoWrap(oligohits,tooligo_func)
     for rec_it in range(nrecs):
         # create state_init
-        init = [i.bpos+numpy.round(noise()) for i in oligohits]
+        init = [i.pos+noise() for i in oligohits]
         # customized distribution for hopping steps
         dists = [scipy.stats.norm(loc=i,scale=exp_err) for i in init]
-        steps = assemble.PreFixedSteps(dists=dists)
+        hopp_steps = assemble.PreFixedSteps(dists=dists)
         assembler = assemble.MCAssemble(state_init=init,
                                         func=wrapper(energy_func),
-                                        step=steps)
+                                        step=hopp_steps)
         recorders.append(assemble.SeqRecorder(sequence=sequence,
                                               oligohits=oligohits,
                                               assembler=assembler,

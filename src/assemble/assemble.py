@@ -118,6 +118,7 @@ def pos2oligos(olis,pos): # formerly oligos_from_pos
     oligos = [deepcopy(i) for i in olis]
     for idx,val in enumerate(pos):
         oligos[idx].pos=val
+
     return oligos
 
 def bpos2oligos(olis,bpos): # oligos_from_bpos
@@ -246,12 +247,10 @@ class Recorder:
     u'''
     keeps the results the assembler at each time step
     '''
-    def __init__(self,*args,**kwargs):
+    def __init__(self,**kwargs):
         self.assembler = kwargs.get("assembler",None)
         self.rec = kwargs.get("rec",[]) # list of results
         self.filename = kwargs.get("filename","recorder_default")
-        self.args = args # for subsequent analysis
-        self.kwargs = kwargs # for subsequent analysis
 
     def run(self):
         u'calls assembler and save the result'
@@ -303,7 +302,7 @@ class SeqRecorder(Recorder):
                 for idx,val in enumerate(self.oligohits)]
 
     @classmethod
-    def from_pickle(cls,picklename,energy_func):
+    def from_pickle(cls,picklename,energy_func,tooligo_func):
         u'''
         temp function to deal with wrapped function not pickling.
         Creates a new seqRecorder object
@@ -311,9 +310,9 @@ class SeqRecorder(Recorder):
         with open(picklename,"rb") as outfile:
             sr_pickler = pickle.load(outfile)
         # reconstruct class from loaded class
-        return sr_pickler.to_seqrecorder(energy_func)
+        return sr_pickler.to_seqrecorder(energy_func,tooligo_func)
 
-    def assembled_sequence(self): # to check
+    def assembled_sequence(self): # to modify
         u'''
         returns the assembled sequence and the shift corresponding to the oligo with lowest bpos
         '''
@@ -379,8 +378,8 @@ class _SeqRecPickler:
         self.filename = seqr.filename
         self.sequence = seqr.sequence
         self.oligohits =  deepcopy(seqr.oligohits)
-        self.args=seqr.args
-        self.kwargs=seqr.kwargs
+        #self.args=seqr.args
+        #self.kwargs=seqr.kwargs
         # pop func which does not pickle
         asr_atr =  deepcopy(seqr.assembler.__dict__)
         asr_atr.pop("func")
@@ -401,13 +400,13 @@ class _SeqRecPickler:
             seqrpickler=pickle.load(outfile)
         return seqrpickler
 
-    def to_seqrecorder(self,energy_func)->SeqRecorder:
+    def to_seqrecorder(self,energy_func,tooligo_func)->SeqRecorder:
         u'''
         reconstructs a SeqRecorder object
         '''
         asr_atr = self.assembler.__dict__
         # update asr_dict with wrapped func
-        wrapper = OligoWrap(self.oligohits,energy_func)
+        wrapper = OligoWrap(self.oligohits,tooligo_func)
         wrpfunc = wrapper(energy_func) # eg noverlaps_energy
         asr_atr.update({"func":wrpfunc})
         assembler = self.assembler.__class__(**asr_atr)
