@@ -4,7 +4,7 @@ u"Deals with running a list of processes"
 from inspect        import signature
 from itertools      import groupby
 from typing         import (Callable, Optional,     # pylint: disable=unused-import
-                            Iterable, Tuple)
+                            Iterable, Tuple, Sequence)
 import numpy
 
 from data           import TrackItems, createTrackItem
@@ -14,8 +14,9 @@ from .cache         import Cache
 
 class Runner:
     u"Arguments used for iterating"
-    __slots__ = ('data', 'level', 'gen')
-    def __init__(self, data):
+    __slots__ = ('model', 'data', 'level', 'gen')
+    def __init__(self, model, data):
+        self.model = model     # type: Sequence[Task]
         self.data  = data      # type: Cache
         self.gen   = None      # type: Optional[TrackItems]
         self.level = Level(0)
@@ -123,12 +124,12 @@ class Runner:
 
     first = property(lambda self: self.data.first)
 
-def run(data, tsk = None):
+def run(model, data, tsk = None):
     u"""
     Iterates through the list up to and including *tsk*.
     Iterates through all if *tsk* is None
     """
-    args = Runner(data)
+    args = Runner(model, data)
     ind  = None if tsk is None else data.index(tsk)+1
     for proc in data[:ind]:
         proc.run(args)

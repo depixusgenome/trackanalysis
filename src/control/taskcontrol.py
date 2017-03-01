@@ -75,7 +75,7 @@ class ProcessorController:
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
         """
-        return _runprocessors(self.data, tsk)
+        return _runprocessors(self.model, self.data, tsk)
 
     @classmethod
     def create(cls,
