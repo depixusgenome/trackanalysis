@@ -100,6 +100,14 @@ class Processor(metaclass=MetaProcessor):
         u"Returns a copy of a task's dict"
         return self.task.config()
 
+    @classmethod
+    def newtask(cls, **kwargs) -> _tasks.Task:
+        u"Returns a copy of a task's dict"
+        if callable(cls.tasktype):
+            return cls.tasktype(**kwargs) # pylint: disable=not-callable
+        else:
+            raise TypeError("{}.tasktype is not callable".format(cls))
+
     def caller(self) -> Callable:
         u"Returns an instance of the task's first callable parent class"
         tpe   = type(self.task)
