@@ -239,7 +239,7 @@ class PeaksSheet(Reporter):
                    units = Reporter.baseunits,
                    cond  = _disttoref_conditional,
                    fmt   = Reporter.basefmt)
-    def _disttoref(self, *args) -> Optional[str]:
+    def _disttoref(self, *args) -> Optional[float]:
         u"Difference: reference peak position minus the bead's peak position"
         return self._pos.distance(*args)
 
