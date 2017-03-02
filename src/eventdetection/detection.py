@@ -195,9 +195,14 @@ class EventSelector:
     def __init__(self, **_):
         pass
 
+    @property
+    def minduration(self) -> int:
+        u"returns 2*edgelength+minlength"
+        return 2*self.edgelength+self.minlength
+
     def __call__(self, intervals: np.ndarray) -> np.ndarray:
         edx  = self.edgelength
-        minl = 2*edx+self.minlength
+        minl = self.minduration
         if minl <= 0:
             return intervals
         else:
