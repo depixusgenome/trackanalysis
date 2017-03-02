@@ -3,7 +3,8 @@
 """
 Extracts information from a report
 """
-from typing                 import Optional, Sequence, Tuple, cast
+from typing                 import (Optional,   # pylint: disable=unused-import
+                                    Sequence, Tuple, List, Union, Callable, cast)
 from openpyxl               import load_workbook
 from excelreports.creation  import writecolumns
 
@@ -13,7 +14,10 @@ def _id(row, ibead):
         return
     elif isinstance(val, str):
         try:
-            return int(val.split('B')[-1])
+            if 'B' in val:
+                return int(val.split('B')[-1])
+            else:
+                return int(val)
         except ValueError:
             return
     else:
@@ -36,7 +40,10 @@ def _add(info, row, ibead, ref):
         return
     elif isinstance(val, str):
         try:
-            beadid = int(val.split('B')[-1])
+            if 'B' in val:
+                return int(val.split('B')[-1])
+            else:
+                return int(val)
         except ValueError:
             return
     else:
@@ -47,9 +54,9 @@ def _add(info, row, ibead, ref):
 
     info.setdefault(ref, []).append(beadid)
 
-def _read_params(rows):
-    ids   = [None, None, None] # type: List[Optional[int]]
-    names = (u'bead', u'stretch', u'bias')
+def _read_summary(rows) -> List[Tuple[int, str, float, float]]:
+    ids   = [None, None, None, None] # type: List[Optional[int]]
+    names = (u'bead', u'reference', u'stretch', u'bias')
     for row in rows:
         for i, cell in enumerate(row):
             try:
@@ -59,37 +66,19 @@ def _read_params(rows):
         if ids.count(None) != 3:
             break
 
-    info = list() # type: List[Tuple[int,float,float]]
+    info = list() # type: List[Tuple[int,str,float,float]]
     if ids.count(None) == 0:
-        cnv = (_id, _tofloat, _tofloat)
+        cnv = (_id, str, _tofloat, _tofloat) # type: Sequence[Callable]
         for row in rows:
-            vals = tuple(cnv[i](row, ids[i]) for i in range(len(names)))
+            vals = tuple(fcn(row, idx) for fcn, idx in zip(cnv, ids))
             if None not in vals:
-                info.append(vals)
+                info.append(cast(Tuple[int,str,float,float], vals))
 
     return info
 
-def _read_summary(rows):
-    info  = dict() # type: Dict[str,List[int]]
-    ibead = cast(Optional[int], None)
-    iref  = cast(Optional[int], None)
-    for row in rows:
-        for i, cell in enumerate(row):
-            if str(cell.value).lower() == u"bead":
-                ibead = i
-            elif str(cell.value).lower() == u"reference":
-                iref = i
-        if ibead is not None and iref is not None:
-            break
-
-    if ibead is not None and iref is not None:
-        for row in rows:
-            _add(info, row, ibead, row[iref].value.strip())
-    return info
-
-def _read_identifications(rows):
+def _read_identifications(rows) -> List[Tuple[int,str]]:
     info = dict() # type: Dict[str,List[int]]
-    inds = []     # type: Sequence[Tuple[int,str]]
+    inds = []     # type: List[Tuple[int,str]]
     for row in rows:
         for i, cell in enumerate(row):
             val = str(cell.value)
@@ -102,31 +91,21 @@ def _read_identifications(rows):
         for ibead, ref in inds:
             _add(info, row, ibead, ref)
 
-    return info
+    res = [] # type: List[Tuple[int,str]]
+    for hpin, beads in info.items():
+        res.extend((i,hpin) for i in beads)
+    return res
 
-def read(fname:str) -> Sequence[Tuple[str,Sequence[int]]]:
-    u"extracts bead ids and their reference from a report"
-    wbook = load_workbook(filename=fname, read_only=True)
-    info  = dict() # type: Dict[str,List[int]]
-    for sheetname in wbook.get_sheet_names():
-        if sheetname.lower() == "summary":
-            info = _read_summary(iter(wbook[sheetname].rows))
-            break
-
-        elif sheetname.lower() == "identification":
-            info = _read_identifications(iter(wbook[sheetname].rows))
-
-    return tuple((x,tuple(y)) for x, y in info.items())
-
-def readparams(fname:str) -> Sequence[Tuple[int,Sequence[int]]]:
+def readparams(fname:str) -> Union[List[Tuple[int,str,float,float]],
+                                   List[Tuple[int,str]]]:
     u"extracts bead ids and their reference from a report"
     wbook = load_workbook(filename=fname, read_only=True)
     for sheetname in wbook.get_sheet_names():
         if sheetname.lower() == "summary":
-            return _read_params(iter(wbook[sheetname].rows))
+            return _read_summary(iter(wbook[sheetname].rows))
 
         elif sheetname.lower() == "identification":
-            return tuple()
+            return _read_identifications(iter(wbook[sheetname].rows))
 
 def write(fname:str, items: Sequence[Tuple[str,Sequence[int]]]):
     u"write bead ids and their reference to a report"

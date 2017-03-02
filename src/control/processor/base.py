@@ -92,21 +92,9 @@ class Processor(metaclass=MetaProcessor):
         u"returns the task's level"
         return (self.levelin, self.levelou)
 
-    @abstractmethod
-    def run(self, args:'Runner'):
-        u"iterates over possible data"
-
     def config(self) -> dict:
         u"Returns a copy of a task's dict"
         return self.task.config()
-
-    @classmethod
-    def newtask(cls, **kwargs) -> _tasks.Task:
-        u"Returns a copy of a task's dict"
-        if callable(cls.tasktype):
-            return cls.tasktype(**kwargs) # pylint: disable=not-callable
-        else:
-            raise TypeError("{}.tasktype is not callable".format(cls))
 
     def caller(self) -> Callable:
         u"Returns an instance of the task's first callable parent class"
@@ -123,6 +111,14 @@ class Processor(metaclass=MetaProcessor):
             bases.extend(cls.__bases__)
 
         raise TypeError("Could not find a functor base type in "+str(tpe))
+
+    @classmethod
+    def newtask(cls, **kwargs) -> _tasks.Task:
+        u"Returns a copy of a task's dict"
+        if callable(cls.tasktype):
+            return cls.tasktype(**kwargs) # pylint: disable=not-callable
+        else:
+            raise TypeError("{}.tasktype is not callable".format(cls))
 
     @staticmethod
     def cache(fcn):
@@ -184,6 +180,10 @@ class Processor(metaclass=MetaProcessor):
             act = fcn(self, args)
             args.apply(lambda frame: frame.withaction(act))
         return _run
+
+    @abstractmethod
+    def run(self, args:'Runner'):
+        u"iterates over possible data"
 
 class TrackReaderProcessor(Processor):
     u"Generates output from a _tasks.CycleCreatorTask"

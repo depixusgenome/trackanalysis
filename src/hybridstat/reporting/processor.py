@@ -18,7 +18,7 @@ from ._summary              import SummarySheet
 from ._peaks                import PeaksSheet
 
 
-class HybridstatReportTask(Task):
+class HybridstatExcelTask(Task):
     u"Reporter for Hybridstat"
     level       = Level.peak
     path        = ""
@@ -31,7 +31,7 @@ class HybridstatReportTask(Task):
     def __init__(self, **_):
         super().__init__(**_)
 
-class HybridstatReportProcessor(Processor):
+class HybridstatExcelProcessor(Processor):
     u"Reporter for Hybridstat"
     def run(self, args):
         hpins = {i: Hairpin(peaks = Hairpin.topeaks(j, self.task.oligos))

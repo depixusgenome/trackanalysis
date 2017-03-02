@@ -8,7 +8,7 @@ from peakcalling.tohairpin  import np, Hairpin, PEAKS_DTYPE
 from peakcalling.processor  import ByHairpinGroup, ByHairpinBead, Distance
 from data                   import Track
 from utils                  import EVENTS_DTYPE
-from hybridstat.reporting   import run, HybridstatReportProcessor, HybridstatReportTask
+from hybridstat.reporting   import run, HybridstatExcelProcessor, HybridstatExcelTask
 
 def test_reporting():
     u"tests reporting"
@@ -126,14 +126,14 @@ def test_processor():
             return iter(i)
 
 
-    task = HybridstatReportTask(path      = mktemp()+"_hybridstattest2.xlsx",
-                                hairpins  = {'hp100': Hairpin(peaks = truth[0]),
-                                             'hp101': Hairpin(peaks = truth[1])},
-                                sequences = sequences,
-                                oligos    = ['atgc'],
-                                knownbeads= (98,),
-                                minduration= 2)
-    proc = HybridstatReportProcessor(task)
+    task = HybridstatExcelTask(path      = mktemp()+"_hybridstattest2.xlsx",
+                               hairpins  = {'hp100': Hairpin(peaks = truth[0]),
+                                            'hp101': Hairpin(peaks = truth[1])},
+                               sequences = sequences,
+                               oligos    = ['atgc'],
+                               knownbeads= (98,),
+                               minduration= 2)
+    proc = HybridstatExcelProcessor(task)
     class _Runner:
         model = {1:2}
         @staticmethod
