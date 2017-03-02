@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Loading and save tracks"
-from    typing      import Sequence, Any, Union
+from    typing      import (Sequence, Callable, # pylint: disable=unused-import
+                            Any, Union, Tuple, Optional, TYPE_CHECKING)
 from    inspect     import signature
 import  pickle
 import  re
@@ -10,77 +11,162 @@ from    pathlib     import Path
 import  numpy       as     np
 
 from    legacy      import readtrack, readgr # pylint: disable=import-error,no-name-in-module
+if TYPE_CHECKING:
+    from data import Track  # pylint: disable=unused-import
 
-PATHTYPE = Union[str, Path]
-class _NotMine(Exception):
-    pass
+PATHTYPE  = Union[str, Path]
+PATHTYPES = Union[PATHTYPE,Tuple[PATHTYPE,PATHTYPE]]
 
-def _fromdict(fcn):
+def _checktype(fcn):
     sig = signature(fcn)
-    tpe = next(iter(sig.parameters.values())).annotation
+    tpe = tuple(sig.parameters.values())[-1].annotation
     if tpe is sig.empty:
         tpe = Any
+    elif tpe == Tuple[PATHTYPE,PATHTYPE]:
+        tpe = tuple
     else:
         tpe = getattr(tpe, '__union_params__', tpe)
 
     @wraps(fcn)
-    def _wrapper(track):
-        if isinstance(track.path, tpe):
-            kwargs = fcn(track.path)
-        else:
-            raise _NotMine()
-
-        if kwargs is None:
-            track.data = dict()
-        else:
-            for name in {'phases', 'framerate'} & set(kwargs):
-                setattr(track, name, kwargs.pop(name))
-
-            track.data = dict(ite for ite in kwargs.items()
-                              if isinstance(ite[1], np.ndarray))
+    def _wrapper(*args):
+        if tpe is Any or isinstance(args[-1], tpe):
+            return fcn(*args)
+        return None
     return _wrapper
 
-@_fromdict
-def _open_pickle(path:PATHTYPE):
-    if Path(path).suffix == ".pk":
+def _fromdict(fcn) -> Callable[..., 'Track']:
+    @wraps(fcn)
+    def _wrapper(*args):
+        kwargs = fcn(*args[:-1]+(args[-1].path,))
+
+        if kwargs is None:
+            args[-1].data = dict()
+        else:
+            for name in {'phases', 'framerate'} & set(kwargs):
+                setattr(args[-1], name, kwargs.pop(name))
+
+            args[-1].data = dict(ite for ite in kwargs.items()
+                                 if isinstance(ite[1], np.ndarray))
+        return args[-1]
+    return _wrapper
+
+class _TrackIO:
+    @staticmethod
+    def check(path):
+        u"checks the existence of a path"
+        raise NotImplementedError()
+
+    @staticmethod
+    def open(path):
+        u"opens a track file"
+        raise NotImplementedError()
+
+class PickleIO(_TrackIO):
+    u"checks and opens pickled paths"
+    @staticmethod
+    @_checktype
+    def check(path:PATHTYPE) -> Optional[PATHTYPE]:
+        u"checks the existence of a path"
+        return path if Path(path).suffix == ".pk" else None
+
+    @staticmethod
+    @_fromdict
+    def open(path:PATHTYPE) -> dict:
+        u"opens a track file"
         with open(str(path), 'rb') as stream:
             return pickle.load(stream)
-    else:
-        raise _NotMine()
 
-@_fromdict
-def _open_legacytracks(path:PATHTYPE):
-    if Path(path).suffix == ".trk":
+class LegacyTrackIO(_TrackIO):
+    u"checks and opens legacy track paths"
+    @staticmethod
+    @_checktype
+    def check(path:PATHTYPE) -> Optional[PATHTYPE]:
+        u"checks the existence of a path"
+        return path if Path(path).suffix == ".trk" else None
+
+    @staticmethod
+    @_fromdict
+    def open(path:PATHTYPE) -> dict:
+        u"opens a track file"
         return readtrack(str(path))
-    else:
-        raise _NotMine()
 
-class _GRDirectory:
-    TITLE   = re.compile(r"\\stack{{Bead (?P<id>\d+) Z.*?phase\(s\)"
-                         +r" \[(?P<phases>.*?)\]}}")
-    GRTITLE = re.compile(r"Bead Cycle (?P<id>\d+) p.*")
-    def __init__(self, paths):
-        self.paths  = paths
+class LegacyGRFilesIO(_TrackIO):
+    u"checks and opens legacy GR files"
+    __TITLE   = re.compile(r"\\stack{{Bead (?P<id>\d+) Z.*?phase\(s\)"
+                           +r" \[(?P<phases>.*?)\]}}")
+    __GRTITLE = re.compile(r"Bead Cycle (?P<id>\d+) p.*")
+    @classmethod
+    @_checktype
+    def check(cls, paths:Tuple[PATHTYPE,PATHTYPE] # type: ignore
+             ) -> Optional[Tuple[PATHTYPE,PATHTYPE]]:
+        u"checks the existence of paths"
+        if all(Path(i).suffix != '.trk' for i in paths):
+            return None
 
-    def open(self):
+        if Path(paths[0]).is_dir():
+            paths = paths[1], paths[0]
+
+        if not Path(paths[1]).is_dir():
+            raise IOError("[LegacyGRFilesIO] Missing directory in:\n- {}\n- {}"
+                          .format(*paths))
+
+        if all(i.suffix != '.gr' for i in Path(paths[1]).iterdir()):
+            raise IOError("[LegacyGRFilesIO] No .gr files in directory\n- {}"
+                          .format(paths[1]))
+        fname = str(paths[0])
+        if '*' in fname:
+            return cls.__findtrk(fname, paths[1])
+
+        elif not Path(paths[0]).exists():
+            raise IOError("Could not find path: " + str(paths[0]))
+
+        return paths
+
+    @classmethod
+    @_fromdict
+    def open(cls, paths:Tuple[PATHTYPE,PATHTYPE]) -> dict: # type: ignore
         u"opens the directory"
-        output = readtrack(str(self.paths[0]))
+        output = readtrack(str(paths[0]))
         remove = set(i for i in output if isinstance(i, int))
 
-        for grpath in Path(self.paths[1]).iterdir():
+        for grpath in Path(paths[1]).iterdir():
             if grpath.suffix != ".gr":
                 continue
 
-            remove.discard(self.update(str(grpath), output))
+            remove.discard(cls.__update(str(grpath), output))
 
         for key in remove:
             output.pop(key)
         return output
 
-    def update(self, path:str, output:dict) -> int:
+    @staticmethod
+    def __findtrk(fname:str, grs:PATHTYPE) -> Tuple[PATHTYPE,PATHTYPE]:
+        cgr  = next((i for i in Path(grs).iterdir() if i.suffix == '.cgr'),
+                    None)
+        if cgr is None:
+            raise IOError("[LegacyGRFilesIO] No .cgr files in directory\n- {}"
+                          .format(grs))
+
+        pot    = cgr.with_suffix('.trk').name
+        ind    = fname.find('*')
+        root   = Path(fname[:ind])
+        if root != Path(fname).parent:
+            glob   = root.name+fname[ind:]
+            parent = Path(str(root.parent))
+        else:
+            glob   = fname[ind:]
+            parent = root
+        trk    = next((i for i in parent.glob(glob) if i.name == pot), None)
+        if trk is None:
+            raise IOError("[LegacyGRFilesIO] Could not find {} in {}"
+                          .format(pot, fname))
+        return trk, grs
+
+    @classmethod
+    def __update(cls, path:str, output:dict) -> int:
         u"verifies one gr"
         grdict = readgr(path)
-        tit    = self.TITLE.match(grdict['title'])
+        tit    = cls.__TITLE.match(grdict['title'])
 
         if tit is None:
             raise IOError("Could not match title in " + path)
@@ -97,7 +183,7 @@ class _GRDirectory:
         bead    = output[beadid]
         bead[:] = np.NaN
         for title, vals in grdict.items():
-            tit = self.GRTITLE.match(title)
+            tit = cls.__GRTITLE.match(title)
             if tit is None:
                 continue
 
@@ -106,48 +192,65 @@ class _GRDirectory:
             bead[inds] = vals[1]
         return beadid
 
-@_fromdict
-def _open_legacygrdirectory(paths:Sequence[PATHTYPE]):
-    if Path(paths[1]).suffix == ".trk":
-        paths = paths[1], paths[0]
+_CALLERS = _TrackIO.__subclasses__()
 
-    if Path(paths[0]).suffix != ".trk":
-        raise _NotMine()
+class Handler:
+    u"A handler for opening the provided path"
+    def __init__(self, path: str, handler: Any) -> None:
+        self.path    = path
+        self.handler = handler
 
-    path = Path(paths[1])
-    if not path.is_dir() or not any(i.suffix == '.gr' for i in path.iterdir()):
-        raise _NotMine()
+    def __call__(self, track, beadsonly = False) -> "Track":
+        from .track import Track    # pylint: disable=redefined-outer-name
+        if not isinstance(track, Track):
+            track = Track(path = self.path)
+        else:
+            track.path = self.path
 
-    return _GRDirectory(paths).open()
+        track = self.handler.open(track)
+        if beadsonly:
+            for key in {i for i in track.data if not track.isbeadname(i)}:
+                track.data.pop(key) # pylint: disable=no-member
+        return track
 
-_CALLERS = tuple(fcn for name, fcn in locals().items() if name.startswith('_open_'))
+    @classmethod
+    def check(cls, track) -> 'Handler':
+        u"""
+        Checks that a path exists without actually opening the track.
+
+        It raises an IOError in case the provided path does not exist or
+        cannot be handled.
+
+        Upon success, it returns a handler with the correct protocol for this path.
+        """
+        paths = getattr(track, 'path', track)
+        if isinstance(paths, (str, Path)):
+            if not Path(paths).exists():
+                raise IOError("Could not find path: " + str(paths))
+        else:
+            paths = tuple(str(i) for i in paths)
+
+        for caller in _CALLERS:
+            tmp = caller.check(paths)
+            if tmp is not None:
+                res = cls(tmp, caller)
+                break
+        else:
+            raise IOError("Unknown file format in: {}".format(paths))
+
+        return res
+
+def checkpath(track) -> Handler:
+    u"""
+    Checks that a path exists without actually opening the track.
+
+    It raises an IOError in case the provided path does not exist or
+    cannot be handled.
+
+    Upon success, it returns a handler with the correct protocol for this path.
+    """
+    return Handler.check(track)
 
 def opentrack(track, beadsonly = False):
     u"Opens a track depending on its extension"
-    paths = getattr(track, 'path', track)
-    if isinstance(paths, (str, Path)):
-        paths = str(paths),
-    else:
-        paths = tuple(str(i) for i in paths)
-
-    for path in paths:
-        if not Path(path).exists():
-            raise IOError("Could not find path: " + str(path))
-
-    if isinstance(track, (str, Path, tuple, list)):
-        from .track import Track
-        track = Track(path = paths[0] if len(paths) == 1 else paths)
-
-    for caller in _CALLERS:
-        try:
-            caller(track)
-        except _NotMine:
-            continue
-        break
-    else:
-        raise IOError("Unknown file format in: " + str(paths))
-
-    if beadsonly:
-        for key in {i for i in track.data if not track.isbeadname(i)}:
-            track.data.pop(key) # pylint: disable=no-member
-    return track
+    checkpath(track)(track, beadsonly)

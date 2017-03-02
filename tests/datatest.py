@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u""" Tests data access """
+from   pathlib import Path
 import numpy as np
 
 from   legacy       import readtrack   # pylint: disable=import-error,no-name-in-module
@@ -165,5 +166,18 @@ def test_loadgrdir():
     assert good == keys
     assert len(good) < track.ncycles
 
+def test_findgrdir():
+    paths = str(Path(path("big_legacy")).parent/'*.trk'), path("big_grlegacy")
+    track = data.Track(path = paths)
+    keys  = {0, 10, 12, 13, 14, 16, 17, 18, 1, 21, 22, 23,
+             24, 25, 26, 27, 28, 29, 2, 34, 35, 37, 3, 4, 6, 7}
+    assert set(track.beadsonly.keys()) == keys
+
+    paths = str(Path(path("big_legacy")).parent/'test*.trk'), path("big_grlegacy")
+    track = data.Track(path = paths)
+    keys  = {0, 10, 12, 13, 14, 16, 17, 18, 1, 21, 22, 23,
+             24, 25, 26, 27, 28, 29, 2, 34, 35, 37, 3, 4, 6, 7}
+    assert set(track.beadsonly.keys()) == keys
+
 if __name__ == '__main__':
-    test_loadgrdir()
+    test_findgrdir()
