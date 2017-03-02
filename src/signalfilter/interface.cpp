@@ -114,22 +114,6 @@ namespace
                               "power"_a      = p.power,
                               "estimators"_a = _get_est(p));
     };
-
-    template <typename T>
-    void _set(pybind11::object n, T & p)
-    {
-        using tpe = typename std::remove_reference<decltype(p)>::type;
-        p = n.cast<tpe>();
-    };
-
-    template <typename T>
-    void _setdict(T & p, pybind11::dict d)
-    {
-        _set(d["derivate"], p.derivate);
-        _set(d["precision"], p.precision);
-        _set(d["power"], p.power);
-        _set_est(p, d["estimators"]);
-    };
 }
 
 namespace signalfilter {
@@ -148,12 +132,7 @@ namespace signalfilter {
                         d["window"]    = p.window;
                         return d;
                     })
-               .def("__setstate__",  [](Args & p, pybind11::kwargs d)
-                    {
-                        _setdict(p, d);
-                        _set(d["normalize"], p.normalize);
-                        _set(d["window"]   , p.window);
-                    })
+               .def("__setstate__",  [](Args & p, pybind11::dict d) { _init(p, d); })
                ;
             _apply<Args>(cls);
         }
@@ -165,7 +144,7 @@ namespace signalfilter {
         {
             pybind11::class_<Args> cls(mod, "NonLinearFilter");
             cls.def("__getstate__",  _getdict<Args>)
-               .def("__setstate__",  _setdict<Args>)
+               .def("__setstate__",  [](Args & p, pybind11::dict d) { _init(p, d); })
                ;
             _apply<Args>(cls);
         }
@@ -179,6 +158,13 @@ namespace signalfilter {
                 .def("__init__", &_init<Args>)
                 .def_readwrite("minval", &Args::minval)
                 .def_readwrite("maxval", &Args::maxval)
+                .def("__getstate__",  [](Args const & p)
+                    {
+                        using namespace pybind11::literals;
+                        return pybind11::dict("minval"_a = p.minval,
+                                              "maxval"_a = p.maxval);
+                    })
+                .def("__setstate__",  [](Args & p, pybind11::dict d) { _init(p, d); })
                 .def("__call__", &_run<Args>)
                 ;
         }
