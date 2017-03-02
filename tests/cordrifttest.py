@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Tests cordrift"
+from   itertools            import product
 import random
 import numpy as np
-from   numpy.testing import assert_allclose, assert_equal
-from cordrift.collapse import (CollapseToMean,        CollapseByDerivate,
-                               CollapseByMerging,
-                               StitchByInterpolation, Profile, _getintervals,
-                               StitchByDerivate, Range)
+from   numpy.testing        import assert_allclose, assert_equal
+from   pytest               import approx # pylint: disable = no-name-in-module
+
+from cordrift.collapse      import (CollapseToMean,        CollapseByDerivate,
+                                    CollapseByMerging,
+                                    StitchByInterpolation, Profile, _getintervals,
+                                    StitchByDerivate, Range)
+from cordrift.processor     import DriftTask, DriftProcessor
+from simulator              import TrackSimulator
+from simulator.processor    import TrackSimulatorTask
+from control.taskcontrol    import create
 
 def test_collapse_to_mean():
     u"Tests interval collapses"
@@ -184,5 +191,86 @@ def test_stitchbyderivate():
         for right in (False, True):
             _test(left, right)
 
+def _run(coll, stitch, brown):
+    bead   = TrackSimulator(zmax      = [0., 0., 1., 1., -.2, -.2, -.3, -.3],
+                            brownian  = brown,
+                            sizes     = 20,
+                            ncycles   = 30,
+                            drift     = (.05, 29.))
+    cycles = bead.phases[0][[5,6]]
+    frame  = bead.track(nbeads = 1, seed = 0).cycles
+    drift  = bead.drift()[cycles[0]:cycles[1]]
+
+    task   = DriftProcessor.newtask(filter   = None, precision = 8e-3,
+                                    collapse = coll(),
+                                    stitch   = stitch())
+    task.events.split.confidence = None
+    task.events.merge.confidence = None
+    prof = DriftProcessor.profile(frame, task)
+    med  = np.median(prof.value[-task.zero:])
+
+    assert prof.xmin == 0,                      (coll, stitch)
+    assert prof.xmax == 100,                    (coll, stitch)
+    assert med       == approx(0., abs = 1e-7), (coll, stitch)
+    if coll is CollapseByDerivate:
+        return
+
+    if brown == 0.:
+        assert_allclose(prof.value[1:-1] - prof.value[-2],
+                        drift[1:-1]      - drift[-2],
+                        atol = 1e-5)
+    else:
+        diff  = prof.value-drift
+        assert np.abs(diff).std() <= 1.5*brown
+
+def _create(coll, stitch, brown):
+    def _fcn():
+        _run(coll, stitch, brown)
+    _fcn.__name__ = 'test_%s_%s_%s' % (str(coll), str(stitch),
+                                       str(brown).replace('.', 'dot'))
+    return {_fcn.__name__: _fcn}
+
+for args in product((CollapseToMean, CollapseByDerivate, CollapseByMerging),
+                    (StitchByDerivate, StitchByInterpolation),
+                    (0.,.003)):
+    locals().update(_create(*args))
+    del args
+del _create
+
+def test_beadprocess():
+    u"tests that tracks are well simulated"
+    pair = create((TrackSimulatorTask(brownian  = 0., randtargs = None),
+                   DriftTask()))
+    cycs = next(i[...,...] for i in pair.run()).withphases(5,5)
+    for _, val in cycs:
+        assert_allclose(val, val.mean(), rtol = 1e-5, atol = 1e-8)
+
+    pair = create((TrackSimulatorTask(brownian  = 0.), DriftTask()))
+    cycs = next(i[...,...] for i in pair.run()).withphases(5,5)
+    for _, val in cycs:
+        val -= np.round(val, 1)
+        assert_allclose(val-val[0], 0., atol = 1e-4)
+
+def test_cycleprocess():
+    u"tests that tracks are well simulated"
+    pair = create((TrackSimulatorTask(brownian  = 0.,
+                                      randtargs = None,
+                                      nbeads    = 30,
+                                      ncycles   = 1),
+                   DriftTask(onbeads = False)))
+    cycs = next(i for i in pair.run())
+    for _, val in cycs:
+        val  = val[33:133]
+        assert_allclose(val, val.mean(), atol = 1e-5)
+
+    pair = create((TrackSimulatorTask(brownian  = 0.,
+                                      nbeads    = 30,
+                                      ncycles   = 1),
+                   DriftTask(onbeads = False)))
+    cycs = next(i for i in pair.run())
+    for _, val in cycs:
+        val  = val[33:133]
+        val -= np.round(val, 1)
+        assert_allclose(val-val[0], 0., atol = 1e-4)
 if __name__ == '__main__':
     test_stitchbyinterpolation()
