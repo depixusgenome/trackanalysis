@@ -7,7 +7,7 @@ from functools        import wraps
 import numpy          as     np
 
 from data.trackitems  import Items, Cycles, Level, CYCLEKEY
-from utils            import escapenans, EVENTS_TYPE, EVENTS_DTYPE
+from utils            import EVENTS_TYPE, EVENTS_DTYPE
 from .                import EventDetectionConfig
 
 class Events(Cycles, EventDetectionConfig, Items):
@@ -29,16 +29,17 @@ class Events(Cycles, EventDetectionConfig, Items):
 
     def __filterfcn(self):
         if self.filter is None:
-            return lambda x, _: x
+            return lambda x, *_: x
 
         fcn = deepcopy(self.filter)
-
         @wraps(fcn)
-        def _fcn(cycle, precision):
-            cycle = np.copy(cycle)
-            with escapenans(cycle) as arr:
-                fcn(arr, precision = precision)
-            return cycle
+        def _fcn(cycle, good, precision):
+            fdt = np.copy(cycle)
+            if good is None:
+                fcn(fdt, precision = precision)
+            else:
+                fdt[good] = fcn(fdt[good], precision = precision)
+            return fdt
         return _fcn
 
     def _iter(self, sel = None) -> Iterator[Tuple[CYCLEKEY, Sequence[EVENTS_TYPE]]]:
@@ -54,18 +55,13 @@ class Events(Cycles, EventDetectionConfig, Items):
                 val  = evts.rawprecision(track, key[0]) if prec is None else prec
                 good = np.isfinite(cycle)
                 cnt  = good.sum()
-                fdt  = np.copy(cycle)
-                if cnt == len(cycle):
+                if cnt == 0:
                     gen  = np.empty((0,), dtype = EVENTS_DTYPE)
                 else:
-                    if cnt == 0:
-                        fdt       = fcn(fdt, val)
-                    else:
-                        fdt[good] = fcn(fdt[good], val)
-
-                    gen  = np.array([(i, cycle[i:j])
-                                     for i, j in evts(fdt, precision = val)],
-                                    dtype = EVENTS_DTYPE)
+                    fdt = fcn(cycle, None if cnt == len(cycle) else good, val)
+                    gen = np.array([(i, cycle[i:j])
+                                    for i, j in evts(fdt, precision = val)],
+                                   dtype = EVENTS_DTYPE)
             yield (key, gen)
 
     if TYPE_CHECKING:

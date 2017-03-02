@@ -8,7 +8,7 @@ from    numpy.testing       import assert_allclose
 from    pytest              import approx # pylint: disable = no-name-in-module
 
 from simulator              import TrackSimulator
-from cordrift.processor     import BeadDriftProcessor
+from cordrift.processor     import DriftProcessor
 from cordrift.collapse      import (CollapseByMerging, CollapseToMean,
                                     CollapseByDerivate, StitchByDerivate,
                                     StitchByInterpolation)
@@ -22,12 +22,12 @@ def _run(coll, stitch, brown):
     frame  = bead.track(nbeads = 1, seed = 0).cycles
     drift  = bead.drift()[cycles[0]:cycles[1]]
 
-    task = BeadDriftProcessor.tasktype(filter   = None, precision = 8e-3,
-                                       collapse = coll(),
-                                       stitch   = stitch())
+    task   = DriftProcessor.newtask(filter   = None, precision = 8e-3,
+                                    collapse = coll(),
+                                    stitch   = stitch())
     task.events.split.confidence = None
     task.events.merge.confidence = None
-    prof = BeadDriftProcessor.profile(frame, task)
+    prof = DriftProcessor.profile(frame, task)
     med  = np.median(prof.value[-task.zero:])
 
     assert prof.xmin == 0,                      (coll, stitch)
@@ -59,4 +59,4 @@ for args in product((CollapseToMean, CollapseByDerivate, CollapseByMerging),
 del _create
 
 if __name__ == '__main__':
-    _run(CollapseToMean, StitchByDerivate, 0.0)
+    _run(CollapseByMerging, StitchByInterpolation, 0.003)

@@ -1,29 +1,46 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Processor for removing correlated drifts"
+u"Task & Processor for removing correlated drifts"
 
 from copy              import copy
 from functools         import partial
 from typing            import (Dict, Union, Sequence,  # pylint: disable=unused-import
-                               Tuple, Any, cast)
+                               Tuple, Optional, Any, cast)
 
 import numpy as np
 
+from utils                  import initdefaults
+from model                  import Task, Level
 from control.processor      import Processor
 from data                   import Track, Cycles
+from eventdetection         import EventDetectionConfig
 from eventdetection.data    import Events
-from .task                  import BeadDriftTask
-from .collapse              import Range, Profile, CollapseToMean
+from .collapse              import (Range, Profile, # pylint: disable=unused-import
+                                    CollapseAlg, CollapseByMerging, CollapseToMean,
+                                    StitchAlg, StitchByDerivate)
+
+class DriftTask(Task, EventDetectionConfig):
+    u"Removes correlations between cycles"
+    level     = Level.bead
+    phases    = (5, 5)                  # type: Optional[Tuple[int,int]]
+    collapse  = CollapseByMerging()     # type: Optional[CollapseAlg]
+    stitch    = StitchByDerivate()      # type: Optional[StitchAlg]
+    zero      = 10
+    precision = 0.
+    onbeads   = True
+    @initdefaults('phases', 'collapse', 'stitch', 'zero', 'precision', 'onbeads')
+    def __init__(self, **kwa):
+        Task.__init__(self)
+        EventDetectionConfig.__init__(self, **kwa)
 
 class _BeadDriftAction:
     u"Action to be passed to a Cycles"
     _DATA    = Sequence[np.ndarray]
-    tasktype = BeadDriftTask
-    def __init__(self, args: Union[dict,BeadDriftTask]) -> None:
+    def __init__(self, args: Union[dict,DriftTask]) -> None:
         self.cache = {}     # type: Dict[Union[int,Sequence[int]], Any]
-        self.task  = cast(BeadDriftTask,
-                          args if isinstance(args, self.tasktype)
-                          else self.tasktype(**args))
+        self.task  = cast(DriftTask,
+                          args if isinstance(args, DriftTask)
+                          else DriftTask(**args))
 
         assert not (self.task.events is None
                     and isinstance(self.task.collapse, CollapseToMean))
@@ -85,10 +102,9 @@ class _BeadDriftAction:
             cyc = frame[...,icyc]
             self.run(frame.parents+(icyc,), cyc.withphases(*self.task.phases))
 
-class BeadDriftProcessor(Processor):
+class DriftProcessor(Processor):
     u"Deals with bead drift"
     _ACTION  = _BeadDriftAction
-    tasktype = _ACTION.tasktype
     def run(self, args):
         action = self._ACTION(self.task.config())
         if self.task.onbeads:
@@ -101,6 +117,6 @@ class BeadDriftProcessor(Processor):
         args.apply(fcn, levels = self.levels)
 
     @classmethod
-    def profile(cls, frame:Cycles, kwa:Union[dict,BeadDriftTask]):
+    def profile(cls, frame:Cycles, kwa:Union[dict,DriftTask]):
         u"action for removing bead drift"
         return cls._ACTION(kwa).profile(frame, True)
