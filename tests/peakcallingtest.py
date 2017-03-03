@@ -124,9 +124,8 @@ def test_control():
                                               ncycles  = 5),
                     BeadsByHairpinTask(distances = hpins)))
 
-    beads = tuple(tuple(i) for i in pair.run())[0]
-    assert len(beads) == 1
-    assert beads[0].key == 'hp100'
+    beads = tuple(i for i in pair.run())[0]
+    assert tuple(beads.keys()) == ('hp100',)
 
 if __name__ == '__main__':
     test_control()

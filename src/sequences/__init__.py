@@ -15,6 +15,8 @@ def read(stream:TextIO) -> 'Iterator[Tuple[str,str]]':
     u"reads a path and yields pairs (name, sequence)"
     yield from seqio.FastaIO.SimpleFastaParser(stream)
 
+PEAKS_DTYPE = [('position', 'i4'), ('orientation', np.bool8)]
+PEAKS_TYPE  = Sequence[Tuple[int, bool]]
 def peaks(seq:str, oligs:'Union[Sequence[str], str]') -> np.ndarray:
     u"""
     Returns the peak positions and orientation associated to a sequence.
@@ -43,6 +45,10 @@ def peaks(seq:str, oligs:'Union[Sequence[str], str]') -> np.ndarray:
     """
     if isinstance(oligs, str):
         oligs = (oligs,)
+
+    if len(oligs) == 0:
+        return np.empty((0,), dtype = PEAKS_TYPE)
+
     def _get(elems, state):
         reg = re.compile('|'.join(elems))
         val = reg.search(seq, 0)
@@ -53,9 +59,7 @@ def peaks(seq:str, oligs:'Union[Sequence[str], str]') -> np.ndarray:
     vals = dict(_get((str(Seq(i).reverse_complement()) for i in oligs), False))
     vals.update(_get((i for i in oligs), True))
 
-    return np.fromiter(sorted(vals.items()),
-                       dtype = [('position', np.int32), ('orientation', np.bool8)],
-                       count = len(vals))
+    return np.array(sorted(vals.items()), dtype = PEAKS_DTYPE)
 
 def overlap(ol1:str, ol2:str, minoverlap = None):
     u"""

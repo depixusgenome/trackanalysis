@@ -95,9 +95,8 @@ class _BeadDriftAction:
         self.run((track.path, info[0]), cyc.withphases(*self.task.phases))
         return info
 
-    def onCycles(self, frame, first):
+    def onCycles(self, frame, _):
         u"Applies the cordrift subtraction to parallel cycles"
-        assert first
         for icyc in range(frame.track.ncycles):
             cyc = frame[...,icyc]
             self.run(frame.parents+(icyc,), cyc.withphases(*self.task.phases))

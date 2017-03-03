@@ -6,9 +6,10 @@ from   typing       import (Dict, Sequence, NamedTuple, # pylint: disable=unused
 from   functools    import partial
 import numpy        as np
 
-from utils                  import StreamUnion, initdefaults, updatecopy
-from data.trackitems        import BEADKEY
+from utils                  import StreamUnion, initdefaults, updatecopy, asobjarray
+from data.trackitems        import BEADKEY, TrackItems
 from peakfinding.selector   import Output as PeakFindingOutput
+from peakfinding.processor  import PeaksDict
 from model                  import Task, Level
 from control.processor      import Processor
 from .tohairpin             import (HairpinDistance, Distance,
@@ -35,9 +36,9 @@ class BeadsByHairpinTask(Task):
     def read(cls, path : StreamUnion, oligos : Sequence[str]) -> 'BeadsByHairpinTask':
         u"creates a BeadsByHairpin from a fasta file and a list of oligos"
         items = dict(HairpinDistance.read(path, oligos))
-        return cls(hairpins = items,
-                   peakids  = {key: PeakIdentifier(**value.config())
-                               for key, value in items.items()})
+        return cls(distances = items,
+                   peakids   = {key: PeakIdentifier(peaks = value.peaks)
+                                for key, value in items.items()})
 
 ByHairpinBead  = NamedTuple('ByHairpinBead',
                             [('key',         BEADKEY),
@@ -51,8 +52,9 @@ ByHairpinGroup = NamedTuple('ByHairpinGroup',
                              ('beads',     Sequence[ByHairpinBead])])
 
 
-Input  = Tuple[BEADKEY, Iterable[PeakFindingOutput]]
+Input  = Union[PeaksDict, Iterable[Tuple[BEADKEY,np.ndarray]]]
 _PEAKS = Dict[BEADKEY, Tuple[Sequence[float], Sequence[PeakFindingOutput]]]
+
 class BeadsByHairpinProcessor(Processor):
     u"Groups beads per hairpin"
     @classmethod
@@ -60,7 +62,7 @@ class BeadsByHairpinProcessor(Processor):
               distances     : Distances,
               constraints   : Constraints,
               peakids       : PeakIds,
-              frame         : Iterable[Tuple[BEADKEY, Iterable[Input]]]
+              frame         : Input,
              ) -> Iterator[ByHairpinGroup]:
         u"Regroups the beads from a frame by hairpin"
         peaks = cls.__topeaks(frame)
@@ -73,11 +75,19 @@ class BeadsByHairpinProcessor(Processor):
 
     def run(self, args):
         cnf   = self.config()
-        elems = 'distances', 'constraints', 'peakids'
-        args.apply(partial(self.apply, *(cnf[i] for i in elems)))
+        app   = self.apply
+        def _run(frame):
+            def _lazy():
+                return {i.key: i for i in app(cnf['distances'],
+                                              cnf['constraints'],
+                                              cnf['peakids'],
+                                              frame)}
+
+            return TrackItems(track = frame.track, data = _lazy)
+        args.apply(_run)
 
     @classmethod
-    def __topeaks(cls, frame:Iterable[Input]) -> _PEAKS:
+    def __topeaks(cls, frame:Input) -> _PEAKS:
         u"Regroups the beads from a frame by hairpin"
         def _get(evts):
             if isinstance(evts, Iterator):
@@ -89,6 +99,7 @@ class BeadsByHairpinProcessor(Processor):
             if getattr(evts, 'dtype', 'O') == 'f4':
                 return evts, np.empty((0,), dtype = 'O')
             else:
+                evts = asobjarray((i, asobjarray(j)) for i, j in evts)
                 return (np.array([i for i, _ in evts], dtype = 'f4'), evts)
 
         return {key: _get(evts) for key, evts in frame}

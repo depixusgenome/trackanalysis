@@ -11,7 +11,7 @@ import  numpy as np
 
 from    utils           import initdefaults, kwargsdefaults, EVENTS_DTYPE
 from    data            import Track
-from    data.trackitems import Cycles, Level
+from    data.trackitems import Cycles, Level, TrackItems
 
 class LadderEvents:
     u""" Creates events on a given range """
@@ -182,20 +182,27 @@ class TrackSimulator:
         u"Creates events in a Events object"
         self.seed(seed)
 
-        evts  = dict()      # type: Dict[Tuple[int,int], np.ndarray]
-        def _create(cycles, bead):
-            evts.update(((bead, cid), evt) for cid, evt in enumerate(self.__events(cycles)))
-            return cycles.ravel()
+        track = Track(data = None, phases = self.phases)
+        def _createall():
+            evts = dict()      # type: Dict[Tuple[int,int], np.ndarray]
+            def _createone(cycs, bead):
+                evts.update(((bead, cid), evt) for cid, evt in enumerate(self.__events(cycs)))
+                return (bead, cycs.ravel())
 
-        data  = dict((bead, self.__apply(_create, bead)) for bead in range(nbeads))
-        track = Track(data = data, phases = self.phases)
-        return Cycles(track = track, data = evts, direct = True, level = Level.event)
+            track.data = dict(self.__apply(_createone, i) for i in range(nbeads))
+            return evts
+
+        return Cycles(track  = track,
+                      data   = _createall,
+                      direct = True,
+                      level  = Level.event)
 
     @kwargsdefaults
     def bypeakevents(self, nbeads, seed = None):
         u"Creates events grouped by peaks"
         self.seed(seed)
 
+        track = Track(data = {i: None for i in range(nbeads)}, phases = self.phases)
         def _create(cycles):
             events = tuple(self.__events(cycles))
             labels = [np.array([i[0] for i in evt['data']]) for evt in events]
@@ -209,15 +216,20 @@ class TrackSimulator:
                     if len(val):
                         cur[i] = (val[0]['start'], val[0]['data'])
                 curs.append(cur)
-            return curs
 
-        def _generator():
-            for cur in self.__apply(_create):
+            return cycles.ravel(), curs
+
+        def _generator(curs):
+            for cur in curs:
                 peak = np.mean([i[1].mean() for i in cur if i[1] is not None])
                 yield (peak, cur)
 
-        for bead in range(nbeads):
-            yield (bead, _generator())
+        def _action(bead):
+            track.data[bead[0]], curs =  self.__apply(_create)
+            return bead[0], _generator(curs)
+
+        return (TrackItems(track = track, data = dict(track.data), level = Level.peak)
+                .withaction(_action))
 
     def __events(self, cycles: np.ndarray) -> Iterator[np.ndarray]:
         dtpe  = EVENTS_DTYPE

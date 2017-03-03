@@ -176,4 +176,4 @@ def test_control():
         assert_allclose(tmp, (peak,)*20, atol = 0.1)
 
 if __name__ == '__main__':
-    test_peakfinder()
+    test_control()
