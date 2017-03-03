@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Testing anastore"
+import sys
 import numpy
 
 import anastore
 import anastore._patches
 from model.task import TrackReaderTask, CycleCreatorTask, TaggingTask
-import __main__
 
 def test_storetasks(monkeypatch):
     u"tests storing tasks"
@@ -23,7 +23,9 @@ def test_storetasks(monkeypatch):
         def __setstate__(self, args):
             beenthere.append(2)
             self.__dict__.update(self.__class__(**dict(args)).__dict__)
-    __main__._Toto = _Toto  # pylint: disable=protected-access
+
+    monkeypatch.setattr(sys.modules.get('anastoretest', sys.modules['__main__']),
+                        '_Toto', _Toto, False)
 
     tasks = [TrackReaderTask(path = 'mypath'),
              TaggingTask(level  = 'bead',
