@@ -118,7 +118,10 @@ class Runner:
         elif callable(fcn):
             self.checkClosure(fcn)
             gen      = self.gen
-            self.gen = iter(fcn(frame) for frame in gen)
+            if gen is None:
+                self.gen = fcn()
+            else:
+                self.gen = iter(fcn(frame) for frame in gen)
         else:
             raise NotImplementedError("What to do with " + str(fcn) + "?")
 
