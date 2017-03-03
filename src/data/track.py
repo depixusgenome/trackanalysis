@@ -24,18 +24,26 @@ class Track:
     def __init__(self, **kwa) -> None:
         self._data = kwa.get('data', None)
 
+    def __unlazyfy(self, arg: bool):
+        if arg and self._data is None and self.path  is not None:
+            opentrack(self)
+
     @property
     def ncycles(self) -> int:
         u"returns the number of cycles in the track file"
+        self.__unlazyfy(len(self.phases) == 0)
         return len(self.phases)
 
     @property
     def nphases(self) -> Optional[int]:
         u"returns the number of phases in the track"
+        self.__unlazyfy(len(self.phases) == 0)
         return self.phases.shape[1]
 
     def phaseduration(self, cid:IDTYPE, pid:IDTYPE) -> Union[int, np.ndarray]:
         u"returns the duration of the cycle and phase"
+        self.__unlazyfy(len(self.phases) == 0)
+
         if pid in _m_ALL:
             ix1, ix2 = 0, -1
         elif isinstance(pid, int):
@@ -48,6 +56,7 @@ class Track:
 
     def phase(self, cid:IDTYPE = None, pid:IDTYPE = None) -> Union[np.ndarray, int]:
         u"returns the starttime of the cycle and phase"
+        self.__unlazyfy(len(self.phases) == 0)
         vect = self.phases
         orig = vect[0,0]
         if {cid, pid}.issubset(_m_ALL):
@@ -63,9 +72,7 @@ class Track:
     @property
     def data(self):
         u"returns the dataframe with all bead info"
-        if self._data is None and self.path is not None:
-            opentrack(self)
-
+        self.__unlazyfy(True)
         return self._data
 
     @data.setter
