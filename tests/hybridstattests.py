@@ -2,19 +2,23 @@
 # -*- coding: utf-8 -*-
 u"testing hybridstat"
 # pylint: disable=import-error,no-name-in-module
-from pathlib                import Path
-from tempfile               import mktemp
-from peakcalling.tohairpin  import np, Hairpin, PEAKS_DTYPE
-from peakcalling.processor  import ByHairpinGroup, ByHairpinBead, Distance
-from data                   import Track
-from utils                  import EVENTS_DTYPE
-from hybridstat.reporting   import run, HybridstatExcelProcessor, HybridstatExcelTask
-from hybridstat.processor   import HybridstatTask
-from control.taskcontrol    import create
-from testingcore            import path
+from pathlib                        import Path
+from tempfile                       import mktemp, gettempdir
+from numpy.testing                  import assert_allclose
+from peakcalling.tohairpin          import np, Hairpin, PEAKS_DTYPE
+from peakcalling.processor          import ByHairpinGroup, ByHairpinBead, Distance
+from data                           import Track
+from utils                          import EVENTS_DTYPE
+from hybridstat.reporting           import run, HybridstatExcelProcessor, HybridstatExcelTask
+from hybridstat.reporting.identification import writeparams, readparams
+from hybridstat.processor           import HybridstatTask
+from control.taskcontrol            import create
+from testingcore                    import path as utfilepath
 
 def test_excel():
     u"tests reporting"
+    for path in Path(gettempdir()).glob("*_hybridstattest*.xlsx"):
+        path.unlink()
     truth  = [np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')/1e-3,
               np.array([0., .1, .5, 1.2, 1.5], dtype = 'f4')/1e-3]
 
@@ -78,8 +82,28 @@ def test_excel():
     fcn(fname)
     assert Path(fname).exists()
 
+def test_ids():
+    u"tests identifications"
+    for path in Path(gettempdir()).glob("*_hybridstattest*.xlsx"):
+        path.unlink()
+
+    out = mktemp()+"_hybridstattest10.xlsx"
+    assert not Path(out).exists()
+    writeparams(out, [('hp1', (1, 3, 5)), ('hp2', (10,)), ('hp3', tuple())])
+    assert Path(out).exists()
+    res = readparams(out)
+    assert set(res) == {(1, 'hp1'), (3, 'hp1'), (5, 'hp1'), (10, 'hp2')}
+
+    res = readparams(utfilepath('hybridstat_report.xlsx'))
+    assert len(res) == 2
+    val = next(i for i in res if i[0] == 0)
+    assert val[:2] == (0, 'GF4')
+    assert_allclose(val[2:], [1173.87, 1.87], atol = 2e-2)
+
 def test_excelprocessor():
     u"tests reporting processor"
+    for path in Path(gettempdir()).glob("*_hybridstattest*.xlsx"):
+        path.unlink()
     truth  = [np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')/1e-3,
               np.array([0., .1, .5, 1.2, 1.5], dtype = 'f4')/1e-3]
 
@@ -149,13 +173,15 @@ def test_excelprocessor():
 
 def test_processor():
     u"tests processor"
+    for path in Path(gettempdir()).glob("*_hybridstattest*.xlsx"):
+        path.unlink()
     out   = mktemp()+"_hybridstattest3.xlsx"
 
     task  = HybridstatTask()
-    task.addpaths(track    = (Path(path("big_legacy")).parent/"*.trk",
-                              path("CTGT_selection")),
+    task.addpaths(track    = (Path(utfilepath("big_legacy")).parent/"*.trk",
+                              utfilepath("CTGT_selection")),
                   reporting= out,
-                  sequence = path("hairpins.fasta"))
+                  sequence = utfilepath("hairpins.fasta"))
 
     pair = create((task,))
     assert not Path(out).exists()
@@ -166,4 +192,4 @@ def test_processor():
     assert Path(out).exists()
 
 if __name__ == '__main__':
-    test_processor()
+    test_ids()

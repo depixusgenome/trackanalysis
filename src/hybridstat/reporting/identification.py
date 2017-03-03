@@ -63,12 +63,12 @@ def _read_summary(rows) -> List[Tuple[int, str, float, float]]:
                 ids[names.index(str(cell.value).lower())] = i
             except ValueError:
                 pass
-        if ids.count(None) != 3:
+        if ids.count(None) != 4:
             break
 
     info = list() # type: List[Tuple[int,str,float,float]]
     if ids.count(None) == 0:
-        cnv = (_id, str, _tofloat, _tofloat) # type: Sequence[Callable]
+        cnv = (_id, lambda r, i: str(r[i].value), _tofloat, _tofloat) # type: Sequence[Callable]
         for row in rows:
             vals = tuple(fcn(row, idx) for fcn, idx in zip(cnv, ids))
             if None not in vals:
@@ -107,6 +107,6 @@ def readparams(fname:str) -> Union[List[Tuple[int,str,float,float]],
         elif sheetname.lower() == "identification":
             return _read_identifications(iter(wbook[sheetname].rows))
 
-def write(fname:str, items: Sequence[Tuple[str,Sequence[int]]]):
+def writeparams(fname:str, items: Sequence[Tuple[str,Sequence[int]]]):
     u"write bead ids and their reference to a report"
     writecolumns(fname, u"Identification", items)

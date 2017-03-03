@@ -17,7 +17,7 @@ class SummarySheet(Reporter):
     @staticmethod
     def tablerow():
         u"start row of the table"
-        return 6
+        return 10
 
     @staticmethod
     def chartheight(npeaks:int) -> int:
@@ -157,7 +157,7 @@ class SummarySheet(Reporter):
         if len(self.config.oligos) > 0:
             items.append(("Oligos:", ','.join(self.config.oligos)))
         if isinstance(self.config.track.path, tuple):
-            items.append(("Track",) + tuple(str(i) for i in self.config.track.path))
+            items.append(("Track", str(self.config.track.path[-1])))
         else:
-            items.append(("Track", self.config.track.path))
+            items.append(("Track", str(self.config.track.path)))
         self.header(items)

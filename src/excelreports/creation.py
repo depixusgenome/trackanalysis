@@ -297,8 +297,8 @@ class XlsReporter(_BaseReporter):
     def iterate(self):
         u"Iterates through sheet's base objects and their hierarchy"
 
-    @abstractmethod
-    def linemark(self, _) -> bool:
+    @staticmethod
+    def linemark(_) -> bool:
         u"returns a function returning an optional line format"
         return False
 
@@ -366,5 +366,5 @@ def writecolumns(filename, sheetname, items):
                       columns    = columns,
                       sheet_name = sheetname))
 
-    with closing(fileobj(filename)) as book:
+    with fileobj(filename) as book:
         sheet(book).table() # pylint: disable=abstract-class-instantiated
