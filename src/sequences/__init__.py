@@ -17,7 +17,7 @@ def read(stream:TextIO) -> 'Iterator[Tuple[str,str]]':
 
 PEAKS_DTYPE = [('position', 'i4'), ('orientation', np.bool8)]
 PEAKS_TYPE  = Sequence[Tuple[int, bool]]
-def peaks(seq:str, oligs:'Union[Sequence[str], str]') -> np.ndarray:
+def peaks(seq:str, oligs:'Union[Sequence[str], str]', flags = re.IGNORECASE) -> np.ndarray:
     u"""
     Returns the peak positions and orientation associated to a sequence.
 
@@ -50,7 +50,7 @@ def peaks(seq:str, oligs:'Union[Sequence[str], str]') -> np.ndarray:
         return np.empty((0,), dtype = PEAKS_TYPE)
 
     def _get(elems, state):
-        reg = re.compile('|'.join(elems))
+        reg = re.compile('|'.join(elems), flags)
         val = reg.search(seq, 0)
         while val is not None:
             yield (val.end(), state)

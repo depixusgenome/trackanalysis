@@ -7,6 +7,7 @@ from copy                       import deepcopy
 from pathlib                    import Path
 import re
 
+from utils                      import initdefaults
 from data.trackio               import (checkpath,       # pylint: disable=unused-import
                                         PATHTYPES, PATHTYPE)
 from model.task                 import RootTask, Task, Level, TrackReaderTask
@@ -23,14 +24,16 @@ from sequences                  import read as readsequences
 from .reporting.processor       import HybridstatExcelTask
 from .reporting.identification  import readparams
 
-class HybristatTemplate:
+class HybridstatTemplate:
     u"Template of tasks to run"
     alignment = None # type: Optional[ExtremumAlignmentTask]
     drift     = [DriftTask(onbeads = True)]
-    events    = EventDetectionTask()    # type: Optional[EventDetectionTask]
+    detection = EventDetectionTask()    # type: Optional[EventDetectionTask]
     peaks     = PeakSelectorTask()      # type: Optional[PeakSelectorTask]
     identity  = BeadsByHairpinTask()    # type: Optional[BeadsByHairpinTask]
-    reporting = HybridstatExcelTask()   # type: Optional[HybridstatExcelTask]
+    @initdefaults
+    def __init__(self, **kwa):
+        pass
 
     def activated(self, aobj:Union[str,Task]) -> bool:
         u"Wether the task will be called"
@@ -44,13 +47,12 @@ class HybristatTemplate:
         if self.alignment:
             yield self.alignment
         yield from self.drift
-        for i in (self.events, self.peaks, self.identity, self.reporting):
+        for i in (self.detection, self.peaks, self.identity):
             if i is None:
-                break
+                return
             yield i
 
-
-ONE_OLIGO      = r'(?P<{}>(?:\[{0,1}[atgc]\]{0,1}){3,4})'
+ONE_OLIGO      = r'(?P<{}>(?:\[{{0,1}}[atgc]\]{{0,1}}){{3,4}})'
 OLIGO_PATTERNS = {1: (r'.*[_-]{}[-_].*'
                       .format(ONE_OLIGO).format('O')),
                   2: (r'.*[_-]{}\+{}[-_].*'
@@ -59,25 +61,35 @@ OLIGO_PATTERNS = {1: (r'.*[_-]{}[-_].*'
                            .format(ONE_OLIGO.format('O1'), ONE_OLIGO.format('O2')))
                  }
 
-class HybristatIO:
+class HybridstatIO:
     u"Paths (as regex) on which to run"
     track     = ''                   # type: PATHTYPES
     sequence  = None                 # type: Optional[PATHTYPE]
     idpath    = None                 # type: Optional[PATHTYPE]
     useparams = False
     oligos    = OLIGO_PATTERNS[1]    # type: Union[Sequence[str], str]
-    excel     = None                 # type: Optional[PATHTYPE]
+    reporting = None                 # type: Optional[PATHTYPE]
+    @initdefaults
+    def __init__(self, **kwa):
+        pass
 
-class HybristatTask(RootTask):
+class HybridstatTask(RootTask):
     u"""
     Constructs a list of tasks depending on a template and paths.
     """
     levelin      = Level.project
     levelou      = Level.peak
-    paths        = []                   # type: Sequence[HybristatIO]
-    template     = HybristatTemplate()
+    paths        = []                   # type: Sequence[HybridstatIO]
+    template     = HybridstatTemplate()
+    @initdefaults
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
 
-class HybristatProcessor(Processor):
+    def addpaths(self, **kwa):
+        u"appends a HybridstatIO to the list"
+        self.paths.append(HybridstatIO(**kwa))
+
+class HybridstatProcessor(Processor):
     u"""
     Constructs a list of tasks depending on a template and paths.
     """
@@ -87,21 +99,25 @@ class HybristatProcessor(Processor):
         return _create(mdl)
 
     @classmethod
-    def models(cls, paths: HybristatIO, modl: HybristatTemplate) -> Sequence[Task]:
+    def models(cls, paths: HybridstatIO, modl: HybridstatTemplate) -> Sequence[Task]:
         u"creates a specific model for each path"
-        track = TrackReaderTask(path = checkpath(paths.track).path)
-        modl  = deepcopy(modl)
-        cls.__identity(track, paths, modl)
-        cls.__excel   (track, paths, modl)
-        return [track]+[i for i in cast(Iterable, modl)]
+        track   = TrackReaderTask(path = checkpath(paths.track).path, beadsonly = True)
+        modl    = deepcopy(modl)
+        oligos  = cls.__oligos(track, paths.oligos)
+        cls.__identity(oligos, paths, modl)
+        rep     = cls.__excel (oligos, track, paths, modl)
+        if rep is None:
+            return [track]+[i for i in cast(Iterable, modl)]
+        else:
+            return [track]+[i for i in cast(Iterable, modl)] + [rep]
 
     def run(self, args):
         cnf = self.config()
-        cls = type(self)
+        cls = type(self) # type: HybridstatProcessor
         def _run():
             for paths in cnf['paths']:
-                modl = cls.model(paths, cnf['template'])
-                yield cls.create(modl).run()
+                modl = cls.models(paths, cnf['template'])
+                yield from cls.create(modl).run()
 
         args.apply(_run, levels = self.levels)
 
@@ -128,7 +144,7 @@ class HybristatProcessor(Processor):
             trkpath = (track.path,) if isinstance(track.path, str) else track.path
             pattern = re.compile(oligos, re.IGNORECASE)
             for path in trkpath:
-                match = pattern.match(path)
+                match = pattern.match(str(path))
                 if match is not None:
                     return [i.lower().replace('[','').replace(']', '')
                             for i in match.groups()]
@@ -137,7 +153,7 @@ class HybristatProcessor(Processor):
         return oligos
 
     @classmethod
-    def __identity(cls, track:TrackReaderTask, paths:HybristatIO, modl:HybristatTemplate):
+    def __identity(cls, oligos:Sequence[str], paths:HybridstatIO, modl:HybridstatTemplate):
         if not modl.activated('identity'):
             return
 
@@ -146,22 +162,25 @@ class HybristatProcessor(Processor):
                 modl.identity = None
             return
 
-        oligos        = cls.__oligos(track, paths.oligos)
         modl.identity = modl.identity.read(paths.sequence, oligos)
         cls.__constraints(paths, modl.identity)
 
     @staticmethod
-    def __excel(track:TrackReaderTask, paths:HybristatIO, modl:HybristatTemplate):
-        if not modl.activated('reporting'):
-            return
-
-        rep             = modl.reporting
-        rep.minduration = modl.events.select.minduration
-        rep.hairpins    = modl.identity.distances
-        rep.knownbeads  = tuple(modl.identity.constraints.keys())
-        rep.sequences   = dict(readsequences(paths.sequence))
+    def __excel(oligos: Sequence[str],
+                track : TrackReaderTask,
+                paths : HybridstatIO,
+                modl  : HybridstatTemplate) -> Optional[HybridstatExcelTask]:
+        if paths.reporting in (None, ''):
+            return None
+        rep = HybridstatExcelTask(minduration = modl.detection.events.select.minduration,
+                                  hairpins    = modl.identity.distances,
+                                  knownbeads  = tuple(modl.identity.constraints.keys()),
+                                  sequences   = dict(readsequences(paths.sequence)),
+                                  oligos      = oligos,
+                                  path        = paths.reporting)
         if '*' in rep.path:
             if rep.path.count('*') > 1:
                 raise KeyError("could not parse excel output path")
             trk         = track.path[0] if isinstance(track.path, tuple) else track.path
             rep.path    = rep.path.replace('*', Path(trk).stem)
+        return rep

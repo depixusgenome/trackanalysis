@@ -2,15 +2,18 @@
 # -*- coding: utf-8 -*-
 u"testing hybridstat"
 # pylint: disable=import-error,no-name-in-module
-import os
+from pathlib                import Path
 from tempfile               import mktemp
 from peakcalling.tohairpin  import np, Hairpin, PEAKS_DTYPE
 from peakcalling.processor  import ByHairpinGroup, ByHairpinBead, Distance
 from data                   import Track
 from utils                  import EVENTS_DTYPE
 from hybridstat.reporting   import run, HybridstatExcelProcessor, HybridstatExcelTask
+from hybridstat.processor   import HybridstatTask
+from control.taskcontrol    import create
+from testingcore            import path
 
-def test_reporting():
+def test_excel():
     u"tests reporting"
     truth  = [np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')/1e-3,
               np.array([0., .1, .5, 1.2, 1.5], dtype = 'f4')/1e-3]
@@ -61,21 +64,21 @@ def test_reporting():
                         groups    = groups)
 
     fname = mktemp()+"_hybridstattest.xlsx"
-    assert not os.path.exists(fname)
+    assert not Path(fname).exists()
     fcn(fname)
-    assert os.path.exists(fname)
+    assert Path(fname).exists()
 
     fname = mktemp()+"_hybridstattest.csv"
-    assert not os.path.exists(fname)
+    assert not Path(fname).exists()
     fcn(fname)
-    assert os.path.exists(fname)
+    assert Path(fname).exists()
 
     fname = mktemp()+"_hybridstattest.pkz"
-    assert not os.path.exists(fname)
+    assert not Path(fname).exists()
     fcn(fname)
-    assert os.path.exists(fname)
+    assert Path(fname).exists()
 
-def test_processor():
+def test_excelprocessor():
     u"tests reporting processor"
     truth  = [np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')/1e-3,
               np.array([0., .1, .5, 1.2, 1.5], dtype = 'f4')/1e-3]
@@ -123,7 +126,7 @@ def test_processor():
                                   ByHairpinBead(102, -3, Distance(.1, 1000., 0.0),
                                                 np.empty((0,), dtype = PEAKS_DTYPE),
                                                 [])])]
-            return iter(i)
+            return zip(range(len(i)), i)
 
 
     task = HybridstatExcelTask(path      = mktemp()+"_hybridstattest2.xlsx",
@@ -139,10 +142,28 @@ def test_processor():
         @staticmethod
         def apply(fcn):
             u"doc"
-            fcn(_Frame())
-    assert not os.path.exists(task.path)
+            tuple(fcn(_Frame()))
+    assert not Path(task.path).exists()
     proc.run(_Runner())
-    assert os.path.exists(task.path)
+    assert Path(task.path).exists()
+
+def test_processor():
+    u"tests processor"
+    out   = mktemp()+"_hybridstattest3.xlsx"
+
+    task  = HybridstatTask()
+    task.addpaths(track    = (Path(path("big_legacy")).parent/"*.trk",
+                              path("CTGT_selection")),
+                  reporting= out,
+                  sequence = path("hairpins.fasta"))
+
+    pair = create((task,))
+    assert not Path(out).exists()
+    gen  = pair.run()
+    assert not Path(out).exists()
+    items = tuple(i for i in gen)
+    items = tuple(tuple(i) for i in items)
+    assert Path(out).exists()
 
 if __name__ == '__main__':
     test_processor()

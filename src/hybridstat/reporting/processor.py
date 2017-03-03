@@ -11,9 +11,9 @@ from anastore               import dumps
 from excelreports.creation  import fileobj
 
 from peakcalling.tohairpin  import Hairpin
-from data                   import BEADKEY         # pylint: disable=unused-import
+from data                   import BEADKEY, Track
 
-from ._base                 import ReporterInfo
+from ._base                 import ReporterInfo, Group
 from ._summary              import SummarySheet
 from ._peaks                import PeaksSheet
 
@@ -41,42 +41,40 @@ class HybridstatExcelProcessor(Processor):
         vals.update(config   = dumps(args.model, False),
                     hairpins = hpins)
 
-        runonce = False
         def _run(frame):
             vals.update(track  = frame.track,
-                        groups = tuple(frame))
+                        groups = [i for _, i in frame])
             run(**vals)
-            nonlocal runonce
-            if runonce:
-                raise NotImplementedError("Can only run one frame at a time")
+            yield frame
 
         args.apply(_run)
 
-def run(**kwa):
-    u"""
-    Creates a report.
-
-    Arguments are:
-
-    * *path:*       FILENAME
-    * *track:*      Track
-    * *config:*     str
-    * *groups:*     Sequence[Group]
-    * *hairpins:*   Dict[str, Hairpin]
-    * *sequences:*  Dict[str, str]
-    * *oligos:*     Sequence[str]
-    * *knownbeads:* Sequence[BEADKEY]
-    * *minduration* float
-    """
-    self = ReporterInfo(**kwa)
-    if str(kwa['path']).endswith('.pkz'):
-        with open(kwa['path'], 'wb') as book:
+def run(path:        str,       # pylint: disable=too-many-arguments
+        track:       Track,
+        config:      str,
+        groups:      Sequence[Group],
+        hairpins:    Dict[str, Hairpin],
+        sequences:   Dict[str, str],
+        oligos:      Sequence[str],
+        knownbeads:  Sequence[BEADKEY],
+        minduration: float,
+        **_):
+    u" Creates a report. "
+    self = ReporterInfo(track       = track,
+                        groups      = groups,
+                        hairpins    = hairpins,
+                        sequences   = sequences,
+                        oligos      = oligos,
+                        knownbeads  = knownbeads,
+                        minduration = minduration)
+    if str(path).endswith('.pkz'):
+        with open(path, 'wb') as book:
             pickle.dump(self, book)
     else:
-        with fileobj(kwa['path']) as book:
+        with fileobj(path) as book:
             summ = SummarySheet(book, self)
 
-            summ.info(kwa['config'])
+            summ.info(config)
             summ.table ()
 
             PeaksSheet(book, self).table()

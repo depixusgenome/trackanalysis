@@ -156,5 +156,8 @@ class SummarySheet(Reporter):
                  ]
         if len(self.config.oligos) > 0:
             items.append(("Oligos:", ','.join(self.config.oligos)))
-        items.append(("Track", self.config.track.path))
+        if isinstance(self.config.track.path, tuple):
+            items.append(("Track",) + tuple(str(i) for i in self.config.track.path))
+        else:
+            items.append(("Track", self.config.track.path))
         self.header(items)
