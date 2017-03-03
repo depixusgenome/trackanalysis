@@ -1,10 +1,10 @@
-p         = require "core/properties"
-Model     = require "model"
-$         = require "jquery"
+import * as $  from "jquery"
+import * as p  from "core/properties"
+import {Model} from "model"
 
-class DpxKeyEventView
+export class DpxKeyEventView
 
-class DpxKeyEvent extends Model
+export class DpxKeyEvent extends Model
     default_view: DpxKeyEventView
     type:"DpxKeyEvent"
     constructor: (attrs, opts) ->
@@ -28,7 +28,3 @@ class DpxKeyEvent extends Model
         value: [p.String, ""]
         count: [p.Int, 0]
     }
-
-module.exports =
-  Model: DpxKeyEvent
-  View:  DpxKeyEventView

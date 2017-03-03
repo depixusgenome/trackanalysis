@@ -1,9 +1,9 @@
-_   = require "underscore"
-$   = require "jquery"
-p   = require "core/properties"
-Row = require "models/layouts/row"
+import * as _         from "underscore"
+import * as $         from "jquery"
+import * as p         from "core/properties"
+import {RowView, Row} from "models/layouts/row"
 
-class DpxKeyedRowView extends Row.View
+export class DpxKeyedRowView extends RowView
     className: "dpx-bk-grid-row"
     initialize: (options) ->
         super()
@@ -11,8 +11,9 @@ class DpxKeyedRowView extends Row.View
         @$el.keydown((evt) => @model.dokeydown(evt))
         @$el.keyup((evt) => @model.dokeyup(evt))
 
-class DpxKeyedRow extends Row.Model
+export class DpxKeyedRow extends Row
     default_view: DpxKeyedRowView
+    type: "DpxKeyedRow"
 
     _fig:      ()     -> @children[0]
     _get_tool: (name) ->
@@ -106,7 +107,3 @@ class DpxKeyedRow extends Row.Model
         zoomrate: [p.Number, 0]
         panrate:  [p.Number, 0]
     }
-
-module.exports =
-    Model: DpxKeyedRow
-    View:  DpxKeyedRowView

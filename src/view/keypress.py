@@ -5,14 +5,12 @@ from typing                 import Callable, Optional # pylint: disable=unused-i
 from bokeh.core.properties  import String, Int, List
 from bokeh.model            import Model
 
-from utils.gui              import coffee
-
 class DpxKeyEvent(Model):
     u"controls keypress actions"
     keys               = List(String)
     value              = String("")
     count              = Int(0)
-    __implementation__ = coffee(__file__)
+    __implementation__ = "keypress.coffee"
 
     def __init__(self, **kwargs):
         super().__init__()

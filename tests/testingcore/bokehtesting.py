@@ -13,19 +13,21 @@ from bokeh.server.server   import Server    # pylint: disable=unused-import
 
 from view.keypress         import KeyPressManager
 
-class _OnLoadModel(Model):
-    done  = Int(0)
-    event = Dict(String, Any)
-    model = Instance(Model)
+class DpxTestLoaded(Model):
+    """
+    This starts tests once flexx/browser window has finished loading
+    """
+    __implementation__ = """
+        import *        as _    from "underscore"
+        import *        as $    from "jquery"
+        import *        as p    from "core/properties"
+        import {Model}          from "model"
 
-    __implementation__ = u"""
-        p         = require "core/properties"
-        Model     = require "model"
-        $         = require "jquery"
-        class DpxTestLoadedView
+        export class DpxTestLoadedView
 
-        class DpxTestLoaded extends Model
+        export class DpxTestLoaded extends Model
             default_view: DpxTestLoadedView
+            type: "DpxTestLoaded"
             constructor : (attributes, options) ->
                 super(attributes, options)
                 @listenTo(@, 'change:event', @_press)
@@ -51,11 +53,10 @@ class _OnLoadModel(Model):
                 event: [p.Any,   {}]
                 model: [p.Any,   {}]
             }
-
-        module.exports =
-          View: DpxTestLoadedView
-          Model: DpxTestLoaded
-                          """
+                         """
+    done  = Int(0)
+    event = Dict(String, Any)
+    model = Instance(Model)
     def press(self, key, model):
         u"Sets-up a new keyevent in JS"
         val = '-' if key == '-' else key.split('-')[-1]
@@ -76,7 +77,7 @@ class _ManagedServerLoop:
     ctrl = property(lambda self: getattr(self.view, '_ctrl'))
 
     @property
-    def loading(self) -> 'Optional[_OnLoadModel]':
+    def loading(self) -> 'Optional[DpxTestLoaded]':
         u"returns the model which allows tests to javascript"
         return next(iter(getattr(self.doc, 'roots', [])), None)
 
@@ -108,14 +109,14 @@ class _ManagedServerLoop:
         @classmethod
         def _open(_, doc, _func_ = server.MainView.open):
             self.doc = doc
-            doc.add_root(_OnLoadModel())
+            doc.add_root(DpxTestLoaded())
             self.view = _func_(doc)
             return self.view
         server.MainView.open = _open
 
         def _close(this, _func_ = server.MainView.close):
-            ret = _func_(this)
             self.server = None
+            ret = _func_(this)
             return ret
 
         server.MainView.close = _close
@@ -133,6 +134,7 @@ class _ManagedServerLoop:
         _start()
 
         self.server.start()
+        self.loop.start()
         return self
 
     @staticmethod

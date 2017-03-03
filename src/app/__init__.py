@@ -46,7 +46,9 @@ def _launch(view, **kwa):
     def run(self):
         u"Stop the stream reader"
         old(self)
-        server.stop()
+        if not getattr(server, '_stopped', False):
+            server.stop()
+        server.io_loop.stop()
     StreamReader.run = run
 
     rtime = _flexxlaunch('http://localhost:5006/', **kwa)

@@ -8,15 +8,13 @@ from bokeh.models           import Row
 from bokeh.core.properties  import Dict, String, Float
 
 from control                import Controller
-from utils.gui              import coffee
-
 
 class DpxKeyedRow(Row):
     u"define div with tabIndex"
     keys               = Dict(String, String, help = u'keys and their action')
     zoomrate           = Float()
     panrate            = Float()
-    __implementation__ = coffee(__file__, 'keyedrow')
+    __implementation__ = 'keyedrow.coffee'
     def __init__(self, plotter, fig, **kwa):
         vals = ('.'.join(i) for i in product(('pan', 'zoom'), ('x', 'y'), ('low', 'high')))
         cnf   = plotter.getConfig().keypress
