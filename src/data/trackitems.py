@@ -107,18 +107,23 @@ class Items(metaclass=ABCMeta):
 
 class TransformedItems:
     u"Dictionnary that will transform its data when a value is requested"
-    __slots__ = ('_data', '_always', '_first', '_fcn')
-    def __init__(self, fcn, data, once = True) -> None:
+    __slots__ = ('_data', '_parent', '_fcn')
+    def __init__(self, fcn, data, parent = None) -> None:
         super().__init__()
         self._data   = data
-        self._always = not once
-        self._first  = True
+        self._parent = parent
         self._fcn    = fcn
 
+    @property
+    def track(self):
+        u"Returns the track if any"
+        return getattr(self._data if self._parent is None else self._parent, 'track', None)
+
     def __getitem__(self, val):
-        if self._first or self._always:
-            self._fcn(self._data, self._first)
-            self._first = False
+        if self._fcn is not None:
+            self._fcn(self._data, val)
+            if self._parent is not None:
+                self._parent.data = self._data
         return self._data[val]
 
     def keys(self, _ = None) -> Iterator:
@@ -199,7 +204,13 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
 
     def withdata(self:Self, dat, fcn = None, once = True) -> Self:
         u"sets the data"
-        self.data = dat if fcn is None else TransformedItems(fcn, dat, once)
+        if fcn is None and callable(dat) and not hasattr(dat, '__getitem__'):
+            dat, fcn  = self.data, dat
+
+        if fcn is None:
+            self.data = dat
+        else:
+            self.data = TransformedItems(fcn, dat, self if once else None)
         return self
 
     def selecting(self:Self, cyc, clear = False) -> Self:
@@ -243,7 +254,7 @@ class TrackItems(_m_ConfigMixin, Items):
 
     def _iter(self, sel = None) -> Iterator[Tuple[Any,Any]]:
         if sel is None and isinstance(self.data, dict):
-            yield from self.data.items()
+            yield from self.data.items()   # pylint: disable=no-member
         else:
             yield from ((bead, self.data[bead]) for bead in self.keys(sel))
 
@@ -285,7 +296,7 @@ class TrackItems(_m_ConfigMixin, Items):
         if sel is None:
             sel = self.selected
         if self.discarded is None:
-            yield from (key for key in self._keys(sel))
+            yield from self._keys(sel)
         else:
             disc = frozenset(self._keys(self.discarded))
             yield from (key for key in self._keys(sel) if key not in disc)
@@ -326,7 +337,7 @@ class Beads(TrackItems, Items):
         if isinstance(self.data, Beads):
             beads = cast(Beads, self.data)
             if sel is None:
-                yield from beads.__iter__()
+                yield from beads.__iter__() # pylint: disable=no-member
             else:
                 yield from shallowcopy(beads).selecting(sel).__iter__()
             return
@@ -368,8 +379,8 @@ class Cycles(TrackItems, Items):
         super().__init__(**kw)
 
     def __keysfrombeads(self, sel):
-        allcycles = range(self.track.ncycles)
         beads     = tuple(Beads(track = self.track, data = self.data).keys())
+        allcycles = range(self.track.ncycles)
         if sel is None:
             yield from ((col, cid) for col in beads for cid in allcycles)
             return
@@ -454,7 +465,7 @@ class Cycles(TrackItems, Items):
         if isinstance(self.data, Cycles):
             cycles = cast(Cycles, self.data)
             if sel is None:
-                yield from cycles.__iter__()
+                yield from cycles.__iter__() # pylint: disable=no-member
             else:
                 yield from shallowcopy(cycles).selecting(sel).__iter__()
 
