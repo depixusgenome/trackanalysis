@@ -5,7 +5,7 @@ import click
 
 @click.command()
 @click.argument('view')
-@click.option("--app", default = 'withtoolbar',
+@click.option("--app", default = 'app.BeadsToolBar',
               help = u'Which app mixin to use')
 @click.option("--web", 'desktop', flag_value = False,
               help = u'Serve to webbrowser rather than desktop app')
@@ -29,7 +29,7 @@ def run(view, app, desktop, show):
         app += 'app.'+app
 
     if view.startswith('toolbar'):
-        app = 'app.Default'
+        app = 'app.Defaults'
 
     if '.' in app and 'A' <= app[app.rfind('.')+1] <= 'Z':
         mod  = app[:app.rfind('.')]

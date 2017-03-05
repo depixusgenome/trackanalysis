@@ -35,6 +35,13 @@ class BeadInput(BokehView):
         self.__inp.on_change("value", self._onchange_cb)
         self._ctrl.observe("globals.current", self._onUpdateCurrent)
 
+    def addkeypress(self, tpe = 'keypress'):
+        u"Adds keypress for changin beads"
+        self._keys.addKeyPress((tpe+'.beadup',
+                                lambda: self._onchange_cb('', '', self.__inp.value+1)))
+        self._keys.addKeyPress((tpe+'.beaddown',
+                                lambda: self._onchange_cb('', '', self.__inp.value-1)))
+
     def getroots(self):
         u"adds items to doc"
         assert False

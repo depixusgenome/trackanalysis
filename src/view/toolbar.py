@@ -13,7 +13,7 @@ class  ToolBar(BokehView):
         u"Sets up the controller"
         super().__init__(**kwa)
         self._open  = self.button(self._onOpen,  u'open')
-        self._save  = self.button(self._onSave,  u'save', disabled = True)]
+        self._save  = self.button(self._onSave,  u'save', disabled = True)
         self._tools = [self._open, self._save]
 
         if self._ctrl.ISAPP:
@@ -67,7 +67,8 @@ class  BeadToolBar(ToolBar):
     def __init__(self, **kwa):
         super().__init__(**kwa)
         self._beads = BeadInput(**kwa)
-        self._tools.insert(2, self._beads)
+        self._beads.addkeypress()
+        self._tools.insert(2, self._beads.input)
 
     def close(self):
         u"Sets up the controller"

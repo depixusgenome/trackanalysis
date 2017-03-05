@@ -267,7 +267,9 @@ class GlobalsController(Controller):
                                                          'redo' : "Control-y",
                                                          'open' : "Control-o",
                                                          'save' : "Control-s",
-                                                         'quit' : "Control-q"}
+                                                         'quit' : "Control-q",
+                                                         'beadup': 'PageUp',
+                                                         'beaddown': 'PageDown'}
         def _gesture(meta):
             return {'rate'    : .2,
                     'activate': meta[:-1],
