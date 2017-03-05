@@ -153,6 +153,12 @@ class TaskController(Controller):
         u"returns a task"
         return self.__items[parent].task(task, noemission = noemission)
 
+    def track(self, parent : RootTask):
+        u"returns the root cache, i;e. the track"
+        self.__items[parent].run(parent) # create cache if needed
+        track = self.__items[parent].data[0].cache
+        return track()
+
     @property
     def tasktree(self) -> 'Iterator[Iterator[Task]]':
         u"Returns a data object in memory."

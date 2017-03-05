@@ -106,8 +106,9 @@ class BokehView(View):
 
     def button(self, fcn:Callable, title:str, prefix = 'keypress', **kwa):
         u"creates and connects a button"
-        kwa.setdefault('label', title.capitalize())
-        kwa.setdefault('width', self._ctrl.getGlobal('css', 'button.width'))
+        kwa.setdefault('label',  title.capitalize())
+        kwa.setdefault('width',  self._ctrl.getGlobal('css', 'button.width'))
+        kwa.setdefault('height', self._ctrl.getGlobal('css', 'button.height'))
 
         btn = Button(**kwa)
         btn.on_click(fcn)

@@ -103,7 +103,13 @@ class _ManagedServerLoop:
         kwa['io_loop'].make_current()
 
         app, mod, fcn = self.kwa.pop('_args_')
-        launch        = getattr(getattr(__import__("app."+mod), mod), fcn)
+        if '.' in mod and 'A' <= mod[mod.rfind('.')+1] <= 'Z':
+            lmod  = mod[:mod.rfind('.')]
+            lattr = mod[mod.rfind('.')+1:]
+            launchmod = getattr(__import__(lmod, fromlist = (lattr,)), lattr)
+            launch    = getattr(launchmod, fcn)
+        else:
+            launch    = getattr(getattr(__import__(mod), mod), fcn)
         server        = launch(app, server = kwa)
 
         @classmethod

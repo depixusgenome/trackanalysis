@@ -10,11 +10,14 @@ from bokeh.application          import Application
 from bokeh.application.handlers import FunctionHandler
 from bokeh.command.util         import build_single_handler_application
 from bokeh.settings             import settings
+from bokeh.layouts              import layout
 
+from utils         import getlocals
 from utils.gui     import MetaMixin
 from control       import Controller
 from view          import View, BokehView
 from view.keypress import KeyPressManager
+import view.toolbar as toolbars
 
 def _serverkwargs(kwa):
     server_kwargs                         = dict(kwa)
@@ -91,31 +94,47 @@ def _create(main, controls, views): # pylint: disable=unused-argument
                      MainControl = MainControl,
                      __init__    = __init__))
 
-def setup(locs,
+def setup(locs            = None, # pylint: disable=too-many-arguments
           mainview        = None,
           creator         = lambda _: _,
           defaultcontrols = tuple(),
-          defaultviews    = tuple()
+          defaultviews    = tuple(),
+          decorate        = lambda x: x
          ):
     u"Sets up launch and serve functions for a given app context"
+    if locs is None:
+        locs = getlocals(1)
 
-
+    @decorate
     def application(main     = mainview,
                     controls = defaultcontrols,
                     views    = defaultviews,
                     creator  = creator):
         u"Creates a main view"
+        def _get(string):
+            if isinstance(string, str):
+                mod  = string[:string.rfind('.')]
+                attr = string[string.rfind('.')+1:]
+                return getattr(__import__(mod, fromlist = (attr,)), attr)
+            return string
+
         classes = set(cls for cls in locs.values() if isinstance(cls, type))
         classes.difference_update((Controller, View))
-        if controls is all:
+        if controls in (all, Ellipsis):
             controls = tuple(i for i in classes if issubclass(i, Controller))
+        else:
+            controls = tuple(_get(i) for i in controls)
 
-        if views is all:
+        if views in (all, Ellipsis):
             views = tuple(i for i in classes
                           if (issubclass(i, View)
                               and not issubclass(i, BokehView)))
+        else:
+            views = tuple(_get(i) for i in views)
+
         return _create(creator(main), controls, views)
 
+    @decorate
     def serve(main     = mainview,
               controls = defaultcontrols,
               views    = defaultviews,
@@ -124,6 +143,7 @@ def setup(locs,
         u"Creates a browser app"
         return _serve(application(main, controls, views, creator), **kwa)
 
+    @decorate
     def launch(main     = mainview,
                controls = defaultcontrols,
                views    = defaultviews,
@@ -137,4 +157,52 @@ def setup(locs,
     locs.setdefault('serve',   serve)
     locs.setdefault('launch',  launch)
 
-setup(locals())
+class WithToolbar:
+    u"Creates an app with a toolbar"
+    def __init__(self, tbar):
+        self.tbar = tbar
+
+    def __call__(self, main):
+        tbar = self.tbar
+        class ViewWithToolbar(BokehView):
+            u"A view with the toolbar on top"
+            def __init__(self, **kwa):
+                self._bar      = tbar(**kwa)
+                self._mainview = main(**kwa)
+                super().__init__(**kwa)
+
+            def close(self):
+                u"remove controller"
+                super().close()
+                self._bar.close()
+                self._mainview.close()
+
+            def getroots(self):
+                u"adds items to doc"
+                children = [self._bar.getroots(), self._mainview.getroots()]
+                return layout(children, sizing_mode = 'scale_width'),
+
+        return ViewWithToolbar
+
+VIEWS       = ('undo.UndoView', 'view.globalsview.GlobalsView',)
+CONTROLS    = ('control.taskcontrol.TaskController',
+               'control.globalscontrol.GlobalsController',
+               'undo.UndoController')
+
+setup()
+
+class Defaults:
+    u"Empty app"
+    setup(defaultcontrols = CONTROLS, defaultviews = VIEWS)
+
+class ToolBar:
+    u"App with a toolbar"
+    setup(creator         = WithToolbar(toolbars.ToolBar),
+          defaultcontrols = CONTROLS,
+          defaultviews    = VIEWS+("view.toolbar.ToolBar",))
+
+class BeadsToolBar:
+    u"App with a toolbar containing a bead spinner"
+    setup(creator         = WithToolbar(toolbars.BeadToolBar),
+          defaultcontrols = CONTROLS,
+          defaultviews    = VIEWS+("view.toolbar.BeadToolBar",))

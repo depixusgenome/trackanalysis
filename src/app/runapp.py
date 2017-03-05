@@ -21,23 +21,29 @@ def run(view, app, desktop, show):
     if '.' not in view:
         view = view.lower()+'.'+view
 
-    if view == 'toolbar.ToolBar':
-        app = 'default'
-
     viewmod  = __import__('view.'+view[:view.rfind('.')],
                           fromlist = view[view.rfind('.')+1:])
     viewcls  = getattr(viewmod, view[view.rfind('.')+1:])
 
-    if app.startswith('app.'):
-        app = app[5:]
+    if not app.startswith('app.'):
+        app += 'app.'+app
 
-    launchmod = __import__('app.'+app, fromlist = (('serve', 'launch')[desktop],))
-    launch    = getattr(launchmod, ('serve', 'launch')[desktop])
+    if view.startswith('toolbar'):
+        app = 'app.Default'
 
-    server    = launch(viewcls)
+    if '.' in app and 'A' <= app[app.rfind('.')+1] <= 'Z':
+        mod  = app[:app.rfind('.')]
+        attr = app[app.rfind('.')+1:]
+        launchmod = getattr(__import__(mod, fromlist = (attr,)), attr)
+    else:
+        launchmod = __import__(app, fromlist = (('serve', 'launch')[desktop],))
+
+    launch = getattr(launchmod, ('serve', 'launch')[desktop])
+    server = launch(viewcls)
     if (not desktop) and show:
         server.io_loop.add_callback(lambda: server.show('/'))
     server.start()
+    server.io_loop.start()
 
 if __name__ == '__main__':
     run()   # pylint: disable=no-value-for-parameter

@@ -4,6 +4,7 @@ u"Toolbar"
 from bokeh.layouts        import Row
 
 from .dialog              import FileDialog
+from .intinput            import BeadInput
 from .                    import BokehView
 
 class  ToolBar(BokehView):
@@ -11,10 +12,13 @@ class  ToolBar(BokehView):
     def __init__(self, **kwa):
         u"Sets up the controller"
         super().__init__(**kwa)
-        self.__tools = [self.button(self._onOpen,  u'open'),
-                        self.button(self._onSave,  u'save', disabled = True)]
+        self._open  = self.button(self._onOpen,  u'open')
+        self._save  = self.button(self._onSave,  u'save', disabled = True)]
+        self._tools = [self._open, self._save]
+
         if self._ctrl.ISAPP:
-            self.__tools.append(self.button(self._ctrl.close, u'quit'))
+            self._quit = self.button(self._ctrl.close, u'quit')
+            self._tools.append(self._quit)
 
         self.__diagopen = FileDialog(filetypes = u'trk|ana|*',
                                      config    = self._ctrl,
@@ -27,19 +31,21 @@ class  ToolBar(BokehView):
 
     def getroots(self):
         u"adds items to doc"
-        return Row(children = self.__tools, sizing_mode = 'fixed'),
+        return Row(children = self._tools, sizing_mode = 'fixed'),
 
     def close(self):
         u"Sets up the controller"
         super().close()
-        del self.__tools
+        del self._tools
+        del self._open
+        del self._save
+        del self._quit
         del self.__diagopen
         del self.__diagsave
 
     def _onUpdateCurrent(self, **items):
-        if 'track' not in items:
-            return
-        self.__tools[1].disabled = items['track'].value is items['empty']
+        if 'track' in items:
+            self._save.disabled = items['track'].value is items['empty']
 
     @BokehView.action
     def _onOpen(self, *_):
@@ -49,9 +55,22 @@ class  ToolBar(BokehView):
 
     @BokehView.action
     def _onSave(self,  *_):
-        if self.__tools[1].disabled:
+        if self._save.disabled:
             return
 
         path = self.__diagsave.save()
         if path is not None:
             self._ctrl.saveTrack(path)
+
+class  BeadToolBar(ToolBar):
+    u"Toolbar with a bead spinner"
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+        self._beads = BeadInput(**kwa)
+        self._tools.insert(2, self._beads)
+
+    def close(self):
+        u"Sets up the controller"
+        super().close()
+        self._beads.close()
+        del self._beads

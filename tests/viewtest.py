@@ -11,7 +11,7 @@ from view.trackplot             import TrackPlot
 
 def test_toolbar(bokehaction):          # pylint: disable=redefined-outer-name
     u"test the toolbar"
-    with bokehaction.launch(ToolBar, 'default') as server:
+    with bokehaction.launch(ToolBar, 'app.Defaults') as server:
         save = server.get('ToolBar', 'tools')[1]
         ctrl = server.ctrl
         curr = ctrl.getGlobal('current')
@@ -45,7 +45,7 @@ def test_trackplot(bokehaction):        # pylint: disable=redefined-outer-name
         if 'y' in evts:
             vals[2:] = evts['y'].value
 
-    with bokehaction.launch(TrackPlot, 'withtoolbar') as server:
+    with bokehaction.launch(TrackPlot, 'app.ToolBar') as server:
         server.ctrl.observe("globals.current.plot.bead", _printrng)
         server.load('small_legacy')
 
@@ -66,4 +66,4 @@ def test_trackplot(bokehaction):        # pylint: disable=redefined-outer-name
         server.press('Ctrl-z')
 
 if __name__ == '__main__':
-    test_trackplot(bokehaction(None))
+    test_toolbar(bokehaction(None))

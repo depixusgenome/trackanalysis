@@ -34,11 +34,12 @@ class BeadPlotter(SinglePlotter):
         if task is None:
             return dict.fromkeys(('t', 'zmag', 'z'), [0., 1.])
 
-        items = next(iter(self._ctrl.run(task, task)))
+        track = self._ctrl.track(task)
         bead  = cnf.bead.get(default = None)
         if bead is None:
-            bead = next(iter(items.keys()))
+            bead = next(iter(track.beadsonly.keys()))
 
+        items = track.beads
         return dict(t    = items['t'],
                     zmag = items['zmag'],
                     z    = items[bead])
