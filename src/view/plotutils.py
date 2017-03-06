@@ -105,12 +105,14 @@ class Plotter:
         else:
             curr  = self.getCurrent(axis, default = (vmin, vmax))
 
-        if hasattr(rng, 'range_padding'):
-            rng.range_padding = over*100.
+        attrs = dict(bounds        = (vmin, vmax),
+                     start         = vmin if curr[0]  is None else curr[0],
+                     end           = vmax if curr[1]  is None else curr[1],
+                     range_padding = over*100.)
+        if not hasattr(rng, 'range_padding'):
+            attrs.pop('range_padding')
 
-        rng.bounds = (vmin, vmax)
-        rng.start  = vmin if curr[0]  is None else curr[0]
-        rng.end    = vmax if curr[1]  is None else curr[1]
+        rng.update(**attrs)
 
     def bounds(self, arr):
         u"Returns boundaries for a column"

@@ -47,7 +47,9 @@ class BeadPlotter(SinglePlotter):
     def _figargs(self):
         args = super()._figargs()
         args.update(x_axis_label = u'Time',
-                    y_axis_label = u'z')
+                    y_axis_label = u'z',
+                    x_range      = Range1d(start = 0., end = 1.),
+                    y_range      = Range1d(start = 0., end = 1.))
         return args
 
     def _addglyph(self, beadname, **kwa):
@@ -83,9 +85,7 @@ class BeadPlotter(SinglePlotter):
         self._addylayout  ()
         self._addglyph    ("zmag", y_range_name = 'zmag')
 
-        glyph = self._addglyph    ("z")
-        self._fig.x_range.renderers = [glyph]
-        self._fig.y_range.renderers = [glyph]
+        self._addglyph    ("z")
         return self._fig
 
     def update(self, items:dict):
