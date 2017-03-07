@@ -26,7 +26,7 @@ def _checktype(fcn):
         tpe = tuple
     else:
         tpe = getattr(tpe, '__union_params__', tpe)
-        if getattr(tpe, '__origin__', None) == 'typing.Union':
+        if str(getattr(tpe, '__origin__', tpe)) == 'typing.Union':
             tpe = getattr(tpe, '__args__', tpe)
 
     @wraps(fcn)
