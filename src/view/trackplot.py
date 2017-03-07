@@ -167,10 +167,14 @@ class CyclesPlotter(Plotter, _PlotterMixin):
         "sets up this plotter's info"
         super().__init__(ctrl)
         cnf = ctrl.getGlobal(self.key())
-        cnf.defaults = dict(binwidth = .003,
-                            ncycles  = 150,
-                            raw      = PlotAttrs('blue',  'circle', 1, alpha = .5),
-                            hist     = PlotAttrs('white', 'quad',   1, line_color = 'blue'),
+        cnf.defaults = dict(binwidth  = .003,
+                            ncycles   = 150,
+                            minframes = 10,
+                            raw       = PlotAttrs('blue',  'circle', 1, alpha = .5),
+                            frames    = PlotAttrs('white', 'quad',   1, line_color = 'blue'),
+                            events    = PlotAttrs('white', 'quad',   1,
+                                                  fill_alpha = 0.,
+                                                  line_color = 'green'),
                             **DpxHoverModel.defaultconfig()
                            )
 
@@ -182,7 +186,7 @@ class CyclesPlotter(Plotter, _PlotterMixin):
         self._histsource = ColumnDataSource()
         self._hist       = figure(y_axis_location = None,
                                   y_range         = self._raw.y_range,
-                                  **self._figargs(u'Count', 200, None))
+                                  **self._figargs(u'Frames', 200, None))
 
     def _figargs(self, # pylint: disable=arguments-differ
                  xaxis, width, loc, tools = None):
@@ -245,52 +249,74 @@ class CyclesPlotter(Plotter, _PlotterMixin):
         if track is None:
             bins  = np.array([-1, 1])
             zeros = np.zeros((1,), dtype = 'f4')
-            items = dict(C0 = zeros)
+            items = zeros,
         else:
-            items = dict(track.cycles[bead,...].withphases(5,5))
-            rng   = (np.nanmin([np.nanmin(i) for i in items.values()]),
-                     np.nanmax([np.nanmax(i) for i in items.values()]))
+            items = [i for _, i in track.cycles[bead,...].withphases(5,5)]
+            rng   = (np.nanmin([np.nanmin(i) for i in items]),
+                     np.nanmax([np.nanmax(i) for i in items]))
             width = self.getConfig()["binwidth"].get()
             bins  = np.arange(rng[0]-width*.5, rng[1]+width*1.01, width, dtype = 'f4')
             if bins[-2] > rng[1]:
                 bins = bins[:-1]
 
-            items = {'C%d' % i[-1]: np.bincount(np.digitize(j, bins),
-                                                minlength = len(bins))[1:]
-                     for i, j in items.items()}
+            items = [np.bincount(np.digitize(i, bins), minlength = len(bins))[1:]
+                     for i in items]
             zeros = np.zeros((len(bins)-1,), dtype = 'f4')
 
-        return dict(right  = np.sum(list(items.values()), axis = 0),
-                    left   = zeros,
-                    bottom = bins[:-1],
-                    top    = bins[1:])
+        threshold = self.getConfig()['minframes'].get()
+        return dict(frames  = np.sum(items, axis = 0),
+                    events  = np.sum([np.int32(i > threshold) for i in items], axis = 0),
+                    left    = zeros,
+                    bottom  = bins[:-1],
+                    top     = bins[1:])
 
-    def _createhist(self):
-        hist             = self._createhistdata()
-        attrs            = self.getConfig()['hist']
-        self._histsource = ColumnDataSource(data = hist)
-        attrs.addto(self._hist, source = self._histsource, **{i:i for i in hist})
-
-        def _onchangebounds(yrng = self._hist.y_range,
-                            xrng = self._hist.x_range,
-                            src  = self._histsource):
+    def _slavexaxis(self):
+        def _onchangebounds(yrng   = self._hist.y_range,
+                            frames = self._hist.x_range,
+                            events = self._hist.extra_x_ranges["cycles"],
+                            src    = self._histsource):
             # pylint: disable=protected-access,no-member
             if yrng.bounds is not None:
                 yrng._initial_start = yrng.bounds[0]
                 yrng._initial_end   = yrng.bounds[1]
 
-            right = src.data["right"]
-            if len(right) < 2:
+            counts = src.data["frames"]
+            if len(counts) < 2:
                 return
             bottom = src.data["bottom"]
             delta  = bottom[1]-bottom[0]
 
             ind1 = min(len(bottom), max(0, int((yrng.start-bottom[0])/delta-1)))
             ind2 = min(len(bottom), max(0, int((yrng.end  -bottom[0])/delta+1)))
-            xrng.start = 0.
-            xrng.end   = window.Math.max.apply(None, right[ind1:ind2])+1
+            frames.start = 0.
+            frames.end   = window.Math.max.apply(None, counts[ind1:ind2])+1
+
+            counts = src.data["cycles"]
+            events.start = 0.
+            events.end   = window.Math.max.apply(None, counts[ind1:ind2])+1
 
         self._hist.y_range.callback = CustomJS.from_py_func(_onchangebounds)
+
+    def _createhist(self):
+        hist             = self._createhistdata()
+        self._histsource = ColumnDataSource(data = hist)
+
+        self._hist.extra_x_ranges = {"cycles": Range1d(start = 0., end = 1.)}
+        self._hist.add_layout(LinearAxis(x_range_name="cycles", axis_label = u'Cycles'),
+                              'above')
+
+        self.getConfig()['frames'].addto(self._hist,
+                                         source = self._histsource,
+                                         bottom = "bottom", top   = "top",
+                                         left   = "left",   right = "frames")
+
+        self.getConfig()["cycles"].addto(self._hist,
+                                         source = self._histsource,
+                                         bottom = "bottom", top   = "top",
+                                         left   = "left",   right = "cycles",
+                                         x_range_name = "cycles")
+
+        self._slavexaxis()
 
     def create(self) -> DpxKeyedRow:
         u"returns the figure"
@@ -306,7 +332,6 @@ class CyclesPlotter(Plotter, _PlotterMixin):
 
         with self.updating():
             raw                   = self._createrawdata()
-
             self._rawsource.data  = raw
             for glyph in self._raw.select(tags = '__lines__'):
                 glyph.visible = raw[glyph.y] is not raw['t']
@@ -314,6 +339,14 @@ class CyclesPlotter(Plotter, _PlotterMixin):
             hist                  = self._createhistdata()
             self._histsource.data = hist
             self.setbounds(self._raw.y_range, None, (hist['bottom'][0], hist['top'][-1]))
+
+            bnd = 0, np.max(hist['frames'])+1
+            self._hist.x_range.update(bounds = bnd, start = 0, end = bnd[1])
+
+            bnd = 0, np.max(hist["cycles"])+1
+            self._hist.extra_x_ranges["cycles"].update(bounds = bnd,
+                                                       start  = 0,
+                                                       end    = bnd[1])
 
 class TrackPlot(BokehView):
     "Track plot view"
