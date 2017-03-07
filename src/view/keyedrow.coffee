@@ -15,9 +15,8 @@ export class DpxKeyedRow extends Row
     default_view: DpxKeyedRowView
     type: "DpxKeyedRow"
 
-    _fig:      ()     -> @children[0]
     _get_tool: (name) ->
-        tools = @_fig().toolbar.tools
+        tools = @fig.toolbar.tools
         for attr in tools
             if attr.type == name
                 return attr
@@ -27,7 +26,7 @@ export class DpxKeyedRow extends Row
         tool               = @_get_tool(name)
 
         if tool?
-            @_curr         = @_fig().toolbar.gestures.pan.active
+            @_curr         = @fig.toolbar.gestures.pan.active
             @_curr?.active = false
             tool.active    = true
 
@@ -58,7 +57,7 @@ export class DpxKeyedRow extends Row
         rng.end   = rng.end   + delta
 
     _do_reset: () ->
-        fig       = @_fig()
+        fig       = @fig
         rng       = fig.x_range
         rng.start = rng.bounds[0]
         rng.end   = rng.bounds[1]
@@ -68,7 +67,7 @@ export class DpxKeyedRow extends Row
         rng.end   = rng.bounds[1]
 
     dokeydown: (evt) ->
-        if not (@_fig()?)
+        if not (@fig?)
             return
 
         val = ""
@@ -92,7 +91,7 @@ export class DpxKeyedRow extends Row
 
             else
                 [tool,axis,dir] = val.split(".")
-                @["_do_"+tool](dir == "low", @_fig()[axis+"_range"])
+                @["_do_"+tool](dir == "low", @fig[axis+"_range"])
 
     dokeyup: (evt) ->
         @_curr?.active = true
@@ -103,6 +102,7 @@ export class DpxKeyedRow extends Row
     }
 
     @define {
+        fig:      [p.Instance ]
         keys:     [p.Any,   {}]
         zoomrate: [p.Number, 0]
         panrate:  [p.Number, 0]

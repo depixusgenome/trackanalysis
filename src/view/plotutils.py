@@ -6,12 +6,14 @@ from contextlib             import contextmanager
 from itertools              import product
 
 from bokeh.models           import Row, CustomJS, Range1d
-from bokeh.core.properties  import Dict, String, Float
+from bokeh.core.properties  import Dict, String, Float, Instance
+from bokeh.plotting.figure  import Figure
 
 from control                import Controller
 
 class DpxKeyedRow(Row):
     u"define div with tabIndex"
+    fig                = Instance(Figure)
     keys               = Dict(String, String, help = u'keys and their action')
     zoomrate           = Float()
     panrate            = Float()
@@ -25,7 +27,9 @@ class DpxKeyedRow(Row):
         keys.update({cnf[tool].activate.get(): tool for tool in ('pan', 'zoom')})
 
         kwa.setdefault('sizing_mode', 'stretch_both')
-        super().__init__(children = [fig],
+        children = kwa.pop('children', [fig])
+        super().__init__(children = children,
+                         fig      = fig,
                          keys     = keys,
                          zoomrate = cnf.zoom.rate.get(),
                          panrate  = cnf.pan.rate.get(),
