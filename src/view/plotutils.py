@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Utils for dealing with the JS side of the view"
+from typing                 import Tuple, Optional # pylint: disable =unused-import
 from contextlib             import contextmanager
 from itertools              import product
 
-from bokeh.models           import Row
+from bokeh.models           import Row, CustomJS, Range1d
 from bokeh.core.properties  import Dict, String, Float
 
 from control                import Controller
@@ -32,18 +33,18 @@ class DpxKeyedRow(Row):
 
 class PlotAttrs:
     u"Plot Attributes for one variable"
-    def __init__(self, color = 'blue', glyph = 'line', size = 1):
+    def __init__(self, color = 'blue', glyph = 'line', size = 1, **kwa):
         self.color = color
         self.glyph = glyph
         self.size  = size
+        self.__dict__.update(kwa)
 
     def addto(self, fig, **kwa):
         u"adds itself to plot: defines color, size and glyph to use"
-        args  = dict(color  = self.color,
-                     size   = self.size,
-                     **kwa
-                    )
-        if self.glyph == 'line':
+        args  = dict(self.__dict__)
+        args.pop('glyph')
+        args.update(kwa)
+        if self.glyph in ('line', 'quad'):
             args['line_width'] = args.pop('size')
 
         return getattr(fig, self.glyph)(**args)
@@ -63,6 +64,19 @@ class Plotter:
         self._ready = False
         yield self
         self._ready = True
+
+    @staticmethod
+    def fixreset(arng):
+        u"Corrects the reset bug in bokeh"
+        assert isinstance(arng, Range1d)
+        def _onchangebounds(rng = arng):
+            # pylint: disable=protected-access,no-member
+            if rng.bounds is not None:
+                rng._initial_start = rng.bounds[0]
+                rng._initial_end   = rng.bounds[1]
+
+        arng.callback = CustomJS.from_py_func(_onchangebounds)
+
 
     @classmethod
     def key(cls, base = 'config'):
@@ -90,7 +104,7 @@ class Plotter:
                     toolbar_sticky = False,
                     sizing_mode    = 'stretch_both')
 
-    def setbounds(self, rng, axis, arr):
+    def newbounds(self, rng, axis, arr) -> dict:
         u"Sets the range boundaries"
         over  = self.getConfig().boundary.overshoot.get()
 
@@ -101,7 +115,7 @@ class Plotter:
         vmax += delta
 
         if axis is None:
-            curr  = None, None
+            curr  = None, None # type: Tuple[Optional[float], Optional[float]]
         else:
             curr  = self.getCurrent(axis, default = (vmin, vmax))
 
@@ -112,7 +126,14 @@ class Plotter:
         if not hasattr(rng, 'range_padding'):
             attrs.pop('range_padding')
 
-        rng.update(**attrs)
+        return attrs
+
+    def setbounds(self, rng, axis, arr, reinit = True):
+        u"Sets the range boundaries"
+        if reinit and hasattr(rng, 'reinit'):
+            rng.update(reinit = not rng.reinit, **self.newbounds(rng, axis, arr))
+        else:
+            rng.update(**self.newbounds(rng, axis, arr))
 
     def bounds(self, arr):
         u"Returns boundaries for a column"

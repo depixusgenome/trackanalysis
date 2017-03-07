@@ -1,20 +1,39 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Track plot view"
+"Track plot view"
 
 from typing         import Optional  # pylint: disable=unused-import
+from bokeh.model    import Model
+from bokeh.core.properties  import Float
 from bokeh.plotting import figure
-from bokeh.models   import (LinearAxis, Range1d, ColumnDataSource, HoverTool,
-                            CustomJS)
+from bokeh.layouts  import gridplot
+from bokeh.models   import (LinearAxis, ColumnDataSource, HoverTool,
+                            CustomJS, Range1d)
 
+import numpy        as np
 from control        import Controller
-from .plotutils     import SinglePlotter, PlotAttrs
+from .plotutils     import SinglePlotter, PlotAttrs, Plotter
 from .              import BokehView
 
-class BeadPlotter(SinglePlotter):
-    u"Plots a default bead"
+window = None # type: ignore # pylint: disable=invalid-name
+
+class _PlotterMixin:
+    def _gettrack(self):
+        cnf  = self._ctrl.getGlobal("current")
+        task = cnf.track.get(default = None)
+        if task is None:
+            return None, None
+
+        track = self._ctrl.track(task)
+        bead  = cnf.bead.get(default = None)
+        if bead is None:
+            bead = next(iter(track.beadsonly.keys()))
+        return track, bead
+
+class BeadPlotter(SinglePlotter, _PlotterMixin):
+    "Plots a default bead"
     def __init__(self,  ctrl:Controller) -> None:
-        u"sets up this plotter's info"
+        "sets up this plotter's info"
         super().__init__(ctrl)
         self._source = ColumnDataSource()
         self._fig    = figure(**self._figargs())
@@ -29,17 +48,10 @@ class BeadPlotter(SinglePlotter):
         return self._source.data[name] # pylint: disable=unsubscriptable-object
 
     def _createdata(self):
-        cnf         = self._ctrl.getGlobal("current")
-        task        = cnf.track.get(default = None)
-        if task is None:
+        track, bead = self._gettrack()
+        if track is None:
             return dict.fromkeys(('t', 'zmag', 'z'), [0., 1.])
-
-        track = self._ctrl.track(task)
-        bead  = cnf.bead.get(default = None)
-        if bead is None:
-            bead = next(iter(track.beadsonly.keys()))
-
-        items = track.beads
+        items       = track.beads
         return dict(t    = items['t'],
                     zmag = items['zmag'],
                     z    = items[bead])
@@ -78,7 +90,7 @@ class BeadPlotter(SinglePlotter):
         self.setbounds(self._fig.y_range, 'y', self._get('z'))
 
     def _create(self):
-        u"sets-up the figure"
+        "sets-up the figure"
         self._source = ColumnDataSource(data = self._createdata())
         self._fig.add_tools(HoverTool(tooltips = self.getConfig().tooltips.get()))
 
@@ -86,10 +98,12 @@ class BeadPlotter(SinglePlotter):
         self._addglyph    ("zmag", y_range_name = 'zmag')
 
         self._addglyph    ("z")
+        for rng in self._fig.x_range, self._fig.y_range, self._fig.extra_y_ranges['zmag']:
+            self.fixreset(rng)
         return self._fig
 
     def update(self, items:dict):
-        u"Updates the data"
+        "Updates the data"
         if not ('track' in items or 'bead' in items):
             return
 
@@ -97,15 +111,211 @@ class BeadPlotter(SinglePlotter):
             self._source.data = self._createdata()
             self._setbounds()
 
+class DpxHoverModel(Model):
+    u"controls keypress actions"
+    precision = Float(0.003)
+    __implementation__ = """
+    import * as p  from "core/properties"
+    import {Model} from "model"
+
+    export class DpxHoverModelView
+    export class DpxHoverModel extends Model
+        default_view: DpxHoverModelView
+        type:"DpxHoverModel"
+        @define {
+            precision : [p.Number,  0.003]
+        }
+    """
+    @staticmethod
+    def defaultconfig() -> dict:
+        u"default config"
+        return dict(selraw  = PlotAttrs('green', 'line',   2))
+
+    def tool(self, fig, source, cnf):
+        u"creates the hover tool"
+        self.precision = cnf['binwidth'].get()
+        attrs          = cnf['selraw'].get()
+
+        glyph = attrs.addto(fig, x = 't', y = 'sel', source = source, visible = False)
+        def _onhover(source = source, glyph = glyph, mdl = self, cb_data = None):
+            xval = window.Math.floor(cb_data['geometry'].x+0.5)
+            yval = cb_data['geometry'].y
+            dist = mdl.precision
+            best = None
+            for column in source.column_names:
+                tmp = window.Math.abs(source.data[column][xval] - yval)
+                if tmp < dist:
+                    dist = tmp
+                    best = column
+
+            if best is not None:
+                source.data['sel'] = source.data[best]
+                glyph.glyph.visible = True
+                source.trigger("change")
+                glyph.trigger("change")
+            elif glyph.glyph.visible:
+                glyph.glyph.visible = False
+                glyph.trigger("change")
+
+        hover = fig.select(HoverTool)
+        hover.tooltips = None
+        hover.callback = CustomJS.from_py_func(_onhover)
+
+class CyclesPlotter(Plotter, _PlotterMixin):
+    "Displays cycles and their projection"
+    def __init__(self,  ctrl:Controller) -> None:
+        "sets up this plotter's info"
+        super().__init__(ctrl)
+        cnf = ctrl.getGlobal(self.key())
+        cnf.defaults = dict(binwidth = .003,
+                            ncycles  = 150,
+                            tools    = 'xpan,ypan,reset,save,hover'
+                            raw      = PlotAttrs('blue',  'circle', 1, alpha = .5),
+                            hist     = PlotAttrs('white', 'quad',   1, line_color = 'blue'),
+                            **DpxHoverModel.defaultconfig()
+                           )
+
+
+        self._mdl        = DpxHoverModel()
+        self._rawsource  = ColumnDataSource()
+        self._raw        = figure(y_axis_label = u'z',
+                                  y_range      = Range1d(start = 0., end = 1.),
+                                  **self._figargs(u'Time', 500, 'left','hover'))
+
+        self._histsource = ColumnDataSource()
+        self._hist       = figure(y_axis_location = None,
+                                  y_range         = self._raw.y_range,
+                                  **self._figargs(u'Count', 200, None))
+        self._row        = gridplot([[self._raw, self._hist]])
+
+
+
+    def _figargs(self, # pylint: disable=arguments-differ
+                 xaxis, width, loc, tools = None):
+        args = super()._figargs()
+        args['x_axis_label']     = xaxis
+        args['plot_width']       = width
+        args['toolbar_location'] = loc
+        if tools is not None:
+            args['tools'] += ','+tools
+        return args
+
+    def _createrawdata(self):
+        track, bead = self._gettrack()
+        keys        = set('C%d' % i for i in range(self.getConfig()['ncycles'].get()))
+        if track is None:
+            return dict.fromkeys(('t', 'sel')+tuple(keys), [0., 1.])
+        items = dict(('C%d' % i[-1], j) for i, j in track.cycles[bead,...])
+        sizes = {len(i) for i in items.values()}
+        size  = max(sizes)
+        if len(sizes) > 1:
+            nans = np.full((size,), np.NaN, dtype = 'f4')
+            for i, j in items.items():
+                if len(j) == size:
+                    continue
+                items[i] = np.concatenate((j, nans[:size-len(j)]))
+
+        items['t']    = np.arange(size, dtype = 'f4')
+        items.update(dict.fromkeys(keys - set(items.keys()), items['t']))
+        items['sel']  = items['C0']
+        return items
+
+    def _createhistdata(self):
+        track, bead   = self._gettrack()
+        if track is None:
+            bins  = np.array([-1, 1])
+            zeros = np.zeros((1,), dtype = 'f4')
+            items = dict(C0 = zeros)
+        else:
+            items = dict(track.cycles[bead,...].withphases(5,5))
+            rng   = (np.nanmin([np.nanmin(i) for i in items.values()]),
+                     np.nanmax([np.nanmax(i) for i in items.values()]))
+            width = self.getConfig()["binwidth"].get()
+            bins  = np.arange(rng[0]-width*.5, rng[1]+width*1.01, width, dtype = 'f4')
+            if bins[-2] > rng[1]:
+                bins = bins[:-1]
+
+            items = {'C%d' % i[-1]: np.bincount(np.digitize(j, bins),
+                                                minlength = len(bins))[1:]
+                     for i, j in items.items()}
+            zeros = np.zeros((len(bins)-1,), dtype = 'f4')
+
+        return dict(right  = np.sum(list(items.values()), axis = 0),
+                    left   = zeros,
+                    bottom = bins[:-1],
+                    top    = bins[1:])
+
+    def create(self):
+        "returns the figure"
+        raw             = self._createrawdata()
+        attrs           = self.getConfig()['raw']
+        self._rawsource = ColumnDataSource(data = raw)
+        for name in raw:
+            attrs.addto(self._raw,
+                        x       = 't',
+                        y       = name,
+                        source  = self._rawsource,
+                        tags    = ['__lines__'],
+                        visible = raw['t'] is not raw[name])
+
+        self._mdl.tool(self._raw, self._rawsource, self.getConfig())
+
+        hist             = self._createhistdata()
+        attrs            = self.getConfig()['hist']
+        self._histsource = ColumnDataSource(data = hist)
+        attrs.addto(self._hist, source = self._histsource, **{i:i for i in hist})
+
+        def _onchangebounds(yrng = self._raw.y_range,
+                            xrng = self._hist.x_range,
+                            src  = self._histsource):
+            # pylint: disable=protected-access,no-member
+            if yrng.bounds is not None:
+                yrng._initial_start = yrng.bounds[0]
+                yrng._initial_end   = yrng.bounds[1]
+
+            right = src.data["right"]
+            if len(right) < 2:
+                return
+            bottom = src.data["bottom"]
+            delta  = bottom[1]-bottom[0]
+
+            ind1 = min(len(bottom), max(0, int((yrng.start-bottom[0])/delta-1)))
+            ind2 = min(len(bottom), max(0, int((yrng.end  -bottom[0])/delta+1)))
+            xrng.start = 0.
+            xrng.end   = window.Math.max.apply(None, right[ind1:ind2])+1
+
+        self._raw.y_range.callback = CustomJS.from_py_func(_onchangebounds)
+        return self._row
+
+    def update(self, items:dict):
+        "Updates the data"
+        if not ('track' in items or 'bead' in items):
+            return
+
+        with self.updating():
+            raw                   = self._createrawdata()
+
+            self._rawsource.data  = raw
+            for glyph in self._raw.select(tags = '__lines__'):
+                glyph.visible = raw[glyph.y] is not raw['t']
+
+            hist                  = self._createhistdata()
+            self._histsource.data = hist
+
+            bnds = 0, max(1,np.max(hist['right']+1))
+            self._hist.x_range.update(bounds = bnds, start = bnds[0], end = bnds[1])
+            self.setbounds(self._raw. y_range, None, (hist['bottom'][0], hist['top'][-1]))
+
 class TrackPlot(BokehView):
-    u"Track plot view"
+    "Track plot view"
+    PLOTTTER = BeadPlotter
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self._plotter = BeadPlotter(self._ctrl) # must change this to a Plot Factory
+        self._plotter = self.PLOTTTER(self._ctrl)
         self._ctrl.observe("globals.current", self._onUpdateCurrent)
 
     def close(self):
-        u"remove controller"
+        "remove controller"
         super().close()
         self._plotter.close()
         self._plotter = None
@@ -114,5 +324,9 @@ class TrackPlot(BokehView):
         self._plotter.update(items)
 
     def getroots(self):
-        u"adds items to doc"
+        "adds items to doc"
         return self._plotter.create(),
+
+class CyclesPlot(TrackPlot):
+    "Track cycles plot view"
+    PLOTTTER = CyclesPlotter

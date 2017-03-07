@@ -52,6 +52,9 @@ class BeadInput(BokehView):
         return self.__inp
 
     def _onchange_cb(self, attr, old, new):
+        if self.__inp.disabled:
+            return
+
         if new not in self.__beads:
             new = self.__beads[min(len(self.__beads)-1,
                                    np.searchsorted(self.__beads, new))]
