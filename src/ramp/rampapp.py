@@ -43,11 +43,13 @@ class DisplaySlider:
         end = kwargs.get("end",100)
         value = kwargs.get("value",0)
         step = kwargs.get("step",10)
+        policy = kwargs.get("policy","mouseup")
         self.slider = Slider(title=title,
                              start=start,
                              end=end,
                              value=value,
-                             step=step)
+                             step=step,
+                             callback_policy=policy)
 
 class DisplayHist:
     u''' Contains fig and ColumnDataSource
