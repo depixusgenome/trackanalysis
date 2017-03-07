@@ -219,7 +219,8 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
                                         start=0,
                                         end=1,
                                         value=self.data.rpmod.good_ratio,
-                                        step=.1)}
+                                        step=.1,
+                                        callback_policy="mouseup")}
 
         self.sliders["gratio"].on_change("value",call_changegratio)
 
