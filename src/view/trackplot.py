@@ -58,6 +58,8 @@ class BeadPlotter(SinglePlotter, _PlotterMixin):
 
     def _figargs(self):
         args = super()._figargs()
+        if self.getConfig().tooltips.get() not in ('', None):
+            args['tools'] += ',hover'
         args.update(x_axis_label = u'Time',
                     y_axis_label = u'z',
                     x_range      = Range1d(start = 0., end = 1.),
@@ -92,7 +94,8 @@ class BeadPlotter(SinglePlotter, _PlotterMixin):
     def _create(self):
         "sets-up the figure"
         self._source = ColumnDataSource(data = self._createdata())
-        self._fig.add_tools(HoverTool(tooltips = self.getConfig().tooltips.get()))
+        if self.getConfig().tooltips.get() not in ('', None):
+            self._fig.select(HoverTool).tooltips = self.getConfig().tooltips.get()
 
         self._addylayout  ()
         self._addglyph    ("zmag", y_range_name = 'zmag')
@@ -122,9 +125,7 @@ class DpxHoverModel(Model):
     export class DpxHoverModel extends Model
         default_view: DpxHoverModelView
         type:"DpxHoverModel"
-        @define {
-            precision : [p.Number,  0.003]
-        }
+        @define { precision : [p.Number,  0.003] }
     """
     @staticmethod
     def defaultconfig() -> dict:
@@ -168,11 +169,12 @@ class CyclesPlotter(Plotter, _PlotterMixin):
         super().__init__(ctrl)
         cnf = ctrl.getGlobal(self.key())
         cnf.defaults = dict(binwidth  = .003,
+                            tools     = 'ypan,ybox_zoom,reset,save',
                             ncycles   = 150,
                             minframes = 10,
                             raw       = PlotAttrs('blue',  'circle', 1, alpha = .5),
                             frames    = PlotAttrs('white', 'quad',   1, line_color = 'blue'),
-                            events    = PlotAttrs('white', 'quad',   1,
+                            cycles    = PlotAttrs('white', 'quad',   1,
                                                   fill_alpha = 0.,
                                                   line_color = 'green'),
                             **DpxHoverModel.defaultconfig()
@@ -265,7 +267,7 @@ class CyclesPlotter(Plotter, _PlotterMixin):
 
         threshold = self.getConfig()['minframes'].get()
         return dict(frames  = np.sum(items, axis = 0),
-                    events  = np.sum([np.int32(i > threshold) for i in items], axis = 0),
+                    cycles  = np.sum([np.int32(i > threshold) for i in items], axis = 0),
                     left    = zeros,
                     bottom  = bins[:-1],
                     top     = bins[1:])
@@ -273,7 +275,7 @@ class CyclesPlotter(Plotter, _PlotterMixin):
     def _slavexaxis(self):
         def _onchangebounds(yrng   = self._hist.y_range,
                             frames = self._hist.x_range,
-                            events = self._hist.extra_x_ranges["cycles"],
+                            cycles = self._hist.extra_x_ranges["cycles"],
                             src    = self._histsource):
             # pylint: disable=protected-access,no-member
             if yrng.bounds is not None:
@@ -292,8 +294,8 @@ class CyclesPlotter(Plotter, _PlotterMixin):
             frames.end   = window.Math.max.apply(None, counts[ind1:ind2])+1
 
             counts = src.data["cycles"]
-            events.start = 0.
-            events.end   = window.Math.max.apply(None, counts[ind1:ind2])+1
+            cycles.start = 0.
+            cycles.end   = window.Math.max.apply(None, counts[ind1:ind2])+1
 
         self._hist.y_range.callback = CustomJS.from_py_func(_onchangebounds)
 
