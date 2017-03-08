@@ -163,12 +163,33 @@ class DpxHoverModel(Model):
         type:"DpxHoverModel"
         @define { precision : [p.Number,  0.003] }
     """
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+        self._source = ColumnDataSource()
+
     @staticmethod
     def defaultconfig() -> dict:
         u"default config"
-        return dict(selraw  = PlotAttrs('green', 'line',   2))
+        return dict(selraw   = PlotAttrs('green', 'line',   2),
+                    tooltips = [(u'(cycle, t, z)', '(@cycles, $x, $y)')])
 
-    def tool(self, fig, source, cnf):
+    @staticmethod
+    def _createdata(raw):
+        get     = lambda i: raw['C%d'%i]
+        time    = raw['t']
+        ncycles = sum(i.startswith('C') for i in raw)
+
+        sizes   = [np.isfinite(get(i)) for i in range(ncycles) if get(i) is not time]
+        if len(sizes) == 0:
+            return dict(values = [0], inds = [0], cycles = [0])
+
+        vals    = np.concatenate([get(i)[j] for i, j in enumerate(sizes)])
+        inds    = np.concatenate([np.arange(len(j))[j] for    j in sizes])
+        cycles  = np.concatenate([np.full((j.sum(),), i, dtype = 'i4')
+                                  for i, j in enumerate(sizes)])
+        return dict(values = vals, inds   = inds, cycles = cycles)
+
+    def createtooltips(self, fig, source, data, cnf):
         u"creates the hover tool"
         self.precision = cnf['binwidth'].get()
         attrs          = cnf['selraw'].get()
@@ -194,9 +215,27 @@ class DpxHoverModel(Model):
                 glyph.glyph.visible = False
                 glyph.trigger("change")
 
-        hover = fig.select(HoverTool)
-        hover.tooltips = None
-        hover.callback = CustomJS.from_py_func(_onhover)
+        hover           = fig.select(HoverTool)
+        hover.callback  = CustomJS.from_py_func(_onhover)
+        hover.tooltips  = None
+
+        tooltips  = cnf['tooltips'].get()
+        if tooltips is None or len(tooltips) == 0:
+            return
+
+        self._source    = ColumnDataSource(self._createdata(data))
+        hover.tooltips  = tooltips
+        hover.renderers = [fig.circle(x          = 'inds',
+                                      y          = 'values',
+                                      source     = self._source,
+                                      size       = 5,
+                                      line_alpha = 0.,
+                                      fill_alpha = 0.,
+                                      visible    = False)]
+
+    def updatetooltips(self, data):
+        u"updates the tooltips for a new file"
+        self._source.data = self._createdata(data)
 
 class CyclesPlotter(Plotter, metaclass = _PlotterMixin):
     "Displays cycles and their projection"
@@ -220,6 +259,7 @@ class CyclesPlotter(Plotter, metaclass = _PlotterMixin):
                             **DpxHoverModel.defaultconfig()
                            )
 
+        self._hover      = DpxHoverModel()
         self._rawsource  = ColumnDataSource()
         self._raw        = figure(y_axis_label = u'z',
                                   y_range      = Range1d(start = 0., end = 1.),
@@ -273,7 +313,7 @@ class CyclesPlotter(Plotter, metaclass = _PlotterMixin):
                         tags    = ['__lines__'],
                         visible = raw['t'] is not raw['C%d' % ind])
 
-        DpxHoverModel().tool(self._raw, self._rawsource, self.getConfig())
+        self._hover.createtooltips(self._raw, self._rawsource, raw, self.getConfig())
 
         fig = self._raw
         def _onchange(attr, old, new): # pylint: disable=unused-argument
@@ -382,6 +422,7 @@ class CyclesPlotter(Plotter, metaclass = _PlotterMixin):
         self._rawsource.data  = raw
         for glyph in self._raw.select(tags = '__lines__'):
             glyph.visible = raw[glyph.y] is not raw['t']
+        self._hover.updatetooltips(raw)
 
         hist                  = self._createhistdata()
         self._histsource.data = hist
