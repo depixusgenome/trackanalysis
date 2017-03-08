@@ -92,7 +92,9 @@ class Plotter:
 
         ctrl.addGlobalMap(self.key())
         ctrl.addGlobalMap(self.key('current'))
-        self.getConfig().defaults = dict(ylabel = u'Z', xlabel = u'Time')
+        self.getConfig().defaults = dict(ylabel    = u'Z',
+                                         xtoplabel = u'Time',
+                                         xlabel    = u'Frames')
 
     @contextmanager
     def updating(self):
@@ -165,6 +167,20 @@ class Plotter:
 
         return attrs
 
+    def _addcallbacks(self, fig):
+        u"adds Range callbacks"
+        def _onchange(attr, old, new): # pylint: disable=unused-argument
+            if self._ready:
+                self._ctrl.updateGlobal(self.key('current'),
+                                        x = (fig.x_range.start, fig.x_range.end),
+                                        y = (fig.y_range.start, fig.y_range.end))
+
+        fig.x_range.on_change('start', _onchange)
+        fig.x_range.on_change('end',   _onchange)
+        fig.y_range.on_change('start', _onchange)
+        fig.y_range.on_change('end',   _onchange)
+        return fig
+
     def setbounds(self, rng, axis, arr, reinit = True):
         u"Sets the range boundaries"
         if reinit and hasattr(rng, 'reinit'):
@@ -183,30 +199,3 @@ class Plotter:
         vmin -= delta
         vmax += delta
         return vmin, vmax
-
-class SinglePlotter(Plotter):
-    u"Base plotter class with single figure"
-    def _addcallbacks(self, fig):
-        u"adds Range callbacks"
-        def _onchange(attr, old, new): # pylint: disable=unused-argument
-            if self._ready:
-                self._ctrl.updateGlobal(self.key('current'),
-                                        x = (fig.x_range.start, fig.x_range.end),
-                                        y = (fig.y_range.start, fig.y_range.end))
-
-        fig.x_range.on_change('start', _onchange)
-        fig.x_range.on_change('end',   _onchange)
-        fig.y_range.on_change('start', _onchange)
-        fig.y_range.on_change('end',   _onchange)
-        return fig
-
-    def create(self) -> DpxKeyedRow:
-        u"returns the figure"
-        fig = self._create()
-        if fig is not None:
-            self._addcallbacks(fig)
-        return DpxKeyedRow(self, fig)
-
-    def _create(self):
-        u"Specified by child class. Returns figure"
-        raise NotImplementedError()
