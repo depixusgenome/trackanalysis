@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Utils for dealing with the JS side of the view"
-from typing                 import Tuple, Optional # pylint: disable =unused-import
+from typing                 import Tuple, Optional, Iterator # pylint: disable =unused-import
 from contextlib             import contextmanager
 from itertools              import product
 
-from bokeh.models           import Row, CustomJS, Range1d
+import bokeh.palettes
+from bokeh.models           import Row, CustomJS, Range1d, Model
 from bokeh.core.properties  import Dict, String, Float, Instance
 from bokeh.plotting.figure  import Figure
 
@@ -14,6 +15,7 @@ from control                import Controller
 class DpxKeyedRow(Row):
     u"define div with tabIndex"
     fig                = Instance(Figure)
+    toolbar            = Instance(Model)
     keys               = Dict(String, String, help = u'keys and their action')
     zoomrate           = Float()
     panrate            = Float()
@@ -37,16 +39,44 @@ class DpxKeyedRow(Row):
 
 class PlotAttrs:
     u"Plot Attributes for one variable"
-    def __init__(self, color = 'blue', glyph = 'line', size = 1, **kwa):
-        self.color = color
-        self.glyph = glyph
-        self.size  = size
+    def __init__(self,
+                 color                  = 'blue',
+                 glyph                  = 'line',
+                 size                   = 1,
+                 palette: Optional[str] = None,
+                 **kwa) -> None:
+        self.color   = color
+        self.glyph   = glyph
+        self.size    = size
+        self.palette = palette
         self.__dict__.update(kwa)
+
+    def iterpalette(self, count, *tochange, indexes = None) -> Iterator['PlotAttrs']:
+        u"yields PlotAttrs with colors along the palette provided"
+        info    = dict(self.__dict__)
+        palette = getattr(bokeh.palettes, self.palette, None)
+
+        if palette is None:
+            for _ in range(count):
+                yield PlotAttrs(**info)
+            return
+
+        colors = palette(count)
+        if indexes is not None:
+            colors = [colors[i] for i in indexes]
+
+        if len(tochange) == 0:
+            tochange = ('color',)
+
+        for color in colors:
+            info.update((name, color) for name in tochange)
+            yield PlotAttrs(**info)
 
     def addto(self, fig, **kwa):
         u"adds itself to plot: defines color, size and glyph to use"
         args  = dict(self.__dict__)
         args.pop('glyph')
+        args.pop('palette')
         args.update(kwa)
         if self.glyph in ('line', 'quad'):
             args['line_width'] = args.pop('size')
@@ -106,7 +136,8 @@ class Plotter:
     def _figargs(self):
         return dict(tools          = self.getConfig().tools.get(),
                     toolbar_sticky = False,
-                    sizing_mode    = 'stretch_both')
+                    sizing_mode    = 'stretch_both',
+                    disabled       = True)
 
     def newbounds(self, rng, axis, arr) -> dict:
         u"Sets the range boundaries"

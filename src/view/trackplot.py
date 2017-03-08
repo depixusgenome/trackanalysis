@@ -17,20 +17,60 @@ from .              import BokehView
 
 window = None # type: ignore # pylint: disable=invalid-name
 
-class _PlotterMixin:
-    def _gettrack(self):
-        cnf  = self._ctrl.getGlobal("current")
-        task = cnf.track.get(default = None)
-        if task is None:
-            return None, None
+class _PlotterMixin(type):
+    _row = None # type: Optional[DpxKeyedRow]
+    def __new__(mcs, clsname, bases, nspace, **_):
+        # pylint: disable=protected-access
+        assert len(bases) == 1
+        plotter = bases[0]
 
-        track = self._ctrl.track(task)
-        bead  = cnf.bead.get(default = None)
-        if bead is None:
-            bead = next(iter(track.beadsonly.keys()))
-        return track, bead
+        _old_init = nspace.pop('__init__')
+        def __init__(self, *_):
+            self._row = None # type: Optional[DpxKeyedRow]
+            _old_init(self, *_)
+        nspace['__init__'] = __init__
 
-class BeadPlotter(SinglePlotter, _PlotterMixin):
+        _old_create = nspace.pop('create', None)
+        if _old_create is None:
+            _old_create = plotter.create
+        def create(self) -> DpxKeyedRow:
+            u"returns the figure"
+            self._row = _old_create(self) # type: ignore
+            self._row.disabled = True
+            return self._row
+        nspace['create'] = create
+
+        def update(self, items:dict):
+            "Updates the data"
+            if not ('track' in items or 'bead' in items):
+                return
+
+            with self.updating():               # type: ignore
+                self._row.disabled = False
+                self._update()
+        nspace['update'] = update
+
+        if '_update' not in nspace:
+            def _update(_):
+                raise NotImplementedError()
+            nspace['_update'] = _update
+
+        def _gettrack(self):
+            cnf  = self._ctrl.getGlobal("current")
+            task = cnf.track.get(default = None)
+            if task is None:
+                return None, None
+
+            track = self._ctrl.track(task)
+            bead  = cnf.bead.get(default = None)
+            if bead is None:
+                bead = next(iter(track.beadsonly.keys()))
+            return track, bead
+        nspace['_gettrack'] = _gettrack
+
+        return type(clsname, (plotter,), nspace)
+
+class BeadPlotter(SinglePlotter, metaclass = _PlotterMixin):
     "Plots a default bead"
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
@@ -48,7 +88,7 @@ class BeadPlotter(SinglePlotter, _PlotterMixin):
         return self._source.data[name] # pylint: disable=unsubscriptable-object
 
     def _createdata(self):
-        track, bead = self._gettrack()
+        track, bead = self._gettrack() # pylint: disable=no-member
         if track is None:
             return dict.fromkeys(('t', 'zmag', 'z'), [0., 1.])
         items       = track.beads
@@ -105,14 +145,10 @@ class BeadPlotter(SinglePlotter, _PlotterMixin):
             self.fixreset(rng)
         return self._fig
 
-    def update(self, items:dict):
-        "Updates the data"
-        if not ('track' in items or 'bead' in items):
-            return
-
-        with self.updating():
-            self._source.data = self._createdata()
-            self._setbounds()
+    def _update(self):
+        self._fig.disabled = False
+        self._source.data  = self._createdata()
+        self._setbounds()
 
 class DpxHoverModel(Model):
     u"controls keypress actions"
@@ -162,7 +198,7 @@ class DpxHoverModel(Model):
         hover.tooltips = None
         hover.callback = CustomJS.from_py_func(_onhover)
 
-class CyclesPlotter(Plotter, _PlotterMixin):
+class CyclesPlotter(Plotter, metaclass = _PlotterMixin):
     "Displays cycles and their projection"
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
@@ -172,11 +208,15 @@ class CyclesPlotter(Plotter, _PlotterMixin):
                             tools     = 'ypan,ybox_zoom,reset,save',
                             ncycles   = 150,
                             minframes = 10,
-                            raw       = PlotAttrs('blue',  'circle', 1, alpha = .5),
-                            frames    = PlotAttrs('white', 'quad',   1, line_color = 'blue'),
+                            raw       = PlotAttrs('blue',  'circle', 1,
+                                                  alpha   = .5,
+                                                  palette = 'inferno'),
+                            frames    = PlotAttrs('white', 'quad',   1,
+                                                  line_color = 'gray',
+                                                  fill_color = 'gray'),
                             cycles    = PlotAttrs('white', 'quad',   1,
                                                   fill_alpha = 0.,
-                                                  line_color = 'green'),
+                                                  line_color = 'blue'),
                             **DpxHoverModel.defaultconfig()
                            )
 
@@ -201,7 +241,7 @@ class CyclesPlotter(Plotter, _PlotterMixin):
         return args
 
     def _createrawdata(self) -> dict:
-        track, bead = self._gettrack()
+        track, bead = self._gettrack() # pylint: disable=no-member
         keys        = set('C%d' % i for i in range(self.getConfig()['ncycles'].get()))
         if track is None:
             return dict.fromkeys(('t', 'sel')+tuple(keys), [0., 1.])
@@ -222,15 +262,16 @@ class CyclesPlotter(Plotter, _PlotterMixin):
 
     def _createraw(self):
         raw             = self._createrawdata()
-        attrs           = self.getConfig()['raw']
+        attrs           = self.getConfig()['raw'].get()
+        ncycles         = self.getConfig()['ncycles'].get()
         self._rawsource = ColumnDataSource(data = raw)
-        for name in raw:
+        for ind, attrs in enumerate(attrs.iterpalette(ncycles)):
             attrs.addto(self._raw,
                         x       = 't',
-                        y       = name,
+                        y       = 'C%d' % ind,
                         source  = self._rawsource,
                         tags    = ['__lines__'],
-                        visible = raw['t'] is not raw[name])
+                        visible = raw['t'] is not raw['C%d' % ind])
 
         DpxHoverModel().tool(self._raw, self._rawsource, self.getConfig())
 
@@ -247,7 +288,7 @@ class CyclesPlotter(Plotter, _PlotterMixin):
         fig.y_range.on_change('end',   _onchange)
 
     def _createhistdata(self):
-        track, bead   = self._gettrack()
+        track, bead   = self._gettrack() # pylint: disable=no-member
         if track is None:
             bins  = np.array([-1, 1])
             zeros = np.zeros((1,), dtype = 'f4')
@@ -304,19 +345,22 @@ class CyclesPlotter(Plotter, _PlotterMixin):
         self._histsource = ColumnDataSource(data = hist)
 
         self._hist.extra_x_ranges = {"cycles": Range1d(start = 0., end = 1.)}
-        self._hist.add_layout(LinearAxis(x_range_name="cycles", axis_label = u'Cycles'),
-                              'above')
+
+        attrs = self.getConfig()['cycles'].get()
+        axis  = LinearAxis(x_range_name="cycles", axis_label = u'Cycles')
+        axis.axis_label_text_color = attrs.line_color
+        self._hist.add_layout(axis, 'above')
 
         self.getConfig()['frames'].addto(self._hist,
                                          source = self._histsource,
                                          bottom = "bottom", top   = "top",
                                          left   = "left",   right = "frames")
 
-        self.getConfig()["cycles"].addto(self._hist,
-                                         source = self._histsource,
-                                         bottom = "bottom", top   = "top",
-                                         left   = "left",   right = "cycles",
-                                         x_range_name = "cycles")
+        attrs.addto(self._hist,
+                    source = self._histsource,
+                    bottom = "bottom", top   = "top",
+                    left   = "left",   right = "cycles",
+                    x_range_name = "cycles")
 
         self._slavexaxis()
 
@@ -325,30 +369,31 @@ class CyclesPlotter(Plotter, _PlotterMixin):
         self._createraw()
         self._createhist()
         row = gridplot([[self._raw, self._hist]])
-        return DpxKeyedRow(self, self._raw, children = [row])
 
-    def update(self, items:dict):
-        "Updates the data"
-        if not ('track' in items or 'bead' in items):
-            return
+        return DpxKeyedRow(self, self._raw,
+                           children = [row],
+                           toolbar  = row.children[0])
 
-        with self.updating():
-            raw                   = self._createrawdata()
-            self._rawsource.data  = raw
-            for glyph in self._raw.select(tags = '__lines__'):
-                glyph.visible = raw[glyph.y] is not raw['t']
+    def _update(self):
+        self._hist.disabled   = False
+        self._raw.disabled    = False
 
-            hist                  = self._createhistdata()
-            self._histsource.data = hist
-            self.setbounds(self._raw.y_range, None, (hist['bottom'][0], hist['top'][-1]))
+        raw                   = self._createrawdata()
+        self._rawsource.data  = raw
+        for glyph in self._raw.select(tags = '__lines__'):
+            glyph.visible = raw[glyph.y] is not raw['t']
 
-            bnd = 0, np.max(hist['frames'])+1
-            self._hist.x_range.update(bounds = bnd, start = 0, end = bnd[1])
+        hist                  = self._createhistdata()
+        self._histsource.data = hist
+        self.setbounds(self._raw.y_range, None, (hist['bottom'][0], hist['top'][-1]))
 
-            bnd = 0, np.max(hist["cycles"])+1
-            self._hist.extra_x_ranges["cycles"].update(bounds = bnd,
-                                                       start  = 0,
-                                                       end    = bnd[1])
+        bnd = 0, np.max(hist['frames'])+1
+        self._hist.x_range.update(bounds = bnd, start = 0, end = bnd[1])
+
+        bnd = 0, np.max(hist["cycles"])+1
+        self._hist.extra_x_ranges["cycles"].update(bounds = bnd,
+                                                   start  = 0,
+                                                   end    = bnd[1])
 
 class TrackPlot(BokehView):
     "Track plot view"
@@ -365,7 +410,7 @@ class TrackPlot(BokehView):
         self._plotter = None
 
     def _onUpdateCurrent(self, **items):
-        self._plotter.update(items)
+        self._plotter.update(items) # pylint: disable=no-member
 
     def getroots(self):
         "adds items to doc"

@@ -2,6 +2,7 @@ import * as _         from "underscore"
 import * as $         from "jquery"
 import * as p         from "core/properties"
 import {RowView, Row} from "models/layouts/row"
+import {ToolbarBox}   from "models/tools/toolbar_box"
 
 export class DpxKeyedRowView extends RowView
     className: "dpx-bk-grid-row"
@@ -14,23 +15,57 @@ export class DpxKeyedRowView extends RowView
 export class DpxKeyedRow extends Row
     default_view: DpxKeyedRowView
     type: "DpxKeyedRow"
+    _get_tb: () ->
+        if @toolbar?
+            return @toolbar
+
+        return @fig.toolbar
 
     _get_tool: (name) ->
-        tools = @fig.toolbar.tools
+        if @toolbar?
+            if @toolbar instanceof ToolbarBox
+                for _, gest of @toolbar._toolbar.gestures
+                    for proxy in gest.tools
+                        for tool in proxy.tools
+                            if tool.type == name
+                                return proxy
+                return null
+            else
+                tools = @toolbar.tools
+        else
+            tools = @fig.toolbar.tools
+
         for attr in tools
             if attr.type == name
                 return attr
         return null
 
-    _set_active: (name) ->
-        tool               = @_get_tool(name)
+    _activate: (tool) ->
+        act         = tool.active
+        tool.active = not act
 
+    _set_active: (name) ->
+        tool = @_get_tool(name)
         if tool?
-            @_curr         = @fig.toolbar.gestures.pan.active
-            @_curr?.active = false
-            tool.active    = true
+            tbar = @fig.toolbar
+            if @toolbar instanceof ToolbarBox
+                tbar = @toolbar._toolbar
+            else if @toolbar?
+                tbar = @toolbar
+
+            @_curr = tbar.gestures.pan.active
+            if @_curr isnt tool
+                if @_curr?
+                    @_activate(@_curr)
+
+                @_activate(tool)
+            else
+                @_curr = null
 
     _do_zoom: (zoomin, rng) ->
+        unless rng.bounds?
+            return
+
         center = (rng.end+rng.start)*.5
         delta  = rng.end-rng.start
         if zoomin
@@ -47,6 +82,9 @@ export class DpxKeyedRow extends Row
             rng.end   = rng.bounds[1]
 
     _do_pan: (panlow, rng) ->
+        unless rng.bounds?
+            return
+
         delta     = (rng.end-rng.start)*@panrate*(if panlow then -1 else 1)
         if rng.bounds[0] > rng.start + delta
             delta = rng.bounds[0]-rng.start
@@ -59,12 +97,14 @@ export class DpxKeyedRow extends Row
     _do_reset: () ->
         fig       = @fig
         rng       = fig.x_range
-        rng.start = rng.bounds[0]
-        rng.end   = rng.bounds[1]
+        if rng.bounds?
+            rng.start = rng.bounds[0]
+            rng.end   = rng.bounds[1]
 
         rng       = fig.y_range
-        rng.start = rng.bounds[0]
-        rng.end   = rng.bounds[1]
+        if rng.bounds?
+            rng.start = rng.bounds[0]
+            rng.end   = rng.bounds[1]
 
     dokeydown: (evt) ->
         if not (@fig?)
@@ -94,8 +134,9 @@ export class DpxKeyedRow extends Row
                 @["_do_"+tool](dir == "low", @fig[axis+"_range"])
 
     dokeyup: (evt) ->
-        @_curr?.active = true
-        @_curr         = null
+        if @_curr?
+            @_activate(@_curr)
+        @_curr  = null
 
     @internal {
         _curr:    [p.Any, null]
@@ -103,6 +144,7 @@ export class DpxKeyedRow extends Row
 
     @define {
         fig:      [p.Instance ]
+        toolbar:  [p.Instance, null]
         keys:     [p.Any,   {}]
         zoomrate: [p.Number, 0]
         panrate:  [p.Number, 0]
