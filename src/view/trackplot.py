@@ -153,6 +153,8 @@ class BeadPlotter(SinglePlotter, metaclass = _PlotterMixin):
 class DpxHoverModel(Model):
     u"controls keypress actions"
     precision = Float(0.003)
+    bias      = Float(0.)
+    slope     = Float(0.)
     __implementation__ = """
     import * as p  from "core/properties"
     import {Model} from "model"
@@ -161,7 +163,11 @@ class DpxHoverModel(Model):
     export class DpxHoverModel extends Model
         default_view: DpxHoverModelView
         type:"DpxHoverModel"
-        @define { precision : [p.Number,  0.003] }
+        @define {
+            precision : [p.Number, 0.003],
+            slope     : [p.Number, 0],
+            bias      : [p.Number, 0]
+        }
     """
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -191,7 +197,9 @@ class DpxHoverModel(Model):
 
     def createtooltips(self, fig, source, data, cnf):
         u"creates the hover tool"
-        self.precision = cnf['binwidth'].get()
+        self.precision = cnf.binwidth.get()
+        self.bias      = cnf.basebias.get()
+        self.slope     = cnf.baseslope.get()
         attrs          = cnf['selraw'].get()
 
         glyph = attrs.addto(fig, x = 't', y = 'sel', source = source, visible = False)
@@ -247,6 +255,8 @@ class CyclesPlotter(Plotter, metaclass = _PlotterMixin):
                             tools     = 'ypan,ybox_zoom,reset,save',
                             ncycles   = 150,
                             minframes = 10,
+                            basebias  = None,
+                            baseslope = 8.8e-4,
                             raw       = PlotAttrs('blue',  'circle', 1,
                                                   alpha   = .5,
                                                   palette = 'inferno'),
@@ -258,22 +268,25 @@ class CyclesPlotter(Plotter, metaclass = _PlotterMixin):
                                                   line_color = 'blue'),
                             **DpxHoverModel.defaultconfig()
                            )
+        cnf.hist.defaults = dict(xtoplabel = u'Cycles',
+                                 xlabel    = u'Frames',
+                                 ylabel    = u'Base number')
 
         self._hover      = DpxHoverModel()
         self._rawsource  = ColumnDataSource()
-        self._raw        = figure(y_axis_label = u'z',
+        self._raw        = figure(y_axis_label = self.getConfig().ylabel.get(),
                                   y_range      = Range1d(start = 0., end = 1.),
-                                  **self._figargs(u'Time', 500, 'left','hover'))
+                                  **self._figargs(cnf, 500, 'left','hover'))
 
         self._histsource = ColumnDataSource()
         self._hist       = figure(y_axis_location = None,
                                   y_range         = self._raw.y_range,
-                                  **self._figargs(u'Frames', 200, None))
+                                  **self._figargs(cnf.hist, 200, None))
 
     def _figargs(self, # pylint: disable=arguments-differ
-                 xaxis, width, loc, tools = None):
+                 cnf, width, loc, tools = None):
         args = super()._figargs()
-        args['x_axis_label']     = xaxis
+        args['x_axis_label']     = cnf.xlabel.get()
         args['plot_width']       = width
         args['toolbar_location'] = loc
         if tools is not None:
@@ -282,7 +295,7 @@ class CyclesPlotter(Plotter, metaclass = _PlotterMixin):
 
     def _createrawdata(self) -> dict:
         track, bead = self._gettrack() # pylint: disable=no-member
-        keys        = set('C%d' % i for i in range(self.getConfig()['ncycles'].get()))
+        keys        = set('C%d' % i for i in range(self.getConfig().ncycles.get()))
         if track is None:
             return dict.fromkeys(('t', 'sel')+tuple(keys), [0., 1.])
         items = dict(('C%d' % i[-1], j) for i, j in track.cycles[bead,...])
@@ -302,8 +315,8 @@ class CyclesPlotter(Plotter, metaclass = _PlotterMixin):
 
     def _createraw(self):
         raw             = self._createrawdata()
-        attrs           = self.getConfig()['raw'].get()
-        ncycles         = self.getConfig()['ncycles'].get()
+        attrs           = self.getConfig().raw.get()
+        ncycles         = self.getConfig().ncycles.get()
         self._rawsource = ColumnDataSource(data = raw)
         for ind, attrs in enumerate(attrs.iterpalette(ncycles)):
             attrs.addto(self._raw,
@@ -357,11 +370,15 @@ class CyclesPlotter(Plotter, metaclass = _PlotterMixin):
         def _onchangebounds(yrng   = self._hist.y_range,
                             frames = self._hist.x_range,
                             cycles = self._hist.extra_x_ranges["cycles"],
+                            bases  = self._hist.extra_y_ranges['bases'],
                             src    = self._histsource):
             # pylint: disable=protected-access,no-member
             if yrng.bounds is not None:
                 yrng._initial_start = yrng.bounds[0]
                 yrng._initial_end   = yrng.bounds[1]
+            if bases.bounds is not None:
+                bases._initial_start = bases.bounds[0]
+                bases._initial_end   = bases.bounds[1]
 
             counts = src.data["frames"]
             if len(counts) < 2:
@@ -381,26 +398,31 @@ class CyclesPlotter(Plotter, metaclass = _PlotterMixin):
         self._hist.y_range.callback = CustomJS.from_py_func(_onchangebounds)
 
     def _createhist(self):
+        cnf              = self.getConfig()
         hist             = self._createhistdata()
         self._histsource = ColumnDataSource(data = hist)
 
         self._hist.extra_x_ranges = {"cycles": Range1d(start = 0., end = 1.)}
 
-        attrs = self.getConfig()['cycles'].get()
-        axis  = LinearAxis(x_range_name="cycles", axis_label = u'Cycles')
+        attrs = cnf.cycles.get()
+        axis  = LinearAxis(x_range_name="cycles", axis_label = cnf.hist.xtoplabel.get())
         axis.axis_label_text_color = attrs.line_color
         self._hist.add_layout(axis, 'above')
 
-        self.getConfig()['frames'].addto(self._hist,
-                                         source = self._histsource,
-                                         bottom = "bottom", top   = "top",
-                                         left   = "left",   right = "frames")
+        cnf.frames.addto(self._hist,
+                         source = self._histsource,
+                         bottom = "bottom", top   = "top",
+                         left   = "left",   right = "frames")
 
         attrs.addto(self._hist,
                     source = self._histsource,
                     bottom = "bottom", top   = "top",
                     left   = "left",   right = "cycles",
                     x_range_name = "cycles")
+
+        self._hist.extra_y_ranges = {"bases": Range1d(start = 0., end = 1.)}
+        axis = LinearAxis(y_range_name="bases", axis_label = cnf.hist.ylabel.get())
+        self._hist.add_layout(axis, 'right')
 
         self._slavexaxis()
 
@@ -432,6 +454,20 @@ class CyclesPlotter(Plotter, metaclass = _PlotterMixin):
         self._hist.x_range.update(bounds = bnd, start = 0, end = bnd[1])
 
         bnd = 0, np.max(hist["cycles"])+1
+        self._hist.extra_x_ranges["cycles"].update(bounds = bnd,
+                                                   start  = 0,
+                                                   end    = bnd[1])
+
+        bias  = self.getConfig().basebias.get()
+        if bias is None:
+            ind  = next((i for i,j in enumerate(hist['cycles']) if j > 0), 0)
+            bias = hist['bottom'][ind] + self.getConfig().binwidth.get()*.5
+
+        slope = self.getConfig().baseslope.get()
+        self.setbounds(self._hist.extra_y_ranges['bases'], None,
+                       ((self._raw.y_range.start-bias)/slope,
+                        (self._raw.y_range.end  -bias)/slope))
+
         self._hist.extra_x_ranges["cycles"].update(bounds = bnd,
                                                    start  = 0,
                                                    end    = bnd[1])

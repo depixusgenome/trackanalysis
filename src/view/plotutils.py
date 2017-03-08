@@ -87,10 +87,12 @@ class Plotter:
     u"Base plotter class"
     def __init__(self, ctrl:Controller) -> None:
         u"sets up this plotter's info"
-        ctrl.addGlobalMap(self.key())
-        ctrl.addGlobalMap(self.key('current'))
         self._ctrl  = ctrl
         self._ready = False
+
+        ctrl.addGlobalMap(self.key())
+        ctrl.addGlobalMap(self.key('current'))
+        self.getConfig().defaults = dict(ylabel = u'Z', xlabel = u'Time')
 
     @contextmanager
     def updating(self):
