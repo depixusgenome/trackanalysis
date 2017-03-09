@@ -11,7 +11,6 @@ from typing import Callable # pylint: disable=unused-import
 import numpy
 from Bio import pairwise2
 from . import oligohit
-from . import asm
 
 
 
@@ -162,7 +161,7 @@ def max_overlap_assemble(oligos):
         seq = oligohit.max_overlap_pile(seq,oli.seq)
     return seq
 
-def match_sequence(srec:asm.SeqRecorder,srec2seq:Callable,align_strs:Callable):
+def match_sequence(srec,srec2seq:Callable,align_strs:Callable):
     u'''
     given a SeqRecorder object, reconstructs the sequence given by oligos using srec2seq.
     return the overlap between reconstructed sequence and the sequence.
@@ -171,7 +170,7 @@ def match_sequence(srec:asm.SeqRecorder,srec2seq:Callable,align_strs:Callable):
     known_seq = srec.sequence
     return align_strs(known_seq,exp_seq)
 
-def score_match(srec:asm.SeqRecorder,srec2seq:Callable,align_strs:Callable):
+def score_match(srec,srec2seq:Callable,align_strs:Callable):
     u'''
     returns the ratio of characters in match_sequence not "-"
     '''
@@ -199,7 +198,7 @@ def _gap_penalties(x,y): # pylint:disable=unused-argument,invalid-name
         return 0
     return -1
 
-def pairwise2_alignment(seqrec:asm.SeqRecorder): # uses bpos
+def pairwise2_alignment(seqrec): # uses bpos
     u'''uses Bio.pairwise2 alignment to compute the best score of
     sequence from oligohits and known sequence'''
     exp_seq = seq_from_bpos(seqrec)[0]
