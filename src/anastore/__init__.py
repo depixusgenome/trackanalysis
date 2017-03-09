@@ -10,17 +10,20 @@ import os
 
 from ._fromjson import Runner as _InputRunner
 from ._tojson   import Runner as _OutputRunner
-from ._patches  import run    as _patch
+from ._patches  import Patches
+from ._default  import __TASKS__, __CONFIGS__
 
-__VERSION__ = 0
 def _dump(info, addversion = True):
     if addversion:
-        return [{'version': __VERSION__}, _OutputRunner()(info)]
-    return _OutputRunner()(info)
+        return _OutputRunner()(__TASKS__.dumps(info))
+    else:
+        return _OutputRunner()(info)
 
-def _load(info):
-    patched = _patch(info[1], info[0]['version'], __VERSION__)
-    return _InputRunner()(patched)
+def _load(info, addversion = True):
+    if addversion:
+        return _InputRunner()(__TASKS__.loads(info))
+    else:
+        return _InputRunner()(info)
 
 def dumps(info, addversion = True, **kwa):
     u"Dumps data to json. This includes the version number"

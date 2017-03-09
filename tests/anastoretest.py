@@ -5,7 +5,6 @@ import sys
 import numpy
 
 import anastore
-import anastore._patches
 from model.task import TrackReaderTask, CycleCreatorTask, TaggingTask
 
 def test_storetasks(monkeypatch):
@@ -45,15 +44,18 @@ def test_storetasks(monkeypatch):
         def _fcn(val, _ = ind):
             used.append(_)
             return val
-        return ('to_version_%d' % ind, _fcn)
+        return _fcn
 
-    monkeypatch.setattr(anastore, '__VERSION__', 5)
+    patch = anastore.Patches()
+    for _ in range(5):
+        patch.patch(_vers(_))
+
+    monkeypatch.setattr(anastore, '__TASKS__', patch)
     dumped = anastore.dumps(tasks)
     assert dumped[:len('[{"version": 5},')] == '[{"version": 5},'
 
-    monkeypatch.setattr(anastore, '__VERSION__', 7)
-    monkeypatch.setattr(anastore._patches, '_LOCS', # pylint: disable=protected-access
-                        dict(_vers(i) for i in range(1, 8)))
+    for _ in range(5,8):
+        patch.patch(_vers(_))
 
     loaded = anastore.loads(dumped)
     assert used   == list(range(6, 8))
