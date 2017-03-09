@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"All sequences-related stuff"
+"All sequences-related stuff"
 from    typing import (Sequence, Union,  # pylint: disable=unused-import
                        Iterator, Tuple, TextIO)
 import  pathlib
@@ -12,13 +12,13 @@ from    utils       import fromstream
 
 @fromstream('r')
 def read(stream:TextIO) -> 'Iterator[Tuple[str,str]]':
-    u"reads a path and yields pairs (name, sequence)"
+    "reads a path and yields pairs (name, sequence)"
     yield from seqio.FastaIO.SimpleFastaParser(stream)
 
 PEAKS_DTYPE = [('position', 'i4'), ('orientation', np.bool8)]
 PEAKS_TYPE  = Sequence[Tuple[int, bool]]
 def peaks(seq:str, oligs:'Union[Sequence[str], str]', flags = re.IGNORECASE) -> np.ndarray:
-    u"""
+    """
     Returns the peak positions and orientation associated to a sequence.
 
     A peak position is the end position of a match. With indexes starting at 0,
@@ -61,8 +61,18 @@ def peaks(seq:str, oligs:'Union[Sequence[str], str]', flags = re.IGNORECASE) -> 
 
     return np.array(sorted(vals.items()), dtype = PEAKS_DTYPE)
 
+def marksequence(seq:str, oligs: Sequence[str]) -> str:
+    u"Returns a sequence with oligos to upper case"
+    seq = seq.lower()
+    for olig in oligs:
+        seq  = seq.replace(olig.lower(), olig.upper())
+
+        olig = str(Seq(olig).reverse_complement())
+        seq  = seq.replace(olig.lower(), olig.upper())
+    return seq
+
 def overlap(ol1:str, ol2:str, minoverlap = None):
-    u"""
+    """
     Returns wether the 2 oligos overlap
 
     Example:

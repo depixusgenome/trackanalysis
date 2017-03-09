@@ -8,5 +8,5 @@ from .attrdefaults  import (toenum, changefields, kwargsdefaults, setdefault,
                             initdefaults, update, updatecopy, updatedeepcopy,
                             pipe, NoArgs)
 
-from .decoration    import fromstream, escapenans, StreamUnion
+from .decoration    import fromstream, escapenans, StreamUnion, cachedio, CachedIO
 from .array         import asdataarrays, asobjarray, EVENTS_DTYPE, EVENTS_TYPE

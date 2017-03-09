@@ -6,17 +6,20 @@ from typing         import (Optional, # pylint: disable=unused-import
                             TYPE_CHECKING)
 from pathlib        import Path
 from functools      import wraps
+from itertools      import product
 
 from bokeh.model    import Model
-from bokeh.core.properties  import Float
+from bokeh.core.properties  import Float, Seq, Instance, Bool
 from bokeh.plotting import figure
 from bokeh.layouts  import gridplot
 from bokeh.models   import (LinearAxis, ColumnDataSource, HoverTool,
-                            CustomJS, Range1d)
+                            CustomJS, Range1d, ContinuousTicker,
+                            BasicTicker, Ticker)
 
 import numpy        as np
 
 import sequences
+from   utils        import CachedIO
 from control        import Controller
 from .plotutils     import PlotAttrs, Plotter, DpxKeyedRow
 from .              import BokehView
@@ -34,14 +37,22 @@ def _checksizes(fcn):
         return res
     return _wrap
 
+_CACHE = CachedIO(lambda path: dict(sequences.read(path)), size = 1)
+def _readsequence(path):
+    if not isinstance(path, (str, Path)):
+        path = path.sequences.get()
+    if not Path(path).exists():
+        return dict()
+    return _CACHE(path)
+
 class _TrackPlotter(Plotter):
-    _row = None # type: Optional[DpxKeyedRow]
+    _row   = None # type: Optional[DpxKeyedRow]
     def __init__(self, *_):
         super().__init__(*_)
         self._row = None
 
     def create(self) -> DpxKeyedRow:
-        u"returns the figure"
+        "returns the figure"
         self._row   = self._create(*self._gettrack())
         self._row.disabled = True
         return self._row
@@ -85,7 +96,7 @@ class BeadPlotter(_TrackPlotter):
         cnf.defaults = dict(z        = PlotAttrs('blue', 'circle', 1),
                             zmag     = PlotAttrs('red',  'line',   1),
                             tooltips = [(u'Index',  '$index'),
-                                        (u'(t, z, zmag)', '($data_x, $data_y, @zmag)')])
+                                        (u'(t, z, zmag)', '($~x, $data_y, @zmag)')])
 
     def _get(self, name):
         return self._source.data[name] # pylint: disable=unsubscriptable-object
@@ -156,7 +167,7 @@ class BeadPlotter(_TrackPlotter):
         self._setbounds()
 
 class DpxHoverModel(Model):
-    u"controls keypress actions"
+    "controls keypress actions"
     precision = Float(0.003)
     framerate = Float(1.)
     bias      = Float(0.)
@@ -183,11 +194,10 @@ class DpxHoverModel(Model):
 
     @staticmethod
     def defaultconfig() -> dict:
-        u"default config"
+        "default config"
         return dict(selraw      = PlotAttrs('green', 'line',   2),
-                    tooltips    = [(u'(cycle, t, z)', '(@cycles, $~x, $~y)')],
+                    tooltips    = [(u'(cycle, t, z)', '(@cycles, $~x, $data_y)')],
                     sequences   = "../tests/testingcore/hairpins.fasta",
-                    oligosize   = 4,
                     sequencekey = 'GF1')
 
     @staticmethod
@@ -209,7 +219,7 @@ class DpxHoverModel(Model):
         return data
 
     def createraw(self, fig, source, data, cnf):
-        u"creates the hover tool"
+        "creates the hover tool"
         self.precision = cnf.binwidth.get()
         self.bias      = cnf.basebias.get()
         self.slope     = cnf.baseslope.get()
@@ -252,7 +262,7 @@ class DpxHoverModel(Model):
         hover[0].renderers = [fig.circle(x                = 'inds',
                                          y                = 'values',
                                          source           = self._rawsource,
-                                         radius           = 1.,
+                                         radius           = 2,
                                          radius_dimension = 'x',
                                          line_alpha       = 0.,
                                          fill_alpha       = 0.,
@@ -261,18 +271,18 @@ class DpxHoverModel(Model):
     @staticmethod
     @_checksizes
     def _createhistdata(cnf):
-        path = cnf.sequences.get()
-        key  = cnf.sequencekey.get()
-        osiz = cnf.oligosize.get()
-
-        dseq = dict(sequences.read(path)) if Path(path).exists() else {}
+        key   = cnf.sequencekey.get()
+        oligs = cnf.oligos.get()
+        osiz  = max(len(i) for i in oligs)
+        dseq  = _readsequence(cnf)
         if len(dseq) == 0:
             return dict(values = [0], inds = [0], text = [''])
 
         nbases = max(len(i) for i in dseq.values())
-        data   = dict(values = np.arange(nbases),
+        data   = dict(values = np.arange(osiz, nbases+osiz),
                       inds   = np.full((nbases,), 0.5, dtype = 'f4'))
         for name, seq in dseq.items():
+            seq        = sequences.marksequence(seq, oligs)
             data[name] = np.full((nbases,), ' ', dtype = 'U%d' % osiz)
             data[name][:len(seq)-osiz+1] = [seq[i:i+osiz] for i in range(len(seq)-osiz+1)]
 
@@ -280,7 +290,7 @@ class DpxHoverModel(Model):
         return data
 
     def createhist(self, fig, cnf):
-        u"Creates the hover tool for histograms"
+        "Creates the hover tool for histograms"
         self.update(framerate = 1./30.,
                     bias      = 0.,
                     slope     = cnf.baseslope.get())
@@ -290,13 +300,13 @@ class DpxHoverModel(Model):
             return
 
         self._histsource = ColumnDataSource(self._createhistdata(cnf))
-        hover[0].tooltips   = '@text'
+        hover[0].tooltips   = '@values: @text'
         hover[0].mode       = 'hline'
 
         hover[0].renderers  = [fig.circle(x                = 'inds',
                                           y                = 'values',
                                           source           = self._histsource,
-                                          radius           = 1,
+                                          radius           = 1.5,
                                           radius_dimension = 'y',
                                           line_alpha       = 0.,
                                           fill_alpha       = 0.,
@@ -305,7 +315,7 @@ class DpxHoverModel(Model):
                                           visible          = False)]
 
     def updateraw(self, fig, rdata):
-        u"updates the tooltips for a new file"
+        "updates the tooltips for a new file"
         hover = fig.select(HoverTool)
         if len(hover) == 0:
             return
@@ -313,7 +323,7 @@ class DpxHoverModel(Model):
         self._rawsource.data  = self._createrawdata(rdata)
 
     def updatehist(self, fig, track, hdata, cnf):
-        u"updates the tooltips for a new file"
+        "updates the tooltips for a new file"
         hover = fig.select(HoverTool)
         if len(hover) == 0:
             return
@@ -328,16 +338,119 @@ class DpxHoverModel(Model):
                     bias      = bias,
                     slope     = cnf.baseslope.get())
 
+class DpxFixedTicker(ContinuousTicker):
+    "Generate ticks at fixed, explicitly supplied locations."
+
+    major   = Seq(Float, default=[], help="List of major tick locations.")
+    minor   = Seq(Float, default=[], help="List of major tick locations.")
+    usebase = Bool(default = True)
+    base    = Instance(Ticker, default = BasicTicker())
+
+    _ORDER     = tuple('grid_line_'+i for i in ('color', 'width', 'dash', 'alpha'))
+    _ORDER    += tuple('minor_'+i for i in _ORDER) # type: ignore
+    _ORDER    += 'y_range_name',                   # type: ignore
+
+    __implementation__ = """
+        import {ContinuousTicker} from "models/tickers/continuous_ticker"
+        import *             as p from "core/properties"
+
+        export class DpxFixedTicker extends ContinuousTicker
+            type: 'DpxFixedTicker'
+
+            @define {
+                major:   [ p.Array, [] ]
+                minor:   [ p.Array, [] ]
+                usebase: [ p.Bool,     true]
+                base:    [ p.Instance, null]
+            }
+
+            get_ticks_no_defaults: (data_low, data_high, desired_n_ticks) ->
+                if @usebase
+                    return @base.get_ticks_no_defaults(data_low, data_high,
+                                                       desired_n_ticks)
+                return {
+                    major: @major
+                    minor: @minor
+                }
+    """
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+        self._defaults = []     # type: list
+        self._axis     = None   # type: Optional[DpxFixedTicker]
+
+    def create(self, cnf, *figs):
+        "Sets the ticks according to the configuration"
+        self._defaults = []
+
+        for fig in figs:
+            if fig.ygrid[0].minor_grid_line_color is not None:
+                continue
+            # bokehjs will never draw minor lines unless the color is
+            # is set at startup
+            fig.ygrid[0].minor_grid_line_color = 'navy'
+            fig.ygrid[0].minor_grid_line_alpha = 0.
+
+        for fig, name in product(figs, self._ORDER):
+            self._defaults.append(getattr(fig.ygrid[0], name))
+
+        for fig in figs:
+            fig.extra_y_ranges = {"bases": Range1d(start = 0., end = 1.)}
+            fig.ygrid[0].ticker       = self
+            fig.ygrid[0].y_range_name = 'bases'
+
+        fig = figs[-1]
+        if self._axis is None:
+            self._axis = type(self)()
+
+        fig.add_layout(LinearAxis(y_range_name = "bases",
+                                  axis_label   = cnf.hist.ylabel.get(),
+                                  ticker       = self._axis),
+                       'right')
+    @staticmethod
+    def defaultconfig() -> dict:
+        "default config"
+        return dict(gridcolor = ('lightblue', 'lightgreen'),
+                    gridwidth = (2,           2),
+                    gridalpha = (1.,          1.),
+                    griddash  = ('solid',     'solid'))
+
+    def update(self, cnf, *figs):
+        "Updates the ticks according to the configuration"
+        dseq = _readsequence(cnf)
+        seq  = dseq.get(cnf.sequencekey.get(), next(iter(dseq.values()), None))
+
+        self.usebase = seq is None
+        if self._axis:
+            self._axis.usebase = self.usebase
+        if self.usebase:
+            for (fig, name), val in zip(product(figs, self._ORDER), self._defaults):
+                setattr(fig.ygrid[0], name, val)
+        else:
+            peaks      = sequences.peaks(seq, cnf.oligos.get())
+            self.major = tuple(peaks["position"][peaks['orientation']])
+            self.minor = tuple(peaks["position"][~peaks['orientation']])
+            if self._axis:
+                self._axis.major = self.major + self.minor
+                self._axis.minor = []
+
+            for fig in figs:
+                grd = fig.ygrid[0]
+                grd.y_range_name = 'bases'
+                for name in ('color', 'dash', 'width', 'alpha'):
+                    props = cnf['grid'+name].get()
+                    setattr(grd, 'grid_line_'+name,       props[0])
+                    setattr(grd, 'minor_grid_line_'+name, props[1])
+
 class _CyclesPlotterMixin:
     if TYPE_CHECKING:
         def getConfig(self):
-            u"returns the config"
+            "returns the config"
             raise NotImplementedError()
         def key(self):
-            u"returns the plot key"
+            "returns the plot key"
             raise NotImplementedError()
         def _figargs(self, cnf, width, loc):
-            u"returns figure args"
+            "returns figure args"
             raise NotImplementedError()
 
 class _CyclesRawPlotterMixin(_CyclesPlotterMixin): # pylint: disable=abstract-method
@@ -426,8 +539,11 @@ class _CyclesHistPlotterMixin(_CyclesPlotterMixin): # pylint: disable=abstract-m
                                                   line_color = 'gray',
                                                   fill_color = 'gray'),
                             cycles    = PlotAttrs('white', 'quad',   1,
-                                                  fill_alpha = 0.,
+                                                  fill_color = None,
+                                                  line_alpha = .5,
                                                   line_color = 'blue'),
+
+                            **DpxFixedTicker.defaultconfig()
                            )
         cnf.hist.defaults = dict(xtoplabel = u'Cycles',
                                  xlabel    = u'Frames',
@@ -437,6 +553,7 @@ class _CyclesHistPlotterMixin(_CyclesPlotterMixin): # pylint: disable=abstract-m
         self._hist       = figure(y_axis_location = None,
                                   y_range         = yrng,
                                   **self._figargs(cnf.hist, 200, None))
+        self._gridticker = DpxFixedTicker()
 
     @_checksizes
     def _createhistdata(self, track, bead):
@@ -465,34 +582,34 @@ class _CyclesHistPlotterMixin(_CyclesPlotterMixin): # pylint: disable=abstract-m
                     top     = bins[1:])
 
     def _slavexaxis(self):
-        # pylint: disable=protected-access,no-member,too-many-arguments
-        def _onchangebounds(yrng   = self._hist.y_range,
-                            frames = self._hist.x_range,
-                            cycles = self._hist.extra_x_ranges["cycles"],
-                            bases  = self._hist.extra_y_ranges['bases'],
-                            mdl    = self._hover,
-                            src    = self._histsource):
+        # pylint: disable=protected-access,no-member
+        def _onchangebounds(hist = self._hist, mdl = self._hover, src= self._histsource):
+            yrng = hist.y_range
             if yrng.bounds is not None:
                 yrng._initial_start = yrng.bounds[0]
                 yrng._initial_end   = yrng.bounds[1]
 
-            counts = src.data["frames"]
-            if len(counts) < 2:
-                return
+            cycles       = hist.extra_x_ranges["cycles"]
+            frames       = hist.x_range
+
+            cycles.start = 0.
+            frames.start = 0.
+
+            bases        = hist.extra_y_ranges['bases']
+            bases.start  = (yrng.start-mdl.bias)/mdl.slope
+            bases.end    = (yrng.end-mdl.bias)/mdl.slope
+
             bottom = src.data["bottom"]
             delta  = bottom[1]-bottom[0]
 
-            ind1 = min(len(bottom), max(0, int((yrng.start-bottom[0])/delta-1)))
-            ind2 = min(len(bottom), max(0, int((yrng.end  -bottom[0])/delta+1)))
-            frames.start = 0.
-            frames.end   = window.Math.max.apply(None, counts[ind1:ind2])+1
+            ind1   = min(len(bottom), max(0, int((yrng.start-bottom[0])/delta-1)))
+            ind2   = min(len(bottom), max(0, int((yrng.end  -bottom[0])/delta+1)))
 
-            counts = src.data["cycles"]
-            cycles.start = 0.
-            cycles.end   = window.Math.max.apply(None, counts[ind1:ind2])+1
+            if ind1 >= ind2:
+                return
 
-            bases.start = (yrng.start-mdl.bias)/mdl.slope
-            bases.end   = (yrng.end-mdl.bias)/mdl.slope
+            frames.end = window.Math.max.apply(None, src.data['frames'][ind1:ind2])+1
+            cycles.end = window.Math.max.apply(None, src.data['cycles'][ind1:ind2])+1
 
         self._hist.y_range.callback = CustomJS.from_py_func(_onchangebounds)
 
@@ -519,10 +636,7 @@ class _CyclesHistPlotterMixin(_CyclesPlotterMixin): # pylint: disable=abstract-m
                     left   = "left",   right = "cycles",
                     x_range_name = "cycles")
 
-        self._hist.extra_y_ranges = {"bases": Range1d(start = 0., end = 1.)}
-        axis = LinearAxis(y_range_name="bases", axis_label = cnf.hist.ylabel.get())
-        self._hist.add_layout(axis, 'right')
-
+        self._gridticker.create(self.getConfig(), self._hist)
         self._hover.createhist(self._hist, self.getConfig())
         self._slavexaxis()
 
@@ -531,6 +645,7 @@ class _CyclesHistPlotterMixin(_CyclesPlotterMixin): # pylint: disable=abstract-m
         self._histsource.data = hist = self._createhistdata(track, bead)
         self._hover.updatehist(self._hist, track, hist, self.getConfig())
         self.setbounds(self._hist.y_range, 'y', (hist['bottom'][0], hist['top'][-1]))
+        self._gridticker.update(self.getConfig(), self._hist)
 
 class CyclesPlotter(_TrackPlotter, _CyclesHistPlotterMixin, _CyclesRawPlotterMixin):
     "Displays cycles and their projection"
@@ -539,11 +654,12 @@ class CyclesPlotter(_TrackPlotter, _CyclesHistPlotterMixin, _CyclesRawPlotterMix
         _TrackPlotter.__init__(self, ctrl)
 
         cnf = ctrl.getGlobal(self.key())
-        cnf.defaults = dict(tools     = 'ypan,ybox_zoom,reset,save,hover',
-                            ncycles   = 150,
-                            **DpxHoverModel.defaultconfig()
+        cnf.defaults = dict(tools   = 'ypan,ybox_zoom,reset,save,hover',
+                            ncycles = 150,
+                            oligos  = ['CTGT'],
+                            **DpxHoverModel.defaultconfig(),
                            )
-        self._hover      = DpxHoverModel()
+        self._hover  = DpxHoverModel()
 
         _CyclesRawPlotterMixin.__init__(self, ctrl)
         _CyclesHistPlotterMixin.__init__(self, ctrl, self._raw.y_range)
@@ -556,7 +672,7 @@ class CyclesPlotter(_TrackPlotter, _CyclesHistPlotterMixin, _CyclesRawPlotterMix
         return args
 
     def _create(self, track, bead) -> DpxKeyedRow:
-        u"returns the figure"
+        "returns the figure"
         self._createraw(track, bead)
         self._createhist(track, bead)
         row = gridplot([[self._raw, self._hist]])
