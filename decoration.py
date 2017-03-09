@@ -3,13 +3,38 @@
 u"decoration utils"
 
 import  pathlib
-from    contextlib import contextmanager
-from    functools  import wraps
-from    inspect    import signature, isgeneratorfunction
-from    typing     import Union, IO
+from    collections import OrderedDict
+from    contextlib  import contextmanager
+from    functools   import wraps
+from    inspect     import signature, isgeneratorfunction
+from    typing      import (Dict, Tuple, Any, Optional, TypeVar,
+                            Generic, Callable, Union, IO, Iterator)
 import  numpy as np
 
 StreamUnion = Union[str,pathlib.Path,IO]
+
+class _PathPos:
+    def __init__(self, fcn):
+        bad  = {'self', 'cls', 'mcs'}
+        good = {'path', 'stream'}
+        sig  = signature(fcn).parameters
+        i, j = next((i for i in enumerate(sig) if i[1] in good),
+                    next((i for i in enumerate(sig) if i[1] not in bad),
+                         (0, next(iter(sig)))))
+        self.ind  = i # type: int
+        self.name = j # type: str
+
+    def path(self, args, kwa):
+        "returns the path arg"
+        return kwa['path'] if 'path' in kwa else args[self.ind]
+
+    def args(self, path, args, kwa):
+        u"returns the args as they should be"
+        if 'path' in kwa:
+            kwa['path'] = path
+        else:
+            args = args[:self.ind] + (path,) + args[self.ind+1:]
+        return args, kwa
 
 def fromstream(streamopts):
     u"""
@@ -20,45 +45,40 @@ def fromstream(streamopts):
     2. the first which is **not** named *self* or *cls*
     """
     def _wrapper(fcn):
-        bad        = {'self', 'cls', 'mcs'}
-        good       = {'path', 'stream'}
-        sig        = signature(fcn).parameters
-        ind, first = next((i for i in enumerate(sig) if i[1] in good),
-                          next((i for i in enumerate(sig) if i[1] not in bad),
-                               (0, next(iter(sig)))))
+        ppos    = _PathPos(fcn)
         if isgeneratorfunction(fcn):
             @wraps(fcn)
             def _wrapgen(*args, **kwa):
-                path = args[ind]
+                path = ppos.path(args, kwa)
                 if isinstance(path, pathlib.Path):
                     path = str(path)
 
                 if isinstance(path, str):
                     with open(path, streamopts) as stream:
-                        args = args[:ind] + (stream,) + args[ind+1:]
+                        args, kwa = ppos.args(stream, args, kwa)
                         yield from fcn(*args, **kwa)
                 else:
-                    args = args[:ind] + (path,) + args[ind+1:]
+                    args, kwa = ppos.args(stream, args, kwa)
                     yield from fcn(*args, **kwa)
 
-            _wrapgen.__annotations__[first] = StreamUnion
+            _wrapgen.__annotations__[ppos.name] = StreamUnion
             return _wrapgen
         else:
             @wraps(fcn)
             def _wrapfcn(*args, **kwa):
-                path = args[ind]
+                path = ppos.path(args, kwa)
                 if isinstance(path, pathlib.Path):
                     path = str(path)
 
                 if isinstance(path, str):
                     with open(path, streamopts) as stream:
-                        args = args[:ind] + (stream,) + args[ind+1:]
+                        args, kwa = ppos.args(stream, args, kwa)
                         return fcn(*args, **kwa)
                 else:
-                    args = args[:ind] + (path,) + args[ind+1:]
+                    args, kwa = ppos.args(stream, args, kwa)
                     return fcn(*args, **kwa)
 
-            _wrapfcn.__annotations__[first] = StreamUnion
+            _wrapfcn.__annotations__[ppos.name] = StreamUnion
             return _wrapfcn
     return _wrapper
 
@@ -133,3 +153,46 @@ def escapenans(*arrays: np.ndarray, reset = True):
         return _wrap
     else:
         return _escapenans(*arrays, reset = reset)
+
+T = TypeVar("T")
+class CachedIO(Generic[T]):
+    "Caches io output"
+    def __init__(self,
+                 reader: Callable[..., T],
+                 cache:  Optional[Dict[pathlib.Path, Tuple[int, Any]]] = None,
+                 size:   int                                           = 10
+                ) -> None:
+        self.__reader = reader
+        self.__ppos   = _PathPos(reader)
+        self.__cache  = OrderedDict() if cache is None else cache
+        self.__size   = size
+
+    def clear(self, path: Optional[Union[str, pathlib.Path]] = None):
+        "clears the cache"
+        if path is not None:
+            self.__cache.pop(pathlib.Path(path).absolute())
+        else:
+            self.__cache.clear()
+
+    def __call__(self, *args, **kwa) -> Optional[T]:
+        "reads and caches a file"
+        path = pathlib.Path(self.__ppos.path(args, kwa)).absolute()
+        if not path.exists():
+            return None
+
+        info  = self.__cache.get(path, None)
+        mtime = path.stat().st_mtime_ns
+        if info is None or info[0] != mtime:
+            info = (mtime, self.__reader(*args, **kwa))
+            if isinstance(info[1], Iterator):
+                info = info[0], tuple(info[1])
+
+            if self.__size == len(self.__cache) and path not in self.__cache:
+                self.__cache.popitem()
+
+            self.__cache[path] = info
+        return info[1]
+
+def cachedio(fcn):
+    "Caches io output"
+    return wraps(fcn)(CachedIO(fcn).__call__)
