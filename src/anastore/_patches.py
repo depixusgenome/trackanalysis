@@ -24,11 +24,13 @@ class Patches:
 
     def loads(self, info):
         u"updates json to current version"
-        vers = info[0]['version']+1
-        if len(self._patches) < vers:
-            return info[1]
-
+        vers = info[0]['version']
         data = info[1]
-        for fcn in self._patches[vers:]:
-            data = fcn(data)
+
+        if vers < self.version:
+            for fcn in self._patches[vers:]:
+                data = fcn(data)
+
+        elif vers > self.version:
+            raise IOError("Anastore file version is too high")
         return data

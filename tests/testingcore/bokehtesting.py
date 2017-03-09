@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 u"Utils for testing views"
 from typing                import Optional  # pylint: disable=unused-import
+import sys
+import tempfile
 
 import pytest
 
@@ -204,6 +206,9 @@ class BokehAction:
     u"All things to make gui testing easy"
     def __init__(self, mkpatch):
         self.monkeypatch = mkpatch
+        class _Dummy:
+            user_config_dir = lambda *_: tempfile.mktemp()
+        sys.modules['appdirs'] = _Dummy
 
     def serve(self, app:type, mod:str  = 'default', **kwa) -> _ManagedServerLoop:
         u"Returns a server managing context"
@@ -240,5 +245,5 @@ def bokehaction(monkeypatch):
         from _pytest.monkeypatch import MonkeyPatch
         import warnings
         warnings.warn("Unsafe call to MonkeyPatch. Use only for manual debugging")
-        return BokehAction(MonkeyPatch())
+        monkeypatch = MonkeyPatch()
     return BokehAction(monkeypatch)

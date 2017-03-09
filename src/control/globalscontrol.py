@@ -25,7 +25,37 @@ of plot.
 """
 from collections    import namedtuple, ChainMap
 from typing         import Dict, Union          # pylint: disable=unused-import
+from pathlib        import Path
+
+import anastore
 from .event         import Controller
+
+class GlobalsChild(ChainMap):
+    u"The main model"
+    __NAME    = 'の'
+    __CNT     = 2
+    __slots__ = '__name'
+    def __init__(self, name, parent = None):
+        maps = tuple(dict() for i in range(self.__CNT))
+        if parent is not None:
+            maps += (parent,)
+
+        self.__name = "globals."+name
+        super().__init__(*maps)
+
+    @property
+    def name(self) -> dict:
+        u"returns the name"
+        return self.__name
+
+    def __getstate__(self):
+        info = {self.__NAME: self.__name}
+        info.update(self.maps[0])
+        return info
+
+    def __setstate__(self, info):
+        self.__name = info.pop(self.__NAME)
+        self.maps[0].update(info)
 
 ReturnPair = namedtuple('ReturnPair', ['old', 'value'])
 delete     = type('delete', tuple(), dict())    # pylint: disable=invalid-name
@@ -168,19 +198,14 @@ class _MapGetter:
 
 class DefaultsMap(Controller):
     u"Dictionnary with defaults values. It can be reset to these."
-    _CNT = 2
-    def __init__(self, name, parent = None, **kwargs):
-        maps = tuple(dict() for i in range(self._CNT))
-        if parent is not None:
-            maps += (parent,)
-
+    __slots__ = '__items',
+    def __init__(self, mdl:GlobalsChild, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.__name  = "globals."+name
-        self.__items = ChainMap(*maps)
+        self.__items = mdl # type: GlobalsChild
 
     def createChild(self, name, **kwargs):
         u"returns a child map"
-        return DefaultsMap(name, parent = self.__items, **kwargs)
+        return DefaultsMap(GlobalsChild(name, self.__items), **kwargs)
 
     def setdefaults(self, *args, version = 1, **kwargs):
         u"adds defaults to the config"
@@ -200,6 +225,8 @@ class DefaultsMap(Controller):
             old = self.__items.get(key, delete)
             if val is delete:
                 self.__items.pop(key, None)
+            elif key not in self.__items.maps[1]:
+                raise KeyError("Default value must be set first")
             else:
                 self.__items[key] = val
 
@@ -207,7 +234,7 @@ class DefaultsMap(Controller):
                 ret[key] = ReturnPair(old, val)
 
         if len(ret) > 1:
-            return self.handle(self.__name, self.outasdict, ret)
+            return self.handle(self.__items.name, self.outasdict, ret)
 
     def pop(self, *args):
         u"removes view information"
@@ -255,14 +282,10 @@ class GlobalsController(Controller):
     >> # Get secondary keys starting with 'keypress.pan.x'
     >> ctrl.getGlobal('plot').keypress.pan.x.items
     """
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.__maps = dict()
-        css = self.addGlobalMap('css')
-        css.button.width  = 90
-        css.button.height = 20
-
+        self.addGlobalMap('css').button.defaults = {'width': 90, 'height': 20}
         self.addGlobalMap('config').keypress.defaults = {'undo' : "Control-z",
                                                          'redo' : "Control-y",
                                                          'open' : "Control-o",
@@ -294,7 +317,7 @@ class GlobalsController(Controller):
             parent = self.__maps[key[:key.rfind('.')]]
             self.__maps[key] = parent.createChild(key, handlers = self._handlers)
         else:
-            self.__maps[key] = DefaultsMap(key, handlers = self._handlers)
+            self.__maps[key] = DefaultsMap(GlobalsChild(key), handlers = self._handlers)
 
         self.__maps[key].setdefaults(*args, **kwargs)
         return _MapGetter(self.__maps[key], '')
@@ -320,3 +343,36 @@ class GlobalsController(Controller):
         if len(args) == 0 or len(args) == 1 and args[0] == '':
             return _MapGetter(self.__maps[key], '')
         return self.__maps[key].get(*args, default = default)
+
+    @classmethod
+    def configpath(cls, _1 = None, _2 = None) -> Path:
+        u"returns the path to the config file"
+        raise IOError("Method should be defined in apps")
+
+    def writeconfig(self, appname = None, patchname = 'config'):
+        u"Sets-up the user preferences"
+        path = self.configpath(appname, anastore.version(patchname))
+        path.parent.mkdir(parents = True, exist_ok = True)
+        path.touch(exist_ok = True)
+
+        maps = {i: j._DefaultsMap__items.maps[0] # pylint: disable=protected-access
+                for i, j in self.__maps.items()
+                if 'current' not in i}
+        anastore.dump(maps, path, patch = patchname)
+
+    def readconfig(self, appname = None, patchname = 'config'):
+        u"Sets-up the user preferences"
+        for version in anastore.iterversions(patchname):
+            path = self.configpath(appname, version)
+            if not path.exists():
+                continue
+            try:
+                cnf = anastore.load(path, patch = patchname)
+            except: # pylint: disable=bare-except
+                continue
+            break
+
+        for root in set(cnf) & set(self.__maps):
+            defmap = self.__maps[root]._DefaultsMap__items # pylint: disable=protected-access
+            for key in set(defmap) & set(cnf[root]):
+                defmap[key] = cnf[root][key]

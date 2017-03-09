@@ -58,7 +58,7 @@ def test_storetasks(monkeypatch):
         patch.patch(_vers(_))
 
     loaded = anastore.loads(dumped)
-    assert used   == list(range(6, 8))
+    assert used   == list(range(5, 8))
     assert beenthere == [1,2]
     for i, j in zip(loaded, tasks):
         assert i.__dict__ == j.__dict__, str(i)
@@ -74,6 +74,4 @@ def test_storenumpy():
     assert numpy.array_equal(vals['c'], loaded['c'])
 
 if __name__ == '__main__':
-    import pytest # pylint: disable = unused-import
-    from _pytest.monkeypatch import MonkeyPatch
-    test_storetasks(MonkeyPatch())
+    test_storenumpy()

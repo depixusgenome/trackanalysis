@@ -43,3 +43,11 @@ def path(name:str) -> Union[str, Sequence[str]]:
         return tuple(_test(i) for i in default)
     else:
         return _test(default)
+
+def getmonkey():
+    u"for calling with pudb"
+    import  pytest  # pylint: disable=unused-import,unused-variable
+    from    _pytest.monkeypatch import MonkeyPatch
+    import  warnings
+    warnings.warn("Unsafe call to MonkeyPatch. Use only for manual debugging")
+    return MonkeyPatch()
