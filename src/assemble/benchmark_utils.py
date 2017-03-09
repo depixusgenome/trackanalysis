@@ -45,7 +45,8 @@ def create_benchmark(nrecs=1,  # pylint: disable=too-many-arguments,too-many-loc
     returns a list of nrecs recorders with the same random sequence
     exp_err in number of base pairs
     '''
-    noise = scipy.stats.truncnorm(a=-10/exp_err,b=10/exp_err,loc=0.0,scale=exp_err).rvs
+    #noise = scipy.stats.truncnorm(a=-10/exp_err,b=10/exp_err,loc=0.0,scale=exp_err).rvs
+    noise = scipy.stats.norm(loc=0.0,scale=exp_err).rvs
     recorders = []
     # generate sequence
     sequence = random_sequence(seq_length)

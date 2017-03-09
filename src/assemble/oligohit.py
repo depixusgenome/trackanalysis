@@ -30,6 +30,18 @@ def tail_overlap(ol1:str, ol2:str)->str:
             return ol1[i:]
     return ""
 
+def max_overlap_pile(seq:str,oseq:str)->str:
+    u'''
+    returns the sequence such that overlap of seq and oseq is maximised
+    '''
+    if oseq=="":
+        return seq
+    i=0 # if seq==""
+    for i in range(len(seq)):
+        if seq[i:]==oseq[:len(seq)-i]:
+            return seq[:i]+oseq
+    return seq+oseq
+
 def pile_oligo(seq:str,oligo,shift:int=0)->str:
     u'''
     complement sequence with matching given by oligo
