@@ -2,6 +2,9 @@
 # -*- coding: utf-8 -*-
 u"Updates app manager so as to deal with controllers"
 from functools  import wraps
+from pathlib    import Path
+
+import appdirs
 
 from flexx.webruntime           import launch as _flexxlaunch
 from flexx.webruntime.common    import StreamReader
@@ -75,7 +78,11 @@ def _create(main, controls, views): # pylint: disable=unused-argument
         Main controller: contains all sub-controllers.
         These share a common dictionnary of handlers
         """
-        ISAPP = False
+        ISAPP    = False
+        AUTHOR   = 'depixus'
+        APPSUITE = 'trackanalysis'
+        APPNAME  = main.__name__.lower().replace('view', '')
+        SUFFIX   = '.txt'
         def __init__(self, **kwa):
             self.topview = kwa['topview']
 
@@ -83,9 +90,24 @@ def _create(main, controls, views): # pylint: disable=unused-argument
             u"yields all undoable user actions"
             yield from self._yieldovermixins('__undos__') # pylint: disable=no-member
 
+        @classmethod
+        def configpath(cls, appname = None, version = None) -> Path:
+            u"returns the path to the config file"
+            if appname is None:
+                appname = cls.APPNAME
+            path = Path(appdirs.user_config_dir(cls.APPSUITE, cls.AUTHOR, version))/appname
+            return path.with_suffix(cls.SUFFIX)
+
+        def close(self):
+            u"remove controller"
+            # pylint: disable=no-member
+            self.writeconfig()
+            super().close()
+
     def __init__(self):
         u"sets up the controller, then initializes the view"
         ctrl = MainControl(handlers = dict(), topview = self)
+        ctrl.readconfig() # pylint: disable=no-member
         keys = KeyPressManager(ctrl = ctrl)
         main.__init__(self, ctrl = ctrl, keys = keys)
 
