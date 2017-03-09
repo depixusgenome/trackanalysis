@@ -13,31 +13,26 @@ from Bio import pairwise2
 from . import oligohit
 
 
-
 class OligoWrap:
     u'''
-    decorator for use of bpos array instead of list of oligohit
+    functor to convert function taking array as input into function taking oligohits
     '''
-    def __init__(self,oligos,wrapping):
+    def __init__(self,oligohits,arr2oligohits,to_call):
         u'''
-        wrapping is a function whci returns new oligos from *args
-        ex: wrapping = bpos2oligos, pos2oligos
+        oligohits, list of original oligohits (contains sequence)
+        arr2oligohits, function converting array into new oligohits
+        to_call, function taking oligohits
         '''
-        self.oligos=oligos
-        self.wrapping=wrapping
-
-    def __call__(self,func):
+        self.oligohits = oligohits
+        self.arr2oligohits = arr2oligohits # type: Callable
+        self.to_call = to_call # type: Callable
+    def __call__(self,*args):
         u'''returns a function which takes new positions of oligos
         instead of new oligos
         required for basinhopping
         '''
-        def wrapped_func(*args):
-            u'''
-            wrapper
-            '''
-            oligos=self.wrapping(self.oligos,*args)
-            return func(oligos)
-        return wrapped_func
+        oligos = self.arr2oligohits(self.oligohits,*args)
+        return self.to_call(oligos)
 
 def pos2oligos(olis,pos):
     u'''

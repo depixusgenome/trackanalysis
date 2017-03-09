@@ -16,9 +16,6 @@ from scipy.stats import truncnorm
 # needs fixing : each object should be pickable
 #                test NestedAsmrs
 
-# Fixed parameters
-# bp_to_nm = 1.100
-
 # to benchmark:
 #    * fix size of sequences, vary size of oligos and overlap
 #    * time/ number of steps for convergence (probably needs optimization)
@@ -113,7 +110,7 @@ class NestedAsmrs:
         self.asmr_init = kwargs.get("asmr_init",None) # Assembler
         nprocs = kwargs.get("nprocs",1) # type: int
         self.seeds = kwargs.get("seeds",[]) # type: Iterable[int]
-        self.asmrs = [copy.deepcopy(self.asmr_init) for i in self.asmr_init]
+        self.asmrs = [copy.deepcopy(self.asmr_init) for i in self.seeds]
         for idx,val in enumerate(self.seeds):
             self.asmrs[idx].npstate = numpy.random.RandomState(val).get_state()
         try:
@@ -122,21 +119,34 @@ class NestedAsmrs:
             print("could not create Pool")
             self._pool = None
 
-    def run(self,nsteps:int=1):
+
+    def run(self,niter:int=1):
         u'run in parallel each asmrs'
         if self._pool is None:
             for asm in self.asmrs:
-                asm.run(nsteps)
+                asm.run(niter=niter)
         else:
-            self._pool.map(_run_asm,[(asm,nsteps) for asm in self.asmrs]) # check this
+            self.asmrs = self._pool.map(_run_asm,
+                                        [(asm,niter) for asm in self.asmrs])
+
+
+    def set_asmr_inits(self,inits):
+        u'''
+        sets the state_init of each of the asmrs
+        '''
+        for idx,init in enumerate(inits):
+            self.asmrs[idx].state_init = init
+
 
     def result(self):
         u'''needs to return a result to use Recorder
-        is it really needed? '''
+        is it really needed?'''
         pass
 
-def _run_asm(asmr:Assembler,nsteps)->None:
-    asmr.run(nsteps)
+def _run_asm(*args):
+    asmr=args[0][0]
+    asmr.run(niter=args[0][1])
+    return asmr
 
 class MCAssembler(Assembler):
     u'''Monte Carlo for assembling sequences from oligohits
@@ -153,7 +163,8 @@ class MCAssembler(Assembler):
     def run(self,*args,**kwargs)->None: # pylint:disable = unused-argument
         u'''runs a specified number of steps
         '''
-        nsteps = kwargs.get("nsteps",1)
+        if not "niter" in kwargs.keys():
+            kwargs["niter"]=1
         numpy.random.set_state(self.npstate)
 
         if self.state is None:
@@ -166,10 +177,8 @@ class MCAssembler(Assembler):
                                    accept_test=self.acceptance,
                                    minimizer_kwargs=dict(method=self.minimizer),
                                    callback=self.callback,
-                                   niter=nsteps,
                                    **kwargs)
-        self.result.it = count+nsteps
-
+        self.result.it = count+kwargs.get("niter")
         self.npstate = numpy.random.get_state()
         self._update(self.result)
 
