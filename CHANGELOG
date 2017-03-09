@@ -13,3 +13,9 @@
         * generates a ramp_discard.csv file for pias
         * added a third graph to display the estimated size of each hairpin in the trk files 
         
+# tag ramp_v1.3
+## Tagger: David Salthouse <david.salthouse@depixus.com>
+    ### rampapp_v1.3
+        * user has now access to a slider (top-right) which allows to specify the ratio of cycles which the algorithm defines as correct to tag a bead as "good".
+        Note that the 2 first cycles of the track file are still automatically discarded (as in pias) 
+        
