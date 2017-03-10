@@ -53,10 +53,13 @@ class DpxHoverModel(Model):
     @staticmethod
     def defaultconfig() -> dict:
         "default config"
-        return dict(selraw      = PlotAttrs('green', 'line',   2),
-                    tooltips    = [(u'(cycle, t, z)', '(@cycles, $~x, $data_y)')],
-                    sequences   = "../tests/testingcore/hairpins.fasta",
-                    sequencekey = 'GF1')
+        return {'raw.selection'       : PlotAttrs('green', 'line',   2),
+                'tooltips'            : [(u'(cycle, t, z)', '(@cycles, $~x, $data_y)')],
+                'sequence.path'       : "../tests/testingcore/hairpins.fasta",
+                'sequence.key'        : 'GF1',
+                'raw.tooltips.radius' : 2,
+                'hist.tooltips.radius': 1.5
+               }
 
     @staticmethod
     @checksizes
@@ -85,7 +88,7 @@ class DpxHoverModel(Model):
         hover          = fig.select(HoverTool)
         if len(hover) == 0:
             return
-        attrs          = cnf['selraw'].get()
+        attrs          = cnf.raw.selection.get()
 
         glyph = attrs.addto(fig, x = 't', y = 'sel', source = source, visible = False)
         def _onhover(source = source, glyph = glyph, mdl = self, cb_data = None):
@@ -120,7 +123,7 @@ class DpxHoverModel(Model):
         hover[0].renderers = [fig.circle(x                = 'inds',
                                          y                = 'values',
                                          source           = self._rawsource,
-                                         radius           = 2,
+                                         radius           = cnf.raw.tooltips.radius.get(),
                                          radius_dimension = 'x',
                                          line_alpha       = 0.,
                                          fill_alpha       = 0.,
@@ -129,10 +132,10 @@ class DpxHoverModel(Model):
     @staticmethod
     @checksizes
     def _createhistdata(cnf):
-        key   = cnf.sequencekey.get()
+        key   = cnf.sequence.key.get()
         oligs = cnf.oligos.get()
         osiz  = max(len(i) for i in oligs)
-        dseq  = readsequence(cnf)
+        dseq  = readsequence(cnf.sequence.path.get())
         if len(dseq) == 0:
             return dict(values = [0], inds = [0], text = [''])
 
@@ -164,7 +167,7 @@ class DpxHoverModel(Model):
         hover[0].renderers  = [fig.circle(x                = 'inds',
                                           y                = 'values',
                                           source           = self._histsource,
-                                          radius           = 1.5,
+                                          radius           = cnf.hist.tooltips.radius.get(),
                                           radius_dimension = 'y',
                                           line_alpha       = 0.,
                                           fill_alpha       = 0.,
@@ -274,7 +277,7 @@ class DpxFixedTicker(ContinuousTicker):
 
     def update(self, cnf, *figs):
         "Updates the ticks according to the configuration"
-        dseq = readsequence(cnf)
+        dseq = readsequence(cnf.sequence.path.get())
         seq  = dseq.get(cnf.sequencekey.get(), next(iter(dseq.values()), None))
 
         self.usebase = seq is None

@@ -33,8 +33,6 @@ def checksizes(fcn):
 _CACHE = CachedIO(lambda path: dict(_readsequences(path)), size = 1)
 def readsequence(path):
     u"Reads / caches DNA sequences"
-    if not isinstance(path, (str, Path)):
-        path = path.sequences.get()
     if not Path(path).exists():
         return dict()
     return _CACHE(path)
