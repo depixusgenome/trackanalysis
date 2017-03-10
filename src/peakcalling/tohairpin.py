@@ -79,7 +79,7 @@ class HairpinDistance(Hairpin):
             optimize = _cost.optimize
             for vals in product(np.arange(*self.stretch), np.arange(*self.bias)):
                 args.update(rng('stretch', vals[0], self.stretch.step))
-                args.update(rng('bias',    vals[1], self.bias.step))
+                args.update(rng('bias',    vals[1]+delta*vals[0], self.bias.step))
                 try:
                     out = optimize(hpin, peaks, **args)
                 except: # pylint: disable=bare-except
@@ -87,6 +87,7 @@ class HairpinDistance(Hairpin):
                 else:
                     if out[0] < best[0]:
                         best = out
+
         return Distance(best[0], best[1], best[2]-best[1]*delta)
 
 PEAKS_DTYPE = np.dtype([('zvalue', 'f4'), ('key', 'i4')])
