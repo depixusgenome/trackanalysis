@@ -10,7 +10,7 @@ from itertools      import product
 
 from bokeh.model    import Model
 from bokeh.core.properties  import Float, Seq, Instance, Bool
-from bokeh.plotting import figure
+from bokeh.plotting import figure, Figure # pylint: disable=unused-import
 from bokeh.layouts  import gridplot
 from bokeh.models   import (LinearAxis, ColumnDataSource, HoverTool,
                             CustomJS, Range1d, ContinuousTicker,
@@ -96,8 +96,8 @@ class BeadPlotter(_TrackPlotter):
                                          ylabel      = u"Z",
                                          yrightlabel = u"Zmag",
                                          tooltips    = ttips)
-        self._source = ColumnDataSource()
-        self._fig    = figure(**self._figargs())
+        self._source = None # type: Optional[ColumnDataSource]
+        self._fig    = None # type: Optional[Figure]
 
     def _get(self, name):
         return self._source.data[name] # pylint: disable=unsubscriptable-object
@@ -153,6 +153,7 @@ class BeadPlotter(_TrackPlotter):
 
     def _create(self, track, bead) -> DpxKeyedRow:
         "sets-up the figure"
+        self._fig    = figure(**self._figargs())
         self._source = ColumnDataSource(data = self._createdata(track, bead))
         if self.getConfig().tooltips.get() not in ('', None):
             self._fig.select(HoverTool).tooltips = self.getConfig().tooltips.get()
@@ -459,17 +460,13 @@ class _CyclesPlotterMixin:
             raise NotImplementedError()
 
 class _CyclesRawPlotterMixin(_CyclesPlotterMixin): # pylint: disable=abstract-method
-    def __init__(self,  ctrl:Controller) -> None:
+    def __init__(self):
         "sets up this plotter's info"
-        cnf = ctrl.getGlobal(self.key())
-        cnf.defaults = dict(raw = PlotAttrs('blue',  'circle', 1,
-                                            alpha   = .5,
-                                            palette = 'inferno'))
-
-        self._rawsource  = ColumnDataSource()
-        self._raw        = figure(y_axis_label = self.getConfig().ylabel.get(),
-                                  y_range      = Range1d(start = 0., end = 1.),
-                                  **self._figargs(cnf, 500, 'left'))
+        self.getConfig().defaults = dict(raw = PlotAttrs('blue',  'circle', 1,
+                                                         alpha   = .5,
+                                                         palette = 'inferno'))
+        self._rawsource = None # type: Optional[ColumnDataSource]
+        self._raw       = None # type: Optional[Figure]
 
     @_checksizes
     def _createrawdata(self, track, bead) -> dict:
@@ -507,10 +504,13 @@ class _CyclesRawPlotterMixin(_CyclesPlotterMixin): # pylint: disable=abstract-me
         fig.x_range.callback = CustomJS.from_py_func(_onchangebounds)
 
     def _createraw(self, track, bead):
+        cnf             = self.getConfig()
+        self._raw       = figure(y_axis_label = self.getConfig().ylabel.get(),
+                                 y_range      = Range1d(start = 0., end = 1.),
+                                 **self._figargs(cnf, 500, 'left'))
         raw             = self._createrawdata(track, bead)
         self._rawsource = ColumnDataSource(data = raw)
 
-        cnf             = self.getConfig()
         for ind, attrs in enumerate(cnf.raw.get().iterpalette(cnf.ncycles.get())):
             attrs.addto(self._raw,
                         x       = 't',
@@ -533,9 +533,9 @@ class _CyclesRawPlotterMixin(_CyclesPlotterMixin): # pylint: disable=abstract-me
         self._hover.updateraw(self._raw, raw)
 
 class _CyclesHistPlotterMixin(_CyclesPlotterMixin): # pylint: disable=abstract-method
-    def __init__(self,  ctrl:Controller, yrng) -> None:
+    def __init__(self):
         "sets up this plotter's info"
-        cnf = ctrl.getGlobal(self.key())
+        cnf = self.getConfig()
         cnf.defaults = dict(binwidth  = .003,
                             minframes = 10,
                             basebias  = None,
@@ -554,11 +554,9 @@ class _CyclesHistPlotterMixin(_CyclesPlotterMixin): # pylint: disable=abstract-m
                                  xlabel    = u'Frames',
                                  ylabel    = u'Base number')
 
-        self._histsource = ColumnDataSource()
-        self._hist       = figure(y_axis_location = None,
-                                  y_range         = yrng,
-                                  **self._figargs(cnf.hist, 200, None))
-        self._gridticker = DpxFixedTicker()
+        self._histsource = None # type: Optional[ColumnDataSource]
+        self._hist       = None # type: Optional[Figure]
+        self._gridticker = None # type: Optional[DpxFixedTicker]
 
     @_checksizes
     def _createhistdata(self, track, bead):
@@ -618,13 +616,17 @@ class _CyclesHistPlotterMixin(_CyclesPlotterMixin): # pylint: disable=abstract-m
 
         self._hist.y_range.callback = CustomJS.from_py_func(_onchangebounds)
 
-    def _createhist(self, track, bead):
+    def _createhist(self, track, bead, yrng):
+        cnf              = self.getConfig()
+        self._hist       = figure(y_axis_location = None,
+                                  y_range         = yrng,
+                                  **self._figargs(cnf.hist, 200, None))
+
         hist             = self._createhistdata(track, bead)
         self._histsource = ColumnDataSource(data = hist)
 
         self._hist.extra_x_ranges = {"cycles": Range1d(start = 0., end = 1.)}
 
-        cnf   = self.getConfig()
         attrs = cnf.cycles.get()
         axis  = LinearAxis(x_range_name          = "cycles",
                            axis_label            = cnf.hist.xtoplabel.get(),
@@ -643,6 +645,7 @@ class _CyclesHistPlotterMixin(_CyclesPlotterMixin): # pylint: disable=abstract-m
                     left   = "left",   right = "cycles",
                     x_range_name = "cycles")
 
+        self._gridticker = DpxFixedTicker()
         self._gridticker.create(self.getConfig(), self._hist)
         self._hover.createhist(self._hist, self.getConfig())
         self._slavexaxis()
@@ -658,18 +661,14 @@ class CyclesPlotter(_TrackPlotter, _CyclesHistPlotterMixin, _CyclesRawPlotterMix
     "Displays cycles and their projection"
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
-        _TrackPlotter.__init__(self, ctrl)
-
-        cnf = ctrl.getGlobal(self.key())
-        cnf.defaults = dict(tools   = 'ypan,ybox_zoom,reset,save,hover',
-                            ncycles = 150,
-                            oligos  = ['CTGT'],
-                            **DpxHoverModel.defaultconfig(),
-                           )
-        self._hover  = DpxHoverModel()
-
-        _CyclesRawPlotterMixin.__init__(self, ctrl)
-        _CyclesHistPlotterMixin.__init__(self, ctrl, self._raw.y_range)
+        _TrackPlotter           .__init__(self, ctrl)
+        _CyclesRawPlotterMixin  .__init__(self)
+        _CyclesHistPlotterMixin .__init__(self)
+        self.getConfig().defaults = dict(tools   = 'ypan,ybox_zoom,reset,save,hover',
+                                         ncycles = 150,
+                                         oligos  = ['CTGT'],
+                                         **DpxHoverModel.defaultconfig())
+        self._hover  = None # type: Optional[DpxHoverModel]
 
     def _figargs(self, cnf, width, loc): # pylint: disable=arguments-differ
         args = super()._figargs()
@@ -680,8 +679,9 @@ class CyclesPlotter(_TrackPlotter, _CyclesHistPlotterMixin, _CyclesRawPlotterMix
 
     def _create(self, track, bead) -> DpxKeyedRow:
         "returns the figure"
+        self._hover  = DpxHoverModel()
         self._createraw(track, bead)
-        self._createhist(track, bead)
+        self._createhist(track, bead, self._raw.y_range)
         row = gridplot([[self._raw, self._hist]])
 
         return DpxKeyedRow(self, self._raw,
