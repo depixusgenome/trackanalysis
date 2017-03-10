@@ -58,7 +58,7 @@ def fromstream(streamopts):
                         args, kwa = ppos.args(stream, args, kwa)
                         yield from fcn(*args, **kwa)
                 else:
-                    args, kwa = ppos.args(stream, args, kwa)
+                    args, kwa = ppos.args(path, args, kwa)
                     yield from fcn(*args, **kwa)
 
             _wrapgen.__annotations__[ppos.name] = StreamUnion
@@ -75,7 +75,7 @@ def fromstream(streamopts):
                         args, kwa = ppos.args(stream, args, kwa)
                         return fcn(*args, **kwa)
                 else:
-                    args, kwa = ppos.args(stream, args, kwa)
+                    args, kwa = ppos.args(path, args, kwa)
                     return fcn(*args, **kwa)
 
             _wrapfcn.__annotations__[ppos.name] = StreamUnion
