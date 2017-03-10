@@ -383,7 +383,7 @@ class TestTaskControl:
         assert type(val)    is numpy.ndarray
         assert type(val[0]) is Cycles
 
-def test_globals(monkeypatch): # pylint: disable=too-many-statements
+def test_globals(): # pylint: disable=too-many-statements
     u"testing globals"
     ctrl = GlobalsController()
     ctrl.addGlobalMap("toto", titi = 1)
@@ -423,10 +423,10 @@ def test_globals(monkeypatch): # pylint: disable=too-many-statements
     ctrl.addGlobalMap("toto.mm", tata = 11)
     ctrl.getGlobal("toto.mm").tata = 10
 
-    path = tempfile.mktemp()+"/config.txt"
-    monkeypatch.setattr(GlobalsController, 'configpath', lambda *_: Path(path))
+    path  = tempfile.mktemp()+"/config.txt"
+    cpath = lambda *_: Path(path)
     assert not Path(path).exists()
-    ctrl.writeconfig()
+    ctrl.writeconfig(cpath)
     assert Path(path).exists()
 
     ctrl.getGlobal("toto").tintin.default = 10
@@ -439,7 +439,7 @@ def test_globals(monkeypatch): # pylint: disable=too-many-statements
     with pytest.raises(KeyError):
         ctrl.getGlobal("tutu")
 
-    ctrl.readconfig()
+    ctrl.readconfig(cpath)
     assert ctrl.getGlobal("toto.mm").tata == 10
     assert ctrl.getGlobal("toto").tintin == 10
     assert ctrl.getGlobal("toto").titi == 3
@@ -452,5 +452,4 @@ def test_globals(monkeypatch): # pylint: disable=too-many-statements
         ctrl.getGlobal("toto").tutu.get()
 
 if __name__ == '__main__':
-    from testingcore import getmonkey
-    test_globals(getmonkey())
+    test_globals()

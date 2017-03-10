@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Updates app manager so as to deal with controllers"
+from typing     import TYPE_CHECKING
 from functools  import wraps
 from pathlib    import Path
 
@@ -35,7 +36,8 @@ def _serve(view, **kwa):
     u"Launches a bokeh server"
     def start(doc):
         u"Starts the application and adds itself to the document"
-        return view.open(doc)
+        ret = view.open(doc)
+        return ret
 
     server = Server(Application(FunctionHandler(start)), **_serverkwargs(kwa))
     server.MainView = view
@@ -48,21 +50,20 @@ def _launch(view, **kwa):
     else:
         server = _serve(view, **kwa.pop('server', {}))
 
-    old        = StreamReader.run
-    def run(self):
+    def run(self, __old__ = StreamReader.run):
         u"Stop the stream reader"
-        old(self)
+        __old__(self)
         if not getattr(server, '_stopped', False):
             server.stop()
         server.io_loop.stop()
     StreamReader.run = run
 
     rtime = _flexxlaunch('http://localhost:5006/', **kwa)
-    def close(self):
+    def close(self, __old__ = view.MainControl.close):
         u"closes the application"
         top, self.topview = self.topview, None
         if top is not None:
-            self._callmixins('close') # pylint: disable=protected-access
+            __old__(self)
             top.close()
             rtime.close()
     view.MainControl.ISAPP = True
@@ -79,35 +80,46 @@ def _create(main, controls, views): # pylint: disable=unused-argument
         These share a common dictionnary of handlers
         """
         ISAPP    = False
-        AUTHOR   = 'depixus'
-        APPSUITE = 'trackanalysis'
-        APPNAME  = main.__name__.lower().replace('view', '')
-        SUFFIX   = '.txt'
         def __init__(self, **kwa):
             self.topview = kwa['topview']
 
+        if TYPE_CHECKING:
+            def _yieldovermixins(self, *_1, **_2):
+                pass
+            def _callmixins(self, *_1, **_2):
+                pass
+
         def __undos__(self):
             u"yields all undoable user actions"
-            yield from self._yieldovermixins('__undos__') # pylint: disable=no-member
+            yield from self._yieldovermixins('__undos__')
 
         @classmethod
-        def configpath(cls, appname = None, version = None) -> Path:
+        def configpath(cls, version) -> Path:
             u"returns the path to the config file"
-            if appname is None:
-                appname = cls.APPNAME
-            path = Path(appdirs.user_config_dir(cls.APPSUITE, cls.AUTHOR, version))/appname
-            return path.with_suffix(cls.SUFFIX)
+            name = main.__name__.lower().replace('view', '')
+            if '.' in name:
+                name = name[name.rfind('.')+1:]
+            name = "depixus_"+name
+            path = Path(appdirs.user_config_dir(name, 'depixus', version))
+            return path/'config.txt'
+
+        def readconfig(self):
+            u"writes the config"
+            self._callmixins("readconfig", self.configpath)
+
+        def writeconfig(self):
+            u"writes the config"
+            self._callmixins("writeconfig", self.configpath)
 
         def close(self):
             u"remove controller"
-            # pylint: disable=no-member
             self.writeconfig()
-            super().close()
+            self._callmixins("close")
 
     def __init__(self):
         u"sets up the controller, then initializes the view"
         ctrl = MainControl(handlers = dict(), topview = self)
-        ctrl.readconfig() # pylint: disable=no-member
+        ctrl.readconfig()
         keys = KeyPressManager(ctrl = ctrl)
         main.__init__(self, ctrl = ctrl, keys = keys)
 

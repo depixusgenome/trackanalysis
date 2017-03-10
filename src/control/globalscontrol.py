@@ -24,9 +24,8 @@ map only needs specify those default values that should be changed for this type
 of plot.
 """
 from collections    import namedtuple, ChainMap
-from typing         import Dict, Union          # pylint: disable=unused-import
-from pathlib        import Path
-
+from typing         import (Dict, Union, # pylint: disable=unused-import
+                            Callable, Optional, Sequence)
 import anastore
 from .event         import Controller
 
@@ -35,16 +34,16 @@ class GlobalsChild(ChainMap):
     __NAME    = 'の'
     __CNT     = 2
     __slots__ = '__name'
-    def __init__(self, name, parent = None):
-        maps = tuple(dict() for i in range(self.__CNT))
+    def __init__(self, name:str, parent: Optional['GlobalsChild'] = None) -> None:
+        maps = tuple(dict() for i in range(self.__CNT)) # type: Sequence[Union[dict,GlobalsChild]]
         if parent is not None:
-            maps += (parent,)
+            maps += (parent,) # type: ignore
 
-        self.__name = "globals."+name
+        self.__name = name # type: str
         super().__init__(*maps)
 
     @property
-    def name(self) -> dict:
+    def name(self) -> str:
         u"returns the name"
         return self.__name
 
@@ -234,7 +233,7 @@ class DefaultsMap(Controller):
                 ret[key] = ReturnPair(old, val)
 
         if len(ret) > 1:
-            return self.handle(self.__items.name, self.outasdict, ret)
+            return self.handle("globals."+self.__items.name, self.outasdict, ret)
 
     def pop(self, *args):
         u"removes view information"
@@ -344,14 +343,9 @@ class GlobalsController(Controller):
             return _MapGetter(self.__maps[key], '')
         return self.__maps[key].get(*args, default = default)
 
-    @classmethod
-    def configpath(cls, _1 = None, _2 = None) -> Path:
-        u"returns the path to the config file"
-        raise IOError("Method should be defined in apps")
-
-    def writeconfig(self, appname = None, patchname = 'config'):
+    def writeconfig(self, configpath: Callable, patchname = 'config'):
         u"Sets-up the user preferences"
-        path = self.configpath(appname, anastore.version(patchname))
+        path = configpath(anastore.version(patchname))
         path.parent.mkdir(parents = True, exist_ok = True)
         path.touch(exist_ok = True)
 
@@ -360,10 +354,10 @@ class GlobalsController(Controller):
                 if 'current' not in i}
         anastore.dump(maps, path, patch = patchname)
 
-    def readconfig(self, appname = None, patchname = 'config'):
+    def readconfig(self, configpath, patchname = 'config'):
         u"Sets-up the user preferences"
         for version in anastore.iterversions(patchname):
-            path = self.configpath(appname, version)
+            path = configpath(version)
             if not path.exists():
                 continue
             try:
@@ -371,6 +365,8 @@ class GlobalsController(Controller):
             except: # pylint: disable=bare-except
                 continue
             break
+        else:
+            return
 
         for root in set(cnf) & set(self.__maps):
             defmap = self.__maps[root]._DefaultsMap__items # pylint: disable=protected-access
