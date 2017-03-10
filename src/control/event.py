@@ -30,8 +30,9 @@ class Event:
     inputs      = EmitPolicy.inputs
     nothing     = EmitPolicy.nothing
     annotations = EmitPolicy.annotations
-    _EM_NAME    = re.compile(r'^_?(\w+)',     re.IGNORECASE)
-    _OBS_NAME   = re.compile(r'^_?on_?(\w+)', re.IGNORECASE)
+    __SIMPLE    = re.compile(r'^(\w|.+)',     re.IGNORECASE)
+    __EM_NAME   = re.compile(r'^_?(\w+)',     re.IGNORECASE)
+    __OBS_NAME  = re.compile(r'^_?on_?(\w+)', re.IGNORECASE)
 
     def __init__(self, **kwargs):
         self._handlers = kwargs.get('handlers', dict()) # type: Dict
@@ -40,7 +41,7 @@ class Event:
     def _emit_list(cls, names, fcn = None) -> 'frozenset':
         u"creates a list of emissions"
         if len(names) == 0 or names[0] is fcn:
-            tmp = (cls._EM_NAME.match(fcn.__name__).group(1),)
+            tmp = (cls.__EM_NAME.match(fcn.__name__).group(1),)
             return frozenset(name.lower().strip() for name in tmp)
         else:
             return frozenset(name.lower().strip() for name in names)
@@ -216,13 +217,19 @@ class Event:
                 raise ValueError("observer must be callable")
 
             for name in lst:
-                self._handlers.setdefault(name.lower().strip(), set()).add(fcn)
+                if self.__SIMPLE.match(name):
+                    self._handlers.setdefault(name.lower().strip(), set()).add(fcn)
+                else:
+                    match = re.compile(name.lower()).match
+                    for key in self._handlers:
+                        if match(key):
+                            self._handlers[key].add(fcn)
             return fcn
 
         def _fromfcn(fcn:Callable, name = None):
             if name is None:
                 name  = fcn.__name__
-            match = self._OBS_NAME.match(name)
+            match = self.__OBS_NAME.match(name)
 
             if match is None:
                 return _add((name,), fcn)
