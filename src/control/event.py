@@ -3,6 +3,7 @@
 u"Base event handler"
 import re
 
+from itertools      import product
 from functools      import wraps
 from enum           import Enum, unique
 from typing         import (Dict, Union, Sequence, # pylint: disable=unused-import
@@ -30,9 +31,9 @@ class Event:
     inputs      = EmitPolicy.inputs
     nothing     = EmitPolicy.nothing
     annotations = EmitPolicy.annotations
-    __SIMPLE    = re.compile(r'^(\w|.+)',     re.IGNORECASE)
-    __EM_NAME   = re.compile(r'^_?(\w+)',     re.IGNORECASE)
-    __OBS_NAME  = re.compile(r'^_?on_?(\w+)', re.IGNORECASE)
+    __SIMPLE    = re.compile(r'^(\w|\.+)',    re.IGNORECASE).match
+    __EM_NAME   = re.compile(r'^_?(\w+)',     re.IGNORECASE).match
+    __OBS_NAME  = re.compile(r'^_?on_?(\w+)', re.IGNORECASE).match
 
     def __init__(self, **kwargs):
         self._handlers = kwargs.get('handlers', dict()) # type: Dict
@@ -41,7 +42,7 @@ class Event:
     def _emit_list(cls, names, fcn = None) -> 'frozenset':
         u"creates a list of emissions"
         if len(names) == 0 or names[0] is fcn:
-            tmp = (cls.__EM_NAME.match(fcn.__name__).group(1),)
+            tmp = (cls.__EM_NAME(fcn.__name__).group(1),)
             return frozenset(name.lower().strip() for name in tmp)
         else:
             return frozenset(name.lower().strip() for name in names)
@@ -150,6 +151,10 @@ class Event:
         for name in lst.intersection(self._handlers):
             allfcns.update(self._handlers[name])
 
+        for fcn, names in self._handlers.get('ㄡ', {}).items():
+            if any(patt(key) for patt, key in product(names, lst)):
+                allfcns.add(fcn)
+
         if   policy is EmitPolicy.outasdict:
             for hdl in allfcns:
                 hdl(**cast(Dict, args))
@@ -217,19 +222,19 @@ class Event:
                 raise ValueError("observer must be callable")
 
             for name in lst:
-                if self.__SIMPLE.match(name):
+                if self.__SIMPLE(name):
                     self._handlers.setdefault(name.lower().strip(), set()).add(fcn)
                 else:
-                    match = re.compile(name.lower()).match
-                    for key in self._handlers:
-                        if match(key):
-                            self._handlers[key].add(fcn)
+                    (self._handlers.setdefault('ㄡ', {})
+                     .setdefault(fcn, set())
+                     .add(re.compile(name).match))
+
             return fcn
 
         def _fromfcn(fcn:Callable, name = None):
             if name is None:
                 name  = fcn.__name__
-            match = self.__OBS_NAME.match(name)
+            match = self.__OBS_NAME(name)
 
             if match is None:
                 return _add((name,), fcn)

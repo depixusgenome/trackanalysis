@@ -353,6 +353,7 @@ class GlobalsController(Controller):
         maps = {i: j._DefaultsMap__items.maps[0] # pylint: disable=protected-access
                 for i, j in self.__maps.items()
                 if 'current' not in i}
+        maps = {i: j for i, j in maps.items() if len(j)}
         anastore.dump(maps, path, patch = patchname)
 
     def readconfig(self, configpath, patchname = 'config'):

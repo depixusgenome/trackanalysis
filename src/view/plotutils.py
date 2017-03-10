@@ -78,6 +78,10 @@ class PlotAttrs:
         args.pop('glyph')
         args.pop('palette')
         args.update(kwa)
+
+        if self.glyph == 'circle' and 'radius' in args:
+            args.pop('size')
+
         if self.glyph in ('line', 'quad'):
             args['line_width'] = args.pop('size')
 
@@ -114,7 +118,6 @@ class Plotter:
                 rng._initial_end   = rng.bounds[1]
 
         arng.callback = CustomJS.from_py_func(_onchangebounds)
-
 
     @classmethod
     def key(cls, base = 'config'):
@@ -169,16 +172,22 @@ class Plotter:
 
     def _addcallbacks(self, fig):
         u"adds Range callbacks"
-        def _onchange(attr, old, new): # pylint: disable=unused-argument
-            if self._ready:
-                self._ctrl.updateGlobal(self.key('current'),
-                                        x = (fig.x_range.start, fig.x_range.end),
-                                        y = (fig.y_range.start, fig.y_range.end))
+        cnf = self.getCurrent()
 
-        fig.x_range.on_change('start', _onchange)
-        fig.x_range.on_change('end',   _onchange)
-        fig.y_range.on_change('start', _onchange)
-        fig.y_range.on_change('end',   _onchange)
+        def _onchangex_cb(attr, old, new):
+            if self._ready:
+                cnf.update(x = (fig.x_range.start, fig.x_range.end))
+        fig.x_range.on_change('start', _onchangex_cb)
+        fig.x_range.on_change('end',   _onchangex_cb)
+
+        def _onchangey_cb(attr, old, new):
+            if self._ready:
+                cnf.update(y = (fig.y_range.start, fig.y_range.end))
+
+        fig.y_range.on_change('start', _onchangey_cb)
+        fig.y_range.on_change('end',   _onchangey_cb)
+
+        cnf.defaults = dict(x = (None, None), y = (None, None))
         return fig
 
     def setbounds(self, rng, axis, arr, reinit = True):

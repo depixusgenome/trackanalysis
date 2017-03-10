@@ -53,8 +53,8 @@ def test_trackplot(bokehaction):        # pylint: disable=redefined-outer-name
             server.press(val, server.doc.roots[-1].children[-1].children[-1])
             assert vals == approx(truth, rel = 1e-2)
 
-        _press('Shift- ',          652.7515, 1150.2485, -0.04378, 1.11549)
-        _press('Shift-ArrowUp',    652.7515, 1150.2485,  0.41992, 0.65178)
+        _press('Shift- ',          0., 0.,  0., 0.)
+        _press('Shift-ArrowUp',    0., 0.,               0.41992, 0.65178)
         _press('Shift-ArrowRight', 851.7503, 951.2497,   0.41992, 0.65178)
         _press('Alt-ArrowLeft',    831.8504, 931.34982,  0.41992, 0.65178)
         _press('Alt-ArrowUp',      831.8504, 931.34982,  0.46629, 0.69815)
@@ -66,4 +66,4 @@ def test_trackplot(bokehaction):        # pylint: disable=redefined-outer-name
         server.press('Ctrl-z')
 
 if __name__ == '__main__':
-    test_toolbar(bokehaction(None))
+    test_trackplot(bokehaction(None))

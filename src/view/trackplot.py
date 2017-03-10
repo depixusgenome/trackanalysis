@@ -89,14 +89,15 @@ class BeadPlotter(_TrackPlotter):
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
+        ttips = [(u'Index', '$index'), (u'(t, z, zmag)', '($~x, $data_y, @zmag)')]
+        self.getConfig().defaults = dict(z           = PlotAttrs('blue', 'circle', 1),
+                                         zmag        = PlotAttrs('red',  'line',   1),
+                                         xlabel      = u"Frames",
+                                         ylabel      = u"Z",
+                                         yrightlabel = u"Zmag",
+                                         tooltips    = ttips)
         self._source = ColumnDataSource()
         self._fig    = figure(**self._figargs())
-
-        cnf = ctrl.getGlobal(self.key())
-        cnf.defaults = dict(z        = PlotAttrs('blue', 'circle', 1),
-                            zmag     = PlotAttrs('red',  'line',   1),
-                            tooltips = [(u'Index',  '$index'),
-                                        (u'(t, z, zmag)', '($~x, $data_y, @zmag)')])
 
     def _get(self, name):
         return self._source.data[name] # pylint: disable=unsubscriptable-object
@@ -114,8 +115,8 @@ class BeadPlotter(_TrackPlotter):
         args = super()._figargs()
         if self.getConfig().tooltips.get() not in ('', None):
             args['tools'] += ',hover'
-        args.update(x_axis_label = u'Frames',
-                    y_axis_label = u'z',
+        args.update(x_axis_label = self.getConfig().xlabel.get(),
+                    y_axis_label = self.getConfig().ylabel.get(),
                     x_range      = Range1d(start = 0., end = 1.),
                     y_range      = Range1d(start = 0., end = 1.))
         return args
@@ -128,8 +129,13 @@ class BeadPlotter(_TrackPlotter):
                                                 **kwa)
 
     def _addylayout(self):
+        cnf = self.getConfig()
         self._fig.extra_y_ranges = {'zmag': Range1d(start = 0., end = 1.)}
-        self._fig.add_layout(LinearAxis(y_range_name='zmag', axis_label = u'zmag'), 'right')
+        axis  = LinearAxis(y_range_name          = 'zmag',
+                           axis_label            = cnf.yrightlabel.get(),
+                           axis_label_text_color = cnf.zmag.get().color,
+                          )
+        self._fig.add_layout(axis, 'right')
 
     def _addcallbacks(self, fig):
         super()._addcallbacks(fig)
@@ -152,9 +158,8 @@ class BeadPlotter(_TrackPlotter):
             self._fig.select(HoverTool).tooltips = self.getConfig().tooltips.get()
 
         self._addylayout  ()
-        self._addglyph    ("zmag", y_range_name = 'zmag')
-
-        self._addglyph    ("z")
+        self._addglyph    ('zmag', y_range_name = 'zmag')
+        self._addglyph    ('z')
         for rng in self._fig.x_range, self._fig.y_range, self._fig.extra_y_ranges['zmag']:
             self.fixreset(rng)
 
@@ -621,8 +626,10 @@ class _CyclesHistPlotterMixin(_CyclesPlotterMixin): # pylint: disable=abstract-m
 
         cnf   = self.getConfig()
         attrs = cnf.cycles.get()
-        axis  = LinearAxis(x_range_name="cycles", axis_label = cnf.hist.xtoplabel.get())
-        axis.axis_label_text_color = attrs.line_color
+        axis  = LinearAxis(x_range_name          = "cycles",
+                           axis_label            = cnf.hist.xtoplabel.get(),
+                           axis_label_text_color = attrs.line_color
+                          )
         self._hist.add_layout(axis, 'above')
 
         cnf.frames.addto(self._hist,
