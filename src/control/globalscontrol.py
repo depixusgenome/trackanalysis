@@ -225,7 +225,8 @@ class DefaultsMap(Controller):
             if val is delete:
                 self.__items.pop(key, None)
             elif key not in self.__items.maps[1]:
-                raise KeyError("Default value must be set first")
+                raise KeyError("Default value must be set first "
+                               +str((self.__items.name, key)))
             else:
                 self.__items[key] = val
 

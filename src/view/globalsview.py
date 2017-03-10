@@ -11,8 +11,10 @@ class GlobalsView(View):
         self.__onstartstop()
 
     def __ontask(self):
-        ctrl = self._ctrl
-        cnf  = self._ctrl.getGlobal('current')
+        ctrl         = self._ctrl
+        cnf          = self._ctrl.getGlobal('current')
+        cnf.defaults = dict.fromkeys(('track', 'task'), None)
+
         # pylint: disable=unused-variable
         def _onCloseTrack(model = None, **_):
             tasks = ('track',)

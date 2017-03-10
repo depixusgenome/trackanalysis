@@ -52,7 +52,7 @@ class Action(ActionDescriptor):
                           args = {'type':      tpe,
                                   'value':     val,
                                   'backtrace': bkt,
-                                  'recursive': self._CNT == 0})
+                                  'recursive': self._CNT > 0})
         return False
 
 class View:

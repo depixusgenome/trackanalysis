@@ -20,6 +20,9 @@ class  ToolBar(BokehView):
             self._quit = self.button(self._ctrl.close, u'quit')
             self._tools.append(self._quit)
 
+        cnf          = self._ctrl.getGlobal("config").last.path
+        cnf.defaults = dict.fromkeys(FileDialog.DEFAULTS, None)
+
         self.__diagopen = FileDialog(filetypes = u'trk|ana|*',
                                      config    = self._ctrl,
                                      title     = u'Open a track or analysis file')
