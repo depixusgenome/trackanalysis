@@ -170,18 +170,18 @@ class CachedIO(Generic[T]):
     def clear(self, path: Optional[Union[str, pathlib.Path]] = None):
         "clears the cache"
         if path is not None:
-            self.__cache.pop(pathlib.Path(path).absolute())
+            self.__cache.pop(pathlib.Path(path).resolve())
         else:
             self.__cache.clear()
 
     def __call__(self, *args, **kwa) -> Optional[T]:
         "reads and caches a file"
-        path = pathlib.Path(self.__ppos.path(args, kwa)).absolute()
-        if not path.exists():
+        path = pathlib.Path(self.__ppos.path(args, kwa)).resolve()
+        if not path.exists():               # pylint: disable=no-member
             return None
 
         info  = self.__cache.get(path, None)
-        mtime = path.stat().st_mtime_ns
+        mtime = path.stat().st_mtime_ns     # pylint: disable=no-member
         if info is None or info[0] != mtime:
             info = (mtime, self.__reader(*args, **kwa))
             if isinstance(info[1], Iterator):
