@@ -4,13 +4,40 @@ u"Utils for dealing with the JS side of the view"
 from typing                 import Tuple, Optional, Iterator # pylint: disable =unused-import
 from contextlib             import contextmanager
 from itertools              import product
+from functools              import wraps
+from pathlib                import Path
 
-import bokeh.palettes
-from bokeh.models           import Row, CustomJS, Range1d, Model
-from bokeh.core.properties  import Dict, String, Float, Instance
-from bokeh.plotting.figure  import Figure
+import  bokeh.palettes
+from    bokeh.models           import Row, CustomJS, Range1d, Model
+from    bokeh.core.properties  import Dict, String, Float, Instance
+from    bokeh.plotting.figure  import Figure
 
-from control                import Controller
+from    sequences              import read as _readsequences
+
+from    utils                  import CachedIO
+from    control                import Controller
+from    .                      import BokehView
+
+def checksizes(fcn):
+    u"Checks that the ColumnDataSource have same sizes"
+    @wraps(fcn)
+    def _wrap(*args, **kwa):
+        res  = fcn(*args, **kwa)
+        if len(res) == 0:
+            return res
+        size = len(next(iter(res.values())))
+        assert all(size == len(i) for i in res.values())
+        return res
+    return _wrap
+
+_CACHE = CachedIO(lambda path: dict(_readsequences(path)), size = 1)
+def readsequence(path):
+    u"Reads / caches DNA sequences"
+    if not isinstance(path, (str, Path)):
+        path = path.sequences.get()
+    if not Path(path).exists():
+        return dict()
+    return _CACHE(path)
 
 class DpxKeyedRow(Row):
     u"define div with tabIndex"
@@ -87,7 +114,7 @@ class PlotAttrs:
 
         return getattr(fig, self.glyph)(**args)
 
-class Plotter:
+class PlotCreator:
     u"Base plotter class"
     def __init__(self, ctrl:Controller) -> None:
         u"sets up this plotter's info"
@@ -208,3 +235,65 @@ class Plotter:
         vmin -= delta
         vmax += delta
         return vmin, vmax
+
+class TrackPlotCreator(PlotCreator):
+    u"Base plotter for tracks"
+    _row   = None # type: Optional[DpxKeyedRow]
+    def __init__(self, *_):
+        super().__init__(*_)
+        self._row = None
+
+    def create(self) -> DpxKeyedRow:
+        "returns the figure"
+        self._row   = self._create(*self._gettrack())
+        self._row.disabled = True
+        return self._row
+
+    def update(self, items:dict):
+        "Updates the data"
+        if not ('track' in items or 'bead' in items):
+            return
+
+        with self.updating():
+            self._row.disabled = False
+            self._update(*self._gettrack())
+
+    def _create(self, track, bead) -> DpxKeyedRow:
+        raise NotImplementedError()
+
+    def _update(self, track, bead):
+        raise NotImplementedError()
+
+    def _gettrack(self):
+        cnf  = self._ctrl.getGlobal("current")
+        task = cnf.track.get(default = None)
+        if task is None:
+            return None, None
+
+        track = self._ctrl.track(task)
+        bead  = cnf.bead.get(default = None)
+        if bead is None:
+            bead = next(iter(track.beadsonly.keys()))
+        return track, bead
+
+class TrackPlotView(BokehView):
+    "Track plot view"
+    PLOTTER = None # type: Optional[type]
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+        assert callable(self.PLOTTER)
+        self._plotter = self.PLOTTER(self._ctrl) # pylint: disable=not-callable
+        self._ctrl.observe("globals.current", self._onUpdateCurrent)
+
+    def close(self):
+        "remove controller"
+        super().close()
+        self._plotter.close()
+        self._plotter = None
+
+    def _onUpdateCurrent(self, **items):
+        self._plotter.update(items) # pylint: disable=no-member
+
+    def getroots(self):
+        "adds items to doc"
+        return self._plotter.create(),
