@@ -17,7 +17,7 @@ class UndoView(View):
     u"View listing all undos"
     def __init__(self, **kwa): # pylint: disable=too-many-locals
         super().__init__(**kwa)
-        self.__curr = [None, 0]
+        self.__curr = [None]
 
         self._observe()
         if 'keys' in kwa:
@@ -42,20 +42,17 @@ class UndoView(View):
         u"Returns the methods for observing user start & stop action delimiters"
         # pylint: disable=unused-variable
         @self._ctrl.observe
-        def _onstartaction():
-            if self.__curr[0] is None:
+        def _onstartaction(recursive = None):
+            assert (self.__curr[0] is not None) is recursive
+            if not recursive:
                 self.__curr[0] = []
-                assert self.__curr[1] == 0
-            else:
-                self.__curr[1] = self.__curr[1]+1 # count nested 'startaction'
 
         @self._ctrl.observe
-        def _onstopaction(**_):
-            if self.__curr[1] == 0:
+        def _onstopaction(recursive = None, **_):
+            assert recursive is not None
+            if not recursive:
                 self._ctrl.appendUndos(self.__curr[0])
                 self.__curr[0] = None
-            else:
-                self.__curr[1] = self.__curr[1]-1 # count nested 'stopaction'
 
     def close(self):
         u"Removes the controller"

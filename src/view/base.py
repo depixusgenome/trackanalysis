@@ -37,16 +37,22 @@ class Action(ActionDescriptor):
 
     This can also be as a descriptor, or a decorator
     """
+    _CNT = 0
     def __init__(self, ctrl = None):
         self._ctrl = ctrl
 
     def __enter__(self):
-        self._ctrl.handle("startaction")
+        self._CNT += 1
+        self._ctrl.handle("startaction", args = {'recursive': self._CNT > 1})
         return self._ctrl
 
     def __exit__(self, tpe, val, bkt):
+        self._CNT -= 1
         self._ctrl.handle("stopaction",
-                          args = {'type': tpe, 'value': val, 'backtrace': bkt})
+                          args = {'type':      tpe,
+                                  'value':     val,
+                                  'backtrace': bkt,
+                                  'recursive': self._CNT == 0})
         return False
 
 class View:
