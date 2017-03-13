@@ -26,6 +26,16 @@ class _Tester(BuildContext):
     cmd = 'test'
     fun = 'test'
 
+class _CondaEnv(BuildContext):
+    u"runs condaenv"
+    cmd = 'condaenv'
+    fun = 'condaenv'
+
+class _Requirements(BuildContext):
+    u"runs requirements"
+    cmd = 'requirements'
+    fun = 'requirements'
+
 builder.defaultwscript("src", "make()")
 _ALL      = ('tests',) + tuple(builder.wscripted("src"))
 builder.addbuild(_ALL)
