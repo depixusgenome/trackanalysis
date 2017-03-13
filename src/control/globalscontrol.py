@@ -318,11 +318,12 @@ class GlobalsController(Controller):
 
     def addGlobalMap(self, key, *args, **kwargs):
         u"adds a map"
-        if '.' in key:
-            parent = self.__maps[key[:key.rfind('.')]]
-            self.__maps[key] = parent.createChild(key, handlers = self._handlers)
-        else:
-            self.__maps[key] = DefaultsMap(GlobalsChild(key), handlers = self._handlers)
+        if key not in self.__maps:
+            if '.' in key:
+                parent = self.__maps[key[:key.rfind('.')]]
+                self.__maps[key] = parent.createChild(key, handlers = self._handlers)
+            else:
+                self.__maps[key] = DefaultsMap(GlobalsChild(key), handlers = self._handlers)
 
         self.__maps[key].setdefaults(*args, **kwargs)
         return _MapGetter(self.__maps[key], '')
