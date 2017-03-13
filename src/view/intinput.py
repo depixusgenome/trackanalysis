@@ -3,7 +3,8 @@
 "all view aspects here"
 
 import numpy as np
-from bokeh.models.widgets.inputs    import InputWidget, Callback, String, Int, Instance
+from bokeh.models.widgets.inputs  import (InputWidget, Callback, String,
+                                          Float, Int, Instance)
 
 from .base import BokehView
 
@@ -13,7 +14,22 @@ class IntInput(InputWidget):
 
     value    = Int(default=0, help="Initial or entered int value")
     minvalue = Int(default=0, help="min value which can be input")
+    step     = Int(default=1,  help="step value which can be input")
     maxvalue = Int(default=10, help="max value which can be input")
+    callback = Instance(Callback, help="""
+    A callback to run in the browser whenever the user unfocuses the TextInput
+    widget by hitting Enter or clicking outside of the text box area.
+    """)
+    placeholder = String(default="", help="Placeholder for empty input field")
+
+class FloatInput(InputWidget):
+    """ Single-line input widget. """
+    __implementation__ = "floatinput.coffee"
+
+    value    = Float(default=0.,  help="Initial or entered int value")
+    minvalue = Float(default=0.,  help="min value which can be input")
+    step     = Float(default=1.,  help="step value which can be input")
+    maxvalue = Float(default=10., help="max value which can be input")
     callback = Instance(Callback, help="""
     A callback to run in the browser whenever the user unfocuses the TextInput
     widget by hitting Enter or clicking outside of the text box area.
@@ -27,8 +43,8 @@ class BeadInput(BokehView):
         super().__init__(**kwa)
         self.__beads = np.empty((0,), dtype = 'i4')
 
-        kwa = dict(height       = self._ctrl.getGlobal('css', 'button.height'),
-                   width        = 90,#self._ctrl.getGlobal('css', 'button.height'),
+        kwa = dict(height       = self._ctrl.getGlobal('css', 'input.height'),
+                   width        = self._ctrl.getGlobal('css', 'input.width'),
                    disabled     = True,
                    title        = 'bead number')
         self.__inp   = IntInput(**kwa)

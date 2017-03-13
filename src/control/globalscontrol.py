@@ -291,6 +291,7 @@ class GlobalsController(Controller):
         super().__init__(**kwargs)
         self.__maps = dict()
         self.addGlobalMap('css').button.defaults = {'width': 90, 'height': 20}
+        self.addGlobalMap('css').input .defaults = {'width': 90, 'height': 20}
         self.addGlobalMap('config').keypress.defaults = {'undo' : "Control-z",
                                                          'redo' : "Control-y",
                                                          'open' : "Control-o",

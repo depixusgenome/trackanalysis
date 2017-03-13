@@ -20,12 +20,13 @@ from bokeh.models   import (LinearAxis, ColumnDataSource, HoverTool,
 import numpy        as np
 
 import sequences
-from   utils                  import NoArgs
-from   control                import Controller
-from  .dialog                 import FileDialog
-from  .plotutils              import (PlotAttrs, DpxKeyedRow, TrackPlotCreator,
-                                      TrackPlotView, TrackPlotModel, checksizes,
-                                      readsequence)
+from   utils        import NoArgs
+from   control      import Controller
+from  .intinput     import FloatInput
+from  .dialog       import FileDialog
+from  .plotutils    import (PlotAttrs, DpxKeyedRow, TrackPlotCreator,
+                            TrackPlotView, TrackPlotModel, checksizes,
+                            readsequence)
 
 window = None # type: ignore # pylint: disable=invalid-name
 def configprop(attr):
@@ -56,13 +57,19 @@ def beadorconfig(attr):
 
 class CyclesModel(TrackPlotModel):
     "Model for Cycles View"
-    _CACHED = 'base.slope', 'base.bias', 'sequence.key', 'sequence.witnesses'
+    _CACHED = 'base.stretch', 'base.bias', 'sequence.key', 'sequence.witnesses'
     def __init__(self, ctrl, cnf, curr):
         super().__init__(ctrl, cnf, curr)
-        cnf.defaults = {'binwidth'      : .003,
-                        'minframes'     : 10,
-                        'base.bias'     : None,
-                        'base.slope'    : 8.8e-4,
+        cnf.defaults = {'binwidth'          : .003,
+                        'minframes'         : 10,
+                        'base.bias'         : None,
+                        'base.bias.min'     : -10.,
+                        'base.bias.step'    : .003,
+                        'base.bias.max'     : 10.,
+                        'base.stretch'      : 8.8e-4,
+                        'base.stretch.min'  : 1.e-5,
+                        'base.stretch.step' : 1.e-5,
+                        'base.stretch.max'  : 1.e-3,
                         'sequence.path' : "../tests/testingcore/hairpins.fasta",
                         'sequence.key'  : 'GF1',
                        }
@@ -79,7 +86,7 @@ class CyclesModel(TrackPlotModel):
     minframes    = cast(int,                     configprop  ('minframes'))
     sequencepath = cast(Optional[str],           configprop  ('sequence.path'))
     oligos       = cast(Optional[Sequence[str]], configprop  ('oligos'))
-    slope        = cast(float,                   beadorconfig('base.slope'))
+    stretch      = cast(float,                   beadorconfig('base.stretch'))
     bias         = cast(Optional[float],         beadorconfig('base.bias'))
     sequencekey  = cast(Optional[str],           beadorconfig('sequence.key'))
     witnesses    = cast(Optional[Tuple[float,float,float,float]],
@@ -90,7 +97,8 @@ class DpxHoverModel(Model):
     precision = Float(0.003)
     framerate = Float(1.)
     bias      = Float(0.)
-    slope     = Float(0.)
+    stretch   = Float(0.)
+    updating  = Bool(False)
     __implementation__ = """
     import * as p  from "core/properties"
     import {Model} from "model"
@@ -102,8 +110,9 @@ class DpxHoverModel(Model):
         @define {
             precision : [p.Number, 0.003],
             framerate : [p.Number, 1],
-            slope     : [p.Number, 0],
-            bias      : [p.Number, 0]
+            stretch   : [p.Number, 0],
+            bias      : [p.Number, 0],
+            updating  : [p.Bool,  false]
         }
     """
     def __init__(self, **kwa):
@@ -121,7 +130,8 @@ class DpxHoverModel(Model):
         return {'raw.selection'       : PlotAttrs('green', 'line',   2),
                 'raw.tooltips'        : [(u'(cycle, t, z)', '(@cycles, $~x, $data_y)')],
                 'raw.tooltips.radius' : 2,
-                'hist.tooltips.radius': 1.5
+                'hist.tooltips.radius': 1.5,
+                'hist.tooltips'       : u'@values: @text'
                }
 
     @staticmethod
@@ -146,7 +156,7 @@ class DpxHoverModel(Model):
         "creates the hover tool"
         self.precision = mdl.binwidth
         self.bias      = mdl.bias
-        self.slope     = mdl.slope
+        self.stretch   = mdl.stretch
 
         hover          = fig.select(HoverTool)
         if len(hover) == 0:
@@ -217,14 +227,14 @@ class DpxHoverModel(Model):
         "Creates the hover tool for histograms"
         self.update(framerate = 1./30.,
                     bias      = 0.,
-                    slope     = mdl.slope)
+                    stretch   = mdl.stretch)
 
         hover = fig.select(HoverTool)
         if len(hover) == 0:
             return
 
         self._histsource = ColumnDataSource(self._createhistdata(mdl))
-        hover[0].tooltips   = '@values: @text'
+        hover[0].tooltips   = css.hist.tooltips.get()
         hover[0].mode       = 'hline'
 
         hover[0].renderers  = [fig.circle(x                = 'inds',
@@ -260,7 +270,7 @@ class DpxHoverModel(Model):
             bias = hdata['bottom'][(ind1+ind2-1)//2] + mdl.binwidth*.5
         self.update(framerate = mdl.track.framerate,
                     bias      = bias,
-                    slope     = mdl.slope)
+                    stretch   = mdl.stretch)
 
     def observe(self, ctrl, key, mdl):
         u"sets up model observers"
@@ -311,6 +321,10 @@ class DpxFixedTicker(ContinuousTicker):
         super().__init__(**kwa)
         self._defaults = []     # type: list
         self._axis     = None   # type: Optional[DpxFixedTicker]
+
+    def getaxis(self):
+        u"returns the fixed axis"
+        return self._axis
 
     def create(self, css, *figs):
         "Sets the ticks according to the configuration"
@@ -548,8 +562,8 @@ class _HistMixin(_Mixin):
             frames.start = 0.
 
             bases        = hist.extra_y_ranges['bases']
-            bases.start  = (yrng.start-mdl.bias)/mdl.slope
-            bases.end    = (yrng.end-mdl.bias)/mdl.slope
+            bases.start  = (yrng.start-mdl.bias)/mdl.stretch
+            bases.end    = (yrng.end-mdl.bias)/mdl.stretch
 
             bottom = src.data["bottom"]
             delta  = bottom[1]-bottom[0]
@@ -573,7 +587,6 @@ class _HistMixin(_Mixin):
 
         hist             = self._createhistdata(track, bead)
         self._histsource = ColumnDataSource(data = hist)
-
         self._hist.extra_x_ranges = {"cycles": Range1d(start = 0., end = 1.)}
 
         attrs = css.cycles.get()
@@ -611,61 +624,118 @@ class _HistMixin(_Mixin):
 
 class _ConfigMixin(_Mixin):
     def __init__(self):
-        self.__updates = [] # type: List[Callable]
+        self.__updates = []   # type: List[Callable]
         self.getCSS().defaults = {'tablesize'      : (200, 100),
                                   'title.table'    : u'[nm] ↔ [base] in positions',
                                   'title.sequence' : u'Selected DNA sequence',
-                                  'title.slope'    : u'[nm] ↔ [base] slope',
-                                  'title.bias'     : u'[nm] ↔ [base] bias'}
+                                  'title.stretch'  : u'[nm] ↔ [base] stretch',
+                                  'title.bias'     : u'[nm] ↔ [base] bias',
+                                  'input.height'   : 50,
+                                  'input.width'    : 160}
 
     def _createconfig(self):
-        self.__observemodel()
-        return layouts.layout([[layouts.widgetbox(list(self.__doconvert())),
-                                layouts.widgetbox(list(self.__dowitness()))],
-                               [layouts.widgetbox(list(self.__dosequence())),
-                                self.__dooligos ()]])
+        stretch, bias  = self.__doconvert()
+        par,     table = self.__dowitness()
+        ret = layouts.layout([[layouts.widgetbox([bias, stretch]),
+                               layouts.widgetbox([par,  table])],
+                              [layouts.widgetbox(list(self.__dosequence())),
+                               self.__dooligos ()]])
+
+        def _py_cb(attr, old, new):
+            setattr(self._model, attr, new)
+
+        for name in 'stretch', 'bias':
+            self._hover.on_change(name, _py_cb)
+
+        # do this here because the trigger on _hover attributes doesn't work
+        def _js_cb(stretch = stretch,
+                   bias    = bias,
+                   data    = table.source,
+                   fig     = self._hist,
+                   mdl     = self._hover):
+            # pylint: disable=no-member
+            if mdl.updating:
+                return
+            mdl.updating   = True
+            mdl.stretch    = stretch.value
+            mdl.bias       = bias.value
+            data.data['z'] = [data.data['bases'][0]*stretch.value+bias.value,
+                              data.data['bases'][1]*stretch.value+bias.value]
+            data.trigger('change:data')
+
+            fig.extra_y_ranges['bases'].start = (fig.y_range.start-mdl.bias)/mdl.stretch
+            fig.extra_y_ranges['bases'].end   = (fig.y_range.end-mdl.bias)/mdl.stretch
+            mdl.updating   = False
+
+        cust = CustomJS.from_py_func(_js_cb)
+        for widget in (stretch, bias):
+            widget.js_on_change('value', cust)
+
+        # do this here because the trigger on _hover attributes doesn't work
+        def _jstable_cb(stretch = stretch,
+                        bias    = bias,
+                        data    = table.source,
+                        fig     = self._hist,
+                        mdl     = self._hover):
+            # pylint: disable=no-member
+            if mdl.updating:
+                return
+
+            zval  = data.data['z']
+            bases = data.data['bases']
+            if zval[0] == zval[1] or bases[0] == bases[1]:
+                return
+
+            mdl.updating = True
+            rho           = (zval[1]-zval[0]) / (bases[1]-bases[0])
+            mdl.stretch   = rho
+            mdl.bias      = zval[0] - bases[0]*rho
+
+            stretch.value = mdl.stretch
+            bias.value    = mdl.bias
+
+            fig.extra_y_ranges['bases'].start = (fig.y_range.start-mdl.bias)/mdl.stretch
+            fig.extra_y_ranges['bases'].end   = (fig.y_range.end-mdl.bias)/mdl.stretch
+            mdl.updating = False
+
+        # pylint: disable=no-member
+        table.source.js_on_change("data", CustomJS.from_py_func(_jstable_cb))
+        return ret
 
     def _updateconfig(self):
         for fcn in self.__updates:
             fcn()
 
-    def __observemodel(self):
-        def _py_cb(attr, old, new):
-            setattr(self._model, attr, new)
-
-        def _js_cb(fig = self._hist, mdl = self._hover):
-            zrng       = fig.y_range
-            brng       = fig.extra_y_ranges['bases']
-            brng.start = (zrng.start - mdl.bias)/mdl.slope
-            brng.end   = (zrng.end   - mdl.bias)/mdl.slope
-
-        for name in 'slope', 'bias':
-            self._hover.on_change(name,    _py_cb)
-            self._hover.js_on_change(name, CustomJS.from_py_func(_js_cb))
-
     def __doconvert(self):
-        css   = self.getCSS().title
-        slope = TextInput(value = str(self._model.slope), title = css.slope.get())
-        bias  = TextInput(value = str(self._hover.bias),  title = css.bias .get())
-        def _js_cb(slope = slope, bias = bias, mdl = self._hover):
-            mdl.slope  = float(slope.value)
-            mdl.bias   = float(bias.value)
-
-        for widget in (slope, bias):
-            widget.js_on_change('value', CustomJS.from_py_func(_js_cb))
+        size    = tuple(self.getCSS().input.get("width", "height"))
+        css     = self.getCSS().title
+        stretch = FloatInput(value    = self._model.stretch,
+                             minvalue = self.getConfig().base.stretch.min.get(),
+                             maxvalue = self.getConfig().base.stretch.max.get(),
+                             step     = self.getConfig().base.stretch.step.get(),
+                             width    = size[0],
+                             height   = size[1],
+                             title    = css.stretch.get())
+        bias    = FloatInput(value    = self._hover.bias,
+                             minvalue = self.getConfig().base.bias.min.get(),
+                             maxvalue = self.getConfig().base.bias.max.get(),
+                             step     = self.getConfig().base.bias.step.get(),
+                             width    = size[0],
+                             height   = size[1],
+                             title    = css.bias .get())
 
         def _onupdate():
-            slope.value = str(self._model.slope)
-            bias.value  = str(self._model.bias)
+            stretch.value = self._model.stretch
+            bias.value    = self._model.bias
 
         def _onconfig(items):
-            if any(i in items  for i in ('base.slope', 'base.bias')):
+            if any(i in items  for i in ('base.stretch', 'base.bias')):
                 _onupdate()
 
         self._ctrl.observe(self.key(),          _onconfig)
         self._ctrl.observe(self.key("current"), _onconfig)
         self.__updates.append(_onupdate)
-        return slope, bias
+        return stretch, bias
 
     def __dowitness(self):
         def _createdata():
@@ -677,11 +747,11 @@ class _ConfigMixin(_Mixin):
                 peaks = sequences.peaks(seq, self._model.oligos)['position']
                 if len(peaks) > 2:
                     info = (peaks[0], peaks[-1],
-                            peaks[0] *self._hover.slope+self._hover.bias,
-                            peaks[-1]*self._hover.slope+self._hover.bias)
+                            peaks[0] *self._hover.stretch+self._hover.bias,
+                            peaks[-1]*self._hover.stretch+self._hover.bias)
             if info is None:
-                info = (0., 1e3, self._hover.bias, self._hover.slope)
-            return dict(bases = info[:2], frames = info[2:])
+                info = (0., 1e3, self._hover.bias, self._hover.stretch)
+            return dict(bases = info[:2], z = info[2:])
 
         size = self.getCSS().tablesize.get()
         data = ColumnDataSource(_createdata())
@@ -689,7 +759,7 @@ class _ConfigMixin(_Mixin):
                             title  = self.getCSS().hist.ylabel.get(),
                             editor = IntEditor(),
                             width  = size[0]//2),
-                TableColumn(field  = 'frames',
+                TableColumn(field  = 'z',
                             title  = self.getCSS().ylabel.get(),
                             editor = NumberEditor(step = 1e-4),
                             width  = size[0]//2)]
@@ -701,21 +771,8 @@ class _ConfigMixin(_Mixin):
                            width       = size[0],
                            height      = size[1])
         def _py_cb(attr, old, new):
-            self._model.witnesses = tuple(data.data['bases']) + tuple(data.data['cycles'])
+            self._model.witnesses = tuple(data.data['bases']) + tuple(data.data['z'])
         data.on_change("data", self.action(_py_cb))
-
-        def _js_cb(mdl = self._hover, data = data):
-            cycles   = data.data['cycles']
-            if cycles[0] == cycles[1]:
-                return
-            bases    = data.data['bases']
-            if bases[0] == bases[1]:
-                return
-            slope     = (cycles[1]-cycles[0]) / (bases[1]-bases[0])
-            bias      = cycles[0] - bases[0]*slope
-            mdl.slope = slope
-            mdl.bias  = bias
-        data.js_on_change("data", CustomJS.from_py_func(_js_cb))
 
         def _onconfig(items):
             if 'sequence.witnesses' in items:
@@ -732,22 +789,21 @@ class _ConfigMixin(_Mixin):
         lst = []
         def _attrs(lst = lst): # pylint: disable = dangerous-default-value
             lst.clear()
-            lst.extend(sorted(readsequence(self._model.sequencepath).items()))
-            if len(lst) == 0:
-                lst = [('→', '--1--')]
-            key = self._model.sequencekey
-            val = next((j for i, j in lst if i == key), None)
+            lst.extend(sorted(readsequence(self._model.sequencepath).keys()))
 
-            return dict(menu  = ([(j, str(i)) for i, (j, _) in enumerate(lst)]
-                                 + [None, (u'Find path', '--2--')]),
-                        label = u'Sequence' if val is None else key,
-                        value = u'--1--'    if val is None else val)
+            key   = self._model.sequencekey
+            val   = key if key in lst else None
+            menu  = [(i, i) for i in lst] if len(lst) else [('→', '→')]
+            menu += [None, (u'Find path', '←')]
+            return dict(menu  = menu,
+                        label = lst[-1][0] if val is None else key,
+                        value = lst[0][1]  if val is None else val)
 
         widget = Dropdown(**_attrs())
 
-        def _py_cb(new):
-            if new not in ('--1--', '--2--'):
-                self._model.sequencekey = lst[int(new)]
+        def _py_cb(new, lst = lst): #pylint: disable=dangerous-default-value
+            if new in lst:
+                self._model.sequencekey = new
             else:
                 path = dia.open()
                 seqs = readsequence(path)
@@ -755,15 +811,16 @@ class _ConfigMixin(_Mixin):
                     self._model.sequencepath = path
                     self._model.sequencekey  = next(iter(seqs))
 
-        def _js_cb(choice = widget,
-                   ticker = self._gridticker,
-                   hsrc   = self._histsource,
-                   tsrc   = self._hover.source('hist')):
-            if choice.value not in ('--1--', '--2--'):
+        def _js_cb(choice  = widget,
+                   ticker   = self._gridticker,
+                   axticker = self._gridticker.getaxis(),
+                   tsrc     = self._hover.source('hist')):
+            if choice.value in tsrc.column_names:
+                choice.label      = choice.value
                 ticker.key        = choice.value
+                axticker.key      = choice.value
                 tsrc.data['text'] = tsrc.data[choice.value]
-                tsrc.trigger('change')
-                hsrc.trigger('change')
+                tsrc.trigger("change")
 
         widget.on_click(self.action(_py_cb))
         widget.js_on_change('value', CustomJS.from_py_func(_js_cb))
@@ -812,17 +869,17 @@ class CyclesPlotCreator(TrackPlotCreator, _HistMixin, _RawMixin, _ConfigMixin):
         args['toolbar_location'] = loc
         return args
 
-    def _create(self, track, bead) -> DpxKeyedRow:
+    def _create(self, track, bead):
         "returns the figure"
         self._hover  = DpxHoverModel()
         self._createraw(track, bead)
         self._createhist(track, bead, self._raw.y_range)
         plts  = layouts.gridplot([[self._raw, self._hist]])
-        items = layouts.column([plts, self._createconfig()])
+        keyed = DpxKeyedRow(self, self._raw,
+                            children = [plts],
+                            toolbar  = plts.children[0])
 
-        return DpxKeyedRow(self, self._raw,
-                           children = [items],
-                           toolbar  = plts.children[0])
+        return layouts.column([keyed, self._createconfig()])
 
     def _update(self, track, bead, items):
         if 'track' in items:

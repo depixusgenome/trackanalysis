@@ -6,6 +6,7 @@ from contextlib             import contextmanager
 from itertools              import product
 from functools              import wraps
 from pathlib                import Path
+import inspect
 
 import  bokeh.palettes
 from    bokeh.models           import Row, CustomJS, Range1d, Model
@@ -134,12 +135,27 @@ class PlotCreator:
 
     def action(self, fcn):
         u"decorator which starts a user action unless _ready is set to false"
-        @wraps(fcn)
-        def _wrap(attr, old, new):
-            if self._ready:
-                with Action(self._ctrl):
-                    fcn(attr, old, new)
-        return _wrap
+        if tuple(inspect.signature(fcn).parameters) == ('attr', 'old', 'new'):
+            @wraps(fcn)
+            def _wrap_cb(attr, old, new):
+                if self._ready:
+                    with Action(self._ctrl):
+                        fcn(attr, old, new)
+            return _wrap_cb
+        elif tuple(inspect.signature(fcn).parameters)[1:] == ('attr', 'old', 'new'):
+            @wraps(fcn)
+            def _wrap_cb(self, attr, old, new):
+                if self._ready:
+                    with Action(self._ctrl):
+                        fcn(self, attr, old, new)
+            return _wrap_cb
+        else:
+            @wraps(fcn)
+            def _wrap_cb(*args, **kwa):
+                if self._ready:
+                    with Action(self._ctrl):
+                        fcn(*args, **kwa)
+            return _wrap_cb
 
     @contextmanager
     def updating(self):

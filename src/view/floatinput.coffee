@@ -8,7 +8,7 @@ import {InputWidget, InputWidgetView} from "models/widgets/input_widget"
 import template from "./intinput_template"
 
 
-export class IntInputView extends InputWidgetView
+export class FloatInputView extends InputWidgetView
   tagName: "div"
   className: "bk-widget-form-group"
   template: template
@@ -33,7 +33,7 @@ export class IntInputView extends InputWidgetView
     return @
 
   change_input: () ->
-    value = parseInt(@$el.find('input').val())
+    value = Number(@$el.find('input').val())
     if isNaN(value)
         @$el.find('input').val(model.value)
     else
@@ -41,14 +41,14 @@ export class IntInputView extends InputWidgetView
         @model.value = value
     super()
 
-export class IntInput extends InputWidget
-  type: "IntInput"
-  default_view: IntInputView
+export class FloatInput extends InputWidget
+  type: "FloatInput"
+  default_view: FloatInputView
 
   @define {
-      value:        [p.Int, 0 ]
-      minvalue:     [p.Int, 0]
-      step:         [p.Int, 1]
-      maxvalue:     [p.Int, 10]
+      value:        [p.Number, 0 ]
+      minvalue:     [p.Number, 0]
+      step:         [p.Number, 1]
+      maxvalue:     [p.Number, 10]
       placeholder:  [p.String, "" ]
     }
