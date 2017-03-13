@@ -17,12 +17,12 @@ class BeadPlotCreator(TrackPlotCreator):
         "sets up this plotter's info"
         super().__init__(ctrl)
         ttips = [(u'Index', '$index'), (u'(t, z, zmag)', '($~x, $data_y, @zmag)')]
-        self.getConfig().defaults = dict(z           = PlotAttrs('blue', 'circle', 1),
-                                         zmag        = PlotAttrs('red',  'line',   1),
-                                         xlabel      = u"Frames",
-                                         ylabel      = u"Z",
-                                         yrightlabel = u"Zmag",
-                                         tooltips    = ttips)
+        self.getCSS().defaults = dict(z           = PlotAttrs('blue', 'circle', 1),
+                                      zmag        = PlotAttrs('red',  'line',   1),
+                                      xlabel      = u"Frames",
+                                      ylabel      = u"Z",
+                                      yrightlabel = u"Zmag",
+                                      tooltips    = ttips)
         self._source = None # type: Optional[ColumnDataSource]
         self._fig    = None # type: Optional[Figure]
 
@@ -40,23 +40,23 @@ class BeadPlotCreator(TrackPlotCreator):
 
     def _figargs(self):
         args = super()._figargs()
-        if self.getConfig().tooltips.get() not in ('', None):
+        if self.getCSS().tooltips.get() not in ('', None):
             args['tools'] += ',hover'
-        args.update(x_axis_label = self.getConfig().xlabel.get(),
-                    y_axis_label = self.getConfig().ylabel.get(),
+        args.update(x_axis_label = self.getCSS().xlabel.get(),
+                    y_axis_label = self.getCSS().ylabel.get(),
                     x_range      = Range1d(start = 0., end = 1.),
                     y_range      = Range1d(start = 0., end = 1.))
         return args
 
     def _addglyph(self, beadname, **kwa):
-        return self.getConfig()[beadname].addto(self._fig,
-                                                x      = 't',
-                                                y      = beadname,
-                                                source = self._source,
-                                                **kwa)
+        return self.getCSS()[beadname].addto(self._fig,
+                                             x      = 't',
+                                             y      = beadname,
+                                             source = self._source,
+                                             **kwa)
 
     def _addylayout(self):
-        cnf = self.getConfig()
+        cnf = self.getCSS()
         self._fig.extra_y_ranges = {'zmag': Range1d(start = 0., end = 1.)}
         axis  = LinearAxis(y_range_name          = 'zmag',
                            axis_label            = cnf.yrightlabel.get(),
@@ -82,8 +82,8 @@ class BeadPlotCreator(TrackPlotCreator):
         "sets-up the figure"
         self._fig    = figure(**self._figargs())
         self._source = ColumnDataSource(data = self._createdata(track, bead))
-        if self.getConfig().tooltips.get() not in ('', None):
-            self._fig.select(HoverTool).tooltips = self.getConfig().tooltips.get()
+        if self.getCSS().tooltips.get() not in ('', None):
+            self._fig.select(HoverTool).tooltips = self.getCSS().tooltips.get()
 
         self._addylayout  ()
         self._addglyph    ('zmag', y_range_name = 'zmag')

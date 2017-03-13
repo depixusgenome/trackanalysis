@@ -18,7 +18,7 @@ from    model.task             import RootTask, Task
 from    data.track             import Track
 from    utils                  import CachedIO
 from    control                import Controller
-from    .                      import BokehView
+from    .base                  import BokehView, Action
 
 def checksizes(fcn):
     "Checks that the ColumnDataSource have same sizes"
@@ -126,9 +126,20 @@ class PlotCreator:
 
         ctrl.addGlobalMap(self.key())
         ctrl.addGlobalMap(self.key('current'))
-        self.getConfig().defaults = dict(ylabel    = u'Z',
-                                         xtoplabel = u'Time',
-                                         xlabel    = u'Frames')
+        ctrl.addGlobalMap("css.plot",
+                          ylabel    = u'Z',
+                          xtoplabel = u'Time',
+                          xlabel    = u'Frames')
+        ctrl.addGlobalMap(self.key('css'))
+
+    def action(self, fcn):
+        u"decorator which starts a user action unless _ready is set to false"
+        @wraps(fcn)
+        def _wrap(attr, old, new):
+            if self._ready:
+                with Action(self._ctrl):
+                    fcn(attr, old, new)
+        return _wrap
 
     @contextmanager
     def updating(self):
@@ -152,7 +163,7 @@ class PlotCreator:
     @classmethod
     def key(cls, base = 'config'):
         "Returns the key used by the global variables"
-        return base+".plot."+cls.__name__[:-len('Plotter')].lower()
+        return base+".plot."+cls.__name__[:-len('PlotCreator')].lower()
 
     def close(self):
         "Removes the controller"
@@ -161,6 +172,10 @@ class PlotCreator:
     def getConfig(self):
         "returns config values"
         return self._ctrl.getGlobal(self.key())
+
+    def getCSS(self):
+        "returns config values"
+        return self._ctrl.getGlobal(self.key('css'))
 
     def getCurrent(self, *key, **kwa):
         "returns config values"
