@@ -7,7 +7,7 @@ from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-imp
 import anastore.control # pylint: disable=unused-import
 
 from view.toolbar               import ToolBar
-from view.trackplot             import TrackPlotView
+from view.beadplot              import BeadPlotView
 
 def test_toolbar(bokehaction):          # pylint: disable=redefined-outer-name
     u"test the toolbar"
@@ -45,7 +45,7 @@ def test_trackplot(bokehaction):        # pylint: disable=redefined-outer-name
         if 'y' in evts:
             vals[2:] = evts['y'].value
 
-    with bokehaction.launch(TrackPlotView, 'app.ToolBar') as server:
+    with bokehaction.launch(BeadPlotView, 'app.ToolBar') as server:
         server.ctrl.observe("globals.current.plot.bead", _printrng)
         server.load('small_legacy')
 
