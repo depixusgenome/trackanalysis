@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"decoration utils"
+"decoration utils"
 
 import  pathlib
 from    collections import OrderedDict
@@ -29,7 +29,7 @@ class _PathPos:
         return kwa['path'] if 'path' in kwa else args[self.ind]
 
     def args(self, path, args, kwa):
-        u"returns the args as they should be"
+        "returns the args as they should be"
         if 'path' in kwa:
             kwa['path'] = path
         else:
@@ -37,7 +37,7 @@ class _PathPos:
         return args, kwa
 
 def fromstream(streamopts):
-    u"""
+    """
     wraps a method using a stream as input so it can use str, Path or stream
 
     The stream attribute will be identified as:
@@ -113,7 +113,7 @@ def _escapenans(*arrays: np.ndarray, reset = True):
             yield arrays
 
 def escapenans(*arrays: np.ndarray, reset = True):
-    u"""
+    """
     Allows removing nans from arrays prior to a computation and putting
     them back inside afterwards:
 
@@ -167,6 +167,14 @@ class CachedIO(Generic[T]):
         self.__cache  = OrderedDict() if cache is None else cache
         self.__size   = size
 
+    def values(self):
+        "iters over all entries"
+        yield from (i for _, i in self.__cache.values())
+
+    def items(self):
+        "iters over all entries"
+        yield from ((i, j) for i, (_, j) in self.__cache.items())
+
     def clear(self, path: Optional[Union[str, pathlib.Path]] = None):
         "clears the cache"
         if path is not None:
@@ -180,7 +188,7 @@ class CachedIO(Generic[T]):
         if not path.exists():               # pylint: disable=no-member
             return None
 
-        info  = self.__cache.get(path, None)
+        info  = self.__cache.pop(path, None)
         mtime = path.stat().st_mtime_ns     # pylint: disable=no-member
         if info is None or info[0] != mtime:
             info = (mtime, self.__reader(*args, **kwa))
@@ -190,7 +198,7 @@ class CachedIO(Generic[T]):
             if self.__size == len(self.__cache) and path not in self.__cache:
                 self.__cache.popitem()
 
-            self.__cache[path] = info
+        self.__cache[path] = info
         return info[1]
 
 def cachedio(fcn):

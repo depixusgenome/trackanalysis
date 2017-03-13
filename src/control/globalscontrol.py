@@ -163,6 +163,11 @@ class _MapGetter:
             return self._ctrl.get(self._base, default = default)
         return self._ctrl.get(*(self._key+i for i in keys), default = default)
 
+    def getdict(self, *keys, default = delete):
+        u"Calls get using the current base key"
+        keys = tuple(self._key+i for i in keys)
+        return dict(zip(keys, self._ctrl.get(*keys, default = default)))
+
     def set(self, arg):
         u"Calls update using the current base key"
         return self._ctrl.update((self._base, arg))
@@ -234,7 +239,7 @@ class DefaultsMap(Controller):
                 ret[key] = ReturnPair(old, val)
 
         if len(ret) > 1:
-            return self.handle("globals."+self.__items.name, self.outasdict, ret)
+            return self.handle("globals."+self.__items.name, self.outastuple, (ret,))
 
     def pop(self, *args):
         u"removes view information"

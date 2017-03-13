@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"all view aspects here"
+"all view aspects here"
 
 import numpy as np
 from bokeh.models.widgets.inputs    import InputWidget, Callback, String, Int, Instance
@@ -21,9 +21,9 @@ class IntInput(InputWidget):
     placeholder = String(default="", help="Placeholder for empty input field")
 
 class BeadInput(BokehView):
-    u"Spinner for controlling the current bead"
+    "Spinner for controlling the current bead"
     def __init__(self, **kwa):
-        u"Sets up the controller"
+        "Sets up the controller"
         super().__init__(**kwa)
         self.__beads = np.empty((0,), dtype = 'i4')
 
@@ -36,19 +36,19 @@ class BeadInput(BokehView):
         self._ctrl.observe("globals.current", self._onUpdateCurrent)
 
     def addkeypress(self, tpe = 'keypress'):
-        u"Adds keypress for changin beads"
+        "Adds keypress for changin beads"
         self._keys.addKeyPress((tpe+'.beadup',
                                 lambda: self._onchange_cb('', '', self.__inp.value+1)))
         self._keys.addKeyPress((tpe+'.beaddown',
                                 lambda: self._onchange_cb('', '', self.__inp.value-1)))
 
     def getroots(self):
-        u"adds items to doc"
+        "adds items to doc"
         assert False
 
     @property
     def input(self):
-        u"returns the bokeh model"
+        "returns the bokeh model"
         return self.__inp
 
     def _onchange_cb(self, attr, old, new):
@@ -62,7 +62,7 @@ class BeadInput(BokehView):
 
         self._ctrl.getGlobal("current").bead = new
 
-    def _onUpdateCurrent(self, **items):
+    def _onUpdateCurrent(self, items):
         if 'track' in items:
             disabled = items['track'].value is items['empty']
             self.__inp.disabled = disabled

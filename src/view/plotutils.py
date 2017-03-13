@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Utils for dealing with the JS side of the view"
+"Utils for dealing with the JS side of the view"
 from typing                 import Tuple, Optional, Iterator # pylint: disable =unused-import
 from contextlib             import contextmanager
 from itertools              import product
@@ -14,12 +14,14 @@ from    bokeh.plotting.figure  import Figure
 
 from    sequences              import read as _readsequences
 
+from    model.task             import RootTask, Task
+from    data.track             import Track
 from    utils                  import CachedIO
 from    control                import Controller
 from    .                      import BokehView
 
 def checksizes(fcn):
-    u"Checks that the ColumnDataSource have same sizes"
+    "Checks that the ColumnDataSource have same sizes"
     @wraps(fcn)
     def _wrap(*args, **kwa):
         res  = fcn(*args, **kwa)
@@ -32,16 +34,19 @@ def checksizes(fcn):
 
 _CACHE = CachedIO(lambda path: dict(_readsequences(path)), size = 1)
 def readsequence(path):
-    u"Reads / caches DNA sequences"
-    if not Path(path).exists():
+    "Reads / caches DNA sequences"
+    if path is None or not Path(path).exists():
         return dict()
-    return _CACHE(path)
+    try:
+        return _CACHE(path)
+    except: # pylint: disable=bare-except
+        return dict()
 
 class DpxKeyedRow(Row):
-    u"define div with tabIndex"
+    "define div with tabIndex"
     fig                = Instance(Figure)
     toolbar            = Instance(Model)
-    keys               = Dict(String, String, help = u'keys and their action')
+    keys               = Dict(String, String, help = 'keys and their action')
     zoomrate           = Float()
     panrate            = Float()
     __implementation__ = 'keyedrow.coffee'
@@ -63,7 +68,7 @@ class DpxKeyedRow(Row):
                          **kwa)
 
 class PlotAttrs:
-    u"Plot Attributes for one variable"
+    "Plot Attributes for one variable"
     def __init__(self,
                  color                  = 'blue',
                  glyph                  = 'line',
@@ -77,7 +82,7 @@ class PlotAttrs:
         self.__dict__.update(kwa)
 
     def iterpalette(self, count, *tochange, indexes = None) -> Iterator['PlotAttrs']:
-        u"yields PlotAttrs with colors along the palette provided"
+        "yields PlotAttrs with colors along the palette provided"
         info    = dict(self.__dict__)
         palette = getattr(bokeh.palettes, self.palette, None)
 
@@ -98,7 +103,7 @@ class PlotAttrs:
             yield PlotAttrs(**info)
 
     def addto(self, fig, **kwa):
-        u"adds itself to plot: defines color, size and glyph to use"
+        "adds itself to plot: defines color, size and glyph to use"
         args  = dict(self.__dict__)
         args.pop('glyph')
         args.pop('palette')
@@ -113,9 +118,9 @@ class PlotAttrs:
         return getattr(fig, self.glyph)(**args)
 
 class PlotCreator:
-    u"Base plotter class"
+    "Base plotter class"
     def __init__(self, ctrl:Controller) -> None:
-        u"sets up this plotter's info"
+        "sets up this plotter's info"
         self._ctrl  = ctrl
         self._ready = False
 
@@ -127,14 +132,14 @@ class PlotCreator:
 
     @contextmanager
     def updating(self):
-        u"Stops on_change events for a time"
+        "Stops on_change events for a time"
         self._ready = False
         yield self
         self._ready = True
 
     @staticmethod
     def fixreset(arng):
-        u"Corrects the reset bug in bokeh"
+        "Corrects the reset bug in bokeh"
         assert isinstance(arng, Range1d)
         def _onchangebounds(rng = arng):
             # pylint: disable=protected-access,no-member
@@ -146,23 +151,23 @@ class PlotCreator:
 
     @classmethod
     def key(cls, base = 'config'):
-        u"Returns the key used by the global variables"
+        "Returns the key used by the global variables"
         return base+".plot."+cls.__name__[:-len('Plotter')].lower()
 
     def close(self):
-        u"Removes the controller"
+        "Removes the controller"
         del self._ctrl
 
     def getConfig(self):
-        u"returns config values"
+        "returns config values"
         return self._ctrl.getGlobal(self.key())
 
     def getCurrent(self, *key, **kwa):
-        u"returns config values"
+        "returns config values"
         return self._ctrl.getGlobal(self.key('current'), '.'.join(key), **kwa)
 
     def create(self):
-        u"returns the figure"
+        "returns the figure"
         raise NotImplementedError("need to create")
 
     def _figargs(self):
@@ -172,7 +177,7 @@ class PlotCreator:
                     disabled       = True)
 
     def newbounds(self, rng, axis, arr) -> dict:
-        u"Sets the range boundaries"
+        "Sets the range boundaries"
         over  = self.getConfig().boundary.overshoot.get()
 
         vmin  = min(arr)
@@ -196,7 +201,7 @@ class PlotCreator:
         return attrs
 
     def _addcallbacks(self, fig):
-        u"adds Range callbacks"
+        "adds Range callbacks"
         cnf = self.getCurrent()
 
         def _onchangex_cb(attr, old, new):
@@ -216,14 +221,14 @@ class PlotCreator:
         return fig
 
     def setbounds(self, rng, axis, arr, reinit = True):
-        u"Sets the range boundaries"
+        "Sets the range boundaries"
         if reinit and hasattr(rng, 'reinit'):
             rng.update(reinit = not rng.reinit, **self.newbounds(rng, axis, arr))
         else:
             rng.update(**self.newbounds(rng, axis, arr))
 
     def bounds(self, arr):
-        u"Returns boundaries for a column"
+        "Returns boundaries for a column"
         if len(arr) == 0:
             return 0., 1.
 
@@ -234,12 +239,46 @@ class PlotCreator:
         vmax += delta
         return vmin, vmax
 
+class TrackPlotModel:
+    "Contains all access to model items likely to be set by user actions"
+    def __init__(self, ctrl, cnf, curr):
+        self._ctrl = ctrl
+        self.cnf   = cnf
+        self.curr  = curr
+
+    @property
+    def bead(self) -> Optional[int]:
+        "returns the current bead number"
+        bead = self.curr.bead.get(default = None)
+        if bead is None:
+            track = self.track
+            if track is not None:
+                return next(iter(track.beadsonly.keys()))
+        return bead
+
+    @property
+    def roottask(self) -> Optional[RootTask]:
+        "returns the current root task"
+        return self.curr.track.get()
+
+    @property
+    def task(self) -> Optional[Task]:
+        "returns the current task"
+        return self.curr.task.get()
+
+    @property
+    def track(self) -> Optional[Track]:
+        "returns the current track"
+        return self._ctrl.track(self.roottask)
+
 class TrackPlotCreator(PlotCreator):
-    u"Base plotter for tracks"
+    "Base plotter for tracks"
     _row   = None # type: Optional[DpxKeyedRow]
-    def __init__(self, *_):
-        super().__init__(*_)
-        self._row = None
+    _MODEL = TrackPlotModel
+    def __init__(self, ctrl, *_):
+        super().__init__(ctrl, *_)
+        self._model = self._MODEL(ctrl, self.getConfig(), self.getCurrent())
+        self._row   = None
 
     def create(self) -> DpxKeyedRow:
         "returns the figure"
@@ -254,25 +293,16 @@ class TrackPlotCreator(PlotCreator):
 
         with self.updating():
             self._row.disabled = False
-            self._update(*self._gettrack())
+            self._update(*self._gettrack(), items)
 
     def _create(self, track, bead) -> DpxKeyedRow:
         raise NotImplementedError()
 
-    def _update(self, track, bead):
+    def _update(self, track, bead, items):
         raise NotImplementedError()
 
-    def _gettrack(self):
-        cnf  = self._ctrl.getGlobal("current")
-        task = cnf.track.get(default = None)
-        if task is None:
-            return None, None
-
-        track = self._ctrl.track(task)
-        bead  = cnf.bead.get(default = None)
-        if bead is None:
-            bead = next(iter(track.beadsonly.keys()))
-        return track, bead
+    def _gettrack(self) -> Tuple[Track, int]:
+        return self._model.track, self._model.bead
 
 class TrackPlotView(BokehView):
     "Track plot view"
@@ -289,7 +319,7 @@ class TrackPlotView(BokehView):
         self._plotter.close()
         self._plotter = None
 
-    def _onUpdateCurrent(self, **items):
+    def _onUpdateCurrent(self, items:dict):
         self._plotter.update(items) # pylint: disable=no-member
 
     def getroots(self):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Different file dialogs."
+"Different file dialogs."
 
 import pathlib
 from typing             import Callable
@@ -8,7 +8,7 @@ from tkinter            import Tk as _Tk
 from tkinter.filedialog import (askopenfilename   as _tkopen,
                                 asksaveasfilename as _tksave)
 class FileDialog:
-    u"""
+    """
     Deals with filepaths to be opened or saved
 
     *defaultextension* is first item in *filetypes* by default.
@@ -17,11 +17,12 @@ class FileDialog:
     Default descriptions and extensions exist for usual file types. One can
     have thus:  *filetypes* = 'trk|*' for track files + any other extension.
     """
-    DEFAULTS = {'all': (u'all files',               '.*'),
-                'trk': (u'track files',             '.trk'),
-                'ana': (u'analysis files',          '.ana'),
-                'xls': (u'excel files',             '.xlsx'),
-                'csv': (u'comma-separated files',   '.csv')}
+    DEFAULTS = {'all':      (u'all files',               '.*'),
+                'trk':      (u'track files',             '.trk'),
+                'ana':      (u'analysis files',          '.ana'),
+                'fasta':    (u'fasta files',             '.fasta'),
+                'xls':      (u'excel files',             '.xlsx'),
+                'csv':      (u'comma-separated files',   '.csv')}
     DEFAULTS['any'] = DEFAULTS['all']
     DEFAULTS['*']   = DEFAULTS['all']
 
@@ -63,10 +64,10 @@ class FileDialog:
             return
 
         def _transf(item):
-            ele = tuple(ite.strip() for ite in item.split(u':'))
+            ele = tuple(ite.strip() for ite in item.split(':'))
             return self.DEFAULTS[ele[0].lower()] if len(ele) == 1 else ele
 
-        info[self._KFT] = [_transf(ite) for ite in self.filetypes.split(u'|')]
+        info[self._KFT] = [_transf(ite) for ite in self.filetypes.split('|')]
 
     def _parse_extension(self, info:dict):
         if self.defaultextension is None:
@@ -115,11 +116,11 @@ class FileDialog:
         return ret
 
     def open(self):
-        u"Returns a filepath to be opened."
+        "Returns a filepath to be opened."
         return self._tk_run(self._parse_all(), _tkopen)
 
     def save(self):
-        u"Returns a filepath where to save to."
+        "Returns a filepath where to save to."
         info = self._parse_all()
         info.pop('multiple', None)
         return self._tk_run(info, _tksave)

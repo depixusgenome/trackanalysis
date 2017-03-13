@@ -52,7 +52,7 @@ class GlobalsView(View):
                 counts[0]  = False
 
         @self._ctrl.observe(r"^globals\.(?!.*?current).*$")
-        def _onconfig(*_1, **_2):
+        def _onconfig(*_):
             counts[0] = True
 
         @self._ctrl.observe

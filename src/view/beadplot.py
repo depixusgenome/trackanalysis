@@ -94,11 +94,11 @@ class BeadPlotCreator(TrackPlotCreator):
         self._addcallbacks(self._fig)
         return DpxKeyedRow(self, self._fig)
 
-    def _update(self, track, bead):
+    def _update(self, track, bead, _):
         self._fig.disabled = False
         self._source.data  = self._createdata(track, bead)
         self._setbounds()
 
 class BeadPlotView(TrackPlotView):
     "Bead plot view"
-    PLOTTTER = BeadPlotCreator
+    PLOTTER = BeadPlotCreator

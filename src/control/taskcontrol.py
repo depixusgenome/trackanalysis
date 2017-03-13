@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"""
+"""
 Task controller.
 
 The controller stores:
@@ -18,14 +18,14 @@ from .processor     import Cache, Processor, run as _runprocessors
 from .              import FileIO
 
 class ProcessorController:
-    u"data and model for tasks"
+    "data and model for tasks"
     __slots__ = ('model', 'data')
     def __init__(self):
         self.model   = []         # type: List[Task]
         self.data    = Cache()
 
     def task(self, task:Union[Task,int,type], noemission = False) -> Task:
-        u"returns a task"
+        "returns a task"
         tsk = None
         if isinstance(task, Task):
             tsk = task
@@ -44,7 +44,7 @@ class ProcessorController:
         return tsk
 
     def add(self, task, proctype, index = None):
-        u"adds a task to the list"
+        "adds a task to the list"
         TaskIsUniqueError.verify(task, self.model)
         proc = proctype(task)
 
@@ -56,22 +56,22 @@ class ProcessorController:
             self.data .insert(index, proc)
 
     def remove(self, task):
-        u"removes a task from the list"
+        "removes a task from the list"
         task = self.task(task)
 
         self.model.remove(task)
         self.data .remove(task)
 
     def update(self, tsk):
-        u"clears data starting at *tsk*"
+        "clears data starting at *tsk*"
         self.data.delCache(tsk)
 
     def clear(self):
-        u"clears data starting at *tsk*"
+        "clears data starting at *tsk*"
         self.data.delCache()
 
     def run(self, tsk:Optional[Task] = None):
-        u"""
+        """
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
         """
@@ -82,7 +82,7 @@ class ProcessorController:
                model     : Iterable[Task],
                processors: 'Union[Dict,Iterable[type],type,None]' = Processor
               ) -> 'ProcessorController':
-        u"creates a task pair for this model"
+        "creates a task pair for this model"
         tasks = tuple(model)
         pair  = cls()
         if not isinstance(processors, Dict):
@@ -97,7 +97,7 @@ class ProcessorController:
                  processor: Union[Iterable[type], Processor, None] = None,
                  cache:     Optional[dict]                         = None
                 ) -> 'Dict[type,Any]':
-        u"registers a task processor"
+        "registers a task processor"
         if cache is None:
             cache = dict()
 
@@ -121,11 +121,11 @@ class ProcessorController:
 def create(model     : Iterable[Task],
            processors: 'Union[Dict,Iterable[type],type,None]' = Processor
           ) -> 'ProcessorController':
-    u"creates a task pair for this model"
+    "creates a task pair for this model"
     return ProcessorController.create(model, processors)
 
 class TaskController(Controller):
-    u"Data controller class"
+    "Data controller class"
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.__items   = dict() # type: Dict[RootTask, ProcessorController]
@@ -136,13 +136,13 @@ class TaskController(Controller):
 
     @staticmethod
     def defaultopener():
-        u"yields default openers"
+        "yields default openers"
         for cls in FileIO.__subclasses__():
             yield cls().open
 
     @staticmethod
     def defaultsaver():
-        u"yields default openers"
+        "yields default openers"
         for cls in FileIO.__subclasses__():
             yield cls().save
 
@@ -150,30 +150,32 @@ class TaskController(Controller):
              parent : RootTask,
              task   : Union[Task,int,type],
              noemission = False) -> Task:
-        u"returns a task"
+        "returns a task"
         return self.__items[parent].task(task, noemission = noemission)
 
-    def track(self, parent : RootTask):
-        u"returns the root cache, i;e. the track"
+    def track(self, parent : Optional[RootTask]):
+        "returns the root cache, i;e. the track"
+        if parent not in self.__items:
+            return None
         self.__items[parent].run(parent) # create cache if needed
         track = self.__items[parent].data[0].cache
         return track()
 
     @property
     def tasktree(self) -> 'Iterator[Iterator[Task]]':
-        u"Returns a data object in memory."
+        "Returns a data object in memory."
         return iter(self.tasks(tsk) for tsk in self.__items.keys())
 
     def tasks(self, task:RootTask) -> 'Iterator[Task]':
-        u"Returns a data object in memory."
+        "Returns a data object in memory."
         return iter(tsk for tsk in self.__items[task].model)
 
     def cache(self, parent:RootTask, tsk:Optional[Task]):
-        u"Returns the cache for a given task"
+        "Returns the cache for a given task"
         return self.__items[parent].data.getCache(tsk)
 
     def run(self, parent:RootTask, tsk:Task):
-        u"""
+        """
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
         """
@@ -181,7 +183,7 @@ class TaskController(Controller):
 
     @Controller.emit
     def saveTrack(self, path: str) -> None:
-        u"saves the current model"
+        "saves the current model"
         items = [item.model for item in self.__items.values()]
         for closing in self.__savers():
             if closing(path, items):
@@ -191,7 +193,7 @@ class TaskController(Controller):
     def openTrack(self,
                   task : 'Union[None,str,RootTask]' = None,
                   model: Iterable[Task]             = tuple()) -> dict:
-        u"opens a new file"
+        "opens a new file"
         tasks = tuple(model)
         if task is None:
             if len(tasks) == 0:
@@ -223,21 +225,21 @@ class TaskController(Controller):
 
     @Controller.emit
     def closeTrack(self, task:RootTask) -> dict:
-        u"opens a new file"
+        "opens a new file"
         old = tuple(self.__items[task].model)
         del self.__items[task]
         return dict(controller = self, task = task, model = old)
 
     @Controller.emit
     def addTask(self, parent:RootTask, task:Task, index = None) -> dict:
-        u"opens a new file"
+        "opens a new file"
         old = tuple(self.__items[parent].model)
         self.__items[parent].add(task, self.__procs[type(task)], index = index)
         return dict(controller = self, parent = parent, task = task, old = old)
 
     @Controller.emit
     def updateTask(self, parent:RootTask, task:Union[Task,int,type], **kwargs) -> dict:
-        u"updates a task"
+        "updates a task"
         tsk = self.task(parent, task, noemission = True)
         old = Controller.updateModel(tsk, **kwargs)
         self.__items[parent].update(tsk)
@@ -245,7 +247,7 @@ class TaskController(Controller):
 
     @Controller.emit
     def removeTask(self, parent:RootTask, task:Union[Task,int,type]) -> dict:
-        u"removes a task"
+        "removes a task"
         tsk = self.task(parent, task, noemission = True)
         old = tuple(self.__items[parent].model)
         self.__items[parent].remove(tsk)
@@ -262,7 +264,7 @@ class TaskController(Controller):
 
     @staticmethod
     def __undos__():
-        u"yields all undoable user actions"
+        "yields all undoable user actions"
         # pylint: disable=unused-variable
         _1  = None
         def _onOpenTrack(controller = _1, model = _1, **_):
