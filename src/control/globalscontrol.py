@@ -163,10 +163,11 @@ class _MapGetter:
             return self._ctrl.get(self._base, default = default)
         return self._ctrl.get(*(self._key+i for i in keys), default = default)
 
-    def getdict(self, *keys, default = delete):
+    def getdict(self, *keys, default = delete, fullnames = True):
         u"Calls get using the current base key"
-        keys = tuple(self._key+i for i in keys)
-        return dict(zip(keys, self._ctrl.get(*keys, default = default)))
+        fkeys = tuple(self._key+i for i in keys)
+        vals  = self._ctrl.get(*fkeys, default = default)
+        return dict(zip(fkeys if fullnames else keys, vals))
 
     def set(self, arg):
         u"Calls update using the current base key"

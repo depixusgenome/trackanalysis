@@ -16,7 +16,7 @@ from    bokeh.models   import (LinearAxis,      # pylint: disable=unused-import
                                CustomJS, Range1d, ContinuousTicker,
                                BasicTicker, Ticker, Dropdown, TextInput,
                                DataTable, TableColumn, IntEditor, NumberEditor,
-                               Paragraph, GlyphRenderer)
+                               Paragraph, GlyphRenderer, Slider)
 
 import numpy        as np
 from   numpy.lib.index_tricks import as_strided
@@ -24,7 +24,6 @@ from   numpy.lib.index_tricks import as_strided
 import sequences
 from   utils        import NoArgs
 from   control      import Controller
-from  .intinput     import FloatInput
 from  .dialog       import FileDialog
 from  .plotutils    import (PlotAttrs, DpxKeyedRow, TrackPlotCreator,
                             TrackPlotView, TrackPlotModel, checksizes,
@@ -65,13 +64,12 @@ class CyclesModel(TrackPlotModel):
         cnf.defaults = {'binwidth'          : .003,
                         'minframes'         : 10,
                         'base.bias'         : None,
-                        'base.bias.min'     : -10.,
-                        'base.bias.step'    : .003,
-                        'base.bias.max'     : 10.,
+                        'base.bias.step'    : .0001,
+                        'base.bias.ratio'   : .25,
                         'base.stretch'      : 8.8e-4,
-                        'base.stretch.min'  : 1.e-5,
+                        'base.stretch.start': 5.e-4,
                         'base.stretch.step' : 1.e-5,
-                        'base.stretch.max'  : 1.e-3,
+                        'base.stretch.end'  : 1.5e-3,
                         'sequence.path' : "../tests/testingcore/hairpins.fasta",
                         'sequence.key'  : 'GF1',
                        }
@@ -646,9 +644,7 @@ class _ConfigMixin(_Mixin):
                                   'title.table'    : u'[nm] ↔ [base] in positions',
                                   'title.sequence' : u'Selected DNA sequence',
                                   'title.stretch'  : u'[nm] ↔ [base] stretch',
-                                  'title.bias'     : u'[nm] ↔ [base] bias',
-                                  'input.height'   : 50,
-                                  'input.width'    : 160}
+                                  'title.bias'     : u'[nm] ↔ [base] bias'}
 
     def _createconfig(self):
         stretch, bias  = self.__doconvert()
@@ -724,26 +720,20 @@ class _ConfigMixin(_Mixin):
             fcn()
 
     def __doconvert(self):
-        size    = tuple(self.getCSS().input.get("width", "height"))
-        css     = self.getCSS().title
-        stretch = FloatInput(value    = self._model.stretch,
-                             minvalue = self.getConfig().base.stretch.min.get(),
-                             maxvalue = self.getConfig().base.stretch.max.get(),
-                             step     = self.getConfig().base.stretch.step.get(),
-                             width    = size[0],
-                             height   = size[1],
-                             title    = css.stretch.get())
-        bias    = FloatInput(value    = self._hover.bias,
-                             minvalue = self.getConfig().base.bias.min.get(),
-                             maxvalue = self.getConfig().base.bias.max.get(),
-                             step     = self.getConfig().base.bias.step.get(),
-                             width    = size[0],
-                             height   = size[1],
-                             title    = css.bias .get())
+        widget = lambda x, s, e: Slider(value = getattr(self._model, x),
+                                        title = self.getCSS().title[x].get(),
+                                        step  = self.getConfig().base[x].step.get(),
+                                        start = s, end = e)
+
+        stretch = widget('stretch', *self.getConfig().base.stretch.get('start', 'end'))
+        bias    = widget('bias', -1., 1.)
 
         def _onupdate():
             stretch.value = self._model.stretch
-            bias.value    = self._model.bias
+            minv  = self._histsource.data['bottom'][0]
+            delta = self._histsource.data['top'][-1] - minv
+            ratio = self.getConfig().base.bias.ratio.get()
+            bias.update(value = self._model.bias, start = minv, end = minv+delta*ratio)
 
         def _onconfig(items):
             if any(i in items  for i in ('base.stretch', 'base.bias')):
