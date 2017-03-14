@@ -36,6 +36,11 @@ class _Requirements(BuildContext):
     cmd = 'requirements'
     fun = 'requirements'
 
+class _CondaSetup(BuildContext):
+    u"runs conda setup"
+    cmd = 'condasetup'
+    fun = 'condasetup'
+
 builder.defaultwscript("src", "make()")
 _ALL      = ('tests',) + tuple(builder.wscripted("src"))
 builder.addbuild(_ALL)
@@ -88,6 +93,12 @@ def options(opt):
                    default = '',
                    help    = (u"consider only modules which are "
                               +u" necessary for provided applications"))
+
+    opt.add_option('--conda',
+                   dest    = 'condaenv',
+                   action  = 'store',
+                   default = 'root',
+                   help    = u"conda environment name (use with condasetup)")
 
 def configure(cnf):
     cnf.env.app = cnf.options.app.split(',') if len(cnf.options.app) else []
@@ -143,3 +154,9 @@ def requirements(cnf):
     u"prints requirements"
     _getmodules(cnf)
     builder.requirements.tostream()
+
+def condasetup(cnf):
+    u"prints requirements"
+    _getmodules(cnf)
+    print(cnf.options.condaenv)
+    builder.condasetup(cnf.options.condaenv)
