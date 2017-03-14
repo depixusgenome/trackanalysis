@@ -41,15 +41,9 @@ class BeadInput(BokehView):
     def __init__(self, **kwa):
         "Sets up the controller"
         super().__init__(**kwa)
+        self._ctrl.getGlobal('css').title.beadinput.default = 'Bead'
         self.__beads = np.empty((0,), dtype = 'i4')
-
-        kwa = dict(height       = self._ctrl.getGlobal('css', 'input.height'),
-                   width        = self._ctrl.getGlobal('css', 'input.width'),
-                   disabled     = True,
-                   title        = 'bead number')
-        self.__inp   = IntInput(**kwa)
-        self.__inp.on_change("value", self._onchange_cb)
-        self._ctrl.observe("globals.current", self._onUpdateCurrent)
+        self.__inp   = None
 
     def addkeypress(self, tpe = 'keypress'):
         "Adds keypress for changin beads"
@@ -60,7 +54,14 @@ class BeadInput(BokehView):
 
     def getroots(self):
         "adds items to doc"
-        assert False
+        kwa = dict(height       = self._ctrl.getGlobal('css', 'input.height'),
+                   width        = self._ctrl.getGlobal('css', 'input.width'),
+                   disabled     = True,
+                   title        = self._ctrl.getGlobal('css').title.beadinput.get())
+        self.__inp   = IntInput(**kwa)
+        self.__inp.on_change("value", self._onchange_cb)
+        self._ctrl.observe("globals.current", self._onUpdateCurrent)
+        return self.__inp
 
     @property
     def input(self):

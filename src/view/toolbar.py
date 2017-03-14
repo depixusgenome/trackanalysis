@@ -12,29 +12,44 @@ class  ToolBar(BokehView):
     def __init__(self, **kwa):
         "Sets up the controller"
         super().__init__(**kwa)
-        self._open  = self.button(self._onOpen,  u'open')
-        self._save  = self.button(self._onSave,  u'save', disabled = True)
-        self._tools = [self._open, self._save]
+        self._open  = None
+        self._save  = None
+        self._quit  = None
+        self._tools = []
 
-        if self._ctrl.ISAPP:
-            self._quit = self.button(self._ctrl.close, u'quit')
-            self._tools.append(self._quit)
+        css          = self._ctrl.getGlobal('css').title
+        css.defaults = {'open': u'Open', 'save': u'Save', 'quit': u'Quit',
+                        'open.dialog': u'Open a track or analysis file',
+                        'save.dialog': u'Save an analysis file'}
 
         cnf               = self._ctrl.getGlobal("config").last.path
         cnf.defaults      = dict.fromkeys(FileDialog.DEFAULTS, None)
-        cnf.fasta.default = "../tests/testingcore/hairpins.fasta"
+
+        self.__diagopen = None
+        self.__diagsave = None
+
+    def _getroots(self):
+        "adds items to doc"
+        css         = self._ctrl.getGlobal('css').title
+        self._open  = self.button(self._onOpen,  css.open.get())
+        self._save  = self.button(self._onSave,  css.save.get(), disabled = True)
+        self._tools.extend([self._open, self._save])
+
+        if self._ctrl.ISAPP:
+            self._quit = self.button(self._ctrl.close, css.quit.get())
+            self._tools.append(self._quit)
 
         self.__diagopen = FileDialog(filetypes = 'trk|ana|*',
                                      config    = self._ctrl,
-                                     title     = u'Open a track or analysis file')
+                                     title     = css.open.dialog.get())
         self.__diagsave = FileDialog(filetypes = 'ana|*',
                                      config    = self._ctrl,
-                                     title     = u'Save an analysis file')
-
-        self._ctrl.observe("globals.current", self._onUpdateCurrent)
+                                     title     = css.save.dialog.get())
 
     def getroots(self):
         "adds items to doc"
+        self._getroots()
+        self._ctrl.observe("globals.current", self._onUpdateCurrent)
         return Row(children = self._tools, sizing_mode = 'fixed'),
 
     def close(self):
@@ -71,6 +86,10 @@ class  BeadToolBar(ToolBar):
     def __init__(self, **kwa):
         super().__init__(**kwa)
         self._beads = BeadInput(**kwa)
+
+    def _getroots(self):
+        super()._getroots()
+        self._beads.getroots()
         self._beads.addkeypress()
         self._tools.insert(2, self._beads.input)
 

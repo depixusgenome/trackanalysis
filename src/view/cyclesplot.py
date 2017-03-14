@@ -69,8 +69,8 @@ class CyclesModel(TrackPlotModel):
                         'base.stretch.start': 5.e-4,
                         'base.stretch.step' : 1.e-5,
                         'base.stretch.end'  : 1.5e-3,
-                        'sequence.path' : "../tests/testingcore/hairpins.fasta",
-                        'sequence.key'  : 'GF1',
+                        'sequence.path' : None,
+                        'sequence.key'  : None,
                        }
         cnf.sequence.witnesses.default = None
         for attr in self._CACHED:
@@ -209,10 +209,10 @@ class DpxHoverModel(Model):
 
     @staticmethod
     @checksizes
-    def _createhistdata(mdl):
+    def _createhistdata(mdl, cnf):
         key   = mdl.sequencekey
         oligs = mdl.oligos
-        osiz  = max(len(i) for i in oligs)
+        osiz  = max((len(i) for i in oligs), default = cnf.oligos.size.get())
         dseq  = readsequence(mdl.sequencepath)
         if len(dseq) == 0:
             return dict(values = [0], inds = [0], text = [''])
@@ -229,7 +229,7 @@ class DpxHoverModel(Model):
         data['z']    = data['values']*mdl.stretch+(0. if mdl.bias is None else mdl.bias)
         return data
 
-    def createhist(self, fig, mdl, css):
+    def createhist(self, fig, mdl, css, cnf):
         "Creates the hover tool for histograms"
         self.update(framerate = 1./30.,
                     bias      = 0.,
@@ -239,7 +239,7 @@ class DpxHoverModel(Model):
         if len(hover) == 0:
             return
 
-        self._histsource = ColumnDataSource(self._createhistdata(mdl))
+        self._histsource = ColumnDataSource(self._createhistdata(mdl, cnf))
         hover[0].tooltips   = css.hist.tooltips.get()
         hover[0].mode       = 'hline'
 
@@ -264,13 +264,13 @@ class DpxHoverModel(Model):
         self._rawsource.data         = self._createrawdata(rdata)
         self._rawglyph.glyph.visible = False
 
-    def updatehist(self, fig, hdata, mdl):
+    def updatehist(self, fig, hdata, mdl, cnf):
         "updates the tooltips for a new file"
         hover = fig.select(DpxHoverTool)
         if len(hover) == 0:
             return
 
-        self._histsource.data = self._createhistdata(mdl)
+        self._histsource.data = self._createhistdata(mdl, cnf)
         bias = mdl.bias
         if bias is None:
             ind1 = next((i for i,j in enumerate(hdata['cycles']) if j > 0), 0)
@@ -280,11 +280,11 @@ class DpxHoverModel(Model):
                     bias      = bias,
                     stretch   = mdl.stretch)
 
-    def observe(self, ctrl, key, mdl):
+    def observe(self, ctrl, key, mdl, cnf):
         u"sets up model observers"
         def _onconfig(items):
             if 'oligos' in items:
-                self._histsource.data = self._createhistdata(mdl)
+                self._histsource.data = self._createhistdata(mdl, cnf)
 
         ctrl.observe(key, _onconfig)
 
@@ -628,33 +628,36 @@ class _HistMixin(_Mixin):
         self._gridticker.create(self.getCSS(), self._hist)
         self._gridticker.observe(self._ctrl, self.key(), self._model, self._hist)
 
-        self._hover.createhist(self._hist, self._model, self.getCSS())
-        self._hover.observe(self._ctrl, self.key(), self._model)
+        self._hover.createhist(self._hist, self._model, self.getCSS(), self.getConfig())
+        self._hover.observe(self._ctrl, self.key(), self._model, self.getConfig())
         self._slavexaxis()
 
     def _updatehist(self, track, data, shape):
         self._hist.disabled   = False
         self._histsource.data = hist = self.__data(track, data, shape)
-        self._hover.updatehist(self._hist, hist, self._model)
+        self._hover.updatehist(self._hist, hist, self._model, self.getConfig())
         self.setbounds(self._hist.y_range, 'y', (hist['bottom'][0], hist['top'][-1]))
         self._gridticker.updatedata(self._model, self.getCSS(), self._hist)
 
 class _ConfigMixin(_Mixin):
     def __init__(self):
         self.__updates = []   # type: List[Callable]
-        self.getCSS().defaults = {'tablesize'      : (200, 100),
-                                  'title.table'    : u'[nm] ↔ [base] in positions',
-                                  'title.sequence' : u'Selected DNA sequence',
-                                  'title.stretch'  : u'[nm] ↔ [base] stretch',
-                                  'title.bias'     : u'[nm] ↔ [base] bias'}
+        self.getCSS().defaults = {'tablesize'        : (200, 100),
+                                  'title.fasta'      : u'Open a fasta file',
+                                  'title.oligos'     : u'Oligos',
+                                  'title.oligos.help': u'comma-separated list',
+                                  'title.sequence'   : u'Selected DNA sequence',
+                                  'title.table'      : u'dna ↔ nm',
+                                  'title.stretch'    : u'stretch [dna/nm]',
+                                  'title.bias'       : u'bias [nm]'}
 
     def _createconfig(self):
         stretch, bias  = self.__doconvert()
         par,     table = self.__dowitness()
-        ret = layouts.layout([[layouts.widgetbox([bias, stretch]),
-                               layouts.widgetbox([par,  table])],
-                              [layouts.widgetbox(list(self.__dosequence())),
-                               self.__dooligos ()]])
+        ret = layouts.layout([[layouts.widgetbox(list(self.__dosequence())),
+                               self.__dooligos  ()],
+                              [layouts.widgetbox([bias, stretch]),
+                               layouts.widgetbox([par,  table])]])
 
         def _py_cb(attr, old, new):
             setattr(self._model, attr, new)
@@ -817,7 +820,7 @@ class _ConfigMixin(_Mixin):
     def __dosequence(self):
         dia = FileDialog(filetypes = 'fasta|*',
                          config    = self._ctrl,
-                         title     = u'Open a fasta file')
+                         title     = self.getCSS().title.fasta.get())
         lst = []
         def _attrs(lst = lst): # pylint: disable = dangerous-default-value
             lst.clear()
@@ -828,8 +831,8 @@ class _ConfigMixin(_Mixin):
             menu  = [(i, i) for i in lst] if len(lst) else [('→', '→')]
             menu += [None, (u'Find path', '←')]
             return dict(menu  = menu,
-                        label = lst[-1][0] if val is None else key,
-                        value = lst[0][1]  if val is None else val)
+                        label = menu[-1][0] if val is None else key,
+                        value = menu[0][1]  if val is None else val)
 
         widget = Dropdown(**_attrs())
 
@@ -864,8 +867,12 @@ class _ConfigMixin(_Mixin):
         return Paragraph(text = self.getCSS().title.sequence.get()), widget
 
     def __dooligos(self):
-        attrs  = lambda: {'value': ', '.join(sorted(j.lower() for j in self._model.oligos))}
-        widget = TextInput(**attrs(), title = u'Oligos')
+        attrs  = lambda: {'value'      : ', '.join(sorted(j.lower()
+                                                          for j in self._model.oligos)),
+                          'placeholder': self.getCSS().title.oligos.help.get(),
+                          'title'      : self.getCSS().title.oligos.get()
+                         }
+        widget = TextInput(**attrs())
 
         match  = re.compile(r'(?:[^atgc]*)([atgc]+)(?:[^atgc]+|$)*',
                             re.IGNORECASE).findall
@@ -890,9 +897,9 @@ class CyclesPlotCreator(TrackPlotCreator, _HistMixin, _RawMixin, _ConfigMixin):
         _ConfigMixin    .__init__(self)
         self.getCSS   ().defaults = {'toolbar_location': 'right',
                                      **DpxHoverModel.defaultconfig()}
-        self.getConfig().defaults = dict(tools   = 'ypan,ybox_zoom,reset,save,dpxhover',
-                                         ncycles = 150,
-                                         oligos  = ['CTGT'])
+        self.getConfig().defaults = {'tools'      : 'ypan,ybox_zoom,reset,save,dpxhover',
+                                     'oligos'     : [],
+                                     'oligos.size': 4}
         self._hover  = None # type: Optional[DpxHoverModel]
 
     def _figargs(self, css): # pylint: disable=arguments-differ
