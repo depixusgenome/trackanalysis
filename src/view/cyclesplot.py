@@ -131,10 +131,11 @@ class DpxHoverModel(Model):
     def defaultconfig() -> dict:
         "default config"
         return {'raw.selection'       : PlotAttrs('green', 'line',   2),
-                'raw.tooltips'        : [(u'(cycle, t, z)', '(@cycle, $~x, $data_y)')],
-                'raw.tooltips.radius' : 2,
-                'hist.tooltips.radius': 1.5,
-                'hist.tooltips'       : u'@values: @text'
+                'raw.tooltips'        : [(u'(cycle, t, z)',
+                                          '(@cycle, $~x{1}, $data_y{1.1111})')],
+                'raw.tooltips.radius' : 1.5,
+                'hist.tooltips.radius': 1.,
+                'hist.tooltips'       : u'@z{1.1111} ↔ @values: @text'
                }
 
     def _createrawdata(self, source):
@@ -226,6 +227,7 @@ class DpxHoverModel(Model):
             data[name][:len(seq)-osiz+1] = [seq[i:i+osiz] for i in range(len(seq)-osiz+1)]
 
         data['text'] = data.get(key, data[next(iter(dseq))])
+        data['z']    = data['values']*mdl.stretch+(0. if mdl.bias is None else mdl.bias)
         return data
 
     def createhist(self, fig, mdl, css):
@@ -429,7 +431,7 @@ class _Mixin:
             "returns the plot key"
             return attr
 
-        def _figargs(self, cnf, width, loc):
+        def _figargs(self, cnf):
             "returns figure args"
             return
 
@@ -438,7 +440,8 @@ class _RawMixin(_Mixin):
         "sets up this plotter's info"
         self.getCSS().defaults = dict(raw = PlotAttrs('color',  'circle', 1,
                                                       alpha   = .5,
-                                                      palette = 'inferno'))
+                                                      palette = 'inferno'),
+                                      plotwidth = 500)
         self._rawsource = None # type: Optional[ColumnDataSource]
         self._raw       = None # type: Optional[Figure]
 
@@ -488,7 +491,7 @@ class _RawMixin(_Mixin):
         css             = self.getCSS()
         self._raw       = figure(y_axis_label = css.ylabel.get(),
                                  y_range      = Range1d(start = 0., end = 1.),
-                                 **self._figargs(css, 500, 'left'))
+                                 **self._figargs(css))
 
         raw, shape      = self.__data(track, bead)
         self._rawsource = ColumnDataSource(data = raw)
@@ -525,7 +528,8 @@ class _HistMixin(_Mixin):
                        }
         css.hist.defaults = dict(xtoplabel = u'Cycles',
                                  xlabel    = u'Frames',
-                                 ylabel    = u'Base number')
+                                 ylabel    = u'Base number',
+                                 plotwidth = 200)
 
         self._histsource = None # type: Optional[ColumnDataSource]
         self._hist       = None # type: Optional[Figure]
@@ -598,7 +602,7 @@ class _HistMixin(_Mixin):
         css              = self.getCSS()
         self._hist       = figure(y_axis_location = None,
                                   y_range         = yrng,
-                                  **self._figargs(css.hist, 200, None))
+                                  **self._figargs(css.hist))
 
         hist             = self.__data(track, data, shape)
         self._histsource = ColumnDataSource(data = hist)
@@ -660,24 +664,37 @@ class _ConfigMixin(_Mixin):
         for name in 'stretch', 'bias':
             self._hover.on_change(name, _py_cb)
 
+        # pylint: disable=too-many-arguments,protected-access,consider-using-enumerate
         # do this here because the trigger on _hover attributes doesn't work
         def _js_cb(stretch = stretch,
                    bias    = bias,
                    data    = table.source,
                    fig     = self._hist,
-                   mdl     = self._hover):
+                   mdl     = self._hover,
+                   ttsrc   = self._hover._histsource):
             # pylint: disable=no-member
             if mdl.updating:
                 return
-            mdl.updating   = True
-            mdl.stretch    = stretch.value
-            mdl.bias       = bias.value
-            data.data['z'] = [data.data['bases'][0]*stretch.value+bias.value,
-                              data.data['bases'][1]*stretch.value+bias.value]
-            data.trigger('change:data')
+            aval = stretch.value
+            bval = bias.value
 
-            fig.extra_y_ranges['bases'].start = (fig.y_range.start-mdl.bias)/mdl.stretch
-            fig.extra_y_ranges['bases'].end   = (fig.y_range.end-mdl.bias)/mdl.stretch
+            mdl.updating   = True
+            data.data['z'] = [data.data['bases'][0]*aval+bval,
+                              data.data['bases'][1]*aval+bval]
+
+            mdl.stretch    = aval
+            mdl.bias       = bval
+
+            fig.extra_y_ranges['bases'].start = (fig.y_range.start-bval)/aval
+            fig.extra_y_ranges['bases'].end   = (fig.y_range.end-bval)/aval
+
+            zvals = ttsrc.data['z']
+            bvals = ttsrc.data['values']
+            for i in range(len(zvals)):
+                zvals[i] = bvals[i]*aval+bval
+
+            data.trigger('change:data')
+            ttsrc.trigger('change:data')
             mdl.updating   = False
 
         cust = CustomJS.from_py_func(_js_cb)
@@ -689,7 +706,8 @@ class _ConfigMixin(_Mixin):
                         bias    = bias,
                         data    = table.source,
                         fig     = self._hist,
-                        mdl     = self._hover):
+                        mdl     = self._hover,
+                        ttsrc   = self._hover._histsource):
             # pylint: disable=no-member
             if mdl.updating:
                 return
@@ -699,16 +717,25 @@ class _ConfigMixin(_Mixin):
             if zval[0] == zval[1] or bases[0] == bases[1]:
                 return
 
-            mdl.updating = True
-            rho           = (zval[1]-zval[0]) / (bases[1]-bases[0])
-            mdl.stretch   = rho
-            mdl.bias      = zval[0] - bases[0]*rho
+            aval          = (zval[1]-zval[0]) / (bases[1]-bases[0])
+            bval          = zval[0] - bases[0]*aval
 
-            stretch.value = mdl.stretch
-            bias.value    = mdl.bias
+            mdl.updating  = True
+            stretch.value = aval
+            bias.value    = bval
 
-            fig.extra_y_ranges['bases'].start = (fig.y_range.start-mdl.bias)/mdl.stretch
-            fig.extra_y_ranges['bases'].end   = (fig.y_range.end-mdl.bias)/mdl.stretch
+            mdl.stretch   = aval
+            mdl.bias      = bval
+
+            fig.extra_y_ranges['bases'].start = (fig.y_range.start-bval)/aval
+            fig.extra_y_ranges['bases'].end   = (fig.y_range.end-bval)/aval
+
+            zvals = ttsrc.data['z']
+            bvals = ttsrc.data['values']
+            for i in range(len(zvals)):
+                zvals[i] = bvals[i]*aval+bval
+
+            ttsrc.trigger('change:data')
             mdl.updating = False
 
         # pylint: disable=no-member
@@ -869,11 +896,10 @@ class CyclesPlotCreator(TrackPlotCreator, _HistMixin, _RawMixin, _ConfigMixin):
                                          oligos  = ['CTGT'])
         self._hover  = None # type: Optional[DpxHoverModel]
 
-    def _figargs(self, css, width, loc): # pylint: disable=arguments-differ
+    def _figargs(self, css): # pylint: disable=arguments-differ
         args = super()._figargs()
-        args['x_axis_label']     = css.xlabel.get()
-        args['plot_width']       = width
-        args['toolbar_location'] = loc
+        args['x_axis_label'] = css.xlabel.get()
+        args['plot_width']   = css.plotwidth.get()
         return args
 
     def _create(self, track, bead):
