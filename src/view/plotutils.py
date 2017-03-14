@@ -10,8 +10,8 @@ from pathlib                import Path
 import inspect
 
 import  bokeh.palettes
-from    bokeh.models           import Row, CustomJS, Range1d, Model
-from    bokeh.core.properties  import Dict, String, Float, Instance
+import  bokeh.core.properties  as     props
+from    bokeh.models           import Row, CustomJS, Range1d, Model, HoverTool
 from    bokeh.plotting.figure  import Figure
 
 from    sequences              import read as _readsequences
@@ -46,11 +46,11 @@ def readsequence(path):
 
 class DpxKeyedRow(Row):
     "define div with tabIndex"
-    fig                = Instance(Figure)
-    toolbar            = Instance(Model)
-    keys               = Dict(String, String, help = 'keys and their action')
-    zoomrate           = Float()
-    panrate            = Float()
+    fig                = props.Instance(Figure)
+    toolbar            = props.Instance(Model)
+    keys               = props.Dict(props.String, props.String, help = 'keys and their action')
+    zoomrate           = props.Float()
+    panrate            = props.Float()
     __implementation__ = 'keyedrow.coffee'
     def __init__(self, plotter, fig, **kwa):
         vals = ('.'.join(i) for i in product(('pan', 'zoom'), ('x', 'y'), ('low', 'high')))
@@ -68,6 +68,28 @@ class DpxKeyedRow(Row):
                          zoomrate = cnf.zoom.rate.get(),
                          panrate  = cnf.pan.rate.get(),
                          **kwa)
+
+class DpxHoverTool(HoverTool):
+    "sorts indices before displaying tooltips"
+    maxcount           = props.Int(5)
+    __implementation__ = """
+    import * as p  from "core/properties"
+    import {HoverTool, HoverToolView} from "models/tools/inspectors/hover_tool"
+
+    export class DpxHoverToolView extends HoverToolView
+        _update: (indices, tool, renderer, ds, {geometry}) ->
+            inds = indices['1d'].indices
+            if inds?.length > 1
+                inds.sort((a,b) => a - b)
+                if inds.length > @model.maxcount
+                    ind = Math.floor((inds.length - @model.maxcount)*0.5)
+                    indices['1d'].indices = inds.slice(ind, ind+@model.maxcount)
+            super(indices, tool, renderer, ds, {geometry})
+
+    export class DpxHoverTool extends HoverTool
+        default_view: DpxHoverToolView
+        @define { maxcount: [ p.Int, 5] }
+    """
 
 class PlotAttrs:
     "Plot Attributes for one variable"
@@ -216,7 +238,10 @@ class PlotCreator:
         raise NotImplementedError("need to create")
 
     def _figargs(self):
-        return dict(tools          = self.getConfig().tools.get(),
+        tools = self.getConfig().tools.get()
+        if 'dpxhover' in tools:
+            tools = [i if i != 'dpxhover' else DpxHoverTool() for i in tools.split(',')]
+        return dict(tools          = tools,
                     toolbar_sticky = False,
                     sizing_mode    = 'stretch_both',
                     disabled       = True)

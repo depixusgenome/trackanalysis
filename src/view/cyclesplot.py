@@ -12,11 +12,10 @@ from    bokeh          import layouts
 from    bokeh.model    import Model
 from    bokeh.plotting import figure, Figure    # pylint: disable=unused-import
 from    bokeh.models   import (LinearAxis,      # pylint: disable=unused-import
-                               ColumnDataSource, HoverTool,
-                               CustomJS, Range1d, ContinuousTicker,
+                               ColumnDataSource, Slider, GlyphRenderer,
+                               CustomJS, Range1d, ContinuousTicker, Paragraph,
                                BasicTicker, Ticker, Dropdown, TextInput,
-                               DataTable, TableColumn, IntEditor, NumberEditor,
-                               Paragraph, GlyphRenderer, Slider)
+                               DataTable, TableColumn, IntEditor, NumberEditor)
 
 import numpy        as np
 from   numpy.lib.index_tricks import as_strided
@@ -27,7 +26,7 @@ from   control      import Controller
 from  .dialog       import FileDialog
 from  .plotutils    import (PlotAttrs, DpxKeyedRow, TrackPlotCreator,
                             TrackPlotView, TrackPlotModel, checksizes,
-                            readsequence)
+                            readsequence, DpxHoverTool)
 
 window = None # type: ignore # pylint: disable=invalid-name
 def configprop(attr):
@@ -148,7 +147,7 @@ class DpxHoverModel(Model):
         self.stretch   = mdl.stretch
         self.shape     = tuple(shape)
 
-        hover          = fig.select(HoverTool)
+        hover          = fig.select(DpxHoverTool)
         if len(hover) == 0:
             return
 
@@ -236,7 +235,7 @@ class DpxHoverModel(Model):
                     bias      = 0.,
                     stretch   = mdl.stretch)
 
-        hover = fig.select(HoverTool)
+        hover = fig.select(DpxHoverTool)
         if len(hover) == 0:
             return
 
@@ -257,7 +256,7 @@ class DpxHoverModel(Model):
 
     def updateraw(self, fig, rdata, shape):
         "updates the tooltips for a new file"
-        hover = fig.select(HoverTool)
+        hover = fig.select(DpxHoverTool)
         if len(hover) == 0:
             return
 
@@ -267,7 +266,7 @@ class DpxHoverModel(Model):
 
     def updatehist(self, fig, hdata, mdl):
         "updates the tooltips for a new file"
-        hover = fig.select(HoverTool)
+        hover = fig.select(DpxHoverTool)
         if len(hover) == 0:
             return
 
@@ -492,7 +491,6 @@ class _RawMixin(_Mixin):
         self._raw       = figure(y_axis_label = css.ylabel.get(),
                                  y_range      = Range1d(start = 0., end = 1.),
                                  **self._figargs(css))
-
         raw, shape      = self.__data(track, bead)
         self._rawsource = ColumnDataSource(data = raw)
 
@@ -890,16 +888,18 @@ class CyclesPlotCreator(TrackPlotCreator, _HistMixin, _RawMixin, _ConfigMixin):
         _RawMixin       .__init__(self)
         _HistMixin      .__init__(self)
         _ConfigMixin    .__init__(self)
-        self.getCSS   ().defaults = DpxHoverModel.defaultconfig()
-        self.getConfig().defaults = dict(tools   = 'ypan,ybox_zoom,reset,save,hover',
+        self.getCSS   ().defaults = {'toolbar_location': 'right',
+                                     **DpxHoverModel.defaultconfig()}
+        self.getConfig().defaults = dict(tools   = 'ypan,ybox_zoom,reset,save,dpxhover',
                                          ncycles = 150,
                                          oligos  = ['CTGT'])
         self._hover  = None # type: Optional[DpxHoverModel]
 
     def _figargs(self, css): # pylint: disable=arguments-differ
         args = super()._figargs()
-        args['x_axis_label'] = css.xlabel.get()
-        args['plot_width']   = css.plotwidth.get()
+        args['x_axis_label']     = css.xlabel.get()
+        args['plot_width']       = css.plotwidth.get()
+        args['toolbar_location'] = 'right'
         return args
 
     def _create(self, track, bead):
@@ -908,7 +908,8 @@ class CyclesPlotCreator(TrackPlotCreator, _HistMixin, _RawMixin, _ConfigMixin):
         shape       = self._createraw(track, bead)
         self._createhist(track, self._rawsource.data, shape, self._raw.y_range)
 
-        plts  = layouts.gridplot([[self._raw, self._hist]])
+        plts  = layouts.gridplot([[self._raw, self._hist]],
+                                 toolbar_location = self.getCSS().toolbar_location.get())
         keyed = DpxKeyedRow(self, self._raw,
                             children = [plts],
                             toolbar  = plts.children[0])
