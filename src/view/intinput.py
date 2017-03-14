@@ -13,9 +13,9 @@ class IntInput(InputWidget):
     __implementation__ = "intinput.coffee"
 
     value    = Int(default=0, help="Initial or entered int value")
-    minvalue = Int(default=0, help="min value which can be input")
+    start    = Int(default=0, help="min value which can be input")
     step     = Int(default=1,  help="step value which can be input")
-    maxvalue = Int(default=10, help="max value which can be input")
+    end      = Int(default=10, help="max value which can be input")
     callback = Instance(Callback, help="""
     A callback to run in the browser whenever the user unfocuses the TextInput
     widget by hitting Enter or clicking outside of the text box area.
@@ -27,9 +27,9 @@ class FloatInput(InputWidget):
     __implementation__ = "floatinput.coffee"
 
     value    = Float(default=0.,  help="Initial or entered int value")
-    minvalue = Float(default=0.,  help="min value which can be input")
+    start    = Float(default=0.,  help="min value which can be input")
     step     = Float(default=1.,  help="step value which can be input")
-    maxvalue = Float(default=10., help="max value which can be input")
+    end      = Float(default=10., help="max value which can be input")
     callback = Instance(Callback, help="""
     A callback to run in the browser whenever the user unfocuses the TextInput
     widget by hitting Enter or clicking outside of the text box area.
@@ -85,7 +85,7 @@ class BeadInput(BokehView):
             if not disabled:
                 beads = self._ctrl.track(items['track'].value).beadsonly.keys()
                 self.__beads = np.sort(tuple(beads))
-                self.__inp.minvalue = self.__beads[0]
-                self.__inp.maxvalue = self.__beads[-1]
+                self.__inp.start = self.__beads[0]
+                self.__inp.end   = self.__beads[-1]
         elif 'bead' in items:
             self.__inp.value = items['bead'].value

@@ -47,8 +47,8 @@ export class FloatInput extends InputWidget
 
   @define {
       value:        [p.Number, 0 ]
-      minvalue:     [p.Number, 0]
+      start:        [p.Number, 0]
       step:         [p.Number, 1]
-      maxvalue:     [p.Number, 10]
+      end:          [p.Number, 10]
       placeholder:  [p.String, "" ]
     }

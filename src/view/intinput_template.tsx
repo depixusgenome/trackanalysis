@@ -5,9 +5,9 @@ interface IntInputProps {
   title: string;
   name: string;
   value: float;
-  minvalue: float;
+  start: float;
   step: float;
-  maxvalue: float;
+  end: float;
 }
 
 export default (props: IntInputProps): HTMLElement => {
@@ -16,7 +16,7 @@ export default (props: IntInputProps): HTMLElement => {
       <label for={props.id}>{props.title}</label>
       <input class="bk-widget-form-input" type="number"
         id={props.id} name={props.name} value={props.value} 
-        min={props.minvalue} max={props.maxvalue}
+        min={props.start} max={props.end}
         step={props.step}/>
     </fragment>
   )

@@ -47,8 +47,8 @@ export class IntInput extends InputWidget
 
   @define {
       value:        [p.Int, 0 ]
-      minvalue:     [p.Int, 0]
+      start:        [p.Int, 0]
       step:         [p.Int, 1]
-      maxvalue:     [p.Int, 10]
+      end:          [p.Int, 10]
       placeholder:  [p.String, "" ]
     }
