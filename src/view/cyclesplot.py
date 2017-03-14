@@ -100,6 +100,7 @@ class DpxHoverModel(Model):
     bias      = props.Float(0.)
     stretch   = props.Float(0.)
     shape     = props.Tuple(props.Int, props.Int, default = (0, 0))
+    cycle     = props.Int(0)
     updating  = props.Bool(False)
     __implementation__ = """
     import * as p  from "core/properties"
@@ -114,6 +115,7 @@ class DpxHoverModel(Model):
             stretch   : [p.Number, 0],
             bias      : [p.Number, 0],
             shape     : [p.Array,  [0, 0]],
+            cycle     : [p.Int,  0]
             updating  : [p.Bool,  false]
         }
     """
@@ -138,12 +140,8 @@ class DpxHoverModel(Model):
                }
 
     def _createrawdata(self, source):
-        zvals = source.data['z']
-        cyc   = source.data['cycle']
         return dict(t = source.data['t'][:self.shape[1]],
-                    z = zvals           [:self.shape[1]],
-                    **{'c%d'% cyc[i*self.shape[1]]: zvals[i*self.shape[1]:(i+1)*self.shape[1]]
-                       for i in range(self.shape[0])})
+                    z = source.data['z'][:self.shape[1]])
 
     def createraw(self, fig, source, shape, mdl, css): # pylint: disable = too-many-arguments
         "creates the hover tool"
@@ -184,8 +182,13 @@ class DpxHoverModel(Model):
                     dist = tmp
                     best = ind
 
-            xval                = hvrsrc.data['cycle'][best]
-            source.data['z']    = source.data['c'+str(xval)]
+            ind                 = best//mdl.shape[1]
+            if ind == mdl.cycle:
+                return
+
+            mdl.cycle           = ind
+            ind                *= mdl.shape[1]
+            source.data['z']    = hvrsrc.data['z'][ind:ind+mdl.shape[1]]
             glyph.glyph.visible = True
             source.trigger('change')
 
