@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Utils for dealing with the JS side of the view"
-from typing                 import Tuple, Optional, Iterator # pylint: disable =unused-import
+from typing                 import (Tuple, Optional, # pylint: disable =unused-import
+                                    Iterator, List)
 from contextlib             import contextmanager
 from itertools              import product
 from functools              import wraps
@@ -102,6 +103,19 @@ class PlotAttrs:
         for color in colors:
             info.update((name, color) for name in tochange)
             yield PlotAttrs(**info)
+
+    def listpalette(self, count, indexes = None) -> List[str]:
+        "yields PlotAttrs with colors along the palette provided"
+        palette = getattr(bokeh.palettes, self.palette, None)
+        if palette is None:
+            return [self.color]*count
+
+        colors = palette(count)
+        if indexes is not None:
+            return [colors[i] for i in indexes]
+        else:
+            return colors
+
 
     def addto(self, fig, **kwa):
         "adds itself to plot: defines color, size and glyph to use"

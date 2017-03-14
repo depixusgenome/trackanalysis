@@ -2,22 +2,24 @@
 # -*- coding: utf-8 -*-
 "Cycles plot view"
 
-from typing         import (Optional, # pylint: disable=unused-import
+from typing         import (Optional,           # pylint: disable=unused-import
                             Sequence, Tuple, cast, TYPE_CHECKING)
 from itertools      import product
 import re
 
-from bokeh          import layouts
-from bokeh.model    import Model
-from bokeh.core.properties  import Float, Seq, Instance, Bool, Dict, String
-from bokeh.plotting import figure, Figure # pylint: disable=unused-import
-from bokeh.models   import (LinearAxis, ColumnDataSource, HoverTool,
-                            CustomJS, Range1d, ContinuousTicker,
-                            BasicTicker, Ticker, Dropdown, TextInput,
-                            DataTable, TableColumn, IntEditor, NumberEditor,
-                            Paragraph)
+import  bokeh.core.properties as props
+from    bokeh          import layouts
+from    bokeh.model    import Model
+from    bokeh.plotting import figure, Figure    # pylint: disable=unused-import
+from    bokeh.models   import (LinearAxis,      # pylint: disable=unused-import
+                               ColumnDataSource, HoverTool,
+                               CustomJS, Range1d, ContinuousTicker,
+                               BasicTicker, Ticker, Dropdown, TextInput,
+                               DataTable, TableColumn, IntEditor, NumberEditor,
+                               Paragraph, GlyphRenderer)
 
 import numpy        as np
+from   numpy.lib.index_tricks import as_strided
 
 import sequences
 from   utils        import NoArgs
@@ -76,9 +78,9 @@ class CyclesModel(TrackPlotModel):
         cnf.sequence.witnesses.default = None
         for attr in self._CACHED:
             self.curr[attr].setdefault(None)
-        self.update()
+        self.clearcache()
 
-    def update(self):
+    def clearcache(self):
         u"updates the model when a new track is loaded"
         self.curr.update({i: dict() for i in self._CACHED})
 
@@ -94,11 +96,11 @@ class CyclesModel(TrackPlotModel):
 
 class DpxHoverModel(Model):
     "controls keypress actions"
-    precision = Float(0.003)
-    framerate = Float(1.)
-    bias      = Float(0.)
-    stretch   = Float(0.)
-    updating  = Bool(False)
+    framerate = props.Float(1.)
+    bias      = props.Float(0.)
+    stretch   = props.Float(0.)
+    shape     = props.Tuple(props.Int, props.Int, default = (0, 0))
+    updating  = props.Bool(False)
     __implementation__ = """
     import * as p  from "core/properties"
     import {Model} from "model"
@@ -108,10 +110,10 @@ class DpxHoverModel(Model):
         default_view: DpxHoverModelView
         type:"DpxHoverModel"
         @define {
-            precision : [p.Number, 0.003],
             framerate : [p.Number, 1],
             stretch   : [p.Number, 0],
             bias      : [p.Number, 0],
+            shape     : [p.Array,  [0, 0]],
             updating  : [p.Bool,  false]
         }
     """
@@ -119,6 +121,7 @@ class DpxHoverModel(Model):
         super().__init__(**kwa)
         self._rawsource  = ColumnDataSource()
         self._histsource = ColumnDataSource()
+        self._rawglyph   = None # type: Optional[GlyphRenderer]
 
     def source(self, key):
         u"returns the hist source"
@@ -128,74 +131,75 @@ class DpxHoverModel(Model):
     def defaultconfig() -> dict:
         "default config"
         return {'raw.selection'       : PlotAttrs('green', 'line',   2),
-                'raw.tooltips'        : [(u'(cycle, t, z)', '(@cycles, $~x, $data_y)')],
+                'raw.tooltips'        : [(u'(cycle, t, z)', '(@cycle, $~x, $data_y)')],
                 'raw.tooltips.radius' : 2,
                 'hist.tooltips.radius': 1.5,
                 'hist.tooltips'       : u'@values: @text'
                }
 
-    @staticmethod
-    @checksizes
-    def _createrawdata(raw):
-        get     = lambda i: raw['C%d'%i]
-        time    = raw['t']
-        ncycles = sum(i.startswith('C') for i in raw)
+    def _createrawdata(self, source):
+        zvals = source.data['z']
+        cyc   = source.data['cycle']
+        return dict(t = source.data['t'][:self.shape[1]],
+                    z = zvals           [:self.shape[1]],
+                    **{'c%d'% cyc[i*self.shape[1]]: zvals[i*self.shape[1]:(i+1)*self.shape[1]]
+                       for i in range(self.shape[0])})
 
-        sizes   = [np.isfinite(get(i)) for i in range(ncycles) if get(i) is not time]
-        if len(sizes) == 0:
-            return dict(values = [0], inds = [0], cycles = [0])
-
-        vals    = np.concatenate([get(i)[j] for i, j in enumerate(sizes)])
-        inds    = np.concatenate([np.arange(len(j))[j] for    j in sizes])
-        cycles  = np.concatenate([np.full((j.sum(),), i, dtype = 'i4')
-                                  for i, j in enumerate(sizes)])
-        data    = dict(values = vals, inds   = inds, cycles = cycles)
-        return data
-
-    def createraw(self, fig, source, data, mdl, css): # pylint: disable = too-many-arguments
+    def createraw(self, fig, source, shape, mdl, css): # pylint: disable = too-many-arguments
         "creates the hover tool"
-        self.precision = mdl.binwidth
         self.bias      = mdl.bias
         self.stretch   = mdl.stretch
+        self.shape     = tuple(shape)
 
         hover          = fig.select(HoverTool)
         if len(hover) == 0:
             return
-        attrs          = css.raw.selection.get()
 
-        glyph = attrs.addto(fig, x = 't', y = 'sel', source = source, visible = False)
-        def _onhover(source = source, glyph = glyph, mdl = self, cb_data = None):
-            xval = window.Math.floor(cb_data['geometry'].x+0.5)
+        self._rawsource = ColumnDataSource(self._createrawdata(source))
+        attrs           = css.raw.selection.get()
+        self._rawglyph  = attrs.addto(fig,  x = 't', y = 'z',
+                                      source  = self._rawsource,
+                                      visible = False)
+
+        def _onhover(source  = self._rawsource,
+                     hvrsrc  = source,
+                     glyph   = self._rawglyph,
+                     mdl     = self,
+                     cb_data = None):
+            if mdl.shape == (1, 2):
+                return
+
+            if not cb_data.index['1d'].indices.length:
+                if glyph.glyph.visible:
+                    glyph.glyph.visible = False
+                    glyph.trigger('change')
+                return
+
             yval = cb_data['geometry'].y
-            dist = mdl.precision
-            best = None
-            for col in source.column_names:
-                tmp = window.Math.abs(source.data[col][xval] - yval)
+            best = cb_data.index['1d'].indices[0]
+            dist = window.Math.abs(hvrsrc.data['z'][best] - yval)
+            for ind in cb_data.index['1d'].indices[1:]:
+                tmp = window.Math.abs(hvrsrc.data['z'][ind] - yval)
                 if tmp < dist:
                     dist = tmp
-                    best = col
+                    best = ind
 
-            if best is not None:
-                source.data['sel'] = source.data[best]
-                glyph.glyph.visible = True
-                source.trigger("change")
-                glyph.trigger("change")
-            elif glyph.glyph.visible:
-                glyph.glyph.visible = False
-                glyph.trigger("change")
+            xval                = hvrsrc.data['cycle'][best]
+            source.data['z']    = source.data['c'+str(xval)]
+            glyph.glyph.visible = True
+            source.trigger('change')
 
-        hover[0].callback  = CustomJS.from_py_func(_onhover)
-        hover[0].tooltips  = None
+        hover[0].callback = CustomJS.from_py_func(_onhover)
+        hover[0].tooltips = None
 
         tooltips  = css.raw.tooltips.get()
         if tooltips is None or len(tooltips) == 0:
             return
 
-        self._rawsource = ColumnDataSource(self._createrawdata(data))
         hover[0].tooltips  = tooltips
-        hover[0].renderers = [fig.circle(x                = 'inds',
-                                         y                = 'values',
-                                         source           = self._rawsource,
+        hover[0].renderers = [fig.circle(x                = 't',
+                                         y                = 'z',
+                                         source           = source,
                                          radius           = css.raw.tooltips.radius.get(),
                                          radius_dimension = 'x',
                                          line_alpha       = 0.,
@@ -248,13 +252,15 @@ class DpxHoverModel(Model):
                                           y_range_name     = 'bases',
                                           visible          = False)]
 
-    def updateraw(self, fig, rdata):
+    def updateraw(self, fig, rdata, shape):
         "updates the tooltips for a new file"
         hover = fig.select(HoverTool)
         if len(hover) == 0:
             return
 
-        self._rawsource.data  = self._createrawdata(rdata)
+        self.shape                   = shape
+        self._rawsource.data         = self._createrawdata(rdata)
+        self._rawglyph.glyph.visible = False
 
     def updatehist(self, fig, hdata, mdl):
         "updates the tooltips for a new file"
@@ -283,11 +289,11 @@ class DpxHoverModel(Model):
 class DpxFixedTicker(ContinuousTicker):
     "Generate ticks at fixed, explicitly supplied locations."
 
-    major   = Dict(String, Seq(Float), default = {'': []})
-    minor   = Dict(String, Seq(Float), default = {'': []})
-    key     = String(default = '')
-    usebase = Bool(default = True)
-    base    = Instance(Ticker, default = BasicTicker())
+    major   = props.Dict(props.String, props.Seq(props.Float), default = {'': []})
+    minor   = props.Dict(props.String, props.Seq(props.Float), default = {'': []})
+    key     = props.String(default = '')
+    usebase = props.Bool(default = True)
+    base    = props.Instance(Ticker, default = BasicTicker())
 
     _ORDER     = tuple('grid_line_'+i for i in ('color', 'width', 'dash', 'alpha'))
     _ORDER    += tuple('minor_'+i for i in _ORDER) # type: ignore
@@ -403,9 +409,9 @@ class DpxFixedTicker(ContinuousTicker):
                 grd = fig.ygrid[0]
                 grd.y_range_name = 'bases'
                 for name in ('color', 'dash', 'width', 'alpha'):
-                    props = css['grid'+name].get()
-                    setattr(grd, 'grid_line_'+name,       props[0])
-                    setattr(grd, 'minor_grid_line_'+name, props[1])
+                    gridprops = css['grid'+name].get()
+                    setattr(grd, 'grid_line_'+name,       gridprops[0])
+                    setattr(grd, 'minor_grid_line_'+name, gridprops[1])
 
 class _Mixin:
     if TYPE_CHECKING:
@@ -429,33 +435,40 @@ class _Mixin:
 class _RawMixin(_Mixin):
     def __init__(self):
         "sets up this plotter's info"
-        self.getCSS().defaults = dict(raw = PlotAttrs('blue',  'circle', 1,
+        self.getCSS().defaults = dict(raw = PlotAttrs('color',  'circle', 1,
                                                       alpha   = .5,
                                                       palette = 'inferno'))
         self._rawsource = None # type: Optional[ColumnDataSource]
         self._raw       = None # type: Optional[Figure]
 
-    @checksizes
-    def _createrawdata(self, track, bead) -> dict:
-        keys        = set('C%d' % i for i in range(self.getConfig().ncycles.get()))
+    def __data(self, track, bead) -> Tuple[dict, Tuple[int,int]]:
         if track is None:
-            return dict.fromkeys(('t', 'sel')+tuple(keys), [0., 1.])
-        items = dict(('C%d' % i[-1], j) for i, j in track.cycles[bead,...])
-        sizes = {len(i) for i in items.values()}
-        size  = max(sizes)
-        if len(sizes) > 1:
-            nans = np.full((size,), np.NaN, dtype = 'f4')
-            for i, j in items.items():
-                if len(j) == size:
-                    continue
-                items[i] = np.concatenate((j, nans[:size-len(j)]))
+            return (dict.fromkeys(('t', 'z', 'cycle', 'color'), [0., 1.]),
+                    (1, 2))
 
-        items['t']    = np.arange(size, dtype = 'f4')
-        items.update(dict.fromkeys(keys - set(items.keys()), items['t'])) # type: ignore
-        items['sel']  = items['C0']
-        return items
+        items = list(track.cycles[bead,...])
+        if len(items) == 0 or max(len(i) for _, i in items) == 0:
+            return self.__data(None, bead)
 
-    def _addrawcallbacks(self):
+        size = max(len(i) for _, i in items)
+        val  = np.full((len(items), size), np.NaN, dtype = 'f4')
+        for i, (_, j) in zip(val, items):
+            i[:len(j)] = j
+
+        tmp   = np.arange(size, dtype = 'i4')
+        time  = as_strided(tmp, shape = val.shape, strides = (0, tmp.strides[0]))
+
+        tmp   = np.array([i[-1] for i, _ in items], dtype = 'i4')
+        cycle = as_strided(tmp, shape = val.shape, strides = (tmp.strides[0], 0))
+
+        tmp   = np.array(self.getCSS().raw.get().listpalette(val.shape[0]))
+        color = as_strided(tmp, shape = val.shape, strides = (tmp.strides[0], 0))
+
+        return (dict(t     = time .ravel(), z     = val  .ravel(),
+                     cycle = cycle.ravel(), color = color.ravel()),
+                val.shape)
+
+    def _addcallbacks(self):
         fig = self._raw
         super()._addcallbacks(fig)
 
@@ -472,35 +485,31 @@ class _RawMixin(_Mixin):
 
     def _createraw(self, track, bead):
         css             = self.getCSS()
-        cnf             = self.getConfig()
         self._raw       = figure(y_axis_label = css.ylabel.get(),
                                  y_range      = Range1d(start = 0., end = 1.),
                                  **self._figargs(css, 500, 'left'))
-        raw             = self._createrawdata(track, bead)
+
+        raw, shape      = self.__data(track, bead)
         self._rawsource = ColumnDataSource(data = raw)
 
-        for ind, attrs in enumerate(css.raw.get().iterpalette(cnf.ncycles.get())):
-            attrs.addto(self._raw,
-                        x       = 't',
-                        y       = 'C%d' % ind,
-                        source  = self._rawsource,
-                        tags    = ['__lines__'],
-                        visible = raw['t'] is not raw['C%d' % ind])
+        css.raw.addto(self._raw, x = 't', y = 'z', source = self._rawsource)
 
-        self._hover.createraw(self._raw, self._rawsource, raw, self._model, self.getCSS())
+        self._hover.createraw(self._raw, self._rawsource, shape,
+                              self._model, self.getCSS())
         self._raw.extra_x_ranges = {"time": Range1d(start = 0., end = 1.)}
 
         axis = LinearAxis(x_range_name="time", axis_label = css.xtoplabel.get())
         self._raw.add_layout(axis, 'above')
+        return shape
 
     def _updateraw(self, track, bead):
-        self._raw.disabled    = False
-        self._rawsource.data  = raw = self._createrawdata(track, bead)
-        for glyph in self._raw.select(tags = '__lines__'):
-            glyph.visible = raw[glyph.y] is not raw['t']
-        self._hover.updateraw(self._raw, raw)
+        self._raw.disabled          = False
+        self._rawsource.data, shape = self.__data(track, bead)
+        self._hover.updateraw(self._raw, self._rawsource, shape)
+        return shape
 
 class _HistMixin(_Mixin):
+    __PHASE = 5
     def __init__(self):
         "sets up this plotter's info"
         css = self.getCSS()
@@ -522,15 +531,20 @@ class _HistMixin(_Mixin):
         self._gridticker = None # type: Optional[DpxFixedTicker]
 
     @checksizes
-    def _createhistdata(self, track, bead):
-        if track is None:
+    def __data(self, track, data, shape):
+        if shape == (1, 2):
             bins  = np.array([-1, 1])
             zeros = np.zeros((1,), dtype = 'f4')
             items = zeros,
         else:
-            items = [i for _, i in track.cycles[bead,...].withphases(5,5)]
+            zvals = data['z'].reshape(shape)
+            ind1  = track.phases[:,self.__PHASE]  -track.phases[:,0]
+            ind2  = track.phases[:,self.__PHASE+1]-track.phases[:,0]
+            items = [val[ix1:ix2] for ix1, ix2, val in zip(ind1, ind2, zvals)]
+
             rng   = (np.nanmin([np.nanmin(i) for i in items]),
                      np.nanmax([np.nanmax(i) for i in items]))
+
             width = self._model.binwidth
             bins  = np.arange(rng[0]-width*.5, rng[1]+width*1.01, width, dtype = 'f4')
             if bins[-2] > rng[1]:
@@ -579,13 +593,13 @@ class _HistMixin(_Mixin):
 
         self._hist.y_range.callback = CustomJS.from_py_func(_onchangebounds)
 
-    def _createhist(self, track, bead, yrng):
+    def _createhist(self, track, data, shape, yrng):
         css              = self.getCSS()
         self._hist       = figure(y_axis_location = None,
                                   y_range         = yrng,
                                   **self._figargs(css.hist, 200, None))
 
-        hist             = self._createhistdata(track, bead)
+        hist             = self.__data(track, data, shape)
         self._histsource = ColumnDataSource(data = hist)
         self._hist.extra_x_ranges = {"cycles": Range1d(start = 0., end = 1.)}
 
@@ -615,9 +629,9 @@ class _HistMixin(_Mixin):
         self._hover.observe(self._ctrl, self.key(), self._model)
         self._slavexaxis()
 
-    def _updatehist(self, track, bead):
+    def _updatehist(self, track, data, shape):
         self._hist.disabled   = False
-        self._histsource.data = hist = self._createhistdata(track, bead)
+        self._histsource.data = hist = self.__data(track, data, shape)
         self._hover.updatehist(self._hist, hist, self._model)
         self.setbounds(self._hist.y_range, 'y', (hist['bottom'][0], hist['top'][-1]))
         self._gridticker.updatedata(self._model, self.getCSS(), self._hist)
@@ -871,9 +885,10 @@ class CyclesPlotCreator(TrackPlotCreator, _HistMixin, _RawMixin, _ConfigMixin):
 
     def _create(self, track, bead):
         "returns the figure"
-        self._hover  = DpxHoverModel()
-        self._createraw(track, bead)
-        self._createhist(track, bead, self._raw.y_range)
+        self._hover = DpxHoverModel()
+        shape       = self._createraw(track, bead)
+        self._createhist(track, self._rawsource.data, shape, self._raw.y_range)
+
         plts  = layouts.gridplot([[self._raw, self._hist]])
         keyed = DpxKeyedRow(self, self._raw,
                             children = [plts],
@@ -883,9 +898,9 @@ class CyclesPlotCreator(TrackPlotCreator, _HistMixin, _RawMixin, _ConfigMixin):
 
     def _update(self, track, bead, items):
         if 'track' in items:
-            self._model.update() # pylint: disable=no-member
-        self._updateraw(track, bead)
-        self._updatehist(track, bead)
+            self._model.clearcache() # pylint: disable=no-member
+        shape = self._updateraw(track, bead)
+        self._updatehist(track, self._rawsource.data, shape)
         self._updateconfig()
 
 class CyclesPlotView(TrackPlotView):
