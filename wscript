@@ -53,18 +53,6 @@ def _getmodules(bld):
     builder.requirements.reload(('',)+tuple(mods))
     return mods
 
-def _command(fcn):
-    loc  = builder.getlocals()
-    name = "_"+fcn.__name__.capitalize()
-    loc[name] =  type(name, (BuildContext,), dict(cmd = fcn.__name__,
-                                                  fun = fcn.__name__))
-
-    @_wraps(fcn)
-    def _wrap(bld:BuildContext):
-        _getmodules(bld)
-        fcn(bld)
-    return fcn
-
 def options(opt):
     builder.load(opt)
     opt.recurse(_ALL)
@@ -122,7 +110,8 @@ def build(bld):
     builder.findpyext(bld, set(mod for mod in mods if mod != 'tests'))
     bld.recurse(mods)
 
-@_command
+class _Test(BuildContext):
+    fun = cmd = 'test'
 def test(bld):
     u"runs pytests"
     mods  = ('/'+i.split('/')[-1] for i in _getmodules(bld))
@@ -134,17 +123,23 @@ def environment(cnf):
     u"prints the environment variables for current configuration"
     print(cnf.env)
 
-@_command
-def condaenv(cnf):
-    u"prints the conda yaml recipe"
-    builder.condaenv('trackanalysis')
-
-@_command
+class _Requirements(BuildContext):
+    fun = cmd = 'requirements'
 def requirements(cnf):
     u"prints requirements"
+    _getmodules(cnf)
     builder.requirements.tostream()
 
-@_command
+class _CondaEnv(BuildContext):
+    fun = cmd = 'condaenv'
+def condaenv(cnf):
+    u"prints the conda yaml recipe"
+    _getmodules(cnf)
+    builder.condaenv('trackanalysis')
+
+class _CondaSetup(BuildContext):
+    fun = cmd = 'condasetup'
 def condasetup(cnf):
     u"prints requirements"
+    _getmodules(cnf)
     builder.condasetup(cnf)

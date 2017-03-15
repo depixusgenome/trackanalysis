@@ -27,15 +27,15 @@ from collections    import namedtuple, ChainMap
 from typing         import (Dict, Union, # pylint: disable=unused-import
                             Callable, Optional, Sequence)
 import anastore
-from .event         import Controller
+from .action        import Controller, Action
 
+_CNT     = 2
 class GlobalsChild(ChainMap):
     u"The main model"
     __NAME    = 'の'
-    __CNT     = 2
     __slots__ = '__name'
     def __init__(self, name:str, parent: Optional['GlobalsChild'] = None) -> None:
-        maps = tuple(dict() for i in range(self.__CNT)) # type: Sequence[Union[dict,GlobalsChild]]
+        maps = tuple(dict() for i in range(_CNT)) # type: Sequence[Union[dict,GlobalsChild]]
         if parent is not None:
             maps += (parent,) # type: ignore
 
@@ -56,8 +56,14 @@ class GlobalsChild(ChainMap):
         self.__name = info.pop(self.__NAME)
         self.maps[0].update(info)
 
-ReturnPair = namedtuple('ReturnPair', ['old', 'value'])
+EventPair = namedtuple('EventPair', ['old', 'value'])
 delete     = type('delete', tuple(), dict())    # pylint: disable=invalid-name
+class EventData(dict):
+    u"All data provided to the event"
+    empty = delete
+    def __init__(self, root, *args, **kwargs):
+        self.name = root
+        super().__init__(*args, **kwargs)
 
 def _tokwargs(args, kwargs):
     if len(args) == 1 and isinstance(args[0], dict):
@@ -216,16 +222,13 @@ class DefaultsMap(Controller):
         u"adds defaults to the config"
         self.__items.maps[version].update(**_tokwargs(args, kwargs))
 
-    def reset(self, version = None):
+    def reset(self):
         u"resets to default values"
-        if version is None:
-            version = 1
-        for i in range(version):
-            self.__items.maps[i].clear()
+        self.pop(*self.__items.maps[1].keys())
 
     def update(self, *args, **kwargs) -> dict:
         u"updates keys or raises NoEmission"
-        ret = dict(empty = delete) # type: Dict[str,Union[type,ReturnPair]]
+        ret = EventData(self.__items.name)
         for key, val in _tokwargs(args, kwargs).items():
             old = self.__items.get(key, delete)
             if val is delete:
@@ -237,9 +240,9 @@ class DefaultsMap(Controller):
                 self.__items[key] = val
 
             if old != val:
-                ret[key] = ReturnPair(old, val)
+                ret[key] = EventPair(old, val)
 
-        if len(ret) > 1:
+        if len(ret) > 0:
             return self.handle("globals."+self.__items.name, self.outastuple, (ret,))
 
     def pop(self, *args):
@@ -378,7 +381,18 @@ class GlobalsController(Controller):
         else:
             return
 
-        for root in set(cnf) & set(self.__maps):
-            defmap = self.__maps[root]._DefaultsMap__items # pylint: disable=protected-access
-            for key in set(defmap) & set(cnf[root]):
-                defmap[key] = cnf[root][key]
+        with Action(self):
+            for root in set(cnf) & set(self.__maps):
+                keys = frozenset(self.__maps[root].keys()) & frozenset(cnf[root])
+                self.__maps[root].update(root, **{i: cnf[root][i] for i in keys})
+
+    def __undos__(self):
+        "yields all undoable user actions"
+        def _onglobals(items):
+            items.pop("track", None)
+            items.pop("task",  None)
+            name = items.name
+            vals = {i: j.old for i, j in items}
+            return lambda: self.updateGlobal(name, **vals)
+
+        yield from ((key, _onglobals) for key in self.__maps)

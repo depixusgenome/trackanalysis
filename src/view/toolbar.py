@@ -64,7 +64,7 @@ class  ToolBar(BokehView):
 
     def _onUpdateCurrent(self, items:dict):
         if 'track' in items:
-            self._save.disabled = items['track'].value is items['empty']
+            self._save.disabled = items['track'].value is items.empty
 
     @BokehView.action
     def _onOpen(self, *_):

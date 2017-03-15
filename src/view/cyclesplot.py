@@ -25,7 +25,7 @@ from   utils        import NoArgs
 from   control      import Controller
 from  .dialog       import FileDialog
 from  .plotutils    import (PlotAttrs, DpxKeyedRow, TrackPlotCreator,
-                            TrackPlotView, TrackPlotModel, checksizes,
+                            TrackPlotView, TrackPlotModelController, checksizes,
                             readsequence, DpxHoverTool)
 
 window = None # type: ignore # pylint: disable=invalid-name
@@ -55,7 +55,7 @@ def beadorconfig(attr):
     hmsg  = "link to config's {}".format(attr)
     return property(_getter, _setter, None, hmsg)
 
-class CyclesModel(TrackPlotModel):
+class CyclesModelController(TrackPlotModelController):
     "Model for Cycles View"
     _CACHED = 'base.stretch', 'base.bias', 'sequence.key', 'sequence.witnesses'
     def __init__(self, ctrl, cnf, curr):
@@ -888,7 +888,7 @@ class _ConfigMixin(_Mixin):
 
 class CyclesPlotCreator(TrackPlotCreator, _HistMixin, _RawMixin, _ConfigMixin):
     "Displays cycles and their projection"
-    _MODEL = CyclesModel
+    _MODEL = CyclesModelController
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
         TrackPlotCreator.__init__(self, ctrl)

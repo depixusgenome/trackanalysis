@@ -272,8 +272,7 @@ class PlotCreator:
 
     def _addcallbacks(self, fig):
         "adds Range callbacks"
-        cnf = self.getCurrent()
-
+        cnf       = self.getCurrent()
         def _onchangex_cb(attr, old, new):
             if self._ready:
                 cnf.update(x = (fig.x_range.start, fig.x_range.end))
@@ -288,6 +287,13 @@ class PlotCreator:
         fig.y_range.on_change('end',   _onchangey_cb)
 
         cnf.defaults = dict(x = (None, None), y = (None, None))
+
+        def _onobserve(items):
+            for i in {'x', 'y'} & frozenset(items):
+                vals = items[i].value
+                getattr(fig, i+'_range').update(start = vals[0], end = vals[1])
+
+        self._ctrl.observe(self.key("current"), _onobserve)
         return fig
 
     def setbounds(self, rng, axis, arr, reinit = True):
@@ -309,7 +315,7 @@ class PlotCreator:
         vmax += delta
         return vmin, vmax
 
-class TrackPlotModel:
+class TrackPlotModelController:
     "Contains all access to model items likely to be set by user actions"
     def __init__(self, ctrl, cnf, curr):
         self._ctrl = ctrl
@@ -344,7 +350,7 @@ class TrackPlotModel:
 class TrackPlotCreator(PlotCreator):
     "Base plotter for tracks"
     _row   = None # type: Optional[DpxKeyedRow]
-    _MODEL = TrackPlotModel
+    _MODEL = TrackPlotModelController
     def __init__(self, ctrl, *_):
         super().__init__(ctrl, *_)
         self._model = self._MODEL(ctrl, self.getConfig(), self.getCurrent())

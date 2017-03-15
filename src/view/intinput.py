@@ -81,7 +81,7 @@ class BeadInput(BokehView):
 
     def _onUpdateCurrent(self, items):
         if 'track' in items:
-            disabled = items['track'].value is items['empty']
+            disabled = items['track'].value is items.empty
             self.__inp.disabled = disabled
             if not disabled:
                 beads = self._ctrl.track(items['track'].value).beadsonly.keys()

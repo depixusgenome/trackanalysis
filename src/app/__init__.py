@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Updates app manager so as to deal with controllers"
+"Updates app manager so as to deal with controllers"
 from typing     import TYPE_CHECKING
 from functools  import wraps
 from pathlib    import Path
@@ -33,9 +33,9 @@ def _serverkwargs(kwa):
     return server_kwargs
 
 def _serve(view, **kwa):
-    u"Launches a bokeh server"
+    "Launches a bokeh server"
     def start(doc):
-        u"Starts the application and adds itself to the document"
+        "Starts the application and adds itself to the document"
         ret = view.open(doc)
         return ret
 
@@ -44,14 +44,14 @@ def _serve(view, **kwa):
     return server
 
 def _launch(view, **kwa):
-    u"Launches a bokeh server"
+    "Launches a bokeh server"
     if isinstance(view, Server):
         server = view
     else:
         server = _serve(view, **kwa.pop('server', {}))
 
     def run(self, __old__ = StreamReader.run):
-        u"Stop the stream reader"
+        "Stop the stream reader"
         __old__(self)
         if not getattr(server, '_stopped', False):
             server.stop()
@@ -60,7 +60,7 @@ def _launch(view, **kwa):
 
     rtime = _flexxlaunch('http://localhost:5006/', **kwa)
     def close(self, __old__ = view.MainControl.close):
-        u"closes the application"
+        "closes the application"
         top, self.topview = self.topview, None
         if top is not None:
             __old__(self)
@@ -71,11 +71,11 @@ def _launch(view, **kwa):
     return server
 
 def _create(main, controls, views): # pylint: disable=unused-argument
-    u"Creates a main view"
+    "Creates a main view"
     class MainControl(metaclass   = MetaMixin,
                       mixins      = controls,
                       selectfirst = True):
-        u"""
+        """
         Main controller: contains all sub-controllers.
         These share a common dictionnary of handlers
         """
@@ -90,12 +90,12 @@ def _create(main, controls, views): # pylint: disable=unused-argument
                 pass
 
         def __undos__(self):
-            u"yields all undoable user actions"
+            "yields all undoable user actions"
             yield from self._yieldovermixins('__undos__')
 
         @classmethod
         def configpath(cls, version) -> Path:
-            u"returns the path to the config file"
+            "returns the path to the config file"
             name = main.__name__.lower().replace('view', '')
             if '.' in name:
                 name = name[name.rfind('.')+1:]
@@ -104,29 +104,36 @@ def _create(main, controls, views): # pylint: disable=unused-argument
             return path/'config.txt'
 
         def readconfig(self):
-            u"writes the config"
+            "writes the config"
             self._callmixins("readconfig", self.configpath)
 
         def writeconfig(self):
-            u"writes the config"
+            "writes the config"
             self._callmixins("writeconfig", self.configpath)
 
         def close(self):
-            u"remove controller"
+            "remove controller"
             self.writeconfig()
             self._callmixins("close")
 
-    def __init__(self):
-        u"sets up the controller, then initializes the view"
-        ctrl = MainControl(handlers = dict(), topview = self)
-        ctrl.readconfig()
-        keys = KeyPressManager(ctrl = ctrl)
-        main.__init__(self, ctrl = ctrl, keys = keys)
+    class Main(*(main,)+views):
+        "The main view"
+        MainControl = MainControl
+        def __init__(self):
+            "sets up the controller, then initializes the view"
+            ctrl = MainControl(handlers = dict(), topview = self)
+            keys = KeyPressManager(ctrl = ctrl)
+            main.__init__(self, ctrl = ctrl, keys = keys)
 
-    return type('Main', (main,)+views,
-                dict(__doc__     = u"The main view",
-                     MainControl = MainControl,
-                     __init__    = __init__))
+        def open(self): # pylint: disable=redefined-builtin,protected-access
+            "sets up the model and view"
+            self._ctrl.readconfig()
+            main.observe(self)
+            for cls in views:
+                cls.observe(self)
+            main.open(self)
+
+    return Main
 
 def setup(locs            = None, # pylint: disable=too-many-arguments
           mainview        = None,
@@ -135,7 +142,7 @@ def setup(locs            = None, # pylint: disable=too-many-arguments
           defaultviews    = tuple(),
           decorate        = lambda x: x
          ):
-    u"Sets up launch and serve functions for a given app context"
+    "Sets up launch and serve functions for a given app context"
     if locs is None:
         locs = getlocals(1)
 
@@ -144,7 +151,7 @@ def setup(locs            = None, # pylint: disable=too-many-arguments
                     controls = defaultcontrols,
                     views    = defaultviews,
                     creator  = creator):
-        u"Creates a main view"
+        "Creates a main view"
         def _get(string):
             if isinstance(string, str):
                 mod  = string[:string.rfind('.')]
@@ -174,7 +181,7 @@ def setup(locs            = None, # pylint: disable=too-many-arguments
               views    = defaultviews,
               creator  = creator,
               **kwa):
-        u"Creates a browser app"
+        "Creates a browser app"
         return _serve(application(main, controls, views, creator), **kwa)
 
     @decorate
@@ -183,7 +190,7 @@ def setup(locs            = None, # pylint: disable=too-many-arguments
                views    = defaultviews,
                creator  = creator,
                **kwa):
-        u"Creates a desktop app"
+        "Creates a desktop app"
         kwa.setdefault("title", 'track analysis')
         kwa.setdefault("size",  (1000, 1000))
         return _launch(application(main, controls, views, creator), **kwa)
@@ -192,27 +199,27 @@ def setup(locs            = None, # pylint: disable=too-many-arguments
     locs.setdefault('launch',  launch)
 
 class WithToolbar:
-    u"Creates an app with a toolbar"
+    "Creates an app with a toolbar"
     def __init__(self, tbar):
         self.tbar = tbar
 
     def __call__(self, main):
         tbar = self.tbar
         class ViewWithToolbar(BokehView):
-            u"A view with the toolbar on top"
+            "A view with the toolbar on top"
             def __init__(self, **kwa):
                 self._bar      = tbar(**kwa)
                 self._mainview = main(**kwa)
                 super().__init__(**kwa)
 
             def close(self):
-                u"remove controller"
+                "remove controller"
                 super().close()
                 self._bar.close()
                 self._mainview.close()
 
             def getroots(self):
-                u"adds items to doc"
+                "adds items to doc"
                 children = [self._bar.getroots(), self._mainview.getroots()]
                 return layout(children, sizing_mode = 'scale_width'),
 
@@ -226,17 +233,17 @@ CONTROLS    = ('control.taskcontrol.TaskController',
 setup()
 
 class Defaults:
-    u"Empty app"
+    "Empty app"
     setup(defaultcontrols = CONTROLS, defaultviews = VIEWS)
 
 class ToolBar:
-    u"App with a toolbar"
+    "App with a toolbar"
     setup(creator         = WithToolbar(toolbars.ToolBar),
           defaultcontrols = CONTROLS,
           defaultviews    = VIEWS+("view.toolbar.ToolBar",))
 
 class BeadsToolBar:
-    u"App with a toolbar containing a bead spinner"
+    "App with a toolbar containing a bead spinner"
     setup(creator         = WithToolbar(toolbars.BeadToolBar),
           defaultcontrols = CONTROLS,
           defaultviews    = VIEWS+("view.toolbar.BeadToolBar",))

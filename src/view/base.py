@@ -1,78 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "basic view module"
-import inspect
-from functools            import wraps
 from typing               import Callable
 from bokeh.models.widgets import Button
 from bokeh.layouts        import layout
 
-from control     import Controller      # pylint: disable=unused-import
-from .keypress   import KeyPressManager # pylint: disable=unused-import
-
-class ActionDescriptor:
-    """
-    For user gui action: surrounds controller action with 2 events.
-
-    This can also be as a descriptor, or a decorator
-    """
-    def __call__(self, fcn):
-        @wraps(fcn)
-        def _wrap(this, *args, **kwargs):
-            with Action(this._ctrl): # pylint: disable=protected-access
-                return fcn(this, *args, **kwargs)
-        return _wrap
-
-    def __get__(self, obj, tpe):
-        if obj is None:
-            # called as a class attribute: to be used as a decorator
-            return self
-        else:
-            # called as an instance attribute:
-            # can be used as a context or a decorator
-            return Action(obj._ctrl) # pylint: disable=protected-access
-
-class Action(ActionDescriptor):
-    """
-    For user gui action: surrounds controller action with 2 events.
-
-    This can also be as a descriptor, or a decorator
-    """
-    _CNT = 0
-    def __init__(self, ctrl = None):
-        self._ctrl = ctrl
-
-    def __enter__(self):
-        self._CNT += 1
-        self._ctrl.handle("startaction", args = {'recursive': self._CNT > 1})
-        return self._ctrl
-
-    def __call__(self, fcn):
-        if tuple(inspect.signature(fcn).parameters) == ('attr', 'old', 'new'):
-            # Special Bokeh callback context
-            @wraps(fcn)
-            def _wrap_cb(attr, old, new):
-                with self:
-                    fcn(attr, old, new)
-            return _wrap_cb
-        elif tuple(inspect.signature(fcn).parameters)[1:] == ('attr', 'old', 'new'):
-            # Special Bokeh callback context
-            @wraps(fcn)
-            def _wraps_cb(self, attr, old, new):
-                with self:
-                    fcn(self, attr, old, new)
-            return _wraps_cb
-        else:
-            return super().__call__(fcn)
-
-    def __exit__(self, tpe, val, bkt):
-        self._CNT -= 1
-        self._ctrl.handle("stopaction",
-                          args = {'type':      tpe,
-                                  'value':     val,
-                                  'backtrace': bkt,
-                                  'recursive': self._CNT > 0})
-        return False
+from control        import Controller                   # pylint: disable=unused-import
+from control.action import ActionDescriptor, Action     # pylint: disable=unused-import
+from .keypress      import KeyPressManager              # pylint: disable=unused-import
 
 class View:
     "Classes to be passed a controller"
@@ -89,6 +24,9 @@ class View:
                 self._ctrl.openTrack(path)
             if script is not None:
                 script(self, self._ctrl)
+
+    def observe(self):
+        "whatever needs to be initialized"
 
     def close(self):
         "closes the application"
