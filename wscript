@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # encoding: utf-8
-from waflib.Build import BuildContext
+from functools import wraps as _wraps
 try:
     import wafbuilder as builder
 except ImportError:
     raise ImportError("Don't forget to clone wafbuilder!!")
 import wafbuilder.git as git
+from waflib.Build import BuildContext
 
 require(cxx    = {'msvc'     : 14.0,
                   'clang++'  : 3.8,
@@ -21,25 +22,6 @@ require(python = {'pybind11' : '2.0.1',
                   'mypy'     : '0.470'},
         rtime  = False)
 
-class _Tester(BuildContext):
-    u"runs pytests"
-    cmd = 'test'
-    fun = 'test'
-
-class _CondaEnv(BuildContext):
-    u"runs condaenv"
-    cmd = 'condaenv'
-    fun = 'condaenv'
-
-class _Requirements(BuildContext):
-    u"runs requirements"
-    cmd = 'requirements'
-    fun = 'requirements'
-
-class _CondaSetup(BuildContext):
-    u"runs conda setup"
-    cmd = 'condasetup'
-    fun = 'condasetup'
 
 builder.defaultwscript("src", "make()")
 _ALL      = ('tests',) + tuple(builder.wscripted("src"))
@@ -71,6 +53,18 @@ def _getmodules(bld):
     builder.requirements.reload(('',)+tuple(mods))
     return mods
 
+def _command(fcn):
+    loc  = builder.getlocals()
+    name = "_"+fcn.__name__.capitalize()
+    loc[name] =  type(name, (BuildContext,), dict(cmd = fcn.__name__,
+                                                  fun = fcn.__name__))
+
+    @_wraps(fcn)
+    def _wrap(bld:BuildContext):
+        _getmodules(bld)
+        fcn(bld)
+    return fcn
+
 def options(opt):
     builder.load(opt)
     opt.recurse(_ALL)
@@ -93,12 +87,6 @@ def options(opt):
                    default = '',
                    help    = (u"consider only modules which are "
                               +u" necessary for provided applications"))
-
-    opt.add_option('--conda',
-                   dest    = 'condaenv',
-                   action  = 'store',
-                   default = 'root',
-                   help    = u"conda environment name (use with condasetup)")
 
 def configure(cnf):
     cnf.env.app = cnf.options.app.split(',') if len(cnf.options.app) else []
@@ -134,6 +122,7 @@ def build(bld):
     builder.findpyext(bld, set(mod for mod in mods if mod != 'tests'))
     bld.recurse(mods)
 
+@_command
 def test(bld):
     u"runs pytests"
     mods  = ('/'+i.split('/')[-1] for i in _getmodules(bld))
@@ -145,18 +134,17 @@ def environment(cnf):
     u"prints the environment variables for current configuration"
     print(cnf.env)
 
+@_command
 def condaenv(cnf):
     u"prints the conda yaml recipe"
-    _getmodules(cnf)
     builder.condaenv('trackanalysis')
 
+@_command
 def requirements(cnf):
     u"prints requirements"
-    _getmodules(cnf)
     builder.requirements.tostream()
 
+@_command
 def condasetup(cnf):
     u"prints requirements"
-    _getmodules(cnf)
-    print(cnf.options.condaenv)
-    builder.condasetup(cnf.options.condaenv)
+    builder.condasetup(cnf)
