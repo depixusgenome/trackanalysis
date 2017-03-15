@@ -49,7 +49,7 @@ class  ToolBar(BokehView):
     def getroots(self):
         "adds items to doc"
         self._getroots()
-        self._ctrl.observe("globals.current", self._onUpdateCurrent)
+        self.enableOnTrack(self._save)
         return Row(children = self._tools, sizing_mode = 'fixed'),
 
     def close(self):
@@ -61,10 +61,6 @@ class  ToolBar(BokehView):
         del self._quit
         del self.__diagopen
         del self.__diagsave
-
-    def _onUpdateCurrent(self, items:dict):
-        if 'track' in items:
-            self._save.disabled = items['track'].value is items.empty
 
     @BokehView.action
     def _onOpen(self, *_):
@@ -89,8 +85,7 @@ class  BeadToolBar(ToolBar):
 
     def _getroots(self):
         super()._getroots()
-        self._beads.getroots()
-        self._beads.addkeypress()
+        self._beads.observe()
         self._tools.insert(2, self._beads.input)
 
     def close(self):

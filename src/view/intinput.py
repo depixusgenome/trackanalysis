@@ -45,12 +45,26 @@ class BeadInput(BokehView):
         self.__beads = np.empty((0,), dtype = 'i4')
         self.__inp   = None
 
-    def addkeypress(self, tpe = 'keypress'):
+    def observe(self):
         "Adds keypress for changin beads"
-        self._keys.addKeyPress((tpe+'.beadup',
-                                lambda: self._onchange_cb('', '', self.__inp.value+1)))
-        self._keys.addKeyPress((tpe+'.beaddown',
-                                lambda: self._onchange_cb('', '', self.__inp.value-1)))
+        self.getroots()
+        def _oncurrent(items):
+            if 'track' in items:
+                self.__beads        = np.sort(tuple(self.getbeads()))
+                self.__inp.disabled = len(self.__beads) > 0
+                if len(self.__beads):
+                    self.__inp.start = self.__beads[0]
+                    self.__inp.end   = self.__beads[-1]
+
+            elif 'bead' in items:
+                self.__inp.value = items['bead'].value
+
+        self._ctrl.observe('globals.current', _oncurrent)
+
+        self._keys.addKeyPress(('keypress.beadup',
+                                lambda: self.__onchange_cb('', '', self.__inp.value+1)))
+        self._keys.addKeyPress(('keypress.beaddown',
+                                lambda: self.__onchange_cb('', '', self.__inp.value-1)))
 
     def getroots(self):
         "adds items to doc"
@@ -59,8 +73,8 @@ class BeadInput(BokehView):
                    disabled     = True,
                    title        = self._ctrl.getGlobal('css').title.beadinput.get())
         self.__inp   = IntInput(**kwa)
-        self.__inp.on_change("value", self._onchange_cb)
-        self._ctrl.observe("globals.current", self._onUpdateCurrent)
+        self.__inp.on_change("value", self.__onchange_cb)
+        self.enableOnTrack(self.__inp)
         return self.__inp
 
     @property
@@ -68,7 +82,7 @@ class BeadInput(BokehView):
         "returns the bokeh model"
         return self.__inp
 
-    def _onchange_cb(self, attr, old, new):
+    def __onchange_cb(self, attr, old, new):
         if self.__inp.disabled:
             return
 
@@ -79,14 +93,9 @@ class BeadInput(BokehView):
 
         self._ctrl.getGlobal("current").bead = new
 
-    def _onUpdateCurrent(self, items):
-        if 'track' in items:
-            disabled = items['track'].value is items.empty
-            self.__inp.disabled = disabled
-            if not disabled:
-                beads = self._ctrl.track(items['track'].value).beadsonly.keys()
-                self.__beads = np.sort(tuple(beads))
-                self.__inp.start = self.__beads[0]
-                self.__inp.end   = self.__beads[-1]
-        elif 'bead' in items:
-            self.__inp.value = items['bead'].value
+    def getbeads(self):
+        "returns the active beads"
+        track = self._ctrl.track(self._ctrl.getGlobal("current").track.get())
+        if track is None:
+            return []
+        return track.beadsonly.keys()

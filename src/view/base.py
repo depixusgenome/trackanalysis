@@ -33,6 +33,18 @@ class View:
         self._ctrl.close()
         self._ctrl = None
 
+def enableOnTrack(ctrl, *itms):
+    "Enables/disables view elements depending on the track status"
+    for ite in itms:
+        ite.disabled = True
+
+    def _oncurrent(items):
+        if 'track' in items:
+            val = items['track'].value is items.empty
+            for ite in itms:
+                ite.disabled = val
+    getattr(ctrl, '_ctrl', ctrl).observe("globals.current", _oncurrent)
+
 class BokehView(View):
     "A view with a gui"
     def __init__(self, **kwargs):
@@ -52,6 +64,10 @@ class BokehView(View):
         self = cls(**kwa)
         self.addtodoc(doc)
         return self
+
+    def enableOnTrack(self, *itms):
+        "Enables/disables view elements depending on the track status"
+        enableOnTrack(self._ctrl, *itms)
 
     def addtodoc(self, doc):
         "Adds one's self to doc"

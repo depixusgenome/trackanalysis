@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"""
+"""
 All things global:
     - current track
     - current task
@@ -27,11 +27,12 @@ from collections    import namedtuple, ChainMap
 from typing         import (Dict, Union, # pylint: disable=unused-import
                             Callable, Optional, Sequence)
 import anastore
-from .action        import Controller, Action
+from .event         import Controller
+from .action        import Action
 
 _CNT     = 2
 class GlobalsChild(ChainMap):
-    u"The main model"
+    "The main model"
     __NAME    = 'の'
     __slots__ = '__name'
     def __init__(self, name:str, parent: Optional['GlobalsChild'] = None) -> None:
@@ -44,7 +45,7 @@ class GlobalsChild(ChainMap):
 
     @property
     def name(self) -> str:
-        u"returns the name"
+        "returns the name"
         return self.__name
 
     def __getstate__(self):
@@ -59,7 +60,7 @@ class GlobalsChild(ChainMap):
 EventPair = namedtuple('EventPair', ['old', 'value'])
 delete     = type('delete', tuple(), dict())    # pylint: disable=invalid-name
 class EventData(dict):
-    u"All data provided to the event"
+    "All data provided to the event"
     empty = delete
     def __init__(self, root, *args, **kwargs):
         self.name = root
@@ -138,11 +139,11 @@ class _MapGetter:
         return iter((self._key+i, j) for i, j in items)
 
     def setdefault(self, arg):
-        u"Calls update using the current base key"
+        "Calls update using the current base key"
         return self._ctrl.setdefaults((self._base, arg))
 
     def setdefaults(self, *args, version = 1, **kwargs):
-        u"""
+        """
         Sets the defaults using the current base key.
         - *args*   is a sequence of pairs (key, value)
         - *kwargs* is similar.
@@ -164,23 +165,23 @@ class _MapGetter:
         return self._ctrl.setdefaults(*self.__kwargs(args, kwargs), version = version)
 
     def get(self, *keys, default = delete):
-        u"Calls get using the current base key"
+        "Calls get using the current base key"
         if len(keys) == 0:
             return self._ctrl.get(self._base, default = default)
         return self._ctrl.get(*(self._key+i for i in keys), default = default)
 
     def getdict(self, *keys, default = delete, fullnames = True):
-        u"Calls get using the current base key"
+        "Calls get using the current base key"
         fkeys = tuple(self._key+i for i in keys)
         vals  = self._ctrl.get(*fkeys, default = default)
         return dict(zip(fkeys if fullnames else keys, vals))
 
     def set(self, arg):
-        u"Calls update using the current base key"
+        "Calls update using the current base key"
         return self._ctrl.update((self._base, arg))
 
     def update(self, *args, **kwargs):
-        u"""
+        """
         Calls update using the current base key.
         - *args*   is a sequence of pairs (key, value)
         - *kwargs* is similar.
@@ -202,32 +203,32 @@ class _MapGetter:
         return self._ctrl.update(*self.__kwargs(args, kwargs))
 
     def pop(self, *keys):
-        u"Calls get using the current base key"
+        "Calls get using the current base key"
         if len(keys) == 0:
             return self._ctrl.pop(self._base)
         return self._ctrl.pop(*(self._key+i for i in keys))
 
 class DefaultsMap(Controller):
-    u"Dictionnary with defaults values. It can be reset to these."
+    "Dictionnary with defaults values. It can be reset to these."
     __slots__ = '__items',
     def __init__(self, mdl:GlobalsChild, **kwargs) -> None:
         super().__init__(**kwargs)
         self.__items = mdl # type: GlobalsChild
 
     def createChild(self, name, **kwargs):
-        u"returns a child map"
+        "returns a child map"
         return DefaultsMap(GlobalsChild(name, self.__items), **kwargs)
 
     def setdefaults(self, *args, version = 1, **kwargs):
-        u"adds defaults to the config"
+        "adds defaults to the config"
         self.__items.maps[version].update(**_tokwargs(args, kwargs))
 
     def reset(self):
-        u"resets to default values"
+        "resets to default values"
         self.pop(*self.__items.maps[1].keys())
 
     def update(self, *args, **kwargs) -> dict:
-        u"updates keys or raises NoEmission"
+        "updates keys or raises NoEmission"
         ret = EventData(self.__items.name)
         for key, val in _tokwargs(args, kwargs).items():
             old = self.__items.get(key, delete)
@@ -246,23 +247,23 @@ class DefaultsMap(Controller):
             return self.handle("globals."+self.__items.name, self.outastuple, (ret,))
 
     def pop(self, *args):
-        u"removes view information"
+        "removes view information"
         return self.update(dict.fromkeys(args, delete))
 
     def keys(self, base = ''):
-        u"returns all keys starting with base"
+        "returns all keys starting with base"
         return iter(key for key in self.__items if key.startswith(base))
 
     def values(self, base = ''):
-        u"returns all values with keys starting with base"
+        "returns all values with keys starting with base"
         return iter(val for key, val in self.__items.items() if key.startswith(base))
 
     def items(self, base = ''):
-        u"returns all items with keys starting with base"
+        "returns all items with keys starting with base"
         return iter(key for key in self.__items.items() if key[0].startswith(base))
 
     def get(self, *keys, default = delete):
-        u"returns values associated to the keys"
+        "returns values associated to the keys"
         if default is not delete:
             if len(keys) == 1:
                 return self.__items.get(keys[0], default)
@@ -278,7 +279,7 @@ class DefaultsMap(Controller):
             return iter(self.__items[key] for key in keys)
 
 class GlobalsController(Controller):
-    u"""
+    """
     Controller class for global values.
     These can be accessed using a main key and secondary keys:
 
@@ -322,7 +323,7 @@ class GlobalsController(Controller):
         self.addGlobalMap('current.plot')
 
     def addGlobalMap(self, key, *args, **kwargs):
-        u"adds a map"
+        "adds a map"
         if key not in self.__maps:
             if '.' in key:
                 parent = self.__maps[key[:key.rfind('.')]]
@@ -334,29 +335,29 @@ class GlobalsController(Controller):
         return _MapGetter(self.__maps[key], '')
 
     def removeGlobalMap(self, key):
-        u"removes a map"
+        "removes a map"
         self.__maps.pop(key)
 
     def setGlobalDefaults(self, key, **kwargs):
-        u"sets default values to the map"
+        "sets default values to the map"
         self.__maps[key].setdefaults(**kwargs)
 
     def updateGlobal(self, key, *args, **kwargs) -> dict:
-        u"updates view information"
+        "updates view information"
         return self.__maps[key].update(*args, **kwargs)
 
     def deleteGlobal(self, key, *args):
-        u"removes view information"
+        "removes view information"
         return self.__maps[key].pop(*args)
 
     def getGlobal(self, key, *args, default = delete):
-        u"returns values associated to the keys"
+        "returns values associated to the keys"
         if len(args) == 0 or len(args) == 1 and args[0] == '':
             return _MapGetter(self.__maps[key], '')
         return self.__maps[key].get(*args, default = default)
 
     def writeconfig(self, configpath: Callable, patchname = 'config'):
-        u"Sets-up the user preferences"
+        "Sets-up the user preferences"
         path = configpath(anastore.version(patchname))
         path.parent.mkdir(parents = True, exist_ok = True)
         path.touch(exist_ok = True)
@@ -368,7 +369,7 @@ class GlobalsController(Controller):
         anastore.dump(maps, path, patch = patchname)
 
     def readconfig(self, configpath, patchname = 'config'):
-        u"Sets-up the user preferences"
+        "Sets-up the user preferences"
         for version in anastore.iterversions(patchname):
             path = configpath(version)
             if not path.exists():
@@ -384,14 +385,15 @@ class GlobalsController(Controller):
         with Action(self):
             for root in set(cnf) & set(self.__maps):
                 keys = frozenset(self.__maps[root].keys()) & frozenset(cnf[root])
-                self.__maps[root].update(root, **{i: cnf[root][i] for i in keys})
+                self.__maps[root].update({i: cnf[root][i] for i in keys})
 
     def __undos__(self):
         "yields all undoable user actions"
         def _onglobals(items):
-            items.pop("track", None)
-            items.pop("task",  None)
             name = items.name
+            if name == 'current':
+                items.pop("track", None)
+                items.pop("task",  None)
             vals = {i: j.old for i, j in items}
             return lambda: self.updateGlobal(name, **vals)
 

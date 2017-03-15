@@ -72,66 +72,63 @@ def _launch(view, **kwa):
 
 def _create(main, controls, views): # pylint: disable=unused-argument
     "Creates a main view"
-    class MainControl(metaclass   = MetaMixin,
-                      mixins      = controls,
-                      selectfirst = True):
-        """
-        Main controller: contains all sub-controllers.
-        These share a common dictionnary of handlers
-        """
-        ISAPP    = False
-        def __init__(self, **kwa):
-            self.topview = kwa['topview']
-
-        if TYPE_CHECKING:
-            def _yieldovermixins(self, *_1, **_2):
-                pass
-            def _callmixins(self, *_1, **_2):
-                pass
-
-        def __undos__(self):
-            "yields all undoable user actions"
-            yield from self._yieldovermixins('__undos__')
-
-        @classmethod
-        def configpath(cls, version) -> Path:
-            "returns the path to the config file"
-            name = main.__name__.lower().replace('view', '')
-            if '.' in name:
-                name = name[name.rfind('.')+1:]
-            name = "depixus_"+name
-            path = Path(appdirs.user_config_dir(name, 'depixus', version))
-            return path/'config.txt'
-
-        def readconfig(self):
-            "writes the config"
-            self._callmixins("readconfig", self.configpath)
-
-        def writeconfig(self):
-            "writes the config"
-            self._callmixins("writeconfig", self.configpath)
-
-        def close(self):
-            "remove controller"
-            self.writeconfig()
-            self._callmixins("close")
 
     class Main(*(main,)+views):
         "The main view"
-        MainControl = MainControl
+        class MainControl(metaclass   = MetaMixin,
+                          mixins      = controls,
+                          selectfirst = True):
+            """
+            Main controller: contains all sub-controllers.
+            These share a common dictionnary of handlers
+            """
+            ISAPP    = False
+            def __init__(self, **kwa):
+                self.topview = kwa['topview']
+
+            if TYPE_CHECKING:
+                def _yieldovermixins(self, *_1, **_2):
+                    pass
+                def _callmixins(self, *_1, **_2):
+                    pass
+
+            def __undos__(self):
+                "yields all undoable user actions"
+                yield from self._yieldovermixins('__undos__')
+
+            @classmethod
+            def configpath(cls, version) -> Path:
+                "returns the path to the config file"
+                name = main.__name__.lower().replace('view', '')
+                if '.' in name:
+                    name = name[name.rfind('.')+1:]
+                name = "depixus_"+name
+                path = Path(appdirs.user_config_dir(name, 'depixus', version))
+                return path/'config.txt'
+
+            def readconfig(self):
+                "writes the config"
+                self._callmixins("readconfig", self.configpath)
+
+            def writeconfig(self):
+                "writes the config"
+                self._callmixins("writeconfig", self.configpath)
+
+            def close(self):
+                "remove controller"
+                self.writeconfig()
+                self._callmixins("close")
+
         def __init__(self):
             "sets up the controller, then initializes the view"
-            ctrl = MainControl(handlers = dict(), topview = self)
+            ctrl = self.MainControl(handlers = dict(), topview = self)
             keys = KeyPressManager(ctrl = ctrl)
             main.__init__(self, ctrl = ctrl, keys = keys)
 
-        def open(self): # pylint: disable=redefined-builtin,protected-access
-            "sets up the model and view"
-            self._ctrl.readconfig()
+            ctrl.readconfig()
             main.observe(self)
             for cls in views:
                 cls.observe(self)
-            main.open(self)
 
     return Main
 

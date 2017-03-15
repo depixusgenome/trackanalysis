@@ -24,6 +24,7 @@ import sequences
 from   utils        import NoArgs
 from   control      import Controller
 from  .dialog       import FileDialog
+from  .base         import enableOnTrack
 from  .plotutils    import (PlotAttrs, DpxKeyedRow, TrackPlotCreator,
                             TrackPlotView, TrackPlotModelController, checksizes,
                             readsequence, DpxHoverTool)
@@ -276,7 +277,8 @@ class DpxHoverModel(Model):
             ind1 = next((i for i,j in enumerate(hdata['cycles']) if j > 0), 0)
             ind2 = next((i for i,j in enumerate(hdata['cycles'][ind1+1:]) if j == 0), ind1+1)
             bias = hdata['bottom'][(ind1+ind2-1)//2] + mdl.binwidth*.5
-        self.update(framerate = mdl.track.framerate,
+
+        self.update(framerate = getattr(mdl.track, 'framerate', 1./30.),
                     bias      = bias,
                     stretch   = mdl.stretch)
 
@@ -489,7 +491,7 @@ class _RawMixin(_Mixin):
     def _createraw(self, track, bead):
         css             = self.getCSS()
         self._raw       = figure(y_axis_label = css.ylabel.get(),
-                                 y_range      = Range1d(start = 0., end = 1.),
+                                 y_range      = Range1d(start = 0., end = 0.),
                                  **self._figargs(css))
         raw, shape      = self.__data(track, bead)
         self._rawsource = ColumnDataSource(data = raw)
@@ -498,7 +500,7 @@ class _RawMixin(_Mixin):
 
         self._hover.createraw(self._raw, self._rawsource, shape,
                               self._model, self.getCSS())
-        self._raw.extra_x_ranges = {"time": Range1d(start = 0., end = 1.)}
+        self._raw.extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
 
         axis = LinearAxis(x_range_name="time", axis_label = css.xtoplabel.get())
         self._raw.add_layout(axis, 'above')
@@ -604,7 +606,7 @@ class _HistMixin(_Mixin):
 
         hist             = self.__data(track, data, shape)
         self._histsource = ColumnDataSource(data = hist)
-        self._hist.extra_x_ranges = {"cycles": Range1d(start = 0., end = 1.)}
+        self._hist.extra_x_ranges = {"cycles": Range1d(start = 0., end = 0.)}
 
         attrs = css.cycles.get()
         axis  = LinearAxis(x_range_name          = "cycles",
@@ -654,93 +656,14 @@ class _ConfigMixin(_Mixin):
     def _createconfig(self):
         stretch, bias  = self.__doconvert()
         par,     table = self.__dowitness()
-        ret = layouts.layout([[layouts.widgetbox(list(self.__dosequence())),
-                               self.__dooligos  ()],
+        oligos         = self.__dooligos ()
+        parseq,  seq   = self.__dosequence()
+        ret = layouts.layout([[layouts.widgetbox([parseq, seq]), oligos],
                               [layouts.widgetbox([bias, stretch]),
                                layouts.widgetbox([par,  table])]])
 
-        def _py_cb(attr, old, new):
-            setattr(self._model, attr, new)
-
-        for name in 'stretch', 'bias':
-            self._hover.on_change(name, _py_cb)
-
-        # pylint: disable=too-many-arguments,protected-access,consider-using-enumerate
-        # do this here because the trigger on _hover attributes doesn't work
-        def _js_cb(stretch = stretch,
-                   bias    = bias,
-                   data    = table.source,
-                   fig     = self._hist,
-                   mdl     = self._hover,
-                   ttsrc   = self._hover._histsource):
-            # pylint: disable=no-member
-            if mdl.updating:
-                return
-            aval = stretch.value
-            bval = bias.value
-
-            mdl.updating   = True
-            data.data['z'] = [data.data['bases'][0]*aval+bval,
-                              data.data['bases'][1]*aval+bval]
-
-            mdl.stretch    = aval
-            mdl.bias       = bval
-
-            fig.extra_y_ranges['bases'].start = (fig.y_range.start-bval)/aval
-            fig.extra_y_ranges['bases'].end   = (fig.y_range.end-bval)/aval
-
-            zvals = ttsrc.data['z']
-            bvals = ttsrc.data['values']
-            for i in range(len(zvals)):
-                zvals[i] = bvals[i]*aval+bval
-
-            data.trigger('change:data')
-            ttsrc.trigger('change:data')
-            mdl.updating   = False
-
-        cust = CustomJS.from_py_func(_js_cb)
-        for widget in (stretch, bias):
-            widget.js_on_change('value', cust)
-
-        # do this here because the trigger on _hover attributes doesn't work
-        def _jstable_cb(stretch = stretch,
-                        bias    = bias,
-                        data    = table.source,
-                        fig     = self._hist,
-                        mdl     = self._hover,
-                        ttsrc   = self._hover._histsource):
-            # pylint: disable=no-member
-            if mdl.updating:
-                return
-
-            zval  = data.data['z']
-            bases = data.data['bases']
-            if zval[0] == zval[1] or bases[0] == bases[1]:
-                return
-
-            aval          = (zval[1]-zval[0]) / (bases[1]-bases[0])
-            bval          = zval[0] - bases[0]*aval
-
-            mdl.updating  = True
-            stretch.value = aval
-            bias.value    = bval
-
-            mdl.stretch   = aval
-            mdl.bias      = bval
-
-            fig.extra_y_ranges['bases'].start = (fig.y_range.start-bval)/aval
-            fig.extra_y_ranges['bases'].end   = (fig.y_range.end-bval)/aval
-
-            zvals = ttsrc.data['z']
-            bvals = ttsrc.data['values']
-            for i in range(len(zvals)):
-                zvals[i] = bvals[i]*aval+bval
-
-            ttsrc.trigger('change:data')
-            mdl.updating = False
-
-        # pylint: disable=no-member
-        table.source.js_on_change("data", CustomJS.from_py_func(_jstable_cb))
+        self.__onchangeconversion(stretch, bias, table)
+        enableOnTrack(self, self._hist, self._raw, stretch, bias, oligos, seq, table)
         return ret
 
     def _updateconfig(self):
@@ -828,11 +751,11 @@ class _ConfigMixin(_Mixin):
 
             key   = self._model.sequencekey
             val   = key if key in lst else None
-            menu  = [(i, i) for i in lst] if len(lst) else [('→', '→')]
+            menu  = [(i, i) for i in lst] if len(lst) else []#('→', '→')]
             menu += [None, (u'Find path', '←')]
             return dict(menu  = menu,
                         label = menu[-1][0] if val is None else key,
-                        value = menu[0][1]  if val is None else val)
+                        value = menu[-1][1] if val is None else val)
 
         widget = Dropdown(**_attrs())
 
@@ -885,6 +808,90 @@ class _ConfigMixin(_Mixin):
                 widget.update(**attrs())
         self._ctrl.observe(self.key(), _onconfig)
         return widget
+
+    def __onchangeconversion(self, stretch, bias, table):
+        def _py_cb(attr, old, new):
+            setattr(self._model, attr, new)
+
+        for name in 'stretch', 'bias':
+            self._hover.on_change(name, _py_cb)
+
+        # pylint: disable=too-many-arguments,protected-access,consider-using-enumerate
+        # do this here because the trigger on _hover attributes doesn't work
+        def _js_cb(stretch = stretch,
+                   bias    = bias,
+                   data    = table.source,
+                   fig     = self._hist,
+                   mdl     = self._hover,
+                   ttsrc   = self._hover._histsource):
+            # pylint: disable=no-member
+            if mdl.updating:
+                return
+            aval = stretch.value
+            bval = bias.value
+
+            mdl.updating   = True
+            data.data['z'] = [data.data['bases'][0]*aval+bval,
+                              data.data['bases'][1]*aval+bval]
+
+            mdl.stretch    = aval
+            mdl.bias       = bval
+
+            fig.extra_y_ranges['bases'].start = (fig.y_range.start-bval)/aval
+            fig.extra_y_ranges['bases'].end   = (fig.y_range.end-bval)/aval
+
+            zvals = ttsrc.data['z']
+            bvals = ttsrc.data['values']
+            for i in range(len(zvals)):
+                zvals[i] = bvals[i]*aval+bval
+
+            data.trigger('change:data')
+            ttsrc.trigger('change:data')
+            mdl.updating   = False
+
+        cust = CustomJS.from_py_func(_js_cb)
+        for widget in (stretch, bias):
+            widget.js_on_change('value', cust)
+
+        # do this here because the trigger on _hover attributes doesn't work
+        def _jstable_cb(stretch = stretch,
+                        bias    = bias,
+                        data    = table.source,
+                        fig     = self._hist,
+                        mdl     = self._hover,
+                        ttsrc   = self._hover._histsource):
+            # pylint: disable=no-member
+            if mdl.updating:
+                return
+
+            zval  = data.data['z']
+            bases = data.data['bases']
+            if zval[0] == zval[1] or bases[0] == bases[1]:
+                return
+
+            aval          = (zval[1]-zval[0]) / (bases[1]-bases[0])
+            bval          = zval[0] - bases[0]*aval
+
+            mdl.updating  = True
+            stretch.value = aval
+            bias.value    = bval
+
+            mdl.stretch   = aval
+            mdl.bias      = bval
+
+            fig.extra_y_ranges['bases'].start = (fig.y_range.start-bval)/aval
+            fig.extra_y_ranges['bases'].end   = (fig.y_range.end-bval)/aval
+
+            zvals = ttsrc.data['z']
+            bvals = ttsrc.data['values']
+            for i in range(len(zvals)):
+                zvals[i] = bvals[i]*aval+bval
+
+            ttsrc.trigger('change:data')
+            mdl.updating = False
+
+        # pylint: disable=no-member
+        table.source.js_on_change("data", CustomJS.from_py_func(_jstable_cb))
 
 class CyclesPlotCreator(TrackPlotCreator, _HistMixin, _RawMixin, _ConfigMixin):
     "Displays cycles and their projection"
