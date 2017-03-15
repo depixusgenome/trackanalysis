@@ -136,7 +136,7 @@ class _ManagedServerLoop:
         def _start():
             u"Waiting for the document to load"
             if getattr(self.loading, 'done', False):
-                self.loop.stop()
+                self.loop.call_later(2., self.loop.stop)
             else:
                 self.loop.call_later(0.5, _start)
         _start()
@@ -151,12 +151,12 @@ class _ManagedServerLoop:
         from testingcore import path as _testpath
         return _testpath(path)
 
-    def cmd(self, fcn, *args, andstop = True, **kwargs):
+    def cmd(self, fcn, *args, andstop = True, andwaiting = 2., **kwargs):
         u"send command to the view"
         if andstop:
             def _cmd():
                 fcn(*args, **kwargs)
-                self.loop.call_later(.5, self.loop.stop)
+                self.loop.call_later(andwaiting, self.loop.stop)
         else:
             _cmd = fcn
         self.doc.add_next_tick_callback(_cmd)
