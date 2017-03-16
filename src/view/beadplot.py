@@ -78,7 +78,7 @@ class BeadPlotCreator(TrackPlotCreator):
         self.setbounds(self._fig.x_range, 'x', self._get('t'))
         self.setbounds(self._fig.y_range, 'y', self._get('z'))
 
-    def _create(self, track, bead) -> DpxKeyedRow:
+    def _create(self, track, bead, _) -> DpxKeyedRow:
         "sets-up the figure"
         self._fig    = figure(**self._figargs())
         self._source = ColumnDataSource(data = self._createdata(track, bead))
@@ -95,7 +95,6 @@ class BeadPlotCreator(TrackPlotCreator):
         return DpxKeyedRow(self, self._fig)
 
     def _update(self, track, bead, _):
-        self._fig.disabled = False
         self._source.data  = self._createdata(track, bead)
         self._setbounds()
 

@@ -233,7 +233,7 @@ class PlotCreator:
         "returns config values"
         return self._ctrl.getGlobal(self.key('current'), '.'.join(key), **kwa)
 
-    def create(self):
+    def create(self, doc):
         "returns the figure"
         raise NotImplementedError("need to create")
 
@@ -243,8 +243,7 @@ class PlotCreator:
             tools = [i if i != 'dpxhover' else DpxHoverTool() for i in tools.split(',')]
         return dict(tools          = tools,
                     toolbar_sticky = False,
-                    sizing_mode    = 'stretch_both',
-                    disabled       = True)
+                    sizing_mode    = 'stretch_both')
 
     def newbounds(self, rng, axis, arr) -> dict:
         "Sets the range boundaries"
@@ -317,15 +316,26 @@ class PlotCreator:
 
 class TrackPlotModelController:
     "Contains all access to model items likely to be set by user actions"
-    def __init__(self, ctrl, cnf, curr):
+    def __init__(self, key:str, ctrl:Controller) -> None:
         self._ctrl = ctrl
-        self.cnf   = cnf
-        self.curr  = curr
+        self._key  = key
+
+    def getConfig(self):
+        "returns config values"
+        return self._ctrl.getGlobal('config'+self._key)
+
+    def getCSS(self):
+        "returns config values"
+        return self._ctrl.getGlobal('css'+self._key)
+
+    def getCurrent(self, *key, **kwa):
+        "returns config values"
+        return self._ctrl.getGlobal('current'+self._key, '.'.join(key), **kwa)
 
     @property
     def bead(self) -> Optional[int]:
         "returns the current bead number"
-        bead = self.curr.bead.get(default = None)
+        bead = self.getCurrent().bead.get(default = None)
         if bead is None:
             track = self.track
             if track is not None:
@@ -335,32 +345,51 @@ class TrackPlotModelController:
     @property
     def roottask(self) -> Optional[RootTask]:
         "returns the current root task"
-        return self.curr.track.get()
+        return self.getCurrent().track.get()
 
     @property
     def task(self) -> Optional[Task]:
         "returns the current task"
-        return self.curr.task.get()
+        return self.getCurrent().task.get()
 
     @property
     def track(self) -> Optional[Track]:
         "returns the current track"
         return self._ctrl.track(self.roottask)
 
+class WidgetCreator:
+    "Base class for creating a widget"
+    def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
+        self._ctrl  = ctrl
+        self._model = model
+        self._key   = key
+
+    def key(self, base = 'config') -> str:
+        "returns the key"
+        return base+self._key
+
+    def getConfig(self):
+        "returns config values"
+        return self._ctrl.getGlobal('config'+self._key)
+
+    def getCSS(self):
+        "returns config values"
+        return self._ctrl.getGlobal('css'+self._key)
+
+    def getCurrent(self, *key, **kwa):
+        "returns config values"
+        return self._ctrl.getGlobal('current'+self._key, '.'.join(key), **kwa)
+
 class TrackPlotCreator(PlotCreator):
     "Base plotter for tracks"
-    _row   = None # type: Optional[DpxKeyedRow]
     _MODEL = TrackPlotModelController
     def __init__(self, ctrl, *_):
         super().__init__(ctrl, *_)
-        self._model = self._MODEL(ctrl, self.getConfig(), self.getCurrent())
-        self._row   = None
+        self._model = self._MODEL(self.key(''), ctrl)
 
-    def create(self) -> DpxKeyedRow:
+    def create(self, doc) -> DpxKeyedRow:
         "returns the figure"
-        self._row   = self._create(*self._gettrack())
-        self._row.disabled = True
-        return self._row
+        return self._create(*self._gettrack(), doc)
 
     def update(self, items:dict):
         "Updates the data"
@@ -368,10 +397,9 @@ class TrackPlotCreator(PlotCreator):
             return
 
         with self.updating():
-            self._row.disabled = False
             self._update(*self._gettrack(), items)
 
-    def _create(self, track, bead) -> DpxKeyedRow:
+    def _create(self, track, bead, doc) -> DpxKeyedRow:
         raise NotImplementedError()
 
     def _update(self, track, bead, items):
@@ -398,6 +426,6 @@ class TrackPlotView(BokehView):
     def _onUpdateCurrent(self, items:dict):
         self._plotter.update(items) # pylint: disable=no-member
 
-    def getroots(self):
+    def getroots(self, doc):
         "adds items to doc"
-        return self._plotter.create(),
+        return self._plotter.create(doc),

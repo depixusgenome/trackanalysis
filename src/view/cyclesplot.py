@@ -2,9 +2,8 @@
 # -*- coding: utf-8 -*-
 "Cycles plot view"
 
-from typing         import (Optional,           # pylint: disable=unused-import
+from typing         import (Optional, List,    # pylint: disable=unused-import
                             Sequence, Tuple, cast, TYPE_CHECKING)
-from itertools      import product
 import re
 
 import  bokeh.core.properties as props
@@ -15,7 +14,8 @@ from    bokeh.models   import (LinearAxis,      # pylint: disable=unused-import
                                ColumnDataSource, Slider, GlyphRenderer,
                                CustomJS, Range1d, ContinuousTicker, Paragraph,
                                BasicTicker, Ticker, Dropdown, TextInput,
-                               DataTable, TableColumn, IntEditor, NumberEditor)
+                               DataTable, TableColumn, IntEditor, NumberEditor,
+                               ToolbarBox)
 
 import numpy        as np
 from   numpy.lib.index_tricks import as_strided
@@ -27,29 +27,29 @@ from  .dialog       import FileDialog
 from  .base         import enableOnTrack
 from  .plotutils    import (PlotAttrs, DpxKeyedRow, TrackPlotCreator,
                             TrackPlotView, TrackPlotModelController, checksizes,
-                            readsequence, DpxHoverTool)
+                            readsequence, DpxHoverTool, WidgetCreator)
 
 window = None # type: ignore # pylint: disable=invalid-name
 def configprop(attr):
     "returns a property which links to the config"
     def _getter(self):
-        return self.cnf[attr].get()
+        return self.getConfig()[attr].get()
     def _setter(self, val):
-        self.cnf[attr].set(val)
+        self.getConfig()[attr].set(val)
     hmsg  = "link to config's {}".format(attr)
     return property(_getter, _setter, None, hmsg)
 
 def beadorconfig(attr):
     "returns a property which links to the current bead or the config"
     def _getter(self):
-        value = self.curr[attr].get().get(self.bead, NoArgs)
+        value = self.getCurrent()[attr].get().get(self.bead, NoArgs)
         if value is not NoArgs:
             return value
-        return self.cnf[attr].get()
+        return self.getConfig()[attr].get()
 
     def _setter(self, val):
-        cache = self.curr[attr].get()
-        if val == self.cnf[attr].get():
+        cache = self.getCurrent()[attr].get()
+        if val == self.getConfig()[attr].get():
             cache.pop(self.bead, None)
         else:
             cache[self.bead] = val
@@ -59,28 +59,28 @@ def beadorconfig(attr):
 class CyclesModelController(TrackPlotModelController):
     "Model for Cycles View"
     _CACHED = 'base.stretch', 'base.bias', 'sequence.key', 'sequence.witnesses'
-    def __init__(self, ctrl, cnf, curr):
-        super().__init__(ctrl, cnf, curr)
-        cnf.defaults = {'binwidth'          : .003,
-                        'minframes'         : 10,
-                        'base.bias'         : None,
-                        'base.bias.step'    : .0001,
-                        'base.bias.ratio'   : .25,
-                        'base.stretch'      : 8.8e-4,
-                        'base.stretch.start': 5.e-4,
-                        'base.stretch.step' : 1.e-5,
-                        'base.stretch.end'  : 1.5e-3,
-                        'sequence.path' : None,
-                        'sequence.key'  : None,
-                       }
-        cnf.sequence.witnesses.default = None
+    def __init__(self, ctrl, key):
+        super().__init__(ctrl, key)
+        self.getConfig().defaults = {'binwidth'          : .003,
+                                     'minframes'         : 10,
+                                     'base.bias'         : None,
+                                     'base.bias.step'    : .0001,
+                                     'base.bias.ratio'   : .25,
+                                     'base.stretch'      : 8.8e-4,
+                                     'base.stretch.start': 5.e-4,
+                                     'base.stretch.step' : 1.e-5,
+                                     'base.stretch.end'  : 1.5e-3,
+                                     'sequence.path' : None,
+                                     'sequence.key'  : None,
+                                    }
+        self.getConfig().sequence.witnesses.default = None
         for attr in self._CACHED:
-            self.curr[attr].setdefault(None)
+            self.getCurrent()[attr].setdefault(None)
         self.clearcache()
 
     def clearcache(self):
         u"updates the model when a new track is loaded"
-        self.curr.update({i: dict() for i in self._CACHED})
+        self.getCurrent().update({i: dict() for i in self._CACHED})
 
     binwidth     = cast(float,                   configprop  ('binwidth'))
     minframes    = cast(int,                     configprop  ('minframes'))
@@ -88,9 +88,22 @@ class CyclesModelController(TrackPlotModelController):
     oligos       = cast(Optional[Sequence[str]], configprop  ('oligos'))
     stretch      = cast(float,                   beadorconfig('base.stretch'))
     bias         = cast(Optional[float],         beadorconfig('base.bias'))
-    sequencekey  = cast(Optional[str],           beadorconfig('sequence.key'))
     witnesses    = cast(Optional[Tuple[float,float,float,float]],
                         beadorconfig('sequence.witnesses'))
+
+    _sequencekey = cast(Optional[str],           beadorconfig('sequence.key'))
+    @property
+    def sequencekey(self) -> Optional[str]:
+        "returns the current sequence key"
+        key  = self._sequencekey
+        dseq = readsequence(self.sequencepath)
+        if key not in dseq:
+            return next(iter(dseq), None)
+
+    @sequencekey.setter
+    def sequencekey(self, value) -> Optional[str]:
+        self._sequencekey = value
+        return self._sequencekey
 
 class DpxHoverModel(Model):
     "controls keypress actions"
@@ -99,7 +112,7 @@ class DpxHoverModel(Model):
     stretch   = props.Float(0.)
     shape     = props.Tuple(props.Int, props.Int, default = (0, 0))
     cycle     = props.Int(0)
-    updating  = props.Bool(False)
+    updating  = props.Int(0)
     __implementation__ = """
     import * as p  from "core/properties"
     import {Model} from "model"
@@ -114,7 +127,7 @@ class DpxHoverModel(Model):
             bias      : [p.Number, 0],
             shape     : [p.Array,  [0, 0]],
             cycle     : [p.Int,  0]
-            updating  : [p.Bool,  false]
+            updating  : [p.Int,  0]
         }
     """
     def __init__(self, **kwa):
@@ -255,6 +268,24 @@ class DpxHoverModel(Model):
                                           y_range_name     = 'bases',
                                           visible          = False)]
 
+        source = self._histsource
+        def _js_cb(source = source, mdl = self, fig = fig):
+            zvals   = source.data['z']
+            bvals   = source.data['values']
+            stretch = mdl.stretch
+            bias    = mdl.bias
+            for i in range(len(zvals)): # pylint: disable=consider-using-enumerate
+                zvals[i] = bvals[i]*stretch+bias
+
+            source.trigger('change:data')
+
+            bases       = fig.extra_y_ranges['bases']
+            yrng        = fig.y_range
+            bases.start = (yrng.start-mdl.bias)/mdl.stretch
+            bases.end   = (yrng.end  -mdl.bias)/mdl.stretch
+
+        self.js_on_change("updating", CustomJS.from_py_func(_js_cb))
+
     def updateraw(self, fig, rdata, shape):
         "updates the tooltips for a new file"
         hover = fig.select(DpxHoverTool)
@@ -282,26 +313,18 @@ class DpxHoverModel(Model):
                     bias      = bias,
                     stretch   = mdl.stretch)
 
-    def observe(self, ctrl, key, mdl, cnf):
+    def observe(self, cnf, mdl):
         u"sets up model observers"
-        def _onconfig(items):
-            if 'oligos' in items:
-                self._histsource.data = self._createhistdata(mdl, cnf)
-
-        ctrl.observe(key, _onconfig)
+        obs = lambda: setattr(self._histsource, 'data', self._createhistdata(mdl, cnf))
+        cnf.observe('oligos', obs)
 
 class DpxFixedTicker(ContinuousTicker):
     "Generate ticks at fixed, explicitly supplied locations."
-
-    major   = props.Dict(props.String, props.Seq(props.Float), default = {'': []})
-    minor   = props.Dict(props.String, props.Seq(props.Float), default = {'': []})
-    key     = props.String(default = '')
-    usebase = props.Bool(default = True)
-    base    = props.Instance(Ticker, default = BasicTicker())
-
-    _ORDER     = tuple('grid_line_'+i for i in ('color', 'width', 'dash', 'alpha'))
-    _ORDER    += tuple('minor_'+i for i in _ORDER) # type: ignore
-    _ORDER    += 'y_range_name',                   # type: ignore
+    major      = props.Dict(props.String, props.Seq(props.Float), default = {'': []})
+    minor      = props.Dict(props.String, props.Seq(props.Float), default = {'': []})
+    key        = props.String(default = '')
+    usedefault = props.Bool(default = True)
+    base       = props.Instance(Ticker, default = BasicTicker())
 
     __implementation__ = """
         import {ContinuousTicker} from "models/tickers/continuous_ticker"
@@ -311,15 +334,15 @@ class DpxFixedTicker(ContinuousTicker):
             type: 'DpxFixedTicker'
 
             @define {
-                major:   [ p.Any, {} ]
-                minor:   [ p.Any, {} ]
-                key:     [ p.String, '']
-                usebase: [ p.Bool,     true]
-                base:    [ p.Instance, null]
+                major:      [ p.Any, {} ]
+                minor:      [ p.Any, {} ]
+                key:        [ p.String, '']
+                usedefault: [ p.Bool,     true]
+                base:       [ p.Instance, null]
             }
 
             get_ticks_no_defaults: (data_low, data_high, desired_n_ticks) ->
-                if @usebase
+                if @usedefault
                     return @base.get_ticks_no_defaults(data_low, data_high,
                                                        desired_n_ticks)
                 return {
@@ -329,34 +352,37 @@ class DpxFixedTicker(ContinuousTicker):
     """
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self._defaults = []     # type: list
+        self._defaults = dict() # type: Any
+        self._withbase = []     # type: Any
         self._axis     = None   # type: Optional[DpxFixedTicker]
 
     def getaxis(self):
         u"returns the fixed axis"
         return self._axis
 
-    def create(self, css, *figs):
+    def create(self, css, fig):
         "Sets the ticks according to the configuration"
-        self._defaults = []
-
-        for fig in figs:
-            if fig.ygrid[0].minor_grid_line_color is not None:
-                continue
+        if fig.ygrid[0].minor_grid_line_color is None:
             # bokehjs will never draw minor lines unless the color is
             # is set at startup
             fig.ygrid[0].minor_grid_line_color = 'navy'
             fig.ygrid[0].minor_grid_line_alpha = 0.
 
-        for fig, name in product(figs, self._ORDER):
-            self._defaults.append(getattr(fig.ygrid[0], name))
+        order  = tuple('grid_line_'+i for i in ('color', 'width', 'dash', 'alpha'))
+        order += tuple('minor_'+i for i in order)  # type: ignore
+        order += 'y_range_name',                   # type: ignore
+        self._defaults = {i: getattr(fig.ygrid[0], i) for i in order}
 
-        for fig in figs:
-            fig.extra_y_ranges = {"bases": Range1d(start = 0., end = 1.)}
-            fig.ygrid[0].ticker       = self
-            fig.ygrid[0].y_range_name = 'bases'
+        self._withbase = dict()
+        for name in ('color', 'dash', 'width', 'alpha'):
+            gridprops = css['grid'+name].get()
+            self._withbase['grid_line_'+name]       = gridprops[0]
+            self._withbase['minor_grid_line_'+name] = gridprops[1]
 
-        fig = figs[-1]
+        fig.extra_y_ranges        = {"bases": Range1d(start = 0., end = 1.)}
+        fig.ygrid[0].ticker       = self
+        fig.ygrid[0].y_range_name = 'bases'
+
         if self._axis is None:
             self._axis = type(self)()
 
@@ -365,12 +391,9 @@ class DpxFixedTicker(ContinuousTicker):
                                   ticker       = self._axis),
                        'right')
 
-    def observe(self, ctrl, key, mdl, figs):
+    def observe(self, cnf, mdl, fig):
         u"sets up model observers"
-        def _onconfig(items):
-            if 'oligos' in items:
-                self.updatedata(mdl, *figs)
-        ctrl.observe(key, _onconfig)
+        cnf.observe('oligos', lambda: self.updatedata(mdl, fig))
 
     @staticmethod
     def defaultconfig() -> dict:
@@ -380,42 +403,30 @@ class DpxFixedTicker(ContinuousTicker):
                     gridalpha = (1.,          1.),
                     griddash  = ('solid',     'solid'))
 
-    def updatedata(self, mdl, css, *figs):
+    def updatedata(self, mdl, fig):
         "Updates the ticks according to the configuration"
-        dseq         = readsequence(mdl.sequencepath)
-        self.usebase = len(dseq) == 0
-        if self._axis:
-            self._axis.usebase = self.usebase
-        if self.usebase:
-            for (fig, name), val in zip(product(figs, self._ORDER), self._defaults):
-                setattr(fig.ygrid[0], name, val)
-        else:
+        key                   = mdl.sequencekey if len(mdl.oligos) else None
+        self.usedefault       = True
+        self._axis.usedefault = True
+        if key is not None:
             majors = {}
             minors = {}
-            axvals = {}
-            for name, seq in dseq.items():
-                peaks = sequences.peaks(seq, mdl.oligos)
+            for name, seq in readsequence(mdl.sequencepath).items():
+                peaks        = sequences.peaks(seq, mdl.oligos)
                 majors[name] = tuple(peaks['position'][peaks['orientation']])
                 minors[name] = tuple(peaks['position'][~peaks['orientation']])
-                axvals[name] = majors[name]+minors[name]
 
-            name = mdl.sequencekey
-            if name not in dseq:
-                name = next(iter(dseq))
+            self.update(major = majors, minor = minors, key = key)
+            self._axis.update(major = {i: majors[i]+minors[i] for i in majors},
+                              minor = dict.fromkeys(majors.keys(), tuple()),
+                              key   = key)
+            self.usedefault       = False
+            self._axis.usedefault = False
 
-            self.update(major = majors, minor = minors, key = name)
-            if self._axis:
-                self._axis.update(major = axvals,
-                                  minor = dict.fromkeys(axvals.keys(), tuple()),
-                                  key   = name)
-
-            for fig in figs:
-                grd = fig.ygrid[0]
-                grd.y_range_name = 'bases'
-                for name in ('color', 'dash', 'width', 'alpha'):
-                    gridprops = css['grid'+name].get()
-                    setattr(grd, 'grid_line_'+name,       gridprops[0])
-                    setattr(grd, 'minor_grid_line_'+name, gridprops[1])
+        info = self._defaults if self.usedefault else self._withbase
+        for name in ('color', 'dash', 'width', 'alpha'):
+            setattr(fig.ygrid[0], 'grid_line_'+name, info['grid_line_'+name])
+            setattr(fig.ygrid[0], 'minor_grid_line_'+name, info['minor_grid_line_'+name])
 
 class _Mixin:
     if TYPE_CHECKING:
@@ -473,9 +484,9 @@ class _RawMixin(_Mixin):
                      cycle = cycle.ravel(), color = color.ravel()),
                 val.shape)
 
-    def _addcallbacks(self):
+    def __addcallbacks(self):
         fig = self._raw
-        super()._addcallbacks(fig)
+        self._addcallbacks(fig)
 
         def _onchangebounds(frng = fig.x_range,
                             trng = fig.extra_x_ranges["time"],
@@ -504,10 +515,10 @@ class _RawMixin(_Mixin):
 
         axis = LinearAxis(x_range_name="time", axis_label = css.xtoplabel.get())
         self._raw.add_layout(axis, 'above')
+        self.__addcallbacks()
         return shape
 
     def _updateraw(self, track, bead):
-        self._raw.disabled          = False
         self._rawsource.data, shape = self.__data(track, bead)
         self._hover.updateraw(self._raw, self._rawsource, shape)
         return shape
@@ -628,91 +639,30 @@ class _HistMixin(_Mixin):
 
         self._gridticker = DpxFixedTicker()
         self._gridticker.create(self.getCSS(), self._hist)
-        self._gridticker.observe(self._ctrl, self.key(), self._model, self._hist)
+        self._gridticker.observe(self.getConfig(), self._model, self._hist)
 
         self._hover.createhist(self._hist, self._model, self.getCSS(), self.getConfig())
-        self._hover.observe(self._ctrl, self.key(), self._model, self.getConfig())
+        self._hover.observe(self.getConfig(), self._model)
         self._slavexaxis()
 
     def _updatehist(self, track, data, shape):
-        self._hist.disabled   = False
         self._histsource.data = hist = self.__data(track, data, shape)
         self._hover.updatehist(self._hist, hist, self._model, self.getConfig())
         self.setbounds(self._hist.y_range, 'y', (hist['bottom'][0], hist['top'][-1]))
-        self._gridticker.updatedata(self._model, self.getCSS(), self._hist)
+        self._gridticker.updatedata(self._model, self._hist)
 
-class _ConfigMixin(_Mixin):
-    def __init__(self):
-        self.__updates = []   # type: List[Callable]
-        self.getCSS().defaults = {'tablesize'        : (200, 100),
-                                  'title.fasta'      : u'Open a fasta file',
-                                  'title.oligos'     : u'Oligos',
-                                  'title.oligos.help': u'comma-separated list',
-                                  'title.sequence'   : u'Selected DNA sequence',
-                                  'title.table'      : u'dna ↔ nm',
-                                  'title.stretch'    : u'stretch [dna/nm]',
-                                  'title.bias'       : u'bias [nm]'}
+class _PeakTableCreator(WidgetCreator):
+    "Table creator"
+    def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
+        super().__init__(ctrl, model, key)
+        self.__widget = None # type: Optional[DataTable]
+        self.__hover  = None # type: DpxHoverModel
+        self.getCSS().defaults = {'tablesize'   : (200, 100),
+                                  'title.table' : u'dna ↔ nm'}
 
-    def _createconfig(self):
-        stretch, bias  = self.__doconvert()
-        par,     table = self.__dowitness()
-        oligos         = self.__dooligos ()
-        parseq,  seq   = self.__dosequence()
-        ret = layouts.layout([[layouts.widgetbox([parseq, seq]), oligos],
-                              [layouts.widgetbox([bias, stretch]),
-                               layouts.widgetbox([par,  table])]])
-
-        self.__onchangeconversion(stretch, bias, table)
-        enableOnTrack(self, self._hist, self._raw, stretch, bias, oligos, seq, table)
-        return ret
-
-    def _updateconfig(self):
-        for fcn in self.__updates:
-            fcn()
-
-    def __doconvert(self):
-        widget = lambda x, s, e: Slider(value = getattr(self._model, x),
-                                        title = self.getCSS().title[x].get(),
-                                        step  = self.getConfig().base[x].step.get(),
-                                        start = s, end = e)
-
-        stretch = widget('stretch', *self.getConfig().base.stretch.get('start', 'end'))
-        bias    = widget('bias', -1., 1.)
-
-        def _onupdate():
-            stretch.value = self._model.stretch
-            minv  = self._histsource.data['bottom'][0]
-            delta = self._histsource.data['top'][-1] - minv
-            ratio = self.getConfig().base.bias.ratio.get()
-            bias.update(value = self._model.bias, start = minv, end = minv+delta*ratio)
-
-        def _onconfig(items):
-            if any(i in items  for i in ('base.stretch', 'base.bias')):
-                _onupdate()
-
-        self._ctrl.observe(self.key(),          _onconfig)
-        self._ctrl.observe(self.key("current"), _onconfig)
-        self.__updates.append(_onupdate)
-        return stretch, bias
-
-    def __dowitness(self):
-        def _createdata():
-            info = self._model.witnesses
-            if (self._model.sequencekey is not None
-                    and len(self._model.oligos)
-                    and info is None):
-                seq   = readsequence(self._model.sequencepath)[self._model.sequencekey]
-                peaks = sequences.peaks(seq, self._model.oligos)['position']
-                if len(peaks) > 2:
-                    info = (peaks[0], peaks[-1],
-                            peaks[0] *self._hover.stretch+self._hover.bias,
-                            peaks[-1]*self._hover.stretch+self._hover.bias)
-            if info is None:
-                info = (0., 1e3, self._hover.bias, self._hover.stretch)
-            return dict(bases = info[:2], z = info[2:])
-
+    def create(self, hover):
+        "creates the widget"
         size = self.getCSS().tablesize.get()
-        data = ColumnDataSource(_createdata())
         cols = [TableColumn(field  = 'bases',
                             title  = self.getCSS().hist.ylabel.get(),
                             editor = IntEditor(),
@@ -722,176 +672,278 @@ class _ConfigMixin(_Mixin):
                             editor = NumberEditor(step = 1e-4),
                             width  = size[0]//2)]
 
-        widget = DataTable(source      = data,
-                           columns     = cols,
-                           editable    = True,
-                           row_headers = False,
-                           width       = size[0],
-                           height      = size[1])
+
+        self.__hover  = hover
+        self.__widget = DataTable(source      = ColumnDataSource(self.__data()),
+                                  columns     = cols,
+                                  editable    = True,
+                                  row_headers = False,
+                                  width       = size[0],
+                                  height      = size[1])
+        return Paragraph(text = self.getCSS().title.table.get()), self.__widget
+
+    def update(self):
+        "updates the widget"
+        self.__widget.source.data = self.__data()
+
+    def __data(self):
+        info = self._model.witnesses
+        if (self._model.sequencekey is not None
+                and len(self._model.oligos)
+                and info is None):
+            seq   = readsequence(self._model.sequencepath)[self._model.sequencekey]
+            peaks = sequences.peaks(seq, self._model.oligos)['position']
+            if len(peaks) > 2:
+                info = peaks[0], peaks[-1]
+
+        if info is None:
+            info = 0., 1e3
+
+        info += (info[0]*self.__hover.stretch+self.__hover.bias,
+                 info[1]*self.__hover.stretch+self.__hover.bias)
+
+        return dict(bases = info[:2], z = info[2:])
+
+    def callbacks(self, action, stretch, bias):
+        "adding callbacks"
+        source = self.__widget.source
+        hover  = self.__hover
         def _py_cb(attr, old, new):
-            self._model.witnesses = tuple(data.data['bases']) + tuple(data.data['z'])
-        data.on_change("data", self.action(_py_cb))
+            self._model.witnesses = tuple(source.data['bases'])
 
-        def _onconfig(items):
-            if 'sequence.witnesses' in items:
-                data.data = _createdata()
+            zval  = source.data['z']
+            bases = source.data['bases']
+            if zval[0] == zval[1] or bases[0] == bases[1]:
+                return
 
-        self._ctrl.observe(self.key("current"), _onconfig)
-        self.__updates.append(lambda: setattr(data, 'data', _createdata()))
-        return Paragraph(text = self.getCSS().title.table.get()), widget
+            self._model.stretch = (zval[1]-zval[0]) / (bases[1]-bases[0])
+            self._model.bias    = zval[0] - bases[0]*self._model.stretch
 
-    def __dosequence(self):
-        dia = FileDialog(filetypes = 'fasta|*',
-                         config    = self._ctrl,
-                         title     = self.getCSS().title.fasta.get())
-        lst = []
-        def _attrs(lst = lst): # pylint: disable = dangerous-default-value
-            lst.clear()
-            lst.extend(sorted(readsequence(self._model.sequencepath).keys()))
+        source.on_change("data", action(_py_cb)) # pylint: disable=no-member
 
-            key   = self._model.sequencekey
-            val   = key if key in lst else None
-            menu  = [(i, i) for i in lst] if len(lst) else []#('→', '→')]
-            menu += [None, (u'Find path', '←')]
-            return dict(menu  = menu,
-                        label = menu[-1][0] if val is None else key,
-                        value = menu[-1][1] if val is None else val)
+        self.getCurrent().observe(('oligos', 'sequence.witnesses'),
+                                  lambda: setattr(source, 'data', self.__data()))
 
-        widget = Dropdown(**_attrs())
+        # pylint: disable=no-member,function-redefined
+        def _js_cb(source = source, mdl = hover, stretch = stretch, bias = bias):
+            zval  = source.data['z']
+            bases = source.data['bases']
+            if zval[0] == zval[1] or bases[0] == bases[1]:
+                return
 
-        def _py_cb(new, lst = lst): #pylint: disable=dangerous-default-value
-            if new in lst:
+            aval = (zval[1]-zval[0]) / (bases[1]-bases[0])
+            bval = zval[0] - bases[0]*aval
+
+            stretch.value = aval
+            bias   .value = bval
+            mdl.stretch   = aval
+            mdl.bias      = bval
+            mdl.updating += 1
+
+        source.js_on_change("data", CustomJS.from_py_func(_js_cb))
+
+class _SliderCreator(WidgetCreator):
+    "Slider creator"
+    def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
+        super().__init__(ctrl, model, key)
+        self.__stretch = None # type: Optional[Slider]
+        self.__bias    = None # type: Optional[Slider]
+        self.__figdata = None # type: Optional[ColumnDataSource]
+        self.getCSS().defaults = {'title.stretch'    : u'stretch [dna/nm]',
+                                  'title.bias'       : u'bias [nm]'}
+
+    def create(self, figdata):
+        "creates the widget"
+        widget = lambda x, s, e: Slider(value = getattr(self._model, x),
+                                        title = self.getCSS().title[x].get(),
+                                        step  = self.getConfig().base[x].step.get(),
+                                        start = s, end = e)
+
+        self.__stretch = widget('stretch', *self.getConfig().base.stretch.get('start', 'end'))
+        self.__bias    = widget('bias', -1., 1.)
+        self.__figdata = figdata
+        return self.__stretch, self.__bias
+
+    def update(self):
+        "updates the widgets"
+        minv  = self.__figdata.data['bottom'][0]
+        delta = self.__figdata.data['top'][-1] - minv
+        ratio = self.getConfig().base.bias.ratio.get()
+        self.__bias.update(value = self._model.bias,
+                           start = minv,
+                           end   = minv+delta*ratio)
+        self.__stretch.value = self._model.stretch
+
+    def callbacks(self, action, hover, table):
+        "adding callbacks"
+        self.getConfig() .observe(('base.stretch', 'base.bias'), self.update)
+        self.getCurrent().observe(('base.stretch', 'base.bias'), self.update)
+
+        stretch, bias = self.__stretch, self.__bias
+
+        # pylint: disable=function-redefined
+        def _py_cb(attr, old, new):
+            self._model.stretch = new
+        stretch.on_change('value', action(_py_cb))
+
+        def _py_cb(attr, old, new):
+            self._model.bias = new
+        bias   .on_change('value', action(_py_cb))
+
+        source = table.source
+        def _js_cb(stretch = stretch, bias = bias, mdl = hover, source = source):
+            mdl.stretch  = stretch.value
+            mdl.bias     = bias.value
+            mdl.updating = mdl.updating+1
+
+            bases            = source.data['bases']
+            source.data['z'] = [bases[0] * stretch.value + bias.value,
+                                bases[1] * stretch.value + bias.value]
+            source.trigger('change:data')
+
+        cust = CustomJS.from_py_func(_js_cb)
+        stretch.js_on_change('value', cust)
+        bias   .js_on_change('value', cust)
+
+class _SequenceCreator(WidgetCreator):
+    "Sequence Droppdown creator"
+    def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
+        super().__init__(ctrl, model, key)
+        self.__widget  = None # type: Optional[Dropdown]
+        self.__list    = []   # type: List[str]
+        self.__hover   = None # type: Optional[DpxHoverModel]
+        self.__dialog  = None # type: Optional[FileDialog]
+        self.getCSS().defaults = {'title.fasta'      : u'Open a fasta file',
+                                  'title.sequence'   : u'Selected DNA sequence',
+                                  'title.sequence.missing.key' : u'Select sequence',
+                                  'title.sequence.missing.path': u'Find path'}
+
+    def create(self, action, hover, tick1, tick2):
+        "creates the widget"
+        self.__dialog = FileDialog(filetypes = 'fasta|*',
+                                   config    = self._ctrl,
+                                   title     = self.getCSS().title.fasta.get())
+
+        self.__widget = Dropdown(**self.__data())
+        self.__hover  = hover
+        self.__observe(action, tick1, tick2)
+        return Paragraph(text = self.getCSS().title.sequence.get()), self.__widget
+
+    def update(self):
+        "updates the widget"
+        self.__widget.update(**self.__data())
+
+    def __data(self) -> dict:
+        lst = self.__list
+        lst.clear()
+        lst.extend(sorted(readsequence(self._model.sequencepath).keys()))
+
+        key   = self._model.sequencekey
+        val   = key if key in lst else None
+        menu  = [(i, i) for i in lst] if len(lst) else []  # type: List[Optional[Tuple[str,str]]]
+        if len(menu):
+            title = self.getCSS().title.sequence.missing.key.get()
+            menu += [None, (title, '←')]
+        else:
+            title = self.getCSS().title.sequence.missing.path.get()
+            menu += [('', '→'), (title, '←')]
+        return dict(menu  = menu,
+                    label = title if val is None else key,
+                    value = '→'   if val is None else val)
+
+    def __observe(self, action, tick1, tick2):
+        def _py_cb(new):
+            if new in self.__list:
                 self._model.sequencekey = new
-            else:
-                path = dia.open()
+            elif new == '←':
+                path = self.__dialog.open()
                 seqs = readsequence(path)
                 if len(seqs) > 0:
                     self._model.sequencepath = path
                     self._model.sequencekey  = next(iter(seqs))
+                else:
+                    self.__widget.value = '→'
+        self.__widget.on_click(action(_py_cb))
 
-        def _js_cb(choice  = widget,
-                   ticker   = self._gridticker,
-                   axticker = self._gridticker.getaxis(),
-                   tsrc     = self._hover.source('hist')):
-            if choice.value in tsrc.column_names:
-                choice.label      = choice.value
-                ticker.key        = choice.value
-                axticker.key      = choice.value
-                tsrc.data['text'] = tsrc.data[choice.value]
-                tsrc.trigger("change")
+        widget = self.__widget
+        hover  = self.__hover
+        src    = hover.source('hist')
+        def _js_cb(choice  = widget, tick1 = tick1, tick2 = tick2, src = src):
+            if choice.value in src.column_names:
+                choice.label     = choice.value
+                tick1.key        = choice.value
+                tick2.key        = choice.value
+                src.data['text'] = src.data[choice.value]
+                src.trigger("change")
+        self.__widget.js_on_change('value', CustomJS.from_py_func(_js_cb))
 
-        widget.on_click(self.action(_py_cb))
-        widget.js_on_change('value', CustomJS.from_py_func(_js_cb))
-        def _onconfig(items):
-            if any(i in items for i in ('sequence.key', 'sequence.path')):
-                widget.update(**_attrs())
-        self._ctrl.observe(self.key(), _onconfig)
-        self.__updates.append(lambda: widget.update(**_attrs()))
-        return Paragraph(text = self.getCSS().title.sequence.get()), widget
+        self.getConfig().observe(('sequence.key', 'sequence.path'),
+                                 lambda: self.__widget.update(**self.__data()))
 
-    def __dooligos(self):
-        attrs  = lambda: {'value'      : ', '.join(sorted(j.lower()
-                                                          for j in self._model.oligos)),
-                          'placeholder': self.getCSS().title.oligos.help.get(),
-                          'title'      : self.getCSS().title.oligos.get()
-                         }
-        widget = TextInput(**attrs())
+class _OligosCreator(WidgetCreator):
+    "Oligo list creator"
+    def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
+        super().__init__(ctrl, model, key)
+        self.__widget  = None # type: Optional[TextInput]
+        self.getCSS().defaults = {'title.oligos'     : u'Oligos',
+                                  'title.oligos.help': u'comma-separated list'}
 
+    def create(self, action):
+        "creates the widget"
+        self.__widget = TextInput(value       = self.__data(),
+                                  placeholder = self.getCSS().title.oligos.help.get(),
+                                  title       = self.getCSS().title.oligos.get())
+        self.__observe(action)
+        return self.__widget
+
+    def update(self):
+        "updates the widget"
+        self.__widget.value = self.__data()
+
+    def __data(self):
+        return ', '.join(sorted(j.lower() for j in self._model.oligos))
+
+    def __observe(self, action):
+        widget = self.__widget
         match  = re.compile(r'(?:[^atgc]*)([atgc]+)(?:[^atgc]+|$)*',
                             re.IGNORECASE).findall
         def _py_cb(attr, old, new):
-            self._model.oligos = sorted({i.lowercase() for i in match(new)})
-        widget.on_change('value', self.action(_py_cb))
+            self._model.oligos = sorted({i.lower() for i in match(new)})
+        widget.on_change('value', action(_py_cb))
 
-        def _onconfig(items):
-            if 'oligos' in items:
-                widget.update(**attrs())
-        self._ctrl.observe(self.key(), _onconfig)
-        return widget
+        self.getConfig().observe('oligos', lambda: setattr(self.__widget, 'value',
+                                                           self.__data()))
 
-    def __onchangeconversion(self, stretch, bias, table):
-        def _py_cb(attr, old, new):
-            setattr(self._model, attr, new)
+class _ConfigMixin(_Mixin):
+    def __init__(self):
+        args           = self._ctrl, self._model, self.key('')
+        self.__table   = _PeakTableCreator(*args)
+        self.__sliders = _SliderCreator(*args)
+        self.__seq     = _SequenceCreator(*args)
+        self.__oligs   = _OligosCreator(*args)
 
-        for name in 'stretch', 'bias':
-            self._hover.on_change(name, _py_cb)
+    def _createconfig(self):
+        stretch, bias  = self.__sliders.create(self._histsource)
+        par,     table = self.__table  .create(self._hover)
+        oligos         = self.__oligs  .create(self.action)
+        parseq,  seq   = self.__seq    .create(self.action, self._hover,
+                                               self._gridticker,
+                                               self._gridticker.getaxis())
 
-        # pylint: disable=too-many-arguments,protected-access,consider-using-enumerate
-        # do this here because the trigger on _hover attributes doesn't work
-        def _js_cb(stretch = stretch,
-                   bias    = bias,
-                   data    = table.source,
-                   fig     = self._hist,
-                   mdl     = self._hover,
-                   ttsrc   = self._hover._histsource):
-            # pylint: disable=no-member
-            if mdl.updating:
-                return
-            aval = stretch.value
-            bval = bias.value
+        self.__sliders.callbacks(self.action, self._hover, table)
+        self.__table  .callbacks(self.action, stretch, bias)
+        ret = layouts.layout([[layouts.widgetbox([parseq, seq]), oligos],
+                              [layouts.widgetbox([bias, stretch]),
+                               layouts.widgetbox([par,  table])]])
 
-            mdl.updating   = True
-            data.data['z'] = [data.data['bases'][0]*aval+bval,
-                              data.data['bases'][1]*aval+bval]
+        enableOnTrack(self, self._hist, self._raw, stretch, bias, oligos, seq, table)
+        return ret
 
-            mdl.stretch    = aval
-            mdl.bias       = bval
-
-            fig.extra_y_ranges['bases'].start = (fig.y_range.start-bval)/aval
-            fig.extra_y_ranges['bases'].end   = (fig.y_range.end-bval)/aval
-
-            zvals = ttsrc.data['z']
-            bvals = ttsrc.data['values']
-            for i in range(len(zvals)):
-                zvals[i] = bvals[i]*aval+bval
-
-            data.trigger('change:data')
-            ttsrc.trigger('change:data')
-            mdl.updating   = False
-
-        cust = CustomJS.from_py_func(_js_cb)
-        for widget in (stretch, bias):
-            widget.js_on_change('value', cust)
-
-        # do this here because the trigger on _hover attributes doesn't work
-        def _jstable_cb(stretch = stretch,
-                        bias    = bias,
-                        data    = table.source,
-                        fig     = self._hist,
-                        mdl     = self._hover,
-                        ttsrc   = self._hover._histsource):
-            # pylint: disable=no-member
-            if mdl.updating:
-                return
-
-            zval  = data.data['z']
-            bases = data.data['bases']
-            if zval[0] == zval[1] or bases[0] == bases[1]:
-                return
-
-            aval          = (zval[1]-zval[0]) / (bases[1]-bases[0])
-            bval          = zval[0] - bases[0]*aval
-
-            mdl.updating  = True
-            stretch.value = aval
-            bias.value    = bval
-
-            mdl.stretch   = aval
-            mdl.bias      = bval
-
-            fig.extra_y_ranges['bases'].start = (fig.y_range.start-bval)/aval
-            fig.extra_y_ranges['bases'].end   = (fig.y_range.end-bval)/aval
-
-            zvals = ttsrc.data['z']
-            bvals = ttsrc.data['values']
-            for i in range(len(zvals)):
-                zvals[i] = bvals[i]*aval+bval
-
-            ttsrc.trigger('change:data')
-            mdl.updating = False
-
-        # pylint: disable=no-member
-        table.source.js_on_change("data", CustomJS.from_py_func(_jstable_cb))
+    def _updateconfig(self):
+        self.__sliders.update()
+        self.__table.update()
+        self.__oligs.update()
+        self.__seq.update()
 
 class CyclesPlotCreator(TrackPlotCreator, _HistMixin, _RawMixin, _ConfigMixin):
     "Displays cycles and their projection"
@@ -916,7 +968,7 @@ class CyclesPlotCreator(TrackPlotCreator, _HistMixin, _RawMixin, _ConfigMixin):
         args['toolbar_location'] = 'right'
         return args
 
-    def _create(self, track, bead):
+    def _create(self, track, bead, doc):
         "returns the figure"
         self._hover = DpxHoverModel()
         shape       = self._createraw(track, bead)
@@ -926,8 +978,10 @@ class CyclesPlotCreator(TrackPlotCreator, _HistMixin, _RawMixin, _ConfigMixin):
                                  toolbar_location = self.getCSS().toolbar_location.get())
         keyed = DpxKeyedRow(self, self._raw,
                             children = [plts],
-                            toolbar  = plts.children[0])
+                            toolbar  = next(i for i in plts.children
+                                            if isinstance(i, ToolbarBox)))
 
+        doc.add_root(self._hover)
         return layouts.column([keyed, self._createconfig()])
 
     def _update(self, track, bead, items):

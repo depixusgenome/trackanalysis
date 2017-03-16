@@ -28,7 +28,7 @@ class  ToolBar(BokehView):
         self.__diagopen = None
         self.__diagsave = None
 
-    def _getroots(self):
+    def _getroots(self, _):
         "adds items to doc"
         css         = self._ctrl.getGlobal('css').title
         self._open  = self.button(self._onOpen,  css.open.get())
@@ -46,9 +46,9 @@ class  ToolBar(BokehView):
                                      config    = self._ctrl,
                                      title     = css.save.dialog.get())
 
-    def getroots(self):
+    def getroots(self, doc):
         "adds items to doc"
-        self._getroots()
+        self._getroots(doc)
         self.enableOnTrack(self._save)
         return Row(children = self._tools, sizing_mode = 'fixed'),
 
@@ -83,9 +83,9 @@ class  BeadToolBar(ToolBar):
         super().__init__(**kwa)
         self._beads = BeadInput(**kwa)
 
-    def _getroots(self):
-        super()._getroots()
-        self._beads.observe()
+    def _getroots(self, doc):
+        super()._getroots(doc)
+        self._beads.observe(doc)
         self._tools.insert(2, self._beads.input)
 
     def close(self):

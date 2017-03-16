@@ -45,9 +45,9 @@ class BeadInput(BokehView):
         self.__beads = np.empty((0,), dtype = 'i4')
         self.__inp   = None
 
-    def observe(self):
+    def observe(self, doc): # pylint: disable=arguments-differ
         "Adds keypress for changin beads"
-        self.getroots()
+        self.getroots(doc)
         def _oncurrent(items):
             if 'track' in items:
                 self.__beads        = np.sort(tuple(self.getbeads()))
@@ -66,7 +66,7 @@ class BeadInput(BokehView):
         self._keys.addKeyPress(('keypress.beaddown',
                                 lambda: self.__onchange_cb('', '', self.__inp.value-1)))
 
-    def getroots(self):
+    def getroots(self, _):
         "adds items to doc"
         kwa = dict(height       = self._ctrl.getGlobal('css', 'input.height'),
                    width        = self._ctrl.getGlobal('css', 'input.width'),

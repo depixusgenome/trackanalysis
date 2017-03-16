@@ -71,15 +71,14 @@ class BokehView(View):
 
     def addtodoc(self, doc):
         "Adds one's self to doc"
-        doc.add_root(self._keys.getroots()[0])
-
-        roots = self.getroots()
+        self._keys.getroots(doc)
+        roots = self.getroots(doc)
         if len(roots) == 1:
             doc.add_root(roots[0])
         else:
             doc.add_root(layout(roots, sizing_mode = 'stretch_both'))
 
-    def getroots(self):
+    def getroots(self, doc):
         "returns object root"
         raise NotImplementedError("Add items to doc")
 

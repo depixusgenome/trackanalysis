@@ -65,9 +65,10 @@ class DpxKeyEvent(Model):
                 self._keys.pop(arg, None)
         self._setkeys()
 
-    def getroots(self):
+    def getroots(self, doc):
         u"returns object root"
         self.on_change("count", lambda attr, old, value: self.onKeyPress())
+        doc.add_root(self)
         return self,
 
 KeyPressManager = DpxKeyEvent
