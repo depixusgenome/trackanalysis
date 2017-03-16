@@ -139,7 +139,7 @@ class DpxHoverModel(Model):
         osiz  = max((len(i) for i in oligs), default = cnf.oligos.size.get())
         dseq  = readsequence(mdl.sequencepath)
         if len(dseq) == 0:
-            return dict(values = [0], inds = [0], text = [''])
+            return dict(values = [0], inds = [0], text = [''], z = [0])
 
         nbases = max(len(i) for i in dseq.values())
         data   = dict(values = np.arange(osiz, nbases+osiz),
@@ -184,7 +184,7 @@ class DpxHoverModel(Model):
             bvals   = source.data['values']
             stretch = mdl.stretch
             bias    = mdl.bias
-            for i in range(len(zvals)): # pylint: disable=consider-using-enumerate
+            for i in range(len(source.data['z'])):
                 zvals[i] = bvals[i]*stretch+bias
 
             source.trigger('change:data')

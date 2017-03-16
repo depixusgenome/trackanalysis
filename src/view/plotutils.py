@@ -335,7 +335,7 @@ class TrackPlotModelController:
     @property
     def bead(self) -> Optional[int]:
         "returns the current bead number"
-        bead = self.getCurrent().bead.get(default = None)
+        bead = self.getCurrent().bead.get()
         if bead is None:
             track = self.track
             if track is not None:
@@ -415,6 +415,7 @@ class TrackPlotView(BokehView):
         super().__init__(**kwa)
         assert callable(self.PLOTTER)
         self._plotter = self.PLOTTER(self._ctrl) # pylint: disable=not-callable
+        self._ctrl.getGlobal("current").bead.default = None
         self._ctrl.observe("globals.current", self._onUpdateCurrent)
 
     def close(self):

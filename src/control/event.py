@@ -31,7 +31,7 @@ class Event:
     inputs      = EmitPolicy.inputs
     nothing     = EmitPolicy.nothing
     annotations = EmitPolicy.annotations
-    __SIMPLE    = re.compile(r'^(\w|\.+)',    re.IGNORECASE).match
+    __SIMPLE    = re.compile(r'^(\w|\.)+$',   re.IGNORECASE).match
     __EM_NAME   = re.compile(r'^_?(\w+)',     re.IGNORECASE).match
     __OBS_NAME  = re.compile(r'^_?on_?(\w+)', re.IGNORECASE).match
 

@@ -51,7 +51,7 @@ class BeadInput(BokehView):
         def _oncurrent(items):
             if 'track' in items:
                 self.__beads        = np.sort(tuple(self.getbeads()))
-                self.__inp.disabled = len(self.__beads) > 0
+                self.__inp.disabled = len(self.__beads) == 0
                 if len(self.__beads):
                     self.__inp.start = self.__beads[0]
                     self.__inp.end   = self.__beads[-1]
