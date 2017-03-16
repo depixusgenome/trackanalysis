@@ -75,25 +75,26 @@ class _PeakTableCreator(WidgetCreator):
 
     def callbacks(self, action, stretch, bias):
         "adding callbacks"
-        source = self.__widget.source
-        hover  = self.__hover
+        @action
         def _py_cb(attr, old, new):
-            self._model.witnesses = tuple(source.data['bases'])
-
-            zval  = source.data['z']
-            bases = source.data['bases']
+            zval  = self.__widget.source.data['z']
+            bases = self.__widget.source.data['bases']
+            self._model.witnesses = tuple(bases)
             if zval[0] == zval[1] or bases[0] == bases[1]:
                 return
 
             self._model.stretch = (zval[1]-zval[0]) / (bases[1]-bases[0])
             self._model.bias    = zval[0] - bases[0]*self._model.stretch
 
-        source.on_change("data", action(_py_cb)) # pylint: disable=no-member
+        source = self.__widget.source
+        source.on_change("data", _py_cb) # pylint: disable=no-member
 
         self.getCurrent().observe(('oligos', 'sequence.witnesses'),
                                   lambda: setattr(source, 'data', self.__data()))
 
-        # pylint: disable=no-member,function-redefined
+        hover  = self.__hover
+
+        @CustomJS.from_py_func
         def _js_cb(source = source, mdl = hover, stretch = stretch, bias = bias):
             zval  = source.data['z']
             bases = source.data['bases']
@@ -108,8 +109,7 @@ class _PeakTableCreator(WidgetCreator):
             mdl.stretch   = aval
             mdl.bias      = bval
             mdl.updating += 1
-
-        source.js_on_change("data", CustomJS.from_py_func(_js_cb))
+        source.js_on_change("data", _js_cb) # pylint: disable=no-member
 
 class _SliderCreator(WidgetCreator):
     "Slider creator"
@@ -160,6 +160,7 @@ class _SliderCreator(WidgetCreator):
         bias   .on_change('value', action(_py_cb))
 
         source = table.source
+        @CustomJS.from_py_func
         def _js_cb(stretch = stretch, bias = bias, mdl = hover, source = source):
             mdl.stretch  = stretch.value
             mdl.bias     = bias.value
@@ -170,9 +171,8 @@ class _SliderCreator(WidgetCreator):
                                 bases[1] * stretch.value + bias.value]
             source.trigger('change:data')
 
-        cust = CustomJS.from_py_func(_js_cb)
-        stretch.js_on_change('value', cust)
-        bias   .js_on_change('value', cust)
+        stretch.js_on_change('value', _js_cb)
+        bias   .js_on_change('value', _js_cb)
 
 class _SequenceCreator(WidgetCreator):
     "Sequence Droppdown creator"
@@ -221,6 +221,7 @@ class _SequenceCreator(WidgetCreator):
                     value = '→'   if val is None else val)
 
     def __observe(self, action, tick1, tick2):
+        @action
         def _py_cb(new):
             if new in self.__list:
                 self._model.sequencekey = new
@@ -232,11 +233,13 @@ class _SequenceCreator(WidgetCreator):
                     self._model.sequencekey  = next(iter(seqs))
                 else:
                     self.__widget.value = '→'
-        self.__widget.on_click(action(_py_cb))
+        self.__widget.on_click(_py_cb)
 
         widget = self.__widget
         hover  = self.__hover
         src    = hover.source('hist')
+
+        @CustomJS.from_py_func
         def _js_cb(choice  = widget, tick1 = tick1, tick2 = tick2, src = src):
             if choice.value in src.column_names:
                 choice.label     = choice.value
@@ -244,7 +247,7 @@ class _SequenceCreator(WidgetCreator):
                 tick2.key        = choice.value
                 src.data['text'] = src.data[choice.value]
                 src.trigger("change")
-        self.__widget.js_on_change('value', CustomJS.from_py_func(_js_cb))
+        self.__widget.js_on_change('value', _js_cb)
 
         self.getConfig().observe(('sequence.key', 'sequence.path'),
                                  lambda: self.__widget.update(**self.__data()))
@@ -276,9 +279,10 @@ class _OligosCreator(WidgetCreator):
         widget = self.__widget
         match  = re.compile(r'(?:[^atgc]*)([atgc]+)(?:[^atgc]+|$)*',
                             re.IGNORECASE).findall
+        @action
         def _py_cb(attr, old, new):
             self._model.oligos = sorted({i.lower() for i in match(new)})
-        widget.on_change('value', action(_py_cb))
+        widget.on_change('value', _py_cb)
 
         self.getConfig().observe('oligos', lambda: setattr(self.__widget, 'value',
                                                            self.__data()))
