@@ -69,14 +69,19 @@ class OligoHit:
         self.bpos=int(kwa.get("bpos",0)) # base position
         self.pos0=kwa.get("pos0",0) # initial (experimental) position in nanometer
         self.bpos0=int(kwa.get("bpos0",0)) # initial (experimental) base position
-        self.size=len(self.seq)
         self.batch_id=kwa.get("batch_id",None)
+        self.poserr=kwa.get("poserr",None)
+
+    @property
+    def size(self):
+        u'probably not very useful'
+        return len(self.seq)
 
     def noverlaps(self,other)->int:
         u'''
         given the position (bpos) of each oligo
         return the number overlapping bases (str) between the two
         '''
-        shift=other.bpos-self.bpos
+        shift = other.bpos-self.bpos
 
         return noverlaps(self.seq,other.seq,shift=shift)

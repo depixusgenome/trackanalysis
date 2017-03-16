@@ -7,7 +7,6 @@ regroups functions and classes to initialise assemblers
 
 import sys
 from typing import Callable, Iterable # pylint: disable=unused-import
-import copy
 from multiprocessing import Pool
 import numpy
 from scipy.optimize import basinhopping,OptimizeResult
@@ -44,6 +43,7 @@ class HoppingSteps:
         self.max_x = kwargs.get("max_x",sys.maxsize) # in number of bases
         self.scale = kwargs.get("scale",1) # in number of bases
         self.dists = kwargs.get("dists",[]) # list of distributions
+        self.random_state = kwargs.get("random_state",None)
     def __call__(self,xstate): # should be overriden
         pass
 
@@ -52,33 +52,76 @@ class PreFixedSteps(HoppingSteps):
     calls predefined fixed distributions
     '''
     def __call__(self,*args):
-        return call_rvs(self,*args)
+        return numpy.array([i.rvs(random_state=self.random_state) for i in self.dists])
 
-def call_rvs(obj:HoppingSteps,*args): # pylint: disable=unused-argument
+class NestedAsmrs:
     u'''
-    call predefined distributions
+    nested Monte Carlo running different random seeds in parallel
+    should update the temperature based on each asmrs
     '''
-    return numpy.array([i.rvs() for i in obj.dists])
+    def __init__(self,**kwargs):
+        u'''
+        duplicate an Assembler object for different seeds value
+        '''
+        self.nprocs = kwargs.get("nprocs",1) # type: int
+        self.seeds = kwargs.get("seeds",[]) # type: Iterable[int]
+        self.asmrs = kwargs.get("asmrs",[]) # Assemblers
+        for idx,val in enumerate(self.seeds):
+            self.asmrs[idx].npstate = numpy.random.RandomState(val)
+        self._pool = None
+        #if self.nprocs>1:
+        try:
+            self._pool = Pool(processes=self.nprocs)
+        except OSError:
+            print("could not create Pool")
+            self._pool = None
 
-def rtruncnorm_step(obj:HoppingSteps,xstate):
-    u'''
-    rounded and truncated normal step
-    '''
-    assert isinstance(obj,HoppingSteps)
-    xstate = numpy.round([truncnorm.rvs(a=(obj.min_x-i)/obj.scale,
-                                        b=(obj.max_x-i)/obj.scale,
-                                        loc=i,
-                                        scale=obj.scale) for i in xstate])
-    return xstate
 
-def flip_step(obj:HoppingSteps,xstate):
-    u'''
-    flips the position of two xstate values
-    '''
-    assert isinstance(obj,HoppingSteps)
-    idx = numpy.random.randint(0,len(xstate)-1)
-    xstate[idx],xstate[idx+1]=xstate[idx+1],xstate[idx]
-    return xstate
+
+    def run(self,niter:int=1):
+        u'''run in parallel each asmrs
+        '''
+        if self._pool is None:
+            for asmr in self.asmrs:
+                asmr.run(niter=niter)
+        else:
+            for asmr in self.asmrs:
+                print("asmr.npstate=",asmr.npstate)
+            self.asmrs = self._pool.map(_run_asmr,
+                                        [(asmr,niter) for asmr in self.asmrs])
+
+    def set_asmr_inits(self,inits):
+        u'''
+        sets the state_init of each of the asmrs
+        '''
+        for idx,init in enumerate(inits):
+            self.asmrs[idx].state_init = init
+
+    @property
+    def result(self):
+        u'''results for each of the assemblers'''
+        return [asmr.result for asmr in self.asmrs]
+
+    def __getstate__(self):
+        u'for pickling'
+        self_dict = self.__dict__.copy()
+        del self_dict["_pool"]
+        return self_dict
+
+    def __setstate__(self,state):
+        u'reassign nprocs worker to the _pool'
+        try:
+            _pool = Pool(processes=state["nprocs"])
+        except OSError:
+            print("could not create Pool")
+            _pool = None
+        state.update({"_pool":_pool})
+        self.__dict__=state # pylint: disable=attribute-defined-outside-init
+
+def _run_asmr(*args):
+    asmr=args[0][0]
+    asmr.run(niter=args[0][1])
+    return asmr
 
 class Assembler:
     u'''
@@ -90,63 +133,13 @@ class Assembler:
         self.func = kwargs.get("func",None) # type: Callable[[numpy.ndarray],float]
         seed = kwargs.get("seed",None)
         if seed is None:
-            self.npstate = numpy.random.get_state()
+            self.npstate = None
         else:
-            self.npstate = numpy.random.RandomState(seed).get_state()
+            self.npstate = numpy.random.RandomState(seed)
 
     def run(self,*args,**kwargs):
         u'runs the assembler'
         pass
-
-class NestedAsmrs:
-    u'''
-    nested Monte Carlo running different random seeds in parallel
-    should update the temperature based on each asmrs
-    '''
-    def __init__(self,**kwargs):
-        u'''
-        duplicate an Assembler object for different seeds value
-        '''
-        self.asmr_init = kwargs.get("asmr_init",None) # Assembler
-        nprocs = kwargs.get("nprocs",1) # type: int
-        self.seeds = kwargs.get("seeds",[]) # type: Iterable[int]
-        self.asmrs = [copy.deepcopy(self.asmr_init) for i in self.seeds]
-        for idx,val in enumerate(self.seeds):
-            self.asmrs[idx].npstate = numpy.random.RandomState(val).get_state()
-        try:
-            self._pool = Pool(processes=nprocs)
-        except OSError:
-            print("could not create Pool")
-            self._pool = None
-
-
-    def run(self,niter:int=1):
-        u'run in parallel each asmrs'
-        if self._pool is None:
-            for asm in self.asmrs:
-                asm.run(niter=niter)
-        else:
-            self.asmrs = self._pool.map(_run_asm,
-                                        [(asm,niter) for asm in self.asmrs])
-
-
-    def set_asmr_inits(self,inits):
-        u'''
-        sets the state_init of each of the asmrs
-        '''
-        for idx,init in enumerate(inits):
-            self.asmrs[idx].state_init = init
-
-
-    def result(self):
-        u'''needs to return a result to use Recorder
-        is it really needed?'''
-        pass
-
-def _run_asm(*args):
-    asmr=args[0][0]
-    asmr.run(niter=args[0][1])
-    return asmr
 
 class MCAssembler(Assembler):
     u'''Monte Carlo for assembling sequences from oligohits
@@ -165,12 +158,11 @@ class MCAssembler(Assembler):
         '''
         if not "niter" in kwargs.keys():
             kwargs["niter"]=1
-        numpy.random.set_state(self.npstate)
-
         if self.state is None:
             self.state=self.state_init
 
         count = self.result.it if hasattr(self.result,"it") else 0
+        self.step.random_state=self.npstate
         self.result = basinhopping(self.func,
                                    self.state,
                                    take_step=self.step,
@@ -179,7 +171,7 @@ class MCAssembler(Assembler):
                                    callback=self.callback,
                                    **kwargs)
         self.result.it = count+kwargs.get("niter")
-        self.npstate = numpy.random.get_state()
+        self.npstate = self.step.random_state # get_state from the distribution
         self._update(self.result)
 
     def _update(self,result:OptimizeResult):
@@ -196,3 +188,8 @@ def acceptance(): # could implement
     '''
     # if there is a switch of two peaks within the same batch return False
     return True
+
+
+def force_accept(*args,**kwargs):# pylint: disable=unused-argument
+    u'for testing purposes'
+    return "force accept"

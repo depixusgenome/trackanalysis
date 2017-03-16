@@ -12,7 +12,6 @@ import numpy
 from Bio import pairwise2
 from . import oligohit
 
-
 class OligoWrap:
     u'''
     functor to convert function taking array as input into function taking oligohits
@@ -95,6 +94,23 @@ def test2_scaled_energies(oligos):
     energy = - bp_to_nm*sum_tail_overlap(oligos)
     energy += 0.25 * sum([abs(i.pos-i.pos0) for i in oligos])
     return energy
+
+def test3_scaled_energies(oligos):
+    u''' second test for combining energies
+    '''
+    bp_to_nm = 1.100
+    # sorted oligos
+    solis = sorted(oligos,key=lambda x :x.pos)
+    oenergies = -bp_to_nm*numpy.array([len(oligohit.tail_overlap(vx.seq,solis[ix+1].seq))\
+                                       for ix,vx in enumerate(solis[:-1])])
+    per_oligo = numpy.hstack((oenergies[0],oenergies[1:]+oenergies[:-1],oenergies[-1]))
+
+    per_oligo += 0.25*numpy.array([abs(i.pos-i.pos0)/i.poserr for i in solis]) # abs ??
+    return -sum(per_oligo**2)
+
+def test_energies(oligos):
+    u'for testing seed'
+    return sum([i.pos**2 for i in oligos])
 
 def noverlaps_tsl_energy(oligos,ratio=0.01):
     # can't use as is because of relationship between bpos and pos
