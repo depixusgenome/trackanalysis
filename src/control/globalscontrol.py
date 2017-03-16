@@ -26,6 +26,7 @@ of plot.
 from collections    import namedtuple, ChainMap
 from typing         import (Dict, Union, # pylint: disable=unused-import
                             Callable, Optional, Sequence)
+import inspect
 import anastore
 from .event         import Controller
 from .action        import Action
@@ -208,6 +209,10 @@ class _MapGetter:
             return self._ctrl.pop(self._base)
         return self._ctrl.pop(*(self._key+i for i in keys))
 
+    def observe(self, attrs, fcn = None): # pylint: disable=arguments-differ
+        "observes items in the current root"
+        self._ctrl.observe(attrs, fcn)
+
 class DefaultsMap(Controller):
     "Dictionnary with defaults values. It can be reset to these."
     __slots__ = '__items',
@@ -249,6 +254,41 @@ class DefaultsMap(Controller):
     def pop(self, *args):
         "removes view information"
         return self.update(dict.fromkeys(args, delete))
+
+    @property
+    def name(self):
+        "returns the name of the root"
+        return self.__items.name
+
+    def observe(self, attrs, fcn = None): # pylint: disable=arguments-differ
+        "observes items in the current root"
+        if fcn is None:
+            if not callable(attrs):
+                raise TypeError()
+            observer = attrs
+        else:
+            if callable(attrs):
+                fcn, attrs = attrs, fcn
+
+            npars = len(inspect.signature(fcn).parameters) > 0
+            if isinstance(attrs, str):
+                def _wrap(items):
+                    if attrs in items:
+                        if npars:
+                            fcn(items)
+                        else:
+                            fcn()
+                observer = _wrap
+            else:
+                def _wrap(items):
+                    if any(i in items for i in attrs):
+                        if npars:
+                            fcn(items)
+                        else:
+                            fcn()
+                observer = _wrap
+
+        super().observe('globals.'+self.__items.name, observer)
 
     def keys(self, base = ''):
         "returns all keys starting with base"
@@ -296,6 +336,7 @@ class GlobalsController(Controller):
         super().__init__(**kwargs)
         self.__maps = dict()
         self.addGlobalMap('css').button.defaults = {'width': 90, 'height': 20}
+        self.addGlobalMap('css').config.indent.default = 4
         self.addGlobalMap('css').input .defaults = {'width': 90, 'height': 20}
         self.addGlobalMap('config').keypress.defaults = {'undo' : "Control-z",
                                                          'redo' : "Control-y",
@@ -366,10 +407,13 @@ class GlobalsController(Controller):
                 for i, j in self.__maps.items()
                 if 'current' not in i}
         maps = {i: j for i, j in maps.items() if len(j)}
-        anastore.dump(maps, path, patch = patchname)
+        anastore.dump(maps, path,
+                      patch  = patchname,
+                      indent = self.getGlobal('css').config.indent.get())
 
     def readconfig(self, configpath, patchname = 'config'):
         "Sets-up the user preferences"
+        cnf = None
         for version in anastore.iterversions(patchname):
             path = configpath(version)
             if not path.exists():
@@ -379,7 +423,7 @@ class GlobalsController(Controller):
             except: # pylint: disable=bare-except
                 continue
             break
-        else:
+        if cnf is None:
             return
 
         with Action(self):
@@ -394,6 +438,10 @@ class GlobalsController(Controller):
             if name == 'current':
                 items.pop("track", None)
                 items.pop("task",  None)
+            elif name.startswith('current.plot.'):
+                items.pop('x', None)
+                items.pop('y', None)
+
             vals = {i: j.old for i, j in items}
             return lambda: self.updateGlobal(name, **vals)
 

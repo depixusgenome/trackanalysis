@@ -56,9 +56,11 @@ def isana(path: Union[str, Path]):
     if not path.is_file():
         return False
 
+    const = '[{"version":'
     try:
         with open(str(path), 'r') as stream:
-            return stream.read(len('[{"version":')) == '[{"version":'
+            line = stream.read(100).replace('\n', '').replace(' ', '')
+            return line[:len(const)] == const
     except: # pylint: disable=bare-except
         return False
 

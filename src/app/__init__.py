@@ -99,11 +99,15 @@ def _create(main, controls, views): # pylint: disable=unused-argument
             @classmethod
             def configpath(cls, version) -> Path:
                 "returns the path to the config file"
-                name = main.__name__.lower().replace('view', '')
-                if '.' in name:
-                    name = name[name.rfind('.')+1:]
-                name = "depixus_"+name
-                path = Path(appdirs.user_config_dir(name, 'depixus', version))
+                pot  = (i.APPNAME for i in (main,)+views if hasattr(i, 'APPNAME'))
+                name = next(pot, None)
+                if name is None:
+                    for itm in (main,)+views+(main,):
+                        name = itm.__name__.lower().replace('view', '')
+                        if name not in ('undo', 'globals') and 'toolbar' not in name:
+                            break
+
+                path = Path(appdirs.user_config_dir('depixus', 'depixus', name+"/"+version))
                 return path/'config.txt'
 
             def readconfig(self):
@@ -204,6 +208,7 @@ class WithToolbar:
         tbar = self.tbar
         class ViewWithToolbar(BokehView):
             "A view with the toolbar on top"
+            APPNAME = main.__name__.lower().replace('view', '')
             def __init__(self, **kwa):
                 self._bar      = tbar(**kwa)
                 self._mainview = main(**kwa)
@@ -215,9 +220,9 @@ class WithToolbar:
                 self._bar.close()
                 self._mainview.close()
 
-            def getroots(self):
+            def getroots(self, doc):
                 "adds items to doc"
-                children = [self._bar.getroots(), self._mainview.getroots()]
+                children = [self._bar.getroots(doc), self._mainview.getroots(doc)]
                 return layout(children, sizing_mode = 'scale_width'),
 
         return ViewWithToolbar

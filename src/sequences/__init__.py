@@ -47,7 +47,7 @@ def peaks(seq:str, oligs:'Union[Sequence[str], str]', flags = re.IGNORECASE) -> 
         oligs = (oligs,)
 
     if len(oligs) == 0:
-        return np.empty((0,), dtype = PEAKS_TYPE)
+        return np.empty((0,), dtype = PEAKS_DTYPE)
 
     def _get(elems, state):
         reg = re.compile('|'.join(elems), flags)
