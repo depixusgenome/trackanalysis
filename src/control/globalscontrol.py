@@ -236,12 +236,13 @@ class DefaultsMap(Controller):
         "updates keys or raises NoEmission"
         ret = EventData(self.__items.name)
         for key, val in _tokwargs(args, kwargs).items():
-            old = self.__items.get(key, delete)
-            if val is delete:
-                self.__items.pop(key, None)
-            elif key not in self.__items.maps[1]:
+            old     = self.__items.get(key, delete)
+            default = self.__items.maps[1].get(key, delete)
+            if default is delete:
                 raise KeyError("Default value must be set first "
                                +str((self.__items.name, key)))
+            elif val is delete or val == default:
+                self.__items.pop(key, None)
             else:
                 self.__items[key] = val
 
