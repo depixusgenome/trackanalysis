@@ -75,7 +75,7 @@ def test_cyclesplot(bokehaction):        # pylint: disable=redefined-outer-name
         if 'y' in evts:
             vals[:2] = evts['y'].value
 
-    with bokehaction.serve(CyclesPlotView, 'app.BeadsToolBar') as server:
+    with bokehaction.launch(CyclesPlotView, 'app.BeadsToolBar') as server:
         server.ctrl.observe("globals.current.plot.cycles", _printrng)
         server.load('big_legacy')
 
@@ -117,18 +117,21 @@ def test_cyclesplot(bokehaction):        # pylint: disable=redefined-outer-name
 
         server.load('hairpins.fasta', andpress = False)
         server.change('Cycles:Sequence', 'value', '←')
+        assert server.widget['Cycles:Hist'].ygrid[0].ticker.usedefault is True
         assert (server.widget['Cycles:Peaks'].source.data['bases']
                 == approx([0, 1000], abs = 1.))
+
         server.change('Cycles:Oligos',   'value', 'TgGC ')
+        assert server.widget['Cycles:Hist'].ygrid[0].ticker.usedefault is False
         assert (server.widget['Cycles:Peaks'].source.data['bases']
                 == approx([166, 1113], abs = 1.))
+
         assert server.widget['Cycles:Stretch'].value == approx(0.88, abs = 1e-5)
         assert server.widget['Cycles:Bias'].value == approx(-.0816519, abs = 1e-5)
         server.change('Cycles:Bias',     'value', -.05)
         assert server.widget['Cycles:Bias'].value == approx(-.05, abs = 1e-5)
         server.change('Cycles:Stretch',  'value', .9)
         assert server.widget['Cycles:Stretch'].value == approx(0.9, abs = 1e-5)
-        server.change('Cycles:Peaks',   ("source", "data","z"),  [0., .7])
 
         server.press('Ctrl-z')
 

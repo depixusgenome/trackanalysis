@@ -53,16 +53,6 @@ class DpxTestLoaded(Model):
                     @model.dokeydown?(@_create_evt('keydown'))
                     @model.dokeyup?(@_create_evt('keyup'))
 
-            _change1: () ->
-                if @model?
-                    mdl = @model
-                    for i in @attrs[...-1]
-                        mdl = mdl[i]
-
-                    mdl[@attrs[-1]] = @value
-                    mdl.trigger('change:'+@attrs[-1])
-                    console.log(mdl.type, mdl[@attrs[-1]], 'change:'+@attrs[0])
-
             _change: () ->
                 if @model?
 
@@ -71,7 +61,7 @@ class DpxTestLoaded(Model):
                         mdl = mdl[i]
 
                     mdl[@attr] = @value
-                    mdl.trigger('change:'+@attr)
+                    @model.trigger('change:'+@attrs[0])
 
             @define {
                 done:  [p.Number, 0]
