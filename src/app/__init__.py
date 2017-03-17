@@ -32,12 +32,16 @@ def _serverkwargs(kwa):
     server_kwargs['redirect_root']        = True
     return server_kwargs
 
+def _title(view) -> str:
+    appname   = getattr(view.MainControl, 'APPNAME', 'track analysis')
+    return appname.capitalize()
+
 def _serve(view, **kwa):
     "Launches a bokeh server"
     def start(doc):
         "Starts the application and adds itself to the document"
-        ret = view.open(doc)
-        return ret
+        doc.title = _title(view)
+        return view.open(doc)
 
     server = Server(Application(FunctionHandler(start)), **_serverkwargs(kwa))
     server.MainView = view
@@ -83,6 +87,8 @@ def _create(main, controls, views): # pylint: disable=unused-argument
             These share a common dictionnary of handlers
             """
             ISAPP    = False
+            APPNAME  = next((i.APPNAME for i in (main,)+views if hasattr(i, 'APPNAME')),
+                            'Track Analysis')
             def __init__(self, **kwa):
                 self.topview = kwa['topview']
 
@@ -99,14 +105,7 @@ def _create(main, controls, views): # pylint: disable=unused-argument
             @classmethod
             def configpath(cls, version) -> Path:
                 "returns the path to the config file"
-                pot  = (i.APPNAME for i in (main,)+views if hasattr(i, 'APPNAME'))
-                name = next(pot, None)
-                if name is None:
-                    for itm in (main,)+views+(main,):
-                        name = itm.__name__.lower().replace('view', '')
-                        if name not in ('undo', 'globals') and 'toolbar' not in name:
-                            break
-
+                name = cls.APPNAME.replace(' ', '_').lower()
                 path = Path(appdirs.user_config_dir('depixus', 'depixus', name+"/"+version))
                 return path/'config.txt'
 
@@ -192,9 +191,10 @@ def setup(locs            = None, # pylint: disable=too-many-arguments
                creator  = creator,
                **kwa):
         "Creates a desktop app"
-        kwa.setdefault("title", 'track analysis')
+        app = application(main, controls, views, creator)
+        kwa.setdefault("title", _title(app))
         kwa.setdefault("size",  (1000, 1000))
-        return _launch(application(main, controls, views, creator), **kwa)
+        return _launch(app, **kwa)
 
     locs.setdefault('serve',   serve)
     locs.setdefault('launch',  launch)
@@ -208,7 +208,7 @@ class WithToolbar:
         tbar = self.tbar
         class ViewWithToolbar(BokehView):
             "A view with the toolbar on top"
-            APPNAME = main.__name__.lower().replace('view', '')
+            APPNAME = getattr(main, 'APPNAME', main.__name__.lower().replace('view', ''))
             def __init__(self, **kwa):
                 self._bar      = tbar(**kwa)
                 self._mainview = main(**kwa)

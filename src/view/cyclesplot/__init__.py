@@ -64,3 +64,4 @@ class CyclesPlotCreator(TrackPlotCreator, HistMixin, RawMixin, ConfigMixin):
 class CyclesPlotView(TrackPlotView):
     "Cycles plot view"
     PLOTTER = CyclesPlotCreator
+    APPNAME = 'Track Cycles'
