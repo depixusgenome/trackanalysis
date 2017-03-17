@@ -3,6 +3,7 @@
 "Utils for dealing with the JS side of the view"
 from typing                 import (Tuple, Optional, # pylint: disable =unused-import
                                     Iterator, List)
+from collections            import OrderedDict
 from contextlib             import contextmanager
 from itertools              import product
 from functools              import wraps
@@ -34,7 +35,7 @@ def checksizes(fcn):
         return res
     return _wrap
 
-_CACHE = CachedIO(lambda path: dict(_readsequences(path)), size = 1)
+_CACHE = CachedIO(lambda path: OrderedDict(_readsequences(path)), size = 1)
 def readsequence(path):
     "Reads / caches DNA sequences"
     if path is None or not Path(path).exists():
