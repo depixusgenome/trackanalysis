@@ -6,7 +6,8 @@ try:
 except ImportError:
     raise ImportError("Don't forget to clone wafbuilder!!")
 import wafbuilder.git as git
-from waflib.Build import BuildContext
+from waflib.Build       import BuildContext
+from waflib.Configure   import ConfigurationContext
 
 require(cxx    = {'msvc'     : 14.0,
                   'clang++'  : 3.8,
@@ -137,7 +138,7 @@ def condaenv(cnf):
     _getmodules(cnf)
     builder.condaenv('trackanalysis')
 
-class _CondaSetup(BuildContext):
+class _CondaSetup(ConfigurationContext):
     fun = cmd = 'condasetup'
 def condasetup(cnf):
     u"prints requirements"
