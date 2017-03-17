@@ -303,7 +303,7 @@ class DpxFixedTicker(ContinuousTicker):
 
     def observe(self, cnf, mdl, fig):
         u"sets up model observers"
-        cnf.observe('oligos', lambda: self.updatedata(mdl, fig))
+        cnf.observe(('oligos', 'sequence.path'), lambda: self.updatedata(mdl, fig))
 
     @staticmethod
     def defaultconfig() -> dict:

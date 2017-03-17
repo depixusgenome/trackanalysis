@@ -106,6 +106,7 @@ class HistMixin:
         css              = self.getCSS()
         self._hist       = figure(y_axis_location = None,
                                   y_range         = yrng,
+                                  name            = 'Cycles:Hist',
                                   **self._figargs(css.hist))
 
         hist             = self.__data(track, data, shape)

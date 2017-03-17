@@ -48,7 +48,8 @@ class _PeakTableCreator(WidgetCreator):
                                   editable    = True,
                                   row_headers = False,
                                   width       = size[0],
-                                  height      = size[1])
+                                  height      = size[1],
+                                  name        = "Cycles:Peaks")
         return Paragraph(text = self.getCSS().title.table.get()), self.__widget
 
     def update(self):
@@ -56,7 +57,7 @@ class _PeakTableCreator(WidgetCreator):
         self.__widget.source.data = self.__data()
 
     def __data(self):
-        info = self._model.witnesses
+        info = self._model.peaks
         if (self._model.sequencekey is not None
                 and len(self._model.oligos)
                 and info is None):
@@ -66,7 +67,7 @@ class _PeakTableCreator(WidgetCreator):
                 info = peaks[0], peaks[-1]
 
         if info is None:
-            info = 0., 1e3
+            info = 0, 1000
 
         info += (info[0]*self.__hover.stretch+self.__hover.bias,
                  info[1]*self.__hover.stretch+self.__hover.bias)
@@ -79,7 +80,9 @@ class _PeakTableCreator(WidgetCreator):
         def _py_cb(attr, old, new):
             zval  = self.__widget.source.data['z']
             bases = self.__widget.source.data['bases']
-            self._model.witnesses = tuple(bases)
+            peaks = tuple(int(i+.01) for i in bases)
+            if peaks != (0, 1000):
+                self._model.peaks = peaks
             if zval[0] == zval[1] or bases[0] == bases[1]:
                 return
 
@@ -89,7 +92,9 @@ class _PeakTableCreator(WidgetCreator):
         source = self.__widget.source
         source.on_change("data", _py_cb) # pylint: disable=no-member
 
-        self.getCurrent().observe(('oligos', 'sequence.witnesses'),
+        self.getConfig() .observe(('oligos', 'sequence.peaks', 'sequence.peaks'),
+                                  lambda: setattr(source, 'data', self.__data()))
+        self.getCurrent().observe(('sequence.key',),
                                   lambda: setattr(source, 'data', self.__data()))
 
         hover  = self.__hover
@@ -104,7 +109,7 @@ class _PeakTableCreator(WidgetCreator):
             aval = (zval[1]-zval[0]) / (bases[1]-bases[0])
             bval = zval[0] - bases[0]*aval
 
-            stretch.value = aval
+            stretch.value = aval*1e3
             bias   .value = bval
             mdl.stretch   = aval
             mdl.bias      = bval
@@ -118,18 +123,19 @@ class _SliderCreator(WidgetCreator):
         self.__stretch = None # type: Optional[Slider]
         self.__bias    = None # type: Optional[Slider]
         self.__figdata = None # type: Optional[ColumnDataSource]
-        self.getCSS().defaults = {'title.stretch'    : u'stretch [dna/nm]',
+        self.getCSS().defaults = {'title.stretch'    : u'stretch 10³[dna/nm]',
                                   'title.bias'       : u'bias [nm]'}
 
     def create(self, figdata):
         "creates the widget"
-        widget = lambda x, s, e: Slider(value = getattr(self._model, x),
-                                        title = self.getCSS().title[x].get(),
-                                        step  = self.getConfig().base[x].step.get(),
-                                        start = s, end = e)
+        widget = lambda x, s, e, n: Slider(value = getattr(self._model, x),
+                                           title = self.getCSS().title[x].get(),
+                                           step  = self.getConfig().base[x].step.get(),
+                                           start = s, end = e, name = n)
 
-        self.__stretch = widget('stretch', *self.getConfig().base.stretch.get('start', 'end'))
-        self.__bias    = widget('bias', -1., 1.)
+        vals = tuple(self.getConfig().base.stretch.get('start', 'end'))
+        self.__stretch = widget('stretch', vals[0]*1e3, vals[1]*1e3, 'Cycles:Stretch')
+        self.__bias    = widget('bias', -1., 1., 'Cycles:Bias')
         self.__figdata = figdata
         return self.__stretch, self.__bias
 
@@ -141,7 +147,7 @@ class _SliderCreator(WidgetCreator):
         self.__bias.update(value = self._model.bias,
                            start = minv,
                            end   = minv+delta*ratio)
-        self.__stretch.value = self._model.stretch
+        self.__stretch.value = self._model.stretch*1e3
 
     def callbacks(self, action, hover, table):
         "adding callbacks"
@@ -152,7 +158,7 @@ class _SliderCreator(WidgetCreator):
 
         # pylint: disable=function-redefined
         def _py_cb(attr, old, new):
-            self._model.stretch = new
+            self._model.stretch = new*1e-3
         stretch.on_change('value', action(_py_cb))
 
         def _py_cb(attr, old, new):
@@ -162,13 +168,13 @@ class _SliderCreator(WidgetCreator):
         source = table.source
         @CustomJS.from_py_func
         def _js_cb(stretch = stretch, bias = bias, mdl = hover, source = source):
-            mdl.stretch  = stretch.value
+            mdl.stretch  = stretch.value*1e-3
             mdl.bias     = bias.value
             mdl.updating = mdl.updating+1
 
             bases            = source.data['bases']
-            source.data['z'] = [bases[0] * stretch.value + bias.value,
-                                bases[1] * stretch.value + bias.value]
+            source.data['z'] = [bases[0] * stretch.value*1e-3 + bias.value,
+                                bases[1] * stretch.value*1e-3 + bias.value]
             source.trigger('change:data')
 
         stretch.js_on_change('value', _js_cb)
@@ -193,7 +199,7 @@ class _SequenceCreator(WidgetCreator):
                                    config    = self._ctrl,
                                    title     = self.getCSS().title.fasta.get())
 
-        self.__widget = Dropdown(**self.__data())
+        self.__widget = Dropdown(name = 'Cycles:Sequence', **self.__data())
         self.__hover  = hover
         self.__observe(action, tick1, tick2)
         return Paragraph(text = self.getCSS().title.sequence.get()), self.__widget
@@ -264,7 +270,8 @@ class _OligosCreator(WidgetCreator):
         "creates the widget"
         self.__widget = TextInput(value       = self.__data(),
                                   placeholder = self.getCSS().title.oligos.help.get(),
-                                  title       = self.getCSS().title.oligos.get())
+                                  title       = self.getCSS().title.oligos.get(),
+                                  name        = 'Cycles:Oligos')
         self.__observe(action)
         return self.__widget
 

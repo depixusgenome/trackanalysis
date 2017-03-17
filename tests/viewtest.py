@@ -5,6 +5,7 @@ from pytest                     import approx       # pylint: disable=no-name-in
 from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 
 import anastore.control # pylint: disable=unused-import
+import anastore
 
 from view.toolbar               import ToolBar
 from view.beadplot              import BeadPlotView, DpxKeyedRow
@@ -74,7 +75,7 @@ def test_cyclesplot(bokehaction):        # pylint: disable=redefined-outer-name
         if 'y' in evts:
             vals[:2] = evts['y'].value
 
-    with bokehaction.launch(CyclesPlotView, 'app.BeadsToolBar') as server:
+    with bokehaction.serve(CyclesPlotView, 'app.BeadsToolBar') as server:
         server.ctrl.observe("globals.current.plot.cycles", _printrng)
         server.load('big_legacy')
 
@@ -84,7 +85,14 @@ def test_cyclesplot(bokehaction):        # pylint: disable=redefined-outer-name
             assert vals == approx(truth, rel = 1e-2)
 
         _press('Shift- ',           0., 0.)
+        fig  = server.widget['Cycles:Hist']()
+        assert fig.x_range.end                  > 2000.
+        assert fig.extra_x_ranges['cycles'].end > 30.
+
         _press('Shift-ArrowUp',     0.275218, 0.475218)
+        assert fig.x_range.end                  == approx(103, abs=.1)
+        assert fig.extra_x_ranges['cycles'].end == approx(4,   abs=.1)
+
         _press('Alt-ArrowUp',       0.315218, 0.515218)
         _press('Alt-ArrowDown',     0.275218, 0.475218)
         _press('Shift-ArrowDown',  -0.124781, 0.875219)
@@ -96,6 +104,31 @@ def test_cyclesplot(bokehaction):        # pylint: disable=redefined-outer-name
 
         yvals = server.ctrl.getGlobal("current.plot.cycles").y.get()
         assert yvals == approx((-0.124781, 0.875219), rel=1e-2)
+
+        server.change('Cycles:Oligos', 'value', ' TGGC  , aatt')
+        assert server.widget['Cycles:Oligos'].value == 'aatt, tggc'
+        cnf = anastore.load(server.ctrl.configpath(next(anastore.iterversions('config'))))
+        assert cnf['config.plot.cycles']['oligos'] == ['aatt', 'tggc']
+
+        server.change('Cycles:Oligos', 'value', '')
+        assert server.widget['Cycles:Oligos'].value == ''
+        cnf = anastore.load(server.ctrl.configpath(next(anastore.iterversions('config'))))
+        assert 'oligos' not in cnf.get('config.plot.cycles', {})
+
+        server.load('hairpins.fasta', andpress = False)
+        server.change('Cycles:Sequence', 'value', '←')
+        assert (server.widget['Cycles:Peaks'].source.data['bases']
+                == approx([0, 1000], abs = 1.))
+        server.change('Cycles:Oligos',   'value', 'TgGC ')
+        assert (server.widget['Cycles:Peaks'].source.data['bases']
+                == approx([166, 1113], abs = 1.))
+        assert server.widget['Cycles:Stretch'].value == approx(0.88, abs = 1e-5)
+        assert server.widget['Cycles:Bias'].value == approx(-.0816519, abs = 1e-5)
+        server.change('Cycles:Bias',     'value', -.05)
+        assert server.widget['Cycles:Bias'].value == approx(-.05, abs = 1e-5)
+        server.change('Cycles:Stretch',  'value', .9)
+        assert server.widget['Cycles:Stretch'].value == approx(0.9, abs = 1e-5)
+        server.change('Cycles:Peaks',   ("source", "data","z"),  [0., .7])
 
         server.press('Ctrl-z')
 

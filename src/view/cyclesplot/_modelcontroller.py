@@ -11,8 +11,10 @@ def _configprop(attr):
     "returns a property which links to the config"
     def _getter(self):
         return self.getConfig()[attr].get()
+
     def _setter(self, val):
         self.getConfig()[attr].set(val)
+
     hmsg  = "link to config's {}".format(attr)
     return property(_getter, _setter, None, hmsg)
 
@@ -35,7 +37,7 @@ def _beadorconfig(attr):
 
 class CyclesModelController(TrackPlotModelController):
     "Model for Cycles View"
-    _CACHED = 'base.stretch', 'base.bias', 'sequence.key', 'sequence.witnesses'
+    _CACHED = 'base.stretch', 'base.bias', 'sequence.key', 'sequence.peaks'
     def __init__(self, ctrl, key):
         super().__init__(ctrl, key)
         self.getConfig().defaults = {'binwidth'          : .003,
@@ -50,7 +52,7 @@ class CyclesModelController(TrackPlotModelController):
                                      'sequence.path' : None,
                                      'sequence.key'  : None,
                                     }
-        self.getConfig().sequence.witnesses.default = None
+        self.getConfig().sequence.peaks.default = None
         for attr in self._CACHED:
             self.getCurrent()[attr].setdefault(None)
         self.clearcache()
@@ -65,8 +67,8 @@ class CyclesModelController(TrackPlotModelController):
     oligos       = cast(Optional[Sequence[str]], _configprop  ('oligos'))
     stretch      = cast(float,                   _beadorconfig('base.stretch'))
     bias         = cast(Optional[float],         _beadorconfig('base.bias'))
-    witnesses    = cast(Optional[Tuple[float,float,float,float]],
-                        _beadorconfig('sequence.witnesses'))
+    peaks        = cast(Optional[Tuple[float,float,float,float]],
+                        _beadorconfig('sequence.peaks'))
 
     _sequencekey = cast(Optional[str],           _beadorconfig('sequence.key'))
     @property
@@ -74,8 +76,7 @@ class CyclesModelController(TrackPlotModelController):
         "returns the current sequence key"
         key  = self._sequencekey
         dseq = readsequence(self.sequencepath)
-        if key not in dseq:
-            return next(iter(dseq), None)
+        return next(iter(dseq), None) if key not in dseq else key
 
     @sequencekey.setter
     def sequencekey(self, value) -> Optional[str]:

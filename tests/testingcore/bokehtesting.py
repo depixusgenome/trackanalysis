@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Utils for testing views"
-from typing                import Optional  # pylint: disable=unused-import
+from typing                import (Optional,# pylint: disable=unused-import
+                                   Union, Sequence, Any)
 import sys
 import tempfile
 
 import pytest
 
 from tornado.ioloop        import IOLoop
-from bokeh.core.properties import Int, String, Dict, Any, Instance
+import bokeh.core.properties as     props
 from bokeh.model           import Model
 from bokeh.document        import Document  # pylint: disable=unused-import
 from bokeh.server.server   import Server    # pylint: disable=unused-import
@@ -33,6 +34,8 @@ class DpxTestLoaded(Model):
             constructor : (attributes, options) ->
                 super(attributes, options)
                 @listenTo(@, 'change:event', @_press)
+                @listenTo(@, 'change:value', @_change)
+
                 $((e) => @done = 1)
 
             _create_evt: (name) ->
@@ -50,15 +53,42 @@ class DpxTestLoaded(Model):
                     @model.dokeydown?(@_create_evt('keydown'))
                     @model.dokeyup?(@_create_evt('keyup'))
 
+            _change1: () ->
+                if @model?
+                    mdl = @model
+                    for i in @attrs[...-1]
+                        mdl = mdl[i]
+
+                    mdl[@attrs[-1]] = @value
+                    mdl.trigger('change:'+@attrs[-1])
+                    console.log(mdl.type, mdl[@attrs[-1]], 'change:'+@attrs[0])
+
+            _change: () ->
+                if @model?
+
+                    mdl = @model
+                    for i in @attrs
+                        mdl = mdl[i]
+
+                    mdl[@attr] = @value
+                    mdl.trigger('change:'+@attr)
+
             @define {
                 done:  [p.Number, 0]
                 event: [p.Any,   {}]
                 model: [p.Any,   {}]
+                attrs: [p.Array, []]
+                attr : [p.String, '']
+                value: [p.Any,   {}]
             }
                          """
-    done  = Int(0)
-    event = Dict(String, Any)
-    model = Instance(Model)
+    done  = props.Int(0)
+    event = props.Dict(props.String, props.Any)
+    model = props.Instance(Model)
+    attrs = props.List(props.String, default = [])
+    attr  = props.String()
+    value = props.Any()
+
     def press(self, key, model):
         u"Sets-up a new keyevent in JS"
         val = '-' if key == '-' else key.split('-')[-1]
@@ -69,6 +99,50 @@ class DpxTestLoaded(Model):
                    key   = val)
         self.model = model
         self.event = evt
+
+    def change(self, model:Model, attrs: Union[str, Sequence[str]], value: Any):
+        u"Changes a model attribute on the browser side"
+        self.model = model
+        self.attrs = list(attrs)[:-1] if isinstance(attrs, (tuple, list)) else []
+        self.attr  = attrs[-1]        if isinstance(attrs, (tuple, list)) else attrs
+        self.value = value
+
+class WidgetAccess:
+    "Access to bokeh models"
+    _none = type('_none', (), {})
+    def __init__(self, docs, key = None):
+        self._docs = docs if isinstance(docs, (list, tuple)) else (docs,)
+        self._key  = key
+
+    def __getitem__(self, value):
+        if isinstance(value, type):
+            if self._key is not None:
+                val = next((i for doc in self._docs for i in doc.select({'type': value})),
+                           self._none)
+                if val is not self._none:
+                    return val
+            return next(i for doc in self._docs for i in doc.select({'type': value}))
+        else:
+            itms = tuple()
+            for doc in self._docs:
+                itms += tuple(doc.select({'name': value}))
+            if len(itms) > 0:
+                return WidgetAccess(itms)
+            else:
+                key = value if self._key is None else self._key + '.' + value
+                return WidgetAccess(tuple(self._docs), key)
+
+    def __getattr__(self, key):
+        return super().__getattribute__(key) if key[0] == '_' else getattr(self(), key)
+
+    def __setattr__(self, key, value):
+        return super().__setattr__(key, value) if key[0] == '_' else setattr(self(), key, value)
+
+    def __call__(self):
+        if self._key is not None:
+            raise KeyError("Could not find "+ self._key)
+        else:
+            return self._docs[0]
 
 class _ManagedServerLoop:
     u"""
@@ -170,13 +244,14 @@ class _ManagedServerLoop:
 
         self.cmd(_quit, andstop = False)
 
-    def load(self, path:str):
+    def load(self, path:str, andpress = True):
         u"loads a path"
         import view.dialog  # pylint: disable=import-error
         def _tkopen(*_1, **_2):
             return self.path(path)
         self.monkeypatch.setattr(view.dialog, '_tkopen', _tkopen)
-        self.press('Control-o')
+        if andpress:
+            self.press('Control-o')
 
     def get(self, clsname, attr):
         u"Returns a private attribute in the view"
@@ -202,12 +277,31 @@ class _ManagedServerLoop:
         else:
             self.cmd(self.loading.press, key, src)
 
+    def change(self,
+               model: Union[str,dict,Model],
+               attrs: Union[str, Sequence[str]],
+               value: Any):
+        u"Changes a model attribute on the browser side"
+        if isinstance(model, str):
+            mdl = next(iter(self.doc.select(dict(name = model))))
+        elif isinstance(model, dict):
+            mdl = next(iter(self.doc.select(model)))
+        else:
+            mdl = model
+        self.cmd(self.loading.change, mdl, attrs, value)
+
+    @property
+    def widget(self):
+        "Returns something to access web elements"
+        return WidgetAccess(self.doc)
+
 class BokehAction:
     u"All things to make gui testing easy"
     def __init__(self, mkpatch):
         self.monkeypatch = mkpatch
+        tmp = tempfile.mktemp()+"_test"
         class _Dummy:
-            user_config_dir = lambda *_: tempfile.mktemp()
+            user_config_dir = lambda *_: tmp+"/"+_[-1]
         sys.modules['appdirs'] = _Dummy
 
     def serve(self, app:type, mod:str  = 'default', **kwa) -> _ManagedServerLoop:
