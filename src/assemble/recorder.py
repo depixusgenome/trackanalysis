@@ -55,19 +55,19 @@ class Recorder:
         u'''
         returns the records under a DataFrame to analyse the results
         '''
-        data = pandas.DataFrame()
+        to_pandas = []
         if isinstance(self.assembler,asm.Assembler):
             for elm in self.rec:
                 to_dict = _OResult_to_Series(elm)
-                data = data.append(to_dict,ignore_index=True)
+                to_pandas.append(to_dict)
         elif isinstance(self.assembler,asm.NestedAsmrs):
             for rec_it in self.rec:
                 for asm_id,elm in enumerate(rec_it):
                     to_dict = _OResult_to_Series(elm)
                     to_dict["asm_id"] = asm_id
                     to_dict["npseed"] = self.assembler.seeds[asm_id]
-                    data = data.append(to_dict,ignore_index=True)
-        return data
+                    to_pandas.append(to_dict)
+        return pandas.DataFrame(to_pandas)
 
 def _OResult_to_Series(elm):
     u'modifies slightly the OptimizeResult dict'

@@ -10,7 +10,6 @@ from typing import Callable, Iterable # pylint: disable=unused-import
 from multiprocessing import Pool
 import numpy
 from scipy.optimize import basinhopping,OptimizeResult
-from scipy.stats import truncnorm
 
 # needs fixing : each object should be pickable
 #                test NestedAsmrs
@@ -85,17 +84,8 @@ class NestedAsmrs:
             for asmr in self.asmrs:
                 asmr.run(niter=niter)
         else:
-            for asmr in self.asmrs:
-                print("asmr.npstate=",asmr.npstate)
             self.asmrs = self._pool.map(_run_asmr,
                                         [(asmr,niter) for asmr in self.asmrs])
-
-    def set_asmr_inits(self,inits):
-        u'''
-        sets the state_init of each of the asmrs
-        '''
-        for idx,init in enumerate(inits):
-            self.asmrs[idx].state_init = init
 
     @property
     def result(self):
