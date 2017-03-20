@@ -76,7 +76,10 @@ class NestedAsmrs:
             print("could not create Pool")
             self._pool = None
 
-
+    def __del__(self,):
+        u'closes pool'
+        if not self._pool is None:
+            self._pool.close()
 
     def run(self,niter:int=1):
         u'''run in parallel each asmrs
