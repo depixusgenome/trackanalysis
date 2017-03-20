@@ -28,7 +28,7 @@ class CyclesPlotCreator(TrackPlotCreator, HistMixin, RawMixin, ConfigMixin):
                                      **DpxHoverModel.defaultconfig()}
         self.getConfig().defaults = {'tools'      : 'ypan,ybox_zoom,reset,save,dpxhover',
                                      'oligos.size': 4}
-        self._ctrl.getGlobal("config").defaults = {'oligos': set(),
+        self._ctrl.getGlobal("config").defaults = {'oligos': [],
                                                    'oligos.history': [],
                                                    'oligos.history.maxlength': 10
                                                   }

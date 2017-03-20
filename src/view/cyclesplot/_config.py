@@ -300,10 +300,10 @@ class _OligosCreator(WidgetCreator):
                             re.IGNORECASE).findall
         @action
         def _py_cb(attr, old, new):
-            ols  = sorted({i.lower() for i in match(new)})
+            ols  = sorted(i.lower() for i in match(new))
             hist = self.getRootConfig().oligos.history
-            lst  = (i for i in hist.get() if i != ols)[:hist.maxlength.get()]
-            hist.set((ols,) + lst)
+            lst  = list(i for i in hist.get() if i != ols)[:hist.maxlength.get()]
+            hist.set(([ols] if len(ols) else []) + lst)
             self._model.oligos = ols
 
         widget.on_change('value', _py_cb)

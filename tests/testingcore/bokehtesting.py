@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Utils for testing views"
+"Utils for testing views"
 from typing                import (Optional,# pylint: disable=unused-import
                                    Union, Sequence, Any)
 import sys
@@ -80,7 +80,7 @@ class DpxTestLoaded(Model):
     value = props.Any()
 
     def press(self, key, model):
-        u"Sets-up a new keyevent in JS"
+        "Sets-up a new keyevent in JS"
         val = '-' if key == '-' else key.split('-')[-1]
         evt = dict(alt   = 'Alt-'     in key,
                    shift = 'Shift-'   in key,
@@ -91,7 +91,7 @@ class DpxTestLoaded(Model):
         self.event = evt
 
     def change(self, model:Model, attrs: Union[str, Sequence[str]], value: Any):
-        u"Changes a model attribute on the browser side"
+        "Changes a model attribute on the browser side"
         self.model = model
         self.attrs = list(attrs)[:-1] if isinstance(attrs, (tuple, list)) else []
         self.attr  = attrs[-1]        if isinstance(attrs, (tuple, list)) else attrs
@@ -135,7 +135,7 @@ class WidgetAccess:
             return self._docs[0]
 
 class _ManagedServerLoop:
-    u"""
+    """
     lets us use a current IOLoop with "with"
     and ensures the server unlistens
     """
@@ -144,13 +144,13 @@ class _ManagedServerLoop:
 
     @property
     def loading(self) -> 'Optional[DpxTestLoaded]':
-        u"returns the model which allows tests to javascript"
+        "returns the model which allows tests to javascript"
         return next(iter(getattr(self.doc, 'roots', [])), None)
 
     class _Dummy:
         @staticmethod
         def setattr(*args):
-            u"dummy"
+            "dummy"
             return setattr(*args)
 
     def __init__(self, mkpatch, kwa:dict) -> None:
@@ -198,7 +198,7 @@ class _ManagedServerLoop:
         self.server = self.__buildserver(self.kwa)
 
         def _start():
-            u"Waiting for the document to load"
+            "Waiting for the document to load"
             if getattr(self.loading, 'done', False):
                 self.loop.call_later(2., self.loop.stop)
             else:
@@ -211,12 +211,12 @@ class _ManagedServerLoop:
 
     @staticmethod
     def path(path:str) -> str:
-        u"returns the path to testing data"
+        "returns the path to testing data"
         from testingcore import path as _testpath
         return _testpath(path)
 
     def cmd(self, fcn, *args, andstop = True, andwaiting = 2., **kwargs):
-        u"send command to the view"
+        "send command to the view"
         if andstop:
             def _cmd():
                 fcn(*args, **kwargs)
@@ -226,8 +226,12 @@ class _ManagedServerLoop:
         self.doc.add_next_tick_callback(_cmd)
         self.loop.start()
 
+    def wait(self, time = 2.):
+        "wait some more"
+        self.cmd(lambda: None, andwaiting = time)
+
     def quit(self):
-        u"close the view"
+        "close the view"
         def _quit():
             self.server.unlisten()
             self.ctrl.close()
@@ -235,7 +239,7 @@ class _ManagedServerLoop:
         self.cmd(_quit, andstop = False)
 
     def load(self, path:str, andpress = True):
-        u"loads a path"
+        "loads a path"
         import view.dialog  # pylint: disable=import-error
         def _tkopen(*_1, **_2):
             return self.path(path)
@@ -244,7 +248,7 @@ class _ManagedServerLoop:
             self.press('Control-o')
 
     def get(self, clsname, attr):
-        u"Returns a private attribute in the view"
+        "Returns a private attribute in the view"
         key = '_'+clsname+'__'+attr
         if key in self.view.__dict__:
             return self.view.__dict__[key]
@@ -256,7 +260,7 @@ class _ManagedServerLoop:
         return self.view.__dict__[attr]
 
     def press(self, key:str, src = None):
-        u"press one key in python server"
+        "press one key in python server"
         if src is None:
             for root in self.doc.roots:
                 if isinstance(root, KeyPressManager):
@@ -271,7 +275,7 @@ class _ManagedServerLoop:
                model: Union[str,dict,Model],
                attrs: Union[str, Sequence[str]],
                value: Any):
-        u"Changes a model attribute on the browser side"
+        "Changes a model attribute on the browser side"
         if isinstance(model, str):
             mdl = next(iter(self.doc.select(dict(name = model))))
         elif isinstance(model, dict):
@@ -286,7 +290,7 @@ class _ManagedServerLoop:
         return WidgetAccess(self.doc)
 
 class BokehAction:
-    u"All things to make gui testing easy"
+    "All things to make gui testing easy"
     def __init__(self, mkpatch):
         self.monkeypatch = mkpatch
         tmp = tempfile.mktemp()+"_test"
@@ -295,23 +299,23 @@ class BokehAction:
         sys.modules['appdirs'] = _Dummy
 
     def serve(self, app:type, mod:str  = 'default', **kwa) -> _ManagedServerLoop:
-        u"Returns a server managing context"
+        "Returns a server managing context"
         kwa['_args_'] = app, mod, 'serve'
         return _ManagedServerLoop(self.monkeypatch, kwa)
 
     def launch(self, app:type, mod:str  = 'default', **kwa) -> _ManagedServerLoop:
-        u"Returns a server managing context"
+        "Returns a server managing context"
         kwa['_args_'] = app, mod, 'launch'
         return _ManagedServerLoop(self.monkeypatch, kwa)
 
     def setattr(self, *args, **kwargs):
-        u"apply monkey patch"
+        "apply monkey patch"
         self.monkeypatch.setattr(*args, **kwargs)
         return self
 
 @pytest.fixture()
 def bokehaction(monkeypatch):
-    u"""
+    """
     Create a BokehAction fixture.
     Use case is:
 
