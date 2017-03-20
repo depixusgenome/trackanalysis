@@ -78,10 +78,10 @@ class BeadPlotCreator(TrackPlotCreator):
         self.setbounds(self._fig.x_range, 'x', self._get('t'))
         self.setbounds(self._fig.y_range, 'y', self._get('z'))
 
-    def _create(self, track, bead, _) -> DpxKeyedRow:
+    def _create(self, _, *args) -> DpxKeyedRow:
         "sets-up the figure"
         self._fig    = figure(**self._figargs())
-        self._source = ColumnDataSource(data = self._createdata(track, bead))
+        self._source = ColumnDataSource(data = self._createdata(*args))
         if self.getCSS().tooltips.get() not in ('', None):
             self._fig.select(HoverTool).tooltips = self.getCSS().tooltips.get()
 
@@ -94,8 +94,8 @@ class BeadPlotCreator(TrackPlotCreator):
         self._addcallbacks(self._fig)
         return DpxKeyedRow(self, self._fig)
 
-    def _update(self, track, bead, _):
-        self._source.data  = self._createdata(track, bead)
+    def _update(self, _, *args):
+        self._source.data  = self._createdata(*args)
         self._setbounds()
 
 class BeadPlotView(TrackPlotView):

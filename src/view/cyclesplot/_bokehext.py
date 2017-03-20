@@ -223,10 +223,10 @@ class DpxHoverModel(Model):
                     bias      = bias,
                     stretch   = mdl.stretch)
 
-    def observe(self, cnf, mdl):
+    def observe(self, evts, cnf, mdl):
         u"sets up model observers"
         obs = lambda: setattr(self._histsource, 'data', self._createhistdata(mdl, cnf))
-        cnf.observe('oligos', obs)
+        evts.observe('oligos', obs)
 
 class DpxFixedTicker(ContinuousTicker):
     "Generate ticks at fixed, explicitly supplied locations."
@@ -303,7 +303,7 @@ class DpxFixedTicker(ContinuousTicker):
 
     def observe(self, cnf, mdl, fig):
         u"sets up model observers"
-        cnf.observe(('oligos', 'sequence.path'), lambda: self.updatedata(mdl, fig))
+        cnf.observe(('oligos', 'last.path.fasta'), lambda: self.updatedata(mdl, fig))
 
     @staticmethod
     def defaultconfig() -> dict:

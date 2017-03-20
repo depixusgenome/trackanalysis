@@ -27,21 +27,27 @@ class CyclesPlotCreator(TrackPlotCreator, HistMixin, RawMixin, ConfigMixin):
         self.getCSS   ().defaults = {'toolbar_location': 'right',
                                      **DpxHoverModel.defaultconfig()}
         self.getConfig().defaults = {'tools'      : 'ypan,ybox_zoom,reset,save,dpxhover',
-                                     'oligos'     : [],
                                      'oligos.size': 4}
+        self._ctrl.getGlobal("config").defaults = {'oligos': set(),
+                                                   'oligos.history': [],
+                                                   'oligos.history.maxlength': 10
+                                                  }
         self._hover  = None # type: Optional[DpxHoverModel]
 
-    def _figargs(self, css): # pylint: disable=arguments-differ
+    def _figargs(self, css):                       # pylint: disable=arguments-differ
         args = super()._figargs()
         args['x_axis_label']     = css.xlabel.get()
-        args['plot_width']       = css.plotwidth.get()
+        if css.plotwidth.get(default = None) is not None:
+            args['plot_width']       = css.plotwidth.get()
+        if css.plotheight.get(default = None) is not None:
+            args['plot_height']      = self.getCSS().plotheight.get()
         args['toolbar_location'] = 'right'
         return args
 
-    def _create(self, track, bead, doc):
+    def _create(self, doc, track, cycles, bead):   # pylint: disable=arguments-differ
         "returns the figure"
         self._hover = DpxHoverModel()
-        shape       = self._createraw(track, bead)
+        shape       = self._createraw(cycles, bead)
         self._createhist(track, self._rawsource.data, shape, self._raw.y_range)
 
         plts  = layouts.gridplot([[self._raw, self._hist]],
@@ -54,14 +60,31 @@ class CyclesPlotCreator(TrackPlotCreator, HistMixin, RawMixin, ConfigMixin):
         doc.add_root(self._hover)
         return layouts.column([keyed, self._createconfig()])
 
-    def _update(self, track, bead, items):
+    def _update(self, items, track, cycles, bead): # pylint: disable=arguments-differ
         if 'track' in items:
-            self._model.clearcache() # pylint: disable=no-member
-        shape = self._updateraw(track, bead)
+            self._model.clearcache()               # pylint: disable=no-member
+        shape = self._updateraw(cycles, bead)
         self._updatehist(track, self._rawsource.data, shape)
         self._updateconfig()
+
+    def _needsupdate(self, items) -> bool:
+        "wether the plots should be updated considering the changes that ocurred"
+        if 'parent' in items:
+            # pylint: disable=no-member
+            return self._model.checktask(items['parent'], items['task'])
+        else:
+            return super()._needsupdate(items)
+
+    def _gettrack(self):
+        return self._model.runbead()               # pylint: disable=no-member
 
 class CyclesPlotView(TrackPlotView):
     "Cycles plot view"
     PLOTTER = CyclesPlotCreator
     APPNAME = 'Track Cycles'
+
+    def getroots(self, doc):
+        "adds items to doc"
+        self._ctrl.observe("updatetask", "addtask", "removetask",
+                           lambda **items: self._plotter.update(items))
+        return super().getroots(doc)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Adds easy access to cycles and events"
+"Adds easy access to cycles and events"
 import  inspect
 from    copy        import copy as shallowcopy
 from    abc         import ABCMeta, abstractmethod
@@ -25,7 +25,7 @@ Self     = TypeVar('Self',  bound = '_m_ConfigMixin')
 TSelf    = TypeVar('TSelf', bound = 'TrackItems')
 
 def _m_setfield(fcn):
-    u"provides a setter return self"
+    "provides a setter return self"
     @wraps(fcn)
     def _wrap(self, item):
         name = fcn.__name__[len("with"):]
@@ -90,23 +90,23 @@ def _m_check_action_sig(fcn):
         raise TypeError(msg) from exc
 
 def _m_copy(item):
-    u"Copies the data"
+    "Copies the data"
     return item[0], np.copy(item[1])
 
 ISelf = TypeVar('ISelf', bound = 'Items')
 class Items(metaclass=ABCMeta):
-    u"Class for iterating over data"
+    "Class for iterating over data"
     @abstractmethod
     def __getitem__(self:ISelf, val) -> Union[ISelf, np.ndarray]:
-        u"can return one item or a copy of self with only the selected keys"
+        "can return one item or a copy of self with only the selected keys"
 
     @abstractmethod
     def keys(self, _ = None) -> Iterator:
-        u"iterates over keys"
+        "iterates over keys"
         assert _ is None # should not be necessary: dicts can't do that
 
 class TransformedItems:
-    u"Dictionnary that will transform its data when a value is requested"
+    "Dictionnary that will transform its data when a value is requested"
     __slots__ = ('_data', '_parent', '_fcn')
     def __init__(self, fcn, data, parent = None) -> None:
         super().__init__()
@@ -116,7 +116,7 @@ class TransformedItems:
 
     @property
     def track(self):
-        u"Returns the track if any"
+        "Returns the track if any"
         return getattr(self._data if self._parent is None else self._parent, 'track', None)
 
     def __getitem__(self, val):
@@ -127,7 +127,7 @@ class TransformedItems:
         return self._data[val]
 
     def keys(self, _ = None) -> Iterator:
-        u"iterates over keys"
+        "iterates over keys"
         assert _ is None
         yield from self._data.keys()
 
@@ -146,19 +146,20 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
 
         self.selecting  (get('selected'))
         self.discarding (get('discarded'))
-        self.withcopy   (kw.get('copy',      False))
-        self.withsamples(kw.get('samples',   None))
+        if kw.get('copy', None) is not None:
+            self.withcopy(kw.get('copy',   False))
+        self.withsamples(kw.get('samples', None))
 
     copy = staticmethod(_m_copy)    # type: ignore
 
     def withsamples(self:Self, samples) -> Self:
-        u"specifies that only some samples should be taken"
+        "specifies that only some samples should be taken"
         if samples is not None:
             self.actions.append(lambda item: (item[0], item[1][samples]))
         return self
 
     def withcopy(self:Self, cpy:bool) -> Self:
-        u"specifies that a copy of the data should or shouldn't be made"
+        "specifies that a copy of the data should or shouldn't be made"
         fcn = getattr(self, 'copy', _m_copy)
         if cpy:
             self.actions.append(fcn)
@@ -167,7 +168,7 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
         return self
 
     def withfunction(self:Self, fcn = None, clear = False, beadonly = False) -> Self:
-        u"Adds an action with fcn taking a value as single argument"
+        "Adds an action with fcn taking a value as single argument"
         if clear:
             self.actions = []
 
@@ -185,7 +186,7 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
         return self
 
     def withaction(self:Self, fcn = None, clear = False, beadonly = False) -> Self:
-        u"Adds an action with fcn taking a (key, value) pair as single argument"
+        "Adds an action with fcn taking a (key, value) pair as single argument"
         if clear:
             self.actions = []
 
@@ -203,7 +204,7 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
         return self
 
     def withdata(self:Self, dat, fcn = None, once = True) -> Self:
-        u"sets the data"
+        "sets the data"
         if fcn is None and callable(dat) and not hasattr(dat, '__getitem__'):
             dat, fcn  = self.data, dat
 
@@ -214,15 +215,15 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
         return self
 
     def selecting(self:Self, cyc, clear = False) -> Self:
-        u"selects ids over which to iterate. See class doc."
+        "selects ids over which to iterate. See class doc."
         return _m_selection(self, 'selected', cyc, clear)
 
     def discarding(self:Self, cyc, clear = False) -> Self:
-        u"selects ids to discard. See class doc."
+        "selects ids to discard. See class doc."
         return _m_selection(self, 'discarded', cyc, clear)
 
     def getaction(self, actions = None):
-        u"returns a function performing all actions"
+        "returns a function performing all actions"
         if actions is None:
             actions = self.actions
         if len(actions) > 1:
@@ -237,7 +238,7 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
             return None
 
 class TrackItems(_m_ConfigMixin, Items):
-    u"Class for iterating over beads or creating a new list of data"
+    "Class for iterating over beads or creating a new list of data"
     level     = Level.none
     track     = None  # type: Any
     beadsonly = False
@@ -287,11 +288,11 @@ class TrackItems(_m_ConfigMixin, Items):
             return cpy.selecting(keys, clear = True)
 
     def new(self:TSelf) -> TSelf:
-        u"returns a item containing self in the data field"
+        "returns a item containing self in the data field"
         return self.__class__(track = self.track, data = self)
 
     def keys(self, sel = None) -> Iterator:
-        u"returns accepted keys"
+        "returns accepted keys"
         _m_unlazyfy(self)
         if sel is None:
             sel = self.selected
@@ -301,8 +302,12 @@ class TrackItems(_m_ConfigMixin, Items):
             disc = frozenset(self._keys(self.discarded))
             yield from (key for key in self._keys(sel) if key not in disc)
 
+    def values(self) -> Iterator[np.ndarray]:
+        "returns the values only"
+        yield from (i for _, i in self.__iter__())
+
     def get(self, key, default = _m_NONE):
-        u"get an item"
+        "get an item"
         if default is not _m_NONE:
             vals = next(self._iter(sel = [key]))
         else:
@@ -316,7 +321,7 @@ class TrackItems(_m_ConfigMixin, Items):
         return vals[1]
 
 class Beads(TrackItems, Items):
-    u"""
+    """
     Class for iterating over beads:
 
     * providing all: selects all beads
@@ -359,7 +364,7 @@ class Beads(TrackItems, Items):
             yield from super().__iter__()
 
 class Cycles(TrackItems, Items):
-    u"""
+    """
     Class for iterating over selected cycles:
 
     * providing a pair (column name, cycle id) will extract a cycle on
@@ -476,21 +481,29 @@ class Cycles(TrackItems, Items):
             yield from self.__iterfrombeads(sel)
 
     def withphases(self, first:Optional[int], last:Optional[int]) -> 'Cycles':
-        u"specifies the phase to extract: None for all"
+        "specifies the phase to extract: None for all"
         self.first = first
         self.last  = last
         return self
 
+    def withphase(self, first:Optional[int]) -> 'Cycles':
+        "specifies the phase to extract: None for all"
+        if first is Ellipsis:
+            first = None
+        self.first = first
+        self.last  = first
+        return self
+
     @_m_setfield
     def withfirst(self, first:Optional[int]) -> 'Cycles':
-        u"specifies the phase to extract: None for all"
+        "specifies the phase to extract: None for all"
 
     @_m_setfield
     def withlast(self, last:Optional[int]) -> 'Cycles':
-        u"specifies the phase to extract: None for all"
+        "specifies the phase to extract: None for all"
 
     def phase(self, cid:Optional[int] = None, pid:Optional[int] = None):
-        u"returns phase ids for the given cycle"
+        "returns phase ids for the given cycle"
         vect = self.track.phases
         if {cid, pid}.issubset(_m_ALL):
             return vect         - vect[:,0]
@@ -502,7 +515,7 @@ class Cycles(TrackItems, Items):
             return vect[cid,pid]- vect[cid,0]
 
     def maxsize(self):
-        u"returns the max size of cycles"
+        "returns the max size of cycles"
         if isfunction(self.track):
             self.track = self.track()
 
@@ -524,7 +537,7 @@ class Cycles(TrackItems, Items):
             yield from super().__iter__()
 
 def createTrackItem(level:Optional[Level] = Level.none, **kwargs):
-    u"Returns the item type associated to a level"
+    "Returns the item type associated to a level"
     subs = Items.__subclasses__()
     cls  = next(opt for opt in subs if level is getattr(opt, 'level', '--NONE--'))
     return cls(**kwargs) # type: ignore

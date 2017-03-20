@@ -70,12 +70,12 @@ class ProcessorController:
         "clears data starting at *tsk*"
         self.data.delCache()
 
-    def run(self, tsk:Optional[Task] = None):
+    def run(self, tsk:Optional[Task] = None, copy = False):
         """
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
         """
-        return _runprocessors(self.model, self.data, tsk)
+        return _runprocessors(self.model, self.data, tsk, copy = copy)
 
     @classmethod
     def create(cls,
@@ -157,29 +157,33 @@ class TaskController(Controller):
         "returns the root cache, i;e. the track"
         if parent not in self.__items:
             return None
-        self.__items[parent].run(parent) # create cache if needed
-        track = self.__items[parent].data[0].cache
-        return track()
+        track = self.__items[parent].data[0].cache()
+        if track is None:
+            self.__items[parent].run(parent) # create cache if needed
+            track = self.__items[parent].data[0].cache()
+        return track
 
     @property
     def tasktree(self) -> 'Iterator[Iterator[Task]]':
         "Returns a data object in memory."
         return iter(self.tasks(tsk) for tsk in self.__items.keys())
 
-    def tasks(self, task:RootTask) -> 'Iterator[Task]':
+    def tasks(self, task:Optional[RootTask]) -> 'Iterator[Task]':
         "Returns a data object in memory."
+        if task is None:
+            return iter(tuple())
         return iter(tsk for tsk in self.__items[task].model)
 
     def cache(self, parent:RootTask, tsk:Optional[Task]):
         "Returns the cache for a given task"
         return self.__items[parent].data.getCache(tsk)
 
-    def run(self, parent:RootTask, tsk:Task):
+    def run(self, parent:RootTask, tsk:Task, copy = False):
         """
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
         """
-        return self.__items[parent].run(tsk)
+        return self.__items[parent].run(tsk, copy = copy)
 
     @Controller.emit
     def saveTrack(self, path: str) -> None:

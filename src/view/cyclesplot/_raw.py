@@ -23,13 +23,13 @@ class RawMixin:
         self._rawsource = None # type: Optional[ColumnDataSource]
         self._raw       = None # type: Optional[Figure]
 
-    def __data(self, track, bead) -> Tuple[dict, Tuple[int,int]]:
-        if track is None:
+    def __data(self, cycles, bead) -> Tuple[dict, Tuple[int,int]]:
+        if cycles is None:
             return (dict.fromkeys(('t', 'z', 'cycle', 'color'), [0., 1.]),
                     (1, 2))
 
-        items = list(track.cycles[bead,...])
-        if len(items) == 0 or max(len(i) for _, i in items) == 0:
+        items = list(cycles)
+        if len(items) == 0 or not any(len(i) for _, i in items):
             return self.__data(None, bead)
 
         size = max(len(i) for _, i in items)
@@ -85,7 +85,9 @@ class RawMixin:
         return shape
 
     def _updateraw(self, track, bead):
-        self._rawsource.data, shape = self.__data(track, bead)
+        data, shape          = self.__data(track, bead)
+        self._rawsource.data = data
+        self.setbounds(self._hist.y_range, 'y', data['z'])
         self._hover.updateraw(self._raw, self._rawsource, shape)
         return shape
 

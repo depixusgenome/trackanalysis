@@ -9,16 +9,18 @@ import re
 from    bokeh          import layouts
 from    bokeh.models   import (ColumnDataSource,  # pylint: disable=unused-import
                                Slider, CustomJS, Paragraph, Dropdown,
-                               TextInput, DataTable, TableColumn,
-                               IntEditor, NumberEditor, ToolbarBox)
+                               AutocompleteInput, DataTable, TableColumn,
+                               IntEditor, NumberEditor, ToolbarBox,
+                               RadioButtonGroup, CheckboxButtonGroup)
 
 import  sequences
-from    control         import Controller
-from  ..dialog          import FileDialog
-from  ..base            import enableOnTrack
-from  ..plotutils       import TrackPlotModelController, readsequence,  WidgetCreator
+from    control                     import Controller
+from  ..dialog                      import FileDialog
+from  ..base                        import enableOnTrack
+from  ..plotutils                   import (TrackPlotModelController,
+                                            readsequence,  WidgetCreator)
 
-from  ._bokehext        import DpxHoverModel      # pylint: disable=unused-import
+from  ._bokehext                    import DpxHoverModel      # pylint: disable=unused-import
 
 class _PeakTableCreator(WidgetCreator):
     "Table creator"
@@ -26,20 +28,21 @@ class _PeakTableCreator(WidgetCreator):
         super().__init__(ctrl, model, key)
         self.__widget = None # type: Optional[DataTable]
         self.__hover  = None # type: DpxHoverModel
-        self.getCSS().defaults = {'tablesize'   : (200, 100),
-                                  'title.table' : u'dna ↔ nm'}
+        self.getCSS().defaults = {'tableheight': 100,
+                                  'title.table': u'dna ↔ nm'}
 
     def create(self, hover):
         "creates the widget"
-        size = self.getCSS().tablesize.get()
-        cols = [TableColumn(field  = 'bases',
-                            title  = self.getCSS().hist.ylabel.get(),
-                            editor = IntEditor(),
-                            width  = size[0]//2),
-                TableColumn(field  = 'z',
-                            title  = self.getCSS().ylabel.get(),
-                            editor = NumberEditor(step = 1e-4),
-                            width  = size[0]//2)]
+        height = self.getCSS().tableheight.get()
+        width  = self.getCSS().inputwidth.get()
+        cols   = [TableColumn(field  = 'bases',
+                              title  = self.getCSS().hist.ylabel.get(),
+                              editor = IntEditor(),
+                              width  = width//2),
+                  TableColumn(field  = 'z',
+                              title  = self.getCSS().ylabel.get(),
+                              editor = NumberEditor(step = 1e-4),
+                              width  = width//2)]
 
 
         self.__hover  = hover
@@ -47,32 +50,14 @@ class _PeakTableCreator(WidgetCreator):
                                   columns     = cols,
                                   editable    = True,
                                   row_headers = False,
-                                  width       = size[0],
-                                  height      = size[1],
+                                  width       = width,
+                                  height      = height,
                                   name        = "Cycles:Peaks")
         return Paragraph(text = self.getCSS().title.table.get()), self.__widget
 
     def update(self):
         "updates the widget"
         self.__widget.source.data = self.__data()
-
-    def __data(self):
-        info = self._model.peaks
-        if (self._model.sequencekey is not None
-                and len(self._model.oligos)
-                and info is None):
-            seq   = readsequence(self._model.sequencepath)[self._model.sequencekey]
-            peaks = sequences.peaks(seq, self._model.oligos)['position']
-            if len(peaks) > 2:
-                info = peaks[0], peaks[-1]
-
-        if info is None:
-            info = 0, 1000
-
-        info += (info[0]*self.__hover.stretch+self.__hover.bias,
-                 info[1]*self.__hover.stretch+self.__hover.bias)
-
-        return dict(bases = info[:2], z = info[2:])
 
     def callbacks(self, action, stretch, bias):
         "adding callbacks"
@@ -92,8 +77,10 @@ class _PeakTableCreator(WidgetCreator):
         source = self.__widget.source
         source.on_change("data", _py_cb) # pylint: disable=no-member
 
-        self.getConfig() .observe(('oligos', 'sequence.peaks', 'sequence.peaks'),
+        self.getConfig() .observe('sequence.peaks',
                                   lambda: setattr(source, 'data', self.__data()))
+        self.getRootConfig().observe(('oligos', 'last.path.fasta'),
+                                     lambda: setattr(source, 'data', self.__data()))
         self.getCurrent().observe(('sequence.key',),
                                   lambda: setattr(source, 'data', self.__data()))
 
@@ -116,6 +103,24 @@ class _PeakTableCreator(WidgetCreator):
             mdl.updating += 1
         source.js_on_change("data", _js_cb) # pylint: disable=no-member
 
+    def __data(self):
+        info = self._model.peaks
+        if (self._model.sequencekey is not None
+                and len(self._model.oligos)
+                and info is None):
+            seq   = readsequence(self._model.sequencepath)[self._model.sequencekey]
+            peaks = sequences.peaks(seq, self._model.oligos)['position']
+            if len(peaks) > 2:
+                info = peaks[0], peaks[-1]
+
+        if info is None:
+            info = 0, 1000
+
+        info += (info[0]*self.__hover.stretch+self.__hover.bias,
+                 info[1]*self.__hover.stretch+self.__hover.bias)
+
+        return dict(bases = info[:2], z = info[2:])
+
 class _SliderCreator(WidgetCreator):
     "Slider creator"
     def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
@@ -131,6 +136,7 @@ class _SliderCreator(WidgetCreator):
         widget = lambda x, s, e, n: Slider(value = getattr(self._model, x),
                                            title = self.getCSS().title[x].get(),
                                            step  = self.getConfig().base[x].step.get(),
+                                           width = self.getCSS().inputwidth.get(),
                                            start = s, end = e, name = n)
 
         vals = tuple(self.getConfig().base.stretch.get('start', 'end'))
@@ -199,7 +205,9 @@ class _SequenceCreator(WidgetCreator):
                                    config    = self._ctrl,
                                    title     = self.getCSS().title.fasta.get())
 
-        self.__widget = Dropdown(name = 'Cycles:Sequence', **self.__data())
+        self.__widget = Dropdown(name  = 'Cycles:Sequence',
+                                 width = self.getCSS().inputwidth.get(),
+                                 **self.__data())
         self.__hover  = hover
         self.__observe(action, tick1, tick2)
         return Paragraph(text = self.getCSS().title.sequence.get()), self.__widget
@@ -262,25 +270,29 @@ class _OligosCreator(WidgetCreator):
     "Oligo list creator"
     def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
         super().__init__(ctrl, model, key)
-        self.__widget  = None # type: Optional[TextInput]
+        self.__widget  = None # type: Optional[AutocompleteInput]
         self.getCSS().defaults = {'title.oligos'     : u'Oligos',
                                   'title.oligos.help': u'comma-separated list'}
 
     def create(self, action):
         "creates the widget"
-        self.__widget = TextInput(value       = self.__data(),
-                                  placeholder = self.getCSS().title.oligos.help.get(),
-                                  title       = self.getCSS().title.oligos.get(),
-                                  name        = 'Cycles:Oligos')
+        self.__widget = AutocompleteInput(**self.__data(),
+                                          placeholder = self.getCSS().title.oligos.help.get(),
+                                          title       = self.getCSS().title.oligos.get(),
+                                          width       = self.getCSS().inputwidth.get(),
+                                          name        = 'Cycles:Oligos')
         self.__observe(action)
         return self.__widget
 
     def update(self):
         "updates the widget"
-        self.__widget.value = self.__data()
+        self.__widget.update(**self.__data())
 
     def __data(self):
-        return ', '.join(sorted(j.lower() for j in self._model.oligos))
+        hist = self.getRootConfig().oligos.history.get()
+        lst  = [', '.join(sorted(j.lower() for j in i)) for i in hist]
+        ols  = ', '.join(sorted(j.lower() for j in self._model.oligos))
+        return dict(value = ols, completions = lst)
 
     def __observe(self, action):
         widget = self.__widget
@@ -288,11 +300,71 @@ class _OligosCreator(WidgetCreator):
                             re.IGNORECASE).findall
         @action
         def _py_cb(attr, old, new):
-            self._model.oligos = sorted({i.lower() for i in match(new)})
-        widget.on_change('value', _py_cb)
+            ols  = sorted({i.lower() for i in match(new)})
+            hist = self.getRootConfig().oligos.history
+            lst  = (i for i in hist.get() if i != ols)[:hist.maxlength.get()]
+            hist.set((ols,) + lst)
+            self._model.oligos = ols
 
-        self.getConfig().observe('oligos', lambda: setattr(self.__widget, 'value',
-                                                           self.__data()))
+        widget.on_change('value', _py_cb)
+        self.getRootConfig().observe('oligos', self.update)
+
+class _AlignCreator(WidgetCreator):
+    def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
+        super().__init__(ctrl, model, key)
+        self.getCSS().title.alignment.labels.default = [u'None', u'Phase 1', u'Phase 3']
+        self.getCSS().title.alignment.default        = u'Alignment'
+        self.__widget  = None # type: Optional[RadioButtonGroup]
+
+    def create(self, action):
+        "creates the widget"
+        task  = self._model.alignment.task
+        value = 0 if task is None else 1 if task.phase == 1 else 2
+
+        css = self.getCSS().title
+        self.__widget = RadioButtonGroup(labels = css.alignment.labels.get(),
+                                         active = value,
+                                         name   = 'Cycles:Align')
+        @action
+        def _onclick_cb(value):
+            if value == 0:
+                self._model.alignment.remove()
+            else:
+                self._model.alignment.update(phase  = 1 if value == 1 else 3)
+        self.__widget.on_click(_onclick_cb)
+        return Paragraph(text = css.alignment.get()), self.__widget
+
+class _DriftCreator(WidgetCreator):
+    def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
+        super().__init__(ctrl, model, key)
+        self.getCSS().title.drift.labels.default = [u'Per bead', u'Per cycle']
+        self.getCSS().title.drift.default        = u'Drift Removal'
+        self.__widget  = None # type: Optional[CheckboxButtonGroup]
+
+    def create(self, action):
+        "creates the widget"
+        value = []
+        if self._model.driftperbead.task  is not None:
+            value  = [0]
+        if self._model.driftpercycle.task is not None:
+            value += [1]
+
+        css = self.getCSS().title
+        self.__widget = CheckboxButtonGroup(labels = css.drift.labels.get(),
+                                            active = value,
+                                            name   = 'Cycles:Drift')
+        @action
+        def _onclick_cb(value):
+            for ind, name in enumerate(('driftperbead', 'driftpercycle')):
+                attr = getattr(self._model, name)
+                task = attr.task
+                if ind in value and task is None:
+                    getattr(self._model, name).update()
+                elif ind not in value and task is not None:
+                    getattr(self._model, name).remove()
+        self.__widget.on_click(_onclick_cb)
+        return Paragraph(text = css.drift.get()), self.__widget
+
 
 class ConfigMixin:
     "Everything dealing with config"
@@ -302,23 +374,29 @@ class ConfigMixin:
         self.__sliders = _SliderCreator(*args)
         self.__seq     = _SequenceCreator(*args)
         self.__oligs   = _OligosCreator(*args)
+        self.__align   = _AlignCreator(*args)
+        self.__drift   = _DriftCreator(*args)
+        self.getCSS().inputwidth.default = 205
 
     def _createconfig(self):
         stretch, bias  = self.__sliders.create(self._histsource)
-        par,     table = self.__table  .create(self._hover)
+        table          = self.__table  .create(self._hover)
         oligos         = self.__oligs  .create(self.action)
         parseq,  seq   = self.__seq    .create(self.action, self._hover,
                                                self._gridticker,
                                                self._gridticker.getaxis())
+        align = self.__align  .create(self.action)
+        drift = self.__drift  .create(self.action)
 
-        self.__sliders.callbacks(self.action, self._hover, table)
+        enableOnTrack(self, self._hist, self._raw, stretch, bias, oligos, seq,
+                      table[1], align[1], drift[1])
+
+        self.__sliders.callbacks(self.action, self._hover, table[1])
         self.__table  .callbacks(self.action, stretch, bias)
-        ret = layouts.layout([[layouts.widgetbox([parseq, seq]), oligos],
-                              [layouts.widgetbox([bias, stretch]),
-                               layouts.widgetbox([par,  table])]])
-
-        enableOnTrack(self, self._hist, self._raw, stretch, bias, oligos, seq, table)
-        return ret
+        return layouts.layout([[layouts.widgetbox([parseq, seq, oligos]),
+                                layouts.widgetbox([bias, stretch]),
+                                layouts.widgetbox([*table])],
+                               [layouts.widgetbox([*align, *drift])]])
 
     def _updateconfig(self):
         self.__sliders.update()

@@ -1,27 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Utils for dealing with the JS side of the view"
-from typing                 import (Tuple, Optional, # pylint: disable =unused-import
-                                    Iterator, List)
-from collections            import OrderedDict
-from contextlib             import contextmanager
-from itertools              import product
-from functools              import wraps
-from pathlib                import Path
-import inspect
+from    typing       import (Tuple, Optional, # pylint: disable =unused-import
+                             Iterator, List, Any)
+from    collections  import OrderedDict
+from    contextlib   import contextmanager
+from    itertools    import product
+from    functools    import wraps
+from    pathlib      import Path
+import  inspect
 
 import  bokeh.palettes
-import  bokeh.core.properties  as     props
-from    bokeh.models           import Row, CustomJS, Range1d, Model, HoverTool
-from    bokeh.plotting.figure  import Figure
+import  bokeh.core.properties as     props
+from    bokeh.models          import Row, CustomJS, Range1d, Model, HoverTool
+from    bokeh.plotting.figure import Figure
 
-from    sequences              import read as _readsequences
+from    sequences                   import read as _readsequences
 
-from    model.task             import RootTask, Task
-from    data.track             import Track
-from    utils                  import CachedIO
-from    control                import Controller
-from    .base                  import BokehView, Action
+from    model.task                  import RootTask, Task
+from    data.track                  import Track
+from    utils                       import CachedIO
+from    control                     import Controller
+from    .base                       import BokehView, Action
 
 def checksizes(fcn):
     "Checks that the ColumnDataSource have same sizes"
@@ -222,6 +222,10 @@ class PlotCreator:
         "Removes the controller"
         del self._ctrl
 
+    def getRootConfig(self):
+        "returns config values"
+        return self._ctrl.getGlobal('config')
+
     def getConfig(self):
         "returns config values"
         return self._ctrl.getGlobal(self.key())
@@ -321,6 +325,10 @@ class TrackPlotModelController:
         self._ctrl = ctrl
         self._key  = key
 
+    def getRootConfig(self):
+        "returns config values"
+        return self._ctrl.getGlobal('config')
+
     def getConfig(self):
         "returns config values"
         return self._ctrl.getGlobal('config'+self._key)
@@ -349,7 +357,7 @@ class TrackPlotModelController:
         return self.getCurrent().track.get()
 
     @property
-    def task(self) -> Optional[Task]:
+    def currenttask(self) -> Optional[Task]:
         "returns the current task"
         return self.getCurrent().task.get()
 
@@ -368,6 +376,10 @@ class WidgetCreator:
     def key(self, base = 'config') -> str:
         "returns the key"
         return base+self._key
+
+    def getRootConfig(self):
+        "returns config values"
+        return self._ctrl.getGlobal('config')
 
     def getConfig(self):
         "returns config values"
@@ -390,20 +402,24 @@ class TrackPlotCreator(PlotCreator):
 
     def create(self, doc) -> DpxKeyedRow:
         "returns the figure"
-        return self._create(*self._gettrack(), doc)
+        return self._create(doc, *self._gettrack())
 
     def update(self, items:dict):
         "Updates the data"
-        if not ('track' in items or 'bead' in items):
+        if not self._needsupdate(items):
             return
 
         with self.updating():
-            self._update(*self._gettrack(), items)
+            self._update(items, *self._gettrack())
 
-    def _create(self, track, bead, doc) -> DpxKeyedRow:
+    def _create(self, doc, *args) -> DpxKeyedRow:
         raise NotImplementedError()
 
-    def _update(self, track, bead, items):
+    @staticmethod
+    def _needsupdate(items):
+        return 'track' in items or 'bead' in items
+
+    def _update(self, items, *args):
         raise NotImplementedError()
 
     def _gettrack(self) -> Tuple[Track, int]:
@@ -414,10 +430,8 @@ class TrackPlotView(BokehView):
     PLOTTER = None # type: Optional[type]
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        assert callable(self.PLOTTER)
         self._plotter = self.PLOTTER(self._ctrl) # pylint: disable=not-callable
         self._ctrl.getGlobal("current").bead.default = None
-        self._ctrl.observe("globals.current", self._onUpdateCurrent)
 
     def close(self):
         "remove controller"
@@ -430,4 +444,5 @@ class TrackPlotView(BokehView):
 
     def getroots(self, doc):
         "adds items to doc"
+        self._ctrl.observe("globals.current", self._onUpdateCurrent)
         return self._plotter.create(doc),

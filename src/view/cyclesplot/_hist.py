@@ -133,17 +133,33 @@ class HistMixin:
 
         self._gridticker = DpxFixedTicker()
         self._gridticker.create(self.getCSS(), self._hist)
-        self._gridticker.observe(self.getConfig(), self._model, self._hist)
+        self._gridticker.observe(self.getRootConfig(), self._model, self._hist)
 
         self._hover.createhist(self._hist, self._model, self.getCSS(), self.getConfig())
-        self._hover.observe(self.getConfig(), self._model)
+        self._hover.observe(self.getRootConfig(), self.getConfig(), self._model)
         self._slavexaxis()
 
     def _updatehist(self, track, data, shape):
         self._histsource.data = hist = self.__data(track, data, shape)
         self._hover.updatehist(self._hist, hist, self._model, self.getConfig())
-        self.setbounds(self._hist.y_range, 'y', (hist['bottom'][0], hist['top'][-1]))
         self._gridticker.updatedata(self._model, self._hist)
+
+        bottom = self._histsource.data["bottom"]
+        delta  = bottom[1]-bottom[0]
+
+        cycles = self._hist.extra_x_ranges["cycles"]
+        frames = self._hist.x_range
+        yrng   = self._hist.y_range
+
+        ind1   = min(len(bottom), max(0, int((yrng.start-bottom[0])/delta-1)))
+        ind2   = min(len(bottom), max(0, int((yrng.end  -bottom[0])/delta+1)))
+
+        if ind1 >= ind2:
+            cycles.start = 0
+            frames.start = 0
+        else:
+            cycles.update(start = 0, end = max(self._histsource.data['cycles'][ind1:ind2])+1)
+            frames.update(start = 0, end = max(self._histsource.data['frames'][ind1:ind2])+1)
 
     if TYPE_CHECKING:
         getConfig = getCSS = lambda: None

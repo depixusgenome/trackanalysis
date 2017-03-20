@@ -179,7 +179,7 @@ class _MapGetter:
 
     def set(self, arg):
         "Calls update using the current base key"
-        return self._ctrl.update((self._base, arg))
+        return self._ctrl.update({self._base: arg})
 
     def update(self, *args, **kwargs):
         """

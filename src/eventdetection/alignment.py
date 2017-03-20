@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Cycle alignment: define an absolute zero common to all cycles"
+"Cycle alignment: define an absolute zero common to all cycles"
 from   typing import (Union, Optional, # pylint: disable=unused-import
                       Sequence, Iterable, Iterator, cast)
 from   enum   import Enum
 import numpy  as     np
+from   numpy.lib.index_tricks import as_strided
 
 from   utils                    import initdefaults, kwargsdefaults, changefields
 from   signalfilter.convolve    import KernelConvolution
 
 class AlignmentMode(Enum):
-    u"Computation modes ExtremumAlignment."
+    "Computation modes ExtremumAlignment."
     min = 'min'
     max = 'max'
 
 class ExtremumAlignment:
-    u"""
+    """
     Functor which an array of biases computed as the extremum of provided ranges.
     Biases are furthermore centered at zero around their median
 
@@ -33,16 +34,18 @@ class ExtremumAlignment:
 
     def __get(self, elem):
         bsize  = self.binsize
-        binned = elem[len(elem) % bsize:].reshape((len(elem)//bsize, bsize))
+        binned = as_strided(elem,
+                            shape   = (len(elem)-bsize+1, bsize),
+                            strides = (elem.strides[0],)*2)
         return np.median(binned, axis = 0)
 
     def one(self, data) -> np.ndarray:
-        u"call on one table"
+        "call on one table"
         fcn = getattr(np, self.mode.value)
         return -fcn(self.__get(data) if self.binsize > 2 else data)
 
     def many(self, data) -> np.ndarray:
-        u"call on all tables"
+        "call on all tables"
         itr = (self.__get(j) for j in data) if self.binsize > 2 else data
         fcn = getattr(np, self.mode.value)
         res = np.fromiter((-fcn(i) for i in itr), dtype = np.float32)
@@ -56,11 +59,11 @@ class ExtremumAlignment:
 
     @classmethod
     def run(cls, data, **kwa):
-        u"runs the algorithm"
+        "runs the algorithm"
         return cls(**kwa)(data)
 
 class CorrelationAlignment:
-    u"""
+    """
     Finds biases which correlate best a cycle's histogram to the histogram of
     all cycles. This repeated multiple times with the latter histogram taking
     prior biases into account.
@@ -86,7 +89,7 @@ class CorrelationAlignment:
 
     @property
     def exact_oversampling(self) -> float:
-        u"The exact oversampling used: int(oversampling)//2 * 2 +1"
+        "The exact oversampling used: int(oversampling)//2 * 2 +1"
         return (int(self.oversampling)//2) * 2 + 1
 
     @kwargsdefaults(__DEFAULTS+('kernel',))
@@ -128,7 +131,7 @@ class CorrelationAlignment:
 
     @classmethod
     def run(cls, data: Iterable[np.ndarray], **kwa):
-        u"runs the algorithm"
+        "runs the algorithm"
         return cls()(data, **kwa)
 
 Alignment = Union[ExtremumAlignment, CorrelationAlignment]
