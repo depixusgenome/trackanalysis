@@ -11,7 +11,8 @@ from    bokeh.models   import (ColumnDataSource,  # pylint: disable=unused-impor
                                Slider, CustomJS, Paragraph, Dropdown,
                                AutocompleteInput, DataTable, TableColumn,
                                IntEditor, NumberEditor, ToolbarBox,
-                               RadioButtonGroup, CheckboxButtonGroup)
+                               RadioButtonGroup, CheckboxButtonGroup,
+                               CheckboxGroup)
 
 import  sequences
 from    control                     import Controller
@@ -365,6 +366,31 @@ class _DriftCreator(WidgetCreator):
         self.__widget.on_click(_onclick_cb)
         return Paragraph(text = css.drift.get()), self.__widget
 
+class _EventsCreator(WidgetCreator):
+    def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
+        super().__init__(ctrl, model, key)
+        self.getCSS().title.eventdetection.default = u'Find events'
+        self.__widget  = None # type: Optional[CheckboxGroup]
+
+    def create(self, action):
+        "creates the widget"
+        value = []
+        if self._model.eventdetection.task  is not None:
+            value  = [0]
+        css = self.getCSS().title
+        self.__widget = CheckboxGroup(labels = [css.eventdetection.get()],
+                                      active = value,
+                                      name   = 'Cycles:Events')
+        @action
+        def _onclick_cb(value):
+            task = self._model.eventdetection.task
+            if 0 in value and task is None:
+                self._model.eventdetection.update()
+            elif 0 not in value and task is not None:
+                self._model.eventdetection.remove()
+
+        self.__widget.on_click(_onclick_cb)
+        return self.__widget
 
 class ConfigMixin:
     "Everything dealing with config"
@@ -376,6 +402,7 @@ class ConfigMixin:
         self.__oligs   = _OligosCreator(*args)
         self.__align   = _AlignCreator(*args)
         self.__drift   = _DriftCreator(*args)
+        self.__events  = _EventsCreator(*args)
         self.getCSS().inputwidth.default = 205
 
     def _createconfig(self):
@@ -385,18 +412,20 @@ class ConfigMixin:
         parseq,  seq   = self.__seq    .create(self.action, self._hover,
                                                self._gridticker,
                                                self._gridticker.getaxis())
-        align = self.__align  .create(self.action)
-        drift = self.__drift  .create(self.action)
+        align  = self.__align  .create(self.action)
+        drift  = self.__drift  .create(self.action)
+        events = self.__events .create(self.action)
 
         enableOnTrack(self, self._hist, self._raw, stretch, bias, oligos, seq,
-                      table[1], align[1], drift[1])
+                      table[1], align[1], drift[1], events)
 
         self.__sliders.callbacks(self.action, self._hover, table[1])
         self.__table  .callbacks(self.action, stretch, bias)
         return layouts.layout([[layouts.widgetbox([parseq, seq, oligos]),
                                 layouts.widgetbox([bias, stretch]),
                                 layouts.widgetbox([*table])],
-                               [layouts.widgetbox([*align, *drift])]])
+                               [layouts.widgetbox([*i])
+                                for i in (align, drift, (events,))]])
 
     def _updateconfig(self):
         self.__sliders.update()

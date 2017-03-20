@@ -47,9 +47,12 @@ class HistMixin:
             items = zeros,
         else:
             zvals = data['z'].reshape(shape)
-            ind1  = track.phases[:,self.__PHASE]  -track.phases[:,0]
-            ind2  = track.phases[:,self.__PHASE+1]-track.phases[:,0]
-            items = [val[ix1:ix2] for ix1, ix2, val in zip(ind1, ind2, zvals)]
+            if self._model.eventdetection.task is None:
+                ind1  = track.phases[:,self.__PHASE]  -track.phases[:,0]
+                ind2  = track.phases[:,self.__PHASE+1]-track.phases[:,0]
+                items = [val[ix1:ix2] for ix1, ix2, val in zip(ind1, ind2, zvals)]
+            else:
+                items = zvals
 
             rng   = (np.nanmin([np.nanmin(i) for i in items]),
                      np.nanmax([np.nanmax(i) for i in items]))
@@ -59,7 +62,8 @@ class HistMixin:
             if bins[-2] > rng[1]:
                 bins = bins[:-1]
 
-            items = [np.bincount(np.digitize(i, bins), minlength = len(bins))[1:]
+            size  = len(bins)-1
+            items = [np.bincount(np.digitize(i, bins), minlength = size+1)[1:][:size]
                      for i in items]
             zeros = np.zeros((len(bins)-1,), dtype = 'f4')
 

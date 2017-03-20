@@ -7,8 +7,9 @@ from    copy                        import deepcopy
 
 from    utils                       import NoArgs, updatedeepcopy
 from    model.task                  import Task
-from    eventdetection.processor    import ExtremumAlignmentTask as AlignmentTask
 from    cordrift.processor          import DriftTask
+from    eventdetection.processor    import (ExtremumAlignmentTask as AlignmentTask,
+                                            EventDetectionTask)
 from    control                     import Controller
 from    ..plotutils                 import TrackPlotModelController, readsequence
 
@@ -54,11 +55,12 @@ def _beadorconfig(attr):
 
 class SpecificTaskController(TrackPlotModelController):
     "access to tasks"
-    tasktype   = None # type: type
+    TASKTYPE  = None  # type: type
+    PREVIOUS  = tuple # type: ignore
     def __init__(self, *args):
         super().__init__(*args)
         cnf = self.getRootConfig().tasks
-        cnf[self.configname].default = self.tasktype() # pylint: disable=not-callable
+        cnf[self.configname].default = self.TASKTYPE() # pylint: disable=not-callable
 
     @property
     def configname(self) -> str:
@@ -100,19 +102,24 @@ class SpecificTaskController(TrackPlotModelController):
 
     def check(self, task, parent = NoArgs) -> bool:
         "wether this controller deals with this task"
-        if not (isinstance(task, self.tasktype) and self._check(task)):
+        if not (isinstance(task, self.TASKTYPE) and self._check(task)):
             return False
         if parent is NoArgs:
             return True
         return parent is self.roottask
 
-    def _check(self, task) -> bool:
-        raise NotImplementedError()
+    @staticmethod
+    def _check(_) -> bool:
+        return True
 
     @property
     def index(self) -> Optional[Task]:
         "returns the index the new task should have"
-        raise NotImplementedError()
+        tasks = tuple(self._ctrl.tasks(self.roottask))
+        for i in range(1, len(tasks)):
+            if not isinstance(i, self.PREVIOUS):
+                return i
+        return len(tasks)
 
     def observe(self, *args, **kwa):
         "observes the provided task"
@@ -122,10 +129,7 @@ class SpecificTaskController(TrackPlotModelController):
 
 class AlignmentController(SpecificTaskController):
     "access to aligment"
-    tasktype = AlignmentTask
-    def _check(self, task) -> bool:
-        return True
-
+    TASKTYPE = AlignmentTask
     @property
     def index(self) -> Optional[Task]:
         "returns the index the new task should have"
@@ -133,8 +137,10 @@ class AlignmentController(SpecificTaskController):
 
 class DriftPerBeadController(SpecificTaskController):
     "access to drift per bead"
-    tasktype = DriftTask
-    def _check(self, task) -> bool:
+    TASKTYPE = DriftTask
+    PREVIOUS = AlignmentTask,
+    @staticmethod
+    def _check(task) -> bool:
         return task.onbeads
 
     @property
@@ -145,29 +151,35 @@ class DriftPerBeadController(SpecificTaskController):
 
 class DriftPerCycleController(SpecificTaskController):
     "access to drift per cycle"
-    tasktype = DriftTask
-    def _check(self, task) -> bool:
+    TASKTYPE = DriftTask
+    PREVIOUS = AlignmentTask, DriftTask
+    @staticmethod
+    def _check(task) -> bool:
         return not task.onbeads
 
     @property
     def index(self) -> Optional[Task]:
         "returns the index the new task should have"
         tasks = tuple(self._ctrl.tasks(self.roottask))
-        if   len(tasks) > 3 and isinstance(tasks[2], DriftTask):
-            return 3
-        elif len(tasks) > 2 and isinstance(tasks[1], (AlignmentTask, DriftTask)):
-            return 2
-        else:
-            return 1
+        for i in range(1, len(tasks)):
+            if not isinstance(i, (DriftTask, AlignmentTask)):
+                return i
+        return len(tasks)
+
+class EventDetectionController(SpecificTaskController):
+    "access to drift per cycle"
+    TASKTYPE = EventDetectionTask
+    PREVIOUS = AlignmentTask, DriftTask
 
 class CyclesModelController(TrackPlotModelController):
     "Model for Cycles View"
     _CACHED = 'base.stretch', 'base.bias', 'sequence.key', 'sequence.peaks'
     def __init__(self, key:str, ctrl:Controller) -> None:
         super().__init__(key, ctrl)
-        self.driftperbead  = DriftPerBeadController(key, ctrl)
-        self.driftpercycle = DriftPerCycleController(key, ctrl)
-        self.alignment     = AlignmentController(key, ctrl)
+        self.driftperbead   = DriftPerBeadController(key, ctrl)
+        self.driftpercycle  = DriftPerCycleController(key, ctrl)
+        self.alignment      = AlignmentController(key, ctrl)
+        self.eventdetection = EventDetectionController(key, ctrl)
 
         self.getConfig().defaults = {'binwidth'          : .003,
                                      'minframes'         : 10,

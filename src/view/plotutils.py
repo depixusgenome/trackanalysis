@@ -10,6 +10,8 @@ from    functools    import wraps
 from    pathlib      import Path
 import  inspect
 
+import  numpy        as     np
+
 import  bokeh.palettes
 import  bokeh.core.properties as     props
 from    bokeh.models          import Row, CustomJS, Range1d, Model, HoverTool
@@ -254,8 +256,12 @@ class PlotCreator:
         "Sets the range boundaries"
         over  = self.getConfig().boundary.overshoot.get()
 
-        vmin  = min(arr)
-        vmax  = max(arr)
+        if isinstance(arr, np.ndarray):
+            vmin  = np.nanmin(arr)
+            vmax  = np.nanmax(arr)
+        else:
+            vmin  = min(arr)
+            vmax  = max(arr)
         delta = (vmax-vmin)*over*.5
         vmin -= delta
         vmax += delta
