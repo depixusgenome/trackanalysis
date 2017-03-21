@@ -12,7 +12,7 @@ from    bokeh.models   import (ColumnDataSource,  # pylint: disable=unused-impor
                                AutocompleteInput, DataTable, TableColumn,
                                IntEditor, NumberEditor, ToolbarBox,
                                RadioButtonGroup, CheckboxButtonGroup,
-                               CheckboxGroup)
+                               CheckboxGroup, Widget)
 
 import  sequences
 from    control                     import Controller
@@ -23,8 +23,8 @@ from  ..plotutils                   import (TrackPlotModelController,
 
 from  ._bokehext                    import DpxHoverModel      # pylint: disable=unused-import
 
-class _PeakTableCreator(WidgetCreator):
-    "Table creator"
+class PeaksTableCreator(WidgetCreator):
+    "Table of peaks in z and dna units"
     def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
         super().__init__(ctrl, model, key)
         self.__widget = None # type: Optional[DataTable]
@@ -122,8 +122,8 @@ class _PeakTableCreator(WidgetCreator):
 
         return dict(bases = info[:2], z = info[2:])
 
-class _SliderCreator(WidgetCreator):
-    "Slider creator"
+class ConversionSlidersCreator(WidgetCreator):
+    "Sliders for managing stretch and bias factors"
     def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
         super().__init__(ctrl, model, key)
         self.__stretch = None # type: Optional[Slider]
@@ -187,8 +187,8 @@ class _SliderCreator(WidgetCreator):
         stretch.js_on_change('value', _js_cb)
         bias   .js_on_change('value', _js_cb)
 
-class _SequenceCreator(WidgetCreator):
-    "Sequence Droppdown creator"
+class SequencePathCreator(WidgetCreator):
+    "Dropdown for choosing a fasta file"
     def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
         super().__init__(ctrl, model, key)
         self.__widget  = None # type: Optional[Dropdown]
@@ -267,8 +267,8 @@ class _SequenceCreator(WidgetCreator):
         self.getConfig().observe(('sequence.key', 'sequence.path'),
                                  lambda: self.__widget.update(**self.__data()))
 
-class _OligosCreator(WidgetCreator):
-    "Oligo list creator"
+class OligoListCreator(WidgetCreator):
+    "Input for defining a list of oligos"
     def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
         super().__init__(ctrl, model, key)
         self.__widget  = None # type: Optional[AutocompleteInput]
@@ -310,99 +310,111 @@ class _OligosCreator(WidgetCreator):
         widget.on_change('value', _py_cb)
         self.getRootConfig().observe('oligos', self.update)
 
-class _AlignCreator(WidgetCreator):
+class GroupCreator(WidgetCreator):
+    "Allows creating group widgets"
+    INPUT = RadioButtonGroup
+    def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
+        super().__init__(ctrl, model, key)
+        self._widget  = None # type: ignore
+
+    def create(self, action):
+        "creates the widget"
+        name = self.__class__.__name__.lower()[:-len('Creator')]
+        css  = self.getCSS().title[name]
+        self._widget = self.INPUT(labels = css.labels.get(),
+                                  name   = 'Cycles:'+name,
+                                  **self._data())
+        self._widget.on_click(action(self.onclick_cb))
+
+        if css.get(default = None) is not None:
+            return Paragraph(text = css.get()), self._widget
+        return self._widget,
+
+    def update(self):
+        "updates the widget"
+        self._widget.update(**self._data())
+
+    def onclick_cb(self, value):
+        "action to be performed when buttons are clicked"
+        raise NotImplementedError()
+
+    def _data(self) -> dict:
+        raise NotImplementedError()
+
+class AlignmentCreator(GroupCreator):
+    "Allows aligning the cycles on a given phase"
+    INPUT = RadioButtonGroup
     def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
         super().__init__(ctrl, model, key)
         self.getCSS().title.alignment.labels.default = [u'None', u'Phase 1', u'Phase 3']
         self.getCSS().title.alignment.default        = u'Alignment'
-        self.__widget  = None # type: Optional[RadioButtonGroup]
 
-    def create(self, action):
-        "creates the widget"
+    def onclick_cb(self, value):
+        "action to be performed when buttons are clicked"
+        if value == 0:
+            self._model.alignment.remove()
+        else:
+            self._model.alignment.update(phase  = 1 if value == 1 else 3)
+
+    def _data(self):
         task  = self._model.alignment.task
-        value = 0 if task is None else 1 if task.phase == 1 else 2
+        return dict(active = 0 if task is None else 1 if task.phase == 1 else 2)
 
-        css = self.getCSS().title
-        self.__widget = RadioButtonGroup(labels = css.alignment.labels.get(),
-                                         active = value,
-                                         name   = 'Cycles:Align')
-        @action
-        def _onclick_cb(value):
-            if value == 0:
-                self._model.alignment.remove()
-            else:
-                self._model.alignment.update(phase  = 1 if value == 1 else 3)
-        self.__widget.on_click(_onclick_cb)
-        return Paragraph(text = css.alignment.get()), self.__widget
-
-class _DriftCreator(WidgetCreator):
+class DriftCreator(GroupCreator):
+    "Allows removing the drifts"
+    INPUT = CheckboxButtonGroup
     def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
         super().__init__(ctrl, model, key)
         self.getCSS().title.drift.labels.default = [u'Per bead', u'Per cycle']
         self.getCSS().title.drift.default        = u'Drift Removal'
-        self.__widget  = None # type: Optional[CheckboxButtonGroup]
 
-    def create(self, action):
-        "creates the widget"
-        value = []
+    def onclick_cb(self, value):
+        "action to be performed when buttons are clicked"
+        for ind, name in enumerate(('driftperbead', 'driftpercycle')):
+            attr = getattr(self._model, name)
+            task = attr.task
+            if ind in value and task is None:
+                getattr(self._model, name).update()
+            elif ind not in value and task is not None:
+                getattr(self._model, name).remove()
+
+    def _data(self) -> dict:
+        value = [] # type: List[int]
         if self._model.driftperbead.task  is not None:
             value  = [0]
         if self._model.driftpercycle.task is not None:
             value += [1]
+        return dict(active = value)
 
-        css = self.getCSS().title
-        self.__widget = CheckboxButtonGroup(labels = css.drift.labels.get(),
-                                            active = value,
-                                            name   = 'Cycles:Drift')
-        @action
-        def _onclick_cb(value):
-            for ind, name in enumerate(('driftperbead', 'driftpercycle')):
-                attr = getattr(self._model, name)
-                task = attr.task
-                if ind in value and task is None:
-                    getattr(self._model, name).update()
-                elif ind not in value and task is not None:
-                    getattr(self._model, name).remove()
-        self.__widget.on_click(_onclick_cb)
-        return Paragraph(text = css.drift.get()), self.__widget
-
-class _EventsCreator(WidgetCreator):
+class EventDetectionCreator(GroupCreator):
+    "Allows displaying only events"
+    INPUT = CheckboxGroup
     def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
         super().__init__(ctrl, model, key)
-        self.getCSS().title.eventdetection.default = u'Find events'
-        self.__widget  = None # type: Optional[CheckboxGroup]
+        self.getCSS().title.eventdetection.labels.default = [u'Find events']
 
-    def create(self, action):
-        "creates the widget"
-        value = []
-        if self._model.eventdetection.task  is not None:
-            value  = [0]
-        css = self.getCSS().title
-        self.__widget = CheckboxGroup(labels = [css.eventdetection.get()],
-                                      active = value,
-                                      name   = 'Cycles:Events')
-        @action
-        def _onclick_cb(value):
-            task = self._model.eventdetection.task
-            if 0 in value and task is None:
-                self._model.eventdetection.update()
-            elif 0 not in value and task is not None:
-                self._model.eventdetection.remove()
+    def onclick_cb(self, value):
+        "action to be performed when buttons are clicked"
+        task = self._model.eventdetection.task
+        if 0 in value and task is None:
+            self._model.eventdetection.update()
+        elif 0 not in value and task is not None:
+            self._model.eventdetection.remove()
 
-        self.__widget.on_click(_onclick_cb)
-        return self.__widget
+    def _data(self) -> dict:
+        return dict(active = [] if self._model.eventdetection.task is None else [0])
 
 class ConfigMixin:
     "Everything dealing with config"
     def __init__(self):
         args           = self._ctrl, self._model, self.key('')
-        self.__table   = _PeakTableCreator(*args)
-        self.__sliders = _SliderCreator(*args)
-        self.__seq     = _SequenceCreator(*args)
-        self.__oligs   = _OligosCreator(*args)
-        self.__align   = _AlignCreator(*args)
-        self.__drift   = _DriftCreator(*args)
-        self.__events  = _EventsCreator(*args)
+        self.__table   = PeaksTableCreator(*args)
+        self.__sliders = ConversionSlidersCreator(*args)
+        self.__seq     = SequencePathCreator(*args)
+        self.__oligs   = OligoListCreator(*args)
+        self.__align   = AlignmentCreator(*args)
+        self.__drift   = DriftCreator(*args)
+        self.__events  = EventDetectionCreator(*args)
         self.getCSS().inputwidth.default = 205
 
     def _createconfig(self):
@@ -416,8 +428,8 @@ class ConfigMixin:
         drift  = self.__drift  .create(self.action)
         events = self.__events .create(self.action)
 
-        enableOnTrack(self, self._hist, self._raw, stretch, bias, oligos, seq,
-                      table[1], align[1], drift[1], events)
+        enableOnTrack(self, self._hist, self._raw,
+                      *(i for i in locals().values() if isinstance(i, Widget)))
 
         self.__sliders.callbacks(self.action, self._hover, table[1])
         self.__table  .callbacks(self.action, stretch, bias)
@@ -425,13 +437,12 @@ class ConfigMixin:
                                 layouts.widgetbox([bias, stretch]),
                                 layouts.widgetbox([*table])],
                                [layouts.widgetbox([*i])
-                                for i in (align, drift, (events,))]])
+                                for i in (align, drift, events)]])
 
     def _updateconfig(self):
-        self.__sliders.update()
-        self.__table.update()
-        self.__oligs.update()
-        self.__seq.update()
+        for ite in self.__dict__.values():
+            if isinstance(ite, WidgetCreator):
+                ite.update()
 
     if TYPE_CHECKING:
         # pylint: disable=no-self-use,unused-argument

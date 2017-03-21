@@ -147,7 +147,7 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
         self.selecting  (get('selected'))
         self.discarding (get('discarded'))
         if kw.get('copy', None) is not None:
-            self.withcopy(kw.get('copy',   False))
+            self.withcopy(kw['copy'])
         self.withsamples(kw.get('samples', None))
 
     copy = staticmethod(_m_copy)    # type: ignore

@@ -135,16 +135,43 @@ def test_cyclesplot(bokehaction):        # pylint: disable=redefined-outer-name
         assert server.widget['Cycles:Bias'].value == approx(-.05, abs = 1e-5)
         server.change('Cycles:Stretch',  'value', .9)
         assert server.widget['Cycles:Stretch'].value == approx(0.9, abs = 1e-5)
+        server.press('Control-z')
 
+def test_cyclesplot2(bokehaction):        # pylint: disable=redefined-outer-name
+    u"test plot"
+
+    with bokehaction.launch(CyclesPlotView, 'app.BeadsToolBar') as server:
+        server.load('big_legacy')
+
+        fig  = server.widget['Cycles:Hist']()
         assert fig.extra_x_ranges['cycles'].end < 50
-        server.change('Cycles:Align', 'active', 1)
-        assert server.widget['Cycles:Align'].active == 1
+        server.change('Cycles:Alignment', 'active', 1)
+
         for _ in range(5):
-            if fig.extra_x_ranges['cycles'].end < 80:
-                server.wait()
+            val = fig.extra_x_ranges['cycles'].end
+            if val is not None and val > 80:
+                break
+            server.wait()
+        assert server.widget['Cycles:Alignment'].active == 1
         assert fig.extra_x_ranges['cycles'].end > 80
 
-        server.press('Ctrl-z')
+        server.press('Control-z')
+        for _ in range(5):
+            val = fig.extra_x_ranges['cycles'].end
+            if val is not None and val < 80:
+                break
+            server.wait()
+        assert server.widget['Cycles:Alignment'].active == 0
+        assert fig.extra_x_ranges['cycles'].end < 50
+
+        server.change('Cycles:EventDetection', 'active', [0])
+        rng = server.widget['Cycles:Raw']().x_range
+        for _ in range(5):
+            val = rng.end
+            if val is not None and val < 400:
+                break
+        assert rng.start == 0
+        assert rng.end < 310
 
 if __name__ == '__main__':
-    test_cyclesplot(bokehaction(None))
+    test_cyclesplot2(bokehaction(None))
