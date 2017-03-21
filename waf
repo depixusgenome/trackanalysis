@@ -17,7 +17,7 @@ if sys.platform.startswith('win'):
         args = args[2:]
     else:
         args = args[1:]
-    subprocess.run([str(Path("wafbuilder")/"bin"/"waf.bat")] + list(args[1:]))
+    subprocess.run([str(Path("wafbuilder")/"bin"/"waf.bat")] + list(args))
 else:
     with open(str(fname), "rb") as stream:
         exec(compile(stream.read(), str(fname), "exec"))
