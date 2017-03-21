@@ -274,7 +274,8 @@ class _ManagedServerLoop:
     def change(self,
                model: Union[str,dict,Model],
                attrs: Union[str, Sequence[str]],
-               value: Any):
+               value: Any,
+               browser = True):
         "Changes a model attribute on the browser side"
         if isinstance(model, str):
             mdl = next(iter(self.doc.select(dict(name = model))))
@@ -282,7 +283,13 @@ class _ManagedServerLoop:
             mdl = next(iter(self.doc.select(model)))
         else:
             mdl = model
-        self.cmd(self.loading.change, mdl, attrs, value)
+        if browser:
+            self.cmd(self.loading.change, mdl, attrs, value)
+        else:
+            assert isinstance(attrs, str)
+            def _cb():
+                setattr(mdl, attrs, value)
+            self.cmd(_cb)
 
     @property
     def widget(self):

@@ -92,6 +92,7 @@ class RawMixin:
         css             = self.getCSS()
         self._raw       = figure(y_axis_label = css.ylabel.get(),
                                  y_range      = Range1d(start = 0., end = 0.),
+                                 name         = 'Cycles:Raw',
                                  **self._figargs(css))
         raw, shape      = self.__data(track, bead)
         self._rawsource = ColumnDataSource(data = raw)

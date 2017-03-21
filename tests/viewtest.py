@@ -164,14 +164,18 @@ def test_cyclesplot2(bokehaction):        # pylint: disable=redefined-outer-name
         assert server.widget['Cycles:Alignment'].active == 0
         assert fig.extra_x_ranges['cycles'].end < 50
 
-        server.change('Cycles:EventDetection', 'active', [0])
-        rng = server.widget['Cycles:Raw']().x_range
+        rng  = server.widget['Cycles:Raw']().x_range
+        vals = rng.start, rng.end
+
+        server.change('Cycles:EventDetection', 'active', [0], browser = False)
         for _ in range(5):
             val = rng.end
             if val is not None and val < 400:
                 break
-        assert rng.start == 0
-        assert rng.end < 310
+            server.wait()
+        assert rng.start > vals[0]
+        assert rng.end   < vals[1]
+        assert rng.end   < 350
 
 if __name__ == '__main__':
     test_cyclesplot2(bokehaction(None))

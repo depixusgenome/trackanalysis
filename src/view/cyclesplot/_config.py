@@ -319,8 +319,8 @@ class GroupCreator(WidgetCreator):
 
     def create(self, action):
         "creates the widget"
-        name = self.__class__.__name__.lower()[:-len('Creator')]
-        css  = self.getCSS().title[name]
+        name = self.__class__.__name__[:-len('Creator')]
+        css  = self.getCSS().title[name.lower()]
         self._widget = self.INPUT(labels = css.labels.get(),
                                   name   = 'Cycles:'+name,
                                   **self._data())
