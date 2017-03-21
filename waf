@@ -1,12 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Calls on waf directly: this is a link which both windows and git can understand"
-from pathlib import Path
+import  sys
+import  subprocess
+from    pathlib     import Path
+
 fname = Path.cwd()/"wafbuilder"/"bin"/"waf"
 if not fname.exists():
     msg  = "Missing wafbuilder: do\n"
     msg += "    git clone http://gitlab.picoseq.org/build-system/wafbuilder.git\n"
     raise IOError(msg)
 
-with open(str(fname), "rb") as stream:
-    exec(compile(stream.read(), str(fname), "exec"))
+if sys.platform.startswith('win'):
+    args = tuple(sys.argv)
+    if args[0].startswith('python'):
+        args = args[2:]
+    else:
+        args = args[1:]
+    subprocess.run([str(Path("wafbuilder")/"bin"/"waf.bat")] + list(args[1:]))
+else:
+    with open(str(fname), "rb") as stream:
+        exec(compile(stream.read(), str(fname), "exec"))
