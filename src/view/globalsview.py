@@ -22,7 +22,7 @@ class GlobalsView(View):
                 tasks += ('task',)
 
             try:
-                inst = next(next(ctrl.tasktree))
+                inst = next(next(ctrl.tasks(...)))
             except StopIteration:
                 del cnf[tasks]
             else:

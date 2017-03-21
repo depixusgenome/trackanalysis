@@ -3,9 +3,7 @@
 "access to the model"
 
 from    typing                      import Optional, Sequence, Tuple, cast
-from    copy                        import deepcopy
-
-from    utils                       import NoArgs, updatedeepcopy
+from    utils                       import NoArgs, updatecopy, updatedeepcopy
 from    model.task                  import Task
 from    cordrift.processor          import DriftTask
 from    eventdetection.processor    import (ExtremumAlignmentTask as AlignmentTask,
@@ -70,14 +68,7 @@ class SpecificTaskController(TrackPlotModelController):
     @property
     def configtask(self) -> Task:
         "returns the config task"
-        return self.getRootConfig().tasks[self.configname].get()
-
-    @configtask.setter
-    def configtask(self, task) -> Task:
-        "returns the config task"
-        task = deepcopy(task)
-        self.getRootConfig().tasks[self.configname] = task
-        return task
+        return self.getRootConfig().tasks[self.configname]
 
     def remove(self):
         "removes the task"
@@ -85,15 +76,21 @@ class SpecificTaskController(TrackPlotModelController):
         if task is not None:
             self._ctrl.removeTask(self.roottask, task)
 
+            cnf = self.configtask
+            cnf.set(updatecopy(cnf.get(), disabled = True))
+
     def update(self, **kwa):
         "removes the task"
         root = self.roottask
         task = self.task
+        cnf  = self.configtask
         if task is None:
-            item  = updatedeepcopy(self.configtask, **kwa)
+            kwa.setdefault('disabled', False)
+            item = updatedeepcopy(cnf.get(), **kwa)
             self._ctrl.addTask(root, item, index = self.index)
         else:
             self._ctrl.updateTask(root, task, **kwa)
+        cnf.set(updatecopy(cnf.get(), **kwa))
 
     @property
     def task(self) -> Optional[Task]:

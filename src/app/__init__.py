@@ -127,6 +127,7 @@ def _create(main, controls, views): # pylint: disable=unused-argument
             ctrl = self.MainControl(handlers = dict(), topview = self)
             keys = KeyPressManager(ctrl = ctrl)
             main.__init__(self, ctrl = ctrl, keys = keys)
+            main.ismain(self)
 
             ctrl.readconfig()
             main.observe(self)
@@ -213,6 +214,10 @@ class WithToolbar:
                 self._bar      = tbar(**kwa)
                 self._mainview = main(**kwa)
                 super().__init__(**kwa)
+
+            def ismain(self):
+                "sets-up the main view as main"
+                self._mainview.ismain()
 
             def close(self):
                 "remove controller"

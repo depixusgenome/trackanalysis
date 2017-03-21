@@ -28,6 +28,9 @@ class View:
     def observe(self):
         "whatever needs to be initialized"
 
+    def ismain(self):
+        "Allows setting-up stuff only when the view is the main one"
+
     def close(self):
         "closes the application"
         self._ctrl.close()

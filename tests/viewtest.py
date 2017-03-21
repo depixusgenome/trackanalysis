@@ -76,6 +76,7 @@ def test_cyclesplot(bokehaction):        # pylint: disable=redefined-outer-name
             vals[:2] = evts['y'].value
 
     with bokehaction.launch(CyclesPlotView, 'app.BeadsToolBar') as server:
+        server.ctrl.getGlobal('config').tasks.default = []
         server.ctrl.observe("globals.current.plot.cycles", _printrng)
         server.load('big_legacy')
 
@@ -141,6 +142,7 @@ def test_cyclesplot2(bokehaction):        # pylint: disable=redefined-outer-name
     u"test plot"
 
     with bokehaction.launch(CyclesPlotView, 'app.BeadsToolBar') as server:
+        server.ctrl.getGlobal('config').tasks.default = []
         server.load('big_legacy')
 
         fig  = server.widget['Cycles:Hist']()

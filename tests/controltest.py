@@ -172,7 +172,7 @@ class TestTaskControl:
         read = tasks.TrackReaderTask(path = utpath("small_legacy"))
         ctrl.openTrack(read)
         assert len(events['opentrack']) == 1
-        assert tuple(tuple(ite) for ite in ctrl.tasktree) == ((read,),)
+        assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,),)
 
         dum0  = _DummyTask0()
         dum1  = _DummyTask1()
@@ -180,15 +180,15 @@ class TestTaskControl:
 
         ctrl.addTask(read, dum0)
         assert len(events['addtask']) == 1
-        assert tuple(tuple(ite) for ite in ctrl.tasktree) == ((read,dum0),)
+        assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,dum0),)
 
         ctrl.addTask(read, dum1)
         assert len(events['addtask']) == 2
-        assert tuple(tuple(ite) for ite in ctrl.tasktree) == ((read,dum0,dum1),)
+        assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,dum0,dum1),)
 
         ctrl.addTask(read, dum2)
         assert len(events['addtask']) == 3
-        assert tuple(tuple(ite) for ite in ctrl.tasktree) == ((read,dum0,dum1,dum2),)
+        assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,dum0,dum1,dum2),)
 
         assert ctrl.cache(read, dum0)() is None
         assert ctrl.cache(read, dum1)() is None
@@ -229,12 +229,12 @@ class TestTaskControl:
 
         ctrl.removeTask(read, dum1)
         assert len(events['removetask'])                  == 1
-        assert tuple(tuple(ite) for ite in ctrl.tasktree) == ((read,dum0,dum2),)
+        assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,dum0,dum2),)
         assert ctrl.cache(read, dum2)()                   is None
 
         ctrl.closeTrack(read)
         assert len(events['closetrack'])                  == 1
-        assert tuple(tuple(ite) for ite in ctrl.tasktree) == tuple()
+        assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == tuple()
 
     def test_closure(self):
         u"testing that closures don't include too many side-effects"
