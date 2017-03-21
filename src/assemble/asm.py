@@ -67,6 +67,7 @@ class NestedAsmrs:
         self.asmrs = kwargs.get("asmrs",[]) # Assemblers
         for idx,val in enumerate(self.seeds):
             self.asmrs[idx].npstate = numpy.random.RandomState(val)
+        self.T = kwargs.get("T",1.0) # pylint:disable=invalid-name
         self._pool = None
         #if self.nprocs>1:
         try:
@@ -75,17 +76,20 @@ class NestedAsmrs:
             print("could not create Pool")
             self._pool = None
 
-
+    def __del__(self,):
+        u'closes pool'
+        if not self._pool is None:
+            self._pool.close()
 
     def run(self,niter:int=1):
         u'''run in parallel each asmrs
         '''
         if self._pool is None:
             for asmr in self.asmrs:
-                asmr.run(niter=niter)
+                asmr.run(niter=niter,T=self.T)
         else:
             self.asmrs = self._pool.map(_run_asmr,
-                                        [(asmr,niter) for asmr in self.asmrs])
+                                        [(asmr,{"niter":niter,"T":self.T}) for asmr in self.asmrs])
 
     @property
     def result(self):
@@ -110,8 +114,17 @@ class NestedAsmrs:
 
 def _run_asmr(*args):
     asmr=args[0][0]
-    asmr.run(niter=args[0][1])
+    asmr.run(**args[0][1])
     return asmr
+
+
+
+def adjust_T(nested:NestedAsmrs):
+    u'modifies the temperature of the NestedAsmrs to increase mixing'
+    # read fun values
+    all_fun = [i.fun for i in nested.result]
+    all_fun.sort()
+    nested.T = all_fun[-1]-all_fun[0]
 
 class Assembler:
     u'''
