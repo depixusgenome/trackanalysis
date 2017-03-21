@@ -11,13 +11,13 @@ if not fname.exists():
     msg += "    git clone http://gitlab.picoseq.org/build-system/wafbuilder.git\n"
     raise IOError(msg)
 
+args = tuple(sys.argv)
+if args[0].startswith('python'):
+    args = args[2:]
+else:
+    args = args[1:]
+
 if sys.platform.startswith('win'):
-    args = tuple(sys.argv)
-    if args[0].startswith('python'):
-        args = args[2:]
-    else:
-        args = args[1:]
     subprocess.run([str(Path("wafbuilder")/"bin"/"waf.bat")] + list(args))
 else:
-    with open(str(fname), "rb") as stream:
-        exec(compile(stream.read(), str(fname), "exec"))
+    subprocess.run([str(Path("wafbuilder")/"bin"/"waf")] + list(args))
