@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Updates app manager so as to deal with controllers"
+"Updates app manager so as to deal with controllers"
+from typing     import TYPE_CHECKING
 from functools  import wraps
+from pathlib    import Path
+
+import appdirs
 
 from flexx.webruntime           import launch as _flexxlaunch
 from flexx.webruntime.common    import StreamReader
@@ -10,11 +14,14 @@ from bokeh.application          import Application
 from bokeh.application.handlers import FunctionHandler
 from bokeh.command.util         import build_single_handler_application
 from bokeh.settings             import settings
+from bokeh.layouts              import layout
 
+from utils         import getlocals
 from utils.gui     import MetaMixin
 from control       import Controller
 from view          import View, BokehView
 from view.keypress import KeyPressManager
+import view.toolbar as toolbars
 
 def _serverkwargs(kwa):
     server_kwargs                         = dict(kwa)
@@ -25,10 +32,15 @@ def _serverkwargs(kwa):
     server_kwargs['redirect_root']        = True
     return server_kwargs
 
+def _title(view) -> str:
+    appname   = getattr(view.MainControl, 'APPNAME', 'track analysis')
+    return appname.capitalize()
+
 def _serve(view, **kwa):
-    u"Launches a bokeh server"
+    "Launches a bokeh server"
     def start(doc):
-        u"Starts the application and adds itself to the document"
+        "Starts the application and adds itself to the document"
+        doc.title = _title(view)
         return view.open(doc)
 
     server = Server(Application(FunctionHandler(start)), **_serverkwargs(kwa))
@@ -36,25 +48,26 @@ def _serve(view, **kwa):
     return server
 
 def _launch(view, **kwa):
-    u"Launches a bokeh server"
+    "Launches a bokeh server"
     if isinstance(view, Server):
         server = view
     else:
         server = _serve(view, **kwa.pop('server', {}))
 
-    old        = StreamReader.run
-    def run(self):
-        u"Stop the stream reader"
-        old(self)
-        server.stop()
+    def run(self, __old__ = StreamReader.run):
+        "Stop the stream reader"
+        __old__(self)
+        if not getattr(server, '_stopped', False):
+            server.stop()
+        server.io_loop.stop()
     StreamReader.run = run
 
     rtime = _flexxlaunch('http://localhost:5006/', **kwa)
-    def close(self):
-        u"closes the application"
+    def close(self, __old__ = view.MainControl.close):
+        "closes the application"
         top, self.topview = self.topview, None
         if top is not None:
-            self._callmixins('close') # pylint: disable=protected-access
+            __old__(self)
             top.close()
             rtime.close()
     view.MainControl.ISAPP = True
@@ -62,77 +75,182 @@ def _launch(view, **kwa):
     return server
 
 def _create(main, controls, views): # pylint: disable=unused-argument
-    u"Creates a main view"
-    class MainControl(metaclass   = MetaMixin,
-                      mixins      = controls,
-                      selectfirst = True):
-        u"""
-        Main controller: contains all sub-controllers.
-        These share a common dictionnary of handlers
-        """
-        ISAPP = False
-        def __init__(self, **kwa):
-            self.topview = kwa['topview']
+    "Creates a main view"
 
-        def __undos__(self):
-            u"yields all undoable user actions"
-            yield from self._yieldovermixins('__undos__') # pylint: disable=no-member
+    class Main(*(main,)+views):
+        "The main view"
+        class MainControl(metaclass   = MetaMixin,
+                          mixins      = controls,
+                          selectfirst = True):
+            """
+            Main controller: contains all sub-controllers.
+            These share a common dictionnary of handlers
+            """
+            ISAPP    = False
+            APPNAME  = next((i.APPNAME for i in (main,)+views if hasattr(i, 'APPNAME')),
+                            'Track Analysis')
+            def __init__(self, **kwa):
+                self.topview = kwa['topview']
 
-    def __init__(self):
-        u"sets up the controller, then initializes the view"
-        ctrl = MainControl(handlers = dict(), topview = self)
-        keys = KeyPressManager(ctrl = ctrl)
-        main.__init__(self, ctrl = ctrl, keys = keys)
+            if TYPE_CHECKING:
+                def _yieldovermixins(self, *_1, **_2):
+                    pass
+                def _callmixins(self, *_1, **_2):
+                    pass
 
-    return type('Main', (main,)+views,
-                dict(__doc__     = u"The main view",
-                     MainControl = MainControl,
-                     __init__    = __init__))
+            def __undos__(self):
+                "yields all undoable user actions"
+                yield from self._yieldovermixins('__undos__')
 
-def setup(locs,
+            @classmethod
+            def configpath(cls, version) -> Path:
+                "returns the path to the config file"
+                name = cls.APPNAME.replace(' ', '_').lower()
+                path = Path(appdirs.user_config_dir('depixus', 'depixus', name+"/"+version))
+                return path/'config.txt'
+
+            def readconfig(self):
+                "writes the config"
+                self._callmixins("readconfig", self.configpath)
+
+            def writeconfig(self):
+                "writes the config"
+                self._callmixins("writeconfig", self.configpath)
+
+            def close(self):
+                "remove controller"
+                self.writeconfig()
+                self._callmixins("close")
+
+        def __init__(self):
+            "sets up the controller, then initializes the view"
+            ctrl = self.MainControl(handlers = dict(), topview = self)
+            keys = KeyPressManager(ctrl = ctrl)
+            main.__init__(self, ctrl = ctrl, keys = keys)
+            main.ismain(self)
+
+            ctrl.readconfig()
+            main.observe(self)
+            for cls in views:
+                cls.observe(self)
+
+    return Main
+
+def setup(locs            = None, # pylint: disable=too-many-arguments
           mainview        = None,
           creator         = lambda _: _,
           defaultcontrols = tuple(),
-          defaultviews    = tuple()
+          defaultviews    = tuple(),
+          decorate        = lambda x: x
          ):
-    u"Sets up launch and serve functions for a given app context"
+    "Sets up launch and serve functions for a given app context"
+    if locs is None:
+        locs = getlocals(1)
 
-
+    @decorate
     def application(main     = mainview,
                     controls = defaultcontrols,
                     views    = defaultviews,
                     creator  = creator):
-        u"Creates a main view"
+        "Creates a main view"
+        def _get(string):
+            if isinstance(string, str):
+                mod  = string[:string.rfind('.')]
+                attr = string[string.rfind('.')+1:]
+                return getattr(__import__(mod, fromlist = (attr,)), attr)
+            return string
+
         classes = set(cls for cls in locs.values() if isinstance(cls, type))
         classes.difference_update((Controller, View))
-        if controls is all:
+        if controls in (all, Ellipsis):
             controls = tuple(i for i in classes if issubclass(i, Controller))
+        else:
+            controls = tuple(_get(i) for i in controls)
 
-        if views is all:
+        if views in (all, Ellipsis):
             views = tuple(i for i in classes
                           if (issubclass(i, View)
                               and not issubclass(i, BokehView)))
+        else:
+            views = tuple(_get(i) for i in views)
+
         return _create(creator(main), controls, views)
 
+    @decorate
     def serve(main     = mainview,
               controls = defaultcontrols,
               views    = defaultviews,
               creator  = creator,
               **kwa):
-        u"Creates a browser app"
+        "Creates a browser app"
         return _serve(application(main, controls, views, creator), **kwa)
 
+    @decorate
     def launch(main     = mainview,
                controls = defaultcontrols,
                views    = defaultviews,
                creator  = creator,
                **kwa):
-        u"Creates a desktop app"
-        kwa.setdefault("title", 'track analysis')
+        "Creates a desktop app"
+        app = application(main, controls, views, creator)
+        kwa.setdefault("title", _title(app))
         kwa.setdefault("size",  (1000, 1000))
-        return _launch(application(main, controls, views, creator), **kwa)
+        return _launch(app, **kwa)
 
     locs.setdefault('serve',   serve)
     locs.setdefault('launch',  launch)
 
-setup(locals())
+class WithToolbar:
+    "Creates an app with a toolbar"
+    def __init__(self, tbar):
+        self.tbar = tbar
+
+    def __call__(self, main):
+        tbar = self.tbar
+        class ViewWithToolbar(BokehView):
+            "A view with the toolbar on top"
+            APPNAME = getattr(main, 'APPNAME', main.__name__.lower().replace('view', ''))
+            def __init__(self, **kwa):
+                self._bar      = tbar(**kwa)
+                self._mainview = main(**kwa)
+                super().__init__(**kwa)
+
+            def ismain(self):
+                "sets-up the main view as main"
+                self._mainview.ismain()
+
+            def close(self):
+                "remove controller"
+                super().close()
+                self._bar.close()
+                self._mainview.close()
+
+            def getroots(self, doc):
+                "adds items to doc"
+                children = [self._bar.getroots(doc), self._mainview.getroots(doc)]
+                return layout(children, sizing_mode = 'scale_width'),
+
+        return ViewWithToolbar
+
+VIEWS       = ('undo.UndoView', 'view.globalsview.GlobalsView',)
+CONTROLS    = ('control.taskcontrol.TaskController',
+               'control.globalscontrol.GlobalsController',
+               'undo.UndoController')
+
+setup()
+
+class Defaults:
+    "Empty app"
+    setup(defaultcontrols = CONTROLS, defaultviews = VIEWS)
+
+class ToolBar:
+    "App with a toolbar"
+    setup(creator         = WithToolbar(toolbars.ToolBar),
+          defaultcontrols = CONTROLS,
+          defaultviews    = VIEWS+("view.toolbar.ToolBar",))
+
+class BeadsToolBar:
+    "App with a toolbar containing a bead spinner"
+    setup(creator         = WithToolbar(toolbars.BeadToolBar),
+          defaultcontrols = CONTROLS,
+          defaultviews    = VIEWS+("view.toolbar.BeadToolBar",))

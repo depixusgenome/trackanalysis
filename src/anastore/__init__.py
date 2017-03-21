@@ -5,54 +5,84 @@ Track Analysis inputs and outputs.
 
 This does not include track files io.
 """
+from   typing   import Union, IO, Any
+from   pathlib  import Path
 import json
 import os
 
 from ._fromjson import Runner as _InputRunner
 from ._tojson   import Runner as _OutputRunner
-from ._patches  import run    as _patch
+from ._patches  import Patches
+from ._default  import __TASKS__, __CONFIGS__
 
-__VERSION__ = 0
-def _dump(info, addversion = True):
-    if addversion:
-        return [{'version': __VERSION__}, _OutputRunner()(info)]
-    return _OutputRunner()(info)
+def _apply(info, patch, patchfcn, inout):
+    if patch == 'tasks':
+        patch = __TASKS__
+    elif patch == 'config':
+        patch = __CONFIGS__
+    else:
+        return inout()(info)
 
-def _load(info):
-    patched = _patch(info[1], info[0]['version'], __VERSION__)
-    return _InputRunner()(patched)
+    return inout()(getattr(patch, patchfcn)(info))
 
-def dumps(info, addversion = True, **kwa):
+def dumps(info:Any, patch = 'tasks', **kwa):
     u"Dumps data to json. This includes the version number"
-    return json.dumps(_dump(info, addversion), **kwa)
+    return json.dumps(_apply(info, patch, 'dumps', _OutputRunner), **kwa)
 
-def dump(info, arg, **kwa):
+def dump(info:Any, path:Union[str,Path,IO], patch = 'tasks', **kwa):
     u"Dumps data to json file. This includes the version number"
-    if isinstance(arg, str):
-        with open(arg, 'w') as stream:
-            return json.dump(_dump(info), stream, **kwa)
-    return json.dump(_dump(info), arg, **kwa)
+    if isinstance(path, (Path, str)):
+        with open(str(Path(path).absolute()), 'w') as stream:
+            return dump(info, stream, **kwa)
+    return json.dump(_apply(info, patch, 'dumps', _OutputRunner), path, **kwa)
 
-def loads(stream, **kwa):
+def loads(stream:str, patch = 'tasks', **kwa):
     u"Dumps data to json. This includes the version number"
-    return _load(json.loads(stream, **kwa))
+    return _apply(json.loads(stream, **kwa), patch, 'loads', _InputRunner)
 
-def load(arg, **kwa):
+def load(path:Union[str,Path,IO], patch = 'tasks', **kwa):
     u"Dumps data to json file. This includes the version number"
-    if isinstance(arg, str):
-        if isana(arg):
-            with open(arg) as stream:
-                return _load(json.load(stream, **kwa))
+    if isinstance(path, (Path, str)):
+        if isana(path):
+            with open(str(Path(path).absolute()), 'r') as stream:
+                return load(stream, patch, **kwa)
         return None
-    return _load(json.load(arg, **kwa))
 
-def isana(path):
+    return _apply(json.load(path, **kwa), patch, 'loads', _InputRunner)
+
+def isana(path: Union[str, Path]):
     u"Wether the file as an analysis file"
-    if not (os.path.exists(path) and os.path.isfile(path)):
+    path = Path(path)
+    if not path.is_file():
         return False
 
+    const = '[{"version":'
     try:
-        with open(path, 'r') as stream:
-            return stream.read(len('[{"version":')) == '[{"version":'
+        with open(str(path), 'r') as stream:
+            line = stream.read(100).replace('\n', '').replace(' ', '')
+            return line[:len(const)] == const
     except: # pylint: disable=bare-except
         return False
+
+def version(patch):
+    u"returns the current version"
+    if patch == 'tasks':
+        patch = __TASKS__
+    elif patch == 'config':
+        patch = __CONFIGS__
+    else:
+        return None
+    return 'v%d' % patch.version
+
+def iterversions(patch):
+    u"iters over possible versions"
+    if patch == 'tasks':
+        patch = __TASKS__
+    elif patch == 'config':
+        patch = __CONFIGS__
+    else:
+        yield None
+        return
+
+    for i in range(patch.version, -1, -1):
+        yield 'v%d' % i

@@ -33,6 +33,7 @@ class TaskIsUniqueError(Exception):
 class Task:
     u"Class containing high-level configuration infos for a task"
     def __init__(self, **kwargs) -> None:
+        self.disabled = kwargs.get('disabled', False)
         if 'level' in kwargs:
             self.level = toenum(Level, kwargs['level']) # type: Level
         else:
@@ -58,6 +59,16 @@ class Task:
 
     def __setstate__(self, kwargs):
         self.__dict__.update(self.__class__(**kwargs).__dict__)
+
+    def __eq__(self, obj):
+        if obj.__class__ is not self.__class__:
+            return False
+        if hasattr(self, '__getstate__'):
+            return obj.__getstate__() == self.__getstate__() # pylint: disable=no-member
+        else:
+            return obj.__dict__ == self.__dict__
+
+    __hash__ = object.__hash__
 
     @classmethod
     def unique(cls):
@@ -90,10 +101,14 @@ class RootTask(Task):
 
 class TrackReaderTask(RootTask):
     u"Class indicating that a track file should be added to memory"
-    def __init__(self, path: Optional[str] = None, beadsonly:bool = False) -> None:
+    def __init__(self,
+                 path:     Optional[str] = None,
+                 beadsonly:bool          = False,
+                 copy:     bool          = False) -> None:
         super().__init__()
         self.path      = path # Optional[str]
         self.beadsonly = beadsonly
+        self.copy      = copy
 
 @unique
 class TagAction(Enum):

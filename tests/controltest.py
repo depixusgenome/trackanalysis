@@ -2,14 +2,18 @@
 # -*- coding: utf-8 -*-
 u"Test control"
 # pylint: disable=import-error
+from    pathlib                 import Path
+import  tempfile
 import  numpy
+import pytest
+from    control.globalscontrol  import GlobalsController
 from    control.event           import Event, EmitPolicy
 from    control.taskcontrol     import TaskController
 from    control.processor       import Processor, Cache, Runner
 from    data                    import Cycles, Beads, TrackItems
 import  model.task           as tasks
 
-from    testingcore             import path
+from    testingcore             import path as utpath
 
 # pylint: disable=no-self-use
 
@@ -165,10 +169,10 @@ class TestTaskControl:
             ctrl.observe(evt, _obs)
 
 
-        read = tasks.TrackReaderTask(path = path("small_legacy"))
+        read = tasks.TrackReaderTask(path = utpath("small_legacy"))
         ctrl.openTrack(read)
         assert len(events['opentrack']) == 1
-        assert tuple(tuple(ite) for ite in ctrl.tasktree) == ((read,),)
+        assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,),)
 
         dum0  = _DummyTask0()
         dum1  = _DummyTask1()
@@ -176,15 +180,15 @@ class TestTaskControl:
 
         ctrl.addTask(read, dum0)
         assert len(events['addtask']) == 1
-        assert tuple(tuple(ite) for ite in ctrl.tasktree) == ((read,dum0),)
+        assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,dum0),)
 
         ctrl.addTask(read, dum1)
         assert len(events['addtask']) == 2
-        assert tuple(tuple(ite) for ite in ctrl.tasktree) == ((read,dum0,dum1),)
+        assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,dum0,dum1),)
 
         ctrl.addTask(read, dum2)
         assert len(events['addtask']) == 3
-        assert tuple(tuple(ite) for ite in ctrl.tasktree) == ((read,dum0,dum1,dum2),)
+        assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,dum0,dum1,dum2),)
 
         assert ctrl.cache(read, dum0)() is None
         assert ctrl.cache(read, dum1)() is None
@@ -225,12 +229,12 @@ class TestTaskControl:
 
         ctrl.removeTask(read, dum1)
         assert len(events['removetask'])                  == 1
-        assert tuple(tuple(ite) for ite in ctrl.tasktree) == ((read,dum0,dum2),)
+        assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,dum0,dum2),)
         assert ctrl.cache(read, dum2)()                   is None
 
         ctrl.closeTrack(read)
         assert len(events['closetrack'])                  == 1
-        assert tuple(tuple(ite) for ite in ctrl.tasktree) == tuple()
+        assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == tuple()
 
     def test_closure(self):
         u"testing that closures don't include too many side-effects"
@@ -299,7 +303,7 @@ class TestTaskControl:
                 return _outp
 
         ctrl = TaskController()
-        read = tasks.TrackReaderTask(path = path("small_legacy"))
+        read = tasks.TrackReaderTask(path = utpath("small_legacy"))
         tb   = TBeads()
         ctrl.openTrack(read, (read, tb))
 
@@ -352,7 +356,7 @@ class TestTaskControl:
                 args.apply(None, levels = self.levels)
 
         ctrl = TaskController()
-        read = tasks.TrackReaderTask(path = path("small_pickle"))
+        read = tasks.TrackReaderTask(path = utpath("small_pickle"))
         tb   = TBeads()
         tc   = TCycle()
         ctrl.openTrack(read, (read, tc, tb))
@@ -379,5 +383,73 @@ class TestTaskControl:
         assert type(val)    is numpy.ndarray
         assert type(val[0]) is Cycles
 
+def test_globals(): # pylint: disable=too-many-statements
+    u"testing globals"
+    ctrl = GlobalsController()
+    ctrl.addGlobalMap("toto", titi = 1)
+    assert ctrl.getGlobal("toto").titi.get() == 1 # pylint: disable=no-member
+    assert ctrl.getGlobal("toto").titi == 1
+
+    ctrl.getGlobal("toto").titi = 2
+    assert ctrl.getGlobal("toto").titi.get() == 2 # pylint: disable=no-member
+    assert ctrl.getGlobal("toto").titi == 2
+
+    ctrl.updateGlobal("toto", titi = 3)
+    assert ctrl.getGlobal("toto").titi.get() == 3 # pylint: disable=no-member
+    assert ctrl.getGlobal("toto").titi  == 3
+
+    ctrl.updateGlobal("toto", titi = 3)
+    assert ctrl.getGlobal("toto").titi  == 3
+    del ctrl.getGlobal("toto")['titi']
+    assert ctrl.getGlobal("toto").titi == 1
+
+    del ctrl.getGlobal("toto").titi
+    assert ctrl.getGlobal("toto").titi == 1
+
+    ctrl.updateGlobal("toto", titi = 3)
+    assert ctrl.getGlobal("toto").titi  == 3
+    ctrl.getGlobal("toto").pop("titi")
+    assert ctrl.getGlobal("toto").titi == 1
+
+    with pytest.raises(KeyError):
+        ctrl.getGlobal("toto").mm.pp = 1
+
+    ctrl.getGlobal("toto").tintin.default = 11
+    ctrl.updateGlobal("toto", titi = 3)
+    ctrl.getGlobal("toto").tata.default = 11
+    ctrl.addGlobalMap("tutu", tata = 11)
+    ctrl.getGlobal("toto").tata = 10
+    ctrl.getGlobal("tutu").tata = 10
+    ctrl.addGlobalMap("toto.mm", tata = 11)
+    ctrl.getGlobal("toto.mm").tata = 10
+
+    path  = tempfile.mktemp()+"/config.txt"
+    cpath = lambda *_: Path(path)
+    assert not Path(path).exists()
+    ctrl.writeconfig(cpath)
+    assert Path(path).exists()
+
+    ctrl.getGlobal("toto").tintin.default = 10
+    del ctrl.getGlobal("toto").titi
+    del ctrl.getGlobal("toto.mm").tata
+    assert ctrl.getGlobal("toto.mm").tata == 11
+    assert ctrl.getGlobal("toto").titi == 1
+    ctrl.getGlobal("toto").titi.default = 2
+    ctrl.removeGlobalMap("tutu")
+    with pytest.raises(KeyError):
+        ctrl.getGlobal("tutu")
+
+    ctrl.readconfig(cpath)
+    assert ctrl.getGlobal("toto.mm").tata == 10
+    assert ctrl.getGlobal("toto").tintin == 10
+    assert ctrl.getGlobal("toto").titi == 3
+    del ctrl.getGlobal("toto").titi
+    assert ctrl.getGlobal("toto").titi == 2
+
+    with pytest.raises(KeyError):
+        ctrl.getGlobal("tutu")
+    with pytest.raises(KeyError):
+        ctrl.getGlobal("toto").tutu.get()
+
 if __name__ == '__main__':
-    TestTaskControl().test_cache()
+    test_globals()

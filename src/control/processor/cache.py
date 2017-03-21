@@ -56,7 +56,7 @@ class CacheItem:
         u"Delayed access to the cache"
         return self._getCache(self._cache[0])
 
-    cache   = property(lambda self: self.getCache, setCache)
+    cache   = property(lambda self: self.getCache(), setCache)
     proc    = property(lambda self: self._proc)
 
 class Cache:

@@ -37,9 +37,17 @@ def path(name:str) -> Union[str, Sequence[str]]:
         val = Path("../tests/"+__package__+"/"+i)
         if not val.exists():
             raise KeyError("Check your file name!!! {}".format(val))
-        return val.absolute()
+        return str(val.absolute())
 
     if isinstance(default, tuple):
         return tuple(_test(i) for i in default)
     else:
         return _test(default)
+
+def getmonkey():
+    u"for calling with pudb"
+    import  pytest  # pylint: disable=unused-import,unused-variable
+    from    _pytest.monkeypatch import MonkeyPatch
+    import  warnings
+    warnings.warn("Unsafe call to MonkeyPatch. Use only for manual debugging")
+    return MonkeyPatch()

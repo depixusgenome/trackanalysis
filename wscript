@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # encoding: utf-8
-from waflib.Build import BuildContext
+from functools import wraps as _wraps
 try:
     import wafbuilder as builder
 except ImportError:
     raise ImportError("Don't forget to clone wafbuilder!!")
 import wafbuilder.git as git
+from waflib.Build       import BuildContext
+from waflib.Configure   import ConfigurationContext
 
 require(cxx    = {'msvc'     : 14.0,
                   'clang++'  : 3.8,
@@ -21,10 +23,6 @@ require(python = {'pybind11' : '2.0.1',
                   'mypy'     : '0.470'},
         rtime  = False)
 
-class _Tester(BuildContext):
-    u"runs pytests"
-    cmd = 'test'
-    fun = 'test'
 
 builder.defaultwscript("src", "make()")
 _ALL      = ('tests',) + tuple(builder.wscripted("src"))
@@ -113,6 +111,8 @@ def build(bld):
     builder.findpyext(bld, set(mod for mod in mods if mod != 'tests'))
     bld.recurse(mods)
 
+class _Test(BuildContext):
+    fun = cmd = 'test'
 def test(bld):
     u"runs pytests"
     mods  = ('/'+i.split('/')[-1] for i in _getmodules(bld))
@@ -124,12 +124,23 @@ def environment(cnf):
     u"prints the environment variables for current configuration"
     print(cnf.env)
 
+class _Requirements(BuildContext):
+    fun = cmd = 'requirements'
+def requirements(cnf):
+    u"prints requirements"
+    _getmodules(cnf)
+    builder.requirements.tostream()
+
+class _CondaEnv(BuildContext):
+    fun = cmd = 'condaenv'
 def condaenv(cnf):
     u"prints the conda yaml recipe"
     _getmodules(cnf)
     builder.condaenv('trackanalysis')
 
-def requirements(cnf):
+class _CondaSetup(ConfigurationContext):
+    fun = cmd = 'condasetup'
+def condasetup(cnf):
     u"prints requirements"
     _getmodules(cnf)
-    builder.requirements.tostream()
+    builder.condasetup(cnf)

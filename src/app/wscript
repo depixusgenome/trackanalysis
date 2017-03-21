@@ -1,0 +1,2 @@
+require('python', click = 6.6, appdirs = "1.4.0")
+make()

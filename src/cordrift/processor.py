@@ -17,14 +17,14 @@ from eventdetection         import EventDetectionConfig
 from eventdetection.data    import Events
 from .collapse              import (Range, Profile, # pylint: disable=unused-import
                                     CollapseAlg, CollapseByMerging, CollapseToMean,
-                                    StitchAlg, StitchByDerivate)
+                                    StitchAlg, StitchByDerivate, StitchByInterpolation)
 
 class DriftTask(Task, EventDetectionConfig):
     u"Removes correlations between cycles"
     level     = Level.bead
     phases    = (5, 5)                  # type: Optional[Tuple[int,int]]
-    collapse  = CollapseByMerging()     # type: Optional[CollapseAlg]
-    stitch    = StitchByDerivate()      # type: Optional[StitchAlg]
+    collapse  = CollapseToMean()        # type: Optional[CollapseAlg]
+    stitch    = StitchByInterpolation() # type: Optional[StitchAlg]
     zero      = 10
     precision = 0.
     onbeads   = True

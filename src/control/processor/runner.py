@@ -127,13 +127,18 @@ class Runner:
 
     first = property(lambda self: self.data.first)
 
-def run(model, data, tsk = None):
+def run(model, data, tsk = None, copy = False):
     u"""
     Iterates through the list up to and including *tsk*.
     Iterates through all if *tsk* is None
     """
-    args = Runner(model, data)
-    ind  = None if tsk is None else data.index(tsk)+1
+    args  = Runner(model, data)
+    ind   = None if tsk is None else data.index(tsk)+1
+    first = True
     for proc in data[:ind]:
-        proc.run(args)
+        if not proc.task.disabled:
+            proc.run(args)
+            if first and copy:
+                args.gen = tuple(frame.withcopy(True) for frame in args.gen)
+            first  = False
     return args.gen

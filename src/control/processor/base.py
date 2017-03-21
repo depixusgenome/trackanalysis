@@ -191,13 +191,10 @@ class TrackReaderProcessor(Processor):
 
     def run(self, args:'Runner'):
         u"returns a dask delayed item"
-        res = args.data.setCacheDefault(self, Track(path = self.task.path))
-        if self.task.levelou is Level.cycle:
-            args.apply((res.cyclesonly if self.task.beadsonly else res.cycles,),
-                       levels = self.levels)
-        else:
-            args.apply((res.beadsonly if self.task.beadsonly else res.beads,),
-                       levels = self.levels)
+        res   = args.data.setCacheDefault(self, Track(path = self.task.path))
+        attr  = 'cycles' if self.task.levelou is Level.cycle else 'beads'
+        attr += 'only'   if self.task.beadsonly else ''
+        args.apply((getattr(res, attr).withcopy(self.task.copy),), levels = self.levels)
 
 class CycleCreatorProcessor(Processor):
     u"Generates output from a _tasks.CycleCreatorTask"

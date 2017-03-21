@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"""
+"""
 Task controller.
 
 The controller stores:
@@ -12,20 +12,21 @@ It can add/delete/update tasks, emitting the corresponding events
 from typing         import (Union, Iterator, Tuple, # pylint: disable=unused-import
                             Optional, Any, List, Iterable, Dict)
 
+from copy           import deepcopy
 from model.task     import Task, RootTask, TrackReaderTask, TaskIsUniqueError
 from .event         import Controller, NoEmission
 from .processor     import Cache, Processor, run as _runprocessors
 from .              import FileIO
 
 class ProcessorController:
-    u"data and model for tasks"
+    "data and model for tasks"
     __slots__ = ('model', 'data')
     def __init__(self):
         self.model   = []         # type: List[Task]
         self.data    = Cache()
 
     def task(self, task:Union[Task,int,type], noemission = False) -> Task:
-        u"returns a task"
+        "returns a task"
         tsk = None
         if isinstance(task, Task):
             tsk = task
@@ -44,7 +45,7 @@ class ProcessorController:
         return tsk
 
     def add(self, task, proctype, index = None):
-        u"adds a task to the list"
+        "adds a task to the list"
         TaskIsUniqueError.verify(task, self.model)
         proc = proctype(task)
 
@@ -56,33 +57,33 @@ class ProcessorController:
             self.data .insert(index, proc)
 
     def remove(self, task):
-        u"removes a task from the list"
+        "removes a task from the list"
         task = self.task(task)
 
         self.model.remove(task)
         self.data .remove(task)
 
     def update(self, tsk):
-        u"clears data starting at *tsk*"
+        "clears data starting at *tsk*"
         self.data.delCache(tsk)
 
     def clear(self):
-        u"clears data starting at *tsk*"
+        "clears data starting at *tsk*"
         self.data.delCache()
 
-    def run(self, tsk:Optional[Task] = None):
-        u"""
+    def run(self, tsk:Optional[Task] = None, copy = False):
+        """
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
         """
-        return _runprocessors(self.model, self.data, tsk)
+        return _runprocessors(self.model, self.data, tsk, copy = copy)
 
     @classmethod
     def create(cls,
                model     : Iterable[Task],
                processors: 'Union[Dict,Iterable[type],type,None]' = Processor
               ) -> 'ProcessorController':
-        u"creates a task pair for this model"
+        "creates a task pair for this model"
         tasks = tuple(model)
         pair  = cls()
         if not isinstance(processors, Dict):
@@ -97,7 +98,7 @@ class ProcessorController:
                  processor: Union[Iterable[type], Processor, None] = None,
                  cache:     Optional[dict]                         = None
                 ) -> 'Dict[type,Any]':
-        u"registers a task processor"
+        "registers a task processor"
         if cache is None:
             cache = dict()
 
@@ -121,71 +122,105 @@ class ProcessorController:
 def create(model     : Iterable[Task],
            processors: 'Union[Dict,Iterable[type],type,None]' = Processor
           ) -> 'ProcessorController':
-    u"creates a task pair for this model"
+    "creates a task pair for this model"
     return ProcessorController.create(model, processors)
 
+class TrackReaderTaskIO:
+    "Deals with reading a track file"
+    @staticmethod
+    def open(path, tasks):
+        "opens a track file"
+        if len(tasks):
+            raise NotImplementedError()
+        return [(TrackReaderTask(path = path),)]
+
+class ConfigTrackReaderTaskIO(TrackReaderTaskIO):
+    "Adds an alignment to the tracks per default"
+    def __init__(self, ctrl):
+        self._ctrl = ctrl
+
+    @classmethod
+    def setup(cls, ctrl, cnf):
+        "sets itself-up in stead of TrackReaderTaskIO"
+        ctrl.replace('openers', TrackReaderTaskIO, cls(cnf))
+
+    def open(self, path, tasks):
+        "opens a track file and adds a alignment"
+        items = [TrackReaderTaskIO.open(path, tasks)[0][0]]
+        for name in self._ctrl.get(default = tuple()):
+            task = self._ctrl[name].get(default = None)
+            if not getattr(task, 'disabled', True):
+                items.append(deepcopy(task))
+        return [tuple(items)]
+
 class TaskController(Controller):
-    u"Data controller class"
+    "Data controller class"
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.__items   = dict() # type: Dict[RootTask, ProcessorController]
         self.__procs   = dict() # type: Dict[type,Any]
         self.__procs   = ProcessorController.register(kwargs.get('processors', Processor))
-        self.__openers = kwargs.get("openers", self.defaultopener)
-        self.__savers  = kwargs.get("savers",  self.defaultsaver)
 
-    @staticmethod
-    def defaultopener():
-        u"yields default openers"
-        for cls in FileIO.__subclasses__():
-            yield cls().open
+        self.__openers = kwargs.get("openers", self.__defaultopeners())
+        self.__savers  = kwargs.get("savers",  self.__defaultsavers())
 
-    @staticmethod
-    def defaultsaver():
-        u"yields default openers"
-        for cls in FileIO.__subclasses__():
-            yield cls().save
+    def replace(self, attr:str, old, new):
+        "returns the list of file openers"
+        lst = getattr(self, '_TaskController__'+attr)
+        if isinstance(old, type):
+            lst[next(i for i, j in enumerate(lst) if isinstance(j, old))] = new
+        else:
+            lst[lst.index(old)] = new
 
     def task(self,
              parent : RootTask,
              task   : Union[Task,int,type],
              noemission = False) -> Task:
-        u"returns a task"
+        "returns a task"
         return self.__items[parent].task(task, noemission = noemission)
 
-    @property
-    def tasktree(self) -> 'Iterator[Iterator[Task]]':
-        u"Returns a data object in memory."
-        return iter(self.tasks(tsk) for tsk in self.__items.keys())
+    def track(self, parent : Optional[RootTask]):
+        "returns the root cache, i;e. the track"
+        if parent not in self.__items:
+            return None
+        track = self.__items[parent].data[0].cache()
+        if track is None:
+            self.__items[parent].run(parent) # create cache if needed
+            track = self.__items[parent].data[0].cache()
+        return track
 
-    def tasks(self, task:RootTask) -> 'Iterator[Task]':
-        u"Returns a data object in memory."
+    def tasks(self, task:Optional[RootTask]) -> 'Iterator[Task]':
+        "Returns a data object in memory."
+        if task is None:
+            return iter(tuple())
+        if task is Ellipsis:
+            return iter(self.tasks(tsk) for tsk in self.__items.keys())
         return iter(tsk for tsk in self.__items[task].model)
 
     def cache(self, parent:RootTask, tsk:Optional[Task]):
-        u"Returns the cache for a given task"
+        "Returns the cache for a given task"
         return self.__items[parent].data.getCache(tsk)
 
-    def run(self, parent:RootTask, tsk:Task):
-        u"""
+    def run(self, parent:RootTask, tsk:Task, copy = False):
+        """
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
         """
-        return self.__items[parent].run(tsk)
+        return self.__items[parent].run(tsk, copy = copy)
 
     @Controller.emit
     def saveTrack(self, path: str) -> None:
-        u"saves the current model"
+        "saves the current model"
         items = [item.model for item in self.__items.values()]
-        for closing in self.__savers():
-            if closing(path, items):
+        for obj in self.__savers:
+            if obj.close(path, items):
                 break
 
     @Controller.emit
     def openTrack(self,
                   task : 'Union[None,str,RootTask]' = None,
                   model: Iterable[Task]             = tuple()) -> dict:
-        u"opens a new file"
+        "opens a new file"
         tasks = tuple(model)
         if task is None:
             if len(tasks) == 0:
@@ -193,14 +228,10 @@ class TaskController(Controller):
             task = tasks[0]
 
         if not isinstance(task, RootTask):
-            for opening in self.__openers():
-                models = opening(task, tasks)
+            for obj in self.__openers:
+                models = obj.open(task, tasks)
                 if models is not None:
                     break
-            else:
-                if len(tasks):
-                    raise NotImplementedError()
-                models = [(TrackReaderTask(path = task),)]
 
             for elem in models:
                 self.openTrack(elem[0], elem)
@@ -217,21 +248,21 @@ class TaskController(Controller):
 
     @Controller.emit
     def closeTrack(self, task:RootTask) -> dict:
-        u"opens a new file"
+        "opens a new file"
         old = tuple(self.__items[task].model)
         del self.__items[task]
         return dict(controller = self, task = task, model = old)
 
     @Controller.emit
     def addTask(self, parent:RootTask, task:Task, index = None) -> dict:
-        u"opens a new file"
+        "opens a new file"
         old = tuple(self.__items[parent].model)
         self.__items[parent].add(task, self.__procs[type(task)], index = index)
         return dict(controller = self, parent = parent, task = task, old = old)
 
     @Controller.emit
     def updateTask(self, parent:RootTask, task:Union[Task,int,type], **kwargs) -> dict:
-        u"updates a task"
+        "updates a task"
         tsk = self.task(parent, task, noemission = True)
         old = Controller.updateModel(tsk, **kwargs)
         self.__items[parent].update(tsk)
@@ -239,7 +270,7 @@ class TaskController(Controller):
 
     @Controller.emit
     def removeTask(self, parent:RootTask, task:Union[Task,int,type]) -> dict:
-        u"removes a task"
+        "removes a task"
         tsk = self.task(parent, task, noemission = True)
         old = tuple(self.__items[parent].model)
         self.__items[parent].remove(tsk)
@@ -256,7 +287,7 @@ class TaskController(Controller):
 
     @staticmethod
     def __undos__():
-        u"yields all undoable user actions"
+        "yields all undoable user actions"
         # pylint: disable=unused-variable
         _1  = None
         def _onOpenTrack(controller = _1, model = _1, **_):
@@ -277,3 +308,13 @@ class TaskController(Controller):
             return lambda: controller.addTask(parent, task, ind)
 
         yield from (fcn for name, fcn in locals().items() if name[:3] == '_on')
+
+    @staticmethod
+    def __defaultopeners():
+        "yields default openers"
+        return [cls() for cls in FileIO.__subclasses__()] + [TrackReaderTaskIO()]
+
+    @staticmethod
+    def __defaultsavers():
+        "yields default openers"
+        return [cls() for cls in FileIO.__subclasses__()]

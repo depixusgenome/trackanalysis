@@ -152,7 +152,7 @@ def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
     arguments were provided.
     """
     fcn = None
-    if len(attrs) == 1 and isinstance(attrs[0], Iterable):
+    if len(attrs) == 1 and isinstance(attrs[0], Iterable) and not isinstance(attrs[0], str):
         attrs = attrs[0]
 
     if len(attrs) == 1 and callable(attrs[0]):
