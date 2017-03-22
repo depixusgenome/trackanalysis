@@ -147,3 +147,12 @@ def app(bld):
 
     build(bld, [i for i in _getmodules(bld) if i != 'tests'])
     builder.condasetup(bld, copy = 'build/output', runtimeonly = True)
+
+    iswin = builder.os.sys.platform.startswith("win")
+    ext   = ".bat"                       if iswin else ""
+    cmd   = r"start /min %%~dp0pythonw " if iswin else "./"
+
+    for name, val in {'cyclesplot': 'cyclesplot.CyclesPlotView'}.items():
+        with open(str(bld.options.APP_PATH.make_node(name+ext)), 'w',
+                  encoding = 'utf-8') as stream:
+            print(cmd + r"app/runapp.py " + val, file = stream)
