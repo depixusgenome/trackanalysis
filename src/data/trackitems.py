@@ -17,7 +17,7 @@ _m_ALL   = frozenset((None, all, Ellipsis))
 _m_INTS  = int, cast(type, np.integer)
 _m_KEYS  = int, cast(type, np.integer), str
 _m_INDEX = int, cast(type, np.integer), str, tuple
-_m_NONE  = '_m_NONE'
+_m_NONE  = type('_m_NONE', (), {}) # pylint: disable=invalid-name
 
 BEADKEY  = Union[str,int]
 CYCLEKEY = Tuple[BEADKEY,int]
@@ -309,7 +309,7 @@ class TrackItems(_m_ConfigMixin, Items):
 
     def get(self, key, default = _m_NONE):
         "get an item"
-        if default is not _m_NONE:
+        if default is _m_NONE:
             vals = next(self._iter(sel = [key]))
         else:
             vals = next(self._iter(sel = [key]), default)

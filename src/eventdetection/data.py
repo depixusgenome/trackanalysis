@@ -47,9 +47,11 @@ class Events(Cycles, EventDetectionConfig, Items):
         track = self.track
         fcn   = self.__filterfcn()
         evts  = deepcopy(self.events)
-
+        test  = None
         for key, cycle in super()._iter(sel):
-            if cycle.dtype == 'O':
+            if test is None:
+                test = cycle.dtype == EVENTS_DTYPE or cycle.dtype == 'O'
+            if test:
                 gen = cycle
             else:
                 val  = evts.rawprecision(track, key[0]) if prec is None else prec
