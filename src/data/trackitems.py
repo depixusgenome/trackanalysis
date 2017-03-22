@@ -161,9 +161,9 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
     def withcopy(self:Self, cpy:bool) -> Self:
         "specifies that a copy of the data should or shouldn't be made"
         fcn = getattr(self, 'copy', _m_copy)
-        if cpy:
+        if cpy and fcn not in self.actions:
             self.actions.append(fcn)
-        elif fcn in self.actions:
+        elif not cpy and fcn in self.actions:
             self.actions.remove(fcn)
         return self
 

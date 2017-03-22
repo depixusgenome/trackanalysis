@@ -138,9 +138,12 @@ def condaenv(cnf):
     _getmodules(cnf)
     builder.condaenv('trackanalysis')
 
-class _CondaSetup(ConfigurationContext):
-    fun = cmd = 'condasetup'
-def condasetup(cnf):
+class _CondaSetup(BuildContext):
+    fun = cmd = 'setup'
+def setup(cnf):
     u"prints requirements"
     _getmodules(cnf)
     builder.condasetup(cnf)
+    print('********************************************')
+    print("BOOST must be installed manually")
+    print("coffeescript must be installed manually")
