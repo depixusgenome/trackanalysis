@@ -38,7 +38,7 @@ namespace peakcalling
                     {
                         Parameters cf; cf.symmetric = sym; cf.sigma = sig; cf.current = {cs, cb};
                         cf.lower = {ls, lb}; cf.upper = {us, ub}; cf.xrel = rpar; cf.frel = rfcn;
-                        cf.stopval = stop; cf.maxeval = maxe;
+                        cf.xabs  = apar; cf.stopval = stop; cf.maxeval = maxe;
                         return optimize(cf,
                                         bead1.data(), bead1.size(),
                                         bead2.data(), bead2.size());
