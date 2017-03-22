@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # encoding: utf-8
-from functools import wraps as _wraps
 try:
     import wafbuilder as builder
 except ImportError:
@@ -45,11 +44,11 @@ def _getmodules(bld):
         else:
             print("Selected modules:", defaults)
 
-    requested   = bld.options.modules
+    requested = bld.options.modules
     if requested is None or len(requested) == 0:
-        mods  = defaults
+        mods = defaults
     else:
-        mods  = tuple(names[req] for req in requested.split(',') if req in names)
+        mods = tuple(names[req] for req in requested.split(',') if req in names)
 
     builder.requirements.reload(('',)+tuple(mods))
     return mods
@@ -90,26 +89,13 @@ def configure(cnf):
     builder.configure(cnf)
     cnf.recurse(mods)
 
-def build(bld):
-    lines  = '#!/usr/bin/env python3\n'
-    lines += '# encoding: utf-8\n'
-    lines += 'u"Build information"'
-    lines += '\n'
-    lines += 'def version ():\n    u"git version"\n    return "%s"\n\n'
-    lines += 'def lasthash():\n    u"git hash"\n    return "%s"\n\n'
-    lines += 'def hashdate():\n    u"git hash date"\n    return "%s"\n\n'
-    lines += 'def isdirty ():\n    u"git hash"\n    return %s\n\n'
-    lines += 'def compiler():\n    u"compiler used"\n    return "%s"'
-    lines %= (git.version(), git.lasthash(),
-              git.lastdate(), str(git.isdirty()), bld.cpp_compiler_name())
-
-    with open(bld.bldnode.make_node('version.py').abspath(), 'w') as stream:
-        print(lines, file = stream)
-
-    mods = _getmodules(bld)
+def build(bld, mods = None):
+    if mods is None:
+        mods = _getmodules(bld)
+    bld.build_python_version_file()
     builder.build(bld)
     builder.findpyext(bld, set(mod for mod in mods if mod != 'tests'))
-    bld.recurse(mods)
+    bld.recurse(mods, 'build')
 
 class _Test(BuildContext):
     fun = cmd = 'test'
@@ -140,10 +126,24 @@ def condaenv(cnf):
 
 class _CondaSetup(BuildContext):
     fun = cmd = 'setup'
+
 def setup(cnf):
     u"prints requirements"
     _getmodules(cnf)
     builder.condasetup(cnf)
     print('********************************************')
+    print('********************************************')
     print("BOOST must be installed manually")
     print("coffeescript must be installed manually")
+    print('********************************************')
+    print('********************************************')
+
+class _CondaApp(BuildContext):
+    fun = cmd = 'app'
+def app(bld):
+    bld.options.APP_PATH = bld.bldnode.make_node("output")
+    if bld.options.APP_PATH.exists():
+        bld.options.APP_PATH.delete()
+
+    build(bld, [i for i in _getmodules(bld) if i != 'tests'])
+    builder.condasetup(bld, copy = 'build/output', runtimeonly = True)
