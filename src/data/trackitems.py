@@ -7,7 +7,7 @@ from    abc         import ABCMeta, abstractmethod
 from    functools   import wraps
 from    typing      import (Optional, Tuple, Union, # pylint: disable=unused-import
                             Any, List, Sequence, Iterable, Iterator,
-                            TypeVar, Hashable, TYPE_CHECKING, cast)
+                            TypeVar, Hashable, TYPE_CHECKING, Dict, cast)
 import  numpy as np
 
 from    utils       import isfunction, initdefaults
@@ -104,6 +104,7 @@ class Items(metaclass=ABCMeta):
     def keys(self, _ = None) -> Iterator:
         "iterates over keys"
         assert _ is None # should not be necessary: dicts can't do that
+        return iter(tuple())
 
 class TransformedItems:
     "Dictionnary that will transform its data when a value is requested"

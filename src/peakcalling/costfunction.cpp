@@ -1,6 +1,13 @@
 #include <limits>
 #include <sstream>
-#include <nlopt.hpp>
+#ifdef _MSC_VER
+# pragma warning( push )
+# pragma warning( disable : 4267)
+# include <nlopt.hpp>
+# pragma warning( pop )
+#else
+# include <nlopt.hpp>
+#endif
 #include <pybind11/pybind11.h>
 #include "peakcalling/costfunction.h"
 
@@ -72,10 +79,10 @@ namespace peakcalling { namespace cost
 
             auto r2 = cost(bead2, size2, bead1, size1, 1./stretch, -bias/stretch,
                            cf.sigma);
-            return std::make_tuple(std::get<0>(r1) +std::get<0>(r2),
-                                   std::get<1>(r1)-(std::get<1>(r2)-std::get<2>(r2)*bias)
-                                                  /(stretch*stretch),
-                                   std::get<2>(r1) -std::get<2>(r2)/stretch);
+            return std::make_tuple(float(std::get<0>(r1) +std::get<0>(r2)),
+                                   float(std::get<1>(r1)-(std::get<1>(r2)-std::get<2>(r2)*bias)
+                                                         /(stretch*stretch)),
+                                   float(std::get<2>(r1) -std::get<2>(r2)/stretch));
         }
 
         double  _compute(unsigned, double const * x, double * g, void * d)
@@ -99,18 +106,18 @@ namespace peakcalling { namespace cost
                      float const * bead1, size_t size1,
                      float const * bead2, size_t size2)
     {
-        nlopt::opt opt(nlopt::LD_LBFGS, 2);
+        nlopt::opt opt(nlopt::LD_LBFGS, size_t(2));
         opt.set_xtol_rel(cf.xrel);
         opt.set_ftol_rel(cf.frel);
         opt.set_xtol_abs(cf.xabs);
         opt.set_stopval (cf.stopval);
-        opt.set_maxeval (cf.maxeval);
+        opt.set_maxeval (int(cf.maxeval));
 
         NLOptCall call = {&cf, {bead1, bead2}, {size1, size2}};
         opt.set_min_objective(_compute, static_cast<void*>(&call));
 
         std::ostringstream stream;
-        for(size_t i = 0, e = cf.lower.size(); i < e; ++i)
+        for(size_t i = size_t(0), e = cf.lower.size(); i < e; ++i)
         {
             if(cf.lower[i] > cf.current[i])
                 stream << "lower[" << i << "] > current[" <<i << "]: "

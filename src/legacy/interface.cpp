@@ -23,8 +23,8 @@ namespace legacy
                 res[pybind11::cast(key)] = pybind11::array(sz, mem.data()+first);
             };
 
-        for(size_t ibead = 0, ebead = rec.nbeads(); ibead < ebead; ++ibead)
-            if(notall == false || !rec.islost(ibead))
+        for(size_t ibead = size_t(0), ebead = rec.nbeads(); ibead < ebead; ++ibead)
+            if(notall == false || !rec.islost(int(ibead)))
                 add(ibead, [&]() { return rec.bead(ibead); });
 
         add("t",    [&]() { return rec.t(); });

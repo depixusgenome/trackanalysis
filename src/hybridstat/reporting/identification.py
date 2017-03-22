@@ -4,7 +4,8 @@
 Extracts information from a report
 """
 from typing                 import (Optional,   # pylint: disable=unused-import
-                                    Sequence, Tuple, List, Union, Callable, cast)
+                                    Sequence, Tuple, List, Union,
+                                    Dict, Callable, cast)
 from openpyxl               import load_workbook
 from excelreports.creation  import writecolumns
 
@@ -106,6 +107,8 @@ def readparams(fname:str) -> Union[List[Tuple[int,str,float,float]],
 
         elif sheetname.lower() == "identification":
             return _read_identifications(iter(wbook[sheetname].rows))
+    res = [] # type: List[Tuple[int, str]]
+    return res
 
 def writeparams(fname:str, items: Sequence[Tuple[str,Sequence[int]]]):
     u"write bead ids and their reference to a report"

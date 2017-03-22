@@ -7,7 +7,7 @@ Classes defining a type of data treatment.
 """
 from copy           import deepcopy
 from typing         import (Optional, Sequence,  # pylint: disable=unused-import
-                            Dict, Callable)
+                            Dict, Callable, Set)
 from enum           import Enum, unique
 import numpy        as     np
 

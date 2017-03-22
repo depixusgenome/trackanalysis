@@ -3,14 +3,15 @@
 """
 Creates peaks sheet
 """
-from typing                 import Tuple, Iterator, Optional # pylint: disable=unused-import
+from typing                 import (Tuple, Iterator,  # pylint: disable=unused-import
+                                    Optional, Dict)
 from math                   import floor
 from xlsxwriter.utility     import xl_col_to_name
 
 import numpy as np
 
 from excelreports.creation  import column_method, sheet_class, Columns
-from data.trackitems        import BEADKEY                   # pylint: disable=unused-import
+from data.trackitems        import BEADKEY            # pylint: disable=unused-import
 from ..probabilities        import Probability
 from ._base                 import Reporter, HasLengthPeak, Group, Bead
 

@@ -3,6 +3,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+#ifdef _MSC_VER
+# pragma warning( disable : 4996 4244 4267 4305 4800 4477 4653)
+#endif
 #include "legacy/legacygr.h"
 
 namespace legacy { namespace { // unitset

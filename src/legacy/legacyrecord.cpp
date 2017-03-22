@@ -1,5 +1,6 @@
 #include "legacy/legacyrecord.h"
 #ifdef _MSC_VER
+# pragma warning( disable : 4996 4244 4267 4305 4800 4477 4003 4267)
 # include <Windows.h>
 # define fseeko64 _fseeki64
 # define ftello64 _ftelli64 
@@ -4649,7 +4650,7 @@ namespace legacy
                 for(size_t k = 0, ke = i+psz > e ? e-i : psz; k < ke; ++k)      \
                     out[k] = CODE ptr[0][k];
         if(corr == 1 && bias == 0)
-            ITER()
+            ITER( )
         else if(corr == 1)
             ITER(bias+)
         else if(bias == 0)
@@ -4706,5 +4707,14 @@ namespace legacy
             return true;
         return _ptr->b_r[i]->completely_losted;
             //|| _ptr->b_r[i]->calib_im == NULL && _ptr->SDI_mode == 0;
+    }
+
+    void GenRecord::open(std::string x)
+    {
+        close();
+        char tmp[2048];
+        strncpy(tmp, x.c_str(), sizeof(tmp));
+        _ptr  = load(tmp);
+        _name = x;
     }
 }

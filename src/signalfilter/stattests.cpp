@@ -13,7 +13,7 @@ namespace samples
             template <typename T>
             inline auto _level(std::pair<T,float> val)
             {
-                bm::students_t dist(val.first);
+                bm::students_t dist(double(val.first));
                 return bm::cdf(dist, std::abs(val.second));
             }
 
@@ -21,15 +21,15 @@ namespace samples
             inline bool _isequal(float alpha, std::pair<T,float> val)
             {
                 auto lev = _level(val);
-                return lev > alpha*.5 && lev < 1.-alpha*.5;
+                return lev > alpha*.5f && lev < 1.0f-alpha*.5f;
             }
 
             template <typename T>
             inline bool _islower(float alpha, std::pair<T,float> val)
             { return _level(val) < alpha; }
 
-            float _cntnorm(float c1, float c2)
-            { return std::sqrt(c1*c2/(c1+c2)); }
+            float _cntnorm(size_t c1, size_t c2)
+            { return std::sqrt(float(c1*c2)/float(c1+c2)); }
         }
 
         namespace knownsigma
@@ -37,11 +37,11 @@ namespace samples
             float value(bool bequal, Input const & left, Input const & right)
             {
                 auto val = (left.mean-right.mean) * _cntnorm(left.count, right.count);
-                return bequal && val < 0. ? -val : val;
+                return bequal && val < 0.f ? -val : val;
             }
 
             float threshold(bool bequal, float alpha, float sigma)
-            { return bm::quantile(bm::normal(0., sigma), bequal ? 1. - alpha * .5 : alpha); }
+            { return float(bm::quantile(bm::normal(0.f, sigma), bequal ? 1.0f - alpha * .5f : alpha)); }
 
             float threshold(bool bequal, float alpha, float sigma, size_t cnt1, size_t cnt2)
             { return threshold(bequal, alpha, sigma)/_cntnorm(cnt1, cnt2); }

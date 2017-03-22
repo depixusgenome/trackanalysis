@@ -7,6 +7,19 @@
 
 namespace
 {
+    struct Check
+    {
+        bool err = false;
+        bool operator () ();
+    };
+#   ifdef _MSC_VER
+#       pragma warning( push )
+#       pragma warning( disable : 4800)
+#   endif
+    bool Check::operator () () { return !(err || (err = PyErr_Occurred())); };
+#   ifdef _MSC_VER
+#       pragma warning( pop )
+#   endif
 
     template <typename T>
     pybind11::object _get_prec(T const & est)
@@ -34,8 +47,7 @@ namespace
     void _set_est(T & est, pybind11::object obj)
     {
         auto seq = pybind11::reinterpret_borrow<pybind11::sequence>(obj);
-        bool err   = false;
-        auto check = [&err]() { return !(err || (err = PyErr_Occurred())); };
+        Check check;
 
         est.estimators.resize(seq.size());
         for(size_t i = 0; i < est.estimators.size() && check(); ++i)
@@ -184,8 +196,7 @@ namespace pybind11 { namespace detail {
         bool load(handle obj, bool)
         {
             pybind11::str const keys[3] = { "count", "mean", "sigma"};
-            bool err   = false;
-            auto check = [&err]() { return !(err || (err = PyErr_Occurred())); };
+            Check check;
 
             pybind11::object   items[3];
             if(pybind11::isinstance<pybind11::sequence>(obj))
@@ -223,8 +234,7 @@ namespace pybind11 { namespace detail {
         bool load(handle obj, bool)
         {
             pybind11::str const keys[2] = { "count", "mean"};
-            bool err   = false;
-            auto check = [&err]() { return !(err || (err = PyErr_Occurred())); };
+            Check check;
 
             pybind11::object   items[2];
             if(pybind11::isinstance<pybind11::sequence>(obj))
@@ -290,10 +300,17 @@ namespace signalfilter { namespace stats {
                             { return hfsigma(inp.size(), inp.data()); });
         smod.def("hfsigma", [](pybind11::array_t<double> & inp)
                             { return hfsigma(inp.size(), inp.data()); });
+#       ifdef _MSC_VER
+#           pragma warning ( push )
+#           pragma warning ( disable : 4244 )
+#       endif
         smod.def("mediandeviation", [](pybind11::array_t<float> & inp)
                             { return mediandeviation(inp.size(), inp.data()); });
         smod.def("mediandeviation", [](pybind11::array_t<double> & inp)
                             { return mediandeviation(inp.size(), inp.data()); });
+#       ifdef _MSC_VER
+#           pragma warning ( pop )
+#       endif
     }
 }}
 

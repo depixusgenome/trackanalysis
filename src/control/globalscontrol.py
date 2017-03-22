@@ -232,7 +232,7 @@ class DefaultsMap(Controller):
         "resets to default values"
         self.pop(*self.__items.maps[1].keys())
 
-    def update(self, *args, **kwargs) -> dict:
+    def update(self, *args, **kwargs) -> EventData:
         "updates keys or raises NoEmission"
         ret = EventData(self.__items.name)
         for key, val in _tokwargs(args, kwargs).items():
@@ -251,6 +251,7 @@ class DefaultsMap(Controller):
 
         if len(ret) > 0:
             return self.handle("globals."+self.__items.name, self.outastuple, (ret,))
+        return ret
 
     def pop(self, *args):
         "removes view information"

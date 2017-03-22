@@ -4,6 +4,7 @@
 .waf*
 .*.un~
 .*.swp
+*.*~
 build/
 waf*-*
 pyenv/

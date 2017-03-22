@@ -15,7 +15,7 @@ namespace peakcalling
                                  pybind11::array_t<float> const & bead2,
                                  bool a, float b, float c, float d)
                     {
-                        Parameters cf = {a, b, {}, {c, d}, {}};
+                        Parameters cf; cf.symmetric = a; cf.sigma = b; cf.current = {c, d};
                         return compute(cf,
                                        bead1.data(), bead1.size(),
                                        bead2.data(), bead2.size());
@@ -36,8 +36,9 @@ namespace peakcalling
                                   size_t maxe
                                  )
                     {
-                        Parameters cf = {sym, sig, {ls, lb}, {cs, cb}, {us, ub},
-                                         rpar, rfcn, apar, stop, maxe};
+                        Parameters cf; cf.symmetric = sym; cf.sigma = sig; cf.current = {cs, cb};
+                        cf.lower = {ls, lb}; cf.upper = {us, ub}; cf.xrel = rpar; cf.frel = rfcn;
+                        cf.stopval = stop; cf.maxeval = maxe;
                         return optimize(cf,
                                         bead1.data(), bead1.size(),
                                         bead2.data(), bead2.size());

@@ -53,8 +53,8 @@ def _beadorconfig(attr):
 
 class SpecificTaskController(TrackPlotModelController):
     "access to tasks"
-    TASKTYPE  = None  # type: type
-    PREVIOUS  = tuple # type: ignore
+    TASKTYPE  = None   # type: type
+    PREVIOUS  = tuple, # type: Tuple[type, ...]
     def __init__(self, *args):
         super().__init__(*args)
         cnf = self.getRootConfig().tasks
@@ -135,7 +135,7 @@ class AlignmentController(SpecificTaskController):
 class DriftPerBeadController(SpecificTaskController):
     "access to drift per bead"
     TASKTYPE = DriftTask
-    PREVIOUS = AlignmentTask,
+    PREVIOUS = AlignmentTask, # type: Tuple[type, ...]
     @staticmethod
     def _check(task) -> bool:
         return task.onbeads
@@ -149,7 +149,7 @@ class DriftPerBeadController(SpecificTaskController):
 class DriftPerCycleController(SpecificTaskController):
     "access to drift per cycle"
     TASKTYPE = DriftTask
-    PREVIOUS = AlignmentTask, DriftTask
+    PREVIOUS = AlignmentTask, DriftTask # type: Tuple[type, ...]
     @staticmethod
     def _check(task) -> bool:
         return not task.onbeads
@@ -166,7 +166,7 @@ class DriftPerCycleController(SpecificTaskController):
 class EventDetectionController(SpecificTaskController):
     "access to drift per cycle"
     TASKTYPE = EventDetectionTask
-    PREVIOUS = AlignmentTask, DriftTask
+    PREVIOUS = AlignmentTask, DriftTask # type: Tuple[type, ...]
 
 class CyclesModelController(TrackPlotModelController):
     "Model for Cycles View"

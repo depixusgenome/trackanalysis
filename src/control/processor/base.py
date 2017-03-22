@@ -3,7 +3,8 @@
 u"Processors apply tasks to a data flow"
 from    abc         import ABCMeta, abstractmethod
 from    functools   import wraps
-from    typing      import TYPE_CHECKING, Callable, Tuple, Iterable
+from    typing      import (TYPE_CHECKING,  # pylint: disable=unused-import
+                            Tuple, Callable, Iterable, cast)
 
 from    utils       import getlocals
 import  model.task   as     _tasks
@@ -35,7 +36,7 @@ class TaskTypeDescriptor:
     Dynamically finds all Task subclasses implementing
     the __processor__ protocol.
     """
-    def __get__(self, obj, tpe):
+    def __get__(self, obj, tpe) -> Tuple[type, ...]:
         return getattr(tpe, '_tasktypes')()
 
 class MetaProcessor(ABCMeta):
@@ -67,7 +68,7 @@ class Processor(metaclass=MetaProcessor):
     u"""
     Main class for processing tasks
     """
-    tasktype = None # type: Union[type,Tuple[type]]
+    tasktype = None # type: Union[type, Tuple[type, ...]]
     def __init__(self, task: _tasks.Task) -> None:
         if not isinstance(task, self.tasktype):
             raise TypeError('"task" must have type '+ str(self.tasktype))
@@ -221,7 +222,7 @@ class SelectionProcessor(Processor):
 class ProtocolProcessor(Processor):
     u"A processor that can deal with any task having the __processor__ attribute"
 
-    tasktype = TaskTypeDescriptor()
+    tasktype = cast(Tuple[type, ...], TaskTypeDescriptor())
 
     @staticmethod
     def _tasktypes():

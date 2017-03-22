@@ -18,14 +18,7 @@ namespace legacy
         GenRecord(std::string x)    : GenRecord() { open(x); }
         ~GenRecord() { close(); }
 
-        void open(std::string x)
-        {
-            close();
-            char tmp[2048];
-            strncpy(tmp, x.c_str(), sizeof(tmp));
-            _ptr  = load(tmp);
-            _name = x;
-        }
+        void open(std::string x);
 
         void close()
         { auto x = _ptr; _ptr   = nullptr; freegr(x); }

@@ -448,18 +448,25 @@ namespace signalfilter { namespace stats
     inline T hfsigma(size_t sz, T const * dt)
     {
         acc_t<bat::median> quant;
-        for(size_t i = 1; i < sz; ++i)
-            quant(std::abs(dt[i]-dt[i-1]));
-        return compute(quant);
+        for(size_t i = size_t(1); i < sz; ++i)
+            quant((double) std::abs(dt[i]-dt[i-1]));
+        return (T) compute(quant);
     }
 
     template <typename T>
     inline T mediandeviation(size_t sz, T const * dt)
     {
+#       ifdef _MSC_VER
+#           pragma warning( push )
+#           pragma warning( disable : 4244 )
+#       endif
         acc_t<bat::mediandeviation> quant;
-        for(size_t i = 0; i < sz; ++i)
-            quant(dt[i]);
-        return compute(quant);
+#       ifdef _MSC_VER
+#           pragma warning (pop)
+#       endif
+        for(size_t i = size_t(0); i < sz; ++i)
+            quant((double) dt[i]);
+        return (T) compute(quant);
     }
 }}
 #endif

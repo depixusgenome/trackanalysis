@@ -76,7 +76,7 @@ namespace signalfilter
 
             void operator()(size_t i, float const * xd)
             {
-                _var(i);
+                _var(double(i));
                 _covar(xd[0]*i);
                 T::operator()(i, xd);
             }
@@ -110,7 +110,7 @@ namespace signalfilter
 
             size_t          size()                   const { return _sz;     }
             float const *   get (int i, int)         const { return _xd+i;   }
-            void            set (int i, double v)          { _xd[i] = v;     }
+            void            set (int i, double v)          { _xd[i] = float(v); }
 
             template <typename T>
             void   add (T const & qual, int i, int j)
@@ -127,7 +127,7 @@ namespace signalfilter
             {
                 if(_sz == _m1.size())
                     for(size_t i = 0; i < _sz; ++i)
-                        _xd[i] = _m1[i];
+                        _xd[i] = float(_m1[i]);
             }
 
             protected:
@@ -256,8 +256,8 @@ namespace signalfilter
 
                 void   add(std::pair<double,double> val, size_t, size_t j)
                 {
-                    _BaseFunc::add(val, _k, j);
-                    _BaseFunc::add(val, (_k+_inc[j]) % _nv, j);
+                    _BaseFunc::add(val, int(_k), int(j));
+                    _BaseFunc::add(val, int((_k+_inc[j]) % _nv), int(j));
                 }
 
                 auto compute()
@@ -277,34 +277,34 @@ namespace signalfilter
         template <typename T, typename Q>
         void run(Args const & cf, T & fcn)
         {
-            size_t const ne = cf.estimators.size();
-            size_t const nv = cf.estimators[ne-1];
-            size_t const nx = fcn.size();
+            int const ne = (int) cf.estimators.size();
+            int const nv = (int) cf.estimators[ne-1];
+            int const nx = (int) fcn.size();
             if(nv >= nx)
                 return;
 
             auto qual(_qual<Args,Q>(cf, true));
 
-            auto update = [ne, &qual, &fcn](size_t i)
+            auto update = [ne, &qual, &fcn](int i)
                         {
-                            for(size_t j = 0; j < ne; ++j)
+                            for(int j = 0; j < ne; ++j)
                                 qual[j](i, fcn.get(i, j));
                         };
-            auto apply  = [ne, &qual, &fcn](size_t i)
+            auto apply  = [ne, &qual, &fcn](int i)
                         {
-                            for(size_t j = 0; j < ne; ++j)
+                            for(int j = 0; j < ne; ++j)
                                 fcn.add(qual[j], i, j);
                             return fcn.compute();
                         };
 
             decltype(apply(0)) val = 0;
-            for(size_t i = 0; i < nv; ++i)
+            for(int i = 0; i < nv; ++i)
             {
                 update(i);
                 val = apply (i);
             }
 
-            for(size_t i = nv; i < nx; ++i)
+            for(int i = nv; i < nx; ++i)
             {
                 update(i);
                 fcn.set(i-nv, val);
@@ -312,7 +312,7 @@ namespace signalfilter
             }
             fcn.set(nx-nv, val);
 
-            for(size_t i = nx-nv+1; i < nx; ++i)
+            for(int i = nx-nv+1; i < nx; ++i)
                 fcn.set(i, apply (i));
 
             fcn.finish();
