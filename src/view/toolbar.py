@@ -22,11 +22,10 @@ class  ToolBar(BokehView):
                         'open.dialog': u'Open a track or analysis file',
                         'save.dialog': u'Save an analysis file'}
 
-        cnf               = self._ctrl.getGlobal("config").last.path
-        cnf.defaults      = dict.fromkeys(FileDialog.DEFAULTS, None)
-
-        self.__diagopen = None
-        self.__diagsave = None
+        self.__diagopen = FileDialog(filetypes = 'trk|ana|*',
+                                     config    = self._ctrl)
+        self.__diagsave = FileDialog(filetypes = 'ana|*',
+                                     config    = self._ctrl)
 
     def _getroots(self, _):
         "adds items to doc"
@@ -39,12 +38,8 @@ class  ToolBar(BokehView):
             self._quit = self.button(self._ctrl.close, css.quit.get())
             self._tools.append(self._quit)
 
-        self.__diagopen = FileDialog(filetypes = 'trk|ana|*',
-                                     config    = self._ctrl,
-                                     title     = css.open.dialog.get())
-        self.__diagsave = FileDialog(filetypes = 'ana|*',
-                                     config    = self._ctrl,
-                                     title     = css.save.dialog.get())
+        self.__diagopen.title = css.open.dialog.get()
+        self.__diagsave.title = css.save.dialog.get()
 
     def getroots(self, doc):
         "adds items to doc"
