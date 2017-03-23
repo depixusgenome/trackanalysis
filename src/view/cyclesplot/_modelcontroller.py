@@ -59,7 +59,8 @@ class SpecificTaskController(TrackPlotModelController):
     def __init__(self, *args):
         super().__init__(*args)
         cnf = self.getRootConfig().tasks
-        cnf[self.configname].default = self.TASKTYPE() # pylint: disable=not-callable
+        # pylint: disable=not-callable
+        cnf[self.configname].default = self.TASKTYPE(**self._default())
 
     @property
     def configname(self) -> str:
@@ -110,6 +111,10 @@ class SpecificTaskController(TrackPlotModelController):
     def _check(_) -> bool:
         return True
 
+    @staticmethod
+    def _default() -> dict:
+        return {}
+
     @property
     def index(self) -> Optional[Task]:
         "returns the index the new task should have"
@@ -138,6 +143,10 @@ class DriftPerBeadController(SpecificTaskController):
     def _check(task) -> bool:
         return task.onbeads
 
+    @staticmethod
+    def _default() -> dict:
+        return dict(onbeads = True)
+
 class DriftPerCycleController(SpecificTaskController):
     "access to drift per cycle"
     TASKTYPE = DriftTask
@@ -145,6 +154,10 @@ class DriftPerCycleController(SpecificTaskController):
     @staticmethod
     def _check(task) -> bool:
         return not task.onbeads
+
+    @staticmethod
+    def _default() -> dict:
+        return dict(onbeads = False)
 
 class EventDetectionController(SpecificTaskController):
     "access to drift per cycle"
