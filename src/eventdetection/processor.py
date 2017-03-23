@@ -23,17 +23,25 @@ class ExtremumAlignmentTask(Task):
 
 class ExtremumAlignmentProcessor(Processor):
     "Aligns cycles to zero"
-    def run(self, args):
-        phase = self.task.phase
-        align = ExtremumAlignment(binsize = self.task.binsize,
+    @classmethod
+    def apply(cls, toframe, **kwa):
+        "applies the task to a frame or returns a function that does so"
+        phase = kwa.get('phase', cls.tasktype.phase)
+        align = ExtremumAlignment(binsize = kwa.get('binsize', cls.tasktype.binsize),
                                   mode    = 'max' if phase == 3 else 'min')
         def _action(frame, info):
-            cycles = frame.new().withdata({info[0]: info[1]})[info[0],...]
+            cycles = frame.new(data = {info[0]: info[1]})[info[0],...]
             vals   = np.array(list(cycles.withphase(phase).values()), dtype = 'O')
             for val, delta in zip(cycles.withphase(...).values(), align(vals)):
                 val += delta
             return info[0], info[1]
-        args.apply(lambda frame: frame.withaction(partial(_action, frame)))
+
+        def _apply(frame):
+            return frame.withaction(partial(_action, frame), beadsonly = True)
+        return _apply if toframe is None else _apply(toframe)
+
+    def run(self, args):
+        args.apply(self.apply(None, **self.config()))
 
 class EventDetectionTask(EventDetectionConfig, Task):
     "Config for an event detection"
@@ -47,9 +55,13 @@ class EventDetectionTask(EventDetectionConfig, Task):
 
 class EventDetectionProcessor(Processor):
     "Generates output from a _tasks."
+    @classmethod
+    def apply(cls, toframe, **kwa):
+        "applies the task to a frame or returns a function that does so"
+        kwa['first'] = kwa['last'] = kwa.pop('phase')
+        fcn = lambda data: Events(track = data.track, data = data, **kwa)
+        return fcn if toframe is None else fcn(toframe)
+
     def run(self, args):
         "iterates through beads and yields cycle events"
-        kwa          = self.task.config()
-        kwa['first'] = kwa['last'] = kwa.pop('phase')
-        args.apply(lambda data: Events(track = data.track, data = data, **kwa),
-                   levels = self.levels)
+        args.apply(self.apply(None, **self.task.config()), levels = self.levels)

@@ -82,7 +82,7 @@ class _BeadDriftAction:
     def run(self, key, cycle:Cycles):
         u"Applies the cordrift subtraction to a bead"
         prof  = self.cache.get(key, None)
-        if prof is  not None:
+        if prof is not None:
             return
 
         self.cache[key] = prof = self.profile(cycle, False)
@@ -98,22 +98,27 @@ class _BeadDriftAction:
     def onCycles(self, frame, _):
         u"Applies the cordrift subtraction to parallel cycles"
         for icyc in range(frame.track.ncycles):
-            cyc = frame[...,icyc]
-            self.run(frame.parents+(icyc,), cyc.withphases(*self.task.phases))
+            cyc = frame[...,icyc].withbeadsonly().withphases(*self.task.phases)
+            self.run(frame.parents+(icyc,), cyc)
 
 class DriftProcessor(Processor):
     u"Deals with bead drift"
     _ACTION  = _BeadDriftAction
-    def run(self, args):
-        action = self._ACTION(self.task.config())
-        if self.task.onbeads:
+    @classmethod
+    def apply(cls, toframe, **kwa):
+        "applies the task to a frame or returns a function that does so"
+        action = cls._ACTION(kwa)
+        if kwa.get('onbeads', True):
             fcn = lambda frame: (frame
                                  .new()
                                  .withaction(partial(action.onBead, frame.track),
-                                             beadonly = True))
+                                             beadsonly = True))
         else:
             fcn = lambda frame: frame.new().withdata(frame, action.onCycles)
-        args.apply(fcn, levels = self.levels)
+        return fcn if toframe is None else fcn(toframe)
+
+    def run(self, args):
+        args.apply(self.apply(None, **self.config()), levels = self.levels)
 
     @classmethod
     def profile(cls, frame:Cycles, kwa:Union[dict,DriftTask]):
