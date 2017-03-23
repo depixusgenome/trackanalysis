@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Tests cordrift"
-from   itertools            import product
+from   itertools                import product
 import random
 import numpy as np
-from   numpy.testing        import assert_allclose, assert_equal
-from   pytest               import approx # pylint: disable = no-name-in-module
+from   numpy.testing            import assert_allclose, assert_equal
+from   pytest                   import approx # pylint: disable = no-name-in-module
 
-from cordrift.collapse      import (CollapseToMean,        CollapseByDerivate,
-                                    CollapseByMerging,
-                                    StitchByInterpolation, Profile, _getintervals,
-                                    StitchByDerivate, Range)
-from cordrift.processor     import DriftTask, DriftProcessor
-from simulator              import TrackSimulator
-from simulator.processor    import TrackSimulatorTask
-from control.taskcontrol    import create
+from cordrift.collapse          import (CollapseToMean,        CollapseByDerivate,
+                                        CollapseByMerging,
+                                        StitchByInterpolation, Profile, _getintervals,
+                                        StitchByDerivate, Range)
+from cordrift.processor         import DriftTask, DriftProcessor
+from simulator                  import TrackSimulator
+from simulator.processor        import TrackSimulatorTask
+from eventdetection.processor   import ExtremumAlignmentTask
+from model.task                 import TrackReaderTask
+from control.taskcontrol        import create
+from testingcore                import path as utpath
 
 def test_collapse_to_mean():
     u"Tests interval collapses"
@@ -272,5 +275,15 @@ def test_cycleprocess():
         val  = val[33:133]
         val -= np.round(val, 1)
         assert_allclose(val-val[0], 0., atol = 1e-4)
+
+def test_cycleprocess_withalignment():
+    u"tests that tracks are well simulated"
+    pair = create((TrackReaderTask(path = utpath("big_legacy")),
+                   ExtremumAlignmentTask(phase = 1),
+                   DriftTask(onbeads = False)))
+    cycs = next(i for i in pair.run())
+    val = cycs[0]
+    assert val is not None
+
 if __name__ == '__main__':
-    test_stitchbyinterpolation()
+    test_cycleprocess_withalignment()
