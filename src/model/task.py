@@ -159,8 +159,8 @@ class CycleCreatorTask(Task):
 
 class DataFunctorTask(Task):
     u"Adds it's task to the TrackItem using *withfunction*"
-    copy     = False
-    beadonly = True
+    copy      = False
+    beadsonly = True
     @initdefaults
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -175,6 +175,6 @@ class DataFunctorTask(Task):
 
         if self.copy:
             fcn = lambda val: cpy(np.copy(val)) # pylint: disable=not-callable
-            return lambda dat: dat.withfunction(fcn, beadonly = self.beadonly)
+            return lambda dat: dat.withfunction(fcn, beadsonly = self.beadsonly)
         else:
-            return lambda dat: dat.withfunction(cpy, beadonly = self.beadonly)
+            return lambda dat: dat.withfunction(cpy, beadsonly = self.beadsonly)
