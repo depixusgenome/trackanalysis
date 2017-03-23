@@ -18,8 +18,9 @@ class _MyItem(Items):
     def __getitem__(self, key):
         return self.vals[key]
 
-    def keys(self, sel = None):
+    def keys(self, sel = None, beadsonly = None):
         assert sel is None
+        assert beadsonly is None
         yield from self.vals.keys()
 
 class TestBeadIteration:
@@ -31,6 +32,8 @@ class TestBeadIteration:
         vals = set(tuple(range(92))+ ('zmag', 't'))
         assert set(beads().keys())                 == vals
         assert set(i for i, _ in beads())          == vals
+        assert set(beads().selecting(['t', 0]).withbeadsonly().keys()) == {0}
+        assert set(beads().withbeadsonly().keys()) == (vals-{'zmag', 't'})
         assert set(beads().selecting(all).keys())  == vals
         assert set(beads().selecting(None).keys()) == vals
         assert isinstance(beads()['t'], np.ndarray)
@@ -62,6 +65,10 @@ class TestCycleIteration:
         assert set  (cycs()[...,0].keys())               == cids(0)
         assert set  (cycs()[0,...].keys())               == bids(0)
         assert set  (cycs()['zmag',...].keys())          == bids('zmag')
+        assert set(i[0] for i in (cycs()
+                                  .selecting([('t',...), (0,...)])
+                                  .withbeadsonly().keys())) == {0}
+        assert {"t", "zmag"} - set(i[0] for i in cycs().withbeadsonly().keys())  == {'t', 'zmag'}
 
         assert (tuple(cycs()
                       .selecting((0,all))
@@ -180,4 +187,4 @@ def test_findgrdir():
     assert set(track.beadsonly.keys()) == keys
 
 if __name__ == '__main__':
-    test_findgrdir()
+    TestCycleIteration().test_iterkeys()
