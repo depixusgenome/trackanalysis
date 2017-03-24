@@ -6,7 +6,7 @@ from typing             import (Iterator, Tuple, # pylint: disable=unused-import
 
 from model.task         import Task, Level
 from control.processor  import Processor
-from data.trackitems    import BEADKEY, TrackItems
+from data.trackitems    import BEADKEY, TrackItems, Beads
 from .selector          import PeakSelector, Output as PeakOutput
 
 class PeakSelectorTask(PeakSelector, Task):
@@ -26,9 +26,9 @@ class PeaksDict(TrackItems):
         self.config = config
         self.__keys = None
 
-    def _keys(self, sel:Optional[Sequence] = None) -> Iterator[BEADKEY]:
+    def _keys(self, sel:Optional[Sequence] = None, _ = None) -> Iterator[BEADKEY]:
         if self.__keys is None:
-            self.__keys = frozenset(i for i, _ in self.data.keys())
+            self.__keys = frozenset(i for i, _ in self.data.keys() if Beads.isbead(i))
 
         if sel is None:
             yield from self.__keys

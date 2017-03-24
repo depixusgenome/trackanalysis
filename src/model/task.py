@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"""
+"""
 Classes defining a type of data treatment.
 
 **Warning** Those definitions must remain data-independant.
 """
 from copy           import deepcopy
 from typing         import (Optional, Sequence,  # pylint: disable=unused-import
-                            Dict, Callable, Set)
+                            Dict, Callable, Set, Tuple, Union, List)
 from enum           import Enum, unique
 import numpy        as     np
 
@@ -15,10 +15,10 @@ from utils          import toenum, initdefaults
 from .level         import Level
 
 class TaskIsUniqueError(Exception):
-    u"verifies that the list contains no unique task of type task"
+    "verifies that the list contains no unique task of type task"
     @classmethod
     def verify(cls, task:'Task', lst):
-        u"verifies that the list contains no unique task of type task"
+        "verifies that the list contains no unique task of type task"
         if task is None:
             return
 
@@ -31,7 +31,7 @@ class TaskIsUniqueError(Exception):
             raise cls()
 
 class Task:
-    u"Class containing high-level configuration infos for a task"
+    "Class containing high-level configuration infos for a task"
     def __init__(self, **kwargs) -> None:
         self.disabled = kwargs.get('disabled', False)
         if 'level' in kwargs:
@@ -44,7 +44,7 @@ class Task:
                 self.levelou = toenum(Level, kwargs['levelou'])
 
         if ('levelin' in kwargs or 'levelou' in kwargs) and ('level' in kwargs):
-            raise KeyError('Specify only "level" or both "levelin", "levelou"')
+            raise KeyError('Specify only "level" or both "levelin", "levelo"')
 
         names = ('level',) # type: Sequence[str]
         if not hasattr(self, 'level'):
@@ -72,35 +72,35 @@ class Task:
 
     @classmethod
     def unique(cls):
-        u"returns class or parent task if must remain unique"
+        "returns class or parent task if must remain unique"
         return cls
 
     @classmethod
     def isroot(cls):
-        u"returns whether the class should be a root"
+        "returns whether the class should be a root"
         return False
 
     def config(self) -> dict:
-        u"returns a deepcopy of its dict which can be safely used in generators"
+        "returns a deepcopy of its dict which can be safely used in generators"
         return deepcopy(self.__dict__)
 
 class RootTask(Task):
-    u"Class indicating that a track file should be created/loaded to memory"
+    "Class indicating that a track file should be created/loaded to memory"
     levelin = Level.project
     levelou = Level.bead
 
     @classmethod
     def unique(cls):
-        u"returns class or parent task if must remain unique"
+        "returns class or parent task if must remain unique"
         return cls
 
     @classmethod
     def isroot(cls):
-        u"returns whether the class should be a root"
+        "returns whether the class should be a root"
         return True
 
 class TrackReaderTask(RootTask):
-    u"Class indicating that a track file should be added to memory"
+    "Class indicating that a track file should be added to memory"
     def __init__(self,
                  path:     Optional[str] = None,
                  beadsonly:bool          = False,
@@ -110,15 +110,28 @@ class TrackReaderTask(RootTask):
         self.beadsonly = beadsonly
         self.copy      = copy
 
+class DataSelectionTask(Task):
+    "selects some part of the data"
+    level     = Level.none
+    beadsonly = None    # type: Optional[bool]
+    samples   = None    # type: Union[Sequence[int], slice, None]
+    phases    = None    # type: Union[Tuple[int,...], int, None]
+    selected  = None    # type: Optional[List]
+    discarded = None    # type: Optional[List]
+    cycles    = None    # type: Optional[slice]
+    @initdefaults
+    def __init__(self, **_) -> None:
+        super().__init__()
+
 @unique
 class TagAction(Enum):
-    u"type of actions to perform on selected tags"
+    "type of actions to perform on selected tags"
     none    = 0
     keep    = 1
     remove  = 2
 
 class TaggingTask(Task):
-    u"Class for tagging tracks, beads ..."
+    "Class for tagging tracks, beads ..."
     none    = TagAction.none
     keep    = TagAction.keep
     remove  = TagAction.remove
@@ -130,35 +143,35 @@ class TaggingTask(Task):
         self.action    = toenum(TagAction, kw.get('action', 'none')) # type: TagAction
 
     def selected(self, item) -> bool:
-        u"Returns whether an item is selected"
+        "Returns whether an item is selected"
         if self.action is TagAction.none:
             return False
 
         return any(item.id in self.tags[tag] for tag in self.selection & set(self.tags))
 
     def process(self, item) -> bool:
-        u"Returns whether an item is kept"
+        "Returns whether an item is kept"
         if self.action is TagAction.none:
             return True
 
         return self.selected(item) == (self.action == TagAction.keep)
 
     def clean(self):
-        u"Removes tags not in the parent"
+        "Removes tags not in the parent"
         self.selection &= set(self.tags)
 
 class CycleCreatorTask(Task):
-    u"Task for dividing a bead's data into cycles"
+    "Task for dividing a bead's data into cycles"
     levelin = Level.bead
     levelou = Level.cycle
 
     @classmethod
     def unique(cls):
-        u"returns class or parent task if must remain unique"
+        "returns class or parent task if must remain unique"
         return cls
 
 class DataFunctorTask(Task):
-    u"Adds it's task to the TrackItem using *withfunction*"
+    "Adds it's task to the TrackItem using *withfunction*"
     copy      = False
     beadsonly = True
     @initdefaults

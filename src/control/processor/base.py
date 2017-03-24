@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Processors apply tasks to a data flow"
+"Processors apply tasks to a data flow"
 from    abc         import ABCMeta, abstractmethod
 from    functools   import wraps
 from    typing      import (TYPE_CHECKING,  # pylint: disable=unused-import
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 _PROTECTED = 'tasktype',
 class ProtectedDict(dict):
-    u"Dictionary with read-only keys"
+    "Dictionary with read-only keys"
     def __setitem__(self, key, val):
         if key in _PROTECTED and key in self:
             raise KeyError('"{}" is read-only'.format(key))
@@ -32,7 +32,7 @@ class ProtectedDict(dict):
             super().__delitem__(key)
 
 class TaskTypeDescriptor:
-    u"""
+    """
     Dynamically finds all Task subclasses implementing
     the __processor__ protocol.
     """
@@ -40,12 +40,15 @@ class TaskTypeDescriptor:
         return getattr(tpe, '_tasktypes')()
 
 class MetaProcessor(ABCMeta):
-    u"Protects attribute tasktype"
+    "Protects attribute tasktype"
 
     def __new__(mcs, name, bases, nspace):
         if name != 'Processor' and 'tasktype' not in nspace:
-            locs = getlocals(1)
-            nspace['tasktype'] = locs[name.replace('Processor', 'Task')]
+            tskname = name.replace('Processor', 'Task')
+            tsk     = getlocals(1).get(tskname, None)
+            if tsk is None:
+                tsk = getattr(_tasks, tskname)
+            nspace['tasktype'] = tsk
 
         if isinstance(nspace['tasktype'], type):
             if not issubclass(nspace['tasktype'], _tasks.Task):
@@ -65,7 +68,7 @@ class MetaProcessor(ABCMeta):
         super().__setattr__(key, value)
 
 class Processor(metaclass=MetaProcessor):
-    u"""
+    """
     Main class for processing tasks
     """
     tasktype = None # type: Union[type, Tuple[type, ...]]
@@ -76,29 +79,29 @@ class Processor(metaclass=MetaProcessor):
 
     @property
     def levelin(self) -> Level:
-        u"returns the task's input level"
+        "returns the task's input level"
         if hasattr(self.task, 'level'):
             return self.task.level
         return self.task.levelin
 
     @property
     def levelou(self) -> Level:
-        u"returns the task's output level"
+        "returns the task's output level"
         if hasattr(self.task, 'level'):
             return self.task.level
         return self.task.levelou
 
     @property
     def levels(self) -> Tuple[Level,Level]:
-        u"returns the task's level"
+        "returns the task's level"
         return (self.levelin, self.levelou)
 
     def config(self) -> dict:
-        u"Returns a copy of a task's dict"
+        "Returns a copy of a task's dict"
         return self.task.config()
 
     def caller(self) -> Callable:
-        u"Returns an instance of the task's first callable parent class"
+        "Returns an instance of the task's first callable parent class"
         tpe   = type(self.task)
         bases = list(tpe.__bases__)
         while len(bases):
@@ -115,7 +118,7 @@ class Processor(metaclass=MetaProcessor):
 
     @classmethod
     def newtask(cls, **kwargs) -> _tasks.Task:
-        u"Returns a copy of a task's dict"
+        "Returns a copy of a task's dict"
         if callable(cls.tasktype):
             return cls.tasktype(**kwargs) # pylint: disable=not-callable
         else:
@@ -123,7 +126,7 @@ class Processor(metaclass=MetaProcessor):
 
     @staticmethod
     def cache(fcn):
-        u"""
+        """
         Caches actions.
 
         The cache is specific to the processor instance.
@@ -168,7 +171,7 @@ class Processor(metaclass=MetaProcessor):
 
     @staticmethod
     def action(fcn):
-        u"""
+        """
         Adds an action to the currently yielded TrackItems.
         The decorated function is expected to return an action.
         See TrackItems.withactions for an explanation.
@@ -184,44 +187,69 @@ class Processor(metaclass=MetaProcessor):
 
     @abstractmethod
     def run(self, args:'Runner'):
-        u"iterates over possible data"
+        "iterates over possible data"
 
 class TrackReaderProcessor(Processor):
-    u"Generates output from a _tasks.CycleCreatorTask"
-    tasktype = _tasks.TrackReaderTask
-
+    "Generates output from a _tasks.CycleCreatorTask"
     def run(self, args:'Runner'):
-        u"returns a dask delayed item"
+        "returns a dask delayed item"
         res   = args.data.setCacheDefault(self, Track(path = self.task.path))
         attr  = 'cycles' if self.task.levelou is Level.cycle else 'beads'
         attr += 'only'   if self.task.beadsonly else ''
         args.apply((getattr(res, attr).withcopy(self.task.copy),), levels = self.levels)
 
 class CycleCreatorProcessor(Processor):
-    u"Generates output from a _tasks.CycleCreatorTask"
-    tasktype = _tasks.CycleCreatorTask
+    "Generates output from a _tasks.CycleCreatorTask"
+    @classmethod
+    def apply(cls, toframe = None, **kwa):
+        "applies the task to a frame or returns a function that does so"
+        fcn = lambda data: data[...,...].withphases(kwa['first'], kwa['last'])
+        return fcn if toframe is None else fcn(toframe)
 
     def run(self, args:'Runner'):
-        u"iterates through beads and yields cycles"
-        kwargs = self.task.first, self.task.last
-        args.apply(lambda data: data[...,...].withphases(*kwargs), levels = self.levels)
+        "iterates through beads and yields cycles"
+        args.apply(self.apply(**self.config()), levels = self.levels)
 
-class SelectionProcessor(Processor):
-    u"Generates output from a TaggingTask"
-    tasktype = _tasks.TaggingTask
+class DataSelectionProcessor(Processor):
+    "Generates output from a DataSelectionTask"
+    @classmethod
+    def apply(cls, toframe = None, **kwa):
+        "applies the task to a frame or returns a function that does so"
+        names = lambda i: ('selecting'  if i == 'selected'  else
+                           'discarding' if i == 'discarded' else
+                           'with'+i)
+
+        kwa   = {names(i): j for i, j in kwa.items()
+                 if j is not None and i not in ('level', 'disabled')}
+
+        def _apply(frame):
+            for name, value in kwa.items():
+                getattr(frame, name)(value)
+            return frame
+        return _apply if toframe is None else _apply(toframe)
+
+    def run(self, args):
+        args.apply(self.apply(**self.config()))
+
+class TaggingProcessor(Processor):
+    "Generates output from a TaggingTask"
+    @classmethod
+    def apply(cls, toframe = None, **kwa):
+        "applies the task to a frame or returns a function that does so"
+        task  = cls.tasktype(**kwa) # pylint: disable=not-callable
+        elems = tuple(task.selection)
+        if   task.action is cls.tasktype.keep:
+            fcn = lambda frame: frame.selecting(elems)
+
+        elif task.action is cls.tasktype.remove:
+            fcn = lambda frame: frame.discarding(elems)
+        return fcn if toframe is None else fcn(toframe)
 
     def run(self, args:'Runner'):
-        u"iterates through beads and yields accepted items"
-        elems = tuple(self.task.selection)
-        if   self.task.action is self.tasktype.keep:
-            args.apply(lambda frame: frame.selecting(elems))
-
-        elif self.task.action is self.tasktype.remove:
-            args.apply(lambda frame: frame.discarding(elems))
+        args.apply(self.apply(**self.config()))
 
 class ProtocolProcessor(Processor):
-    u"A processor that can deal with any task having the __processor__ attribute"
-
+    "A processor that can deal with any task having the __processor__ attribute"
     tasktype = cast(Tuple[type, ...], TaskTypeDescriptor())
 
     @staticmethod
@@ -235,5 +263,11 @@ class ProtocolProcessor(Processor):
                 treating.extend(cur.__subclasses__())
         return tuple(_run())
 
+    @classmethod
+    def apply(cls, toframe = None, **kwa):
+        "applies the task to a frame or returns a function that does so"
+        fcn = cls.tasktype(**kwa).__processor__() # pylint: disable=not-callable
+        return fcn if toframe is None else fcn(toframe)
+
     def run(self, args:'Runner'):
-        args.apply(self.task.__processor__())
+        args.apply(self.apply(**self.config()))

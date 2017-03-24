@@ -83,7 +83,7 @@ class Track(_Track):
             ibead = next(i for i in ibead if isinstance(i, int))
         return PrecisionAlg.rawprecision(self, ibead)
 
-    measures = cast(Cycles, property(lambda self: self.cycles.withphase(5)))
+    measures = cast(Cycles, property(lambda self: self.cycles.withphases(5)))
     events   = cast(Events, property(lambda self: Events(track     = self,
                                                          beadsonly = True,
                                                          first     = 5,

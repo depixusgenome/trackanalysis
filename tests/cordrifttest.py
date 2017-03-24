@@ -15,7 +15,7 @@ from cordrift.processor         import DriftTask, DriftProcessor
 from simulator                  import TrackSimulator
 from simulator.processor        import TrackSimulatorTask
 from eventdetection.processor   import ExtremumAlignmentTask
-from model.task                 import TrackReaderTask
+from model.task                 import DataSelectionTask
 from control.taskcontrol        import create
 from testingcore                import path as utpath
 
@@ -244,12 +244,12 @@ def test_beadprocess():
     u"tests that tracks are well simulated"
     pair = create((TrackSimulatorTask(brownian  = 0., randtargs = None),
                    DriftTask()))
-    cycs = next(i[...,...] for i in pair.run()).withphases(5,5)
+    cycs = next(i[...,...] for i in pair.run()).withphases(5)
     for _, val in cycs:
         assert_allclose(val, val.mean(), rtol = 1e-5, atol = 1e-8)
 
     pair = create((TrackSimulatorTask(brownian  = 0.), DriftTask()))
-    cycs = next(i[...,...] for i in pair.run()).withphases(5,5)
+    cycs = next(i[...,...] for i in pair.run()).withphases(5)
     for _, val in cycs:
         val -= np.round(val, 1)
         assert_allclose(val-val[0], 0., atol = 1e-4)
@@ -278,12 +278,13 @@ def test_cycleprocess():
 
 def test_cycleprocess_withalignment():
     u"tests that tracks are well simulated"
-    pair = create((TrackReaderTask(path = utpath("big_legacy")),
+    pair = create((utpath("big_all"),
+                   DataSelectionTask(cycles = slice(2)),
                    ExtremumAlignmentTask(phase = 1),
                    DriftTask(onbeads = False)))
     cycs = next(i for i in pair.run())
-    val = cycs[0]
-    assert val is not None
+    val  = cycs[0]
+    assert val.shape == (1654,) # should be smaller because 2 cycles only selected
 
 if __name__ == '__main__':
     test_cycleprocess_withalignment()

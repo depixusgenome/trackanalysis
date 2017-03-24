@@ -31,9 +31,10 @@ class ExtremumAlignmentProcessor(Processor):
                                   mode    = 'max' if phase == 3 else 'min')
         def _action(frame, info):
             cycles = frame.new(data = {info[0]: info[1]})[info[0],...]
-            vals   = np.array(list(cycles.withphase(phase).values()), dtype = 'O')
-            for val, delta in zip(cycles.withphase(...).values(), align(vals)):
-                val += delta
+            vals   = np.array(list(cycles.withphases(phase).values()), dtype = 'O')
+            for val, delta in zip(cycles.withphases(...).values(), align(vals)):
+                if np.isfinite(delta):
+                    val += delta
             return info[0], info[1]
 
         def _apply(frame):
