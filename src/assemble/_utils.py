@@ -5,7 +5,7 @@ u'''
 regroups functions and classes to complement assembler
 '''
 
-from itertools import combinations
+import itertools
 from copy import deepcopy
 from typing import Callable # pylint: disable=unused-import
 import scipy.stats
@@ -59,7 +59,7 @@ def noverlaps_energy(oligos):
     u'''use noverlap_bpos to compute energy
     '''
     energy=0
-    for ol1,ol2 in combinations(oligos,2):
+    for ol1,ol2 in itertools.combinations(oligos,2):
         energy-=ol1.noverlaps(ol2)**2
     return energy
 
@@ -267,11 +267,26 @@ def find_overlaping_normdists(dists,nscale=2): # to pytest
 
 
 
-def optimal_perm_normdists(perm,dists,state)->numpy.ndarray:
+def optimal_perm_normdists(perm,dists)->numpy.ndarray: # brute-force # to optimize # to finish
     u'''
     given a permuation perm and the known distributions of each state
     returns the permutated state which maximise the probability
     '''
-    print(perm,dists,state)
+    print(perm,dists)
+    _epsi=0.001
+    # list all possibilities
+    bounds={idx:dists[idx].mean() for idx in perm}
+    for i in perm[:-1]:
+        for j in perm[i:]:
+            flag = _highest_norm_intersect(dists[i],dists[j])
+            sign = 1 if dists[i].mean()<dists[j].mean() else -1
+            bounds[i].append(flag+sign*_epsi)
+            bounds[j].append(flag-sign*_epsi)
 
+
+    # pop if the order of the permutation is not respected
+    permbounds = [bounds[pe] for pe in perm]
+    possibles = list(itertools.product(permbounds))
+    # compute the probability of each case
+    # return the maximal value
     return numpy.zeros(len(perm))
