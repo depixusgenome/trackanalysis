@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 
 u'''
-regroups functions and classes to complement asm
+regroups functions and classes to complement assembler
 '''
 
 from itertools import combinations
 from copy import deepcopy
 from typing import Callable # pylint: disable=unused-import
+import scipy.stats
 import numpy
 from Bio import pairwise2
 from . import oligohit
@@ -96,21 +97,30 @@ def test2_scaled_energies(oligos):
     return energy
 
 def test3_scaled_energies(oligos):
-    u''' second test for combining energies
+    u'''third test for combining energies
     '''
     bp_to_nm = 1.100
     # sorted oligos
     solis = sorted(oligos,key=lambda x :x.pos)
-    oenergies = -bp_to_nm*numpy.array([len(oligohit.tail_overlap(vx.seq,solis[ix+1].seq))\
-                                       for ix,vx in enumerate(solis[:-1])])
-    per_oligo = numpy.hstack((oenergies[0],oenergies[1:]+oenergies[:-1],oenergies[-1]))
+    overlaps = bp_to_nm*numpy.array([len(oligohit.tail_overlap(vx.seq,solis[ix+1].seq))/vx.poserr\
+                                     for ix,vx in enumerate(solis[:-1])])
+    overlaps = numpy.hstack((overlaps,0))
+    tsl_e = numpy.array([((i.pos-i.pos0)/i.poserr)**2 for i in solis]) # khi2
+    return sum(-overlaps**2+tsl_e)
 
-    per_oligo += 0.25*numpy.array([abs(i.pos-i.pos0)/i.poserr for i in solis]) # abs ??
-    return -sum(per_oligo**2)
 
-def test_energies(oligos):
-    u'for testing seed'
-    return sum([i.pos**2 for i in oligos])
+def test4_scaled_energies(oligos):
+    u'''
+    can work with (log) probabilities only
+    '''
+    # sorted oligos
+    solis = sorted(oligos,key=lambda x :x.pos)
+    proba_tsl = numpy.array([scipy.stats.norm(loc=i.pos0,scale=i.poserr).logpdf(i.pos)\
+                             for i in solis]).sum()
+    overlaps = numpy.array([len(oligohit.tail_overlap(vx.seq,solis[ix+1].seq))/vx.poserr\
+                            for ix,vx in enumerate(solis[:-1])])
+    prob_overl = -(0.25)**sum(overlaps) # taylor decomposition
+    return -proba_tsl-prob_overl
 
 def noverlaps_tsl_energy(oligos,ratio=0.01):
     # can't use as is because of relationship between bpos and pos
@@ -172,20 +182,20 @@ def max_overlap_assemble(oligos):
         seq = oligohit.max_overlap_pile(seq,oli.seq)
     return seq
 
-def match_sequence(srec,srec2seq:Callable,align_strs:Callable):
+def match_sequence(srec,srec2seq:Callable,align_strs:Callable,asmrid:int=0):
     u'''
     given a SeqRecorder object, reconstructs the sequence given by oligos using srec2seq.
     return the overlap between reconstructed sequence and the sequence.
     '''
-    exp_seq = srec2seq(srec.get_curr_oligohits())
+    exp_seq = srec2seq(srec.get_curr_oligohits(asmrid))
     known_seq = srec.sequence
     return align_strs(known_seq,exp_seq)
 
-def score_match(srec,srec2seq:Callable,align_strs:Callable):
+def score_match(srec,srec2seq:Callable,align_strs:Callable,asmrid:int=0):
     u'''
     returns the ratio of characters in match_sequence not "-"
     '''
-    match = match_sequence(srec,srec2seq,align_strs)
+    match = match_sequence(srec,srec2seq,align_strs,asmrid)
     if len(match)==0:
         return numpy.nan
     return 1-(match.count("-")+match.count("?"))/len(match)
@@ -216,3 +226,49 @@ def pairwise2_alignment(seqrec): # uses bpos
     gap_exp = ScaleGap(1)(_gap_penalties)
     gap_known = ScaleGap(1000)(_gap_penalties)
     return pairwise2.align.globalxc(seqrec.sequence,exp_seq,gap_known,gap_exp,score_only=True) # pylint: disable=no-member
+
+
+def _solver_norm_intersect(dist1,dist2):
+    u'returns the x-values of intersecting normal distributions'
+    sc1=dist1.std()
+    mea1=dist1.mean()
+    sc2=dist2.std()
+    mea2=dist2.mean()
+
+    coef1 = 1/(2*sc1**2) -1/(2*sc2**2)
+    coef2 = mea2/(sc2**2)-mea1/(sc1**2)
+    coef3 = mea1**2/(2*sc1**2) -mea2**2/(2*sc2**2) -numpy.log(sc2/sc1)
+    return numpy.roots([coef1,coef2,coef3])
+
+def _highest_norm_intersect(dist1,dist2):
+    sc_dist=[(dist1.pdf(xval),xval) for xval in _solver_norm_intersect(dist1,dist2)]
+    sc_dist.sort()
+    return sc_dist[-1][1]
+
+def find_overlaping_normdists(dists,nscale=2): # to pytest
+    u'''
+    returns lists of indices [(i,j,k)] of overlaping distributions with cdf of overlap >threshold
+    DEAD CODE ?
+    # find all pairs of overlapping
+    dist_ids = []
+    for id1,dis1 in enumerate(dists):
+        for id2,dis2 in enumerate(dists[id1+1:]):
+            # j=id2+id1+1
+            xval = _highest_norm_intersect(dis1,dis2)
+            # work out threshold value
+            left1 = 1-dis1.cdf(xval) if xval>dis1.mean() else dis1.cdf(xval)
+            left2 = 1-dis2.cdf(xval) if xval>dis2.mean() else dis2.cdf(xval)
+            if min(left1,left2)>threshold:
+                dist_ids.append((id1,id2+id1+1))
+    # merge tuples [i,j] & [i,k] & [j,k] => [i,j,k], set?
+    '''
+    sdists=[(di.mean(),di.mean()-nscale*di.std(),di.mean()+nscale*di.std(),idx)\
+            for idx,di in enumerate(dists)]
+    sdists.sort()
+    overlaps=[]
+    tomerge=set(range(len(sdists)))
+    for idx in sdists:
+        merging=(idx[3],)+tuple(sdists[jdx][3] for jdx in tomerge if idx[2]>sdists[jdx][1])
+        overlaps.append(merging)
+        tomerge=tomerge-set(merging)
+    return overlaps

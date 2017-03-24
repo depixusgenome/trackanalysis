@@ -10,7 +10,7 @@ from typing import Callable, Iterable # pylint: disable=unused-import
 from multiprocessing import Pool
 import numpy
 from scipy.optimize import basinhopping,OptimizeResult
-
+from . import _utils as utils
 # needs fixing : each object should be pickable
 #                test NestedAsmrs
 
@@ -53,6 +53,44 @@ class PreFixedSteps(HoppingSteps):
     def __call__(self,*args):
         return numpy.array([i.rvs(random_state=self.random_state) for i in self.dists])
 
+
+class GaussAndFlip(HoppingSteps):
+    u'''for two calls, one uses defined dists
+    the other randomly flips 2 consecutive xstates
+    '''
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
+        self.count = 0
+    def __call__(self,xst):
+        if self.count==0:
+            self.count=1
+            return numpy.array([i.rvs(random_state=self.random_state) for i in self.dists])
+        else:
+            self.count=0
+            flip = numpy.random.randint(len(xst)-1)
+            xst[flip], xst[flip+1] = xst[flip+1],xst[flip]
+            return xst
+
+class OGandF(HoppingSteps):
+    u'''trying to optimize the exploration of param space given hypotheses:
+    symetric distribution of z around z0 (gaussian at the moment)
+    # find the distribution which overlap (and allow permutation of oligos)
+    # when allowing permutations of oligos return the optimal solution wrt to dist(z,z0)
+    '''
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
+        self.count = 0
+        self.over_dist = utils.find_overlaping_normdists(self.dists)
+    def __call__(self,xst):
+        if self.count==0:
+            self.count=1
+            return numpy.array([i.rvs(random_state=self.random_state) for i in self.dists])
+        else:
+            self.count=0
+            flip = numpy.random.randint(len(xst)-1)
+            xst[flip], xst[flip+1] = xst[flip+1],xst[flip]
+            return xst
+
 class NestedAsmrs:
     u'''
     nested Monte Carlo running different random seeds in parallel
@@ -69,12 +107,12 @@ class NestedAsmrs:
             self.asmrs[idx].npstate = numpy.random.RandomState(val)
         self.T = kwargs.get("T",1.0) # pylint:disable=invalid-name
         self._pool = None
-        #if self.nprocs>1:
-        try:
-            self._pool = Pool(processes=self.nprocs)
-        except OSError:
-            print("could not create Pool")
-            self._pool = None
+        if self.nprocs>1:
+            try:
+                self._pool = Pool(processes=self.nprocs)
+            except OSError:
+                print("could not create Pool")
+                self._pool = None
 
     def __del__(self,):
         u'closes pool'
