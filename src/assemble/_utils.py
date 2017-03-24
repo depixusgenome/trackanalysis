@@ -230,10 +230,10 @@ def pairwise2_alignment(seqrec): # uses bpos
 
 def _solver_norm_intersect(dist1,dist2):
     u'returns the x-values of intersecting normal distributions'
-    sc1=dist1.scale
-    mea1=dist1.loc
-    sc2=dist2.scale
-    mea2=dist2.loc
+    sc1=dist1.std()
+    mea1=dist1.mean()
+    sc2=dist2.std()
+    mea2=dist2.mean()
 
     coef1 = 1/(2*sc1**2) -1/(2*sc2**2)
     coef2 = mea2/(sc2**2)-mea1/(sc1**2)
@@ -256,13 +256,13 @@ def find_overlaping_normdists(dists,nscale=2): # to pytest
             # j=id2+id1+1
             xval = _highest_norm_intersect(dis1,dis2)
             # work out threshold value
-            left1 = 1-dis1.cdf(xval) if xval>dis1.loc else dis1.cdf(xval)
-            left2 = 1-dis2.cdf(xval) if xval>dis2.loc else dis2.cdf(xval)
+            left1 = 1-dis1.cdf(xval) if xval>dis1.mean() else dis1.cdf(xval)
+            left2 = 1-dis2.cdf(xval) if xval>dis2.mean() else dis2.cdf(xval)
             if min(left1,left2)>threshold:
                 dist_ids.append((id1,id2+id1+1))
     # merge tuples [i,j] & [i,k] & [j,k] => [i,j,k], set?
     '''
-    sdists=[(di.loc,di.loc-nscale*di.scale,di.loc+nscale*di.scale,idx)\
+    sdists=[(di.mean(),di.mean()-nscale*di.std(),di.mean()+nscale*di.std(),idx)\
             for idx,di in enumerate(dists)]
     sdists.sort()
     overlaps=[]
