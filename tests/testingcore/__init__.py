@@ -37,7 +37,7 @@ def path(name:str) -> Union[str, Sequence[str]]:
         val = Path("../tests/"+__package__+"/"+i)
         if not val.exists():
             raise KeyError("Check your file name!!! {}".format(val))
-        return str(val.absolute())
+        return str(val.resolve())
 
     if isinstance(default, tuple):
         return tuple(_test(i) for i in default)
