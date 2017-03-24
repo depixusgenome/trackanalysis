@@ -10,7 +10,7 @@ import pickle
 import pandas
 import numpy
 from . import oligohit
-from . import asm
+from . import assembler
 
 class Recorder:
     u'''
@@ -56,16 +56,16 @@ class Recorder:
         returns the records under a DataFrame to analyse the results
         '''
         to_pandas = []
-        if isinstance(self.assembler,asm.Assembler):
+        if isinstance(self.assembler,assembler.Assembler):
             for elm in self.rec:
                 to_dict = _OResult_to_Series(elm)
                 to_pandas.append(to_dict)
-        elif isinstance(self.assembler,asm.NestedAsmrs):
+        elif isinstance(self.assembler,assembler.NestedAsmrs):
             for rec_it in self.rec:
-                for asm_id,elm in enumerate(rec_it):
+                for asmr_id,elm in enumerate(rec_it):
                     to_dict = _OResult_to_Series(elm)
-                    to_dict["asm_id"] = asm_id
-                    to_dict["npseed"] = self.assembler.seeds[asm_id]
+                    to_dict["asmr_id"] = asmr_id
+                    to_dict["npseed"] = self.assembler.seeds[asmr_id]
                     to_pandas.append(to_dict)
         return pandas.DataFrame(to_pandas)
 

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 u"All code related to sequencing hairpins"
 
-from .asm import MCAssembler, PreFixedSteps
+from .assembler import MCAssembler, PreFixedSteps, NestedAsmrs
 from .recorder import Recorder, SeqRecorder
-from .asm_utils import OligoWrap
+from ._utils import OligoWrap
 from .oligohit import OligoHit
