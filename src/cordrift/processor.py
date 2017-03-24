@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Task & Processor for removing correlated drifts"
-
-from copy              import copy
-from functools         import partial
-from typing            import (Dict, Union, Sequence,  # pylint: disable=unused-import
-                               Tuple, Optional, Any, cast)
+from functools              import partial
+from typing                 import (Dict, Union,  # pylint: disable=unused-import
+                                    Sequence, Tuple, Optional, Any, cast)
 
 import numpy as np
 
@@ -65,7 +63,7 @@ class _BeadDriftAction:
             data.append(info[1])
             return info
 
-        frame = copy(frame).withphases(*self.task.phases) if bcopy else frame
+        frame = frame[...].withphases(self.task.phases) if bcopy else frame
         frame.withaction(_setcache)
 
         prof  = self.task.collapse(self.__events(frame),
@@ -82,7 +80,7 @@ class _BeadDriftAction:
     def run(self, key, cycle:Cycles):
         u"Applies the cordrift subtraction to a bead"
         prof  = self.cache.get(key, None)
-        if prof is  not None:
+        if prof is not None:
             return
 
         self.cache[key] = prof = self.profile(cycle, False)
@@ -92,28 +90,34 @@ class _BeadDriftAction:
     def onBead(self, track:Track, info:Tuple[Any,np.ndarray]):
         u"Applies the cordrift subtraction to a bead"
         cyc = Cycles(track = track, data = dict((info,)))
-        self.run((track.path, info[0]), cyc.withphases(*self.task.phases))
+        self.run((track.path, info[0]), cyc.withphases(self.task.phases))
         return info
 
     def onCycles(self, frame, _):
         u"Applies the cordrift subtraction to parallel cycles"
-        for icyc in range(frame.track.ncycles):
-            cyc = frame[...,icyc]
-            self.run(frame.parents+(icyc,), cyc.withphases(*self.task.phases))
+        data = frame.new(data = dict(frame[...].withbeadsonly()))
+        for icyc in frame.cyclerange():
+            cyc = data[...,icyc].withphases(self.task.phases)
+            self.run(frame.parents+(icyc,), cyc)
 
 class DriftProcessor(Processor):
     u"Deals with bead drift"
     _ACTION  = _BeadDriftAction
-    def run(self, args):
-        action = self._ACTION(self.task.config())
-        if self.task.onbeads:
+    @classmethod
+    def apply(cls, toframe, **kwa):
+        "applies the task to a frame or returns a function that does so"
+        action = cls._ACTION(kwa)
+        if kwa.get('onbeads', True):
             fcn = lambda frame: (frame
                                  .new()
                                  .withaction(partial(action.onBead, frame.track),
-                                             beadonly = True))
+                                             beadsonly = True))
         else:
             fcn = lambda frame: frame.new().withdata(frame, action.onCycles)
-        args.apply(fcn, levels = self.levels)
+        return fcn if toframe is None else fcn(toframe)
+
+    def run(self, args):
+        args.apply(self.apply(None, **self.config()), levels = self.levels)
 
     @classmethod
     def profile(cls, frame:Cycles, kwa:Union[dict,DriftTask]):

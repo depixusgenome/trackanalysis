@@ -39,7 +39,8 @@ class FileDialog:
 
         cnf = kwa.get('config', None)  # type: ignore
         if hasattr(cnf, 'getGlobal'):
-            cnf = cnf.getGlobal('config').last.path
+            cnf          = cnf.getGlobal('config').last.path
+            cnf.defaults = dict.fromkeys(self.DEFAULTS, None)
         if hasattr(cnf, 'get'):
             self.config = self._getconfig(cnf), self._setconfig(cnf)
         else:

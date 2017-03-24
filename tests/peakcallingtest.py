@@ -56,7 +56,7 @@ def test_onehairpincost():
     truth = np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')/8.8e-4
     bead  = (truth*1.03+1.)*8.8e-4
     res   = HairpinDistance(peaks = truth)(bead[:-1])
-    assert_allclose(bead*res[1]+res[2], truth, rtol = 1e-4)
+    assert_allclose(bead*res[1]+res[2], truth, rtol = 1e-4, atol = 1e-2)
 
 def test_onehairpinid():
     u"tests haipin id method"

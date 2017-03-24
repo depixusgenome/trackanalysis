@@ -197,6 +197,7 @@ def setup(locs            = None, # pylint: disable=too-many-arguments
         kwa.setdefault("size",  (1000, 1000))
         return _launch(app, **kwa)
 
+    locs.setdefault('application', application)
     locs.setdefault('serve',   serve)
     locs.setdefault('launch',  launch)
 

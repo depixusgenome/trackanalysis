@@ -51,14 +51,16 @@ def _beadorconfig(attr):
     hmsg  = "link to config's {}".format(attr)
     return property(_getter, _setter, None, hmsg)
 
+ORDER = tuple, AlignmentTask, DriftTask, EventDetectionTask
 class SpecificTaskController(TrackPlotModelController):
     "access to tasks"
-    TASKTYPE  = None   # type: type
-    PREVIOUS  = tuple, # type: Tuple[type, ...]
+    TASKTYPE = None   # type: type
+    SIDE     = 'LEFT'
     def __init__(self, *args):
         super().__init__(*args)
         cnf = self.getRootConfig().tasks
-        cnf[self.configname].default = self.TASKTYPE() # pylint: disable=not-callable
+        # pylint: disable=not-callable
+        cnf[self.configname].default = self.TASKTYPE(**self._default())
 
     @property
     def configname(self) -> str:
@@ -109,13 +111,19 @@ class SpecificTaskController(TrackPlotModelController):
     def _check(_) -> bool:
         return True
 
+    @staticmethod
+    def _default() -> dict:
+        return {}
+
     @property
     def index(self) -> Optional[Task]:
         "returns the index the new task should have"
         tasks = tuple(self._ctrl.tasks(self.roottask))
-        for i in range(1, len(tasks)):
-            if not isinstance(i, self.PREVIOUS):
-                return i
+        ind   = ORDER.index(self.TASKTYPE) + (1 if self.SIDE == 'RIGHT' else 0)
+        rem   = ORDER[:ind] # type: ignore
+        for i, tsk in enumerate(tasks[1:]):
+            if not isinstance(tsk, rem):
+                return i+1
         return len(tasks)
 
     def observe(self, *args, **kwa):
@@ -127,46 +135,33 @@ class SpecificTaskController(TrackPlotModelController):
 class AlignmentController(SpecificTaskController):
     "access to aligment"
     TASKTYPE = AlignmentTask
-    @property
-    def index(self) -> Optional[Task]:
-        "returns the index the new task should have"
-        return 1
 
 class DriftPerBeadController(SpecificTaskController):
     "access to drift per bead"
     TASKTYPE = DriftTask
-    PREVIOUS = AlignmentTask, # type: Tuple[type, ...]
     @staticmethod
     def _check(task) -> bool:
         return task.onbeads
 
-    @property
-    def index(self) -> Optional[Task]:
-        "returns the index the new task should have"
-        tasks = tuple(self._ctrl.tasks(self.roottask))
-        return 2 if len(tasks) > 1 and isinstance(tasks[1], AlignmentTask) else 1
+    @staticmethod
+    def _default() -> dict:
+        return dict(onbeads = True)
 
 class DriftPerCycleController(SpecificTaskController):
     "access to drift per cycle"
     TASKTYPE = DriftTask
-    PREVIOUS = AlignmentTask, DriftTask # type: Tuple[type, ...]
+    SIDE     = 'RIGHT'
     @staticmethod
     def _check(task) -> bool:
         return not task.onbeads
 
-    @property
-    def index(self) -> Optional[Task]:
-        "returns the index the new task should have"
-        tasks = tuple(self._ctrl.tasks(self.roottask))
-        for i in range(1, len(tasks)):
-            if not isinstance(i, (DriftTask, AlignmentTask)):
-                return i
-        return len(tasks)
+    @staticmethod
+    def _default() -> dict:
+        return dict(onbeads = False)
 
 class EventDetectionController(SpecificTaskController):
     "access to drift per cycle"
     TASKTYPE = EventDetectionTask
-    PREVIOUS = AlignmentTask, DriftTask # type: Tuple[type, ...]
 
 class CyclesModelController(TrackPlotModelController):
     "Model for Cycles View"

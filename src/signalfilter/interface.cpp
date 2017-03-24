@@ -49,9 +49,10 @@ namespace
         auto seq = pybind11::reinterpret_borrow<pybind11::sequence>(obj);
         Check check;
 
-        est.estimators.resize(seq.size());
-        for(size_t i = 0; i < est.estimators.size() && check(); ++i)
-            est.estimators[i] = seq[i].cast<size_t>();
+        size_t sz = seq.size();
+        est.estimators.resize(sz);
+        for(size_t i = 0; i < sz && check(); ++i)
+            est.estimators[i] = (size_t) (seq[i].cast<int>());
     }
 
     template <typename T>
@@ -72,9 +73,8 @@ namespace
     }
 
     template <typename T>
-    void _init(T & inst, pybind11::kwargs kwa)
+    void _fromkwa(T & inst, pybind11::kwargs kwa)
     {
-        new (&inst) T();
         _get(inst.derivate, "derivate",     kwa);
         _get(inst.power,    "power",        kwa);
         if(kwa.contains("precision"))
@@ -86,12 +86,26 @@ namespace
     };
 
     template <>
+    void _fromkwa<signalfilter::clip::Args>(signalfilter::clip::Args & inst,
+                                            pybind11::kwargs kwa)
+    {
+        _get(inst.minval, "minval", kwa);
+        _get(inst.maxval, "maxval", kwa);
+    };
+
+    template <typename T>
+    void _init(T & inst, pybind11::kwargs kwa)
+    {
+        new (&inst) T();
+        _fromkwa(inst, kwa);
+    }
+
+    template <>
     void _init<signalfilter::clip::Args>(signalfilter::clip::Args & inst,
                                          pybind11::kwargs kwa)
     {
         new (&inst) signalfilter::clip::Args();
-        _get(inst.minval, "minval", kwa);
-        _get(inst.maxval, "maxval", kwa);
+        _fromkwa(inst, kwa);
     };
 
     template<typename T>
@@ -100,7 +114,7 @@ namespace
                            pybind11::kwargs           kwa)
     {
         T cpy = self;
-        _init(cpy, kwa);
+        _fromkwa(cpy, kwa);
         run(cpy, inp.size(), inp.mutable_data());
         return inp;
     }

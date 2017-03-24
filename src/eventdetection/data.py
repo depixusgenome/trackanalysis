@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Finds peak positions on a bead"
-from typing           import Iterator, Tuple, Union, Sequence, TYPE_CHECKING
+from typing           import (Iterator, Tuple, Union, Sequence,
+                              Optional, TYPE_CHECKING)
 from copy             import deepcopy
 from functools        import wraps
 import numpy          as     np
@@ -47,9 +48,11 @@ class Events(Cycles, EventDetectionConfig, Items):
         track = self.track
         fcn   = self.__filterfcn()
         evts  = deepcopy(self.events)
-
+        test  = None
         for key, cycle in super()._iter(sel):
-            if cycle.dtype == 'O':
+            if test is None:
+                test = cycle.dtype == EVENTS_DTYPE or cycle.dtype == 'O'
+            if test:
                 gen = cycle
             else:
                 val  = evts.rawprecision(track, key[0]) if prec is None else prec
@@ -65,8 +68,8 @@ class Events(Cycles, EventDetectionConfig, Items):
             yield (key, gen)
 
     if TYPE_CHECKING:
-        def keys(self, sel = None) -> Iterator[CYCLEKEY]:
-            yield from super().keys(sel)
+        def keys(self, sel = None, beadsonly:Optional[bool] = None) -> Iterator[CYCLEKEY]:
+            yield from super().keys(sel, beadsonly)
 
         def __getitem__(self, keys) -> Union['Events', Sequence[EVENTS_TYPE]]:
             return super().__getitem__(keys)

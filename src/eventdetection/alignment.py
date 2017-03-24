@@ -33,6 +33,12 @@ class ExtremumAlignment:
         pass
 
     def __get(self, elem):
+        if len(elem) <= 2:
+            return np.NaN
+
+        elif len(elem) <= self.binsize:
+            return np.median(elem)
+
         bsize  = self.binsize
         binned = as_strided(elem,
                             shape   = (len(elem)-bsize+1, bsize),
@@ -49,7 +55,7 @@ class ExtremumAlignment:
         itr = (self.__get(j) for j in data) if self.binsize > 2 else data
         fcn = getattr(np, self.mode.value)
         res = np.fromiter((-fcn(i) for i in itr), dtype = np.float32)
-        return np.subtract(res, np.median(res), out = res)
+        return np.subtract(res, np.nanmedian(res), out = res)
 
     def __call__(self, data) -> np.ndarray:
         if isinstance(data, np.ndarray) and np.isscalar(data[0]):
