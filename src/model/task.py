@@ -191,3 +191,6 @@ class DataFunctorTask(Task):
             return lambda dat: dat.withfunction(fcn, beadsonly = self.beadsonly)
         else:
             return lambda dat: dat.withfunction(cpy, beadsonly = self.beadsonly)
+
+__all__  = tuple(i for i in locals() if i.endswith('Task') and len(i) > len('Task'))
+__all__ += 'TagAction',

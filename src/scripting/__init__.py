@@ -23,34 +23,38 @@ We add some methods and change the default behaviour:
 """
 # pylint: disable=unused-import,invalid-name
 from typing                 import cast
-from copy                   import copy
+from copy                   import copy as shallowcopy, deepcopy
 from functools              import wraps
+from enum                   import Enum
 import inspect
 
+from utils                  import updatedeepcopy
+from model.task             import *  # pylint: disable=wildcard-import
+import control.processor
 from control.globalscontrol import GlobalsController
+from control.taskcontrol    import create as _create
+from cordrift.processor     import DriftTask
 from view.globalsview       import View, GlobalsView
 from view.dialog            import FileDialog
 from app                    import Defaults
 
-from data                   import Track as _Track, Beads, Cycles
-from eventdetection.data    import Events
-from signalfilter           import (PrecisionAlg, RollingFilter, NonLinearFilter,
-                                    ForwardBackwardFilter)
+from data                       import Track as _Track, Beads, Cycles
+from eventdetection.processor   import ExtremumAlignmentTask, EventDetectionTask
+from eventdetection.data        import Events
+from signalfilter               import (PrecisionAlg, RollingFilter, NonLinearFilter,
+                                        ForwardBackwardFilter)
 
 import numpy                as np
 import matplotlib.pyplot    as plt
 import pandas               as pd
 
-frame = msg = fname = None
-for frame in inspect.stack()[1:]:
-    fname = frame.filename
-    if 'importlib' not in fname:
-        msg = "Use directly in the interpreter or not at all"
-        assert fname == '<stdin>' or fname.startswith('<ipython'), msg
+_frame = None
+for _frame in inspect.stack()[1:]:
+    if 'importlib' not in _frame.filename:
+        assert (_frame.filename == '<stdin>'
+                or _frame.filename.startswith('<ipython'))
     break
-del fname
-del frame
-del msg
+del _frame
 
 class ScriptingView(View):
     "Dummy view for scripting"
@@ -60,12 +64,49 @@ class ScriptingView(View):
         self.trkdlg    = FileDialog(filetypes = 'trk|ana|*',
                                     config    = self._ctrl,
                                     title     = "open a track file")
+
+        cnf = self._ctrl.getGlobal("config").tasks
+        cnf.defaults = dict(selection      = DataSelectionTask(),
+                            alignment      = ExtremumAlignmentTask(),
+                            driftperbead   = DriftTask(onbeads = True),
+                            driftpercycle  = DriftTask(onbeads = False),
+                            cycles         = CycleCreatorTask(),
+                            eventdetection = EventDetectionTask())
+
     @property
     def control(self):
         "returns the controller"
         return self._ctrl
 
 scriptapp = Defaults.application(main = ScriptingView)() # pylint: disable=no-member
+
+class Tasks(Enum):
+    "possible tasks"
+    selection      = 'selection'
+    alignment      = 'alignment'
+    driftperbead   = 'driftperbead'
+    driftpercycle  = 'driftpercycle'
+    cycles         = 'cycles'
+    eventdetection = 'eventdetection'
+
+    def __call__(self, **kwa):
+        cnf = scriptapp.control.getGlobal("config").tasks
+        return updatedeepcopy(cnf[self.value].get(), **kwa)
+
+    @classmethod
+    def get(cls, arg, **kwa):
+        "returns the task associated to the argument"
+        if isinstance(arg, (str, cls)):
+            return cls(arg)(**kwa)
+
+        elif isinstance(arg, tuple):
+            return cls(arg[0])(**arg[1], **kwa)
+
+        else:
+            assert isinstance(arg, Task)
+            if len(kwa):
+                return updatedeepcopy(arg, **kwa)
+            return arg
 
 class Track(_Track):
     "Adding helper functions for simple calls"
@@ -83,6 +124,17 @@ class Track(_Track):
             ibead = next(i for i in ibead if isinstance(i, int))
         return PrecisionAlg.rawprecision(self, ibead)
 
+    def tasklist(self, *args, beadsonly = True):
+        "creates a tasklist"
+        return ([TrackReaderTask(path = self.path, beadsonly = beadsonly)]
+                + [Tasks.get(i) for i in args])
+
+    def apply(self, *args, copy = True, beadsonly = True):
+        "returns an iterator over the result of provided tasks"
+        procs = _create(self.tasklist(*args, beadsonly = beadsonly))
+        procs.data.setCacheDefault(0, self)
+        return next(iter(procs.run(copy = copy)))
+
     measures = cast(Cycles, property(lambda self: self.cycles.withphases(5)))
     events   = cast(Events, property(lambda self: Events(track     = self,
                                                          beadsonly = True,
@@ -97,29 +149,29 @@ def _copied(fcn):
         if len(stack) > 1 and stack[1].filename.endswith('trackitems.py'):
             cpy = self
         else:
-            cpy = copy(self)
+            cpy = shallowcopy(self)
         __old__(cpy, *args, **kwargs)
         return cpy
     _fcn.__old__ = fcn
     return _fcn
 
-for cls in (Beads, Cycles, Events):
-    cls._COPY = True # pylint: disable=protected-access
-    cls.rawprecision = lambda self, ibead: self.track.rawprecision(ibead)
-    for itm in inspect.getmembers(cls, callable):
+for _cls in (Beads, Cycles, Events):
+    _cls._COPY = True # pylint: disable=protected-access
+    _cls.rawprecision = lambda self, ibead: self.track.rawprecision(ibead)
+    for itm in inspect.getmembers(_cls, callable):
         if itm[0].startswith('with'):
-            setattr(cls, itm[0], _copied(itm[1]))
+            setattr(_cls, itm[0], _copied(itm[1]))
 
-def withfilter(self, tpe = NonLinearFilter, **kwa):
+def _withfilter(self, tpe = NonLinearFilter, **kwa):
     "applies the filter to the data"
     filt = tpe(**kwa)
     fcn  = lambda info: (info[0],
                          filt(info[1], precision = self.track.rawprecision(info[0])))
     return self.withaction(fcn)
 
-for cls in (Beads, Cycles, Events):
-    cls.withfilter   = withfilter
+for _cls in (Beads, Cycles, Events):
+    _cls.withfilter   = _withfilter
 
-del cls
+del _cls
 del _copied
-del withfilter
+del _withfilter
