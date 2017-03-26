@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Runs an app"
+import warnings
 import click
 
 @click.command()
@@ -15,6 +16,7 @@ import click
               help = u'If using webbrowser, launch it automatically')
 def run(view, app, desktop, show):
     u"Launches an view"
+    warnings.filterwarnings('error', category = FutureWarning)
     if view.startswith('view.'):
         view = view[5:]
 

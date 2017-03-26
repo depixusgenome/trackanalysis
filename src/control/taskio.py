@@ -26,7 +26,7 @@ class TaskIO:
     @classmethod
     def extensions(cls, ctrl, attr:str):
         "returns the list of possible extensions"
-        return '|'.join(i.EXT for i in cls.__get(ctrl, attr)[::-1])+'|*'
+        return '*|'+'|'.join(i.EXT for i in cls.__get(ctrl, attr)[::-1])
 
     @classmethod
     def insert(cls, ctrl, attr:str, ind, new):
