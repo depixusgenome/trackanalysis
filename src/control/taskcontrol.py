@@ -12,11 +12,10 @@ It can add/delete/update tasks, emitting the corresponding events
 from typing         import (Union, Iterator, Tuple, # pylint: disable=unused-import
                             Optional, Any, List, Iterable, Dict)
 
-from copy           import deepcopy
-from model.task     import Task, RootTask, TrackReaderTask, TaskIsUniqueError
+from model.task     import Task, RootTask, TaskIsUniqueError
 from .event         import Controller, NoEmission
 from .processor     import Cache, Processor, run as _runprocessors
-from .              import FileIO
+from .taskio        import DefaultTaskIO, GrFilesIO, TrackIO
 
 class ProcessorController:
     "data and model for tasks"
@@ -125,34 +124,6 @@ def create(model     : Iterable[Task],
     "creates a task pair for this model"
     return ProcessorController.create(model, processors)
 
-class TrackReaderTaskIO:
-    "Deals with reading a track file"
-    @staticmethod
-    def open(path, tasks):
-        "opens a track file"
-        if len(tasks):
-            raise NotImplementedError()
-        return [(TrackReaderTask(path = path),)]
-
-class ConfigTrackReaderTaskIO(TrackReaderTaskIO):
-    "Adds an alignment to the tracks per default"
-    def __init__(self, ctrl):
-        self._ctrl = ctrl
-
-    @classmethod
-    def setup(cls, ctrl, cnf):
-        "sets itself-up in stead of TrackReaderTaskIO"
-        ctrl.replace('openers', TrackReaderTaskIO, cls(cnf))
-
-    def open(self, path, tasks):
-        "opens a track file and adds a alignment"
-        items = [TrackReaderTaskIO.open(path, tasks)[0][0]]
-        for name in self._ctrl.get(default = tuple()):
-            task = self._ctrl[name].get(default = None)
-            if not getattr(task, 'disabled', True):
-                items.append(deepcopy(task))
-        return [tuple(items)]
-
 class TaskController(Controller):
     "Data controller class"
     def __init__(self, **kwargs):
@@ -163,14 +134,6 @@ class TaskController(Controller):
 
         self.__openers = kwargs.get("openers", self.__defaultopeners())
         self.__savers  = kwargs.get("savers",  self.__defaultsavers())
-
-    def replace(self, attr:str, old, new):
-        "returns the list of file openers"
-        lst = getattr(self, '_TaskController__'+attr)
-        if isinstance(old, type):
-            lst[next(i for i, j in enumerate(lst) if isinstance(j, old))] = new
-        else:
-            lst[lst.index(old)] = new
 
     def task(self,
              parent : RootTask,
@@ -281,6 +244,8 @@ class TaskController(Controller):
         "clears all data"
         if parent is None:
             self.__items.clear()
+        elif parent not in self.__items:
+            raise NoEmission('wrong key')
         else:
             self.__items[parent].clear()
         return dict(controller = self, parent = parent)
@@ -309,12 +274,12 @@ class TaskController(Controller):
 
         yield from (fcn for name, fcn in locals().items() if name[:3] == '_on')
 
-    @staticmethod
-    def __defaultopeners():
+    @classmethod
+    def __defaultopeners(cls):
         "yields default openers"
-        return [cls() for cls in FileIO.__subclasses__()] + [TrackReaderTaskIO()]
+        return cls.__defaultsavers() + [GrFilesIO(), TrackIO()]
 
     @staticmethod
     def __defaultsavers():
         "yields default openers"
-        return [cls() for cls in FileIO.__subclasses__()]
+        return [cls() for cls in DefaultTaskIO.__subclasses__()]
