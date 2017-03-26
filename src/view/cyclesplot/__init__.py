@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cycles plot"
-from    typing              import Optional # pylint: disable=unused-import
+from    typing           import Optional # pylint: disable=unused-import
 
-from    bokeh               import layouts
-from    bokeh.models        import ToolbarBox
+from    bokeh            import layouts
+from    bokeh.models     import ToolbarBox
 
-from    control             import Controller
-from    control.taskcontrol import ConfigTrackReaderTaskIO
+from    control          import Controller
+from    control.taskio   import ConfigTrackIO, ConfigGrFilesIO
 
-from  ..plotutils           import DpxKeyedRow, TrackPlotCreator, TrackPlotView
-from   ._bokehext           import DpxHoverModel
-from   ._modelcontroller    import CyclesModelController
-from   ._raw                import RawMixin
-from   ._hist               import HistMixin
-from   ._config             import ConfigMixin
+from  ..plotutils        import DpxKeyedRow, TrackPlotCreator, TrackPlotView
+from   ._bokehext        import DpxHoverModel
+from   ._modelcontroller import CyclesModelController
+from   ._raw             import RawMixin
+from   ._hist            import HistMixin
+from   ._config          import ConfigMixin
 
 class CyclesPlotCreator(TrackPlotCreator, HistMixin, RawMixin, ConfigMixin):
     "Displays cycles and their projection"
@@ -86,9 +86,15 @@ class CyclesPlotView(TrackPlotView):
 
     def ismain(self):
         "Alignment, ... is set-up by default"
-        cnf         = self._ctrl.getGlobal('config').tasks
-        cnf.default = ['alignment']
-        ConfigTrackReaderTaskIO.setup(self._ctrl, cnf)
+        trk           = self._ctrl.getGlobal('current').track
+
+        tasks         = self._ctrl.getGlobal('config').tasks
+        tasks.default = ['alignment']
+
+        ConfigTrackIO  .setup(self._ctrl, tasks)
+        ConfigGrFilesIO.setup(self._ctrl, trk, tasks)
+
+        trk.observe(lambda itm: self._ctrl.clearData(itm.old))
 
     def getroots(self, doc):
         "adds items to doc"

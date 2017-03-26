@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Toolbar"
+from pathlib              import Path
 from bokeh.layouts        import Row
 
+from control.taskio       import TaskIO
 from .dialog              import FileDialog
 from .intinput            import BeadInput
 from .                    import BokehView
@@ -22,10 +24,9 @@ class  ToolBar(BokehView):
                         'open.dialog': u'Open a track or analysis file',
                         'save.dialog': u'Save an analysis file'}
 
-        self.__diagopen = FileDialog(filetypes = 'trk|ana|*',
+        self.__diagopen = FileDialog(multiple  = 1,
                                      config    = self._ctrl)
-        self.__diagsave = FileDialog(filetypes = 'ana|*',
-                                     config    = self._ctrl)
+        self.__diagsave = FileDialog(config    = self._ctrl)
 
     def _getroots(self, _):
         "adds items to doc"
@@ -38,13 +39,25 @@ class  ToolBar(BokehView):
             self._quit = self.button(self._ctrl.close, css.quit.get())
             self._tools.append(self._quit)
 
-        self.__diagopen.title = css.open.dialog.get()
-        self.__diagsave.title = css.save.dialog.get()
+        self.__diagopen.filetypes = TaskIO.extensions(self._ctrl, 'openers')
+        self.__diagopen.title     = css.open.dialog.get()
+        self.__diagsave.filetypes = TaskIO.extensions(self._ctrl, 'savers')
+        self.__diagsave.title     = css.save.dialog.get()
 
     def getroots(self, doc):
         "adds items to doc"
         self._getroots(doc)
         self.enableOnTrack(self._save)
+        def _title(item):
+            path = getattr(item.value, 'path', None)
+            if isinstance(path, (list, tuple)):
+                path = path[0]
+            title = doc.title.split(':')[0]
+            if path is not None and len(path) > 0:
+                title += ':' + Path(path).stem
+            doc.title = title
+
+        self._ctrl.getGlobal("current").track.observe(_title)
         return Row(children = self._tools, sizing_mode = 'fixed'),
 
     def close(self):
@@ -59,9 +72,9 @@ class  ToolBar(BokehView):
 
     @BokehView.action
     def _onOpen(self, *_):
-        path  = self.__diagopen.open()
-        if path is not None:
-            self._ctrl.openTrack(path)
+        paths = self.__diagopen.open()
+        if paths is not None:
+            self._ctrl.openTrack(paths)
 
     @BokehView.action
     def _onSave(self,  *_):

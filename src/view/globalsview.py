@@ -29,7 +29,7 @@ class GlobalsView(View):
                 cnf.items = {i: inst for i in tasks}
 
         def _onOpenTrack(model = None, **_):
-            cnf.items = {'track': model[0], 'task': model[0]}
+            cnf.items = {'track': model[0], 'task': model[0], 'bead': None}
 
         def _onAddTask(parent = None, task = None, **_):
             cnf.items = {'track': parent, 'task' : task}

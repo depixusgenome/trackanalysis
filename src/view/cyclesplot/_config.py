@@ -78,12 +78,10 @@ class PeaksTableCreator(WidgetCreator):
         source = self.__widget.source
         source.on_change("data", _py_cb) # pylint: disable=no-member
 
-        self.getConfig() .observe('sequence.peaks',
-                                  lambda: setattr(source, 'data', self.__data()))
-        self.getRootConfig().observe(('oligos', 'last.path.fasta'),
-                                     lambda: setattr(source, 'data', self.__data()))
-        self.getCurrent().observe(('sequence.key',),
-                                  lambda: setattr(source, 'data', self.__data()))
+        obs = lambda: setattr(source, 'data', self.__data())
+        self.getConfig().sequence.peaks.observe(obs)
+        self.getRootConfig().observe(('oligos', 'last.path.fasta'), obs)
+        self.getCurrent().sequence.key.observe(obs)
 
         hover  = self.__hover
 
@@ -158,8 +156,8 @@ class ConversionSlidersCreator(WidgetCreator):
 
     def callbacks(self, action, hover, table):
         "adding callbacks"
-        self.getConfig() .observe(('base.stretch', 'base.bias'), self.update)
-        self.getCurrent().observe(('base.stretch', 'base.bias'), self.update)
+        self.getConfig() .base.observe(('stretch', 'bias'), self.update)
+        self.getCurrent().base.observe(('stretch', 'bias'), self.update)
 
         stretch, bias = self.__stretch, self.__bias
 
@@ -264,8 +262,9 @@ class SequencePathCreator(WidgetCreator):
                 src.trigger("change")
         self.__widget.js_on_change('value', _js_cb)
 
-        self.getConfig().observe(('sequence.key', 'sequence.path'),
-                                 lambda: self.__widget.update(**self.__data()))
+        obs = lambda: self.__widget.update(**self.__data())
+        self.getConfig().sequence.key.observe(obs)
+        self.getRootConfig().last.path.fasta.observe(obs)
 
 class OligoListCreator(WidgetCreator):
     "Input for defining a list of oligos"
@@ -308,7 +307,7 @@ class OligoListCreator(WidgetCreator):
             self._model.oligos = ols
 
         widget.on_change('value', _py_cb)
-        self.getRootConfig().observe('oligos', self.update)
+        self.getRootConfig().oligos.observe(self.update)
 
 class GroupCreator(WidgetCreator):
     "Allows creating group widgets"

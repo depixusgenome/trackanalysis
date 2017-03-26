@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 "Building a projection of phase 5"
 
-from typing         import Optional, Any, TYPE_CHECKING   # pylint: disable=unused-import
+from    typing         import Optional, Any, TYPE_CHECKING   # pylint: disable=unused-import
+import  warnings
 
 from    bokeh.plotting import figure, Figure    # pylint: disable=unused-import
 from    bokeh.models   import LinearAxis, ColumnDataSource, CustomJS, Range1d
 
-import numpy        as np
+import  numpy        as np
 
 from  ..plotutils  import PlotAttrs, checksizes
 from   ._bokehext  import DpxFixedTicker
@@ -16,8 +17,6 @@ window = None # type: Any # pylint: disable=invalid-name
 
 class HistMixin:
     "Building a projection of phase 5 onto the Z axis"
-
-    __PHASE = 5
     def __init__(self):
         "sets up this plotter's info"
         css = self.getCSS()
@@ -41,31 +40,35 @@ class HistMixin:
 
     @checksizes
     def __data(self, track, data, shape):
-        if shape == (1, 2):
-            bins  = np.array([-1, 1])
-            zeros = np.zeros((1,), dtype = 'f4')
-            items = zeros,
-        else:
+        bins  = np.array([-1, 1])
+        zeros = np.zeros((1,), dtype = 'f4')
+        items = zeros,
+        if shape != (1, 2):
+            phase = self.getRootConfig().phase.measure.get()
             zvals = data['z'].reshape(shape)
             if self._model.eventdetection.task is None:
-                ind1  = track.phases[:,self.__PHASE]  -track.phases[:,0]
-                ind2  = track.phases[:,self.__PHASE+1]-track.phases[:,0]
+                ind1  = track.phases[:,phase]  -track.phases[:,0]
+                ind2  = track.phases[:,phase+1]-track.phases[:,0]
                 items = [val[ix1:ix2] for ix1, ix2, val in zip(ind1, ind2, zvals)]
             else:
                 items = zvals
 
-            rng   = (np.nanmin([np.nanmin(i) for i in items]),
-                     np.nanmax([np.nanmax(i) for i in items]))
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore', category = RuntimeWarning)
+                rng = (np.nanmin([np.nanmin(i) for i in items]),
+                       np.nanmax([np.nanmax(i) for i in items]))
+            if all(np.isfinite(i) for i in rng):
+                width = self._model.binwidth
+                bins  = np.arange(rng[0]-width*.5, rng[1]+width*1.01, width, dtype = 'f4')
+                if bins[-2] > rng[1]:
+                    bins = bins[:-1]
 
-            width = self._model.binwidth
-            bins  = np.arange(rng[0]-width*.5, rng[1]+width*1.01, width, dtype = 'f4')
-            if bins[-2] > rng[1]:
-                bins = bins[:-1]
-
-            size  = len(bins)-1
-            items = [np.bincount(np.digitize(i, bins), minlength = size+1)[1:][:size]
-                     for i in items]
-            zeros = np.zeros((len(bins)-1,), dtype = 'f4')
+                size  = len(bins)-1
+                items = [np.bincount(np.digitize(i, bins), minlength = size+1)[1:][:size]
+                         for i in items]
+                zeros = np.zeros((len(bins)-1,), dtype = 'f4')
+            else:
+                items = zeros,
 
         threshold = self._model.minframes
         return dict(frames  = np.sum(items, axis = 0),
