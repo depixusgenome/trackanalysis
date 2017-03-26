@@ -95,17 +95,21 @@ class HistMixin:
             bases.start  = (yrng.start-mdl.bias)/mdl.stretch
             bases.end    = (yrng.end-mdl.bias)/mdl.stretch
 
-            bottom = src.data["bottom"]
-            delta  = bottom[1]-bottom[0]
-
-            ind1   = min(len(bottom), max(0, int((yrng.start-bottom[0])/delta-1)))
-            ind2   = min(len(bottom), max(0, int((yrng.end  -bottom[0])/delta+1)))
+            bottom       = src.data["bottom"]
+            if len(bottom) < 2:
+                ind1 = 1
+                ind2 = 0
+            else:
+                delta = bottom[1]-bottom[0]
+                ind1  = min(len(bottom), max(0, int((yrng.start-bottom[0])/delta-1)))
+                ind2  = min(len(bottom), max(0, int((yrng.end  -bottom[0])/delta+1)))
 
             if ind1 >= ind2:
-                return
-
-            frames.end = window.Math.max.apply(None, src.data['frames'][ind1:ind2])+1
-            cycles.end = window.Math.max.apply(None, src.data['cycles'][ind1:ind2])+1
+                cycles.end = 0
+                frames.end = 0
+            else:
+                frames.end = window.Math.max.apply(None, src.data['frames'][ind1:ind2])+1
+                cycles.end = window.Math.max.apply(None, src.data['cycles'][ind1:ind2])+1
 
         self._hist.y_range.callback = CustomJS.from_py_func(_onchangebounds)
 
@@ -151,19 +155,24 @@ class HistMixin:
         self._hover.updatehist(self._hist, hist, self._model, self.getConfig())
         self._gridticker.updatedata(self._model, self._hist)
 
-        bottom = self._histsource.data["bottom"]
-        delta  = bottom[1]-bottom[0]
-
         cycles = self._hist.extra_x_ranges["cycles"]
         frames = self._hist.x_range
         yrng   = self._hist.y_range
 
-        ind1   = min(len(bottom), max(0, int((yrng.start-bottom[0])/delta-1)))
-        ind2   = min(len(bottom), max(0, int((yrng.end  -bottom[0])/delta+1)))
+        bottom = self._histsource.data["bottom"]
+        if len(bottom) < 2:
+            ind1 = 1
+            ind2 = 0
+            cycles.update(start = 0, end = 0)
+            frames.update(start = 0, end = 0)
+        else:
+            delta  = bottom[1]-bottom[0]
+            ind1   = min(len(bottom), max(0, int((yrng.start-bottom[0])/delta-1)))
+            ind2   = min(len(bottom), max(0, int((yrng.end  -bottom[0])/delta+1)))
 
         if ind1 >= ind2:
-            cycles.start = 0
-            frames.start = 0
+            cycles.update(start = 0, end = 0)
+            frames.update(start = 0, end = 0)
         else:
             cycles.update(start = 0, end = max(self._histsource.data['cycles'][ind1:ind2])+1)
             frames.update(start = 0, end = max(self._histsource.data['frames'][ind1:ind2])+1)
