@@ -61,9 +61,15 @@ class ScriptingView(View):
     APPNAME = 'Scripting'
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.trkdlg    = FileDialog(filetypes = 'trk|ana|*',
-                                    config    = self._ctrl,
-                                    title     = "open a track file")
+        self.trkdlg  = FileDialog(filetypes = 'trk|*',
+                                  config    = self._ctrl,
+                                  multiple  = False,
+                                  title     = "open a track file")
+
+        self.grdlg   = FileDialog(filetypes = 'gr|*',
+                                  config    = self._ctrl,
+                                  multiple  = True,
+                                  title     = "open a gr files")
 
         cnf = self._ctrl.getGlobal("config").tasks
         cnf.defaults = dict(selection      = DataSelectionTask(),
@@ -113,10 +119,20 @@ class Track(_Track):
     def __init__(self, path = None, **kwa):
         if path is None:
             path = scriptapp.trkdlg.open()
+            if path is None:
+                path = ''
         else:
             scriptapp.control.getGlobal('config').last.path.trk.set(path)
             scriptapp.control.writeconfig()
         super().__init__(path = path, **kwa)
+
+    def grfiles(self):
+        "access to gr files"
+        paths = scriptapp.grdlg.open()
+        if paths is None or len(paths) == 0:
+            return
+        old = self.path
+        self.__init__(path = ((old,) if isinstance(old, str) else old)+paths)
 
     def rawprecision(self, ibead):
         "the raw precision for a given bead"
@@ -135,12 +151,19 @@ class Track(_Track):
         procs.data.setCacheDefault(0, self)
         return next(iter(procs.run(copy = copy)))
 
-    measures = cast(Cycles, property(lambda self: self.cycles.withphases(5)))
-    events   = cast(Events, property(lambda self: Events(track     = self,
-                                                         beadsonly = True,
-                                                         first     = 5,
-                                                         last      = 5,
-                                                         parents   = (self.path,))))
+    @property
+    def measures(self):
+        "returns cycles for phase 5 only"
+        phase = scriptapp.control.getGlobal('config').phase.measure.get()
+        return self.cycles.withphases(phase)
+
+    @property
+    def events(self):
+        "returns events in phase 5 only"
+        phase = scriptapp.control.getGlobal('config').phase.measure.get()
+        return Events(track = self, beadsonly = True,
+                      first = phase, last = phase,
+                      parents= (self.path,))
 
 def _copied(fcn):
     @wraps(fcn)

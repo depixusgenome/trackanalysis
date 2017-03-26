@@ -10,6 +10,7 @@ from abc                    import abstractmethod
 import numpy as np
 
 from utils                  import initdefaults
+from model                  import PHASE
 from excelreports.creation  import Reporter as _Reporter, column_method, FILEOBJ
 from data.track             import Track, BEADKEY            # pylint: disable=unused-import
 from signalfilter           import PrecisionAlg
@@ -122,7 +123,7 @@ class TrackInfo:
             self.path          = track.path
             self.framerate     = track.framerate
             self.ncycles       = track.ncycles
-            self.durations     = track.phaseduration(...,5)
+            self.durations     = track.phaseduration(...,PHASE.measure)
             self.uncertainties = {i: PrecisionAlg.rawprecision(track, i)
                                   for i in track.beads.keys()}
 

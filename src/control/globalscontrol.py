@@ -28,6 +28,7 @@ from typing         import (Dict, Union, # pylint: disable=unused-import
                             Callable, Optional, Sequence)
 import inspect
 import anastore
+from  model         import PHASE
 from .event         import Controller
 from .action        import Action
 
@@ -211,7 +212,13 @@ class _MapGetter:
 
     def observe(self, attrs, fcn = None): # pylint: disable=arguments-differ
         "observes items in the current root"
-        self._ctrl.observe(attrs, fcn)
+        if fcn is None:
+            self._ctrl.observe(self._base, attrs)
+
+        elif isinstance(attrs, str):
+            self._ctrl.observe(self._key+attrs, fcn)
+        else:
+            self._ctrl.observe(tuple(self._key+i for i in attrs), fcn)
 
 class DefaultsMap(Controller):
     "Dictionnary with defaults values. It can be reset to these."
@@ -264,6 +271,11 @@ class DefaultsMap(Controller):
 
     def observe(self, attrs, fcn = None): # pylint: disable=arguments-differ
         "observes items in the current root"
+        if attrs == '':
+            attrs, fcn = fcn, None
+        elif fcn == '':
+            fcn = None
+
         if fcn is None:
             if not callable(attrs):
                 raise TypeError()
@@ -273,11 +285,14 @@ class DefaultsMap(Controller):
                 fcn, attrs = attrs, fcn
 
             npars = len(inspect.signature(fcn).parameters) > 0
+            if len(attrs) == 1 and not isinstance(attrs, str):
+                attrs = attrs[0]
+
             if isinstance(attrs, str):
                 def _wrap(items):
                     if attrs in items:
                         if npars:
-                            fcn(items)
+                            fcn(items[attrs])
                         else:
                             fcn()
                 observer = _wrap
@@ -347,6 +362,7 @@ class GlobalsController(Controller):
                                                          'quit' : "Control-q",
                                                          'beadup': 'PageUp',
                                                          'beaddown': 'PageDown'}
+        self.getGlobal('config').phase.defaults = PHASE.__dict__
         def _gesture(meta):
             return {'rate'    : .2,
                     'activate': meta[:-1],

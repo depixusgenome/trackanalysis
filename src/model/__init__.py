@@ -4,4 +4,4 @@ u"""
 Base model for track analysis
 """
 from .task      import Task
-from .level     import levelprop, Level
+from .level     import levelprop, Level, PHASE

@@ -8,7 +8,7 @@ from typing                 import (Dict, Union,  # pylint: disable=unused-impor
 import numpy as np
 
 from utils                  import initdefaults
-from model                  import Task, Level
+from model                  import Task, Level, PHASE
 from control.processor      import Processor
 from data                   import Track, Cycles
 from eventdetection         import EventDetectionConfig
@@ -20,9 +20,9 @@ from .collapse              import (Range, Profile, # pylint: disable=unused-imp
 class DriftTask(Task, EventDetectionConfig):
     u"Removes correlations between cycles"
     level     = Level.bead
-    phases    = (5, 5)                  # type: Optional[Tuple[int,int]]
-    collapse  = CollapseToMean()        # type: Optional[CollapseAlg]
-    stitch    = StitchByInterpolation() # type: Optional[StitchAlg]
+    phases    = PHASE.measure, PHASE.measure # type: Optional[Tuple[int,int]]
+    collapse  = CollapseToMean()             # type: Optional[CollapseAlg]
+    stitch    = StitchByInterpolation()      # type: Optional[StitchAlg]
     zero      = 10
     precision = 0.
     onbeads   = True
