@@ -157,6 +157,10 @@ def setup(locs            = None, # pylint: disable=too-many-arguments
             if isinstance(string, str):
                 mod  = string[:string.rfind('.')]
                 attr = string[string.rfind('.')+1:]
+                if attr[0] != attr[0].upper():
+                    __import__(string)
+                    return None
+
                 return getattr(__import__(mod, fromlist = (attr,)), attr)
             return string
 
@@ -165,7 +169,7 @@ def setup(locs            = None, # pylint: disable=too-many-arguments
         if controls in (all, Ellipsis):
             controls = tuple(i for i in classes if issubclass(i, Controller))
         else:
-            controls = tuple(_get(i) for i in controls)
+            controls = tuple(_get(i) for i in controls if _get(i) is not None)
 
         if views in (all, Ellipsis):
             views = tuple(i for i in classes
@@ -236,6 +240,7 @@ class WithToolbar:
 VIEWS       = ('undo.UndoView', 'view.globalsview.GlobalsView',)
 CONTROLS    = ('control.taskcontrol.TaskController',
                'control.globalscontrol.GlobalsController',
+               'anastore.control',
                'undo.UndoController')
 
 setup()
