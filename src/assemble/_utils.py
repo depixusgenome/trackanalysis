@@ -267,26 +267,79 @@ def find_overlaping_normdists(dists,nscale=2): # to pytest
 
 
 
+def _list_perm_bounds(perm,dists,_epsi=0.001):
+    u'list of possible positions which allow (any or no) switchs between oligo positions'
+    # list all possibilities
+    bounds={idx:[dists[idx].mean()] for idx in perm}
+    for idi,vli in enumerate(perm[:-1]):
+        for vlj in perm[idi+1:]:
+            flag = _highest_norm_intersect(dists[vli],dists[vlj])
+            sign = 1 if dists[vli].mean()<dists[vlj].mean() else -1
+            bounds[vli].append(flag+sign*_epsi)
+            bounds[vlj].append(flag-sign*_epsi)
+    return bounds
+
 def optimal_perm_normdists(perm,dists)->numpy.ndarray: # brute-force # to optimize # to finish
     u'''
     given a permuation perm and the known distributions of each state
     returns the permutated state which maximise the probability
     '''
-    print(perm,dists)
-    _epsi=0.001
-    # list all possibilities
-    bounds={idx:dists[idx].mean() for idx in perm}
-    for i in perm[:-1]:
-        for j in perm[i:]:
-            flag = _highest_norm_intersect(dists[i],dists[j])
-            sign = 1 if dists[i].mean()<dists[j].mean() else -1
-            bounds[i].append(flag+sign*_epsi)
-            bounds[j].append(flag-sign*_epsi)
+    _epsi=0.001*min([dists[i].std() for i  in perm])
 
-
+    bounds = _list_perm_bounds(perm,dists,_epsi=_epsi)
     # pop if the order of the permutation is not respected
     permbounds = [bounds[pe] for pe in perm]
-    possibles = list(itertools.product(permbounds))
+    possiblep = list(itertools.product(*permbounds))
+
+    # check permutation order preserved
+    topop=[]
+    for idx, val in enumerate(possiblep):
+        if list(val)!=sorted(val):
+            topop.append(idx)
+
+    topop.reverse()
+    for idx in topop:
+        possiblep.pop(idx)
+
     # compute the probability of each case
-    # return the maximal value
-    return numpy.zeros(len(perm))
+    sc_perm = []
+    for idx,val in enumerate(possiblep):
+        sc_perm.append((numpy.product([dists[vlp].pdf(val[idp])
+                                       for idp,vlp in enumerate(perm)]),val))
+
+    sc_perm.sort()
+    # return the state with maximal value
+    xstate = numpy.array([i.mean() for i in dists])
+    xstate[perm]=sc_perm[-1][1]
+
+    constraints=[]
+    for idx in range(len(perm[:-1])):
+        constraints.append({"type":"ineq",
+                            "fun":SOMConstraint(idx,_epsi)})
+
+    # there is a much simpler way to find a correct x0 value
+    fun = CostPermute(dists,perm)
+    xstate[perm]=scipy.optimize.minimize(fun,sc_perm[-1][1],constraints=constraints).x
+    return xstate
+
+
+
+
+class CostPermute:
+    u' returns the "cost" of translations due to permutation of oligo peaks'
+    def __init__(self,dists,perm):
+        self.dists=dists
+        self.perm=perm
+
+    def __call__(self,xstate):
+        return -numpy.product([self.dists[vlp].pdf(xstate[idp])
+                               for idp,vlp in enumerate(self.perm)])
+
+
+class SOMConstraint:
+    u'functor for scipy.optimize.minimize constraints'
+    def __init__(self,index,_epsi):
+        self.index=index
+        self._epsi=_epsi
+    def __call__(self,xstate):
+        return xstate[self.index+1]-xstate[self.index]-self._epsi

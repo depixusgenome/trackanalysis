@@ -89,8 +89,8 @@ class OGandF(HoppingSteps):
             return numpy.array([i.rvs(random_state=self.random_state) for i in self.dists])
         else:
             self.count=0
-            flip = numpy.random.randint(len(self.over_dist))
-            perm = numpy.random.permutation(numpy.array(self.over_dist[flip]))
+            #flip = numpy.random.randint(len(self.over_dist))
+            #perm = numpy.random.permutation(numpy.array(self.over_dist[flip]))
             # optimal permutation is pre computed in self.opti_perm
             # make change to xst
             return xst # TO CHANGE #utils.optimal_perm_normdists(perm,self.dists,xst)
