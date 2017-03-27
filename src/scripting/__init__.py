@@ -45,7 +45,14 @@ from signalfilter               import (PrecisionAlg, RollingFilter, NonLinearFi
                                         ForwardBackwardFilter)
 
 import numpy                as np
-import matplotlib.pyplot    as plt
+try:
+    import matplotlib.pyplot as plt     # pylint: disable=import-error
+except ImportError:
+    pass
+try:
+    import bokeh                        # pylint: disable=import-error
+except ImportError:
+    pass
 import pandas               as pd
 
 _frame = None
