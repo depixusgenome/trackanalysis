@@ -38,9 +38,9 @@ class HoppingSteps:
     Can forbid flipping of peaks within the same batch
     '''
     def __init__(self,**kwargs):
-        self.min_x = kwargs.get("min_x",0) # in number of bases
-        self.max_x = kwargs.get("max_x",sys.maxsize) # in number of bases
-        self.scale = kwargs.get("scale",1) # in number of bases
+        self.min_x = kwargs.get("min_x",0)
+        self.max_x = kwargs.get("max_x",sys.maxsize)
+        self.scale = kwargs.get("scale",1)
         self.dists = kwargs.get("dists",[]) # list of distributions
         self.random_state = kwargs.get("random_state",None)
     def __call__(self,xstate): # should be overriden
@@ -81,15 +81,19 @@ class OGandF(HoppingSteps):
         super().__init__(**kwargs)
         self.count = 0
         self.over_dist = utils.find_overlaping_normdists(self.dists)
+        perms = []
+        self.opti_perm = {perm : utils.optimal_perm_normdists(perm,self.dists) for perm in perms}
     def __call__(self,xst):
         if self.count==0:
             self.count=1
             return numpy.array([i.rvs(random_state=self.random_state) for i in self.dists])
         else:
             self.count=0
-            flip = numpy.random.randint(len(xst)-1)
-            xst[flip], xst[flip+1] = xst[flip+1],xst[flip]
-            return xst
+            flip = numpy.random.randint(len(self.over_dist))
+            perm = numpy.random.permutation(numpy.array(self.over_dist[flip]))
+            # optimal permutation is pre computed in self.opti_perm
+            # make change to xst
+            return xst # TO CHANGE #utils.optimal_perm_normdists(perm,self.dists,xst)
 
 class NestedAsmrs:
     u'''

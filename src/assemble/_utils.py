@@ -5,7 +5,7 @@ u'''
 regroups functions and classes to complement assembler
 '''
 
-from itertools import combinations
+import itertools
 from copy import deepcopy
 from typing import Callable # pylint: disable=unused-import
 import scipy.stats
@@ -59,7 +59,7 @@ def noverlaps_energy(oligos):
     u'''use noverlap_bpos to compute energy
     '''
     energy=0
-    for ol1,ol2 in combinations(oligos,2):
+    for ol1,ol2 in itertools.combinations(oligos,2):
         energy-=ol1.noverlaps(ol2)**2
     return energy
 
@@ -247,28 +247,46 @@ def _highest_norm_intersect(dist1,dist2):
 
 def find_overlaping_normdists(dists,nscale=2): # to pytest
     u'''
-    returns lists of indices [(i,j,k)] of overlaping distributions with cdf of overlap >threshold
-    DEAD CODE ?
-    # find all pairs of overlapping
-    dist_ids = []
-    for id1,dis1 in enumerate(dists):
-        for id2,dis2 in enumerate(dists[id1+1:]):
-            # j=id2+id1+1
-            xval = _highest_norm_intersect(dis1,dis2)
-            # work out threshold value
-            left1 = 1-dis1.cdf(xval) if xval>dis1.mean() else dis1.cdf(xval)
-            left2 = 1-dis2.cdf(xval) if xval>dis2.mean() else dis2.cdf(xval)
-            if min(left1,left2)>threshold:
-                dist_ids.append((id1,id2+id1+1))
-    # merge tuples [i,j] & [i,k] & [j,k] => [i,j,k], set?
+    returns lists of indices [(i,j,k)] each element of the tuple has distrbution which overlap
     '''
     sdists=[(di.mean(),di.mean()-nscale*di.std(),di.mean()+nscale*di.std(),idx)\
             for idx,di in enumerate(dists)]
     sdists.sort()
+
+    bounds = [(di.mean()-nscale*di.std(),idx) for idx,di in enumerate(dists)]
+    bounds+= [(di.mean()+nscale*di.std(),idx) for idx,di in enumerate(dists)]
+    bounds.sort()
+
     overlaps=[]
-    tomerge=set(range(len(sdists)))
-    for idx in sdists:
-        merging=(idx[3],)+tuple(sdists[jdx][3] for jdx in tomerge if idx[2]>sdists[jdx][1])
-        overlaps.append(merging)
-        tomerge=tomerge-set(merging)
-    return overlaps
+    for regid in range(len(bounds[:-1])):
+        beflag=set(idx[1] for idx in bounds[:regid+1])
+        aflag = set(idx[1] for idx in bounds[regid+1:])
+        overlaps.append(sorted(beflag.intersection(aflag)))
+
+    return [overl for overl in overlaps if len(overl)>1]
+
+
+
+def optimal_perm_normdists(perm,dists)->numpy.ndarray: # brute-force # to optimize # to finish
+    u'''
+    given a permuation perm and the known distributions of each state
+    returns the permutated state which maximise the probability
+    '''
+    print(perm,dists)
+    _epsi=0.001
+    # list all possibilities
+    bounds={idx:dists[idx].mean() for idx in perm}
+    for i in perm[:-1]:
+        for j in perm[i:]:
+            flag = _highest_norm_intersect(dists[i],dists[j])
+            sign = 1 if dists[i].mean()<dists[j].mean() else -1
+            bounds[i].append(flag+sign*_epsi)
+            bounds[j].append(flag-sign*_epsi)
+
+
+    # pop if the order of the permutation is not respected
+    permbounds = [bounds[pe] for pe in perm]
+    possibles = list(itertools.product(permbounds))
+    # compute the probability of each case
+    # return the maximal value
+    return numpy.zeros(len(perm))
