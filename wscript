@@ -135,6 +135,8 @@ def setup(cnf):
     print('********************************************')
     print('********************************************')
     print("BOOST must be installed manually")
+    if builder.os.sys.platform.startswith("win"):
+        print("COFFEESCRIPT is not mandatory & can be installed manually")
     print('********************************************')
     print('********************************************')
 
