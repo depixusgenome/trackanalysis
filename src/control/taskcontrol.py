@@ -17,6 +17,8 @@ from .event         import Controller, NoEmission
 from .processor     import Cache, Processor, run as _runprocessors
 from .taskio        import DefaultTaskIO, GrFilesIO, TrackIO
 
+_m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
+
 class ProcessorController:
     "data and model for tasks"
     __slots__ = ('model', 'data')
@@ -43,12 +45,12 @@ class ProcessorController:
             raise NoEmission("Missing task")
         return tsk
 
-    def add(self, task, proctype, index = None):
+    def add(self, task, proctype, index = _m_none):
         "adds a task to the list"
         TaskIsUniqueError.verify(task, self.model)
         proc = proctype(task)
 
-        if index is None:
+        if index is _m_none:
             self.model.append(task)
             self.data .append(proc)
         else:
@@ -240,9 +242,9 @@ class TaskController(Controller):
         return dict(controller = self, parent = parent, task = tsk, old = old)
 
     @Controller.emit
-    def clearData(self, parent:'Optional[RootTask]' = None) -> dict:
+    def clearData(self, parent:'Optional[RootTask]' = _m_none) -> dict:
         "clears all data"
-        if parent is None:
+        if parent is _m_none:
             self.__items.clear()
         elif parent not in self.__items:
             raise NoEmission('wrong key')
