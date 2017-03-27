@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Different file dialogs."
+import sys
 from pathlib            import Path
 from typing             import Callable
 from tkinter            import Tk as _Tk
@@ -115,8 +116,12 @@ class FileDialog:
         rets = dialog(**info,parent=root)
         if rets is None or len(rets) == 0:
             return None
-        if isinstance(rets, tuple) and 'initialfile' in info and info.get('multiple', False):
-            rets = rets[1:] # discard initiali file
+        if (not sys.platform.startswith('win')
+                and isinstance(rets, tuple)
+                and len(rets) > 1
+                and 'initialfile' in info
+                and info.get('multiple', False)):
+            rets = rets[1:] # discard initial file
 
         ret = Path(rets if isinstance(rets, str) else next(iter(rets)))
         self.initialdir  = ret.parent
