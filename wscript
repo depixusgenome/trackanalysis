@@ -135,7 +135,6 @@ def setup(cnf):
     print('********************************************')
     print('********************************************')
     print("BOOST must be installed manually")
-    print("coffeescript must be installed manually")
     print('********************************************')
     print('********************************************')
 
