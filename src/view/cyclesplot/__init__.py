@@ -86,14 +86,11 @@ class CyclesPlotView(TrackPlotView):
 
     def ismain(self):
         "Alignment, ... is set-up by default"
-        trk           = self._ctrl.getGlobal('current').track
-
         tasks         = self._ctrl.getGlobal('config').tasks
         tasks.default = ['alignment']
+        ConfigTrackIO.setup(self._ctrl, tasks)
 
-        ConfigTrackIO  .setup(self._ctrl, tasks)
-        ConfigGrFilesIO.setup(self._ctrl, trk, tasks)
-
+        trk = self._ctrl.getGlobal('current').track
         trk.observe(lambda itm: self._ctrl.clearData(itm.old))
 
     def getroots(self, doc):
