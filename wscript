@@ -77,6 +77,7 @@ def options(opt):
                               +u" necessary for provided applications"))
 
 def configure(cnf):
+    cnf.load('msvs')
     cnf.env.app = cnf.options.app.split(',') if len(cnf.options.app) else []
 
     if cnf.options.dyn is None and len(cnf.options.modules) == 0:
