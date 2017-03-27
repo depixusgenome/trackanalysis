@@ -15,14 +15,14 @@ import  sequences
 from  ..plotutils    import PlotAttrs, checksizes, readsequence, DpxHoverTool
 
 window = None # type: ignore # pylint: disable=invalid-name
-class DpxHoverModel(Model):
+class DpxHoverModel(Model):  # pylint: disable=too-many-instance-attributes
     "controls keypress actions"
     framerate = props.Float(1.)
     bias      = props.Float(0.)
     stretch   = props.Float(0.)
     shape     = props.Tuple(props.Int, props.Int, default = (0, 0))
     cycle     = props.Int(0)
-    updating  = props.Int(0)
+    updating  = props.String('')
     __implementation__ = """
     import * as p  from "core/properties"
     import {Model} from "model"
@@ -31,13 +31,27 @@ class DpxHoverModel(Model):
     export class DpxHoverModel extends Model
         default_view: DpxHoverModelView
         type:"DpxHoverModel"
+
+        setsource: (source, values) ->
+            if values[0] == @_values[0] && values[1] == @_values[1]
+                return
+            if values[0] != @bias || values[1] != @stretch
+                return
+            source.data["z"] = source.data["values"].map(((x)-> x*@stretch+@bias), @)
+            @_values = values
+            source.trigger('change:data')
+
         @define {
             framerate : [p.Number, 1],
             stretch   : [p.Number, 0],
             bias      : [p.Number, 0],
             shape     : [p.Array,  [0, 0]],
             cycle     : [p.Int,  0]
-            updating  : [p.Int,  0]
+            updating  : [p.String, '']
+        }
+
+        @internal {
+            _values: [p.Array, [0, 1]]
         }
     """
     def __init__(self, **kwa):
@@ -179,20 +193,16 @@ class DpxHoverModel(Model):
                                           visible          = False)]
 
         source = self._histsource
-        def _js_cb(source = source, mdl = self, fig = fig):
-            zvals   = source.data['z']
-            bvals   = source.data['values']
-            stretch = mdl.stretch
-            bias    = mdl.bias
-            for i in range(len(source.data['z'])):
-                zvals[i] = bvals[i]*stretch+bias
+        def _js_cb(source = source, fig = fig, cb_obj = None):
+            if cb_obj.updating == '':
+                return
 
-            source.trigger('change:data')
-
+            values = cb_obj.bias, cb_obj.stretch
+            window.setTimeout(lambda a, b, c: a.setsource(b, c), 500, cb_obj, source, values)
             bases       = fig.extra_y_ranges['bases']
             yrng        = fig.y_range
-            bases.start = (yrng.start-mdl.bias)/mdl.stretch
-            bases.end   = (yrng.end  -mdl.bias)/mdl.stretch
+            bases.start = (yrng.start-cb_obj.bias)/cb_obj.stretch
+            bases.end   = (yrng.end  -cb_obj.bias)/cb_obj.stretch
 
         self.js_on_change("updating", CustomJS.from_py_func(_js_cb))
 

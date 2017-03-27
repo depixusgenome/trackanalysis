@@ -86,9 +86,11 @@ class PeaksTableCreator(WidgetCreator):
         hover  = self.__hover
 
         @CustomJS.from_py_func
-        def _js_cb(source = source, mdl = hover, stretch = stretch, bias = bias):
-            zval  = source.data['z']
-            bases = source.data['bases']
+        def _js_cb(cb_obj = None, mdl = hover, stretch = stretch, bias = bias):
+            if mdl.updating != '':
+                return
+            zval  = cb_obj.data['z']
+            bases = cb_obj.data['bases']
             if zval[0] == zval[1] or bases[0] == bases[1]:
                 return
 
@@ -99,7 +101,8 @@ class PeaksTableCreator(WidgetCreator):
             bias   .value = bval
             mdl.stretch   = aval
             mdl.bias      = bval
-            mdl.updating += 1
+            mdl.updating = 'peaks'
+            mdl.updating = ''
         source.js_on_change("data", _js_cb) # pylint: disable=no-member
 
     def __data(self):
@@ -173,14 +176,18 @@ class ConversionSlidersCreator(WidgetCreator):
         source = table.source
         @CustomJS.from_py_func
         def _js_cb(stretch = stretch, bias = bias, mdl = hover, source = source):
+            if mdl.updating != '':
+                return
+
             mdl.stretch  = stretch.value*1e-3
             mdl.bias     = bias.value
-            mdl.updating = mdl.updating+1
+            mdl.updating = 'sliders'
 
             bases            = source.data['bases']
             source.data['z'] = [bases[0] * stretch.value*1e-3 + bias.value,
                                 bases[1] * stretch.value*1e-3 + bias.value]
             source.trigger('change:data')
+            mdl.updating = ''
 
         stretch.js_on_change('value', _js_cb)
         bias   .js_on_change('value', _js_cb)
