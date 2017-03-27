@@ -143,6 +143,7 @@ class _CondaApp(BuildContext):
     fun = cmd = 'app'
 def app(bld):
     bld.options.APP_PATH = bld.bldnode.make_node("output")
+
     if bld.options.APP_PATH.exists():
         bld.options.APP_PATH.delete()
 
@@ -151,7 +152,7 @@ def app(bld):
 
     iswin = builder.os.sys.platform.startswith("win")
     ext   = ".bat"                       if iswin else ""
-    cmd   = r"start /min %%~dp0pythonw " if iswin else "./"
+    cmd   = r"start /min %~dp0pythonw " if iswin else "./"
 
     for name, val in {'cyclesplot': 'cyclesplot.CyclesPlotView'}.items():
         with open(str(bld.options.APP_PATH.make_node(name+ext)), 'w',
