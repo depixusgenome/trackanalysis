@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Utils for dealing with the JS side of the view"
 from    typing       import (Tuple, Optional, # pylint: disable =unused-import
-                             Iterator, List, Any)
+                             Iterator, List, Union, Any)
 from    collections  import OrderedDict
 from    contextlib   import contextmanager
 from    itertools    import product
@@ -13,17 +13,19 @@ import  inspect
 import  numpy        as     np
 
 import  bokeh.palettes
-import  bokeh.core.properties as     props
-from    bokeh.models          import Row, CustomJS, Range1d, Model, HoverTool
-from    bokeh.plotting.figure import Figure
+import  bokeh.core.properties   as     props
+from    bokeh.models            import (Row, CustomJS, Range1d, Model, HoverTool,
+                                        RadioButtonGroup, Paragraph)
+from    bokeh.plotting.figure   import Figure
 
-from    sequences                   import read as _readsequences
+from    sequences               import read as _readsequences
 
-from    model.task                  import RootTask, Task
-from    data.track                  import Track
-from    utils                       import CachedIO
-from    control                     import Controller
-from    .base                       import BokehView, Action
+from    model.task              import RootTask, Task
+from    data.track              import Track
+from    utils                   import CachedIO, NoArgs, updatecopy, updatedeepcopy
+from    control                 import Controller
+from    control.globalscontrol  import GlobalsAccess
+from    .base                   import BokehView, Action
 
 def checksizes(fcn):
     "Checks that the ColumnDataSource have same sizes"
@@ -57,7 +59,7 @@ class DpxKeyedRow(Row):
     __implementation__ = 'keyedrow.coffee'
     def __init__(self, plotter, fig, **kwa):
         vals = ('.'.join(i) for i in product(('pan', 'zoom'), ('x', 'y'), ('low', 'high')))
-        cnf   = plotter.getConfig().keypress
+        cnf   = plotter.config.keypress
 
         keys  = dict((cnf[key].get(), key) for key in vals)
         keys[cnf.reset.get()] = 'reset'
@@ -157,13 +159,10 @@ class PlotAttrs:
 
         return getattr(fig, self.glyph)(**args)
 
-class PlotCreator:
+class PlotCreator(GlobalsAccess):
     "Base plotter class"
     def __init__(self, ctrl:Controller) -> None:
         "sets up this plotter's info"
-        self._ctrl  = ctrl
-        self._ready = False
-
         ctrl.addGlobalMap(self.key())
         ctrl.addGlobalMap(self.key('current'))
         ctrl.addGlobalMap("css.plot",
@@ -171,6 +170,10 @@ class PlotCreator:
                           xtoplabel = u'Time',
                           xlabel    = u'Frames')
         ctrl.addGlobalMap(self.key('css'))
+
+        super().__init__(ctrl, self.key())
+        self._ctrl  = ctrl
+        self._ready = False
 
     def action(self, fcn):
         u"decorator which starts a user action unless _ready is set to false"
@@ -224,28 +227,12 @@ class PlotCreator:
         "Removes the controller"
         del self._ctrl
 
-    def getRootConfig(self):
-        "returns config values"
-        return self._ctrl.getGlobal('config')
-
-    def getConfig(self):
-        "returns config values"
-        return self._ctrl.getGlobal(self.key())
-
-    def getCSS(self):
-        "returns config values"
-        return self._ctrl.getGlobal(self.key('css'))
-
-    def getCurrent(self, *key, **kwa):
-        "returns config values"
-        return self._ctrl.getGlobal(self.key('current'), '.'.join(key), **kwa)
-
     def create(self, doc):
         "returns the figure"
         raise NotImplementedError("need to create")
 
     def _figargs(self):
-        tools = self.getConfig().tools.get()
+        tools = self.config.tools.get()
         if 'dpxhover' in tools:
             tools = [i if i != 'dpxhover' else DpxHoverTool() for i in tools.split(',')]
         return dict(tools          = tools,
@@ -254,7 +241,7 @@ class PlotCreator:
 
     def newbounds(self, rng, axis, arr) -> dict:
         "Sets the range boundaries"
-        over  = self.getConfig().boundary.overshoot.get()
+        over  = self.config.boundary.overshoot.get()
 
         if isinstance(arr, np.ndarray):
             vmin  = np.nanmin(arr)
@@ -269,7 +256,7 @@ class PlotCreator:
         if axis is None:
             curr  = None, None # type: Tuple[Optional[float], Optional[float]]
         else:
-            curr  = self.getCurrent(axis, default = (vmin, vmax))
+            curr  = self.project[axis].get(default = (vmin, vmax))
 
         attrs = dict(bounds        = (vmin, vmax),
                      start         = vmin if curr[0]  is None else curr[0],
@@ -282,7 +269,7 @@ class PlotCreator:
 
     def _addcallbacks(self, fig):
         "adds Range callbacks"
-        cnf       = self.getCurrent()
+        cnf       = self.project
         def _onchangex_cb(attr, old, new):
             if self._ready:
                 cnf.update(x = (fig.x_range.start, fig.x_range.end))
@@ -303,7 +290,7 @@ class PlotCreator:
                 vals = items[i].value
                 getattr(fig, i+'_range').update(start = vals[0], end = vals[1])
 
-        self._ctrl.observe(self.key("current"), _onobserve)
+        self.project.observe(('x', 'y'), _onobserve)
         return fig
 
     def setbounds(self, rng, axis, arr, reinit = True):
@@ -320,37 +307,29 @@ class PlotCreator:
 
         vmin  = min(arr)
         vmax  = max(arr)
-        delta = (vmax-vmin)*self.getConfig().boundary.overshoot.get()
+        delta = (vmax-vmin)*self.config.boundary.overshoot.get()
         vmin -= delta
         vmax += delta
         return vmin, vmax
 
-class TrackPlotModelController:
+class PlotModelAccess(GlobalsAccess):
     "Contains all access to model items likely to be set by user actions"
-    def __init__(self, key:str, ctrl:Controller) -> None:
-        self._ctrl = ctrl
-        self._key  = key
+    def __init__(self,
+                 ctrl: Union['PlotModelAccess', Controller],
+                 key:  Optional[str] = None,
+                 **_) -> None:
+        super().__init__(ctrl, key)
+        self._ctrl = getattr(ctrl, '_ctrl', ctrl)
 
-    def getRootConfig(self):
-        "returns config values"
-        return self._ctrl.getGlobal('config')
-
-    def getConfig(self):
-        "returns config values"
-        return self._ctrl.getGlobal('config'+self._key)
-
-    def getCSS(self):
-        "returns config values"
-        return self._ctrl.getGlobal('css'+self._key)
-
-    def getCurrent(self, *key, **kwa):
-        "returns config values"
-        return self._ctrl.getGlobal('current'+self._key, '.'.join(key), **kwa)
+        super().__init__(ctrl, key)
+        for attr in self._cached():
+            self.project[attr].setdefault(None)
+        self.clearcache()
 
     @property
     def bead(self) -> Optional[int]:
         "returns the current bead number"
-        bead = self.getCurrent().bead.get()
+        bead = self.project.bead.get()
         if bead is None:
             track = self.track
             if track is not None:
@@ -360,51 +339,237 @@ class TrackPlotModelController:
     @property
     def roottask(self) -> Optional[RootTask]:
         "returns the current root task"
-        return self.getCurrent().track.get()
+        return self.project.track.get()
 
     @property
     def currenttask(self) -> Optional[Task]:
         "returns the current task"
-        return self.getCurrent().task.get()
+        return self.project.task.get()
 
     @property
     def track(self) -> Optional[Track]:
         "returns the current track"
         return self._ctrl.track(self.roottask)
 
-class WidgetCreator:
+    def clearcache(self):
+        u"updates the model when a new track is loaded"
+        self.project.update({i: dict() for i in self._cached()})
+
+    def checktask(self, root, task):
+        "checks wether a task belongs to the model"
+        if not any(val.check(task) for val in self.__dict__.values()
+                   if isinstance(val, TaskAccess)):
+            return False
+
+        return root is self.roottask
+
+    def runbead(self):
+        "returns a tuple (dataitem, bead) to be displayed"
+        track = self.track
+        if track is None:
+            return None, None, None
+
+        root  = self.roottask
+        for task in tuple(self._ctrl.tasks(root))[::-1]:
+            if self.checktask(root, task):
+                ibead = self.bead
+                beads = next(iter(self._ctrl.run(root, task, copy = True)))
+                return track, beads[ibead,...], ibead
+
+        return track, track.cycles[self.bead,...], self.bead
+
+    def observetasks(self, *args, **kwa):
+        "observes the provided task"
+        def _check(parent = None, task = None, **_):
+            return self.checktask(parent, task)
+        self._ctrl.observe(*args, argstest = _check, **kwa)
+
+    class _Props:
+        @staticmethod
+        def configroot(attr):
+            "returns a property which links to the config"
+            # pylint: disable=protected-access
+            def _getter(self):
+                return self.configroot[attr].get()
+
+            def _setter(self, val):
+                return self.configroot[attr].set(val)
+
+            hmsg  = "link to config's {}".format(attr)
+            return property(_getter, _setter, None, hmsg)
+
+        @staticmethod
+        def config(attr):
+            "returns a property which links to the config"
+            def _getter(self):
+                return self.config[attr].get()
+
+            def _setter(self, val):
+                self.config[attr].set(val)
+
+            hmsg  = "link to config's {}".format(attr)
+            return property(_getter, _setter, None, hmsg)
+
+        @staticmethod
+        def bead(attr):
+            "returns a property which links to the current bead or the config"
+            def _getter(self):
+                value = self.project[attr].get().get(self.bead, NoArgs)
+                if value is not NoArgs:
+                    return value
+                return self.config[attr].get()
+
+            def _setter(self, val):
+                cache = self.project[attr].get()
+                if val == self.config[attr].get():
+                    cache.pop(self.bead, None)
+                else:
+                    cache[self.bead] = val
+            hmsg     = "link to config's {}".format(attr)
+            prop     = property(_getter, _setter, None, hmsg)
+            prop.KEY = attr
+            return prop
+
+    props = _Props()
+    del _Props
+
+    @classmethod
+    def _cached(cls):
+        pred = lambda x: isinstance(x, property) and hasattr(x, 'KEY')
+        yield from (value.KEY for _, value in inspect.getmembers(cls, pred))
+
+class TaskAccess(PlotModelAccess):
+    "access to tasks"
+    def __init__(self,
+                 ctrl       : PlotModelAccess,
+                 tasktype   : type,
+                 order      : Tuple[type,...],
+                 **kwa) -> None:
+        super().__init__(ctrl)
+        side    = kwa.get('side', 'LEFT')
+        attrs   = kwa.get('attrs', {})
+        default = tasktype(**attrs)
+
+        self.defaultindex = order.index(type(default)) + (1 if side == 'RIGHT' else 0)
+        self.previous     = order[:self.defaultindex]
+        self.tasktype     = type(default)
+        self.attrs        = attrs
+
+        # pylint: disable=not-callable
+        self.configroot.tasks[self.configname].default = default
+
+    @property
+    def configname(self) -> str:
+        "returns the config name"
+        return self.__class__.__name__.lower()[:-len('Access')]
+
+    @property
+    def configtask(self) -> Task:
+        "returns the config task"
+        return self.configroot.tasks[self.configname]
+
+    def remove(self):
+        "removes the task"
+        task = self.task
+        if task is not None:
+            self._ctrl.removeTask(self.roottask, task)
+
+            cnf = self.configtask
+            cnf.set(updatecopy(cnf.get(), disabled = True))
+
+    def update(self, **kwa):
+        "removes the task"
+        root = self.roottask
+        task = self.task
+        cnf  = self.configtask
+        if task is None:
+            kwa.setdefault('disabled', False)
+            item = updatedeepcopy(cnf.get(), **kwa)
+            self._ctrl.addTask(root, item, index = self.index)
+        else:
+            self._ctrl.updateTask(root, task, **kwa)
+        cnf.set(updatecopy(cnf.get(), **kwa))
+
+    @property
+    def task(self) -> Optional[Task]:
+        "returns the task if it exists"
+        return next((t for t in self._ctrl.tasks(self.roottask) if self.check(t)), None)
+
+    def check(self, task, parent = NoArgs) -> bool:
+        "wether this controller deals with this task"
+        if not (isinstance(task, self.tasktype) and self._check(task)):
+            return False
+        if parent is NoArgs:
+            return True
+        return parent is self.roottask
+
+    @staticmethod
+    def _check(_) -> bool:
+        return True
+
+    @staticmethod
+    def _default() -> dict:
+        return {}
+
+    @property
+    def index(self) -> Optional[Task]:
+        "returns the index the new task should have"
+        tasks = tuple(self._ctrl.tasks(self.roottask))
+        for i, tsk in enumerate(tasks[1:]):
+            if not isinstance(tsk, self.previous):
+                return i+1
+        return len(tasks)
+
+    def observe(self, *args, **kwa):
+        "observes the provided task"
+        def _check(parent = None, task = None, **_):
+            return self.check(task, parent)
+        self._ctrl.observe(*args, argstest = _check, **kwa)
+
+class WidgetCreator(GlobalsAccess):
     "Base class for creating a widget"
-    def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
-        self._ctrl  = ctrl
+    def __init__(self, model:PlotModelAccess) -> None:
+        super().__init__(model)
         self._model = model
-        self._key   = key
+        self._ctrl  = getattr(model, '_ctrl')
 
-    def key(self, base = 'config') -> str:
-        "returns the key"
-        return base+self._key
+class GroupCreator(WidgetCreator):
+    "Allows creating group widgets"
+    INPUT = RadioButtonGroup
+    def __init__(self, model:PlotModelAccess) -> None:
+        super().__init__(model)
+        self._widget  = None # type: ignore
 
-    def getRootConfig(self):
-        "returns config values"
-        return self._ctrl.getGlobal('config')
+    def create(self, action):
+        "creates the widget"
+        name = self.__class__.__name__[:-len('Creator')]
+        css  = self.css.title[name.lower()]
+        self._widget = self.INPUT(labels = css.labels.get(),
+                                  name   = 'Cycles:'+name,
+                                  **self._data())
+        self._widget.on_click(action(self.onclick_cb))
 
-    def getConfig(self):
-        "returns config values"
-        return self._ctrl.getGlobal('config'+self._key)
+        if css.get(default = None) is not None:
+            return Paragraph(text = css.get()), self._widget
+        return self._widget,
 
-    def getCSS(self):
-        "returns config values"
-        return self._ctrl.getGlobal('css'+self._key)
+    def update(self):
+        "updates the widget"
+        self._widget.update(**self._data())
 
-    def getCurrent(self, *key, **kwa):
-        "returns config values"
-        return self._ctrl.getGlobal('current'+self._key, '.'.join(key), **kwa)
+    def onclick_cb(self, value):
+        "action to be performed when buttons are clicked"
+        raise NotImplementedError()
+
+    def _data(self) -> dict:
+        raise NotImplementedError()
 
 class TrackPlotCreator(PlotCreator):
     "Base plotter for tracks"
-    _MODEL = TrackPlotModelController
+    _MODEL = PlotModelAccess
     def __init__(self, ctrl, *_):
         super().__init__(ctrl, *_)
-        self._model = self._MODEL(self.key(''), ctrl)
+        self._model = self._MODEL(ctrl, self.key(''))
 
     def create(self, doc) -> DpxKeyedRow:
         "returns the figure"
@@ -450,5 +615,5 @@ class TrackPlotView(BokehView):
 
     def getroots(self, doc):
         "adds items to doc"
-        self._ctrl.observe("globals.current", self._onUpdateCurrent)
+        self._ctrl.getGlobal('current').observe(self._onUpdateCurrent)
         return self._plotter.create(doc),

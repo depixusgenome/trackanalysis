@@ -15,33 +15,31 @@ from    bokeh.models   import (ColumnDataSource,  # pylint: disable=unused-impor
                                CheckboxGroup, Widget)
 
 import  sequences
-from    control                     import Controller
 from  ..dialog                      import FileDialog
 from  ..base                        import enableOnTrack
-from  ..plotutils                   import (TrackPlotModelController,
+from  ..plotutils                   import (PlotModelAccess, GroupCreator,
                                             readsequence,  WidgetCreator)
 
 from  ._bokehext                    import DpxHoverModel      # pylint: disable=unused-import
 
 class PeaksTableCreator(WidgetCreator):
     "Table of peaks in z and dna units"
-    def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
-        super().__init__(ctrl, model, key)
+    def __init__(self, model:PlotModelAccess) -> None:
+        super().__init__(model)
         self.__widget = None # type: Optional[DataTable]
         self.__hover  = None # type: DpxHoverModel
-        self.getCSS().defaults = {'tableheight': 100,
-                                  'title.table': u'dna ↔ nm'}
+        self.css.defaults = {'tableheight': 100, 'title.table': u'dna ↔ nm'}
 
     def create(self, hover):
         "creates the widget"
-        height = self.getCSS().tableheight.get()
-        width  = self.getCSS().inputwidth.get()
+        height = self.css.tableheight.get()
+        width  = self.css.inputwidth.get()
         cols   = [TableColumn(field  = 'bases',
-                              title  = self.getCSS().hist.ylabel.get(),
+                              title  = self.css.hist.ylabel.get(),
                               editor = IntEditor(),
                               width  = width//2),
                   TableColumn(field  = 'z',
-                              title  = self.getCSS().ylabel.get(),
+                              title  = self.css.ylabel.get(),
                               editor = NumberEditor(step = 1e-4),
                               width  = width//2)]
 
@@ -54,7 +52,7 @@ class PeaksTableCreator(WidgetCreator):
                                   width       = width,
                                   height      = height,
                                   name        = "Cycles:Peaks")
-        return Paragraph(text = self.getCSS().title.table.get()), self.__widget
+        return Paragraph(text = self.css.title.table.get()), self.__widget
 
     def update(self):
         "updates the widget"
@@ -79,9 +77,9 @@ class PeaksTableCreator(WidgetCreator):
         source.on_change("data", _py_cb) # pylint: disable=no-member
 
         obs = lambda: setattr(source, 'data', self.__data())
-        self.getConfig().sequence.peaks.observe(obs)
-        self.getRootConfig().observe(('oligos', 'last.path.fasta'), obs)
-        self.getCurrent().sequence.key.observe(obs)
+        self.config.sequence.peaks.observe(obs)
+        self.configroot.observe(('oligos', 'last.path.fasta'), obs)
+        self.project.sequence.key.observe(obs)
 
         hover  = self.__hover
 
@@ -125,23 +123,23 @@ class PeaksTableCreator(WidgetCreator):
 
 class ConversionSlidersCreator(WidgetCreator):
     "Sliders for managing stretch and bias factors"
-    def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
-        super().__init__(ctrl, model, key)
+    def __init__(self, model:PlotModelAccess) -> None:
+        super().__init__(model)
         self.__stretch = None # type: Optional[Slider]
         self.__bias    = None # type: Optional[Slider]
         self.__figdata = None # type: Optional[ColumnDataSource]
-        self.getCSS().defaults = {'title.stretch'    : u'stretch 10³[dna/nm]',
-                                  'title.bias'       : u'bias [nm]'}
+        self.css.defaults = {'title.stretch' : u'stretch 10³[dna/nm]',
+                             'title.bias'    : u'bias [nm]'}
 
     def create(self, figdata):
         "creates the widget"
         widget = lambda x, s, e, n: Slider(value = getattr(self._model, x),
-                                           title = self.getCSS().title[x].get(),
-                                           step  = self.getConfig().base[x].step.get(),
-                                           width = self.getCSS().inputwidth.get(),
+                                           title = self.css.title[x].get(),
+                                           step  = self.config.base[x].step.get(),
+                                           width = self.css.inputwidth.get(),
                                            start = s, end = e, name = n)
 
-        vals = tuple(self.getConfig().base.stretch.get('start', 'end'))
+        vals = tuple(self.config.base.stretch.get('start', 'end'))
         self.__stretch = widget('stretch', vals[0]*1e3, vals[1]*1e3, 'Cycles:Stretch')
         self.__bias    = widget('bias', -1., 1., 'Cycles:Bias')
         self.__figdata = figdata
@@ -151,7 +149,7 @@ class ConversionSlidersCreator(WidgetCreator):
         "updates the widgets"
         minv  = self.__figdata.data['bottom'][0]
         delta = self.__figdata.data['top'][-1] - minv
-        ratio = self.getConfig().base.bias.ratio.get()
+        ratio = self.config.base.bias.ratio.get()
         self.__bias.update(value = self._model.bias,
                            start = minv,
                            end   = minv+delta*ratio)
@@ -159,8 +157,8 @@ class ConversionSlidersCreator(WidgetCreator):
 
     def callbacks(self, action, hover, table):
         "adding callbacks"
-        self.getConfig() .base.observe(('stretch', 'bias'), self.update)
-        self.getCurrent().base.observe(('stretch', 'bias'), self.update)
+        self.config .base.observe(('stretch', 'bias'), self.update)
+        self.project.base.observe(('stretch', 'bias'), self.update)
 
         stretch, bias = self.__stretch, self.__bias
 
@@ -194,29 +192,29 @@ class ConversionSlidersCreator(WidgetCreator):
 
 class SequencePathCreator(WidgetCreator):
     "Dropdown for choosing a fasta file"
-    def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
-        super().__init__(ctrl, model, key)
+    def __init__(self, model:PlotModelAccess) -> None:
+        super().__init__(model)
         self.__widget  = None # type: Optional[Dropdown]
         self.__list    = []   # type: List[str]
         self.__hover   = None # type: Optional[DpxHoverModel]
         self.__dialog  = None # type: Optional[FileDialog]
-        self.getCSS().defaults = {'title.fasta'      : u'Open a fasta file',
-                                  'title.sequence'   : u'Selected DNA sequence',
-                                  'title.sequence.missing.key' : u'Select sequence',
-                                  'title.sequence.missing.path': u'Find path'}
+        self.css.defaults = {'title.fasta'      : u'Open a fasta file',
+                             'title.sequence'   : u'Selected DNA sequence',
+                             'title.sequence.missing.key' : u'Select sequence',
+                             'title.sequence.missing.path': u'Find path'}
 
     def create(self, action, hover, tick1, tick2):
         "creates the widget"
         self.__dialog = FileDialog(filetypes = 'fasta|*',
                                    config    = self._ctrl,
-                                   title     = self.getCSS().title.fasta.get())
+                                   title     = self.css.title.fasta.get())
 
         self.__widget = Dropdown(name  = 'Cycles:Sequence',
-                                 width = self.getCSS().inputwidth.get(),
+                                 width = self.css.inputwidth.get(),
                                  **self.__data())
         self.__hover  = hover
         self.__observe(action, tick1, tick2)
-        return Paragraph(text = self.getCSS().title.sequence.get()), self.__widget
+        return Paragraph(text = self.css.title.sequence.get()), self.__widget
 
     def update(self):
         "updates the widget"
@@ -231,10 +229,10 @@ class SequencePathCreator(WidgetCreator):
         val   = key if key in lst else None
         menu  = [(i, i) for i in lst] if len(lst) else []  # type: List[Optional[Tuple[str,str]]]
         if len(menu):
-            title = self.getCSS().title.sequence.missing.key.get()
+            title = self.css.title.sequence.missing.key.get()
             menu += [None, (title, '←')]
         else:
-            title = self.getCSS().title.sequence.missing.path.get()
+            title = self.css.title.sequence.missing.path.get()
             menu += [('', '→'), (title, '←')]
         return dict(menu  = menu,
                     label = title if val is None else key,
@@ -270,23 +268,23 @@ class SequencePathCreator(WidgetCreator):
         self.__widget.js_on_change('value', _js_cb)
 
         obs = lambda: self.__widget.update(**self.__data())
-        self.getConfig().sequence.key.observe(obs)
-        self.getRootConfig().last.path.fasta.observe(obs)
+        self.config.sequence.key.observe(obs)
+        self.configroot.last.path.fasta.observe(obs)
 
 class OligoListCreator(WidgetCreator):
     "Input for defining a list of oligos"
-    def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
-        super().__init__(ctrl, model, key)
+    def __init__(self, model:PlotModelAccess) -> None:
+        super().__init__(model)
         self.__widget  = None # type: Optional[AutocompleteInput]
-        self.getCSS().defaults = {'title.oligos'     : u'Oligos',
-                                  'title.oligos.help': u'comma-separated list'}
+        self.css.defaults = {'title.oligos'     : u'Oligos',
+                             'title.oligos.help': u'comma-separated list'}
 
     def create(self, action):
         "creates the widget"
         self.__widget = AutocompleteInput(**self.__data(),
-                                          placeholder = self.getCSS().title.oligos.help.get(),
-                                          title       = self.getCSS().title.oligos.get(),
-                                          width       = self.getCSS().inputwidth.get(),
+                                          placeholder = self.css.title.oligos.help.get(),
+                                          title       = self.css.title.oligos.get(),
+                                          width       = self.css.inputwidth.get(),
                                           name        = 'Cycles:Oligos')
         self.__observe(action)
         return self.__widget
@@ -296,7 +294,7 @@ class OligoListCreator(WidgetCreator):
         self.__widget.update(**self.__data())
 
     def __data(self):
-        hist = self.getRootConfig().oligos.history.get()
+        hist = self.configroot.oligos.history.get()
         lst  = [', '.join(sorted(j.lower() for j in i)) for i in hist]
         ols  = ', '.join(sorted(j.lower() for j in self._model.oligos))
         return dict(value = ols, completions = lst)
@@ -308,52 +306,21 @@ class OligoListCreator(WidgetCreator):
         @action
         def _py_cb(attr, old, new):
             ols  = sorted(i.lower() for i in match(new))
-            hist = self.getRootConfig().oligos.history
+            hist = self.configroot.oligos.history
             lst  = list(i for i in hist.get() if i != ols)[:hist.maxlength.get()]
             hist.set(([ols] if len(ols) else []) + lst)
             self._model.oligos = ols
 
         widget.on_change('value', _py_cb)
-        self.getRootConfig().oligos.observe(self.update)
-
-class GroupCreator(WidgetCreator):
-    "Allows creating group widgets"
-    INPUT = RadioButtonGroup
-    def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
-        super().__init__(ctrl, model, key)
-        self._widget  = None # type: ignore
-
-    def create(self, action):
-        "creates the widget"
-        name = self.__class__.__name__[:-len('Creator')]
-        css  = self.getCSS().title[name.lower()]
-        self._widget = self.INPUT(labels = css.labels.get(),
-                                  name   = 'Cycles:'+name,
-                                  **self._data())
-        self._widget.on_click(action(self.onclick_cb))
-
-        if css.get(default = None) is not None:
-            return Paragraph(text = css.get()), self._widget
-        return self._widget,
-
-    def update(self):
-        "updates the widget"
-        self._widget.update(**self._data())
-
-    def onclick_cb(self, value):
-        "action to be performed when buttons are clicked"
-        raise NotImplementedError()
-
-    def _data(self) -> dict:
-        raise NotImplementedError()
+        self.configroot.oligos.observe(self.update)
 
 class AlignmentCreator(GroupCreator):
     "Allows aligning the cycles on a given phase"
     INPUT = RadioButtonGroup
-    def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
-        super().__init__(ctrl, model, key)
-        self.getCSS().title.alignment.labels.default = [u'None', u'Phase 1', u'Phase 3']
-        self.getCSS().title.alignment.default        = u'Alignment'
+    def __init__(self, model:PlotModelAccess) -> None:
+        super().__init__(model)
+        self.css.title.alignment.labels.default = [u'None', u'Phase 1', u'Phase 3']
+        self.css.title.alignment.default        = u'Alignment'
 
     def onclick_cb(self, value):
         "action to be performed when buttons are clicked"
@@ -369,10 +336,10 @@ class AlignmentCreator(GroupCreator):
 class DriftCreator(GroupCreator):
     "Allows removing the drifts"
     INPUT = CheckboxButtonGroup
-    def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
-        super().__init__(ctrl, model, key)
-        self.getCSS().title.drift.labels.default = [u'Per bead', u'Per cycle']
-        self.getCSS().title.drift.default        = u'Drift Removal'
+    def __init__(self, model:PlotModelAccess) -> None:
+        super().__init__(model)
+        self.css.title.drift.labels.default = [u'Per bead', u'Per cycle']
+        self.css.title.drift.default        = u'Drift Removal'
 
     def onclick_cb(self, value):
         "action to be performed when buttons are clicked"
@@ -395,9 +362,9 @@ class DriftCreator(GroupCreator):
 class EventDetectionCreator(GroupCreator):
     "Allows displaying only events"
     INPUT = CheckboxGroup
-    def __init__(self, ctrl:Controller, model:TrackPlotModelController, key:str) -> None:
-        super().__init__(ctrl, model, key)
-        self.getCSS().title.eventdetection.labels.default = [u'Find events']
+    def __init__(self, model:PlotModelAccess) -> None:
+        super().__init__(model)
+        self.css.title.eventdetection.labels.default = [u'Find events']
 
     def onclick_cb(self, value):
         "action to be performed when buttons are clicked"
@@ -413,15 +380,14 @@ class EventDetectionCreator(GroupCreator):
 class ConfigMixin:
     "Everything dealing with config"
     def __init__(self):
-        args           = self._ctrl, self._model, self.key('')
-        self.__table   = PeaksTableCreator(*args)
-        self.__sliders = ConversionSlidersCreator(*args)
-        self.__seq     = SequencePathCreator(*args)
-        self.__oligs   = OligoListCreator(*args)
-        self.__align   = AlignmentCreator(*args)
-        self.__drift   = DriftCreator(*args)
-        self.__events  = EventDetectionCreator(*args)
-        self.getCSS().inputwidth.default = 205
+        self.__table   = PeaksTableCreator(self._model)
+        self.__sliders = ConversionSlidersCreator(self._model)
+        self.__seq     = SequencePathCreator(self._model)
+        self.__oligs   = OligoListCreator(self._model)
+        self.__align   = AlignmentCreator(self._model)
+        self.__drift   = DriftCreator(self._model)
+        self.__events  = EventDetectionCreator(self._model)
+        self.css.inputwidth.default = 205
 
     def _createconfig(self):
         stretch, bias  = self.__sliders.create(self._histsource)
@@ -452,7 +418,7 @@ class ConfigMixin:
 
     if TYPE_CHECKING:
         # pylint: disable=no-self-use,unused-argument
-        getConfig = lambda : None
-        getCSS    = lambda : None
+        config    = None    # type: ignore
+        css       = None    # type: ignore
         key       = lambda *_: None
         _figargs  = lambda *_: None

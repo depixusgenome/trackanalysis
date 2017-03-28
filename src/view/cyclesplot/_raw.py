@@ -17,10 +17,10 @@ class RawMixin:
     "Building the graph of cycles"
     def __init__(self):
         "sets up this plotter's info"
-        self.getCSS().defaults = dict(raw = PlotAttrs('color',  'circle', 1,
-                                                      alpha   = .5,
-                                                      palette = 'inferno'),
-                                      plotwidth = 500)
+        self.css.defaults = dict(raw        = PlotAttrs('color',  'circle', 1,
+                                                        alpha      = .5,
+                                                        palette    = 'inferno'),
+                                 plotwidth  = 500)
         self._rawsource = None # type: Optional[ColumnDataSource]
         self._raw       = None # type: Optional[Figure]
 
@@ -66,7 +66,7 @@ class RawMixin:
         res['cycle'] = (as_strided(tmp, shape = shape, strides = (tmp.strides[0], 0))
                         .ravel())
 
-        tmp          = np.array(self.getCSS().raw.get().listpalette(shape[0]))
+        tmp          = np.array(self.css.raw.get().listpalette(shape[0]))
         res['color'] = (as_strided(tmp, shape = shape, strides = (tmp.strides[0], 0))
                         .ravel())
 
@@ -89,7 +89,7 @@ class RawMixin:
         fig.x_range.callback = CustomJS.from_py_func(_onchangebounds)
 
     def _createraw(self, track, bead):
-        css             = self.getCSS()
+        css             = self.css
         self._raw       = figure(y_axis_label = css.ylabel.get(),
                                  y_range      = Range1d(start = 0., end = 0.),
                                  name         = 'Cycles:Raw',
@@ -100,7 +100,7 @@ class RawMixin:
         css.raw.addto(self._raw, x = 't', y = 'z', source = self._rawsource)
 
         self._hover.createraw(self._raw, self._rawsource, shape,
-                              self._model, self.getCSS())
+                              self._model, self.css)
         self._raw.extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
 
         axis = LinearAxis(x_range_name="time", axis_label = css.xtoplabel.get())
@@ -116,6 +116,5 @@ class RawMixin:
         return shape
 
     if TYPE_CHECKING:
-        getConfig = lambda: None
-        getCSS    = lambda: None
+        css       = None # type: ignore
         _model    = None # type: ignore

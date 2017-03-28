@@ -11,28 +11,30 @@ from    control.taskio   import ConfigTrackIO, ConfigGrFilesIO
 
 from  ..plotutils        import DpxKeyedRow, TrackPlotCreator, TrackPlotView
 from   ._bokehext        import DpxHoverModel
-from   ._modelcontroller import CyclesModelController
+from   ._modelcontroller import CyclesModelAccess
 from   ._raw             import RawMixin
 from   ._hist            import HistMixin
 from   ._config          import ConfigMixin
 
 class CyclesPlotCreator(TrackPlotCreator, HistMixin, RawMixin, ConfigMixin):
     "Displays cycles and their projection"
-    _MODEL = CyclesModelController
-    def __init__(self,  ctrl:Controller) -> None:
+    _MODEL = CyclesModelAccess
+    def __init__(self, ctrl:Controller) -> None:
         "sets up this plotter's info"
         TrackPlotCreator.__init__(self, ctrl)
         RawMixin       .__init__(self)
         HistMixin      .__init__(self)
         ConfigMixin    .__init__(self)
-        self.getCSS   ().defaults = {'toolbar_location': 'right',
-                                     **DpxHoverModel.defaultconfig()}
-        self.getConfig().defaults = {'tools'      : 'ypan,ybox_zoom,reset,save,dpxhover',
-                                     'oligos.size': 4}
-        self._ctrl.getGlobal("config").defaults = {'oligos': [],
-                                                   'oligos.history': [],
-                                                   'oligos.history.maxlength': 10
-                                                  }
+        self.css       .defaults = {'toolbar_location': 'right',
+                                    **DpxHoverModel.defaultconfig()
+                                   }
+        self.config    .defaults = {'tools'      : 'ypan,ybox_zoom,reset,save,dpxhover',
+                                    'oligos.size': 4
+                                   }
+        self.configroot.defaults = {'oligos'                  : [],
+                                    'oligos.history'          : [],
+                                    'oligos.history.maxlength': 10
+                                   }
         self._hover  = None # type: Optional[DpxHoverModel]
 
     def _figargs(self, css):                       # pylint: disable=arguments-differ
@@ -41,7 +43,7 @@ class CyclesPlotCreator(TrackPlotCreator, HistMixin, RawMixin, ConfigMixin):
         if css.plotwidth.get(default = None) is not None:
             args['plot_width']       = css.plotwidth.get()
         if css.plotheight.get(default = None) is not None:
-            args['plot_height']      = self.getCSS().plotheight.get()
+            args['plot_height']      = self.css.plotheight.get()
         args['toolbar_location'] = 'right'
         return args
 
@@ -52,7 +54,7 @@ class CyclesPlotCreator(TrackPlotCreator, HistMixin, RawMixin, ConfigMixin):
         self._createhist(track, self._rawsource.data, shape, self._raw.y_range)
 
         plts  = layouts.gridplot([[self._raw, self._hist]],
-                                 toolbar_location = self.getCSS().toolbar_location.get())
+                                 toolbar_location = self.css.toolbar_location.get())
         keyed = DpxKeyedRow(self, self._raw,
                             children = [plts],
                             toolbar  = next(i for i in plts.children

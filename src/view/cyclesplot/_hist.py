@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Building a projection of phase 5"
 
-from    typing         import Optional, Any, TYPE_CHECKING   # pylint: disable=unused-import
+from    typing         import Optional, Any   # pylint: disable=unused-import
 import  warnings
 
 from    bokeh.plotting import figure, Figure    # pylint: disable=unused-import
@@ -19,20 +19,19 @@ class HistMixin:
     "Building a projection of phase 5 onto the Z axis"
     def __init__(self):
         "sets up this plotter's info"
-        css = self.getCSS()
-        css.defaults = {'frames'    : PlotAttrs('white', 'quad',   1,
-                                                line_color = 'gray',
-                                                fill_color = 'gray'),
-                        'cycles'    : PlotAttrs('white', 'quad',   1,
-                                                fill_color = None,
-                                                line_alpha = .5,
-                                                line_color = 'blue'),
-                        **DpxFixedTicker.defaultconfig()
-                       }
-        css.hist.defaults = dict(xtoplabel = u'Cycles',
-                                 xlabel    = u'Frames',
-                                 ylabel    = u'Base number',
-                                 plotwidth = 200)
+        self.css.defaults = {'frames'    : PlotAttrs('white', 'quad',   1,
+                                                     line_color = 'gray',
+                                                     fill_color = 'gray'),
+                             'cycles'    : PlotAttrs('white', 'quad',   1,
+                                                     fill_color = None,
+                                                     line_alpha = .5,
+                                                     line_color = 'blue'),
+                             **DpxFixedTicker.defaultconfig()
+                            }
+        self.css.hist.defaults = dict(xtoplabel = u'Cycles',
+                                      xlabel    = u'Frames',
+                                      ylabel    = u'Base number',
+                                      plotwidth = 200)
 
         self._histsource = None # type: Optional[ColumnDataSource]
         self._hist       = None # type: Optional[Figure]
@@ -114,27 +113,26 @@ class HistMixin:
         self._hist.y_range.callback = CustomJS.from_py_func(_onchangebounds)
 
     def _createhist(self, track, data, shape, yrng):
-        css              = self.getCSS()
         self._hist       = figure(y_axis_location = None,
                                   y_range         = yrng,
                                   name            = 'Cycles:Hist',
-                                  **self._figargs(css.hist))
+                                  **self._figargs(self.css.hist))
 
         hist             = self.__data(track, data, shape)
         self._histsource = ColumnDataSource(data = hist)
         self._hist.extra_x_ranges = {"cycles": Range1d(start = 0., end = 0.)}
 
-        attrs = css.cycles.get()
+        attrs = self.css.cycles.get()
         axis  = LinearAxis(x_range_name          = "cycles",
-                           axis_label            = css.hist.xtoplabel.get(),
+                           axis_label            = self.css.hist.xtoplabel.get(),
                            axis_label_text_color = attrs.line_color
                           )
         self._hist.add_layout(axis, 'above')
 
-        css.frames.addto(self._hist,
-                         source = self._histsource,
-                         bottom = "bottom", top   = "top",
-                         left   = "left",   right = "frames")
+        self.css.frames.addto(self._hist,
+                              source = self._histsource,
+                              bottom = "bottom", top   = "top",
+                              left   = "left",   right = "frames")
 
         attrs.addto(self._hist,
                     source = self._histsource,
@@ -143,16 +141,16 @@ class HistMixin:
                     x_range_name = "cycles")
 
         self._gridticker = DpxFixedTicker()
-        self._gridticker.create(self.getCSS(), self._hist)
-        self._gridticker.observe(self.getRootConfig(), self._model, self._hist)
+        self._gridticker.create(self.css, self._hist)
+        self._gridticker.observe(self.configroot, self._model, self._hist)
 
-        self._hover.createhist(self._hist, self._model, self.getCSS(), self.getConfig())
-        self._hover.observe(self.getRootConfig(), self.getConfig(), self._model)
+        self._hover.createhist(self._hist, self._model, self.css, self.config)
+        self._hover.observe(self.configroot, self.config, self._model)
         self._slavexaxis()
 
     def _updatehist(self, track, data, shape):
         self._histsource.data = hist = self.__data(track, data, shape)
-        self._hover.updatehist(self._hist, hist, self._model, self.getConfig())
+        self._hover.updatehist(self._hist, hist, self._model, self.config)
         self._gridticker.updatedata(self._model, self._hist)
 
         cycles = self._hist.extra_x_ranges["cycles"]
@@ -176,6 +174,3 @@ class HistMixin:
         else:
             cycles.update(start = 0, end = max(self._histsource.data['cycles'][ind1:ind2])+1)
             frames.update(start = 0, end = max(self._histsource.data['frames'][ind1:ind2])+1)
-
-    if TYPE_CHECKING:
-        getConfig = getCSS = lambda: None

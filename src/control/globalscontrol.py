@@ -24,6 +24,7 @@ map only needs specify those default values that should be changed for this type
 of plot.
 """
 from collections    import namedtuple, ChainMap
+from itertools      import product
 from typing         import (Dict, Union, # pylint: disable=unused-import
                             Callable, Optional, Sequence)
 import inspect
@@ -335,6 +336,31 @@ class DefaultsMap(Controller):
                 return self.__items[keys[0]]
             return iter(self.__items[key] for key in keys)
 
+class GlobalsAccess:
+    "Contains all access to model items likely to be set by user actions"
+    def __init__(self,
+                 ctrl:Union['GlobalsAccess', Controller],
+                 key :Optional[str] = None,
+                 **_) -> None:
+        if isinstance(ctrl, GlobalsAccess):
+            for name, pref in product(('config', 'css', 'project'), ('', 'root')):
+                if hasattr(ctrl, name+pref):
+                    setattr(self, name+pref, getattr(ctrl, name+pref))
+
+        else:
+            self.configroot  = ctrl.getGlobal('config')
+            self.projectroot = ctrl.getGlobal('project')
+            self.cssroot     = ctrl.getGlobal('css')
+            if key is None:
+                return
+
+            elif key[0] != '.':
+                key = '.'+key
+
+            self.config  = ctrl.getGlobal('config' + key)
+            self.project = ctrl.getGlobal('project'+ key)
+            self.css     = ctrl.getGlobal('css'    + key)
+
 class GlobalsController(Controller):
     """
     Controller class for global values.
@@ -380,6 +406,10 @@ class GlobalsController(Controller):
 
         self.addGlobalMap('current')
         self.addGlobalMap('current.plot')
+
+    def access(self, key: Optional[str] = None) -> GlobalsAccess:
+        "returns a GlobalsAccess to a given map"
+        return GlobalsAccess(self, key)
 
     def addGlobalMap(self, key, *args, **kwargs):
         "adds a map"
