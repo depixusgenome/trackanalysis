@@ -6,9 +6,10 @@ from    typing                      import Optional, Sequence, Tuple, cast
 from    cordrift.processor          import DriftTask
 from    eventdetection.processor    import (ExtremumAlignmentTask,
                                             EventDetectionTask)
-from    ..plotutils                 import PlotModelAccess, TaskAccess, readsequence
+from    view.plots.tasks            import TaskPlotModelAccess, TaskAccess
+from    view.plots.sequence         import readsequence
 
-class CyclesModelAccess(PlotModelAccess):
+class CyclesModelAccess(TaskPlotModelAccess):
     "Model for Cycles View"
     def __init__(self, ctrl, key: Optional[str] = None) -> None:
         super().__init__(ctrl, key)
@@ -32,7 +33,7 @@ class CyclesModelAccess(PlotModelAccess):
                                          side = 'RIGHT')
         self.eventdetection = TaskAccess(self, EventDetectionTask)
 
-    props        = PlotModelAccess.props
+    props        = TaskPlotModelAccess.props
     sequencepath = cast(Optional[str],           props.configroot('last.path.fasta'))
     oligos       = cast(Optional[Sequence[str]], props.configroot('oligos'))
     binwidth     = cast(float,                   props.config    ('binwidth'))

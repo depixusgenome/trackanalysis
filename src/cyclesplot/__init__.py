@@ -1,27 +1,29 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cycles plot"
-from    typing           import Optional, TYPE_CHECKING # pylint: disable=unused-import
+from    typing              import Optional, TYPE_CHECKING # pylint: disable=unused-import
 
-from    bokeh            import layouts
-from    bokeh.models     import ToolbarBox
+from    bokeh               import layouts
+from    bokeh.models        import ToolbarBox
 
-from    control          import Controller
-from    control.taskio   import ConfigTrackIO, ConfigGrFilesIO
+from    control             import Controller
+from    control.taskio      import ConfigTrackIO, ConfigGrFilesIO
 
-from  ..plotutils        import DpxKeyedRow, TrackPlotCreator, TrackPlotView
-from   ._bokehext        import DpxHoverModel
-from   ._modelcontroller import CyclesModelAccess
-from   ._raw             import RawMixin
-from   ._hist            import HistMixin
-from   ._config          import ConfigMixin
+from    view.plots          import DpxKeyedRow, PlotView
+from    view.plots.tasks    import TaskPlotCreator
 
-class CyclesPlotCreator(TrackPlotCreator, HistMixin, RawMixin, ConfigMixin):
+from   ._bokehext           import DpxHoverModel
+from   ._model              import CyclesModelAccess
+from   ._raw                import RawMixin
+from   ._hist               import HistMixin
+from   ._config             import ConfigMixin
+
+class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, ConfigMixin):
     "Displays cycles and their projection"
     _MODEL = CyclesModelAccess
     def __init__(self, ctrl:Controller) -> None:
         "sets up this plotter's info"
-        TrackPlotCreator.__init__(self, ctrl)
+        TaskPlotCreator.__init__(self, ctrl)
         RawMixin       .__init__(self)
         HistMixin      .__init__(self)
         ConfigMixin    .__init__(self)
@@ -39,8 +41,8 @@ class CyclesPlotCreator(TrackPlotCreator, HistMixin, RawMixin, ConfigMixin):
         if TYPE_CHECKING:
             self._model = CyclesModelAccess('', '')
 
-    def _figargs(self, css):                       # pylint: disable=arguments-differ
-        args = super()._figargs()
+    def _figargs(self, css):
+        args = super()._figargs(css)
         args['x_axis_label']     = css.xlabel.get()
         if css.plotwidth.get(default = None) is not None:
             args['plot_width']       = css.plotwidth.get()
@@ -66,12 +68,12 @@ class CyclesPlotCreator(TrackPlotCreator, HistMixin, RawMixin, ConfigMixin):
 
         return layouts.column([keyed, self._createconfig()])
 
-    def _update(self, items):
-        shape = self._updateraw()
-        self._updatehist(self._rawsource.data, shape)
-        self._updateconfig()
+    def _reset(self, items):
+        shape = self._resetraw()
+        self._resethist(self._rawsource.data, shape)
+        self._resetconfig()
 
-class CyclesPlotView(TrackPlotView):
+class CyclesPlotView(PlotView):
     "Cycles plot view"
     PLOTTER = CyclesPlotCreator
     APPNAME = 'Track Cycles'

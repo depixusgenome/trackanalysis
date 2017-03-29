@@ -8,10 +8,11 @@ from bokeh.plotting import figure, Figure # pylint: disable=unused-import
 from bokeh.models   import (LinearAxis, ColumnDataSource, HoverTool,
                             CustomJS, Range1d)
 
-from control        import Controller
-from .plotutils     import PlotAttrs, DpxKeyedRow, TrackPlotCreator, TrackPlotView
+from control            import Controller
+from .plotutils         import PlotAttrs, DpxKeyedRow, PlotView
+from .plotutils.tasks   import TaskPlotCreator
 
-class BeadPlotCreator(TrackPlotCreator):
+class BeadPlotCreator(TaskPlotCreator):
     "Plots a default bead"
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
@@ -96,10 +97,10 @@ class BeadPlotCreator(TrackPlotCreator):
         self._addcallbacks(self._fig)
         return DpxKeyedRow(self, self._fig)
 
-    def _update(self, _):
+    def _reset(self, _):
         self._source.data  = self.__data()
         self._setbounds()
 
-class BeadPlotView(TrackPlotView):
+class BeadPlotView(PlotView):
     "Bead plot view"
     PLOTTER = BeadPlotCreator

@@ -11,7 +11,7 @@ from    bokeh.models   import LinearAxis, ColumnDataSource, CustomJS, Range1d
 import  numpy                   as     np
 from    numpy.lib.index_tricks  import as_strided
 
-from  ..plotutils           import PlotAttrs
+from    view.plots              import PlotAttrs
 
 class RawMixin:
     "Building the graph of cycles"
@@ -78,16 +78,17 @@ class RawMixin:
         fig = self._raw
         self._addcallbacks(fig)
 
-        def _onchangebounds(frng = fig.x_range,
-                            trng = fig.extra_x_ranges["time"],
-                            mdl  = self._hover):
+        trng = fig.extra_x_ranges["time"]
+        mdl  = self._hover
+        @CustomJS.from_py_func
+        def _onchangebounds(cb_obj = None, trng = trng, mdl = mdl):
             # pylint: disable=protected-access,no-member
-            if frng.bounds is not None:
-                frng._initial_start = frng.bounds[0]
-                frng._initial_end   = frng.bounds[1]
-            trng.start = frng.start/mdl.framerate
-            trng.end   = frng.end  /mdl.framerate
-        fig.x_range.callback = CustomJS.from_py_func(_onchangebounds)
+            if cb_obj.bounds is not None:
+                cb_obj._initial_start = cb_obj.bounds[0]
+                cb_obj._initial_end   = cb_obj.bounds[1]
+            trng.start = cb_obj.start/mdl.framerate
+            trng.end   = cb_obj.end  /mdl.framerate
+        fig.x_range.callback = _onchangebounds
 
     def _createraw(self):
         css             = self.css
@@ -109,11 +110,11 @@ class RawMixin:
         self.__addcallbacks()
         return shape
 
-    def _updateraw(self):
+    def _resetraw(self):
         data, shape          = self.__data()
         self._rawsource.data = data
         self.setbounds(self._hist.y_range, 'y', data['z'])
-        self._hover.updateraw(self._raw, self._rawsource, shape)
+        self._hover.resetraw(self._raw, self._rawsource, shape)
         return shape
 
     if TYPE_CHECKING:

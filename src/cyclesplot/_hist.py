@@ -10,8 +10,8 @@ from    bokeh.models   import LinearAxis, ColumnDataSource, CustomJS, Range1d
 
 import  numpy        as np
 
-from  ..plotutils       import PlotAttrs, checksizes
-from  ..sequenceticker  import SequenceTicker
+from    view.plots          import PlotAttrs, checksizes
+from    view.plots.sequence import SequenceTicker
 
 window = None # type: Any # pylint: disable=invalid-name
 
@@ -76,42 +76,6 @@ class HistMixin:
                     bottom  = bins[:-1],
                     top     = bins[1:])
 
-    def _slavexaxis(self):
-        # pylint: disable=protected-access,no-member
-        def _onchangebounds(hist = self._hist, mdl = self._hover, src= self._histsource):
-            yrng = hist.y_range
-            if yrng.bounds is not None:
-                yrng._initial_start = yrng.bounds[0]
-                yrng._initial_end   = yrng.bounds[1]
-
-            cycles       = hist.extra_x_ranges["cycles"]
-            frames       = hist.x_range
-
-            cycles.start = 0.
-            frames.start = 0.
-
-            bases        = hist.extra_y_ranges['bases']
-            bases.start  = (yrng.start-mdl.bias)/mdl.stretch
-            bases.end    = (yrng.end-mdl.bias)/mdl.stretch
-
-            bottom       = src.data["bottom"]
-            if len(bottom) < 2:
-                ind1 = 1
-                ind2 = 0
-            else:
-                delta = bottom[1]-bottom[0]
-                ind1  = min(len(bottom), max(0, int((yrng.start-bottom[0])/delta-1)))
-                ind2  = min(len(bottom), max(0, int((yrng.end  -bottom[0])/delta+1)))
-
-            if ind1 >= ind2:
-                cycles.end = 0
-                frames.end = 0
-            else:
-                frames.end = window.Math.max.apply(None, src.data['frames'][ind1:ind2])+1
-                cycles.end = window.Math.max.apply(None, src.data['cycles'][ind1:ind2])+1
-
-        self._hist.y_range.callback = CustomJS.from_py_func(_onchangebounds)
-
     def _createhist(self, data, shape, yrng):
         self._hist       = figure(y_axis_location = None,
                                   y_range         = yrng,
@@ -142,31 +106,10 @@ class HistMixin:
 
         self._ticker.create(self._hist, self._model, self)
         self._hover.createhist(self._hist, self._model, self)
-        self._slavexaxis()
+        self._hover.slaveaxes(self._hist, self._histsource, "cycles", "bottom")
 
-    def _updatehist(self, data, shape):
+    def _resethist(self, data, shape):
         self._histsource.data = hist = self.__data(data, shape)
-        self._hover.updatehist(hist)
+        self._hover.resethist(hist)
         self._ticker.reset()
-
-        cycles = self._hist.extra_x_ranges["cycles"]
-        frames = self._hist.x_range
-        yrng   = self._hist.y_range
-
-        bottom = self._histsource.data["bottom"]
-        if len(bottom) < 2:
-            ind1 = 1
-            ind2 = 0
-            cycles.update(start = 0, end = 0)
-            frames.update(start = 0, end = 0)
-        else:
-            delta  = bottom[1]-bottom[0]
-            ind1   = min(len(bottom), max(0, int((yrng.start-bottom[0])/delta-1)))
-            ind2   = min(len(bottom), max(0, int((yrng.end  -bottom[0])/delta+1)))
-
-        if ind1 >= ind2:
-            cycles.update(start = 0, end = 0)
-            frames.update(start = 0, end = 0)
-        else:
-            cycles.update(start = 0, end = max(self._histsource.data['cycles'][ind1:ind2])+1)
-            frames.update(start = 0, end = max(self._histsource.data['frames'][ind1:ind2])+1)
+        self._hover.slaveaxes(self._hist, self._histsource, "cycles", "bottom", inpy = True)

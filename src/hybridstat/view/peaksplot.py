@@ -16,10 +16,10 @@ from peakfinding.selector       import PeakSelectorDetails
 from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
                                         FitBead)
 
-from .plotutils                 import (PlotModelAccess, TrackPlotCreator,
-                                        TaskAccess, TrackPlotView, PlotAttrs,
-                                        readsequence)
-from .sequenceticker            import SequenceTicker, SequenceHoverMixin
+from view.plot                  import PlotView, PlotAttrs
+from view.plot.tasks            import (TaskPlotModelAccess, TaskPlotCreator,
+                                        TaskAccess)
+from view.plot.sequence         import readsequence, SequenceTicker, SequenceHoverMixin
 
 def sequenceprop(attr):
     "create a property which updates the FitToHairpinTask as well"
@@ -39,7 +39,7 @@ def sequenceprop(attr):
     hmsg  = "link to config's {}".format(attr)
     return property(_getter, _setter, None, hmsg)
 
-class PeaksPlotModelAccess(PlotModelAccess):
+class PeaksPlotModelAccess(TaskPlotModelAccess):
     "Access to peaks"
     def __init__(self, ctrl, key: Optional[str] = None) -> None:
         super().__init__(ctrl, key)
@@ -70,7 +70,7 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
     stretches = props.Dict(props.String, props.Float)
     __implementation__ = SequenceHoverMixin.impl('PeaksSequenceHover', '')
 
-class PeaksPlotCreator(TrackPlotCreator):
+class PeaksPlotCreator(TaskPlotCreator):
     "Creates plots for peaks"
     _MODEL = PeaksPlotModelAccess
     def __init__(self, *args):
@@ -83,7 +83,7 @@ class PeaksPlotCreator(TrackPlotCreator):
                                                            line_alpha = .5,
                                                            line_color = 'blue'),
                              'xtoplabel'       : u'Duration (s)',
-                             'xlabel'          : u'Events (%)',
+                             'xlabel'          : u'Cycles (%)',
                              'toolbar_location': 'right',
                              **SequenceTicker.defaultconfig()
                             }
@@ -96,8 +96,8 @@ class PeaksPlotCreator(TrackPlotCreator):
         if TYPE_CHECKING:
             self._model = PeaksPlotModelAccess('', '')
 
-    def _figargs(self):
-        args = super()._figargs()
+    def _figargs(self, _ = None):
+        args = super()._figargs(_)
         args['x_axis_label']     = self.css.xlabel.get()
         args['y_axis_label']     = self.css.ylabel.get()
         args['toolbar_location'] = 'right'
@@ -119,7 +119,8 @@ class PeaksPlotCreator(TrackPlotCreator):
         peaks = self._model.peakselection.task
         prec  = peaks.rawprecision(track, self._model.bead)
         dtl   = peaks.detailed(items, prec)
-        lens  = np.array([np.array([len(i) for i in j], dtype = 'i4') for j in items],
+        frate = self._model.framerate
+        lens  = np.array([np.array([len(i)*frate for i in j], dtype = 'i4') for j in items],
                          dtype = 'O')
 
         hist  = peaks.histogram
@@ -143,17 +144,19 @@ class PeaksPlotCreator(TrackPlotCreator):
 
         self._ticker.create(self._fig, self._model, self)
 
-        self._fig.extra_x_ranges = {"durations": Range1d(start = 0., end = 0.)}
-        axis = LinearAxis(x_range_name="durations", axis_label = self.css.xtoplabel.get())
+        self._fig.extra_x_ranges = {"duration": Range1d(start = 0., end = 0.)}
+        axis = LinearAxis(x_range_name="duration", axis_label = self.css.xtoplabel.get())
         self._fig.add_layout(axis, 'above')
         self._addcallbacks(self._fig)
+        self._hover.slaveaxes(self._hist, self._histsource, "duration", "z")
 
-    def _update(self, items):
+    def _reset(self, _):
         self._source.data, dtl = self.__data()
         self._model.setfits(dtl)
         self._hover .reset()
         self._ticker.reset()
+        self._hover.slaveaxes(self._hist, self._histsource, "duration", "z", inpy = True)
 
-class PeaksPlotView(TrackPlotView):
+class PeaksPlotView(PlotView):
     "Peaks plot view"
     PLOTTER = PeaksPlotCreator

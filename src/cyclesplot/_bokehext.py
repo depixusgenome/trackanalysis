@@ -9,8 +9,8 @@ from    bokeh.models   import (LinearAxis,      # pylint: disable=unused-import
                                ColumnDataSource, GlyphRenderer, Range1d,
                                CustomJS, ContinuousTicker, BasicTicker, Ticker)
 
-from  ..sequenceticker  import SequenceHoverMixin, Model
-from  ..plotutils       import PlotAttrs, DpxHoverTool
+from    view.plots.sequence import SequenceHoverMixin, Model
+from    view.plots          import PlotAttrs, DpxHoverTool
 
 window = None # type: ignore # pylint: disable=invalid-name
 class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-instance-attributes
@@ -127,7 +127,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         self.js_on_change("updating", CustomJS.from_py_func(_js_cb))
         cnf.configroot.observe('oligos', self.resetsource)
 
-    def updateraw(self, fig, rdata, shape):
+    def resetraw(self, fig, rdata, shape):
         "updates the tooltips for a new file"
         hover = fig.select(DpxHoverTool)
         if len(hover) == 0:
@@ -137,7 +137,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         self._rawsource.data         = self._createrawdata(rdata)
         self._rawglyph.glyph.visible = False
 
-    def updatehist(self, hdata):
+    def resethist(self, hdata):
         "updates the tooltips for a new file"
         mdl  = self.model
         bias = mdl.bias
