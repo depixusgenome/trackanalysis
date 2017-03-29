@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Track plot view"
 
-from typing         import Optional # pylint: disable=unused-import
+from typing         import Optional, Any # pylint: disable=unused-import
 
 from bokeh.plotting import figure, Figure # pylint: disable=unused-import
 from bokeh.models   import (LinearAxis, ColumnDataSource, HoverTool,
@@ -23,17 +23,19 @@ class BeadPlotCreator(TrackPlotCreator):
                                  ylabel      = u"Z",
                                  yrightlabel = u"Zmag",
                                  tooltips    = ttips)
-        self._source = None # type: Optional[ColumnDataSource]
+        self._source = ColumnDataSource()
         self._fig    = None # type: Optional[Figure]
+        self._model  = None # type: Any
 
     def _get(self, name):
         return self._source.data[name] # pylint: disable=unsubscriptable-object
 
-    @staticmethod
-    def _createdata(track, bead):
+    def __data(self):
+        track = self._model.track
+        bead  = self._model.bead
         if track is None:
             return dict.fromkeys(('t', 'zmag', 'z'), [0., 1.])
-        items       = track.beads
+        items = track.beads
         return dict(t    = items['t'],
                     zmag = items['zmag'],
                     z    = items[bead])
@@ -78,10 +80,10 @@ class BeadPlotCreator(TrackPlotCreator):
         self.setbounds(self._fig.x_range, 'x', self._get('t'))
         self.setbounds(self._fig.y_range, 'y', self._get('z'))
 
-    def _create(self, _, *args) -> DpxKeyedRow:
+    def _create(self, _) -> DpxKeyedRow:
         "sets-up the figure"
         self._fig    = figure(**self._figargs())
-        self._source = ColumnDataSource(data = self._createdata(*args))
+        self._source.data = self.__data()
         if self.css.tooltips.get() not in ('', None):
             self._fig.select(HoverTool).tooltips = self.css.tooltips.get()
 
@@ -94,8 +96,8 @@ class BeadPlotCreator(TrackPlotCreator):
         self._addcallbacks(self._fig)
         return DpxKeyedRow(self, self._fig)
 
-    def _update(self, _, *args):
-        self._source.data  = self._createdata(*args)
+    def _update(self, _):
+        self._source.data  = self.__data()
         self._setbounds()
 
 class BeadPlotView(TrackPlotView):

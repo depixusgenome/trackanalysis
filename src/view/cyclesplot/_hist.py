@@ -10,8 +10,8 @@ from    bokeh.models   import LinearAxis, ColumnDataSource, CustomJS, Range1d
 
 import  numpy        as np
 
-from  ..plotutils  import PlotAttrs, checksizes
-from   ._bokehext  import DpxFixedTicker
+from  ..plotutils       import PlotAttrs, checksizes
+from  ..sequenceticker  import SequenceTicker
 
 window = None # type: Any # pylint: disable=invalid-name
 
@@ -26,19 +26,18 @@ class HistMixin:
                                                      fill_color = None,
                                                      line_alpha = .5,
                                                      line_color = 'blue'),
-                             **DpxFixedTicker.defaultconfig()
+                             **SequenceTicker.defaultconfig()
                             }
         self.css.hist.defaults = dict(xtoplabel = u'Cycles',
                                       xlabel    = u'Frames',
-                                      ylabel    = u'Base number',
                                       plotwidth = 200)
 
-        self._histsource = None # type: Optional[ColumnDataSource]
-        self._hist       = None # type: Optional[Figure]
-        self._gridticker = None # type: Optional[DpxFixedTicker]
+        self._histsource = ColumnDataSource()
+        self._hist       = None             # type: Optional[Figure]
+        self._ticker = SequenceTicker()
 
     @checksizes
-    def __data(self, track, data, shape):
+    def __data(self, data, shape):
         bins  = np.array([-1, 1])
         zeros = np.zeros((1,), dtype = 'f4')
         items = zeros,
@@ -46,6 +45,7 @@ class HistMixin:
             phase = self.getRootConfig().phase.measure.get()
             zvals = data['z'].reshape(shape)
             if self._model.eventdetection.task is None:
+                track = self._model.track
                 ind1  = track.phases[:,phase]  -track.phases[:,0]
                 ind2  = track.phases[:,phase+1]-track.phases[:,0]
                 items = [val[ix1:ix2] for ix1, ix2, val in zip(ind1, ind2, zvals)]
@@ -112,14 +112,14 @@ class HistMixin:
 
         self._hist.y_range.callback = CustomJS.from_py_func(_onchangebounds)
 
-    def _createhist(self, track, data, shape, yrng):
+    def _createhist(self, data, shape, yrng):
         self._hist       = figure(y_axis_location = None,
                                   y_range         = yrng,
                                   name            = 'Cycles:Hist',
                                   **self._figargs(self.css.hist))
 
-        hist             = self.__data(track, data, shape)
-        self._histsource = ColumnDataSource(data = hist)
+        hist                  = self.__data(data, shape)
+        self._histsource.data = hist
         self._hist.extra_x_ranges = {"cycles": Range1d(start = 0., end = 0.)}
 
         attrs = self.css.cycles.get()
@@ -140,18 +140,14 @@ class HistMixin:
                     left   = "left",   right = "cycles",
                     x_range_name = "cycles")
 
-        self._gridticker = DpxFixedTicker()
-        self._gridticker.create(self.css, self._hist)
-        self._gridticker.observe(self.configroot, self._model, self._hist)
-
-        self._hover.createhist(self._hist, self._model, self.css, self.config)
-        self._hover.observe(self.configroot, self.config, self._model)
+        self._ticker.create(self._hist, self._model, self)
+        self._hover.createhist(self._hist, self._model, self)
         self._slavexaxis()
 
-    def _updatehist(self, track, data, shape):
-        self._histsource.data = hist = self.__data(track, data, shape)
-        self._hover.updatehist(self._hist, hist, self._model, self.config)
-        self._gridticker.updatedata(self._model, self._hist)
+    def _updatehist(self, data, shape):
+        self._histsource.data = hist = self.__data(data, shape)
+        self._hover.updatehist(hist)
+        self._ticker.reset()
 
         cycles = self._hist.extra_x_ranges["cycles"]
         frames = self._hist.x_range

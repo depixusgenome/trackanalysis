@@ -10,10 +10,12 @@ from    numpy.lib.stride_tricks import as_strided
 from    scipy.signal            import find_peaks_cwt
 
 from    utils                   import (kwargsdefaults, initdefaults, NoArgs,
-                                        asdataarrays)
+                                        asdataarrays, updatecopy)
 from    signalfilter            import PrecisionAlg
 from    signalfilter.convolve   import KernelConvolution # pylint: disable=unused-import
 
+HistInputs = Union[Iterable[Iterable[float]], Iterable[Iterable[np.ndarray]]]
+BiasType   = Union[None, float, np.ndarray]
 class Histogram(PrecisionAlg):
     u"""
     Creates a gaussian smeared histogram of events.
@@ -53,10 +55,9 @@ class Histogram(PrecisionAlg):
 
     @kwargsdefaults
     def __call__(self,
-                 aevents  : Union[Iterable[Iterable[float]],
-                                  Iterable[Iterable[np.ndarray]]],
-                 bias     : Union[None,float,np.ndarray] = None,
-                 separate : bool                         = False,
+                 aevents  : HistInputs,
+                 bias     : BiasType = None,
+                 separate : bool     = False,
                 ) -> Tuple[Iterator[np.ndarray], float, float]:
         events = asdataarrays(aevents)
         if events is None:
@@ -68,6 +69,12 @@ class Histogram(PrecisionAlg):
         gen          = self.__compute(events, bias, separate)
         minv, bwidth = next(gen)
         return gen, minv, bwidth
+
+    def projection(self, aevents : HistInputs, bias: BiasType = None, **kwa):
+        "Calls itself and returns the sum of histograms + min value and bin size"
+        cpy = updatecopy(self, **kwa)
+        tmp, (minv, bwidth) = cpy(aevents, bias, separate = False)
+        return next(tmp), minv, bwidth
 
     @property
     def exactoversampling(self) -> int:
@@ -115,6 +122,8 @@ class Histogram(PrecisionAlg):
     def __weights(fcn, events):
         if fcn is None:
             return itertools.repeat(1., len(events))
+        elif isinstance(fcn, np.ndarray):
+            return fcn
         else:
             return (fcn(evts) for evts in events)
 
@@ -157,7 +166,7 @@ class Histogram(PrecisionAlg):
         if not separate:
             items = iter((np.concatenate(tuple(items)),))
             if isinstance(weight, np.ndarray):
-                weight = weight.ravel()[np.newaxis] # pylint: disable=no-member
+                weight = iter((np.concatenate(tuple(weight)),))
 
         yield (minv, bwidth)
         yield from self.__generate(lenv, kern, items, weight)

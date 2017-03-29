@@ -48,14 +48,15 @@ class RawMixin:
 
         return dict(t = time.ravel(), z = val.ravel()), val.shape
 
-    def __data(self, cycles, bead) -> Tuple[dict, Tuple[int,int]]:
+    def __data(self) -> Tuple[dict, Tuple[int,int]]:
+        cycles = self._model.runbead()
         if cycles is None:
             return (dict.fromkeys(('t', 'z', 'cycle', 'color'), [0., 1.]),
                     (1, 2))
 
         items = list(cycles)
         if len(items) == 0 or not any(len(i) for _, i in items):
-            return self.__data(None, bead)
+            return self.__data(None)
 
         if self._model.eventdetection.task is None:
             res, shape = self.__normal_data(items)
@@ -88,13 +89,13 @@ class RawMixin:
             trng.end   = frng.end  /mdl.framerate
         fig.x_range.callback = CustomJS.from_py_func(_onchangebounds)
 
-    def _createraw(self, track, bead):
+    def _createraw(self):
         css             = self.css
         self._raw       = figure(y_axis_label = css.ylabel.get(),
                                  y_range      = Range1d(start = 0., end = 0.),
                                  name         = 'Cycles:Raw',
                                  **self._figargs(css))
-        raw, shape      = self.__data(track, bead)
+        raw, shape      = self.__data()
         self._rawsource = ColumnDataSource(data = raw)
 
         css.raw.addto(self._raw, x = 't', y = 'z', source = self._rawsource)
@@ -108,8 +109,8 @@ class RawMixin:
         self.__addcallbacks()
         return shape
 
-    def _updateraw(self, track, bead):
-        data, shape          = self.__data(track, bead)
+    def _updateraw(self):
+        data, shape          = self.__data()
         self._rawsource.data = data
         self.setbounds(self._hist.y_range, 'y', data['z'])
         self._hover.updateraw(self._raw, self._rawsource, shape)

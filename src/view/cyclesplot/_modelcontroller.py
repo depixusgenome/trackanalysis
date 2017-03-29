@@ -11,14 +11,7 @@ from    ..plotutils                 import PlotModelAccess, TaskAccess, readsequ
 class CyclesModelAccess(PlotModelAccess):
     "Model for Cycles View"
     def __init__(self, ctrl, key: Optional[str] = None) -> None:
-        order = tuple, ExtremumAlignmentTask, DriftTask, EventDetectionTask
-        def _get(ttype, **kwa) -> TaskAccess:
-            return TaskAccess(self, ttype, order, **kwa)
-        self.alignment      = _get(ExtremumAlignmentTask)
-        self.driftperbead   = _get(DriftTask, attrs = {'onbeads': True})
-        self.driftpercycle  = _get(DriftTask, attrs = {'onbeads': False}, side = 'RIGHT')
-        self.eventdetection = _get(EventDetectionTask)
-
+        super().__init__(ctrl, key)
         self.config.defaults = {'binwidth'          : .003,
                                 'minframes'         : 10,
                                 'base.bias'         : None,
@@ -33,7 +26,11 @@ class CyclesModelAccess(PlotModelAccess):
                                }
         self.config.sequence.peaks.default = None
 
-        super().__init__(ctrl, key)
+        self.alignment      = TaskAccess(self, ExtremumAlignmentTask)
+        self.driftperbead   = TaskAccess(self, DriftTask, attrs = {'onbeads': True})
+        self.driftpercycle  = TaskAccess(self, DriftTask, attrs = {'onbeads': False},
+                                         side = 'RIGHT')
+        self.eventdetection = TaskAccess(self, EventDetectionTask)
 
     props        = PlotModelAccess.props
     sequencepath = cast(Optional[str],           props.configroot('last.path.fasta'))

@@ -79,7 +79,7 @@ def test_hairpincost():
                'hp101': HairpinDistance(peaks = truth[1])}
     ids     = {'hp100': PeakIdentifier(peaks = truth[0]),
                'hp101': PeakIdentifier(peaks = truth[1])}
-    results = dict(BeadsByHairpinProcessor.apply(hpins, {}, ids, beads))
+    results = dict(BeadsByHairpinProcessor.compute(hpins, {}, ids, beads))
     assert len(results) == 3
     assert len(results['hp100']) == 1
     assert len(results['hp101']) == 1
@@ -104,7 +104,7 @@ def test_constrainedhairpincost():
                'hp101': HairpinDistance(peaks = truth[1])}
     cstrs   = dict.fromkeys((100, 110), DistanceConstraint('hp101', {}))
 
-    results = dict(BeadsByHairpinProcessor.apply(hpins, cstrs, {}, beads))
+    results = dict(BeadsByHairpinProcessor.compute(hpins, cstrs, {}, beads))
     assert len(results) == 1
     assert len(results['hp101']) == 3
 

@@ -20,10 +20,11 @@ from    bokeh.plotting.figure   import Figure
 
 from    sequences               import read as _readsequences
 
-from    model.task              import RootTask, Task
+from    model.task              import RootTask, Task, taskorder, TASK_ORDER
 from    data.track              import Track
 from    utils                   import CachedIO, NoArgs, updatecopy, updatedeepcopy
 from    control                 import Controller
+from    control.processor       import Processor
 from    control.globalscontrol  import GlobalsAccess
 from    .base                   import BokehView, Action
 
@@ -166,9 +167,10 @@ class PlotCreator(GlobalsAccess):
         ctrl.addGlobalMap(self.key())
         ctrl.addGlobalMap(self.key('current'))
         ctrl.addGlobalMap("css.plot",
-                          ylabel    = u'Z',
-                          xtoplabel = u'Time',
-                          xlabel    = u'Frames')
+                          ylabel      = u'Z (nm)',
+                          yrightlabel = u'Base number',
+                          xtoplabel   = u'Time (s)',
+                          xlabel      = u'Frames')
         ctrl.addGlobalMap(self.key('css'))
 
         super().__init__(ctrl, self.key())
@@ -312,6 +314,9 @@ class PlotCreator(GlobalsAccess):
         vmax += delta
         return vmin, vmax
 
+    def observe(self):
+        "sets-up model observers"
+
 class PlotModelAccess(GlobalsAccess):
     "Contains all access to model items likely to be set by user actions"
     def __init__(self,
@@ -320,11 +325,6 @@ class PlotModelAccess(GlobalsAccess):
                  **_) -> None:
         super().__init__(ctrl, key)
         self._ctrl = getattr(ctrl, '_ctrl', ctrl)
-
-        super().__init__(ctrl, key)
-        for attr in self._cached():
-            self.project[attr].setdefault(None)
-        self.clearcache()
 
     @property
     def bead(self) -> Optional[int]:
@@ -335,6 +335,12 @@ class PlotModelAccess(GlobalsAccess):
             if track is not None:
                 return next(iter(track.beadsonly.keys()))
         return bead
+
+    def create(self, _):
+        "sets-up the model"
+        for attr in self._cached():
+            self.project[attr].setdefault(None)
+        self.clearcache()
 
     @property
     def roottask(self) -> Optional[RootTask]:
@@ -440,23 +446,15 @@ class PlotModelAccess(GlobalsAccess):
 
 class TaskAccess(PlotModelAccess):
     "access to tasks"
-    def __init__(self,
-                 ctrl       : PlotModelAccess,
-                 tasktype   : type,
-                 order      : Tuple[type,...],
-                 **kwa) -> None:
+    def __init__(self, ctrl: PlotModelAccess, tasktype: type, **kwa) -> None:
         super().__init__(ctrl)
-        side    = kwa.get('side', 'LEFT')
-        attrs   = kwa.get('attrs', {})
-        default = tasktype(**attrs)
-
-        self.defaultindex = order.index(type(default)) + (1 if side == 'RIGHT' else 0)
-        self.previous     = order[:self.defaultindex]
-        self.tasktype     = type(default)
-        self.attrs        = attrs
+        self.attrs     = kwa.get('attrs', {})
+        self.tasktype  = tasktype
+        self.side      = (0  if kwa.get('side', 'LEFT') == 'LEFT' else 1)
 
         # pylint: disable=not-callable
-        self.configroot.tasks[self.configname].default = default
+        self.configroot.tasks.order.default            = TASK_ORDER
+        self.configroot.tasks[self.configname].default = tasktype(**self.attrs)
 
     @property
     def configname(self) -> str:
@@ -495,6 +493,14 @@ class TaskAccess(PlotModelAccess):
         "returns the task if it exists"
         return next((t for t in self._ctrl.tasks(self.roottask) if self.check(t)), None)
 
+    @property
+    def processor(self) -> Optional[Processor]:
+        "returns the task if it exists"
+        task = self.task
+        if task is None:
+            return None
+        return next((t for t in self._ctrl.tasks(self.roottask) if self.check(t)), None)
+
     def check(self, task, parent = NoArgs) -> bool:
         "wether this controller deals with this task"
         if not (isinstance(task, self.tasktype) and self._check(task)):
@@ -514,9 +520,13 @@ class TaskAccess(PlotModelAccess):
     @property
     def index(self) -> Optional[Task]:
         "returns the index the new task should have"
-        tasks = tuple(self._ctrl.tasks(self.roottask))
+        order    = tuple(taskorder(self.configroot.tasks.order.get()))
+        ind      = order.index(self.tasktype) + self.side
+        previous = order[:ind]
+
+        tasks    = tuple(self._ctrl.tasks(self.roottask))
         for i, tsk in enumerate(tasks[1:]):
-            if not isinstance(tsk, self.previous):
+            if not isinstance(tsk, previous):
                 return i+1
         return len(tasks)
 
@@ -573,28 +583,38 @@ class TrackPlotCreator(PlotCreator):
 
     def create(self, doc) -> DpxKeyedRow:
         "returns the figure"
-        return self._create(doc, *self._gettrack())
+        self._model.create(doc)
+        return self._create(doc)
 
     def update(self, items:dict):
         "Updates the data"
         if not self._needsupdate(items):
             return
 
-        with self.updating():
-            self._update(items, *self._gettrack())
+        if 'track' in items:
+            self._model.clearcache()
 
-    def _create(self, doc, *args) -> DpxKeyedRow:
+        with self.updating():
+            self._update(items)
+
+    def observe(self):
+        "sets-up model observers"
+        if any(isinstance(i, TaskAccess) for i in self._model.__dict__.values()):
+            self._ctrl.observe("updatetask", "addtask", "removetask",
+                               lambda **items: self.update(items))
+        self.projectroot.observe(self.update)
+
+    def _create(self, doc) -> DpxKeyedRow:
         raise NotImplementedError()
 
-    @staticmethod
-    def _needsupdate(items):
-        return 'track' in items or 'bead' in items
+    def _needsupdate(self, items):
+        if 'parent' in items:
+            return self._model.checktask(items['parent'], items['task'])
+        else:
+            return 'track' in items or 'bead' in items
 
     def _update(self, items, *args):
         raise NotImplementedError()
-
-    def _gettrack(self) -> Tuple[Track, int]:
-        return self._model.track, self._model.bead
 
 class TrackPlotView(BokehView):
     "Track plot view"
@@ -610,10 +630,7 @@ class TrackPlotView(BokehView):
         self._plotter.close()
         self._plotter = None
 
-    def _onUpdateCurrent(self, items:dict):
-        self._plotter.update(items) # pylint: disable=no-member
-
     def getroots(self, doc):
         "adds items to doc"
-        self._ctrl.getGlobal('current').observe(self._onUpdateCurrent)
+        self._plotter.observe()
         return self._plotter.create(doc),
