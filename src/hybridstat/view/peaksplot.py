@@ -235,7 +235,7 @@ class PeaksPlotCreator(TaskPlotCreator):
                             }
         self.config.defaults = {'tools'      : 'ypan,ybox_zoom,reset,save,dpxhover'}
 
-        self._source  = ColumnDataSource()
+        self._source  = None # type: Optional[ColumnDataSource]
         self._fig     = None # type: Optional[Figure]
         self._widgets = dict(seq    = PeaksSequencePathWidget(self._model),
                              oligos = OligoListWidget(self._model),
@@ -284,8 +284,8 @@ class PeaksPlotCreator(TaskPlotCreator):
 
     def _create(self, doc):
         "returns the figure"
-        self._fig            = figure(**self._figargs())
-        self._source.data, _ = self.__data()
+        self._fig    = figure(**self._figargs())
+        self._source = ColumnDataSource(self.__data()[0])
         self._hover.create(self._fig, self._model, self)
         doc.add_root(self._hover)
 

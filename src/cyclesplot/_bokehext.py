@@ -27,7 +27,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
                                                  """)
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self._rawsource  = ColumnDataSource()
+        self._rawsource  = None # type: Optional[ColumnDataSource]
         self._rawglyph   = None # type: Optional[GlyphRenderer]
 
     @staticmethod

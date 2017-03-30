@@ -24,7 +24,7 @@ class BeadPlotCreator(TaskPlotCreator):
                                  ylabel      = u"Z",
                                  yrightlabel = u"Zmag",
                                  tooltips    = ttips)
-        self._source = ColumnDataSource()
+        self._source = None # type: Optional[ColumnDataSource]
         self._fig    = None # type: Optional[Figure]
 
     def _get(self, name):
@@ -83,7 +83,7 @@ class BeadPlotCreator(TaskPlotCreator):
     def _create(self, _) -> DpxKeyedRow:
         "sets-up the figure"
         self._fig    = figure(**self._figargs(None))
-        self._source.data = self.__data()
+        self._source = ColumnDataSource(self.__data())
         if self.css.tooltips.get() not in ('', None):
             self._fig.select(HoverTool).tooltips = self.css.tooltips.get()
 
@@ -97,7 +97,7 @@ class BeadPlotCreator(TaskPlotCreator):
         return DpxKeyedRow(self, self._fig)
 
     def _reset(self, _):
-        self._source.data  = self.__data()
+        self._source.data = self.__data()
         self._setbounds()
 
 class BeadPlotView(PlotView):

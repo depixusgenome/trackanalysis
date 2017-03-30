@@ -32,7 +32,7 @@ class HistMixin:
                                       xlabel    = u'Frames',
                                       plotwidth = 200)
 
-        self._histsource = ColumnDataSource()
+        self._histsource = None             # type: Optional[ColumnDataSource]
         self._hist       = None             # type: Optional[Figure]
         self._ticker = SequenceTicker()
 
@@ -82,8 +82,8 @@ class HistMixin:
                                   name            = 'Cycles:Hist',
                                   **self._figargs(self.css.hist))
 
-        hist                  = self.__data(data, shape)
-        self._histsource.data = hist
+        hist             = self.__data(data, shape)
+        self._histsource = ColumnDataSource(hist)
         self._hist.extra_x_ranges = {"cycles": Range1d(start = 0., end = 0.)}
 
         attrs = self.css.cycles.get()

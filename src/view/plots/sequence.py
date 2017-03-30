@@ -149,7 +149,7 @@ class SequenceHoverMixin:
     "controls keypress actions"
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.__source = ColumnDataSource()
+        self.__source = None # type: Optional[ColumnDataSource]
         self.__tool   = None # type: Optional[DpxHoverTool]
         self.__size   = None # type: Any
         self.model    = None # type: Any
@@ -210,10 +210,10 @@ class SequenceHoverMixin:
         hover = fig.select(DpxHoverTool)
         if len(hover) == 0:
             return
-        self.model         = mdl
-        self.__tool        = hover[0]
-        self.__size        = cnf.configroot.oligos.size
-        self.__source.data = self.__data()
+        self.model    = mdl
+        self.__tool   = hover[0]
+        self.__size   = cnf.configroot.oligos.size
+        self.__source = ColumnDataSource(self.__data())
 
         rend          = fig.circle(x                = 'inds',
                                    y                = 'values',
