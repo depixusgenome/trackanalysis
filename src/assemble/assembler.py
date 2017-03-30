@@ -8,11 +8,23 @@ regroups functions and classes to initialise assemblers
 import sys
 from typing import Callable, Iterable # pylint: disable=unused-import
 from multiprocessing import Pool
+import math
 import numpy
 from scipy.optimize import basinhopping,OptimizeResult
 from . import _utils as utils
-# needs fixing : each object should be pickable
-#                test NestedAsmrs
+
+# number of combinations for 4-mers and 5 nm exp precision leads to
+# 4.064499031853928e+26 possibilities with 100 possibilities  that's ~4*1e19 days.
+# for 1nm exp precision it falls down to 25936
+# proposed solution reconstruct the sequence a batch at a time.
+
+# reconstruction a batch at a time
+# if we consider an oligo-batch at a time, then:
+#     * permutation can only decrease score
+#     * adding a new batch, permutation can only occur between different batches
+
+# to add variability in (stretching,bias) for each batch (to estimate from hybridstat analyses)
+
 
 # to benchmark:
 #    * fix size of sequences, vary size of oligos and overlap
@@ -71,7 +83,7 @@ class GaussAndFlip(HoppingSteps):
             xst[flip], xst[flip+1] = xst[flip+1],xst[flip]
             return xst
 
-class OGandF(HoppingSteps):
+class OptimSwap(HoppingSteps): # not usable
     u'''trying to optimize the exploration of param space given hypotheses:
     symetric distribution of z around z0 (gaussian at the moment)
     # find the distribution which overlap (and allow permutation of oligos)
@@ -79,21 +91,30 @@ class OGandF(HoppingSteps):
     '''
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
-        self.count = 0
         self.over_dist = utils.find_overlaping_normdists(self.dists)
-        perms = []
-        self.opti_perm = {perm : utils.optimal_perm_normdists(perm,self.dists) for perm in perms}
+        # weight to draw uniformly a permutation amongst all possible
+        self.weights= numpy.array([math.factorial(len(i)) for i in self.over_dist])
     def __call__(self,xst):
-        if self.count==0:
-            self.count=1
-            return numpy.array([i.rvs(random_state=self.random_state) for i in self.dists])
-        else:
-            self.count=0
-            #flip = numpy.random.randint(len(self.over_dist))
-            #perm = numpy.random.permutation(numpy.array(self.over_dist[flip]))
-            # optimal permutation is pre computed in self.opti_perm
-            # make change to xst
-            return xst # TO CHANGE #utils.optimal_perm_normdists(perm,self.dists,xst)
+        #swap = numpy.random.choice(list(self.opti_perm))
+        #xst[list(swap)]=utils.optimal_perm_normdists(swap,self.dists)
+        return xst
+
+class OptimOligoSwap(HoppingSteps): # not yet usable
+    u'''trying to optimize the exploration of param space given hypotheses:
+    symetric distribution of z around z0 (gaussian at the moment)
+    # find the distribution which overlap (and allow permutation of oligos)
+    # when allowing permutations of oligos return the optimal solution wrt to dist(z,z0)
+    '''
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
+        self.oligos = kwargs.get("oligos",[])
+        self.over_dist = None #utils.find_overlaping_normdists(self.dists)
+        # weight to draw uniformly a permutation amongst all possible
+        #self.weights= numpy.array([math.factorial(len(i)) for i in self.over_dist])
+    def __call__(self,xst):
+        #swap = numpy.random.choice(list(self.opti_perm))
+        #xst[list(swap)]=utils.optimal_perm_normdists(swap,self.dists)
+        return xst
 
 class NestedAsmrs:
     u'''

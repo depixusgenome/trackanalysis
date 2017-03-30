@@ -7,7 +7,7 @@ regroups functions and classes to complement assembler
 
 import itertools
 from copy import deepcopy
-from typing import Callable # pylint: disable=unused-import
+from typing import Callable, List # pylint: disable=unused-import
 import scipy.stats
 import numpy
 from Bio import pairwise2
@@ -247,7 +247,7 @@ def _highest_norm_intersect(dist1,dist2):
 
 def find_overlaping_normdists(dists,nscale=2): # to pytest
     u'''
-    returns lists of indices [(i,j,k)] each element of the tuple has distrbution which overlap
+    returns lists of indices [(i,j,k)] each element of the tuple has distribution which overlap
     '''
     sdists=[(di.mean(),di.mean()-nscale*di.std(),di.mean()+nscale*di.std(),idx)\
             for idx,di in enumerate(dists)]
@@ -256,14 +256,24 @@ def find_overlaping_normdists(dists,nscale=2): # to pytest
     bounds = [(di.mean()-nscale*di.std(),idx) for idx,di in enumerate(dists)]
     bounds+= [(di.mean()+nscale*di.std(),idx) for idx,di in enumerate(dists)]
     bounds.sort()
-
+    print("bounds=",bounds[:5])
     overlaps=[]
     for regid in range(len(bounds[:-1])):
         beflag=set(idx[1] for idx in bounds[:regid+1])
         aflag = set(idx[1] for idx in bounds[regid+1:])
+
         overlaps.append(sorted(beflag.intersection(aflag)))
 
-    return [overl for overl in overlaps if len(overl)>1]
+    print("overlaps=",overlaps[:5])
+    ssets = [set(overl) for overl in overlaps if len(overl)>1]
+    ssets.sort(reverse=True)
+    print("in func ssets=",ssets[:5])
+    uset=[ssets[0]]
+    for val in ssets[1:]:
+        if val.issubset(uset[-1]):
+            continue
+        uset.append(val)
+    return ssets,uset
 
 
 
@@ -279,48 +289,21 @@ def _list_perm_bounds(perm,dists,_epsi=0.001):
             bounds[vlj].append(flag-sign*_epsi)
     return bounds
 
-def optimal_perm_normdists(perm,dists)->numpy.ndarray: # brute-force # to optimize # to finish
+def optimal_perm_normdists(perm:List,dists)->numpy.ndarray: # brute-force # to optimize # to finish
     u'''
     given a permuation perm and the known distributions of each state
     returns the permutated state which maximise the probability
     '''
     _epsi=0.001*min([dists[i].std() for i  in perm])
 
-    bounds = _list_perm_bounds(perm,dists,_epsi=_epsi)
-    # pop if the order of the permutation is not respected
-    permbounds = [bounds[pe] for pe in perm]
-    possiblep = list(itertools.product(*permbounds))
-
-    # check permutation order preserved
-    topop=[]
-    for idx, val in enumerate(possiblep):
-        if list(val)!=sorted(val):
-            topop.append(idx)
-
-    topop.reverse()
-    for idx in topop:
-        possiblep.pop(idx)
-
-    # compute the probability of each case
-    sc_perm = []
-    for idx,val in enumerate(possiblep):
-        sc_perm.append((numpy.product([dists[vlp].pdf(val[idp])
-                                       for idp,vlp in enumerate(perm)]),val))
-
-    sc_perm.sort()
-    # return the state with maximal value
-    xstate = numpy.array([i.mean() for i in dists])
-    xstate[perm]=sc_perm[-1][1]
-
     constraints=[]
     for idx in range(len(perm[:-1])):
         constraints.append({"type":"ineq",
                             "fun":SOMConstraint(idx,_epsi)})
 
-    # there is a much simpler way to find a correct x0 value
+    xinit = [dists[i].mean() for i in perm]
     fun = CostPermute(dists,perm)
-    xstate[perm]=scipy.optimize.minimize(fun,sc_perm[-1][1],constraints=constraints).x
-    return xstate
+    return scipy.optimize.minimize(fun,xinit,constraints=constraints).x
 
 
 
