@@ -41,12 +41,12 @@ def enableOnTrack(ctrl, *itms):
     for ite in itms:
         ite.disabled = True
 
-    def _oncurrent(items):
+    def _onproject(items):
         if 'track' in items:
             val = items['track'].value is items.empty
             for ite in itms:
                 ite.disabled = val
-    getattr(ctrl, '_ctrl', ctrl).getGlobal("current").observe(_oncurrent)
+    getattr(ctrl, '_ctrl', ctrl).getGlobal("project").observe(_onproject)
 
 class BokehView(View):
     "A view with a gui"

@@ -251,13 +251,14 @@ class TaskPlotCreator(PlotCreator):
     _MODEL = TaskPlotModelAccess
     def __init__(self, *args, **kwa):
         super().__init__(*args, **kwa)
-        self._ctrl.getGlobal("current").bead.default = None
+        self._ctrl.getGlobal("project").bead.default = None
         if TYPE_CHECKING:
             self._model = TaskPlotModelAccess('', '')
 
     def observe(self):
         "sets-up model observers"
         super().observe()
+
         if any(isinstance(i, TaskAccess) for i in self._model.__dict__.values()):
             self._ctrl.observe("updatetask", "addtask", "removetask",
                                lambda **items: self.reset(items))

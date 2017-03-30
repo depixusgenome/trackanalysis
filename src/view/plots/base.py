@@ -166,7 +166,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                           xtoplabel   = u'Time (s)',
                           xlabel      = u'Frames')
         ctrl.addGlobalMap('config'  + key)
-        ctrl.addGlobalMap('current' + key)
+        ctrl.addGlobalMap('project' + key)
         ctrl.addGlobalMap('css'     + key)
 
         super().__init__(ctrl, key)
@@ -350,5 +350,6 @@ class PlotView(BokehView):
 
     def getroots(self, doc):
         "adds items to doc"
+        ret = self._plotter.create(doc)
         self._plotter.observe()
-        return self._plotter.create(doc),
+        return ret,

@@ -26,7 +26,6 @@ class BeadPlotCreator(TaskPlotCreator):
                                  tooltips    = ttips)
         self._source = ColumnDataSource()
         self._fig    = None # type: Optional[Figure]
-        self._model  = None # type: Any
 
     def _get(self, name):
         return self._source.data[name] # pylint: disable=unsubscriptable-object

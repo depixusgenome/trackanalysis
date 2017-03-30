@@ -404,8 +404,8 @@ class GlobalsController(Controller):
         item.keypress.pan       .defaults = _gesture('Alt-')
         item.keypress.zoom      .defaults = _gesture('Shift-')
 
-        self.addGlobalMap('current')
-        self.addGlobalMap('current.plot')
+        self.addGlobalMap('project')
+        self.addGlobalMap('project.plot')
 
     def access(self, key: Optional[str] = None) -> GlobalsAccess:
         "returns a GlobalsAccess to a given map"
@@ -453,7 +453,7 @@ class GlobalsController(Controller):
 
         maps = {i: j._DefaultsMap__items.maps[0] # pylint: disable=protected-access
                 for i, j in self.__maps.items()
-                if 'current' not in i}
+                if 'project' not in i}
         maps = {i: j for i, j in maps.items() if len(j)}
         anastore.dump(maps, path,
                       patch  = patchname,
@@ -483,10 +483,10 @@ class GlobalsController(Controller):
         "yields all undoable user actions"
         def _onglobals(items):
             name = items.name
-            if name == 'current':
+            if name == 'project':
                 items.pop("track", None)
                 items.pop("task",  None)
-            elif name.startswith('current.plot.'):
+            elif name.startswith('project.plot.'):
                 items.pop('x', None)
                 items.pop('y', None)
 

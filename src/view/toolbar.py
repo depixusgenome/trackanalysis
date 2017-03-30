@@ -57,7 +57,7 @@ class  ToolBar(BokehView):
                 title += ':' + Path(path).stem
             doc.title = title
 
-        self._ctrl.getGlobal("current").track.observe(_title)
+        self._ctrl.getGlobal("project").track.observe(_title)
         return Row(children = self._tools, sizing_mode = 'fixed'),
 
     def close(self):

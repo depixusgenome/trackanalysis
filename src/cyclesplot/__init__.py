@@ -84,5 +84,5 @@ class CyclesPlotView(PlotView):
         tasks.default = ['alignment']
         ConfigTrackIO.setup(self._ctrl, tasks)
 
-        trk = self._ctrl.getGlobal('current').track
+        trk = self._ctrl.getGlobal('project').track
         trk.observe(lambda itm: self._ctrl.clearData(itm.old))
