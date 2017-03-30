@@ -263,11 +263,11 @@ class TaskPlotCreator(PlotCreator):
             self._ctrl.observe("updatetask", "addtask", "removetask",
                                lambda **items: self.reset(items))
 
-    def _needsreset(self, items):
+    def _needsreset(self, items) -> bool:
         if 'parent' in items:
             return self._model.checktask(items['parent'], items['task'])
         else:
-            super()._needsreset(items)
+            return super()._needsreset(items)
 
     def _create(self, doc):
         raise NotImplementedError()

@@ -324,7 +324,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                     sizing_mode    = 'stretch_both')
 
     @classmethod
-    def _needsreset(cls, items):
+    def _needsreset(cls, items) -> bool:
         return not cls._RESET.isdisjoint(items)
 
     @abstractmethod
