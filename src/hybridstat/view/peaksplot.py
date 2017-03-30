@@ -19,7 +19,7 @@ from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
 
 from view.base                  import enableOnTrack
 from view.plots                 import (PlotView, PlotAttrs, from_py_func,
-                                        WidgetCreator)
+                                        WidgetCreator, DpxKeyedRow)
 from view.plots.tasks           import (TaskPlotModelAccess, TaskPlotCreator,
                                         TaskAccess)
 from view.plots.sequence        import (readsequence, SequenceTicker,

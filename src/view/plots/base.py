@@ -126,7 +126,7 @@ class GroupWidget(WidgetCreator):
         self._widget.on_click(action(self.onclick_cb))
 
         if css.get(default = None) is not None:
-            return Paragraph(text = css.get()), self._widget
+            return [Paragraph(text = css.get()), self._widget]
         return [self._widget]
 
     def reset(self):

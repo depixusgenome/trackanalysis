@@ -6,7 +6,7 @@ from    typing         import Optional, Any   # pylint: disable=unused-import
 import  warnings
 
 from    bokeh.plotting import figure, Figure    # pylint: disable=unused-import
-from    bokeh.models   import LinearAxis, ColumnDataSource, CustomJS, Range1d
+from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 
 import  numpy        as np
 

@@ -56,7 +56,7 @@ class RawMixin:
 
         items = list(cycles)
         if len(items) == 0 or not any(len(i) for _, i in items):
-            return self.__data(None)
+            return self.__data()
 
         if self._model.eventdetection.task is None:
             res, shape = self.__normal_data(items)

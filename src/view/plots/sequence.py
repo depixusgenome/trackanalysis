@@ -188,7 +188,7 @@ class SequenceHoverMixin:
                     @internal {
                         _values: [p.Array, [0, 1]]
                     }
-                """ % ((name,)*4, atts)
+                """ % (name, name, name, name, atts)
 
     @staticmethod
     def defaultconfig() -> dict:

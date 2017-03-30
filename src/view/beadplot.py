@@ -8,9 +8,9 @@ from bokeh.plotting import figure, Figure # pylint: disable=unused-import
 from bokeh.models   import (LinearAxis, ColumnDataSource, HoverTool,
                             CustomJS, Range1d)
 
-from control            import Controller
-from .plotutils         import PlotAttrs, DpxKeyedRow, PlotView
-from .plotutils.tasks   import TaskPlotCreator
+from control        import Controller
+from .plots         import PlotAttrs, DpxKeyedRow, PlotView
+from .plots.tasks   import TaskPlotCreator
 
 class BeadPlotCreator(TaskPlotCreator):
     "Plots a default bead"
@@ -41,8 +41,8 @@ class BeadPlotCreator(TaskPlotCreator):
                     zmag = items['zmag'],
                     z    = items[bead])
 
-    def _figargs(self):
-        args = super()._figargs()
+    def _figargs(self, _):
+        args = super()._figargs(_)
         if self.css.tooltips.get() not in ('', None):
             args['tools'] += ',hover'
         args.update(x_axis_label = self.css.xlabel.get(),
@@ -83,7 +83,7 @@ class BeadPlotCreator(TaskPlotCreator):
 
     def _create(self, _) -> DpxKeyedRow:
         "sets-up the figure"
-        self._fig    = figure(**self._figargs())
+        self._fig    = figure(**self._figargs(None))
         self._source.data = self.__data()
         if self.css.tooltips.get() not in ('', None):
             self._fig.select(HoverTool).tooltips = self.css.tooltips.get()

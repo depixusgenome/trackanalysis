@@ -5,7 +5,7 @@ from types      import FunctionType
 from itertools  import product
 
 import flexx.pyscript        as     pyscript
-from bokeh.models            import Row, Model, HoverTool, Model, CustomJS
+from bokeh.models            import Row, Model, HoverTool, CustomJS
 from bokeh.plotting.figure   import Figure
 
 import  bokeh.core.properties   as     props

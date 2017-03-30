@@ -9,7 +9,7 @@ import anastore
 
 from view.toolbar               import ToolBar
 from view.beadplot              import BeadPlotView, DpxKeyedRow
-from view.cyclesplot            import CyclesPlotView
+from cyclesplot                 import CyclesPlotView
 
 def test_toolbar(bokehaction):          # pylint: disable=redefined-outer-name
     u"test the toolbar"
