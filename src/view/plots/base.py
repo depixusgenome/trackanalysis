@@ -3,6 +3,7 @@
 "The basic architecture"
 from    typing       import (Tuple, Optional, # pylint: disable=unused-import
                              Iterator, List, Union)
+from    abc          import ABCMeta, abstractmethod
 from    contextlib   import contextmanager
 from    functools    import wraps
 import  inspect
@@ -10,11 +11,11 @@ import  inspect
 import  numpy        as     np
 
 import  bokeh.palettes
-from    bokeh.models            import CustomJS, Range1d, RadioButtonGroup, Paragraph
+from    bokeh.models            import Range1d, RadioButtonGroup, Paragraph, Widget
 from    control                 import Controller
 from    control.globalscontrol  import GlobalsAccess
 from    ..base                  import BokehView, Action
-from    .bokehext               import DpxHoverTool
+from    .bokehext               import DpxHoverTool, from_py_func
 
 def checksizes(fcn):
     "Checks that the ColumnDataSource have same sizes"
@@ -90,12 +91,23 @@ class PlotAttrs:
 
         return getattr(fig, self.glyph)(**args)
 
-class WidgetCreator(GlobalsAccess):
+class WidgetCreator(GlobalsAccess, metaclass = ABCMeta):
     "Base class for creating a widget"
     def __init__(self, model:GlobalsAccess) -> None:
         super().__init__(model)
         self._model = model
         self._ctrl  = getattr(model, '_ctrl')
+
+    def observe(self):
+        "sets-up config observers"
+
+    @abstractmethod
+    def create(self, action) -> List[Widget]:
+        "Creates the widget"
+
+    @abstractmethod
+    def reset(self):
+        "resets the wiget when a new file is opened"
 
 class GroupWidget(WidgetCreator):
     "Allows creating group widgets"
@@ -104,7 +116,7 @@ class GroupWidget(WidgetCreator):
         super().__init__(model)
         self._widget  = None # type: ignore
 
-    def create(self, action):
+    def create(self, action) -> List[Widget]:
         "creates the widget"
         name = self.__class__.__name__[:-len('Creator')]
         css  = self.css.title[name.lower()]
@@ -115,18 +127,19 @@ class GroupWidget(WidgetCreator):
 
         if css.get(default = None) is not None:
             return Paragraph(text = css.get()), self._widget
-        return self._widget,
+        return [self._widget]
 
-    def update(self):
+    def reset(self):
         "updates the widget"
         self._widget.update(**self._data())
 
+    @abstractmethod
     def onclick_cb(self, value):
         "action to be performed when buttons are clicked"
-        raise NotImplementedError()
 
+    @abstractmethod
     def _data(self) -> dict:
-        raise NotImplementedError()
+        "returns  a dict of updated widget attributes"
 
 class PlotModelAccess(GlobalsAccess):
     "Default plot model"
@@ -140,9 +153,10 @@ class PlotModelAccess(GlobalsAccess):
     def create(self, _):
         "creates the model"
 
-class PlotCreator(GlobalsAccess):
+class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     "Base plotter class"
     _MODEL = PlotModelAccess
+    _RESET = frozenset(('track', 'bead'))
     def __init__(self, ctrl:Controller, *_) -> None:
         "sets up this plotter's info"
         key = ".plot." + type(self).__name__[:-len('PlotCreator')].lower()
@@ -195,7 +209,7 @@ class PlotCreator(GlobalsAccess):
     def fixreset(arng):
         "Corrects the reset bug in bokeh"
         assert isinstance(arng, Range1d)
-        @CustomJS.from_py_func
+        @from_py_func
         def _onchangebounds(cb_obj = None):
             # pylint: disable=protected-access,no-member
             if cb_obj.bounds is not None:
@@ -309,15 +323,17 @@ class PlotCreator(GlobalsAccess):
                     toolbar_sticky = False,
                     sizing_mode    = 'stretch_both')
 
-    @staticmethod
-    def _needsreset(items):
-        return 'track' in items or 'bead' in items
+    @classmethod
+    def _needsreset(cls, items):
+        return not cls._RESET.isdisjoint(items)
 
+    @abstractmethod
     def _create(self, doc):
-        raise NotImplementedError()
+        "creates the plot structure"
 
+    @abstractmethod
     def _reset(self, items, *args):
-        raise NotImplementedError()
+        "initializes the plot for a new file"
 
 class PlotView(BokehView):
     "plot view"

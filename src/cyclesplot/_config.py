@@ -28,12 +28,16 @@ class PeaksTableWidget(_Widget):
         self.__hover  = None # type: DpxHoverModel
         self.css.defaults = {'tableheight': 100, 'title.table': u'dna ↔ nm'}
 
-    def create(self, hover):
+    def addinfo(self, hover):
+        "adds info to the widget"
+        self.__hover = hover
+
+    def create(self, action) -> List[Widget]:
         "creates the widget"
         height = self.css.tableheight.get()
         width  = self.css.inputwidth.get()
         cols   = [TableColumn(field  = 'bases',
-                              title  = self.css.hist.ylabel.get(),
+                              title  = self.css.yrightlabel.get(),
                               editor = IntEditor(),
                               width  = width//2),
                   TableColumn(field  = 'z',
@@ -41,8 +45,6 @@ class PeaksTableWidget(_Widget):
                               editor = NumberEditor(step = 1e-4),
                               width  = width//2)]
 
-
-        self.__hover  = hover
         self.__widget = DataTable(source      = ColumnDataSource(self.__data()),
                                   columns     = cols,
                                   editable    = True,
@@ -50,14 +52,7 @@ class PeaksTableWidget(_Widget):
                                   width       = width,
                                   height      = height,
                                   name        = "Cycles:Peaks")
-        return Paragraph(text = self.css.title.table.get()), self.__widget
 
-    def reset(self):
-        "updates the widget"
-        self.__widget.source.data = self.__data()
-
-    def callbacks(self, action, stretch, bias):
-        "adding callbacks"
         @action
         def _py_cb(attr, old, new):
             zval  = self.__widget.source.data['z']
@@ -71,16 +66,20 @@ class PeaksTableWidget(_Widget):
             self._model.stretch = (zval[1]-zval[0]) / (bases[1]-bases[0])
             self._model.bias    = zval[0] - bases[0]*self._model.stretch
 
-        source = self.__widget.source
-        source.on_change("data", _py_cb) # pylint: disable=no-member
+        self.__widget.source.on_change("data", _py_cb) # pylint: disable=no-member
+        return [Paragraph(text = self.css.title.table.get()), self.__widget]
 
-        obs = lambda: setattr(source, 'data', self.__data())
-        self.config.sequence.peaks.observe(obs)
-        self.configroot.observe(('oligos', 'last.path.fasta'), obs)
-        self.project.sequence.key.observe(obs)
+    def reset(self):
+        "updates the widget"
+        self.__widget.source.data = self.__data()
 
-        hover  = self.__hover
+    def observe(self):
+        "sets-up config observers"
+        self._model.observeprop('oligos', 'sequencepath', 'sequencekey', self.reset)
 
+    def callbacks(self, stretch, bias):
+        "adding callbacks"
+        hover = self.__hover
         @CustomJS.from_py_func
         def _js_cb(cb_obj = None, mdl = hover, stretch = stretch, bias = bias):
             if mdl.updating != '':
@@ -99,7 +98,8 @@ class PeaksTableWidget(_Widget):
             mdl.bias      = bval
             mdl.updating = 'peaks'
             mdl.updating = ''
-        source.js_on_change("data", _js_cb) # pylint: disable=no-member
+
+        self.__widget.source.js_on_change("data", _js_cb) # pylint: disable=no-member
 
     def __data(self):
         info = self._model.peaks
@@ -119,6 +119,18 @@ class PeaksTableWidget(_Widget):
 
         return dict(bases = info[:2], z = info[2:])
 
+class CyclesSequencePathWidget(SequencePathWidget):
+    "SequencePathWidget for cycles"
+    def observe(self):
+        "sets-up config observers"
+        self._model.observeprop('sequencekey', 'sequencepath', self.reset)
+
+class CyclesOligoListWidget(OligoListWidget):
+    "OligoListWidget for cycles"
+    def observe(self):
+        "sets-up config observers"
+        self._model.observeprop('oligos', self.reset)
+
 class ConversionSlidersWidget(_Widget):
     "Sliders for managing stretch and bias factors"
     def __init__(self, model:PlotModelAccess) -> None:
@@ -129,7 +141,11 @@ class ConversionSlidersWidget(_Widget):
         self.css.defaults = {'title.stretch' : u'stretch 10³[dna/nm]',
                              'title.bias'    : u'bias [nm]'}
 
-    def create(self, figdata):
+    def addinfo(self, histsource):
+        "adds info to the widget"
+        self.__figdata = histsource
+
+    def create(self, action) -> List[Widget]:
         "creates the widget"
         widget = lambda x, s, e, n: Slider(value = getattr(self._model, x),
                                            title = self.css.title[x].get(),
@@ -140,8 +156,15 @@ class ConversionSlidersWidget(_Widget):
         vals = tuple(self.config.base.stretch.get('start', 'end'))
         self.__stretch = widget('stretch', vals[0]*1e3, vals[1]*1e3, 'Cycles:Stretch')
         self.__bias    = widget('bias', -1., 1., 'Cycles:Bias')
-        self.__figdata = figdata
-        return self.__stretch, self.__bias
+
+        def _py_stretch_cb(attr, old, new):
+            self._model.stretch = new*1e-3
+        self.__stretch.on_change('value', action(_py_stretch_cb))
+
+        def _py_bias_cb(attr, old, new):
+            self._model.bias = new
+        self.__bias.on_change('value', action(_py_bias_cb))
+        return [self.__stretch, self.__bias]
 
     def reset(self):
         "updates the widgets"
@@ -153,23 +176,14 @@ class ConversionSlidersWidget(_Widget):
                            end   = minv+delta*ratio)
         self.__stretch.value = self._model.stretch*1e3
 
-    def callbacks(self, action, hover, table):
+    def observe(self):
+        "sets-up config observers"
+        self._model.observeprop('stretch', 'bias', self.reset)
+
+    def callbacks(self, hover, table):
         "adding callbacks"
-        self.config .base.observe(('stretch', 'bias'), self.reset)
-        self.project.base.observe(('stretch', 'bias'), self.reset)
-
         stretch, bias = self.__stretch, self.__bias
-
-        # pylint: disable=function-redefined
-        def _py_cb(attr, old, new):
-            self._model.stretch = new*1e-3
-        stretch.on_change('value', action(_py_cb))
-
-        def _py_cb(attr, old, new):
-            self._model.bias = new
-        bias   .on_change('value', action(_py_cb))
-
-        source = table.source
+        source        = table.source
         @CustomJS.from_py_func
         def _js_cb(stretch = stretch, bias = bias, mdl = hover, source = source):
             if mdl.updating != '':
@@ -254,36 +268,34 @@ class EventDetectionWidget(GroupWidget):
 class ConfigMixin:
     "Everything dealing with config"
     def __init__(self):
-        self.__table   = PeaksTableWidget(self._model)
-        self.__sliders = ConversionSlidersWidget(self._model)
-        self.__seq     = SequencePathWidget(self._model)
-        self.__oligs   = OligoListWidget(self._model)
-        self.__align   = AlignmentWidget(self._model)
-        self.__drift   = DriftWidget(self._model)
-        self.__events  = EventDetectionWidget(self._model)
+        self.__widget  = dict(table   = PeaksTableWidget(self._model),
+                              sliders = ConversionSlidersWidget(self._model),
+                              seq     = CyclesSequencePathWidget(self._model),
+                              oligs   = CyclesOligoListWidget(self._model),
+                              align   = AlignmentWidget(self._model),
+                              drift   = DriftWidget(self._model),
+                              events  = EventDetectionWidget(self._model))
         self.css.inputwidth.default = 205
 
     def _createconfig(self):
-        stretch, bias  = self.__sliders.create(self._histsource)
-        table          = self.__table  .create(self._hover)
-        oligos         = self.__oligs  .create(self.action)
-        parseq,  seq   = self.__seq    .create(self.action)
+        self.__widgets['sliders'].addinfo(self._histsource)
+        self.__widgets['table']  .addinfo(self._hover)
 
-        align  = self.__align  .create(self.action)
-        drift  = self.__drift  .create(self.action)
-        events = self.__events .create(self.action)
+        widgets = {i: j.create(self.action) for i, j in self.__widgets.items()}
+        for widget in self.__widgets.values():
+            widget.observe()
 
-        enableOnTrack(self, self._hist, self._raw,
-                      *(i for i in locals().values() if isinstance(i, Widget)))
+        enableOnTrack(self, self._hist, self._raw, *widgets.values())
 
-        self.__seq    .callbacks(self._hover.source, self._ticker)
-        self.__sliders.callbacks(self.action, self._hover, table[1])
-        self.__table  .callbacks(self.action, stretch, bias)
-        return layouts.layout([[layouts.widgetbox([parseq, seq, oligos]),
-                                layouts.widgetbox([bias, stretch]),
-                                layouts.widgetbox([*table])],
-                               [layouts.widgetbox([*i])
-                                for i in (align, drift, events)]])
+        self.__widgets['seq']    .callbacks(self._hover.source, self._ticker)
+        self.__widgets['sliders'].callbacks(self._hover, widgets['table'][1])
+        self.__widgets['table']  .callbacks(*widgets['sliders'])
+
+        return layouts.layout([[layouts.widgetbox(widgets['seq']+widgets['oligos']),
+                                layouts.widgetbox(widgets['sliders']),
+                                layouts.widgetbox(widgets['table'])],
+                               [layouts.widgetbox(widgets[i])
+                                for i in ('align', 'drift', 'events')]])
 
     def _resetconfig(self):
         for ite in self.__dict__.values():

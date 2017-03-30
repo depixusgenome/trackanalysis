@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 "Utils for dealing with the JS side of the view"
 from    typing       import (Tuple, Optional, # pylint: disable =unused-import
-                             Iterator, List, Union, Any, TYPE_CHECKING)
+                             Iterator, List, Union, Any, Callable, Dict,
+                             TYPE_CHECKING)
 import  inspect
 from    model.task              import RootTask, Task, taskorder, TASK_ORDER
 from    data.track              import Track
@@ -76,6 +77,22 @@ class TaskPlotModelAccess(PlotModelAccess):
             return self.checktask(parent, task)
         self._ctrl.observe(*args, argstest = _check, **kwa)
 
+    def observeprop(self, *args):
+        "observe an attribute set through props"
+        fcn   = next (i for i in args if callable(i))
+        attrs = tuple(i for i in args if isinstance(i, str))
+        assert len(attrs) + 1 == len(args)
+
+        keys = dict() # type: Dict[str, List[str]]
+        cls  = type(self)
+        for attr in attrs:
+            prop = getattr(cls, attr)
+            for obs in prop.OBSERVERS:
+                keys.setdefault(obs, []).append(prop.KEY)
+
+        for key, items in keys.items():
+            getattr(self, key).observe(items, fcn)
+
     class _Props:
         @staticmethod
         def configroot(attr):
@@ -87,8 +104,11 @@ class TaskPlotModelAccess(PlotModelAccess):
             def _setter(self, val):
                 return self.configroot[attr].set(val)
 
-            hmsg  = "link to config's {}".format(attr)
-            return property(_getter, _setter, None, hmsg)
+            hmsg          = "link to root config's {}".format(attr)
+            ret           = property(_getter, _setter, None, hmsg)
+            ret.KEY       = attr
+            ret.OBSERVERS = ('configroot',)
+            return ret
 
         @staticmethod
         def config(attr):
@@ -99,8 +119,11 @@ class TaskPlotModelAccess(PlotModelAccess):
             def _setter(self, val):
                 self.config[attr].set(val)
 
-            hmsg  = "link to config's {}".format(attr)
-            return property(_getter, _setter, None, hmsg)
+            hmsg          = "link to config's {}".format(attr)
+            ret           = property(_getter, _setter, None, hmsg)
+            ret.KEY       = attr
+            ret.OBSERVERS = ('config',)
+            return ret
 
         @staticmethod
         def bead(attr):
@@ -117,10 +140,11 @@ class TaskPlotModelAccess(PlotModelAccess):
                     cache.pop(self.bead, None)
                 else:
                     cache[self.bead] = val
-            hmsg     = "link to config's {}".format(attr)
-            prop     = property(_getter, _setter, None, hmsg)
-            prop.KEY = attr
-            return prop
+            hmsg          = "link to config's {}".format(attr)
+            ret           = property(_getter, _setter, None, hmsg)
+            ret.KEY       = attr
+            ret.OBSERVERS = ('config', 'project')
+            return ret
 
     props = _Props()
     del _Props

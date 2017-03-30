@@ -19,8 +19,8 @@ import  sequences
 from    utils           import CachedIO
 
 from   ..dialog         import FileDialog
-from    .base           import checksizes, WidgetCreator, from_py_func
-from    .bokehext       import DpxHoverTool
+from    .base           import checksizes, WidgetCreator
+from    .bokehext       import DpxHoverTool, from_py_func
 
 _CACHE = CachedIO(lambda path: OrderedDict(sequences.read(path)), size = 1)
 def readsequence(path):
@@ -110,8 +110,6 @@ class SequenceTicker(ContinuousTicker):
                                   ticker       = self.__axis),
                        'right')
 
-        cnf.configroot.observe(('oligos', 'last.path.fasta'), self.reset)
-
     @staticmethod
     def defaultconfig() -> dict:
         "default config"
@@ -183,7 +181,8 @@ class SequenceHoverMixin:
                         %s
                         framerate : [p.Number, 1],
                         stretch   : [p.Number, 0],
-                        bias      : [p.Number, 0]
+                        bias      : [p.Number, 0],
+                        updating  : [p.String, ''],
                     }
 
                     @internal {
@@ -229,18 +228,29 @@ class SequenceHoverMixin:
         self.__tool.update(tooltips  = cnf.css.tooltips.get(),
                            mode      = 'hline',
                            renderers = rend)
-        return self.__source
 
-    def resetsource(self):
+        src = self.__source
+        fig = self._fig
+        @from_py_func
+        def _js_cb(src = src, fig = fig, cb_obj = None, window = None):
+            if cb_obj.updating == '':
+                return
+
+            values = cb_obj.bias, cb_obj.stretch
+            window.setTimeout(lambda a, b, c: a.setsrc(b, c), 500, cb_obj, src, values)
+            bases       = fig.extra_y_ranges['bases']
+            yrng        = fig.y_range
+            bases.start = (yrng.start-cb_obj.bias)/cb_obj.stretch
+            bases.end   = (yrng.end  -cb_obj.bias)/cb_obj.stretch
+
+        self.js_on_change("updating", _js_cb)
+
+    def reset(self, **kwa):
         "updates the tooltips for a new file"
         if self.__tool is None:
             return
 
         self.__source.data = self.__data()
-
-    def reset(self, **kwa):
-        "updates the tooltips for a new file"
-        self.resetsource()
         kwa.setdefault('framerate', getattr(self.model.track, 'framerate', 1./30.))
         kwa.setdefault('bias',      self.model.bias)
         kwa.setdefault('stretch',   self.model.stretch)
@@ -327,9 +337,7 @@ class SequencePathWidget(WidgetCreator):
                         'title.sequence.missing.key' : u'Select sequence',
                         'title.sequence.missing.path': u'Find path'}
 
-    def create(self, action,
-               hover: Optional[SequenceHoverMixin] = None,
-               tick : Optional[SequenceTicker]     = None):
+    def create(self, action):
         "creates the widget"
         css = self._ctrl.getGlobal("css.plots")
         self.__dialog = FileDialog(filetypes = 'fasta|*',
@@ -339,7 +347,19 @@ class SequencePathWidget(WidgetCreator):
         self.__widget = Dropdown(name  = 'Cycles:Sequence',
                                  width = css.inputwidth.get(),
                                  **self.__data())
-        self.__observe(action)
+        @action
+        def _py_cb(new):
+            if new in self.__list:
+                self._model.sequencekey = new
+            elif new == '←':
+                path = self.__dialog.open()
+                seqs = readsequence(path)
+                if len(seqs) > 0:
+                    self._model.sequencepath = path
+                    self._model.sequencekey  = next(iter(seqs))
+                else:
+                    self.__widget.value = '→'
+        self.__widget.on_click(_py_cb)
         return Paragraph(text = css.title.sequence.get()), self.__widget
 
     def reset(self):
@@ -359,11 +379,16 @@ class SequencePathWidget(WidgetCreator):
                 src.data['text'] = src.data[cb_obj.value]
                 src.trigger("change")
         self.__widget.js_on_change('value', _js_cb)
+        return self.__widget
+
+    @staticmethod
+    def _sort(lst) -> List[str]:
+        return sorted(lst)
 
     def __data(self) -> dict:
         lst = self.__list
         lst.clear()
-        lst.extend(sorted(readsequence(self._model.sequencepath).keys()))
+        lst.extend(self._sort(sorted(readsequence(self._model.sequencepath).keys())))
 
         key   = self._model.sequencekey
         val   = key if key in lst else None
@@ -378,25 +403,6 @@ class SequencePathWidget(WidgetCreator):
         return dict(menu  = menu,
                     label = title if val is None else key,
                     value = '→'   if val is None else val)
-
-    def __observe(self, action):
-        @action
-        def _py_cb(new):
-            if new in self.__list:
-                self._model.sequencekey = new
-            elif new == '←':
-                path = self.__dialog.open()
-                seqs = readsequence(path)
-                if len(seqs) > 0:
-                    self._model.sequencepath = path
-                    self._model.sequencekey  = next(iter(seqs))
-                else:
-                    self.__widget.value = '→'
-        self.__widget.on_click(_py_cb)
-
-        obs = lambda: self.__widget.update(**self.__data())
-        self.config.sequence.key.observe(obs)
-        self.configroot.last.path.fasta.observe(obs)
 
 class OligoListWidget(WidgetCreator):
     "Input for defining a list of oligos"
@@ -413,20 +419,7 @@ class OligoListWidget(WidgetCreator):
                                           title       = self.css.title.oligos.get(),
                                           width       = self.css.inputwidth.get(),
                                           name        = 'Cycles:Oligos')
-        self.__observe(action)
-        return self.__widget
 
-    def reset(self):
-        "updates the widget"
-        self.__widget.update(**self.__data())
-
-    def __data(self):
-        hist = self.configroot.oligos.history.get()
-        lst  = [', '.join(sorted(j.lower() for j in i)) for i in hist]
-        ols  = ', '.join(sorted(j.lower() for j in self._model.oligos))
-        return dict(value = ols, completions = lst)
-
-    def __observe(self, action):
         widget = self.__widget
         match  = re.compile(r'(?:[^atgc]*)([atgc]+)(?:[^atgc]+|$)*',
                             re.IGNORECASE).findall
@@ -439,4 +432,14 @@ class OligoListWidget(WidgetCreator):
             self._model.oligos = ols
 
         widget.on_change('value', _py_cb)
-        self.configroot.oligos.observe(self.reset)
+        return self.__widget
+
+    def reset(self):
+        "updates the widget"
+        self.__widget.update(**self.__data())
+
+    def __data(self):
+        hist = self.configroot.oligos.history.get()
+        lst  = [', '.join(sorted(j.lower() for j in i)) for i in hist]
+        ols  = ', '.join(sorted(j.lower() for j in self._model.oligos))
+        return dict(value = ols, completions = lst)

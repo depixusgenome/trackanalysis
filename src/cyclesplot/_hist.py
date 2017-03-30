@@ -105,6 +105,8 @@ class HistMixin:
                     x_range_name = "cycles")
 
         self._ticker.create(self._hist, self._model, self)
+        self._model.observeprop('oligos', 'sequencepath', self._ticker.create)
+
         self._hover.createhist(self._hist, self._model, self)
         self._hover.slaveaxes(self._hist, self._histsource, "cycles", "bottom")
 
