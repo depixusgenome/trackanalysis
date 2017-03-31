@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # encoding: utf-8
+from pathlib import Path
 try:
     import wafbuilder as builder
 except ImportError:
     raise ImportError("Don't forget to clone wafbuilder!!")
 import wafbuilder.git as git
-from waflib.Build       import BuildContext
+from waflib.Build       import BuildContext, Context
 from waflib.Configure   import ConfigurationContext
 
 require(cxx    = {'msvc'     : 14.0,
@@ -111,8 +112,9 @@ def environment(cnf):
     u"prints the environment variables for current configuration"
     print(cnf.env)
 
-class _Requirements(BuildContext):
+class _Requirements(BuildContext if Path('build/c4che').exists() else ConfigurationContext):
     fun = cmd = 'requirements'
+
 def requirements(cnf):
     u"prints requirements"
     _getmodules(cnf)
@@ -125,9 +127,8 @@ def condaenv(cnf):
     _getmodules(cnf)
     builder.condaenv('trackanalysis')
 
-class _CondaSetup(BuildContext):
+class _CondaSetup(BuildContext if Path('build/c4che').exists() else ConfigurationContext):
     fun = cmd = 'setup'
-
 def setup(cnf):
     u"prints requirements"
     _getmodules(cnf)
