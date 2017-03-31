@@ -292,12 +292,15 @@ class SequenceHoverMixin:
             if ind1 >= ind2:
                 cycles.end = 0
                 frames.end = 0
+            elif inpy is not None:
+                frames.end = np.max(src.data['frames'][ind1:ind2])+1
+                cycles.end = np.max(src.data['cycles'][ind1:ind2])+1
             else:
                 frames.end = window.Math.max.apply(None, src.data['frames'][ind1:ind2])+1
                 cycles.end = window.Math.max.apply(None, src.data['cycles'][ind1:ind2])+1
 
         if inpy:
-            _onchangebounds(window = type('_Dummy', (), {'Math': np}))
+            _onchangebounds()
         else:
             fig.y_range.callback = from_py_func(_onchangebounds)
 

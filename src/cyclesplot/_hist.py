@@ -42,7 +42,7 @@ class HistMixin:
         zeros = np.zeros((1,), dtype = 'f4')
         items = zeros,
         if shape != (1, 2):
-            phase = self.getRootConfig().phase.measure.get()
+            phase = self.configroot.phase.measure.get()
             zvals = data['z'].reshape(shape)
             if self._model.eventdetection.task is None:
                 track = self._model.track

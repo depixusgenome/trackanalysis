@@ -55,7 +55,6 @@ class RawMixin:
                     (1, 2))
 
         items = list(cycles)
-        print(items)
         if len(items) == 0 or not any(len(i) for _, i in items):
             return self.__data()
 
