@@ -105,12 +105,15 @@ class TaskAccess(TaskPlotModelAccess):
 
         # pylint: disable=not-callable
         self.configroot.tasks.order.default            = TASK_ORDER
+
+        cur = self.configroot.tasks.get(self.configname, default = None)
+        assert cur is None or isinstance(cur, tasktype)
         self.configroot.tasks[self.configname].default = tasktype(**self.attrs)
 
     @property
     def configname(self) -> str:
         "returns the config name"
-        return self.__class__.__name__.lower()[:-len('Access')]
+        return self.tasktype.__name__.lower()[:-len('Task')]
 
     @property
     def configtask(self) -> Task:

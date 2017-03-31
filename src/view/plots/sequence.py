@@ -232,6 +232,7 @@ class SequenceHoverMixin:
         src = self.__source
         @from_py_func
         def _js_cb(src = src, fig = fig, cb_obj = None, window = None):
+            print(cb_obj, cb_obj.updating)
             if cb_obj.updating == '':
                 return
 
@@ -259,12 +260,7 @@ class SequenceHoverMixin:
         "slaves a histogram's axes to its y-axis"
         # pylint: disable=too-many-arguments,protected-access
         hvr = self
-        def _onchangebounds(fig    = fig,
-                            hvr    = hvr,
-                            src    = src,
-                            extra  = extra,
-                            data   = data,
-                            window = None):
+        def _onchangebounds(fig = fig, hvr = hvr, src = src, window = None):
             yrng = fig.y_range
             if hasattr(yrng, '_initial_start') and yrng.bounds is not None:
                 yrng._initial_start = yrng.bounds[0]
@@ -302,7 +298,7 @@ class SequenceHoverMixin:
         if inpy:
             _onchangebounds()
         else:
-            fig.y_range.callback = from_py_func(_onchangebounds)
+            fig.y_range.callback = from_py_func(_onchangebounds, extra = extra, data = data)
 
     @checksizes
     def __data(self):

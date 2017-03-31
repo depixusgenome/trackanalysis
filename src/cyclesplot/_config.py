@@ -156,6 +156,7 @@ class ConversionSlidersWidget(_Widget):
 
         vals = tuple(self.config.base.stretch.get('start', 'end'))
         self.__stretch = widget('stretch', vals[0]*1e3, vals[1]*1e3, 'Cycles:Stretch')
+        self.__stretch.value *= 1e3
         self.__bias    = widget('bias', -1., 1., 'Cycles:Bias')
 
         def _py_stretch_cb(attr, old, new):
@@ -299,9 +300,8 @@ class ConfigMixin:
                                 for i in ('align', 'drift', 'events')]])
 
     def _resetconfig(self):
-        for ite in self.__dict__.values():
-            if isinstance(ite, _Widget):
-                ite.reset()
+        for ite in self.__widgets.values():
+            ite.reset()
 
     if TYPE_CHECKING:
         # pylint: disable=no-self-use,unused-argument

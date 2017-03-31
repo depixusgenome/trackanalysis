@@ -270,7 +270,7 @@ class TaskController(Controller):
         def _onUpdateTask(controller = _1, parent = _1, task = _1,  old = _1, **_):
             return lambda: controller.updateTask(parent, task, **old)
 
-        def _onDeleteTask(controller = _1, parent = _1, task = _1,  old = _1, **_):
+        def _onRemoveTask(controller = _1, parent = _1, task = _1,  old = _1, **_):
             ind = old.index(task)
             return lambda: controller.addTask(parent, task, ind)
 

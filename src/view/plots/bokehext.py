@@ -1,31 +1,35 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Basic bokeh models for dealing with it's idiosyncraties"
-from types      import FunctionType
-from itertools  import product
+from itertools               import product
+import re
 
-import flexx.pyscript        as     pyscript
 from bokeh.models            import Row, Model, HoverTool, CustomJS
 from bokeh.plotting.figure   import Figure
 
-import  bokeh.core.properties   as     props
+import bokeh.core.properties   as     props
 
-def from_py_func(func):
+def from_py_func(func, **kwa):
     """ Create a CustomJS instance from a Python function. The
     function is translated to Python using PyScript.
     """
-    if not isinstance(func, FunctionType):
-        raise ValueError('CustomJS.from_py_func needs function object.')
+    def _isgood(val):
+        if isinstance(val, dict):
+            return (all(isinstance(i, str) for i in val)
+                    and all(_isgood(i) for i in val.items()))
+        elif isinstance(val, (tuple, list)):
+            val = list(val)
+            return all(_isgood(i) for i in val)
+        return isinstance(val, (float, int, str))
 
-    # Collect default values
-    default_values = func.__defaults__  # Python 2.6+
-    default_names  = func.__code__.co_varnames[:len(default_values)]
-    args = dict(i for i in zip(default_names, default_values) if isinstance(i[1], Model))
-
-    # Get JS code, we could rip out the function def, or just
-    # call the function. We do the latter.
-    code = pyscript.py2js(func, 'cb') + 'cb(%s);\n' % ', '.join(args)
-    return CustomJS(code=code, args=args)
+    cust = CustomJS.from_py_func(func)
+    for name, val in kwa.items():
+        assert _isgood(val)
+        cust.code = re.sub(r'(\W)%s(\W)' % name,
+                           # pylint: disable=cell-var-from-loop
+                           lambda x: x.group(1)+repr(val)+x.group(2),
+                           cust.code)
+    return cust
 
 class DpxKeyedRow(Row):
     "define div with tabIndex"
