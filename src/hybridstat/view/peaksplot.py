@@ -82,7 +82,7 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
                                                  ''')
     def reset(self, **kwa):
         "Creates the hover tool for histograms"
-        fits = self.model.fits
+        fits = self._model.fits
         if fits is None:
             kwa['biases'] = kwa['stretches'] = {}
         else:

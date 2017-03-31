@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 "Widgets for configuration"
 
-from   typing          import (Optional, List,    # pylint: disable=unused-import
-                               Tuple, TYPE_CHECKING)
+from    typing          import (Optional, List,    # pylint: disable=unused-import
+                                Tuple, TYPE_CHECKING)
+from    itertools      import chain
 
 from    bokeh          import layouts
 from    bokeh.models   import (ColumnDataSource,  # pylint: disable=unused-import
@@ -35,7 +36,7 @@ class PeaksTableWidget(_Widget):
     def create(self, action) -> List[Widget]:
         "creates the widget"
         height = self.css.tableheight.get()
-        width  = self.css.inputwidth.get()
+        width  = self.css.input.width.get()
         cols   = [TableColumn(field  = 'bases',
                               title  = self.css.yrightlabel.get(),
                               editor = IntEditor(),
@@ -150,7 +151,7 @@ class ConversionSlidersWidget(_Widget):
         widget = lambda x, s, e, n: Slider(value = getattr(self._model, x),
                                            title = self.css.title[x].get(),
                                            step  = self.config.base[x].step.get(),
-                                           width = self.css.inputwidth.get(),
+                                           width = self.css.input.width.get(),
                                            start = s, end = e, name = n)
 
         vals = tuple(self.config.base.stretch.get('start', 'end'))
@@ -268,14 +269,14 @@ class EventDetectionWidget(GroupWidget):
 class ConfigMixin:
     "Everything dealing with config"
     def __init__(self):
-        self.__widget  = dict(table   = PeaksTableWidget(self._model),
+        self.css.input.width.default = 205
+        self.__widgets = dict(table   = PeaksTableWidget(self._model),
                               sliders = ConversionSlidersWidget(self._model),
                               seq     = CyclesSequencePathWidget(self._model),
-                              oligs   = CyclesOligoListWidget(self._model),
+                              oligos  = CyclesOligoListWidget(self._model),
                               align   = AlignmentWidget(self._model),
                               drift   = DriftWidget(self._model),
                               events  = EventDetectionWidget(self._model))
-        self.css.inputwidth.default = 205
 
     def _createconfig(self):
         self.__widgets['sliders'].addinfo(self._histsource)
@@ -285,9 +286,9 @@ class ConfigMixin:
         for widget in self.__widgets.values():
             widget.observe()
 
-        enableOnTrack(self, self._hist, self._raw, *widgets.values())
+        enableOnTrack(self, self._hist, self._raw, *chain(*widgets.values()))
 
-        self.__widgets['seq']    .callbacks(self._hover.source, self._ticker)
+        self.__widgets['seq']    .callbacks(self._hover, self._ticker)
         self.__widgets['sliders'].callbacks(self._hover, widgets['table'][1])
         self.__widgets['table']  .callbacks(*widgets['sliders'])
 

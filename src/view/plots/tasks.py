@@ -14,10 +14,6 @@ from .base             import PlotModelAccess, PlotCreator
 
 class TaskPlotModelAccess(PlotModelAccess):
     "Contains all access to model items likely to be set by user actions"
-    def __init__(self, *_1, **_2):
-        "sets-up the model"
-        super().__init__(*_1, **_2)
-
     @property
     def bead(self) -> Optional[int]:
         "returns the current bead number"

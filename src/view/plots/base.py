@@ -118,7 +118,7 @@ class GroupWidget(WidgetCreator):
 
     def create(self, action) -> List[Widget]:
         "creates the widget"
-        name = self.__class__.__name__[:-len('Creator')]
+        name = self.__class__.__name__.replace('Widget', '').replace('Creator', '')
         css  = self.css.title[name.lower()]
         self._widget = self.INPUT(labels = css.labels.get(),
                                   name   = 'Cycles:'+name,

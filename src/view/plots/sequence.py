@@ -12,7 +12,7 @@ from    bokeh.models    import (LinearAxis,      # pylint: disable=unused-import
                                 Model, ColumnDataSource, Range1d,
                                 ContinuousTicker, BasicTicker, Ticker,
                                 Dropdown, Paragraph, AutocompleteInput,
-                                CustomJS)
+                                CustomJS, Widget)
 
 import  sequences
 
@@ -192,8 +192,8 @@ class SequenceHoverMixin:
     @staticmethod
     def defaultconfig() -> dict:
         "default config"
-        return { 'hist.tooltips.radius': 1.,
-                 'hist.tooltips'       : u'@z{1.1111} ↔ @values: @text'}
+        return { 'sequence.tooltips.radius': 1.,
+                 'sequence.tooltips'       : u'@z{1.1111} ↔ @values: @text'}
 
     @property
     def source(self):
@@ -203,7 +203,7 @@ class SequenceHoverMixin:
     def create(self, fig, mdl, cnf):
         "Creates the hover tool for histograms"
         self.update(framerate = 1./30.,
-                    bias      = mdl.bias,
+                    bias      = mdl.bias if mdl.bias is not None else 0.,
                     stretch   = mdl.stretch)
 
         hover = fig.select(DpxHoverTool)
@@ -214,22 +214,22 @@ class SequenceHoverMixin:
         self.__size   = cnf.configroot.oligos.size
         self.__source = ColumnDataSource(self.__data())
 
+        css           = cnf.css.sequence.tooltips
         rend          = fig.circle(x                = 'inds',
                                    y                = 'values',
                                    source           = self.__source,
-                                   radius           = cnf.css.tooltips.radius.get(),
+                                   radius           = css.radius.get(),
                                    radius_dimension = 'y',
                                    line_alpha       = 0.,
                                    fill_alpha       = 0.,
                                    x_range_name     = 'cycles',
                                    y_range_name     = 'bases',
                                    visible          = False)
-        self.__tool.update(tooltips  = cnf.css.tooltips.get(),
+        self.__tool.update(tooltips  = css.get(),
                            mode      = 'hline',
-                           renderers = rend)
+                           renderers = [rend])
 
         src = self.__source
-        fig = self._fig
         @from_py_func
         def _js_cb(src = src, fig = fig, cb_obj = None, window = None):
             if cb_obj.updating == '':
@@ -336,15 +336,15 @@ class SequencePathWidget(WidgetCreator):
                         'sequence.missing.key' : u'Select sequence',
                         'sequence.missing.path': u'Find path'}
 
-    def create(self, action):
+    def create(self, action) -> List[Widget]:
         "creates the widget"
-        css = self._ctrl.getGlobal("css.plots")
+        css = self._ctrl.getGlobal("css.plot")
         self.__dialog = FileDialog(filetypes = 'fasta|*',
                                    config    = self._ctrl,
                                    title     = css.title.fasta.get())
 
         self.__widget = Dropdown(name  = 'Cycles:Sequence',
-                                 width = css.inputwidth.get(),
+                                 width = css.input.width.get(),
                                  **self.__data())
         @action
         def _py_cb(new):
@@ -359,7 +359,7 @@ class SequencePathWidget(WidgetCreator):
                 else:
                     self.__widget.value = '→'
         self.__widget.on_click(_py_cb)
-        return Paragraph(text = css.title.sequence.get()), self.__widget
+        return [Paragraph(text = css.title.sequence.get()), self.__widget]
 
     def reset(self):
         "updates the widget"
@@ -392,7 +392,7 @@ class SequencePathWidget(WidgetCreator):
         key   = self._model.sequencekey
         val   = key if key in lst else None
         menu  = [(i, i) for i in lst] if len(lst) else []  # type: List[Optional[Tuple[str,str]]]
-        css   = self._ctrl.getGlobal("css.plots").title.sequence
+        css   = self._ctrl.getGlobal("css.plot").title.sequence
         if len(menu):
             title = css.missing.key.get()
             menu += [None, (title, '←')]
@@ -411,12 +411,12 @@ class OligoListWidget(WidgetCreator):
         self.css.defaults = {'title.oligos'     : u'Oligos',
                              'title.oligos.help': u'comma-separated list'}
 
-    def create(self, action):
+    def create(self, action) -> List[Widget]:
         "creates the widget"
         self.__widget = AutocompleteInput(**self.__data(),
                                           placeholder = self.css.title.oligos.help.get(),
                                           title       = self.css.title.oligos.get(),
-                                          width       = self.css.inputwidth.get(),
+                                          width       = self.css.input.width.get(),
                                           name        = 'Cycles:Oligos')
 
         widget = self.__widget
@@ -431,7 +431,7 @@ class OligoListWidget(WidgetCreator):
             self._model.oligos = ols
 
         widget.on_change('value', _py_cb)
-        return self.__widget
+        return [self.__widget]
 
     def reset(self):
         "updates the widget"
