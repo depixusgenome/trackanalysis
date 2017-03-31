@@ -66,7 +66,7 @@ class OligoHit:
     def __init__(self,**kwa)->None:
         self.seq=kwa.get("seq","") # the oligo sequence
         self.pos=kwa.get("pos",0) # position in nanometer
-        self.bpos=int(kwa.get("bpos",0)) # base position
+        self.bpos=kwa.get("bpos",None) # base position
 
     @property
     def size(self):
@@ -96,4 +96,4 @@ class OligoPeak(OligoHit):
         self.dist=kwa.get("dist",None)
         self.poserr=kwa.get("poserr",None)
         self.pos0=kwa.get("pos0",None) # initial (experimental) position in nanometer
-        self.bpos0=int(kwa.get("bpos0",None)) # initial (experimental) base position
+        self.bpos0=kwa.get("bpos0",None) # initial (experimental) base position

@@ -245,7 +245,7 @@ def _highest_norm_intersect(dist1,dist2):
     sc_dist.sort()
     return sc_dist[-1][1]
 
-def find_overlaping_normdists(dists,nscale=2): # to pytest
+def find_overlaping_normdists(dists,nscale=2): # to pytest !! # what if no intersection?
     u'''
     returns lists of indices [(i,j,k)] each element of the tuple has distribution which overlap
     '''
@@ -256,7 +256,6 @@ def find_overlaping_normdists(dists,nscale=2): # to pytest
     bounds = [(di.mean()-nscale*di.std(),idx) for idx,di in enumerate(dists)]
     bounds+= [(di.mean()+nscale*di.std(),idx) for idx,di in enumerate(dists)]
     bounds.sort()
-    print("bounds=",bounds[:5])
     overlaps=[]
     for regid in range(len(bounds[:-1])):
         beflag=set(idx[1] for idx in bounds[:regid+1])
@@ -264,10 +263,8 @@ def find_overlaping_normdists(dists,nscale=2): # to pytest
 
         overlaps.append(sorted(beflag.intersection(aflag)))
 
-    print("overlaps=",overlaps[:5])
     ssets = [set(overl) for overl in overlaps if len(overl)>1]
     ssets.sort(reverse=True)
-    print("in func ssets=",ssets[:5])
     uset=[ssets[0]]
     for val in ssets[1:]:
         if val.issubset(uset[-1]):
@@ -305,8 +302,20 @@ def optimal_perm_normdists(perm:List,dists)->numpy.ndarray: # brute-force # to o
     fun = CostPermute(dists,perm)
     return scipy.optimize.minimize(fun,xinit,constraints=constraints).x
 
+def find_overlaping_oligos(oligos,nscale=2): # to implement
+    u'''
+    returns groups of overlaping oligos
+    '''
+    groups = find_overlaping_normdists([oli.dist for oli in oligos],nscale=nscale)[1]
+    return [[oligos[idx] for idx in grp] for grp in groups]
 
-
+def group_oligos(oligos,**kwa): # pytest
+    u''' returns oligos grouped by attr "by"
+    '''
+    byattr = kwa.get("by","batch_id")
+    attr = set([getattr(oli,byattr) for oli in oligos])
+    grouped = [[oli for oli in oligos if getattr(oli,byattr)==atv] for atv in attr]
+    return grouped
 
 class CostPermute:
     u' returns the "cost" of translations due to permutation of oligo peaks'

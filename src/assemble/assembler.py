@@ -9,6 +9,7 @@ import sys
 from typing import Callable, Iterable # pylint: disable=unused-import
 from multiprocessing import Pool
 import math
+import itertools
 import numpy
 from scipy.optimize import basinhopping,OptimizeResult
 from . import _utils as utils
@@ -100,21 +101,35 @@ class OptimSwap(HoppingSteps): # not usable
         return xst
 
 class OptimOligoSwap(HoppingSteps): # not yet usable
-    u'''trying to optimize the exploration of param space given hypotheses:
+    u'''
+    trying to optimize the exploration of param space given hypotheses:
     symetric distribution of z around z0 (gaussian at the moment)
     # find the distribution which overlap (and allow permutation of oligos)
-    # when allowing permutations of oligos return the optimal solution wrt to dist(z,z0)
+    # use generators in __call__
+
+    # segregate per batch permutation beteen oligos with same batch_id is forbidden
+    # -> better for recursive, scaffolding
+    # segregate per batch permutation beteen oligos with same sequence is forbidden
+
+    # strategies:
+    # find overlaping oligos. discard permutations between same groups
+    #self.over_oligos = utils.find_overlaping_oligos(self.oligos,nscale)
+
+    # or find each groups of oligos, take itertools.product(groups) find overlaps
     '''
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.oligos = kwargs.get("oligos",[])
-        self.over_dist = None #utils.find_overlaping_normdists(self.dists)
-        # weight to draw uniformly a permutation amongst all possible
-        #self.weights= numpy.array([math.factorial(len(i)) for i in self.over_dist])
+        nscale = kwargs.get("nscale",2)
+        self.seg = kwargs.get("seg","batch_id") # "batch", "sequence"
+        groups = utils.group_oligos(self.oligos,by=self.seg) # ok
+        self.over_oligos = []
+        #prod_grps = [pro for pro in itertools.product(groups)] # mem issue?
+        for pro in itertools.product(*groups):
+            self.over_oligos.extend(utils.find_overlaping_oligos(pro,nscale=nscale))
+        print("over_oligos=",self.over_oligos)
     def __call__(self,xst):
-        #swap = numpy.random.choice(list(self.opti_perm))
-        #xst[list(swap)]=utils.optimal_perm_normdists(swap,self.dists)
-        return xst
+        pass
 
 class NestedAsmrs:
     u'''
@@ -208,7 +223,8 @@ class Assembler:
         pass
 
 class MCAssembler(Assembler):
-    u'''Monte Carlo for assembling sequences from oligohits
+    u'''
+    Monte Carlo for assembling sequences from oligohits
     '''
 
     def __init__(self,**kwargs):
