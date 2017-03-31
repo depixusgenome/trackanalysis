@@ -27,6 +27,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
                                                  """)
     def __init__(self, **kwa):
         super().__init__(**kwa)
+        SequenceHoverMixin.__init__(self)
         self._rawsource  = None # type: Optional[ColumnDataSource]
         self._rawglyph   = None # type: Optional[GlyphRenderer]
 
@@ -44,8 +45,9 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         return dict(t = source.data['t'][:self.shape[1]],
                     z = source.data['z'][:self.shape[1]])
 
-    def createraw(self, fig, source, shape, css): # pylint: disable = too-many-arguments
+    def createraw(self, fig, source, shape, model):
         "creates the hover tool"
+        self._model    = model
         self.shape     = tuple(shape)
 
         hover          = fig.select(DpxHoverTool)
@@ -53,10 +55,10 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
             return
 
         self._rawsource = ColumnDataSource(self._createrawdata(source))
-        attrs           = css.raw.selection.get()
-        self._rawglyph  = attrs.addto(fig,  x = 't', y = 'z',
-                                      source  = self._rawsource,
-                                      visible = False)
+        css             = self._model.css.raw
+        self._rawglyph  = css.selection.get().addto(fig,  x = 't', y = 'z',
+                                                    source  = self._rawsource,
+                                                    visible = False)
 
         def _onhover(source  = self._rawsource, # pylint: disable=too-many-arguments
                      hvrsrc  = source,
@@ -95,7 +97,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         hover[0].callback = CustomJS.from_py_func(_onhover)
         hover[0].tooltips = None
 
-        tooltips  = css.raw.tooltips.get()
+        tooltips  = css.tooltips.get()
         if tooltips is None or len(tooltips) == 0:
             return
 
@@ -103,7 +105,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         hover[0].renderers = [fig.circle(x                = 't',
                                          y                = 'z',
                                          source           = source,
-                                         radius           = css.raw.tooltips.radius.get(),
+                                         radius           = css.tooltips.radius.get(),
                                          radius_dimension = 'x',
                                          line_alpha       = 0.,
                                          fill_alpha       = 0.,
@@ -126,7 +128,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
 
     def resethist(self, hdata):
         "updates the tooltips for a new file"
-        mdl  = self.model
+        mdl  = self._model
         bias = mdl.bias
         if bias is None:
             ind1 = next((i for i,j in enumerate(hdata['cycles']) if j > 0), 0)

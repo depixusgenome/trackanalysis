@@ -159,15 +159,14 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     _RESET = frozenset(('track', 'bead'))
     def __init__(self, ctrl:Controller, *_) -> None:
         "sets up this plotter's info"
+        ctrl.getGlobal("css.plot").defaults = dict(ylabel      = u'Z (nm)',
+                                                   yrightlabel = u'Base number',
+                                                   xtoplabel   = u'Time (s)',
+                                                   xlabel      = u'Frames')
+
         key = ".plot." + type(self).__name__[:-len('PlotCreator')].lower()
-        ctrl.addGlobalMap("css.plot",
-                          ylabel      = u'Z (nm)',
-                          yrightlabel = u'Base number',
-                          xtoplabel   = u'Time (s)',
-                          xlabel      = u'Frames')
-        ctrl.addGlobalMap('config'  + key)
-        ctrl.addGlobalMap('project' + key)
-        ctrl.addGlobalMap('css'     + key)
+        for name in 'config', 'project', 'css':
+            ctrl.addGlobalMap(name+key)
 
         super().__init__(ctrl, key)
         self._model = self._MODEL(ctrl, key)

@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Utils for dealing with the JS side of the view"
-from    typing       import (Tuple, Optional, # pylint: disable =unused-import
-                             Iterator, List, Union, Any, Callable, Dict,
-                             TYPE_CHECKING)
-import  inspect
-from    model.task              import RootTask, Task, taskorder, TASK_ORDER
-from    data.track              import Track
-from    utils                   import NoArgs, updatecopy, updatedeepcopy
-from    control.processor       import Processor
-from    .base                   import PlotModelAccess, PlotCreator
+from typing            import (Tuple, Optional, # pylint: disable =unused-import
+                               Iterator, List, Union, Any, Callable, Dict,
+                               TYPE_CHECKING)
+
+from model.task        import RootTask, Task, taskorder, TASK_ORDER
+from model.globals     import ConfigProperty, ConfigRootProperty, BeadProperty
+from data.track        import Track
+from utils             import NoArgs, updatecopy, updatedeepcopy
+from control.processor import Processor
+from .base             import PlotModelAccess, PlotCreator
 
 class TaskPlotModelAccess(PlotModelAccess):
     "Contains all access to model items likely to be set by user actions"
+    def __init__(self, *_1, **_2):
+        "sets-up the model"
+        super().__init__(*_1, **_2)
+
     @property
     def bead(self) -> Optional[int]:
         "returns the current bead number"
@@ -23,11 +28,9 @@ class TaskPlotModelAccess(PlotModelAccess):
                 return next(iter(track.beadsonly.keys()))
         return bead
 
-    def create(self, _):
-        "sets-up the model"
-        for attr in self.__cached():
-            self.project[attr].setdefault(None)
-        self.clear()
+    def clear(self):
+        u"updates the model when a new track is loaded"
+        BeadProperty.clear(self)
 
     @property
     def roottask(self) -> Optional[RootTask]:
@@ -44,10 +47,6 @@ class TaskPlotModelAccess(PlotModelAccess):
         "returns the current track"
         return self._ctrl.track(self.roottask)
 
-    def clear(self):
-        u"updates the model when a new track is loaded"
-        self.project.update({i: dict() for i in self.__cached()})
-
     def checktask(self, root, task):
         "checks wether a task belongs to the model"
         if not any(val.check(task) for val in self.__dict__.values()
@@ -60,16 +59,17 @@ class TaskPlotModelAccess(PlotModelAccess):
         "returns a tuple (dataitem, bead) to be displayed"
         track = self.track
         if track is None:
-            return None, None, None
+            return None
 
         root  = self.roottask
+        ibead = self.bead
+
         for task in tuple(self._ctrl.tasks(root))[::-1]:
             if self.checktask(root, task):
-                ibead = self.bead
                 beads = next(iter(self._ctrl.run(root, task, copy = True)))
-                return track, beads[ibead,...], ibead
+                return beads[ibead,...]
 
-        return track, track.cycles[self.bead,...], self.bead
+        return track.cycles[ibead,...]
 
     def observetasks(self, *args, **kwa):
         "observes the provided task"
@@ -88,71 +88,16 @@ class TaskPlotModelAccess(PlotModelAccess):
         for attr in attrs:
             prop = getattr(cls, attr)
             for obs in prop.OBSERVERS:
-                keys.setdefault(obs, []).append(prop.KEY)
+                keys.setdefault(obs, []).append(prop.key)
 
         for key, items in keys.items():
             getattr(self, key).observe(items, fcn)
 
-    class _Props:
-        @staticmethod
-        def configroot(attr):
-            "returns a property which links to the config"
-            # pylint: disable=protected-access
-            def _getter(self):
-                return self.configroot[attr].get()
-
-            def _setter(self, val):
-                return self.configroot[attr].set(val)
-
-            hmsg          = "link to root config's {}".format(attr)
-            ret           = property(_getter, _setter, None, hmsg)
-            ret.KEY       = attr
-            ret.OBSERVERS = ('configroot',)
-            return ret
-
-        @staticmethod
-        def config(attr):
-            "returns a property which links to the config"
-            def _getter(self):
-                return self.config[attr].get()
-
-            def _setter(self, val):
-                self.config[attr].set(val)
-
-            hmsg          = "link to config's {}".format(attr)
-            ret           = property(_getter, _setter, None, hmsg)
-            ret.KEY       = attr
-            ret.OBSERVERS = ('config',)
-            return ret
-
-        @staticmethod
-        def bead(attr):
-            "returns a property which links to the current bead or the config"
-            def _getter(self):
-                value = self.project[attr].get().get(self.bead, NoArgs)
-                if value is not NoArgs:
-                    return value
-                return self.config[attr].get()
-
-            def _setter(self, val):
-                cache = self.project[attr].get()
-                if val == self.config[attr].get():
-                    cache.pop(self.bead, None)
-                else:
-                    cache[self.bead] = val
-            hmsg          = "link to config's {}".format(attr)
-            ret           = property(_getter, _setter, None, hmsg)
-            ret.KEY       = attr
-            ret.OBSERVERS = ('config', 'project')
-            return ret
-
-    props = _Props()
-    del _Props
-
-    @classmethod
-    def __cached(cls):
-        pred = lambda x: isinstance(x, property) and hasattr(x, 'KEY')
-        yield from (value.KEY for _, value in inspect.getmembers(cls, pred))
+    class props: # pylint: disable=invalid-name
+        "access to property builders"
+        configroot = ConfigRootProperty
+        config     = ConfigProperty
+        bead       = BeadProperty
 
 class TaskAccess(TaskPlotModelAccess):
     "access to tasks"

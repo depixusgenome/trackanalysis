@@ -21,8 +21,12 @@ def run(view, app, desktop, show):
     if '.' not in view:
         view = view.lower()+'.'+view
 
-    viewmod  = __import__('view.'+view[:view.rfind('.')],
-                          fromlist = view[view.rfind('.')+1:])
+    try:
+        viewmod  = __import__(view[:view.rfind('.')],
+                              fromlist = view[view.rfind('.')+1:])
+    except ImportError:
+        viewmod  = __import__('view.'+view[:view.rfind('.')],
+                              fromlist = view[view.rfind('.')+1:])
     viewcls  = getattr(viewmod, view[view.rfind('.')+1:])
 
     if not app.startswith('app.'):

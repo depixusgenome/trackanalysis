@@ -23,42 +23,15 @@ example, the "plot" map will contain items for all plot types. The "plot.bead"
 map only needs specify those default values that should be changed for this type
 of plot.
 """
-from collections    import namedtuple, ChainMap
-from itertools      import product
-from typing         import (Dict, Union, # pylint: disable=unused-import
-                            Callable, Optional, Sequence)
+from collections    import namedtuple
+from typing         import (Callable, # pylint: disable=unused-import
+                            Optional)
 import inspect
 import anastore
 from  model         import PHASE
+from  model.globals import GlobalsChild, GlobalsAccess
 from .event         import Controller
 from .action        import Action
-
-_CNT     = 2
-class GlobalsChild(ChainMap):
-    "The main model"
-    __NAME    = 'の'
-    __slots__ = '__name'
-    def __init__(self, name:str, parent: Optional['GlobalsChild'] = None) -> None:
-        maps = tuple(dict() for i in range(_CNT)) # type: Sequence[Union[dict,GlobalsChild]]
-        if parent is not None:
-            maps += (parent,) # type: ignore
-
-        self.__name = name # type: str
-        super().__init__(*maps)
-
-    @property
-    def name(self) -> str:
-        "returns the name"
-        return self.__name
-
-    def __getstate__(self):
-        info = {self.__NAME: self.__name}
-        info.update(self.maps[0])
-        return info
-
-    def __setstate__(self, info):
-        self.__name = info.pop(self.__NAME)
-        self.maps[0].update(info)
 
 EventPair = namedtuple('EventPair', ['old', 'value'])
 delete     = type('delete', tuple(), dict())    # pylint: disable=invalid-name
@@ -336,31 +309,6 @@ class DefaultsMap(Controller):
                 return self.__items[keys[0]]
             return iter(self.__items[key] for key in keys)
 
-class GlobalsAccess:
-    "Contains all access to model items likely to be set by user actions"
-    def __init__(self,
-                 ctrl:Union['GlobalsAccess', Controller],
-                 key :Optional[str] = None,
-                 **_) -> None:
-        if isinstance(ctrl, GlobalsAccess):
-            for name, pref in product(('config', 'css', 'project'), ('', 'root')):
-                if hasattr(ctrl, name+pref):
-                    setattr(self, name+pref, getattr(ctrl, name+pref))
-
-        else:
-            self.configroot  = ctrl.getGlobal('config')
-            self.projectroot = ctrl.getGlobal('project')
-            self.cssroot     = ctrl.getGlobal('css')
-            if key is None:
-                return
-
-            elif key[0] != '.':
-                key = '.'+key
-
-            self.config  = ctrl.getGlobal('config' + key)
-            self.project = ctrl.getGlobal('project'+ key)
-            self.css     = ctrl.getGlobal('css'    + key)
-
 class GlobalsController(Controller):
     """
     Controller class for global values.
@@ -381,6 +329,7 @@ class GlobalsController(Controller):
         self.addGlobalMap('css').button.defaults = {'width': 90, 'height': 20}
         self.addGlobalMap('css').config.indent.default = 4
         self.addGlobalMap('css').input .defaults = {'width': 90, 'height': 20}
+        self.addGlobalMap("css.plot")
         self.addGlobalMap('config').keypress.defaults = {'undo' : "Control-z",
                                                          'redo' : "Control-y",
                                                          'open' : "Control-o",

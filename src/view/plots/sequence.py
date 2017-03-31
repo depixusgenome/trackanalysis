@@ -147,12 +147,11 @@ class SequenceTicker(ContinuousTicker):
 
 class SequenceHoverMixin:
     "controls keypress actions"
-    def __init__(self, **kwa):
-        super().__init__(**kwa)
+    def __init__(self):
         self.__source = None # type: Optional[ColumnDataSource]
         self.__tool   = None # type: Optional[DpxHoverTool]
         self.__size   = None # type: Any
-        self.model    = None # type: Any
+        self._model   = None # type: Any
 
     @staticmethod
     def impl(name, atts):
@@ -210,7 +209,7 @@ class SequenceHoverMixin:
         hover = fig.select(DpxHoverTool)
         if len(hover) == 0:
             return
-        self.model    = mdl
+        self._model    = mdl
         self.__tool   = hover[0]
         self.__size   = cnf.configroot.oligos.size
         self.__source = ColumnDataSource(self.__data())
@@ -251,9 +250,9 @@ class SequenceHoverMixin:
             return
 
         self.__source.data = self.__data()
-        kwa.setdefault('framerate', getattr(self.model.track, 'framerate', 1./30.))
-        kwa.setdefault('bias',      self.model.bias)
-        kwa.setdefault('stretch',   self.model.stretch)
+        kwa.setdefault('framerate', getattr(self._model.track, 'framerate', 1./30.))
+        kwa.setdefault('bias',      self._model.bias)
+        kwa.setdefault('stretch',   self._model.stretch)
         self.update(**kwa)
 
     def slaveaxes(self, fig, src, extra:str, data:str, inpy = False):
@@ -304,7 +303,7 @@ class SequenceHoverMixin:
 
     @checksizes
     def __data(self):
-        mdl   = self.model
+        mdl   = self._model
         key   = mdl.sequencekey
         oligs = mdl.oligos
         osiz  = max((len(i) for i in oligs), default = self.__size.get())
@@ -331,11 +330,11 @@ class SequencePathWidget(WidgetCreator):
         self.__widget  = None # type: Optional[Dropdown]
         self.__list    = []   # type: List[str]
         self.__dialog  = None # type: Optional[FileDialog]
-        css = self._ctrl.getGlobal("css.plots")
-        css.defaults = {'title.fasta'      : u'Open a fasta file',
-                        'title.sequence'   : u'Selected DNA sequence',
-                        'title.sequence.missing.key' : u'Select sequence',
-                        'title.sequence.missing.path': u'Find path'}
+        css = self._ctrl.getGlobal("css.plot").title
+        css.defaults = {'fasta'                : u'Open a fasta file',
+                        'sequence'             : u'Selected DNA sequence',
+                        'sequence.missing.key' : u'Select sequence',
+                        'sequence.missing.path': u'Find path'}
 
     def create(self, action):
         "creates the widget"

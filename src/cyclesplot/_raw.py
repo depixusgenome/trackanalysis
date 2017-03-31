@@ -55,6 +55,7 @@ class RawMixin:
                     (1, 2))
 
         items = list(cycles)
+        print(items)
         if len(items) == 0 or not any(len(i) for _, i in items):
             return self.__data()
 
@@ -101,8 +102,7 @@ class RawMixin:
 
         css.raw.addto(self._raw, x = 't', y = 'z', source = self._rawsource)
 
-        self._hover.createraw(self._raw, self._rawsource, shape,
-                              self._model, self.css)
+        self._hover.createraw(self._raw, self._rawsource, shape, self._model)
         self._raw.extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
 
         axis = LinearAxis(x_range_name="time", axis_label = css.xtoplabel.get())
