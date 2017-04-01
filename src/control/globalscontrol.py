@@ -144,13 +144,25 @@ class _MapGetter:
         "Calls get using the current base key"
         if len(keys) == 0:
             return self._ctrl.get(self._base, default = default)
+        elif len(keys) == 1 and keys[0] is Ellipsis:
+            return self._ctrl.get(self._base, ...)
+        elif len(keys) == 2 and keys[1] is Ellipsis:
+            return self._ctrl.get(self._key+keys[0], ...)
         return self._ctrl.get(*(self._key+i for i in keys), default = default)
 
-    def getdict(self, *keys, default = delete, fullnames = True):
+    def getdict(self, *keys, default = delete, fullnames = True) -> dict:
         "Calls get using the current base key"
-        fkeys = tuple(self._key+i for i in keys)
-        vals  = self._ctrl.get(*fkeys, default = default)
-        return dict(zip(fkeys if fullnames else keys, vals))
+        if len(keys) == 1 and keys[0] is Ellipsis:
+            vals = self._ctrl.get(self._base, ..., default = default)
+            lenb = len(self._base)
+            if fullnames or lenb == 0:
+                return vals
+            lenb += 1
+            return {i[lenb:]: j for i, j in vals.items()}
+        else:
+            fkeys = tuple(self._key+i for i in keys)
+            vals  = self._ctrl.get(*fkeys, default = default)
+            return dict(zip(fkeys if fullnames else keys, vals))
 
     def set(self, arg):
         "Calls update using the current base key"
@@ -243,6 +255,19 @@ class DefaultsMap(Controller):
         "returns the name of the root"
         return self.__items.name
 
+    @staticmethod
+    def __npars(fcn) -> bool:
+        params = inspect.signature(fcn).parameters
+        if len(params) == 0:
+            return False
+        elif len(params) == 1:
+            return next(iter(params)) not in ('cls', 'self')
+        elif len(params) == 2:
+            assert next(iter(params)) in ('cls', 'self')
+            return True
+        assert False
+        return False
+
     def observe(self, attrs, fcn = None): # pylint: disable=arguments-differ
         "observes items in the current root"
         if attrs == '':
@@ -258,10 +283,10 @@ class DefaultsMap(Controller):
             if callable(attrs):
                 fcn, attrs = attrs, fcn
 
-            npars = len(inspect.signature(fcn).parameters) > 0
             if len(attrs) == 1 and not isinstance(attrs, str):
                 attrs = attrs[0]
 
+            npars = self.__npars(fcn)
             if isinstance(attrs, str):
                 def _wrap(items):
                     if attrs in items:
@@ -295,6 +320,12 @@ class DefaultsMap(Controller):
 
     def get(self, *keys, default = delete):
         "returns values associated to the keys"
+        if len(keys) == 2 and keys[1] is Ellipsis:
+            root = keys[0]
+            base = keys[0]+'.'
+            return {i: j for i, j in self.__items.items()
+                    if i == root or i.startswith(base)}
+
         if default is not delete:
             if len(keys) == 1:
                 return self.__items.get(keys[0], default)
@@ -327,7 +358,9 @@ class GlobalsController(Controller):
         super().__init__(**kwargs)
         self.__maps = dict()
         self.addGlobalMap('css').button.defaults = {'width': 90, 'height': 20}
-        self.addGlobalMap('css').config.indent.default = 4
+        self.addGlobalMap('css').config.defaults = {'indent':       4,
+                                                    'ensure_ascii': False,
+                                                    'sort_keys':    True}
         self.addGlobalMap('css').input .defaults = {'width': 90, 'height': 20}
         self.addGlobalMap("css.plot")
         self.addGlobalMap('config').keypress.defaults = {'undo' : "Control-z",
@@ -404,9 +437,9 @@ class GlobalsController(Controller):
                 for i, j in self.__maps.items()
                 if 'project' not in i}
         maps = {i: j for i, j in maps.items() if len(j)}
-        anastore.dump(maps, path,
-                      patch  = patchname,
-                      indent = self.getGlobal('css').config.indent.get())
+
+        css = self.getGlobal('css').config
+        anastore.dump(maps, path, patch = patchname, **css.getdict(..., fullnames = False))
 
     def readconfig(self, configpath, patchname = 'config'):
         "Sets-up the user preferences"
