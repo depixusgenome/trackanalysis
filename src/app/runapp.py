@@ -1,7 +1,40 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Runs an app"
+from   pathlib import Path
+import inspect
 import click
+
+def _from_path(view):
+    pview = Path(view)
+    if not pview.exists():
+        return
+    vname   = str(pview.parent/pview.stem).replace('/', '.').replace('\\', '.')
+    viewmod = __import__(vname)
+    for name in vname.split('.')[1:]:
+        viewmod = getattr(viewmod, name)
+
+    name = pview.stem+'view'
+    pred = lambda i: (isinstance(i, type)
+                      and i.__module__ == viewmod.__name__
+                      and i.__name__.lower() == name)
+    pot  = tuple(i for _, i in inspect.getmembers(viewmod, pred))
+    assert len(pot) == 1
+    return pot[0]
+
+def _from_module(view):
+    if view.startswith('view.'):
+        view = view[5:]
+
+    if '.' not in view:
+        view = view.lower()+'.'+view
+    try:
+        viewmod  = __import__(view[:view.rfind('.')],
+                              fromlist = view[view.rfind('.')+1:])
+    except ImportError:
+        viewmod  = __import__('view.'+view[:view.rfind('.')],
+                              fromlist = view[view.rfind('.')+1:])
+    return getattr(viewmod, view[view.rfind('.')+1:])
 
 @click.command()
 @click.argument('view')
@@ -15,19 +48,9 @@ import click
               help = u'If using webbrowser, launch it automatically')
 def run(view, app, desktop, show):
     u"Launches an view"
-    if view.startswith('view.'):
-        view = view[5:]
-
-    if '.' not in view:
-        view = view.lower()+'.'+view
-
-    try:
-        viewmod  = __import__(view[:view.rfind('.')],
-                              fromlist = view[view.rfind('.')+1:])
-    except ImportError:
-        viewmod  = __import__('view.'+view[:view.rfind('.')],
-                              fromlist = view[view.rfind('.')+1:])
-    viewcls  = getattr(viewmod, view[view.rfind('.')+1:])
+    viewcls = _from_path(view)
+    if viewcls is None:
+        viewcls = _from_module(view)
 
     if not app.startswith('app.'):
         app += 'app.'+app
