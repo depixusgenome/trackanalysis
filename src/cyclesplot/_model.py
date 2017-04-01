@@ -14,11 +14,11 @@ class SequenceKeyProp(TaskPlotModelAccess.props.bead[Optional[str]]):
     def __init__(self):
         super().__init__('sequence.key')
 
-    def __get__(self, obj, val:Optional[str]) -> Optional[str]:
+    def __get__(self, obj, tpe) -> Optional[str]:
         "returns the current sequence key"
         if obj is None:
             return self
-        key  = super().__get__(obj, val)
+        key  = super().__get__(obj, tpe)
         dseq = readsequence(obj.sequencepath)
         return next(iter(dseq), None) if key not in dseq else key
 
