@@ -7,6 +7,7 @@ from typing             import Callable
 from tkinter            import Tk as _Tk
 from tkinter.filedialog import (askopenfilename   as _tkopen,
                                 asksaveasfilename as _tksave)
+_m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
 class FileDialog:
     """
     Deals with filepaths to be opened or saved
@@ -42,26 +43,39 @@ class FileDialog:
         if hasattr(cnf, 'getGlobal'):
             cnf          = cnf.getGlobal('config').last.path
             cnf.defaults = dict.fromkeys(self.DEFAULTS, None)
+
+        storage = kwa.get('storage', None)
         if hasattr(cnf, 'get'):
-            self.config = self._getconfig(cnf), self._setconfig(cnf)
+            if storage is not None:
+                cnf[storage].default = None
+            self.config = self._getconfig(cnf, storage), self._setconfig(cnf, storage)
         else:
             self.config = cnf
 
     @staticmethod
-    def _getconfig(cnf):
+    def _getconfig(cnf, storage = None):
         def _defaultpath(ext):
-            ext = ext.replace('.', '')
-            return cnf.get(ext, default = None)
+            val = cnf.get(storage) if storage is not None else None
+            if val is None:
+                ext = ext.replace('.', '')
+                return cnf.get(ext, default = None)
+            return val
         return _defaultpath
 
     @staticmethod
-    def _setconfig(cnf):
+    def _setconfig(cnf, storage = None):
         def _defaultpath(rets):
-            vals = {}
-            itr  = (rets,) if isinstance(rets, str) else rets
+            vals  = {}
+            itr   = (rets,) if isinstance(rets, str) else rets
+            first = None
             for ret in itr:
                 ret = Path(ret).resolve()
-                vals.setdefault(ret.suffix[1:], str(ret))
+                if cnf.get(ret.suffix[1:], default = _m_none) is not _m_none:
+                    vals.setdefault(ret.suffix[1:], str(ret))
+                if first is None:
+                    first = ret
+            if storage is not None:
+                vals[storage] = str(first)
             cnf.update(**vals)
 
         return _defaultpath

@@ -25,7 +25,8 @@ class  ToolBar(BokehView):
                         'save.dialog': u'Save an analysis file'}
 
         self.__diagopen = FileDialog(multiple  = 1,
-                                     config    = self._ctrl)
+                                     config    = self._ctrl,
+                                     storage   = 'toolbar')
         self.__diagsave = FileDialog(config    = self._ctrl)
 
     def _getroots(self, _):
