@@ -232,12 +232,11 @@ class SequenceHoverMixin:
         src = self.__source
         @from_py_func
         def _js_cb(src = src, fig = fig, cb_obj = None, window = None):
-            print(cb_obj, cb_obj.updating)
             if cb_obj.updating == '':
                 return
 
             values = cb_obj.bias, cb_obj.stretch
-            window.setTimeout(lambda a, b, c: a.setsrc(b, c), 500, cb_obj, src, values)
+            window.setTimeout(lambda a, b, c: a.setsource(b, c), 500, cb_obj, src, values)
             bases       = fig.extra_y_ranges['bases']
             yrng        = fig.y_range
             bases.start = (yrng.start-cb_obj.bias)/cb_obj.stretch
@@ -250,17 +249,18 @@ class SequenceHoverMixin:
         if self.__tool is None:
             return
 
-        self.__source.data = self.__data()
+        data = self.__data()
+        self.__source.update(column_names = list(data.keys()), data = data)
         kwa.setdefault('framerate', getattr(self._model.track, 'framerate', 1./30.))
         kwa.setdefault('bias',      self._model.bias)
         kwa.setdefault('stretch',   self._model.stretch)
         self.update(**kwa)
 
-    def slaveaxes(self, fig, src, extra:str, data:str, inpy = False):
+    def slaveaxes(self, fig, src, extra:str, column:str, inpy = False):
         "slaves a histogram's axes to its y-axis"
         # pylint: disable=too-many-arguments,protected-access
         hvr = self
-        def _onchangebounds(fig = fig, hvr = hvr, src = src, window = None):
+        def _onchangebounds(fig = fig, hvr = hvr, src = src):
             yrng = fig.y_range
             if hasattr(yrng, '_initial_start') and yrng.bounds is not None:
                 yrng._initial_start = yrng.bounds[0]
@@ -276,7 +276,7 @@ class SequenceHoverMixin:
             bases.start  = (yrng.start - hvr.bias)/hvr.stretch
             bases.end    = (yrng.end   - hvr.bias)/hvr.stretch
 
-            bottom       = src.data[data]
+            bottom       = src.data[column]
             if len(bottom) < 2:
                 ind1 = 1
                 ind2 = 0
@@ -288,17 +288,14 @@ class SequenceHoverMixin:
             if ind1 >= ind2:
                 cycles.end = 0
                 frames.end = 0
-            elif inpy is not None:
-                frames.end = np.max(src.data['frames'][ind1:ind2])+1
-                cycles.end = np.max(src.data['cycles'][ind1:ind2])+1
             else:
-                frames.end = window.Math.max.apply(None, src.data['frames'][ind1:ind2])+1
-                cycles.end = window.Math.max.apply(None, src.data['cycles'][ind1:ind2])+1
+                frames.end = max(src.data['frames'][ind1:ind2])+1
+                cycles.end = max(src.data['cycles'][ind1:ind2])+1
 
         if inpy:
             _onchangebounds()
         else:
-            fig.y_range.callback = from_py_func(_onchangebounds, extra = extra, data = data)
+            fig.y_range.callback = from_py_func(_onchangebounds, extra = extra, column = column)
 
     @checksizes
     def __data(self):
@@ -328,7 +325,9 @@ class SequencePathWidget(WidgetCreator):
         super().__init__(model)
         self.__widget  = None # type: Optional[Dropdown]
         self.__list    = []   # type: List[str]
-        self.__dialog  = None # type: Optional[FileDialog]
+        self.__dialog  = FileDialog(filetypes = 'fasta|*',
+                                    config    = self._ctrl,
+                                    storage   = 'sequence')
         css = self._ctrl.getGlobal("css.plot").title
         css.defaults = {'fasta'                : u'Open a fasta file',
                         'sequence'             : u'Selected DNA sequence',
@@ -337,14 +336,10 @@ class SequencePathWidget(WidgetCreator):
 
     def create(self, action) -> List[Widget]:
         "creates the widget"
-        css = self._ctrl.getGlobal("css.plot")
-        self.__dialog = FileDialog(filetypes = 'fasta|*',
-                                   config    = self._ctrl,
-                                   title     = css.title.fasta.get())
-
-        self.__widget = Dropdown(name  = 'Cycles:Sequence',
-                                 width = css.input.width.get(),
-                                 **self.__data())
+        self.__dialog.title = self.css.title.fasta.get()
+        self.__widget       = Dropdown(name  = 'Cycles:Sequence',
+                                       width = self.css.input.width.get(),
+                                       **self.__data())
         @action
         def _py_cb(new):
             if new in self.__list:
@@ -358,7 +353,7 @@ class SequencePathWidget(WidgetCreator):
                 else:
                     self.__widget.value = '→'
         self.__widget.on_click(_py_cb)
-        return [Paragraph(text = css.title.sequence.get()), self.__widget]
+        return [Paragraph(text = self.css.title.sequence.get()), self.__widget]
 
     def reset(self):
         "updates the widget"
@@ -366,10 +361,11 @@ class SequencePathWidget(WidgetCreator):
 
     def callbacks(self, hover: SequenceHoverMixin, tick1: SequenceTicker):
         "sets-up callbacks for the tooltips and grids"
-        ttsource = hover.source
-        tick2    = tick1.axis
+        tick2 = tick1.axis
+        src   = hover.source
         @from_py_func
-        def _js_cb(cb_obj, tick1 = tick1, tick2 = tick2, src = ttsource):
+        def _js_cb(cb_obj = None, tick1 = tick1, tick2 = tick2, src = src):
+            print(cb_obj.value, src.column_names)
             if cb_obj.value in src.column_names:
                 cb_obj.label     = cb_obj.value
                 tick1.key        = cb_obj.value
@@ -391,7 +387,7 @@ class SequencePathWidget(WidgetCreator):
         key   = self._model.sequencekey
         val   = key if key in lst else None
         menu  = [(i, i) for i in lst] if len(lst) else []  # type: List[Optional[Tuple[str,str]]]
-        css   = self._ctrl.getGlobal("css.plot").title.sequence
+        css   = self.css.title.sequence
         if len(menu):
             title = css.missing.key.get()
             menu += [None, (title, '←')]

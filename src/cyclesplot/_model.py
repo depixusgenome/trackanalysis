@@ -12,7 +12,7 @@ from    view.plots.sequence         import readsequence
 class SequenceKeyProp(TaskPlotModelAccess.props.bead[Optional[str]]):
     "access to the sequence key"
     def __init__(self):
-        super().__init__('sequence.peaks')
+        super().__init__('sequence.key')
 
     def __get__(self, obj, val:Optional[str]) -> Optional[str]:
         "returns the current sequence key"
@@ -46,7 +46,7 @@ class CyclesModelAccess(TaskPlotModelAccess):
 
     props        = TaskPlotModelAccess.props
     sequencekey  = SequenceKeyProp()
-    sequencepath = props.configroot[Optional[str]]          ('last.path.fasta')
+    sequencepath = props.configroot[Optional[str]]          ('last.path.sequence')
     oligos       = props.configroot[Optional[Sequence[str]]]('oligos')
     binwidth     = props.config[float]                      ('binwidth')
     minframes    = props.config[int]                        ('minframes')

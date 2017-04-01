@@ -115,9 +115,10 @@ class PeaksTableWidget(_Widget):
         if info is None:
             info = 0, 1000
 
-        info += (info[0]*self.__hover.stretch+self.__hover.bias,
-                 info[1]*self.__hover.stretch+self.__hover.bias)
-
+        stretch, bias = self.__hover.stretch, self.__hover.bias
+        if bias is None:
+            bias = 0.
+        info += (info[0]*stretch+bias, info[1]*stretch+bias)
         return dict(bases = info[:2], z = info[2:])
 
 class CyclesSequencePathWidget(SequencePathWidget):

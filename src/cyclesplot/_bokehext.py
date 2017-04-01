@@ -114,7 +114,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
     def createhist(self, fig, mdl, cnf):
         "Creates the hover tool for histograms"
         self.create(fig, mdl, cnf)
-        cnf.configroot.oligos.observe(self.reset)
+        self._model.observeprop('oligos', 'sequencepath', self.resethist)
 
     def resetraw(self, fig, rdata, shape):
         "updates the tooltips for a new file"

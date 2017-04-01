@@ -34,7 +34,7 @@ class HistMixin:
 
         self._histsource = None             # type: Optional[ColumnDataSource]
         self._hist       = None             # type: Optional[Figure]
-        self._ticker = SequenceTicker()
+        self._ticker     = SequenceTicker()
 
     @checksizes
     def __data(self, data, shape):
@@ -105,7 +105,7 @@ class HistMixin:
                     x_range_name = "cycles")
 
         self._ticker.create(self._hist, self._model, self)
-        self._model.observeprop('oligos', 'sequencepath', self._ticker.create)
+        self._model.observeprop('oligos', 'sequencepath', self._ticker.reset)
 
         self._hover.createhist(self._hist, self._model, self)
         self._hover.slaveaxes(self._hist, self._histsource, "cycles", "bottom")
