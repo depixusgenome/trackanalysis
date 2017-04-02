@@ -25,12 +25,11 @@ class HistMixin:
                              'cycles'    : PlotAttrs('white', 'quad',   1,
                                                      fill_color = None,
                                                      line_alpha = .5,
-                                                     line_color = 'blue'),
-                             **SequenceTicker.defaultconfig()
-                            }
+                                                     line_color = 'blue')}
         self.css.hist.defaults = dict(xtoplabel = u'Cycles',
                                       xlabel    = u'Frames',
                                       plotwidth = 200)
+        SequenceTicker.defaultconfig(self)
 
         self._histsource = None             # type: Optional[ColumnDataSource]
         self._hist       = None             # type: Optional[Figure]
@@ -108,10 +107,10 @@ class HistMixin:
         self._model.observeprop('oligos', 'sequencepath', self._ticker.reset)
 
         self._hover.createhist(self._hist, self._model, self)
-        self._hover.slaveaxes(self._hist, self._histsource, "cycles", "bottom")
+        self._hover.slaveaxes(self._hist, self._histsource)
 
     def _resethist(self, data, shape):
         self._histsource.data = hist = self.__data(data, shape)
         self._hover.resethist(hist)
         self._ticker.reset()
-        self._hover.slaveaxes(self._hist, self._histsource, "cycles", "bottom", inpy = True)
+        self._hover.slaveaxes(self._hist, self._histsource, inpy = True)

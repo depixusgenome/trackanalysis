@@ -30,16 +30,17 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         SequenceHoverMixin.__init__(self)
         self._rawsource  = None # type: Optional[ColumnDataSource]
         self._rawglyph   = None # type: Optional[GlyphRenderer]
+        self._model      = None # type: Any
 
     @staticmethod
-    def defaultconfig() -> dict:
+    def defaultconfig(mdl):
         "default config"
-        return {'raw.selection'       : PlotAttrs('green', 'line',   2),
-                'raw.tooltips'        : [(u'(cycle, t, z)',
-                                          '(@cycle, $~x{1}, $data_y{1.1111})')],
-                'raw.tooltips.radius' : 1.5,
-                **SequenceHoverMixin.defaultconfig()
-               }
+        css = mdl.css.raw
+        css.defaults = {'selection'       : PlotAttrs('green', 'line',   2),
+                        'tooltips'        : [(u'(cycle, t, z)',
+                                              '(@cycle, $~x{1}, $data_y{1.1111})')],
+                        'tooltips.radius' : 1.5}
+        SequenceHoverMixin.defaultconfig(mdl)
 
     def _createrawdata(self, source):
         return dict(t = source.data['t'][:self.shape[1]],
@@ -47,10 +48,10 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
 
     def createraw(self, fig, source, shape, model):
         "creates the hover tool"
-        self._model    = model
-        self.shape     = tuple(shape)
+        self._model = model
+        self.shape  = tuple(shape)
 
-        hover          = fig.select(DpxHoverTool)
+        hover       = fig.select(DpxHoverTool)
         if len(hover) == 0:
             return
 
@@ -113,8 +114,12 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
 
     def createhist(self, fig, mdl, cnf):
         "Creates the hover tool for histograms"
-        self.create(fig, mdl, cnf)
+        self.create(fig, mdl, cnf, 'cycles')
         self._model.observeprop('oligos', 'sequencepath', self.resethist)
+
+    def slaveaxes(self, fig, src, inpy = False): # pylint: disable=arguments-differ
+        "slaves a histogram's axes to its y-axis"
+        super().slaveaxes(fig, src, 'frames', 'cycles', 'bottom')
 
     def resetraw(self, fig, rdata, shape):
         "updates the tooltips for a new file"
@@ -126,12 +131,6 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         self._rawsource.data         = self._createrawdata(rdata)
         self._rawglyph.glyph.visible = False
 
-    def resethist(self, hdata):
+    def resethist(self, hdata = None):
         "updates the tooltips for a new file"
-        mdl  = self._model
-        bias = mdl.bias
-        if bias is None:
-            ind1 = next((i for i,j in enumerate(hdata['cycles']) if j > 0), 0)
-            ind2 = next((i for i,j in enumerate(hdata['cycles'][ind1+1:]) if j == 0), ind1+1)
-            bias = hdata['bottom'][(ind1+ind2-1)//2] + mdl.binwidth*.5
-        self.reset(bias = bias)
+        self.reset(bias = self.estimatebias(hdata, 'cycles', 'bottom'))

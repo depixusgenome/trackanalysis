@@ -49,8 +49,10 @@ class ConfigRootProperty(Generic[T]):
     def __init__(self, key:str) -> None:
         self.key = key
 
-    def setdefault(self, obj, value:T, **kwa):
+    def setdefault(self, obj, value:T, items:Optional[dict] = None, **kwa):
         "initializes the property stores"
+        if items is not None:
+            kwa.update(**items)
         obj.configroot[self.key].default  = value
         obj.configroot[self.key].defaults = kwa
 
@@ -66,8 +68,10 @@ class ConfigProperty(Generic[T]):
     def __init__(self, key:str) -> None:
         self.key = key
 
-    def setdefault(self, obj, value:T, **kwa):
+    def setdefault(self, obj, value:T, items:Optional[dict] = None, **kwa):
         "initializes the property stores"
+        if items is not None:
+            kwa.update(**items)
         obj.config[self.key].default  = value
         obj.config[self.key].defaults = kwa
 
@@ -83,8 +87,10 @@ class BeadProperty(Generic[T]):
     def __init__(self, key:str) -> None:
         self.key = key
 
-    def setdefault(self, obj, value:T, **kwa):
+    def setdefault(self, obj, value:T, items:Optional[dict] = None, **kwa):
         "initializes the property stores"
+        if items is not None:
+            kwa.update(**items)
         obj.project[self.key].default = None
         obj.project[self.key].set({})
         obj.config[self.key].default  = value

@@ -10,7 +10,7 @@ from    numpy.lib.stride_tricks import as_strided
 from    scipy.signal            import find_peaks_cwt
 
 from    utils                   import (kwargsdefaults, initdefaults, NoArgs,
-                                        asdataarrays, updatecopy)
+                                        asdataarrays)
 from    signalfilter            import PrecisionAlg
 from    signalfilter.convolve   import KernelConvolution # pylint: disable=unused-import
 
@@ -72,8 +72,7 @@ class Histogram(PrecisionAlg):
 
     def projection(self, aevents : HistInputs, bias: BiasType = None, **kwa):
         "Calls itself and returns the sum of histograms + min value and bin size"
-        cpy = updatecopy(self, **kwa)
-        tmp, (minv, bwidth) = cpy(aevents, bias, separate = False)
+        tmp, minv, bwidth = self(aevents, bias, separate = False, **kwa)
         return next(tmp), minv, bwidth
 
     @property

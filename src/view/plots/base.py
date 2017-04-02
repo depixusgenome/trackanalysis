@@ -162,7 +162,10 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         ctrl.getGlobal("css.plot").defaults = dict(ylabel      = u'Z (nm)',
                                                    yrightlabel = u'Base number',
                                                    xtoplabel   = u'Time (s)',
-                                                   xlabel      = u'Frames')
+                                                   xlabel      = u'Frames',
+                                                   toolbar_location = 'right',
+                                                   toolbar_sticky   = False,
+                                                   sizing_mode      = 'stretch_both')
 
         key = ".plot." + type(self).__name__[:-len('PlotCreator')].lower()
         for name in 'config', 'project', 'css':
@@ -319,8 +322,8 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         if 'dpxhover' in tools:
             tools = [i if i != 'dpxhover' else DpxHoverTool() for i in tools.split(',')]
         return dict(tools          = tools,
-                    toolbar_sticky = False,
-                    sizing_mode    = 'stretch_both')
+                    toolbar_sticky = self.css.toolbar_sticky.get(),
+                    sizing_mode    = self.css.sizing_mode.get())
 
     @classmethod
     def _needsreset(cls, items) -> bool:

@@ -47,7 +47,7 @@ class PeaksDict(TrackItems):
 class PeakSelectorProcessor(Processor):
     u"Groups events per peak"
     @classmethod
-    def apply(cls, toframe, **cnf):
+    def apply(cls, toframe = None, **cnf):
         "applies the task to a frame or returns a function that does so"
         # pylint: disable=not-callable
         fcn = lambda frame: frame.new(PeaksDict, config = cls.tasktype(**cnf))

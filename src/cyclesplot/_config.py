@@ -4,7 +4,6 @@
 
 from    typing          import (Optional, List,    # pylint: disable=unused-import
                                 Tuple, TYPE_CHECKING)
-from    itertools      import chain
 
 from    bokeh          import layouts
 from    bokeh.models   import (ColumnDataSource,  # pylint: disable=unused-import
@@ -142,6 +141,10 @@ class ConversionSlidersWidget(_Widget):
         self.__figdata = None # type: Optional[ColumnDataSource]
         self.css.defaults = {'title.stretch' : u'stretch 10³[dna/nm]',
                              'title.bias'    : u'bias [nm]'}
+
+        base = self.configroot.base
+        base.stretch.defaults = dict(start = 5.e-4, step = 1.e-5, end = 1.5e-3)
+        base.bias   .defaults = dict(step = .0001, ratio = .25)
 
     def addinfo(self, histsource):
         "adds info to the widget"
@@ -288,7 +291,7 @@ class ConfigMixin:
         for widget in self.__widgets.values():
             widget.observe()
 
-        enableOnTrack(self, self._hist, self._raw, *chain(*widgets.values()))
+        enableOnTrack(self, self._hist, self._raw, widgets)
 
         self.__widgets['seq']    .callbacks(self._hover, self._ticker)
         self.__widgets['sliders'].callbacks(self._hover, widgets['table'][1])

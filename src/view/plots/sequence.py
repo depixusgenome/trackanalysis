@@ -94,7 +94,7 @@ class SequenceTicker(ContinuousTicker):
 
         self.__withbase = dict()
         for name in ('color', 'dash', 'width', 'alpha'):
-            gridprops = cnf.css['grid'+name].get()
+            gridprops = cnf.css.grid[name].get()
             self.__withbase['grid_line_'+name]       = gridprops[0]
             self.__withbase['minor_grid_line_'+name] = gridprops[1]
 
@@ -111,12 +111,12 @@ class SequenceTicker(ContinuousTicker):
                        'right')
 
     @staticmethod
-    def defaultconfig() -> dict:
+    def defaultconfig(mdl):
         "default config"
-        return dict(gridcolor = ('lightblue', 'lightgreen'),
-                    gridwidth = (2,           2),
-                    gridalpha = (1.,          1.),
-                    griddash  = ('solid',     'solid'))
+        mdl.css.grid.defaults = dict(color = ('lightblue', 'lightgreen'),
+                                     width = (2,           2),
+                                     alpha = (1.,          1.),
+                                     dash  = ('solid',     'solid'))
 
     def reset(self):
         "Updates the ticks according to the configuration"
@@ -190,17 +190,18 @@ class SequenceHoverMixin:
                 """ % (name, name, name, name, atts)
 
     @staticmethod
-    def defaultconfig() -> dict:
+    def defaultconfig(mdl):
         "default config"
-        return { 'sequence.tooltips.radius': 1.,
-                 'sequence.tooltips'       : u'@z{1.1111} ↔ @values: @text'}
+        mdl.css.sequence.defaults = {'tooltips.radius': 1.,
+                                     'tooltips'       : u'@z{1.1111} ↔ @values: @text'}
+        mdl.config.oligos.size.default = 4
 
     @property
     def source(self):
         "returns the tooltip source"
         return self.__source
 
-    def create(self, fig, mdl, cnf):
+    def create(self, fig, mdl, cnf, xrngname = None):
         "Creates the hover tool for histograms"
         self.update(framerate = 1./30.,
                     bias      = mdl.bias if mdl.bias is not None else 0.,
@@ -211,23 +212,25 @@ class SequenceHoverMixin:
             return
         self._model    = mdl
         self.__tool   = hover[0]
-        self.__size   = cnf.configroot.oligos.size
+        self.__size   = cnf.config.oligos.size
         self.__source = ColumnDataSource(self.__data())
 
-        css           = cnf.css.sequence.tooltips
-        rend          = fig.circle(x                = 'inds',
-                                   y                = 'values',
-                                   source           = self.__source,
-                                   radius           = css.radius.get(),
-                                   radius_dimension = 'y',
-                                   line_alpha       = 0.,
-                                   fill_alpha       = 0.,
-                                   x_range_name     = 'cycles',
-                                   y_range_name     = 'bases',
-                                   visible          = False)
+        css  = cnf.css.sequence.tooltips
+        args = dict(x                = 'inds',
+                    y                = 'values',
+                    source           = self.__source,
+                    radius           = css.radius.get(),
+                    radius_dimension = 'y',
+                    line_alpha       = 0.,
+                    fill_alpha       = 0.,
+                    y_range_name     = 'bases',
+                    visible          = False)
+        if xrngname is not None:
+            args['x_range_name'] = xrngname
+
         self.__tool.update(tooltips  = css.get(),
                            mode      = 'hline',
-                           renderers = [rend])
+                           renderers = [fig.circle(**args)])
 
         src = self.__source
         @from_py_func
@@ -256,7 +259,7 @@ class SequenceHoverMixin:
         kwa.setdefault('stretch',   self._model.stretch)
         self.update(**kwa)
 
-    def slaveaxes(self, fig, src, extra:str, column:str, inpy = False):
+    def slaveaxes(self, fig, src, normal:str, extra:str, column:str, inpy = False):
         "slaves a histogram's axes to its y-axis"
         # pylint: disable=too-many-arguments,protected-access
         hvr = self
@@ -289,13 +292,29 @@ class SequenceHoverMixin:
                 cycles.end = 0
                 frames.end = 0
             else:
-                frames.end = max(src.data['frames'][ind1:ind2])+1
-                cycles.end = max(src.data['cycles'][ind1:ind2])+1
+                frames.end = max(src.data[normal][ind1:ind2])+1
+                cycles.end = max(src.data[extra][ind1:ind2])+1
 
         if inpy:
             _onchangebounds()
         else:
-            fig.y_range.callback = from_py_func(_onchangebounds, extra = extra, column = column)
+            fig.y_range.callback = from_py_func(_onchangebounds,
+                                                normal = normal,
+                                                extra  = extra,
+                                                column = column)
+
+    def estimatebias(self, hdata, extra:str, column:str):
+        "estimate the bias using the plot data"
+        if hdata is None:
+            return self.bias  # type: ignore
+
+        bias = self._model.bias
+        if bias is None:
+            ind1 = next((i for i,j in enumerate(hdata[extra]) if j > 0), 0)
+            ind2 = next((i for i,j in enumerate(hdata[extra][ind1+1:]) if j == 0), ind1+1)
+            ind  = (ind1+ind2-1)//2
+            return sum(hdata[column][ind:ind+2])*.5
+        return bias
 
     @checksizes
     def __data(self):
@@ -365,7 +384,6 @@ class SequencePathWidget(WidgetCreator):
         src   = hover.source
         @from_py_func
         def _js_cb(cb_obj = None, tick1 = tick1, tick2 = tick2, src = src):
-            print(cb_obj.value, src.column_names)
             if cb_obj.value in src.column_names:
                 cb_obj.label     = cb_obj.value
                 tick1.key        = cb_obj.value
@@ -403,6 +421,7 @@ class OligoListWidget(WidgetCreator):
     def __init__(self, model) -> None:
         super().__init__(model)
         self.__widget  = None # type: Optional[AutocompleteInput]
+        self.configroot.oligos.defaults = {'history': [], 'history.maxlength': 10}
         self.css.defaults = {'title.oligos'     : u'Oligos',
                              'title.oligos.help': u'comma-separated list'}
 

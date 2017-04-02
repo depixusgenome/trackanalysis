@@ -27,14 +27,11 @@ class CyclesModelAccess(TaskPlotModelAccess):
     def __init__(self, ctrl, key: Optional[str] = None) -> None:
         super().__init__(ctrl, key)
         cls = type(self)
-        cls.oligos      .setdefault(self, tuple(), size = 4)
+        cls.oligos      .setdefault(self, [], size = 4)
         cls.binwidth    .setdefault(self, 0.003)
         cls.minframes   .setdefault(self, 10)
-        cls.stretch     .setdefault(self, 8.8e-4,
-                                    start = 5.e-4,
-                                    step  = 1.e-5,
-                                    end   = 1.5e-3)
-        cls.bias        .setdefault(self, None, step = .0001, ratio = .25)
+        cls.stretch     .setdefault(self, 8.8e-4)
+        cls.bias        .setdefault(self, None)
         cls.peaks       .setdefault(self, None)
         cls.sequencekey .setdefault(self, None) # type: ignore
 
