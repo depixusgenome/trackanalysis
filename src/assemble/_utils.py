@@ -245,7 +245,7 @@ def _highest_norm_intersect(dist1,dist2):
     sc_dist.sort()
     return sc_dist[-1][1]
 
-def find_overlaping_normdists(dists,nscale=2): # to pytest !! # what if no intersection?
+def find_overlapping_normdists(dists,nscale=1): # to pytest !! # what if no intersection?
     u'''
     returns lists of indices [(i,j,k)] each element of the tuple has distribution which overlap
     '''
@@ -286,7 +286,7 @@ def _list_perm_bounds(perm,dists,_epsi=0.001):
             bounds[vlj].append(flag-sign*_epsi)
     return bounds
 
-def optimal_perm_normdists(perm:List,dists)->numpy.ndarray: # brute-force # to optimize # to finish
+def optimal_perm_normdists(perm:List,dists)->numpy.ndarray: # pytest
     u'''
     given a permuation perm and the known distributions of each state
     returns the permutated state which maximise the probability
@@ -302,14 +302,14 @@ def optimal_perm_normdists(perm:List,dists)->numpy.ndarray: # brute-force # to o
     fun = CostPermute(dists,perm)
     return scipy.optimize.minimize(fun,xinit,constraints=constraints).x
 
-def find_overlaping_oligos(oligos,nscale=2): # to implement
+def find_overlapping_oligos(oligos,nscale=1):
     u'''
-    returns groups of overlaping oligos
+    returns groups of overlapping oligos
     '''
-    groups = find_overlaping_normdists([oli.dist for oli in oligos],nscale=nscale)[1]
+    groups = find_overlapping_normdists([oli.dist for oli in oligos],nscale=nscale)[1]
     return [[oligos[idx] for idx in grp] for grp in groups]
 
-def group_oligos(oligos,**kwa): # pytest
+def group_oligos(oligos,**kwa):
     u''' returns oligos grouped by attr "by"
     '''
     byattr = kwa.get("by","batch_id")

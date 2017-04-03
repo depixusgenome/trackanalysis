@@ -10,6 +10,7 @@ from typing import Callable, Iterable # pylint: disable=unused-import
 from multiprocessing import Pool
 import math
 import itertools
+import pickle
 import numpy
 from scipy.optimize import basinhopping,OptimizeResult
 from . import _utils as utils
@@ -92,7 +93,7 @@ class OptimSwap(HoppingSteps): # not usable
     '''
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
-        self.over_dist = utils.find_overlaping_normdists(self.dists)
+        self.over_dist = utils.find_overlapping_normdists(self.dists)
         # weight to draw uniformly a permutation amongst all possible
         self.weights= numpy.array([math.factorial(len(i)) for i in self.over_dist])
     def __call__(self,xst):
@@ -104,31 +105,37 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
     u'''
     trying to optimize the exploration of param space given hypotheses:
     symetric distribution of z around z0 (gaussian at the moment)
-    # find the distribution which overlap (and allow permutation of oligos)
-    # use generators in __call__
+    find the distribution which overlap (and allow permutation of oligos)
 
     # segregate per batch permutation beteen oligos with same batch_id is forbidden
     # -> better for recursive, scaffolding
     # segregate per batch permutation beteen oligos with same sequence is forbidden
 
     # strategies:
-    # find overlaping oligos. discard permutations between same groups
-    #self.over_oligos = utils.find_overlaping_oligos(self.oligos,nscale)
-
-    # or find each groups of oligos, take itertools.product(groups) find overlaps
+    # find each groups of oligos, take itertools.product(groups) find overlaps is too long!
+    # find overlapping oligos, find different groups for each overlapping set
     '''
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.oligos = kwargs.get("oligos",[])
-        nscale = kwargs.get("nscale",2)
+        nscale = kwargs.get("nscale",1)
         self.seg = kwargs.get("seg","batch_id") # "batch", "sequence"
-        groups = utils.group_oligos(self.oligos,by=self.seg) # ok
-        self.over_oligos = []
-        #prod_grps = [pro for pro in itertools.product(groups)] # mem issue?
-        for pro in itertools.product(*groups):
-            self.over_oligos.extend(utils.find_overlaping_oligos(pro,nscale=nscale))
-        print("over_oligos=",self.over_oligos)
+        # find overlapping oligos
+        # for each overlapping group, find the different groups, within overlapping oligos
+        overoli = utils.find_overlapping_oligos(self.oligos,nscale=nscale)
+        pickle.dump(self.oligos,open("oligos.pickle","wb"))
+        self.perms = []
+        for overgrp in overoli:
+            groups = utils.group_oligos(overgrp,by=self.seg)
+            print("len(groups)=",len(groups))
+            for pro in itertools.product(*groups):
+                self.perms.append(pro) # perms contains duplicate permutations
+
+        pickle.dump(self.perms,open("perms.pickle","wb"))
+        # can "align" oligo sequences in order to rank permutations per "beneficits"
+
     def __call__(self,xst):
+        #for combi in self.perms:
         pass
 
 class NestedAsmrs:
