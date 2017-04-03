@@ -11,6 +11,8 @@ from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
                                         DataTable, TableColumn, Model, Widget)
 
 import numpy                    as     np
+
+from signalfilter               import rawprecision
 from control.taskio             import ConfigTrackIO
 from control.processor          import processors
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
@@ -129,9 +131,9 @@ class PeaksPlotModelAccess(TaskPlotModelAccess):
             task  = self.configroot.tasks.eventdetection.get()
             ind   = self.eventdetection.index
             beads = next(iter(self._ctrl.run(root, ind-1, copy = True)))
-            return next(processors(task)).apply(beads, **task.config())[[ibead]]
+            return next(processors(task)).apply(beads, **task.config())[ibead, ...]
         else:
-            return next(iter(self._ctrl.run(root, task, copy = True)))[[ibead]]
+            return next(iter(self._ctrl.run(root, task, copy = True)))[ibead, ...]
 
 class PeaksSequenceHover(Model, SequenceHoverMixin):
     "tooltip over peaks"
@@ -217,8 +219,7 @@ class PeaksStatsWidget(WidgetCreator):
             best      = self._model.sequencekey
             values[0] = self._model.distances[best].stretch
             values[1] = self._model.distances[best].bias
-            values[2] = self._model.peakselection.task.rawprecision(self._model.track,
-                                                                    self._model.bead)
+            values[2] = rawprecision(self._model.track, self._model.bead)
             values[3] = len(self._model.fits.peaks)
             values[4] = np.sum(self._model.fits.peaks['key'] >= 0)
             values[5] = len(self._model.identification.task.peakids[best].peaks)-1
@@ -327,9 +328,8 @@ class PeaksPlotCreator(TaskPlotCreator):
         if cycles is None:
             return data, None
 
-        tmp   = list(cycles)
-        items = list(tmp[0][1])
-        if len(items) == 0 or not any(len(i) for _, i in items):
+        items = tuple(i for _, i in cycles)
+        if len(items) == 0 or not any(len(i) for i in items):
             return data, None
 
         peaks = self._model.peakselection.task
@@ -338,17 +338,20 @@ class PeaksPlotCreator(TaskPlotCreator):
 
         track = self._model.track
         frate = track.framerate
-        prec  = peaks.rawprecision(track, self._model.bead)
+        prec  = rawprecision(track, self._model.bead)
         dtl   = peaks.detailed(items, prec)
-        lens  = np.array([np.array([len(i)*frate for i in j], dtype = 'i4') for j in items],
+        lens  = np.array([np.array([len(i)/frate for _, i in j], dtype = 'i4')
+                          for j in items],
                          dtype = 'O')
 
         hist  = peaks.histogram
-        data  = dict(z        = np.arange(dtl.minv,
-                                          (len(dtl.hist)+0.001)*dtl.binwidth+dtl.minv,
-                                          dtl.binwidth, dtype = 'f4'),
-                     count    = dtl.hist/track.ncycles,
-                     duration = hist(dtl.pos, weights = lens, zmeasure = None)
+        data  = dict(z        = (dtl.binwidth*np.arange(len(dtl.histogram), dtype = 'f4')
+                                 +dtl.minvalue),
+                     count    = dtl.histogram/track.ncycles*100.,
+                     duration = hist.projection(dtl.positions,
+                                                weight    = lens,
+                                                zmeasure  = None,
+                                                precision = prec)[0]
                     )
         return data, dtl
 
@@ -363,8 +366,9 @@ class PeaksPlotCreator(TaskPlotCreator):
         self._fig.add_layout(axis, 'above')
 
         self._source = ColumnDataSource(self.__data()[0])
-        self.css.duration.addto(self._fig, y = 'z', x = 'duration', source = self._source)
         self.css.count   .addto(self._fig, y = 'z', x = 'count',    source = self._source)
+        self.css.duration.addto(self._fig, y = 'z', x = 'duration', source = self._source,
+                                x_range_name = "duration")
 
         self._hover.create(self._fig, self._model, self)
         doc.add_root(self._hover)
@@ -388,6 +392,7 @@ class PeaksPlotCreator(TaskPlotCreator):
     def _reset(self, _):
         data, dtl = self.__data()
         self._source.data = data
+        self.setbounds(self._fig.y_range, 'y', data['z'][[0,-1]])
         self._model.setfits(dtl)
         self._hover .reset(data)
         self._ticker.reset()
