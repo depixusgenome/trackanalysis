@@ -1,3 +1,49 @@
+# tag cycles_v1.0
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+New application for viewing cycles
+
+* On the left plot:
+
+    * Each cycle is displayed from yellow (first) to black (last)
+    * The x-axis is the number of frames (bottom) or the duration in seconds (top)
+    * The y-axis is in nanometers (left) or number of bases (right)
+    * Use the mouse to see a given cycle.
+
+* On the right plot:
+
+    * The x-axis is the number of frames (bottom) or the number of cycles (top)
+    * The y-axis is in nanometers (left) or number of bases (right)
+    * The number of frames at a given *z* position is the gray histogram
+    * The number of cycles at a given *z* position is the blue histogram. This
+    is estimated as the number of cycles having 10 or more frames at that position.
+    * Use the mouse to view the sequence at a given z.
+
+    * The x-axis is the number of frames (bottom) or the duration in seconds (top)
+    * The y-axis is in nanometers (left) or number of bases (right)
+    * Use the mouse to see a given cycle.
+
+* Viewing the sequence:
+    * A single fasta file can be opened. It may contain multiple sequences.
+    * The oligos can be selected. Using the Top/Bottom arrows should allow cycling
+    over previously selected oligos.
+    * The stretch and bias can be changed using either the sliders or the table
+    displaying 2 positions (first and last theoretic peaks)
+
+* Data cleaning includes:
+
+    * alignment: either on phase 1 or phase 3
+    * drift removal per bead: the correlation between cycles on a given bead is removed
+    * drift removal per cycle: **use only if all beads are good!** The correlation between
+    beads for each cycle is removed.
+
+* Phase 5 can be viewed alone by selecting *Find events*.
+
+* GR files can be loaded in 2 steps:
+
+    * first open the corresponding *.trk* file: it is need to reconstruct exact cycle
+    durations and number.
+    * then open the *.gr* files. You can select all of them in one go.
+
 # tag ramp_v1.2 
 ## Tagger: David Salthouse <david.salthouse@depixus.com>
     ### rampapp_v1.2

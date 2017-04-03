@@ -474,7 +474,7 @@ class Cycles(TrackItems, Items):
             yield from ((col, cid) for col in beads for cid in allcycles)
             return
 
-        isbead    = self.isbead
+        isbead = Beads.isbead
         for thisid in sel:
             if isinstance(thisid, (tuple, list)):
                 bid, tmp = thisid[0], thisid[1] # type: BEADKEY, Any

@@ -5,7 +5,7 @@ from   functools          import partial
 
 import numpy              as     np
 from   utils              import initdefaults
-from   model              import Task, Level
+from   model              import Task, Level, PHASE
 from   control.processor  import Processor
 
 from   .data              import Events
@@ -16,7 +16,7 @@ class ExtremumAlignmentTask(Task):
     "Task for aligning on a given phase"
     level   = Level.bead
     binsize = 5
-    phase   = 1
+    phase   = PHASE.initial
     @initdefaults('binsize', 'phase')
     def __init__(self, **_):
         super().__init__()
@@ -28,7 +28,7 @@ class ExtremumAlignmentProcessor(Processor):
         "applies the task to a frame or returns a function that does so"
         phase = kwa.get('phase', cls.tasktype.phase)
         align = ExtremumAlignment(binsize = kwa.get('binsize', cls.tasktype.binsize),
-                                  mode    = 'max' if phase == 3 else 'min')
+                                  mode    = 'max' if phase == PHASE.pull else 'min')
         def _action(frame, info):
             cycles = frame.new(data = {info[0]: info[1]})[info[0],...]
             vals   = np.array(list(cycles.withphases(phase).values()), dtype = 'O')
@@ -48,7 +48,7 @@ class EventDetectionTask(EventDetectionConfig, Task):
     "Config for an event detection"
     levelin = Level.bead
     levelou = Level.event
-    phase   = 5
+    phase   = PHASE.measure
     @initdefaults('phase')
     def __init__(self, **kw) -> None:
         EventDetectionConfig.__init__(self, **kw)

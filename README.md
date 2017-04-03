@@ -5,26 +5,33 @@
 
 # Installing
 
-* Check that you have all dependencies listed in REQUIRE. The better method
-  is to create a conda environment "pyenv/" at the project's root:
+The first step is to install boost libraries, either using the linux distribution's package manager or installing them manually.
+
+Clone the git repository and it's submodules, then set up the 
+environment and build:
 
 ```
-conda create -p pyenv/ pandas flexx bokeh pybind11
-```
+git clone http:\\GIT-REPO
+git submodule update --init --recursive
 
-* Copy or clone the wafbuilder library at the project's root.
-* Link or copy wafbuilder/bin/waf to the project's root.
-* Then do:
+python3 waf setup [-n myenv]
+[conda activate myenv]
 
-```
-conda activate pyenv/
-python3 waf configure
+python3 waf configure [--boost-includes=BOOST_INCLUDEPATH --boost-libs=BOOST_LIBSPATH]
+
 python3 waf build
 ```
 
-The *configure* step is required only once. The *conda activate* step is required
-once per shell. It sets the path such that the python used is the one in *pyenv*.
-The *build* step is required any time sources are changed.
+Items in between [] are optional or specific to windows:
+
+* [-n myenv] is optional. [conda activate myenv] is mandatory if and
+  only if the [-n myenv] option was used.
+
+* [--boost ... ] are mandatory only if BOOST was installed manually.
+
+The *configure* and *setup* steps are every time new dependencies
+are added. The *build* step is required any time sources are
+changed.
 
 # Architecture
 

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 u"Loading and save tracks"
 from    typing      import (Sequence, Callable, # pylint: disable=unused-import
-                            Any, Union, Tuple, Optional, TYPE_CHECKING)
+                            Any, Union, Tuple, Optional, Iterator, TYPE_CHECKING)
 from    inspect     import signature
 import  pickle
 import  re
@@ -15,14 +15,14 @@ if TYPE_CHECKING:
     from data import Track  # pylint: disable=unused-import
 
 PATHTYPE  = Union[str, Path]
-PATHTYPES = Union[PATHTYPE,Tuple[PATHTYPE,PATHTYPE]]
+PATHTYPES = Union[PATHTYPE,Tuple[PATHTYPE,...]]
 
 def _checktype(fcn):
     sig = signature(fcn)
     tpe = tuple(sig.parameters.values())[-1].annotation
     if tpe is sig.empty:
         tpe = Any
-    elif tpe == Tuple[PATHTYPE,PATHTYPE]:
+    elif tpe == Tuple[PATHTYPE,...]:
         tpe = tuple
     else:
         tpe = getattr(tpe, '__union_params__', tpe)
@@ -39,17 +39,21 @@ def _checktype(fcn):
 def _fromdict(fcn) -> Callable[..., 'Track']:
     @wraps(fcn)
     def _wrapper(*args):
-        kwargs = fcn(*args[:-1]+(args[-1].path,))
+        trk    = args[-1]
+        path   = trk.path
+        if (not isinstance(path, (str, Path))) and len(path) == 1:
+            path = path[0]
+        kwargs = fcn(*args[:-1]+(path,))
 
         if kwargs is None:
-            args[-1].data = dict()
+            trk.data = dict()
         else:
             for name in {'phases', 'framerate'} & set(kwargs):
-                setattr(args[-1], name, kwargs.pop(name))
+                setattr(trk, name, kwargs.pop(name))
 
-            args[-1].data = dict(ite for ite in kwargs.items()
-                                 if isinstance(ite[1], np.ndarray))
-        return args[-1]
+            trk.data = dict(ite for ite in kwargs.items()
+                            if isinstance(ite[1], np.ndarray))
+        return trk
     return _wrapper
 
 class _TrackIO:
@@ -99,30 +103,36 @@ class LegacyGRFilesIO(_TrackIO):
     __GRTITLE = re.compile(r"Bead Cycle (?P<id>\d+) p.*")
     @classmethod
     @_checktype
-    def check(cls, paths:Tuple[PATHTYPE,PATHTYPE] # type: ignore
-             ) -> Optional[Tuple[PATHTYPE,PATHTYPE]]:
+    def check(cls, apaths:Tuple[PATHTYPE,...] # type: ignore
+             ) -> Optional[Tuple[PATHTYPE,...]]:
         u"checks the existence of paths"
-        if all(Path(i).suffix != '.trk' for i in paths):
+        if len(apaths) < 2:
             return None
 
-        if Path(paths[0]).is_dir():
-            paths = paths[1], paths[0]
+        paths = tuple(Path(i) for i in apaths)
+        if sum(1 for i in paths if i.suffix == '.trk') != 1:
+            return None
 
-        if not Path(paths[1]).is_dir():
-            raise IOError("[LegacyGRFilesIO] Missing directory in:\n- {}\n- {}"
-                          .format(*paths))
+        if len(paths) == 2 and any(i.is_dir() for i in paths):
+            if paths[0].is_dir():
+                paths = paths[1], paths[0]
 
-        if all(i.suffix != '.gr' for i in Path(paths[1]).iterdir()):
-            raise IOError("[LegacyGRFilesIO] No .gr files in directory\n- {}"
-                          .format(paths[1]))
-        fname = str(paths[0])
-        if '*' in fname:
-            return cls.__findtrk(fname, paths[1])
+            if all(i.suffix != '.gr' for i in paths[1].iterdir()):
+                raise IOError("[LegacyGRFilesIO] No .gr files in directory\n- {}"
+                              .format(paths[1]))
+            fname = str(paths[0])
+            if '*' in fname:
+                return cls.__findtrk(fname, paths[1])
 
-        elif not Path(paths[0]).exists():
-            raise IOError("Could not find path: " + str(paths[0]))
+            elif not paths[0].exists():
+                raise IOError("Could not find path: " + str(paths[0]))
 
-        return paths
+            return paths
+
+        else:
+            trk = next(i for i in paths if i.suffix == '.trk')
+            grs = tuple(i for i in paths if i.suffix  == '.gr')
+            return (trk,) + grs
 
     @classmethod
     @_fromdict
@@ -131,7 +141,12 @@ class LegacyGRFilesIO(_TrackIO):
         output = readtrack(str(paths[0]))
         remove = set(i for i in output if isinstance(i, int))
 
-        for grpath in Path(paths[1]).iterdir():
+        if len(paths) == 2 and Path(paths[1]).is_dir():
+            itr = Path(paths[1]).iterdir()      # type: Iterator[Path]
+        else:
+            itr = (Path(i) for i in paths[1:])
+
+        for grpath in itr:
             if grpath.suffix != ".gr":
                 continue
 
@@ -226,6 +241,10 @@ class Handler:
         Upon success, it returns a handler with the correct protocol for this path.
         """
         paths = getattr(track, 'path', track)
+
+        if (not isinstance(paths, (str, Path))) and len(paths) == 1:
+            paths = paths[0]
+
         if isinstance(paths, (str, Path)):
             if not Path(paths).exists():
                 raise IOError("Could not find path: " + str(paths))

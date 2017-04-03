@@ -77,6 +77,7 @@ def options(opt):
                               +u" necessary for provided applications"))
 
 def configure(cnf):
+    cnf.load('msvs')
     cnf.env.app = cnf.options.app.split(',') if len(cnf.options.app) else []
 
     if cnf.options.dyn is None and len(cnf.options.modules) == 0:
@@ -134,7 +135,8 @@ def setup(cnf):
     print('********************************************')
     print('********************************************')
     print("BOOST must be installed manually")
-    print("coffeescript must be installed manually")
+    if builder.os.sys.platform.startswith("win"):
+        print("COFFEESCRIPT is not mandatory & can be installed manually")
     print('********************************************')
     print('********************************************')
 
@@ -142,6 +144,7 @@ class _CondaApp(BuildContext):
     fun = cmd = 'app'
 def app(bld):
     bld.options.APP_PATH = bld.bldnode.make_node("output")
+
     if bld.options.APP_PATH.exists():
         bld.options.APP_PATH.delete()
 
@@ -150,7 +153,7 @@ def app(bld):
 
     iswin = builder.os.sys.platform.startswith("win")
     ext   = ".bat"                       if iswin else ""
-    cmd   = r"start /min %%~dp0pythonw " if iswin else "./"
+    cmd   = r"start /min %~dp0pythonw " if iswin else "./"
 
     for name, val in {'cyclesplot': 'cyclesplot.CyclesPlotView'}.items():
         with open(str(bld.options.APP_PATH.make_node(name+ext)), 'w',

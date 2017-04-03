@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Different file dialogs."
-
-import pathlib
+import sys
+from pathlib            import Path
 from typing             import Callable
 from tkinter            import Tk as _Tk
 from tkinter.filedialog import (askopenfilename   as _tkopen,
@@ -19,6 +19,7 @@ class FileDialog:
     """
     DEFAULTS = {'all':      (u'all files',               '.*'),
                 'trk':      (u'track files',             '.trk'),
+                'gr':       (u'graphics files',          '.gr'),
                 'ana':      (u'analysis files',          '.ana'),
                 'fasta':    (u'fasta files',             '.fasta'),
                 'xls':      (u'excel files',             '.xlsx'),
@@ -55,9 +56,14 @@ class FileDialog:
 
     @staticmethod
     def _setconfig(cnf):
-        def _defaultpath(ret):
-            ret                 = pathlib.Path(ret)
-            cnf[ret.suffix[1:]] = str(ret.resolve())
+        def _defaultpath(rets):
+            vals = {}
+            itr  = (rets,) if isinstance(rets, str) else rets
+            for ret in itr:
+                ret = Path(ret).resolve()
+                vals.setdefault(ret.suffix[1:], str(ret))
+            cnf.update(**vals)
+
         return _defaultpath
 
     def _parse_filetypes(self, info:dict):
@@ -88,8 +94,8 @@ class FileDialog:
             if path is None:
                 continue
 
-            info['initialdir']  = path[:path.rfind('/')]
-            info['initialfile'] = path[len(info['initialdir'])+1:]
+            info['initialdir']  = str(Path(path).parent)
+            info['initialfile'] = str(Path(path).name)
             break
 
     def _parse_all(self):
@@ -106,15 +112,24 @@ class FileDialog:
         root = _Tk()
         root.withdraw()
         root.wm_attributes("-topmost",1)
-        ret = dialog(**info,parent=root)
-        if ret is None or len(ret) == 0:
-            return None
 
-        self.initialdir  = ret[:ret.rfind('/')]
-        self.initialfile = ret[len(self.initialdir)+1:]
+        rets = dialog(**info,parent=root)
+        if rets is None or len(rets) == 0:
+            return None
+        if (not sys.platform.startswith('win')
+                and isinstance(rets, tuple)
+                and len(rets) > 1
+                and 'initialfile' in info
+                and info.get('multiple', False)):
+            rets = rets[1:] # discard initial file
+
+        ret = Path(rets if isinstance(rets, str) else next(iter(rets)))
+        self.initialdir  = ret.parent
+        self.initialfile = ret.name
+
         if self.config is not None:
-            self.config[1](ret)
-        return ret
+            self.config[1](rets)
+        return rets
 
     def open(self):
         "Returns a filepath to be opened."

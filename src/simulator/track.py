@@ -10,6 +10,7 @@ from    itertools       import chain
 import  numpy as np
 
 from    utils           import initdefaults, kwargsdefaults, EVENTS_DTYPE
+from    model           import PHASE
 from    data            import Track
 from    data.trackitems import Cycles, Level, TrackItems
 
@@ -233,7 +234,7 @@ class TrackSimulator:
 
     def __events(self, cycles: np.ndarray) -> Iterator[np.ndarray]:
         dtpe  = EVENTS_DTYPE
-        for cyc in self.__cyclephase(cycles, 5):
+        for cyc in self.__cyclephase(cycles, PHASE.measure):
             rng  = np.nonzero(np.diff(cyc))[0]+1
             evts = [(i, evt) for i, evt in zip(chain((0,), rng), np.split(cyc, rng))]
             yield np.array(evts, dtype = dtpe)
@@ -243,7 +244,7 @@ class TrackSimulator:
         cycles = np.zeros((self.ncycles, sum(self.durations)), dtype = 'f4')
         self.__addtemplate(cycles)
         if self.events is not None:
-            self.events(self.__cyclephase(cycles, 5))
+            self.events(self.__cyclephase(cycles, PHASE.measure))
 
         ret = fcn(cycles, *args)
 

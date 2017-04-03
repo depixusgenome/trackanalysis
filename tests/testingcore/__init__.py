@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u""" access to files """
-from typing  import Union, Sequence
-from pathlib import Path
+import  warnings
+from    typing  import Union, Sequence
+from    pathlib import Path
+import  numpy as np
+np.seterr(all='raise')
+warnings.filterwarnings('error', category = FutureWarning)
+warnings.filterwarnings('error', category = DeprecationWarning)
+warnings.filterwarnings('error', category = PendingDeprecationWarning)
 
 def _trackreadertask(fpath, beadsonly = True):
     from model.task     import TrackReaderTask
@@ -37,7 +43,7 @@ def path(name:str) -> Union[str, Sequence[str]]:
         val = Path("../tests/"+__package__+"/"+i)
         if not val.exists():
             raise KeyError("Check your file name!!! {}".format(val))
-        return str(val.absolute())
+        return str(val.resolve())
 
     if isinstance(default, tuple):
         return tuple(_test(i) for i in default)
@@ -48,6 +54,5 @@ def getmonkey():
     u"for calling with pudb"
     import  pytest  # pylint: disable=unused-import,unused-variable
     from    _pytest.monkeypatch import MonkeyPatch
-    import  warnings
     warnings.warn("Unsafe call to MonkeyPatch. Use only for manual debugging")
     return MonkeyPatch()

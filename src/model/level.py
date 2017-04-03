@@ -4,6 +4,7 @@ u"""
 Classes defining a level of data treatment.
 """
 from enum   import Enum, unique
+from utils  import initdefaults
 
 @unique
 class Level(Enum):
@@ -14,6 +15,17 @@ class Level(Enum):
     event   = 3
     peak    = 4
     none    = None # type: ignore
+
+class Phase:
+    "Class containing default phases"
+    initial = 1 # type: int
+    pull    = 3 # type: int
+    measure = 5 # type: int
+    count   = 8 # type: int
+    @initdefaults
+    def __init__(self, **_):
+        pass
+PHASE = Phase()
 
 def levelprop(val):
     u"Adds a read-only property"

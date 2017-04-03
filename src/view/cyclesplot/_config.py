@@ -78,19 +78,19 @@ class PeaksTableCreator(WidgetCreator):
         source = self.__widget.source
         source.on_change("data", _py_cb) # pylint: disable=no-member
 
-        self.getConfig() .observe('sequence.peaks',
-                                  lambda: setattr(source, 'data', self.__data()))
-        self.getRootConfig().observe(('oligos', 'last.path.fasta'),
-                                     lambda: setattr(source, 'data', self.__data()))
-        self.getCurrent().observe(('sequence.key',),
-                                  lambda: setattr(source, 'data', self.__data()))
+        obs = lambda: setattr(source, 'data', self.__data())
+        self.getConfig().sequence.peaks.observe(obs)
+        self.getRootConfig().observe(('oligos', 'last.path.fasta'), obs)
+        self.getCurrent().sequence.key.observe(obs)
 
         hover  = self.__hover
 
         @CustomJS.from_py_func
-        def _js_cb(source = source, mdl = hover, stretch = stretch, bias = bias):
-            zval  = source.data['z']
-            bases = source.data['bases']
+        def _js_cb(cb_obj = None, mdl = hover, stretch = stretch, bias = bias):
+            if mdl.updating != '':
+                return
+            zval  = cb_obj.data['z']
+            bases = cb_obj.data['bases']
             if zval[0] == zval[1] or bases[0] == bases[1]:
                 return
 
@@ -101,7 +101,8 @@ class PeaksTableCreator(WidgetCreator):
             bias   .value = bval
             mdl.stretch   = aval
             mdl.bias      = bval
-            mdl.updating += 1
+            mdl.updating = 'peaks'
+            mdl.updating = ''
         source.js_on_change("data", _js_cb) # pylint: disable=no-member
 
     def __data(self):
@@ -158,8 +159,8 @@ class ConversionSlidersCreator(WidgetCreator):
 
     def callbacks(self, action, hover, table):
         "adding callbacks"
-        self.getConfig() .observe(('base.stretch', 'base.bias'), self.update)
-        self.getCurrent().observe(('base.stretch', 'base.bias'), self.update)
+        self.getConfig() .base.observe(('stretch', 'bias'), self.update)
+        self.getCurrent().base.observe(('stretch', 'bias'), self.update)
 
         stretch, bias = self.__stretch, self.__bias
 
@@ -175,14 +176,18 @@ class ConversionSlidersCreator(WidgetCreator):
         source = table.source
         @CustomJS.from_py_func
         def _js_cb(stretch = stretch, bias = bias, mdl = hover, source = source):
+            if mdl.updating != '':
+                return
+
             mdl.stretch  = stretch.value*1e-3
             mdl.bias     = bias.value
-            mdl.updating = mdl.updating+1
+            mdl.updating = 'sliders'
 
             bases            = source.data['bases']
             source.data['z'] = [bases[0] * stretch.value*1e-3 + bias.value,
                                 bases[1] * stretch.value*1e-3 + bias.value]
             source.trigger('change:data')
+            mdl.updating = ''
 
         stretch.js_on_change('value', _js_cb)
         bias   .js_on_change('value', _js_cb)
@@ -264,8 +269,9 @@ class SequencePathCreator(WidgetCreator):
                 src.trigger("change")
         self.__widget.js_on_change('value', _js_cb)
 
-        self.getConfig().observe(('sequence.key', 'sequence.path'),
-                                 lambda: self.__widget.update(**self.__data()))
+        obs = lambda: self.__widget.update(**self.__data())
+        self.getConfig().sequence.key.observe(obs)
+        self.getRootConfig().last.path.fasta.observe(obs)
 
 class OligoListCreator(WidgetCreator):
     "Input for defining a list of oligos"
@@ -308,7 +314,7 @@ class OligoListCreator(WidgetCreator):
             self._model.oligos = ols
 
         widget.on_change('value', _py_cb)
-        self.getRootConfig().observe('oligos', self.update)
+        self.getRootConfig().oligos.observe(self.update)
 
 class GroupCreator(WidgetCreator):
     "Allows creating group widgets"

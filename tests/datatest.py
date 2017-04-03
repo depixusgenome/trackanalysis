@@ -4,10 +4,10 @@ u""" Tests data access """
 from   pathlib import Path
 import numpy as np
 
-from   legacy       import readtrack   # pylint: disable=import-error,no-name-in-module
+from   legacy           import readtrack   # pylint: disable=import-error,no-name-in-module
 import data
 from   data.trackitems  import Items
-from   testingcore      import path
+from   testingcore      import path as utpath
 
 # pylint: disable=no-self-use, missing-docstring,protected-access
 class _MyItem(Items):
@@ -27,7 +27,7 @@ class TestBeadIteration:
     u"tests opening a trackfile"
     def test_iterkeys(self):
         u"tests wether keys are well listed"
-        track = data.Track(path = path("small_legacy"), beadsonly = False)
+        track = data.Track(path = utpath("small_legacy"), beadsonly = False)
         beads = lambda: data.Beads(track = track, data = _MyItem(track.data))
         vals = set(tuple(range(92))+ ('zmag', 't'))
         assert set(beads().keys())                 == vals
@@ -56,7 +56,7 @@ class TestCycleIteration:
     u"tests opening a trackfile"
     def test_iterkeys(self):
         u"tests wether keys are well listed"
-        track = data.Track(path = path("big_legacy"), beadsonly = False)
+        track = data.Track(path = utpath("big_legacy"), beadsonly = False)
         cycs  = lambda: data.Cycles(track = track, data = _MyItem(track.data))
         cids  = lambda _: set(tuple((i,_) for i in range(39)) + (('zmag', _), ('t', _)))
         bids  = lambda _: set((_,i) for i in range(102))
@@ -78,7 +78,7 @@ class TestCycleIteration:
 
         assert isinstance(cycs()[('zmag',0)], np.ndarray)
 
-        truth = readtrack(path("big_legacy"))[0]
+        truth = readtrack(utpath("big_legacy"))[0]
         for _, vals in cycs().selecting((0,1)):
             assert np.array_equal(vals, truth[1166-678:1654-678])
 
@@ -87,7 +87,7 @@ class TestCycleIteration:
 
     def test_cancyclefromcycle(self):
         u"A cycle can contain a cycle as data"
-        track = data.Track(path = path("big_legacy"))
+        track = data.Track(path = utpath("big_legacy"))
         cycs  = data.Cycles(track = track, data = _MyItem(track.data))
         cyc   = data.Cycles(track = track, data = cycs)
         assert set(cyc.keys()) == set(track.cycles.keys())
@@ -108,8 +108,8 @@ class TestCycleIteration:
 
     def test_lazy(self):
         u"tests what happens when using lazy mode"
-        truth = readtrack(path("big_legacy"))[0]
-        for _, vals in data.Cycles(track    = lambda:data.Track(path = path("big_legacy")),
+        truth = readtrack(utpath("big_legacy"))[0]
+        for _, vals in data.Cycles(track    = lambda:data.Track(path = utpath("big_legacy")),
                                    first    = lambda:2,
                                    last     = lambda:3,
                                    selected = lambda:[(0,1)]):
@@ -117,7 +117,7 @@ class TestCycleIteration:
 
     def test_nocopy(self):
         u"tests that data by default is not copied"
-        track = data.Track(path = path("big_legacy"))
+        track = data.Track(path = utpath("big_legacy"))
         vals1 = np.arange(1)
         for _, vals1 in data.Cycles(track   = track,
                                     first    = 2,
@@ -138,7 +138,7 @@ class TestCycleIteration:
 
     def test_copy(self):
         u"tests that data can be copied"
-        track = data.Track(path = path("big_legacy"))
+        track = data.Track(path = utpath("big_legacy"))
         vals1 = np.arange(1)
         for _, vals1 in data.Cycles(track   = track,
                                     first    = 2,
@@ -159,32 +159,37 @@ class TestCycleIteration:
         assert not np.array_equal(vals1, vals2)
 
 def test_loadgrdir():
-    paths = path("big_legacy"), path("big_grlegacy")
-    track = data.Track(path = paths)
-    keys  = {0, 10, 12, 13, 14, 16, 17, 18, 1, 21, 22, 23,
-             24, 25, 26, 27, 28, 29, 2, 34, 35, 37, 3, 4, 6, 7}
-    assert set(track.beadsonly.keys()) == keys
+    paths = utpath("big_legacy"), utpath("big_grlegacy")
+    for time in range(2):
+        if time == 1:
+            paths = paths[:1] + tuple(str(i) for i in Path(paths[1]).iterdir()
+                                      if i.suffix == '.gr')
+            paths = paths[5:] + paths[:5]
+        track = data.Track(path = paths)
+        keys  = {0, 10, 12, 13, 14, 16, 17, 18, 1, 21, 22, 23,
+                 24, 25, 26, 27, 28, 29, 2, 34, 35, 37, 3, 4, 6, 7}
+        assert set(track.beadsonly.keys()) == keys
 
-    keys  = {17, 23, 41, 14, 31, 45, 18, 37, 44,  7, 32,  6, 48, 22, 24, 47, 28,
-             19, 30, 25, 43, 42,  8, 26, 16, 12,  9, 33, 35, 27,  3, 10, 21, 15,
-             34, 29, 13,  5,  4, 20, 46, 11}
-    keys  = {i-3 for i in keys}
-    good  = {i[1] for i, j in track.cycles[28,...] if not np.all(np.isnan(j))}
-    assert good == keys
-    assert len(good) < track.ncycles
+        keys  = {17, 23, 41, 14, 31, 45, 18, 37, 44,  7, 32,  6, 48, 22, 24, 47, 28,
+                 19, 30, 25, 43, 42,  8, 26, 16, 12,  9, 33, 35, 27,  3, 10, 21, 15,
+                 34, 29, 13,  5,  4, 20, 46, 11}
+        keys  = {i-3 for i in keys}
+        good  = {i[1] for i, j in track.cycles[28,...] if not np.all(np.isnan(j))}
+        assert good == keys
+        assert len(good) < track.ncycles
 
 def test_findgrdir():
-    paths = str(Path(path("big_legacy")).parent/'*.trk'), path("big_grlegacy")
+    paths = str(Path(utpath("big_legacy")).parent/'*.trk'), utpath("big_grlegacy")
     track = data.Track(path = paths)
     keys  = {0, 10, 12, 13, 14, 16, 17, 18, 1, 21, 22, 23,
              24, 25, 26, 27, 28, 29, 2, 34, 35, 37, 3, 4, 6, 7}
     assert set(track.beadsonly.keys()) == keys
 
-    paths = str(Path(path("big_legacy")).parent/'test*.trk'), path("big_grlegacy")
+    paths = str(Path(utpath("big_legacy")).parent/'test*.trk'), utpath("big_grlegacy")
     track = data.Track(path = paths)
     keys  = {0, 10, 12, 13, 14, 16, 17, 18, 1, 21, 22, 23,
              24, 25, 26, 27, 28, 29, 2, 34, 35, 37, 3, 4, 6, 7}
     assert set(track.beadsonly.keys()) == keys
 
 if __name__ == '__main__':
-    TestCycleIteration().test_iterkeys()
+    test_loadgrdir()

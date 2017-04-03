@@ -55,11 +55,12 @@ class BeadInput(BokehView):
                 if len(self.__beads):
                     self.__inp.start = self.__beads[0]
                     self.__inp.end   = self.__beads[-1]
+                    self.__inp.value = self.__beads[0]
 
             elif 'bead' in items:
                 self.__inp.value = items['bead'].value
 
-        self._ctrl.observe('globals.current', _oncurrent)
+        self._ctrl.getGlobal('current').observe(_oncurrent)
 
         self._keys.addKeyPress(('keypress.beadup',
                                 lambda: self.__onchange_cb('', '', self.__inp.value+1)))
