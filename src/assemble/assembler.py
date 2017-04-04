@@ -8,9 +8,7 @@ regroups functions and classes to initialise assemblers
 import sys
 from typing import Callable, Iterable # pylint: disable=unused-import
 from multiprocessing import Pool
-import math
 import itertools
-import pickle
 import numpy
 from scipy.optimize import basinhopping,OptimizeResult
 from . import _utils as utils
@@ -85,22 +83,6 @@ class GaussAndFlip(HoppingSteps):
             xst[flip], xst[flip+1] = xst[flip+1],xst[flip]
             return xst
 
-class OptimSwap(HoppingSteps): # not usable
-    u'''trying to optimize the exploration of param space given hypotheses:
-    symetric distribution of z around z0 (gaussian at the moment)
-    # find the distribution which overlap (and allow permutation of oligos)
-    # when allowing permutations of oligos return the optimal solution wrt to dist(z,z0)
-    '''
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
-        self.over_dist = utils.find_overlapping_normdists(self.dists)
-        # weight to draw uniformly a permutation amongst all possible
-        self.weights= numpy.array([math.factorial(len(i)) for i in self.over_dist])
-    def __call__(self,xst):
-        #swap = numpy.random.choice(list(self.opti_perm))
-        #xst[list(swap)]=utils.optimal_perm_normdists(swap,self.dists)
-        return xst
-
 class OptimOligoSwap(HoppingSteps): # not yet usable
     u'''
     trying to optimize the exploration of param space given hypotheses:
@@ -118,26 +100,28 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.oligos = kwargs.get("oligos",[])
-        nscale = kwargs.get("nscale",1)
+        self.nscale = kwargs.get("nscale",1)
         self.seg = kwargs.get("seg","batch_id") # "batch", "sequence"
         # find overlapping oligos
         # for each overlapping group, find the different groups, within overlapping oligos
-        overoli = utils.find_overlapping_oligos(self.oligos,nscale=nscale)
-        pickle.dump(self.oligos,open("oligos.pickle","wb"))
-        self.perms = []
-        for overgrp in overoli:
-            groups = utils.group_oligos(overgrp,by=self.seg)
-            print("len(groups)=",len(groups))
-            for pro in itertools.product(*groups):
-                self.perms.append(pro) # perms contains duplicate permutations
+        #overoli = utils.find_overlapping_oligos(self.oligos,nscale=nscale)
+        #self.perms = []
+        #for overgrp in overoli:
+        #    groups = utils.group_oligos(overgrp,by=self.seg)
+        #    print("len(groups)=",len(groups))
+        #    for pro in itertools.product(*groups):
+        #        self.perms.append(pro) # perms contains duplicate permutations
 
-        pickle.dump(self.perms,open("perms.pickle","wb"))
-        # can "align" oligo sequences in order to rank permutations per "beneficits"
+        # set the calls such that __call__ tends to merge batches together 
+        batches = set(i.batch_id for i in self.oligos)
+        groups = utils.group_oligos(,by=self.seg)
 
     def __call__(self,xst):
-        #for combi in self.perms:
-        pass
-
+        u'''
+        at each call 2 batch_ids are merged
+        '''
+        
+        
 class NestedAsmrs:
     u'''
     nested Monte Carlo running different random seeds in parallel
