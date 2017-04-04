@@ -92,10 +92,8 @@ class RawMixin:
 
     def _createraw(self):
         css             = self.css
-        self._raw       = figure(y_axis_label = css.ylabel.get(),
-                                 y_range      = Range1d(start = 0., end = 0.),
-                                 name         = 'Cycles:Raw',
-                                 **self._figargs(css))
+        self._raw       = figure(**self._figargs(y_range = Range1d,
+                                                 name    = 'Cycles:Raw'))
         raw, shape      = self.__data()
         self._rawsource = ColumnDataSource(data = raw)
 

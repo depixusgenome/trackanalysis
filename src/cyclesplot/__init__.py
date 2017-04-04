@@ -34,16 +34,6 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, ConfigMixin):
         if TYPE_CHECKING:
             self._model = CyclesModelAccess('', '')
 
-    def _figargs(self, css):
-        args = super()._figargs(css)
-        args['x_axis_label']     = css.xlabel.get()
-        if css.plotwidth.get(default = None) is not None:
-            args['plot_width']       = css.plotwidth.get()
-        if css.plotheight.get(default = None) is not None:
-            args['plot_height']      = self.css.plotheight.get()
-        args['toolbar_location']     = self.css.toolbar_location.get()
-        return args
-
     def _create(self, doc):
         "returns the figure"
         self._hover = DpxHoverModel()

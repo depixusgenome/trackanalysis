@@ -17,6 +17,8 @@ from    control.globalscontrol  import GlobalsAccess
 from    ..base                  import BokehView, Action
 from    .bokehext               import DpxHoverTool, from_py_func
 
+_m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
+
 def checksizes(fcn):
     "Checks that the ColumnDataSource have same sizes"
     @wraps(fcn)
@@ -163,9 +165,9 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                                                    yrightlabel = u'Base number',
                                                    xtoplabel   = u'Time (s)',
                                                    xlabel      = u'Frames',
-                                                   toolbar_location = 'right',
+                                                   toolbar_location = 'left',
                                                    toolbar_sticky   = False,
-                                                   sizing_mode      = 'stretch_both')
+                                                   sizing_mode      = 'scale_width')
 
         key = ".plot." + type(self).__name__[:-len('PlotCreator')].lower()
         for name in 'config', 'project', 'css':
@@ -317,13 +319,45 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         self.project.observe(('x', 'y'), _onobserve)
         return fig
 
-    def _figargs(self, _) -> dict:
-        tools = self.config.tools.get()
-        if 'dpxhover' in tools:
-            tools = [i if i != 'dpxhover' else DpxHoverTool() for i in tools.split(',')]
-        return dict(tools          = tools,
-                    toolbar_sticky = self.css.toolbar_sticky.get(),
-                    sizing_mode    = self.css.sizing_mode.get())
+    def _figargs(self, *cssarr, **kwa) -> dict:
+        args    = dict()
+        cssarr  = (self.config,) + tuple(cssarr) + (self.css,)
+
+        for key, name in (('toolbar_sticky',   'toolbar_sticky'),
+                          ('toolbar_location', 'toolbar_location'),
+                          ('sizing_mode',      'sizing_mode'),
+                          ('x_axis_label',     'xlabel'),
+                          ('y_axis_label',     'ylabel'),
+                          ('plot_width',       'plotwidth'),
+                          ('plot_height',      'plotheight'),
+                          ('tools',            'tools')):
+            for css in cssarr:
+                val = css.get(name, default = _m_none)
+                if val is not _m_none:
+                    args[key] = val
+                    break
+        args.update(kwa)
+
+        if args.get('tools', _m_none) is _m_none:
+            args['tools'] = []
+        else:
+            args['tools'] = args['tools'].split(',')
+
+        ttips = _m_none
+        for css in cssarr:
+            ttips = css.get('tooltips', default = _m_none)
+            if ttips is not _m_none:
+                break
+
+        if ttips not in (_m_none, '', None) and 'dpxhover' not in args['tools']:
+            args['tools'] += [DpxHoverTool()]
+        elif 'dpxhover' in args['tools']:
+            args['tools'] = [i if i != 'dpxhover' else DpxHoverTool()
+                             for i in args['tools']]
+        for name in ('x_range', 'y_range'):
+            if args.get(name, _m_none) is Range1d:
+                args[name] = Range1d(start = 0., end = 0.)
+        return args
 
     @classmethod
     def _needsreset(cls, items) -> bool:

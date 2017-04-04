@@ -149,20 +149,58 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
                                                  biases:    [p.Any, {}],
                                                  ''')
 
-    def slaveaxes(self, fig, src, inpy = False): # pylint: disable=arguments-differ
-        "slaves a histogram's axes to its y-axis"
-        super().slaveaxes(fig, src, 'count', 'duration', 'z', inpy)
-
     def reset(self, hdata = None): # pylint: disable=arguments-differ
         "Creates the hover tool for histograms"
         kwa  = dict()
         bias = self._model.bias
         if bias is None:
-            kwa['bias']  = self.estimatebias(hdata, 'duration', 'z')
+            kwa['bias']  = self.estimatebias(hdata, 'count', 'z')
 
         kwa['biases']    = {i: j.bias    for i, j in self._model.distances}
         kwa['stretches'] = {i: j.stretch for i, j in self._model.distances}
         super().reset(**kwa)
+
+    def slaveaxes(self, fig, src, inpy = False): # pylint: disable=arguments-differ
+        "slaves a histogram's axes to its y-axis"
+        # pylint: disable=too-many-arguments,protected-access
+        hvr = self
+        def _onchangebounds(fig = fig, hvr = hvr, src = src):
+            yrng = fig.y_range
+            if hasattr(yrng, '_initial_start') and yrng.bounds is not None:
+                yrng._initial_start = yrng.bounds[0]
+                yrng._initial_end   = yrng.bounds[1]
+
+            bases        = fig.extra_y_ranges['bases']
+            bases.start  = (yrng.start - hvr.bias)/hvr.stretch
+            bases.end    = (yrng.end   - hvr.bias)/hvr.stretch
+
+            zval = src.data["z"]
+            ix1  = 0
+            ix2  = len(zval)
+            for i in range(ix2):
+                if zval[i] < yrng.start:
+                    ix1 = i+1
+                    continue
+                if zval[i] > yrng.end:
+                    ix2 = i
+                    break
+
+            dur = fig.extra_x_ranges['duration']
+            cnt = fig.x_range
+
+            dur.start = 0.
+            cnt.start = 0.
+            if len(zval) < 2 or ix1 == ix2:
+                dur.end = 0.
+                cnt.end = 0.
+            else:
+                dur.end = max(src.data["duration"][ix1:ix2])
+                cnt.end = max(src.data["count"][ix1:ix2])
+
+        if inpy:
+            _onchangebounds()
+        else:
+            fig.y_range.callback = from_py_func(_onchangebounds)
 
 class PeaksSequencePathWidget(SequencePathWidget):
     "Widget for setting the sequence to use"
@@ -296,13 +334,17 @@ class PeaksPlotCreator(TaskPlotCreator):
         super().__init__(*args)
         self.css.defaults = {'duration'        : PlotAttrs('gray', 'line', 1),
                              'count'           : PlotAttrs('blue', 'line', 1),
+                             'plotwidth'       : 500,
                              'xtoplabel'       : u'Duration (s)',
                              'xlabel'          : u'Cycles (%)'}
+        self.css.peaks.defaults = {'duration'  : PlotAttrs('gray', 'diamond', 5),
+                                   'count'     : PlotAttrs('blue', 'circle', 5)}
         self.config.defaults = {'tools'      : 'ypan,ybox_zoom,reset,save,dpxhover'}
         PeaksSequenceHover.defaultconfig(self)
         SequenceTicker.defaultconfig(self)
 
-        self._source  = None # type: Optional[ColumnDataSource]
+        self._histsrc = None # type: Optional[ColumnDataSource]
+        self._peaksrc = None # type: Optional[ColumnDataSource]
         self._fig     = None # type: Optional[Figure]
         self._widgets = dict(seq    = PeaksSequencePathWidget(self._model),
                              oligos = OligoListWidget(self._model),
@@ -313,51 +355,40 @@ class PeaksPlotCreator(TaskPlotCreator):
         if TYPE_CHECKING:
             self._model = PeaksPlotModelAccess('', '')
 
-    def _figargs(self, _ = None):
-        args = super()._figargs(_)
-        args['x_axis_label']     = self.css.xlabel.get()
-        args['y_axis_label']     = self.css.ylabel.get()
-        args['toolbar_location'] = 'right'
-        args['y_range']          = Range1d(start = 0., end = 0.)
-        args['name']             = 'Peaks:Fig'
-        return args
-
-    def __data(self) -> Tuple[dict, PeakSelectorDetails]:
+    def __data(self) -> Tuple[dict, dict, PeakSelectorDetails]:
         cycles = self._model.runbead()
         data   = dict.fromkeys(('z', 'duration', 'count'), [0., 1.])
         if cycles is None:
-            return data, None
+            return data, data, None
 
         items = tuple(i for _, i in cycles)
         if len(items) == 0 or not any(len(i) for i in items):
-            return data, None
+            return data, data, None
 
         peaks = self._model.peakselection.task
         if peaks is None:
-            return data, None
+            return data, data, None
 
         track = self._model.track
         frate = track.framerate
-        prec  = rawprecision(track, self._model.bead)
-        dtl   = peaks.detailed(items, prec)
-        lens  = np.array([np.array([len(i)/frate for _, i in j], dtype = 'i4')
-                          for j in items],
-                         dtype = 'O')
+        dtl   = peaks.detailed(items, rawprecision(track, self._model.bead))
 
-        hist  = peaks.histogram
+        maxv  = max(peaks.histogram.kernelarray())
         data  = dict(z        = (dtl.binwidth*np.arange(len(dtl.histogram), dtype = 'f4')
                                  +dtl.minvalue),
-                     count    = dtl.histogram/track.ncycles*100.,
-                     duration = hist.projection(dtl.positions,
-                                                weight    = lens,
-                                                zmeasure  = None,
-                                                precision = prec)[0]
-                    )
-        return data, dtl
+                     count    = dtl.histogram/(maxv*track.ncycles)*100.)
+
+        lst   = tuple(peaks.details2output(dtl))
+        pks   = dict(z        = [i for i, _ in lst],
+                     count    = [sum(1 for j in i if j is not None)*100./track.ncycles
+                                 for _, i in lst],
+                     duration = [np.mean([len(j[1])/frate for j in i if j is not None])
+                                 for _, i in lst])
+        return data, pks, dtl
 
     def _create(self, doc):
         "returns the figure"
-        self._fig    = figure(**self._figargs())
+        self._fig = figure(**self._figargs(y_range = Range1d, name = 'Peaks:fig'))
         self._fig.extra_x_ranges = {"duration": Range1d(start = 0., end = 0.)}
         axis  = LinearAxis(x_range_name          = "duration",
                            axis_label            = self.css.xtoplabel.get(),
@@ -365,16 +396,20 @@ class PeaksPlotCreator(TaskPlotCreator):
                           )
         self._fig.add_layout(axis, 'above')
 
-        self._source = ColumnDataSource(self.__data()[0])
-        self.css.count   .addto(self._fig, y = 'z', x = 'count',    source = self._source)
-        self.css.duration.addto(self._fig, y = 'z', x = 'duration', source = self._source,
-                                x_range_name = "duration")
+        self._histsrc, self._peaksrc = [ColumnDataSource(i) for i in self.__data()[:2]]
+        self.css.count         .addto(self._fig, y = 'z', x = 'count',
+                                      source       = self._histsrc)
+        self.css.peaks.count   .addto(self._fig, y = 'z', x = 'count',
+                                      source       = self._peaksrc)
+        self.css.peaks.duration.addto(self._fig, y = 'z', x = 'duration',
+                                      source       = self._peaksrc,
+                                      x_range_name = "duration")
 
         self._hover.create(self._fig, self._model, self)
         doc.add_root(self._hover)
 
         self._ticker.create(self._fig, self._model, self)
-        self._hover.slaveaxes(self._fig, self._source)
+        self._hover.slaveaxes(self._fig, self._peaksrc)
 
         widgets = {i: j.create(self.action) for i, j in self._widgets.items()}
         enableOnTrack(self, self._fig, widgets)
@@ -390,13 +425,15 @@ class PeaksPlotCreator(TaskPlotCreator):
         return layouts.row(DpxKeyedRow(self, self._fig), box)
 
     def _reset(self, _):
-        data, dtl = self.__data()
-        self._source.data = data
-        self.setbounds(self._fig.y_range, 'y', data['z'][[0,-1]])
+        data, peaks, dtl = self.__data()
+        self._peaksrc.data = peaks
+        self._histsrc.data = data
         self._model.setfits(dtl)
         self._hover .reset(data)
         self._ticker.reset()
-        self._hover.slaveaxes(self._fig, self._source, inpy = True)
+
+        self.setbounds(self._fig.y_range, 'y', data['z'][[0,-1]])
+        self._hover.slaveaxes(self._fig, self._peaksrc, inpy = True)
 
 class PeaksPlotView(PlotView):
     "Peaks plot view"

@@ -5,12 +5,12 @@
 from typing         import Optional, Any # pylint: disable=unused-import
 
 from bokeh.plotting import figure, Figure # pylint: disable=unused-import
-from bokeh.models   import (LinearAxis, ColumnDataSource, HoverTool,
-                            CustomJS, Range1d)
+from bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 
-from control        import Controller
-from .plots         import PlotAttrs, DpxKeyedRow, PlotView
-from .plots.tasks   import TaskPlotCreator
+from control            import Controller
+from .plots             import PlotAttrs, DpxKeyedRow, PlotView
+from .plots.bokehext    import DpxHoverTool, from_py_func
+from .plots.tasks       import TaskPlotCreator
 
 class BeadPlotCreator(TaskPlotCreator):
     "Plots a default bead"
@@ -40,16 +40,6 @@ class BeadPlotCreator(TaskPlotCreator):
                     zmag = items['zmag'],
                     z    = items[bead])
 
-    def _figargs(self, _):
-        args = super()._figargs(_)
-        if self.css.tooltips.get() not in ('', None):
-            args['tools'] += ',hover'
-        args.update(x_axis_label = self.css.xlabel.get(),
-                    y_axis_label = self.css.ylabel.get(),
-                    x_range      = Range1d(start = 0., end = 1.),
-                    y_range      = Range1d(start = 0., end = 1.))
-        return args
-
     def _addglyph(self, beadname, **kwa):
         return self.css[beadname].addto(self._fig,
                                         x      = 't',
@@ -73,7 +63,7 @@ class BeadPlotCreator(TaskPlotCreator):
             rng.start = rng.bounds[0]
             rng.end   = rng.bounds[1]
 
-        rng.callback = CustomJS.from_py_func(_onRangeChange)
+        rng.callback = from_py_func(_onRangeChange)
 
     def _setbounds(self):
         self.setbounds(self._fig.extra_y_ranges['zmag'], None, self._get('zmag'))
@@ -82,10 +72,11 @@ class BeadPlotCreator(TaskPlotCreator):
 
     def _create(self, _) -> DpxKeyedRow:
         "sets-up the figure"
-        self._fig    = figure(**self._figargs(None))
+        self._fig    = figure(**self._figargs(x_range = Range1d,
+                                              y_range = Range1d))
         self._source = ColumnDataSource(self.__data())
         if self.css.tooltips.get() not in ('', None):
-            self._fig.select(HoverTool).tooltips = self.css.tooltips.get()
+            self._fig.select(DpxHoverTool).tooltips = self.css.tooltips.get()
 
         self._addylayout  ()
         self._addglyph    ('zmag', y_range_name = 'zmag')
