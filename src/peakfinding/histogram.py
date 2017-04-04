@@ -9,8 +9,7 @@ import  numpy  as     np
 from    numpy.lib.stride_tricks import as_strided
 from    scipy.signal            import find_peaks_cwt
 
-from    utils                   import (kwargsdefaults, initdefaults, NoArgs,
-                                        asdataarrays)
+from    utils                   import (kwargsdefaults, initdefaults, NoArgs, asdataarrays)
 from    signalfilter            import PrecisionAlg
 from    signalfilter.convolve   import KernelConvolution # pylint: disable=unused-import
 
@@ -53,7 +52,7 @@ class Histogram(PrecisionAlg):
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-    @kwargsdefaults
+    @kwargsdefaults(asinit = False)
     def __call__(self,
                  aevents  : HistInputs,
                  bias     : BiasType = None,
@@ -95,6 +94,14 @@ class Histogram(PrecisionAlg):
 
         fcn = self.zmeasure if zmeasure is NoArgs else zmeasure
         return self.__eventpositions(events, bias, fcn)
+
+    def kernelarray(self) -> np.ndarray:
+        "the kernel used in the histogram creation"
+        if self.kernel is not None:
+            osamp = (int(self.oversampling)//2) * 2 + 1
+            return self.kernel.kernel(oversampling = osamp, range = 'same')
+        else:
+            return np.array([1.], dtype = 'f4')
 
     @classmethod
     def run(cls, *args, **kwa):
