@@ -9,7 +9,7 @@ from typing import Callable, Iterable # pylint: disable=unused-import
 from multiprocessing import Pool
 import numpy
 from scipy.optimize import basinhopping,OptimizeResult
-import .stepper as stepper
+from . import stepper
 
 # number of combinations for 4-mers and 5 nm exp precision leads to
 # 4.064499031853928e+26 possibilities with 100 possibilities  that's ~4*1e19 days.

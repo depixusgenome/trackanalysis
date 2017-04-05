@@ -100,7 +100,8 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
         for idg,grp in enumerate(groups[:-1]):
             # find overlapping oligos
             # if they belong to 2 groups add a swap
-            self.swaps.extend([it for it in itertools.product(grp,groups[idg+1]) if len(grp_ovl(*it))==1])
+            self.swaps.extend([it for it in itertools.product(grp,groups[idg+1])
+                               if len(grp_ovl(*it))==1])
 
 
     def __call__(self,xst):
@@ -109,4 +110,3 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
         '''
         for swp in self.swaps:
             yield swp
-
