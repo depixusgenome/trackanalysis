@@ -7,7 +7,7 @@ regroups functions and classes to complement assembler
 
 import itertools
 from copy import deepcopy
-from typing import Callable # pylint: disable=unused-import
+from typing import Callable, List # pylint: disable=unused-import
 import scipy.stats
 import numpy
 from Bio import pairwise2
@@ -245,9 +245,9 @@ def _highest_norm_intersect(dist1,dist2):
     sc_dist.sort()
     return sc_dist[-1][1]
 
-def find_overlaping_normdists(dists,nscale=2): # to pytest
+def group_overlapping_normdists(dists,nscale=1): # to pytest !! # what if no intersection?
     u'''
-    returns lists of indices [(i,j,k)] each element of the tuple has distrbution which overlap
+    returns lists of indices [(i,j,k)] each element of the tuple has distribution which overlap
     '''
     sdists=[(di.mean(),di.mean()-nscale*di.std(),di.mean()+nscale*di.std(),idx)\
             for idx,di in enumerate(dists)]
@@ -256,37 +256,82 @@ def find_overlaping_normdists(dists,nscale=2): # to pytest
     bounds = [(di.mean()-nscale*di.std(),idx) for idx,di in enumerate(dists)]
     bounds+= [(di.mean()+nscale*di.std(),idx) for idx,di in enumerate(dists)]
     bounds.sort()
-
     overlaps=[]
     for regid in range(len(bounds[:-1])):
         beflag=set(idx[1] for idx in bounds[:regid+1])
         aflag = set(idx[1] for idx in bounds[regid+1:])
+
         overlaps.append(sorted(beflag.intersection(aflag)))
 
-    return [overl for overl in overlaps if len(overl)>1]
+    ssets = [set(overl) for overl in overlaps if len(overl)>1]
+    ssets.sort(reverse=True)
+    uset=[ssets[0]]
+    for val in ssets[1:]:
+        if val.issubset(uset[-1]):
+            continue
+        uset.append(val)
+    return ssets,uset
 
 
 
-def optimal_perm_normdists(perm,dists)->numpy.ndarray: # brute-force # to optimize # to finish
+def _list_perm_bounds(perm,dists,_epsi=0.001):
+    u'list of possible positions which allow (any or no) switchs between oligo positions'
+    # list all possibilities
+    bounds={idx:[dists[idx].mean()] for idx in perm}
+    for idi,vli in enumerate(perm[:-1]):
+        for vlj in perm[idi+1:]:
+            flag = _highest_norm_intersect(dists[vli],dists[vlj])
+            sign = 1 if dists[vli].mean()<dists[vlj].mean() else -1
+            bounds[vli].append(flag+sign*_epsi)
+            bounds[vlj].append(flag-sign*_epsi)
+    return bounds
+
+def optimal_perm_normdists(perm:List,dists)->numpy.ndarray: # pytest
     u'''
     given a permuation perm and the known distributions of each state
     returns the permutated state which maximise the probability
     '''
-    print(perm,dists)
-    _epsi=0.001
-    # list all possibilities
-    bounds={idx:dists[idx].mean() for idx in perm}
-    for i in perm[:-1]:
-        for j in perm[i:]:
-            flag = _highest_norm_intersect(dists[i],dists[j])
-            sign = 1 if dists[i].mean()<dists[j].mean() else -1
-            bounds[i].append(flag+sign*_epsi)
-            bounds[j].append(flag-sign*_epsi)
+    _epsi=0.001*min([dists[i].std() for i  in perm])
+
+    constraints=[]
+    for idx in range(len(perm[:-1])):
+        constraints.append({"type":"ineq",
+                            "fun":SOMConstraint(idx,_epsi)})
+
+    xinit = [dists[i].mean() for i in perm]
+    fun = CostPermute(dists,perm)
+    return scipy.optimize.minimize(fun,xinit,constraints=constraints).x
+
+def group_overlapping_oligos(oligos,nscale=1):
+    u'''
+    returns groups of overlapping oligos
+    '''
+    groups = group_overlapping_normdists([oli.dist for oli in oligos],nscale=nscale)[1]
+    return [[oligos[idx] for idx in grp] for grp in groups]
+
+def group_oligos(oligos,**kwa):
+    u''' returns oligos grouped by attr "by"
+    '''
+    byattr = kwa.get("by","batch_id")
+    attr = set([getattr(oli,byattr) for oli in oligos])
+    grouped = [[oli for oli in oligos if getattr(oli,byattr)==atv] for atv in attr]
+    return grouped
+
+class CostPermute:
+    u' returns the "cost" of translations due to permutation of oligo peaks'
+    def __init__(self,dists,perm):
+        self.dists=dists
+        self.perm=perm
+
+    def __call__(self,xstate):
+        return -numpy.product([self.dists[vlp].pdf(xstate[idp])
+                               for idp,vlp in enumerate(self.perm)])
 
 
-    # pop if the order of the permutation is not respected
-    permbounds = [bounds[pe] for pe in perm]
-    possibles = list(itertools.product(permbounds))
-    # compute the probability of each case
-    # return the maximal value
-    return numpy.zeros(len(perm))
+class SOMConstraint:
+    u'functor for scipy.optimize.minimize constraints'
+    def __init__(self,index,_epsi):
+        self.index=index
+        self._epsi=_epsi
+    def __call__(self,xstate):
+        return xstate[self.index+1]-xstate[self.index]-self._epsi

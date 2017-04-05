@@ -5,14 +5,16 @@ u'''
 regroups functions and classes to initialise assemblers
 '''
 
-import sys
 from typing import Callable, Iterable # pylint: disable=unused-import
 from multiprocessing import Pool
 import numpy
 from scipy.optimize import basinhopping,OptimizeResult
-from . import _utils as utils
-# needs fixing : each object should be pickable
-#                test NestedAsmrs
+import .stepper as stepper
+
+# number of combinations for 4-mers and 5 nm exp precision leads to
+# 4.064499031853928e+26 possibilities with 100 possibilities  that's ~4*1e19 days.
+# for 1nm exp precision it falls down to 25936
+# proposed solution reconstruct the sequence a batch at a time.
 
 # to benchmark:
 #    * fix size of sequences, vary size of oligos and overlap
@@ -31,69 +33,6 @@ def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argumen
     u'''use this minimizer to avoid minimization step in basinhopping
     '''
     return OptimizeResult(x=xinit, fun=fun(xinit), success=True, nfev=1)
-
-class HoppingSteps:
-    u'''
-    Class to define boundaries, steps for basinhopping
-    Can forbid flipping of peaks within the same batch
-    '''
-    def __init__(self,**kwargs):
-        self.min_x = kwargs.get("min_x",0)
-        self.max_x = kwargs.get("max_x",sys.maxsize)
-        self.scale = kwargs.get("scale",1)
-        self.dists = kwargs.get("dists",[]) # list of distributions
-        self.random_state = kwargs.get("random_state",None)
-    def __call__(self,xstate): # should be overriden
-        pass
-
-class PreFixedSteps(HoppingSteps):
-    u'''
-    calls predefined fixed distributions
-    '''
-    def __call__(self,*args):
-        return numpy.array([i.rvs(random_state=self.random_state) for i in self.dists])
-
-
-class GaussAndFlip(HoppingSteps):
-    u'''for two calls, one uses defined dists
-    the other randomly flips 2 consecutive xstates
-    '''
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
-        self.count = 0
-    def __call__(self,xst):
-        if self.count==0:
-            self.count=1
-            return numpy.array([i.rvs(random_state=self.random_state) for i in self.dists])
-        else:
-            self.count=0
-            flip = numpy.random.randint(len(xst)-1)
-            xst[flip], xst[flip+1] = xst[flip+1],xst[flip]
-            return xst
-
-class OGandF(HoppingSteps):
-    u'''trying to optimize the exploration of param space given hypotheses:
-    symetric distribution of z around z0 (gaussian at the moment)
-    # find the distribution which overlap (and allow permutation of oligos)
-    # when allowing permutations of oligos return the optimal solution wrt to dist(z,z0)
-    '''
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
-        self.count = 0
-        self.over_dist = utils.find_overlaping_normdists(self.dists)
-        perms = []
-        self.opti_perm = {perm : utils.optimal_perm_normdists(perm,self.dists) for perm in perms}
-    def __call__(self,xst):
-        if self.count==0:
-            self.count=1
-            return numpy.array([i.rvs(random_state=self.random_state) for i in self.dists])
-        else:
-            self.count=0
-            flip = numpy.random.randint(len(self.over_dist))
-            perm = numpy.random.permutation(numpy.array(self.over_dist[flip]))
-            # optimal permutation is pre computed in self.opti_perm
-            # make change to xst
-            return xst # TO CHANGE #utils.optimal_perm_normdists(perm,self.dists,xst)
 
 class NestedAsmrs:
     u'''
@@ -187,7 +126,8 @@ class Assembler:
         pass
 
 class MCAssembler(Assembler):
-    u'''Monte Carlo for assembling sequences from oligohits
+    u'''
+    Monte Carlo for assembling sequences from oligohits
     '''
 
     def __init__(self,**kwargs):
@@ -196,7 +136,7 @@ class MCAssembler(Assembler):
         self.minimizer = kwargs.get("minimizer",no_minimizer) # type: Callable
         self.acceptance = kwargs.get("acceptance",None) # type: Callable
         self.result = OptimizeResult()
-        self.step = kwargs.get("step",HoppingSteps())
+        self.step = kwargs.get("step",stepper.HoppingSteps())
 
     def run(self,*args,**kwargs)->None: # pylint:disable = unused-argument
         u'''runs a specified number of steps
