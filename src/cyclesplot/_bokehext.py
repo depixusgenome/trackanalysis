@@ -131,6 +131,6 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         self._rawsource.data         = self._createrawdata(rdata)
         self._rawglyph.glyph.visible = False
 
-    def resethist(self, hdata = None):
+    def resethist(self):
         "updates the tooltips for a new file"
-        self.reset(bias = self.estimatebias(hdata, 'cycles', 'bottom'))
+        self.reset()

@@ -157,19 +157,9 @@ class TaskAccess(TaskPlotModelAccess):
 
     def check(self, task, parent = NoArgs) -> bool:
         "wether this controller deals with this task"
-        if not (isinstance(task, self.tasktype) and self._check(task)):
-            return False
-        if parent is NoArgs:
-            return True
-        return parent is self.roottask
-
-    @staticmethod
-    def _check(_) -> bool:
-        return True
-
-    @staticmethod
-    def _default() -> dict:
-        return {}
+        return (isinstance(task, self.tasktype)
+                and (parent is NoArgs or parent is self.roottask)
+                and all(getattr(task, i) == j for i, j in self.attrs.items()))
 
     @property
     def index(self) -> Optional[Task]:
@@ -186,9 +176,8 @@ class TaskAccess(TaskPlotModelAccess):
 
     def observe(self, *args, **kwa):
         "observes the provided task"
-        def _check(parent = None, task = None, **_):
-            return self.check(task, parent)
-        self._ctrl.observe(*args, argstest = _check, **kwa)
+        check = lambda parent = None, task = None, **_: self.check(task, parent)
+        self._ctrl.observe(*args, argstest = check, **kwa)
 
 class TaskPlotCreator(PlotCreator):
     "Base plotter for tracks"

@@ -17,10 +17,10 @@ class RawMixin:
     "Building the graph of cycles"
     def __init__(self):
         "sets up this plotter's info"
-        self.css.defaults = dict(raw        = PlotAttrs('color',  'circle', 1,
-                                                        alpha      = .5,
-                                                        palette    = 'inferno'),
-                                 plotwidth  = 500)
+        self.css.defaults = {'raw'        : PlotAttrs('color',  'circle', 1,
+                                                      alpha   = .5,
+                                                      palette = 'inferno'),
+                             'plot.width' : 500}
         self._rawsource = None # type: Optional[ColumnDataSource]
         self._raw       = None # type: Optional[Figure]
 

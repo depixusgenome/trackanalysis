@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
-from typing                     import (Optional, Sequence, Tuple, List,
+from typing                     import (Optional, Sequence, Tuple, List, Dict,
                                         Generic, TypeVar, TYPE_CHECKING)
 
 import bokeh.core.properties as props
 from bokeh                      import layouts
 from bokeh.plotting             import figure, Figure    # pylint: disable=unused-import
 from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
-                                        DataTable, TableColumn, Model, Widget)
+                                        DataTable, TableColumn, Model, Widget,
+                                        Div, NumberFormatter)
 
 import numpy                    as     np
 
@@ -17,7 +18,6 @@ from control.taskio             import ConfigTrackIO
 from control.processor          import processors
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
 from peakfinding.processor      import PeakSelectorTask
-from peakfinding.selector       import PeakSelectorDetails
 from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
                                         FitBead)
 
@@ -45,7 +45,7 @@ class SequenceProp(TaskPlotModelAccess.props.configroot[T], Generic[T]):
             obj.identification.update(**FitToHairpinTask.read(seq, ols).config())
         return val
 
-class FitParamProp(TaskPlotModelAccess.props.config[Optional[float]]):
+class FitParamProp(TaskPlotModelAccess.props.config[float]):
     "access to bias or stretch"
     def __init__(self, attr):
         super().__init__('base.'+attr)
@@ -57,7 +57,10 @@ class FitParamProp(TaskPlotModelAccess.props.config[Optional[float]]):
         key  = obj.sequencekey
         dist = obj.distances
         if key not in dist:
-            return super().__get__(obj, tpe)
+            val = super().__get__(obj, tpe)
+            if val is None:
+                return getattr(obj, 'estimated'+self.__key)
+            return val
         else:
             return getattr(dist[key], self.__key)
 
@@ -88,10 +91,13 @@ class PeaksPlotModelAccess(TaskPlotModelAccess):
     def __init__(self, ctrl, key: Optional[str] = None) -> None:
         super().__init__(ctrl, key)
         self.configroot.tasks.extremumalignment.default = ExtremumAlignmentTask()
-        self.eventdetection = TaskAccess(self, EventDetectionTask)
-        self.peakselection  = TaskAccess(self, PeakSelectorTask)
-        self.identification = TaskAccess(self, FitToHairpinTask)
-        self.fits           = None # type: Optional[FitBead]
+        self.eventdetection     = TaskAccess(self, EventDetectionTask)
+        self.peakselection      = TaskAccess(self, PeakSelectorTask)
+        self.identification     = TaskAccess(self, FitToHairpinTask)
+        self.fits               = None   # type: Optional[FitBead]
+        self.peaks              = dict() # type: Dict[str, np.ndarray]
+        self.estimatedstretch   = 1.
+        self.estimatedbias      = 0.
 
         cls = type(self)
         cls.oligos      .setdefault(self, [], size = 4)
@@ -105,19 +111,54 @@ class PeaksPlotModelAccess(TaskPlotModelAccess):
     stretch      = FitParamProp('stretch')
     bias         = FitParamProp('bias')
     @property
-    def distances(self) -> dict:
+    def distances(self) -> Dict[str,Tuple[float,...]]:
         "returns the distances which were computed"
         return self.fits.distances if self.fits is not None else {}
 
-    def setfits(self, dtl) -> Optional[FitBead]:
-        "sets current bead fit"
-        if dtl is None or self.identification.task is None:
-            self.fits = None
-        else:
-            vals = self.peakselection.task.details2output(dtl)
-            cnf  = self.identification.task.config()
-            self.fits = FitToHairpinProcessor.compute(vals, **cnf)[1]
-        return self.fits
+    def setpeaks(self, dtl) -> Optional[FitBead]:
+        "sets current bead peaks and computes the fits"
+        if dtl is None:
+            self.peaks = dict.fromkeys(('z', 'id', 'distance', 'sigma', 'bases',
+                                        'duration', 'count'), [])
+            self.fits  = None
+            return
+
+        nan        = lambda: np.full((len(peaks),), '', dtype = 'O')
+        peaks      = tuple(self.peakselection.task.details2output(dtl))
+        self.peaks = dict(z        = np.array([i for i, _ in peaks], dtype = 'f4'),
+                          id       = nan(),
+                          distance = nan(),
+                          sigma    = nan(),
+                          duration = nan(),
+                          count    = nan())
+        self.estimatedbias  = self.peaks['z'][0]
+        self.peaks['bases'] = (self.peaks['z']-self.bias)/self.stretch
+
+        task = self.identification.task
+        if task is not None:
+            cnf       = self.identification.task.config()
+            self.fits = FitToHairpinProcessor.compute(peaks, **cnf)[1]
+
+            tmp       = task.peakids[self.sequencekey](self.peaks['z'],
+                                                       self.stretch,
+                                                       self.bias)
+
+            self.peaks['id'] = np.float32(tmp['key']) # type: ignore
+            self.peaks['id'][self.peaks['id'] < 0] = ''
+            self.peaks['distance'] = self.peaks['bases'] - self.peaks['id']
+
+        prob = Probability(framerate   = self.track.framerate,
+                           minduration = (self.eventdetection.task
+                                          .events.select.minduration))
+        dur  = self.track.phaseduration(..., self.eventdetection.task.phase)
+        ncyc = self.track.ncycles
+        for i, (_, evts) in enumerate(peaks):
+            val                       = prob(evts, dur)
+            self.peaks['duration'][i] = val.averageduration
+            self.peaks['sigma'][i]    = prob.resolution(evts)
+            self.peaks['count'][i]    = min(100., val.nevents / ncyc*100.)
+
+        return self.peaks
 
     def runbead(self):
         "returns a tuple (dataitem, bead) to be displayed"
@@ -149,16 +190,11 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
                                                  biases:    [p.Any, {}],
                                                  ''')
 
-    def reset(self, hdata = None): # pylint: disable=arguments-differ
+    def reset(self):
         "Creates the hover tool for histograms"
-        kwa  = dict()
-        bias = self._model.bias
-        if bias is None:
-            kwa['bias']  = self.estimatebias(hdata, 'count', 'z')
-
-        kwa['biases']    = {i: j.bias    for i, j in self._model.distances}
-        kwa['stretches'] = {i: j.stretch for i, j in self._model.distances}
-        super().reset(**kwa)
+        dist = self._model.distances
+        super().reset(biases    = {i: j.bias    for i, j in dist},
+                      stretches = {i: j.stretch for i, j in dist})
 
     def slaveaxes(self, fig, src, inpy = False): # pylint: disable=arguments-differ
         "slaves a histogram's axes to its y-axis"
@@ -227,116 +263,91 @@ class PeaksStatsWidget(WidgetCreator):
     "Table containing stats per peaks"
     def __init__(self, model:PeaksPlotModelAccess) -> None:
         super().__init__(model)
-        self.__widget = None # type: Optional[DataTable]
-        css = self.css.title.stats
-        css.columns.defaults = {'title' : u'keys', 'value' : u'values'}
-        css.lines.default = ['stretch', 'bias', 'σ[HF]', 'peak count',
-                             'identified peaks', 'missing peaks']
+        self.__widget = None # type: Optional[Div]
+        css = self.css.stats.lines
+        css.default = [[u'Stretch (µm/base)',  '.4f'],
+                       [u'Bias (µm)',          '.4f'],
+                       [u'σ[HF] (µm)',         '.4f'],
+                       [u'σ[Peaks] (µm)',      '.4f'],
+                       [u'Peak count',         '.0f'],
+                       [u'Identified peaks',   '.0f'],
+                       [u'Unknown peaks',      '.0f']]
     def create(self, _) -> List[Widget]:
-        cols = [TableColumn(field = i, title = self.css.title.stats.columns[i].get())
-                for i in ('title', 'value')]
-
-        self.__widget = DataTable(source      = ColumnDataSource(self.__data()),
-                                  columns     = cols,
-                                  editable    = False,
-                                  row_headers = False,
-                                  name        = "Peaks:Stats")
+        self.__widget = Div(text  = self.__data(),
+                            width = self.css.input.width.get())
         return [self.__widget]
 
-    def observe(self):
-        "sets-up config observers"
-        self._model.observeprop('oligos', self.reset)
-
     def reset(self):
-        self.__widget.source.data = self.__data()
+        self.__widget.text = self.__data()
 
-    def __data(self) -> dict:
-        titles = self.css.title.stats.lines.get()
-        values = np.full((len(titles),), np.NaN, dtype = 'f4')
+    def __data(self) -> str:
+        titles = self.css.stats.lines.get()
+        values = ['']*len(titles) # type: List
         if self._model.identification.task is not None:
             best      = self._model.sequencekey
-            values[0] = self._model.distances[best].stretch
-            values[1] = self._model.distances[best].bias
+            values[5] = np.sum(self._model.fits.peaks['key'] >= 0)
+            values[6] = (len(self._model.identification.task.peakids[best].peaks)-1
+                         -values[4])
+
+        if self._model.track is not None:
+            values[0] = self._model.stretch
+            values[1] = self._model.bias
             values[2] = rawprecision(self._model.track, self._model.bead)
-            values[3] = len(self._model.fits.peaks)
-            values[4] = np.sum(self._model.fits.peaks['key'] >= 0)
-            values[5] = len(self._model.identification.task.peakids[best].peaks)-1
-        return {'title': titles, 'value': values}
+            values[3] = np.mean(self._model.peaks['sigma'])
+            values[4] = len(self._model.peaks['z'])
+
+        line = '<tr><td>{}</td><td>{}</td></tr>'
+        fcn  = lambda fmt, val: '' if val == '' else ('{:'+fmt+'}').format(val)
+        tab  = ''.join(line.format(i[0], fcn(i[1], j))
+                       for i, j in zip(titles, values))
+        return '<table>'+tab+'</table>'
 
 class PeakListWidget(WidgetCreator):
     "Table containing stats per peaks"
     def __init__(self, model:PeaksPlotModelAccess) -> None:
         super().__init__(model)
         self.__widget = None # type: Optional[DataTable]
-        self.css.title.peaks.defaults = {'id'         : u'Id',
-                                         'distance'   : u'Distance to Id',
-                                         'count'      : u'Rate     (%)',
-                                         'duration'   : u'Duration (s)',
-                                         'sigma'      : u'σ (nm)'}
+        self.css.peaks.columns.default = [['z',          'css:ylabel',      '0.0[000]'],
+                                          ['bases',      'css:yrightlabel', '0.[00]'],
+                                          ['id',         u'Id',             '[0]'],
+                                          ['distance',   u'Distance',       '0.[0]'],
+                                          ['count',      'css:xlabel',      '0.[0]'],
+                                          ['duration',   'css:xtoplabel',   '0.[000]'],
+                                          ['sigma',      u'σ (µm)',         '0.0[000]']]
 
     def create(self, _) -> List[Widget]:
-        cols = [TableColumn(field = 'bases',
-                            title = self.css.yrightlabel.get()),
-                TableColumn(field = 'z',
-                            title = self.css.ylabel.get()),
-                *(TableColumn(field = i, title = self.css.title.peaks[i].get())
-                  for i in ('sigma', 'id', 'distance', 'count', 'duration'))]
-
-        self.__widget = DataTable(source      = ColumnDataSource(self.__data()),
+        width = self.cssroot.input.width.get()
+        get   = lambda i: self.css[i[4:]].get() if i.startswith('css:') else i
+        cols  = list(TableColumn(field     = i[0],
+                                 title     = get(i[1]),
+                                 formatter = NumberFormatter(format = i[2]))
+                     for i in self.css.peaks.columns.get())
+        self.__widget = DataTable(source      = ColumnDataSource(self._model.peaks),
                                   columns     = cols,
                                   editable    = False,
-                                  row_headers = True,
+                                  row_headers = False,
+                                  width       = width*len(cols),
                                   name        = "Peaks:List")
         return [self.__widget]
 
-    def observe(self):
-        "sets-up config observers"
-        self._model.observeprop('oligos', self.reset)
+    def setsource(self, src):
+        "this widget has a source in common with the plots"
+        self.__widget.source = src
 
     def reset(self):
-        self.__widget.source.data = self.__data()
-
-    def __data(self) -> dict:
-        if self._model.identification.task is None:
-            return {}
-
-        best   = self._model.sequencekey
-        dist   = self._model.distances[best][1:]
-        alg    = self._model.identification.task.peakids[best]
-        peaks  = alg(np.array([i for i, _ in self._model.fits.events], dtype = 'f4'),
-                     *dist)
-
-        res    = {i.field: np.empty((len(peaks),), dtype = 'f4')
-                  for i in self.__widget.columns} # pylint: disable=not-an-iterable
-        res.update(dict(bases = peaks['zvalue']*dist[0]+dist[1],
-                        z     = peaks['zvalue'],
-                        id    = np.float32(peaks['key']))) # type: ignore
-        res['id'][res['id'] < 0] = np.NaN
-        res['distance'] = res['bases'] - res['id']
-
-        prob = Probability(framerate   = self._model.track.framerate,
-                           minduration = (self._model.eventdetection.task
-                                          .events.selection.minduration))
-        dur  = self._model.track.phaseduration(..., self._model.eventdetection.task.phase)
-        ncyc = self._model.track.ncycles
-        for i, (_, evts) in enumerate(self._model.fits.events):
-            val = prob(evts, dur)
-            res['sigma'][i]    = np.nanstd([np.nanmean(evt) for evt in evts])
-            res['duration'][i] = val.averageduration
-            res['count'][i]    = min(1., val.nevents / ncyc)
-        return res
+        pass
 
 class PeaksPlotCreator(TaskPlotCreator):
     "Creates plots for peaks"
     _MODEL = PeaksPlotModelAccess
-    _RESET = TaskPlotCreator._RESET | {'oligos', 'last.track.sequence'}
     def __init__(self, *args):
         super().__init__(*args)
         self.css.defaults = {'duration'        : PlotAttrs('gray', 'line', 1),
                              'count'           : PlotAttrs('blue', 'line', 1),
-                             'plotwidth'       : 500,
+                             'plot.width'      : 500,
+                             'plot.height'     : 800,
                              'xtoplabel'       : u'Duration (s)',
-                             'xlabel'          : u'Cycles (%)'}
+                             'xlabel'          : u'Rate (%)'}
         self.css.peaks.defaults = {'duration'  : PlotAttrs('gray', 'diamond', 5),
                                    'count'     : PlotAttrs('blue', 'circle', 5)}
         self.config.defaults = {'tools'      : 'ypan,ybox_zoom,reset,save,dpxhover'}
@@ -355,36 +366,30 @@ class PeaksPlotCreator(TaskPlotCreator):
         if TYPE_CHECKING:
             self._model = PeaksPlotModelAccess('', '')
 
-    def __data(self) -> Tuple[dict, dict, PeakSelectorDetails]:
+    def __data(self) -> Tuple[dict, dict]:
         cycles = self._model.runbead()
         data   = dict.fromkeys(('z', 'duration', 'count'), [0., 1.])
+        self._model.setpeaks(None)
         if cycles is None:
-            return data, data, None
+            return data, self._model.peaks
 
         items = tuple(i for _, i in cycles)
         if len(items) == 0 or not any(len(i) for i in items):
-            return data, data, None
+            return data, self._model.peaks
 
         peaks = self._model.peakselection.task
         if peaks is None:
-            return data, data, None
+            return data, self._model.peaks
 
         track = self._model.track
-        frate = track.framerate
         dtl   = peaks.detailed(items, rawprecision(track, self._model.bead))
 
         maxv  = max(peaks.histogram.kernelarray())
-        data  = dict(z        = (dtl.binwidth*np.arange(len(dtl.histogram), dtype = 'f4')
-                                 +dtl.minvalue),
-                     count    = dtl.histogram/(maxv*track.ncycles)*100.)
+        data  = dict(z     = (dtl.binwidth*np.arange(len(dtl.histogram), dtype = 'f4')
+                              +dtl.minvalue),
+                     count = dtl.histogram/(maxv*track.ncycles)*100.)
 
-        lst   = tuple(peaks.details2output(dtl))
-        pks   = dict(z        = [i for i, _ in lst],
-                     count    = [sum(1 for j in i if j is not None)*100./track.ncycles
-                                 for _, i in lst],
-                     duration = [np.mean([len(j[1])/frate for j in i if j is not None])
-                                 for _, i in lst])
-        return data, pks, dtl
+        return data, self._model.setpeaks(dtl)
 
     def _create(self, doc):
         "returns the figure"
@@ -396,7 +401,8 @@ class PeaksPlotCreator(TaskPlotCreator):
                           )
         self._fig.add_layout(axis, 'above')
 
-        self._histsrc, self._peaksrc = [ColumnDataSource(i) for i in self.__data()[:2]]
+        self._histsrc, self._peaksrc = (ColumnDataSource(i) for i in self.__data())
+
         self.css.count         .addto(self._fig, y = 'z', x = 'count',
                                       source       = self._histsrc)
         self.css.peaks.count   .addto(self._fig, y = 'z', x = 'count',
@@ -416,21 +422,30 @@ class PeaksPlotCreator(TaskPlotCreator):
 
         self._addcallbacks(self._fig)
         self._widgets['seq'].callbacks(self._hover, self._ticker)
+        self._widgets['peaks'].setsource(self._peaksrc)
 
-        self._widgets['stats'].observe()
-        self._widgets['peaks'].observe()
         self.configroot.observe(self.reset)
-        box = layouts.widgetbox(*widgets['seq'], *widgets['oligos'], *widgets['peaks'],
-                                sizing_mode = self.css.sizing_mode.get())
-        return layouts.row(DpxKeyedRow(self, self._fig), box)
+
+        # pylint: disable=redefined-variable-type
+        width = widgets['peaks'][-1].width+10
+        lay   = layouts.widgetbox(*widgets['seq'], *widgets['oligos'],
+                                  width       = self.css.input.width.get()+10,
+                                  sizing_mode = self.css.sizing_mode.get())
+        lay = layouts.row(lay, layouts.widgetbox(*widgets['stats']),
+                          width       = self.css.input.width.get()*2,
+                          sizing_mode = self.css.sizing_mode.get())
+        lay = layouts.column(lay, *widgets['peaks'],
+                             sizing_mode = self.css.sizing_mode.get(),
+                             width       = width)
+        return layouts.row(DpxKeyedRow(self, self._fig), lay)
 
     def _reset(self, _):
-        data, peaks, dtl = self.__data()
-        self._peaksrc.data = peaks
-        self._histsrc.data = data
-        self._model.setfits(dtl)
-        self._hover .reset(data)
+        data, self._peaksrc.data = self.__data()
+        self._histsrc.data       = data
+        self._hover .reset()
         self._ticker.reset()
+        for widget in self._widgets.values():
+            widget.reset()
 
         self.setbounds(self._fig.y_range, 'y', data['z'][[0,-1]])
         self._hover.slaveaxes(self._fig, self._peaksrc, inpy = True)

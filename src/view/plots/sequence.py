@@ -32,6 +32,16 @@ def readsequence(path):
     except: # pylint: disable=bare-except
         return dict()
 
+def estimatebias(position: np.ndarray, cnt: np.ndarray) -> float:
+    "estimate the bias using the plot data"
+    if len(position) < 3:
+        return 0.
+
+    ind1 = next((i for i,j in enumerate(cnt) if j > 0), 0)
+    ind2 = next((i for i,j in enumerate(cnt[ind1+1:]) if j == 0), ind1+1)
+    ind  = (ind1+ind2-1)//2
+    return sum(position[ind:ind+2])*.5
+
 class SequenceTicker(ContinuousTicker):
     "Generate ticks at fixed, explicitly supplied locations."
     major      = props.Dict(props.String, props.Seq(props.Float), default = {'': []})
@@ -309,12 +319,7 @@ class SequenceHoverMixin:
             return self.bias  # type: ignore
 
         bias = self._model.bias
-        if bias is None:
-            ind1 = next((i for i,j in enumerate(hdata[extra]) if j > 0), 0)
-            ind2 = next((i for i,j in enumerate(hdata[extra][ind1+1:]) if j == 0), ind1+1)
-            ind  = (ind1+ind2-1)//2
-            return sum(hdata[column][ind:ind+2])*.5
-        return bias
+        return estimatebias(hdata[column], hdata[extra]) if bias is None else bias
 
     @checksizes
     def __data(self):

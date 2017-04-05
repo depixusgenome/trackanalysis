@@ -11,7 +11,7 @@ from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 import  numpy        as np
 
 from    view.plots          import PlotAttrs, checksizes
-from    view.plots.sequence import SequenceTicker
+from    view.plots.sequence import SequenceTicker, estimatebias
 
 window = None # type: Any # pylint: disable=invalid-name
 
@@ -26,9 +26,9 @@ class HistMixin:
                                                      fill_color = None,
                                                      line_alpha = .5,
                                                      line_color = 'blue')}
-        self.css.hist.defaults = dict(xtoplabel = u'Cycles',
-                                      xlabel    = u'Frames',
-                                      plotwidth = 200)
+        self.css.hist.defaults = {'xtoplabel'  : u'Cycles',
+                                  'xlabel'     : u'Frames',
+                                  'plot.width' : 200}
         SequenceTicker.defaultconfig(self)
 
         self._histsource = None             # type: Optional[ColumnDataSource]
@@ -110,7 +110,8 @@ class HistMixin:
         self._hover.slaveaxes(self._hist, self._histsource)
 
     def _resethist(self, data, shape):
-        self._histsource.data = hist = self.__data(data, shape)
-        self._hover.resethist(hist)
+        self._histsource.data     = hist = self.__data(data, shape)
+        self._model.estimatedbias = estimatebias(hist['bottom'], hist['cycles'])
+        self._hover.resethist()
         self._ticker.reset()
         self._hover.slaveaxes(self._hist, self._histsource, inpy = True)

@@ -22,6 +22,18 @@ class SequenceKeyProp(TaskPlotModelAccess.props.bead[Optional[str]]):
         dseq = readsequence(obj.sequencepath)
         return next(iter(dseq), None) if key not in dseq else key
 
+class FitParamProp(TaskPlotModelAccess.props.bead[float]):
+    "access to bias or stretch"
+    def __init__(self, attr):
+        super().__init__('base.'+attr)
+        self.__key = attr
+
+    def __get__(self, obj, tpe) -> Optional[str]:
+        val = super().__get__(obj, tpe)
+        if val is None:
+            return getattr(obj, 'estimated'+self.__key)
+        return val
+
 class CyclesModelAccess(TaskPlotModelAccess):
     "Model for Cycles View"
     def __init__(self, ctrl, key: Optional[str] = None) -> None:
@@ -35,11 +47,13 @@ class CyclesModelAccess(TaskPlotModelAccess):
         cls.peaks       .setdefault(self, None)
         cls.sequencekey .setdefault(self, None) # type: ignore
 
-        self.alignment      = TaskAccess(self, ExtremumAlignmentTask)
-        self.driftperbead   = TaskAccess(self, DriftTask, attrs = {'onbeads': True})
-        self.driftpercycle  = TaskAccess(self, DriftTask, attrs = {'onbeads': False},
-                                         side = 'RIGHT')
-        self.eventdetection = TaskAccess(self, EventDetectionTask)
+        self.alignment        = TaskAccess(self, ExtremumAlignmentTask)
+        self.driftperbead     = TaskAccess(self, DriftTask, attrs = {'onbeads': True})
+        self.driftpercycle    = TaskAccess(self, DriftTask, attrs = {'onbeads': False},
+                                           side = 'RIGHT')
+        self.eventdetection   = TaskAccess(self, EventDetectionTask)
+        self.estimatedbias    = 0.
+        self.estimatedstretch = 1.
 
     props        = TaskPlotModelAccess.props
     sequencekey  = SequenceKeyProp()
@@ -47,6 +61,6 @@ class CyclesModelAccess(TaskPlotModelAccess):
     oligos       = props.configroot[Optional[Sequence[str]]]('oligos')
     binwidth     = props.config[float]                      ('binwidth')
     minframes    = props.config[int]                        ('minframes')
-    stretch      = props.bead[float]                        ('base.stretch')
-    bias         = props.bead[Optional[float]]              ('base.bias')
+    stretch      = props.bead[float]                        ('stretch')
+    bias         = props.bead[float]                        ('bias')
     peaks        = props.bead[Optional[Tuple[float,float]]] ('sequence.peaks') # type: ignore

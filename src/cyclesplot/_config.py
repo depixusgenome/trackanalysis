@@ -25,12 +25,7 @@ class PeaksTableWidget(_Widget):
     def __init__(self, model:PlotModelAccess) -> None:
         super().__init__(model)
         self.__widget = None # type: Optional[DataTable]
-        self.__hover  = None # type: DpxHoverModel
         self.css.defaults = {'tableheight': 100, 'title.table': u'dna ↔ nm'}
-
-    def addinfo(self, hover):
-        "adds info to the widget"
-        self.__hover = hover
 
     def create(self, action) -> List[Widget]:
         "creates the widget"
@@ -77,9 +72,8 @@ class PeaksTableWidget(_Widget):
         "sets-up config observers"
         self._model.observeprop('oligos', 'sequencepath', 'sequencekey', self.reset)
 
-    def callbacks(self, stretch, bias):
+    def callbacks(self, hover, stretch, bias):
         "adding callbacks"
-        hover = self.__hover
         @CustomJS.from_py_func
         def _js_cb(cb_obj = None, mdl = hover, stretch = stretch, bias = bias):
             if mdl.updating != '':
@@ -114,10 +108,8 @@ class PeaksTableWidget(_Widget):
         if info is None:
             info = 0, 1000
 
-        stretch, bias = self.__hover.stretch, self.__hover.bias
-        if bias is None:
-            bias = 0.
-        info += (info[0]*stretch+bias, info[1]*stretch+bias)
+        stretch, bias = self._model.stretch, self._model.bias
+        info         += (info[0]*stretch+bias, info[1]*stretch+bias)
         return dict(bases = info[:2], z = info[2:])
 
 class CyclesSequencePathWidget(SequencePathWidget):
@@ -274,7 +266,6 @@ class EventDetectionWidget(GroupWidget):
 class ConfigMixin:
     "Everything dealing with config"
     def __init__(self):
-        self.css.input.width.default = 205
         self.__widgets = dict(table   = PeaksTableWidget(self._model),
                               sliders = ConversionSlidersWidget(self._model),
                               seq     = CyclesSequencePathWidget(self._model),
@@ -285,7 +276,6 @@ class ConfigMixin:
 
     def _createconfig(self):
         self.__widgets['sliders'].addinfo(self._histsource)
-        self.__widgets['table']  .addinfo(self._hover)
 
         widgets = {i: j.create(self.action) for i, j in self.__widgets.items()}
         for widget in self.__widgets.values():
@@ -295,7 +285,7 @@ class ConfigMixin:
 
         self.__widgets['seq']    .callbacks(self._hover, self._ticker)
         self.__widgets['sliders'].callbacks(self._hover, widgets['table'][1])
-        self.__widgets['table']  .callbacks(*widgets['sliders'])
+        self.__widgets['table']  .callbacks(self._hover, *widgets['sliders'])
 
         return layouts.layout([[layouts.widgetbox(widgets['seq']+widgets['oligos']),
                                 layouts.widgetbox(widgets['sliders']),

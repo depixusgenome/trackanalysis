@@ -161,13 +161,15 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     _RESET = frozenset(('track', 'bead'))
     def __init__(self, ctrl:Controller, *_) -> None:
         "sets up this plotter's info"
-        ctrl.getGlobal("css.plot").defaults = dict(ylabel      = u'Z (nm)',
-                                                   yrightlabel = u'Base number',
-                                                   xtoplabel   = u'Time (s)',
-                                                   xlabel      = u'Frames',
-                                                   toolbar_location = 'left',
-                                                   toolbar_sticky   = False,
-                                                   sizing_mode      = 'scale_width')
+        ctrl.getGlobal("css.plot").defaults = {'ylabel'          : u'Z (nm)',
+                                               'yrightlabel'     : u'Base number',
+                                               'xtoplabel'       : u'Time (s)',
+                                               'xlabel'          : u'Frames',
+                                               'toolbar_location': 'right',
+                                               'toolbar_sticky'  : False,
+                                               'input.width'     : 205,
+                                               'sizing_mode'     : 'scale_width'}
+
 
         key = ".plot." + type(self).__name__[:-len('PlotCreator')].lower()
         for name in 'config', 'project', 'css':
@@ -328,8 +330,8 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                           ('sizing_mode',      'sizing_mode'),
                           ('x_axis_label',     'xlabel'),
                           ('y_axis_label',     'ylabel'),
-                          ('plot_width',       'plotwidth'),
-                          ('plot_height',      'plotheight'),
+                          ('plot_width',       'plot.width'),
+                          ('plot_height',      'plot.height'),
                           ('tools',            'tools')):
             for css in cssarr:
                 val = css.get(name, default = _m_none)
