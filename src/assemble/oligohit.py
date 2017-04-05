@@ -3,6 +3,7 @@
 u'''
 Creates Classes and function to use with assemble sequence
 '''
+from typing import List
 
 def shifted_overlap(ol1:str,ol2:str,shift=0)->str:
     u'''
@@ -58,7 +59,7 @@ def pile_oligo(seq:str,oligo,shift:int=0)->str:
                 seq = seq[:idx+osh]+"?"+seq[idx+osh+1:]
     return seq
 
-class OligoHit:
+class Oligo:
     u'''
     container for an oligo sequence, a position in nanometer
     and a position in base
@@ -84,7 +85,7 @@ class OligoHit:
 
 
 
-class OligoPeak(OligoHit):
+class OligoPeak(Oligo):
     u'''
     represents peaks obtained from experiment adding attributes such as :
     position error,
@@ -97,3 +98,17 @@ class OligoPeak(OligoHit):
         self.poserr=kwa.get("poserr",None)
         self.pos0=kwa.get("pos0",None) # initial (experimental) position in nanometer
         self.bpos0=kwa.get("bpos0",None) # initial (experimental) base position
+
+
+class Batch:
+    u'''
+    Container for Oligo
+    '''
+    def __init__(self,**kwa):
+        self.oligos = kwa.get("oligos",[])
+        self.index = kwa.get("index",0)
+
+    def fill_with(self,other)->None:
+        u'adds oligos from other into self and empties other'
+        self.oligos.extend(other.oligos)
+        del other.oligos

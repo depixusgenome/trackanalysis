@@ -10,7 +10,7 @@ from typing import Callable, Iterable # pylint: disable=unused-import
 import itertools
 import numpy
 from . import _utils as utils
-
+from oligohit import Batch
 
 # reconstruction a batch at a time
 # if we consider an oligo-batch at a time, then:
@@ -68,46 +68,43 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
     # -> better for recursive, scaffolding
     # segregate per batch permutation beteen oligos with same sequence is forbidden
 
-    # strategies:
-    # find each groups of oligos, take itertools.product(groups) find overlaps is too long!
-    # find overlapping oligos, find different groups for each overlapping set
     '''
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
-        self.oligos = kwargs.get("oligos",[])
+        self.oligos = kwargs.get("oligos",tuple())
         self.nscale = kwargs.get("nscale",1)
         self.seg = kwargs.get("seg","batch_id") # "batch", "sequence"
-        # find overlapping oligos
-        # for each overlapping group, find the different groups, within overlapping oligos
-        #overoli = utils.find_overlapping_oligos(self.oligos,nscale=nscale)
-        #self.perms = []
-        #for overgrp in overoli:
-        #    groups = utils.group_oligos(overgrp,by=self.seg)
-        #    print("len(groups)=",len(groups))
-        #    for pro in itertools.product(*groups):
-        #        self.perms.append(pro) # perms contains duplicate permutations
-
-        # set the calls such that __call__ tends to merge batches together
-        #batches = set(i.batch_id for i in self.oligos)
-        groups = utils.group_oligos(self.oligos, by=self.seg)
-        import pickle
-        pickle.dump(groups,open("groups.pickle","wb"))
         self.swaps = []
-        # define generators of generators?
-        # group i and i+1
 
-        # can't do overoli first because find_overlapping_oligos does not return a partition
-        grp_ovl=utils.group_overlapping_oligos
-        for idg,grp in enumerate(groups[1:]):
-            # find overlapping oligos
-            # if they belong to 2 groups add a swap
-            self.swaps.extend([it for it in itertools.product(grp,groups[idg])
-                               if len(grp_ovl(*it))==1])
+        # create Batches from each batch_ids move from one Batch to another
+        batchids = list(set(i.batch_id for i in self.oligos))
+        self.batches = [Batch(oligos=[i for i in self.oligos if i.batch_id==index],
+                              index=index)
+                        for index in batchids]
 
+        # batches from groups( = utils.group_oligos(self.oligos, by=self.seg))?? 
 
+        self.swaps_from_batches()
+                    
     def __call__(self,xst):
         u'''
         should be something like
         '''
-        for swp in self.swaps:
-            yield swp
+        swaps = self.swaps_from_batches()
+        while swaps:
+            for swp in swaps:
+                yield swp
+            swaps=self.swaps_from_batches()
+
+    def swaps_from_batches(self):
+        u'returns swaps between the first two batches then merges them'
+        if len(self.batches)<2:
+            return None
+
+        grp_ovl=utils.group_overlapping_oligos
+        swaps = [it for it in itertools.product(self.batches[0], self.batches[1])
+                 if len(grp_ovl(it))==1]
+        self.batches[0].fill_with(self.batches[1])
+        self.batches.pop(1)
+        return swaps
+        

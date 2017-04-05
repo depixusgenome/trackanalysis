@@ -7,7 +7,7 @@ regroups functions and classes to complement assembler
 
 import itertools
 from copy import deepcopy
-from typing import Callable, List # pylint: disable=unused-import
+from typing import Callable, List, Dict # pylint: disable=unused-import
 import scipy.stats
 import numpy
 from Bio import pairwise2
@@ -256,7 +256,6 @@ def group_overlapping_normdists(dists,nscale=1): # to pytest !! # what if no int
     bounds = [(di.mean()-nscale*di.std(),idx) for idx,di in enumerate(dists)]
     bounds+= [(di.mean()+nscale*di.std(),idx) for idx,di in enumerate(dists)]
     bounds.sort()
-    print("bounds=",bounds)
     overlaps=[]
     for regid in range(len(bounds[:-1])):
         beflag = set(idx[1] for idx in bounds[:regid+1])
@@ -264,7 +263,6 @@ def group_overlapping_normdists(dists,nscale=1): # to pytest !! # what if no int
 
         overlaps.append(sorted(beflag.intersection(aflag)))
 
-    print("overlaps=",overlaps)
     ssets = [set(overl) for overl in overlaps if len(overl)>1]
     ssets.sort(reverse=True)
     if len(ssets)==0:
@@ -313,12 +311,12 @@ def group_overlapping_oligos(oligos,nscale=1):
     groups = group_overlapping_normdists([oli.dist for oli in oligos],nscale=nscale)[1]
     return [[oligos[idx] for idx in grp] for grp in groups]
 
-def group_oligos(oligos,**kwa):
-    u''' returns oligos grouped by attr "by"
+def group_oligos(oligos,**kwa)->Dict: # pytest!
+    u''' returns dictionnary of oligos grouped by attr "by"
     '''
     byattr = kwa.get("by","batch_id")
     attr = set([getattr(oli,byattr) for oli in oligos])
-    grouped = [[oli for oli in oligos if getattr(oli,byattr)==atv] for atv in attr]
+    grouped = {atv:[oli for oli in oligos if getattr(oli,byattr)==atv] for atv in attr}
     return grouped
 
 class CostPermute:
