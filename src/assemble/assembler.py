@@ -5,26 +5,16 @@ u'''
 regroups functions and classes to initialise assemblers
 '''
 
-import sys
 from typing import Callable, Iterable # pylint: disable=unused-import
 from multiprocessing import Pool
-import itertools
 import numpy
 from scipy.optimize import basinhopping,OptimizeResult
-from . import _utils as utils
+import .stepper as stepper
 
 # number of combinations for 4-mers and 5 nm exp precision leads to
 # 4.064499031853928e+26 possibilities with 100 possibilities  that's ~4*1e19 days.
 # for 1nm exp precision it falls down to 25936
 # proposed solution reconstruct the sequence a batch at a time.
-
-# reconstruction a batch at a time
-# if we consider an oligo-batch at a time, then:
-#     * permutation can only decrease score
-#     * adding a new batch, permutation can only occur between different batches
-
-# to add variability in (stretching,bias) for each batch (to estimate from hybridstat analyses)
-
 
 # to benchmark:
 #    * fix size of sequences, vary size of oligos and overlap
@@ -44,84 +34,6 @@ def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argumen
     '''
     return OptimizeResult(x=xinit, fun=fun(xinit), success=True, nfev=1)
 
-class HoppingSteps:
-    u'''
-    Class to define boundaries, steps for basinhopping
-    Can forbid flipping of peaks within the same batch
-    '''
-    def __init__(self,**kwargs):
-        self.min_x = kwargs.get("min_x",0)
-        self.max_x = kwargs.get("max_x",sys.maxsize)
-        self.scale = kwargs.get("scale",1)
-        self.dists = kwargs.get("dists",[]) # list of distributions
-        self.random_state = kwargs.get("random_state",None)
-    def __call__(self,xstate): # should be overriden
-        pass
-
-class PreFixedSteps(HoppingSteps):
-    u'''
-    calls predefined fixed distributions
-    '''
-    def __call__(self,*args):
-        return numpy.array([i.rvs(random_state=self.random_state) for i in self.dists])
-
-
-class GaussAndFlip(HoppingSteps):
-    u'''for two calls, one uses defined dists
-    the other randomly flips 2 consecutive xstates
-    '''
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
-        self.count = 0
-    def __call__(self,xst):
-        if self.count==0:
-            self.count=1
-            return numpy.array([i.rvs(random_state=self.random_state) for i in self.dists])
-        else:
-            self.count=0
-            flip = numpy.random.randint(len(xst)-1)
-            xst[flip], xst[flip+1] = xst[flip+1],xst[flip]
-            return xst
-
-class OptimOligoSwap(HoppingSteps): # not yet usable
-    u'''
-    trying to optimize the exploration of param space given hypotheses:
-    symetric distribution of z around z0 (gaussian at the moment)
-    find the distribution which overlap (and allow permutation of oligos)
-
-    # segregate per batch permutation beteen oligos with same batch_id is forbidden
-    # -> better for recursive, scaffolding
-    # segregate per batch permutation beteen oligos with same sequence is forbidden
-
-    # strategies:
-    # find each groups of oligos, take itertools.product(groups) find overlaps is too long!
-    # find overlapping oligos, find different groups for each overlapping set
-    '''
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
-        self.oligos = kwargs.get("oligos",[])
-        self.nscale = kwargs.get("nscale",1)
-        self.seg = kwargs.get("seg","batch_id") # "batch", "sequence"
-        # find overlapping oligos
-        # for each overlapping group, find the different groups, within overlapping oligos
-        #overoli = utils.find_overlapping_oligos(self.oligos,nscale=nscale)
-        #self.perms = []
-        #for overgrp in overoli:
-        #    groups = utils.group_oligos(overgrp,by=self.seg)
-        #    print("len(groups)=",len(groups))
-        #    for pro in itertools.product(*groups):
-        #        self.perms.append(pro) # perms contains duplicate permutations
-
-        # set the calls such that __call__ tends to merge batches together 
-        batches = set(i.batch_id for i in self.oligos)
-        groups = utils.group_oligos(,by=self.seg)
-
-    def __call__(self,xst):
-        u'''
-        at each call 2 batch_ids are merged
-        '''
-        
-        
 class NestedAsmrs:
     u'''
     nested Monte Carlo running different random seeds in parallel
@@ -224,7 +136,7 @@ class MCAssembler(Assembler):
         self.minimizer = kwargs.get("minimizer",no_minimizer) # type: Callable
         self.acceptance = kwargs.get("acceptance",None) # type: Callable
         self.result = OptimizeResult()
-        self.step = kwargs.get("step",HoppingSteps())
+        self.step = kwargs.get("step",stepper.HoppingSteps())
 
     def run(self,*args,**kwargs)->None: # pylint:disable = unused-argument
         u'''runs a specified number of steps
