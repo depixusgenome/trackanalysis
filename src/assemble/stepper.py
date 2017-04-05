@@ -90,17 +90,18 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
         # set the calls such that __call__ tends to merge batches together
         #batches = set(i.batch_id for i in self.oligos)
         groups = utils.group_oligos(self.oligos, by=self.seg)
-
+        import pickle
+        pickle.dump(groups,open("groups.pickle","wb"))
         self.swaps = []
         # define generators of generators?
         # group i and i+1
 
         # can't do overoli first because find_overlapping_oligos does not return a partition
         grp_ovl=utils.group_overlapping_oligos
-        for idg,grp in enumerate(groups[:-1]):
+        for idg,grp in enumerate(groups[1:]):
             # find overlapping oligos
             # if they belong to 2 groups add a swap
-            self.swaps.extend([it for it in itertools.product(grp,groups[idg+1])
+            self.swaps.extend([it for it in itertools.product(grp,groups[idg])
                                if len(grp_ovl(*it))==1])
 
 

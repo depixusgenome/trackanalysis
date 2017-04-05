@@ -256,15 +256,19 @@ def group_overlapping_normdists(dists,nscale=1): # to pytest !! # what if no int
     bounds = [(di.mean()-nscale*di.std(),idx) for idx,di in enumerate(dists)]
     bounds+= [(di.mean()+nscale*di.std(),idx) for idx,di in enumerate(dists)]
     bounds.sort()
+    print("bounds=",bounds)
     overlaps=[]
     for regid in range(len(bounds[:-1])):
-        beflag=set(idx[1] for idx in bounds[:regid+1])
+        beflag = set(idx[1] for idx in bounds[:regid+1])
         aflag = set(idx[1] for idx in bounds[regid+1:])
 
         overlaps.append(sorted(beflag.intersection(aflag)))
 
+    print("overlaps=",overlaps)
     ssets = [set(overl) for overl in overlaps if len(overl)>1]
     ssets.sort(reverse=True)
+    if len(ssets)==0:
+        return ssets,[]
     uset=[ssets[0]]
     for val in ssets[1:]:
         if val.issubset(uset[-1]):
