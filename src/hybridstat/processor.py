@@ -133,8 +133,8 @@ class HybridstatProcessor(Processor):
                 continue
 
             rngs    = idtask.distances[item[0]]
-            stretch = Range(item[2], item[2]+rngs.stretch[-1]*1.01, rngs.stretch[-1])
-            bias    = Range(item[3], item[3]+rngs.bias   [-1]*1.01, rngs.bias[-1])
+            stretch = Range(item[2], 0., rngs.stretch[-1])
+            bias    = Range(item[3], 0., rngs.bias[-1])
             cstrs[item[0]]['stretch'] = stretch
             cstrs[item[0]]['bias']    = bias
 

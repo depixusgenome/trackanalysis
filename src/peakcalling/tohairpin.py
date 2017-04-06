@@ -4,7 +4,8 @@ u"""
 Matching experimental peaks to hairpins
 """
 from   typing       import (Dict, Sequence, NamedTuple, # pylint: disable=unused-import
-                            Callable, Iterator, Iterable, Tuple, Any, Union, cast)
+                            Callable, Iterator, Iterable, Tuple, Any,
+                            Optional, Union, cast)
 from   itertools    import product
 import numpy        as np
 
@@ -20,9 +21,9 @@ OptimisationParams = NamedTuple('OptimisationParams',
                                  ('maxeval',             int)])
 
 Range              = NamedTuple('Range',
-                                [('min',  float),
-                                 ('max',  float),
-                                 ('step', float)])
+                                [('center', Optional[float]),
+                                 ('size',   float),
+                                 ('step',   float)])
 
 class Hairpin:
     u"Matching experimental peaks to hairpins"
@@ -51,16 +52,27 @@ class HairpinDistance(Hairpin):
     DEFAULT_BEST = 1e20
     symmetry     = False
     precision    = 15.
-    stretch      = Range(1./8.8e-4-200, 1./8.8e-4+200.01, 100.)
-    bias         = Range(-20., 20.01, 20.)
+    stretch      = Range(1./8.8e-4, 200., 100.)
+    bias         = Range(None,       20.,  20.)
     optim        = OptimisationParams(1e-4, 1e-8, 1e-4, 1e-8, 100)
     @initdefaults
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
+    def arange(self, attr: Optional[str] = None
+              ) -> Union[np.ndarray, Iterator[Tuple[float, ...]]]:
+        "returns the range on which the attribute is explored"
+        if attr is None:
+            return product(self.arange('stretch'), self.arange('bias'))
+
+        val = getattr(self, attr)
+        if val.center is None:
+            return np.arange(-val.size, val.size+val.step*.1, val.step)
+        return np.arange(val.center-val.size, val.center+val.size+val.step*.1, val.step)
+
     @kwargsdefaults('precision', 'stretch', 'bias', 'lastpeak')
     def __call__(self, peaks : np.ndarray) -> Distance:
-        best  = self.DEFAULT_BEST, sum(self.stretch[:2])*.5, sum(self.bias[:2])*.5
+        best  = self.DEFAULT_BEST, self.stretch.center, (self.bias.center or 0.)
         delta = 0.
         if len(peaks) > 1:
             rng  = lambda x, y, z: (('min_'+x, y-z), (x, y), ('max_'+x, y+z))
@@ -77,9 +89,12 @@ class HairpinDistance(Hairpin):
             peaks = peaks - peaks[0]
 
             optimize = _cost.optimize
-            for vals in product(np.arange(*self.stretch), np.arange(*self.bias)):
+            for vals in self.arange():
                 args.update(rng('stretch', vals[0], self.stretch.step))
-                args.update(rng('bias',    vals[1]+delta*vals[0], self.bias.step))
+                if self.bias.center is None:
+                    args.update(rng('bias', vals[1], self.bias.step))
+                else:
+                    args.update(rng('bias', vals[1]+delta*vals[0], self.bias.step))
                 try:
                     out = optimize(hpin, peaks, **args)
                 except: # pylint: disable=bare-except
