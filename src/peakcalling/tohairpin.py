@@ -88,7 +88,7 @@ class HairpinDistance(Hairpin):
                     if out[0] < best[0]:
                         best = out
 
-        return Distance(best[0], best[1], best[2]-best[1]*delta)
+        return Distance(best[0], best[1], delta-best[2]/best[1])
 
 PEAKS_DTYPE = np.dtype([('zvalue', 'f4'), ('key', 'i4')])
 PEAKS_TYPE  = Union[Sequence[Tuple[float,int]],np.ndarray]

@@ -182,7 +182,7 @@ class SequenceHoverMixin:
                             return
 
                         tmp = source.data["values"]
-                        source.data["z"] = tmp.map(((x)-> x*@stretch+@bias), @)
+                        source.data["z"] = tmp.map(((x)-> x/@stretch+@bias), @)
                         @_values = values
                         source.trigger('change:data')
 
@@ -252,8 +252,8 @@ class SequenceHoverMixin:
             window.setTimeout(lambda a, b, c: a.setsource(b, c), 500, cb_obj, src, values)
             bases       = fig.extra_y_ranges['bases']
             yrng        = fig.y_range
-            bases.start = (yrng.start-cb_obj.bias)/cb_obj.stretch
-            bases.end   = (yrng.end  -cb_obj.bias)/cb_obj.stretch
+            bases.start = (yrng.start-cb_obj.bias)*cb_obj.stretch
+            bases.end   = (yrng.end  -cb_obj.bias)*cb_obj.stretch
 
         self.js_on_change("updating", _js_cb)
 
@@ -286,8 +286,8 @@ class SequenceHoverMixin:
             frames.start = 0.
 
             bases        = fig.extra_y_ranges['bases']
-            bases.start  = (yrng.start - hvr.bias)/hvr.stretch
-            bases.end    = (yrng.end   - hvr.bias)/hvr.stretch
+            bases.start  = (yrng.start - hvr.bias)*hvr.stretch
+            bases.end    = (yrng.end   - hvr.bias)*hvr.stretch
 
             bottom       = src.data[column]
             if len(bottom) < 2:
@@ -313,14 +313,6 @@ class SequenceHoverMixin:
                                                 extra  = extra,
                                                 column = column)
 
-    def estimatebias(self, hdata, extra:str, column:str):
-        "estimate the bias using the plot data"
-        if hdata is None:
-            return self.bias  # type: ignore
-
-        bias = self._model.bias
-        return estimatebias(hdata[column], hdata[extra]) if bias is None else bias
-
     @checksizes
     def __data(self):
         mdl   = self._model
@@ -340,7 +332,7 @@ class SequenceHoverMixin:
             data[name][:len(seq)-osiz+1] = [seq[i:i+osiz] for i in range(len(seq)-osiz+1)]
 
         data['text'] = data.get(key, data[next(iter(dseq))])
-        data['z']    = data['values']*mdl.stretch+(0. if mdl.bias is None else mdl.bias)
+        data['z']    = data['values']/mdl.stretch+(0. if mdl.bias is None else mdl.bias)
         return data
 
 class SequencePathWidget(WidgetCreator):
@@ -444,7 +436,7 @@ class OligoListWidget(WidgetCreator):
         @action
         def _py_cb(attr, old, new):
             ols  = sorted(i.lower() for i in match(new))
-            hist = self.configroot.oligos.history
+            hist = self.config.oligos.history
             lst  = list(i for i in hist.get() if i != ols)[:hist.maxlength.get()]
             hist.set(([ols] if len(ols) else []) + lst)
             self._model.oligos = ols
@@ -457,7 +449,7 @@ class OligoListWidget(WidgetCreator):
         self.__widget.update(**self.__data())
 
     def __data(self):
-        hist = self.configroot.oligos.history.get()
+        hist = self.config.oligos.history.get()
         lst  = [', '.join(sorted(j.lower() for j in i)) for i in hist]
         ols  = ', '.join(sorted(j.lower() for j in self._model.oligos))
         return dict(value = ols, completions = lst)

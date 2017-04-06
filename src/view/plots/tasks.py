@@ -104,7 +104,7 @@ class TaskAccess(TaskPlotModelAccess):
         self.side      = (0  if kwa.get('side', 'LEFT') == 'LEFT' else 1)
 
         # pylint: disable=not-callable
-        self.configroot.tasks.order.default            = TASK_ORDER
+        self.configroot.tasks.order.default = TASK_ORDER
 
         cur = self.configroot.tasks.get(self.configname, default = None)
         assert cur is None or isinstance(cur, tasktype)
@@ -164,7 +164,7 @@ class TaskAccess(TaskPlotModelAccess):
     @property
     def index(self) -> Optional[Task]:
         "returns the index the new task should have"
-        order    = tuple(taskorder(self.configroot.tasks.order.get()))
+        order    = tuple(taskorder(self.config.tasks.order.get()))
         ind      = order.index(self.tasktype) + self.side
         previous = order[:ind]
 
@@ -185,6 +185,9 @@ class TaskPlotCreator(PlotCreator):
     def __init__(self, *args, **kwa):
         super().__init__(*args, **kwa)
         self._ctrl.getGlobal("project").bead.default = None
+        css = self._ctrl.getGlobal('css.plot').title
+        css.defaults = {'stretch': u'Stretch (base/µm)', 'bias': u'Bias (µm)'}
+
         if TYPE_CHECKING:
             self._model = TaskPlotModelAccess('', '')
 

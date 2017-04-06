@@ -58,8 +58,8 @@ class PeaksTableWidget(_Widget):
             if zval[0] == zval[1] or bases[0] == bases[1]:
                 return
 
-            self._model.stretch = (zval[1]-zval[0]) / (bases[1]-bases[0])
-            self._model.bias    = zval[0] - bases[0]*self._model.stretch
+            self._model.stretch = (bases[1]-bases[0]) / (zval[1]-zval[0])
+            self._model.bias    = zval[0] - bases[0]/self._model.stretch
 
         self.__widget.source.on_change("data", _py_cb) # pylint: disable=no-member
         return [Paragraph(text = self.css.title.table.get()), self.__widget]
@@ -86,7 +86,7 @@ class PeaksTableWidget(_Widget):
             aval = (zval[1]-zval[0]) / (bases[1]-bases[0])
             bval = zval[0] - bases[0]*aval
 
-            stretch.value = aval*1e3
+            stretch.value = aval
             bias   .value = bval
             mdl.stretch   = aval
             mdl.bias      = bval
@@ -109,7 +109,7 @@ class PeaksTableWidget(_Widget):
             info = 0, 1000
 
         stretch, bias = self._model.stretch, self._model.bias
-        info         += (info[0]*stretch+bias, info[1]*stretch+bias)
+        info         += info[0]/stretch+bias, info[1]/stretch+bias
         return dict(bases = info[:2], z = info[2:])
 
 class CyclesSequencePathWidget(SequencePathWidget):
@@ -131,12 +131,10 @@ class ConversionSlidersWidget(_Widget):
         self.__stretch = None # type: Optional[Slider]
         self.__bias    = None # type: Optional[Slider]
         self.__figdata = None # type: Optional[ColumnDataSource]
-        self.css.defaults = {'title.stretch' : u'stretch 10³[dna/nm]',
-                             'title.bias'    : u'bias [nm]'}
 
-        base = self.configroot.base
-        base.stretch.defaults = dict(start = 5.e-4, step = 1.e-5, end = 1.5e-3)
-        base.bias   .defaults = dict(step = .0001, ratio = .25)
+        base = self.css.base
+        base.stretch.defaults = dict(start = 900, step = 50, end = 1400)
+        base.bias   .defaults = dict(step  = 1e-4,   ratio = .25)
 
     def addinfo(self, histsource):
         "adds info to the widget"
@@ -150,29 +148,25 @@ class ConversionSlidersWidget(_Widget):
                                            width = self.css.input.width.get(),
                                            start = s, end = e, name = n)
 
-        vals = tuple(self.config.base.stretch.get('start', 'end'))
-        self.__stretch = widget('stretch', vals[0]*1e3, vals[1]*1e3, 'Cycles:Stretch')
-        self.__stretch.value *= 1e3
+        vals = tuple(self.css.base.stretch.get('start', 'end'))
+        self.__stretch = widget('stretch', vals[0], vals[1], 'Cycles:Stretch')
         self.__bias    = widget('bias', -1., 1., 'Cycles:Bias')
 
-        def _py_stretch_cb(attr, old, new):
-            self._model.stretch = new*1e-3
-        self.__stretch.on_change('value', action(_py_stretch_cb))
+        py_stretch_cb  = lambda attr, old, new: setattr(self._model, 'stretch', new)
+        self.__stretch.on_change('value', action(py_stretch_cb))
 
-        def _py_bias_cb(attr, old, new):
-            self._model.bias = new
-        self.__bias.on_change('value', action(_py_bias_cb))
+        py_bias_cb     = lambda attr, old, new: setattr(self._model, 'bias', new)
+        self.__bias.on_change('value', action(py_bias_cb))
         return [self.__stretch, self.__bias]
 
     def reset(self):
         "updates the widgets"
-        minv  = self.__figdata.data['bottom'][0]
-        delta = self.__figdata.data['top'][-1] - minv
-        ratio = self.config.base.bias.ratio.get()
-        self.__bias.update(value = self._model.bias,
-                           start = minv,
-                           end   = minv+delta*ratio)
-        self.__stretch.value = self._model.stretch*1e3
+        ratio = self.css.base.bias.ratio.get()
+        start = self.__figdata.data['bottom'][0]
+        end   = start + (self.__figdata.data['top'][-1] - start)*ratio
+
+        self.__bias.update(value = self._model.bias, start = start, end = end)
+        self.__stretch.value = self._model.stretch
 
     def observe(self):
         "sets-up config observers"
@@ -187,13 +181,13 @@ class ConversionSlidersWidget(_Widget):
             if mdl.updating != '':
                 return
 
-            mdl.stretch  = stretch.value*1e-3
+            mdl.stretch  = stretch.value
             mdl.bias     = bias.value
             mdl.updating = 'sliders'
 
             bases            = source.data['bases']
-            source.data['z'] = [bases[0] * stretch.value*1e-3 + bias.value,
-                                bases[1] * stretch.value*1e-3 + bias.value]
+            source.data['z'] = [bases[0] / stretch.value + bias.value,
+                                bases[1] / stretch.value + bias.value]
             source.trigger('change:data')
             mdl.updating = ''
 

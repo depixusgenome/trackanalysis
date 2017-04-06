@@ -78,6 +78,7 @@ class HistMixin:
     def _createhist(self, data, shape, yrng):
         self._hist       = figure(**self._figargs(self.css.hist,
                                                   y_axis_location = None,
+                                                  x_range         = Range1d,
                                                   y_range         = yrng,
                                                   name            = 'Cycles:Hist'))
 

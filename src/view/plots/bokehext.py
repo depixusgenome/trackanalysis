@@ -4,7 +4,7 @@
 from itertools               import product
 import re
 
-from bokeh.models            import Row, Model, HoverTool, CustomJS
+from bokeh.models            import Row, Model, HoverTool, CustomJS, NumberFormatter
 from bokeh.plotting.figure   import Figure
 
 import bokeh.core.properties   as     props
@@ -76,4 +76,19 @@ class DpxHoverTool(HoverTool):
     export class DpxHoverTool extends HoverTool
         default_view: DpxHoverToolView
         @define { maxcount: [ p.Int, 5] }
+    """
+
+class DpxNumberFormatter(NumberFormatter):
+    "Deals with"
+    __implementation__ = """
+    import {NumberFormatter, StringFormatter} from "models/widgets/cell_formatters"
+
+    export class DpxNumberFormatter extends NumberFormatter
+      type: 'DpxNumberFormatter'
+
+      doFormat: (row, cell, value, columnDef, dataContext) ->
+        if value or value == 0
+            return super(row, cell, value, columnDef, dataContext)
+
+        StringFormatter.prototype.doFormat.apply(this, [row, cell, null, columnDef, dataContext])
     """
