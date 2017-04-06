@@ -26,9 +26,10 @@ from view.plots                 import (PlotView, PlotAttrs, from_py_func,
                                         DpxNumberFormatter, WidgetCreator, DpxKeyedRow)
 from view.plots.tasks           import (TaskPlotModelAccess, TaskPlotCreator,
                                         TaskAccess)
-from view.plots.sequence        import (readsequence, SequenceTicker,
+from view.plots.sequence        import (readsequence, SequenceTicker, OligoListWidget,
                                         SequenceHoverMixin, SequencePathWidget,
-                                        OligoListWidget)
+                                        FitParamProp    as _FitParamProp,
+                                        SequenceKeyProp as _SequenceKeyProp)
 
 from ..probabilities            import  Probability
 
@@ -44,46 +45,23 @@ class SequenceProp(TaskPlotModelAccess.props.configroot[T], Generic[T]):
             obj.identification.update(**task.config())
         return val
 
-class FitParamProp(TaskPlotModelAccess.props.config[float]):
+class FitParamProp(_FitParamProp):
     "access to bias or stretch"
-    def __init__(self, attr):
-        super().__init__('base.'+attr)
-        self.__key = attr
-
     def __get__(self, obj, tpe) -> Optional[str]:
-        if obj is None:
-            return self
-        key  = obj.sequencekey
-        dist = obj.distances
-        if key not in dist:
-            val = super().__get__(obj, tpe)
-            if val is None:
-                return getattr(obj, 'estimated'+self.__key)
-            return val
-        else:
-            return getattr(dist[key], self.__key)
+        if obj is not None:
+            dist = obj.distances.get(obj.sequencekey, None)
+            if dist is not None:
+                return getattr(dist, self._key)
 
-    def __set__(self, obj, val):
-        raise AttributeError("can't set attribute")
+        return super().__get__(obj, tpe)
 
-class SequenceKeyProp(TaskPlotModelAccess.props.bead[Optional[str]]):
+class SequenceKeyProp(_SequenceKeyProp):
     "access to the sequence key"
-    def __init__(self):
-        super().__init__('sequence.key')
-
     def __get__(self, obj, tpe) -> Optional[str]:
         "returns the current sequence key"
-        if obj is None:
-            return self
-        key  = super().__get__(obj, tpe)
-        if key is not None:
-            return key
-
-        if len(obj.distances):
+        if obj is not None and len(obj.distances) and self.fromglobals(obj) is None:
             return min(obj.distances, key = obj.distances.__getitem__)
-
-        dseq = readsequence(obj.sequencepath)
-        return next(iter(dseq), None) if key not in dseq else key
+        return super().__get__(obj, tpe)
 
 class PeaksPlotModelAccess(TaskPlotModelAccess):
     "Access to peaks"
@@ -95,14 +73,14 @@ class PeaksPlotModelAccess(TaskPlotModelAccess):
         self.identification     = TaskAccess(self, FitToHairpinTask)
         self.fits               = None   # type: Optional[FitBead]
         self.peaks              = dict() # type: Dict[str, np.ndarray]
-        self.estimatedstretch   = 1.
+        self.estimatedstretch   = 1./8.8e-4
         self.estimatedbias      = 0.
 
         cls = type(self)
         cls.oligos      .setdefault(self, [], size = 4)
-        cls.sequencekey .setdefault(self, None)   # type: ignore
-        cls.stretch     .setdefault(self, 1./8.8e-4) # type: ignore
-        cls.bias        .setdefault(self, None)   # type: ignore
+        cls.sequencekey .setdefault(self, None)                  # type: ignore
+        cls.stretch     .setdefault(self, self.estimatedstretch) # type: ignore
+        cls.bias        .setdefault(self, None)                  # type: ignore
 
     sequencekey  = SequenceKeyProp()
     sequencepath = SequenceProp[Optional[str]]('last.path.sequence')
@@ -279,25 +257,36 @@ class PeaksSequencePathWidget(SequencePathWidget):
                   hover: SequenceHoverMixin,
                   tick1: SequenceTicker,
                   div:   'PeaksStatsDiv',
-                  peaksrc: ColumnDataSource):
+                  table: DataTable):
         "sets-up callbacks for the tooltips and grids"
-        widget = super().callbacks(hover, tick1)
+        widget = self.widget
         source = hover.source
+        tick2  = tick1.axis
 
         @from_py_func
-        def _js_cb(cb_obj = None,
-                   hvr    = hover,
+        def _js_cb(hvr    = hover,  # pylint: disable=too-many-arguments
                    src    = source,
-                   peaks  = peaksrc,
-                   stats  = div):
+                   peaks  = table,
+                   stats  = div,
+                   tick1  = tick1,
+                   tick2  = tick2,
+                   cb_obj = None):
             if cb_obj.value in src.column_names:
-                hvr.bias    = hvr.biases [cb_obj.value]
-                hvr.stretch = hvr.stretch[cb_obj.value]
-                peaks.data['id']       = peaks.data[cb_obj.value+'id']
-                peaks.data['bases']    = peaks.data[cb_obj.value+'bases']
-                peaks.data['distance'] = peaks.data[cb_obj.value+'distance']
-                stats.text             = stats.data[cb_obj.value]
+                cb_obj.label     = cb_obj.value
+                tick1.key        = cb_obj.value
+                tick2.key        = cb_obj.value
+                src.data['text'] = src.data[cb_obj.value]
+                src.trigger("change")
+
                 hvr.updating = 'seq'
+                hvr.stretch  = hvr.stretches[cb_obj.value]
+                hvr.bias     = hvr.biases   [cb_obj.value]
+                peaks.source.data['id']       = peaks.source.data[cb_obj.value+'id']
+                peaks.source.data['bases']    = peaks.source.data[cb_obj.value+'bases']
+                peaks.source.data['distance'] = peaks.source.data[cb_obj.value+'distance']
+                stats.text             = stats.data[cb_obj.value]
+                peaks.trigger("change")
+
                 hvr.updating = ''
         widget.js_on_change('value', _js_cb)
 
@@ -503,11 +492,11 @@ class PeaksPlotCreator(TaskPlotCreator):
         enableOnTrack(self, self._fig, widgets)
 
         self._addcallbacks(self._fig)
+        self._widgets['peaks'].setsource(self._peaksrc)
         self._widgets['seq'].callbacks(self._hover,
                                        self._ticker,
                                        widgets['stats'][-1],
-                                       self._peaksrc)
-        self._widgets['peaks'].setsource(self._peaksrc)
+                                       widgets['peaks'][-1])
 
         self.configroot.observe(self.reset)
 

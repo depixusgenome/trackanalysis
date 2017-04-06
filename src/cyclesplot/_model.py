@@ -7,32 +7,7 @@ from    cordrift.processor          import DriftTask
 from    eventdetection.processor    import (ExtremumAlignmentTask,
                                             EventDetectionTask)
 from    view.plots.tasks            import TaskPlotModelAccess, TaskAccess
-from    view.plots.sequence         import readsequence
-
-class SequenceKeyProp(TaskPlotModelAccess.props.bead[Optional[str]]):
-    "access to the sequence key"
-    def __init__(self):
-        super().__init__('sequence.key')
-
-    def __get__(self, obj, tpe) -> Optional[str]:
-        "returns the current sequence key"
-        if obj is None:
-            return self
-        key  = super().__get__(obj, tpe)
-        dseq = readsequence(obj.sequencepath)
-        return next(iter(dseq), None) if key not in dseq else key
-
-class FitParamProp(TaskPlotModelAccess.props.bead[float]):
-    "access to bias or stretch"
-    def __init__(self, attr):
-        super().__init__('base.'+attr)
-        self.__key = attr
-
-    def __get__(self, obj, tpe) -> Optional[str]:
-        val = super().__get__(obj, tpe)
-        if val is None:
-            return getattr(obj, 'estimated'+self.__key)
-        return val
+from    view.plots.sequence         import SequenceKeyProp, FitParamProp
 
 class CyclesModelAccess(TaskPlotModelAccess):
     "Model for Cycles View"
@@ -61,6 +36,6 @@ class CyclesModelAccess(TaskPlotModelAccess):
     oligos       = props.configroot[Optional[Sequence[str]]]('oligos')
     binwidth     = props.config[float]                      ('binwidth')
     minframes    = props.config[int]                        ('minframes')
-    stretch      = props.bead[float]                        ('stretch')
-    bias         = props.bead[float]                        ('bias')
+    stretch      = FitParamProp                             ('stretch')
+    bias         = FitParamProp                             ('bias')
     peaks        = props.bead[Optional[Tuple[float,float]]] ('sequence.peaks') # type: ignore

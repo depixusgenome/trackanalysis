@@ -86,12 +86,12 @@ class PeaksTableWidget(_Widget):
             aval = (zval[1]-zval[0]) / (bases[1]-bases[0])
             bval = zval[0] - bases[0]*aval
 
-            stretch.value = aval
-            bias   .value = bval
+            mdl.updating  = 'peaks'
             mdl.stretch   = aval
             mdl.bias      = bval
-            mdl.updating = 'peaks'
-            mdl.updating = ''
+            stretch.value = aval
+            bias   .value = bval
+            mdl.updating  = ''
 
         self.__widget.source.js_on_change("data", _js_cb) # pylint: disable=no-member
 
@@ -181,9 +181,9 @@ class ConversionSlidersWidget(_Widget):
             if mdl.updating != '':
                 return
 
+            mdl.updating = 'sliders'
             mdl.stretch  = stretch.value
             mdl.bias     = bias.value
-            mdl.updating = 'sliders'
 
             bases            = source.data['bases']
             source.data['z'] = [bases[0] / stretch.value + bias.value,

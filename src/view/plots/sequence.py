@@ -18,6 +18,7 @@ import  sequences
 
 from    utils           import CachedIO
 
+from   model.globals    import BeadProperty
 from   ..dialog         import FileDialog
 from    .base           import checksizes, WidgetCreator
 from    .bokehext       import DpxHoverTool, from_py_func
@@ -245,7 +246,7 @@ class SequenceHoverMixin:
         src = self.__source
         @from_py_func
         def _js_cb(src = src, fig = fig, cb_obj = None, window = None):
-            if cb_obj.updating == '':
+            if cb_obj.updating != '':
                 return
 
             values = cb_obj.bias, cb_obj.stretch
@@ -375,12 +376,17 @@ class SequencePathWidget(WidgetCreator):
         "updates the widget"
         self.__widget.update(**self.__data())
 
+    @property
+    def widget(self):
+        "returns the widget"
+        return self.__widget
+
     def callbacks(self, hover: SequenceHoverMixin, tick1: SequenceTicker):
         "sets-up callbacks for the tooltips and grids"
         tick2 = tick1.axis
         src   = hover.source
         @from_py_func
-        def _js_cb(cb_obj = None, tick1 = tick1, tick2 = tick2, src = src):
+        def _js_cb(tick1 = tick1, tick2 = tick2, src = src, cb_obj = None):
             if cb_obj.value in src.column_names:
                 cb_obj.label     = cb_obj.value
                 tick1.key        = cb_obj.value
@@ -453,3 +459,36 @@ class OligoListWidget(WidgetCreator):
         lst  = [', '.join(sorted(j.lower() for j in i)) for i in hist]
         ols  = ', '.join(sorted(j.lower() for j in self._model.oligos))
         return dict(value = ols, completions = lst)
+
+class SequenceKeyProp(BeadProperty[Optional[str]]):
+    "access to the sequence key"
+    def __init__(self):
+        super().__init__('sequence.key')
+
+    def fromglobals(self, obj) -> Optional[str]:
+        "returns the current sequence key stored in globals"
+        return super().__get__(obj, None)
+
+    def __get__(self, obj, tpe) -> Optional[str]:
+        "returns the current sequence key"
+        if obj is None:
+            return self
+
+        key  = self.fromglobals(obj)
+        if key is not None:
+            return key
+
+        dseq = readsequence(obj.sequencepath)
+        return next(iter(dseq), None) if key not in dseq else key
+
+class FitParamProp(BeadProperty[float]):
+    "access to bias or stretch"
+    def __init__(self, attr):
+        super().__init__('base.'+attr)
+        self._key = attr
+
+    def __get__(self, obj, tpe) -> Optional[str]:
+        val = super().__get__(obj, tpe)
+        if val is None:
+            return getattr(obj, 'estimated'+self._key)
+        return val
