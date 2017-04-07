@@ -33,6 +33,11 @@ class Hairpin:
     def __init__(self, **kwa):
         pass
 
+    @property
+    def hybridizations(self):
+        "returns only peaks linked to hibridizations"
+        return self.peaks[1:-1]
+
     @staticmethod
     def topeaks(seq:str, oligos:Sequence[str]) -> np.ndarray:
         u"creates a peak sequence from a dna sequence and a list of oligos"
@@ -70,7 +75,7 @@ class HairpinDistance(Hairpin):
             return np.arange(-val.size, val.size+val.step*.1, val.step)
         return np.arange(val.center-val.size, val.center+val.size+val.step*.1, val.step)
 
-    @kwargsdefaults('precision', 'stretch', 'bias', 'lastpeak')
+    @kwargsdefaults
     def __call__(self, peaks : np.ndarray) -> Distance:
         best  = self.DEFAULT_BEST, self.stretch.center, (self.bias.center or 0.)
         delta = 0.

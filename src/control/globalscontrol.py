@@ -232,8 +232,11 @@ class DefaultsMap(Controller):
             old     = self.__items.get(key, delete)
             default = self.__items.maps[1].get(key, delete)
             if default is delete:
-                raise KeyError("Default value must be set first "
-                               +str((self.__items.name, key)))
+                if len(self.__items.maps) > 2:
+                    default = self.__items.maps[-1].get(key, delete)
+                if default is delete:
+                    raise KeyError("Default value must be set first "
+                                   +str((self.__items.name, key)))
             elif val is delete or val == default:
                 self.__items.pop(key, None)
             else:
@@ -432,7 +435,6 @@ class GlobalsController(Controller):
         path = configpath(anastore.version(patchname))
         path.parent.mkdir(parents = True, exist_ok = True)
         path.touch(exist_ok = True)
-
         maps = {i: j._DefaultsMap__items.maps[0] # pylint: disable=protected-access
                 for i, j in self.__maps.items()
                 if 'project' not in i}

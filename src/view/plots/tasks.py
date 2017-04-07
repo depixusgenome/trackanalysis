@@ -129,8 +129,10 @@ class TaskAccess(TaskPlotModelAccess):
         if task is not None:
             self._ctrl.removeTask(self.roottask, task)
 
-            cnf = self.configtask
-            cnf.set(updatecopy(cnf.get(), disabled = True))
+            kwa = self._configattributes({'disabled': True})
+            if len(kwa):
+                cnf = self.configtask
+                cnf.set(updatecopy(cnf.get(), **kwa))
 
     def update(self, **kwa):
         "removes the task"
@@ -143,7 +145,11 @@ class TaskAccess(TaskPlotModelAccess):
             self._ctrl.addTask(root, item, index = self.index)
         else:
             self._ctrl.updateTask(root, task, **kwa)
-        cnf.set(updatecopy(cnf.get(), **kwa))
+
+        kwa = self._configattributes(kwa)
+        if len(kwa):
+            cnf = self.configtask
+            cnf.set(updatecopy(cnf.get(), **kwa))
 
     @property
     def task(self) -> Optional[Task]:
@@ -181,6 +187,10 @@ class TaskAccess(TaskPlotModelAccess):
         "observes the provided task"
         check = lambda parent = None, task = None, **_: self.check(task, parent)
         self._ctrl.observe(*args, argstest = check, **kwa)
+
+    @staticmethod
+    def _configattributes(kwa):
+        return kwa
 
 class TaskPlotCreator(PlotCreator):
     "Base plotter for tracks"

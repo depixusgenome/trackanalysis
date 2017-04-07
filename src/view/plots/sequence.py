@@ -344,7 +344,7 @@ class SequencePathWidget(WidgetCreator):
         self.__dialog  = FileDialog(filetypes = 'fasta|*',
                                     config    = self._ctrl,
                                     storage   = 'sequence')
-        css = self._ctrl.getGlobal("css.plot").title
+        css = self.css.plot.title
         css.defaults = {'fasta'                : u'Open a fasta file',
                         'sequence'             : u'Selected DNA sequence',
                         'sequence.missing.key' : u'Select sequence',
@@ -423,9 +423,9 @@ class OligoListWidget(WidgetCreator):
     def __init__(self, model) -> None:
         super().__init__(model)
         self.__widget  = None # type: Optional[AutocompleteInput]
-        self.config.root.oligos.defaults = {'history': [], 'history.maxlength': 10}
-        self.css.defaults = {'title.oligos'     : u'Oligos',
-                             'title.oligos.help': u'comma-separated list'}
+        self.config.plot.oligos.defaults = {'history': [], 'history.maxlength': 10}
+        self.css.plot.defaults = {'title.oligos'     : u'Oligos',
+                                  'title.oligos.help': u'comma-separated list'}
 
     def create(self, action) -> List[Widget]:
         "creates the widget"
@@ -441,7 +441,7 @@ class OligoListWidget(WidgetCreator):
         @action
         def _py_cb(attr, old, new):
             ols  = sorted(i.lower() for i in match(new))
-            hist = self.config.oligos.history
+            hist = self.config.plot.oligos.history
             lst  = list(i for i in hist.get() if i != ols)[:hist.maxlength.get()]
             hist.set(([ols] if len(ols) else []) + lst)
             self._model.oligos = ols
