@@ -84,14 +84,13 @@ class PeaksPlotModelAccess(TaskPlotModelAccess):
         self.identification     = FitToHairpinAccess(self)
         self.fits               = None   # type: Optional[FitBead]
         self.peaks              = dict() # type: Dict[str, np.ndarray]
-        self.estimatedstretch   = 1./8.8e-4
         self.estimatedbias      = 0.
 
         cls = type(self)
         cls.oligos      .setdefault(self, [], size = 4)
-        cls.sequencekey .setdefault(self, None)                  # type: ignore
-        cls.stretch     .setdefault(self, self.estimatedstretch) # type: ignore
-        cls.bias        .setdefault(self, None)                  # type: ignore
+        cls.sequencekey .setdefault(self, None) # type: ignore
+        cls.stretch     .setdefault(self)       # type: ignore
+        cls.bias        .setdefault(self)       # type: ignore
 
     sequencekey  = SequenceKeyProp()
     sequencepath = SequenceProp[Optional[str]]('last.path.sequence')

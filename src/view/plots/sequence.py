@@ -213,7 +213,7 @@ class SequenceHoverMixin:
         "returns the tooltip source"
         return self.__source
 
-    def create(self, fig, mdl, cnf):
+    def create(self, fig, mdl, cnf, xrng = None):
         "Creates the hover tool for histograms"
         self.update(framerate = 1./30.,
                     bias      = mdl.bias if mdl.bias is not None else 0.,
@@ -238,6 +238,8 @@ class SequenceHoverMixin:
                     fill_alpha       = 0.,
                     y_range_name     = 'bases',
                     visible          = False)
+        if xrng is not None:
+            args['x_range_name'] = xrng
         self.__tool.update(tooltips  = css.get(),
                            mode      = 'hline',
                            renderers = [fig.circle(**args)])
@@ -278,6 +280,9 @@ class SequenceHoverMixin:
             if hasattr(yrng, '_initial_start') and yrng.bounds is not None:
                 yrng._initial_start = yrng.bounds[0]
                 yrng._initial_end   = yrng.bounds[1]
+
+            if not hasattr(fig, 'extra_x_ranges'):
+                return
 
             cycles = fig.extra_x_ranges[extra]
             frames = fig.x_range
@@ -491,3 +496,10 @@ class FitParamProp(BeadProperty[float]):
         if val is None:
             return getattr(obj, 'estimated'+self._key)
         return val
+
+    def setdefault(self, obj, items:Optional[dict] = None, **kwa):
+        "initializes the property stores"
+        super().setdefault(obj,
+                           (None if self._key == 'bias' else 1./8.8e-4),
+                           items,
+                           **kwa)

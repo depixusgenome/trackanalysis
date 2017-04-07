@@ -17,8 +17,8 @@ class CyclesModelAccess(TaskPlotModelAccess):
         cls.oligos      .setdefault(self, [], size = 4)
         cls.binwidth    .setdefault(self, 0.003)
         cls.minframes   .setdefault(self, 10)
-        cls.stretch     .setdefault(self, 8.8e-4)
-        cls.bias        .setdefault(self, None)
+        cls.stretch     .setdefault(self)
+        cls.bias        .setdefault(self)
         cls.peaks       .setdefault(self, None)
         cls.sequencekey .setdefault(self, None) # type: ignore
 
@@ -28,7 +28,6 @@ class CyclesModelAccess(TaskPlotModelAccess):
                                            side = 'RIGHT')
         self.eventdetection   = TaskAccess(self, EventDetectionTask)
         self.estimatedbias    = 0.
-        self.estimatedstretch = 1.
 
     props        = TaskPlotModelAccess.props
     sequencekey  = SequenceKeyProp()

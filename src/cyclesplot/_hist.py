@@ -28,7 +28,7 @@ class HistMixin:
                                                      line_color = 'blue')}
         self.css.hist.defaults = {'xtoplabel'  : u'Cycles',
                                   'xlabel'     : u'Frames',
-                                  'plot.width' : 200}
+                                  'plot.width' : 400}
         SequenceTicker.defaultconfig(self)
 
         self._histsource = None             # type: Optional[ColumnDataSource]

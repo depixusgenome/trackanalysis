@@ -83,7 +83,7 @@ class PeaksTableWidget(_Widget):
             if zval[0] == zval[1] or bases[0] == bases[1]:
                 return
 
-            aval = (zval[1]-zval[0]) / (bases[1]-bases[0])
+            aval = (bases[1]-bases[0])/(zval[1]-zval[0])
             bval = zval[0] - bases[0]*aval
 
             mdl.updating  = 'peaks'
@@ -144,7 +144,7 @@ class ConversionSlidersWidget(_Widget):
         "creates the widget"
         widget = lambda x, s, e, n: Slider(value = getattr(self._model, x),
                                            title = self.css.title[x].get(),
-                                           step  = self.config.base[x].step.get(),
+                                           step  = self.css.base[x].step.get(),
                                            width = self.css.input.width.get(),
                                            start = s, end = e, name = n)
 

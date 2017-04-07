@@ -119,7 +119,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
 
     def slaveaxes(self, fig, src, inpy = False): # pylint: disable=arguments-differ
         "slaves a histogram's axes to its y-axis"
-        super().slaveaxes(fig, src, 'frames', 'cycles', 'bottom')
+        super().slaveaxes(fig, src, 'frames', 'cycles', 'bottom', inpy)
 
     def resetraw(self, fig, rdata, shape):
         "updates the tooltips for a new file"
