@@ -105,6 +105,18 @@ class HairpinDistance(Hairpin):
 
         return Distance(best[0], best[1], delta-best[2]/best[1])
 
+    @staticmethod
+    def silhouette(dist, key = None) -> float:
+        "returns the silhouette value for a given key"
+        if len(dist) > 1:
+            if key is None:
+                key = min(dist, key = dist.__getitem__)
+            aval = dist[key].value
+            bval = min(i[0] for k, i in dist.items() if k != key)
+            return ((bval-aval)/max(aval, bval)-.5)*2.
+        else:
+            return 1. if len(dist) == 1 else -3.
+
 PEAKS_DTYPE = np.dtype([('zvalue', 'f4'), ('key', 'i4')])
 PEAKS_TYPE  = Union[Sequence[Tuple[float,int]],np.ndarray]
 class PeakIdentifier(Hairpin):

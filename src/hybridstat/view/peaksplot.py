@@ -3,23 +3,25 @@
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
 from typing                     import (Optional, Sequence, Tuple, List, Dict,
                                         Generic, TypeVar, Union, TYPE_CHECKING)
+from itertools                  import product
 
 import bokeh.core.properties as props
 from bokeh                      import layouts
 from bokeh.plotting             import figure, Figure    # pylint: disable=unused-import
 from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
                                         DataTable, TableColumn, Model, Widget,
-                                        Div)
+                                        Div, StringFormatter)
 
 import numpy                    as     np
 
+import sequences
 from signalfilter               import rawprecision
 from control.taskio             import ConfigTrackIO
 from control.processor          import processors
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
 from peakfinding.processor      import PeakSelectorTask
 from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
-                                        FitBead, Distance)
+                                        FitBead, Distance, HairpinDistance)
 
 from view.base                  import enableOnTrack
 from view.plots                 import (PlotView, PlotAttrs, from_py_func,
@@ -104,33 +106,38 @@ class PeaksPlotModelAccess(TaskPlotModelAccess):
         return self.fits.distances if self.fits is not None else {}
 
     def __set_ids_and_distances(self, peaks):
-        task = self.identification.task
-        dico = self.peaks
+        task  = self.identification.task
+        dico  = self.peaks
+        names = 'bases', 'id', 'distance', 'orient'
+        nan   = np.full((len(peaks),), np.NaN, dtype = 'f4')
+
+        dico.update(**dict.fromkeys(names, nan))
+        dico['orient'] = np.array([' '] * len(nan))
+
         if task is None:
-            dico['bases'] = (dico['z']-self.bias)*self.stretch
+            dico['bases']  = (dico['z']-self.bias)*self.stretch
             return
 
-        nan       = lambda: np.full((len(peaks),), np.NaN, dtype = 'f4')
-        cnf       = task.config()
-        self.fits = FitToHairpinProcessor.compute((self.bead, peaks), **cnf)[1]
+        self.fits = FitToHairpinProcessor.compute((self.bead, peaks),
+                                                  **task.config())[1]
 
-        for name in readsequence(self.sequencepath):
-            dist = self.distances[name].stretch, self.distances[name].bias
+        for key in product(readsequence(self.sequencepath), names):
+            dico[''.join(key)] = np.copy(dico[key[1]])
 
-            dico[name+'bases']          = (dico['z'] - dist[1])*dist[0]
+        for key, seq in readsequence(self.sequencepath).items():
+            dist = self.distances[key].stretch, self.distances[key].bias
+            tmp  = task.peakids[key](dico['z'], *dist)['key']
+            good = tmp >= 0
+            ori  = dict(sequences.peaks(seq, self.oligos))
 
-            tmp                         = task.peakids[name](dico['z'], *dist)['key']
-            good                        = tmp >= 0
+            dico[key+'bases']          = (dico['z'] - dist[1])*dist[0]
+            dico[key+'id']      [good] = tmp[good]
+            dico[key+'distance'][good] = (tmp - dico[key+'bases'])[good]
+            dico[key+'orient']  [good] = ['━╋ '[ori.get(int(i+0.01), 2)]
+                                          for i in dico[key+'id'][good]]
 
-            dico[name+'id']             = nan()
-            dico[name+'id']      [good] = tmp[good]
-
-            dico[name+'distance']       = nan()
-            dico[name+'distance'][good] = (tmp - dico[name+'bases'])[good]
-
-        dico['bases']    = dico[self.sequencekey+'bases']
-        dico['id']       = dico[self.sequencekey+'id']
-        dico['distance'] = dico[self.sequencekey+'distance']
+        for key in names:
+            dico[key] = dico[self.sequencekey+key]
 
     def __set_probas(self, peaks):
         task = self.eventdetection.task
@@ -281,10 +288,9 @@ class PeaksSequencePathWidget(SequencePathWidget):
                 hvr.updating = 'seq'
                 hvr.stretch  = hvr.stretches[cb_obj.value]
                 hvr.bias     = hvr.biases   [cb_obj.value]
-                peaks.source.data['id']       = peaks.source.data[cb_obj.value+'id']
-                peaks.source.data['bases']    = peaks.source.data[cb_obj.value+'bases']
-                peaks.source.data['distance'] = peaks.source.data[cb_obj.value+'distance']
-                stats.text             = stats.data[cb_obj.value]
+                stats.text   = stats.data   [cb_obj.value]
+                for key in ('id', 'bases', 'distance', 'orient'):
+                    peaks.source.data[key] = peaks.source.data[cb_obj.value+key]
                 peaks.trigger("change")
 
                 hvr.updating = ''
@@ -313,16 +319,17 @@ class PeaksStatsWidget(WidgetCreator):
         self.__widget = None # type: Optional[PeaksStatsDiv]
         css = self.css.stats
         css.defaults = {'title.format': '{}',
-                        'lines': [['css:title.stretch',    '.4f'],
-                                  ['css:title.bias',       '.4f'],
-                                  [u'σ[HF] (µm)',         '.4f'],
-                                  [u'σ[Peaks] (µm)',      '.4f'],
-                                  [u'Peak count',         '.0f'],
-                                  [u'Identified peaks',   '.0f'],
-                                  [u'Unknown peaks',      '.0f']]}
+                        'lines': [['css:title.stretch', '.4f'],
+                                  ['css:title.bias',    '.4f'],
+                                  [u'σ[HF] (µm)',       '.4f'],
+                                  [u'σ[Peaks] (µm)',    '.4f'],
+                                  [u'Peak count',       '.0f'],
+                                  [u'Sites found',      ''],
+                                  [u'Silhouette',       '.1f'],
+                                  [u'reduced χ²',       '.1f']]}
 
     def create(self, _) -> List[Widget]:
-        self.__widget = PeaksStatsDiv()
+        self.__widget = PeaksStatsDiv(width = self.css.input.width.get())
         self.reset()
         return [self.__widget]
 
@@ -344,10 +351,10 @@ class PeaksStatsWidget(WidgetCreator):
             values[1] = self._model.bias
             values[2] = rawprecision(self._model.track, self._model.bead)
             values[3] = np.mean(self._model.peaks['sigma'])
-            values[4] = len(self._model.peaks['z'])
+            values[4] = len(self._model.peaks['z']) - 1
 
         line = '<tr><td>'+self.css.stats.title.format.get()+'</td><td>{}</td></tr>'
-        fcn  = lambda fmt, val: '' if val == '' else ('{:'+fmt+'}').format(val)
+        fcn  = lambda fmt, val: val if isinstance(val, str) else ('{:'+fmt+'}').format(val)
         tab  = lambda: ('<table>'
                         + ''.join(line.format(i[0], fcn(i[1], j))
                                   for i, j in zip(titles, values))
@@ -356,9 +363,18 @@ class PeaksStatsWidget(WidgetCreator):
         if self._model.identification.task is not None:
             ret = dict()
             for key in readsequence(self._model.sequencepath):
-                values[5] = np.isfinite(self._model.peaks[key+'id']).sum()
-                values[6] = (len(self._model.identification.task.peakids[key].peaks)-1
-                             -values[5])
+                nfound    = np.isfinite(self._model.peaks[key+'id']).sum()
+                if 0. in self._model.peaks[key+'id']:
+                    nfound -= 1
+                npks      = len(self._model.identification.task.peakids[key].peaks)
+                values[5] = '{}/{}'.format(nfound, npks)
+
+                values[6] = HairpinDistance.silhouette(self._model.distances, key)
+
+                if nfound > 2:
+                    stretch   = self._model.distances[key].stretch
+                    values[7] = (np.nanstd(self._model.peaks[key+'id'])
+                                 / ((values[3]*stretch)**2 * (nfound - 2)))
                 ret[key] = tab()
             return ret
         else:
@@ -368,22 +384,23 @@ class PeakListWidget(WidgetCreator):
     "Table containing stats per peaks"
     def __init__(self, model:PeaksPlotModelAccess) -> None:
         super().__init__(model)
-        self.__widget = None # type: Optional[DataTable]
-        css           = self.css.peaks.columns
-        css.default   = [['z',          'css:ylabel',    '0.0000'],
-                         ['bases',      u'Z (base)',     '0.0'],
-                         ['id',         u'Id',           '0'],
-                         ['distance',   u'Distance',     '0.0'],
-                         ['count',      'css:xlabel',    '0.0'],
-                         ['duration',   'css:xtoplabel', '0.000'],
-                         ['sigma',      u'σ (µm)',       '0.0000']]
+        self.__widget     = None # type: Optional[DataTable]
+        css               = self.css.peaks.columns
+        css.width.default = 60
+        css.default       = [['z',        'css:ylabel',    '0.0000'],
+                             ['bases',    u'Z (base)',     '0.0'],
+                             ['id',       u'Id',           '0'],
+                             ['orient',   u'Orientation',  ''],
+                             ['distance', u'Distance',     '0.0'],
+                             ['count',    'css:xlabel',    '0.0'],
+                             ['duration', 'css:xtoplabel', '0.000'],
+                             ['sigma',    u'σ (µm)',       '0.0000']]
 
     def create(self, _) -> List[Widget]:
-        width = self.cssroot.input.width.get()
+        width = self.css.peaks.columns.width.get()
         get   = lambda i: self.css[i[4:]].get() if i.startswith('css:') else i
-        cols  = list(TableColumn(field     = i[0],
-                                 title     = get(i[1]),
-                                 formatter = DpxNumberFormatter(format = i[2]))
+        fmt   = lambda i: (StringFormatter() if i == '' else DpxNumberFormatter(format = i))
+        cols  = list(TableColumn(field = i[0], title = get(i[1]), formatter = fmt(i[2]))
                      for i in self.css.peaks.columns.get())
 
         self.__widget = DataTable(source      = ColumnDataSource(self._model.peaks),

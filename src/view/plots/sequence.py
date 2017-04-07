@@ -204,6 +204,7 @@ class SequenceHoverMixin:
     def defaultconfig(mdl):
         "default config"
         mdl.css.sequence.defaults = {'tooltips.radius': 1.,
+                                     'tooltips.policy': 'follow_mouse',
                                      'tooltips'       : u'@z{1.1111} ↔ @values: @text'}
         mdl.config.oligos.size.default = 4
 
@@ -212,7 +213,7 @@ class SequenceHoverMixin:
         "returns the tooltip source"
         return self.__source
 
-    def create(self, fig, mdl, cnf, xrngname = None):
+    def create(self, fig, mdl, cnf):
         "Creates the hover tool for histograms"
         self.update(framerate = 1./30.,
                     bias      = mdl.bias if mdl.bias is not None else 0.,
@@ -221,6 +222,7 @@ class SequenceHoverMixin:
         hover = fig.select(DpxHoverTool)
         if len(hover) == 0:
             return
+        hover.point_policy = self.css.sequence.tooltips.policy.get()
         self._model    = mdl
         self.__tool   = hover[0]
         self.__size   = cnf.config.oligos.size
@@ -236,9 +238,6 @@ class SequenceHoverMixin:
                     fill_alpha       = 0.,
                     y_range_name     = 'bases',
                     visible          = False)
-        if xrngname is not None:
-            args['x_range_name'] = xrngname
-
         self.__tool.update(tooltips  = css.get(),
                            mode      = 'hline',
                            renderers = [fig.circle(**args)])
@@ -326,7 +325,7 @@ class SequenceHoverMixin:
 
         nbases = max(len(i) for i in dseq.values())
         data   = dict(values = np.arange(osiz, nbases+osiz),
-                      inds   = np.full((nbases,), 0.5, dtype = 'f4'))
+                      inds   = np.full((nbases,), 1, dtype = 'f4'))
         for name, seq in dseq.items():
             seq        = sequences.marksequence(seq, oligs)
             data[name] = np.full((nbases,), ' ', dtype = 'U%d' % osiz)

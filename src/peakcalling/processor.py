@@ -124,16 +124,10 @@ class FitToHairpinProcessor(Processor):
                      events  : Sequence[PeakFindingOutput],
                      dist    : Dict[Optional[str], Distance],
                     ) -> FitBead:
-        best  = min(dist, key = dist.__getitem__)
-        if len(dist) > 1:
-            aval = dist[best].value
-            bval = min(i[0] for k, i in dist.items() if k != best)
-            silh = ((bval-aval)/max(aval, bval)-.5)*2.
-        else:
-            silh = 1. if len(dist) == 1 else -3.
-
-        alg = peakids.get(best, PeakIdentifier())
-        ids = alg(peaks, *dist.get(best, (0., 1., 0))[1:])
+        best = min(dist, key = dist.__getitem__)
+        sihl = HairpinDistance.silhouette(dist, best)
+        alg  = peakids.get(best, PeakIdentifier())
+        ids  = alg(peaks, *dist.get(best, (0., 1., 0))[1:])
         return FitBead(key, silh, dist, ids, events)
 
 ByHairpinBead  = NamedTuple('ByHairpinBead',
