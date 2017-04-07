@@ -25,11 +25,8 @@ export class IntInputView extends InputWidgetView
     super()
     @$el.html(@template(@model.attributes))
     if @model.disabled then @$el.find("input").prop("disabled", true)
-    @$el.find("input").width(@model.width-20)
-    if @model.height - @$el.find("label").height()-4 > 0
-        @$el.find("input").height(@model.height - @$el.find("label").height()-4)
-    else
-        @$el.find("input").height(@model.height/1.5)
+    @$el.find("input").width(@model.width)
+    @$el.find("input").height(@model.height)
     return @
 
   change_input: () ->

@@ -42,6 +42,7 @@ class BeadInput(BokehView):
         "Sets up the controller"
         super().__init__(**kwa)
         self._ctrl.getGlobal('css').title.beadinput.default = 'Bead'
+        self._ctrl.getGlobal('css').beadinput.defaults = {'width': 60, 'height' : 25}
         self.__beads = np.empty((0,), dtype = 'i4')
         self.__inp   = None
 
@@ -69,8 +70,8 @@ class BeadInput(BokehView):
 
     def getroots(self, _):
         "adds items to doc"
-        kwa = dict(height       = self._ctrl.getGlobal('css', 'input.height'),
-                   width        = self._ctrl.getGlobal('css', 'input.width'),
+        kwa = dict(height       = self._ctrl.getGlobal('css', 'beadinput.height'),
+                   width        = self._ctrl.getGlobal('css', 'beadinput.width'),
                    disabled     = True,
                    title        = self._ctrl.getGlobal('css').title.beadinput.get())
         self.__inp   = IntInput(**kwa)
