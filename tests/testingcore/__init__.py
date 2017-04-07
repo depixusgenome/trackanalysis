@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u""" access to files """
+import  json
 import  warnings
 from    typing  import Union, Sequence
 from    pathlib import Path
 import  numpy as np
-np.seterr(all='raise')
+
 warnings.filterwarnings('error', category = FutureWarning)
 warnings.filterwarnings('error', category = DeprecationWarning)
 warnings.filterwarnings('error', category = PendingDeprecationWarning)
+np.seterr(all='raise')
 
 def _trackreadertask(fpath, beadsonly = True):
     from model.task     import TrackReaderTask

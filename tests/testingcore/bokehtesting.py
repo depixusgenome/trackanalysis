@@ -5,14 +5,17 @@ from typing                import (Optional,# pylint: disable=unused-import
                                    Union, Sequence, Any)
 import sys
 import tempfile
-
+import warnings
 import pytest
 
 from tornado.ioloop        import IOLoop
 import bokeh.core.properties as     props
-from bokeh.model           import Model
-from bokeh.document        import Document  # pylint: disable=unused-import
-from bokeh.server.server   import Server    # pylint: disable=unused-import
+
+with warnings.catch_warnings():
+    warnings.filterwarnings('ignore', category = DeprecationWarning)
+    from bokeh.model           import Model
+    from bokeh.document        import Document  # pylint: disable=unused-import
+    from bokeh.server.server   import Server    # pylint: disable=unused-import
 
 from view.keypress         import KeyPressManager
 
@@ -176,13 +179,18 @@ class _ManagedServerLoop:
             launch    = getattr(launchmod, fcn)
         else:
             launch    = getattr(getattr(__import__(mod), mod), fcn)
-        server        = launch(app, server = kwa)
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', '.*inspect.getargspec().*')
+            server    = launch(app, server = kwa)
 
         @classmethod
         def _open(_, doc, _func_ = server.MainView.open):
             self.doc = doc
-            doc.add_root(DpxTestLoaded())
-            self.view = _func_(doc)
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore', '.*inspect.getargspec().*')
+                doc.add_root(DpxTestLoaded())
+                self.view = _func_(doc)
             return self.view
         server.MainView.open = _open
 
@@ -338,7 +346,6 @@ def bokehaction(monkeypatch):
     """
     if monkeypatch is None:
         from _pytest.monkeypatch import MonkeyPatch
-        import warnings
         warnings.warn("Unsafe call to MonkeyPatch. Use only for manual debugging")
         monkeypatch = MonkeyPatch()
     return BokehAction(monkeypatch)

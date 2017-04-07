@@ -16,7 +16,7 @@ def test_toolbar(bokehaction):          # pylint: disable=redefined-outer-name
     with bokehaction.launch(ToolBar, 'app.Defaults') as server:
         save = server.get('ToolBar', 'tools')[1]
         ctrl = server.ctrl
-        curr = ctrl.getGlobal('current')
+        curr = ctrl.getGlobal('project')
         def _checknone():
             assert save.disabled, ('???', save, save.disabled)
             assert curr.get('track', default = None) is None
@@ -48,7 +48,7 @@ def test_beadplot(bokehaction):        # pylint: disable=redefined-outer-name
             vals[2:] = evts['y'].value
 
     with bokehaction.launch(BeadPlotView, 'app.ToolBar') as server:
-        server.ctrl.observe("globals.current.plot.bead", _printrng)
+        server.ctrl.observe("globals.project.plot.bead", _printrng)
         server.load('small_legacy')
 
         krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))
@@ -77,7 +77,7 @@ def test_cyclesplot(bokehaction):        # pylint: disable=redefined-outer-name
 
     with bokehaction.launch(CyclesPlotView, 'app.BeadsToolBar') as server:
         server.ctrl.getGlobal('config').tasks.default = []
-        server.ctrl.observe("globals.current.plot.cycles", _printrng)
+        server.ctrl.observe("globals.project.plot.cycles", _printrng)
         server.load('big_legacy')
 
         krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))
@@ -102,7 +102,7 @@ def test_cyclesplot(bokehaction):        # pylint: disable=redefined-outer-name
         _press('Alt-ArrowUp',       0.299618, 0.505657)
         _press('Alt-ArrowDown',     0.258410, 0.464449)
         _press('Shift-ArrowDown',  -0.153668, 0.876528)
-        curr = server.ctrl.getGlobal("current")
+        curr = server.ctrl.getGlobal("project")
         assert curr.bead in (None, 0)
         server.press('PageUp')
         assert curr.bead == 1
@@ -111,13 +111,13 @@ def test_cyclesplot(bokehaction):        # pylint: disable=redefined-outer-name
         assert server.widget['Cycles:Oligos'].value == 'aatt, tggc'
         cnf = anastore.load(server.ctrl.configpath(next(anastore.iterversions('config'))))
         assert cnf['config']['oligos'] == ['aatt', 'tggc']
-        assert cnf['config']['oligos.history'] == [['aatt', 'tggc']]
+        assert cnf['config.plot']['oligos.history'] == [['aatt', 'tggc']]
 
         server.change('Cycles:Oligos', 'value', '')
         assert server.widget['Cycles:Oligos'].value == ''
         cnf = anastore.load(server.ctrl.configpath(next(anastore.iterversions('config'))))
         assert 'oligos' not in cnf.get('config', {})
-        assert cnf['config']['oligos.history'] == [['aatt', 'tggc']]
+        assert cnf['config.plot']['oligos.history'] == [['aatt', 'tggc']]
 
         server.load('hairpins.fasta', andpress = False)
         server.change('Cycles:Sequence', 'value', '←')
@@ -130,12 +130,12 @@ def test_cyclesplot(bokehaction):        # pylint: disable=redefined-outer-name
         assert (server.widget['Cycles:Peaks'].source.data['bases']
                 == approx([166, 1113], abs = 1.))
 
-        assert server.widget['Cycles:Stretch'].value == approx(0.88, abs = 1e-5)
+        assert server.widget['Cycles:Stretch'].value == approx(1./8.8e-4, abs = 1e-1)
         assert server.widget['Cycles:Bias'].value == approx(-.0816519, abs = 1e-5)
         server.change('Cycles:Bias',     'value', -.05)
         assert server.widget['Cycles:Bias'].value == approx(-.05, abs = 1e-5)
-        server.change('Cycles:Stretch',  'value', .9)
-        assert server.widget['Cycles:Stretch'].value == approx(0.9, abs = 1e-5)
+        server.change('Cycles:Stretch',  'value', 1050.)
+        assert server.widget['Cycles:Stretch'].value == approx(1050., abs = 1e-5)
         server.press('Control-z')
 
 def test_cyclesplot2(bokehaction):        # pylint: disable=redefined-outer-name
@@ -180,4 +180,4 @@ def test_cyclesplot2(bokehaction):        # pylint: disable=redefined-outer-name
         assert rng.end   < 350
 
 if __name__ == '__main__':
-    test_cyclesplot2(bokehaction(None))
+    test_cyclesplot(bokehaction(None))
