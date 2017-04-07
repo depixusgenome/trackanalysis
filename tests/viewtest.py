@@ -131,7 +131,7 @@ def test_cyclesplot(bokehaction):        # pylint: disable=redefined-outer-name
                 == approx([166, 1113], abs = 1.))
 
         assert server.widget['Cycles:Stretch'].value == approx(1./8.8e-4, abs = 1e-1)
-        assert server.widget['Cycles:Bias'].value == approx(-.0816519, abs = 1e-5)
+        assert server.widget['Cycles:Bias'].value == approx(-.092152, abs = 1e-5)
         server.change('Cycles:Bias',     'value', -.05)
         assert server.widget['Cycles:Bias'].value == approx(-.05, abs = 1e-5)
         server.change('Cycles:Stretch',  'value', 1050.)
