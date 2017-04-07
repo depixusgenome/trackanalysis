@@ -118,7 +118,7 @@ class EventMerger(PrecisionAlg):
         if not any(merge):
             return np.empty(0, dtype = 'i4')
 
-        tomerge = np.nonzero(np.diff(merge))[0]
+        tomerge = np.nonzero(np.logical_xor(merge[:-1], merge[1:]))[0]
         tomerge = tomerge.reshape((len(tomerge)//2, 2))
 
         if self.oneperrange:
