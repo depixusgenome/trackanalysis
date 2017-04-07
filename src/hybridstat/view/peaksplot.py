@@ -297,18 +297,19 @@ class PeaksSequencePathWidget(SequencePathWidget):
                 if cb_obj.value in stats.data:
                     stats.text   = stats.data   [cb_obj.value]
 
-                if cb_obj.value in hvr.stretches:
-                    hvr.updating = 'seq'
-                    hvr.stretch  = hvr.stretches[cb_obj.value]
-                    hvr.bias     = hvr.biases   [cb_obj.value]
-
-                if  cb_obj.value+'id' in peaks.source.column_names:
+                if cb_obj.value+'id' in peaks.source.column_names:
                     for key in ('id', 'bases', 'distance', 'orient'):
                         ref = cb_obj.value+key
                         peaks.source.data[key] = peaks.source.data[ref]
                     peaks.trigger("change")
 
-                hvr.updating = ''
+                if cb_obj.value in hvr.stretches:
+                    hvr.updating = 'seq'
+                    hvr.stretch  = hvr.stretches[cb_obj.value]
+                    hvr.bias     = hvr.biases   [cb_obj.value]
+                    hvr.updating = '*'
+                    hvr.updating = ''
+
         widget.js_on_change('value', _js_cb)
 
 class PeaksStatsDiv(Div): # pylint: disable = too-many-ancestors

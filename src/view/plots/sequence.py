@@ -40,8 +40,7 @@ def estimatebias(position: np.ndarray, cnt: np.ndarray) -> float:
 
     ind1 = next((i for i,j in enumerate(cnt) if j > 0), 0)
     ind2 = next((i for i,j in enumerate(cnt[ind1+1:]) if j == 0), ind1+1)
-    ind  = (ind1+ind2-1)//2
-    return sum(position[ind:ind+2])*.5
+    return position[max(range(ind1,ind2), key = cnt.__getitem__)]
 
 class SequenceTicker(ContinuousTicker):
     "Generate ticks at fixed, explicitly supplied locations."
@@ -247,7 +246,7 @@ class SequenceHoverMixin:
         src = self.__source
         @from_py_func
         def _js_cb(src = src, fig = fig, cb_obj = None, window = None):
-            if cb_obj.updating != '':
+            if cb_obj.updating != '*':
                 return
 
             values = cb_obj.bias, cb_obj.stretch
