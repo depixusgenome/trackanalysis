@@ -40,7 +40,9 @@ def estimatebias(position: np.ndarray, cnt: np.ndarray) -> float:
 
     ind1 = next((i for i,j in enumerate(cnt) if j > 0), 0)
     ind2 = next((i for i,j in enumerate(cnt[ind1+1:]) if j == 0), ind1+1)
-    return position[max(range(ind1,ind2), key = cnt.__getitem__)]
+    return position[max(range(ind1,ind2),
+                        key     = cnt.__getitem__,
+                        default = (ind1+ind2)//2)]
 
 class SequenceTicker(ContinuousTicker):
     "Generate ticks at fixed, explicitly supplied locations."
