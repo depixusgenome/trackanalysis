@@ -7,7 +7,7 @@ from    bokeh               import layouts
 from    bokeh.models        import ToolbarBox
 
 from    control             import Controller
-from    control.taskio      import ConfigTrackIO
+from    control.taskio      import ConfigTrackIO, GrFilesIO
 
 from    view.plots          import DpxKeyedRow, PlotView
 from    view.plots.tasks    import TaskPlotCreator
@@ -66,6 +66,7 @@ class CyclesPlotView(PlotView):
         tasks         = self._ctrl.getGlobal('config').tasks
         tasks.default = ['extremumalignment']
         ConfigTrackIO.setup(self._ctrl, tasks)
+        GrFilesIO.setup(self._ctrl, self._ctrl.getGlobal('project').track)
 
         trk = self._ctrl.getGlobal('project').track
         trk.observe(lambda itm: self._ctrl.clearData(itm.old))
