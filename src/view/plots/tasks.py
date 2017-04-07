@@ -87,7 +87,10 @@ class TaskPlotModelAccess(PlotModelAccess):
                 keys.setdefault(obs, []).append(prop.key)
 
         for key, items in keys.items():
-            getattr(self, key).observe(items, fcn)
+            val = self
+            for attr in key.split('.'):
+                val = getattr(val, attr)
+            val.observe(items, fcn) # pylint: disable=no-member
 
     class props: # pylint: disable=invalid-name
         "access to property builders"
@@ -104,11 +107,11 @@ class TaskAccess(TaskPlotModelAccess):
         self.side      = (0  if kwa.get('side', 'LEFT') == 'LEFT' else 1)
 
         # pylint: disable=not-callable
-        self.configroot.tasks.order.default = TASK_ORDER
+        self.config.root.tasks.order.default = TASK_ORDER
 
-        cur = self.configroot.tasks.get(self.configname, default = None)
+        cur = self.config.root.tasks.get(self.configname, default = None)
         assert cur is None or isinstance(cur, tasktype)
-        self.configroot.tasks[self.configname].default = tasktype(**self.attrs)
+        self.config.root.tasks[self.configname].default = tasktype(**self.attrs)
 
     @property
     def configname(self) -> str:
@@ -118,7 +121,7 @@ class TaskAccess(TaskPlotModelAccess):
     @property
     def configtask(self) -> Task:
         "returns the config task"
-        return self.configroot.tasks[self.configname]
+        return self.config.root.tasks[self.configname]
 
     def remove(self):
         "removes the task"

@@ -11,7 +11,8 @@ import  inspect
 import  numpy        as     np
 
 import  bokeh.palettes
-from    bokeh.models            import Range1d, RadioButtonGroup, Paragraph, Widget
+from    bokeh.models            import (Range1d, RadioButtonGroup,
+                                        Paragraph, Widget, GlyphRenderer)
 from    control                 import Controller
 from    control.globalscontrol  import GlobalsAccess
 from    ..base                  import BokehView, Action
@@ -78,7 +79,7 @@ class PlotAttrs:
         else:
             return colors
 
-    def addto(self, fig, **kwa):
+    def addto(self, fig, **kwa) -> GlyphRenderer:
         "adds itself to plot: defines color, size and glyph to use"
         args  = dict(self.__dict__)
         args.pop('glyph')
@@ -293,7 +294,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
 
     def observe(self):
         "sets-up model observers"
-        self.projectroot.observe(self.reset)
+        self.project.root.observe(self.reset)
 
     def _addcallbacks(self, fig):
         "adds Range callbacks"

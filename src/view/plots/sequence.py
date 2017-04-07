@@ -124,10 +124,10 @@ class SequenceTicker(ContinuousTicker):
     @staticmethod
     def defaultconfig(mdl):
         "default config"
-        mdl.css.grid.defaults = dict(color = ('lightblue', 'lightgreen'),
-                                     width = (2,           2),
-                                     alpha = (1.,          1.),
-                                     dash  = ('solid',     'solid'))
+        mdl.css.plot.grid.defaults = dict(color = ('lightblue', 'lightgreen'),
+                                          width = (2,           2),
+                                          alpha = (1.,          1.),
+                                          dash  = ('solid',     'solid'))
 
     def reset(self):
         "Updates the ticks according to the configuration"
@@ -203,10 +203,10 @@ class SequenceHoverMixin:
     @staticmethod
     def defaultconfig(mdl):
         "default config"
-        mdl.css.sequence.defaults = {'tooltips.radius': 1.,
-                                     'tooltips.policy': 'follow_mouse',
-                                     'tooltips'       : u'@z{1.1111} ↔ @values: @text'}
-        mdl.config.oligos.size.default = 4
+        mdl.css.plot.sequence.defaults = {'tooltips.radius': 1.,
+                                          'tooltips.policy': 'follow_mouse',
+                                          'tooltips'       : u'@z{1.1111} ↔ @values: @text'}
+        mdl.config.plot.oligos.size.default = 4
 
     @property
     def source(self):
@@ -222,7 +222,7 @@ class SequenceHoverMixin:
         hover = fig.select(DpxHoverTool)
         if len(hover) == 0:
             return
-        hover.point_policy = self.css.sequence.tooltips.policy.get()
+        hover.point_policy = mdl.css.sequence.tooltips.policy.get()
         self._model    = mdl
         self.__tool   = hover[0]
         self.__size   = cnf.config.oligos.size
@@ -423,7 +423,7 @@ class OligoListWidget(WidgetCreator):
     def __init__(self, model) -> None:
         super().__init__(model)
         self.__widget  = None # type: Optional[AutocompleteInput]
-        self.configroot.oligos.defaults = {'history': [], 'history.maxlength': 10}
+        self.config.root.oligos.defaults = {'history': [], 'history.maxlength': 10}
         self.css.defaults = {'title.oligos'     : u'Oligos',
                              'title.oligos.help': u'comma-separated list'}
 
