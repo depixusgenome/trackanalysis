@@ -197,6 +197,8 @@ class TaskController(Controller):
                 models = obj.open(task, tasks)
                 if models is not None:
                     break
+            else:
+                raise IOError(u"IOError: Couldn't open "+str(getattr(task, 'path', 'path')))
 
             for elem in models:
                 self.openTrack(elem[0], elem)

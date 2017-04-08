@@ -3,9 +3,7 @@
 u"Task IO module"
 from typing         import Union, Tuple
 from copy           import deepcopy
-
 from model.task     import TrackReaderTask
-from .event         import NoEmission
 
 class TaskIO:
     u"base class for opening files"
@@ -105,7 +103,7 @@ class _GrFilesIOMixin:
 
         track = self._track
         if track is None:
-            raise NoEmission("Open track first")
+            raise IOError(u"IOError: start by opening a track file!")
 
         path = ((track.path,) if isinstance(track.path, str) else track.path) + path
         return type(self).__base__.open(self, path, _) # type: ignore # pylint: disable=no-member

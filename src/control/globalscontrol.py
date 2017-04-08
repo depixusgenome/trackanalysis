@@ -389,7 +389,7 @@ class GlobalsController(Controller):
         item.keypress.pan       .defaults = _gesture('Alt-')
         item.keypress.zoom      .defaults = _gesture('Shift-')
 
-        self.addGlobalMap('project')
+        self.addGlobalMap('project', message = '')
         self.addGlobalMap('project.plot')
 
     def access(self, key: Optional[str] = None) -> GlobalsAccess:
