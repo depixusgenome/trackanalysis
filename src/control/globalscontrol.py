@@ -430,12 +430,21 @@ class GlobalsController(Controller):
             return _MapGetter(self.__maps[key], '')
         return self.__maps[key].get(*args, default = default)
 
-    def writeconfig(self, configpath: Callable, patchname = 'config'):
+    def writeconfig(self, configpath: Callable,
+                    patchname = 'config',
+                    index     = 0,
+                    overwrite = True):
         "Sets-up the user preferences"
+        if overwrite is False:
+            for version in anastore.iterversions(patchname):
+                if configpath(version).exists():
+                    return
+
         path = configpath(anastore.version(patchname))
         path.parent.mkdir(parents = True, exist_ok = True)
         path.touch(exist_ok = True)
-        maps = {i: j._DefaultsMap__items.maps[0] # pylint: disable=protected-access
+
+        maps = {i: j._DefaultsMap__items.maps[index] # pylint: disable=protected-access
                 for i, j in self.__maps.items()
                 if 'project' not in i}
         maps = {i: j for i, j in maps.items() if len(j)}

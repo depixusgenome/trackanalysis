@@ -103,19 +103,23 @@ def _create(main, controls, views): # pylint: disable=unused-argument
                 yield from self._yieldovermixins('__undos__')
 
             @classmethod
-            def configpath(cls, version) -> Path:
+            def configpath(cls, version, stem = None) -> Path:
                 "returns the path to the config file"
                 name = cls.APPNAME.replace(' ', '_').lower()
                 path = Path(appdirs.user_config_dir('depixus', 'depixus', name+"/"+version))
-                return path/'config.txt'
+                return path/(('autosave' if stem is None else stem)+'.txt')
 
             def readconfig(self):
-                "writes the config"
+                """
+                reads the config: first the stuff saved automatically, then
+                anything the user wishes to impose.
+                """
                 self._callmixins("readconfig", self.configpath)
+                self._callmixins("readconfig", lambda i: self.configpath(i, 'userconfig'))
 
-            def writeconfig(self):
+            def writeconfig(self, name = None, **kwa):
                 "writes the config"
-                self._callmixins("writeconfig", self.configpath)
+                self._callmixins("writeconfig", lambda i: self.configpath(i, name), **kwa)
 
             def close(self):
                 "remove controller"
@@ -128,6 +132,9 @@ def _create(main, controls, views): # pylint: disable=unused-argument
             keys = KeyPressManager(ctrl = ctrl)
             main.__init__(self, ctrl = ctrl, keys = keys)
             main.ismain(self)
+
+            ctrl.writeconfig('defaults',   index = 1)
+            ctrl.writeconfig('userconfig', index = 0, overwrite = False)
 
             ctrl.readconfig()
             main.observe(self)
