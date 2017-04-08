@@ -221,7 +221,7 @@ class TaskController(Controller):
         return dict(controller = self, task = task, model = old)
 
     @Controller.emit
-    def addTask(self, parent:RootTask, task:Task, index = None) -> dict:
+    def addTask(self, parent:RootTask, task:Task, index = _m_none) -> dict:
         "opens a new file"
         old = tuple(self.__items[parent].model)
         self.__items[parent].add(task, self.__procs[type(task)], index = index)

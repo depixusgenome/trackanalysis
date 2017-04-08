@@ -284,7 +284,6 @@ class Event:
 
         return fcn
 
-
 class Controller(Event):
     "Main controller class"
     @classmethod

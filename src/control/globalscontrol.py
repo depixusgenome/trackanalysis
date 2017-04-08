@@ -23,253 +23,59 @@ example, the "plot" map will contain items for all plot types. The "plot.bead"
 map only needs specify those default values that should be changed for this type
 of plot.
 """
-from collections    import namedtuple
-from typing         import (Callable, # pylint: disable=unused-import
-                            Optional)
-import inspect
-import anastore
-from  model         import PHASE
-from  model.globals import GlobalsChild, GlobalsAccess
-from .event         import Controller
-from .action        import Action
+from    typing        import Callable, Optional
+import  inspect
 
-EventPair = namedtuple('EventPair', ['old', 'value'])
-delete     = type('delete', tuple(), dict())    # pylint: disable=invalid-name
-class EventData(dict):
-    "All data provided to the event"
-    empty = delete
-    def __init__(self, root, *args, **kwargs):
-        self.name = root
-        super().__init__(*args, **kwargs)
+import  anastore
 
-def _tokwargs(args, kwargs):
-    if len(args) == 1 and isinstance(args[0], dict):
-        kwargs.update(args[0])
-    else:
-        kwargs.update(args)
-    return kwargs
+from    model.globals import (GlobalsChild, GlobalsAccess, SingleMapAccess,
+                              EventData, delete, Globals)
+from    model.level   import PHASE
+from    .event        import Controller
+from    .action       import Action
 
-class _MapGetter:
-    PROPS    = ('items', 'default', 'defaults')
-    value    = property(lambda self:        self.get(),
-                        lambda self, val:   self.set(val),
-                        lambda self:        self.pop())
-    items    = property(lambda self:        self._ctrl.items(self._base),
-                        lambda self, val:   self.update(**val),
-                        lambda self:        self._ctrl.pop(*self.items))
-    default  = property(None,
-                        lambda self, val:   self.setdefault(val))
-    defaults = property(None,
-                        lambda self, val:   self.setdefaults(**val))
-
-    _key  = ''      # type: str
-    _base = property(lambda self: (self._key[:-1] if len(self._key) else ''))
-    _ctrl = None    # type: DefaultsMap
-    def __init__(self, ctrl, key):
-        self.__dict__.update(_ctrl = ctrl, _key = key)
-
-    def __call__(self, *args, **kwargs):
-        if self._key == '':
-            raise TypeError("_MapGetter is not callable")
-        else:
-            key = self._base
-            ind = key.rfind('.')
-            val = self._ctrl.get(key[:ind])
-            return getattr(val, key[ind+1:])(*args, **kwargs)
-
-    def __getattr__(self, name):
-        if name[0] == '_' or name in _MapGetter.PROPS:
-            return super().__getattribute__(name)
-        return _MapGetter(self.__dict__['_ctrl'], self._key+name+'.')
-
-    def __getitem__(self, name):
-        if isinstance(name, (tuple, list)):
-            return self._ctrl.get(*name)
-        else:
-            return self.__getattr__(name)
-
-    def __eq__(self, other):
-        return self.get() == other
-
-    def __setattr__(self, name, value):
-        if name[0] == '_' or name in _MapGetter.PROPS:
-            return super().__setattr__(name, value)
-        return self._ctrl.update((self._key+name, value))
-
-    __setitem__ = __setattr__
-
-    def __delattr__(self, name):
-        if name[0] == '_' or name in _MapGetter.PROPS:
-            return super().__delattr__(name)
-        else:
-            return self._ctrl.pop(self._key+name)
-
-    def __delitem__(self, name):
-        if isinstance(name, (tuple, list)):
-            return self.pop(*name)
-        else:
-            return self.pop(name)
-
-    def __kwargs(self, args, kwargs):
-        items = _tokwargs(args, kwargs).items()
-        return iter((self._key+i, j) for i, j in items)
-
-    def setdefault(self, arg):
-        "Calls update using the current base key"
-        return self._ctrl.setdefaults((self._base, arg))
-
-    def setdefaults(self, *args, version = 1, **kwargs):
-        """
-        Sets the defaults using the current base key.
-        - *args*   is a sequence of pairs (key, value)
-        - *kwargs* is similar.
-        The keys in argument are appended to the current key.
-
-        >> ctrl.keypress.setdefaults(('zoom', 'Ctrl-z'))
-        >> assert ctrl.keypress.zoom == 'Ctrl-z'
-
-        One can also do:
-
-        >> ctrl.keypress.defaults = {'zoom': 'Ctrl-z', 'pan': 'Ctrl-p'}
-        >> assert ctrl.keypress.zoom == 'Ctrl-z'
-
-        Or, for a single key:
-
-        >> ctrl.keypress.zoom.default = 'Ctrl-z'
-        >> assert ctrl.keypress.zoom == 'Ctrl-z'
-        """
-        return self._ctrl.setdefaults(*self.__kwargs(args, kwargs), version = version)
-
-    def get(self, *keys, default = delete):
-        "Calls get using the current base key"
-        if len(keys) == 0:
-            return self._ctrl.get(self._base, default = default)
-        elif len(keys) == 1 and keys[0] is Ellipsis:
-            return self._ctrl.get(self._base, ...)
-        elif len(keys) == 2 and keys[1] is Ellipsis:
-            return self._ctrl.get(self._key+keys[0], ...)
-        return self._ctrl.get(*(self._key+i for i in keys), default = default)
-
-    def getdict(self, *keys, default = delete, fullnames = True) -> dict:
-        "Calls get using the current base key"
-        if len(keys) == 1 and keys[0] is Ellipsis:
-            vals = self._ctrl.get(self._base, ..., default = default)
-            lenb = len(self._base)
-            if fullnames or lenb == 0:
-                return vals
-            lenb += 1
-            return {i[lenb:]: j for i, j in vals.items()}
-        else:
-            fkeys = tuple(self._key+i for i in keys)
-            vals  = self._ctrl.get(*fkeys, default = default)
-            return dict(zip(fkeys if fullnames else keys, vals))
-
-    def set(self, arg):
-        "Calls update using the current base key"
-        return self._ctrl.update({self._base: arg})
-
-    def update(self, *args, **kwargs):
-        """
-        Calls update using the current base key.
-        - *args*   is a sequence of pairs (key, value)
-        - *kwargs* is similar.
-        The keys in argument are appended to the current key.
-
-        >> ctrl.keypress.update(('zoom', 'Ctrl-z'))
-        >> assert ctrl.keypress.zoom == 'Ctrl-z'
-
-        One can also do:
-
-        >> ctrl.keypress.items = {'zoom': 'Ctrl-z', 'pan': 'Ctrl-p'}
-        >> assert ctrl.keypress.zoom == 'Ctrl-z'
-
-        Or, for a single key:
-
-        >> ctrl.keypress.zoom.item = 'Ctrl-z'
-        >> assert ctrl.keypress.zoom == 'Ctrl-z'
-        """
-        return self._ctrl.update(*self.__kwargs(args, kwargs))
-
-    def pop(self, *keys):
-        "Calls get using the current base key"
-        if len(keys) == 0:
-            return self._ctrl.pop(self._base)
-        return self._ctrl.pop(*(self._key+i for i in keys))
-
+class SingleMapAccessController(SingleMapAccess):
+    "access to SingleMapController"
     def observe(self, attrs, fcn = None): # pylint: disable=arguments-differ
         "observes items in the current root"
         if fcn is None:
-            self._ctrl.observe(self._base, attrs)
+            self._map.observe(self._base, attrs)
 
         elif isinstance(attrs, str):
-            self._ctrl.observe(self._key+attrs, fcn)
+            self._map.observe(self._key+attrs, fcn)
         else:
-            self._ctrl.observe(tuple(self._key+i for i in attrs), fcn)
+            self._map.observe(tuple(self._key+i for i in attrs), fcn)
 
-class DefaultsMap(Controller):
+class SingleMapController(Controller):
     "Dictionnary with defaults values. It can be reset to these."
     __slots__ = '__items',
     def __init__(self, mdl:GlobalsChild, **kwargs) -> None:
         super().__init__(**kwargs)
         self.__items = mdl # type: GlobalsChild
 
-    def createChild(self, name, **kwargs):
-        "returns a child map"
-        return DefaultsMap(GlobalsChild(name, self.__items), **kwargs)
-
-    def setdefaults(self, *args, version = 1, **kwargs):
+    def setdefaults(self, *args, version = None, **kwargs):
         "adds defaults to the config"
-        self.__items.maps[version].update(**_tokwargs(args, kwargs))
+        self.__items.setdefaults(*args, version = version, **kwargs)
 
     def reset(self):
         "resets to default values"
-        self.pop(*self.__items.maps[1].keys())
+        self.__items.pop()
 
     def update(self, *args, **kwargs) -> EventData:
         "updates keys or raises NoEmission"
-        ret = EventData(self.__items.name)
-        for key, val in _tokwargs(args, kwargs).items():
-            old     = self.__items.get(key, delete)
-            default = self.__items.maps[1].get(key, delete)
-            if default is delete:
-                if len(self.__items.maps) > 2:
-                    default = self.__items.maps[-1].get(key, delete)
-                if default is delete:
-                    raise KeyError("Default value must be set first "
-                                   +str((self.__items.name, key)))
-            elif val is delete or val == default:
-                self.__items.pop(key, None)
-            else:
-                self.__items[key] = val
-
-            if old != val:
-                ret[key] = EventPair(old, val)
-
-        if len(ret) > 0:
+        ret = self.__items.update(*args, **kwargs)
+        if ret is not None:
             return self.handle("globals."+self.__items.name, self.outastuple, (ret,))
         return ret
 
     def pop(self, *args):
         "removes view information"
-        return self.update(dict.fromkeys(args, delete))
+        return self.__items.update(dict.fromkeys(args, delete))
 
     @property
-    def name(self):
+    def name(self) -> str:
         "returns the name of the root"
         return self.__items.name
-
-    @staticmethod
-    def __npars(fcn) -> bool:
-        params = inspect.signature(fcn).parameters
-        if len(params) == 0:
-            return False
-        elif len(params) == 1:
-            return next(iter(params)) not in ('cls', 'self')
-        elif len(params) == 2:
-            assert next(iter(params)) in ('cls', 'self')
-            return True
-        assert False
-        return False
 
     def observe(self, attrs, fcn = None): # pylint: disable=arguments-differ
         "observes items in the current root"
@@ -311,37 +117,32 @@ class DefaultsMap(Controller):
 
     def keys(self, base = ''):
         "returns all keys starting with base"
-        return iter(key for key in self.__items if key.startswith(base))
+        return self.__items.keys(base)
 
     def values(self, base = ''):
         "returns all values with keys starting with base"
-        return iter(val for key, val in self.__items.items() if key.startswith(base))
+        return self.__items.values(base)
 
     def items(self, base = ''):
         "returns all items with keys starting with base"
-        return iter(key for key in self.__items.items() if key[0].startswith(base))
+        return self.__items.items(base)
 
     def get(self, *keys, default = delete):
         "returns values associated to the keys"
-        if len(keys) == 2 and keys[1] is Ellipsis:
-            root = keys[0]
-            base = keys[0]+'.'
-            return {i: j for i, j in self.__items.items()
-                    if i == root or i.startswith(base)}
+        return self.__items.get(*keys, default = default)
 
-        if default is not delete:
-            if len(keys) == 1:
-                return self.__items.get(keys[0], default)
-
-            elif isinstance(default, list):
-                return iter(self.__items.get(key, val)
-                            for key, val in zip(keys, default))
-            else:
-                return iter(self.__items.get(key, default) for key in keys)
-        else:
-            if len(keys) == 1:
-                return self.__items[keys[0]]
-            return iter(self.__items[key] for key in keys)
+    @staticmethod
+    def __npars(fcn) -> bool:
+        params = inspect.signature(fcn).parameters
+        if len(params) == 0:
+            return False
+        elif len(params) == 1:
+            return next(iter(params)) not in ('cls', 'self')
+        elif len(params) == 2:
+            assert next(iter(params)) in ('cls', 'self')
+            return True
+        assert False
+        return False
 
 class GlobalsController(Controller):
     """
@@ -359,7 +160,8 @@ class GlobalsController(Controller):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.__maps = dict()
+        self.__model = Globals()
+        self.__maps  = dict()
         self.addGlobalMap('css').button.defaults = {'width': 90, 'height': 20}
         self.addGlobalMap('css').config.defaults = {'indent':       4,
                                                     'ensure_ascii': False,
@@ -398,19 +200,14 @@ class GlobalsController(Controller):
 
     def addGlobalMap(self, key, *args, **kwargs):
         "adds a map"
-        if key not in self.__maps:
-            if '.' in key:
-                parent = self.__maps[key[:key.rfind('.')]]
-                self.__maps[key] = parent.createChild(key, handlers = self._handlers)
-            else:
-                self.__maps[key] = DefaultsMap(GlobalsChild(key), handlers = self._handlers)
-
-        self.__maps[key].setdefaults(*args, **kwargs)
-        return _MapGetter(self.__maps[key], '')
+        val  = getattr(self.__model.addGlobalMap(key, *args, **kwargs), '_map')
+        self.__maps[key] = SingleMapController(val, handlers = self._handlers)
+        return SingleMapAccessController(self.__maps[key], '')
 
     def removeGlobalMap(self, key):
         "removes a map"
         self.__maps.pop(key)
+        self.__model.removeGlobalMap(key)
 
     def setGlobalDefaults(self, key, **kwargs):
         "sets default values to the map"
@@ -427,50 +224,30 @@ class GlobalsController(Controller):
     def getGlobal(self, key, *args, default = delete):
         "returns values associated to the keys"
         if len(args) == 0 or len(args) == 1 and args[0] == '':
-            return _MapGetter(self.__maps[key], '')
+            return SingleMapAccessController(self.__maps[key], '')
         return self.__maps[key].get(*args, default = default)
 
     def writeconfig(self, configpath: Callable,
                     patchname = 'config',
                     index     = 0,
                     overwrite = True):
-        "Sets-up the user preferences"
-        if overwrite is False:
-            for version in anastore.iterversions(patchname):
-                if configpath(version).exists():
-                    return
+        """
+        Writes up the user preferences.
 
-        path = configpath(anastore.version(patchname))
-        path.parent.mkdir(parents = True, exist_ok = True)
-        path.touch(exist_ok = True)
-
-        maps = {i: j._DefaultsMap__items.maps[index] # pylint: disable=protected-access
-                for i, j in self.__maps.items()
-                if 'project' not in i}
-        maps = {i: j for i, j in maps.items() if len(j)}
-
-        css = self.getGlobal('css').config
-        anastore.dump(maps, path, patch = patchname, **css.getdict(..., fullnames = False))
+        If *overwrite* is *False*, the preferences are first read from file, then
+        written again. Notwithstanding version patches, this is a no-change operation.
+        """
+        self.__model.writeconfig(configpath, anastore, patchname, index, overwrite)
 
     def readconfig(self, configpath, patchname = 'config'):
         "Sets-up the user preferences"
-        cnf = None
-        for version in anastore.iterversions(patchname):
-            path = configpath(version)
-            if not path.exists():
-                continue
-            try:
-                cnf = anastore.load(path, patch = patchname)
-            except: # pylint: disable=bare-except
-                continue
-            break
-        if cnf is None:
+        cnf = self.__model.readconfig(configpath, anastore, patchname)
+        if cnf is None or len(cnf) == 0:
             return
 
         with Action(self):
-            for root in set(cnf) & set(self.__maps):
-                keys = frozenset(self.__maps[root].keys()) & frozenset(cnf[root])
-                self.__maps[root].update({i: cnf[root][i] for i in keys})
+            for root, values in cnf.items():
+                self.__maps[root].update(values)
 
     def __undos__(self):
         "yields all undoable user actions"
