@@ -58,9 +58,9 @@ class SingleMapController(Controller):
         "adds defaults to the config"
         self.__items.setdefaults(*args, version = version, **kwargs)
 
-    def reset(self):
+    def reset(self, base = ''):
         "resets to default values"
-        self.__items.pop()
+        return self.update(dict.fromkeys(self.__items.keys(base), delete))
 
     def update(self, *args, **kwargs) -> EventData:
         "updates keys or raises NoEmission"
@@ -71,7 +71,7 @@ class SingleMapController(Controller):
 
     def pop(self, *args):
         "removes view information"
-        return self.__items.update(dict.fromkeys(args, delete))
+        return self.update(dict.fromkeys(args, delete))
 
     @property
     def name(self) -> str:
@@ -257,4 +257,5 @@ class GlobalsController(BaseGlobalsController):
             vals = {i: j.old for i, j in items}
             return lambda: self.updateGlobal(name, **vals)
 
-        yield from ((key, _onglobals) for key in self.__maps)
+        maps = self._BaseGlobalsController__maps # pylint: disable=protected-access,no-member
+        yield from ((key, _onglobals) for key in maps)
