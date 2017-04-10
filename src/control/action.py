@@ -63,7 +63,7 @@ class Action(ActionDescriptor):
 
     def __exit__(self, tpe, val, bkt):
         _CNT[0] -= 1
-        errvalue = [False]
+        errvalue = [self._ctrl.getGlobal('config').catcherror.get()]
         self._ctrl.handle("stopaction",
                           args = {'type':       tpe,
                                   'value':      val,

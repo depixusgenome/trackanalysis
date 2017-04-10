@@ -44,11 +44,10 @@ class  ToolBar(BokehView):
                         'working': u'Please wait ...'}
 
         cnf = self._ctrl.getGlobal('config')
-        cnf.keypress.defaults = {'open'     : "Control-o",
-                                 'save'     : "Control-s",
-                                 'quit'     : "Control-q",
-                                 'beadup'   : 'PageUp',
-                                 'beaddown' : 'PageDown'}
+        cnf.catcherror.toolbar.default = True
+        cnf.keypress.defaults          = {'open'     : "Control-o",
+                                          'save'     : "Control-s",
+                                          'quit'     : "Control-q"}
 
         self.__diagopen = TrackFileDialog(self._ctrl)
         self.__diagsave = FileDialog(config    = self._ctrl)
@@ -92,6 +91,7 @@ class  ToolBar(BokehView):
             if not recursive:
                 self._text.text = self._ctrl.getGlobal('css').title.working.get()
 
+        catch = self._ctrl.getGlobal('config').catcherror.toolbar
         @self._ctrl.observe
         def _onstopaction(recursive = None, value = None, catcherror = None, **_):
             if not recursive:
@@ -99,7 +99,7 @@ class  ToolBar(BokehView):
                     self._text.text = ''
                 else:
                     self._text.text = str(value)
-                    catcherror[0]   = True
+                    catcherror[0]   = catch.get()
 
         fcn = lambda itm: setattr(self._text, 'text', str(itm))
         self._ctrl.getGlobal('project').message.observe(fcn)

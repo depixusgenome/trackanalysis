@@ -230,14 +230,15 @@ class GlobalsController(BaseGlobalsController):
         css.config.defaults = {'indent': 4, 'ensure_ascii': False, 'sort_keys': True}
 
         cnf = self.getGlobal('config')
-        cnf.phase.defaults = PHASE.__dict__
-        cnf.tasks.defaults = {'processors':  'control.processor.Processor',
-                              'io.open':    ('anastore.control.AnaIO',
-                                             'control.taskio.GrFilesIO',
-                                             'control.taskio.TrackIO'),
-                              'io.save':    ('anastore.control.AnaIO',),
-                              'clear':      True
-                             }
+        cnf.catcherror.default = False
+        cnf.phase.defaults     = PHASE.__dict__
+        cnf.tasks.defaults     = {'processors':  'control.processor.Processor',
+                                  'io.open':    ('anastore.control.AnaIO',
+                                                 'control.taskio.GrFilesIO',
+                                                 'control.taskio.TrackIO'),
+                                  'io.save':    ('anastore.control.AnaIO',),
+                                  'clear':      True
+                                 }
 
     def access(self, key: Optional[str] = None) -> GlobalsAccess:
         "returns a GlobalsAccess to a given map"

@@ -23,6 +23,8 @@ from view          import View, BokehView
 from view.keypress import KeyPressManager
 import view.toolbar as toolbars
 
+DEFAULT_CONFIG = lambda x: None
+
 def _serverkwargs(kwa):
     server_kwargs                         = dict(kwa)
     server_kwargs['sign_sessions']        = settings.sign_sessions()
@@ -62,7 +64,7 @@ def _launch(view, **kwa):
         server.io_loop.stop()
     StreamReader.run = run
 
-    rtime = _flexxlaunch('http://localhost:5006/', **kwa)
+    rtime = _flexxlaunch('http://localhost:{}/'.format(kwa.get('port', '5006')), **kwa)
     def close(self, __old__ = view.MainControl.close):
         "closes the application"
         top, self.topview = self.topview, None
@@ -116,6 +118,7 @@ def _create(main, controls, views): # pylint: disable=unused-argument
                 """
                 self._callmixins("readconfig", self.configpath)
                 self._callmixins("readconfig", lambda i: self.configpath(i, 'userconfig'))
+                DEFAULT_CONFIG(self)
 
             def writeconfig(self, name = None, **kwa):
                 "writes the config"

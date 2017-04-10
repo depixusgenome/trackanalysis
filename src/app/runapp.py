@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 u"Runs an app"
 from   pathlib import Path
+import random
 import inspect
 import click
 
@@ -46,7 +47,11 @@ def _from_module(view):
               help = u'Launch as desktop app')
 @click.option("--show", flag_value = True, default = False,
               help = u'If using webbrowser, launch it automatically')
-def run(view, app, desktop, show):
+@click.option("--port", default = '5006',
+              help = u'port used: use "random" for any')
+@click.option('-r', "--raiseerr", flag_value = True, default = False,
+              help = u'Wether errors should be caught')
+def run(view, app, desktop, show, port, raiseerr): # pylint: disable=too-many-arguments
     u"Launches an view"
     viewcls = _from_path(view)
     if viewcls is None:
@@ -66,7 +71,20 @@ def run(view, app, desktop, show):
         launchmod = __import__(app, fromlist = (('serve', 'launch')[desktop],))
 
     launch = getattr(launchmod, ('serve', 'launch')[desktop])
-    server = launch(viewcls)
+    if port == 'random':
+        port = random.randint(5000, 8000)
+    else:
+        port = int(port)
+
+    if raiseerr:
+        import app
+
+        def _cnf(ctrl):
+            ctrl.getGlobal('config').catcherror.default         = False
+            ctrl.getGlobal('config').catcherror.toolbar.default = False
+        app.DEFAULT_CONFIG = _cnf
+
+    server = launch(viewcls, port = port)
     if (not desktop) and show:
         server.io_loop.add_callback(lambda: server.show('/'))
     server.start()
