@@ -177,18 +177,29 @@ class _ManagedServerLoop:
         kwa['io_loop'] = IOLoop()
         kwa['io_loop'].make_current()
 
-        app, mod, fcn = self.kwa.pop('_args_')
-        if '.' in mod and 'A' <= mod[mod.rfind('.')+1] <= 'Z':
-            lmod  = mod[:mod.rfind('.')]
-            lattr = mod[mod.rfind('.')+1:]
-            launchmod = getattr(__import__(lmod, fromlist = (lattr,)), lattr)
-            launch    = getattr(launchmod, fcn)
-        else:
-            launch    = getattr(getattr(__import__(mod), mod), fcn)
+        def _import(amod):
+            if not isinstance(amod, str):
+                return amod
+
+            if '.' in amod and 'A' <= amod[amod.rfind('.')+1] <= 'Z':
+                modname = amod[:amod.rfind('.')]
+                attr    = (amod[amod.rfind('.')+1:],)
+            else:
+                modname = amod
+                attr    = tuple()
+
+            mod = __import__(modname)
+            for i in tuple(modname.split('.')[1:]) + attr:
+                mod = getattr(mod, i)
+            return mod
+
+        tmpapp, mod, fcn = self.kwa.pop('_args_')
+        app              = _import(tmpapp)
+        launch           = getattr(_import(mod), fcn)
 
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', '.*inspect.getargspec().*')
-            server    = launch(app, server = kwa)
+            server = launch(app, server = kwa)
 
         @classmethod
         def _open(_, doc, _func_ = server.MainView.open):
@@ -319,12 +330,12 @@ class BokehAction:
             user_config_dir = lambda *_: tmp+"/"+_[-1]
         sys.modules['appdirs'] = _Dummy
 
-    def serve(self, app:type, mod:str  = 'default', **kwa) -> _ManagedServerLoop:
+    def serve(self, app:Union[type, str], mod:str  = 'default', **kwa) -> _ManagedServerLoop:
         "Returns a server managing context"
         kwa['_args_'] = app, mod, 'serve'
         return _ManagedServerLoop(self.monkeypatch, kwa)
 
-    def launch(self, app:type, mod:str  = 'default', **kwa) -> _ManagedServerLoop:
+    def launch(self, app:Union[type, str], mod:str  = 'default', **kwa) -> _ManagedServerLoop:
         "Returns a server managing context"
         kwa['_args_'] = app, mod, 'launch'
         return _ManagedServerLoop(self.monkeypatch, kwa)
