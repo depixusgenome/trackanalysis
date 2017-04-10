@@ -43,6 +43,13 @@ class  ToolBar(BokehView):
                         'save.dialog': u'Save an analysis file',
                         'working': u'Please wait ...'}
 
+        cnf = self._ctrl.getGlobal('config')
+        cnf.keypress.defaults = {'open'     : "Control-o",
+                                 'save'     : "Control-s",
+                                 'quit'     : "Control-q",
+                                 'beadup'   : 'PageUp',
+                                 'beaddown' : 'PageDown'}
+
         self.__diagopen = TrackFileDialog(self._ctrl)
         self.__diagsave = FileDialog(config    = self._ctrl)
 
@@ -130,6 +137,11 @@ class  BeadToolBar(ToolBar):
         super().__init__(**kwa)
         self._beads = BeadInput(**kwa)
         self._ctrl.getGlobal('css').beadinput.boxwidth.default = 200
+
+        cnf = self._ctrl.getGlobal('config')
+        cnf.keypress.defaults = {'beadup'   : 'PageUp',
+                                 'beaddown' : 'PageDown'}
+
 
     def _getroots(self, doc):
         super()._getroots(doc)

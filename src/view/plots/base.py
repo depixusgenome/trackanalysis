@@ -386,6 +386,22 @@ class PlotView(BokehView):
     PLOTTER = None # type: Optional[type]
     def __init__(self, **kwa):
         super().__init__(**kwa)
+
+        def _gesture(meta):
+            return {'rate'    : .2,
+                    'activate': meta[:-1],
+                    'x.low'   : meta+'ArrowLeft',
+                    'x.high'  : meta+'ArrowRight',
+                    'y.low'   : meta+'ArrowDown',
+                    'y.high'  : meta+'ArrowUp'}
+
+        plt = self._ctrl.getGlobal('config.plot')
+        plt.tools              .default  ='xpan,box_zoom,reset,save'
+        plt.boundary.overshoot .default  =.001
+        plt.keypress.reset     .default  ='Shift- '
+        plt.keypress.pan       .defaults = _gesture('Alt-')
+        plt.keypress.zoom      .defaults = _gesture('Shift-')
+
         self._plotter = self.PLOTTER(self._ctrl) # pylint: disable=not-callable
 
     def close(self):

@@ -65,6 +65,10 @@ class BokehView(View):
     def __init__(self, **kwargs):
         "initializes the gui"
         super().__init__(**kwargs)
+        css = self._ctrl.getGlobal('css')
+        css.button.defaults = {'width': 90, 'height': 20}
+        css.input .defaults = {'width': 90, 'height': 20}
+
         self._keys = kwargs['keys']  # type: KeyPressManager
 
     def close(self):

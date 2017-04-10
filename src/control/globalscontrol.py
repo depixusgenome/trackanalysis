@@ -24,6 +24,7 @@ map only needs specify those default values that should be changed for this type
 of plot.
 """
 from    typing        import Callable, Optional
+from    itertools     import product
 import  inspect
 
 import  anastore
@@ -144,7 +145,7 @@ class SingleMapController(Controller):
         assert False
         return False
 
-class GlobalsController(Controller):
+class BaseGlobalsController(Controller):
     """
     Controller class for global values.
     These can be accessed using a main key and secondary keys:
@@ -162,51 +163,6 @@ class GlobalsController(Controller):
         super().__init__(**kwargs)
         self.__model = Globals()
         self.__maps  = dict()
-        self.addGlobalMap('css').button.defaults = {'width': 90, 'height': 20}
-        self.addGlobalMap('css').config.defaults = {'indent':       4,
-                                                    'ensure_ascii': False,
-                                                    'sort_keys':    True}
-        self.addGlobalMap('css').input .defaults = {'width': 90, 'height': 20}
-        self.addGlobalMap("css.plot")
-        self.addGlobalMap('config').keypress.defaults = {'undo' : "Control-z",
-                                                         'redo' : "Control-y",
-                                                         'open' : "Control-o",
-                                                         'save' : "Control-s",
-                                                         'quit' : "Control-q",
-                                                         'beadup': 'PageUp',
-                                                         'beaddown': 'PageDown'}
-        self.getGlobal('config').phase.defaults = PHASE.__dict__
-
-        tasks = self.getGlobal('config').tasks
-        tasks.defaults = {'processors':  'control.processor.Processor',
-                          'io.open':    ('anastore.control.AnaIO',
-                                         'control.taskio.GrFilesIO',
-                                         'control.taskio.TrackIO'),
-                          'io.save':    ('anastore.control.AnaIO',),
-                          'clear':      True
-                         }
-
-        def _gesture(meta):
-            return {'rate'    : .2,
-                    'activate': meta[:-1],
-                    'x.low'   : meta+'ArrowLeft',
-                    'x.high'  : meta+'ArrowRight',
-                    'y.low'   : meta+'ArrowDown',
-                    'y.high'  : meta+'ArrowUp'}
-
-        item = self.addGlobalMap('config.plot')
-        item.tools              .default  ='xpan,box_zoom,reset,save'
-        item.boundary.overshoot .default  =.001
-        item.keypress.reset     .default  ='Shift- '
-        item.keypress.pan       .defaults = _gesture('Alt-')
-        item.keypress.zoom      .defaults = _gesture('Shift-')
-
-        self.addGlobalMap('project', message = '')
-        self.addGlobalMap('project.plot')
-
-    def access(self, key: Optional[str] = None) -> GlobalsAccess:
-        "returns a GlobalsAccess to a given map"
-        return GlobalsAccess(self, key)
 
     def addGlobalMap(self, key, *args, **kwargs):
         "adds a map"
@@ -258,6 +214,34 @@ class GlobalsController(Controller):
         with Action(self):
             for root, values in cnf.items():
                 self.__maps[root].update(values)
+
+class GlobalsController(BaseGlobalsController):
+    """
+    Controller class for global values with initial defaults
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        for suff, name in product(('', '.plot'), ('project', 'css', 'config')):
+            self.addGlobalMap(name+suff)
+
+        self.getGlobal('project').message.default = ''
+
+        css = self.getGlobal('css')
+        css.config.defaults = {'indent': 4, 'ensure_ascii': False, 'sort_keys': True}
+
+        cnf = self.getGlobal('config')
+        cnf.phase.defaults = PHASE.__dict__
+        cnf.tasks.defaults = {'processors':  'control.processor.Processor',
+                              'io.open':    ('anastore.control.AnaIO',
+                                             'control.taskio.GrFilesIO',
+                                             'control.taskio.TrackIO'),
+                              'io.save':    ('anastore.control.AnaIO',),
+                              'clear':      True
+                             }
+
+    def access(self, key: Optional[str] = None) -> GlobalsAccess:
+        "returns a GlobalsAccess to a given map"
+        return GlobalsAccess(self, key)
 
     def __undos__(self):
         "yields all undoable user actions"
