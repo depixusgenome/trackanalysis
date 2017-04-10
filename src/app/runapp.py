@@ -38,7 +38,7 @@ def _from_module(view):
 
 @click.command()
 @click.argument('view')
-@click.option("--app", default = 'app.BeadsToolBar',
+@click.option("--app", default = 'app.BeadToolBar',
               help = u'Which app mixin to use')
 @click.option("--web", 'desktop', flag_value = False,
               help = u'Serve to webbrowser rather than desktop app')
