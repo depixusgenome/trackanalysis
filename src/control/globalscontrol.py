@@ -176,6 +176,16 @@ class GlobalsController(Controller):
                                                          'beadup': 'PageUp',
                                                          'beaddown': 'PageDown'}
         self.getGlobal('config').phase.defaults = PHASE.__dict__
+
+        tasks = self.getGlobal('config').tasks
+        tasks.defaults = {'processors':  'control.processor.Processor',
+                          'io.open':    ('anastore.control.AnaIO',
+                                         'control.taskio.GrFilesIO',
+                                         'control.taskio.TrackIO'),
+                          'io.save':    ('anastore.control.AnaIO',),
+                          'clear':      True
+                         }
+
         def _gesture(meta):
             return {'rate'    : .2,
                     'activate': meta[:-1],

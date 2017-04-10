@@ -65,8 +65,5 @@ class CyclesPlotView(PlotView):
         "Alignment, ... is set-up by default"
         tasks         = self._ctrl.getGlobal('config').tasks
         tasks.default = ['extremumalignment']
-        ConfigTrackIO.setup(self._ctrl, tasks)
-        GrFilesIO.setup(self._ctrl, self._ctrl.getGlobal('project').track)
-
-        trk = self._ctrl.getGlobal('project').track
-        trk.observe(lambda itm: self._ctrl.clearData(itm.old))
+        tasks.io.open.default = (tuple(tasks.io.open.get()[:-1])
+                                 + ('control.taskio.ConfigTrackIO',))

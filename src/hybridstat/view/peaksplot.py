@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
 from typing                     import (Optional, Sequence, Tuple, List, Dict,
-                                        Generic, TypeVar, Union, TYPE_CHECKING)
+                                        Union, TYPE_CHECKING)
 from itertools                  import product
 
 import bokeh.core.properties as props
@@ -16,7 +16,7 @@ import numpy                    as     np
 
 import sequences
 from signalfilter               import rawprecision
-from control.taskio             import ConfigTrackIO
+from control.taskio             import ConfigTrackIO, ConfigGrFilesIO
 from control.processor          import processors
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
 from peakfinding.processor      import PeakSelectorTask
@@ -34,18 +34,6 @@ from view.plots.sequence        import (readsequence, SequenceTicker, OligoListW
                                         SequenceKeyProp as _SequenceKeyProp)
 
 from ..probabilities            import  Probability
-
-T = TypeVar('T')
-class SequenceProp(TaskPlotModelAccess.props.configroot[T], Generic[T]):
-    "A property which updates the FitToHairpinTask as well"
-    def __set__(self, obj, val):
-        super().__set__(obj, val)
-        task = obj.defaultidenfication
-        if task is None:
-            obj.identification.remove()
-        else:
-            obj.identification.update(**task.config())
-        return val
 
 class FitToHairpinAccess(TaskAccess):
     "access to the FitToHairpinTask"
@@ -74,14 +62,33 @@ class SequenceKeyProp(_SequenceKeyProp):
             return min(obj.distances, key = obj.distances.__getitem__)
         return super().__get__(obj, tpe)
 
-class PeaksPlotModelAccess(TaskPlotModelAccess):
+class _PeaksPlotModelAccess(TaskPlotModelAccess):
+    "Access to identification"
+    def __init__(self, ctrl, key: Optional[str] = None) -> None:
+        super().__init__(ctrl, key)
+        self.identification = FitToHairpinAccess(self)
+
+    props        = TaskPlotModelAccess.props
+    sequencepath = props.configroot[Optional[str]]('last.path.sequence')
+    oligos       = props.configroot[Optional[Sequence[str]]]('oligos')
+
+    @property
+    def defaultidenfication(self):
+        "returns the default identification task"
+        ols = self.oligos
+        seq = self.sequencepath
+        if ols is None or len(ols) == 0 or len(readsequence(seq)) == 0:
+            return None
+        else:
+            return FitToHairpinTask.read(seq, ols)
+
+class PeaksPlotModelAccess(_PeaksPlotModelAccess):
     "Access to peaks"
     def __init__(self, ctrl, key: Optional[str] = None) -> None:
         super().__init__(ctrl, key)
         self.config.root.tasks.extremumalignment.default = ExtremumAlignmentTask()
         self.eventdetection     = TaskAccess(self, EventDetectionTask)
         self.peakselection      = TaskAccess(self, PeakSelectorTask)
-        self.identification     = FitToHairpinAccess(self)
         self.fits               = None   # type: Optional[FitBead]
         self.peaks              = dict() # type: Dict[str, np.ndarray]
         self.estimatedbias      = 0.
@@ -93,20 +100,8 @@ class PeaksPlotModelAccess(TaskPlotModelAccess):
         cls.bias        .setdefault(self)       # type: ignore
 
     sequencekey  = SequenceKeyProp()
-    sequencepath = SequenceProp[Optional[str]]('last.path.sequence')
-    oligos       = SequenceProp[Optional[Sequence[str]]]('oligos')
     stretch      = FitParamProp('stretch')
     bias         = FitParamProp('bias')
-
-    @property
-    def defaultidenfication(self):
-        "returns the default identification task"
-        ols = self.oligos
-        seq = self.sequencepath
-        if ols is None or len(ols) == 0 or len(readsequence(seq)) == 0:
-            return None
-        else:
-            return FitToHairpinTask.read(seq, ols)
 
     @property
     def distances(self) -> Dict[str, Distance]:
@@ -588,22 +583,26 @@ class PeaksPlotCreator(TaskPlotCreator):
                               sizing_mode = mode,
                               width       = twidth)
 
-class PeaksConfigTrackIO(ConfigTrackIO):
-    "selects the default tasks"
-    def __init__(self, model):
-        tasks         = model.config.tasks
-        tasks.default = ['extremumalignment', 'eventdetection', 'peakselector']
-        super().__init__(tasks)
-        self.__model  = model
+class _PeaksIOMixin:
+    def __init__(self, ctrl):
+        type(self).__bases__ [0].__init__(self, ctrl)
+        self.__model = _PeaksPlotModelAccess(ctrl, 'config'+PeaksPlotCreator.key())
 
     def open(self, path:Union[str, Tuple[str,...]], model:tuple):
         "opens a track file and adds a alignment"
-        items = super().open(path, model)
+        cls   = type(self).__bases__[0]
+        items = cls.open(self, path, model) # type: ignore # pylint: disable=no-member
         if items is not None:
             task = self.__model.defaultidenfication
             if task is not None:
                 items[0] += (task,)
         return items
+
+class PeaksConfigTrackIO(ConfigTrackIO, _PeaksIOMixin):
+    "selects the default tasks"
+
+class PeaksConfigGRFilesIO(ConfigGrFilesIO, _PeaksIOMixin):
+    "selects the default tasks"
 
 class PeaksPlotView(PlotView):
     "Peaks plot view"
@@ -611,7 +610,22 @@ class PeaksPlotView(PlotView):
 
     def ismain(self):
         "Alignment, ... is set-up by default"
-        PeaksConfigTrackIO.setup(self._ctrl, self._plotter.model)
+        tasks = self._plotter.model.config.tasks
+        tasks.default = ['extremumalignment', 'eventdetection', 'peakselector']
 
-        trk = self._ctrl.getGlobal('project').track
-        trk.observe(lambda itm: self._ctrl.clearData(itm.old))
+        vals = (tuple(tasks.io.open.get()[:-2])
+                + ('hybribstat.view.PeaksConfigTrackIO',
+                   'hybribstat.view.PeaksConfigGRFilesIO'))
+        tasks.io.open.default = vals
+
+    def getroots(self, doc):
+        mdl = self._plotter.model
+        def _observe(_):
+            task = mdl.defaultidenfication
+            if task is None:
+                mdl.identification.remove()
+            else:
+                mdl.identification.update(**task.config())
+
+        self._plotter.model.observeprops(('oligos', 'sequencepath'), _observe)
+        return super().getroots(doc)

@@ -10,6 +10,21 @@ from .dialog              import FileDialog
 from .intinput            import BeadInput
 from .                    import BokehView
 
+class TrackFileDialog(FileDialog):
+    "A file dialog that doesn't open .gr files first"
+    def __init__(self, ctrl):
+        storage   = 'toolbar'
+        super().__init__(multiple  = 1,
+                         storage   = storage,
+                         config    = ctrl)
+
+        def _defaultpath(ext):
+            pot = self.storedpaths(ctrl, storage, ext)
+            if ctrl.getGlobal('project').track.get(default = None) is None:
+                pot = [i for i in pot if i.suffix != '.gr']
+            return self.firstexistingpath(pot)
+        self.config = _defaultpath, self.config[1]
+
 class  ToolBar(BokehView):
     "Toolbar"
     def __init__(self, **kwa):
@@ -28,9 +43,7 @@ class  ToolBar(BokehView):
                         'save.dialog': u'Save an analysis file',
                         'working': u'Please wait ...'}
 
-        self.__diagopen = FileDialog(multiple  = 1,
-                                     config    = self._ctrl,
-                                     storage   = 'toolbar')
+        self.__diagopen = TrackFileDialog(self._ctrl)
         self.__diagsave = FileDialog(config    = self._ctrl)
 
     def _getroots(self, _):

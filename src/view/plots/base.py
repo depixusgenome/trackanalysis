@@ -171,8 +171,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                                                'input.width'     : 205,
                                                'sizing_mode'     : 'scale_width'}
 
-
-        key = ".plot." + type(self).__name__[:-len('PlotCreator')].lower()
+        key = type(self).key()
         for name in 'config', 'project', 'css':
             ctrl.addGlobalMap(name+key)
 
@@ -180,6 +179,14 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         self._model = self._MODEL(ctrl, key)
         self._ctrl  = ctrl
         self._ready = False
+
+    @classmethod
+    def key(cls):
+        "the key to this plot creator"
+        name = cls.__name__.lower()
+        if 'plot' in name:
+            name = name[:name.rfind('plot')]
+        return ".plot." + name
 
     def action(self, fcn):
         u"decorator which starts a user action unless _ready is set to false"

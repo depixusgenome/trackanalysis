@@ -121,6 +121,10 @@ def _create(main, controls, views): # pylint: disable=unused-argument
                 "writes the config"
                 self._callmixins("writeconfig", lambda i: self.configpath(i, name), **kwa)
 
+            def setup(self):
+                "writes the config"
+                self._callmixins("setup", self)
+
             def close(self):
                 "remove controller"
                 self.writeconfig()
@@ -135,8 +139,8 @@ def _create(main, controls, views): # pylint: disable=unused-argument
 
             ctrl.writeconfig('defaults',   index = 1)
             ctrl.writeconfig('userconfig', index = 0, overwrite = False)
-
             ctrl.readconfig()
+            ctrl.setup()
             main.observe(self)
             for cls in views:
                 cls.observe(self)

@@ -15,7 +15,6 @@ from typing         import (Union, Iterator, Tuple, # pylint: disable=unused-imp
 from model.task     import Task, RootTask, TaskIsUniqueError
 from .event         import Controller, NoEmission
 from .processor     import Cache, Processor, run as _runprocessors
-from .taskio        import DefaultTaskIO, GrFilesIO, TrackIO
 
 _m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
 
@@ -132,10 +131,35 @@ class TaskController(Controller):
         super().__init__(**kwargs)
         self.__items   = dict() # type: Dict[RootTask, ProcessorController]
         self.__procs   = dict() # type: Dict[type,Any]
-        self.__procs   = ProcessorController.register(kwargs.get('processors', Processor))
+        self.__procs   = (ProcessorController.register(kwargs['processors'])
+                          if 'processors' in kwargs else None)
 
-        self.__openers = kwargs.get("openers", self.__defaultopeners())
-        self.__savers  = kwargs.get("savers",  self.__defaultsavers())
+        self.__openers = kwargs.get("openers", None)
+        self.__savers  = kwargs.get("savers",  None)
+
+    def setup(self, ctrl):
+        "sets up the missing info"
+        def _import(name):
+            if not isinstance(name, str):
+                return name
+            modname, clsname = name[:name.rfind('.')], name[name.rfind('.')+1:]
+            return getattr(__import__(modname, fromlist = (clsname,)), clsname)
+
+        cnf = ctrl.getGlobal('config').tasks
+        if self.__procs is None:
+            proc         = _import(cnf.processors.get())
+            self.__procs = ProcessorController.register(proc)
+
+        if self.__openers is None:
+            self.__openers = [_import(itm)(ctrl) for itm in cnf.io.open.get()]
+
+        if self.__savers is None:
+            self.__savers  = [_import(itm)(ctrl) for itm in cnf.io.save.get()]
+
+        def _clear(itm):
+            if ctrl.getGlobal('config').tasks.clear.get(default = True):
+                ctrl.clearData(itm.old)
+        ctrl.getGlobal('project').track.observe(_clear)
 
     def task(self,
              parent : RootTask,
@@ -277,13 +301,3 @@ class TaskController(Controller):
             return lambda: controller.addTask(parent, task, ind)
 
         yield from (fcn for name, fcn in locals().items() if name[:3] == '_on')
-
-    @classmethod
-    def __defaultopeners(cls):
-        "yields default openers"
-        return cls.__defaultsavers() + [GrFilesIO(), TrackIO()]
-
-    @staticmethod
-    def __defaultsavers():
-        "yields default openers"
-        return [cls() for cls in DefaultTaskIO.__subclasses__()]
