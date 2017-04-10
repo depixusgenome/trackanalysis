@@ -5,9 +5,9 @@ u'''
 regroups functions and classes to complement assembler
 '''
 
-from itertools import combinations
+import itertools
 from copy import deepcopy
-from typing import Callable # pylint: disable=unused-import
+from typing import Callable, List # pylint: disable=unused-import
 import scipy.stats
 import numpy
 from Bio import pairwise2
@@ -59,7 +59,7 @@ def noverlaps_energy(oligos):
     u'''use noverlap_bpos to compute energy
     '''
     energy=0
-    for ol1,ol2 in combinations(oligos,2):
+    for ol1,ol2 in itertools.combinations(oligos,2):
         energy-=ol1.noverlaps(ol2)**2
     return energy
 
@@ -245,30 +245,93 @@ def _highest_norm_intersect(dist1,dist2):
     sc_dist.sort()
     return sc_dist[-1][1]
 
-def find_overlaping_normdists(dists,nscale=2): # to pytest
+def group_overlapping_normdists(dists,nscale=1): # to pytest !! # what if no intersection?
     u'''
-    returns lists of indices [(i,j,k)] of overlaping distributions with cdf of overlap >threshold
-    DEAD CODE ?
-    # find all pairs of overlapping
-    dist_ids = []
-    for id1,dis1 in enumerate(dists):
-        for id2,dis2 in enumerate(dists[id1+1:]):
-            # j=id2+id1+1
-            xval = _highest_norm_intersect(dis1,dis2)
-            # work out threshold value
-            left1 = 1-dis1.cdf(xval) if xval>dis1.mean() else dis1.cdf(xval)
-            left2 = 1-dis2.cdf(xval) if xval>dis2.mean() else dis2.cdf(xval)
-            if min(left1,left2)>threshold:
-                dist_ids.append((id1,id2+id1+1))
-    # merge tuples [i,j] & [i,k] & [j,k] => [i,j,k], set?
+    returns lists of indices [(i,j,k)] each element of the tuple has distribution which overlap
     '''
     sdists=[(di.mean(),di.mean()-nscale*di.std(),di.mean()+nscale*di.std(),idx)\
             for idx,di in enumerate(dists)]
     sdists.sort()
+
+    bounds = [(di.mean()-nscale*di.std(),idx) for idx,di in enumerate(dists)]
+    bounds+= [(di.mean()+nscale*di.std(),idx) for idx,di in enumerate(dists)]
+    bounds.sort()
     overlaps=[]
-    tomerge=set(range(len(sdists)))
-    for idx in sdists:
-        merging=(idx[3],)+tuple(sdists[jdx][3] for jdx in tomerge if idx[2]>sdists[jdx][1])
-        overlaps.append(merging)
-        tomerge=tomerge-set(merging)
-    return overlaps
+    for regid in range(len(bounds[:-1])):
+        beflag=set(idx[1] for idx in bounds[:regid+1])
+        aflag = set(idx[1] for idx in bounds[regid+1:])
+
+        overlaps.append(sorted(beflag.intersection(aflag)))
+
+    ssets = [set(overl) for overl in overlaps if len(overl)>1]
+    ssets.sort(reverse=True)
+    uset=[ssets[0]]
+    for val in ssets[1:]:
+        if val.issubset(uset[-1]):
+            continue
+        uset.append(val)
+    return ssets,uset
+
+
+
+def _list_perm_bounds(perm,dists,_epsi=0.001):
+    u'list of possible positions which allow (any or no) switchs between oligo positions'
+    # list all possibilities
+    bounds={idx:[dists[idx].mean()] for idx in perm}
+    for idi,vli in enumerate(perm[:-1]):
+        for vlj in perm[idi+1:]:
+            flag = _highest_norm_intersect(dists[vli],dists[vlj])
+            sign = 1 if dists[vli].mean()<dists[vlj].mean() else -1
+            bounds[vli].append(flag+sign*_epsi)
+            bounds[vlj].append(flag-sign*_epsi)
+    return bounds
+
+def optimal_perm_normdists(perm:List,dists)->numpy.ndarray: # pytest
+    u'''
+    given a permuation perm and the known distributions of each state
+    returns the permutated state which maximise the probability
+    '''
+    _epsi=0.001*min([dists[i].std() for i  in perm])
+
+    constraints=[]
+    for idx in range(len(perm[:-1])):
+        constraints.append({"type":"ineq",
+                            "fun":SOMConstraint(idx,_epsi)})
+
+    xinit = [dists[i].mean() for i in perm]
+    fun = CostPermute(dists,perm)
+    return scipy.optimize.minimize(fun,xinit,constraints=constraints).x
+
+def group_overlapping_oligos(oligos,nscale=1):
+    u'''
+    returns groups of overlapping oligos
+    '''
+    groups = group_overlapping_normdists([oli.dist for oli in oligos],nscale=nscale)[1]
+    return [[oligos[idx] for idx in grp] for grp in groups]
+
+def group_oligos(oligos,**kwa):
+    u''' returns oligos grouped by attr "by"
+    '''
+    byattr = kwa.get("by","batch_id")
+    attr = set([getattr(oli,byattr) for oli in oligos])
+    grouped = [[oli for oli in oligos if getattr(oli,byattr)==atv] for atv in attr]
+    return grouped
+
+class CostPermute:
+    u' returns the "cost" of translations due to permutation of oligo peaks'
+    def __init__(self,dists,perm):
+        self.dists=dists
+        self.perm=perm
+
+    def __call__(self,xstate):
+        return -numpy.product([self.dists[vlp].pdf(xstate[idp])
+                               for idp,vlp in enumerate(self.perm)])
+
+
+class SOMConstraint:
+    u'functor for scipy.optimize.minimize constraints'
+    def __init__(self,index,_epsi):
+        self.index=index
+        self._epsi=_epsi
+    def __call__(self,xstate):
+        return xstate[self.index+1]-xstate[self.index]-self._epsi
