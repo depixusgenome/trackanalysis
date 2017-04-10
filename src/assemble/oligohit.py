@@ -3,7 +3,6 @@
 u'''
 Creates Classes and function to use with assemble sequence
 '''
-from typing import List
 
 def shifted_overlap(ol1:str,ol2:str,shift=0)->str:
     u'''

@@ -337,3 +337,66 @@ class SOMConstraint:
         self._epsi=_epsi
     def __call__(self,xstate):
         return xstate[self.index+1]-xstate[self.index]-self._epsi
+
+def swap_between_batches(bat1, bat2, nscale=1): # not great impl # to optimize
+    u'''
+    compute all possibles swaps between batch1 and batch2
+    need to rethink the algorithm.
+    We assume must constraints the number of permutations as soon as possible
+    batches between oligos from different batches only
+    '''
+
+    groups = group_overlapping_oligos(list(bat1.oligos)+list(bat2.oligos),nscale=nscale)
+    infogrp=[]
+    for grp in groups:
+        info=[]
+        for elmt in grp:
+            try:
+                info.append((elmt,bat1.oligos.index(elmt),1))
+            except ValueError:
+                info.append((elmt,bat2.oligos.index(elmt),2))
+        infogrp.append(info)
+
+    # remove groups if there is not a representative of the two batches
+    infogrp = [i for i in infogrp if len(set(j[2] for j in i))>1]
+
+    # ok-ish up to here
+    stop
+    perms=[]
+    for grp in infogrp:
+        print("len(grp)=",len(grp))
+        for perm in itertools.permutations(grp):
+            # if 2 oligos within a batch are permuted, remove permutation
+            # in bat1
+            if sorted([j[1] for j in perm if j[2]==1])==[j[1] for j in perm if j[2]==1]\
+               and len([j[1] for j in perm if j[2]==1])>1:
+                continue
+
+            # in bat2
+            if sorted([j[1] for j in perm if j[2]==2])==[j[1] for j in perm if j[2]==2]\
+               and len([j[1] for j in perm if j[2]==2])>1:
+                continue
+            perms.append(perm)
+
+    return [[s[0] for s in elmt] for elmt in perms]
+
+
+def can_oligos_overlap(bat1:oligohit.Batch,bat2:oligohit.Batch,min_overl=1):
+    u'''
+    compare the sequences of oligos in the two batch
+    if any can tail_overlap
+    return True
+    else return False
+    '''
+    oli1 = set(oli.seq for oli in bat1.oligos)
+    oli2 = set(oli.seq for oli in bat2.oligos)
+    for ite in itertools.product(oli1,oli2):
+        if len(oligohit.tail_overlap(ite[0],ite[1]))>=min_overl:
+            return True
+        if len(oligohit.tail_overlap(ite[1],ite[0]))>=min_overl:
+            return True
+
+    return False
+
+
+def 

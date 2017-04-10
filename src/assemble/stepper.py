@@ -9,8 +9,8 @@ import sys
 from typing import Callable, Iterable # pylint: disable=unused-import
 import itertools
 import numpy
+from .oligohit import Batch
 from . import _utils as utils
-from oligohit import Batch
 
 # reconstruction a batch at a time
 # if we consider an oligo-batch at a time, then:
@@ -64,10 +64,7 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
     symetric distribution of z around z0 (gaussian at the moment)
     find the distribution which overlap (and allow permutation of oligos)
 
-    # segregate per batch permutation beteen oligos with same batch_id is forbidden
-    # -> better for recursive, scaffolding
-    # segregate per batch permutation beteen oligos with same sequence is forbidden
-
+    batches need to be merged such that the previous merge are more contrainted than the laters
     '''
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
@@ -78,33 +75,56 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
 
         # create Batches from each batch_ids move from one Batch to another
         batchids = list(set(i.batch_id for i in self.oligos))
+        # need to order batch : by decreasing number of peaks
+        # batch needs to be merged in a given order to maximize constraints
+        # can only merge batches if oligos overlap by n-1
         self.batches = [Batch(oligos=[i for i in self.oligos if i.batch_id==index],
                               index=index)
                         for index in batchids]
+        # batches from groups( = utils.group_oligos(self.oligos, by=self.seg))??
 
-        # batches from groups( = utils.group_oligos(self.oligos, by=self.seg))?? 
+        self.swap_batches()
 
-        self.swaps_from_batches()
-                    
     def __call__(self,xst):
         u'''
-        should be something like
-        '''
-        swaps = self.swaps_from_batches()
+        * should be something like (see impl)
+        * requires xstate to add permutations
+        * there should be no conflict when adding permutations by construction of the
+          optimal_perm_normdists
+        * what happens when no more permutations are to be explored?
+
+        to fix:
         while swaps:
             for swp in swaps:
                 yield swp
-            swaps=self.swaps_from_batches()
+            swaps = self.swap_batches()
+        return None
+        '''
+        print("len(self.batches)=",len(self.batches))
+        return self.swap_batches()
 
-    def swaps_from_batches(self):
-        u'returns swaps between the first two batches then merges them'
-        if len(self.batches)<2:
+    def swap_batches(self):
+        u'''
+        takes two batches, if there can be an overlap between oligos in the two batches,
+        compute swaps
+        returns swaps between two batches.
+        These batches are then merged
+        '''
+        if len(self.batches)==1:
             return None
 
-        grp_ovl=utils.group_overlapping_oligos
-        swaps = [it for it in itertools.product(self.batches[0], self.batches[1])
-                 if len(grp_ovl(it))==1]
-        self.batches[0].fill_with(self.batches[1])
-        self.batches.pop(1)
+        # what if no batches can overlap?
+        # corresponds to primed batches does for which we have no info
+        swaps = None
+        for merges in itertools.combinations(range(len(self.batches)),2):
+            if utils.can_oligos_overlap(self.batches[merges[0]],
+                                        self.batches[merges[1]],
+                                        min_overl=3):
+                swaps = utils.swap_between_batches(self.batches[merges[0]],
+                                                   self.batches[merges[1]],
+                                                   nscale = self.nscale)
+                self.batches[merges[0]].fill_with(self.batches[merges[1]])
+                self.batches.pop(merges[1])
+                break
+        # remove swaps if oligos are note permuted??
         return swaps
-        
