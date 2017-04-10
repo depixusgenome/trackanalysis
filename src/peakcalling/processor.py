@@ -125,7 +125,7 @@ class FitToHairpinProcessor(Processor):
                      dist    : Dict[Optional[str], Distance],
                     ) -> FitBead:
         best = min(dist, key = dist.__getitem__)
-        sihl = HairpinDistance.silhouette(dist, best)
+        silh = HairpinDistance.silhouette(dist, best)
         alg  = peakids.get(best, PeakIdentifier())
         ids  = alg(peaks, *dist.get(best, (0., 1., 0))[1:])
         return FitBead(key, silh, dist, ids, events)
