@@ -363,8 +363,9 @@ class PeaksStatsWidget(WidgetCreator):
             values[0] = self._model.stretch
             values[1] = self._model.bias
             values[2] = rawprecision(self._model.track, self._model.bead)
-            values[3] = np.mean(self._model.peaks['sigma'])
-            values[4] = len(self._model.peaks['z']) - 1
+            if len(self._model.peaks['z']):
+                values[3] = np.mean(self._model.peaks['sigma'])
+            values[4] = max(0, len(self._model.peaks['z']) - 1)
 
         line = '<tr><td>'+self.css.stats.title.format.get()+'</td><td>{}</td></tr>'
         fcn  = lambda fmt, val: val if isinstance(val, str) else ('{:'+fmt+'}').format(val)
@@ -514,7 +515,7 @@ class PeaksPlotCreator(TaskPlotCreator):
         for widget in self._widgets.values():
             widget.reset()
 
-        self.setbounds(self._fig.y_range, 'y', data['z'][[0,-1]])
+        self.setbounds(self._fig.y_range, 'y', (data['z'][0], data['z'][-1]))
         self._hover.slaveaxes(self._fig, self._peaksrc, inpy = True)
 
     def __create_fig(self):
@@ -610,12 +611,12 @@ class PeaksPlotView(PlotView):
 
     def ismain(self):
         "Alignment, ... is set-up by default"
-        tasks = self._plotter.model.config.tasks
+        tasks = self._plotter.model.config.root.tasks
         tasks.default = ['extremumalignment', 'eventdetection', 'peakselector']
 
         vals = (tuple(tasks.io.open.get()[:-2])
-                + ('hybribstat.view.PeaksConfigTrackIO',
-                   'hybribstat.view.PeaksConfigGRFilesIO'))
+                + ('hybridstat.view.peaksplot.PeaksConfigTrackIO',
+                   'hybridstat.view.peaksplot.PeaksConfigGRFilesIO'))
         tasks.io.open.default = vals
 
     def getroots(self, doc):
@@ -627,5 +628,5 @@ class PeaksPlotView(PlotView):
             else:
                 mdl.identification.update(**task.config())
 
-        self._plotter.model.observeprops(('oligos', 'sequencepath'), _observe)
+        self._plotter.model.observeprop('oligos', 'sequencepath', _observe)
         return super().getroots(doc)
