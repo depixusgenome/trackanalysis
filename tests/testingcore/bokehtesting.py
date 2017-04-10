@@ -36,8 +36,8 @@ class DpxTestLoaded(Model):
             type: "DpxTestLoaded"
             constructor : (attributes, options) ->
                 super(attributes, options)
-                @listenTo(@, 'change:event', @_press)
-                @listenTo(@, 'change:value', @_change)
+                @listenTo(@, 'change:event_cnt', @_press)
+                @listenTo(@, 'change:value_cnt', @_change)
 
                 $((e) => @done = 1)
 
@@ -69,18 +69,22 @@ class DpxTestLoaded(Model):
             @define {
                 done:  [p.Number, 0]
                 event: [p.Any,   {}]
+                event_cnt: [p.Int, 0]
                 model: [p.Any,   {}]
                 attrs: [p.Array, []]
                 attr : [p.String, '']
                 value: [p.Any,   {}]
+                value_cnt: [p.Int, 0]
             }
                          """
-    done  = props.Int(0)
-    event = props.Dict(props.String, props.Any)
-    model = props.Instance(Model)
-    attrs = props.List(props.String, default = [])
-    attr  = props.String()
-    value = props.Any()
+    done        = props.Int(0)
+    event       = props.Dict(props.String, props.Any)
+    event_cnt   = props.Int(0)
+    model       = props.Instance(Model)
+    attrs       = props.List(props.String, default = [])
+    attr        = props.String()
+    value       = props.Any()
+    value_cnt   = props.Int(0)
 
     def press(self, key, model):
         "Sets-up a new keyevent in JS"
@@ -92,6 +96,7 @@ class DpxTestLoaded(Model):
                    key   = val)
         self.model = model
         self.event = evt
+        self.event_cnt += 1
 
     def change(self, model:Model, attrs: Union[str, Sequence[str]], value: Any):
         "Changes a model attribute on the browser side"
@@ -99,6 +104,7 @@ class DpxTestLoaded(Model):
         self.attrs = list(attrs)[:-1] if isinstance(attrs, (tuple, list)) else []
         self.attr  = attrs[-1]        if isinstance(attrs, (tuple, list)) else attrs
         self.value = value
+        self.value_cnt += 1
 
 class WidgetAccess:
     "Access to bokeh models"
@@ -146,7 +152,7 @@ class _ManagedServerLoop:
     ctrl = property(lambda self: getattr(self.view, '_ctrl'))
 
     @property
-    def loading(self) -> 'Optional[DpxTestLoaded]':
+    def loading(self) -> Optional[DpxTestLoaded]:
         "returns the model which allows tests to javascript"
         return next(iter(getattr(self.doc, 'roots', [])), None)
 

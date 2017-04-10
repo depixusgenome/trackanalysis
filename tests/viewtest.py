@@ -7,7 +7,7 @@ from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-imp
 import anastore.control # pylint: disable=unused-import
 import anastore
 
-from view.toolbar               import ToolBar
+from view.toolbar               import ToolBar, BeadToolBar
 from view.beadplot              import BeadPlotView, DpxKeyedRow
 from cyclesplot                 import CyclesPlotView
 
@@ -37,6 +37,22 @@ def test_toolbar(bokehaction):          # pylint: disable=redefined-outer-name
         server.press('Control-y')
         _checkopen()
         server.quit()
+
+def test_beadtoolbar(bokehaction):          # pylint: disable=redefined-outer-name
+    u"test the toolbar"
+    with bokehaction.launch(BeadToolBar, 'app.Defaults') as server:
+        beads = server.get('BeadToolBar', '_beads')
+
+        # pylint: disable=protected-access
+        assert beads.input.disabled
+        server.load('big_legacy')
+        assert frozenset(beads._BeadInput__beads) == frozenset(range(39))
+
+        server.load('CTGT_selection/Z(t)bd1track10.gr')
+        assert frozenset(beads._BeadInput__beads) == frozenset((1,))
+
+        server.load('CTGT_selection/Z(t)bd0track10.gr')
+        assert frozenset(beads._BeadInput__beads) == frozenset((0, 1))
 
 def test_beadplot(bokehaction):        # pylint: disable=redefined-outer-name
     u"test plot"
@@ -75,7 +91,7 @@ def test_cyclesplot(bokehaction):        # pylint: disable=redefined-outer-name
         if 'y' in evts:
             vals[:2] = evts['y'].value
 
-    with bokehaction.launch(CyclesPlotView, 'app.BeadsToolBar') as server:
+    with bokehaction.launch(CyclesPlotView, 'app.BeadToolBar') as server:
         server.ctrl.getGlobal('config').tasks.default = []
         server.ctrl.observe("globals.project.plot.cycles", _printrng)
         server.load('big_legacy')
@@ -141,7 +157,7 @@ def test_cyclesplot(bokehaction):        # pylint: disable=redefined-outer-name
 def test_cyclesplot2(bokehaction):        # pylint: disable=redefined-outer-name
     u"test plot"
 
-    with bokehaction.launch(CyclesPlotView, 'app.BeadsToolBar') as server:
+    with bokehaction.launch(CyclesPlotView, 'app.BeadToolBar') as server:
         server.ctrl.getGlobal('config').tasks.default = []
         server.load('big_legacy')
 

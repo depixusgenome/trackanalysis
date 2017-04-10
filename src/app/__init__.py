@@ -266,7 +266,7 @@ class ToolBar:
           defaultcontrols = CONTROLS,
           defaultviews    = VIEWS+("view.toolbar.ToolBar",))
 
-class BeadsToolBar:
+class BeadToolBar:
     "App with a toolbar containing a bead spinner"
     setup(creator         = WithToolbar(toolbars.BeadToolBar),
           defaultcontrols = CONTROLS,
