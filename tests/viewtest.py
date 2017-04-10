@@ -3,8 +3,9 @@
 # pylint: disable=redefined-outer-name
 """ Tests views """
 from pytest                     import approx       # pylint: disable=no-name-in-module
-from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
+import numpy as np
 
+from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 from view.plots                 import DpxKeyedRow
 
 def test_toolbar(bokehaction):
@@ -218,15 +219,26 @@ def test_peaksplot(bokehaction):
         _press('Alt-ArrowDown',   0.216678, 0.377610)
         _press('Shift-ArrowDown', -0.10518, 0.699475)
 
+        src = server.widget['Peaks:List'].source
+        assert all(np.isnan(src.data['distance']))
+        assert all(i.strip() == '' for i in src.data['orient'])
         server.change('Cycles:Oligos', 'value', 'ctgt')
+        assert all(np.isnan(src.data['distance']))
+        assert all(i.strip() == '' for i in src.data['orient'])
         server.change('Cycles:Oligos', 'value', '')
         server.load('hairpins.fasta', andpress = False)
         server.change('Cycles:Sequence', 'value', '←')
+        assert all(np.isnan(src.data['distance']))
+        assert all(i.strip() == '' for i in src.data['orient'])
+
         server.change('Cycles:Oligos', 'value', 'ctgt')
         assert server.widget['Cycles:Oligos'].value == 'ctgt'
+        assert not all(np.isnan(src.data['distance']))
+        assert not all(i.strip() == '' for i in src.data['orient'])
+
         menu = server.widget['Cycles:Sequence'].menu
         lst  = tuple(i if i is None else i[0] for i in list(menu))
-        assert lst == ('GF4', 'GF2', 'GF1', 'GF3', 'O15', None, 'Select sequence')
+        assert lst == ('GF4', 'GF2', 'GF1', 'GF3', '015', None, 'Select sequence')
 
 if __name__ == '__main__':
     test_peaksplot(bokehaction(None))
