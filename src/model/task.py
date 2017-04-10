@@ -192,5 +192,19 @@ class DataFunctorTask(Task):
         else:
             return lambda dat: dat.withfunction(cpy, beadsonly = self.beadsonly)
 
+TASK_ORDER = ('model.task.RootTask',
+              'model.task.DataSelectionTask',
+              'eventdetection.processor.ExtremumAlignmentTask',
+              'cordrift.processor.DriftTask',
+              'eventdetection.processor.EventDetectionTask',
+              'peakfinding.processor.PeakSelectorTask',
+              'peakcalling.processor.FitToHairpinTask',
+             )
+def taskorder(lst):
+    "yields a list of task types in the right order"
+    for itm in lst:
+        modname, clsname = itm[:itm.rfind('.')], itm[itm.rfind('.')+1:]
+        yield getattr(__import__(modname, fromlist = (clsname,)), clsname)
+
 __all__  = tuple(i for i in locals() if i.endswith('Task') and len(i) > len('Task'))
-__all__ += 'TagAction',
+__all__ += 'TagAction', 'TASK_ORDER' # type: ignore

@@ -3,8 +3,9 @@
 "Processors apply tasks to a data flow"
 from    abc         import ABCMeta, abstractmethod
 from    functools   import wraps
+from    itertools   import chain
 from    typing      import (TYPE_CHECKING,  # pylint: disable=unused-import
-                            Tuple, Callable, Iterable, cast)
+                            Tuple, Callable, Iterable, Iterator, Type, Union, cast)
 
 from    utils       import getlocals
 import  model.task   as     _tasks
@@ -13,7 +14,6 @@ from    data        import Track
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
-    from typing     import Union
     from .runner    import Runner
 
 _PROTECTED = 'tasktype',
@@ -271,3 +271,11 @@ class ProtocolProcessor(Processor):
 
     def run(self, args:'Runner'):
         args.apply(self.apply(**self.config()))
+
+def processors(atask: Union[_tasks.Task, type]) -> Iterator[Type[Processor]]:
+    "yields processor types which can handle this task"
+    task = type(atask) if not isinstance(atask, type) else atask
+    procs = Processor.__subclasses__()
+    while len(procs):
+        yield from (i for i in procs if issubclass(task, i.tasktype))
+        procs = list(chain(*(i.__subclasses__() for i in procs)))

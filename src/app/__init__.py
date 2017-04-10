@@ -23,6 +23,8 @@ from view          import View, BokehView
 from view.keypress import KeyPressManager
 import view.toolbar as toolbars
 
+DEFAULT_CONFIG = lambda x: None
+
 def _serverkwargs(kwa):
     server_kwargs                         = dict(kwa)
     server_kwargs['sign_sessions']        = settings.sign_sessions()
@@ -62,7 +64,7 @@ def _launch(view, **kwa):
         server.io_loop.stop()
     StreamReader.run = run
 
-    rtime = _flexxlaunch('http://localhost:5006/', **kwa)
+    rtime = _flexxlaunch('http://localhost:{}/'.format(kwa.get('port', '5006')), **kwa)
     def close(self, __old__ = view.MainControl.close):
         "closes the application"
         top, self.topview = self.topview, None
@@ -103,19 +105,28 @@ def _create(main, controls, views): # pylint: disable=unused-argument
                 yield from self._yieldovermixins('__undos__')
 
             @classmethod
-            def configpath(cls, version) -> Path:
+            def configpath(cls, version, stem = None) -> Path:
                 "returns the path to the config file"
                 name = cls.APPNAME.replace(' ', '_').lower()
                 path = Path(appdirs.user_config_dir('depixus', 'depixus', name+"/"+version))
-                return path/'config.txt'
+                return path/(('autosave' if stem is None else stem)+'.txt')
 
             def readconfig(self):
-                "writes the config"
+                """
+                reads the config: first the stuff saved automatically, then
+                anything the user wishes to impose.
+                """
                 self._callmixins("readconfig", self.configpath)
+                self._callmixins("readconfig", lambda i: self.configpath(i, 'userconfig'))
+                DEFAULT_CONFIG(self)
 
-            def writeconfig(self):
+            def writeconfig(self, name = None, **kwa):
                 "writes the config"
-                self._callmixins("writeconfig", self.configpath)
+                self._callmixins("writeconfig", lambda i: self.configpath(i, name), **kwa)
+
+            def setup(self):
+                "writes the config"
+                self._callmixins("setup", self)
 
             def close(self):
                 "remove controller"
@@ -129,7 +140,10 @@ def _create(main, controls, views): # pylint: disable=unused-argument
             main.__init__(self, ctrl = ctrl, keys = keys)
             main.ismain(self)
 
+            ctrl.writeconfig('defaults',   index = 1)
+            ctrl.writeconfig('userconfig', index = 0, overwrite = False)
             ctrl.readconfig()
+            ctrl.setup()
             main.observe(self)
             for cls in views:
                 cls.observe(self)
@@ -255,7 +269,7 @@ class ToolBar:
           defaultcontrols = CONTROLS,
           defaultviews    = VIEWS+("view.toolbar.ToolBar",))
 
-class BeadsToolBar:
+class BeadToolBar:
     "App with a toolbar containing a bead spinner"
     setup(creator         = WithToolbar(toolbars.BeadToolBar),
           defaultcontrols = CONTROLS,

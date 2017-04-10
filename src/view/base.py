@@ -36,23 +36,39 @@ class View:
         self._ctrl.close()
         self._ctrl = None
 
-def enableOnTrack(ctrl, *itms):
+def enableOnTrack(ctrl, *aitms):
     "Enables/disables view elements depending on the track status"
+    litms = []
+    def _get(obj):
+        if isinstance(obj, (tuple, list)):
+            for i in obj:
+                _get(i)
+        elif isinstance(obj, dict):
+            for i in obj.values():
+                _get(i)
+        else:
+            litms.append(obj)
+    _get(aitms)
+    itms = tuple(litms)
     for ite in itms:
         ite.disabled = True
 
-    def _oncurrent(items):
+    def _onproject(items, __lst__ = itms):
         if 'track' in items:
             val = items['track'].value is items.empty
-            for ite in itms:
+            for ite in __lst__:
                 ite.disabled = val
-    getattr(ctrl, '_ctrl', ctrl).getGlobal("current").observe(_oncurrent)
+    getattr(ctrl, '_ctrl', ctrl).getGlobal("project").observe(_onproject)
 
 class BokehView(View):
     "A view with a gui"
     def __init__(self, **kwargs):
         "initializes the gui"
         super().__init__(**kwargs)
+        css = self._ctrl.getGlobal('css')
+        css.button.defaults = {'width': 90, 'height': 20}
+        css.input .defaults = {'width': 90, 'height': 20}
+
         self._keys = kwargs['keys']  # type: KeyPressManager
 
     def close(self):

@@ -7,22 +7,6 @@ from functools  import wraps
 from pandas     import Series
 from ._core     import ForwardBackwardFilter, NonLinearFilter
 
-def _m_correct_pybind11_bug(cls):
-    old = cls.__init__
-    @wraps(old)
-    def __init__(self, __old__ = old, **kwa):
-        __old__(self, kwa)
-    cls.__init__ = __init__
-
-    old = cls.__call__
-    @wraps(old)
-    def __call__(self, inp, __old__ = old, **kwa):
-        return __old__(self, inp, kwa)
-    cls.__call__ = __call__
-
-_m_correct_pybind11_bug(ForwardBackwardFilter)
-_m_correct_pybind11_bug(NonLinearFilter)
-
 class RollingFilter:
     u"interface to panda rolling window methods"
     def __init__(self, window = 10, mode = 'mean', std = None, **_):

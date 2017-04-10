@@ -32,7 +32,7 @@ def dumps(info:Any, patch = 'tasks', **kwa):
 def dump(info:Any, path:Union[str,Path,IO], patch = 'tasks', **kwa):
     u"Dumps data to json file. This includes the version number"
     if isinstance(path, (Path, str)):
-        with open(str(Path(path).absolute()), 'w') as stream:
+        with open(str(Path(path).absolute()), 'w', encoding = 'utf-8') as stream:
             return dump(info, stream, **kwa)
     return json.dump(_apply(info, patch, 'dumps', _OutputRunner), path, **kwa)
 
@@ -44,7 +44,7 @@ def load(path:Union[str,Path,IO], patch = 'tasks', **kwa):
     u"Dumps data to json file. This includes the version number"
     if isinstance(path, (Path, str)):
         if isana(path):
-            with open(str(Path(path).absolute()), 'r') as stream:
+            with open(str(Path(path).absolute()), 'r', encoding = 'utf-8') as stream:
                 return load(stream, patch, **kwa)
         return None
 
@@ -58,7 +58,7 @@ def isana(path: Union[str, Path]):
 
     const = '[{"version":'
     try:
-        with open(str(path), 'r') as stream:
+        with open(str(path), 'r', encoding = 'utf-8') as stream:
             line = stream.read(100).replace('\n', '').replace(' ', '')
             return line[:len(const)] == const
     except: # pylint: disable=bare-except

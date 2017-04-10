@@ -18,6 +18,9 @@ class UndoView(View):
     def __init__(self, **kwa): # pylint: disable=too-many-locals
         super().__init__(**kwa)
         self.__curr = [None]
+        cnf = self._ctrl.getGlobal('config')
+        cnf.keypress.defaults = {'undo'     : "Control-z",
+                                 'redo'     : "Control-y"}
 
         if 'keys' in kwa:
             kwa['keys'].addKeyPress('keypress', undo = self.undo, redo = self.redo)

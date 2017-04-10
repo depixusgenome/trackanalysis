@@ -55,20 +55,28 @@ def changefields(obj, __items__ = None, **items):
     u"Context within which given fields are momentarily changed"
     return ChangeFields(obj, __items__, **items)
 
-def kwargsdefaults(*items):
+def kwargsdefaults(*items, asinit = True):
     u"""
     Keyword arguments are used for changing an object's fields before running
-    the method
+    the method.
+
+    Using *asinit* means the same attributes as for __init__ will be allowed.
+    This is only valid if initdefaults decorates the __init__
     """
+    def _fields(vals):
+        assert len(vals) and all(isinstance(i, str) for i in vals)
+        accepted = frozenset(vals)
+        return lambda _: accepted
+
     if len(items) == 1 and isinstance(items[0], tuple):
         items = items[0]
 
-    if len(items) == 1 and callable(items[0]):
-        fields   = fieldnames
+    call = len(items) == 1 and callable(items[0])
+    pot  = getattr(getlocals(1).get('__init__', None), 'KEYS', None)
+    if call:
+        fields = fieldnames if pot is None or not asinit else _fields(pot)
     else:
-        assert len(items) and all(isinstance(i, str) for i in items)
-        accepted = frozenset(items)
-        fields   = lambda _: accepted
+        fields = fieldnames if not len(items)            else _fields(items)
 
     def _wrapper(fcn):
         @wraps(fcn)
@@ -79,9 +87,7 @@ def kwargsdefaults(*items):
             return ret
         return _wrap
 
-    if len(items) == 1 and callable(items[0]):
-        return _wrapper(items[0])
-    return _wrapper
+    return _wrapper(items[0]) if call else _wrapper
 
 def setdefault(self, name, kwargs, roots = ('',), # pylint: disable=too-many-arguments
                cpy = None, deepcpy = None):
@@ -179,12 +185,14 @@ def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
                     updater(self, kwargs, cpy = args[0])
                 else:
                     updater(self, kwargs)
+            __init__.KEYS = attrs
             return __init__
         else:
             @wraps(fcn)
             def __init__(self, *args, **kwargs):
                 fcn(self, *args, **kwargs)
                 updater(self, kwargs)
+            __init__.KEYS = attrs
             return __init__
 
     return _wrapper if fcn is None else _wrapper(fcn)

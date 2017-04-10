@@ -12,7 +12,7 @@ class GlobalsView(View):
 
     def __ontask(self):
         ctrl         = self._ctrl
-        cnf          = self._ctrl.getGlobal('current')
+        cnf          = self._ctrl.getGlobal('project')
         cnf.defaults = dict.fromkeys(('track', 'task', 'bead'), None)
 
         # pylint: disable=unused-variable
@@ -51,7 +51,7 @@ class GlobalsView(View):
             if recursive is False:
                 counts[0]  = False
 
-        @self._ctrl.observe(r"^globals\.(?!.*?current).*$")
+        @self._ctrl.observe(r"^globals\.(?!.*?project).*$")
         def _onconfig(*_):
             counts[0] = True
 

@@ -40,7 +40,7 @@ class HasLengthPeak:
     def basevalue(bead, ipk):
         u"converts zvalues to base values"
         dist = bead.distance
-        return bead.peaks[ipk][0] * dist.stretch + dist.bias
+        return (bead.peaks[ipk][0]-dist.bias) * dist.stretch
 
 class ChartCreator(object):
     u"Creates charts"

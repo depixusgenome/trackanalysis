@@ -51,7 +51,7 @@ u"""
 """
 from    typing  import Union, Sequence
 import  numpy   as np
-from    utils   import initdefaults, EVENTS_TYPE, EVENTS_DTYPE
+from    utils   import initdefaults, EVENTS_TYPE
 
 class Probability:
     u"Computes probabilities"
@@ -61,17 +61,14 @@ class Probability:
     ntoolong      = 0
     totalduration = 0
     FMAX          = np.finfo('f4').max # type: ignore
-
     @initdefaults
     def __init__(self, **_):
         pass
 
-    def __apply(self, arrevents, arrmaxdurs):
-        dur  = np.array([len(i) for i in arrevents['data']])
-        last = arrevents['start']+dur
+    def __apply(self, dur, last, maxdurs):
         self.nevents       += len(dur)
-        self.ntoolong      += (last > arrmaxdurs).sum()
-        self.totalduration += dur.sum()
+        self.ntoolong      += (last > maxdurs).sum()
+        self.totalduration += np.sum(dur)
 
     def update(self,
                events : Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]],
@@ -80,13 +77,31 @@ class Probability:
         u"Updates stats"
         arrs = np.array([isinstance(i, (list, np.ndarray)) for i in events])
         if any(arrs):
-            evts  = events [arrs]
-            mdurs = np.repeat(maxdurs[arrs], [len(i) for i in evts])
-            self.__apply(np.concatenate(tuple(evts)), mdurs)
+            evts = events [arrs]
+            dur  = [i['start'][-1]-i['start'][0]+len(i['data'][-1]) for i in evts]
+            last = np.array([i['start'][-1]+len(i['data'][-1]) for i in evts],
+                            dtype = 'i4')
+            self.__apply(dur, last, maxdurs[arrs])
 
         arrs = np.array([isinstance(i, (tuple, np.void)) for i in events])
         if any(arrs):
-            self.__apply(np.array(events[arrs], dtype = EVENTS_DTYPE), maxdurs[arrs])
+            evts = events [arrs]
+            dur  = np.array([len(i) for _, i in evts], dtype = 'i4')
+            self.__apply(dur, dur + [i for i, _ in evts], maxdurs[arrs])
+
+    @staticmethod
+    def resolution(events):
+        "returns the average position and resolution"
+        arrs = np.array([isinstance(i, (list, np.ndarray)) for i in events])
+        stds = [np.average([np.nanmean(j)    for j in i['data']],
+                           weights = [len(j) for j in i['data']])
+                for i in events[arrs]]
+
+        arrs = np.array([isinstance(i, (tuple, np.void)) for i in events])
+        if any(arrs):
+            stds += [np.nanmean(i[1]) for i in events[arrs]]
+
+        return np.nanstd(stds)
 
     def __call__(self,
                  events : Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]],
@@ -125,7 +140,7 @@ class Probability:
             return 0.
 
         lnp = -np.log(prob)*self.framerate
-        return self.FMAX if lnp <= 0. else 0. if np.isfinite(lnp) else 1./lnp
+        return self.FMAX if lnp <= 0. else 1./lnp if np.isfinite(lnp) else 0.
 
     @property
     def stddev(self) -> float:

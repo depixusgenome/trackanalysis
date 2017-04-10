@@ -57,7 +57,7 @@ def _add(info, row, ibead, ref):
 
 def _read_summary(rows) -> List[Tuple[int, str, float, float]]:
     ids   = [None, None, None, None] # type: List[Optional[int]]
-    names = (u'bead', u'reference', u'stretch', u'bias')
+    names = ('bead', 'reference', 'stretch', 'bias')
     for row in rows:
         for i, cell in enumerate(row):
             try:
@@ -99,7 +99,7 @@ def _read_identifications(rows) -> List[Tuple[int,str]]:
 
 def readparams(fname:str) -> Union[List[Tuple[int,str,float,float]],
                                    List[Tuple[int,str]]]:
-    u"extracts bead ids and their reference from a report"
+    "extracts bead ids and their reference from a report"
     wbook = load_workbook(filename=fname, read_only=True)
     for sheetname in wbook.get_sheet_names():
         if sheetname.lower() == "summary":
@@ -111,5 +111,5 @@ def readparams(fname:str) -> Union[List[Tuple[int,str,float,float]],
     return res
 
 def writeparams(fname:str, items: Sequence[Tuple[str,Sequence[int]]]):
-    u"write bead ids and their reference to a report"
-    writecolumns(fname, u"Identification", items)
+    "write bead ids and their reference to a report"
+    writecolumns(fname, "Identification", items)

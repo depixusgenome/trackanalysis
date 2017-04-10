@@ -42,13 +42,14 @@ class BeadInput(BokehView):
         "Sets up the controller"
         super().__init__(**kwa)
         self._ctrl.getGlobal('css').title.beadinput.default = 'Bead'
+        self._ctrl.getGlobal('css').beadinput.defaults = {'width': 60, 'height' : 25}
         self.__beads = np.empty((0,), dtype = 'i4')
         self.__inp   = None
 
     def observe(self, doc): # pylint: disable=arguments-differ
         "Adds keypress for changin beads"
         self.getroots(doc)
-        def _oncurrent(items):
+        def _onproject(items):
             if 'track' in items:
                 self.__beads        = np.sort(tuple(self.getbeads()))
                 self.__inp.disabled = len(self.__beads) == 0
@@ -60,7 +61,7 @@ class BeadInput(BokehView):
             elif 'bead' in items:
                 self.__inp.value = items['bead'].value
 
-        self._ctrl.getGlobal('current').observe(_oncurrent)
+        self._ctrl.getGlobal('project').observe(_onproject)
 
         self._keys.addKeyPress(('keypress.beadup',
                                 lambda: self.__onchange_cb('', '', self.__inp.value+1)))
@@ -69,8 +70,8 @@ class BeadInput(BokehView):
 
     def getroots(self, _):
         "adds items to doc"
-        kwa = dict(height       = self._ctrl.getGlobal('css', 'input.height'),
-                   width        = self._ctrl.getGlobal('css', 'input.width'),
+        kwa = dict(height       = self._ctrl.getGlobal('css', 'beadinput.height'),
+                   width        = self._ctrl.getGlobal('css', 'beadinput.width'),
                    disabled     = True,
                    title        = self._ctrl.getGlobal('css').title.beadinput.get())
         self.__inp   = IntInput(**kwa)
@@ -92,11 +93,11 @@ class BeadInput(BokehView):
                                    np.searchsorted(self.__beads, new))]
             self.__inp.value = new
 
-        self._ctrl.getGlobal("current").bead = new
+        self._ctrl.getGlobal("project").bead = new
 
     def getbeads(self):
         "returns the active beads"
-        track = self._ctrl.track(self._ctrl.getGlobal("current").track.get())
+        track = self._ctrl.track(self._ctrl.getGlobal("project").track.get())
         if track is None:
             return []
         return track.beadsonly.keys()

@@ -17,7 +17,7 @@ require(cxx    = {'msvc'     : 14.0,
 require(python = {'python': 3.5, 'numpy': '1.11.2', 'pandas': '0.19.0'},
         rtime  = True)
 
-require(python = {'pybind11' : '2.0.1',
+require(python = {'pybind11' : '2.1.0',
                   'pylint'   : '1.6.4',
                   'astroid'  : '1.4.8',
                   'mypy'     : '0.470'},

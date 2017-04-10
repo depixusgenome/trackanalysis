@@ -13,7 +13,6 @@ from utils          import ismethod, isfunction, toenum
 
 class NoEmission(Exception):
     "can be raised to stop an emission"
-    pass
 
 @unique
 class EmitPolicy(Enum):
@@ -284,7 +283,6 @@ class Event:
                  .add(re.compile(name).match))
 
         return fcn
-
 
 class Controller(Event):
     "Main controller class"
