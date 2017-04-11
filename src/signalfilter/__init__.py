@@ -6,4 +6,4 @@ from ._core             import samples # pylint: disable=no-name-in-module,impor
 from .noisereduction    import (RollingFilter, NonLinearFilter,
                                 ForwardBackwardFilter, Filter)
 
-RAWPRECISION = PrecisionAlg.rawprecision
+rawprecision = PrecisionAlg.rawprecision
