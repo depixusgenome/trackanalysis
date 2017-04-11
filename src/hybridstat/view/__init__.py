@@ -59,8 +59,13 @@ class HybridStatView(BokehView):
         for panel in self._panels[ind+1:]:
             self.__state(panel, PlotState.disabled)
 
+        if self._ctrl.getGlobal('css').responsive.get():
+            mod  =  {'sizing_mode': 'scale_width'}
+        else:
+            mod  =  {'sizing_mode': self._ctrl.getGlobal('css').sizing_mode.get()}
         tabs = Tabs(tabs   = [_panel(panel) for panel in self._panels],
-                    active = ind)
+                    active = ind,
+                    **mod)
 
         @self.action
         def _py_cb(attr, old, new):

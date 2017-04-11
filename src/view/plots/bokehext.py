@@ -48,7 +48,7 @@ class DpxKeyedRow(Row):
         keys.update({cnf[tool].activate.get(): tool for tool in ('pan', 'zoom')})
 
         if plotter.css.responsive.get():
-            kwa['responsive']  = True
+            kwa['sizing_mode'] = 'scale_width'
         else:
             kwa['sizing_mode'] = plotter.css.sizing_mode.get()
 

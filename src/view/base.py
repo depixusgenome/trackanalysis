@@ -68,7 +68,7 @@ class BokehView(View):
         css = self._ctrl.getGlobal('css')
         css.button.defaults = {'width': 90, 'height': 20}
         css.input .defaults = {'width': 90, 'height': 20}
-        css.defaults = {'responsive': False, 'sizing_mode': 'scale_width'}
+        css.defaults = {'responsive': True, 'sizing_mode': 'scale_width'}
 
 
         self._keys = kwargs['keys']  # type: KeyPressManager

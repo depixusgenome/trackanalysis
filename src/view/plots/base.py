@@ -177,6 +177,8 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                                                'toolbar_location'   : 'right',
                                                'toolbar_sticky'     : False,
                                                'input.width'        : 205,
+                                               'figure.width'       : 1200,
+                                               'figure.height'      : 800,
                                                'figure.responsive'  : True}
 
         key = type(self).key()
