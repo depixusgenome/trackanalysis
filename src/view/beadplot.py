@@ -87,7 +87,7 @@ class BeadPlotCreator(TaskPlotCreator):
         self._addcallbacks(self._fig)
         return DpxKeyedRow(self, self._fig)
 
-    def _reset(self, _):
+    def _reset(self):
         self._source.data = self.__data()
         self._setbounds()
 

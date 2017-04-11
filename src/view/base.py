@@ -68,6 +68,8 @@ class BokehView(View):
         css = self._ctrl.getGlobal('css')
         css.button.defaults = {'width': 90, 'height': 20}
         css.input .defaults = {'width': 90, 'height': 20}
+        css.defaults = {'responsive': False, 'sizing_mode': 'scale_width'}
+
 
         self._keys = kwargs['keys']  # type: KeyPressManager
 
@@ -94,8 +96,11 @@ class BokehView(View):
         roots = self.getroots(doc)
         if len(roots) == 1:
             doc.add_root(roots[0])
+        elif self._ctrl.getGlobal('css').responsive.get():
+            doc.add_root(layout(roots, responsive = True))
         else:
-            doc.add_root(layout(roots, sizing_mode = 'stretch_both'))
+            mode = self._ctrl.getGlobal('css').sizing_mode.get()
+            doc.add_root(layout(roots, sizing_mode = mode))
 
     def getroots(self, doc):
         "returns object root"

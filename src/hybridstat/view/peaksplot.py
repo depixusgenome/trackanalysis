@@ -25,7 +25,8 @@ from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
 
 from view.base                  import enableOnTrack
 from view.plots                 import (PlotView, PlotAttrs, from_py_func,
-                                        DpxNumberFormatter, WidgetCreator, DpxKeyedRow)
+                                        DpxNumberFormatter, WidgetCreator,
+                                        DpxKeyedRow, PlotState)
 from view.plots.tasks           import (TaskPlotModelAccess, TaskPlotCreator,
                                         TaskAccess)
 from view.plots.sequence        import (readsequence, SequenceTicker, OligoListWidget,
@@ -108,6 +109,59 @@ class PeaksPlotModelAccess(_PeaksPlotModelAccess):
         "returns the distances which were computed"
         return self.fits.distances if self.fits is not None else {}
 
+    def setpeaks(self, dtl) -> Optional[FitBead]:
+        "sets current bead peaks and computes the fits"
+        if dtl is None:
+            self.peaks = dict.fromkeys(('z', 'id', 'distance', 'sigma', 'bases',
+                                        'duration', 'count'), [])
+            self.fits  = None
+            return
+
+        nan        = lambda: np.full((len(peaks),), np.NaN, dtype = 'f4')
+        peaks      = tuple(self.peakselection.task.details2output(dtl))
+        self.peaks = dict(z        = np.array([i for i, _ in peaks], dtype = 'f4'),
+                          sigma    = nan(),
+                          duration = nan(),
+                          count    = nan())
+
+        self.estimatedbias  = self.peaks['z'][0]
+
+        self.__set_ids_and_distances(peaks)
+        self.__set_probas(peaks)
+
+        return self.peaks
+
+    def runbead(self):
+        "returns a tuple (dataitem, bead) to be displayed"
+        if self.track is None:
+            return None
+
+        root  = self.roottask
+        ibead = self.bead
+        task  = self.eventdetection.task
+        if task is None:
+            task  = self.config.tasks.eventdetection.get()
+            ind   = self.eventdetection.index
+            beads = next(iter(self._ctrl.run(root, ind-1, copy = True)))
+            return next(processors(task)).apply(beads, **task.config())[ibead, ...]
+        else:
+            return next(iter(self._ctrl.run(root, task, copy = True)))[ibead, ...]
+
+    def reset(self):
+        "adds tasks if needed"
+        if self.eventdetection.task is None:
+            self.eventdetection.update()
+
+        if self.peakselection.task is None:
+            self.peakselection.update()
+
+        task = self.defaultidenfication
+        cur  = self.identification.task
+        if task is None and cur is not None:
+            self.identification.remove()
+        elif task is not None and cur is None:
+            self.identification.update()
+
     def __set_ids_and_distances(self, peaks):
         task  = self.identification.task
         dico  = self.peaks
@@ -154,44 +208,6 @@ class PeaksPlotModelAccess(_PeaksPlotModelAccess):
             self.peaks['duration'][i] = val.averageduration
             self.peaks['sigma'][i]    = prob.resolution(evts)
             self.peaks['count'][i]    = min(100., val.nevents / ncyc*100.)
-
-    def setpeaks(self, dtl) -> Optional[FitBead]:
-        "sets current bead peaks and computes the fits"
-        if dtl is None:
-            self.peaks = dict.fromkeys(('z', 'id', 'distance', 'sigma', 'bases',
-                                        'duration', 'count'), [])
-            self.fits  = None
-            return
-
-        nan        = lambda: np.full((len(peaks),), np.NaN, dtype = 'f4')
-        peaks      = tuple(self.peakselection.task.details2output(dtl))
-        self.peaks = dict(z        = np.array([i for i, _ in peaks], dtype = 'f4'),
-                          sigma    = nan(),
-                          duration = nan(),
-                          count    = nan())
-
-        self.estimatedbias  = self.peaks['z'][0]
-
-        self.__set_ids_and_distances(peaks)
-        self.__set_probas(peaks)
-
-        return self.peaks
-
-    def runbead(self):
-        "returns a tuple (dataitem, bead) to be displayed"
-        if self.track is None:
-            return None
-
-        root  = self.roottask
-        ibead = self.bead
-        task  = self.eventdetection.task
-        if task is None:
-            task  = self.config.tasks.eventdetection.get()
-            ind   = self.eventdetection.index
-            beads = next(iter(self._ctrl.run(root, ind-1, copy = True)))
-            return next(processors(task)).apply(beads, **task.config())[ibead, ...]
-        else:
-            return next(iter(self._ctrl.run(root, task, copy = True)))[ibead, ...]
 
 class PeaksSequenceHover(Model, SequenceHoverMixin):
     "tooltip over peaks"
@@ -445,8 +461,8 @@ class PeaksPlotCreator(TaskPlotCreator):
     def __init__(self, *args):
         super().__init__(*args)
         self.css.defaults = {'count'           : PlotAttrs('blue', 'line', 1),
-                             'plot.width'      : 500,
-                             'plot.height'     : 800,
+                             'figure.width'    : 500,
+                             'figure.height'   : 800,
                              'xtoplabel'       : u'Duration (s)',
                              'xlabel'          : u'Rate (%)',
                              'widgets.border'  : 10}
@@ -500,13 +516,28 @@ class PeaksPlotCreator(TaskPlotCreator):
 
     def _create(self, doc):
         "returns the figure"
-        self.config.root.observe(self.reset)
         self.__create_fig()
         rends = self.__add_curves()
         self.__setup_tools(doc, rends)
         return layouts.row(self.__setup_widgets(), DpxKeyedRow(self, self._fig))
 
-    def _reset(self, _):
+    def observe(self):
+        super().observe()
+        def _observe(_):
+            if self.state is not PlotState.active:
+                return
+
+            task = self._model.defaultidenfication
+            if task is None:
+                self._model.identification.remove()
+            else:
+                self._model.identification.update(**task.config())
+
+        self._model.observeprop('oligos', 'sequencepath', _observe)
+
+    def _reset(self):
+        self._model.reset()
+
         data, peaks        = self.__data()
         self._peaksrc.update(data = peaks, column_names = list(peaks.keys()))
         self._histsrc.data = data
@@ -615,18 +646,6 @@ class PeaksPlotView(PlotView):
         tasks.default = ['extremumalignment', 'eventdetection', 'peakselector']
 
         vals = (tuple(tasks.io.open.get()[:-2])
-                + ('hybridstat.view.peaksplot.PeaksConfigTrackIO',
-                   'hybridstat.view.peaksplot.PeaksConfigGRFilesIO'))
+                + ('hybridstat.view.peaksplot.PeaksConfigGRFilesIO',
+                   'hybridstat.view.peaksplot.PeaksConfigTrackIO'))
         tasks.io.open.default = vals
-
-    def getroots(self, doc):
-        mdl = self._plotter.model
-        def _observe(_):
-            task = mdl.defaultidenfication
-            if task is None:
-                mdl.identification.remove()
-            else:
-                mdl.identification.update(**task.config())
-
-        self._plotter.model.observeprop('oligos', 'sequencepath', _observe)
-        return super().getroots(doc)

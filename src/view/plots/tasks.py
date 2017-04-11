@@ -10,7 +10,7 @@ from model.globals     import ConfigProperty, ConfigRootProperty, BeadProperty
 from data.track        import Track
 from utils             import NoArgs, updatecopy, updatedeepcopy
 from control.processor import Processor
-from .base             import PlotModelAccess, PlotCreator
+from .base             import PlotModelAccess, PlotCreator, PlotState
 
 class TaskPlotModelAccess(PlotModelAccess):
     "Contains all access to model items likely to be set by user actions"
@@ -70,7 +70,9 @@ class TaskPlotModelAccess(PlotModelAccess):
     def observetasks(self, *args, **kwa):
         "observes the provided task"
         def _check(parent = None, task = None, **_):
-            return self.checktask(parent, task)
+            if self.project.state.get() is PlotState.active:
+                return self.checktask(parent, task)
+            return False
         self._ctrl.observe(*args, argstest = _check, **kwa)
 
     def observeprop(self, *args):
@@ -86,11 +88,14 @@ class TaskPlotModelAccess(PlotModelAccess):
             for obs in prop.OBSERVERS:
                 keys.setdefault(obs, []).append(prop.key)
 
+        def _check(*_1, **_2):
+            return self.project.state.get() is PlotState.active
+
         for key, items in keys.items():
             val = self
             for attr in key.split('.'):
                 val = getattr(val, attr)
-            val.observe(items, fcn) # pylint: disable=no-member
+            val.observe(*items, fcn, argstest = _check) # pylint: disable=no-member
 
     class props: # pylint: disable=invalid-name
         "access to property builders"
@@ -105,6 +110,7 @@ class TaskAccess(TaskPlotModelAccess):
         self.attrs     = kwa.get('attrs', {})
         self.tasktype  = tasktype
         self.side      = (0  if kwa.get('side', 'LEFT') == 'LEFT' else 1)
+        self.permanent = kwa.get('permanent', False)
 
         # pylint: disable=not-callable
         self.config.root.tasks.order.default = TASK_ORDER
@@ -127,7 +133,10 @@ class TaskAccess(TaskPlotModelAccess):
         "removes the task"
         task = self.task
         if task is not None:
-            self._ctrl.removeTask(self.roottask, task)
+            if self.permanent:
+                return self._ctrl.updateTask(self.roottask, task, disabled = True)
+            else:
+                self._ctrl.removeTask(self.roottask, task)
 
             kwa = self._configattributes({'disabled': True})
             if len(kwa):
@@ -137,10 +146,11 @@ class TaskAccess(TaskPlotModelAccess):
     def update(self, **kwa):
         "removes the task"
         root = self.roottask
-        task = self.task
+        task = self._task
         cnf  = self.configtask
+
+        kwa.setdefault('disabled', False)
         if task is None:
-            kwa.setdefault('disabled', False)
             item = updatedeepcopy(cnf.get(), **kwa)
             self._ctrl.addTask(root, item, index = self.index)
         else:
@@ -152,9 +162,15 @@ class TaskAccess(TaskPlotModelAccess):
             cnf.set(updatecopy(cnf.get(), **kwa))
 
     @property
+    def _task(self) -> Optional[Task]:
+        "returns the task if it exists"
+        return next((t for t in self._ctrl.tasks(self.roottask) if self._check(t)), None)
+
+    @property
     def task(self) -> Optional[Task]:
         "returns the task if it exists"
-        return next((t for t in self._ctrl.tasks(self.roottask) if self.check(t)), None)
+        task = self._task
+        return None if getattr(task, 'disabled', True) else task
 
     @property
     def processor(self) -> Optional[Processor]:
@@ -164,11 +180,15 @@ class TaskAccess(TaskPlotModelAccess):
             return None
         return next((t for t in self._ctrl.tasks(self.roottask) if self.check(t)), None)
 
-    def check(self, task, parent = NoArgs) -> bool:
+    def _check(self, task, parent = NoArgs) -> bool:
         "wether this controller deals with this task"
         return (isinstance(task, self.tasktype)
                 and (parent is NoArgs or parent is self.roottask)
                 and all(getattr(task, i) == j for i, j in self.attrs.items()))
+
+    def check(self, task, parent = NoArgs) -> bool:
+        "wether this controller deals with this task"
+        return self._check(task, parent) and not task.disabled
 
     @property
     def index(self) -> Optional[Task]:
@@ -221,5 +241,5 @@ class TaskPlotCreator(PlotCreator):
     def _create(self, doc):
         raise NotImplementedError()
 
-    def _reset(self, items, *args):
+    def _reset(self):
         raise NotImplementedError()

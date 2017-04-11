@@ -47,7 +47,11 @@ class DpxKeyedRow(Row):
         keys[cnf.reset.get()] = 'reset'
         keys.update({cnf[tool].activate.get(): tool for tool in ('pan', 'zoom')})
 
-        kwa.setdefault('sizing_mode', 'stretch_both')
+        if plotter.css.responsive.get():
+            kwa['responsive']  = True
+        else:
+            kwa['sizing_mode'] = plotter.css.sizing_mode.get()
+
         children = kwa.pop('children', [fig])
         super().__init__(children = children,
                          fig      = fig,

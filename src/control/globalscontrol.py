@@ -37,15 +37,15 @@ from    .action       import Action
 
 class SingleMapAccessController(SingleMapAccess):
     "access to SingleMapController"
-    def observe(self, attrs, fcn = None): # pylint: disable=arguments-differ
+    def observe(self, *names, decorate = None, argstest = None):
         "observes items in the current root"
-        if fcn is None:
-            self._map.observe(self._base, attrs)
-
-        elif isinstance(attrs, str):
-            self._map.observe(self._key+attrs, fcn)
+        if len(names) == 1 and isinstance(names[0], str):
+            raise AttributeError('Missing observer function')
+        elif len(names) == 1 and self._base != '':
+            names = self._base, names[0]
         else:
-            self._map.observe(tuple(self._key+i for i in attrs), fcn)
+            names = tuple((self._key+i if isinstance(i, str) else i) for i in names)
+        self._map.observe(*names, decorate = decorate, argstest = argstest)
 
 class SingleMapController(Controller):
     "Dictionnary with defaults values. It can be reset to these."
@@ -78,43 +78,32 @@ class SingleMapController(Controller):
         "returns the name of the root"
         return self.__items.name
 
-    def observe(self, attrs, fcn = None): # pylint: disable=arguments-differ
+    def observe(self, *names, decorate = None, argstest = None):
         "observes items in the current root"
-        if attrs == '':
-            attrs, fcn = fcn, None
-        elif fcn == '':
-            fcn = None
-
+        fcn = next((i for i in names if not isinstance(i, str)), None)
         if fcn is None:
-            if not callable(attrs):
-                raise TypeError()
-            observer = attrs
-        else:
-            if callable(attrs):
-                fcn, attrs = attrs, fcn
+            raise AttributeError('Missing observer function')
 
-            if len(attrs) == 1 and not isinstance(attrs, str):
-                attrs = attrs[0]
+        elif sum(1 for i in names if not isinstance(i, str)) > 1:
+            raise AttributeError('Too many observer functions')
 
-            npars = self.__npars(fcn)
-            if isinstance(attrs, str):
-                def _wrap(items):
-                    if attrs in items:
-                        if npars:
-                            fcn(items[attrs])
-                        else:
-                            fcn()
-                observer = _wrap
+        attrs = frozenset(i for i in names if isinstance(i, str) and len(i))
+        if self.__npars(fcn) == 0:
+            if len(attrs) == 0:
+                observer = lambda itms: fcn()
             else:
-                def _wrap(items):
-                    if any(i in items for i in attrs):
-                        if npars:
-                            fcn(items)
-                        else:
-                            fcn()
-                observer = _wrap
-
-        super().observe('globals.'+self.__items.name, observer)
+                observer = lambda itms: attrs.isdisjoint(itms) or fcn()
+        else:
+            if len(attrs) == 1:
+                attr     = next(iter(attrs))
+                observer = lambda itms: fcn(itms[attr]) if attr in itms else None
+            elif len(attrs) == 0:
+                observer = fcn
+            else:
+                observer = lambda itms: attrs.isdisjoint(itms) or fcn(itms)
+        super().observe('globals.'+self.__items.name, observer,
+                        decorate = decorate,
+                        argstest = argstest)
 
     def keys(self, base = ''):
         "returns all keys starting with base"
@@ -134,7 +123,8 @@ class SingleMapController(Controller):
 
     @staticmethod
     def __npars(fcn) -> bool:
-        params = inspect.signature(fcn).parameters
+        params = [i for i, j in inspect.signature(fcn).parameters.items()
+                  if j.kind == j.POSITIONAL_OR_KEYWORD and j.default is j.empty]
         if len(params) == 0:
             return False
         elif len(params) == 1:

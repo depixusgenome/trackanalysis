@@ -247,7 +247,11 @@ class WithToolbar:
             def getroots(self, doc):
                 "adds items to doc"
                 children = [self._bar.getroots(doc), self._mainview.getroots(doc)]
-                return layout(children, sizing_mode = 'scale_width'),
+                if self._ctrl.getGlobal('css').responsive.get():
+                    return layout(children, responsive = True),
+                else:
+                    mode = self._ctrl.getGlobal('css').sizing_mode.get()
+                    return layout(children, sizing_mode = mode),
 
         return ViewWithToolbar
 

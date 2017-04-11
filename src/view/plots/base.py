@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 "The basic architecture"
 from    typing       import (Tuple, Optional, # pylint: disable=unused-import
-                             Iterator, List, Union)
+                             Iterator, List, Union, cast)
+from    enum         import Enum
 from    abc          import ABCMeta, abstractmethod
 from    contextlib   import contextmanager
 from    functools    import wraps
@@ -19,6 +20,13 @@ from    ..base                  import BokehView, Action
 from    .bokehext               import DpxHoverTool, from_py_func
 
 _m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
+
+class PlotState(Enum):
+    "plot state"
+    active    = 'active'
+    resetting = 'resetting'
+    disabled  = 'disabled'
+    outofdate = 'outofdate'
 
 def checksizes(fcn):
     "Checks that the ColumnDataSource have same sizes"
@@ -162,23 +170,27 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     _RESET = frozenset(('track', 'bead'))
     def __init__(self, ctrl:Controller, *_) -> None:
         "sets up this plotter's info"
-        ctrl.getGlobal("css.plot").defaults = {'ylabel'          : u'Z (nm)',
-                                               'yrightlabel'     : u'Base number',
-                                               'xtoplabel'       : u'Time (s)',
-                                               'xlabel'          : u'Frames',
-                                               'toolbar_location': 'right',
-                                               'toolbar_sticky'  : False,
-                                               'input.width'     : 205,
-                                               'sizing_mode'     : 'scale_width'}
+        ctrl.getGlobal("css.plot").defaults = {'ylabel'             : u'Z (nm)',
+                                               'yrightlabel'        : u'Base number',
+                                               'xtoplabel'          : u'Time (s)',
+                                               'xlabel'             : u'Frames',
+                                               'toolbar_location'   : 'right',
+                                               'toolbar_sticky'     : False,
+                                               'input.width'        : 205,
+                                               'figure.responsive'  : True}
 
         key = type(self).key()
         for name in 'config', 'project', 'css':
             ctrl.addGlobalMap(name+key)
 
         super().__init__(ctrl, key)
-        self._model = self._MODEL(ctrl, key)
-        self._ctrl  = ctrl
-        self._ready = False
+        self._model                = self._MODEL(ctrl, key)
+        self._ctrl                 = ctrl
+        self.project.state.default = PlotState.active
+
+    state = cast(PlotState,
+                 property(lambda self:    self.project.state.get(),
+                          lambda self, i: self.project.state.set(PlotState(i))))
 
     @classmethod
     def key(cls):
@@ -189,35 +201,36 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         return ".plot." + name
 
     def action(self, fcn):
-        u"decorator which starts a user action unless _ready is set to false"
+        u"decorator which starts a user action but only if state is set to active"
         if tuple(inspect.signature(fcn).parameters) == ('attr', 'old', 'new'):
             @wraps(fcn)
             def _wrap_cb(attr, old, new):
-                if self._ready:
+                if self.state is PlotState.active:
                     with Action(self._ctrl):
                         fcn(attr, old, new)
             return _wrap_cb
         elif tuple(inspect.signature(fcn).parameters)[1:] == ('attr', 'old', 'new'):
             @wraps(fcn)
             def _wrap_cb(self, attr, old, new):
-                if self._ready:
+                if self.state is PlotState.active:
                     with Action(self._ctrl):
                         fcn(self, attr, old, new)
             return _wrap_cb
         else:
             @wraps(fcn)
             def _wrap_cb(*args, **kwa):
-                if self._ready:
+                if self.state is PlotState.active:
                     with Action(self._ctrl):
                         fcn(*args, **kwa)
             return _wrap_cb
 
     @contextmanager
-    def updating(self):
+    def resetting(self):
         "Stops on_change events for a time"
-        self._ready = False
+        assert self.state is PlotState.active
+        self.state = PlotState.resetting
         yield self
-        self._ready = True
+        self.state = PlotState.active # pylint: disable=redefined-variable-type
 
     @staticmethod
     def fixreset(arng):
@@ -288,6 +301,14 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         self._model.create(doc)
         return self._create(doc)
 
+    def activate(self, val):
+        "activates the component: resets can occur"
+        old        = self.state
+        self.state = PlotState.active if val else PlotState.disabled
+        if val and old is PlotState.outofdate:
+            with self.resetting():
+                self._reset()
+
     def reset(self, items:dict):
         "Updates the data"
         if not self._needsreset(items):
@@ -296,8 +317,13 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         if 'track' in items:
             self._model.clear()
 
-        with self.updating():
-            self._reset(items)
+        state = self.state
+        if   state is PlotState.disabled:
+            self.state = PlotState.outofdate
+
+        elif state is PlotState.active:
+            with self.resetting():
+                self._reset()
 
     def observe(self):
         "sets-up model observers"
@@ -307,13 +333,13 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         "adds Range callbacks"
         cnf       = self.project
         def _onchangex_cb(attr, old, new):
-            if self._ready:
+            if self.state is PlotState.active:
                 cnf.update(x = (fig.x_range.start, fig.x_range.end))
         fig.x_range.on_change('start', _onchangex_cb)
         fig.x_range.on_change('end',   _onchangex_cb)
 
         def _onchangey_cb(attr, old, new):
-            if self._ready:
+            if self.state is PlotState.active:
                 cnf.update(y = (fig.y_range.start, fig.y_range.end))
 
         fig.y_range.on_change('start', _onchangey_cb)
@@ -326,27 +352,45 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                 vals = items[i].value
                 getattr(fig, i+'_range').update(start = vals[0], end = vals[1])
 
-        self.project.observe(('x', 'y'), _onobserve)
+        self.project.observe('x', 'y', _onobserve)
         return fig
 
-    def _figargs(self, *cssarr, **kwa) -> dict:
-        args    = dict()
-        cssarr  = (self.config,) + tuple(cssarr) + (self.css,)
+    def _sizing(self, *attrs, translations = None, css = None, **kwa) -> dict:
+        "returns keys for sizing"
+        if css is None:
+            cssarr = (self.config,) + (self.css,)
+        elif isinstance(css, (tuple, list)):
+            cssarr = (self.config,) + tuple(css) + (self.css,)
+        else:
+            cssarr = (self.config,) + (css,) + (self.css,)
 
-        for key, name in (('toolbar_sticky',   'toolbar_sticky'),
-                          ('toolbar_location', 'toolbar_location'),
-                          ('sizing_mode',      'sizing_mode'),
-                          ('x_axis_label',     'xlabel'),
-                          ('y_axis_label',     'ylabel'),
-                          ('plot_width',       'plot.width'),
-                          ('plot_height',      'plot.height'),
-                          ('tools',            'tools')):
-            for css in cssarr:
-                val = css.get(name, default = _m_none)
+        if translations is None:
+            translations = {}
+
+        args = {}
+        for name in attrs:
+            for dico in cssarr:
+                val = dico.get(name, default = _m_none)
                 if val is not _m_none:
-                    args[key] = val
+                    args[translations.get(name, name)] = val
                     break
-        args.update(kwa)
+
+        args.update((translations.get(i, i), j) for i, j in kwa.items())
+        args.pop('sizing_mode' if args.get('responsive', False) else 'responsive',
+                 None)
+        return args
+
+    def _figargs(self, *cssarr, **kwa) -> dict:
+        trans = {'toolbar_sticky':      'toolbar_sticky',
+                 'toolbar_location':    'toolbar_location',
+                 'xlabel':              'x_axis_label',
+                 'ylabel':              'y_axis_label',
+                 'figure.sizing_mode':  'sizing_mode',
+                 'figure.responsive':   'responsive',
+                 'figure.width':        'plot_width',
+                 'figure.height':       'plot_height',
+                 'tools':               'tools'}
+        args = self._sizing(*trans.keys(), css = cssarr, translations = trans, **kwa)
 
         if args.get('tools', _m_none) is _m_none:
             args['tools'] = []
@@ -378,7 +422,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         "creates the plot structure"
 
     @abstractmethod
-    def _reset(self, items, *args):
+    def _reset(self):
         "initializes the plot for a new file"
 
 class PlotView(BokehView):
@@ -404,11 +448,20 @@ class PlotView(BokehView):
 
         self._plotter = self.PLOTTER(self._ctrl) # pylint: disable=not-callable
 
+    @property
+    def plotter(self):
+        "returns the plot creator"
+        return self._plotter
+
     def close(self):
         "remove controller"
         super().close()
         self._plotter.close()
         self._plotter = None
+
+    def activate(self, val):
+        "activates the component: resets can occur"
+        self._plotter.activate(val)
 
     def getroots(self, doc):
         "adds items to doc"

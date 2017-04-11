@@ -20,7 +20,7 @@ class RawMixin:
         self.css.defaults = {'raw'        : PlotAttrs('color',  'circle', 1,
                                                       alpha   = .5,
                                                       palette = 'inferno'),
-                             'plot.width' : 500}
+                             'figure.width' : 500}
         self._rawsource = None # type: Optional[ColumnDataSource]
         self._raw       = None # type: Optional[Figure]
 

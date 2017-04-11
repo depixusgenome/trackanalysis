@@ -51,10 +51,16 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, ConfigMixin):
 
         return layouts.column([keyed, self._createconfig()])
 
-    def _reset(self, items):
+    def _reset(self):
         shape = self._resetraw()
         self._resethist(self._rawsource.data, shape)
         self._resetconfig()
+
+    def observe(self):
+        "sets-up model observers"
+        super().observe()
+        self._histobservers()
+        self._configobservers()
 
 class CyclesPlotView(PlotView):
     "Cycles plot view"

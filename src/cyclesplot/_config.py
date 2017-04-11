@@ -271,12 +271,14 @@ class ConfigMixin:
                               drift   = DriftWidget(self._model),
                               events  = EventDetectionWidget(self._model))
 
+    def _configobservers(self):
+        for widget in self.__widgets.values():
+            widget.observe()
+
     def _createconfig(self):
         self.__widgets['sliders'].addinfo(self._histsource)
 
         widgets = {i: j.create(self.action) for i, j in self.__widgets.items()}
-        for widget in self.__widgets.values():
-            widget.observe()
 
         enableOnTrack(self, self._hist, self._raw, widgets)
 

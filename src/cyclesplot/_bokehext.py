@@ -115,7 +115,6 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
     def createhist(self, fig, mdl, cnf):
         "Creates the hover tool for histograms"
         self.create(fig, mdl, cnf, 'cycles')
-        self._model.observeprop('oligos', 'sequencepath', self.resethist)
 
     def slaveaxes(self, fig, src, inpy = False): # pylint: disable=arguments-differ
         "slaves a histogram's axes to its y-axis"

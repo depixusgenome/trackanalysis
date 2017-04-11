@@ -16,6 +16,8 @@ def _from_path(view):
         viewmod = getattr(viewmod, name)
 
     name = pview.stem+'view'
+    if name == 'viewview':
+        name = pview.parent.stem+'view'
     pred = lambda i: (isinstance(i, type)
                       and i.__module__ == viewmod.__name__
                       and i.__name__.lower() == name)

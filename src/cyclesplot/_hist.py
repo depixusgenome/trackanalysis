@@ -10,7 +10,7 @@ from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 
 import  numpy        as np
 
-from    view.plots          import PlotAttrs, checksizes
+from    view.plots          import PlotAttrs, checksizes, PlotState
 from    view.plots.sequence import SequenceTicker, estimatebias
 
 window = None # type: Any # pylint: disable=invalid-name
@@ -26,9 +26,9 @@ class HistMixin:
                                                      fill_color = None,
                                                      line_alpha = .5,
                                                      line_color = 'blue')}
-        self.css.hist.defaults = {'xtoplabel'  : u'Cycles',
-                                  'xlabel'     : u'Frames',
-                                  'plot.width' : 400}
+        self.css.hist.defaults = {'xtoplabel'    : u'Cycles',
+                                  'xlabel'       : u'Frames',
+                                  'figure.width' : 400}
         SequenceTicker.defaultconfig(self)
 
         self._histsource = None             # type: Optional[ColumnDataSource]
@@ -105,10 +105,16 @@ class HistMixin:
                     x_range_name = "cycles")
 
         self._ticker.create(self._hist, self._model, self)
-        self._model.observeprop('oligos', 'sequencepath', self._ticker.reset)
 
         self._hover.createhist(self._hist, self._model, self)
         self._hover.slaveaxes(self._hist, self._histsource)
+
+    def _histobservers(self):
+        def _fcn():
+            if self.state is PlotState.active:
+                self._ticker.reset()
+                self._hover.resethist()
+        self._model.observeprop('oligos', 'sequencepath', _fcn)
 
     def _resethist(self, data, shape):
         self._histsource.data     = hist = self.__data(data, shape)
