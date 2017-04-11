@@ -3,7 +3,7 @@
 u"Signal Analysis: filters for removing noise"
 # pylint: disable=no-name-in-module,import-error
 from typing     import Union
-from functools  import wraps
+#from functools  import wraps
 from pandas     import Series
 from ._core     import ForwardBackwardFilter, NonLinearFilter
 
