@@ -6,6 +6,7 @@ from typing                import (Optional,# pylint: disable=unused-import
 import sys
 import tempfile
 import warnings
+import inspect
 import pytest
 
 from tornado.ioloop        import IOLoop
@@ -195,7 +196,16 @@ class _ManagedServerLoop:
 
         tmpapp, mod, fcn = self.kwa.pop('_args_')
         app              = _import(tmpapp)
-        launch           = getattr(_import(mod), fcn)
+        if not isinstance(app, type):
+            from view.base import BokehView
+            pred = lambda i: (isinstance(i, type)
+                              and i.__module__ == app.__name__
+                              and issubclass(i, BokehView))
+            pot  = tuple(i for _, i in inspect.getmembers(app, pred))
+            assert len(pot) == 1
+            app  = pot[0]
+
+        launch = getattr(_import(mod), fcn)
 
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', '.*inspect.getargspec().*')

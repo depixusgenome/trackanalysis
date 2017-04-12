@@ -65,6 +65,7 @@ class HybridStatView(BokehView):
             mod  =  {'sizing_mode': self._ctrl.getGlobal('css').sizing_mode.get()}
         tabs = Tabs(tabs   = [_panel(panel) for panel in self._panels],
                     active = ind,
+                    name   = 'Hybridstat:Tabs',
                     **mod)
 
         @self.action

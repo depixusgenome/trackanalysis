@@ -73,7 +73,8 @@ class BeadPlotCreator(TaskPlotCreator):
     def _create(self, _) -> DpxKeyedRow:
         "sets-up the figure"
         self._fig    = figure(**self._figargs(x_range = Range1d,
-                                              y_range = Range1d))
+                                              y_range = Range1d,
+                                              name    = 'Bead:Fig'))
         self._source = ColumnDataSource(self.__data())
         if self.css.tooltips.get() not in ('', None):
             self._fig.select(DpxHoverTool).tooltips = self.css.tooltips.get()

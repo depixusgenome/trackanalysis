@@ -240,5 +240,22 @@ def test_peaksplot(bokehaction):
         lst  = tuple(i if i is None else i[0] for i in list(menu))
         assert lst == ('GF4', 'GF2', 'GF1', 'GF3', '015', None, 'Select sequence')
 
+def test_hybridstat(bokehaction):
+    "test hybridstat"
+    with bokehaction.launch('hybridstat.view', 'app.BeadToolBar') as server:
+        server.change('Hybridstat:Tabs', 'active', 0)
+        server.change('Hybridstat:Tabs', 'active', 1)
+        server.change('Hybridstat:Tabs', 'active', 2)
+
+        server.change('Hybridstat:Tabs', 'active', 1)
+        server.load('big_legacy')
+
+        server.change('Hybridstat:Tabs', 'active', 0)
+        server.change('Hybridstat:Tabs', 'active', 1)
+        server.change('Hybridstat:Tabs', 'active', 2)
+        server.change('Hybridstat:Tabs', 'active', 0)
+        server.change('Hybridstat:Tabs', 'active', 1)
+        server.change('Hybridstat:Tabs', 'active', 2)
+
 if __name__ == '__main__':
-    test_peaksplot(bokehaction(None))
+    test_hybridstat(bokehaction(None))
