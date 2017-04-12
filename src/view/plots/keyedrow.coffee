@@ -1,4 +1,3 @@
-import * as _         from "underscore"
 import * as $         from "jquery"
 import * as p         from "core/properties"
 import {RowView, Row} from "models/layouts/row"

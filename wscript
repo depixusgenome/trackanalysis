@@ -161,4 +161,4 @@ def app(bld):
                           ('hybridstat', 'hybridstat.view.HybridstatView')):
             with open(str(bld.options.APP_PATH.make_node(name+optext+ext)), 'w',
                       encoding = 'utf-8') as stream:
-            print(cmd + r"app/runapp.py " + val + opts, file = stream)
+                print(cmd + r"app/runapp.py " + val + opts, file = stream)

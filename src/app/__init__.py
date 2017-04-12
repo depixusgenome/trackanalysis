@@ -212,7 +212,7 @@ def setup(locs            = None, # pylint: disable=too-many-arguments
         "Creates a desktop app"
         app = application(main, controls, views, creator)
         kwa.setdefault("title", _title(app))
-        kwa.setdefault("size",  (1000, 1000))
+        kwa.setdefault("size",  (1200, 1000))
         return _launch(app, **kwa)
 
     locs.setdefault('application', application)
