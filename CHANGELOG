@@ -1,3 +1,31 @@
+# tag cycles_v2.0
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+New application for viewing peaks
+
+* There are 3 tabs:
+
+    1. Bead: displays the raw bead data. Nothing more.
+    2. Cycles: displays cycles as in the 1st version
+    3. Peaks: A histogram of events is shown, similar to cycles tab, but using a
+    gaussian kernel on the position. This allows peak detection:
+
+        * The x-axis is the percentage of cycles when an event is detected (bottom)
+        and their average duration (top).
+        * The y-axis is the position of events in nm (left) or base number (right).
+        * The kernel-smoothed histogram is the smooth blue curve.
+        * Detected peaks display the percentage of cycles (blue squares) and 
+        their average durations (gray diamonds).
+        * Global and peak-wise statistics are **repeated** in table on the left of
+        the figure. Selecting a peak in the figure selects a line in the table and
+        vice-versa.
+        * Use the mouse to view the sequence at a given z.
+
+* Fixed Bugs:
+
+    * fasta files can be opened whatever their extension
+    * gr files can be opened
+    * With chrome, the bead number could not be typed in.
+
 # tag cycles_v1.0
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 New application for viewing cycles
