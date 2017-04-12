@@ -2,7 +2,9 @@
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 New application for viewing peaks
 
-* There are 3 tabs:
+### Features
+
+There are 3 tabs:
 
     1. Bead: displays the raw bead data. Nothing more.
     2. Cycles: displays cycles as in the 1st version
@@ -20,7 +22,10 @@ New application for viewing peaks
         vice-versa.
         * Use the mouse to view the sequence at a given z.
 
-* Fixed Bugs:
+The **Peaks** tab applies to the data all treatments selected in the **Cycles**
+tab. It furthermore aligns cycles using phase 5 events.
+
+### Fixed Bugs
 
     * fasta files can be opened whatever their extension
     * gr files can be opened
