@@ -144,7 +144,7 @@ def setup(cnf):
 class _CondaApp(BuildContext):
     fun = cmd = 'app'
 def app(bld):
-    bld.options.APP_PATH = bld.bldnode.make_node("output")
+    bld.options.APP_PATH = bld.bldnode.make_node("OUTPUT")
 
     if bld.options.APP_PATH.exists():
         bld.options.APP_PATH.delete()
