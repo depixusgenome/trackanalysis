@@ -229,7 +229,6 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     @contextmanager
     def resetting(self):
         "Stops on_change events for a time"
-        assert self.state is PlotState.active
         old, self.state = self.state, PlotState.resetting
         yield self
         self.state = old # pylint: disable=redefined-variable-type

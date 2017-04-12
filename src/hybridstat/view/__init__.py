@@ -72,6 +72,9 @@ class HybridStatView(BokehView):
         def _py_cb(attr, old, new):
             self._panels[old].activate(False)
             self._panels[new].activate(True)
+            self._ctrl.handle('undoaction',
+                              self._ctrl.outastuple,
+                              (lambda: setattr(self._tabs, 'active', old),))
         tabs.on_change('active', _py_cb)
         self._tabs = tabs
         return tabs,

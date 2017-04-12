@@ -8,7 +8,7 @@ class UndoView(View):
     'View listing all undos'
     def __init__(self, **kwa): # pylint: disable=too-many-locals
         super().__init__(**kwa)
-        self.__curr = []
+        self.__curr = [None]
         cnf = self._ctrl.getGlobal('config')
         cnf.keypress.defaults = {'undo'     : "Control-z",
                                  'redo'     : "Control-y"}
@@ -16,14 +16,13 @@ class UndoView(View):
         if 'keys' in kwa:
             kwa['keys'].addKeyPress('keypress', undo = self.undo, redo = self.redo)
 
-    def observe(self):
+        self._ctrl.observe('applicationstarted', self.__observe)
+
+    def __observe(self):
         'sets up the observations'
         def _do(fcn):
             @wraps(fcn)
             def _wrap(*args, **kwargs):
-                if len(self.__curr) == 0:
-                    return # still initializing
-
                 if self.__curr[0] is None:
                     return # could be a bug or just bokeh-startup
 
@@ -49,11 +48,6 @@ class UndoView(View):
         'Returns the methods for observing user start & stop action delimiters'
         # pylint: disable=unused-variable
         @self._ctrl.observe
-        def _onapplicationstarted():
-            assert len(self.__curr) == 0
-            self.__curr.append(None)
-
-        @self._ctrl.observe
         def _onstartaction(recursive = None):
             assert (self.__curr[0] is not None) is recursive
             if not recursive:
@@ -65,6 +59,10 @@ class UndoView(View):
             if not recursive:
                 self._ctrl.appendUndos(self.__curr[0])
                 self.__curr[0] = None
+
+        @self._ctrl.observe
+        def _onundoaction(fcn):
+            self.__curr[0].append(fcn)
 
     def close(self):
         'Removes the controller'
