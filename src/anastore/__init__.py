@@ -8,7 +8,6 @@ This does not include track files io.
 from   typing   import Union, IO, Any
 from   pathlib  import Path
 import json
-import os
 
 from ._fromjson import Runner as _InputRunner
 from ._tojson   import Runner as _OutputRunner
