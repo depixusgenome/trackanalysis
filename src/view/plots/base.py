@@ -230,9 +230,9 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     def resetting(self):
         "Stops on_change events for a time"
         assert self.state is PlotState.active
-        self.state = PlotState.resetting
+        old, self.state = self.state, PlotState.resetting
         yield self
-        self.state = PlotState.active # pylint: disable=redefined-variable-type
+        self.state = old # pylint: disable=redefined-variable-type
 
     @staticmethod
     def fixreset(arng):
@@ -301,7 +301,8 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     def create(self, doc):
         "returns the figure"
         self._model.create(doc)
-        return self._create(doc)
+        with self.resetting():
+            return self._create(doc)
 
     def activate(self, val):
         "activates the component: resets can occur"

@@ -66,7 +66,7 @@ class SingleMapController(Controller):
         "updates keys or raises NoEmission"
         ret = self.__items.update(*args, **kwargs)
         if ret is not None:
-            return self.handle("globals."+self.__items.name, self.outastuple, (ret,))
+            return self.handle("globals."+ret.name, self.outastuple, (ret,))
         return ret
 
     def pop(self, *args):
@@ -237,16 +237,9 @@ class GlobalsController(BaseGlobalsController):
     def __undos__(self):
         "yields all undoable user actions"
         def _onglobals(items):
-            name = items.name
-            if name == 'project':
-                items.pop("track", None)
-                items.pop("task",  None)
-            elif name.startswith('project.plot.'):
-                items.pop('x', None)
-                items.pop('y', None)
-
-            vals = {i: j.old for i, j in items}
-            return lambda: self.updateGlobal(name, **vals)
-
+            vals = {i: j.old for i, j in items.items()}
+            if len(vals):
+                return lambda: self.updateGlobal(items.name, **vals)
         maps = self._BaseGlobalsController__maps # pylint: disable=protected-access,no-member
-        yield from ((key, _onglobals) for key in maps)
+        yield tuple('globals.' + i for i in maps
+                    if not i.startswith('project')) + (_onglobals,)

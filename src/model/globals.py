@@ -349,11 +349,13 @@ class BeadProperty(Generic[T]):
         return obj.config[self.key].get()
 
     def __set__(self, obj, val:T) -> T:
-        cache = obj.project[self.key].get()
+        cache = dict(obj.project[self.key].get())
         if val == obj.config[self.key].get():
             cache.pop(obj.bead, None)
         else:
             cache[obj.bead] = val
+
+        obj.project[self.key].set(cache)
         return val
 
 class _GlobalsAccess:

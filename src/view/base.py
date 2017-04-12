@@ -84,6 +84,7 @@ class BokehView(View):
         "starts the application"
         self = cls(**kwa)
         self.addtodoc(doc)
+        self._ctrl.handle('applicationstarted') # pylint: disable=protected-access
         return self
 
     def enableOnTrack(self, *itms):

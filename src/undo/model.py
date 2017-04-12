@@ -31,5 +31,5 @@ class UndoModel:
         if not isundoing:
             self.redos.clear()
 
-        if len(items) != 0:
-            (self.redos if isundoing else self.undos).append(items)
+        assert len(items)
+        (self.redos if isundoing else self.undos).append(items)
