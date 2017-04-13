@@ -36,7 +36,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
     def defaultconfig(mdl):
         "default config"
         css = mdl.css.raw
-        css.defaults = {'selection'       : PlotAttrs('green', 'line',   2),
+        css.defaults = {'selection'       : PlotAttrs('blue', 'line',   3),
                         'tooltips'        : [(u'(cycle, t, z)',
                                               '(@cycle, $~x{1}, $data_y{1.1111})')],
                         'tooltips.radius' : 1.5}
@@ -58,8 +58,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         self._rawsource = ColumnDataSource(self._createrawdata(source))
         css             = self._model.css.raw
         self._rawglyph  = css.selection.get().addto(fig,  x = 't', y = 'z',
-                                                    source  = self._rawsource,
-                                                    visible = False)
+                                                    source  = self._rawsource)
 
         def _onhover(source  = self._rawsource, # pylint: disable=too-many-arguments
                      hvrsrc  = source,
@@ -71,8 +70,8 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
                 return
 
             if not cb_data.index['1d'].indices.length:
-                if glyph.glyph.visible:
-                    glyph.glyph.visible = False
+                if glyph.visible:
+                    glyph.visible = False
                     glyph.trigger('change')
                 return
 
@@ -92,7 +91,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
             mdl.cycle           = ind
             ind                *= mdl.shape[1]
             source.data['z']    = hvrsrc.data['z'][ind:ind+mdl.shape[1]]
-            glyph.glyph.visible = True
+            glyph.visible = True
             source.trigger('change')
 
         hover[0].callback = CustomJS.from_py_func(_onhover)
@@ -128,7 +127,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
 
         self.shape                   = shape
         self._rawsource.data         = self._createrawdata(rdata)
-        self._rawglyph.glyph.visible = False
+        self._rawglyph.visible = False
 
     def resethist(self):
         "updates the tooltips for a new file"

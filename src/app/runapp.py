@@ -62,7 +62,7 @@ def run(view, app, desktop, show, port, raiseerr): # pylint: disable=too-many-ar
     if not app.startswith('app.'):
         app += 'app.'+app
 
-    if view.startswith('toolbar'):
+    if 'toolbar' in viewcls.__name__.lower():
         app = 'app.Defaults'
 
     if '.' in app and 'A' <= app[app.rfind('.')+1] <= 'Z':

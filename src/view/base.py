@@ -3,6 +3,7 @@
 "basic view module"
 from typing               import Callable
 from bokeh.models.widgets import Button
+from bokeh.themes         import Theme
 from bokeh.layouts        import layout
 
 from control        import Controller                   # pylint: disable=unused-import
@@ -69,7 +70,20 @@ class BokehView(View):
         css.button.defaults = {'width': 90, 'height': 20}
         css.input .defaults = {'width': 90, 'height': 20}
         css.defaults = {'responsive': True, 'sizing_mode': 'scale_width'}
+        dark = { 'attrs': { 'Figure': { 'background_fill_color': '#2F2F2F',
+                                        'border_fill_color': '#2F2F2F',
+                                        'outline_line_color': '#444444' },
+                            'Axis':   { 'axis_line_color': "white",
+                                        'axis_label_text_color': "white",
+                                        'major_label_text_color': "white",
+                                        'major_tick_line_color': "white",
+                                        'minor_tick_line_color': "white"
+                                      },
+                            'Title':  { 'text_color': "white" } } }
 
+        css.theme.dark.default  = dark
+        css.theme.basic.default = {}
+        css.theme.default       = dark
 
         self._keys = kwargs['keys']  # type: KeyPressManager
 
@@ -93,6 +107,9 @@ class BokehView(View):
 
     def addtodoc(self, doc):
         "Adds one's self to doc"
+        theme     = self._ctrl.getGlobal('css').theme.get(default = None)
+        doc.theme = Theme(json = theme)
+
         self._keys.getroots(doc)
         roots = self.getroots(doc)
         if len(roots) == 1:

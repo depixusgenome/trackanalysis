@@ -25,12 +25,12 @@ class DpxTestLoaded(Model):
     This starts tests once flexx/browser window has finished loading
     """
     __implementation__ = """
-        import *        as _    from "underscore"
         import *        as $    from "jquery"
         import *        as p    from "core/properties"
         import {Model}          from "model"
+        import {BokehView} from "core/bokeh_view"
 
-        export class DpxTestLoadedView
+        export class DpxTestLoadedView extends BokehView
 
         export class DpxTestLoaded extends Model
             default_view: DpxTestLoadedView

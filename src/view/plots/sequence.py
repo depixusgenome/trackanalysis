@@ -171,8 +171,9 @@ class SequenceHoverMixin:
         return """
                 import * as p  from "core/properties"
                 import {Model} from "model"
+                import {BokehView} from "core/bokeh_view"
 
-                export class %sView
+                export class %sView extends BokehView
                 export class %s extends Model
                     default_view: %sView
                     type:"%s"

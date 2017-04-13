@@ -83,7 +83,7 @@ class HybridStatView(BokehView):
         super().observe()
         def _make(ind):
             def _fcn(val):
-                if val.new == PlotState.active:
+                if val.value == PlotState.active:
                     self._tabs.active = ind
             return _fcn
 
