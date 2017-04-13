@@ -39,6 +39,39 @@ def _from_module(view):
                               fromlist = view[view.rfind('.')+1:])
     return getattr(viewmod, view[view.rfind('.')+1:])
 
+def _electron(server, **kwa):
+    import subprocess
+    if subprocess.check_call(['electron', '-v']) == 0:
+        jscode = """
+            const {app, BrowserWindow} = require('electron')
+
+            let win
+
+            function createWindow () {
+                win = new BrowserWindow({width:1000, height:1000})
+
+                win.loadURL("http:\\\\localhost:%d")
+                win.setMenu(null);
+
+                win.on('closed', () => { win = null })
+            }
+
+            app.on('ready', createWindow)
+
+            app.on('window-all-closed', () => { app.quit() }) 
+
+            app.on('activate', () => { if (win === null) { createWindow() } })
+            """ % kwa.get('port', 5006)
+
+        import tempfile
+        path = tempfile.mktemp("_trackanalysis.js")
+        with open(path, "w", encoding="utf-8") as stream:
+            print(jscode, file = stream)
+
+        subprocess.Popen(['electron', path])
+    else:
+        server.show("/")
+
 @click.command()
 @click.argument('view')
 @click.option("--app", default = 'app.BeadToolBar',
@@ -88,7 +121,7 @@ def run(view, app, desktop, show, port, raiseerr): # pylint: disable=too-many-ar
 
     server = launch(viewcls, port = port)
     if (not desktop) and show:
-        server.io_loop.add_callback(lambda: server.show('/'))
+        server.io_loop.add_callback(lambda: _electron(server, port = port))
     server.start()
     server.io_loop.start()
 

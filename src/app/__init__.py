@@ -38,14 +38,31 @@ def _title(view) -> str:
     appname   = getattr(view.MainControl, 'APPNAME', 'track analysis')
     return appname.capitalize()
 
+class _FunctionHandler(FunctionHandler):
+    def __init__(self, view):
+        self.__view = None
+        self.server = None
+
+        def start(doc):
+            "Starts the application and adds itself to the document"
+            doc.title = _title(view)
+            self.__view = view.open(doc)
+        super().__init__(start)
+
+    def on_session_destroyed(self, session_context):
+        server, self.server = self.server, None
+        if server is None:
+            return
+
+        if not getattr(server, '_stopped', False):
+            server.stop()
+        server.io_loop.stop()
+
 def _serve(view, **kwa):
     "Launches a bokeh server"
-    def start(doc):
-        "Starts the application and adds itself to the document"
-        doc.title = _title(view)
-        return view.open(doc)
-
-    server = Server(Application(FunctionHandler(start)), **_serverkwargs(kwa))
+    fcn    = _FunctionHandler(view)
+    server = Server(Application(fcn), **_serverkwargs(kwa))
+    fcn.server = server
     server.MainView = view
     return server
 
