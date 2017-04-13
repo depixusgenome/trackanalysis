@@ -53,6 +53,8 @@ def _electron(server, **kwa):
                 break
         except subprocess.CalledProcessError:
             pass
+        except FileNotFoundError:
+            pass
     else:
         electron = None
 
