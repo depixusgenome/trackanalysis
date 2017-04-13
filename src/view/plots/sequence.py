@@ -67,10 +67,11 @@ class SequenceTicker(ContinuousTicker):
                 base:       [ p.Instance, null]
             }
 
-            get_ticks_no_defaults: (data_low, data_high, desired_n_ticks) ->
+            get_ticks_no_defaults: (data_low, data_high, cross_loc, desired_n_ticks) ->
                 if @usedefault
                     return @base.get_ticks_no_defaults(data_low, data_high,
-                                                       desired_n_ticks)
+                                                       cross_loc, desired_n_ticks)
+
                 return {
                     major: @major[@key]
                     minor: @minor[@key]
