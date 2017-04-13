@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 u"Runs an app"
 from   pathlib import Path
+import sys
 import subprocess
 import random
 import inspect
@@ -42,10 +43,11 @@ def _from_module(view):
 
 def _electron(server, **kwa):
     electron = None
-    for electron in ('node_modules\\.bin\\electron', 'electron'):
+    iswin    = sys.platform.startswith('win')
+    for electron in (str(Path('node_modules')/'.bin'/'electron'), 'electron'):
         try:
             if subprocess.check_call([electron, '-v'],
-                                     shell  = True,
+                                     shell  = iswin,
                                      stdout = subprocess.DEVNULL,
                                      stderr = subprocess.DEVNULL) == 0:
                 break
@@ -71,7 +73,7 @@ def _electron(server, **kwa):
 
             app.on('ready', createWindow)
 
-            app.on('window-all-closed', () => { app.quit() }) 
+            app.on('window-all-closed', () => { app.quit() })
 
             app.on('activate', () => { if (win === null) { createWindow() } })
             """ % (server.MainView.APPNAME, kwa.get('port', 5006))
@@ -81,7 +83,7 @@ def _electron(server, **kwa):
         with open(path, "w", encoding="utf-8") as stream:
             print(jscode, file = stream)
 
-        subprocess.Popen([electron, path], shell = True)
+        subprocess.Popen([electron, path], shell = iswin)
     else:
         server.show("/")
 
@@ -132,15 +134,17 @@ def run(view, app, desktop, show, port, raiseerr): # pylint: disable=too-many-ar
             ctrl.getGlobal('config').catcherror.toolbar.default = False
         app.DEFAULT_CONFIG = _cnf
 
-    # get rid of console windows
-    import bokeh.util.compiler as compiler
-    def _Popen(*args, __popen__ = subprocess.Popen, **kwargs):
-        return __popen__(*args, **kwargs, shell = True)
-    compiler.Popen = _Popen
+    if sys.platform.startswith("win"):
+        # get rid of console windows
+        import bokeh.util.compiler as compiler
+        def _Popen(*args, __popen__ = subprocess.Popen, **kwargs):
+            return __popen__(*args, **kwargs, shell = True)
+        compiler.Popen = _Popen
 
     server = launch(viewcls, port = port)
     if (not desktop) and show:
         server.io_loop.add_callback(lambda: _electron(server, port = port))
+    server.io_loop.add_callback(lambda: print('running on: http:\\\\localhost:%d' % port))
     server.start()
     server.io_loop.start()
 

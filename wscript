@@ -8,6 +8,7 @@ except ImportError:
 import wafbuilder.git as git
 from waflib.Build       import BuildContext, Context
 from waflib.Configure   import ConfigurationContext
+from waflib             import Logs
 
 require(cxx    = {'msvc'     : 14.0,
                   'clang++'  : 3.8,
@@ -150,10 +151,10 @@ def app(bld):
         bld.options.APP_PATH.delete()
 
     build(bld, [i for i in _getmodules(bld) if i != 'tests'])
-    builder.condasetup(bld, copy = 'build/output', runtimeonly = True)
+    builder.condasetup(bld, copy = 'build/OUTPUT', runtimeonly = True)
 
     iswin = builder.os.sys.platform.startswith("win")
-    ext   = ".bat"                      if iswin else ""
+    ext   = ".bat"                      if iswin else ".sh"
     cmd   = r"start /min %~dp0pythonw " if iswin else "./"
 
     for optext, opts in (('', ''), ('_chrome', ' --web --show')):
@@ -163,3 +164,16 @@ def app(bld):
                       encoding = 'utf-8') as stream:
                 print(cmd + r"app/runapp.py " + val + opts + ' --port random',
                       file = stream)
+
+    builder.os.chdir("build/OUTPUT")
+    npm = '%s/npm' + ('.cmd' if iswin else '')
+    for path in ('', 'bin', 'Scripts'):
+        if Path(npm % path).exists():
+            cmd = (npm % path) + " install electron"
+            Logs.info(cmd)
+            builder.os.system(cmd)
+            break
+    else:
+        raise IOError("Could not install electron")
+    builder.os.chdir("..")
+    builder.os.chdir("..")
