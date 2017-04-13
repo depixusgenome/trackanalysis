@@ -55,11 +55,17 @@ class PeaksTableWidget(_Widget):
             peaks = tuple(int(i+.01) for i in bases)
             if peaks != (0, 1000):
                 self._model.peaks = peaks
+
             if zval[0] == zval[1] or bases[0] == bases[1]:
                 return
 
-            self._model.stretch = (bases[1]-bases[0]) / (zval[1]-zval[0])
-            self._model.bias    = zval[0] - bases[0]/self._model.stretch
+            aval = (bases[1]-bases[0]) / (zval[1]-zval[0])
+            bval = zval[0] - bases[0]/self._model.stretch
+            if abs(aval - self._model.stretch) < 1e-2 and abs(bval-self._model.bias) < 1e-5:
+                return
+
+            self._model.stretch = aval
+            self._model.bias    = bval
 
         self.__widget.source.on_change("data", _py_cb) # pylint: disable=no-member
         return [Paragraph(text = self.css.title.table.get()), self.__widget]
@@ -86,6 +92,8 @@ class PeaksTableWidget(_Widget):
             aval = (bases[1]-bases[0])/(zval[1]-zval[0])
             bval = zval[0] - bases[0]/aval
 
+            if abs(aval - mdl.stretch) < 1e-2 and abs(bval-mdl.bias) < 1e-5:
+                return
             mdl.updating  = 'peaks'
             mdl.stretch   = aval
             mdl.bias      = bval
@@ -182,13 +190,17 @@ class ConversionSlidersWidget(_Widget):
             if mdl.updating != '':
                 return
 
+            bases = source.data['bases']
+            aval  = bases[0] / stretch.value + bias.value
+            bval  = bases[1] / stretch.value + bias.value
+            if abs(aval-source.data['z']) < 1e-5 and abs(bval-source.data['z']) < 1e-5:
+                return
+
             mdl.updating = 'sliders'
             mdl.stretch  = stretch.value
             mdl.bias     = bias.value
 
-            bases            = source.data['bases']
-            source.data['z'] = [bases[0] / stretch.value + bias.value,
-                                bases[1] / stretch.value + bias.value]
+            source.data['z'] = [aval, bval]
             source.trigger('change:data')
 
             mdl.updating = '*'

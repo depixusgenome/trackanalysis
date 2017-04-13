@@ -160,16 +160,16 @@ def app(bld):
     for optext, opts in (('', ''), ('_chrome', ' --web --show')):
         for name, val in (('cyclesplot', 'cyclesplot.CyclesPlotView'),
                           ('hybridstat', 'hybridstat.view.HybridStatView')):
-            with open(str(bld.options.APP_PATH.make_node(name+optext+ext)), 'w',
+           with open(str(bld.options.APP_PATH.make_node(name+optext+ext)), 'w',
                       encoding = 'utf-8') as stream:
                 print(cmd + r"app/runapp.py " + val + opts + ' --port random',
                       file = stream)
 
-    builder.os.chdir("build/OUTPUT")
-    npm = '%s/npm' + ('.cmd' if iswin else '')
-    for path in ('', 'bin', 'Scripts'):
-        if Path(npm % path).exists():
-            cmd = (npm % path) + " install electron"
+    builder.os.chdir(str(Path("build")/"OUTPUT"))
+    npm = 'npm' + ('.cmd' if iswin else '')
+    for path in ('.', 'bin', 'Scripts'):
+        if (Path(path)/npm).exists():
+            cmd = str(Path(path)/npm) + " install electron"
             Logs.info(cmd)
             builder.os.system(cmd)
             break
