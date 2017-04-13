@@ -460,14 +460,14 @@ class PeaksPlotCreator(TaskPlotCreator):
     _MODEL = PeaksPlotModelAccess
     def __init__(self, *args):
         super().__init__(*args)
-        self.css.defaults = {'count'           : PlotAttrs('blue', 'line', 1),
+        self.css.defaults = {'count'           : PlotAttrs('lightblue', 'line', 1),
                              'figure.width'    : 500,
                              'figure.height'   : 800,
                              'xtoplabel'       : u'Duration (s)',
                              'xlabel'          : u'Rate (%)',
                              'widgets.border'  : 10}
         self.css.peaks.defaults = {'duration'  : PlotAttrs('gray', 'diamond', 10),
-                                   'count'     : PlotAttrs('blue', 'square',  10)}
+                                   'count'     : PlotAttrs('lightblue', 'square',  10)}
         self.config.defaults = {'tools'      : 'ypan,ybox_zoom,reset,save,dpxhover,tap'}
         PeaksSequenceHover.defaultconfig(self)
         SequenceTicker.defaultconfig(self)

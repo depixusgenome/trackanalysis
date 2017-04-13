@@ -27,7 +27,7 @@ def test_cyclesplot(bokehaction):
 
         fig  = server.widget['Cycles:Hist']()
         for _ in range(5):
-            if fig.extra_x_ranges['cycles'].end is None:
+            if fig.extra_x_ranges['cycles'].end == 0.0:
                 server.wait()
         assert fig.x_range.end                  > 2000.
         assert fig.extra_x_ranges['cycles'].end > 30.
