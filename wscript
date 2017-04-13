@@ -156,9 +156,10 @@ def app(bld):
     ext   = ".bat"                      if iswin else ""
     cmd   = r"start /min %~dp0pythonw " if iswin else "./"
 
-    for optext, opts in (('', ''), ('_web', ' --web --show')):
+    for optext, opts in (('', ''), ('_chrome', ' --web --show')):
         for name, val in (('cyclesplot', 'cyclesplot.CyclesPlotView'),
-                          ('hybridstat', 'hybridstat.view.HybridstatView')):
+                          ('hybridstat', 'hybridstat.view.HybridStatView')):
             with open(str(bld.options.APP_PATH.make_node(name+optext+ext)), 'w',
                       encoding = 'utf-8') as stream:
-                print(cmd + r"app/runapp.py " + val + opts, file = stream)
+                print(cmd + r"app/runapp.py " + val + opts + ' --port random',
+                      file = stream)

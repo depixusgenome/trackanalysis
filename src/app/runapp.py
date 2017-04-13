@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 u"Runs an app"
 from   pathlib import Path
+import subprocess
 import random
 import inspect
 import click
@@ -40,15 +41,27 @@ def _from_module(view):
     return getattr(viewmod, view[view.rfind('.')+1:])
 
 def _electron(server, **kwa):
-    import subprocess
-    if subprocess.check_call(['electron', '-v']) == 0:
+    electron = None
+    for electron in ('node_modules\\.bin\\electron', 'electron'):
+        try:
+            if subprocess.check_call([electron, '-v'],
+                                     shell  = True,
+                                     stdout = subprocess.DEVNULL,
+                                     stderr = subprocess.DEVNULL) == 0:
+                break
+        except subprocess.CalledProcessError:
+            pass
+    else:
+        electron = None
+
+    if electron is not None:
         jscode = """
             const {app, BrowserWindow} = require('electron')
 
             let win
 
             function createWindow () {
-                win = new BrowserWindow({width:1000, height:1000})
+                win = new BrowserWindow({width:1000, height:1000, title: "%s"})
 
                 win.loadURL("http:\\\\localhost:%d")
                 win.setMenu(null);
@@ -61,14 +74,14 @@ def _electron(server, **kwa):
             app.on('window-all-closed', () => { app.quit() }) 
 
             app.on('activate', () => { if (win === null) { createWindow() } })
-            """ % kwa.get('port', 5006)
+            """ % (server.MainView.APPNAME, kwa.get('port', 5006))
 
         import tempfile
         path = tempfile.mktemp("_trackanalysis.js")
         with open(path, "w", encoding="utf-8") as stream:
             print(jscode, file = stream)
 
-        subprocess.Popen(['electron', path])
+        subprocess.Popen([electron, path], shell = True)
     else:
         server.show("/")
 
@@ -118,6 +131,12 @@ def run(view, app, desktop, show, port, raiseerr): # pylint: disable=too-many-ar
             ctrl.getGlobal('config').catcherror.default         = False
             ctrl.getGlobal('config').catcherror.toolbar.default = False
         app.DEFAULT_CONFIG = _cnf
+
+    # get rid of console windows
+    import bokeh.util.compiler as compiler
+    def _Popen(*args, __popen__ = subprocess.Popen, **kwargs):
+        return __popen__(*args, **kwargs, shell = True)
+    compiler.Popen = _Popen
 
     server = launch(viewcls, port = port)
     if (not desktop) and show:
