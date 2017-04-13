@@ -18,7 +18,7 @@ class BeadPlotCreator(TaskPlotCreator):
         "sets up this plotter's info"
         super().__init__(ctrl)
         ttips = [(u'Index', '$index'), (u'(t, z, zmag)', '($~x, $data_y, @zmag)')]
-        self.css.defaults = dict(z           = PlotAttrs('blue', 'circle', 1),
+        self.css.defaults = dict(z           = PlotAttrs('lightblue', 'circle', 1),
                                  zmag        = PlotAttrs('red',  'line',   1),
                                  xlabel      = u"Frames",
                                  ylabel      = u"Z",

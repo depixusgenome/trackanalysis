@@ -36,7 +36,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
     def defaultconfig(mdl):
         "default config"
         css = mdl.css.raw
-        css.defaults = {'selection'       : PlotAttrs('blue', 'line',   3),
+        css.defaults = {'selection'       : PlotAttrs('lightblue', 'line',   3),
                         'tooltips'        : [(u'(cycle, t, z)',
                                               '(@cycle, $~x{1}, $data_y{1.1111})')],
                         'tooltips.radius' : 1.5}
