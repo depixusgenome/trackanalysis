@@ -3,14 +3,14 @@
 u"Tests interval detection"
 
 import numpy  as np
-from eventdetection.detection import (SplitDetector, EventMerger, EventSelector,
-                                      tocycles)
+from eventdetection.detection import (DerivateSplitDetector, EventMerger, EventSelector,
+                                      MultiScaleSplitDetector, tocycles)
 from eventdetection.alignment import ExtremumAlignment, CorrelationAlignment
 from signalfilter             import samples
 
 def test_detectsplits():
     u"Tests flat stretches detection"
-    inst  = SplitDetector(precision = 1., confidence = 0.1, window = 1)
+    inst  = DerivateSplitDetector(precision = 1., confidence = 0.1, window = 1)
     det   = lambda  i: tuple(tuple(j) for j in inst(i))
     items = np.zeros((30,))
     thr   = samples.normal.knownsigma.threshold(True, inst.confidence, inst.precision,
@@ -33,6 +33,37 @@ def test_detectsplits():
     items[10:] += thr
     items[20:] += thr
     items[21:] += thr
+    items[[0, 10, 25, 29]] = np.nan
+    assert det(items) == ((0, 11), (11,20), (21,30))
+
+def test_multiscalesplits():
+    u"Tests flat stretches detection"
+    inst  = MultiScaleSplitDetector(precision  = 1.,
+                                    confidence = 0.1,
+                                    scales     = (1,),
+                                    minscales  = None)
+    det   = lambda  i: tuple(tuple(j) for j in inst(i))
+    items = np.zeros((30,))
+    thr   = samples.normal.knownsigma.threshold(True, inst.confidence, inst.precision)
+    thr  *= 1.0001
+
+    assert det([])    == tuple()
+    assert det(items) == ((0, 30),)
+
+    items[10:] -= thr
+    items[20:] -= thr
+    items[21:] -= thr
+    assert det(items) == ((0, 10), (10,20), (21,30))
+
+    items[0:2]  = (2*thr, thr)
+    items[28:] -= thr
+    items[29:] -= thr
+    assert det(items) == ((2, 10), (10,20), (21,28))
+
+    items       = np.zeros((30,))
+    items[10:] -= thr
+    items[20:] -= thr
+    items[21:] -= thr
     items[[0, 10, 25, 29]] = np.nan
     assert det(items) == ((0, 11), (11,20), (21,30))
 
@@ -122,4 +153,4 @@ def test_correlationalignment():
     np.testing.assert_allclose(biases, [1., 0., -1.], rtol = 1e-4, atol = 1e-4)
 
 if __name__ == '__main__':
-    test_fastmerge()
+    test_multiscalesplits()

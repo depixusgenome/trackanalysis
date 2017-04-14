@@ -11,7 +11,7 @@ from    utils        import initdefaults
 from    signalfilter import samples as _samples, PrecisionAlg
 norm = _samples.normal.knownsigma # pylint: disable=invalid-name
 
-class SplitDetector(PrecisionAlg):
+class BaseSplitDetector(PrecisionAlg):
     u"""
     Detects flat stretches of value
 
@@ -23,30 +23,9 @@ class SplitDetector(PrecisionAlg):
     the estimation used is the median-deviation of the derivate of the data.
     """
     confidence = 0.1 # type: Optional[float]
-    window     = 1
     @initdefaults
     def __init__(self, **kwa):
         super().__init__(**kwa)
-
-    def deltas(self,
-               data     : np.ndarray,
-               nans     : Optional[np.ndarray] = None
-              ) -> np.ndarray:
-        "all deltas"
-        window    = self.window
-        if nans is None:
-            nans      = np.isnan(data)
-            if any(nans):
-                data = data[~nans]
-
-        kern = np.ones((window*2,))
-        kern[-window:] = -1.
-
-        delta           = np.convolve(data, kern, mode = 'same')
-        delta[:window] -= np.arange(window+1)[-1:0:-1] * data[0]
-        if window > 1:
-            delta[1-window:] += np.arange(window)[1:] * data[-1]
-        return delta
 
     def __call__(self,
                  data     : np.ndarray,
@@ -60,16 +39,7 @@ class SplitDetector(PrecisionAlg):
         if len(data) <= 1:
             return np.empty((0,2), dtype = 'i4')
 
-        window    = self.window
-        precision = self.getprecision(precision, data)
-        if self.confidence is None or self.confidence <= 0.:
-            thr = precision
-        else:
-            thr = norm.threshold(True, self.confidence, precision, window, window)
-
-        delta = self.deltas(data, nans)
-        ends  = (np.abs(delta) >= (thr*window)).nonzero()[0]
-
+        ends = self._compute(precision, data).nonzero()[0]
         if len(ends) == 0:
             return np.array(((0,len(nans)),), dtype = 'i4')
 
@@ -87,6 +57,109 @@ class SplitDetector(PrecisionAlg):
     def run(cls, data, **kwa):
         u"instantiates and calls class"
         return cls(**kwa)(data)
+
+    def _compute(self, precision:Optional[float], data : np.ndarray) -> np.ndarray:
+        raise NotImplementedError()
+
+class DerivateSplitDetector(BaseSplitDetector):
+    u"""
+    Detects flat stretches of value
+
+    Flatness is defined pointwise: 2 points are flat if close enough one to the
+    other. This closeness is defined using a p-value for 2 points belonging to
+    the same normal distribution with a known sigma.
+
+    The sigma (precision) is either provided or measured. In the latter case,
+    the estimation used is the median-deviation of the derivate of the data.
+    """
+    window = 1
+    @initdefaults
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
+    def deltas(self, data : np.ndarray) -> np.ndarray:
+        "all deltas"
+        window = self.window
+        kern   = np.ones((window*2,))
+        kern[-window:] = -1.
+
+        delta           = np.convolve(data, kern, mode = 'same')
+        delta[:window] -= np.arange(window+1)[-1:0:-1] * data[0]
+        if window > 1:
+            delta[1-window:] += np.arange(window)[1:] * data[-1]
+        return delta
+
+    def threshold(self,
+                  precision: Optional[float]      = None,
+                  data:      Optional[np.ndarray] = None) -> float:
+        "the threshold applied to alphas"
+        precision = self.getprecision(precision, data)
+        if self.confidence is None or self.confidence <= 0.:
+            return precision
+        else:
+            return norm.threshold(True, self.confidence, precision,
+                                  self.window, self.window)
+
+    def _compute(self, precision:Optional[float], data : np.ndarray) -> np.ndarray:
+        return self.deltas(data) >= self.threshold(precision, data)*self.window
+
+class MultiScaleSplitDetector(BaseSplitDetector):
+    u"""
+    Detects flat stretches of value
+
+    Flatness is defined pointwise over multiple scales: 1 point is flat versus
+    it prior if there exist a scale *N* such that this point and the prior *N-1*
+    are lower than the *N* points coming after by a given margin.
+
+    The margin (precision) is either provided or measured. In the latter case,
+    the estimation used is the median-deviation of the derivate of the data.
+    """
+    scales    = (4,5,6,10,15)
+    minscales = None # type: Optional[float]
+    @initdefaults
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
+    @staticmethod
+    def deltas(scale     : int,
+               threshold : float,
+               data      : np.ndarray,
+               out       : Optional[np.ndarray] = None
+              ) -> np.ndarray:
+        "all deltas"
+        dt2d = as_strided(data,
+                          shape   = (len(data)-scale+1, scale),
+                          strides = (data.strides[0],)*2)
+        minv = np.min(dt2d, axis = 1)
+        maxv = np.max(dt2d, axis = 1)
+
+        if out is None:
+            out = np.zeros(len(data), dtype = 'i4')
+
+        out[scale:] += (maxv[scale:] - minv[:-scale]) < -threshold
+        out[:scale] += (maxv[:scale] - minv[0])       < -threshold
+        return out
+
+    def threshold(self,
+                  precision: Optional[float]      = None,
+                  data:      Optional[np.ndarray] = None) -> float:
+        "the threshold applied to alphas"
+        precision = self.getprecision(precision, data)
+        if self.confidence is None or self.confidence <= 0.:
+            return precision
+        else:
+            return norm.threshold(True, self.confidence, precision)
+
+    def _compute(self, precision:Optional[float], data : np.ndarray) -> np.ndarray:
+        thr   = self.threshold(precision, data)
+        delta = None
+        for scale in self.scales:
+            delta = self.deltas(scale, thr, data, delta)
+
+        ithr = len(self.scales)
+        if self.minscales is not None:
+            ithr = int(ithr*self.minscales)
+        return delta >= ithr
 
 class EventMerger(PrecisionAlg):
     u"""
@@ -233,7 +306,7 @@ class EventSelector:
 
 class EventDetector(PrecisionAlg):
     u"detects, mergers and selects intervals"
-    split  = SplitDetector()
+    split  = MultiScaleSplitDetector()
     merge  = EventMerger  ()
     select = EventSelector()
     @initdefaults
