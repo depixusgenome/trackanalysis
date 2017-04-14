@@ -17,6 +17,16 @@ def read(stream:TextIO) -> 'Iterator[Tuple[str,str]]':
 
 PEAKS_DTYPE = [('position', 'i4'), ('orientation', np.bool8)]
 PEAKS_TYPE  = Sequence[Tuple[int, bool]]
+def _translate(olig):
+    olig = olig.lower()
+    for vals in (('k', '[gt]'), ('m', '[ac]'), ('r', '[ag]'),
+                 ('y', '[ct]'), ('s', '[cg]'), ('w', '[at]'),
+                 ('b', '[^a]'), ('v', '[^t]'), ('h', '[^g]'),
+                 ('d', '[^c]'), ('n', '.'),    ('x', '.'),
+                 ('u', 't')):
+        olig = olig.replace(*vals)
+    return olig
+
 def peaks(seq:str, oligs:'Union[Sequence[str], str]', flags = re.IGNORECASE) -> np.ndarray:
     """
     Returns the peak positions and orientation associated to a sequence.
@@ -41,7 +51,9 @@ def peaks(seq:str, oligs:'Union[Sequence[str], str]', flags = re.IGNORECASE) -> 
         >>> assert len(res) == 2
         >>> assert all(a == b for a, b in zip(res['position'],    [8, 10]))
         >>> assert all(a == b for a, b in zip(res['orientation'], [True]*2))
-
+        >>> seq = "c"*5+"ATC"+"g"*5+"TAG"+"c"*5
+        >>> res = peaks(seq, 'wws')
+        >>> assert len(res) == 4
     """
     if isinstance(oligs, str):
         oligs = (oligs,)
@@ -49,8 +61,9 @@ def peaks(seq:str, oligs:'Union[Sequence[str], str]', flags = re.IGNORECASE) -> 
     if len(oligs) == 0:
         return np.empty((0,), dtype = PEAKS_DTYPE)
 
+
     def _get(elems, state):
-        reg = re.compile('|'.join(elems), flags)
+        reg = re.compile('|'.join(_translate(i) for i in elems), flags)
         val = reg.search(seq, 0)
         while val is not None:
             yield (val.end(), state)
