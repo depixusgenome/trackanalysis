@@ -28,6 +28,17 @@ from functools              import wraps
 from enum                   import Enum
 import inspect
 
+import numpy                as np
+try:
+    import matplotlib.pyplot as plt     # pylint: disable=import-error
+except ImportError:
+    pass
+try:
+    import bokeh                        # pylint: disable=import-error
+except ImportError:
+    pass
+import pandas               as pd
+
 from utils                  import updatedeepcopy
 from model.task             import *  # pylint: disable=wildcard-import
 import control.processor
@@ -44,16 +55,7 @@ from eventdetection.data        import Events
 from signalfilter               import (PrecisionAlg, RollingFilter, NonLinearFilter,
                                         ForwardBackwardFilter)
 
-import numpy                as np
-try:
-    import matplotlib.pyplot as plt     # pylint: disable=import-error
-except ImportError:
-    pass
-try:
-    import bokeh                        # pylint: disable=import-error
-except ImportError:
-    pass
-import pandas               as pd
+from .curve                 import * # pylint: disable=wildcard-import
 
 _frame = None
 for _frame in inspect.stack()[1:]:
