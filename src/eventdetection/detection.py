@@ -28,23 +28,16 @@ class SplitDetector(PrecisionAlg):
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-    def __call__(self,
-                 data     : np.ndarray,
-                 precision: Optional[float] = None
-                ) -> np.ndarray:
-        if len(data) <= 1:
-            return np.empty((0,2), dtype = 'i4')
-
-        precision = self.getprecision(precision, data)
+    def deltas(self,
+               data     : np.ndarray,
+               nans     : Optional[np.ndarray] = None
+              ) -> np.ndarray:
+        "all deltas"
         window    = self.window
-        if self.confidence is None or self.confidence <= 0.:
-            thr   = precision
-        else:
-            thr   = norm.threshold(True, self.confidence, precision, window, window)
-
-        nans      = np.isnan(data)
-        if any(nans):
-            data = data[~nans]
+        if nans is None:
+            nans      = np.isnan(data)
+            if any(nans):
+                data = data[~nans]
 
         kern = np.ones((window*2,))
         kern[-window:] = -1.
@@ -53,8 +46,29 @@ class SplitDetector(PrecisionAlg):
         delta[:window] -= np.arange(window+1)[-1:0:-1] * data[0]
         if window > 1:
             delta[1-window:] += np.arange(window)[1:] * data[-1]
+        return delta
 
-        ends = (np.abs(delta) >= (thr*window)).nonzero()[0]
+    def __call__(self,
+                 data     : np.ndarray,
+                 precision: Optional[float] = None
+                ) -> np.ndarray:
+        if len(data) > 1:
+            nans = np.isnan(data)
+            if any(nans):
+                data = data[~nans]
+
+        if len(data) <= 1:
+            return np.empty((0,2), dtype = 'i4')
+
+        window    = self.window
+        precision = self.getprecision(precision, data)
+        if self.confidence is None or self.confidence <= 0.:
+            thr = precision
+        else:
+            thr = norm.threshold(True, self.confidence, precision, window, window)
+
+        delta = self.deltas(data, nans)
+        ends  = (np.abs(delta) >= (thr*window)).nonzero()[0]
 
         if len(ends) == 0:
             return np.array(((0,len(nans)),), dtype = 'i4')
