@@ -18,6 +18,9 @@ class Multiplier:
     def _action(self, plot):
         raise NotImplementedError()
 
+    def __mul__(self, plot):
+        return plot.__rmul__(self)
+
 class Show(Multiplier):
     "shows the plot"
     def _action(self, plot):
