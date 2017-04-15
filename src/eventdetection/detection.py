@@ -127,17 +127,21 @@ class MultiScaleSplitDetector(BaseSplitDetector):
                out       : Optional[np.ndarray] = None
               ) -> np.ndarray:
         "all deltas"
-        dt2d = as_strided(data,
-                          shape   = (len(data)-scale+1, scale),
-                          strides = (data.strides[0],)*2)
-        minv = np.min(dt2d, axis = 1)
-        maxv = np.max(dt2d, axis = 1)
-
         if out is None:
             out = np.zeros(len(data), dtype = 'i4')
 
-        out[scale:] += (maxv[scale:] - minv[:-scale]) < -threshold
-        out[:scale] += (maxv[:scale] - minv[0])       < -threshold
+        if scale == 1:
+            out[1:] = np.diff(data) < -threshold
+        else:
+            dt2d = as_strided(data,
+                              shape   = (len(data)-scale+1, scale),
+                              strides = (data.strides[0],)*2)
+            minv = np.min(dt2d, axis = 1)
+            maxv = np.max(dt2d, axis = 1)
+
+            out[scale:-1] += (maxv[scale:] - minv[:-scale]) < -threshold
+            out[:scale]   += (maxv[:scale] - data[0])       < -threshold
+            out[-1]       += (data[-1]     - minv[-scale])  < -threshold
         return out
 
     def threshold(self,
