@@ -23,6 +23,7 @@ class BaseSplitDetector(PrecisionAlg):
     the estimation used is the median-deviation of the derivate of the data.
     """
     confidence = 0.1 # type: Optional[float]
+    window     = 1   # type: int
     @initdefaults
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -72,7 +73,6 @@ class DerivateSplitDetector(BaseSplitDetector):
     The sigma (precision) is either provided or measured. In the latter case,
     the estimation used is the median-deviation of the derivate of the data.
     """
-    window = 1
     @initdefaults
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -103,45 +103,39 @@ class DerivateSplitDetector(BaseSplitDetector):
     def _compute(self, precision:Optional[float], data : np.ndarray) -> np.ndarray:
         return self.deltas(data) >= self.threshold(precision, data)*self.window
 
-class MultiScaleSplitDetector(BaseSplitDetector):
+class MinMaxSplitDetector(BaseSplitDetector):
     u"""
     Detects flat stretches of value
 
-    Flatness is defined pointwise over multiple scales: 1 point is flat versus
-    it prior if there exist a scale *N* such that this point and the prior *N-1*
-    are lower than the *N* points coming after by a given margin.
+    Flatness is defined pointwise: 1 point is flat versus it prior if there
+    exist a window *N* such that the prior *N* are lower than this and the next
+    *N-1* points by a given margin
 
     The margin (precision) is either provided or measured. In the latter case,
     the estimation used is the median-deviation of the derivate of the data.
     """
-    scales    = (4,5,6,10,15)
-    minscales = None # type: Optional[float]
+    window = 5
     @initdefaults
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-    @staticmethod
-    def deltas(scale     : int,
-               threshold : float,
-               data      : np.ndarray,
-               out       : Optional[np.ndarray] = None
-              ) -> np.ndarray:
+    def deltas(self, data   : np.ndarray) -> np.ndarray:
         "all deltas"
-        if out is None:
-            out = np.zeros(len(data), dtype = 'i4')
-
-        if scale == 1:
-            out[1:] = np.diff(data) < -threshold
+        window = self.window
+        out    = np.empty(len(data), dtype = 'f4')
+        if window == 1:
+            out[0]  = 0.
+            out[1:] = np.diff(data)
         else:
             dt2d = as_strided(data,
-                              shape   = (len(data)-scale+1, scale),
+                              shape   = (len(data)-window+1, window),
                               strides = (data.strides[0],)*2)
-            minv = np.min(dt2d, axis = 1)
-            maxv = np.max(dt2d, axis = 1)
 
-            out[scale:-1] += (maxv[scale:] - minv[:-scale]) < -threshold
-            out[:scale]   += (maxv[:scale] - data[0])       < -threshold
-            out[-1]       += (data[-1]     - minv[-scale])  < -threshold
+            out[:1-window] = np.max(dt2d, axis = 1)
+            out[1-window:] = [max(data[i:]) for i in range(1-window, 0)]
+
+            out[:window]  -= [data[0]]+[min(data[:i]) for i in range(1,window)]
+            out[window:]  -= np.min(dt2d, axis = 1)[:-1]
         return out
 
     def threshold(self,
@@ -155,15 +149,7 @@ class MultiScaleSplitDetector(BaseSplitDetector):
             return norm.threshold(True, self.confidence, precision)
 
     def _compute(self, precision:Optional[float], data : np.ndarray) -> np.ndarray:
-        thr   = self.threshold(precision, data)
-        delta = None
-        for scale in self.scales:
-            delta = self.deltas(scale, thr, data, delta)
-
-        ithr = len(self.scales)
-        if self.minscales is not None:
-            ithr = int(ithr*self.minscales)
-        return delta >= ithr
+        return self.deltas(data) < -self.threshold(precision, data)
 
 class EventMerger(PrecisionAlg):
     u"""
@@ -310,7 +296,7 @@ class EventSelector:
 
 class EventDetector(PrecisionAlg):
     u"detects, mergers and selects intervals"
-    split  = MultiScaleSplitDetector()
+    split  = MinMaxSplitDetector()
     merge  = EventMerger  ()
     select = EventSelector()
     @initdefaults

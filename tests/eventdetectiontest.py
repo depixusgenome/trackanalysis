@@ -4,7 +4,7 @@ u"Tests interval detection"
 
 import numpy  as np
 from eventdetection.detection import (DerivateSplitDetector, EventMerger, EventSelector,
-                                      MultiScaleSplitDetector, tocycles)
+                                      MinMaxSplitDetector, tocycles)
 from eventdetection.alignment import ExtremumAlignment, CorrelationAlignment
 from signalfilter             import samples
 
@@ -39,10 +39,9 @@ def test_detectsplits():
 def test_multiscalesplits():
     u"Tests flat stretches detection"
     for i in range(1,3):
-        inst  = MultiScaleSplitDetector(precision  = 1.,
-                                        confidence = 0.1,
-                                        scales     = (i,),
-                                        minscales  = None)
+        inst  = MinMaxSplitDetector(precision  = 1.,
+                                    confidence = 0.1,
+                                    window     = i)
         det   = lambda k: tuple(tuple(j) for j in inst(k))
         items = np.zeros((30,))
         thr   = samples.normal.knownsigma.threshold(True, inst.confidence, inst.precision)
