@@ -22,12 +22,16 @@ class CyclesModelAccess(TaskPlotModelAccess):
         cls.peaks       .setdefault(self, None)
         cls.sequencekey .setdefault(self, None) # type: ignore
 
-        self.alignment        = TaskAccess(self, ExtremumAlignmentTask)
-        self.driftperbead     = TaskAccess(self, DriftTask, attrs = {'onbeads': True})
-        self.driftpercycle    = TaskAccess(self, DriftTask, attrs = {'onbeads': False},
-                                           side = 'RIGHT')
-        self.eventdetection   = TaskAccess(self, EventDetectionTask)
-        self.estimatedbias    = 0.
+        self.alignment      = TaskAccess(self, ExtremumAlignmentTask)
+        self.driftperbead   = TaskAccess(self, DriftTask,
+                                         attrs      = {'onbeads': True},
+                                         configname = 'driftperbead')
+        self.driftpercycle  = TaskAccess(self, DriftTask,
+                                         attrs      = {'onbeads': False},
+                                         configname = 'driftpercycle',
+                                         side       = 'RIGHT')
+        self.eventdetection = TaskAccess(self, EventDetectionTask)
+        self.estimatedbias  = 0.
 
     props        = TaskPlotModelAccess.props
     sequencekey  = SequenceKeyProp()

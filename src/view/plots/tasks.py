@@ -107,10 +107,12 @@ class TaskAccess(TaskPlotModelAccess):
     "access to tasks"
     def __init__(self, ctrl: PlotModelAccess, tasktype: type, **kwa) -> None:
         super().__init__(ctrl)
-        self.attrs     = kwa.get('attrs', {})
-        self.tasktype  = tasktype
-        self.side      = (0  if kwa.get('side', 'LEFT') == 'LEFT' else 1)
-        self.permanent = kwa.get('permanent', False)
+        self.attrs      = kwa.get('attrs', {})
+        self.tasktype   = tasktype
+        self.side       = (0  if kwa.get('side', 'LEFT') == 'LEFT' else 1)
+        self.permanent  = kwa.get('permanent', False)
+        self.configname = kwa.get('configname',
+                                  tasktype.__name__.lower()[:-len('Task')])
 
         # pylint: disable=not-callable
         self.config.root.tasks.order.default = TASK_ORDER
@@ -118,11 +120,6 @@ class TaskAccess(TaskPlotModelAccess):
         cur = self.config.root.tasks.get(self.configname, default = None)
         assert cur is None or isinstance(cur, tasktype)
         self.config.root.tasks[self.configname].default = tasktype(**self.attrs)
-
-    @property
-    def configname(self) -> str:
-        "returns the config name"
-        return self.tasktype.__name__.lower()[:-len('Task')]
 
     @property
     def configtask(self) -> Task:
