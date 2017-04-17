@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint: disable=too-many-ancestors
 "all view aspects here"
 
 import numpy as np
@@ -35,6 +36,19 @@ class FloatInput(InputWidget):
     widget by hitting Enter or clicking outside of the text box area.
     """)
     placeholder = String(default="", help="Placeholder for empty input field")
+
+class PathInput(InputWidget):
+    """ widget to access a path. """
+    __implementation__ = "pathinput.coffee"
+    value       = String(default="", help="""
+    Initial or entered text value.
+    """)
+    callback    = Instance(Callback, help="""
+    A callback to run in the browser whenever the user unfocuses the TextInput
+    widget by hitting Enter or clicking outside of the text box area.
+    """)
+    placeholder = String(default="", help="Placeholder for empty input field")
+    click       = Int(default = 0)
 
 class BeadInput(BokehView):
     "Spinner for controlling the current bead"

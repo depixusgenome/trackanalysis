@@ -18,11 +18,39 @@ from eventdetection.processor   import (EventDetectionTask, # pylint: disable=un
                                         ExtremumAlignmentTask)
 from peakfinding.processor      import PeakSelectorTask
 from peakcalling.processor      import (BeadsByHairpinTask, # pylint: disable=unused-import
-                                        DistanceConstraint, Constraints)
+                                        FitToHairpinTask, DistanceConstraint,
+                                        Constraints)
 from peakcalling.tohairpin      import Range
 from sequences                  import read as readsequences
 from .reporting.processor       import HybridstatExcelTask
 from .reporting.identification  import readparams
+
+def readconstraints(idtask, idpath: Optional[str], useparams:bool):
+    "adds constraints to an identification task"
+    cstrs              = {} # type: Constraints
+    idtask.constraints = cstrs
+    if idpath is None or not Path(idpath).exists():
+        return
+
+    for item in readparams(idpath):
+        cstrs[item[0]] = DistanceConstraint(item[1], {})
+        if len(item) == 2 or not useparams:
+            continue
+
+        rngs    = idtask.distances[item[0]]
+        if item[2] is not None:
+            stretch = Range(item[2], rngs.stretch[-1]*.1, rngs.stretch[-1])
+            cstrs[item[0]]['stretch'] = stretch
+
+        if item[3] is not None:
+            bias    = Range(item[3], rngs.bias   [-1]*.1, rngs.bias[-1])
+            cstrs[item[0]]['bias']    = bias
+
+def newidentification(seqpath, oligos, idpath, useparams) -> FitToHairpinTask:
+    "creates and identification task from paths"
+    task = FitToHairpinTask.read(seqpath, oligos)
+    readconstraints(task, idpath, useparams)
+    return task
 
 class HybridstatTemplate:
     u"Template of tasks to run"
@@ -122,23 +150,6 @@ class HybridstatProcessor(Processor):
         args.apply(_run, levels = self.levels)
 
     @staticmethod
-    def __constraints(paths, idtask):
-        idtask.constraints = cstrs = {} # type: Constraints
-        if paths.idpath is None:
-            return
-
-        for item in readparams(paths.idpath):
-            cstrs[item[0]] = DistanceConstraint(item[1], {})
-            if len(item) == 2 or not paths.useparams:
-                continue
-
-            rngs    = idtask.distances[item[0]]
-            stretch = Range(item[2], 0., rngs.stretch[-1])
-            bias    = Range(item[3], 0., rngs.bias[-1])
-            cstrs[item[0]]['stretch'] = stretch
-            cstrs[item[0]]['bias']    = bias
-
-    @staticmethod
     def __oligos(track:TrackReaderTask, oligos:Union[Sequence[str],str]):
         if isinstance(oligos, str):
             trkpath = (track.path,) if isinstance(track.path, str) else track.path
@@ -162,8 +173,8 @@ class HybridstatProcessor(Processor):
                 modl.identity = None
             return
 
-        modl.identity = modl.identity.read(paths.sequence, oligos)
-        cls.__constraints(paths, modl.identity)
+        modl.identity = newidentification(paths.sequence, oligos,
+                                          paths.idpath, paths.useparams)
 
     @staticmethod
     def __excel(oligos: Sequence[str],

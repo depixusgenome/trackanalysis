@@ -6,7 +6,8 @@ from typing            import (Tuple, Optional, # pylint: disable =unused-import
                                TYPE_CHECKING)
 
 from model.task        import RootTask, Task, taskorder, TASK_ORDER
-from model.globals     import ConfigProperty, ConfigRootProperty, BeadProperty
+from model.globals     import (ConfigProperty, ConfigRootProperty, BeadProperty,
+                               ProjectRootProperty)
 from data.track        import Track
 from utils             import NoArgs, updatecopy, updatedeepcopy
 from control.processor import Processor
@@ -99,9 +100,10 @@ class TaskPlotModelAccess(PlotModelAccess):
 
     class props: # pylint: disable=invalid-name
         "access to property builders"
-        configroot = ConfigRootProperty
-        config     = ConfigProperty
-        bead       = BeadProperty
+        configroot  = ConfigRootProperty
+        projectroot = ProjectRootProperty
+        config      = ConfigProperty
+        bead        = BeadProperty
 
 class TaskAccess(TaskPlotModelAccess):
     "access to tasks"

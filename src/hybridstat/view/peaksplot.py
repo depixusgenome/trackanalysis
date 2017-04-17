@@ -4,6 +4,7 @@
 from typing                     import (Optional, Sequence, Tuple, List, Dict,
                                         Union, TYPE_CHECKING)
 from itertools                  import product
+from pathlib                    import Path
 
 import bokeh.core.properties as props
 from bokeh                      import layouts
@@ -24,6 +25,8 @@ from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
                                         FitBead, Distance, HairpinDistance)
 
 from view.base                  import enableOnTrack
+from view.dialog                import FileDialog
+from view.intinput              import PathInput
 from view.plots                 import (PlotView, PlotAttrs, from_py_func,
                                         DpxNumberFormatter, WidgetCreator,
                                         DpxKeyedRow, PlotState)
@@ -34,7 +37,8 @@ from view.plots.sequence        import (readsequence, SequenceTicker, OligoListW
                                         FitParamProp    as _FitParamProp,
                                         SequenceKeyProp as _SequenceKeyProp)
 
-from ..probabilities            import  Probability
+from ..probabilities            import Probability
+from ..processor                import newidentification
 
 class FitToHairpinAccess(TaskAccess):
     "access to the FitToHairpinTask"
@@ -69,9 +73,17 @@ class _PeaksPlotModelAccess(TaskPlotModelAccess):
         super().__init__(ctrl, key)
         self.identification = FitToHairpinAccess(self)
 
-    props        = TaskPlotModelAccess.props
-    sequencepath = props.configroot[Optional[str]]('last.path.sequence')
-    oligos       = props.configroot[Optional[Sequence[str]]]('oligos')
+        cls = type(self)
+        cls.sequencepath    .setdefault(self, None)
+        cls.oligos          .setdefault(self, [], size = 4)
+        cls.constraintspath .setdefault(self, None)
+        cls.useparams       .setdefault(self, True)
+
+    props           = TaskPlotModelAccess.props
+    sequencepath    = props.configroot[Optional[str]]('last.path.sequence')
+    oligos          = props.configroot[Optional[Sequence[str]]]('oligos')
+    constraintspath = props.projectroot[Optional[str]]('constraints.path')
+    useparams       = props.projectroot[bool]('constraints.useparams')
 
     @property
     def defaultidenfication(self):
@@ -81,7 +93,7 @@ class _PeaksPlotModelAccess(TaskPlotModelAccess):
         if ols is None or len(ols) == 0 or len(readsequence(seq)) == 0:
             return None
         else:
-            return FitToHairpinTask.read(seq, ols)
+            return newidentification(seq, ols, self.constraintspath.get(), self.useparams)
 
 class PeaksPlotModelAccess(_PeaksPlotModelAccess):
     "Access to peaks"
@@ -95,7 +107,6 @@ class PeaksPlotModelAccess(_PeaksPlotModelAccess):
         self.estimatedbias      = 0.
 
         cls = type(self)
-        cls.oligos      .setdefault(self, [], size = 4)
         cls.sequencekey .setdefault(self, None) # type: ignore
         cls.stretch     .setdefault(self)       # type: ignore
         cls.bias        .setdefault(self)       # type: ignore
@@ -455,6 +466,55 @@ class PeakListWidget(WidgetCreator):
     def reset(self):
         pass
 
+class PeakIDPathWidget(WidgetCreator):
+    "Selects an id file"
+    def __init__(self, model:PeaksPlotModelAccess) -> None:
+        super().__init__(model)
+        self.__widget = None # type: Optional[PathInput]
+        self.__dlg    = FileDialog(config    = self._ctrl,
+                                   storage   = 'constraints.path',
+                                   filetypes = '*|xls')
+
+        css          = self.css.constraints
+        css.defaults = {'title': u'Id file path'}
+
+    def create(self, action) -> List[Widget]:
+        title         = self.css.constraints.title.get()
+        width         = self.css.input.width.get() - 10
+        self.__widget = PathInput(width = width, title = title,
+                                  placeholder = "", value = "")
+
+        @action
+        def _onclick_cb(attr, old, new):
+            path = self.__dlg.open()
+            if path is not None:
+                self.__widget.value = str(Path(path).resolve())
+
+        @action
+        def _onchangetext_cb(attr, old, new):
+            path = self.__widget.value.strip()
+            if path == '':
+                self._model.constraintspath = None
+
+            elif not Path(path).exists():
+                self.reset()
+
+            else:
+                self._model.constraintspath = str(Path(path).resolve())
+
+        self.__widget.on_change('click', _onclick_cb)
+        self.__widget.on_change('value', _onchangetext_cb)
+
+        self.__dlg.title = title
+        return [self.__widget]
+
+    def reset(self):
+        path = self._model.constraintspath
+        if path is not None and Path(path).exists():
+            self.__widget.value = str(Path(path).resolve())
+        else:
+            self.__widget.value = ''
+
 class PeaksPlotCreator(TaskPlotCreator):
     "Creates plots for peaks"
     _MODEL = PeaksPlotModelAccess
@@ -475,10 +535,11 @@ class PeaksPlotCreator(TaskPlotCreator):
         self._histsrc = None # type: Optional[ColumnDataSource]
         self._peaksrc = None # type: Optional[ColumnDataSource]
         self._fig     = None # type: Optional[Figure]
-        self._widgets = dict(seq    = PeaksSequencePathWidget(self._model),
-                             oligos = OligoListWidget(self._model),
-                             stats  = PeaksStatsWidget(self._model),
-                             peaks  = PeakListWidget(self._model))
+        self._widgets = dict(seq      = PeaksSequencePathWidget(self._model),
+                             oligos   = OligoListWidget(self._model),
+                             stats    = PeaksStatsWidget(self._model),
+                             peaks    = PeakListWidget(self._model),
+                             cstrpath = PeakIDPathWidget(self._model))
         self._ticker  = SequenceTicker()
         self._hover   = PeaksSequenceHover()
         if TYPE_CHECKING:
@@ -533,7 +594,9 @@ class PeaksPlotCreator(TaskPlotCreator):
             else:
                 self._model.identification.update(**task.config())
 
-        self._model.observeprop('oligos', 'sequencepath', _observe)
+        self._model.observeprop('oligos', 'sequencepath',
+                                'constraintspath', 'useparams',
+                                _observe)
 
     def _reset(self):
         self._model.reset()
@@ -605,9 +668,11 @@ class PeaksPlotCreator(TaskPlotCreator):
         twidth = widgets['peaks'][-1].width+border
 
         # pylint: disable=redefined-variable-type
-        lay   = layouts.widgetbox(*widgets['seq'], *widgets['oligos'],
-                                  width       = wwidth+border,
-                                  sizing_mode = mode)
+        lay = layouts.widgetbox(*widgets['seq'],
+                                *widgets['oligos'],
+                                *widgets['cstrpath'],
+                                width       = wwidth+border,
+                                sizing_mode = mode)
         lay = layouts.row(lay, layouts.widgetbox(*widgets['stats']),
                           width       = wwidth*2+border,
                           sizing_mode = mode)

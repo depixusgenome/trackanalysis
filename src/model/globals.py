@@ -300,6 +300,25 @@ class ConfigRootProperty(Generic[T]):
     def __set__(self, obj, val:T) -> T:
         return self if obj is None else obj.config.root[self.key].set(val)
 
+class ProjectRootProperty(Generic[T]):
+    "a property which links to the project"
+    OBSERVERS = 'project.root',
+    def __init__(self, key:str) -> None:
+        self.key = key
+
+    def setdefault(self, obj, value:T, items:Optional[dict] = None, **kwa):
+        "initializes the property stores"
+        if items is not None:
+            kwa.update(**items)
+        obj.project.root[self.key].default  = value
+        obj.project.root[self.key].defaults = kwa
+
+    def __get__(self, obj, tpe) -> T:
+        return self if obj is None else obj.project.root[self.key].get()
+
+    def __set__(self, obj, val:T) -> T:
+        return self if obj is None else obj.project.root[self.key].set(val)
+
 class ConfigProperty(Generic[T]):
     "a property which links to the root config"
     OBSERVERS = 'config',
