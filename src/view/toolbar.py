@@ -142,7 +142,6 @@ class  BeadToolBar(ToolBar):
         cnf.keypress.defaults = {'beadup'   : 'PageUp',
                                  'beaddown' : 'PageDown'}
 
-
     def _getroots(self, doc):
         super()._getroots(doc)
         self._beads.observe(doc)

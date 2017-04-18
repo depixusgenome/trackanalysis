@@ -106,10 +106,11 @@ class BeadInput(BokehView):
             new = self.__beads[min(len(self.__beads)-1,
                                    np.searchsorted(self.__beads, new))]
 
-        bead = self._ctrl.getGlobal("project").bead
-        if bead.get() != new:
+        if new == old:
+            self.__inp.value = new
+        else:
             with self.action:
-                bead.set(new)
+                self._ctrl.getGlobal("project").bead.set(new)
 
     def getbeads(self):
         "returns the active beads"
