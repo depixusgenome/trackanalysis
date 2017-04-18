@@ -17,9 +17,12 @@ class RawMixin:
     "Building the graph of cycles"
     def __init__(self):
         "sets up this plotter's info"
-        self.css.defaults = {'raw'        : PlotAttrs('color',  'circle', 1,
-                                                      alpha   = .5,
-                                                      palette = 'inferno'),
+        self.css.defaults = {'raw.dark'     : PlotAttrs('color',  'circle', 1,
+                                                        alpha   = .5,
+                                                        palette = 'YlOrBr'),
+                             'raw.basic'    : PlotAttrs('color',  'circle', 1,
+                                                        alpha   = .5,
+                                                        palette = 'inferno'),
                              'figure.width' : 500}
         self._rawsource = None # type: Optional[ColumnDataSource]
         self._raw       = None # type: Optional[Figure]
@@ -67,7 +70,7 @@ class RawMixin:
         res['cycle'] = (as_strided(tmp, shape = shape, strides = (tmp.strides[0], 0))
                         .ravel())
 
-        tmp          = np.array(self.css.raw.get().listpalette(shape[0]))
+        tmp          = np.array(self.css.raw[self.css.theme.get()].get().listpalette(shape[0]))
         res['color'] = (as_strided(tmp, shape = shape, strides = (tmp.strides[0], 0))
                         .ravel())
 
@@ -97,7 +100,7 @@ class RawMixin:
         raw, shape      = self.__data()
         self._rawsource = ColumnDataSource(data = raw)
 
-        css.raw.addto(self._raw, x = 't', y = 'z', source = self._rawsource)
+        css.raw[css.theme.get()].addto(self._raw, x = 't', y = 'z', source = self._rawsource)
 
         self._hover.createraw(self._raw, self._rawsource, shape, self._model)
         self._raw.extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}

@@ -80,12 +80,20 @@ class PlotAttrs:
         palette = getattr(bokeh.palettes, self.palette, None)
         if palette is None:
             return [self.color]*count
-
-        colors = palette(count)
-        if indexes is not None:
-            return [colors[i] for i in indexes]
+        elif isinstance(palette, dict):
+            colors = max(palette.values(), key = len) # type: List[str]
+            npal   = len(colors)
+            if indexes is None:
+                return [colors[int(i/count*npal)] for i in range(count)]
+            indexes    = tuple(indexes)
+            minv, maxv = min(indexes), max(indexes)
+            return [colors[int((i-minv)/(maxv-minv)*npal)] for i in indexes]
         else:
-            return colors
+            colors  = palette(count)
+            if indexes is not None:
+                return [colors[i] for i in indexes]
+            else:
+                return colors
 
     def addto(self, fig, **kwa) -> GlyphRenderer:
         "adds itself to plot: defines color, size and glyph to use"

@@ -107,7 +107,7 @@ class SequenceTicker(ContinuousTicker):
 
         self.__withbase = dict()
         for name in ('color', 'dash', 'width', 'alpha'):
-            gridprops = cnf.css.grid[name].get()
+            gridprops = cnf.css.grid[cnf.css.theme.get()][name].get()
             self.__withbase['grid_line_'+name]       = gridprops[0]
             self.__withbase['minor_grid_line_'+name] = gridprops[1]
 
@@ -126,10 +126,14 @@ class SequenceTicker(ContinuousTicker):
     @staticmethod
     def defaultconfig(mdl):
         "default config"
-        mdl.css.plot.grid.defaults = dict(color = ('lightblue', 'lightgreen'),
-                                          width = (2,           2),
-                                          alpha = (1.,          1.),
-                                          dash  = ('solid',     'solid'))
+        mdl.css.plot.grid.dark.defaults  = dict(color = ('lightgray', 'lightgreen'),
+                                                width = (1,          1),
+                                                alpha = (.8,         .8),
+                                                dash  = ('solid',    'solid'))
+        mdl.css.plot.grid.basic.defaults = dict(color = ('lightgray', 'lightgreen'),
+                                                width = (1,          1),
+                                                alpha = (.8,         .8),
+                                                dash  = ('solid',    'solid'))
 
     def reset(self):
         "Updates the ticks according to the configuration"

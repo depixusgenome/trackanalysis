@@ -36,7 +36,8 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
     def defaultconfig(mdl):
         "default config"
         css = mdl.css.raw
-        css.defaults = {'selection'       : PlotAttrs('lightblue', 'line',   3),
+        css.defaults = {'selection.dark'  : PlotAttrs('lightblue', 'line',   3),
+                        'selection.basic' : PlotAttrs('blue', 'line',   3),
                         'tooltips'        : [(u'(cycle, t, z)',
                                               '(@cycle, $~x{1}, $data_y{1.1111})')],
                         'tooltips.radius' : 1.5}
@@ -57,8 +58,9 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
 
         self._rawsource = ColumnDataSource(self._createrawdata(source))
         css             = self._model.css.raw
-        self._rawglyph  = css.selection.get().addto(fig,  x = 't', y = 'z',
-                                                    source  = self._rawsource)
+
+        sel             = css.selection[self._model.css.theme.get()].get()
+        self._rawglyph  = sel.addto(fig,  x = 't', y = 'z', source = self._rawsource)
 
         def _onhover(source  = self._rawsource, # pylint: disable=too-many-arguments
                      hvrsrc  = source,
