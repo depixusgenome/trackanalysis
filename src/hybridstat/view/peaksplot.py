@@ -64,7 +64,8 @@ class SequenceKeyProp(_SequenceKeyProp):
     def __get__(self, obj, tpe) -> Optional[str]:
         "returns the current sequence key"
         if obj is not None and len(obj.distances) and self.fromglobals(obj) is None:
-            return min(obj.distances, key = obj.distances.__getitem__)
+            if len(obj.distances):
+                return min(obj.distances, key = obj.distances.__getitem__)
         return super().__get__(obj, tpe)
 
 class _PeaksPlotModelAccess(TaskPlotModelAccess):
@@ -93,7 +94,7 @@ class _PeaksPlotModelAccess(TaskPlotModelAccess):
         if ols is None or len(ols) == 0 or len(readsequence(seq)) == 0:
             return None
         else:
-            return newidentification(seq, ols, self.constraintspath.get(), self.useparams)
+            return newidentification(seq, ols, self.constraintspath, self.useparams)
 
 class PeaksPlotModelAccess(_PeaksPlotModelAccess):
     "Access to peaks"
@@ -171,7 +172,7 @@ class PeaksPlotModelAccess(_PeaksPlotModelAccess):
         if task is None and cur is not None:
             self.identification.remove()
         elif task is not None and cur is None:
-            self.identification.update()
+            self.identification.update(**task.config())
 
     def __set_ids_and_distances(self, peaks):
         task  = self.identification.task
@@ -192,9 +193,13 @@ class PeaksPlotModelAccess(_PeaksPlotModelAccess):
         for key in product(readsequence(self.sequencepath), names):
             dico[''.join(key)] = np.copy(dico[key[1]])
 
-        strori = self.css.stats.title.orientation.get()
+        strori  = self.css.stats.title.orientation.get()
+        alldist = self.distances
         for key, seq in readsequence(self.sequencepath).items():
-            dist = self.distances[key].stretch, self.distances[key].bias
+            if key not in alldist:
+                continue
+
+            dist = alldist[key].stretch, alldist[key].bias
             tmp  = task.peakids[key](dico['z'], *dist)['key']
             good = tmp >= 0
             ori  = dict(sequences.peaks(seq, self.oligos))
@@ -285,9 +290,10 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
 class PeaksSequencePathWidget(SequencePathWidget):
     "Widget for setting the sequence to use"
     def _sort(self, lst) -> List[str]:
-        if len(self._model.distances):
-            fcn  = lambda i: self._model.distances[i].value
-            return sorted(lst, key = fcn)
+        dist = self._model.distances
+        if len(dist):
+            lst  = [i for i in lst if i in dist]
+            return sorted(lst, key = lambda i: dist[i].value)
         else:
             return super()._sort(lst)
 
@@ -381,44 +387,67 @@ class PeaksStatsWidget(WidgetCreator):
             self.__widget.text = data[self._model.sequencekey]
         self.__widget.data = data
 
+    class _TableConstructor:
+        "creates the html table containing stats"
+        def __init__(self, css):
+            get         = lambda i: css[i[4:]].get() if i.startswith('css:') else i
+            self.titles = [(get(i[0]), i[1]) for i in css.stats.lines.get()]
+            self.values = ['']*len(self.titles) # type: List
+            self.line   = '<tr><td>'+css.stats.title.format.get()+'</td><td>{}</td></tr>'
+            self.openhp = css.stats.title.openhairpin.get()
+
+        def trackdependant(self, mdl):
+            "all track dependant stats"
+            if mdl.track is None:
+                return
+
+            self.values[0] = mdl.stretch
+            self.values[1] = mdl.bias
+            self.values[2] = rawprecision(mdl.track, mdl.bead)
+            if len(mdl.peaks['z']):
+                self.values[3] = np.mean(mdl.peaks['sigma'])
+            self.values[4] = max(0, len(mdl.peaks['z']) - 1)
+
+        def sequencedependant(self, mdl, dist, key):
+            "all sequence dependant stats"
+            task      = mdl.identification.task
+            remove    = task.peakids[key].peaks[[0,-1]]
+            nrem      = sum(i in remove for i in mdl.peaks[key+'id'])
+            nfound    = np.isfinite(mdl.peaks[key+'id']).sum()-nrem
+            npks      = len(task.peakids[key].hybridizations)
+            self.values[5] = '{}/{}'.format(nfound, npks)
+            if nrem == 2:
+                self.values[5] += self.openhp
+
+            self.values[6] = HairpinDistance.silhouette(dist, key)
+
+            if nfound > 2:
+                stretch        = dist[key].stretch
+                self.values[7] = (np.nanstd(mdl.peaks[key+'id'])
+                                  / ((self.values[3]*stretch)**2 * (nfound - 2)))
+
+        def __call__(self) -> str:
+            return ('<table>'
+                    + ''.join(self.line.format(i[0], self.__fmt(i[1], j))
+                              for i, j in zip(self.titles, self.values))
+                    +'</table>')
+
+        @staticmethod
+        def __fmt(fmt, val):
+            return val if isinstance(val, str) else ('{:'+fmt+'}').format(val)
+
     def __data(self) -> Dict[str,str]:
-        get    = lambda i: self.css[i[4:]].get() if i.startswith('css:') else i
-        titles = [(get(i[0]), i[1]) for i in self.css.stats.lines.get()]
-        values = ['']*len(titles) # type: List
+        tab = self._TableConstructor(self.css)
+        tab.trackdependant(self._model)
 
-        if self._model.track is not None:
-            values[0] = self._model.stretch
-            values[1] = self._model.bias
-            values[2] = rawprecision(self._model.track, self._model.bead)
-            if len(self._model.peaks['z']):
-                values[3] = np.mean(self._model.peaks['sigma'])
-            values[4] = max(0, len(self._model.peaks['z']) - 1)
-
-        line = '<tr><td>'+self.css.stats.title.format.get()+'</td><td>{}</td></tr>'
-        fcn  = lambda fmt, val: val if isinstance(val, str) else ('{:'+fmt+'}').format(val)
-        tab  = lambda: ('<table>'
-                        + ''.join(line.format(i[0], fcn(i[1], j))
-                                  for i, j in zip(titles, values))
-                        +'</table>')
-
-        task = self._model.identification.task
-        if task is not None:
-            ret = dict()
+        if self._model.identification.task is not None:
+            ret  = dict()
+            dist = self._model.distances
             for key in readsequence(self._model.sequencepath):
-                remove    = task.peakids[key].peaks[[0,-1]]
-                nrem      = sum(i in remove for i in self._model.peaks[key+'id'])
-                nfound    = np.isfinite(self._model.peaks[key+'id']).sum()-nrem
-                npks      = len(task.peakids[key].hybridizations)
-                values[5] = '{}/{}'.format(nfound, npks)
-                if nrem == 2:
-                    values[5] += self.css.stats.title.openhairpin.get()
+                if key not in dist:
+                    continue
 
-                values[6] = HairpinDistance.silhouette(self._model.distances, key)
-
-                if nfound > 2:
-                    stretch   = self._model.distances[key].stretch
-                    values[7] = (np.nanstd(self._model.peaks[key+'id'])
-                                 / ((values[3]*stretch)**2 * (nfound - 2)))
+                tab.sequencedependant(self._model, dist, key)
                 ret[key] = tab()
             return ret
         else:
@@ -482,7 +511,8 @@ class PeakIDPathWidget(WidgetCreator):
         title         = self.css.constraints.title.get()
         width         = self.css.input.width.get() - 10
         self.__widget = PathInput(width = width, title = title,
-                                  placeholder = "", value = "")
+                                  placeholder = "", value = "",
+                                  name = 'Peaks:IDPath')
 
         @action
         def _onclick_cb(attr, old, new):
@@ -597,6 +627,8 @@ class PeaksPlotCreator(TaskPlotCreator):
         self._model.observeprop('oligos', 'sequencepath',
                                 'constraintspath', 'useparams',
                                 _observe)
+        for widget in self._widgets.values():
+            widget.observe()
 
     def _reset(self):
         self._model.reset()

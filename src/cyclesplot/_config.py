@@ -121,18 +121,6 @@ class PeaksTableWidget(_Widget):
         info         += info[0]/stretch+bias, info[1]/stretch+bias
         return dict(bases = info[:2], z = info[2:])
 
-class CyclesSequencePathWidget(SequencePathWidget):
-    "SequencePathWidget for cycles"
-    def observe(self):
-        "sets-up config observers"
-        self._model.observeprop('sequencekey', 'sequencepath', self.reset)
-
-class CyclesOligoListWidget(OligoListWidget):
-    "OligoListWidget for cycles"
-    def observe(self):
-        "sets-up config observers"
-        self._model.observeprop('oligos', self.reset)
-
 class ConversionSlidersWidget(_Widget):
     "Sliders for managing stretch and bias factors"
     def __init__(self, model:PlotModelAccess) -> None:
@@ -277,8 +265,8 @@ class ConfigMixin:
     def __init__(self):
         self.__widgets = dict(table   = PeaksTableWidget(self._model),
                               sliders = ConversionSlidersWidget(self._model),
-                              seq     = CyclesSequencePathWidget(self._model),
-                              oligos  = CyclesOligoListWidget(self._model),
+                              seq     = SequencePathWidget(self._model),
+                              oligos  = OligoListWidget(self._model),
                               align   = AlignmentWidget(self._model),
                               drift   = DriftWidget(self._model),
                               events  = EventDetectionWidget(self._model))

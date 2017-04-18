@@ -2,11 +2,14 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-outer-name
 """ Tests views """
+from tempfile                   import mktemp
 from pytest                     import approx       # pylint: disable=no-name-in-module
 import numpy as np
 
 from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 from view.plots                 import DpxKeyedRow
+from hybridstat.reporting.identification import writeparams
+
 
 def test_peaksplot(bokehaction):
     "test peaksplot"
@@ -29,10 +32,10 @@ def test_peaksplot(bokehaction):
             if fig.extra_x_ranges['duration'].end is None:
                 server.wait()
         _press('Shift- ',         0.,       0.)
-        _press('Shift-ArrowUp',   0.216678, 0.377610)
-        _press('Alt-ArrowUp',     0.248864, 0.409797)
-        _press('Alt-ArrowDown',   0.216678, 0.377610)
-        _press('Shift-ArrowDown', -0.10518, 0.699475)
+        _press('Shift-ArrowUp',   0.220088, 0.379895)
+        _press('Alt-ArrowUp',     0.252049, 0.411856)
+        _press('Alt-ArrowDown',   0.220088, 0.379895)
+        _press('Shift-ArrowDown', -0.09952, 0.699508)
 
         src = server.widget['Peaks:List'].source
         assert all(np.isnan(src.data['distance']))
@@ -54,6 +57,14 @@ def test_peaksplot(bokehaction):
         menu = server.widget['Cycles:Sequence'].menu
         lst  = tuple(i if i is None else i[0] for i in list(menu))
         assert lst == ('GF4', 'GF2', 'GF1', 'GF3', '015', None, 'Select sequence')
+
+        out = mktemp()+"_hybridstattest100.xlsx"
+        writeparams(out, [('GF3', (0,))])
+        server.click('Peaks:IDPath', withpath = out)
+
+        menu = server.widget['Cycles:Sequence'].menu
+        lst  = tuple(i if i is None else i[0] for i in list(menu))
+        assert lst == ('GF3', None, 'Select sequence')
 
 def test_hybridstat(bokehaction):
     "test hybridstat"

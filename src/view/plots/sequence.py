@@ -379,6 +379,10 @@ class SequencePathWidget(WidgetCreator):
         self.__widget.on_click(_py_cb)
         return [Paragraph(text = self.css.title.sequence.get()), self.__widget]
 
+    def observe(self):
+        "sets-up config observers"
+        self._model.observeprop('sequencekey', 'sequencepath', self.reset)
+
     def reset(self):
         "updates the widget"
         self.__widget.update(**self.__data())
@@ -466,6 +470,10 @@ class OligoListWidget(WidgetCreator):
         lst  = [', '.join(sorted(j.lower() for j in i)) for i in hist]
         ols  = ', '.join(sorted(j.lower() for j in self._model.oligos))
         return dict(value = ols, completions = lst)
+
+    def observe(self):
+        "sets-up config observers"
+        self._model.observeprop('oligos', self.reset)
 
 class SequenceKeyProp(BeadProperty[Optional[str]]):
     "access to the sequence key"
