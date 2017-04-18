@@ -99,7 +99,7 @@ class LegacyTrackIO(_TrackIO):
 class LegacyGRFilesIO(_TrackIO):
     u"checks and opens legacy GR files"
     __TITLE   = re.compile(r"\\stack{{Bead (?P<id>\d+) Z.*?phase\(s\)"
-                           +r" \[(?P<phases>.*?)\]}}")
+                           +r"[^\d]*(?P<phases>[\d, ]*?)\]}}")
     __GRTITLE = re.compile(r"Bead Cycle (?P<id>\d+) p.*")
     @classmethod
     @_checktype
@@ -192,7 +192,7 @@ class LegacyGRFilesIO(_TrackIO):
         if beadid not in output:
             raise IOError("Could not find bead "+str(beadid)+" in " + path)
 
-        phases = [int(i) for i in tit.group("phases").split(',')]
+        phases = [int(i) for i in tit.group("phases").split(',') if len(i.strip())]
         if set(np.diff(phases)) != {1}:
             raise IOError("Phases must be sequencial in "+ path)
 
@@ -205,6 +205,9 @@ class LegacyGRFilesIO(_TrackIO):
                 continue
 
             cyc  = int(tit.group("id")) - output['cyclemin']
+            if cyc >= len(starts):
+                continue
+
             inds = np.int32(vals[0]+.1+starts[cyc]) # type: ignore
             bead[inds] = vals[1]
         return beadid

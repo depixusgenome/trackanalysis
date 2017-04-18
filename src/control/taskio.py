@@ -76,8 +76,7 @@ class _GrFilesIOMixin:
         if track is None:
             raise IOError(u"IOError: start by opening a track file!")
 
-        path = ((track.path,) if isinstance(track.path, str) else track.path) + path
-        return type(self).__base__.open(self, path, _) # type: ignore # pylint: disable=no-member
+        return ((track.path,) if isinstance(track.path, str) else track.path) + path
 
 class GrFilesIO(TrackIO, _GrFilesIOMixin):
     "Adds an alignment to the tracks per default"
@@ -87,7 +86,8 @@ class GrFilesIO(TrackIO, _GrFilesIOMixin):
         _GrFilesIOMixin.__init__(self, *_)
 
     def open(self, path:Union[str, Tuple[str,...]], _:tuple):
-        return self._open(path, _)
+        path = self._open(path, _)
+        return None if path is None else TrackIO.open(self, path, _)
 
 class ConfigGrFilesIO(ConfigTrackIO, _GrFilesIOMixin):
     "Adds an alignment to the tracks per default"
@@ -97,9 +97,14 @@ class ConfigGrFilesIO(ConfigTrackIO, _GrFilesIOMixin):
         _GrFilesIOMixin.__init__(self, *_)
 
     def open(self, path:Union[str, Tuple[str,...]], _:tuple):
-        mdls = self._open(path, _)
+        path = self._open(path, _)
+        if path is None:
+            return None
+
+        mdls = ConfigTrackIO.open(self, path, _)
         if mdls is None:
             return None
+
         task = type(self._ctrl.extremumalignment.get(default = None))
         ret  = []
         for mdl in mdls:

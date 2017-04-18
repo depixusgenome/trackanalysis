@@ -714,23 +714,24 @@ class PeaksPlotCreator(TaskPlotCreator):
 
 class _PeaksIOMixin:
     def __init__(self, ctrl):
-        type(self).__bases__ [0].__init__(self, ctrl)
+        type(self).__bases__ [1].__init__(self, ctrl)
         self.__model = _PeaksPlotModelAccess(ctrl, 'config'+PeaksPlotCreator.key())
 
     def open(self, path:Union[str, Tuple[str,...]], model:tuple):
         "opens a track file and adds a alignment"
-        cls   = type(self).__bases__[0]
-        items = cls.open(self, path, model) # type: ignore # pylint: disable=no-member
+        # pylint: disable=no-member
+        items = type(self).__bases__[1].open(self, path, model) # type: ignore
+
         if items is not None:
             task = self.__model.defaultidenfication
             if task is not None:
                 items[0] += (task,)
         return items
 
-class PeaksConfigTrackIO(ConfigTrackIO, _PeaksIOMixin):
+class PeaksConfigTrackIO(_PeaksIOMixin, ConfigTrackIO):
     "selects the default tasks"
 
-class PeaksConfigGRFilesIO(ConfigGrFilesIO, _PeaksIOMixin):
+class PeaksConfigGRFilesIO(_PeaksIOMixin, ConfigGrFilesIO):
     "selects the default tasks"
 
 class PeaksPlotView(PlotView):
