@@ -306,12 +306,29 @@ class _ManagedServerLoop:
         else:
             self.cmd(self.loading.press, key, src)
 
-    def change(self,
+    def click(self, model: Union[str,dict,Model], **kwa):
+        "Clicks on a button on the browser side"
+        if isinstance(model, str):
+            mdl = next(iter(self.doc.select(dict(name = model))))
+        elif isinstance(model, dict):
+            mdl = next(iter(self.doc.select(model)))
+        else:
+            mdl = model
+        self.change(mdl, 'click', mdl.click+1, **kwa)
+
+    def change(self,        # pylint: disable=too-many-arguments
                model: Union[str,dict,Model],
                attrs: Union[str, Sequence[str]],
                value: Any,
-               browser = True):
+               browser  = True,
+               withpath = None):
         "Changes a model attribute on the browser side"
+        if withpath is not None:
+            import view.dialog  # pylint: disable=import-error
+            def _tkopen(*_1, **_2):
+                return self.path(withpath)
+            self.monkeypatch.setattr(view.dialog, '_tkopen', _tkopen)
+
         if isinstance(model, str):
             mdl = next(iter(self.doc.select(dict(name = model))))
         elif isinstance(model, dict):
