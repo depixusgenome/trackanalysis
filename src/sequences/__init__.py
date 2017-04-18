@@ -6,14 +6,36 @@ from    typing import (Sequence, Union,  # pylint: disable=unused-import
 import  pathlib
 import  re
 import  numpy       as np
-import  Bio.SeqIO   as seqio
 from    Bio.Seq     import Seq
 from    utils       import fromstream
 
 @fromstream('r')
 def read(stream:TextIO) -> 'Iterator[Tuple[str,str]]':
     "reads a path and yields pairs (name, sequence)"
-    yield from seqio.FastaIO.SimpleFastaParser(stream)
+    title = None
+    seq   = ""
+    ind   = 0
+    for line in stream:
+        line = line.strip()
+        if len(line) == 0:
+            continue
+
+        if line[0] == '#':
+            continue
+
+        if line[0] == '>':
+            if len(seq):
+                yield ("hairpin %d" % ind if title is None else title, seq)
+                ind += 1
+
+            title = line[1:].strip()
+            seq   = ''
+            continue
+        else:
+            seq += line
+
+    if len(seq):
+        yield ("hairpin %d" % ind if title is None else title, seq)
 
 PEAKS_DTYPE = [('position', 'i4'), ('orientation', np.bool8)]
 PEAKS_TYPE  = Sequence[Tuple[int, bool]]

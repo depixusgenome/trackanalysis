@@ -370,12 +370,16 @@ class SequencePathWidget(WidgetCreator):
                 self._model.sequencekey = new
             elif new == '←':
                 path = self.__dialog.open()
+
                 seqs = readsequence(path)
                 if len(seqs) > 0:
                     self._model.sequencepath = path
                     self._model.sequencekey  = next(iter(seqs))
                 else:
                     self.__widget.value = '→'
+                    if path is not None:
+                        raise IOError("Could not find any sequence in the file")
+
         self.__widget.on_click(_py_cb)
         return [Paragraph(text = self.css.title.sequence.get()), self.__widget]
 
