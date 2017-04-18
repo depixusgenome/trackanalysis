@@ -101,7 +101,7 @@ def readparams(fname:str) -> Union[List[Tuple[int,str,float,float]],
                                    List[Tuple[int,str]]]:
     "extracts bead ids and their reference from a report"
     wbook = load_workbook(filename=fname, read_only=True)
-    for sheetname in wbook.get_sheet_names():
+    for sheetname in wbook.sheetnames:
         if sheetname.lower() == "summary":
             return _read_summary(iter(wbook[sheetname].rows))
 
