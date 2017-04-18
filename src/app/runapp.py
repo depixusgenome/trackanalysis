@@ -85,6 +85,7 @@ def _electron(server, **kwa):
         with open(path, "w", encoding="utf-8") as stream:
             print(jscode, file = stream)
 
+        server.appfunction.stoponnosession = True
         subprocess.Popen([electron, path], shell = iswin)
     else:
         server.show("/")
@@ -147,8 +148,7 @@ def run(view, app, desktop, show, port, raiseerr): # pylint: disable=too-many-ar
     if (not desktop) and show:
         server.io_loop.add_callback(lambda: _electron(server, port = port))
     server.io_loop.add_callback(lambda: print('running on: http:\\\\localhost:%d' % port))
-    server.start()
-    server.io_loop.start()
+    server.run_until_shutdown()
 
 if __name__ == '__main__':
     run()   # pylint: disable=no-value-for-parameter

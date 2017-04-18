@@ -39,9 +39,10 @@ def _title(view) -> str:
     return appname.capitalize()
 
 class _FunctionHandler(FunctionHandler):
-    def __init__(self, view):
+    def __init__(self, view, stop = False):
         self.__view = None
         self.server = None
+        self.stoponnosession = stop
 
         def start(doc):
             "Starts the application and adds itself to the document"
@@ -50,20 +51,25 @@ class _FunctionHandler(FunctionHandler):
         super().__init__(start)
 
     def on_session_destroyed(self, session_context):
-        server, self.server = self.server, None
-        if server is None:
+        if self.server is None or not self.stoponnosession:
             return
 
-        if not getattr(server, '_stopped', False):
-            server.stop()
-        server.io_loop.stop()
+        if len(self.server.get_sessions()) == 0:
+            server, self.server = self.server, None
+            if server is None:
+                return
+
+            if not getattr(server, '_stopped', False):
+                server.stop()
+            server.io_loop.stop()
 
 def _serve(view, **kwa):
     "Launches a bokeh server"
     fcn    = _FunctionHandler(view)
     server = Server(Application(fcn), **_serverkwargs(kwa))
     fcn.server = server
-    server.MainView = view
+    server.MainView    = view
+    server.appfunction = fcn
     return server
 
 def _launch(view, **kwa):
