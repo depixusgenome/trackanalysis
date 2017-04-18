@@ -38,10 +38,19 @@ def _title(view) -> str:
     appname   = getattr(view.MainControl, 'APPNAME', 'track analysis')
     return appname.capitalize()
 
+
+def _stop(self, wait=True, __old__ = Server.stop):
+    if not getattr(self, '_stopped', False):
+        __old__(self, wait)
+    self.io_loop.stop()
+Server.stop = _stop
+del _stop
+
 class _FunctionHandler(FunctionHandler):
     def __init__(self, view, stop = False):
-        self.__view = None
-        self.server = None
+        self.__view          = None
+        self.__gotone        = False
+        self.server          = None
         self.stoponnosession = stop
 
         def start(doc):
@@ -50,18 +59,17 @@ class _FunctionHandler(FunctionHandler):
             self.__view = view.open(doc)
         super().__init__(start)
 
+    def on_session_created(self, session_context):
+        self.__gotone = True
+
     def on_session_destroyed(self, session_context):
-        if self.server is None or not self.stoponnosession:
+        if not self.__gotone:
             return
 
-        if len(self.server.get_sessions()) == 0:
+        if self.server is not None and self.stoponnosession:
             server, self.server = self.server, None
-            if server is None:
-                return
-
-            if not getattr(server, '_stopped', False):
+            if len(server.get_sessions()) == 0:
                 server.stop()
-            server.io_loop.stop()
 
 def _serve(view, **kwa):
     "Launches a bokeh server"
@@ -82,9 +90,7 @@ def _launch(view, **kwa):
     def run(self, __old__ = StreamReader.run):
         "Stop the stream reader"
         __old__(self)
-        if not getattr(server, '_stopped', False):
-            server.stop()
-        server.io_loop.stop()
+        server.stop()
     StreamReader.run = run
 
     rtime = _flexxlaunch('http://localhost:{}/'.format(kwa.get('port', '5006')), **kwa)

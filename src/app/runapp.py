@@ -85,8 +85,8 @@ def _electron(server, **kwa):
         with open(path, "w", encoding="utf-8") as stream:
             print(jscode, file = stream)
 
-        server.appfunction.stoponnosession = True
         subprocess.Popen([electron, path], shell = iswin)
+        server.appfunction.stoponnosession = True
     else:
         server.show("/")
 
@@ -144,7 +144,9 @@ def run(view, app, desktop, show, port, raiseerr): # pylint: disable=too-many-ar
             return __popen__(*args, **kwargs, shell = True)
         compiler.Popen = _Popen
 
-    server = launch(viewcls, port = port)
+    server = launch(viewcls, port = port,
+                    **({} if desktop else
+                       {'unused_session_linger_milliseconds': 30000}))
     if (not desktop) and show:
         server.io_loop.add_callback(lambda: _electron(server, port = port))
     server.io_loop.add_callback(lambda: print('running on: http:\\\\localhost:%d' % port))
