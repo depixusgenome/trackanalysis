@@ -83,7 +83,7 @@ class BokehView(View):
 
         css.theme.dark.default  = dark
         css.theme.basic.default = {}
-        css.theme.default       = dark
+        css.theme.default       = 'dark'
 
         self._keys = kwargs['keys']  # type: KeyPressManager
 
@@ -108,6 +108,8 @@ class BokehView(View):
     def addtodoc(self, doc):
         "Adds one's self to doc"
         theme     = self._ctrl.getGlobal('css').theme.get(default = None)
+        if isinstance(theme, str):
+            theme = self._ctrl.getGlobal('css').theme[theme].get(default = None)
         doc.theme = Theme(json = theme)
 
         self._keys.getroots(doc)
