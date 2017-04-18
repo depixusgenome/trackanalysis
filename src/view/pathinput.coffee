@@ -23,7 +23,8 @@ export class PathInputView extends InputWidgetView
             "placeholder='#{mdl.placeholder}' />"
 
     btn   = "<button type='button' "                            +
-            "class='bk-bs-btn bk-bs-btn-default'>+</button>"
+            "class='bk-bs-btn bk-bs-btn-default' "              +
+            "style='margin-left:5px'>+</button>"
     @$el.html("<fragment>#{label}<table><tr>"                   +
               "<td>#{txt}</td><td>#{btn}</td>"                  +
               "</tr></table></fragment>")
@@ -33,8 +34,8 @@ export class PathInputView extends InputWidgetView
       @$el.find('input').height(@model.height - 35)
 
     if @model.width
-      @$el.find('input').width(@model.width-20)
-    @$el.find('button').width(10)
+      @$el.find('input').width(@model.width-25)
+    @$el.find('button').width(5)
     @$el.find('input').prop("disabled", @model.disabled)
     @$el.find('button').prop("disabled", @model.disabled)
 
