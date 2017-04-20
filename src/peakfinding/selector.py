@@ -105,7 +105,7 @@ class PeakSelector:
 
         hist, minv, binwidth = projector.projection(pos, zmeasure = None)
         peaks = self.find (hist, minv, binwidth)
-        ids   = self.group(peaks, pos)
+        ids   = self.group(peaks, pos, precision = precision)
         return PeakSelectorDetails(pos, hist, minv, binwidth, delta, peaks, original, ids)
 
     def details2output(self, dtl:PeakSelectorDetails) -> Iterator[Output]:

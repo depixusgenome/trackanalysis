@@ -55,7 +55,7 @@ FitBead = NamedTuple('FitBead',
 class FitToHairpinProcessor(Processor):
     "Groups beads per hairpin"
     @classmethod
-    def apply(cls, toframe, **cnf):
+    def apply(cls, toframe = None, **cnf):
         "applies the task to a frame or returns a function that does so"
         app  = partial(cls.compute, **cnf)
         fcn  = lambda frame: frame.withaction(app)
@@ -142,7 +142,7 @@ ByHairpinGroup = NamedTuple('ByHairpinGroup',
 class BeadsByHairpinProcessor(Processor):
     "Groups beads per hairpin"
     @classmethod
-    def apply(cls, toframe, **cnf):
+    def apply(cls, toframe = None, **cnf):
         "applies the task to a frame or returns a function that does so"
         vals = (cnf.get(i, {}) for i in ('distances', 'constrainst', 'peakids'))
         app  = partial(cls.compute, *vals)

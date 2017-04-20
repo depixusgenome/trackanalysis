@@ -273,15 +273,16 @@ PeakFinder = Union[CWTPeakFinder, ZeroCrossingPeakFinder]
 
 class GroupByPeak:
     u"Groups events by peak position"
-    window    = 10
+    window    = 3
     mincount  = 5
     @initdefaults
     def __init__(self, **_):
         pass
 
-    def _bins(self, peaks:np.ndarray):
+    def _bins(self, peaks:np.ndarray, precision):
+        window        = self.window*(1. if precision is None else precision)
         bins          = (np.repeat(peaks, 2).reshape((len(peaks), 2))
-                         + [-self.window, self.window]).ravel()
+                         + [-window, window]).ravel()
         diff          = bins[1:-1].reshape((len(peaks)-1,2))
         div           = np.where(np.diff(diff, 1) < 0)[0]
         bins[2*div+1] = np.mean(diff[div], 1)
@@ -291,8 +292,8 @@ class GroupByPeak:
         inds[np.searchsorted(bins, peaks)] = np.arange(len(peaks))
         return bins, inds
 
-    def __call__(self, peaks, elems):
-        bins, inds = self._bins(peaks)
+    def __call__(self, peaks, elems, precision = None):
+        bins, inds = self._bins(peaks, precision)
 
         ids  = inds[np.digitize(np.concatenate(elems), bins)]
         cnts = np.bincount(ids)
