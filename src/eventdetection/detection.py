@@ -101,7 +101,7 @@ class DerivateSplitDetector(BaseSplitDetector):
                                   self.window, self.window)
 
     def _compute(self, precision:Optional[float], data : np.ndarray) -> np.ndarray:
-        return self.deltas(data) >= self.threshold(precision, data)*self.window
+        return self.deltas(data) <= -self.threshold(precision, data)*self.window
 
 class MinMaxSplitDetector(BaseSplitDetector):
     u"""

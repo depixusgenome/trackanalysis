@@ -19,20 +19,20 @@ def test_detectsplits():
     assert det([])    == tuple()
     assert det(items) == ((0, 30),)
 
-    items[10:] += thr
-    items[20:] += thr
-    items[21:] += thr
+    items[10:] -= thr
+    items[20:] -= thr
+    items[21:] -= thr
     assert det(items) == ((0, 10), (10,20), (21,30))
 
-    items[0:2]  = (-2*thr, -thr)
-    items[28:] += thr
-    items[29:] += thr
+    items[0:2]  = (2*thr, thr)
+    items[28:] -= thr
+    items[29:] -= thr
     assert det(items) == ((2, 10), (10,20), (21,28))
 
     items       = np.zeros((30,))
-    items[10:] += thr
-    items[20:] += thr
-    items[21:] += thr
+    items[10:] -= thr
+    items[20:] -= thr
+    items[21:] -= thr
     items[[0, 10, 25, 29]] = np.nan
     assert det(items) == ((0, 11), (11,20), (21,30))
 
@@ -153,4 +153,4 @@ def test_correlationalignment():
     np.testing.assert_allclose(biases, [1., 0., -1.], rtol = 1e-4, atol = 1e-4)
 
 if __name__ == '__main__':
-    test_multiscalesplits()
+    test_detectsplits()
