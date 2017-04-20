@@ -20,10 +20,16 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
     bias      = props.Float(0.)
     stretch   = props.Float(0.)
     updating  = props.String('')
+
+    # 1 & 2: dummy variables because js_on_change is bugged
+    updating1 = props.String('')
+    updating2 = props.String('')
     __implementation__ = SequenceHoverMixin.impl('DpxHoverModel',
                                                  """
                                                  shape    : [p.Array,  [0, 0]],
                                                  cycle    : [p.Int,  0],
+                                                 updating1: [p.String, ''],
+                                                 updating2: [p.String, '']
                                                  """)
     def __init__(self, **kwa):
         super().__init__(**kwa)

@@ -11,7 +11,7 @@ from bokeh                      import layouts
 from bokeh.plotting             import figure, Figure    # pylint: disable=unused-import
 from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
                                         DataTable, TableColumn, Model, Widget,
-                                        Div, StringFormatter, TapTool)
+                                        Div, StringFormatter, TapTool, CustomJS)
 
 import numpy                    as     np
 
@@ -38,7 +38,7 @@ from view.plots.sequence        import (readsequence, SequenceTicker, OligoListW
                                         SequenceKeyProp as _SequenceKeyProp)
 
 from ..probabilities            import Probability
-from ..processor                import newidentification
+from ..processor                import fittohairpintask
 
 class FitToHairpinAccess(TaskAccess):
     "access to the FitToHairpinTask"
@@ -94,7 +94,7 @@ class _PeaksPlotModelAccess(TaskPlotModelAccess):
         if ols is None or len(ols) == 0 or len(readsequence(seq)) == 0:
             return None
         else:
-            return newidentification(seq, ols, self.constraintspath, self.useparams)
+            return fittohairpintask(seq, ols, self.constraintspath, self.useparams)
 
 class PeaksPlotModelAccess(_PeaksPlotModelAccess):
     "Access to peaks"
@@ -238,6 +238,14 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
                                                  stretches: [p.Any, {}],
                                                  biases:    [p.Any, {}],
                                                  ''')
+
+
+    def create(self, fig, *args, **kwa):
+        "Creates the hover tool for histograms"
+        super().create(fig, *args, **kwa)
+        jsc = CustomJS(args = {'fig': fig, 'source': self.source},
+                       code = 'cb_obj.apply_update(fig, source)')
+        self.js_on_change("updating", jsc)
 
     def reset(self):
         "Creates the hover tool for histograms"

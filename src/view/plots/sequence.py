@@ -183,27 +183,42 @@ class SequenceHoverMixin:
                     default_view: %sView
                     type:"%s"
 
-                    setsource: (source, values) ->
-                        if values[0] == @_values[0] && values[1] == @_values[1]
+                    setsource: (source, value) ->
+                        if @_callcount != value
                             return
-                        if values[0] != @bias || values[1] != @stretch
+                        if @updating   != ''
                             return
 
+                        @_callcount = value
                         tmp = source.data["values"]
                         source.data["z"] = tmp.map(((x)-> x/@stretch+@bias), @)
-                        @_values = values
                         source.trigger('change:data')
+
+                    apply_update: (fig, ttip) ->
+                        if @updating == ''
+                            return
+
+                        @_callcount = @_callcount + 1
+
+                        bases       = fig.extra_y_ranges['bases']
+                        yrng        = fig.y_range
+                        bases.start = (yrng.start - @bias) * @stretch
+                        bases.end   = (yrng.end   - @bias) * @stretch
+
+                        window.setTimeout(((b, c) => @setsource(b, c)),
+                                          800, ttip, @_callcount)
+                        @updating   = ''
 
                     @define {
                         %s
                         framerate : [p.Number, 1],
                         stretch   : [p.Number, 0],
                         bias      : [p.Number, 0],
-                        updating  : [p.String, ''],
+                        updating  : [p.String, '']
                     }
 
                     @internal {
-                        _values: [p.Array, [0, 1]]
+                        _callcount: [p.Number, 0]
                     }
                 """ % (name, name, name, name, atts)
 
@@ -250,21 +265,6 @@ class SequenceHoverMixin:
         self.__tool.update(tooltips  = css.get(),
                            mode      = 'hline',
                            renderers = [fig.circle(**args)])
-
-        src = self.__source
-        @from_py_func
-        def _js_cb(src = src, fig = fig, cb_obj = None, window = None):
-            if cb_obj.updating != '*':
-                return
-
-            values = cb_obj.bias, cb_obj.stretch
-            window.setTimeout(lambda a, b, c: a.setsource(b, c), 500, cb_obj, src, values)
-            bases       = fig.extra_y_ranges['bases']
-            yrng        = fig.y_range
-            bases.start = (yrng.start-cb_obj.bias)*cb_obj.stretch
-            bases.end   = (yrng.end  -cb_obj.bias)*cb_obj.stretch
-
-        self.js_on_change("updating", _js_cb)
 
     def reset(self, **kwa):
         "updates the tooltips for a new file"
