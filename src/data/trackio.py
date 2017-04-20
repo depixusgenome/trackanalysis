@@ -142,7 +142,8 @@ class LegacyGRFilesIO(_TrackIO):
         remove = set(i for i in output if isinstance(i, int))
 
         if len(paths) == 2 and Path(paths[1]).is_dir():
-            itr = Path(paths[1]).iterdir()      # type: Iterator[Path]
+            itr = iter(i for i in Path(paths[1]).iterdir()
+                       if 'z(t)bd' in i.stem.lower()) # type: Iterator[Path]
         else:
             itr = (Path(i) for i in paths[1:])
 
