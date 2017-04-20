@@ -25,12 +25,14 @@ from sequences                  import read as readsequences
 from .reporting.processor       import HybridstatExcelTask
 from .reporting.identification  import readparams
 
-def readconstraints(idtask, idpath: Optional[str], useparams:bool):
+def readconstraints(idtask   : FitToHairpinTask,
+                    idpath   : Union[Path, str, None],
+                    useparams: bool = True) -> FitToHairpinTask:
     "adds constraints to an identification task"
     cstrs              = {} # type: Constraints
     idtask.constraints = cstrs
     if idpath is None or not Path(idpath).exists():
-        return
+        return idtask
 
     for item in readparams(idpath):
         cstrs[item[0]] = DistanceConstraint(item[1], {})
@@ -45,12 +47,17 @@ def readconstraints(idtask, idpath: Optional[str], useparams:bool):
         if item[3] is not None:
             bias    = Range(item[3], rngs.bias   [-1]*.1, rngs.bias[-1])
             cstrs[item[0]]['bias']    = bias
+    return idtask
 
-def newidentification(seqpath, oligos, idpath, useparams) -> FitToHairpinTask:
+def fittohairpintask(seqpath    : Union[Path, str],
+                     oligos     : Union[Sequence[str], str],
+                     idpath     : Union[None,Path,str] = None,
+                     useparams  : bool = True) -> FitToHairpinTask:
     "creates and identification task from paths"
     task = FitToHairpinTask.read(seqpath, oligos)
-    readconstraints(task, idpath, useparams)
-    return task
+    if len(task.distances) == 0:
+        raise IOError("Could not find any sequence in "+str(seqpath))
+    return readconstraints(task, idpath, useparams)
 
 class HybridstatTemplate:
     u"Template of tasks to run"
@@ -173,8 +180,8 @@ class HybridstatProcessor(Processor):
                 modl.identity = None
             return
 
-        modl.identity = newidentification(paths.sequence, oligos,
-                                          paths.idpath, paths.useparams)
+        modl.identity = fittohairpintask(paths.sequence, oligos,
+                                         paths.idpath, paths.useparams)
 
     @staticmethod
     def __excel(oligos: Sequence[str],

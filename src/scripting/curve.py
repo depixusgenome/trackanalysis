@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "for speeding up the creation of figures"
+from itertools      import chain
 import numpy as np
 from bokeh.plotting import Figure, figure
 from bokeh.io       import show as _show
-from bokeh.models   import DataRange1d, LinearAxis
+from bokeh.models   import DataRange1d, LinearAxis, ColumnDataSource
+
+from data           import TrackItems
+from utils          import EVENTS_DTYPE
 
 class Multiplier:
     "basic right multiplier"
@@ -27,8 +31,7 @@ class Show(Multiplier):
         _show(plot)
 
     def __rmul__(self, plot):
-        super().__rmul__(plot)
-        return None
+        _show(plot)
 
 class ExtraAxis(Multiplier):
     "adds a right axis"
@@ -55,48 +58,101 @@ class Curve(Multiplier):
 
     Specifying axis allows displaying a right (='y') or top (='x') axis.
     """
-    def __init__(self, data, **kwa):
-        self.data = data
-        self.kwa  = kwa
-        if 'color' in kwa:
-            self.kwa['line_color'] = self.kwa.pop('color')
+    def __init__(self, *data, bias = 0., stretch = 1., positions = None, **kwa):
+        self.data    = data[0] if len(data) == 1 else data
+        self.kwa     = kwa
+        self.bias    = bias
+        self.stretch = stretch
+        self.pos     = positions
+        if 'line_color' in kwa:
+            self.kwa['color'] = self.kwa.pop('line_color')
 
         axis = self.kwa.pop('axis', None)
         if axis is not None:
             self.kwa.setdefault(axis+'_range_name', 'right' if axis == 'y' else 'top')
 
-        if 'y_range_name' in self.kwa and 'line_color' not in self.kwa:
-            self.kwa['line_color'] = 'red'
+        if 'y_range_name' in self.kwa and 'color' not in self.kwa:
+            self.kwa['color'] = 'red'
 
-        elif 'x_range_name' in self.kwa and 'line_color' not in self.kwa:
-            self.kwa['line_color'] = 'gray'
+        elif 'x_range_name' in self.kwa and 'color' not in self.kwa:
+            self.kwa['color'] = 'gray'
 
-    def _action(self, plot):
+    def __render(self, plot):
+        kwa   = dict(self.kwa)
+        glyph = kwa.pop('glyph', 'line')
+        if glyph == 'line' and 'color' in kwa:
+            kwa['line_color'] = kwa.pop('color')
+        return lambda *x, **y: getattr(plot, glyph)(*x, **y, **kwa)
+
+    def __iterdata(self):
+        if isinstance(self.data, TrackItems):
+            yield from (i for _, i in self.data)
+        elif isinstance(self.data, dict):
+            yield from self.data.values()
+        elif np.isscalar(self.data[0]):
+            yield self.data
+        else:
+            yield from self.data
+
+    def __axes(self, plot):
+        ranges = []
         for axis in 'x', 'y':
             name = axis+'_range_name'
             rng  = getattr(plot, 'extra_{}_ranges'.format(axis))
-            if name in self.kwa and self.kwa[name] not in rng:
-                plot = plot*ExtraAxis(self.kwa[name], axis)
-
-        rend  = plot.line(np.arange(len(self.data)), self.data, **self.kwa)
-        found = False
-        for axis in 'x', 'y':
-            name = axis+'_range_name'
             if name in self.kwa:
-                rng = getattr(plot, 'extra_{}_ranges'.format(axis))[self.kwa[name]]
-                rng.renderers = list(rng.renderers)+[rend]
-                found = True
+                if self.kwa[name] not in rng:
+                    plot = plot*ExtraAxis(self.kwa[name], axis)
+                ranges.append(rng[self.kwa[name]])
+            else:
+                ranges.append(getattr(plot, axis+'_range'))
+        return ranges
 
-        if not found:
-            if len(plot.extra_x_ranges):
-                plot.x_range.renderers = list(plot.x_range.renderers)+[rend]
-            if len(plot.extra_y_ranges):
-                plot.y_range.renderers = list(plot.y_range.renderers)+[rend]
+    def _arrays(self, lens):
+        data = np.full ((sum(lens),), np.NaN, dtype = 'f4')
+        time = np.empty((len(data),),         dtype = 'f4')
+        pos  = self.pos
+        if pos is None:
+            pos = np.arange(max(lens), dtype = 'f4')
+        return self.bias + self.stretch*pos, data, time
+
+    def source(self, source = None):
+        "returns a columndatasource"
+        vals = list(self.__iterdata())
+        if vals[0].dtype == EVENTS_DTYPE:
+            vals = np.concatenate(vals)
+        else:
+            vals = [(0, i) for i in vals]
+
+        lens             = [len(j)+1 for _, j in vals]
+        pos, data, time  = self._arrays(lens)
+        for i, (start, j) in zip(chain([0], np.cumsum(lens)), vals):
+            data[i:i+len(j)] = j
+            time[i:i+len(j)] = (start*self.stretch+self.bias) + pos[:len(j)]
+
+        if source is None:
+            return ColumnDataSource(data = {'z': data, 't': time})
+        else:
+            source.data = {'z': data, 't': time}
+            return source
+
+    def plot(self, plot, source):
+        "plots a source"
+        axes     = self.__axes(plot)
+        renderer = self.__render(plot)
+        rend     = renderer('t', 'z', source = source)
+        for axis in axes:
+            axis.renderers = list(axis.renderers)+[rend]
         return plot
 
-def show():
+    def _action(self, plot):
+        self.plot(plot, self.source())
+
+def show(*args):
     "shows the plot"
-    return Show()
+    if len(args):
+        _show(*args)
+    else:
+        return Show()
 
 def curve(*args, **kwa):
     "adds a curve"

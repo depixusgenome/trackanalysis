@@ -206,5 +206,5 @@ def taskorder(lst):
         modname, clsname = itm[:itm.rfind('.')], itm[itm.rfind('.')+1:]
         yield getattr(__import__(modname, fromlist = (clsname,)), clsname)
 
-__all__  = tuple(i for i in locals() if i.endswith('Task') and len(i) > len('Task'))
+__all__  = tuple(i for i in locals() if i.endswith('Task') and len(i) >= len('Task'))
 __all__ += 'TagAction', 'TASK_ORDER' # type: ignore

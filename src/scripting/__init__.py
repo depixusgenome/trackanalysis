@@ -54,6 +54,8 @@ from eventdetection.processor   import ExtremumAlignmentTask, EventDetectionTask
 from eventdetection.data        import Events
 from signalfilter               import (PrecisionAlg, RollingFilter, NonLinearFilter,
                                         ForwardBackwardFilter)
+from peakfinding.processor      import PeakSelectorTask
+from peakcalling.processor      import FitToHairpinTask
 
 from .curve                 import * # pylint: disable=wildcard-import
 
@@ -86,7 +88,9 @@ class ScriptingView(View):
                             driftperbead   = DriftTask(onbeads = True),
                             driftpercycle  = DriftTask(onbeads = False),
                             cycles         = CycleCreatorTask(),
-                            eventdetection = EventDetectionTask())
+                            eventdetection = EventDetectionTask(),
+                            peakselector   = PeakSelectorTask(),
+                            fittohairpin   = FitToHairpinTask())
 
     @property
     def control(self):
@@ -103,6 +107,8 @@ class Tasks(Enum):
     driftpercycle  = 'driftpercycle'
     cycles         = 'cycles'
     eventdetection = 'eventdetection'
+    peakselector   = 'peakselector'
+    fittohairpin   = 'fittohairpin'
 
     def __call__(self, **kwa):
         cnf = scriptapp.control.getGlobal("config").tasks
@@ -167,7 +173,7 @@ class Track(_Track):
         return self.cycles.withphases(phase)
 
     @property
-    def events(self):
+    def events(self) -> Events:
         "returns events in phase 5 only"
         phase = scriptapp.control.getGlobal('config').phase.measure.get()
         return Events(track = self, beadsonly = True,
