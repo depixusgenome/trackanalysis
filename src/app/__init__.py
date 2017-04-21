@@ -16,13 +16,15 @@ from bokeh.command.util         import build_single_handler_application
 from bokeh.settings             import settings
 from bokeh.layouts              import layout
 
-from utils         import getlocals
-from utils.gui     import MetaMixin
-from control       import Controller
-from view          import View, BokehView
-from view.keypress import KeyPressManager
+from utils.logconfig            import getLogger
+from utils                      import getlocals
+from utils.gui                  import MetaMixin
+from control                    import Controller
+from view                       import View, BokehView
+from view.keypress              import KeyPressManager
 import view.toolbar as toolbars
 
+LOGS           = getLogger(__name__)
 DEFAULT_CONFIG = lambda x: None
 
 def _serverkwargs(kwa):
@@ -60,15 +62,18 @@ class _FunctionHandler(FunctionHandler):
         super().__init__(start)
 
     def on_session_created(self, session_context):
+        LOGS.debug('started session')
         self.__gotone = True
 
     def on_session_destroyed(self, session_context):
+        LOGS.debug('destroyed session')
         if not self.__gotone:
             return
 
         if self.server is not None and self.stoponnosession:
             server, self.server = self.server, None
             if len(server.get_sessions()) == 0:
+                LOGS.info('no more sessions -> stopping server')
                 server.stop()
 
 def _serve(view, **kwa):
