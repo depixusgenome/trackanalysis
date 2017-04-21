@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Runs an app"
+"Runs an app"
 from   pathlib import Path
 import logging
 import sys
@@ -36,6 +36,7 @@ def _from_module(view):
     if view.startswith('view.'):
         view = view[5:]
 
+    print(view)
     if '.' not in view:
         view = view.lower()+'.'+view
     try:
@@ -105,12 +106,17 @@ def _win_opts():
 
 def _raiseerr(raiseerr):
     if raiseerr:
-        import app
+        import app.launcher as app
 
         def _cnf(ctrl):
             ctrl.getGlobal('config').catcherror.default         = False
             ctrl.getGlobal('config').catcherror.toolbar.default = False
         app.DEFAULT_CONFIG = _cnf
+
+def _files(files):
+    if len(files):
+        import app.launcher as app
+        app.INITIAL_ORDERS.append(lambda ctrl: ctrl.openTrack(files))
 
 def _launch(view, app, desktop, kwa):
     viewcls = _from_path(view)
@@ -141,20 +147,21 @@ def _port(port):
 
 @click.command()
 @click.argument('view')
+@click.argument('files', nargs = -1, type = click.Path())
 @click.option("--app", default = 'app.BeadToolBar',
-              help = u'Which app mixin to use')
+              help = 'Which app mixin to use')
 @click.option("--web", 'desktop', flag_value = False,
-              help = u'Serve to webbrowser rather than desktop app')
+              help = 'Serve to webbrowser rather than desktop app')
 @click.option("--desk", 'desktop', flag_value = True, default = True,
-              help = u'Launch as desktop app')
+              help = 'Launch as desktop app')
 @click.option("--show", flag_value = True, default = False,
-              help = u'If using webbrowser, launch it automatically')
+              help = 'If using webbrowser, launch it automatically')
 @click.option("--port", default = '5006',
-              help = u'port used: use "random" for any')
+              help = 'Port used: use "random" for any')
 @click.option('-r', "--raiseerr", flag_value = True, default = False,
-              help = u'Wether errors should be caught')
-def run(view, app, desktop, show, port, raiseerr): # pylint: disable=too-many-arguments
-    u"Launches an view"
+              help = 'Wether errors should be caught')
+def main(view, files, app, desktop, show, port, raiseerr): # pylint: disable=too-many-arguments
+    "Launches an view"
     _raiseerr(raiseerr)
     _win_opts()
 
@@ -169,9 +176,11 @@ def run(view, app, desktop, show, port, raiseerr): # pylint: disable=too-many-ar
     log = lambda: LOGS.info(' http://%(address)s:%(port)s',
                             {'port': port, 'address': 'localhost'})
 
+    _files(files)
+
     server.io_loop.add_callback(log)
     server.run_until_shutdown()
     logging.shutdown()
 
 if __name__ == '__main__':
-    run()   # pylint: disable=no-value-for-parameter
+    main()   # pylint: disable=no-value-for-parameter
