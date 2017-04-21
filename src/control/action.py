@@ -97,7 +97,9 @@ class Action(ActionDescriptor):
         if _CNT == 0 and val is None:
             LOGS.debug("done action %s@%s [%s]", *self._calls)
         elif val is not None:
-            LOGS.error("failed action %s@%s [%s]", *self._calls)
-            if errvalue[0]:
+            if errvalue[0] and (len(val.args) != 2 or val.args[1] != 'treated'):
+                LOGS.error("failed action %s@%s [%s]", *self._calls)
                 LOGS.exception(val)
+            else:
+                LOGS.debug("failed action %s@%s [%s]", *self._calls)
         return errvalue[0]

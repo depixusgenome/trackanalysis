@@ -147,7 +147,7 @@ class ReporterInfo(HasLengthPeak):
         for cls in Reporter.__subclasses__():
             if cls.__name__.lower() in (name.lower(), name.lower()+'sheet'):
                 return cls
-        raise KeyError('No sheet with name: '+name)
+        raise KeyError('No sheet with name: '+name, "treated")
 
 class Reporter(_Reporter):
     u"Basic class for iterating over the data"

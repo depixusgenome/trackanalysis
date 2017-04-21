@@ -18,7 +18,7 @@ class AnaIO(TaskIO):
 
         out = load(path)
         if out is not None and len(model):
-            raise NotImplementedError("Don't know what to do")
+            raise NotImplementedError()
         return out
 
     def save(self, path:str, models):

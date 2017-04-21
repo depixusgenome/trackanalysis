@@ -3,7 +3,7 @@
 "Toolbar"
 from pathlib              import Path
 from bokeh.layouts        import Row, widgetbox
-from bokeh.models         import Paragraph
+from bokeh.models         import Div
 
 from control.taskio       import TaskIO
 from .dialog              import FileDialog
@@ -37,11 +37,16 @@ class  ToolBar(BokehView):
         self._tools = []
 
         self._ctrl.getGlobal('project').message.default = ''
+        msg = self._ctrl.getGlobal('config').message
+        msg.defaults = { 'normal':  '<p>{}</p>',
+                         'warning': '<p style="color:blue;">{}</p>',
+                         'error':   '<p style="color:red>   {}</p>'
+                       }
         css          = self._ctrl.getGlobal('css').title
         css.defaults = {'open': u'Open', 'save': u'Save', 'quit': u'Quit',
                         'open.dialog': u'Open a track or analysis file',
                         'save.dialog': u'Save an analysis file',
-                        'working': u'Please wait ...'}
+                        'working':     u'Please wait ...'}
 
         cnf = self._ctrl.getGlobal('config')
         cnf.catcherror.toolbar.default = True
@@ -62,13 +67,20 @@ class  ToolBar(BokehView):
         if self._ctrl.ISAPP:
             self._quit = self.button(self._ctrl.close, css.quit.get())
             self._tools.append(self._quit)
-        self._text = Paragraph(text = '                                     ')
+        self._text = Div(text = '                                     ')
         self._tools.append(self._text)
 
         self.__diagopen.filetypes = TaskIO.extensions(self._ctrl, 'openers')
         self.__diagopen.title     = css.open.dialog.get()
         self.__diagsave.filetypes = TaskIO.extensions(self._ctrl, 'savers')
         self.__diagsave.title     = css.save.dialog.get()
+
+    def __settext(self, text = None, tpe = 'normal'):
+        if text is None:
+            self._text.text = ''
+        else:
+            msg  = self._ctrl.getGlobal('config').message.get(tpe)
+            self._text.text = msg.format(text)
 
     def getroots(self, doc):
         "adds items to doc"
@@ -89,16 +101,19 @@ class  ToolBar(BokehView):
         @self._ctrl.observe
         def _onstartaction(recursive = None):
             if not recursive:
-                self._text.text = self._ctrl.getGlobal('css').title.working.get()
+                self.__settext(self._ctrl.getGlobal('css').title.working.get())
 
         catch = self._ctrl.getGlobal('config').catcherror.toolbar
         @self._ctrl.observe
         def _onstopaction(recursive = None, value = None, catcherror = None, **_):
             if not recursive:
                 if value is None:
-                    self._text.text = ''
+                    self.__settext()
+                elif len(getattr(value, 'args', [])) == 2 and value.args[1] == 'treated':
+                    self.__settext(value.args[0], 'warning')
+                    catcherror[0]   = catch.get()
                 else:
-                    self._text.text = str(value)
+                    self.__settext(value, 'error')
                     catcherror[0]   = catch.get()
 
         fcn = lambda itm: setattr(self._text, 'text', str(itm))

@@ -5,6 +5,7 @@ from typing            import (Tuple, Optional, # pylint: disable =unused-import
                                Iterator, List, Union, Any, Callable, Dict,
                                TYPE_CHECKING)
 
+from signalfilter      import rawprecision
 from model.task        import RootTask, Task, taskorder, TASK_ORDER
 from model.globals     import (ConfigProperty, ConfigRootProperty, BeadProperty,
                                ProjectRootProperty)
@@ -15,6 +16,13 @@ from .base             import PlotModelAccess, PlotCreator, PlotState
 
 class TaskPlotModelAccess(PlotModelAccess):
     "Contains all access to model items likely to be set by user actions"
+    def __init__(self, *args, **kwa):
+        super().__init__(*args, **kwa)
+        cnf = self.config.root.precision
+        cnf.defaults = {'min': 1e-4,
+                        'max': 1e-2,
+                        'title': ("Bead {bead} has "
+                                  +"{min:.4f} ≮ σ[HF] = {val:.4f} ≮ {max:.4f}")}
     @property
     def bead(self) -> Optional[int]:
         "returns the current bead number"
@@ -24,6 +32,17 @@ class TaskPlotModelAccess(PlotModelAccess):
             if track is not None:
                 return next(iter(track.beadsonly.keys()))
         return bead
+
+    def checkbead(self):
+        "checks that the bead is correct"
+        prec = rawprecision(self.track, self.bead)
+        cnf  = self.config.precision
+        if not cnf.max.get() > prec > cnf.min.get():
+            msg = cnf.title.format(bead = self.bead,
+                                   min  = cnf.min.get(),
+                                   val  = prec,
+                                   max  = cnf.max.get())
+            raise ValueError(msg, 'treated')
 
     def clear(self):
         u"updates the model when a new track is loaded"

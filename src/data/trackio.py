@@ -118,14 +118,14 @@ class LegacyGRFilesIO(_TrackIO):
                 paths = paths[1], paths[0]
 
             if all(i.suffix != '.gr' for i in paths[1].iterdir()):
-                raise IOError("[LegacyGRFilesIO] No .gr files in directory\n- {}"
-                              .format(paths[1]))
+                raise IOError("No .gr files in directory\n- {}".format(paths[1]),
+                              "treated")
             fname = str(paths[0])
             if '*' in fname:
                 return cls.__findtrk(fname, paths[1])
 
             elif not paths[0].exists():
-                raise IOError("Could not find path: " + str(paths[0]))
+                raise IOError("Could not find path: " + str(paths[0]), "treated")
 
             return paths
 
@@ -162,8 +162,7 @@ class LegacyGRFilesIO(_TrackIO):
         cgr  = next((i for i in Path(grs).iterdir() if i.suffix == '.cgr'),
                     None)
         if cgr is None:
-            raise IOError("[LegacyGRFilesIO] No .cgr files in directory\n- {}"
-                          .format(grs))
+            raise IOError("No '.cgr' files in directory\n- {}".format(grs), "treated")
 
         pot    = cgr.with_suffix('.trk').name
         ind    = fname.find('*')
@@ -176,8 +175,7 @@ class LegacyGRFilesIO(_TrackIO):
             parent = root
         trk    = next((i for i in parent.glob(glob) if i.name == pot), None)
         if trk is None:
-            raise IOError("[LegacyGRFilesIO] Could not find {} in {}"
-                          .format(pot, fname))
+            raise IOError("Could not find {} in {}".format(pot, fname), "treated")
         return trk, grs
 
     @classmethod
@@ -187,15 +185,15 @@ class LegacyGRFilesIO(_TrackIO):
         tit    = cls.__TITLE.match(grdict['title'])
 
         if tit is None:
-            raise IOError("Could not match title in " + path)
+            raise IOError("Could not match title in " + path, "treated")
 
         beadid = int(tit.group("id"))
         if beadid not in output:
-            raise IOError("Could not find bead "+str(beadid)+" in " + path)
+            raise IOError("Could not find bead "+str(beadid)+" in " + path, "treated")
 
         phases = [int(i) for i in tit.group("phases").split(',') if len(i.strip())]
         if set(np.diff(phases)) != {1}:
-            raise IOError("Phases must be sequencial in "+ path)
+            raise IOError("Phases must be sequencial in "+ path, "treated")
 
         starts  = output['phases'][:, phases[0]] - output['phases'][0,phases[0]]
         bead    = output[beadid]
@@ -251,7 +249,7 @@ class Handler:
 
         if isinstance(paths, (str, Path)):
             if not Path(paths).exists():
-                raise IOError("Could not find path: " + str(paths))
+                raise IOError("Could not find path: " + str(paths), "treated")
         else:
             paths = tuple(str(i) for i in paths)
 
@@ -261,7 +259,7 @@ class Handler:
                 res = cls(tmp, caller)
                 break
         else:
-            raise IOError("Unknown file format in: {}".format(paths))
+            raise IOError("Unknown file format in: {}".format(paths), "treated")
 
         return res
 

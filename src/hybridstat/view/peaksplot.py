@@ -101,6 +101,7 @@ class PeaksPlotModelAccess(_PeaksPlotModelAccess):
     def __init__(self, ctrl, key: Optional[str] = None) -> None:
         super().__init__(ctrl, key)
         self.config.root.tasks.extremumalignment.default = ExtremumAlignmentTask()
+
         self.eventdetection     = TaskAccess(self, EventDetectionTask)
         self.peakselection      = TaskAccess(self, PeakSelectorTask)
         self.fits               = None   # type: Optional[FitBead]
@@ -147,6 +148,8 @@ class PeaksPlotModelAccess(_PeaksPlotModelAccess):
         "returns a tuple (dataitem, bead) to be displayed"
         if self.track is None:
             return None
+
+        self.checkbead()
 
         root  = self.roottask
         ibead = self.bead
