@@ -75,17 +75,10 @@ class  ToolBar(BokehView):
         self.__diagsave.filetypes = TaskIO.extensions(self._ctrl, 'savers')
         self.__diagsave.title     = css.save.dialog.get()
 
-    def __settext(self, text = None, tpe = 'normal'):
-        if text is None:
-            self._text.text = ''
-        else:
-            msg  = self._ctrl.getGlobal('config').message.get(tpe)
-            self._text.text = msg.format(text)
-
     def getroots(self, doc):
         "adds items to doc"
         self._getroots(doc)
-        self.enableOnTrack(self._save)
+
         def _title(item):
             path = getattr(item.value, 'path', None)
             if isinstance(path, (list, tuple)):
@@ -97,27 +90,38 @@ class  ToolBar(BokehView):
 
         self._ctrl.getGlobal("project").track.observe(_title)
 
+        msg     = self._ctrl.getGlobal('project').message
+        working = self._ctrl.getGlobal('css').title.working.get()
+        catch   = self._ctrl.getGlobal('config').catcherror.toolbar
+
         # pylint: disable=unused-variable
         @self._ctrl.observe
         def _onstartaction(recursive = None):
             if not recursive:
-                self.__settext(self._ctrl.getGlobal('css').title.working.get())
+                msg.set((working, 'normal'))
 
-        catch = self._ctrl.getGlobal('config').catcherror.toolbar
         @self._ctrl.observe
         def _onstopaction(recursive = None, value = None, catcherror = None, **_):
             if not recursive:
                 if value is None:
-                    self.__settext()
-                elif len(getattr(value, 'args', [])) == 2 and value.args[1] == 'treated':
-                    self.__settext(value.args[0], 'warning')
-                    catcherror[0]   = catch.get()
-                else:
-                    self.__settext(value, 'error')
-                    catcherror[0]   = catch.get()
+                    if working in self._text.text:
+                        msg.set(('', 'normal'))
+                    return
 
-        fcn = lambda itm: setattr(self._text, 'text', str(itm))
-        self._ctrl.getGlobal('project').message.observe(fcn)
+                if len(getattr(value, 'args', [])) == 2 and value.args[1] == 'treated':
+                    msg.set((str(value.args[0]), 'warning'))
+                else:
+                    msg.set((str(value), 'error'))
+
+                catcherror[0] = catch.get()
+
+        templ = self._ctrl.getGlobal('config').message.getdict(..., fullnames = False)
+        def _settext(text):
+            self._text.text = templ[text.value[1]].format(text.value[0])
+
+        self._ctrl.getGlobal('project').message.observe(_settext)
+
+        self.enableOnTrack(self._save)
 
         return Row(children = self._tools, sizing_mode = 'fixed'),
 

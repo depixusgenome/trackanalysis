@@ -33,7 +33,7 @@ class TaskPlotModelAccess(PlotModelAccess):
                 return next(iter(track.beadsonly.keys()))
         return bead
 
-    def checkbead(self):
+    def checkbead(self, throwerr = True) -> bool:
         "checks that the bead is correct"
         prec = rawprecision(self.track, self.bead)
         cnf  = self.config.precision
@@ -42,7 +42,12 @@ class TaskPlotModelAccess(PlotModelAccess):
                                    min  = cnf.min.get(),
                                    val  = prec,
                                    max  = cnf.max.get())
-            raise ValueError(msg, 'treated')
+            if throwerr:
+                raise ValueError(msg, 'treated')
+            else:
+                self.project.root.message = (msg, 'warning')
+            return True
+        return False
 
     def clear(self):
         u"updates the model when a new track is loaded"

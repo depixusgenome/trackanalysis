@@ -146,10 +146,8 @@ class PeaksPlotModelAccess(_PeaksPlotModelAccess):
 
     def runbead(self):
         "returns a tuple (dataitem, bead) to be displayed"
-        if self.track is None:
+        if self.track is None or self.checkbead(False):
             return None
-
-        self.checkbead()
 
         root  = self.roottask
         ibead = self.bead
