@@ -36,7 +36,6 @@ def _from_module(view):
     if view.startswith('view.'):
         view = view[5:]
 
-    print(view)
     if '.' not in view:
         view = view.lower()+'.'+view
     try:
