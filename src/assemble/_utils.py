@@ -293,9 +293,9 @@ def optimal_perm_normdists(perm:List,dists)->numpy.ndarray: # pytest
     given a permuation perm and the known distributions of each state
     returns the permutated state which maximise the probability
     '''
-    _epsi=0.001*min([dists[i].std() for i  in perm])
+    _epsi = 0.001*min([dists[i].std() for i  in perm])
 
-    constraints=[]
+    constraints = []
     for idx in range(len(perm[:-1])):
         constraints.append({"type":"ineq",
                             "fun":SOMConstraint(idx,_epsi)})
@@ -322,8 +322,8 @@ def group_oligos(oligos,**kwa)->Dict: # pytest!
 class CostPermute:
     u' returns the "cost" of translations due to permutation of oligo peaks'
     def __init__(self,dists,perm):
-        self.dists=dists
-        self.perm=perm
+        self.dists = dists
+        self.perm = perm
 
     def __call__(self,xstate):
         return -numpy.product([self.dists[vlp].pdf(xstate[idp])
@@ -398,5 +398,3 @@ def can_oligos_overlap(bat1:oligohit.Batch,bat2:oligohit.Batch,min_overl=1):
 
     return False
 
-
-def 
