@@ -31,6 +31,9 @@ class PeakSelector:
 
     @staticmethod
     def __move(evts, deltas):
+        if deltas is None:
+            return evts
+
         first = next((i for i in evts if i is not None), None)
         if first is None:
             return evts
@@ -101,7 +104,7 @@ class PeakSelector:
             delta  = self.align(pos, projector = projector)
             pos   += delta
         else:
-            delta  = 0.
+            delta  = None
 
         hist, minv, binwidth = projector.projection(pos, zmeasure = None)
         peaks = self.find (hist, minv, binwidth)

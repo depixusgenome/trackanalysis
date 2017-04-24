@@ -62,7 +62,8 @@ class Histogram(PrecisionAlg):
         if events is None:
             return np.empty((0,), dtype = 'f4'), np.inf, 0.
 
-        if np.isscalar(events[0][0]) and self.zmeasure is not None:
+        if (self.zmeasure is not None
+                and np.isscalar(next(i[0] for i in events if len(i)))):
             events = events,
 
         gen          = self.__compute(events, bias, separate)
@@ -136,7 +137,12 @@ class Histogram(PrecisionAlg):
     @staticmethod
     def __generate(lenv, kern, zmeas, weights):
         for pos, weight in zip(zmeas, weights):
-            if np.isscalar(weight):
+            if weight == 0. or len(pos) == 0:
+                yield np.empty((lenv,), dtype = 'i8')
+                continue
+            elif weight == 1.:
+                cnt = np.bincount(pos, minlength = lenv)
+            elif np.isscalar(weight):
                 cnt = np.bincount(pos, minlength = lenv) * weight
             else:
                 cnt = np.bincount(pos, minlength = lenv, weights = weight)
