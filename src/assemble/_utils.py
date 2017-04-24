@@ -342,43 +342,40 @@ def swap_between_batches(bat1, bat2, nscale=1): # not great impl # to optimize
     u'''
     compute all possibles swaps between batch1 and batch2
     need to rethink the algorithm.
-    We assume must constraints the number of permutations as soon as possible
+    We must constrain the number of permutations as soon as possible
     batches between oligos from different batches only
+    do not generate identity swap
+    can take into account physical size of oligos to restrain permutations
     '''
 
     groups = group_overlapping_oligos(list(bat1.oligos)+list(bat2.oligos),nscale=nscale)
     infogrp=[]
     for grp in groups:
         info=[]
-        for elmt in grp:
+        for val in grp:
             try:
-                info.append((elmt,bat1.oligos.index(elmt),1))
+                info.append((val,bat1.oligos.index(val),1))
             except ValueError:
-                info.append((elmt,bat2.oligos.index(elmt),2))
+                info.append((val,bat2.oligos.index(val),2))
         infogrp.append(info)
 
     # remove groups if there is not a representative of the two batches
     infogrp = [i for i in infogrp if len(set(j[2] for j in i))>1]
 
-    # ok-ish up to here
-    stop
-    perms=[]
+    # generate all permutations between batches excluding within batches swaps
+    perms = []
     for grp in infogrp:
-        print("len(grp)=",len(grp))
-        for perm in itertools.permutations(grp):
-            # if 2 oligos within a batch are permuted, remove permutation
-            # in bat1
-            if sorted([j[1] for j in perm if j[2]==1])==[j[1] for j in perm if j[2]==1]\
-               and len([j[1] for j in perm if j[2]==1])>1:
-                continue
+        grp1=[i for i in grp if i[2]==1]
+        grp2=[i for i in grp if i[2]==2]
+        combs=[sorted(it) for it in itertools.combinations(range(len(grp)),
+                                                           len(grp1))]
+        for comb in combs:
+            perm=deepcopy(grp2)
+            for index,val in enumerate(comb):
+                perm.insert(val,grp1[index])
+            perms.append([i[0] for i in perm])
 
-            # in bat2
-            if sorted([j[1] for j in perm if j[2]==2])==[j[1] for j in perm if j[2]==2]\
-               and len([j[1] for j in perm if j[2]==2])>1:
-                continue
-            perms.append(perm)
-
-    return [[s[0] for s in elmt] for elmt in perms]
+    return perms
 
 
 def can_oligos_overlap(bat1:oligohit.Batch,bat2:oligohit.Batch,min_overl=1):
@@ -397,4 +394,3 @@ def can_oligos_overlap(bat1:oligohit.Batch,bat2:oligohit.Batch,min_overl=1):
             return True
 
     return False
-

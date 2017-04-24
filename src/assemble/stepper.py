@@ -11,6 +11,7 @@ import itertools
 import numpy
 from .oligohit import Batch
 from . import _utils as utils
+from utils.logconfig import getLogger
 
 # reconstruction a batch at a time
 # if we consider an oligo-batch at a time, then:
@@ -18,6 +19,8 @@ from . import _utils as utils
 #     * adding a new batch, permutation can only occur between different batches
 
 # to add variability in (stretching,bias) for each batch (to estimate from hybridstat analyses)
+
+LOGS = getLogger(__name__)
 
 class HoppingSteps:
     u'''
@@ -71,6 +74,7 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
         self.oligos = kwargs.get("oligos",tuple())
         self.nscale = kwargs.get("nscale",1)
         self.seg = kwargs.get("seg","batch_id") # "batch", "sequence"
+        self.min_overl = kwargs.get("min_overl",1)
         self.swaps = []
 
         # create Batches from each batch_ids move from one Batch to another
@@ -100,7 +104,7 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
             swaps = self.swap_batches()
         return None
         '''
-        print("len(self.batches)=",len(self.batches))
+        LOGS.debug("len(self.batches)="+str(len(self.batches)))
         return self.swap_batches()
 
     def swap_batches(self):
@@ -114,12 +118,19 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
             return None
 
         # what if no batches can overlap?
-        # corresponds to primed batches does for which we have no info
+        # corresponds to primed batches those for which we have no info
         swaps = None
+
+
+        # find possible ways to combine batches
+
+
+
+
         for merges in itertools.combinations(range(len(self.batches)),2):
             if utils.can_oligos_overlap(self.batches[merges[0]],
                                         self.batches[merges[1]],
-                                        min_overl=3):
+                                        min_overl=self.min_overl):
                 swaps = utils.swap_between_batches(self.batches[merges[0]],
                                                    self.batches[merges[1]],
                                                    nscale = self.nscale)

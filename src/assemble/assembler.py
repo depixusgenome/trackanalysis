@@ -9,6 +9,7 @@ from typing import Callable, Iterable # pylint: disable=unused-import
 from multiprocessing import Pool
 import numpy
 from scipy.optimize import basinhopping,OptimizeResult
+from utils.logconfig import getLogger
 from . import stepper
 
 # number of combinations for 4-mers and 5 nm exp precision leads to
@@ -22,12 +23,12 @@ from . import stepper
 #    * reliability with regard to short sequence repeats (AAA..., ATATA...)
 #    * size of correct sequences obtained
 
-
+LOGS = getLogger(__name__)
 
 def print_state(xstate, func, accepted): # pylint: disable=unused-argument
     u'''use this to print the state at each Monte Carlo step
     '''
-    print("at minimum %.4f accepted %d" % (func, int(accepted)))
+    LOGS.info("at minimum %.4f accepted %d", func, int(accepted))
 
 def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argument
     u'''use this minimizer to avoid minimization step in basinhopping
