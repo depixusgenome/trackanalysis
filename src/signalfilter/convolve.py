@@ -25,7 +25,7 @@ class KernelConvolution:
     * *width*: the distribution size of the smearing kernel
     * *oversample*: x-axis oversampling
 
-    Keynames "kernel_"+name are sinonyms
+    Keynames "kernel_"+name are synonyms
     """
     window       = 4
     width        = 1.
