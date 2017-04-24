@@ -13,7 +13,7 @@ import  numpy as np
 from    utils       import isfunction, initdefaults
 from    model       import Level
 
-_m_ALL   = frozenset((None, all, Ellipsis))
+_m_ALL   = None, all, Ellipsis          # type: tuple
 _m_INTS  = int, cast(type, np.integer)
 _m_KEYS  = int, cast(type, np.integer), str
 _m_INDEX = int, cast(type, np.integer), str, tuple
@@ -299,7 +299,7 @@ class TrackItems(_m_ConfigMixin, Items):
             return shallowcopy(self)
 
         elif (isinstance(keys, _m_KEYS)
-              or (isinstance(keys, tuple) and _m_ALL.isdisjoint(keys))):
+              or (isinstance(keys, tuple) and frozenset(_m_ALL).isdisjoint(keys))):
             # this is NOT a slice
             return self.get(keys)
 
@@ -308,12 +308,12 @@ class TrackItems(_m_ConfigMixin, Items):
             cpy = shallowcopy(self)
             return cpy.selecting(keys, clear = True)
 
-    def new(self:TSelf, **kwa) -> TSelf:
+    def new(self:TSelf, tpe: Optional[type] = None, **kwa) -> TSelf:
         "returns a item containing self in the data field"
         kwa.setdefault('track', self.track)
         kwa.setdefault('data',  self)
         kwa.setdefault('cycles', getattr(self, 'cycles', None))
-        return type(self)(**kwa)
+        return (type(self) if tpe is None else tpe)(**kwa)
 
     def keys(self,
              sel      :Optional[Sequence] = None,

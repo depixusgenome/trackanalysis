@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Tests cordrift"
+"Tests cordrift"
 from   itertools                import product
 import random
 import numpy as np
@@ -20,7 +20,7 @@ from control.taskcontrol        import create
 from testingcore                import path as utpath
 
 def test_collapse_to_mean():
-    u"Tests interval collapses"
+    "Tests interval collapses"
     yvals  = np.zeros((100,5), dtype = np.float32)
     for i in range(yvals.shape[1]):
         yvals[:,i] = i
@@ -59,7 +59,7 @@ def test_collapse_to_mean():
     assert all(prof.value[5:] == 0.)
 
 def test_collapse_by_merging():
-    u"Tests interval collapses"
+    "Tests interval collapses"
     yvals  = np.zeros((100,5), dtype = np.float32)
     for i in range(yvals.shape[1]):
         yvals[:,i] = i
@@ -99,7 +99,7 @@ def test_collapse_by_merging():
     assert all(prof.value[5:] == 0.)
 
 def test_collapse_by_derivate():
-    u"Tests derivate collapses"
+    "Tests derivate collapses"
     yvals  = np.zeros((100,5), dtype = np.float32)
     for i in range(yvals.shape[1]):
         yvals[:,i] = i
@@ -124,7 +124,7 @@ def test_collapse_by_derivate():
     assert all(prof.value[5:] == 0.)
 
 def test_getinter():
-    u"Tests _getintervals"
+    "Tests _getintervals"
     fge = lambda x: _getintervals(np.array(x), 2, np.greater_equal)
     flt = lambda x: _getintervals(np.array(x), 2, np.less)
     assert_equal(flt([2]*5+[1]*5),       [[5,10]])
@@ -133,7 +133,7 @@ def test_getinter():
     assert_equal(fge([1]*5+[2]*5+[1]*5), [[5,10]])
 
 def test_stitchbyinterpolation():
-    u"Tests StitchByInterpolation"
+    "Tests StitchByInterpolation"
     def _test(power = 1, left = False, right = False):
         prof          = Profile(60)
         prof.count[:] = 10
@@ -163,7 +163,7 @@ def test_stitchbyinterpolation():
                 _test(order, left, right)
 
 def test_stitchbyderivate():
-    u"Tests StitchByDerivate"
+    "Tests StitchByDerivate"
 
     def _test(left = False, right = False):
         prof          = Profile(60)
@@ -241,43 +241,43 @@ for args in product((CollapseToMean, CollapseByDerivate, CollapseByMerging),
 del _create
 
 def test_beadprocess():
-    u"tests that tracks are well simulated"
-    pair = create((TrackSimulatorTask(brownian  = 0., randtargs = None),
-                   DriftTask()))
+    "tests that tracks are well simulated"
+    pair = create((TrackSimulatorTask(brownian  = 0., events = None),
+                   DriftTask(precision = 0.01)))
     cycs = next(i[...,...] for i in pair.run()).withphases(5)
     for _, val in cycs:
-        assert_allclose(val, val.mean(), rtol = 1e-5, atol = 1e-8)
+        assert_allclose(val[1:-1], val[1:-1].mean(), rtol = 1e-5, atol = 1e-8)
 
-    pair = create((TrackSimulatorTask(brownian  = 0.), DriftTask()))
+    pair = create((TrackSimulatorTask(brownian  = 0.), DriftTask(precision = 0.01)))
     cycs = next(i[...,...] for i in pair.run()).withphases(5)
     for _, val in cycs:
-        val -= np.round(val, 1)
-        assert_allclose(val-val[0], 0., atol = 1e-4)
+        val = (val-np.round(val, 1))[1:-1]
+        assert_allclose(val-val[0], 0., atol = 1e-2)
 
 def test_cycleprocess():
-    u"tests that tracks are well simulated"
+    "tests that tracks are well simulated"
     pair = create((TrackSimulatorTask(brownian  = 0.,
-                                      randtargs = None,
+                                      events    = None,
                                       nbeads    = 30,
                                       ncycles   = 1),
-                   DriftTask(onbeads = False)))
+                   DriftTask(onbeads = False, precision = 0.01)))
     cycs = next(i for i in pair.run())
     for _, val in cycs:
-        val  = val[33:133]
+        val  = val[34:132]
         assert_allclose(val, val.mean(), atol = 1e-5)
 
     pair = create((TrackSimulatorTask(brownian  = 0.,
                                       nbeads    = 30,
                                       ncycles   = 1),
-                   DriftTask(onbeads = False)))
+                   DriftTask(onbeads = False, precision = 0.01)))
     cycs = next(i for i in pair.run())
     for _, val in cycs:
-        val  = val[33:133]
+        val  = val[34:132]
         val -= np.round(val, 1)
-        assert_allclose(val-val[0], 0., atol = 1e-4)
+        assert_allclose(val-val[0], 0., atol = 1e-2)
 
 def test_cycleprocess_withalignment():
-    u"tests that tracks are well simulated"
+    "tests that tracks are well simulated"
     pair = create((utpath("big_all"),
                    DataSelectionTask(cycles = slice(2)),
                    ExtremumAlignmentTask(phase = 1),
@@ -287,4 +287,4 @@ def test_cycleprocess_withalignment():
     assert val.shape == (1654,) # should be smaller because 2 cycles only selected
 
 if __name__ == '__main__':
-    test_cycleprocess_withalignment()
+    test_cycleprocess()

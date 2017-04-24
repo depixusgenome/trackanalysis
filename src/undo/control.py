@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 'Deals with undos'
 from typing         import Set, Callable # pylint: disable=unused-import
-from control.event  import Controller
+from control.event  import Controller, NoEmission
 from .model         import UndoModel
 
 class UndoController(Controller):
@@ -36,17 +36,18 @@ class UndoController(Controller):
     @Controller.emit
     def appendUndos(self, lst) -> dict:
         'Adds to the undos'
-        self.__model.append(self.__isundoing, lst)
-        return dict(items = lst)
+        if len(lst):
+            self.__model.append(self.__isundoing, lst)
+            self.__isundoing = False
+            return dict(items = lst)
+        else:
+            raise NoEmission("empty undo list")
 
     @Controller.emit
     def undo(self) -> None:
         'undoes one action'
         self.__isundoing = True
-        try:
-            self.__apply()
-        finally:
-            self.__isundoing = False
+        self.__apply()
 
     @Controller.emit
     def redo(self) -> None:

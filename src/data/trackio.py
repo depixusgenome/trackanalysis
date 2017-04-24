@@ -99,7 +99,7 @@ class LegacyTrackIO(_TrackIO):
 class LegacyGRFilesIO(_TrackIO):
     u"checks and opens legacy GR files"
     __TITLE   = re.compile(r"\\stack{{Bead (?P<id>\d+) Z.*?phase\(s\)"
-                           +r" \[(?P<phases>.*?)\]}}")
+                           +r"[^\d]*(?P<phases>[\d, ]*?)\]}}")
     __GRTITLE = re.compile(r"Bead Cycle (?P<id>\d+) p.*")
     @classmethod
     @_checktype
@@ -118,14 +118,14 @@ class LegacyGRFilesIO(_TrackIO):
                 paths = paths[1], paths[0]
 
             if all(i.suffix != '.gr' for i in paths[1].iterdir()):
-                raise IOError("[LegacyGRFilesIO] No .gr files in directory\n- {}"
-                              .format(paths[1]))
+                raise IOError("No .gr files in directory\n- {}".format(paths[1]),
+                              "treated")
             fname = str(paths[0])
             if '*' in fname:
                 return cls.__findtrk(fname, paths[1])
 
             elif not paths[0].exists():
-                raise IOError("Could not find path: " + str(paths[0]))
+                raise IOError("Could not find path: " + str(paths[0]), "treated")
 
             return paths
 
@@ -142,7 +142,8 @@ class LegacyGRFilesIO(_TrackIO):
         remove = set(i for i in output if isinstance(i, int))
 
         if len(paths) == 2 and Path(paths[1]).is_dir():
-            itr = Path(paths[1]).iterdir()      # type: Iterator[Path]
+            itr = iter(i for i in Path(paths[1]).iterdir()
+                       if 'z(t)bd' in i.stem.lower()) # type: Iterator[Path]
         else:
             itr = (Path(i) for i in paths[1:])
 
@@ -161,8 +162,7 @@ class LegacyGRFilesIO(_TrackIO):
         cgr  = next((i for i in Path(grs).iterdir() if i.suffix == '.cgr'),
                     None)
         if cgr is None:
-            raise IOError("[LegacyGRFilesIO] No .cgr files in directory\n- {}"
-                          .format(grs))
+            raise IOError("No '.cgr' files in directory\n- {}".format(grs), "treated")
 
         pot    = cgr.with_suffix('.trk').name
         ind    = fname.find('*')
@@ -175,8 +175,7 @@ class LegacyGRFilesIO(_TrackIO):
             parent = root
         trk    = next((i for i in parent.glob(glob) if i.name == pot), None)
         if trk is None:
-            raise IOError("[LegacyGRFilesIO] Could not find {} in {}"
-                          .format(pot, fname))
+            raise IOError("Could not find {} in {}".format(pot, fname), "treated")
         return trk, grs
 
     @classmethod
@@ -186,15 +185,15 @@ class LegacyGRFilesIO(_TrackIO):
         tit    = cls.__TITLE.match(grdict['title'])
 
         if tit is None:
-            raise IOError("Could not match title in " + path)
+            raise IOError("Could not match title in " + path, "treated")
 
         beadid = int(tit.group("id"))
         if beadid not in output:
-            raise IOError("Could not find bead "+str(beadid)+" in " + path)
+            raise IOError("Could not find bead "+str(beadid)+" in " + path, "treated")
 
-        phases = [int(i) for i in tit.group("phases").split(',')]
+        phases = [int(i) for i in tit.group("phases").split(',') if len(i.strip())]
         if set(np.diff(phases)) != {1}:
-            raise IOError("Phases must be sequencial in "+ path)
+            raise IOError("Phases must be sequencial in "+ path, "treated")
 
         starts  = output['phases'][:, phases[0]] - output['phases'][0,phases[0]]
         bead    = output[beadid]
@@ -205,6 +204,9 @@ class LegacyGRFilesIO(_TrackIO):
                 continue
 
             cyc  = int(tit.group("id")) - output['cyclemin']
+            if cyc >= len(starts):
+                continue
+
             inds = np.int32(vals[0]+.1+starts[cyc]) # type: ignore
             bead[inds] = vals[1]
         return beadid
@@ -247,7 +249,7 @@ class Handler:
 
         if isinstance(paths, (str, Path)):
             if not Path(paths).exists():
-                raise IOError("Could not find path: " + str(paths))
+                raise IOError("Could not find path: " + str(paths), "treated")
         else:
             paths = tuple(str(i) for i in paths)
 
@@ -257,7 +259,7 @@ class Handler:
                 res = cls(tmp, caller)
                 break
         else:
-            raise IOError("Unknown file format in: {}".format(paths))
+            raise IOError("Unknown file format in: {}".format(paths), "treated")
 
         return res
 

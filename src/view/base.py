@@ -3,6 +3,7 @@
 "basic view module"
 from typing               import Callable
 from bokeh.models.widgets import Button
+from bokeh.themes         import Theme
 from bokeh.layouts        import layout
 
 from control        import Controller                   # pylint: disable=unused-import
@@ -36,23 +37,54 @@ class View:
         self._ctrl.close()
         self._ctrl = None
 
-def enableOnTrack(ctrl, *itms):
+def enableOnTrack(ctrl, *aitms):
     "Enables/disables view elements depending on the track status"
+    litms = []
+    def _get(obj):
+        if isinstance(obj, (tuple, list)):
+            for i in obj:
+                _get(i)
+        elif isinstance(obj, dict):
+            for i in obj.values():
+                _get(i)
+        else:
+            litms.append(obj)
+    _get(aitms)
+    itms = tuple(litms)
     for ite in itms:
         ite.disabled = True
 
-    def _oncurrent(items):
+    def _onproject(items, __lst__ = itms):
         if 'track' in items:
             val = items['track'].value is items.empty
-            for ite in itms:
+            for ite in __lst__:
                 ite.disabled = val
-    getattr(ctrl, '_ctrl', ctrl).getGlobal("current").observe(_oncurrent)
+    getattr(ctrl, '_ctrl', ctrl).getGlobal("project").observe(_onproject)
 
 class BokehView(View):
     "A view with a gui"
     def __init__(self, **kwargs):
         "initializes the gui"
         super().__init__(**kwargs)
+        css = self._ctrl.getGlobal('css')
+        css.button.defaults = {'width': 90, 'height': 20}
+        css.input .defaults = {'width': 90, 'height': 20}
+        css.defaults = {'responsive': True, 'sizing_mode': 'scale_width'}
+        dark = { 'attrs': { 'Figure': { 'background_fill_color': '#2F2F2F',
+                                        'border_fill_color': '#2F2F2F',
+                                        'outline_line_color': '#444444' },
+                            'Axis':   { 'axis_line_color': "white",
+                                        'axis_label_text_color': "white",
+                                        'major_label_text_color': "white",
+                                        'major_tick_line_color': "white",
+                                        'minor_tick_line_color': "white"
+                                      },
+                            'Title':  { 'text_color': "white" } } }
+
+        css.theme.dark.default  = dark
+        css.theme.basic.default = {}
+        css.theme.default       = 'dark'
+
         self._keys = kwargs['keys']  # type: KeyPressManager
 
     def close(self):
@@ -66,6 +98,7 @@ class BokehView(View):
         "starts the application"
         self = cls(**kwa)
         self.addtodoc(doc)
+        self._ctrl.handle('applicationstarted') # pylint: disable=protected-access
         return self
 
     def enableOnTrack(self, *itms):
@@ -74,12 +107,20 @@ class BokehView(View):
 
     def addtodoc(self, doc):
         "Adds one's self to doc"
+        theme     = self._ctrl.getGlobal('css').theme.get(default = None)
+        if isinstance(theme, str):
+            theme = self._ctrl.getGlobal('css').theme[theme].get(default = None)
+        doc.theme = Theme(json = theme)
+
         self._keys.getroots(doc)
         roots = self.getroots(doc)
         if len(roots) == 1:
             doc.add_root(roots[0])
+        elif self._ctrl.getGlobal('css').responsive.get():
+            doc.add_root(layout(roots, responsive = True))
         else:
-            doc.add_root(layout(roots, sizing_mode = 'stretch_both'))
+            mode = self._ctrl.getGlobal('css').sizing_mode.get()
+            doc.add_root(layout(roots, sizing_mode = mode))
 
     def getroots(self, doc):
         "returns object root"

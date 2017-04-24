@@ -56,7 +56,7 @@ def test_onehairpincost():
     truth = np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')/8.8e-4
     bead  = (truth*1.03+1.)*8.8e-4
     res   = HairpinDistance(peaks = truth)(bead[:-1])
-    assert_allclose(bead*res[1]+res[2], truth, rtol = 1e-4, atol = 1e-2)
+    assert_allclose((bead-res[2])*res[1], truth, rtol = 1e-4, atol = 1e-2)
 
 def test_onehairpinid():
     u"tests haipin id method"
@@ -79,7 +79,7 @@ def test_hairpincost():
                'hp101': HairpinDistance(peaks = truth[1])}
     ids     = {'hp100': PeakIdentifier(peaks = truth[0]),
                'hp101': PeakIdentifier(peaks = truth[1])}
-    results = dict(BeadsByHairpinProcessor.apply(hpins, {}, ids, beads))
+    results = dict(BeadsByHairpinProcessor.compute(hpins, {}, ids, beads))
     assert len(results) == 3
     assert len(results['hp100']) == 1
     assert len(results['hp101']) == 1
@@ -104,7 +104,7 @@ def test_constrainedhairpincost():
                'hp101': HairpinDistance(peaks = truth[1])}
     cstrs   = dict.fromkeys((100, 110), DistanceConstraint('hp101', {}))
 
-    results = dict(BeadsByHairpinProcessor.apply(hpins, cstrs, {}, beads))
+    results = dict(BeadsByHairpinProcessor.compute(hpins, cstrs, {}, beads))
     assert len(results) == 1
     assert len(results['hp101']) == 3
 

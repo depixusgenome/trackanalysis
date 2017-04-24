@@ -11,16 +11,19 @@ from    bokeh.models   import LinearAxis, ColumnDataSource, CustomJS, Range1d
 import  numpy                   as     np
 from    numpy.lib.index_tricks  import as_strided
 
-from  ..plotutils           import PlotAttrs
+from    view.plots              import PlotAttrs
 
 class RawMixin:
     "Building the graph of cycles"
     def __init__(self):
         "sets up this plotter's info"
-        self.getCSS().defaults = dict(raw = PlotAttrs('color',  'circle', 1,
-                                                      alpha   = .5,
-                                                      palette = 'inferno'),
-                                      plotwidth = 500)
+        self.css.defaults = {'raw.dark'     : PlotAttrs('color',  'circle', 1,
+                                                        alpha   = .5,
+                                                        palette = 'YlOrBr'),
+                             'raw.basic'    : PlotAttrs('color',  'circle', 1,
+                                                        alpha   = .5,
+                                                        palette = 'inferno'),
+                             'figure.width' : 500}
         self._rawsource = None # type: Optional[ColumnDataSource]
         self._raw       = None # type: Optional[Figure]
 
@@ -48,14 +51,15 @@ class RawMixin:
 
         return dict(t = time.ravel(), z = val.ravel()), val.shape
 
-    def __data(self, cycles, bead) -> Tuple[dict, Tuple[int,int]]:
+    def __data(self) -> Tuple[dict, Tuple[int,int]]:
+        cycles = self._model.runbead()
         if cycles is None:
             return (dict.fromkeys(('t', 'z', 'cycle', 'color'), [0., 1.]),
                     (1, 2))
 
         items = list(cycles)
         if len(items) == 0 or not any(len(i) for _, i in items):
-            return self.__data(None, bead)
+            return self.__data()
 
         if self._model.eventdetection.task is None:
             res, shape = self.__normal_data(items)
@@ -66,7 +70,7 @@ class RawMixin:
         res['cycle'] = (as_strided(tmp, shape = shape, strides = (tmp.strides[0], 0))
                         .ravel())
 
-        tmp          = np.array(self.getCSS().raw.get().listpalette(shape[0]))
+        tmp          = np.array(self.css.raw[self.css.theme.get()].get().listpalette(shape[0]))
         res['color'] = (as_strided(tmp, shape = shape, strides = (tmp.strides[0], 0))
                         .ravel())
 
@@ -77,30 +81,28 @@ class RawMixin:
         fig = self._raw
         self._addcallbacks(fig)
 
-        def _onchangebounds(frng = fig.x_range,
-                            trng = fig.extra_x_ranges["time"],
-                            mdl  = self._hover):
+        trng = fig.extra_x_ranges["time"]
+        mdl  = self._hover
+        @CustomJS.from_py_func
+        def _onchangebounds(cb_obj = None, trng = trng, mdl = mdl):
             # pylint: disable=protected-access,no-member
-            if frng.bounds is not None:
-                frng._initial_start = frng.bounds[0]
-                frng._initial_end   = frng.bounds[1]
-            trng.start = frng.start/mdl.framerate
-            trng.end   = frng.end  /mdl.framerate
-        fig.x_range.callback = CustomJS.from_py_func(_onchangebounds)
+            if cb_obj.bounds is not None:
+                cb_obj._initial_start = cb_obj.bounds[0]
+                cb_obj._initial_end   = cb_obj.bounds[1]
+            trng.start = cb_obj.start/mdl.framerate
+            trng.end   = cb_obj.end  /mdl.framerate
+        fig.x_range.callback = _onchangebounds
 
-    def _createraw(self, track, bead):
-        css             = self.getCSS()
-        self._raw       = figure(y_axis_label = css.ylabel.get(),
-                                 y_range      = Range1d(start = 0., end = 0.),
-                                 name         = 'Cycles:Raw',
-                                 **self._figargs(css))
-        raw, shape      = self.__data(track, bead)
+    def _createraw(self):
+        css             = self.css
+        self._raw       = figure(**self._figargs(y_range = Range1d,
+                                                 name    = 'Cycles:Raw'))
+        raw, shape      = self.__data()
         self._rawsource = ColumnDataSource(data = raw)
 
-        css.raw.addto(self._raw, x = 't', y = 'z', source = self._rawsource)
+        css.raw[css.theme.get()].addto(self._raw, x = 't', y = 'z', source = self._rawsource)
 
-        self._hover.createraw(self._raw, self._rawsource, shape,
-                              self._model, self.getCSS())
+        self._hover.createraw(self._raw, self._rawsource, shape, self._model)
         self._raw.extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
 
         axis = LinearAxis(x_range_name="time", axis_label = css.xtoplabel.get())
@@ -108,14 +110,13 @@ class RawMixin:
         self.__addcallbacks()
         return shape
 
-    def _updateraw(self, track, bead):
-        data, shape          = self.__data(track, bead)
+    def _resetraw(self):
+        data, shape          = self.__data()
         self._rawsource.data = data
         self.setbounds(self._hist.y_range, 'y', data['z'])
-        self._hover.updateraw(self._raw, self._rawsource, shape)
+        self._hover.resetraw(self._raw, self._rawsource, shape)
         return shape
 
     if TYPE_CHECKING:
-        getConfig = lambda: None
-        getCSS    = lambda: None
+        css       = None # type: ignore
         _model    = None # type: ignore

@@ -1,4 +1,3 @@
-import * as _         from "underscore"
 import * as $         from "jquery"
 import * as p         from "core/properties"
 import {RowView, Row} from "models/layouts/row"
@@ -7,10 +6,10 @@ import {ToolbarBox}   from "models/tools/toolbar_box"
 export class DpxKeyedRowView extends RowView
     className: "dpx-bk-grid-row"
     initialize: (options) ->
-        super()
-        @$el.attr("tabindex", 1)
-        @$el.keydown((evt) => @model.dokeydown(evt))
-        @$el.keyup((evt) => @model.dokeyup(evt))
+        super(options)
+        @el.setAttribute("tabindex", 1)
+        $(@el).keydown((evt) => @model.dokeydown(evt))
+        $(@el).keyup((evt) => @model.dokeyup(evt))
 
 export class DpxKeyedRow extends Row
     default_view: DpxKeyedRowView

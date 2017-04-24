@@ -21,9 +21,17 @@ Output = Tuple[BEADKEY, Iterator[PeakOutput]]
 class PeaksDict(TrackItems):
     u"iterator over peaks grouped by beads"
     level = Level.peak
-    def __init__(self, config, **kwa):
+    def __init__(self, *_, config = None, **kwa):
+        assert len(_) == 0
         super().__init__(**kwa)
-        self.config = config
+        if config is None:
+            self.config = PeakSelector()
+        elif isinstance(config, dict):
+            self.config = PeakSelector(**config)
+        else:
+            assert isinstance(config, PeakSelector), config
+            self.config = config
+
         self.__keys = None
 
     def _keys(self, sel:Optional[Sequence] = None, _ = None) -> Iterator[BEADKEY]:
@@ -45,7 +53,12 @@ class PeaksDict(TrackItems):
 
 class PeakSelectorProcessor(Processor):
     u"Groups events per peak"
+    @classmethod
+    def apply(cls, toframe = None, **cnf):
+        "applies the task to a frame or returns a function that does so"
+        # pylint: disable=not-callable
+        fcn = lambda frame: frame.new(PeaksDict, config = cnf)
+        return fcn if toframe is None else fcn(toframe)
+
     def run(self, args):
-        cnf = self.caller()
-        fcn = lambda frame: PeaksDict(cnf, track = frame.track, data = frame)
-        args.apply(fcn, levels = self.levels)
+        args.apply(self.apply(**self.config()), levels = self.levels)

@@ -11,7 +11,7 @@ from    utils        import initdefaults
 from    signalfilter import samples as _samples, PrecisionAlg
 norm = _samples.normal.knownsigma # pylint: disable=invalid-name
 
-class SplitDetector(PrecisionAlg):
+class BaseSplitDetector(PrecisionAlg):
     u"""
     Detects flat stretches of value
 
@@ -23,7 +23,7 @@ class SplitDetector(PrecisionAlg):
     the estimation used is the median-deviation of the derivate of the data.
     """
     confidence = 0.1 # type: Optional[float]
-    window     = 1
+    window     = 1   # type: int
     @initdefaults
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -32,30 +32,15 @@ class SplitDetector(PrecisionAlg):
                  data     : np.ndarray,
                  precision: Optional[float] = None
                 ) -> np.ndarray:
+        if len(data) > 1:
+            nans = np.isnan(data)
+            if any(nans):
+                data = data[~nans]
+
         if len(data) <= 1:
             return np.empty((0,2), dtype = 'i4')
 
-        precision = self.getprecision(precision, data)
-        window    = self.window
-        if self.confidence is None or self.confidence <= 0.:
-            thr   = precision
-        else:
-            thr   = norm.threshold(True, self.confidence, precision, window, window)
-
-        nans      = np.isnan(data)
-        if any(nans):
-            data = data[~nans]
-
-        kern = np.ones((window*2,))
-        kern[-window:] = -1.
-
-        delta           = np.convolve(data, kern, mode = 'same')
-        delta[:window] -= np.arange(window+1)[-1:0:-1] * data[0]
-        if window > 1:
-            delta[1-window:] += np.arange(window)[1:] * data[-1]
-
-        ends = (np.abs(delta) >= (thr*window)).nonzero()[0]
-
+        ends = self._compute(precision, data).nonzero()[0]
         if len(ends) == 0:
             return np.array(((0,len(nans)),), dtype = 'i4')
 
@@ -73,6 +58,98 @@ class SplitDetector(PrecisionAlg):
     def run(cls, data, **kwa):
         u"instantiates and calls class"
         return cls(**kwa)(data)
+
+    def _compute(self, precision:Optional[float], data : np.ndarray) -> np.ndarray:
+        raise NotImplementedError()
+
+class DerivateSplitDetector(BaseSplitDetector):
+    u"""
+    Detects flat stretches of value
+
+    Flatness is defined pointwise: 2 points are flat if close enough one to the
+    other. This closeness is defined using a p-value for 2 points belonging to
+    the same normal distribution with a known sigma.
+
+    The sigma (precision) is either provided or measured. In the latter case,
+    the estimation used is the median-deviation of the derivate of the data.
+    """
+    @initdefaults
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
+    def deltas(self, data : np.ndarray) -> np.ndarray:
+        "all deltas"
+        window = self.window
+        kern   = np.ones((window*2,))
+        kern[-window:] = -1.
+
+        delta           = np.convolve(data, kern, mode = 'same')
+        delta[:window] -= np.arange(window+1)[-1:0:-1] * data[0]
+        if window > 1:
+            delta[1-window:] += np.arange(window)[1:] * data[-1]
+        return delta
+
+    def threshold(self,
+                  precision: Optional[float]      = None,
+                  data:      Optional[np.ndarray] = None) -> float:
+        "the threshold applied to alphas"
+        precision = self.getprecision(precision, data)
+        if self.confidence is None or self.confidence <= 0.:
+            return precision
+        else:
+            return norm.threshold(True, self.confidence, precision,
+                                  self.window, self.window)
+
+    def _compute(self, precision:Optional[float], data : np.ndarray) -> np.ndarray:
+        return self.deltas(data) <= -self.threshold(precision, data)*self.window
+
+class MinMaxSplitDetector(BaseSplitDetector):
+    u"""
+    Detects flat stretches of value
+
+    Flatness is defined pointwise: 1 point is flat versus it prior if there
+    exist a window *N* such that the prior *N* are lower than this and the next
+    *N-1* points by a given margin
+
+    The margin (precision) is either provided or measured. In the latter case,
+    the estimation used is the median-deviation of the derivate of the data.
+    """
+    window = 5
+    @initdefaults
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
+    def deltas(self, data   : np.ndarray) -> np.ndarray:
+        "all deltas"
+        window = self.window
+        out    = np.empty(len(data), dtype = 'f4')
+        if window == 1:
+            out[0]  = 0.
+            out[1:] = np.diff(data)
+        else:
+            dt2d = as_strided(data,
+                              shape   = (len(data)-window+1, window),
+                              strides = (data.strides[0],)*2)
+
+            out[:1-window] = np.max(dt2d, axis = 1)
+            out[1-window:] = [max(data[i:]) for i in range(1-window, 0)]
+
+            out[:window]  -= [data[0]]+[min(data[:i]) for i in range(1,window)]
+            out[window:]  -= np.min(dt2d, axis = 1)[:-1]
+        return out
+
+    def threshold(self,
+                  precision: Optional[float]      = None,
+                  data:      Optional[np.ndarray] = None) -> float:
+        "the threshold applied to alphas"
+        precision = self.getprecision(precision, data)
+        if self.confidence is None or self.confidence <= 0.:
+            return precision
+        else:
+            return norm.threshold(True, self.confidence, precision)
+
+    def _compute(self, precision:Optional[float], data : np.ndarray) -> np.ndarray:
+        return self.deltas(data) < -self.threshold(precision, data)
 
 class EventMerger(PrecisionAlg):
     u"""
@@ -118,7 +195,7 @@ class EventMerger(PrecisionAlg):
         if not any(merge):
             return np.empty(0, dtype = 'i4')
 
-        tomerge = np.nonzero(np.diff(merge))[0]
+        tomerge = np.nonzero(np.logical_xor(merge[:-1], merge[1:]))[0]
         tomerge = tomerge.reshape((len(tomerge)//2, 2))
 
         if self.oneperrange:
@@ -219,7 +296,7 @@ class EventSelector:
 
 class EventDetector(PrecisionAlg):
     u"detects, mergers and selects intervals"
-    split  = SplitDetector()
+    split  = MinMaxSplitDetector()
     merge  = EventMerger  ()
     select = EventSelector()
     @initdefaults

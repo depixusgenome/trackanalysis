@@ -5,14 +5,18 @@ from typing                import (Optional,# pylint: disable=unused-import
                                    Union, Sequence, Any)
 import sys
 import tempfile
-
+import warnings
+import inspect
 import pytest
 
 from tornado.ioloop        import IOLoop
 import bokeh.core.properties as     props
-from bokeh.model           import Model
-from bokeh.document        import Document  # pylint: disable=unused-import
-from bokeh.server.server   import Server    # pylint: disable=unused-import
+
+with warnings.catch_warnings():
+    warnings.filterwarnings('ignore', category = DeprecationWarning)
+    from bokeh.model           import Model
+    from bokeh.document        import Document  # pylint: disable=unused-import
+    from bokeh.server.server   import Server    # pylint: disable=unused-import
 
 from view.keypress         import KeyPressManager
 
@@ -21,20 +25,20 @@ class DpxTestLoaded(Model):
     This starts tests once flexx/browser window has finished loading
     """
     __implementation__ = """
-        import *        as _    from "underscore"
         import *        as $    from "jquery"
         import *        as p    from "core/properties"
         import {Model}          from "model"
+        import {BokehView} from "core/bokeh_view"
 
-        export class DpxTestLoadedView
+        export class DpxTestLoadedView extends BokehView
 
         export class DpxTestLoaded extends Model
             default_view: DpxTestLoadedView
             type: "DpxTestLoaded"
             constructor : (attributes, options) ->
                 super(attributes, options)
-                @listenTo(@, 'change:event', @_press)
-                @listenTo(@, 'change:value', @_change)
+                @listenTo(@, 'change:event_cnt', @_press)
+                @listenTo(@, 'change:value_cnt', @_change)
 
                 $((e) => @done = 1)
 
@@ -66,18 +70,22 @@ class DpxTestLoaded(Model):
             @define {
                 done:  [p.Number, 0]
                 event: [p.Any,   {}]
+                event_cnt: [p.Int, 0]
                 model: [p.Any,   {}]
                 attrs: [p.Array, []]
                 attr : [p.String, '']
                 value: [p.Any,   {}]
+                value_cnt: [p.Int, 0]
             }
                          """
-    done  = props.Int(0)
-    event = props.Dict(props.String, props.Any)
-    model = props.Instance(Model)
-    attrs = props.List(props.String, default = [])
-    attr  = props.String()
-    value = props.Any()
+    done        = props.Int(0)
+    event       = props.Dict(props.String, props.Any)
+    event_cnt   = props.Int(0)
+    model       = props.Instance(Model)
+    attrs       = props.List(props.String, default = [])
+    attr        = props.String()
+    value       = props.Any()
+    value_cnt   = props.Int(0)
 
     def press(self, key, model):
         "Sets-up a new keyevent in JS"
@@ -89,6 +97,7 @@ class DpxTestLoaded(Model):
                    key   = val)
         self.model = model
         self.event = evt
+        self.event_cnt += 1
 
     def change(self, model:Model, attrs: Union[str, Sequence[str]], value: Any):
         "Changes a model attribute on the browser side"
@@ -96,6 +105,7 @@ class DpxTestLoaded(Model):
         self.attrs = list(attrs)[:-1] if isinstance(attrs, (tuple, list)) else []
         self.attr  = attrs[-1]        if isinstance(attrs, (tuple, list)) else attrs
         self.value = value
+        self.value_cnt += 1
 
 class WidgetAccess:
     "Access to bokeh models"
@@ -143,7 +153,7 @@ class _ManagedServerLoop:
     ctrl = property(lambda self: getattr(self.view, '_ctrl'))
 
     @property
-    def loading(self) -> 'Optional[DpxTestLoaded]':
+    def loading(self) -> Optional[DpxTestLoaded]:
         "returns the model which allows tests to javascript"
         return next(iter(getattr(self.doc, 'roots', [])), None)
 
@@ -168,21 +178,46 @@ class _ManagedServerLoop:
         kwa['io_loop'] = IOLoop()
         kwa['io_loop'].make_current()
 
-        app, mod, fcn = self.kwa.pop('_args_')
-        if '.' in mod and 'A' <= mod[mod.rfind('.')+1] <= 'Z':
-            lmod  = mod[:mod.rfind('.')]
-            lattr = mod[mod.rfind('.')+1:]
-            launchmod = getattr(__import__(lmod, fromlist = (lattr,)), lattr)
-            launch    = getattr(launchmod, fcn)
-        else:
-            launch    = getattr(getattr(__import__(mod), mod), fcn)
-        server        = launch(app, server = kwa)
+        def _import(amod):
+            if not isinstance(amod, str):
+                return amod
+
+            if '.' in amod and 'A' <= amod[amod.rfind('.')+1] <= 'Z':
+                modname = amod[:amod.rfind('.')]
+                attr    = (amod[amod.rfind('.')+1:],)
+            else:
+                modname = amod
+                attr    = tuple()
+
+            mod = __import__(modname)
+            for i in tuple(modname.split('.')[1:]) + attr:
+                mod = getattr(mod, i)
+            return mod
+
+        tmpapp, mod, fcn = self.kwa.pop('_args_')
+        app              = _import(tmpapp)
+        if not isinstance(app, type):
+            from view.base import BokehView
+            pred = lambda i: (isinstance(i, type)
+                              and i.__module__ == app.__name__
+                              and issubclass(i, BokehView))
+            pot  = tuple(i for _, i in inspect.getmembers(app, pred))
+            assert len(pot) == 1
+            app  = pot[0]
+
+        launch = getattr(_import(mod), fcn)
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', '.*inspect.getargspec().*')
+            server = launch(app, server = kwa)
 
         @classmethod
         def _open(_, doc, _func_ = server.MainView.open):
             self.doc = doc
-            doc.add_root(DpxTestLoaded())
-            self.view = _func_(doc)
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore', '.*inspect.getargspec().*')
+                doc.add_root(DpxTestLoaded())
+                self.view = _func_(doc)
             return self.view
         server.MainView.open = _open
 
@@ -271,12 +306,29 @@ class _ManagedServerLoop:
         else:
             self.cmd(self.loading.press, key, src)
 
-    def change(self,
+    def click(self, model: Union[str,dict,Model], **kwa):
+        "Clicks on a button on the browser side"
+        if isinstance(model, str):
+            mdl = next(iter(self.doc.select(dict(name = model))))
+        elif isinstance(model, dict):
+            mdl = next(iter(self.doc.select(model)))
+        else:
+            mdl = model
+        self.change(mdl, 'click', mdl.click+1, **kwa)
+
+    def change(self,        # pylint: disable=too-many-arguments
                model: Union[str,dict,Model],
                attrs: Union[str, Sequence[str]],
                value: Any,
-               browser = True):
+               browser  = True,
+               withpath = None):
         "Changes a model attribute on the browser side"
+        if withpath is not None:
+            import view.dialog  # pylint: disable=import-error
+            def _tkopen(*_1, **_2):
+                return self.path(withpath)
+            self.monkeypatch.setattr(view.dialog, '_tkopen', _tkopen)
+
         if isinstance(model, str):
             mdl = next(iter(self.doc.select(dict(name = model))))
         elif isinstance(model, dict):
@@ -305,12 +357,12 @@ class BokehAction:
             user_config_dir = lambda *_: tmp+"/"+_[-1]
         sys.modules['appdirs'] = _Dummy
 
-    def serve(self, app:type, mod:str  = 'default', **kwa) -> _ManagedServerLoop:
+    def serve(self, app:Union[type, str], mod:str  = 'default', **kwa) -> _ManagedServerLoop:
         "Returns a server managing context"
         kwa['_args_'] = app, mod, 'serve'
         return _ManagedServerLoop(self.monkeypatch, kwa)
 
-    def launch(self, app:type, mod:str  = 'default', **kwa) -> _ManagedServerLoop:
+    def launch(self, app:Union[type, str], mod:str  = 'default', **kwa) -> _ManagedServerLoop:
         "Returns a server managing context"
         kwa['_args_'] = app, mod, 'launch'
         return _ManagedServerLoop(self.monkeypatch, kwa)
@@ -338,7 +390,6 @@ def bokehaction(monkeypatch):
     """
     if monkeypatch is None:
         from _pytest.monkeypatch import MonkeyPatch
-        import warnings
         warnings.warn("Unsafe call to MonkeyPatch. Use only for manual debugging")
         monkeypatch = MonkeyPatch()
     return BokehAction(monkeypatch)

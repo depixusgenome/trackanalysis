@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint: disable=too-many-ancestors
 "all view aspects here"
 
 import numpy as np
@@ -36,19 +37,33 @@ class FloatInput(InputWidget):
     """)
     placeholder = String(default="", help="Placeholder for empty input field")
 
+class PathInput(InputWidget):
+    """ widget to access a path. """
+    __implementation__ = "pathinput.coffee"
+    value       = String(default="", help="""
+    Initial or entered text value.
+    """)
+    callback    = Instance(Callback, help="""
+    A callback to run in the browser whenever the user unfocuses the TextInput
+    widget by hitting Enter or clicking outside of the text box area.
+    """)
+    placeholder = String(default="", help="Placeholder for empty input field")
+    click       = Int(default = 0)
+
 class BeadInput(BokehView):
     "Spinner for controlling the current bead"
     def __init__(self, **kwa):
         "Sets up the controller"
         super().__init__(**kwa)
         self._ctrl.getGlobal('css').title.beadinput.default = 'Bead'
+        self._ctrl.getGlobal('css').beadinput.defaults = {'width': 60, 'height' : 25}
         self.__beads = np.empty((0,), dtype = 'i4')
         self.__inp   = None
 
     def observe(self, doc): # pylint: disable=arguments-differ
         "Adds keypress for changin beads"
         self.getroots(doc)
-        def _oncurrent(items):
+        def _onproject(items):
             if 'track' in items:
                 self.__beads        = np.sort(tuple(self.getbeads()))
                 self.__inp.disabled = len(self.__beads) == 0
@@ -60,7 +75,7 @@ class BeadInput(BokehView):
             elif 'bead' in items:
                 self.__inp.value = items['bead'].value
 
-        self._ctrl.getGlobal('current').observe(_oncurrent)
+        self._ctrl.getGlobal('project').observe(_onproject)
 
         self._keys.addKeyPress(('keypress.beadup',
                                 lambda: self.__onchange_cb('', '', self.__inp.value+1)))
@@ -69,8 +84,8 @@ class BeadInput(BokehView):
 
     def getroots(self, _):
         "adds items to doc"
-        kwa = dict(height       = self._ctrl.getGlobal('css', 'input.height'),
-                   width        = self._ctrl.getGlobal('css', 'input.width'),
+        kwa = dict(height       = self._ctrl.getGlobal('css', 'beadinput.height'),
+                   width        = self._ctrl.getGlobal('css', 'beadinput.width'),
                    disabled     = True,
                    title        = self._ctrl.getGlobal('css').title.beadinput.get())
         self.__inp   = IntInput(**kwa)
@@ -90,13 +105,16 @@ class BeadInput(BokehView):
         if new not in self.__beads:
             new = self.__beads[min(len(self.__beads)-1,
                                    np.searchsorted(self.__beads, new))]
-            self.__inp.value = new
 
-        self._ctrl.getGlobal("current").bead = new
+        if new == old:
+            self.__inp.value = new
+        else:
+            with self.action:
+                self._ctrl.getGlobal("project").bead.set(new)
 
     def getbeads(self):
         "returns the active beads"
-        track = self._ctrl.track(self._ctrl.getGlobal("current").track.get())
+        track = self._ctrl.track(self._ctrl.getGlobal("project").track.get())
         if track is None:
             return []
         return track.beadsonly.keys()

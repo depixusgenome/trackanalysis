@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"""
+"""
 Collapse intervals. The idea is to measure the behaviour common to all
 stretches of data. This should be removed as it's source is either a (thermal,
 electric, ...) drift or a mechanical vibration.
@@ -18,7 +18,7 @@ Range   = NamedTuple('Range', [('start', int), ('values', np.ndarray)])
 _m_INTS = (int, cast(type, np.integer))
 
 class Profile(Sized):
-    u"A bead profile: the behaviour common to all stretches of data"
+    "A bead profile: the behaviour common to all stretches of data"
     def __init__(self, inter:Union[Sequence[Range],int]) -> None:
         if isinstance(inter, _m_INTS):
             self.xmin = 0      # type: int
@@ -46,7 +46,7 @@ def _iter_ranges(xmin:int, inter:Sequence[Range]) -> 'Iterable[Tuple[np.ndarray,
             yield (good+max(rng.start-xmin, 0), vals[good])
 
 class _CollapseAlg:
-    u"base class for collapse. Deals with stitching as well"
+    "base class for collapse. Deals with stitching as well"
     edge   = 1    # type: Optional[int]
     filter = None # type: Optional[Filter]
     @initdefaults
@@ -69,11 +69,11 @@ class _CollapseAlg:
 
     @classmethod
     def run(cls, inter:Iterable[Range], **kwa) -> Profile:
-        u"creates the configuration and runs the algorithm"
+        "creates the configuration and runs the algorithm"
         return cls(**kwa)(inter)
 
 class CollapseToMean(_CollapseAlg):
-    u"""
+    """
     Collapses intervals together using their mean values.
 
     The collapse starts from the right-most interval and moves left.
@@ -102,7 +102,7 @@ class CollapseToMean(_CollapseAlg):
         return prof
 
 class CollapseByMerging(_CollapseAlg):
-    u"""
+    """
     Collapses intervals together using their mean values
 
     The collapse is done by merging intervals sharing the maximum number of points.
@@ -208,25 +208,25 @@ class CollapseByMerging(_CollapseAlg):
         return prof
 
 class DerivateMode(Enum):
-    u"Computation modes for the derivate method."
+    "Computation modes for the derivate method."
     median = 'median'
     mean   = 'mean'
 
 class CollapseByDerivate(_CollapseAlg):
-    u"""
+    """
     Behaviour common to all is measured using the distribution of derivates at
     each time frame. Either the mean or the median is defined as the profile
     derivate.
     """
-    maxder =np.inf    # type: float
-    mode   ='median'  # type: Union[str,DerivateMode]
+    maxder = np.inf    # type: float
+    mode   = 'median'  # type: Union[str,DerivateMode]
     @initdefaults
     def __init__(self, **_):
         super().__init__(**_)
 
     @classmethod
     def __occupation(cls, inter:Sequence[Range], xmin:int, xmax:int) -> np.ndarray:
-        u"returns the number of overlapping intervals in the [xmin, xmax] range"
+        "returns the number of overlapping intervals in the [xmin, xmax] range"
         ret = np.zeros((xmax-xmin,), dtype = np.int32)
         for rng in inter:
             ret[max(rng.start-xmin,0) : max(rng.start+len(rng.values)-xmin, 0)] += 1
@@ -264,20 +264,21 @@ class CollapseByDerivate(_CollapseAlg):
         return prof
 
 def _getintervals(cnt:np.ndarray, minv:int, neq:Callable) -> np.ndarray:
-    u"returns a 2D array containing ranges with prof.count < minv"
+    "returns a 2D array containing ranges with prof.count < minv"
     holes  = np.zeros((len(cnt)+2,), dtype = 'bool')
     neq(cnt, minv, out = holes[1:len(cnt)+1])
-    inters = np.nonzero(np.diff(holes))[0]
+    inters = np.nonzero(holes[1:] != holes[:-1])[0]
     return inters.reshape((len(inters)//2,2))
 
 class StitchByDerivate(CollapseByDerivate):
-    u"""
+    """
     Fills holes using CollapseByDerivate as a method
     CollapseByDerivate for filling holes.
     """
+    minoverlaps = 10
+    @initdefaults
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.minoverlaps = kwa.get('minoverlaps', 10)
 
     # pylint: disable=arguments-differ,signature-differs
     def __call__(self, prof:Profile, data:Iterable[Range]) -> Profile: # type: ignore
@@ -314,17 +315,19 @@ class StitchByDerivate(CollapseByDerivate):
 
     @classmethod
     def run(cls, prof:Profile, data:'Iterable[Range]', **kwa) -> Profile: # type: ignore
-        u"creates the configuration and runs the algorithm"
+        "creates the configuration and runs the algorithm"
         return cls(**kwa)(prof, data)
 
 class StitchByInterpolation:
-    u"""
+    """
     Ensures the continuity of a profile using bilinear interpolation
     """
+    fitlength   = 10
+    fitorder    =  1
+    minoverlaps = 10
+    @initdefaults
     def __init__(self, **kwa):
-        self.fitlength   = kwa.get('fitlength',   10)
-        self.fitorder    = kwa.get('fitorder',     1)
-        self.minoverlaps = kwa.get('minoverlaps', 10)
+        pass
 
     def __fit(self, rng, side, vals):
         if side:
@@ -384,7 +387,7 @@ class StitchByInterpolation:
 
     @classmethod
     def run(cls, prof:Profile, *_, **kwa) -> Profile:
-        u"creates the configuration and runs the algorithm"
+        "creates the configuration and runs the algorithm"
         return cls(**kwa)(prof)
 
 CollapseAlg = Union[CollapseByDerivate, CollapseToMean, CollapseByMerging]

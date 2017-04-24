@@ -5,3 +5,5 @@ from ._base             import nanhfsigma, hfsigma, PrecisionAlg
 from ._core             import samples # pylint: disable=no-name-in-module,import-error
 from .noisereduction    import (RollingFilter, NonLinearFilter,
                                 ForwardBackwardFilter, Filter)
+
+rawprecision = PrecisionAlg.rawprecision # pylint: disable=invalid-name

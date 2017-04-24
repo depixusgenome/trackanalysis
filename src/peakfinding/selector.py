@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Selects peaks and yields all events related to each peak"
-from   typing   import  Iterable, Iterator, Tuple, Optional, Union, Sequence
-from   copy     import  copy
+from   typing       import Iterable, Iterator, Tuple, Optional, Union, Sequence
+from   copy         import copy
+from   collections  import namedtuple
 import numpy    as      np
 
 from utils      import (initdefaults, asobjarray, asdataarrays,
@@ -11,8 +12,13 @@ from .alignment import PeakCorrelationAlignment
 from .histogram import (Histogram, PeakFinder, # pylint: disable=unused-import
                         ZeroCrossingPeakFinder, GroupByPeak)
 
-EventsOutput = Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]]
-Output       = Tuple[float, EventsOutput]
+EventsOutput        = Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]]
+Input               = Union[Iterable[Iterable[np.ndarray]], Sequence[EVENTS_TYPE]]
+Output              = Tuple[float, EventsOutput]
+PeakSelectorDetails = namedtuple('PeakSelectorDetails',
+                                 ['positions', 'histogram', 'minvalue', 'binwidth',
+                                  'corrections', 'peaks', 'events', 'ids'])
+
 class PeakSelector:
     u"Selects peaks and yields all events related to each peak"
     histogram = Histogram(edge = 2)
@@ -83,11 +89,9 @@ class PeakSelector:
         vals = [_measure(i) for i in evts if i is not None]
         return zmeas(np.concatenate(vals))
 
-    def __call__(self,
-                 aevents  : Union[Iterable[Iterable[np.ndarray]], Sequence[EVENTS_TYPE]],
-                 precision: Optional[float] = None
-                ) -> Iterator[Output]:
-        original  = asobjarray(aevents)
+    def detailed(self, evts: Input, precision: Optional[float] = None) -> PeakSelectorDetails:
+        "returns computation details"
+        original  = asobjarray(evts)
         events    = asdataarrays(tuple(original))
         projector = copy(self.histogram)
         projector.precision = projector.getprecision(precision, events)
@@ -99,14 +103,18 @@ class PeakSelector:
         else:
             delta  = 0.
 
-        projector.zmeasure = None
-        hist  = projector (pos, separate = False)
+        hist, minv, binwidth = projector.projection(pos, zmeasure = None)
+        peaks = self.find (hist, minv, binwidth)
+        ids   = self.group(peaks, pos, precision = precision)
+        return PeakSelectorDetails(pos, hist, minv, binwidth, delta, peaks, original, ids)
 
-        peaks = self.find (next(hist[0]), *hist[1:])
-        ids   = self.group(peaks, pos)
-
-        for label, peak in enumerate(peaks):
-            good = tuple(orig[pks == label] for orig, pks in zip(original, ids))
+    def details2output(self, dtl:PeakSelectorDetails) -> Iterator[Output]:
+        "yields results from precomputed details"
+        for label, peak in enumerate(dtl.peaks):
+            good = tuple(orig[pks == label] for orig, pks in zip(dtl.events, dtl.ids))
             if any(len(i) for i in good):
-                evts = self.__move(good, delta)
+                evts = self.__move(good, dtl.corrections)
                 yield (self.__measure(peak, evts), evts)
+
+    def __call__(self, evts: Input, precision: Optional[float] = None) -> Iterator[Output]:
+        yield from self.details2output(self.detailed(evts, precision))

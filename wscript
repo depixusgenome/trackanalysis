@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 # encoding: utf-8
+from pathlib import Path
 try:
     import wafbuilder as builder
 except ImportError:
     raise ImportError("Don't forget to clone wafbuilder!!")
 import wafbuilder.git as git
-from waflib.Build       import BuildContext
+from waflib.Build       import BuildContext, Context
 from waflib.Configure   import ConfigurationContext
+from waflib             import Logs
 
 require(cxx    = {'msvc'     : 14.0,
                   'clang++'  : 3.8,
@@ -16,7 +18,7 @@ require(cxx    = {'msvc'     : 14.0,
 require(python = {'python': 3.5, 'numpy': '1.11.2', 'pandas': '0.19.0'},
         rtime  = True)
 
-require(python = {'pybind11' : '2.0.1',
+require(python = {'pybind11' : '2.1.0',
                   'pylint'   : '1.6.4',
                   'astroid'  : '1.4.8',
                   'mypy'     : '0.470'},
@@ -111,8 +113,9 @@ def environment(cnf):
     u"prints the environment variables for current configuration"
     print(cnf.env)
 
-class _Requirements(BuildContext):
+class _Requirements(BuildContext if Path('build/c4che').exists() else ConfigurationContext):
     fun = cmd = 'requirements'
+
 def requirements(cnf):
     u"prints requirements"
     _getmodules(cnf)
@@ -125,9 +128,8 @@ def condaenv(cnf):
     _getmodules(cnf)
     builder.condaenv('trackanalysis')
 
-class _CondaSetup(BuildContext):
+class _CondaSetup(BuildContext if Path('build/c4che').exists() else ConfigurationContext):
     fun = cmd = 'setup'
-
 def setup(cnf):
     u"prints requirements"
     _getmodules(cnf)
@@ -143,19 +145,35 @@ def setup(cnf):
 class _CondaApp(BuildContext):
     fun = cmd = 'app'
 def app(bld):
-    bld.options.APP_PATH = bld.bldnode.make_node("output")
+    bld.options.APP_PATH = bld.bldnode.make_node("OUTPUT")
 
     if bld.options.APP_PATH.exists():
         bld.options.APP_PATH.delete()
 
     build(bld, [i for i in _getmodules(bld) if i != 'tests'])
-    builder.condasetup(bld, copy = 'build/output', runtimeonly = True)
+    builder.condasetup(bld, copy = 'build/OUTPUT', runtimeonly = True)
 
     iswin = builder.os.sys.platform.startswith("win")
-    ext   = ".bat"                       if iswin else ""
+    ext   = ".bat"                      if iswin else ".sh"
     cmd   = r"start /min %~dp0pythonw " if iswin else "./"
 
-    for name, val in {'cyclesplot': 'cyclesplot.CyclesPlotView'}.items():
-        with open(str(bld.options.APP_PATH.make_node(name+ext)), 'w',
-                  encoding = 'utf-8') as stream:
-            print(cmd + r"app/runapp.py " + val, file = stream)
+    for optext, opts in (('', ''), ('_chrome', ' --web --show')):
+        for name, val in (('cyclesplot', 'cyclesplot.CyclesPlotView'),
+                          ('hybridstat', 'hybridstat.view.HybridStatView')):
+           with open(str(bld.options.APP_PATH.make_node(name+optext+ext)), 'w',
+                      encoding = 'utf-8') as stream:
+                print(cmd + r"app/runapp.py " + val + opts + ' --port random',
+                      file = stream)
+
+    builder.os.chdir(str(Path("build")/"OUTPUT"))
+    npm = 'npm' + ('.cmd' if iswin else '')
+    for path in ('.', 'bin', 'Scripts'):
+        if (Path(path)/npm).exists():
+            cmd = str(Path(path)/npm) + " install electron"
+            Logs.info(cmd)
+            builder.os.system(cmd)
+            break
+    else:
+        raise IOError("Could not install electron")
+    builder.os.chdir("..")
+    builder.os.chdir("..")

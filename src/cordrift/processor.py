@@ -7,20 +7,22 @@ from typing                 import (Dict, Union,  # pylint: disable=unused-impor
 
 import numpy as np
 
-from utils                  import initdefaults
-from model                  import Task, Level, PHASE
-from control.processor      import Processor
-from data                   import Track, Cycles
-from eventdetection         import EventDetectionConfig
-from eventdetection.data    import Events
-from .collapse              import (Range, Profile, # pylint: disable=unused-import
-                                    CollapseAlg, CollapseByMerging, CollapseToMean,
-                                    StitchAlg, StitchByDerivate, StitchByInterpolation)
+from utils                      import initdefaults
+from model                      import Task, Level, PHASE
+from control.processor          import Processor
+from data                       import Track, Cycles
+from eventdetection             import EventDetectionConfig
+from eventdetection.detection   import EventDetector, DerivateSplitDetector
+from eventdetection.data        import Events
+from .collapse                  import (Range, Profile, # pylint: disable=unused-import
+                                        CollapseAlg, CollapseByMerging, CollapseToMean,
+                                        StitchAlg, StitchByDerivate, StitchByInterpolation)
 
 class DriftTask(Task, EventDetectionConfig):
     u"Removes correlations between cycles"
     level     = Level.bead
     phases    = PHASE.measure, PHASE.measure # type: Optional[Tuple[int,int]]
+    events    = EventDetector(split = DerivateSplitDetector())
     collapse  = CollapseToMean()             # type: Optional[CollapseAlg]
     stitch    = StitchByInterpolation()      # type: Optional[StitchAlg]
     zero      = 10

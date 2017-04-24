@@ -3,12 +3,13 @@
 u"Task IO module"
 from typing         import Union, Tuple
 from copy           import deepcopy
-
 from model.task     import TrackReaderTask
-from .event         import NoEmission
 
 class TaskIO:
     u"base class for opening files"
+    def __init__(self, *_):
+        pass
+
     # pylint: disable=no-self-use,unused-argument
     def open(self, path:Union[str, Tuple[str,...]], model:tuple):
         u"opens a file"
@@ -28,30 +29,6 @@ class TaskIO:
         "returns the list of possible extensions"
         return '*|'+'|'.join(i.EXT for i in cls.__get(ctrl, attr)[::-1])
 
-    @classmethod
-    def insert(cls, ctrl, attr:str, ind, new):
-        "returns the list of file openers"
-        cls.__get(ctrl, attr).insert(ind, new)
-
-    @classmethod
-    def replace(cls, ctrl, attr:str, old, new):
-        "returns the list of file openers"
-        lst = cls.__get(ctrl, attr)
-        ind = lst.index(cls.get(ctrl, attr, old))
-        lst[ind] = new
-
-    @classmethod
-    def get(cls, ctrl, attr:str, old):
-        "returns the list of file openers"
-        lst = cls.__get(ctrl, attr)
-        if isinstance(old, type):
-            # pylint: disable=unidiomatic-typecheck
-            return next(j for j in lst if type(j) is old)
-        return old
-
-class DefaultTaskIO(TaskIO):
-    "will be selected by the taskcontrol by default"
-
 class TrackIO(TaskIO):
     "Deals with reading a track file"
     EXT = 'trk'
@@ -64,13 +41,9 @@ class TrackIO(TaskIO):
 class ConfigTrackIO(TrackIO):
     "Adds an alignment to the tracks per default"
     EXT = 'trk'
-    def __init__(self, ctrl):
-        self.__ctrl = ctrl
-
-    @classmethod
-    def setup(cls, ctrl, cnf):
-        "sets itself-up in stead of TrackIO"
-        cls.replace(ctrl, 'openers', TrackIO, cls(cnf))
+    def __init__(self, ctrl, *_):
+        super().__init__(ctrl, *_)
+        self._ctrl = ctrl.getGlobal('config').tasks
 
     def open(self, path:Union[str, Tuple[str,...]], model:tuple):
         "opens a track file and adds a alignment"
@@ -78,22 +51,18 @@ class ConfigTrackIO(TrackIO):
             path = path,
 
         items = [TrackIO().open(path, model)[0][0]]
-        for name in self.__ctrl.get(default = tuple()):
-            task = self.__ctrl[name].get(default = None)
+        for name in self._ctrl.get(default = tuple()):
+            task = self._ctrl[name].get(default = None)
             if not getattr(task, 'disabled', True):
                 items.append(deepcopy(task))
         return [tuple(items)]
 
 class _GrFilesIOMixin:
     "Adds an alignment to the tracks per default"
-    def __init__(self):
+    def __init__(self, ctrl):
         self._track = None
-
-    @classmethod
-    def setup(cls, ctrl, cnf):
-        "sets itself-up just before TrackIO"
-        self = cls.get(ctrl, 'openers', cls)
-        cnf.observe(lambda itm: setattr(self, '_track', itm.value))
+        fcn         = lambda itm: setattr(self, '_track', itm.value)
+        ctrl.getGlobal('project').track.observe(fcn)
 
     def _open(self, path:Union[str, Tuple[str,...]], _):
         "opens a track file and adds a alignment"
@@ -105,25 +74,39 @@ class _GrFilesIOMixin:
 
         track = self._track
         if track is None:
-            raise NoEmission("Open track first")
+            raise IOError(u"IOError: start by opening a track file!", "treated")
 
-        path = ((track.path,) if isinstance(track.path, str) else track.path) + path
-        return type(self).__base__.open(self, path, _) # type: ignore # pylint: disable=no-member
+        return ((track.path,) if isinstance(track.path, str) else track.path) + path
 
 class GrFilesIO(TrackIO, _GrFilesIOMixin):
     "Adds an alignment to the tracks per default"
     EXT = 'gr'
+    def __init__(self, *_):
+        TrackIO.__init__(self, *_)
+        _GrFilesIOMixin.__init__(self, *_)
+
     def open(self, path:Union[str, Tuple[str,...]], _:tuple):
-        return self._open(path, _)
+        path = self._open(path, _)
+        return None if path is None else TrackIO.open(self, path, _)
 
 class ConfigGrFilesIO(ConfigTrackIO, _GrFilesIOMixin):
     "Adds an alignment to the tracks per default"
     EXT = 'gr'
-    def open(self, path:Union[str, Tuple[str,...]], _:tuple):
-        return self._open(path, _)
+    def __init__(self, *_):
+        ConfigTrackIO.__init__(self, *_)
+        _GrFilesIOMixin.__init__(self, *_)
 
-    @classmethod
-    def setup(cls, ctrl, trk, tasks): # pylint: disable=arguments-differ
-        self = cls(tasks)
-        cls.replace(ctrl, 'openers', GrFilesIO, self)
-        trk.observe(lambda itm: setattr(self, '_track', itm.value))
+    def open(self, path:Union[str, Tuple[str,...]], _:tuple):
+        path = self._open(path, _)
+        if path is None:
+            return None
+
+        mdls = ConfigTrackIO.open(self, path, _)
+        if mdls is None:
+            return None
+
+        task = type(self._ctrl.extremumalignment.get(default = None))
+        ret  = []
+        for mdl in mdls:
+            ret.append(tuple(i for i in mdl if not isinstance(i, task)))
+        return ret

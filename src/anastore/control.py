@@ -3,10 +3,10 @@
 u"Sets things up for the taskcontroller"
 
 from typing             import Union, Tuple
-from control.taskio     import DefaultTaskIO
+from control.taskio     import TaskIO
 from .                  import load, dump
 
-class AnaIO(DefaultTaskIO):
+class AnaIO(TaskIO):
     u"Ana IO"
     EXT = 'ana'
     def open(self, path:Union[str, Tuple[str,...]], model:tuple):
@@ -18,7 +18,7 @@ class AnaIO(DefaultTaskIO):
 
         out = load(path)
         if out is not None and len(model):
-            raise NotImplementedError("Don't know what to do")
+            raise NotImplementedError()
         return out
 
     def save(self, path:str, models):
