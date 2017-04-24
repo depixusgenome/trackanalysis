@@ -51,13 +51,11 @@ def asobjarray(arr:Iterable)->np.ndarray:
 def asdataarrays(aevents:Iterable[Iterable])->np.ndarray:
     u"converts  an Iterable[Iterable] to a np.array"
     events = _m_asarray(aevents)
-    if len(events) == 0:
-        return
+    first  = next((evt for evt in events if len(evt)), None)
+    if first is None:
+        return None
 
-    if getattr(events[0], 'dtype', 'f') == EVENTS_DTYPE or not np.isscalar(events[0][0]):
+    if getattr(first, 'dtype', 'f') == EVENTS_DTYPE or not np.isscalar(first[0]):
         for i, evt in enumerate(events):
             events[i] = _m_asarray(evt)
-
-    if not any(len(i) for i in events):
-        return None
     return events
