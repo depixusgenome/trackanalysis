@@ -51,6 +51,12 @@ class PeaksDict(TrackItems):
     def _iter(self, sel:Optional[Sequence] = None) -> Iterator[Output]:
         yield from ((bead, self.__run(bead)) for bead in self.keys(sel))
 
+    def detailed(self, ibead, precision = None):
+        "detailed output from config"
+        if precision is None:
+            precision = self.config.histogram.rawprecision(self.data.track, ibead)
+        return self.config.detailed(iter(i for _, i in self.data[ibead,...]), precision)
+
 class PeakSelectorProcessor(Processor):
     u"Groups events per peak"
     @classmethod
