@@ -11,6 +11,7 @@ from    control.taskio      import ConfigTrackIO, GrFilesIO
 
 from    view.plots          import DpxKeyedRow, PlotView
 from    view.plots.tasks    import TaskPlotCreator
+from    view.modal          import dialog
 
 from   ._bokehext           import DpxHoverModel
 from   ._model              import CyclesModelAccess
@@ -62,13 +63,25 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, ConfigMixin):
         self._histobservers()
         self._configobservers()
 
+    def configuration(self):
+        "modal dialog for configuration"
+        dialog(title = 'Cycles Plot Configuration',
+               body  = (('Histogram bin width',      '%(binwidth)d'),
+                        ('Minimum frames per cycle', '%(minframes)d')),
+               model = self._model)
+
 class CyclesPlotView(PlotView):
     "Cycles plot view"
     PLOTTER = CyclesPlotCreator
     APPNAME = 'Track Cycles'
+    def __init__(self, *args, **kwa):
+        super().__init__(*args, **kwa)
 
     def ismain(self):
         "Alignment, ... is set-up by default"
+        self._ctrl.getGlobal('config').keypress.configuration.default = 'Control-l'
+        self._keys.addKeyPress(('keypress.configuration', self._plotter.configuration))
+
         tasks         = self._ctrl.getGlobal('config').tasks
         tasks.default = ['extremumalignment']
         tasks.io.open.default = (tuple(tasks.io.open.get()[:-1])

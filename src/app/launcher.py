@@ -13,6 +13,7 @@ from bokeh.application          import Application
 from bokeh.application.handlers import FunctionHandler
 from bokeh.settings             import settings
 from bokeh.layouts              import layout
+from tornado.web                import StaticFileHandler
 
 from utils.logconfig            import getLogger
 from utils                      import getlocals
@@ -33,6 +34,8 @@ def _serverkwargs(kwa):
     server_kwargs['generate_session_ids'] = True
     server_kwargs['use_index']            = True
     server_kwargs['redirect_root']        = True
+    server_kwargs['extra_patterns']       = [
+        ("/consts/(.*)", StaticFileHandler, { "path" : "static" })]
     return server_kwargs
 
 def _title(view) -> str:

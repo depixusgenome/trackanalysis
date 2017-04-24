@@ -9,6 +9,7 @@ from bokeh.layouts        import layout
 from control        import Controller                   # pylint: disable=unused-import
 from control.action import ActionDescriptor, Action     # pylint: disable=unused-import
 from .keypress      import KeyPressManager              # pylint: disable=unused-import
+from .modal         import DpxModal
 
 class View:
     "Classes to be passed a controller"
@@ -111,6 +112,8 @@ class BokehView(View):
         if isinstance(theme, str):
             theme = self._ctrl.getGlobal('css').theme[theme].get(default = None)
         doc.theme = Theme(json = theme)
+
+        doc.add_root(DpxModal())
 
         self._keys.getroots(doc)
         roots = self.getroots(doc)
