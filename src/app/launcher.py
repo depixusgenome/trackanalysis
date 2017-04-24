@@ -4,6 +4,7 @@
 from typing     import TYPE_CHECKING, List, Callable # pylint: disable=unused-import
 from pathlib    import Path
 
+import sys
 import appdirs
 
 from flexx.webruntime           import launch as _flexxlaunch
@@ -25,15 +26,18 @@ import view.toolbar as toolbars
 LOGS           = getLogger(__name__)
 DEFAULT_CONFIG = lambda x: None
 INITIAL_ORDERS = []     # type: List[Callable]
+DYN_LOADS      = ('modaldialog',)
 
 def _serverkwargs(kwa):
-    server_kwargs                         = dict(kwa)
-    server_kwargs['sign_sessions']        = settings.sign_sessions()
-    server_kwargs['secret_key']           = settings.secret_key_bytes()
-    server_kwargs['generate_session_ids'] = True
-    server_kwargs['use_index']            = True
-    server_kwargs['redirect_root']        = True
-    return server_kwargs
+    kwargs                         = dict(kwa)
+    kwargs['sign_sessions']        = settings.sign_sessions()
+    kwargs['secret_key']           = settings.secret_key_bytes()
+    kwargs['generate_session_ids'] = True
+    kwargs['use_index']            = True
+    kwargs['redirect_root']        = True
+    for mdl in DYN_LOADS:
+        getattr(sys.modules.get(mdl, None), 'server', lambda x: None)(kwargs)
+    return kwargs
 
 def _title(view) -> str:
     appname   = getattr(view.MainControl, 'APPNAME', 'track analysis')
@@ -186,6 +190,12 @@ def _create(main, controls, views): # pylint: disable=unused-argument
             main.observe(self)
             for cls in views:
                 cls.observe(self)
+
+        def addtodoc(self, doc):
+            "Adds one's self to doc"
+            for mdl in DYN_LOADS:
+                getattr(sys.modules.get(mdl, None), 'document', lambda x: None)(doc)
+            super().addtodoc(doc)
 
     return Main
 
