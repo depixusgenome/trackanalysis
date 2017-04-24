@@ -23,7 +23,7 @@ class Multiplier:
         raise NotImplementedError()
 
     def __mul__(self, plot):
-        return plot.__rmul__(self)
+        return (None*self)*plot
 
 class Show(Multiplier):
     "shows the plot"
