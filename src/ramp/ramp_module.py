@@ -7,11 +7,14 @@ need to allow for beads with only a subset of good cycles
 need to add a little marker specifying when the data is loaded
 Add a test : if min molextension is too big
 '''
-import functools
 from typing import Optional, Tuple , Set, List # pylint: disable=unused-import
 import numpy
 import pandas as pd
 from data import Track
+
+from utils.logconfig import getLogger
+
+LOGS = getLogger(__name__)
 
 class RampModel:
     u''' holds instruction to handle the data
@@ -388,9 +391,8 @@ def cluster1D_dbscan(values,eps=0.2,min_samples=3,**kwargs):
     try:
         from sklearn.cluster import dbscan
     except ImportError as err:
-        print("Cannot import sklearn.cluster (not available on Windows).")
-        print(err)
-        print("returning")
+        LOGS.error(err)
+
     return dbscan(values.reshape(-1,1),
                   eps=eps,
                   min_samples=min_samples,
@@ -411,75 +413,6 @@ def _se_map(data:pd.Series):
     return (data.index> fid) &\
         (data.index<lid)
 
-class Dubious:
-    u'''
-    decorator for dubious function
-    '''
-    def __init__(self,msg):
-        self.count=1
-        self.msg=msg
-    def __call__(self,fcn):
-        functools.wraps(fcn)
-        def wrapper(*args,**kwargs):
-            u'''
-            decorates a function whose use is dubious
-            '''
-            if self.count==1:
-                print("function %s is dubious"%fcn.__name__)
-                print(self.msg)
-                self.count+=1
-            return fcn(*args,**kwargs)
-        return wrapper
-
-NOTUSEFUL = Dubious("As is this function is not very useful")
-OLDTOOSLOW = Dubious("function too slow and a faster alternative has been implemented")
-
-
-@OLDTOOSLOW
-def _isGoodBead(dzdt:pd.Series,scale:float):
-    u'''test a single bead over a single cycle'''
-    return _isGooddzdt(dzdt,scale)
-
-
-@OLDTOOSLOW
-def _isGooddzdt(dzdt:pd.Series,scale:float):
-    u'''
-    tests whether a bead opens and close using only information on dzdt
-    '''
-    det = detectOutliers(dzdt,scale)
-    # at least one opening and closing
-    if not (any(dzdt[det]>0) and any(dzdt[det]<0)):
-        return False
-
-    # last index of positive detected dzdt
-    lposid = dzdt[(dzdt>0)&det].last_valid_index()
-    negids = dzdt[(dzdt<0)&det].index
-    return not any((negids-lposid)<0)
-
-
-@NOTUSEFUL
-def _isdzdt_unit_consistent(dzdt:pd.Series,scale:float,uscale:int)-> bool:
-    u'''
-    returns True if the interval between changes of sign of dzdt is > unit_scale
-    False otherwise
-    No proof that this test rejects more bead, cycles than the _isGooddzdt test..
-    '''
-    sign = dzdt.apply(lambda x : 1 if x>scale else -1 if x<-scale else 0)
-
-    gen = (sign[i:i+uscale] for i in range(sign.size-uscale+1))
-    for win in gen:
-        if any(win)>0 and any(win)<0:
-            return False
-    return True
-
-@NOTUSEFUL
-def isGoodBeadCycle(dzdt:pd.Series, scale:float, unit_scale:int):
-    u'''
-    returns a pd.DataFrame which is a boolean applicable to data.dataz
-    '''
-    if not _isGooddzdt(dzdt,scale):
-        return False
-    return _isdzdt_unit_consistent(dzdt,scale,unit_scale)
 
 def detectOutliers(dzdt,scale:float):
     u'''detects opening and closing '''
@@ -490,24 +423,6 @@ def detectOutliers(dzdt,scale:float):
     min_outlier = quant1-scale*(quant3-quant1)
     return (dzdt>max_outlier)|(dzdt<min_outlier)
 
-@OLDTOOSLOW
-def obsolete_can_be_structure_event(dzdt,detected):
-    u'''
-    args : dzdt and detected (output of detect_outliers(dzdt))
-    Need to apply this to the full data set and not on each cycle
-    '''
-    # find when rezipping starts
-    st_rezip = dzdt[dzdt[detected]<0].apply(lambda x: x.first_valid_index())
-    # find when rezipping stops
-    ed_rezip = dzdt[dzdt[detected]<0].apply(lambda x: x.last_valid_index())
-    # create a map :
-    # If not detected by the sanitising algorithm,
-    # after z_closing (first dzdt[detected]>0,
-    # and before last dzdt[detected]<0
-    canbe_se = ~detected&dzdt.apply(
-        lambda x:x.index>(st_rezip[x.name]))&dzdt.apply(lambda x:x.index<(ed_rezip[x.name]))
-
-    return canbe_se
 
 if __name__=="__main__":
-    print("ramp called as main")
+    pass

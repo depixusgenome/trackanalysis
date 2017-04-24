@@ -31,7 +31,7 @@ def from_py_func(func, **kwa):
                            cust.code)
     return cust
 
-class DpxKeyedRow(Row):
+class DpxKeyedRow(Row): # pylint: disable=too-many-ancestors
     "define div with tabIndex"
     fig                = props.Instance(Figure)
     toolbar            = props.Instance(Model)
@@ -60,7 +60,7 @@ class DpxKeyedRow(Row):
                          panrate  = cnf.pan.rate.get(),
                          **kwa)
 
-class DpxHoverTool(HoverTool):
+class DpxHoverTool(HoverTool): # pylint: disable=too-many-ancestors
     "sorts indices before displaying tooltips"
     maxcount           = props.Int(5)
     __implementation__ = """
@@ -82,7 +82,7 @@ class DpxHoverTool(HoverTool):
         @define { maxcount: [ p.Int, 5] }
     """
 
-class DpxNumberFormatter(NumberFormatter):
+class DpxNumberFormatter(NumberFormatter): # pylint: disable=too-many-ancestors
     "Deals with"
     __implementation__ = """
     import {NumberFormatter, StringFormatter} from "models/widgets/cell_formatters"
