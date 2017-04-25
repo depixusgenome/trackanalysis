@@ -6,6 +6,7 @@ from    typing          import (Sequence, Union, # pylint: disable=unused-import
                                 Callable, Iterator, Any, Tuple)
 import  random
 from    itertools       import chain
+from    collections     import OrderedDict
 
 import  numpy as np
 
@@ -185,7 +186,7 @@ class TrackSimulator:
 
         track = Track(data = None, phases = self.phases)
         def _createall():
-            evts = dict()      # type: Dict[Tuple[int,int], np.ndarray]
+            evts = OrderedDict() # type: Dict[Tuple[int,int], np.ndarray]
             def _createone(cycs, bead):
                 evts.update(((bead, cid), evt) for cid, evt in enumerate(self.__events(cycs)))
                 return (bead, cycs.ravel())
