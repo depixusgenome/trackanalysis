@@ -181,6 +181,9 @@ class Track(_Track):
                       parents= (self.path,))
 
 def _copied(fcn):
+    if hasattr(fcn, '__old__'):
+        return fcn
+
     @wraps(fcn)
     def _fcn(self, *args, __old__ = fcn, **kwargs):
         stack = inspect.stack()
@@ -197,7 +200,7 @@ for _cls in (Beads, Cycles, Events):
     _cls._COPY = True # pylint: disable=protected-access
     _cls.rawprecision = lambda self, ibead: self.track.rawprecision(ibead)
     for itm in inspect.getmembers(_cls, callable):
-        if itm[0].startswith('with'):
+        if itm[0].startswith('with') and not hasattr(itm[1], '__old__'):
             setattr(_cls, itm[0], _copied(itm[1]))
 
 def _withfilter(self, tpe = NonLinearFilter, **kwa):

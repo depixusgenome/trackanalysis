@@ -139,11 +139,15 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
         self.actions   = get('actions')
         self.beadsonly = get('beadsonly')
 
-        self.selecting  (get('selected'))
-        self.discarding (get('discarded'))
-        if kw.get('copy', self._COPY) is not None:
-            self.withcopy(kw.get('copy', self._COPY))
-        self.withsamples(kw.get('samples', None))
+        _m_selection(self, 'selected',  get('selected'),  False)
+        _m_selection(self, 'discarded', get('discarded'), False)
+
+        if kw.get('copy', self._COPY):
+            self.actions.append(getattr(self, 'copy', _m_copy))
+
+        if kw.get('samples', None) is not None:
+            samples = kw['samples']
+            self.actions.append(lambda item: (item[0], item[1][samples]))
 
     copy = staticmethod(_m_copy)    # type: ignore
 
