@@ -273,6 +273,8 @@ class TrackItems(_m_ConfigMixin, Items):
                 yield from (i for i in sel if i in keys)
 
     def _iter(self, sel = None) -> Iterator[Tuple[Any,Any]]:
+        if sel is None:
+            sel = self.selected
         if sel is None and isinstance(self.data, dict):
             yield from self.data.items()   # pylint: disable=no-member
         else:
@@ -376,6 +378,9 @@ class Beads(TrackItems, Items):
     def _iter(self, sel = None) -> Iterator[Tuple[BEADKEY, np.ndarray]]:
         if isinstance(self.data, Beads) and self.cycles is None:
             beads = cast(Beads, self.data)
+            if sel is None:
+                sel = self.selected
+
             if sel is None:
                 yield from beads.__iter__() # pylint: disable=no-member
             else:
@@ -564,6 +569,9 @@ class Cycles(TrackItems, Items):
     def _iter(self, sel = None) -> Iterator[Tuple[CYCLEKEY, np.ndarray]]:
         if isinstance(self.data, Cycles):
             cycles = cast(Cycles, self.data)
+            if sel is None:
+                sel = self.selected
+
             if sel is None:
                 yield from cycles.__iter__() # pylint: disable=no-member
             else:
