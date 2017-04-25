@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Creates a histogram from available events"
+"Creates a histogram from available events"
 from    typing import (Optional, Iterator, # pylint: disable=unused-import
                        Iterable, Union, Sequence, Callable, Tuple, cast)
 from    enum   import Enum
@@ -9,14 +9,15 @@ import  numpy  as     np
 from    numpy.lib.stride_tricks import as_strided
 from    scipy.signal            import find_peaks_cwt
 
-from    utils                   import (kwargsdefaults, initdefaults, NoArgs, asdataarrays)
+from    utils                   import (kwargsdefaults, initdefaults,
+                                        NoArgs, asdataarrays, EVENTS_DTYPE)
 from    signalfilter            import PrecisionAlg
 from    signalfilter.convolve   import KernelConvolution # pylint: disable=unused-import
 
 HistInputs = Union[Iterable[Iterable[float]], Iterable[Iterable[np.ndarray]]]
 BiasType   = Union[None, float, np.ndarray]
 class Histogram(PrecisionAlg):
-    u"""
+    """
     Creates a gaussian smeared histogram of events.
 
     Attributes are:
@@ -77,7 +78,7 @@ class Histogram(PrecisionAlg):
 
     @property
     def exactoversampling(self) -> int:
-        u"returns the exact oversampling used"
+        "returns the exact oversampling used"
         return (int(self.oversampling)//2) * 2 + 1
 
     def eventpositions(self,
@@ -85,12 +86,17 @@ class Histogram(PrecisionAlg):
                                         Iterable[Iterable[np.ndarray]]],
                        bias     : Union[None,float,np.ndarray] = None,
                        zmeasure : Union[None,type,Callable]    = NoArgs) -> np.ndarray:
-        u"Returns event positions as will be added to the histogram"
+        "Returns event positions as will be added to the histogram"
         events = asdataarrays(aevents)
         if events is None:
             return np.empty((0,), dtype = 'f4')
 
-        if np.isscalar(events[0][0]):
+        first = next((i for i in events if len(i)), None)
+        if first is None:
+            return np.empty((0,), dtype = 'f4')
+
+        assert getattr(first, 'dtype', 'f') != EVENTS_DTYPE
+        if np.isscalar(first[0]):
             events = events,
 
         fcn = self.zmeasure if zmeasure is NoArgs else zmeasure
@@ -106,7 +112,7 @@ class Histogram(PrecisionAlg):
 
     @classmethod
     def run(cls, *args, **kwa):
-        u"runs the algorithm"
+        "runs the algorithm"
         return cls()(*args, **kwa)
 
     @staticmethod
@@ -138,7 +144,7 @@ class Histogram(PrecisionAlg):
     def __generate(lenv, kern, zmeas, weights):
         for pos, weight in zip(zmeas, weights):
             if weight == 0. or len(pos) == 0:
-                yield np.empty((lenv,), dtype = 'i8')
+                yield np.zeros((lenv,), dtype = 'i8')
                 continue
             elif weight == 1.:
                 cnt = np.bincount(pos, minlength = lenv)
@@ -184,12 +190,12 @@ class Histogram(PrecisionAlg):
         yield from self.__generate(lenv, kern, items, weight)
 
 class FitMode(Enum):
-    u"Fit mode for sub-pixel peak finding"
+    "Fit mode for sub-pixel peak finding"
     quadratic = 'quadratic'
     gaussian  = 'gaussian'
 
 class SubPixelPeakPosition:
-    u"""
+    """
     Refines the peak position using a quadratic fit
     """
     fitwidth = 1 # type: Optional[int]
@@ -226,7 +232,7 @@ class SubPixelPeakPosition:
         return (vals[0] if np.isscalar(ainds) else vals) * rho + bias
 
 class CWTPeakFinder:
-    u"Finds peaks using scipy's find_peaks_cwt. See the latter's documentation"
+    "Finds peaks using scipy's find_peaks_cwt. See the latter's documentation"
     subpixel      = SubPixelPeakPosition()
     widths        = np.arange(5, 11) # type: Sequence[int]
     wavelet       = None             # type: Optional[Callable]
@@ -249,7 +255,7 @@ class CWTPeakFinder:
         return np.asarray(vals) * slope + bias
 
 class ZeroCrossingPeakFinder:
-    u"""
+    """
     Finds peaks with a minimum *half*width and threshold
     """
     subpixel  = SubPixelPeakPosition()
@@ -278,7 +284,7 @@ class ZeroCrossingPeakFinder:
 PeakFinder = Union[CWTPeakFinder, ZeroCrossingPeakFinder]
 
 class GroupByPeak:
-    u"Groups events by peak position"
+    "Groups events by peak position"
     window    = 3
     mincount  = 5
     @initdefaults
