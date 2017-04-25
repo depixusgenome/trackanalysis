@@ -9,6 +9,7 @@ import itertools
 from copy import deepcopy
 from typing import Callable, List, Dict # pylint: disable=unused-import
 import scipy.stats
+import pickle
 import numpy
 from Bio import pairwise2
 from . import oligohit
@@ -377,6 +378,170 @@ def swap_between_batches(bat1, bat2, nscale=1): # not great impl # to optimize
 
     return perms
 
+# returns the number of states to compare with permutations of all oligos between batches
+def swap_between_batches2(batches, nscale=1): # not great impl # to optimize
+    u'''
+    compute all possibles swaps between batch1 and batch2
+    need to rethink the algorithm.
+    We must constrain the number of permutations as soon as possible
+    batches between oligos from different batches only
+    do not generate identity swap
+    can take into account physical size of oligos to restrain permutations
+    '''
+    import math
+    oligos = []
+    for bat in batches:
+        oligos += list(bat.oligos)
+    groups = group_overlapping_oligos(oligos,nscale=nscale)
+
+    infogrp=[]
+    for grp in groups:
+        info=[]
+        for val in grp:
+            for idx,bat in enumerate(batches):
+                if val in bat.oligos:
+                    info.append((val,bat.oligos.index(val),idx))
+                    break
+        infogrp.append(info)
+
+    # remove groups if there is not a representative of the two batches
+    infogrp = [grp for grp in infogrp if len(set(val[2] for val in grp))>1]
+
+    # generate all permutations between batches excluding within batch swaps
+    perms = 0
+
+    for grp in infogrp:
+        print("len(grp)=",len(grp))
+        subs = set(val[2] for val in grp)
+        print("subs=",len(subs))
+        perm = 1
+        N = len(grp)
+        for idx,val in enumerate(subs):
+            nsub = len([i for i in grp if i[2]==val])
+            perm*=math.factorial(N)/math.factorial(N-nsub)/math.factorial(nsub)
+            N-=nsub
+
+        perms+=perm
+        '''
+        for comb in itertools.combinations(range(len(grp)),len([i in grp if i[2]==val])):
+            indices = list(range(len(grp)))
+            for idx,val in enumerate(subs):
+            perm.append(
+            # remove indices in perm[-1]
+            for i in perm[-1]:
+                indices.remove(i)
+        perms.append(perm)
+        '''
+    return perms
+
+# returns number of permutations to explore, considering only:
+#    * permutations between batches
+#    * permutations between oligos if overlap between oligos is osize-1
+def swap_between_batches3(batches, nscale, ooverl): # not great impl # to optimize
+    u'''
+    the idea is to reduce the number of permutations to the minimum.
+    first check which oligos may swap due to measurement error
+    then cluster oligos if they overlap with osize-1 bases
+    '''
+    import math
+    oligos = []
+    for bat in batches:
+        oligos += list(bat.oligos)
+    groups = group_overlapping_oligos(oligos,nscale=nscale)
+
+    infogrp=[]
+    for grp in groups:
+        info=[]
+        for val in grp:
+            for idx,bat in enumerate(batches):
+                if val in bat.oligos:
+                    info.append((val,bat.oligos.index(val),idx))
+                    break
+        infogrp.append(info)
+
+    # remove groups if there is not a representative of the two batches
+    infogrp = [grp for grp in infogrp if len(set(val[2] for val in grp))>1]
+
+    finer = []
+    with open("infogrp.pickle","wb") as outfile:
+        pickle.dump(infogrp,outfile)
+
+    for grp in infogrp:
+        print("len(grp)=",len(grp))
+        finer += _cluster_overlapping(ooverl,grp)
+
+    infogrp = list(finer)
+    # generate all permutations between batches excluding within batch swaps
+    perms = 0
+
+    for grp in infogrp:
+        print("len(grp)=",len(grp))
+        subs = set(val[2] for val in grp)
+        print("subs=",len(subs))
+        perm = 1
+        N = len(grp)
+        for idx,val in enumerate(subs):
+            nsub = len([i for i in grp if i[2]==val])
+            perm*=math.factorial(N)/math.factorial(N-nsub)/math.factorial(nsub)
+            N-=nsub
+
+        perms+=perm
+        '''
+        for comb in itertools.combinations(range(len(grp)),len([i in grp if i[2]==val])):
+            indices = list(range(len(grp)))
+            for idx,val in enumerate(subs):
+            perm.append(
+            # remove indices in perm[-1]
+            for i in perm[-1]:
+                indices.remove(i)
+        perms.append(perm)
+        '''
+    return perms
+
+def _update_seed(ooverl,seed,grp):
+    nseed = 0
+    while nseed!=len(seed):
+        nseed=len(seed)
+        for elmt in grp[1:]:
+            if elmt[0].seq[:ooverl] in seed:
+                seed.update([elmt[0].seq[:ooverl],elmt[0].seq[-ooverl:]])
+                continue
+            if elmt[0].seq[-ooverl:] in seed:
+                seed.update([elmt[0].seq[:ooverl],elmt[0].seq[-ooverl:]])
+                continue
+    return seed
+
+def _cluster_overlapping(ooverl,grp): # to check
+    u'''
+    a grp is a list of tuples (oligo,oligo index, batch id)
+    returns a list of list of (oligo,oligo index, batch id)
+    each oligo in a list has ooverl bases with at least another oligo in the same list
+    '''
+    print("in _cluster_overlapping")
+    # if two oligos are in the same batch they should at least have ooverl overlaps
+    # do we put them in the same cluster? yes, we compute permutations between batches afterwards
+    seed = set([grp[0][0].seq[:ooverl],grp[0][0].seq[-ooverl:]])
+    seed = _update_seed(ooverl,seed,grp)
+    print("first updated seed = ",seed)
+    clusters = [[elmt for elmt in grp\
+                if elmt[0].seq[:ooverl] in seed or elmt[0].seq[-ooverl:] in seed]]
+    allseeds=set(seed)
+    while sum(len(i) for i in clusters)!=len(grp):
+        # pick a new seed not in seed and restart
+
+        seed = [set([elmt[0].seq[:ooverl],elmt[0].seq[-ooverl:]])\
+                for elmt in grp if not elmt[0].seq[:ooverl] in allseeds][0]
+        print("new seed=",seed)
+        seed = _update_seed(ooverl,seed,grp)
+        print("new updated seed=",seed)
+        clusters+=[[elmt for elmt in grp\
+                    if elmt[0].seq[:ooverl] in seed or elmt[0].seq[-ooverl:] in seed]]
+        allseeds.update(seed)
+        print("sum in clusters=",sum(len(i) for i in clusters))
+        print("len(grp)=",len(grp))
+
+    print("out _cluster_overlapping")
+    return clusters
 
 def can_oligos_overlap(bat1:oligohit.Batch,bat2:oligohit.Batch,min_overl=1):
     u'''

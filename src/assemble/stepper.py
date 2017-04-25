@@ -8,10 +8,11 @@ classes to define Hopping Steps
 import sys
 from typing import Callable, Iterable # pylint: disable=unused-import
 import itertools
+import pickle
 import numpy
+from utils.logconfig import getLogger
 from .oligohit import Batch
 from . import _utils as utils
-from utils.logconfig import getLogger
 
 # reconstruction a batch at a time
 # if we consider an oligo-batch at a time, then:
@@ -86,6 +87,8 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
                               index=index)
                         for index in batchids]
         # batches from groups( = utils.group_oligos(self.oligos, by=self.seg))??
+        with open("batches.pickle","wb") as testfile:
+            pickle.dump(self.batches,testfile)
 
         self.swap_batches()
 
@@ -105,7 +108,7 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
         return None
         '''
         LOGS.debug("len(self.batches)="+str(len(self.batches)))
-        return self.swap_batches()
+        return self.swap_batches3()
 
     def swap_batches(self):
         u'''
@@ -124,9 +127,6 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
 
         # find possible ways to combine batches
 
-
-
-
         for merges in itertools.combinations(range(len(self.batches)),2):
             if utils.can_oligos_overlap(self.batches[merges[0]],
                                         self.batches[merges[1]],
@@ -137,5 +137,47 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
                 self.batches[merges[0]].fill_with(self.batches[merges[1]])
                 self.batches.pop(merges[1])
                 break
+
         # remove swaps if oligos are note permuted??
+        return swaps
+
+    def swap_batches2(self):
+        u'''
+        takes two batches, if there can be an overlap between oligos in the two batches,
+        compute swaps
+        returns swaps between two batches.
+        These batches are then merged
+        '''
+        if len(self.batches)==1:
+            return None
+
+        # what if no batches can overlap?
+        # corresponds to primed batches those for which we have no info
+        swaps = None
+
+        # need to add condition of overlapping of size (osize-1) oligos!!
+        swaps = utils.swap_between_batches2(self.batches,
+                                            nscale = self.nscale)
+
+        return swaps
+
+    def swap_batches3(self):
+        u'''
+        takes two batches, if there can be an overlap between oligos in the two batches,
+        compute swaps
+        returns swaps between two batches.
+        These batches are then merged
+        '''
+        if len(self.batches)==1:
+            return None
+
+        # what if no batches can overlap?
+        # corresponds to primed batches those for which we have no info
+        swaps = None
+
+        # need to add condition of overlapping of size (osize-1) oligos!!
+        swaps = utils.swap_between_batches3(self.batches,
+                                            nscale = self.nscale,
+                                            ooverl = self.min_overl)
+
         return swaps
