@@ -81,10 +81,13 @@ def kwargsdefaults(*items, asinit = True):
     def _wrapper(fcn):
         @wraps(fcn)
         def _wrap(self, *args, **kwargs):
-            tochange = {i: kwargs.pop(i) for i in fields(self) & frozenset(kwargs)}
-            with changefields(self, tochange):
-                ret = fcn(self, *args, **kwargs)
-            return ret
+            if len(kwargs):
+                tochange = {i: kwargs.pop(i) for i in fields(self) & frozenset(kwargs)}
+                if len(tochange):
+                    with changefields(self, tochange):
+                        return fcn(self, *args, **kwargs)
+
+            return fcn(self, *args, **kwargs)
         return _wrap
 
     return _wrapper(items[0]) if call else _wrapper

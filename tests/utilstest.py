@@ -8,7 +8,7 @@ import pytest
 import numpy as np
 from   utils                import escapenans, fromstream
 from   utils.lazy           import LazyInstError, LazyInstanciator, LazyDict
-from   utils.attrdefaults   import fieldnames
+from   utils.attrdefaults   import fieldnames, changefields
 
 class TestLazy:
     u"test lazy stuff"
@@ -146,6 +146,20 @@ def test_fieldnames():
         _propset = property(None, lambda *_: None)
         _propget = property(lambda _: 1)
     assert fieldnames(A()) == {'name', 'descset', 'propset'}
+
+def test_changefields():
+    "tests changefields"
+    class _Aaa:
+        def __init__(self):
+            self.attr = 1
+
+    try:
+        val = _Aaa()
+        with changefields(val, attr = 0):
+            assert val.attr == 0
+            raise KeyError()
+    except KeyError:
+        assert val.attr == 1
 
 if __name__ == '__main__':
     test_fromstream()
