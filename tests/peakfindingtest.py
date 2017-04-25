@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Tests histogram  creation and analysis"
+"Tests histogram  creation and analysis"
 import numpy as np
 from numpy.testing              import assert_equal, assert_allclose
 from numpy.lib.stride_tricks    import as_strided
@@ -14,28 +14,32 @@ from peakfinding.histogram      import (Histogram, CWTPeakFinder,
                                         ZeroCrossingPeakFinder, GroupByPeak)
 from peakfinding.alignment      import PeakCorrelationAlignment
 
-CORR = lambda f, a, b, c, d, e: (PeakCorrelationAlignment.run(f,
-                                                              subpixel      = None,
-                                                              precision     = 1.,
-                                                              oversampling  = a,
-                                                              maxmove       = b,
-                                                              factors       = [1.]*c,
-                                                              kernel_window = d,
-                                                              kernel_width  = e))
+CORR = lambda f, a, b, c, d, e, g: PeakCorrelationAlignment.run(f,
+                                                                subpixel      = None,
+                                                                precision     = 1.,
+                                                                oversampling  = a,
+                                                                maxmove       = b,
+                                                                factors       = [1.]*c,
+                                                                zcost         = g,
+                                                                kernel_window = d,
+                                                                kernel_width  = e)
 
 def test_correlationalignment():
-    u"align on best correlation"
+    "align on best correlation"
     data = [[20, 50], [21, 51], [22, 52]]
 
 
-    biases = CORR(data, 1, 5, 1, 0, .1)
+    biases = CORR(data, 1, 5, 1, 0, .1, None)
     np.testing.assert_allclose(biases, [1., 0., -1.])
 
-    biases = CORR(data, 5, 5, 1, 3, 2.)
+    biases = CORR(data, 5, 5, 1, 3, 2., None)
     np.testing.assert_allclose(biases, [1., 0., -1.], rtol = 1e-4, atol = 1e-4)
 
+    biases = CORR(data, 5, 5, 1, 3, 2, 0.05)
+    np.testing.assert_allclose(biases, [.8, 0., -.8], rtol = 1e-4, atol = 1e-4)
+
 def test_randcorrelationalignment():
-    u"align on best correlation"
+    "align on best correlation"
     peaks, labels  = randpeaks(100,
                                peaks    = [20, 50, 60, 90],
                                rates    = .7,
@@ -44,7 +48,7 @@ def test_randcorrelationalignment():
                                stretch  = None,
                                seed     = 0,
                                labels   = 'range')
-    biases = CORR(peaks, 5, 5, 6, 3, 2.)
+    biases = CORR(peaks, 5, 5, 6, 3, 2., None)
     res    = peaks+biases
 
     orig   = np.array([np.concatenate([pks[labs == i] for pks, labs in zip(peaks, labels)])
@@ -57,7 +61,7 @@ def test_randcorrelationalignment():
     assert  all(cstd < ostd/18.)
 
 def test_histogram():
-    u"tests histogram creation"
+    "tests histogram creation"
     hist = Histogram(kernel = None, precision = 1)
     events = [[np.ones((5,)), np.ones((5,))*5, np.ones((5,))*10],
               [               np.ones((5,))*5, np.ones((5,))*10],
@@ -87,7 +91,7 @@ def test_histogram():
     assert max(out) == out[40]
 
 def test_peakfinder():
-    u"tests peak finding"
+    "tests peak finding"
     hist = Histogram(precision = 1, edge = 8)
     events = [[np.ones((5,)), np.ones((5,))*5, np.ones((5,))*10],
               [               np.ones((5,))*5, np.ones((5,))*10],
@@ -107,7 +111,7 @@ def test_peakfinder():
     assert_allclose(peaks, truth, rtol = 1e-2)
 
 def test_peakgroupby():
-    u"testing group by peaks"
+    "testing group by peaks"
     events = [[1.0, 2.0, 10.0, 20.],
               [1.1, 2.1, 10.1, 20.],
               [1.2, 2.2, 10.2, 20.],
@@ -133,7 +137,7 @@ def test_peakgroupby():
         assert all(i == np.array([0, 0, 1, 2]))
 
 def test_peakselector():
-    u"tests peak finding"
+    "tests peak finding"
     peaks  = [1., 5., 10., 20.]
     data   = randpeaks(5,
                        seed     = 0,
@@ -153,13 +157,14 @@ def test_peakselector():
     assert all(emax[:-1] < emin[1:])
 
 def test_control():
-    u"tests task controller"
+    "tests task controller"
     peaks = [1., 5., 10., 20.]
     pair  = create((EventSimulatorTask(peaks    = peaks,
                                        brownian = .01,
                                        stretch  = None,
                                        bias     = None,
                                        rates    = None,
+                                       baselineargs = None,
                                        nbeads   = 2,
                                        ncycles  = 20),
                     PeakSelectorTask()))
@@ -176,4 +181,4 @@ def test_control():
         assert_allclose(tmp, (peak,)*20, atol = 0.1)
 
 if __name__ == '__main__':
-    test_control()
+    test_correlationalignment()
