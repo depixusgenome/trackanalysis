@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"utils"
+"utils"
 
 from    typing         import (TypeVar, Iterable, # pylint: disable=unused-import
                                FrozenSet, Optional, Callable, Sequence, Dict, Any)
 import  inspect
 from    copy           import deepcopy, copy
-from    functools      import wraps, partial
+from    functools      import wraps
 from    enum           import Enum
 
 from   .inspection     import getlocals
@@ -14,7 +14,7 @@ from   .inspection     import getlocals
 NoArgs = type('NoArgs', (), {})
 
 def toenum(tpe, val):
-    u"returns an enum object"
+    "returns an enum object"
     if not isinstance(tpe, type):
         tpe = type(tpe)
 
@@ -30,7 +30,7 @@ def toenum(tpe, val):
         raise TypeError('"level" attribute has incorrect type')
 
 class ChangeFields:
-    u"Context within which given fields are momentarily changed"
+    "Context within which given fields are momentarily changed"
     def __init__(self, obj, __items__ = None, **items):
         self.obj = obj
         if __items__ is not None:
@@ -52,11 +52,11 @@ class ChangeFields:
             setattr(self.obj, i , j)
 
 def changefields(obj, __items__ = None, **items):
-    u"Context within which given fields are momentarily changed"
+    "Context within which given fields are momentarily changed"
     return ChangeFields(obj, __items__, **items)
 
 def kwargsdefaults(*items, asinit = True):
-    u"""
+    """
     Keyword arguments are used for changing an object's fields before running
     the method.
 
@@ -91,7 +91,7 @@ def kwargsdefaults(*items, asinit = True):
 
 def setdefault(self, name, kwargs, roots = ('',), # pylint: disable=too-many-arguments
                cpy = None, deepcpy = None):
-    u"""
+    """
     Uses the class attribute to initialize the object's fields if no keyword
     arguments were provided.
     """
@@ -153,7 +153,7 @@ class _Updater:
             setattr(obj, name, toenum(getattr(type(obj), name), kwargs[name]))
 
 def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
-    u"""
+    """
     Uses the class attribute to initialize the object's fields if no keyword
     arguments were provided.
     """
@@ -199,7 +199,7 @@ def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
 
 T = TypeVar('T')
 def fieldnames(obj) -> FrozenSet[str]:
-    u"Returns attribute and property names of the object"
+    "Returns attribute and property names of the object"
     dico = frozenset(name
                      for name in getattr(obj, '__dict__', ())
                      if 'a' <= name[0] <= 'z')
@@ -211,7 +211,7 @@ def fieldnames(obj) -> FrozenSet[str]:
     return dico | desc # type: ignore
 
 def _update(cpy: Optional[Callable[[T], T]], obj:T, **attrs) -> T:
-    u"Sets field to provided values"
+    "Sets field to provided values"
     fields = fieldnames(obj) & frozenset(attrs)
     if len(fields):
         if cpy:
@@ -220,12 +220,20 @@ def _update(cpy: Optional[Callable[[T], T]], obj:T, **attrs) -> T:
             setattr(obj, name, attrs[name])
     return obj
 
-update         = partial(_update, None)         # pylint: disable=invalid-name
-updatecopy     = partial(_update, copy)         # pylint: disable=invalid-name
-updatedeepcopy = partial(_update, deepcopy)     # pylint: disable=invalid-name
+def update(obj:T, **attrs) -> T:
+    "Sets field to provided values"
+    return _update(None, obj, **attrs)
+
+def updatecopy(obj:T, **attrs) -> T:
+    "Sets field to provided values on a copied object"
+    return _update(copy, obj, **attrs)
+
+def updatedeepcopy(obj:T, **attrs) -> T:
+    "Sets field to provided values on a deepcopied object"
+    return _update(deepcopy, obj, **attrs)
 
 class AttrPipe:
-    u"Pipes a field to a parent"
+    "Pipes a field to a parent"
     def __init__(self, name: str) -> None:
         self.name = name.split('.')
 
@@ -243,5 +251,5 @@ class AttrPipe:
         setattr(obj, self.name[-1], val)
 
 def pipe(name: str) -> AttrPipe:
-    u"Pipes a field to a parent"
+    "Pipes a field to a parent"
     return AttrPipe(name)
