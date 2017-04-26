@@ -379,50 +379,6 @@ def swap_between_2batches(bat1, bat2, nscale=1): # not great impl # to optimize
 
     return perms
 
-# returns the number of states to compare with permutations of all oligos between batches
-# not great impl # to optimize
-def swap_between_nbatches(batches, nscale=1): # pylint:disable=too-many-locals
-    u'''
-    compute all possibles swaps between batch1 and batch2
-    need to rethink the algorithm.
-    We must constrain the number of permutations as soon as possible
-    batches between oligos from different batches only
-    do not generate identity swap
-    can take into account physical size of oligos to restrain permutations
-    '''
-    warnings.warn("deprecated function")
-    import math
-    oligos = []
-    for bat in batches:
-        oligos += list(bat.oligos)
-    groups = group_overlapping_oligos(oligos,nscale=nscale)
-
-    infogrp=[]
-    for grp in groups:
-        info=[]
-        for val in grp:
-            for idx,bat in enumerate(batches):
-                if val in bat.oligos:
-                    info.append((val,bat.oligos.index(val),idx))
-                    break
-        infogrp.append(info)
-
-    # remove groups if there is not a representative of the two batches
-    infogrp = [grp for grp in infogrp if len(set(val[2] for val in grp))>1]
-
-    # generate all permutations between batches excluding within batch swaps
-    perms = 0
-    for grp in infogrp:
-        subs = set(val[2] for val in grp)
-        perm = 1
-        N = len(grp)
-        for idx,val in enumerate(subs):
-            nsub = len([i for i in grp if i[2]==val])
-            perm*=math.factorial(N)/math.factorial(N-nsub)/math.factorial(nsub)
-            N-=nsub
-
-        perms+=perm
-    return perms
 
 # returns number of permutations to explore, considering only:
 #    * permutations between batches
@@ -477,17 +433,6 @@ def swap_between_batches(batches, nscale, ooverl): # not great impl # to optimiz
         grpperms = _perms_in_group_between_batches(grp)
         perms.extend(grpperms)
 
-
-    '''
-    for grp in infogrp:
-        subs = set(val[2] for val in grp)
-        perm = 1
-        N = len(grp)
-        for idx,val in enumerate(subs):
-            nsub = len([i for i in grp if i[2]==val])
-            #perm*=math.factorial(N)/math.factorial(N-nsub)/math.factorial(nsub)
-            N-=nsub
-    '''
     print("len(perms)=",len(perms))
     return perms
 

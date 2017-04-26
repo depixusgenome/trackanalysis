@@ -100,7 +100,6 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
         LOGS.debug("len(self.batches)="+str(len(self.batches)))
         for perm in find_permutations(self.batches,self.nscale,self.min_overl):
             # from permutations of oligos to permutated positions
-            
             yield perm
         return None
 
@@ -117,4 +116,8 @@ def find_permutations(batches,nscale,min_overl):
         allperms+=perms
     return allperms
 
-def oli_perm_to_xstate()
+def oli_perm_to_xstate():
+    u'''
+    translates permutations in oligos to new xstate for basinhopping
+    '''
+    pass
