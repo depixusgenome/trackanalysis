@@ -116,7 +116,7 @@ def setdefault(self, name, kwargs, roots = ('',), # pylint: disable=too-many-arg
             setattr(self, name, deepcopy(clsdef))
 
 class _Updater:
-    __slots__ = ('roots', 'mandatory', 'update', 'attrs', 'pipes', 'ignore')
+    __slots__ = ('roots', 'mandatory', 'update', 'call', 'attrs', 'pipes', 'ignore')
     def __init__(self,
                  attrs:Sequence[str],
                  roots:Sequence[str],
@@ -125,8 +125,10 @@ class _Updater:
         self.roots     = roots
         self.mandatory = mandatory
 
-        kwa            = {i: j.lower() for i, j in kwa.items()}
+        kwa            = {i: (j.lower() if isinstance(j, str) else j)
+                          for i, j in kwa.items()}
         self.update    = tuple(i for i in attrs if kwa.get(i, '') == 'update')
+        self.call      = tuple((i, j) for i, j in kwa.items() if callable(j))
         self.ignore    = tuple(i for i in attrs if kwa.get(i, '') == 'ignore')
         self.attrs     = tuple(i for i in attrs if kwa.get(i, '') != 'ignore')
         self.pipes     = None        # type: Optional[Sequence[Any]]
@@ -154,6 +156,10 @@ class _Updater:
 
         for name in pipes:
             setattr(obj, name, toenum(getattr(type(obj), name), kwargs[name]))
+
+        for name, fcn in self.call:
+            if name in kwargs:
+                fcn(obj, kwargs[name])
 
 def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
     """
