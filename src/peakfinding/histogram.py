@@ -214,21 +214,24 @@ class SubPixelPeakPosition:
             return ainds
 
         if self.fitmode is FitMode.quadratic:
-            def _fitfcn(i, j):
-                fit = np.polyfit(range(i,j), hist[i:j], 2)
-                return (False, 0.) if fit[0] >= 0. else (True, -fit[1]/fit[0]*.5)
+            def _fitfcn(i, j, k):
+                if i+2 < j:
+                    fit = np.polyfit(range(i,j), hist[i:j], 2)
+                    if fit[0] >= 0.:
+                        return -fit[1]/fit[0]*.5
+                return k
             fitfcn = _fitfcn
         else:
-            fitfcn = lambda i, j: (True, np.average(range(i,j), weights = hist[i:j]))
+            fitfcn = lambda i, j, _: (True, np.average(range(i,j), weights = hist[i:j]))
 
         inds = (ainds,) if np.isscalar(ainds) else ainds
         for _ in range(self.fitcount):
-            rngs = ((max(0, i-self.fitwidth), min(len(hist), i+self.fitwidth+1))
-                    for i in cast(Iterable, inds))
+            rngs = ((max(0,         i-self.fitwidth),
+                     min(len(hist), i+self.fitwidth+1),
+                     i) for i in cast(Iterable, inds))
 
-            fits = tuple(fitfcn(i, j) for i, j in rngs if i+2 < j)
-            vals = np.array([fit[1] for fit in fits if fit[0]])
-            inds = np.int32(vals+.5) # type: ignore
+            vals = np.array([fitfcn(*i) for i in rngs], dtype = 'f4')
+            inds = np.int32(np.rint(vals)) # type: ignore
         return (vals[0] if np.isscalar(ainds) else vals) * rho + bias
 
 class CWTPeakFinder:
