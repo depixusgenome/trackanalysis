@@ -7,7 +7,7 @@ regroups functions and classes to complement assembler
 
 import itertools
 from copy import deepcopy
-from typing import Callable, List # pylint: disable=unused-import
+from typing import Callable, List, Dict # pylint: disable=unused-import
 import scipy.stats
 import numpy
 from Bio import pairwise2
@@ -258,13 +258,15 @@ def group_overlapping_normdists(dists,nscale=1): # to pytest !! # what if no int
     bounds.sort()
     overlaps=[]
     for regid in range(len(bounds[:-1])):
-        beflag=set(idx[1] for idx in bounds[:regid+1])
+        beflag = set(idx[1] for idx in bounds[:regid+1])
         aflag = set(idx[1] for idx in bounds[regid+1:])
 
         overlaps.append(sorted(beflag.intersection(aflag)))
 
     ssets = [set(overl) for overl in overlaps if len(overl)>1]
     ssets.sort(reverse=True)
+    if len(ssets)==0:
+        return ssets,[]
     uset=[ssets[0]]
     for val in ssets[1:]:
         if val.issubset(uset[-1]):
@@ -291,9 +293,9 @@ def optimal_perm_normdists(perm:List,dists)->numpy.ndarray: # pytest
     given a permuation perm and the known distributions of each state
     returns the permutated state which maximise the probability
     '''
-    _epsi=0.001*min([dists[i].std() for i  in perm])
+    _epsi = 0.001*min([dists[i].std() for i  in perm])
 
-    constraints=[]
+    constraints = []
     for idx in range(len(perm[:-1])):
         constraints.append({"type":"ineq",
                             "fun":SOMConstraint(idx,_epsi)})
@@ -309,19 +311,19 @@ def group_overlapping_oligos(oligos,nscale=1):
     groups = group_overlapping_normdists([oli.dist for oli in oligos],nscale=nscale)[1]
     return [[oligos[idx] for idx in grp] for grp in groups]
 
-def group_oligos(oligos,**kwa):
-    u''' returns oligos grouped by attr "by"
+def group_oligos(oligos,**kwa)->Dict: # pytest!
+    u''' returns dictionnary of oligos grouped by attr "by"
     '''
     byattr = kwa.get("by","batch_id")
     attr = set([getattr(oli,byattr) for oli in oligos])
-    grouped = [[oli for oli in oligos if getattr(oli,byattr)==atv] for atv in attr]
+    grouped = {atv:[oli for oli in oligos if getattr(oli,byattr)==atv] for atv in attr}
     return grouped
 
 class CostPermute:
     u' returns the "cost" of translations due to permutation of oligo peaks'
     def __init__(self,dists,perm):
-        self.dists=dists
-        self.perm=perm
+        self.dists = dists
+        self.perm = perm
 
     def __call__(self,xstate):
         return -numpy.product([self.dists[vlp].pdf(xstate[idp])
@@ -335,3 +337,60 @@ class SOMConstraint:
         self._epsi=_epsi
     def __call__(self,xstate):
         return xstate[self.index+1]-xstate[self.index]-self._epsi
+
+def swap_between_batches(bat1, bat2, nscale=1): # not great impl # to optimize
+    u'''
+    compute all possibles swaps between batch1 and batch2
+    need to rethink the algorithm.
+    We must constrain the number of permutations as soon as possible
+    batches between oligos from different batches only
+    do not generate identity swap
+    can take into account physical size of oligos to restrain permutations
+    '''
+
+    groups = group_overlapping_oligos(list(bat1.oligos)+list(bat2.oligos),nscale=nscale)
+    infogrp=[]
+    for grp in groups:
+        info=[]
+        for val in grp:
+            try:
+                info.append((val,bat1.oligos.index(val),1))
+            except ValueError:
+                info.append((val,bat2.oligos.index(val),2))
+        infogrp.append(info)
+
+    # remove groups if there is not a representative of the two batches
+    infogrp = [i for i in infogrp if len(set(j[2] for j in i))>1]
+
+    # generate all permutations between batches excluding within batches swaps
+    perms = []
+    for grp in infogrp:
+        grp1=[i for i in grp if i[2]==1]
+        grp2=[i for i in grp if i[2]==2]
+        combs=[sorted(it) for it in itertools.combinations(range(len(grp)),
+                                                           len(grp1))]
+        for comb in combs:
+            perm=deepcopy(grp2)
+            for index,val in enumerate(comb):
+                perm.insert(val,grp1[index])
+            perms.append([i[0] for i in perm])
+
+    return perms
+
+
+def can_oligos_overlap(bat1:oligohit.Batch,bat2:oligohit.Batch,min_overl=1):
+    u'''
+    compare the sequences of oligos in the two batch
+    if any can tail_overlap
+    return True
+    else return False
+    '''
+    oli1 = set(oli.seq for oli in bat1.oligos)
+    oli2 = set(oli.seq for oli in bat2.oligos)
+    for ite in itertools.product(oli1,oli2):
+        if len(oligohit.tail_overlap(ite[0],ite[1]))>=min_overl:
+            return True
+        if len(oligohit.tail_overlap(ite[1],ite[0]))>=min_overl:
+            return True
+
+    return False

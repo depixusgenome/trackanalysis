@@ -9,8 +9,9 @@ import sys
 from typing import Callable, Iterable # pylint: disable=unused-import
 import itertools
 import numpy
+from .oligohit import Batch
 from . import _utils as utils
-
+from utils.logconfig import getLogger
 
 # reconstruction a batch at a time
 # if we consider an oligo-batch at a time, then:
@@ -18,6 +19,8 @@ from . import _utils as utils
 #     * adding a new batch, permutation can only occur between different batches
 
 # to add variability in (stretching,bias) for each batch (to estimate from hybridstat analyses)
+
+LOGS = getLogger(__name__)
 
 class HoppingSteps:
     u'''
@@ -64,49 +67,75 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
     symetric distribution of z around z0 (gaussian at the moment)
     find the distribution which overlap (and allow permutation of oligos)
 
-    # segregate per batch permutation beteen oligos with same batch_id is forbidden
-    # -> better for recursive, scaffolding
-    # segregate per batch permutation beteen oligos with same sequence is forbidden
-
-    # strategies:
-    # find each groups of oligos, take itertools.product(groups) find overlaps is too long!
-    # find overlapping oligos, find different groups for each overlapping set
+    batches need to be merged such that the previous merge are more contrainted than the laters
     '''
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
-        self.oligos = kwargs.get("oligos",[])
+        self.oligos = kwargs.get("oligos",tuple())
         self.nscale = kwargs.get("nscale",1)
         self.seg = kwargs.get("seg","batch_id") # "batch", "sequence"
-        # find overlapping oligos
-        # for each overlapping group, find the different groups, within overlapping oligos
-        #overoli = utils.find_overlapping_oligos(self.oligos,nscale=nscale)
-        #self.perms = []
-        #for overgrp in overoli:
-        #    groups = utils.group_oligos(overgrp,by=self.seg)
-        #    print("len(groups)=",len(groups))
-        #    for pro in itertools.product(*groups):
-        #        self.perms.append(pro) # perms contains duplicate permutations
-
-        # set the calls such that __call__ tends to merge batches together
-        #batches = set(i.batch_id for i in self.oligos)
-        groups = utils.group_oligos(self.oligos, by=self.seg)
-
+        self.min_overl = kwargs.get("min_overl",1)
         self.swaps = []
-        # define generators of generators?
-        # group i and i+1
 
-        # can't do overoli first because find_overlapping_oligos does not return a partition
-        grp_ovl=utils.group_overlapping_oligos
-        for idg,grp in enumerate(groups[:-1]):
-            # find overlapping oligos
-            # if they belong to 2 groups add a swap
-            self.swaps.extend([it for it in itertools.product(grp,groups[idg+1])
-                               if len(grp_ovl(*it))==1])
+        # create Batches from each batch_ids move from one Batch to another
+        batchids = list(set(i.batch_id for i in self.oligos))
+        # need to order batch : by decreasing number of peaks
+        # batch needs to be merged in a given order to maximize constraints
+        # can only merge batches if oligos overlap by n-1
+        self.batches = [Batch(oligos=[i for i in self.oligos if i.batch_id==index],
+                              index=index)
+                        for index in batchids]
+        # batches from groups( = utils.group_oligos(self.oligos, by=self.seg))??
 
+        self.swap_batches()
 
     def __call__(self,xst):
         u'''
-        should be something like
+        * should be something like (see impl)
+        * requires xstate to add permutations
+        * there should be no conflict when adding permutations by construction of the
+          optimal_perm_normdists
+        * what happens when no more permutations are to be explored?
+
+        to fix:
+        while swaps:
+            for swp in swaps:
+                yield swp
+            swaps = self.swap_batches()
+        return None
         '''
-        for swp in self.swaps:
-            yield swp
+        LOGS.debug("len(self.batches)="+str(len(self.batches)))
+        return self.swap_batches()
+
+    def swap_batches(self):
+        u'''
+        takes two batches, if there can be an overlap between oligos in the two batches,
+        compute swaps
+        returns swaps between two batches.
+        These batches are then merged
+        '''
+        if len(self.batches)==1:
+            return None
+
+        # what if no batches can overlap?
+        # corresponds to primed batches those for which we have no info
+        swaps = None
+
+
+        # find possible ways to combine batches
+
+
+
+
+        for merges in itertools.combinations(range(len(self.batches)),2):
+            if utils.can_oligos_overlap(self.batches[merges[0]],
+                                        self.batches[merges[1]],
+                                        min_overl=self.min_overl):
+                swaps = utils.swap_between_batches(self.batches[merges[0]],
+                                                   self.batches[merges[1]],
+                                                   nscale = self.nscale)
+                self.batches[merges[0]].fill_with(self.batches[merges[1]])
+                self.batches.pop(merges[1])
+                break
+        # remove swaps if oligos are note permuted??
+        return swaps

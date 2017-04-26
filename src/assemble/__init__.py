@@ -5,4 +5,4 @@ u"All code related to sequencing hairpins"
 from .assembler import MCAssembler, NestedAsmrs
 from .recorder import Recorder, SeqRecorder
 from ._utils import OligoWrap
-from .oligohit import OligoHit
+from .oligohit import Oligo
