@@ -158,10 +158,10 @@ class DpxModal(Model):
         self.on_change('results', _on_apply_cb)
 
     def run(self,
-            title   : str,
-            body    : Union[Sequence[str],str],
-            callback: Union[Callable, Callback],
-            model):
+            title   : str                       = "",
+            body    : Union[Sequence[str],str]  = "",
+            callback: Union[Callable, Callback] = None,
+            model                               = None):
         "runs the modal dialog"
         self.__handler = self.__build_handler(callback, body, model)
         self.__running = False

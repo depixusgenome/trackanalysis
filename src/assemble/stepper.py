@@ -9,9 +9,9 @@ import sys
 from typing import Callable, Iterable # pylint: disable=unused-import
 import itertools
 import numpy
+from utils.logconfig import getLogger
 from .oligohit import Batch
 from . import _utils as utils
-from utils.logconfig import getLogger
 
 # reconstruction a batch at a time
 # if we consider an oligo-batch at a time, then:
