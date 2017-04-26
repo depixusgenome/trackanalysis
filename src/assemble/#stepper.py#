@@ -117,4 +117,7 @@ def find_permutations(batches,nscale,min_overl):
         allperms+=perms
     return allperms
 
-def oli_perm_to_xstate()
+def oli_perm_to_xstate():
+    u'''
+    Takes the order of 
+    '''
