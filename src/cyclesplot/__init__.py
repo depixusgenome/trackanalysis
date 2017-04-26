@@ -11,7 +11,7 @@ from    control.taskio      import ConfigTrackIO, GrFilesIO
 
 from    view.plots          import DpxKeyedRow, PlotView
 from    view.plots.tasks    import TaskPlotCreator
-from    view.modal          import dialog
+from    modaldialog         import dialog
 
 from   ._bokehext           import DpxHoverModel
 from   ._model              import CyclesModelAccess
@@ -32,6 +32,7 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, ConfigMixin):
         DpxHoverModel.defaultconfig(self)
         self.config    .defaults = {'tools': 'ypan,ybox_zoom,reset,save,dpxhover'}
         self._hover  = None # type: Optional[DpxHoverModel]
+        self._dialog = None # type: ignore
         if TYPE_CHECKING:
             self._model = CyclesModelAccess('', '')
 
@@ -50,6 +51,7 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, ConfigMixin):
                             toolbar  = next(i for i in plts.children
                                             if isinstance(i, ToolbarBox)))
 
+        self._dialog = dialog(doc)
         return layouts.column([keyed, self._createconfig()])
 
     def _reset(self):
@@ -65,10 +67,10 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, ConfigMixin):
 
     def configuration(self):
         "modal dialog for configuration"
-        dialog(title = 'Cycles Plot Configuration',
-               body  = (('Histogram bin width',      '%(binwidth)d'),
-                        ('Minimum frames per cycle', '%(minframes)d')),
-               model = self._model)
+        self._dialog.run(title = 'Cycles Plot Configuration',
+                         body  = (('Histogram bin width',      '%(binwidth)d'),
+                                  ('Minimum frames per cycle', '%(minframes)d')),
+                         model = self._model)
 
 class CyclesPlotView(PlotView):
     "Cycles plot view"
@@ -79,7 +81,7 @@ class CyclesPlotView(PlotView):
 
     def ismain(self):
         "Alignment, ... is set-up by default"
-        self._ctrl.getGlobal('config').keypress.configuration.default = 'Control-l'
+        self._ctrl.getGlobal('config').keypress.configuration.default = 'Alt-l'
         self._keys.addKeyPress(('keypress.configuration', self._plotter.configuration))
 
         tasks         = self._ctrl.getGlobal('config').tasks
