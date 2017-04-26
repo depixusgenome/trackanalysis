@@ -4,15 +4,19 @@
 Allows creating modals from anywhere
 """
 from  tornado.web   import StaticFileHandler
-from  .modal        import DpxModal
-
-dialog = DpxModal.run # pylint: disable=invalid-name
+from  .modal        import DpxModal, ROUTE
 
 def server(kwa):
     "adds a router to the server"
-    router = ("/modaldialog/(.*)", StaticFileHandler, { "path" : "static" })
+    router = ("/%s/(.*)" % ROUTE, StaticFileHandler, { "path" : "static" })
     kwa['extra_patterns'] = [router]
 
-def document(doc):
-    "adds a root to the document"
-    doc.add_root(DpxModal())
+def dialog(doc):
+    "returns the DpxModal in this doc"
+    for root in doc.roots:
+        if isinstance(root, DpxModal):
+            break
+    else:
+        root = DpxModal()
+        doc.add_root(root)
+    return root

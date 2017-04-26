@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Updates app manager so as to deal with controllers"
-from typing     import TYPE_CHECKING, List, Callable # pylint: disable=unused-import
+from typing     import TYPE_CHECKING, List, Callable, Tuple # pylint: disable=unused-import
 from pathlib    import Path
 
 import sys
@@ -26,7 +26,7 @@ import view.toolbar as toolbars
 LOGS           = getLogger(__name__)
 DEFAULT_CONFIG = lambda x: None
 INITIAL_ORDERS = []     # type: List[Callable]
-DYN_LOADS      = ('modaldialog',)
+DYN_LOADS      = ('modaldialog',) # type: Tuple[str,...]
 
 def _serverkwargs(kwa):
     kwargs                         = dict(kwa)
