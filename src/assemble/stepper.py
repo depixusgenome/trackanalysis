@@ -84,8 +84,7 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
         # batch needs to be merged in a given order to maximize constraints
         # can only merge batches if oligos overlap by n-1
         self.batches = [Batch(oligos=[i for i in self.oligos if i.batch_id==index],
-                              index=index)
-                        for index in batchids]
+                              index=index) for index in batchids]
         # batches from groups( = utils.group_oligos(self.oligos, by=self.seg))??
         with open("batches.pickle","wb") as testfile:
             pickle.dump(self.batches,testfile)
@@ -99,16 +98,11 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
         * there should be no conflict when adding permutations by construction of the
           optimal_perm_normdists
         * what happens when no more permutations are to be explored?
-
-        to fix:
-        while swaps:
-            for swp in swaps:
-                yield swp
-            swaps = self.swap_batches()
-        return None
         '''
         LOGS.debug("len(self.batches)="+str(len(self.batches)))
-        return self.swap_batches3()
+        for perm in swap_betwwen_batches(self.batches,self.min_overl):
+            yield perm
+        return None
 
     def swap_batches(self):
         u'''
@@ -125,7 +119,7 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
         swaps = None
 
 
-        # find possible ways to combine batches
+        # find possible ways to combine batches, to do.
 
         for merges in itertools.combinations(range(len(self.batches)),2):
             if utils.can_oligos_overlap(self.batches[merges[0]],

@@ -8,11 +8,12 @@ regroups functions and classes to complement assembler
 import itertools
 from copy import deepcopy
 from typing import Callable, List, Dict # pylint: disable=unused-import
-import scipy.stats
 import pickle
+import scipy.stats
 import numpy
 from Bio import pairwise2
 from . import oligohit
+import warnings
 
 class OligoWrap:
     u'''
@@ -388,6 +389,7 @@ def swap_between_batches2(batches, nscale=1): # not great impl # to optimize
     do not generate identity swap
     can take into account physical size of oligos to restrain permutations
     '''
+    warnings.warn("deprecated function")
     import math
     oligos = []
     for bat in batches:
@@ -411,9 +413,7 @@ def swap_between_batches2(batches, nscale=1): # not great impl # to optimize
     perms = 0
 
     for grp in infogrp:
-        print("len(grp)=",len(grp))
         subs = set(val[2] for val in grp)
-        print("subs=",len(subs))
         perm = 1
         N = len(grp)
         for idx,val in enumerate(subs):
@@ -422,16 +422,6 @@ def swap_between_batches2(batches, nscale=1): # not great impl # to optimize
             N-=nsub
 
         perms+=perm
-        '''
-        for comb in itertools.combinations(range(len(grp)),len([i in grp if i[2]==val])):
-            indices = list(range(len(grp)))
-            for idx,val in enumerate(subs):
-            perm.append(
-            # remove indices in perm[-1]
-            for i in perm[-1]:
-                indices.remove(i)
-        perms.append(perm)
-        '''
     return perms
 
 # returns number of permutations to explore, considering only:
