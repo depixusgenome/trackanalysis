@@ -15,11 +15,10 @@ from peakfinding.histogram      import (Histogram, CWTPeakFinder,
 from peakfinding.alignment      import PeakCorrelationAlignment
 
 CORR = lambda f, a, b, c, d, e, g: PeakCorrelationAlignment.run(f,
-                                                                subpixel      = None,
                                                                 precision     = 1.,
                                                                 oversampling  = a,
                                                                 maxmove       = b,
-                                                                factors       = [1.]*c,
+                                                                factor        = [1.]*c,
                                                                 zcost         = g,
                                                                 kernel_window = d,
                                                                 kernel_width  = e)
@@ -36,7 +35,7 @@ def test_correlationalignment():
     np.testing.assert_allclose(biases, [1., 0., -1.], rtol = 1e-4, atol = 1e-4)
 
     biases = CORR(data, 5, 5, 1, 3, 2, 0.05)
-    np.testing.assert_allclose(biases, [.8, 0., -.8], rtol = 1e-4, atol = 1e-4)
+    np.testing.assert_allclose(biases, [1., 0., -1.], rtol = 1e-4, atol = 1e-4)
 
 def test_randcorrelationalignment():
     "align on best correlation"
@@ -181,4 +180,4 @@ def test_control():
         assert_allclose(tmp, (peak,)*20, atol = 0.1)
 
 if __name__ == '__main__':
-    test_correlationalignment()
+    test_randcorrelationalignment()
