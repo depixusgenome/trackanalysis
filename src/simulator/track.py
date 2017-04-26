@@ -109,7 +109,7 @@ class TrackSimulator:
     zmax         = [ 0., 0.,  1., 1.,  0., 0., -.3, -.3]
     events       = PoissonEvents()      # type: Callable[..., np.ndarray]
     brownian     = [.003] * 9           # type: Union[None, float, Sequence[float]]
-    baselineargs = (.1, 10.1, True)     # type: Optional[Tuple[float, float, bool]]
+    baselineargs = (.1, 10.1, '')       # type: Optional[Tuple[float, float, str]]
     driftargs    = (.1, 29.)            # type: Optional[Tuple[float, float]]
     @initdefaults(events = 'update')
     def __init__(self, **_):
@@ -125,11 +125,21 @@ class TrackSimulator:
         if self.baselineargs is None:
             return np.zeros((ncycles, size), dtype = 'f4')
 
-        amp, scale, stairs = self.baselineargs
-        if stairs:
+        amp, scale, alg = self.baselineargs
+        if alg == 'rand':
+            base = np.repeat(np.random.rand(ncycles)*amp, size)
+            base = base.reshape((ncycles, size))
+            if scale is not None:
+                ends = np.cumsum(self.durations)
+                for i in range(len(self.durations)-1):
+                    for arr, val in zip(base, np.random.rand(ncycles)*amp*scale):
+                        arr[ends[i]:ends[i+1]] += val
+            return base
+
+        elif alg == 'stairs':
             base = np.repeat(np.cos(np.arange(ncycles)*2.*np.pi/scale) * amp, size)
         else:
-            base = np.cos(np.arange(ncycles*size)*2.*np.pi/(size*scale)) * amp
+            base = getattr(np, alg)(np.arange(ncycles*size)*2.*np.pi/(size*scale)) * amp
 
         base = base.reshape((ncycles, size))
         return base
