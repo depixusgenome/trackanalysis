@@ -4,7 +4,7 @@ u"Tests interval detection"
 
 import numpy  as np
 from   numpy.testing          import assert_allclose
-from   pytest                 import approx
+from   pytest                 import approx # pylint: disable=no-name-in-module
 from model                    import PHASE
 from eventdetection.detection import (DerivateSplitDetector, EventMerger, EventSelector,
                                       MinMaxSplitDetector, tocycles)
