@@ -178,7 +178,7 @@ class Histogram(PrecisionAlg):
         else:
             kern = lambda x: x
 
-        items   = (np.int32(i) for i in zmeas)      # type: ignore
+        items   = (np.int32(np.rint(i)) for i in zmeas)      # type: ignore
         weight  = self.__weights(self.weight,   events)
 
         if not separate:
