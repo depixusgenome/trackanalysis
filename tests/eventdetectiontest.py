@@ -3,10 +3,15 @@
 u"Tests interval detection"
 
 import numpy  as np
+from   numpy.testing          import assert_allclose
+from   pytest                 import approx
+from model                    import PHASE
 from eventdetection.detection import (DerivateSplitDetector, EventMerger, EventSelector,
                                       MinMaxSplitDetector, tocycles)
 from eventdetection.alignment import ExtremumAlignment, CorrelationAlignment
+from eventdetection.processor import ExtremumAlignmentProcessor
 from signalfilter             import samples
+from simulator                import randtrack
 
 def test_detectsplits():
     u"Tests flat stretches detection"
@@ -130,7 +135,34 @@ def test_minmaxalign():
     truth  = np.array([2., 1., 0., -1., -2.])
 
     for tpe in 'min', 'max':
-        np.testing.assert_allclose(ExtremumAlignment.run(data, mode = tpe), truth)
+        assert_allclose(ExtremumAlignment.run(data, mode = tpe), truth)
+
+def test_minmaxprocessor():
+    u"align on min/max value"
+    track   = randtrack(driftargs = None, baselineargs = (.1, None, 'rand'))
+    inipos  = [i.mean() for i in track.cycles.withphases(PHASE.initial).values()]
+
+    bead    = ExtremumAlignmentProcessor.apply(track.beadsonly, phase = PHASE.initial)
+    corrpos = [i.mean() for i in bead[0,...].withphases(PHASE.initial).values()]
+    assert np.std(inipos)  > .015
+    assert np.std(corrpos) < .001
+
+def test_bestalignmentprocessor():
+    u"align on min/max value"
+    track   = randtrack(driftargs = None, baselineargs = (.1, .05, 'rand'))
+
+    ini     = track.cycles.withphases(PHASE.initial)[0,0]
+    ini    += (track.cycles.withphases(PHASE.pull)[0,0].mean()-ini.mean())*.1
+    val     = ini.mean()
+
+    bead    = ExtremumAlignmentProcessor.apply(track.beadsonly, phase = PHASE.initial)
+    inipos  = [i.mean() for i in bead[0,...].withphases(PHASE.initial).values()]
+
+    bead    = ExtremumAlignmentProcessor.apply(track.beadsonly, phase = None)
+    corrpos = [i.mean() for i in bead[0,...].withphases(PHASE.initial).values()]
+    assert_allclose(inipos[1:], corrpos[1:], atol = 0.05)
+    assert corrpos[0] == approx(val, abs = .05)
+
 
 def test_correlationalignment():
     u"align on best correlation"
@@ -147,10 +179,10 @@ def test_correlationalignment():
                                                               kernel_width  = e))
 
     biases = corr(data, 1, 2, 1, 0, .1)
-    np.testing.assert_allclose(biases, [1., 0., -1.])
+    assert_allclose(biases, [1., 0., -1.])
 
     biases = corr(data, 5, 2, 1, 3, 2.)
-    np.testing.assert_allclose(biases, [1., 0., -1.], rtol = 1e-4, atol = 1e-4)
+    assert_allclose(biases, [1., 0., -1.], rtol = 1e-4, atol = 1e-4)
 
 if __name__ == '__main__':
-    test_detectsplits()
+    test_bestalignmentprocessor()

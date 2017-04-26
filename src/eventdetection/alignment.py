@@ -50,12 +50,15 @@ class ExtremumAlignment:
         fcn = getattr(np, self.mode.value)
         return -fcn(self.__get(data) if self.binsize > 2 else data)
 
-    def many(self, data) -> np.ndarray:
+    def many(self, data, subtract = True) -> np.ndarray:
         "call on all tables"
         itr = (self.__get(j) for j in data) if self.binsize > 2 else data
         fcn = getattr(np, self.mode.value)
         res = np.fromiter((-fcn(i) for i in itr), dtype = np.float32)
-        return np.subtract(res, np.nanmedian(res), out = res)
+        if subtract:
+            return np.subtract(res, np.nanmedian(res), out = res)
+        else:
+            return res
 
     def __call__(self, data) -> np.ndarray:
         if isinstance(data, np.ndarray) and np.isscalar(data[0]):
