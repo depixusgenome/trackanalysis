@@ -287,9 +287,17 @@ class ZeroCrossingPeakFinder:
 PeakFinder = Union[CWTPeakFinder, ZeroCrossingPeakFinder]
 
 class GroupByPeak:
-    "Groups events by peak position"
-    window    = 3
-    mincount  = 5
+    """
+    Groups events by peak position.
+
+    Attributes:
+
+        * *mincount:* Peaks with fewer events are discarded.
+        * *window:*   The maximum distance of an event to the peak position, in
+        units of precision.
+    """
+    window       = 3
+    mincount     = 5
     @initdefaults
     def __init__(self, **_):
         pass
@@ -307,16 +315,19 @@ class GroupByPeak:
         inds[np.searchsorted(bins, peaks)] = np.arange(len(peaks))
         return bins, inds
 
-    def __call__(self, peaks, elems, precision = None):
-        bins, inds = self._bins(peaks, precision)
+    @staticmethod
+    def _counts(elems, bins, inds):
+        tags = inds[np.digitize(np.concatenate(elems), bins)]
+        cnts = np.bincount(tags)
 
-        ids  = inds[np.digitize(np.concatenate(elems), bins)]
-        cnts = np.bincount(ids)
-        if len(cnts) == ids[0]:
-            cnts[-1] = 0
+        # inds[0] is for underflows: one of the ids to discard
+        # if cnt has anything to discard, it has a size == ids[0]
+        if len(cnts) == inds[0]+1:
+            cnts[-1] = 0 # discard counts for events outside peak windows
+        return tags, cnts
 
-        bad  = np.where(cnts < self.mincount)[0]
-
+    @staticmethod
+    def _grouped(elems, ids, bad):
         ids[np.in1d(ids, bad)] = np.iinfo('i4').max
 
         sizes  = np.insert(np.cumsum([len(i) for i in elems]), 0, 0)
@@ -326,3 +337,32 @@ class GroupByPeak:
         ret    = np.empty((len(sizes),), dtype = 'O')
         ret[:] = [ids[i:j] for i, j in sizes]
         return ret
+
+    def __call__(self, peaks, elems, precision = None):
+        bins, inds = self._bins(peaks, precision)
+        tags, cnts = self._counts(elems, bins, inds)
+        return self._grouped(elems, tags, np.where(cnts < self.mincount)[0])
+
+class GroupByPeakAndBase(GroupByPeak):
+    """
+    Groups events by peak position, making sure the baseline peak is kept
+
+    Attributes:
+
+        * *baserange:* the range starting from the very left where the baseline
+        peak should be, in µm.
+    """
+
+    baserange = .1
+    @initdefaults
+    def __init__(self, **_):
+        super().__init__(**_)
+
+    def _counts(self, elems, bins, inds):
+        tags, cnts = super()._counts(elems, bins, inds)
+        imax       = max(inds[1:np.searchsorted(bins, bins[0]+self.baserange)+1],
+                         default = -1, key = cnts.__getitem__)
+        if imax >= 0:
+            imin       = min(i for i in range(imax+1) if cnts[i] == cnts[imax])
+            cnts[imin] = self.mincount # make sure peak is accepted
+        return tags, cnts

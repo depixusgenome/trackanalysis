@@ -10,7 +10,7 @@ from utils      import (initdefaults, asobjarray, asdataarrays,
                         EVENTS_TYPE, EVENTS_DTYPE)
 from .alignment import PeakCorrelationAlignment
 from .histogram import (Histogram, PeakFinder, # pylint: disable=unused-import
-                        ZeroCrossingPeakFinder, GroupByPeak)
+                        ZeroCrossingPeakFinder, GroupByPeakAndBase, GroupByPeak)
 
 EventsOutput        = Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]]
 Input               = Union[Iterable[Iterable[np.ndarray]], Sequence[EVENTS_TYPE]]
@@ -24,7 +24,7 @@ class PeakSelector:
     histogram = Histogram(edge = 2)
     align     = PeakCorrelationAlignment()
     find      = ZeroCrossingPeakFinder() # type: PeakFinder
-    group     = GroupByPeak()
+    group     = GroupByPeakAndBase()     # type: GroupByPeak
     @initdefaults
     def __init__(self, **_):
         pass
