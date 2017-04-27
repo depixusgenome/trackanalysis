@@ -154,13 +154,13 @@ def show(*args):
     else:
         return Show()
 
-def curve(*args, **kwa):
+def curve(*data, bias = 0., stretch = 1., positions = None, **kwa):
     "adds a curve"
-    return Curve(*args, **kwa)
+    return Curve(*data, bias = bias, stretch = stretch, positions = positions, **kwa)
 
-def rcurve(*args, axis = 'y', **kwa):
+def rcurve(*data, axis = 'y', bias = 0., stretch = 1., positions = None, **kwa):
     "adds a curve"
-    return Curve(*args, axis = axis, **kwa)
+    return Curve(*data, axis = axis, bias = bias, stretch = stretch, positions = positions, **kwa)
 
 def extra(*args, **kwa):
     "adds a right axis"
