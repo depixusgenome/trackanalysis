@@ -231,6 +231,18 @@ class DataSelectionProcessor(Processor):
     def run(self, args):
         args.apply(self.apply(**self.config()))
 
+class DiscardedBeadsTask(Processor):
+    "Generates output from a TaggingTask"
+    @classmethod
+    def apply(cls, toframe = None, **kwa):
+        "applies the task to a frame or returns a function that does so"
+        elems = tuple(kwa.get('beads', []))
+        fcn   = lambda frame: frame.discarding(elems)
+        return fcn if toframe is None else fcn(toframe)
+
+    def run(self, args:'Runner'):
+        args.apply(self.apply(**self.config()))
+
 class TaggingProcessor(Processor):
     "Generates output from a TaggingTask"
     @classmethod
