@@ -7,8 +7,7 @@ from    itertools   import chain
 from    typing      import (TYPE_CHECKING,  # pylint: disable=unused-import
                             Tuple, Callable, Iterable, Iterator, Type, Union, cast)
 
-from    utils       import getlocals
-import  model.task   as     _tasks
+import  model.task   as    _tasks
 from    model.level import Level
 from    data        import Track
 
@@ -41,13 +40,17 @@ class TaskTypeDescriptor:
 
 class MetaProcessor(ABCMeta):
     "Protects attribute tasktype"
-
     def __new__(mcs, name, bases, nspace):
         if name != 'Processor' and 'tasktype' not in nspace:
             tskname = name.replace('Processor', 'Task')
-            tsk     = getlocals(1).get(tskname, None)
-            if tsk is None:
-                tsk = getattr(_tasks, tskname)
+            tsk     = getattr(_tasks, tskname, None)
+            cur     = [_tasks.Task]
+            while len(cur) and tsk is None:
+                tsk = next((i for i in cur if i.__name__ == tskname), None)
+                if tsk is None:
+                    cur = list(chain(*(i.__subclasses__() for i in cur)))
+
+            assert tsk is not None
             nspace['tasktype'] = tsk
 
         if isinstance(nspace['tasktype'], type):

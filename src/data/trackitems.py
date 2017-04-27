@@ -472,7 +472,7 @@ class Cycles(TrackItems, Items):
     last   = None   # type: Optional[int]
     direct = False  # type: bool
 
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kw):
         super().__init__(**kw)
 

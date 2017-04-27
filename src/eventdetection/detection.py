@@ -24,7 +24,7 @@ class BaseSplitDetector(PrecisionAlg):
     """
     confidence = 0.1 # type: Optional[float]
     window     = 1   # type: int
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
@@ -73,7 +73,6 @@ class DerivateSplitDetector(BaseSplitDetector):
     The sigma (precision) is either provided or measured. In the latter case,
     the estimation used is the median-deviation of the derivate of the data.
     """
-    @initdefaults
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
@@ -115,7 +114,7 @@ class MinMaxSplitDetector(BaseSplitDetector):
     the estimation used is the median-deviation of the derivate of the data.
     """
     window = 5
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
@@ -166,7 +165,7 @@ class EventMerger(PrecisionAlg):
     confidence  = 0.1  # type: Optional[float]
     isequal     = True
     oneperrange = True
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
@@ -268,7 +267,7 @@ class EventSelector:
     """
     edgelength = 0
     minlength  = 5
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 
@@ -299,7 +298,7 @@ class EventDetector(PrecisionAlg):
     split  = MinMaxSplitDetector()
     merge  = EventMerger  ()
     select = EventSelector()
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 

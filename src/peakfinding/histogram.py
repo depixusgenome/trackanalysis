@@ -49,7 +49,7 @@ class Histogram(PrecisionAlg):
     weight       = None                 # type: Optional[Callable]
     kernel       = KernelConvolution()  # type: Optional[KernelConvolution]
 
-    @initdefaults(kernel = 'update')
+    @initdefaults(frozenset(locals()), kernel = 'update')
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
@@ -201,7 +201,7 @@ class SubPixelPeakPosition:
     fitwidth = 1 # type: Optional[int]
     fitcount = 2
     fitmode  = FitMode.quadratic
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 
@@ -244,7 +244,7 @@ class CWTPeakFinder:
     min_length    = None             # type: Optional[int]
     min_snr       = 1.
     noise_perc    = 10.
-    @initdefaults(subpixel = 'update')
+    @initdefaults(frozenset(locals()), subpixel = 'update')
     def __init__(self, **_):
         pass
 
@@ -264,7 +264,7 @@ class ZeroCrossingPeakFinder:
     subpixel  = SubPixelPeakPosition()
     peakwidth = 1
     threshold = getattr(np.finfo('f4'), 'resolution') # type: float
-    @initdefaults(subpixel = 'update')
+    @initdefaults(frozenset(locals()), subpixel = 'update')
     def __init__(self, **_):
         pass
 
@@ -298,7 +298,7 @@ class GroupByPeak:
     """
     window       = 3
     mincount     = 5
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 
@@ -354,7 +354,7 @@ class GroupByPeakAndBase(GroupByPeak):
     """
 
     baserange = .1
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__(**_)
 

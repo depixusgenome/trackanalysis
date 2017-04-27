@@ -49,7 +49,7 @@ class _CollapseAlg:
     "base class for collapse. Deals with stitching as well"
     edge   = 1    # type: Optional[int]
     filter = None # type: Optional[Filter]
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
 
@@ -220,7 +220,7 @@ class CollapseByDerivate(_CollapseAlg):
     """
     maxder = np.inf    # type: float
     mode   = 'median'  # type: Union[str,DerivateMode]
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__(**_)
 
@@ -276,7 +276,7 @@ class StitchByDerivate(CollapseByDerivate):
     CollapseByDerivate for filling holes.
     """
     minoverlaps = 10
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
@@ -325,7 +325,7 @@ class StitchByInterpolation:
     fitlength   = 10
     fitorder    =  1
     minoverlaps = 10
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
 

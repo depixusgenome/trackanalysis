@@ -29,7 +29,7 @@ class Hairpin:
     u"Matching experimental peaks to hairpins"
     peaks    = np.empty((0,), dtype = 'f4') # type: np.array
     lastpeak = False
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
 
@@ -60,7 +60,8 @@ class HairpinDistance(Hairpin):
     stretch      = Range(1./8.8e-4, 200., 100.)
     bias         = Range(None,       20.,  20.)
     optim        = OptimisationParams(1e-4, 1e-8, 1e-4, 1e-8, 100)
-    @initdefaults
+    __KEYS       = frozenset(locals())
+    @initdefaults(__KEYS)
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
@@ -75,7 +76,7 @@ class HairpinDistance(Hairpin):
             return np.arange(-val.size, val.size+val.step*.1, val.step)
         return np.arange(val.center-val.size, val.center+val.size+val.step*.1, val.step)
 
-    @kwargsdefaults
+    @kwargsdefaults(__KEYS)
     def __call__(self, peaks : np.ndarray) -> Distance:
         best  = self.DEFAULT_BEST, self.stretch.center, (self.bias.center or 0.)
         delta = 0.
@@ -128,7 +129,7 @@ class PeakIdentifier(Hairpin):
     u"Identifying experimental peaks with the theoretical ones"
     window   = 10.
     lastpeak = True
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 

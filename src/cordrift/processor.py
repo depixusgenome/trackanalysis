@@ -28,7 +28,7 @@ class DriftTask(Task, EventDetectionConfig):
     zero      = 10
     precision = 0.
     onbeads   = True
-    @initdefaults('phases', 'collapse', 'stitch', 'zero', 'precision', 'onbeads')
+    @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **kwa):
         Task.__init__(self)
         EventDetectionConfig.__init__(self, **kwa)

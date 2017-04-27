@@ -28,7 +28,7 @@ class PrecisionAlg:
                       np.ndarray,
                       None]
     precision = None # type: Optional[float]
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 

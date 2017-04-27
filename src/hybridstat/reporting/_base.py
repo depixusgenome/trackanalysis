@@ -136,7 +136,7 @@ class ReporterInfo(HasLengthPeak):
     knownbeads  = [] # type: Sequence[BEADKEY]
     minduration = 1
     track       = TrackInfo(None)
-    @initdefaults(track = 'ignore')
+    @initdefaults(frozenset(locals()) - {'track'})
     def __init__(self, **kwa):
         super().__init__(kwa)
         self.track = TrackInfo(kwa['track'])

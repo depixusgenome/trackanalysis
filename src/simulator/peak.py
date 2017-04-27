@@ -50,7 +50,8 @@ class PeakSimulator:
     bias     = .1       # type: Optional[float]
     stretch  = .1       # type: Optional[float]
     sizes    = (5, 20)  # type: Optional[Tuple[int,int]]
-    @initdefaults
+    __KEYS   = frozenset(locals())
+    @initdefaults(__KEYS)
     def __init__(self, **_):
         pass
 
@@ -176,7 +177,7 @@ class PeakSimulator:
 
         return bead, events
 
-    @kwargsdefaults
+    @kwargsdefaults(__KEYS)
     def __call__(self, ncycles, seed = None):
         self.seed(seed)
 

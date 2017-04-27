@@ -28,7 +28,7 @@ class ExtremumAlignment:
     """
     binsize = 5
     mode    = AlignmentMode.min
-    @initdefaults('binsize', 'mode')
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 

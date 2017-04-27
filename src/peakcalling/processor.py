@@ -28,7 +28,7 @@ class FitToHairpinTask(Task):
     distances   = dict() # type: Distances
     constraints = dict() # type: Constraints
     peakids     = dict() # type: PeakIds
-    @initdefaults
+    @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_):
         super().__init__()
 

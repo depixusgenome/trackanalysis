@@ -19,7 +19,7 @@ class LadderEvents:
     u""" Creates events on a given range """
     randzargs    = (0., .1, .9)     # type: Optional[Tuple[float, float, float]]
     randtargs    = (10, 100)        # type: Optional[Tuple[int, int]]
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 
@@ -69,7 +69,7 @@ class PoissonEvents:
     peaks = [.1, .3, .5, .9, 1.5]   # type: Sequence[float]
     rates = 1.                      # type: Union[None,float,Sequence[float]]
     sizes = None                    # type: Union[None,float,Sequence[float]]
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 
@@ -111,7 +111,8 @@ class TrackSimulator:
     brownian     = [.003] * 9           # type: Union[None, float, Sequence[float]]
     baselineargs = (.1, 10.1, '')       # type: Optional[Tuple[float, float, str]]
     driftargs    = (.1, 29.)            # type: Optional[Tuple[float, float]]
-    @initdefaults(events = 'update')
+    __KEYS       = frozenset(locals())
+    @initdefaults(__KEYS, events = 'update')
     def __init__(self, **_):
         pass
 
@@ -178,18 +179,18 @@ class TrackSimulator:
             np.random.seed(seed)
             random.seed(seed)
 
-    @kwargsdefaults
+    @kwargsdefaults(__KEYS)
     def track(self, nbeads = 1, seed = None):
         u"creates a simulated track"
         self.seed(seed)
         return Track(data = {i: self() for i in range(nbeads)}, phases = self.phases)
 
-    @kwargsdefaults
+    @kwargsdefaults(__KEYS)
     def beads(self, nbeads = 1, seed = None):
         u"creates a simulated track"
         return self.track(nbeads, seed).beads
 
-    @kwargsdefaults
+    @kwargsdefaults(__KEYS)
     def bybeadevents(self, nbeads, seed = None) -> Cycles: # pylint: disable=arguments-differ
         u"Creates events in a Events object"
         self.seed(seed)
@@ -209,7 +210,7 @@ class TrackSimulator:
                       direct = True,
                       level  = Level.event)
 
-    @kwargsdefaults
+    @kwargsdefaults(__KEYS)
     def bypeakevents(self, nbeads, seed = None):
         u"Creates events grouped by peaks"
         self.seed(seed)

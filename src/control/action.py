@@ -6,7 +6,7 @@ from typing             import Callable
 from functools          import wraps
 from inspect            import signature
 
-from utils.logconfig    import getLogger
+from utils.logconfig    import getLogger, logging
 LOGS = getLogger(__name__)
 
 class ActionDescriptor:
@@ -36,10 +36,12 @@ class ActionDescriptor:
         if obj is None:
             # called as a class attribute: to be used as a decorator
             return self
-        else:
+        elif LOGS.getEffectiveLevel() == logging.DEBUG:
             # called as an instance attribute:
             # can be used as a context or a decorator
             return Action(obj, calls = LOGS.findCaller()[:3])
+        else:
+            return Action(obj, calls = ('?',)*3)
 
 _CNT = [0]
 class Action(ActionDescriptor):
@@ -51,7 +53,10 @@ class Action(ActionDescriptor):
     def __init__(self, ctrl = None, calls = None) -> None:
         self._ctrl  = getattr(ctrl, '_ctrl', ctrl)
         if calls is None:
-            self._calls = LOGS.findCaller()[:3]
+            if LOGS.getEffectiveLevel() == logging.DEBUG:
+                self._calls = LOGS.findCaller()[:3]
+            else:
+                self._calls = ('?',)*3
         else:
             self._calls = calls
 

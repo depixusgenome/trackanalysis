@@ -310,20 +310,20 @@ CONTROLS    = ('control.taskcontrol.TaskController',
                'anastore.control',
                'undo.UndoController')
 
-setup()
+setup(locals())
 
 class Defaults:
     "Empty app"
-    setup(defaultcontrols = CONTROLS, defaultviews = VIEWS)
+    setup(locals(), defaultcontrols = CONTROLS, defaultviews = VIEWS)
 
 class ToolBar:
     "App with a toolbar"
-    setup(creator         = WithToolbar(toolbars.ToolBar),
+    setup(locals(), creator         = WithToolbar(toolbars.ToolBar),
           defaultcontrols = CONTROLS,
           defaultviews    = VIEWS+("view.toolbar.ToolBar",))
 
 class BeadToolBar:
     "App with a toolbar containing a bead spinner"
-    setup(creator         = WithToolbar(toolbars.BeadToolBar),
+    setup(locals(), creator         = WithToolbar(toolbars.BeadToolBar),
           defaultcontrols = CONTROLS,
           defaultviews    = VIEWS+("view.toolbar.BeadToolBar",))

@@ -119,7 +119,7 @@ class DataSelectionTask(Task):
     selected  = None    # type: Optional[List]
     discarded = None    # type: Optional[List]
     cycles    = None    # type: Optional[slice]
-    @initdefaults
+    @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_) -> None:
         super().__init__()
 
@@ -182,7 +182,7 @@ class DataFunctorTask(Task):
     "Adds it's task to the TrackItem using *withfunction*"
     copy      = False
     beadsonly = True
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 

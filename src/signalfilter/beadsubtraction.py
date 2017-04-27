@@ -14,7 +14,7 @@ from   .noisereduction      import Filter   # pylint: disable=unused-import
 class SignalAverage:
     "creates an average of signals"
     filter = None # type: Optional[Filter]
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
 
@@ -42,7 +42,7 @@ class BeadSubtractionTask(SignalAverage, Task):
     "Task for subtracting beads"
     level = Level.bead
     beads = [] # type: List[int]
-    @initdefaults
+    @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **kwa):
         super().__init__(**kwa)
         Task.__init__(self)

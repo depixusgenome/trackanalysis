@@ -61,7 +61,7 @@ class Probability:
     ntoolong      = 0
     totalduration = 0
     FMAX          = np.finfo('f4').max # type: ignore
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 

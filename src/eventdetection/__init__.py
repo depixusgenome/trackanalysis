@@ -11,6 +11,6 @@ class EventDetectionConfig:
     filter      = NonLinearFilter() # type: Optional[Filter]
     events      = EventDetector()   # type: EventDetector
     precision   = 0.                # type: Optional[float]
-    @initdefaults('filter', 'events', 'precision')
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass

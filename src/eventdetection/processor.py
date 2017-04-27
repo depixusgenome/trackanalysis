@@ -24,7 +24,7 @@ class ExtremumAlignmentTask(Task):
     binsize = 5
     factor  = 2.5
     phase   = None # type: Optional[int]
-    @initdefaults('binsize', 'phase')
+    @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_):
         super().__init__()
 

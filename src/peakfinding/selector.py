@@ -25,7 +25,7 @@ class PeakSelector:
     align     = PeakCorrelationAlignment()
     find      = ZeroCrossingPeakFinder() # type: PeakFinder
     group     = GroupByPeakAndBase()     # type: GroupByPeak
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 

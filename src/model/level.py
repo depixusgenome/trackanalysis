@@ -22,7 +22,7 @@ class Phase:
     pull    = 3 # type: int
     measure = 5 # type: int
     count   = 8 # type: int
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 PHASE = Phase()

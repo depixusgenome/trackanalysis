@@ -27,7 +27,7 @@ class HybridstatExcelTask(Task):
     knownbeads  = []  # type: Sequence[BEADKEY]
     minduration = 0
 
-    @initdefaults
+    @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_):
         super().__init__(**_)
 

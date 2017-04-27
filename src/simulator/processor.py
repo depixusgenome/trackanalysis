@@ -11,7 +11,7 @@ class _SimulatorTask(TrackSimulator):
     u"Class indicating that a track file should be added to memory"
     nbeads = 1      # type: int
     seed   = None   # type: Optional[int]
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
         RootTask.__init__(self, **kwa) # pylint: disable=non-parent-init-called

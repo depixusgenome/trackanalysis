@@ -20,7 +20,7 @@ class Track:
     framerate = 0.
     phases    = np.empty((0,9), dtype = 'i4')
     _data     = None # type: Optional[Dict[BEADKEY,np.ndarray]]
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa) -> None:
         self._data = kwa.get('data', None)
 

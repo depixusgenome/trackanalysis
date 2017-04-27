@@ -66,7 +66,7 @@ class HybridstatTemplate:
     detection = EventDetectionTask()    # type: Optional[EventDetectionTask]
     peaks     = PeakSelectorTask()      # type: Optional[PeakSelectorTask]
     identity  = BeadsByHairpinTask()    # type: Optional[BeadsByHairpinTask]
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
 
@@ -104,7 +104,7 @@ class HybridstatIO:
     useparams = False
     oligos    = OLIGO_PATTERNS[1]    # type: Union[Sequence[str], str]
     reporting = None                 # type: Optional[PATHTYPE]
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
 
@@ -116,7 +116,7 @@ class HybridstatTask(RootTask):
     levelou      = Level.peak
     paths        = []                   # type: Sequence[HybridstatIO]
     template     = HybridstatTemplate()
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 

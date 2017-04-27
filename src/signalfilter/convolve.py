@@ -32,11 +32,12 @@ class KernelConvolution:
     mode         = KernelMode.normal
     range        = 'same'
     oversampling = 1
-    @initdefaults(roots = ('', 'kernel'))
+    __KEYS       = frozenset(locals())
+    @initdefaults(__KEYS, roots = ('', 'kernel'))
     def __init__(self, **_):
         pass
 
-    @kwargsdefaults
+    @kwargsdefaults(__KEYS)
     def kernel(self, **_) -> np.ndarray:
         "returns the kernel used for the convolution"
         window = self.window
