@@ -7,7 +7,7 @@ from bokeh.models         import Div
 
 from control.taskio       import TaskIO
 from .dialog              import FileDialog
-from .intinput            import BeadInput
+from .intinput            import BeadInput, RejectedBeadsInput
 from .                    import BokehView
 
 class TrackFileDialog(FileDialog):
@@ -154,21 +154,27 @@ class  BeadToolBar(ToolBar):
     "Toolbar with a bead spinner"
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self._beads = BeadInput(**kwa)
-        self._ctrl.getGlobal('css').beadinput.boxwidth.default = 200
+        self._beads     = BeadInput(**kwa)
+        self._discarded = RejectedBeadsInput(**kwa)
+        self._ctrl.getGlobal('css').beadtoobar.boxwidth.default = 200
 
-        cnf = self._ctrl.getGlobal('config')
-        cnf.keypress.defaults = {'beadup'   : 'PageUp',
-                                 'beaddown' : 'PageDown'}
+    @property
+    def __beadchildren(self):
+        return self._beads, self._discarded
 
     def _getroots(self, doc):
         super()._getroots(doc)
-        self._beads.observe(doc)
-        width = self._ctrl.getGlobal("css").beadinput.boxwidth.get()
-        self._tools.insert(2, widgetbox(self._beads.input, width = width))
+        width    = self._ctrl.getGlobal("css").beadtoobar.boxwidth.get()
+        children = self.__beadchildren
+        for attr in children:
+            attr.getroots(doc)
+
+        self._tools.insert(2, widgetbox(self._beads.input, width = 2*self._beads.input.width))
+        self._tools.insert(3, widgetbox(self._discarded.input, width = width))
+        self.enableOnTrack(*(i.input for i in children))
 
     def close(self):
         "Sets up the controller"
         super().close()
-        self._beads.close()
-        del self._beads
+        for attr in self.__beadchildren:
+            attr.close()
