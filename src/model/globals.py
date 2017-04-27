@@ -145,6 +145,10 @@ class SingleMapAccess:
             vals  = self._map.get(*fkeys, default = default)
             return dict(zip(fkeys if fullnames else keys, vals))
 
+    def getitems(self, *keys, default = delete, fullnames = False) -> dict:
+        "Calls get using the current base key"
+        return self.getdict(*keys, default = default, fullnames = fullnames)
+
     def set(self, arg):
         "Calls update using the current base key"
         return self._map.update({self._base: arg})

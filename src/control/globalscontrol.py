@@ -88,7 +88,7 @@ class SingleMapController(Controller):
             raise AttributeError('Too many observer functions')
 
         attrs = frozenset(i for i in names if isinstance(i, str) and len(i))
-        if self.__npars(fcn) == 0:
+        if not self.__npars(fcn):
             if len(attrs) == 0:
                 observer = lambda itms: fcn()
             else:
