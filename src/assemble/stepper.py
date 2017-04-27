@@ -3,6 +3,13 @@
 
 u'''
 classes to define Hopping Steps
+In the case of OptimOligoSwap, we can run :
+    * the merging of batches 2 by 2 then look at regions where better solutions can be found
+      by merging simultanesouly more batches
+    * or run the full set of possibilities
+          -> pb: requires about 16 minutes to run at current precision
+          -> solution has already been partially implemented in _perms_in_groups_between_batches
+
 '''
 
 import sys
@@ -111,13 +118,30 @@ def find_permutations(batches,nscale,min_overl):
     allperms = []
     while len(batches)>1:
         perms = utils.swap_between_batches([batches[0],batches[1]],nscale,min_overl)
+        if any(numpy.array([len(i) for i in perms])<2):
+            LOGS.warning("problem with permutation size")
         batches[0].fill_with(batches[1])
         batches.pop(1)
         allperms+=perms
     return allperms
 
-def oli_perm_to_xstate():
+def oli_perm_to_xstate(xstate,oligos,operm)->numpy.ndarray:
     u'''
-    translates permutations in oligos to new xstate for basinhopping
+    operm is the oligos permuting (in that order)
+    perm (1,2) is neutral with regard to permutation
+    (2,1) is not
+    perm (i,j,k,l,m) i,j,k,l,m are the oligos whose order has changed
+    eg (4512) 4 is now in position of 1, 5 of 2 etc...
     '''
-    pass
+    #needs to be generic :
+    #    * if 2 oligos are permuted, need to consider all oligos between these 2 oligos
+    #    * what if a permutation already occured
+
+    # find indices of permuted oligos in oligos
+    opermid = [oligos.index(oli) for oli in operm]
+    ids2perm = {sorted(opermid)[idx]:val for idx,val in enumerate(opermid)}
+    permids = list(range(len(oligos)))
+    for key,value in ids2perm.items():
+        permids[key]=value
+
+    return utils.optimal_perm_normdists(permids,[oli.dist for oli in oligos])[permids]
