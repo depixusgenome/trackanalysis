@@ -59,11 +59,12 @@ class Curve(Multiplier):
     Specifying axis allows displaying a right (='y') or top (='x') axis.
     """
     def __init__(self, *data, bias = 0., stretch = 1., positions = None, **kwa):
-        self.data    = data[0] if len(data) == 1 else data
+        self.data    = data[0] if len(data) == 1 else None if len(data) == 0 else data
         self.kwa     = kwa
         self.bias    = bias
         self.stretch = stretch
         self.pos     = positions
+        assert self.data is not None or self.pos is not None
         if 'line_color' in kwa:
             self.kwa['color'] = self.kwa.pop('line_color')
 
@@ -89,6 +90,8 @@ class Curve(Multiplier):
             yield from (i for _, i in self.data)
         elif isinstance(self.data, dict):
             yield from self.data.values()
+        elif self.data is None:
+            yield np.ones((len(self.pos),), dtype = 'f4')
         elif np.isscalar(self.data[0]):
             yield self.data
         else:
@@ -113,12 +116,12 @@ class Curve(Multiplier):
         pos  = self.pos
         if pos is None:
             pos = np.arange(max(lens), dtype = 'f4')
-        return self.bias + self.stretch*pos, data, time
+        return self.stretch*pos, data, time
 
     def source(self, source = None):
         "returns a columndatasource"
         vals = list(self.__iterdata())
-        if vals[0].dtype == EVENTS_DTYPE:
+        if getattr(vals[0], 'dtype', 'f') == EVENTS_DTYPE:
             vals = np.concatenate(vals)
         else:
             vals = [(0, i) for i in vals]
