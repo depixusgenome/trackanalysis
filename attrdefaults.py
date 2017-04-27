@@ -68,13 +68,19 @@ def kwargsdefaults(*items, asinit = True):
         accepted = frozenset(vals)
         return lambda _: accepted
 
-    if len(items) == 1 and isinstance(items[0], tuple):
+    if len(items) == 1 and isinstance(items[0], Iterable) and not isinstance(items[0], str):
         items = items[0]
 
+    if len(items):
+        items = tuple(i for i in items if i[0].upper() != i[0])
+
     call = len(items) == 1 and callable(items[0])
-    pot  = getattr(getlocals(1).get('__init__', None), 'KEYS', None)
     if call:
-        fields = fieldnames if pot is None or not asinit else _fields(pot)
+        if not asinit:
+            fields = fieldnames
+        else:
+            pot    = getattr(getlocals(1).get('__init__', None), 'KEYS', None)
+            fields = fieldnames if pot is None else _fields(pot)
     else:
         fields = fieldnames if not len(items)            else _fields(items)
 
@@ -178,7 +184,7 @@ def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
         attrs = tuple(i for i in getlocals(1).keys())
 
     assert len(attrs) and all(isinstance(i, str) for i in attrs)
-    attrs = tuple(i for i in attrs if i[0].upper() != i[0])
+    attrs = set(i for i in attrs if i[0].upper() != i[0]) - set(kwa)
 
     def _wrapper(fcn):
         val     = tuple(inspect.signature(fcn).parameters.values())[1]
