@@ -10,7 +10,7 @@ from   model              import Task, Level, PHASE
 from   control.processor  import Processor
 
 from   .data              import Events
-from   .alignment         import ExtremumAlignment
+from   .alignment         import ExtremumAlignment, PhaseEdgeAlignment
 from   .                  import EventDetectionConfig
 
 class ExtremumAlignmentTask(Task):
@@ -18,12 +18,34 @@ class ExtremumAlignmentTask(Task):
     Task for aligning on a given phase.
 
     If no phase is selected, alignment is performed on phase 1 for all then
-    phase 3 for outliers.
+    phase 3 for outliers. This is done the following way:
+
+        1. Algnments are performed on phase 1.
+        2. The extension between phases 3 and 1 and 3 and 5 are computed.
+        3. Cycles are considered miss-aligned only if the bead opened during that
+        cycle. The test is:
+
+            * 1-3 extension < (median 1-3 extension) x factor
+            * 3-5 extension > (median 1-3 extension) x factor
+
+        4. Mis-aligned cycles are aligned to the median value in *aligned* phase 3
+
+    Attributes:
+
+        * *window:* The number of frames used to measure the phase position.
+        This is *ExtremumAlignment.binsize* if *edge* is *False* and
+        *PhaseEdgeAlignment.window* if *edge* is *True*.
+        * *edge:* Whether to look at the extremum etremorum (ExtremumAlignment) or
+        simply to align on a given side (EdgeAlignment).
+        * *phase:* Whether to align a specific phase or on the best.
+        * *factor:* When aligning on the best phase, this factor is used to determine
+        cycles miss-aligned on phase 1.
     """
-    level   = Level.bead
-    binsize = 5
-    factor  = 2.5
-    phase   = None # type: Optional[int]
+    level  = Level.bead
+    window = 15
+    edge   = True
+    phase  = None # type: Optional[int]
+    factor = .9
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_):
         super().__init__()
@@ -36,12 +58,17 @@ class ExtremumAlignmentProcessor(Processor):
             "returns computed cycles for this bead"
             self.cycles = frame[info[0],...].new(data = {info[0]: info[1]})
 
-        def bias(self, phase, binsize, subtract):
+        def bias(self, phase, window, edge):
             "aligns a phase"
-            mode  = 'max' if phase == PHASE.pull else 'min'
-            align = ExtremumAlignment(binsize = binsize, mode = mode)
             vals  = np.array(list(self.cycles.withphases(phase).values()), dtype = 'O')
-            return align.many(vals, subtract = subtract)
+            if edge:
+                edge  = 'left' if phase == PHASE.pull else 'right'
+                align = PhaseEdgeAlignment(window = window, edge = edge)
+            else:
+                mode  = 'min'  if phase == PHASE.pull else 'max'
+                # pylint: disable=redefined-variable-type
+                align = ExtremumAlignment(binsize = window, mode = mode).many
+            return align(vals, subtract = False)
 
         def translate(self, bias):
             "translates data according to provided biases"
@@ -51,41 +78,55 @@ class ExtremumAlignmentProcessor(Processor):
             return next(iter(self.cycles.data.items()))
 
     @classmethod
+    def _get(cls, kwa:dict, name:str):
+        return kwa.get(name, getattr(cls.tasktype, name))
+
+    @classmethod
     def apply(cls, toframe = None, **kwa):
         "applies the task to a frame or returns a function that does so"
-        phase   = kwa.get('phase',   cls.tasktype.phase)
-        binsize = kwa.get('binsize', cls.tasktype.binsize)
-        factor  = kwa.get('factor',  cls.tasktype.factor)
-        if phase is None:
-            attr   = factor
-            action = cls.__apply_best
-        else:
-            attr   = phase
-            action = cls.__apply_onephase
+        action = (cls.__apply_best       if cls._get(kwa, 'phase') is None else
+                  cls.__apply_onephase)
 
         def _apply(frame):
-            return frame.withaction(partial(action, attr, binsize, frame),
+            return frame.withaction(partial(action, kwa, frame),
                                     beadsonly = True)
         return _apply if toframe is None else _apply(toframe)
 
     @classmethod
-    def __apply_best(cls, factor, binsize, frame, info):
+    def __apply_best(cls, kwa, frame, info):
         "applies the task to a frame or returns a function that does so"
-        cycles = cls._Utils(frame, info)
-        bias   = cycles.bias(PHASE.initial, binsize, True)
+        window     = cls._get(kwa, 'window')
+        edge       = cls._get(kwa, 'edge')
+        cycles     = cls._Utils(frame, info)
+        initials   = cycles.bias(PHASE.initial, window, edge)
+        pulls      = cycles.bias(PHASE.pull,    window, edge)
 
-        maxes  = cycles.bias(PHASE.pull,    binsize, False) + bias
-        maxes -= np.median(maxes)
+        deltas     = initials-pulls
 
-        bad        = maxes > np.median(np.abs(maxes))*factor
-        bias[bad] += maxes[bad]
+        factor     = cls._get(kwa, 'factor')
+        center     = np.median(deltas)
+        bad        = np.nonzero(deltas < center*factor)[0]
+        if len(bad):
+            deltas = cycles.bias(PHASE.measure, window, True)-pulls
+            bad    = np.setdiff1d(bad, np.nonzero(deltas < center*factor)[0], True)
 
+        bias       = initials
+        bias[bad]  = pulls[bad]+np.median(initials-pulls)
         return cycles.translate(bias)
 
     @classmethod
-    def __apply_onephase(cls, phase, binsize, frame, info):
+    def __apply_onephase(cls, kwa, frame, info):
+        window = cls._get(kwa, 'window')
+        edge   = cls._get(kwa, 'edge')
         cycles = cls._Utils(frame, info)
-        bias   = cycles.bias(phase, binsize, True)
+
+        bias   = cycles.bias(PHASE.initial, window, edge)
+
+        if cls._get(kwa, 'phase') == PHASE.pull:
+            init  = bias
+            bias  = cycles.bias(PHASE.pull, window, edge)
+            bias -= np.median(bias+init)
+
         return cycles.translate(bias)
 
     def run(self, args):

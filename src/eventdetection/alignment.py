@@ -71,6 +71,41 @@ class ExtremumAlignment:
         "runs the algorithm"
         return cls(**kwa)(data)
 
+class PhaseEdgeAlignment:
+    """
+    Functor which an array of biases computed as the extremum of provided ranges.
+    Biases are furthermore centered at zero around their median
+
+    Attributes:
+
+    * *window*: the width on which to compute a median.
+    * *edge*: the edge to use: left or right
+    """
+    class Mode(Enum):
+        "Computation modes EdgeAlignment."
+        left  = 'left'
+        right = 'right'
+
+    window = 15
+    edge   = Mode.left
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+    def __call__(self, data, subtract = True) -> np.ndarray:
+        sli = (slice(self.window) if self.edge is self.Mode.left else
+               slice(-self.window, None))
+        res = np.fromiter((-np.median(i[sli]) for i in data), dtype = np.float32)
+        if subtract:
+            return np.subtract(res, np.nanmedian(res), out = res)
+        else:
+            return res
+
+    @classmethod
+    def run(cls, data, **kwa):
+        "runs the algorithm"
+        return cls(**kwa)(data)
+
 class CorrelationAlignment:
     """
     Finds biases which correlate best a cycle's histogram to the histogram of

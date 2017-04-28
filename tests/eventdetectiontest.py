@@ -4,11 +4,11 @@ u"Tests interval detection"
 
 import numpy  as np
 from   numpy.testing          import assert_allclose
-from   pytest                 import approx
 from model                    import PHASE
 from eventdetection.detection import (DerivateSplitDetector, EventMerger, EventSelector,
                                       MinMaxSplitDetector, tocycles)
-from eventdetection.alignment import ExtremumAlignment, CorrelationAlignment
+from eventdetection.alignment import (ExtremumAlignment, CorrelationAlignment,
+                                      PhaseEdgeAlignment)
 from eventdetection.processor import ExtremumAlignmentProcessor
 from signalfilter             import samples
 from simulator                import randtrack
@@ -137,32 +137,46 @@ def test_minmaxalign():
     for tpe in 'min', 'max':
         assert_allclose(ExtremumAlignment.run(data, mode = tpe), truth)
 
+    for tpe in 'left', 'right':
+        assert_allclose(PhaseEdgeAlignment.run(data, edge = tpe), truth)
+
 def test_minmaxprocessor():
     u"align on min/max value"
     track   = randtrack(driftargs = None, baselineargs = (.1, None, 'rand'))
     inipos  = [i.mean() for i in track.cycles.withphases(PHASE.initial).values()]
 
-    bead    = ExtremumAlignmentProcessor.apply(track.beadsonly, phase = PHASE.initial)
+    bead    = ExtremumAlignmentProcessor.apply(track.beadsonly,
+                                               phase = PHASE.initial,
+                                               edge  = False)
+    corrpos = [i.mean() for i in bead[0,...].withphases(PHASE.initial).values()]
+    assert np.std(inipos)  > .015
+    assert np.std(corrpos) < .001
+
+def test_edgeminmaxprocessor():
+    u"align on min/max value"
+    track   = randtrack(driftargs = None, baselineargs = (.1, None, 'rand'))
+    inipos  = [i.mean() for i in track.cycles.withphases(PHASE.initial).values()]
+
+    bead    = ExtremumAlignmentProcessor.apply(track.beadsonly,
+                                               phase = PHASE.initial,
+                                               edge  = True)
     corrpos = [i.mean() for i in bead[0,...].withphases(PHASE.initial).values()]
     assert np.std(inipos)  > .015
     assert np.std(corrpos) < .001
 
 def test_bestalignmentprocessor():
-    u"align on min/max value"
-    track   = randtrack(driftargs = None, baselineargs = (.1, .05, 'rand'))
+    u"align on 1 phase or another as needed"
+    def _create(phase):
+        track   = randtrack(driftargs = None, baselineargs = (.1, .05, 'rand'))
+        ini     = track.cycles.withphases(PHASE.initial)[0,0]
+        ini    += (track.cycles.withphases(PHASE.pull)[0,0].mean()-ini.mean())*.5
+        bead    = ExtremumAlignmentProcessor.apply(track.beadsonly, phase = phase)
+        return [i.mean() for i in bead[0,...].withphases(PHASE.initial).values()]
 
-    ini     = track.cycles.withphases(PHASE.initial)[0,0]
-    ini    += (track.cycles.withphases(PHASE.pull)[0,0].mean()-ini.mean())*.1
-    val     = ini.mean()
-
-    bead    = ExtremumAlignmentProcessor.apply(track.beadsonly, phase = PHASE.initial)
-    inipos  = [i.mean() for i in bead[0,...].withphases(PHASE.initial).values()]
-
-    bead    = ExtremumAlignmentProcessor.apply(track.beadsonly, phase = None)
-    corrpos = [i.mean() for i in bead[0,...].withphases(PHASE.initial).values()]
+    inipos  = _create(PHASE.initial)
+    corrpos = _create(None)
     assert_allclose(inipos[1:], corrpos[1:], atol = 0.05)
-    assert corrpos[0] == approx(val, abs = .05)
-
+    assert corrpos[0] > .4
 
 def test_correlationalignment():
     u"align on best correlation"
