@@ -177,7 +177,7 @@ class AlignmentWidget(GroupWidget):
     INPUT = RadioButtonGroup
     def __init__(self, model:PlotModelAccess) -> None:
         super().__init__(model)
-        self.css.title.alignment.labels.default = [u'None', u'Best', u'Phase 1', u'Phase 3']
+        self.css.title.alignment.labels.default = [u'None', u'Both', u'Phase 1', u'Phase 3']
         self.css.title.alignment.default        = u'Alignment'
 
     def onclick_cb(self, value):

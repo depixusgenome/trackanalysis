@@ -13,7 +13,7 @@ from .                    import BokehView
 class TrackFileDialog(FileDialog):
     "A file dialog that doesn't open .gr files first"
     def __init__(self, ctrl):
-        storage   = 'toolbar'
+        storage   = 'open'
         super().__init__(multiple  = 1,
                          storage   = storage,
                          config    = ctrl)
@@ -55,7 +55,7 @@ class  ToolBar(BokehView):
                                           'quit'     : "Control-q"}
 
         self.__diagopen = TrackFileDialog(self._ctrl)
-        self.__diagsave = FileDialog(config    = self._ctrl)
+        self.__diagsave = FileDialog(config = self._ctrl, storage = 'save')
 
     def _getroots(self, _):
         "adds items to doc"
