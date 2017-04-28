@@ -7,7 +7,7 @@ classes to define Hopping Steps
 
 import sys
 from typing import Callable, Iterable # pylint: disable=unused-import
-import itertools
+import pickle
 import numpy
 from utils.logconfig import getLogger
 from .oligohit import Batch
@@ -83,59 +83,41 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
         # batch needs to be merged in a given order to maximize constraints
         # can only merge batches if oligos overlap by n-1
         self.batches = [Batch(oligos=[i for i in self.oligos if i.batch_id==index],
-                              index=index)
-                        for index in batchids]
+                              index=index) for index in batchids]
         # batches from groups( = utils.group_oligos(self.oligos, by=self.seg))??
+        with open("batches.pickle","wb") as testfile:
+            pickle.dump(self.batches,testfile)
 
-        self.swap_batches()
 
     def __call__(self,xst):
         u'''
-        * should be something like (see impl)
         * requires xstate to add permutations
         * there should be no conflict when adding permutations by construction of the
-          optimal_perm_normdists
+          optimal_perm_normdists (for 2 by 2 batches merging)
         * what happens when no more permutations are to be explored?
-
-        to fix:
-        while swaps:
-            for swp in swaps:
-                yield swp
-            swaps = self.swap_batches()
-        return None
+        * needs to return the new position of the oligos
         '''
         LOGS.debug("len(self.batches)="+str(len(self.batches)))
-        return self.swap_batches()
-
-    def swap_batches(self):
-        u'''
-        takes two batches, if there can be an overlap between oligos in the two batches,
-        compute swaps
-        returns swaps between two batches.
-        These batches are then merged
-        '''
-        if len(self.batches)==1:
-            return None
-
-        # what if no batches can overlap?
-        # corresponds to primed batches those for which we have no info
-        swaps = None
+        for perm in find_permutations(self.batches,self.nscale,self.min_overl):
+            # from permutations of oligos to permutated positions
+            yield perm
+        return None
 
 
-        # find possible ways to combine batches
+def find_permutations(batches,nscale,min_overl):
+    u'''
+    for now swap_between_batches allow only merging of 2 batches at a time
+    '''
+    allperms = []
+    while len(batches)>1:
+        perms = utils.swap_between_batches([batches[0],batches[1]],nscale,min_overl)
+        batches[0].fill_with(batches[1])
+        batches.pop(1)
+        allperms+=perms
+    return allperms
 
-
-
-
-        for merges in itertools.combinations(range(len(self.batches)),2):
-            if utils.can_oligos_overlap(self.batches[merges[0]],
-                                        self.batches[merges[1]],
-                                        min_overl=self.min_overl):
-                swaps = utils.swap_between_batches(self.batches[merges[0]],
-                                                   self.batches[merges[1]],
-                                                   nscale = self.nscale)
-                self.batches[merges[0]].fill_with(self.batches[merges[1]])
-                self.batches.pop(merges[1])
-                break
-        # remove swaps if oligos are note permuted??
-        return swaps
+def oli_perm_to_xstate():
+    u'''
+    translates permutations in oligos to new xstate for basinhopping
+    '''
+    pass
