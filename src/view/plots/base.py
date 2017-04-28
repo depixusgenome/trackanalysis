@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "The basic architecture"
-from    typing       import (Tuple, Optional, # pylint: disable=unused-import
-                             Iterator, List, Union, cast)
+from    typing       import (Tuple, Optional,       # pylint: disable=unused-import
+                             Iterator, List, Union, Dict, Any, cast)
+from    collections  import defaultdict
 from    enum         import Enum
 from    abc          import ABCMeta, abstractmethod
 from    contextlib   import contextmanager
@@ -12,7 +13,8 @@ import  inspect
 import  numpy        as     np
 
 import  bokeh.palettes
-from    bokeh.models            import (Range1d, RadioButtonGroup,
+from    bokeh.models            import (Range1d,    # pylint: disable=unused-import
+                                        RadioButtonGroup, Model,
                                         Paragraph, Widget, GlyphRenderer)
 from    control                 import Controller
 from    control.globalscontrol  import GlobalsAccess
@@ -125,7 +127,7 @@ class WidgetCreator(GlobalsAccess, metaclass = ABCMeta):
         "Creates the widget"
 
     @abstractmethod
-    def reset(self):
+    def reset(self, resets):
         "resets the wiget when a new file is opened"
 
 class GroupWidget(WidgetCreator):
@@ -148,9 +150,9 @@ class GroupWidget(WidgetCreator):
             return [Paragraph(text = css.get()), self._widget]
         return [self._widget]
 
-    def reset(self):
+    def reset(self, resets):
         "updates the widget"
-        self._widget.update(**self._data())
+        resets[self._widget].update(**self._data())
 
     @abstractmethod
     def onclick_cb(self, value):
@@ -164,7 +166,7 @@ class PlotModelAccess(GlobalsAccess):
     "Default plot model"
     def __init__(self, model:Union[Controller, 'PlotModelAccess'], key = None) -> None:
         super().__init__(model, key)
-        self._ctrl  = getattr(model, '_ctrl', model)
+        self._ctrl   = getattr(model, '_ctrl', model)
 
     def clear(self):
         "clears the model's cache"
@@ -196,6 +198,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         super().__init__(ctrl, key)
         self._model                = self._MODEL(ctrl, key)
         self._ctrl                 = ctrl
+        self._resets               = defaultdict(dict) # type: Dict[Model,Dict[str,Any]]
         self.project.state.default = PlotState.active
 
     state = cast(PlotState,
@@ -209,6 +212,11 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         if 'plot' in name:
             name = name[:name.rfind('plot')]
         return ".plot." + name
+
+    def addupdate(self, model, *args, **attrs):
+        "adds models to be updated"
+        self._resets[model].update(*args)
+        self._resets[model].update(**attrs)
 
     def action(self, fcn):
         u"decorator which starts a user action but only if state is set to active"
@@ -237,10 +245,14 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     @contextmanager
     def resetting(self):
         "Stops on_change events for a time"
+        self._resets.clear()
         old, self.state = self.state, PlotState.resetting
         try:
             yield self
+            for i, j in self._resets.items():
+                i.update(**j)
         finally:
+            self._resets.clear()
             self.state = old # pylint: disable=redefined-variable-type
 
     @staticmethod
@@ -291,9 +303,9 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     def setbounds(self, rng, axis, arr, reinit = True):
         "Sets the range boundaries"
         if reinit and hasattr(rng, 'reinit'):
-            rng.update(reinit = not rng.reinit, **self.newbounds(rng, axis, arr))
+            self.addupdate(rng, reinit = not rng.reinit, **self.newbounds(rng, axis, arr))
         else:
-            rng.update(**self.newbounds(rng, axis, arr))
+            self.addupdate(rng, **self.newbounds(rng, axis, arr))
 
     def bounds(self, arr):
         "Returns boundaries for a column"

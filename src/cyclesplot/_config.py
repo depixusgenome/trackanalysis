@@ -56,9 +56,9 @@ class PeaksTableWidget(_Widget):
 
         return [Paragraph(text = css.title.get()), self.__widget]
 
-    def reset(self):
+    def reset(self, resets):
         "updates the widget"
-        self.__widget.source.data = self.__data()
+        resets[self.__widget.source]['data'] = self.__data()
 
     def observe(self):
         "sets-up config observers"
@@ -134,14 +134,14 @@ class ConversionSlidersWidget(_Widget):
         self.__bias    = widget('bias', -1., 1., 'Cycles:Bias')
         return [self.__stretch, self.__bias]
 
-    def reset(self):
+    def reset(self, resets):
         "updates the widgets"
         ratio = self.css.base.bias.ratio.get()
         start = self.__figdata.data['bottom'][0]
         end   = start + (self.__figdata.data['top'][-1] - start)*ratio
 
-        self.__bias.update(value = self._model.bias, start = start, end = end)
-        self.__stretch.value = self._model.stretch
+        resets[self.__bias].update(value = self._model.bias, start = start, end = end)
+        resets[self.__stretch].update(value = self._model.stretch)
 
     def callbacks(self, hover):
         "adding callbacks"
@@ -276,7 +276,7 @@ class ConfigMixin:
 
     def _resetconfig(self):
         for ite in self.__widgets.values():
-            ite.reset()
+            ite.reset(self._resets)
 
     def __slave_to_hover(self, widgets):
         table         = widgets['table'][-1].source

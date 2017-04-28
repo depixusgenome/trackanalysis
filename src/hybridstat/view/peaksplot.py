@@ -248,13 +248,36 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
                        code = 'cb_obj.apply_update(fig, source)')
         self.js_on_change("updating", jsc)
 
-    def reset(self):
+    def reset(self, resets):
         "Creates the hover tool for histograms"
         dist = self._model.distances
-        super().reset(biases    = {i: j.bias    for i, j in dist.items()},
+        super().reset(resets,
+                      biases    = {i: j.bias    for i, j in dist.items()},
                       stretches = {i: j.stretch for i, j in dist.items()})
 
-    def slaveaxes(self, fig, src, inpy = False): # pylint: disable=arguments-differ
+    def pyslaveaxes(self, fig, src, resets): # pylint: disable=arguments-differ
+        "slaves a histogram's axes to its y-axis"
+        yrng         = fig.y_range
+        bases        = fig.extra_y_ranges['bases']
+        resets[bases].update(start  = (yrng.start - self._model.bias)*self._model.stretch,
+                             end    = (yrng.end   - self._model.bias)*self._model.stretch)
+
+        zval = src.data["z"]
+        ix1  = 0
+        ix2  = len(zval)
+        for i in range(ix2):
+            if zval[i] < yrng.start:
+                ix1 = i+1
+                continue
+            if zval[i] > yrng.end:
+                ix2 = i
+                break
+
+        end = lambda x: (0. if len(zval) < 2 or ix1 == ix2 else max(src[x][ix1:ix2])+1)
+        resets[fig.extra_x_ranges['duration']].update(start = 0., end = end('duration'))
+        resets[fig.x_range]                   .update(start = 0., end = end('count'))
+
+    def jsslaveaxes(self, fig, src): # pylint: disable=arguments-differ
         "slaves a histogram's axes to its y-axis"
         # pylint: disable=too-many-arguments,protected-access
         hvr = self
@@ -291,10 +314,7 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
                 dur.end = max(src.data["duration"][ix1:ix2])
                 cnt.end = max(src.data["count"][ix1:ix2])
 
-        if inpy:
-            _onchangebounds()
-        else:
-            fig.y_range.callback = from_py_func(_onchangebounds)
+        fig.y_range.callback = from_py_func(_onchangebounds)
 
 class PeaksSequencePathWidget(SequencePathWidget):
     "Widget for setting the sequence to use"
@@ -385,16 +405,19 @@ class PeaksStatsWidget(WidgetCreator):
 
     def create(self, _) -> List[Widget]:
         self.__widget = PeaksStatsDiv(width = self.css.input.width.get())
-        self.reset()
+        resets        = {} # type: ignore
+        self.reset(resets)
+        for i, j in resets.items():
+            i.update(**j)
         return [self.__widget]
 
-    def reset(self):
+    def reset(self, resets):
         data = self.__data()
         if len(data) == 1:
-            self.__widget.text = next(iter(data.values()))
+            txt = next(iter(data.values()))
         else:
-            self.__widget.text = data[self._model.sequencekey]
-        self.__widget.data = data
+            txt = data[self._model.sequencekey]
+        resets[self.__widget].update(data = data, text = txt)
 
     class _TableConstructor:
         "creates the html table containing stats"
@@ -501,7 +524,7 @@ class PeakListWidget(WidgetCreator):
         "this widget has a source in common with the plots"
         self.__widget.source = src
 
-    def reset(self):
+    def reset(self, resets):
         pass
 
 class PeakIDPathWidget(WidgetCreator):
@@ -547,12 +570,12 @@ class PeakIDPathWidget(WidgetCreator):
         self.__dlg.title = title
         return [self.__widget]
 
-    def reset(self):
+    def reset(self, resets):
         path = self._model.constraintspath
         if path is not None and Path(path).exists():
-            self.__widget.value = str(Path(path).resolve())
+            resets[self.__widget]["value"] = str(Path(path).resolve())
         else:
-            self.__widget.value = ''
+            resets[self.__widget]['value'] = ''
 
 class PeaksPlotCreator(TaskPlotCreator):
     "Creates plots for peaks"
@@ -643,15 +666,15 @@ class PeaksPlotCreator(TaskPlotCreator):
         self._model.reset()
 
         data, peaks        = self.__data()
-        self._peaksrc.update(data = peaks, column_names = list(peaks.keys()))
-        self._histsrc.data = data
-        self._hover .reset()
-        self._ticker.reset()
+        self._resets[self._peaksrc].update(data = peaks, column_names = list(peaks.keys()))
+        self._resets[self._histsrc].update(data = data)
+        self._hover .reset(self._resets)
+        self._ticker.reset(self._resets)
         for widget in self._widgets.values():
-            widget.reset()
+            widget.reset(self._resets)
 
         self.setbounds(self._fig.y_range, 'y', (data['z'][0], data['z'][-1]))
-        self._hover.slaveaxes(self._fig, self._peaksrc, inpy = True)
+        self._hover.pyslaveaxes(self._fig, data, self._resets)
 
     def __create_fig(self):
         self._fig = figure(**self._figargs(y_range = Range1d,
@@ -691,7 +714,7 @@ class PeaksPlotCreator(TaskPlotCreator):
         self._hover.create(self._fig, self._model, self)
         doc.add_root(self._hover)
         self._ticker.create(self._fig, self._model, self)
-        self._hover.slaveaxes(self._fig, self._peaksrc)
+        self._hover.jsslaveaxes(self._fig, self._peaksrc)
 
     def __setup_widgets(self):
         widgets = {i: j.create(self.action) for i, j in self._widgets.items()}

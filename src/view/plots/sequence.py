@@ -135,7 +135,7 @@ class SequenceTicker(ContinuousTicker):
                                                 alpha = (.8,         .8),
                                                 dash  = ('solid',    'solid'))
 
-    def reset(self):
+    def reset(self, resets):
         "Updates the ticks according to the configuration"
         mdl = self.__model
         fig = self.__fig
@@ -150,17 +150,17 @@ class SequenceTicker(ContinuousTicker):
                 majors[name] = tuple(peaks['position'][peaks['orientation']])
                 minors[name] = tuple(peaks['position'][~peaks['orientation']])
 
-            self.update(major = majors, minor = minors, key = key)
-            self.__axis.update(major = {i: majors[i]+minors[i] for i in majors},
-                               minor = dict.fromkeys(majors.keys(), tuple()),
-                               key   = key)
+            resets[self].update(major = majors, minor = minors, key = key)
+            resets[self.__axis].update(major = {i: majors[i]+minors[i] for i in majors},
+                                       minor = dict.fromkeys(majors.keys(), tuple()),
+                                       key   = key)
             self.usedefault        = False
             self.__axis.usedefault = False
 
         info = self.__defaults if self.usedefault else self.__withbase
         for name in ('color', 'dash', 'width', 'alpha'):
-            setattr(fig.ygrid[0], 'grid_line_'+name, info['grid_line_'+name])
-            setattr(fig.ygrid[0], 'minor_grid_line_'+name, info['minor_grid_line_'+name])
+            resets[fig.ygrid[0]]['grid_line_'+name]       = info['grid_line_'+name]
+            resets[fig.ygrid[0]]['minor_grid_line_'+name] = info['minor_grid_line_'+name]
 
 class SequenceHoverMixin:
     "controls keypress actions"
@@ -266,64 +266,17 @@ class SequenceHoverMixin:
                            mode      = 'hline',
                            renderers = [fig.circle(**args)])
 
-    def reset(self, **kwa):
+    def reset(self,  resets, **kwa):
         "updates the tooltips for a new file"
         if self.__tool is None:
             return
 
         data = self.__data()
-        self.__source.update(column_names = list(data.keys()), data = data)
+        resets[self.__source].update(column_names = list(data.keys()), data = data)
         kwa.setdefault('framerate', getattr(self._model.track, 'framerate', 1./30.))
         kwa.setdefault('bias',      self._model.bias)
         kwa.setdefault('stretch',   self._model.stretch)
-        self.update(**kwa)
-
-    def slaveaxes(self, fig, src, normal:str, extra:str, column:str, inpy = False):
-        "slaves a histogram's axes to its y-axis"
-        # pylint: disable=too-many-arguments,protected-access
-        hvr = self
-        def _onchangebounds(fig = fig, hvr = hvr, src = src):
-            yrng = fig.y_range
-            if hasattr(yrng, '_initial_start') and yrng.bounds is not None:
-                yrng._initial_start = yrng.bounds[0]
-                yrng._initial_end   = yrng.bounds[1]
-
-            if not hasattr(fig, 'extra_x_ranges'):
-                return
-
-            cycles = fig.extra_x_ranges[extra]
-            frames = fig.x_range
-
-            cycles.start = 0.
-            frames.start = 0.
-
-            bases        = fig.extra_y_ranges['bases']
-            bases.start  = (yrng.start - hvr.bias)*hvr.stretch
-            bases.end    = (yrng.end   - hvr.bias)*hvr.stretch
-
-            bottom       = src.data[column]
-            if len(bottom) < 2:
-                ind1 = 1
-                ind2 = 0
-            else:
-                delta = bottom[1]-bottom[0]
-                ind1  = min(len(bottom), max(0, int((yrng.start-bottom[0])/delta-1)))
-                ind2  = min(len(bottom), max(0, int((yrng.end  -bottom[0])/delta+1)))
-
-            if ind1 >= ind2:
-                cycles.end = 0
-                frames.end = 0
-            else:
-                frames.end = max(src.data[normal][ind1:ind2])+1
-                cycles.end = max(src.data[extra][ind1:ind2])+1
-
-        if inpy:
-            _onchangebounds()
-        else:
-            fig.y_range.callback = from_py_func(_onchangebounds,
-                                                normal = normal,
-                                                extra  = extra,
-                                                column = column)
+        resets[self].update(**kwa)
 
     @checksizes
     def __data(self):
@@ -391,9 +344,9 @@ class SequencePathWidget(WidgetCreator):
         "sets-up config observers"
         self._model.observeprop('sequencekey', 'sequencepath', self.reset)
 
-    def reset(self):
+    def reset(self, resets):
         "updates the widget"
-        self.__widget.update(**self.__data())
+        resets[self.__widget].update(**self.__data())
 
     @property
     def widget(self):
@@ -469,9 +422,9 @@ class OligoListWidget(WidgetCreator):
         widget.on_change('value', _py_cb)
         return [self.__widget]
 
-    def reset(self):
+    def reset(self, resets):
         "updates the widget"
-        self.__widget.update(**self.__data())
+        resets[self.__widget].update(**self.__data())
 
     def __data(self):
         hist = self.config.oligos.history.get()
