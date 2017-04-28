@@ -64,7 +64,7 @@ def peaks(seq:str, oligs:'Union[Sequence[str], str]', flags = re.IGNORECASE) -> 
     Example:
 
         >>> import numpy as np
-        >>> seq = "atcgATATATatcgCCCaaGGG"
+        >>> seq = "atcgATATATgtcgCCCaaGGG"
         >>> res = peaks(seq, ('ATAT', 'CCC'))
         >>> assert len(res) == 4
         >>> assert all(a == b for a, b in zip(res['position'],    [8, 10, 17, 22]))
