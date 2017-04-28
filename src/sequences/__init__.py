@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "All sequences-related stuff"
-from    typing import (Sequence, Union,  # pylint: disable=unused-import
-                       Iterator, Tuple, TextIO)
+from    typing      import (Sequence, Union,  # pylint: disable=unused-import
+                            Iterator, Tuple, TextIO, Dict)
 import  pathlib
 import  re
 import  numpy       as np
@@ -39,17 +39,10 @@ def read(stream:TextIO) -> 'Iterator[Tuple[str,str]]':
 
 PEAKS_DTYPE = [('position', 'i4'), ('orientation', np.bool8)]
 PEAKS_TYPE  = Sequence[Tuple[int, bool]]
-def _translate(olig):
-    olig = olig.lower()
-    for vals in (('k', '[gt]'), ('m', '[ac]'), ('r', '[ag]'),
-                 ('y', '[ct]'), ('s', '[cg]'), ('w', '[at]'),
-                 ('b', '[^a]'), ('v', '[^t]'), ('h', '[^g]'),
-                 ('d', '[^c]'), ('n', '.'),    ('x', '.'),
-                 ('u', 't')):
-        olig = olig.replace(*vals)
-    return olig
 
-def peaks(seq:str, oligs:'Union[Sequence[str], str]', flags = re.IGNORECASE) -> np.ndarray:
+def peaks(seq:str, oligs:'Union[Sequence[str], str]',
+          flags       = re.IGNORECASE,
+          methylation = '!') -> np.ndarray:
     """
     Returns the peak positions and orientation associated to a sequence.
 
@@ -83,17 +76,42 @@ def peaks(seq:str, oligs:'Union[Sequence[str], str]', flags = re.IGNORECASE) -> 
     if len(oligs) == 0:
         return np.empty((0,), dtype = PEAKS_DTYPE)
 
+    meths = ((re.compile('.'+methylation), lambda x: '('+x.string[x.start()]+')'),
+             (re.compile(methylation+'.'), lambda x: '('+x.string[x.end()-1]+')'))
 
-    def _get(elems, state):
-        reg = re.compile('|'.join(_translate(i) for i in elems), flags)
-        val = reg.search(seq, 0)
-        while val is not None:
-            yield (val.end(), state)
-            val = reg.search(seq, val.start()+1)
+    trans = {'k': '[gt]', 'm': '[ac]', 'r': '[ag]', 'y': '[ct]', 's': '[cg]',
+             'w': '[at]', 'b': '[^a]', 'v': '[^t]', 'h': '[^g]', 'd': '[^c]',
+             'n': '.',    'x': '.', 'u': 't'}
+    trafind = re.compile('['+''.join(trans)+']')
+    trarep  = lambda x: trans[x.string[slice(*x.span())]]
 
-    vals = dict(_get((str(Seq(i).reverse_complement()) for i in oligs), False))
-    vals.update(_get((i for i in oligs), True))
+    def _translate(olig, state):
+        if not state:
+            olig = str(Seq(olig).reverse_complement())
+        if methylation in olig:
+            olig = meths[state][0].sub(meths[state][1], olig)
+        return trafind.sub(trarep, olig)
 
+    def _get(state):
+        for oli in oligs:
+            patt = _translate(oli, state)
+            reg  = re.compile(patt, flags)
+            val  = reg.search(seq, 0)
+
+            cnt  = range(1, patt.count('(')+1)
+            if '(' in patt:
+                while val is not None:
+                    spans = (val.span(i)[-1] for i in cnt)
+                    yield from ((i, state) for i in spans if i > 0)
+                    val = reg.search(seq, val.start()+1)
+            else:
+                while val is not None:
+                    yield (val.end(), state)
+                    val = reg.search(seq, val.start()+1)
+
+    vals = dict() # type: Dict[int, bool]
+    vals.update(_get(False))
+    vals.update(_get(True))
     return np.array(sorted(vals.items()), dtype = PEAKS_DTYPE)
 
 def marksequence(seq:str, oligs: Sequence[str]) -> str:

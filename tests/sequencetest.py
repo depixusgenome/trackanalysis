@@ -18,6 +18,12 @@ def test_peaks():
     res = peaks(seq, 'wws')
     assert len(res) == 4
 
+    seq = "a"*5+"t"+"a*5"
+    res = tuple(tuple(i) for i in peaks(seq, 'a!taa')) == ((5, True),)
+    res = tuple(tuple(i) for i in peaks(seq, 't!att')) == ((6, False),)
+    res = tuple(tuple(i) for i in peaks(seq, 't!a!tt')) == ((6, False), (7, False))
+    res = tuple(tuple(i) for i in peaks(seq, 'a!t!aa')) == ((5, True), (6, True))
+
 def test_overlap():
     "tests overlaps"
     assert  not overlap('ATAT', '')
