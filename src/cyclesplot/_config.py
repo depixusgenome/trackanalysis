@@ -276,7 +276,7 @@ class ConfigMixin:
 
     def _resetconfig(self):
         for ite in self.__widgets.values():
-            ite.reset(self._resets)
+            ite.reset(self._bkmodels)
 
     def __slave_to_hover(self, widgets):
         table         = widgets['table'][-1].source

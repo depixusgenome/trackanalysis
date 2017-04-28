@@ -1,21 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "The basic architecture"
-from    typing       import (Tuple, Optional,       # pylint: disable=unused-import
-                             Iterator, List, Union, Dict, Any, cast)
-from    collections  import defaultdict
-from    enum         import Enum
-from    abc          import ABCMeta, abstractmethod
-from    contextlib   import contextmanager
-from    functools    import wraps
+from    typing              import (Tuple, Optional,       # pylint: disable=unused-import
+                                    Iterator, List, Union, Dict, Any, cast)
+from    collections         import OrderedDict
+from    enum                import Enum
+from    abc                 import ABCMeta, abstractmethod
+from    contextlib          import contextmanager
+from    functools           import wraps
+from    concurrent.futures  import ThreadPoolExecutor
 import  inspect
 
 import  numpy        as     np
 
 import  bokeh.palettes
+from    bokeh.document          import Document     # pylint: disable=unused-import
 from    bokeh.models            import (Range1d,    # pylint: disable=unused-import
                                         RadioButtonGroup, Model,
                                         Paragraph, Widget, GlyphRenderer)
+
+from tornado.ioloop             import IOLoop
+from tornado.platform.asyncio   import to_tornado_future
+
 from    control                 import Controller
 from    control.globalscontrol  import GlobalsAccess
 from    ..base                  import BokehView, Action
@@ -174,10 +180,19 @@ class PlotModelAccess(GlobalsAccess):
     def create(self, _):
         "creates the model"
 
+    def reset(self):
+        "resets the model"
+
 class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     "Base plotter class"
+    _POOL  = ThreadPoolExecutor(1)
     _MODEL = PlotModelAccess
     _RESET = frozenset(('track', 'bead'))
+    class _OrderedDict(OrderedDict):
+        def __missing__(self, key):
+            self[key] = value = OrderedDict()
+            return value
+
     def __init__(self, ctrl:Controller, *_) -> None:
         "sets up this plotter's info"
         ctrl.getGlobal("css.plot").defaults = {'ylabel'             : u'Z (nm)',
@@ -198,8 +213,9 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         super().__init__(ctrl, key)
         self._model                = self._MODEL(ctrl, key)
         self._ctrl                 = ctrl
-        self._resets               = defaultdict(dict) # type: Dict[Model,Dict[str,Any]]
+        self._bkmodels             = self._OrderedDict() # type: Dict[Model,Dict[str,Any]]
         self.project.state.default = PlotState.active
+        self._doc                  = None                # type: Document
 
     state = cast(PlotState,
                  property(lambda self:    self.project.state.get(),
@@ -215,8 +231,8 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
 
     def addupdate(self, model, *args, **attrs):
         "adds models to be updated"
-        self._resets[model].update(*args)
-        self._resets[model].update(**attrs)
+        self._bkmodels[model].update(*args)
+        self._bkmodels[model].update(**attrs)
 
     def action(self, fcn):
         u"decorator which starts a user action but only if state is set to active"
@@ -245,14 +261,14 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     @contextmanager
     def resetting(self):
         "Stops on_change events for a time"
-        self._resets.clear()
+        self._bkmodels.clear()
         old, self.state = self.state, PlotState.resetting
         try:
             yield self
-            for i, j in self._resets.items():
+            for i, j in self._bkmodels.items():
                 i.update(**j)
         finally:
-            self._resets.clear()
+            self._bkmodels.clear()
             self.state = old # pylint: disable=redefined-variable-type
 
     @staticmethod
@@ -322,6 +338,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     def create(self, doc):
         "returns the figure"
         self._model.create(doc)
+        self._doc = doc
         with self.resetting():
             return self._create(doc)
 
@@ -329,9 +346,8 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         "activates the component: resets can occur"
         old        = self.state
         self.state = PlotState.active if val else PlotState.disabled
-        if val and old is PlotState.outofdate:
-            with self.resetting():
-                self._reset()
+        if val and (old is PlotState.outofdate):
+            self.__doreset()
 
     def reset(self, items:dict):
         "Updates the data"
@@ -346,12 +362,38 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
             self.state = PlotState.outofdate
 
         elif state is PlotState.active:
-            with self.resetting():
-                self._reset()
+            self.__doreset()
 
     def observe(self):
         "sets-up model observers"
         self.project.root.observe(self.reset)
+
+    async def __reset_and_display(self, old):
+        def _reset():
+            try:
+                self._reset()
+                return tuple(self._bkmodels.items())
+            finally:
+                self._bkmodels.clear()
+                self.state = old # pylint: disable=redefined-variable-type
+
+        def _display():
+            for i, j in ret:
+                i.update(**j)
+
+        ret = await to_tornado_future(self._POOL.submit(_reset))
+        self._doc.add_next_tick_callback(_display)
+
+    def __doreset(self):
+        with self.resetting():
+            self._model.reset()
+            self._bkmodels.clear()
+            if not self.project.delayed.get(default = False):
+                self._reset()
+                return
+
+        old, self.state = self.state, PlotState.resetting
+        IOLoop.current().spawn_callback(self.__reset_and_display, old)
 
     def _addcallbacks(self, fig):
         "adds Range callbacks"

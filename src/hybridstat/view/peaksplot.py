@@ -663,18 +663,16 @@ class PeaksPlotCreator(TaskPlotCreator):
             widget.observe()
 
     def _reset(self):
-        self._model.reset()
-
         data, peaks        = self.__data()
-        self._resets[self._peaksrc].update(data = peaks, column_names = list(peaks.keys()))
-        self._resets[self._histsrc].update(data = data)
-        self._hover .reset(self._resets)
-        self._ticker.reset(self._resets)
+        self._bkmodels[self._peaksrc].update(data = peaks, column_names = list(peaks.keys()))
+        self._bkmodels[self._histsrc].update(data = data)
+        self._hover .reset(self._bkmodels)
+        self._ticker.reset(self._bkmodels)
         for widget in self._widgets.values():
-            widget.reset(self._resets)
+            widget.reset(self._bkmodels)
 
         self.setbounds(self._fig.y_range, 'y', (data['z'][0], data['z'][-1]))
-        self._hover.pyslaveaxes(self._fig, data, self._resets)
+        self._hover.pyslaveaxes(self._fig, data, self._bkmodels)
 
     def __create_fig(self):
         self._fig = figure(**self._figargs(y_range = Range1d,

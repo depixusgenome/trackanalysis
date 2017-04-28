@@ -139,10 +139,13 @@ class SequenceTicker(ContinuousTicker):
         "Updates the ticks according to the configuration"
         mdl = self.__model
         fig = self.__fig
-        key                    = mdl.sequencekey if len(mdl.oligos) else None
-        self.usedefault        = True
-        self.__axis.usedefault = True
-        if key is not None:
+        key = mdl.sequencekey if len(mdl.oligos) else None
+
+        if key is None:
+            resets[self]['usedefault']        = True
+            resets[self.__axis]['usedefault'] = True
+            resets[fig.ygrid[0]].update(self.__defaults)
+        else:
             majors = {}
             minors = {}
             for name, seq in readsequence(mdl.sequencepath).items():
@@ -150,17 +153,12 @@ class SequenceTicker(ContinuousTicker):
                 majors[name] = tuple(peaks['position'][peaks['orientation']])
                 minors[name] = tuple(peaks['position'][~peaks['orientation']])
 
-            resets[self].update(major = majors, minor = minors, key = key)
+            resets[self].update(major = majors, minor = minors, key = key,
+                                usedefault = False)
             resets[self.__axis].update(major = {i: majors[i]+minors[i] for i in majors},
                                        minor = dict.fromkeys(majors.keys(), tuple()),
-                                       key   = key)
-            self.usedefault        = False
-            self.__axis.usedefault = False
-
-        info = self.__defaults if self.usedefault else self.__withbase
-        for name in ('color', 'dash', 'width', 'alpha'):
-            resets[fig.ygrid[0]]['grid_line_'+name]       = info['grid_line_'+name]
-            resets[fig.ygrid[0]]['minor_grid_line_'+name] = info['minor_grid_line_'+name]
+                                       key   = key, usedefault = False)
+            resets[fig.ygrid[0]].update(self.__withbase)
 
 class SequenceHoverMixin:
     "controls keypress actions"

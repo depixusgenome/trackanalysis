@@ -215,6 +215,7 @@ class GlobalsController(BaseGlobalsController):
             self.addGlobalMap(name+suff)
 
         self.getGlobal('project').message.default = ''
+        self.getGlobal('project.plot').delayed.default = False
 
         css = self.getGlobal('css')
         css.config.defaults = {'indent': 4, 'ensure_ascii': False, 'sort_keys': True}

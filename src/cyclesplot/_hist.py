@@ -112,17 +112,17 @@ class HistMixin:
     def _histobservers(self):
         def _fcn():
             with self.resetting():
-                self._ticker.reset(self._resets)
-                self._hover.resethist(self._resets)
+                self._ticker.reset(self._bkmodels)
+                self._hover.resethist(self._bkmodels)
         self._model.observeprop('oligos', 'sequencepath', _fcn)
 
     def _resethist(self, data, shape):
         hist = self.__data(data, shape)
 
         self._model.estimatedbias = estimatebias(hist['bottom'], hist['cycles'])
-        self._hover.resethist(self._resets)
-        self._ticker.reset(self._resets)
+        self._hover.resethist(self._bkmodels)
+        self._ticker.reset(self._bkmodels)
 
-        self._resets[self._histsource]['data'] = hist
+        self._bkmodels[self._histsource]['data'] = hist
 
-        self._hover.slaveaxes(self._hist, hist, self._resets)
+        self._hover.slaveaxes(self._hist, hist, self._bkmodels)
