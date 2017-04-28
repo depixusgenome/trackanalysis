@@ -4,6 +4,7 @@
 import  inspect
 from    copy        import copy as shallowcopy
 from    abc         import ABCMeta, abstractmethod
+from    itertools   import product
 from    functools   import wraps
 from    typing      import (Optional, Tuple, Union, # pylint: disable=unused-import
                             Any, List, Sequence, Iterable, Iterator,
@@ -23,6 +24,10 @@ BEADKEY  = Union[str,int]
 CYCLEKEY = Tuple[BEADKEY,int]
 Self     = TypeVar('Self',  bound = '_m_ConfigMixin')
 TSelf    = TypeVar('TSelf', bound = 'TrackItems')
+
+
+def _m_ellipsis(vals):
+    return (not isinstance(vals, np.ndarray)) and vals in _m_ALL
 
 def _m_setfield(fcn):
     "provides a setter return self"
@@ -44,8 +49,17 @@ def _m_selection(self:Self, attr, cyc, clear) -> Self:
     if getattr(self, attr) is None:
         setattr(self, attr, [])
 
-    if isinstance(cyc, _m_INDEX) or isfunction(cyc):
+    if isinstance(cyc, tuple):
+        if all(isinstance(i, _m_INDEX) or _m_ellipsis(i) for i in cyc):
+            getattr(self, attr).append(cyc)
+        else:
+            vals = ((i,) if (isinstance(i, _m_INDEX) or _m_ellipsis(i)) else i
+                    for i in cyc)
+            getattr(self, attr).extend(product(*vals))
+
+    elif isinstance(cyc, _m_INDEX) or isfunction(cyc):
         getattr(self, attr).append(cyc)
+
     else:
         getattr(self, attr).extend(cyc)
 
@@ -300,12 +314,13 @@ class TrackItems(_m_ConfigMixin, Items):
             # could be a slice of beads or a slice of bead data ...
             raise NotImplementedError()
 
-        elif (keys in _m_ALL
-              or (isinstance(keys, tuple) and frozenset(keys).issubset(_m_ALL))):
+        elif (_m_ellipsis(keys)
+              or (isinstance(keys, tuple) and all(_m_ellipsis(i) for i in keys))):
             return shallowcopy(self)
 
         elif (isinstance(keys, _m_KEYS)
-              or (isinstance(keys, tuple) and frozenset(_m_ALL).isdisjoint(keys))):
+              or (isinstance(keys, tuple)
+                  and all(isinstance(i, _m_KEYS) for i in keys))):
             # this is NOT a slice
             return self.get(keys)
 
@@ -411,7 +426,7 @@ class Beads(TrackItems, Items):
                         return res.new(data = {}, direct = True)
                     else:
                         return res[keys]
-                return res if frozenset(keys).issubset(_m_ALL) else res[keys]
+                return res if all(_m_ellipsis(i) for i in keys) else res[keys]
             raise NotImplementedError()
         return super().__getitem__(keys)
 
@@ -439,8 +454,6 @@ class Beads(TrackItems, Items):
             raise NotImplementedError()
         self.cycles = cyc
         return self
-
-
 
     @staticmethod
     def isbead(key:BEADKEY) -> bool:
