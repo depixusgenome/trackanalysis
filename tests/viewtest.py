@@ -69,8 +69,8 @@ def test_beadplot(bokehaction):
             server.press(val, krow)
             assert vals == approx(truth, rel = 1e-2)
 
-        _press('Shift- ',          0., 0.,  0., 0.)
-        _press('Shift-ArrowUp',    0., 0.,               0.41992, 0.65178)
+        _press('Shift- ',          652.7515, 1150.249,  -0.04378, 1.11549)
+        _press('Shift-ArrowUp',    652.7515, 1150.249,   0.41992, 0.65178)
         _press('Shift-ArrowRight', 851.7503, 951.2497,   0.41992, 0.65178)
         _press('Alt-ArrowLeft',    831.8504, 931.34982,  0.41992, 0.65178)
         _press('Alt-ArrowUp',      831.8504, 931.34982,  0.46629, 0.69815)
