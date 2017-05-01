@@ -61,7 +61,8 @@ def test_beadplot(bokehaction):
 
     with bokehaction.launch('view.beadplot.BeadPlotView', 'app.ToolBar') as server:
         server.ctrl.observe("globals.project.plot.bead", _printrng)
-        server.load('small_legacy')
+        server.ctrl.observe("rendered", lambda *_1, **_2: server.wait)
+        server.load('small_legacy', andstop = False)
 
         krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))
         def _press(val, *truth):
@@ -81,4 +82,4 @@ def test_beadplot(bokehaction):
         server.press('Ctrl-z')
 
 if __name__ == '__main__':
-    test_beadtoolbar(bokehaction(None))
+    test_beadplot(bokehaction(None))
