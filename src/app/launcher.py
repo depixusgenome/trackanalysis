@@ -14,6 +14,9 @@ from bokeh.application          import Application
 from bokeh.application.handlers import FunctionHandler
 from bokeh.settings             import settings
 from bokeh.layouts              import layout
+from bokeh.model                import Model
+import bokeh.core.properties as props
+
 
 from utils.logconfig            import getLogger
 from utils                      import getlocals
@@ -50,6 +53,30 @@ def _stop(self, wait=True, __old__ = Server.stop):
 Server.stop = _stop
 del _stop
 
+class DpxLoaded(Model):
+    """
+    This starts tests once flexx/browser window has finished loading
+    """
+    __implementation__ = """
+        import *        as $    from "jquery"
+        import *        as p    from "core/properties"
+        import {Model}          from "model"
+        import {BokehView} from "core/bokeh_view"
+
+        export class DpxLoadedView extends BokehView
+
+        export class DpxLoaded extends Model
+            default_view: DpxLoadedView
+            type: "DpxLoaded"
+            constructor : (attributes, options) ->
+                super(attributes, options)
+                $((e) => @done = 1)
+            @define {
+                done:  [p.Number, 0]
+            }
+                         """
+    done = props.Int(0)
+
 class _FunctionHandler(FunctionHandler):
     def __init__(self, view, stop = False):
         self.__view          = None
@@ -63,11 +90,16 @@ class _FunctionHandler(FunctionHandler):
             self.__view = view.open(doc)
 
             lst = list(INITIAL_ORDERS)
-            def _cmd():
-                if len(lst):
-                    lst.pop(0)(getattr(self.__view, '_ctrl'))
-                    doc.add_next_tick_callback(_cmd)
-            doc.add_next_tick_callback(_cmd)
+            if len(lst):
+                def _cmd():
+                    if len(lst):
+                        with self.__view.action:
+                            lst.pop(0)(getattr(self.__view, '_ctrl'))
+                        doc.add_next_tick_callback(_cmd)
+
+                loaded = DpxLoaded()
+                doc.add_root(loaded)
+                loaded.on_change('done', lambda attr, old, new: _cmd())
         super().__init__(start)
 
     def on_session_created(self, session_context):
