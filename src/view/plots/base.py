@@ -8,8 +8,6 @@ from    enum                import Enum
 from    abc                 import ABCMeta, abstractmethod
 from    contextlib          import contextmanager
 from    functools           import wraps
-from    concurrent.futures  import ThreadPoolExecutor
-import  inspect
 
 import  numpy        as     np
 
@@ -19,12 +17,9 @@ from    bokeh.models            import (Range1d,    # pylint: disable=unused-imp
                                         RadioButtonGroup, Model,
                                         Paragraph, Widget, GlyphRenderer)
 
-from tornado.ioloop             import IOLoop
-from tornado.platform.asyncio   import to_tornado_future
-
 from    control                 import Controller
 from    control.globalscontrol  import GlobalsAccess
-from    ..base                  import BokehView, Action
+from    ..base                  import BokehView, threadmethod, spawn
 from    .bokehext               import DpxHoverTool, from_py_func
 
 _m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
@@ -180,12 +175,13 @@ class PlotModelAccess(GlobalsAccess):
     def create(self, _):
         "creates the model"
 
-    def reset(self):
+    @staticmethod
+    def reset() -> bool:
         "resets the model"
+        return False
 
 class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     "Base plotter class"
-    _POOL  = ThreadPoolExecutor(1)
     _MODEL = PlotModelAccess
     _RESET = frozenset(('track', 'bead'))
     class _OrderedDict(OrderedDict):
@@ -214,8 +210,8 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         self._model                = self._MODEL(ctrl, key)
         self._ctrl                 = ctrl
         self._bkmodels             = self._OrderedDict() # type: Dict[Model,Dict[str,Any]]
+        self._doc                  = None                # type: Optional[Document]
         self.project.state.default = PlotState.active
-        self._doc                  = None                # type: Document
 
     state = cast(PlotState,
                  property(lambda self:    self.project.state.get(),
@@ -229,34 +225,11 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
             name = name[:name.rfind('plot')]
         return ".plot." + name
 
-    def addupdate(self, model, *args, **attrs):
-        "adds models to be updated"
-        self._bkmodels[model].update(*args)
-        self._bkmodels[model].update(**attrs)
-
-    def action(self, fcn):
+    def action(self, fcn = None):
         u"decorator which starts a user action but only if state is set to active"
-        if tuple(inspect.signature(fcn).parameters) == ('attr', 'old', 'new'):
-            @wraps(fcn)
-            def _wrap_cb(attr, old, new):
-                if self.state is PlotState.active:
-                    with Action(self._ctrl):
-                        fcn(attr, old, new)
-            return _wrap_cb
-        elif tuple(inspect.signature(fcn).parameters)[1:] == ('attr', 'old', 'new'):
-            @wraps(fcn)
-            def _wrap_cb(self, attr, old, new):
-                if self.state is PlotState.active:
-                    with Action(self._ctrl):
-                        fcn(self, attr, old, new)
-            return _wrap_cb
-        else:
-            @wraps(fcn)
-            def _wrap_cb(*args, **kwa):
-                if self.state is PlotState.active:
-                    with Action(self._ctrl):
-                        fcn(*args, **kwa)
-            return _wrap_cb
+        test   = lambda *_1, **_2: self.state is PlotState.active
+        action = BokehView.action.type(self._ctrl, test = test)
+        return action if fcn is None else action(fcn)
 
     @contextmanager
     def resetting(self):
@@ -318,10 +291,10 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
 
     def setbounds(self, rng, axis, arr, reinit = True):
         "Sets the range boundaries"
+        vals = self.newbounds(rng, axis, arr)
         if reinit and hasattr(rng, 'reinit'):
-            self.addupdate(rng, reinit = not rng.reinit, **self.newbounds(rng, axis, arr))
-        else:
-            self.addupdate(rng, **self.newbounds(rng, axis, arr))
+            vals['reinit'] = not rng.reinit
+        self._bkmodels[rng].update(**vals)
 
     def bounds(self, arr):
         "Returns boundaries for a column"
@@ -337,8 +310,8 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
 
     def create(self, doc):
         "returns the figure"
-        self._model.create(doc)
         self._doc = doc
+        self._model.create(doc)
         with self.resetting():
             return self._create(doc)
 
@@ -368,32 +341,33 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         "sets-up model observers"
         self.project.root.observe(self.reset)
 
-    async def __reset_and_display(self, old):
-        def _reset():
-            try:
-                self._reset()
-                return tuple(self._bkmodels.items())
-            finally:
-                self._bkmodels.clear()
-                self.state = old # pylint: disable=redefined-variable-type
-
-        def _display():
-            for i, j in ret:
-                i.update(**j)
-
-        ret = await to_tornado_future(self._POOL.submit(_reset))
-        self._doc.add_next_tick_callback(_display)
-
     def __doreset(self):
         with self.resetting():
-            self._model.reset()
             self._bkmodels.clear()
-            if not self.project.delayed.get(default = False):
-                self._reset()
-                return
+            self._model.reset()
 
         old, self.state = self.state, PlotState.resetting
-        IOLoop.current().spawn_callback(self.__reset_and_display, old)
+        async def _reset_and_render():
+            def _reset():
+                with BokehView.computation.type(self, calls = self.__doreset):
+                    try:
+                        self._reset()
+                        return tuple(self._bkmodels.items())
+                    finally:
+                        self._bkmodels.clear()
+                        self.state = old # pylint: disable=redefined-variable-type
+
+            ret = await threadmethod(_reset)
+
+            def _render():
+                with BokehView.computation.type(self, calls = self.__doreset):
+                    for i, j in ret:
+                        i.update(**j)
+                    self._ctrl.handle('rendered', args = {'plot': self})
+
+            self._doc.add_next_tick_callback(_render)
+
+        spawn(_reset_and_render)
 
     def _addcallbacks(self, fig):
         "adds Range callbacks"

@@ -340,7 +340,8 @@ class SequencePathWidget(WidgetCreator):
 
     def observe(self):
         "sets-up config observers"
-        self._model.observeprop('sequencekey', 'sequencepath', self.reset)
+        fcn = lambda: self.__widget.update(**self.__data())
+        self._model.observeprop('sequencekey', 'sequencepath', fcn)
 
     def reset(self, resets):
         "updates the widget"
@@ -432,7 +433,8 @@ class OligoListWidget(WidgetCreator):
 
     def observe(self):
         "sets-up config observers"
-        self._model.observeprop('oligos', self.reset)
+        fcn = lambda: self.__widget.update(**self.__data())
+        self._model.observeprop('oligos', fcn)
 
 class SequenceKeyProp(BeadProperty[Optional[str]]):
     "access to the sequence key"

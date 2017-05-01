@@ -62,7 +62,8 @@ class PeaksTableWidget(_Widget):
 
     def observe(self):
         "sets-up config observers"
-        self._model.observeprop('oligos', 'sequencepath', 'sequencekey', self.reset)
+        fcn = lambda: setattr(self.__widget.source, 'data', self.__data())
+        self._model.observeprop('oligos', 'sequencepath', 'sequencekey', fcn)
 
     def callbacks(self, hover):
         "adding callbacks"

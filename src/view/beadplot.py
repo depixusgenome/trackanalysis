@@ -27,9 +27,6 @@ class BeadPlotCreator(TaskPlotCreator):
         self._source = None # type: Optional[ColumnDataSource]
         self._fig    = None # type: Optional[Figure]
 
-    def _get(self, name):
-        return self._source.data[name] # pylint: disable=unsubscriptable-object
-
     def __data(self):
         track = self._model.track
         bead  = self._model.bead
@@ -65,11 +62,6 @@ class BeadPlotCreator(TaskPlotCreator):
 
         rng.callback = from_py_func(_onRangeChange)
 
-    def _setbounds(self):
-        self.setbounds(self._fig.extra_y_ranges['zmag'], None, self._get('zmag'))
-        self.setbounds(self._fig.x_range, 'x', self._get('t'))
-        self.setbounds(self._fig.y_range, 'y', self._get('z'))
-
     def _create(self, _) -> DpxKeyedRow:
         "sets-up the figure"
         self._fig    = figure(**self._figargs(x_range = Range1d,
@@ -89,8 +81,10 @@ class BeadPlotCreator(TaskPlotCreator):
         return DpxKeyedRow(self, self._fig)
 
     def _reset(self):
-        self._source.data = self.__data()
-        self._setbounds()
+        self._bkmodels[self._source]['data'] = data = self.__data()
+        self.setbounds(self._fig.extra_y_ranges['zmag'], None, data['zmag'])
+        self.setbounds(self._fig.x_range,                 'x', data['t'])
+        self.setbounds(self._fig.y_range,                 'y', data['z'])
 
 class BeadPlotView(PlotView):
     "Bead plot view"

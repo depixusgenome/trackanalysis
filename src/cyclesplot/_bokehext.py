@@ -49,9 +49,9 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
                         'tooltips.radius' : 1.5}
         SequenceHoverMixin.defaultconfig(mdl)
 
-    def _createrawdata(self, source):
-        return dict(t = source.data['t'][:self.shape[1]],
-                    z = source.data['z'][:self.shape[1]])
+    @staticmethod
+    def _createrawdata(data, shape):
+        return dict(t = data['t'][:shape[1]], z = data['z'][:shape[1]])
 
     def createraw(self, fig, source, shape, model):
         "creates the hover tool"
@@ -62,7 +62,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         if len(hover) == 0:
             return
 
-        self._rawsource = ColumnDataSource(self._createrawdata(source))
+        self._rawsource = ColumnDataSource(self._createrawdata(source.data, shape))
         css             = self._model.css.raw
 
         sel             = css.selection[self._model.css.theme.get()].get()
@@ -196,8 +196,8 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         if len(hover) == 0:
             return
 
-        self.shape             = shape
-        resets[self._rawsource]['data']   = self._createrawdata(rdata)
+        resets[self]['shape']             = shape
+        resets[self._rawsource]['data']   = self._createrawdata(rdata, shape)
         resets[self._rawglyph]['visible'] = False
 
     def resethist(self, resets):

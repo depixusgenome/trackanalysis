@@ -160,8 +160,11 @@ class PeaksPlotModelAccess(_PeaksPlotModelAccess):
         else:
             return next(iter(self._ctrl.run(root, task, copy = True)))[ibead, ...]
 
-    def reset(self):
+    def reset(self) -> bool:
         "adds tasks if needed"
+        if self.track is None or self.checkbead(False):
+            return True
+
         if self.eventdetection.task is None:
             self.eventdetection.update()
 
@@ -174,6 +177,8 @@ class PeaksPlotModelAccess(_PeaksPlotModelAccess):
             self.identification.remove()
         elif task is not None and cur is None:
             self.identification.update(**task.config())
+        return False
+
 
     def __set_ids_and_distances(self, peaks):
         task  = self.identification.task
@@ -262,7 +267,7 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
         resets[bases].update(start  = (yrng.start - self._model.bias)*self._model.stretch,
                              end    = (yrng.end   - self._model.bias)*self._model.stretch)
 
-        zval = src.data["z"]
+        zval = src["z"]
         ix1  = 0
         ix2  = len(zval)
         for i in range(ix2):
@@ -405,10 +410,7 @@ class PeaksStatsWidget(WidgetCreator):
 
     def create(self, _) -> List[Widget]:
         self.__widget = PeaksStatsDiv(width = self.css.input.width.get())
-        resets        = {} # type: ignore
-        self.reset(resets)
-        for i, j in resets.items():
-            i.update(**j)
+        self.reset(None)
         return [self.__widget]
 
     def reset(self, resets):
@@ -417,7 +419,11 @@ class PeaksStatsWidget(WidgetCreator):
             txt = next(iter(data.values()))
         else:
             txt = data[self._model.sequencekey]
-        resets[self.__widget].update(data = data, text = txt)
+        if resets is None:
+            self.__widget.update(data = data, text = txt)
+        else:
+            resets[self.__widget].update(data = data, text = txt)
+
 
     class _TableConstructor:
         "creates the html table containing stats"
@@ -559,7 +565,7 @@ class PeakIDPathWidget(WidgetCreator):
                 self._model.constraintspath = None
 
             elif not Path(path).exists():
-                self.reset()
+                self.reset(None)
 
             else:
                 self._model.constraintspath = str(Path(path).resolve())
@@ -571,11 +577,11 @@ class PeakIDPathWidget(WidgetCreator):
         return [self.__widget]
 
     def reset(self, resets):
+        txt  = ''
         path = self._model.constraintspath
         if path is not None and Path(path).exists():
-            resets[self.__widget]["value"] = str(Path(path).resolve())
-        else:
-            resets[self.__widget]['value'] = ''
+            txt = str(Path(path).resolve())
+        (self.__widget if resets is None else resets[self.__widget]).update(value = txt)
 
 class PeaksPlotCreator(TaskPlotCreator):
     "Creates plots for peaks"
@@ -614,7 +620,7 @@ class PeaksPlotCreator(TaskPlotCreator):
 
     def __data(self) -> Tuple[dict, dict]:
         cycles = self._model.runbead()
-        data   = dict.fromkeys(('z', 'duration', 'count'), [0., 1.])
+        data   = dict.fromkeys(('z', 'count'), [0., 1.])
         self._model.setpeaks(None)
         if cycles is None:
             return data, self._model.peaks
@@ -672,7 +678,7 @@ class PeaksPlotCreator(TaskPlotCreator):
             widget.reset(self._bkmodels)
 
         self.setbounds(self._fig.y_range, 'y', (data['z'][0], data['z'][-1]))
-        self._hover.pyslaveaxes(self._fig, data, self._bkmodels)
+        self._hover.pyslaveaxes(self._fig, peaks, self._bkmodels)
 
     def __create_fig(self):
         self._fig = figure(**self._figargs(y_range = Range1d,
@@ -715,7 +721,8 @@ class PeaksPlotCreator(TaskPlotCreator):
         self._hover.jsslaveaxes(self._fig, self._peaksrc)
 
     def __setup_widgets(self):
-        widgets = {i: j.create(self.action) for i, j in self._widgets.items()}
+        action  = self.action()
+        widgets = {i: j.create(action) for i, j in self._widgets.items()}
         enableOnTrack(self, self._fig, widgets)
 
         self._widgets['peaks'].setsource(self._peaksrc)
