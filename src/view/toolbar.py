@@ -2,13 +2,14 @@
 # -*- coding: utf-8 -*-
 "Toolbar"
 from pathlib              import Path
+import threading
 from bokeh.layouts        import Row, widgetbox
 from bokeh.models         import Div
 
 from control.taskio       import TaskIO
 from .dialog              import FileDialog
 from .intinput            import BeadInput, RejectedBeadsInput
-from .                    import BokehView
+from .base                import BokehView, threadmethod, spawn
 
 class TrackFileDialog(FileDialog):
     "A file dialog that doesn't open .gr files first"
@@ -25,7 +26,7 @@ class TrackFileDialog(FileDialog):
             return self.firstexistingpath(pot)
         self.config = _defaultpath, self.config[1]
 
-class  ToolBar(BokehView):
+class ToolBar(BokehView): # pylint: disable=too-many-instance-attributes
     "Toolbar"
     def __init__(self, **kwa):
         "Sets up the controller"
@@ -77,6 +78,7 @@ class  ToolBar(BokehView):
 
     def getroots(self, doc):
         "adds items to doc"
+        self._doc = doc
         self._getroots(doc)
 
         def _title(item):
@@ -94,30 +96,35 @@ class  ToolBar(BokehView):
         working = self._ctrl.getGlobal('css').title.working.get()
         catch   = self._ctrl.getGlobal('config').catcherror.toolbar
 
-        # pylint: disable=unused-variable
-        @self._ctrl.observe
         def _onstartaction(recursive = None):
             if not recursive:
                 msg.set((working, 'normal'))
+        self._ctrl.observe("startaction", "startcomputation", _onstartaction)
 
-        @self._ctrl.observe
         def _onstopaction(recursive = None, value = None, catcherror = None, **_):
             if not recursive:
                 if value is None:
-                    if working in self._text.text:
+                    if working == msg.get()[0]:
                         msg.set(('', 'normal'))
                     return
 
                 if len(getattr(value, 'args', [])) == 2 and value.args[1] == 'treated':
                     msg.set((str(value.args[0]), 'warning'))
+
                 else:
                     msg.set((str(value), 'error'))
 
                 catcherror[0] = catch.get()
+        self._ctrl.observe("stopaction", "stopcomputation", _onstopaction)
 
         templ = self._ctrl.getGlobal('config').message.getdict(..., fullnames = False)
+        curr  = threading.current_thread().ident
         def _settext(text):
-            self._text.text = templ[text.value[1]].format(text.value[0])
+            msg = templ[text.value[1]].format(text.value[0])
+            if curr == threading.current_thread().ident:
+                self._text.text = msg
+            else:
+                self._doc.add_next_tick_callback(lambda: setattr(self._text, 'text', msg))
 
         self._ctrl.getGlobal('project').message.observe(_settext)
 
@@ -135,22 +142,25 @@ class  ToolBar(BokehView):
         del self.__diagopen
         del self.__diagsave
 
-    @BokehView.action
+    def __run(self, name):
+        async def _run():
+            diag  = getattr(self, '_ToolBar__diag'+name)
+            paths = await threadmethod(getattr(diag, name))
+            if paths is not None:
+                def _fcn():
+                    with self.action:
+                        getattr(self._ctrl, name+'Track')(paths)
+                self._doc.add_next_tick_callback(_fcn)
+
+        spawn(_run)
+
     def _onOpen(self, *_):
-        paths = self.__diagopen.open()
-        if paths is not None:
-            self._ctrl.openTrack(paths)
+        self.__run('open')
 
-    @BokehView.action
     def _onSave(self,  *_):
-        if self._save.disabled:
-            return
+        self.__run('save')
 
-        path = self.__diagsave.save()
-        if path is not None:
-            self._ctrl.saveTrack(path)
-
-class  BeadToolBar(ToolBar):
+class BeadToolBar(ToolBar):
     "Toolbar with a bead spinner"
     def __init__(self, **kwa):
         super().__init__(**kwa)
