@@ -8,7 +8,7 @@ from   typing                   import (Union, Optional, # pylint: disable=unuse
 import numpy  as     np
 from   numpy.lib.stride_tricks  import as_strided
 
-from   utils                    import (initdefaults, updatecopy,
+from   utils                    import (initdefaults, updatecopy, kwargsdefaults,
                                         asobjarray, EVENTS_DTYPE)
 from   .histogram               import Histogram, SubPixelPeakPosition
 
@@ -114,7 +114,8 @@ class PeakCorrelationAlignment:
     projector = Histogram()
     subpixel  = SubPixelPeakPosition()
 
-    @initdefaults(frozenset(locals()),
+    __KEYS    = frozenset(locals())
+    @initdefaults(__KEYS,
                   projector = 'update',
                   zcost     = lambda self, j: self.setzcost(j),
                   maxmove   = lambda self, j: self.setmaxmove(j),
@@ -143,6 +144,7 @@ class PeakCorrelationAlignment:
         "sets max move for all actions"
         self.__set('factor', factor)
 
+    @kwargsdefaults(__KEYS)
     def __call__(self,
                  data:      Union[np.ndarray, Iterable[np.ndarray]],
                  precision: Optional[float] = None) -> np.ndarray:
