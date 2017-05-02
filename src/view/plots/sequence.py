@@ -65,7 +65,7 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
             }
 
             get_ticks_no_defaults: (data_low, data_high, cross_loc, desired_n_ticks) ->
-                if @key not in @major
+                if @key not of @major
                     return super(data_low, data_high, cross_loc, desired_n_ticks)
                 else
                     return {
