@@ -3,20 +3,23 @@
 
 u'''
 classes to define Hopping Steps
+In the case of OptimOligoSwap, we can run :
+    * the merging of batches 2 by 2 then look at regions where better solutions can be found
+      by merging simultanesouly more batches
+    * or run the full set of possibilities
+          -> pb: requires about 16 minutes to run at current precision
+          -> solution has already been partially implemented in _perms_in_groups_between_batches
+
 '''
 
+
 import sys
-from typing import Callable, Iterable # pylint: disable=unused-import
+from typing import Callable, Iterable, List, Tuple # pylint: disable=unused-import
 import pickle
 import numpy
 from utils.logconfig import getLogger
 from .oligohit import Batch
 from . import _utils as utils
-
-# reconstruction a batch at a time
-# if we consider an oligo-batch at a time, then:
-#     * permutation can only decrease score
-#     * adding a new batch, permutation can only occur between different batches
 
 # to add variability in (stretching,bias) for each batch (to estimate from hybridstat analyses)
 
@@ -85,39 +88,88 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
         self.batches = [Batch(oligos=[i for i in self.oligos if i.batch_id==index],
                               index=index) for index in batchids]
         # batches from groups( = utils.group_oligos(self.oligos, by=self.seg))??
-        with open("batches.pickle","wb") as testfile:
-            pickle.dump(self.batches,testfile)
-
+        swaps = [Swap(i) for i in find_swaps(self.batches,self.nscale,self.min_overl)]
+        print("len(swaps)=",len(swaps))
+        with open("swaps.pickle","wb") as testfile:
+            pickle.dump(swaps,testfile)
+        self.perms = from_swaps2perms(swaps)
 
     def __call__(self,xst):
         u'''
+        * problem when adding permutations:
+             -> if it overlaps with any other permutations
+                (a new permutation to test includes an oligo already permuted)
+             -> if the 2 permutations are independent (do not involve the same oligos)
         * requires xstate to add permutations
         * there should be no conflict when adding permutations by construction of the
           optimal_perm_normdists (for 2 by 2 batches merging)
-        * what happens when no more permutations are to be explored?
-        * needs to return the new position of the oligos
+
+        return the new position of the oligos
         '''
         LOGS.debug("len(self.batches)="+str(len(self.batches)))
-        for perm in find_permutations(self.batches,self.nscale,self.min_overl):
+        for perm in self.perms:
             # from permutations of oligos to permutated positions
-            yield perm
+            yield oli_perm_to_xstate(self.oligos,perm)
         return None
 
 
-def find_permutations(batches,nscale,min_overl):
+def find_swaps(batches,nscale,min_overl):
     u'''
     for now swap_between_batches allow only merging of 2 batches at a time
     '''
-    allperms = []
+    allswaps = []
     while len(batches)>1:
-        perms = utils.swap_between_batches([batches[0],batches[1]],nscale,min_overl)
+        swaps = utils.swaps_between_batches([batches[0],batches[1]],nscale,min_overl)
+        if any(numpy.array([len(i) for i in swaps])<2):
+            LOGS.warning("problem with swap size")
         batches[0].fill_with(batches[1])
         batches.pop(1)
-        allperms+=perms
-    return allperms
+        allswaps+=swaps
+    return allswaps
 
-def oli_perm_to_xstate():
-    u'''
-    translates permutations in oligos to new xstate for basinhopping
+
+class Swap:
+    u'''defines a swap
+    already takes into account batch contraints
     '''
-    pass
+    def __init__(self,swap:Tuple):
+        self.swap=swap
+    def to_perm(self,size):
+        u'returns Perm'
+        perm = Perm(size)
+        perm.from_swap(self)
+        return perm
+
+class Perm:
+    u'class to permutation'
+    def __init__(self,size):
+        self.size=size
+        self.perm=numpy.array(range(size)) # defaults to neutral permutation
+
+    def from_swap(self,swap:Swap):
+        u'translate a swap of 2 or more indices to a full size permutation'
+        toperm={val:swap.swap[idx] for idx,val in enumerate(sorted(swap.swap))}
+        for key,val in toperm.items():
+            self.perm[key]=val
+
+def oli_perm_to_xstate(oligos,argntsid)->numpy.ndarray:
+    u'''
+    operm is the oligos permuting (in that order)
+    perm (1,2) is neutral with regard to permutation
+    (2,1) is not
+    perm (i,j,k,l,m) i,j,k,l,m are the oligos whose order has changed
+    eg (4512) 4 is now in position of 1, 5 of 2 etc...
+    '''
+    #needs to be generic :
+    #    * if 2 oligos are permuted, need to consider all oligos between these 2 oligos
+    #    * what if a permutation already occured
+
+    # find indices of permuted oligos in oligos
+    #opermid = [oligos.index(oli) for oli in operm]
+
+    ids2perm = {sorted(argntsid)[idx]:val for idx,val in enumerate(argntsid)}
+    permids = list(range(len(oligos)))
+    for key,value in ids2perm.items():
+        permids[key]=value
+
+    return utils.optimal_perm_normdists(permids,[oli.dist for oli in oligos])[permids]

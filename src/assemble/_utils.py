@@ -12,7 +12,10 @@ import pickle
 import scipy.stats
 import numpy
 from Bio import pairwise2
+from utils.logconfig import getLogger
 from . import oligohit
+
+LOGS = getLogger(__name__)
 
 class OligoWrap:
     u'''
@@ -228,24 +231,6 @@ def pairwise2_alignment(seqrec): # uses bpos
     gap_known = ScaleGap(1000)(_gap_penalties)
     return pairwise2.align.globalxc(seqrec.sequence,exp_seq,gap_known,gap_exp,score_only=True) # pylint: disable=no-member
 
-
-def _solver_norm_intersect(dist1,dist2):
-    u'returns the x-values of intersecting normal distributions'
-    sc1=dist1.std()
-    mea1=dist1.mean()
-    sc2=dist2.std()
-    mea2=dist2.mean()
-
-    coef1 = 1/(2*sc1**2) -1/(2*sc2**2)
-    coef2 = mea2/(sc2**2)-mea1/(sc1**2)
-    coef3 = mea1**2/(2*sc1**2) -mea2**2/(2*sc2**2) -numpy.log(sc2/sc1)
-    return numpy.roots([coef1,coef2,coef3])
-
-def _highest_norm_intersect(dist1,dist2):
-    sc_dist=[(dist1.pdf(xval),xval) for xval in _solver_norm_intersect(dist1,dist2)]
-    sc_dist.sort()
-    return sc_dist[-1][1]
-
 def group_overlapping_normdists(dists,nscale=1): # to pytest !! # what if no intersection?
     u'''
     returns lists of indices [(i,j,k)] each element of the tuple has distribution which overlap
@@ -277,23 +262,13 @@ def group_overlapping_normdists(dists,nscale=1): # to pytest !! # what if no int
 
 
 
-def _list_perm_bounds(perm,dists,_epsi=0.001):
-    u'list of possible positions which allow (any or no) switchs between oligo positions'
-    # list all possibilities
-    bounds={idx:[dists[idx].mean()] for idx in perm}
-    for idi,vli in enumerate(perm[:-1]):
-        for vlj in perm[idi+1:]:
-            flag = _highest_norm_intersect(dists[vli],dists[vlj])
-            sign = 1 if dists[vli].mean()<dists[vlj].mean() else -1
-            bounds[vli].append(flag+sign*_epsi)
-            bounds[vlj].append(flag-sign*_epsi)
-    return bounds
 
-def optimal_perm_normdists(perm:List,dists)->numpy.ndarray: # pytest
+def optimal_perm_normdists(perm:List,dists:List)->numpy.ndarray: # pytest
     u'''
-    given a permuation perm and the known distributions of each state
-    returns the permutated state which maximise the probability
+    given a permutation perm and the known distributions of each state
+    returns the PERMUTATED state which maximise the probability
     '''
+    assert len(perm)==len(dists)
     _epsi = 0.001*min([dists[i].std() for i  in perm])
 
     constraints = []
@@ -321,7 +296,7 @@ def group_oligos(oligos,**kwa)->Dict: # pytest!
     return grouped
 
 class CostPermute:
-    u' returns the "cost" of translations due to permutation of oligo peaks'
+    u'returns the "cost" of translations due to permutation of oligo peaks'
     def __init__(self,dists,perm):
         self.dists = dists
         self.perm = perm
@@ -329,7 +304,6 @@ class CostPermute:
     def __call__(self,xstate):
         return -numpy.product([self.dists[vlp].pdf(xstate[idp])
                                for idp,vlp in enumerate(self.perm)])
-
 
 class SOMConstraint:
     u'functor for scipy.optimize.minimize constraints'
@@ -339,64 +313,26 @@ class SOMConstraint:
     def __call__(self,xstate):
         return xstate[self.index+1]-xstate[self.index]-self._epsi
 
-# deprecated
-def swap_between_2batches(bat1, bat2, nscale=1): # not great impl # to optimize
-    u'''
-    compute all possibles swaps between batch1 and batch2
-    need to rethink the algorithm.
-    We must constrain the number of permutations as soon as possible
-    batches between oligos from different batches only
-    do not generate identity swap
-    can take into account physical size of oligos to restrain permutations
-    '''
-
-    groups = group_overlapping_oligos(list(bat1.oligos)+list(bat2.oligos),nscale=nscale)
-    infogrp=[]
-    for grp in groups:
-        info=[]
-        for val in grp:
-            try:
-                info.append((val,bat1.oligos.index(val),1))
-            except ValueError:
-                info.append((val,bat2.oligos.index(val),2))
-        infogrp.append(info)
-
-    # remove groups if there is not a representative of the two batches
-    infogrp = [i for i in infogrp if len(set(j[2] for j in i))>1]
-
-    # generate all permutations between batches excluding within batches swaps
-    perms = []
-    for grp in infogrp:
-        grp1=[i for i in grp if i[2]==1]
-        grp2=[i for i in grp if i[2]==2]
-        combs=[sorted(it) for it in itertools.combinations(range(len(grp)),
-                                                           len(grp1))]
-        for comb in combs:
-            perm=deepcopy(grp2)
-            for index,val in enumerate(comb):
-                perm.insert(val,grp1[index])
-            perms.append([i[0] for i in perm])
-
-    return perms
-
-
-# returns number of permutations to explore, considering only:
-#    * permutations between batches
-#    * permutations between oligos if overlap between oligos is osize-1
+# returns number of arrangements to explore, considering only:
+#    * arrangements between batches
+#    * arrangements between oligos if overlap between oligos is osize-1
 # can create a grp object to avoid confusion with regard to the order of the elements in the tuple
-def swap_between_batches(batches, nscale, ooverl): # not great impl # to optimize
+def swaps_between_batches(batches, nscale, ooverl): # not great impl # to optimize
+    # CAREFUL, misinterpretation of what this function returns.
+    # the swap is the new arrangement of peak ids.
+    # this returns the indices of the peaks flipped which is in general different from the swap!!
     u'''
-    the idea is to reduce the number of permutations to the minimum.
+    the idea is to reduce the number of arrangements to the minimum.
     2 assumptions :
             * oligos may swap positions if they are within 2 nscale from one another
             * consecutive oligos must have overlap by ooverl bases
     (1) group oligos which may swap due to measurement error
     (2) within each group in (1), cluster oligos if they overlap with osize-1 bases
-    (3) compute all combinations of permutations between batches within each cluster
-    (4) to do: not all permutations between batches should be allowed
+    (3) compute all combinations of arrangements between batches within each cluster
+    (4) to do: not all arrangements between batches should be allowed
                need to discard those which do not have ooverl bases
-               -> just use brute force. to discard permutations
-    (5) returns the full list of permutations to consider
+               -> just use brute force. to discard arrangements
+    (5) returns the full list of arrangements to consider
     '''
     oligos = []
     for bat in batches:
@@ -413,40 +349,39 @@ def swap_between_batches(batches, nscale, ooverl): # not great impl # to optimiz
                     break
         infogrp.append(info)
 
-    # remove groups if there is not a representative of at least two batches
-    infogrp = [grp for grp in infogrp if len(set(val[2] for val in grp))>1]
-
-    with open("infogrp.pickle","wb") as outfile:
-        pickle.dump(infogrp,outfile)
-
-    print("before clustering, ",len(infogrp))
+    LOGS.debug("before clustering, %i",len(infogrp))
     finer = []
     for grp in infogrp:
         finer += _cluster_overlapping(ooverl,grp)
-
     infogrp = list(finer)
-    print("after clustering, ",len(infogrp))
-    # generate all permutations between batches excluding within batch swaps
-    perms = []
+    LOGS.debug("after clustering, %i",len(infogrp))
+    # generate all arrangements between batches excluding within batch swaps
+    swaps = []
+
+    # remove groups if there is not a representative of at least two batches
+    infogrp = [grp for grp in infogrp if len(set(val[2] for val in grp))>1]
 
     for grp in infogrp:
-        grpperms = _perms_in_group_between_batches(grp)
-        perms.extend(grpperms)
+        if len(grp)<2:
+            continue
+        grpswaps = _groupswaps_between_batches(grp)
+        swaps.extend(grpswaps)
 
-    print("len(perms)=",len(perms))
-    return perms
+    LOGS.debug("len(swaps)=%i", len(swaps))
+    return swaps
 
 
 
 
-def _perms_in_group_between_batches(grp):
+def _groupswaps_between_batches(grp):
     # can be made more general to include simultaneous
     # merging of more than 2 batches (when necessary)
-    # remove perms which do not satisfy min_overl rule
+    # remove swaps which do not satisfy min_overl rule
+    # we can define the rules which would allow merging of more than 3-mers
     u'''
-    find sequentially the possible permutations of oligos such that:
+    find sequentially the possible arrangements of oligos such that:
         * at least min_overl overlapping bases between consecutive oligos
-        * no permutations between batches
+        * no arrangements between batches
     assumes that oligo indices within the batch are ordered
 
     # the draft of the more general form
@@ -465,31 +400,31 @@ def _perms_in_group_between_batches(grp):
     for idx,fifo in enumerate(fifos):
         prange+=[idx]*fifo.qsize()
 
-    perms=[]
+    swaps=[]
     # for comb in itertools.permutations(prange):
     # continue from here
     for comb in itertools.combinations(range(len(grp)),len([i for i in grp if i[2]==val])):
         indices = list(range(len(grp)))
         for idx,val in enumerate(subs):
-            perm.append()
-            # remove indices in perm[-1]
-            for i in perm[-1]:
+            swap.append()
+            # remove indices in swap[-1]
+            for i in swap[-1]:
                 indices.remove(i)
-                perms.append(perm)
+                swaps.append(swap)
     '''
-
-    grp1=[i for i in grp if i[2]==1]
-    grp2=[i for i in grp if i[2]==2]
+    bids = list(set(i[2] for i in grp))
+    grp1=[i for i in grp if i[2]==bids[0]]
+    grp2=[i for i in grp if i[2]==bids[1]]
     combs=[sorted(it) for it in itertools.combinations(range(len(grp)),
                                                        len(grp1))]
-    perms=[]
+    swaps=[]
     for comb in combs:
-        perm=deepcopy(grp2)
+        swap=list(grp2)
         for index,val in enumerate(comb):
-            perm.insert(val,grp1[index])
-        perms.append([i[0] for i in perm])
+            swap.insert(val,grp1[index])
+        swaps.append([i[0] for i in swap])
 
-    return perms
+    return swaps
 
 def _update_seed(ooverl,seed,grp):
     nseed = 0
@@ -509,9 +444,10 @@ def _cluster_overlapping(ooverl,grp): # to check
     a grp is a list of tuples (oligo,oligo index, batch id)
     returns a list of list of (oligo,oligo index, batch id)
     each oligo in a list has ooverl bases with at least another oligo in the same list
+    defines rule to swap n-oligos with ooverl overlapping bases
     '''
     # if two oligos are in the same batch they should at least have ooverl overlaps
-    # do we put them in the same cluster? yes, we compute permutations between batches afterwards
+    # do we put them in the same cluster? yes, we compute arrangements between batches afterwards
     seed = set([grp[0][0].seq[:ooverl],grp[0][0].seq[-ooverl:]])
     seed = _update_seed(ooverl,seed,grp)
     clusters = [[elmt for elmt in grp\
