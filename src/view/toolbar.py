@@ -71,7 +71,7 @@ class ToolBar(BokehView): # pylint: disable=too-many-instance-attributes
         self._text = Div(text = '                                     ')
         self._tools.append(self._text)
 
-        self.__diagopen.filetypes = TaskIO.extensions(self._ctrl, 'openers')
+        self.__diagopen.filetypes = '*|'+TaskIO.extensions(self._ctrl, 'openers')
         self.__diagopen.title     = css.open.dialog.get()
         self.__diagsave.filetypes = TaskIO.extensions(self._ctrl, 'savers')
         self.__diagsave.title     = css.save.dialog.get()

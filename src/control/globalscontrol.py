@@ -227,7 +227,7 @@ class GlobalsController(BaseGlobalsController):
                                   'io.open':    ('anastore.control.AnaIO',
                                                  'control.taskio.GrFilesIO',
                                                  'control.taskio.TrackIO'),
-                                  'io.save':    ('anastore.control.AnaIO',),
+                                  'io.save':    ('anastore.control.ConfigAnaIO',),
                                   'clear':      True
                                  }
 
