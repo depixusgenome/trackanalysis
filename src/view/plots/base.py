@@ -280,12 +280,11 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         else:
             curr  = self.project[axis].get(default = (vmin, vmax))
 
-        attrs = dict(bounds        = (vmin, vmax),
-                     start         = vmin if curr[0]  is None else curr[0],
-                     end           = vmax if curr[1]  is None else curr[1],
-                     range_padding = over*100.)
-        if not hasattr(rng, 'range_padding'):
-            attrs.pop('range_padding')
+        attrs = OrderedDict(bounds = (vmin, vmax))                  # type: Dict[str, Any]
+        attrs.update(start = vmin if curr[0]  is None else curr[0], # type: ignore
+                     end   = vmax if curr[1]  is None else curr[1])
+        if hasattr(rng, 'range_padding'):
+            attrs['range_padding'] = over*100.
 
         return attrs
 
@@ -294,7 +293,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         vals = self.newbounds(rng, axis, arr)
         if reinit and hasattr(rng, 'reinit'):
             vals['reinit'] = not rng.reinit
-        self._bkmodels[rng].update(**vals)
+        self._bkmodels[rng] = vals
 
     def bounds(self, arr):
         "Returns boundaries for a column"
@@ -361,8 +360,8 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
 
             def _render():
                 with BokehView.computation.type(self, calls = self.__doreset):
-                    for i, j in ret:
-                        i.update(**j)
+                    with self.resetting():
+                        self._bkmodels.update(ret)
                 self._ctrl.handle('rendered', args = {'plot': self})
 
             self._doc.add_next_tick_callback(_render)
@@ -371,26 +370,38 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
 
     def _addcallbacks(self, fig):
         "adds Range callbacks"
-        cnf       = self.project
-        def _onchangex_cb(attr, old, new):
-            if self.state is PlotState.active:
-                cnf.update(x = (fig.x_range.start, fig.x_range.end))
-        fig.x_range.on_change('start', _onchangex_cb)
-        fig.x_range.on_change('end',   _onchangex_cb)
+        updating = [False]
+        def _get(attr):
+            axis = getattr(fig, attr+'_range')
+            cnf  = getattr(self.project, attr)
 
-        def _onchangey_cb(attr, old, new):
-            if self.state is PlotState.active:
-                cnf.update(y = (fig.y_range.start, fig.y_range.end))
+            def _on_cb(attr, old, new):
+                if self.state is PlotState.active:
+                    vals = axis.start, axis.end
+                    if axis.bounds is not None:
+                        rng = 1e-3*(axis.bounds[1]-axis.bounds[0])
+                        vals = tuple(None if abs(i-j) < rng else j
+                                     for i, j in zip(axis.bounds, vals))
+                    updating[0] = True
+                    cnf.set(vals)
+                    updating[0] = False
 
-        fig.y_range.on_change('start', _onchangey_cb)
-        fig.y_range.on_change('end',   _onchangey_cb)
+            cnf.default = None, None
+            axis.on_change('start', _on_cb)
+            axis.on_change('end',   _on_cb)
 
-        cnf.defaults = dict(x = (None, None), y = (None, None))
+        _get('x')
+        _get('y')
 
         def _onobserve(items):
+            if updating[0]:
+                return
             for i in {'x', 'y'} & frozenset(items):
+                rng  = getattr(fig, i+'_range')
                 vals = items[i].value
-                getattr(fig, i+'_range').update(start = vals[0], end = vals[1])
+                bnds = rng.bounds
+                rng.update(start = bnds[0] if vals[0] is None else vals[0],
+                           end   = bnds[1] if vals[1] is None else vals[1])
 
         self.project.observe('x', 'y', _onobserve)
         return fig
