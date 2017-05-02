@@ -17,10 +17,9 @@ from ._types import SciDist
 
 LOGS = getLogger(__name__)
 
-#OliBat = collections.namedtuple("OliBat",[oli:OligoPeak,idinbat:int,batid:int])
 OliBat = collections.namedtuple("OliBat",[oli,idinbat,batid])
 
-class OptiDistPerm: # pytest
+class OptiDistPerm:
     u'''
     optimize translational cost of permutation
     '''
@@ -28,8 +27,15 @@ class OptiDistPerm: # pytest
     dists:List[SciDist] = []
     @initdefaults()
     def __init__(self,**kwa):
-        # assert len(perm)==len(dists) # ??
-        self._epsi:float = 0.001*min([dists[i].std() for i  in perm])
+        pass
+
+    @property
+    def _epsi(self)->float:
+        try: 
+            return self._epsi
+        except AttributeError:
+            self.__setattr__("_epsi",0.001*min([dists[i].std() for i  in perm]))
+        return self._epsi
 
     def run(self)->numpy.ndarray:
         u'returns the PERMUTATED state which maximise the probability'
@@ -69,12 +75,15 @@ class ComputeStates:
     u'Computes possible permutation between'
     # if need to merge 2 by 2 batches, create BCollection of 2 batches?
     collection:BCollection=BCollection()
-    oligos:List[OligoPeak]=list() # self.oligos in __init__? overwritten in compute()???
     nscale:int=1
     ooverl:int=1
     __groups:List=list()
     def __init__(self,**kwa):
         pass
+
+    @property
+    def oligos(self):
+        return self.collection.oligos
 
     def __group_overlapping_oligos(self)->List[OligoPeak]:
         u'''
@@ -134,7 +143,6 @@ class ComputeStates:
                    -> just use brute force. to discard arrangements
         (5) returns the full list of arrangements to consider
         '''
-        self.oligos = self.collection.oligos
         groups = self.__group_overlapping_oligos()
 
         # move to BCollection 
@@ -156,14 +164,16 @@ class ComputeStates:
         # remove groups if there is not a representative of at least two batches
         self.__groups = [grp for grp in self.__groups if len(set(val[2] for val in grp))>1]
 
-        swaps = []
+        oswaps = []
         for grp in self.__groups:
             if len(grp)<2:
                 continue
-            grpswaps = _groupswaps_between_batches(grp)
-            swaps.extend(grpswaps)
+            grposwaps = _groupswaps_between_batches(grp)
+            oswaps.extend(grposwaps)
 
-        LOGS.debug("len(swaps)=%i", len(swaps))
+        LOGS.debug("len(oswaps)=%i", len(oswaps))
+        # translate oswaps to xstates
+            
         return swaps
 
         
@@ -212,7 +222,6 @@ def _groupswaps_between_batches(grp:List[OliBat]):
         * no arrangements between batches
     assumes that oligo indices within the batch are ordered
     '''
-    # the draft of the more general form
     bybat = dict()
     bids = sorted(set(i.batid for i in grp))
     lengths = []
@@ -226,21 +235,6 @@ def _groupswaps_between_batches(grp:List[OliBat]):
                                     lengths=lengths)
 
     swaps = [sorted(zip(comb,bybat),key=lambda x:x[0]) for comb in combs]
-
-    # 2 by 2 merging
-
-    #bids = list(set(i.batid for i in grp))
-    #assert len(bids)==2 # more general case not implemented yet
-    #grp1 = [i for i in grp if i.batid==bids[0]]
-    #grp2 = [i for i in grp if i.batid==bids[1]]
-    #combs = [sorted(it) for it in itertools.combinations(range(len(grp)),
-    #                                                   len(grp1))]
-    #swaps = []
-    #for comb in combs:
-    #    swap = list(grp2)
-    #    for index,val in enumerate(comb):
-    #        swap.insert(val,grp1[index])
-    #    swaps.append([i.oli for i in swap])
 
     return [[swp[1].oli for swp in swap] for swap in swaps]
 

@@ -50,7 +50,7 @@ class Oligo:
 class OligoPeak(Oligo):
     u'represents peaks obtained from sequencing experiment'
     batch_id:int=-1
-    dist=kwa.get("dist",None)# type: List
+    dist:SciDist=kwa.get("dist",None)# type: List
     poserr:float=-1.
     pos0:float=-1. # initial (experimental) position in nanometer
     bpos0:float=-1. # initial (experimental) base position
@@ -94,7 +94,7 @@ class BCollection:
     u'''
     Collection of batches
     '''
-    oligos:List[OligoPeak] = []
+    oligos:List[OligoPeak]=[]
     batches:List[Batch] = []
     @initdefaults
     def __init__(self,**kwa):
