@@ -2,29 +2,36 @@
 # -*- coding: utf-8 -*-
 "allows fencing multiple events between 2 *startaction* and *stopaction* events"
 
-from typing             import Callable
+from typing             import Callable, Optional, Tuple # pylint: disable=unused-import
 from functools          import wraps
 from inspect            import signature
 
 from utils.logconfig    import getLogger, logging
 LOGS = getLogger(__name__)
 
-def _m_defaults(fcn):
-    "returns default values for calls"
-    return (fcn.__code__.co_filename,
-            fcn.__code__.co_firstlineno,
-            fcn.__qualname__)
-
 class _Calls:
+    "Dummy class which delays calls to _m_defaults"
     def __init__(self, calls):
         self._calls = calls
 
     def __str__(self):
         if self._calls is None:
-            self._calls = ('?',)*3
-        elif not isinstance(self._calls, tuple):
-            self._calls = _m_defaults(self._calls)
-        return "%s@%s [%s]" % self._calls
+            self._calls = "!?!"
+
+        elif isinstance(self._calls, tuple):
+            self._calls = "%s@%s [%s]" % self._calls
+
+        elif hasattr(self._calls, '__code__'):
+            fcn  = self._calls # type: ignore
+            code = getattr(fcn, '__code__')
+            if code is not None:
+                self._calls = (getattr(code, 'co_filename', '?')      + "@"
+                               + getattr(code, 'co_firstlineno', '?') + " ["
+                               + getattr(fcn, '__qualname__', '')     + "]")
+            else:
+                self._calls = getattr(fcn, '__qualname__', '')
+
+        return self._calls
 
 class Action:
     """
@@ -126,20 +133,20 @@ class ActionDescriptor:
 
     def __call__(self, fcn, calls = None):
         if calls is None:
-            calls = _m_defaults(fcn)
+            calls = _Calls(fcn)
 
         if tuple(signature(fcn).parameters)[1:] == ('attr', 'old', 'new'):
             @wraps(fcn)
             def _wrap_cb(this, attr, old, new):
                 if self.test is None or self.test(new):
-                    with self.type(self, calls = calls):
+                    with self.type(this, calls = calls):
                         fcn(this, attr, old, new)
             return _wrap_cb
         else:
             @wraps(fcn)
             def _wrap_cb(this, *args, **kwa):
                 if self.test is None or self.test(*args, **kwa):
-                    with self.type(self, calls = calls):
+                    with self.type(this, calls = calls):
                         fcn(this, *args, **kwa)
             return _wrap_cb
 
@@ -148,10 +155,9 @@ class ActionDescriptor:
             # called as a class attribute: to be used as a decorator
             return self
 
+        calls = None # type: Optional[Tuple]
         if LOGS.getEffectiveLevel() == logging.DEBUG:
             # called as an instance attribute:
             # can be used as a context or a decorator
             calls = LOGS.findCaller()[:3]
-        else:
-            calls = ('?',)*3
         return self.type(obj, calls = calls, test = self.test)
