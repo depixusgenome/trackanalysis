@@ -16,11 +16,12 @@ def test_peaksplot(bokehaction):
     vals = [0.]*2
     def _printrng(evts):
         if 'y' in evts:
-            vals[:2] = evts['y'].value
+            vals[:2] = [0. if i is None else i for i in evts['y'].value]
     with bokehaction.launch('hybridstat.view.peaksplot.PeaksPlotView',
                             'app.BeadToolBar') as server:
         server.ctrl.observe("globals.project.plot.peaks", _printrng)
-        server.load('big_legacy')
+        server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
+        server.load('big_legacy', andstop = False)
 
         krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))
         def _press(val, *truth):
@@ -32,10 +33,10 @@ def test_peaksplot(bokehaction):
             if fig.extra_x_ranges['duration'].end is None:
                 server.wait()
         _press('Shift- ',         0.,       0.)
-        _press('Shift-ArrowUp',   0.220088, 0.379895)
-        _press('Alt-ArrowUp',     0.252049, 0.411856)
-        _press('Alt-ArrowDown',   0.220088, 0.379895)
-        _press('Shift-ArrowDown', -0.09952, 0.699508)
+        _press('Shift-ArrowUp',   0.319146, 0.478953)
+        _press('Alt-ArrowUp',     0.351107, 0.510914)
+        _press('Alt-ArrowDown',   0.319146, 0.478953)
+        _press('Shift-ArrowDown', 0.,       0.)
 
         src = server.widget['Peaks:List'].source
         assert all(np.isnan(src.data['distance']))

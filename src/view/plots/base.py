@@ -359,9 +359,10 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
             ret = await threadmethod(_reset)
 
             def _render():
-                with BokehView.computation.type(self, calls = self.__doreset):
-                    with self.resetting():
-                        self._bkmodels.update(ret)
+                if ret is not None:
+                    with BokehView.computation.type(self, calls = self.__doreset):
+                        with self.resetting():
+                            self._bkmodels.update(ret)
                 self._ctrl.handle('rendered', args = {'plot': self})
 
             self._doc.add_next_tick_callback(_render)

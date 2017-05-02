@@ -18,9 +18,7 @@ def test_cyclesplot(bokehaction):
     with bokehaction.launch('cyclesplot.CyclesPlotView', 'app.BeadToolBar') as server:
         server.ctrl.getGlobal('config').tasks.default = []
         server.ctrl.observe("globals.project.plot.cycles", _printrng)
-        def _wait(*_1, **_2):
-            server.wait()
-        server.ctrl.observe("rendered", _wait)
+        server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
         server.load('big_legacy', andstop = False)
 
         krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))

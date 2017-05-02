@@ -414,16 +414,9 @@ class PeaksStatsWidget(WidgetCreator):
         return [self.__widget]
 
     def reset(self, resets):
+        itm  = self.__widget if resets is None else resets[self.__widget]
         data = self.__data()
-        if len(data) == 1:
-            txt = next(iter(data.values()))
-        else:
-            txt = data[self._model.sequencekey]
-        if resets is None:
-            self.__widget.update(data = data, text = txt)
-        else:
-            resets[self.__widget].update(data = data, text = txt)
-
+        itm.update(data = data, text = data.get(self._model.sequencekey, data['']))
 
     class _TableConstructor:
         "creates the html table containing stats"
@@ -477,19 +470,15 @@ class PeaksStatsWidget(WidgetCreator):
     def __data(self) -> Dict[str,str]:
         tab = self._TableConstructor(self.css)
         tab.trackdependant(self._model)
+        ret = {'': tab()}
 
         if self._model.identification.task is not None:
-            ret  = dict()
             dist = self._model.distances
             for key in readsequence(self._model.sequencepath):
-                if key not in dist:
-                    continue
-
-                tab.sequencedependant(self._model, dist, key)
-                ret[key] = tab()
-            return ret
-        else:
-            return {'': tab()}
+                if key in dist:
+                    tab.sequencedependant(self._model, dist, key)
+                    ret[key] = tab()
+        return ret
 
 class PeakListWidget(WidgetCreator):
     "Table containing stats per peaks"
@@ -678,7 +667,7 @@ class PeaksPlotCreator(TaskPlotCreator):
             widget.reset(self._bkmodels)
 
         self.setbounds(self._fig.y_range, 'y', (data['z'][0], data['z'][-1]))
-        self._hover.pyslaveaxes(self._fig, peaks, self._bkmodels)
+        #self._hover.pyslaveaxes(self._fig, peaks, self._bkmodels)
 
     def __create_fig(self):
         self._fig = figure(**self._figargs(y_range = Range1d,
