@@ -257,9 +257,10 @@ class _ManagedServerLoop:
                 fcn(*args, **kwargs)
                 self.loop.call_later(andwaiting, self.loop.stop)
         else:
-            _cmd = fcn
+            _cmd = lambda: fcn(*args, **kwargs)
         self.doc.add_next_tick_callback(_cmd)
-        self.loop.start()
+        if not self.loop._running: # pylint: disable=protected-access
+            self.loop.start()
 
     def wait(self, time = 2.):
         "wait some more"
@@ -299,7 +300,7 @@ class _ManagedServerLoop:
         if src is None:
             for root in self.doc.roots:
                 if isinstance(root, KeyPressManager):
-                    self.cmd(self.loading.press, key, root)
+                    self.cmd(self.loading.press, key, root, **kwa)
                     break
             else:
                 raise KeyError("Missing KeyPressManager in doc.roots")

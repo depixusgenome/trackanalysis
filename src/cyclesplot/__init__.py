@@ -56,7 +56,9 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, ConfigMixin):
 
     def _reset(self):
         shape = self._resetraw()
-        self._resethist(self._bkmodels[self._rawsource]['data'], shape)
+        data  = self._bkmodels[self._rawsource]['data']
+        self._resethist(data, shape)
+        self.setbounds(self._hist.y_range, 'y', data['z'])
         self._resetconfig()
 
     def observe(self):

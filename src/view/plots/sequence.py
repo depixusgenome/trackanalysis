@@ -10,7 +10,7 @@ import  numpy   as np
 import  bokeh.core.properties as props
 from    bokeh.models    import (LinearAxis,      # pylint: disable=unused-import
                                 Model, ColumnDataSource, Range1d,
-                                ContinuousTicker, BasicTicker, Ticker,
+                                BasicTicker, Ticker,
                                 Dropdown, Paragraph, AutocompleteInput,
                                 CustomJS, Widget)
 
@@ -44,38 +44,34 @@ def estimatebias(position: np.ndarray, cnt: np.ndarray) -> float:
                         key     = cnt.__getitem__,
                         default = (ind1+ind2)//2)]
 
-class SequenceTicker(ContinuousTicker):
+class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
     "Generate ticks at fixed, explicitly supplied locations."
     major      = props.Dict(props.String, props.Seq(props.Float), default = {'': []})
     minor      = props.Dict(props.String, props.Seq(props.Float), default = {'': []})
     key        = props.String(default = '')
     usedefault = props.Bool(default = True)
-    base       = props.Instance(Ticker, default = BasicTicker())
 
     __implementation__ = """
-        import {ContinuousTicker} from "models/tickers/continuous_ticker"
+        import {BasicTicker} from "models/tickers/basic_ticker"
         import *             as p from "core/properties"
 
-        export class SequenceTicker extends ContinuousTicker
+        export class SequenceTicker extends BasicTicker
             type: 'SequenceTicker'
 
             @define {
                 major:      [ p.Any, {} ]
                 minor:      [ p.Any, {} ]
                 key:        [ p.String, '']
-                usedefault: [ p.Bool,     true]
-                base:       [ p.Instance, null]
             }
 
             get_ticks_no_defaults: (data_low, data_high, cross_loc, desired_n_ticks) ->
-                if @usedefault
-                    return @base.get_ticks_no_defaults(data_low, data_high,
-                                                       cross_loc, desired_n_ticks)
-
-                return {
-                    major: @major[@key]
-                    minor: @minor[@key]
-                }
+                if @key not in @major
+                    return super(data_low, data_high, cross_loc, desired_n_ticks)
+                else
+                    return {
+                        major: @major[@key]
+                        minor: @minor[@key]
+                    }
     """
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -94,15 +90,23 @@ class SequenceTicker(ContinuousTicker):
         "Sets the ticks according to the configuration"
         self.__model = mdl
         self.__fig   = fig
-        if fig.ygrid[0].minor_grid_line_color is None:
-            # bokehjs will never draw minor lines unless the color is
-            # is set at startup
-            fig.ygrid[0].minor_grid_line_color = 'navy'
-            fig.ygrid[0].minor_grid_line_alpha = 0.
+        self.__axis  = type(self)()
+
+        fig.extra_y_ranges        = {"bases": Range1d(start = 0., end = 1.)}
+        fig.add_layout(LinearAxis(y_range_name = "bases",
+                                  axis_label   = cnf.css.yrightlabel.get(),
+                                  ticker       = self.__axis),
+                       'right')
+
+        # bokehjs will never draw minor lines unless the color is
+        # is set at startup
+        fig.ygrid[0].update(minor_grid_line_color = 'navy',
+                            minor_grid_line_alpha = 0.,
+                            ticker                = self,
+                            y_range_name          = 'bases')
 
         order  = tuple('grid_line_'+i for i in ('color', 'width', 'dash', 'alpha'))
         order += tuple('minor_'+i for i in order)  # type: ignore
-        order += 'y_range_name',                   # type: ignore
         self.__defaults = {i: getattr(fig.ygrid[0], i) for i in order}
 
         self.__withbase = dict()
@@ -110,18 +114,6 @@ class SequenceTicker(ContinuousTicker):
             gridprops = cnf.css.grid[cnf.css.theme.get()][name].get()
             self.__withbase['grid_line_'+name]       = gridprops[0]
             self.__withbase['minor_grid_line_'+name] = gridprops[1]
-
-        fig.extra_y_ranges        = {"bases": Range1d(start = 0., end = 1.)}
-        fig.ygrid[0].ticker       = self
-        fig.ygrid[0].y_range_name = 'bases'
-
-        if self.__axis is None:
-            self.__axis = type(self)()
-
-        fig.add_layout(LinearAxis(y_range_name = "bases",
-                                  axis_label   = cnf.css.yrightlabel.get(),
-                                  ticker       = self.__axis),
-                       'right')
 
     @staticmethod
     def defaultconfig(mdl):
@@ -137,28 +129,24 @@ class SequenceTicker(ContinuousTicker):
 
     def reset(self, resets):
         "Updates the ticks according to the configuration"
-        mdl = self.__model
-        fig = self.__fig
-        key = mdl.sequencekey if len(mdl.oligos) else None
-
-        if key is None:
-            resets[self]['usedefault']        = True
-            resets[self.__axis]['usedefault'] = True
+        mdl    = self.__model
+        fig    = self.__fig
+        key    = mdl.sequencekey if len(mdl.oligos) else 'NONE'
+        majors = {}
+        minors = {}
+        if key == 'NONE':
             resets[fig.ygrid[0]].update(self.__defaults)
         else:
-            majors = {}
-            minors = {}
+            resets[fig.ygrid[0]].update(self.__withbase)
             for name, seq in readsequence(mdl.sequencepath).items():
                 peaks        = sequences.peaks(seq, mdl.oligos)
                 majors[name] = tuple(peaks['position'][peaks['orientation']])
                 minors[name] = tuple(peaks['position'][~peaks['orientation']])
 
-            resets[self].update(major = majors, minor = minors, key = key,
-                                usedefault = False)
-            resets[self.__axis].update(major = {i: majors[i]+minors[i] for i in majors},
-                                       minor = dict.fromkeys(majors.keys(), tuple()),
-                                       key   = key, usedefault = False)
-            resets[fig.ygrid[0]].update(self.__withbase)
+        resets[self].update(major = majors, minor = minors, key = key)
+        resets[self.__axis].update(major = {i: majors[i]+minors[i] for i in majors},
+                                   minor = dict.fromkeys(majors.keys(), tuple()),
+                                   key   = key)
 
 class SequenceHoverMixin:
     "controls keypress actions"

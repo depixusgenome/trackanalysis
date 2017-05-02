@@ -124,5 +124,3 @@ class HistMixin:
         self._ticker.reset(self._bkmodels)
 
         self._bkmodels[self._histsource]['data'] = hist
-
-        self._hover.slaveaxes(self._hist, hist, self._bkmodels)

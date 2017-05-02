@@ -363,7 +363,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                 with BokehView.computation.type(self, calls = self.__doreset):
                     for i, j in ret:
                         i.update(**j)
-                    self._ctrl.handle('rendered', args = {'plot': self})
+                self._ctrl.handle('rendered', args = {'plot': self})
 
             self._doc.add_next_tick_callback(_render)
 

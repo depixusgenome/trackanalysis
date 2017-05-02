@@ -123,34 +123,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         "Creates the hover tool for histograms"
         self.create(fig, mdl, cnf, 'cycles')
 
-    def slaveaxes(self, fig, src, inpy = None): # pylint: disable=arguments-differ
-        "slaves a histogram's axes to its y-axis"
-        if inpy is None:
-            self.__jsslaveaxes(fig, src)
-        else:
-            self.__pyslaveaxes(fig, src, inpy)
-
-    def __pyslaveaxes(self, fig, src, inpy):
-        "slaves a histogram's axes to its y-axis in py"
-        yrng = fig.y_range
-        mdl  = self._model
-        inpy[fig.extra_y_ranges['bases']].update(start = (yrng.start - mdl.bias)*mdl.stretch,
-                                                 end   = (yrng.end   - mdl.bias)*mdl.stretch)
-
-        bottom = src['bottom']
-        if len(bottom) < 2:
-            ind1 = 1
-            ind2 = 0
-        else:
-            delta = bottom[1]-bottom[0]
-            ind1  = min(len(bottom), max(0, int((yrng.start-bottom[0])/delta-1)))
-            ind2  = min(len(bottom), max(0, int((yrng.end  -bottom[0])/delta+1)))
-
-        get = lambda name: (0. if ind1 >= ind2 else max(src[name][ind1:ind2])+1)
-        inpy[fig.extra_x_ranges['cycles']].update(start = 0., end = get('cycles'))
-        inpy[fig.x_range]                 .update(start = 0., end = get('frames'))
-
-    def __jsslaveaxes(self, fig, src):
+    def slaveaxes(self, fig, src):
         "slaves a histogram's axes to its y-axis"
         # pylint: disable=too-many-arguments,protected-access
         hvr = self

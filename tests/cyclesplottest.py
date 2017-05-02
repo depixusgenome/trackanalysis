@@ -18,7 +18,10 @@ def test_cyclesplot(bokehaction):
     with bokehaction.launch('cyclesplot.CyclesPlotView', 'app.BeadToolBar') as server:
         server.ctrl.getGlobal('config').tasks.default = []
         server.ctrl.observe("globals.project.plot.cycles", _printrng)
-        server.load('big_legacy')
+        def _wait(*_1, **_2):
+            server.wait()
+        server.ctrl.observe("rendered", _wait)
+        server.load('big_legacy', andstop = False)
 
         krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))
         def _press(val, *truth):
@@ -32,19 +35,17 @@ def test_cyclesplot(bokehaction):
         assert fig.x_range.end                  > 2000.
         assert fig.extra_x_ranges['cycles'].end > 30.
 
-        _press('Shift- ',           0., 0.)
-
-
+        _press('Shift- ',         -0.153668, 0.876528)
         _press('Shift-ArrowUp',    0.258410, 0.464449)
         assert fig.x_range.end                  == approx(103, abs=.1)
         assert fig.extra_x_ranges['cycles'].end == approx(4,   abs=.1)
-
         _press('Alt-ArrowUp',       0.299618, 0.505657)
         _press('Alt-ArrowDown',     0.258410, 0.464449)
         _press('Shift-ArrowDown',  -0.153668, 0.876528)
+
         curr = server.ctrl.getGlobal("project")
         assert curr.bead in (None, 0)
-        server.press('PageUp')
+        server.press('PageUp', andstop = False)
         assert curr.bead == 1
 
         server.change('Cycles:Oligos', 'value', ' TGGC  , aatt')
@@ -83,7 +84,8 @@ def test_cyclesplot2(bokehaction):
 
     with bokehaction.launch('cyclesplot.CyclesPlotView', 'app.BeadToolBar') as server:
         server.ctrl.getGlobal('config').tasks.default = []
-        server.load('big_legacy')
+        server.ctrl.observe("rendered", lambda *_1, **_2: server.wait)
+        server.load('big_legacy', andstop = False)
 
         fig  = server.widget['Cycles:Hist']()
         assert fig.extra_x_ranges['cycles'].end < 50
