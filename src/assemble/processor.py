@@ -7,6 +7,7 @@ regroups functions and classes to complement assembler
 
 import itertools
 from typing import List # pylint: disable=unused-import
+import collections
 import numpy
 from utils.logconfig import getLogger
 from utils import initdefaults
@@ -15,6 +16,9 @@ from . import data
 from ._types import SciDist
 
 LOGS = getLogger(__name__)
+
+#OliBat = collections.namedtuple("OliBat",[oli:OligoPeak,idinbat:int,batid:int])
+OliBat = collections.namedtuple("OliBat",[oli,idinbat,batid])
 
 class OptiDistPerm: # pytest
     u'''
@@ -65,11 +69,52 @@ class ComputeStates:
     u'Computes possible permutation between'
     # if need to merge 2 by 2 batches, create BCollection of 2 batches?
     collection:BCollection=BCollection()
+    oligos:List[OligoPeak]=list() # self.oligos in __init__? overwritten in compute()???
     nscale:int=1
     ooverl:int=1
+    __groups:List=list()
     def __init__(self,**kwa):
         pass
-    def compute()->numpy.ndarray:
+
+    def __group_overlapping_oligos(self)->List[OligoPeak]:
+        u'''
+        returns groups of overlapping oligos
+        '''
+        groups = group_overlapping_normdists([oli.dist for oli in oligos],nscale=self.nscale)[1]
+        return [[oligos[idx] for idx in grp] for grp in groups]
+
+    def __group_matching(self,groups:list[OliBat])->list[OliBat]: # to check
+        u'''
+        a grp is a list of tuples (oligo,oligo index, batch id)
+        returns a list of list of (oligo,oligo index, batch id)
+        each oligo in a list has ooverl bases with at least another oligo in the same list
+        defines rule to swap n-oligos with ooverl overlapping bases
+        '''
+        # if two oligos are in the same batch they should at least have ooverl overlaps
+        # do we put them in the same cluster?
+        # yes, we compute arrangements between batches afterwards
+
+        clusters = []
+
+        for grp in groups:
+            seed = set([grp[0].oli.seq[:self.ooverl],grp[0].oli.seq[-self.ooverl:]])
+            seed = _update_seed(self.ooverl,seed,grp)
+            pergrp = [[elmt for elmt in grp if elmt.oli.seq[:self.ooverl] in seed or\
+                       elmt[0].seq[-self.ooverl:] in seed]]
+            seedsingrp = set(seed)
+            while sum(len(i) for i in pergrp)!=len(grp):
+                # pick a new seed not in seed and restart
+                seed = [set([elmt[0].seq[:ooverl],elmt[0].seq[-ooverl:]])\
+                        for elmt in grp if not elmt[0].seq[:ooverl] in seedsingrp][0]
+                seed = _update_seed(ooverl,seed,grp)
+                pergrp+=[[elmt for elmt in grp\
+                            if elmt[0].seq[:ooverl] in seed or elmt[0].seq[-ooverl:] in seed]]
+                seedsingrp.update(seed)
+
+            clusters += pergrp
+        return clusters
+
+    def compute(self)->numpy.ndarray:
         # cf find_swaps
         # CAREFUL, misinterpretation of what this function returns.
         # the swap is the new arrangement of peak ids.
@@ -89,32 +134,30 @@ class ComputeStates:
                    -> just use brute force. to discard arrangements
         (5) returns the full list of arrangements to consider
         '''
-        oligos = self.collection.oligos
-        groups = _group_overlapping_oligos(oligos,nscale=self.nscale)
+        self.oligos = self.collection.oligos
+        groups = self.__group_overlapping_oligos()
 
+        # move to BCollection 
         infogrp=[]
         for grp in groups:
             info=[]
             for val in grp:
                 for idx,bat in enumerate(self.batches):
                     if val in bat.oligos:
-                        info.append((val,bat.oligos.index(val),idx))
+                        info.append(OliBat(val,bat.oligos.index(val),idx))
                         break
             infogrp.append(info)
 
         LOGS.debug("before clustering, %i",len(infogrp))
-        finer = []
-        for grp in infogrp:
-            finer += _cluster_overlapping(ooverl,grp)
-        infogrp = list(finer)
-        LOGS.debug("after clustering, %i",len(infogrp))
+        self.__groups = self.__group_matching(infogrp)
+        LOGS.debug("after clustering, %i",len(self.groupping))
         # generate all arrangements between batches excluding within batch swaps
-        swaps = []
 
         # remove groups if there is not a representative of at least two batches
-        infogrp = [grp for grp in infogrp if len(set(val[2] for val in grp))>1]
+        self.__groups = [grp for grp in self.__groups if len(set(val[2] for val in grp))>1]
 
-        for grp in infogrp:
+        swaps = []
+        for grp in self.__groups:
             if len(grp)<2:
                 continue
             grpswaps = _groupswaps_between_batches(grp)
@@ -124,7 +167,6 @@ class ComputeStates:
         return swaps
 
         
-# continue from here
 def _group_overlapping_normdists(dists,nscale=1): # to pytest !! # what if no intersection?
     u'''
     returns lists of indices [(i,j,k)] each element of the tuple has distribution which overlap
@@ -159,7 +201,7 @@ def _group_overlapping_normdists(dists,nscale=1): # to pytest !! # what if no in
 #    * arrangements between oligos if overlap between oligos is osize-1
 # can create a grp object to avoid confusion with regard to the order of the elements in the tuple
 
-def _groupswaps_between_batches(grp):
+def _groupswaps_between_batches(grp:List[OliBat]):
     # can be made more general to include simultaneous
     # merging of more than 2 batches (when necessary)
     # remove swaps which do not satisfy min_overl rule
@@ -169,48 +211,38 @@ def _groupswaps_between_batches(grp):
         * at least min_overl overlapping bases between consecutive oligos
         * no arrangements between batches
     assumes that oligo indices within the batch are ordered
-
-    # the draft of the more general form
-    import queue
-    fifos=[]
-    for bid in set([i[2] for i in grp]):
-        toqueue = sorted([elm for elm in grp if elm[2]==bid],
-                         key=lambda x : x[1])
-        fifo=queue.PriorityQueue()
-        for elm in toqueue:
-            fifo.put(elm)
-        fifos.append(fifo)
-
-
-    prange = []
-    for idx,fifo in enumerate(fifos):
-        prange+=[idx]*fifo.qsize()
-
-    swaps=[]
-    # for comb in itertools.permutations(prange):
-    # continue from here
-    for comb in itertools.combinations(range(len(grp)),len([i for i in grp if i[2]==val])):
-        indices = list(range(len(grp)))
-        for idx,val in enumerate(subs):
-            swap.append()
-            # remove indices in swap[-1]
-            for i in swap[-1]:
-                indices.remove(i)
-                swaps.append(swap)
     '''
-    bids = list(set(i[2] for i in grp))
-    grp1=[i for i in grp if i[2]==bids[0]]
-    grp2=[i for i in grp if i[2]==bids[1]]
-    combs=[sorted(it) for it in itertools.combinations(range(len(grp)),
-                                                       len(grp1))]
-    swaps=[]
-    for comb in combs:
-        swap=list(grp2)
-        for index,val in enumerate(comb):
-            swap.insert(val,grp1[index])
-        swaps.append([i[0] for i in swap])
+    # the draft of the more general form
+    bybat = dict()
+    bids = sorted(set(i.batid for i in grp))
+    lengths = []
+    for bid in  bids:
+        lengths.append(len([elm for elm in grp if elm.batid==bid]))
+        
+    bybat=sorted(grp,key=lambda x:(x.batid,x.idinbat))
 
-    return swaps
+
+    combs=combinationsbetweengroups(set(range(len(grp))),
+                                    lengths=lengths)
+
+    swaps = [sorted(zip(comb,bybat),key=lambda x:x[0]) for comb in combs]
+
+    # 2 by 2 merging
+
+    #bids = list(set(i.batid for i in grp))
+    #assert len(bids)==2 # more general case not implemented yet
+    #grp1 = [i for i in grp if i.batid==bids[0]]
+    #grp2 = [i for i in grp if i.batid==bids[1]]
+    #combs = [sorted(it) for it in itertools.combinations(range(len(grp)),
+    #                                                   len(grp1))]
+    #swaps = []
+    #for comb in combs:
+    #    swap = list(grp2)
+    #    for index,val in enumerate(comb):
+    #        swap.insert(val,grp1[index])
+    #    swaps.append([i.oli for i in swap])
+
+    return [[swp[1].oli for swp in swap] for swap in swaps]
 
 def _update_seed(ooverl,seed,grp):
     nseed = 0
@@ -225,32 +257,8 @@ def _update_seed(ooverl,seed,grp):
                 continue
     return seed
 
-def _cluster_overlapping(ooverl:int,grp): # to check
-    u'''
-    a grp is a list of tuples (oligo,oligo index, batch id)
-    returns a list of list of (oligo,oligo index, batch id)
-    each oligo in a list has ooverl bases with at least another oligo in the same list
-    defines rule to swap n-oligos with ooverl overlapping bases
-    '''
-    # if two oligos are in the same batch they should at least have ooverl overlaps
-    # do we put them in the same cluster? yes, we compute arrangements between batches afterwards
-    seed = set([grp[0][0].seq[:ooverl],grp[0][0].seq[-ooverl:]])
-    seed = _update_seed(ooverl,seed,grp)
-    clusters = [[elmt for elmt in grp\
-                if elmt[0].seq[:ooverl] in seed or elmt[0].seq[-ooverl:] in seed]]
-    allseeds=set(seed)
-    while sum(len(i) for i in clusters)!=len(grp):
-        # pick a new seed not in seed and restart
-        seed = [set([elmt[0].seq[:ooverl],elmt[0].seq[-ooverl:]])\
-                for elmt in grp if not elmt[0].seq[:ooverl] in allseeds][0]
-        seed = _update_seed(ooverl,seed,grp)
-        clusters+=[[elmt for elmt in grp\
-                    if elmt[0].seq[:ooverl] in seed or elmt[0].seq[-ooverl:] in seed]]
-        allseeds.update(seed)
 
-    return clusters
-
-def optimal_perm_normdists(perm:List,dists:List)->numpy.ndarray: # pytest
+def optimal_perm_normdists(perm:List,dists:List[SciDist])->numpy.ndarray: # pytest
     u'''
     given a permutation perm and the known distributions of each state
     returns the PERMUTATED state which maximise the probability
@@ -267,11 +275,16 @@ def optimal_perm_normdists(perm:List,dists:List)->numpy.ndarray: # pytest
     fun = CostPermute(dists,perm)
     return scipy.optimize.minimize(fun,xinit,constraints=constraints).x
 
-def group_overlapping_oligos(oligos,nscale=1):
+
+def combinationsbetweengroups(indices:Set[int],lengths:List[int]):
     u'''
-    returns groups of overlapping oligos
+    returns the product of combinations of size lengths
+    C(lengths[0],indices)*C(lengths[1],indices)*...
     '''
-    groups = group_overlapping_normdists([oli.dist for oli in oligos],nscale=nscale)[1]
-    return [[oligos[idx] for idx in grp] for grp in groups]
+    combs=[]
+    if len(lengths)==1:
+        return [sorted(indices)]
+    for comb in itertools.combinations(indices,lengths[0]):
+        combs+=[list(comb)+i for i in combinationsbetweengroups(indices-set(comb),lengths[1:])]
 
-
+    return combs
