@@ -137,7 +137,7 @@ class DataFrame(_DataFrame):
         if len(cols) != len(args):
             raise KeyError('missing columns %s in file'
                            % (set(name for name, _ in cols) - set(args)),
-                           "treated")
+                           "warning")
 
         vals = dict((name, []) for name , iC in cols)
         inds = []

@@ -74,7 +74,7 @@ class _GrFilesIOMixin:
 
         track = self._track
         if track is None:
-            raise IOError(u"IOError: start by opening a track file!", "treated")
+            raise IOError(u"IOError: start by opening a track file!", "warning")
 
         return ((track.path,) if isinstance(track.path, str) else track.path) + path
 

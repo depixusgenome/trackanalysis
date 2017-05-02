@@ -96,26 +96,27 @@ class ToolBar(BokehView): # pylint: disable=too-many-instance-attributes
         working = self._ctrl.getGlobal('css').title.working.get()
         catch   = self._ctrl.getGlobal('config').catcherror.toolbar
 
-        def _onstartaction(recursive = None):
+        @self._ctrl.observe
+        def _onstartaction(recursive = None):      # pylint: disable=unused-variable
             if not recursive:
                 msg.set((working, 'normal'))
-        self._ctrl.observe("startaction", "startcomputation", _onstartaction)
 
-        def _onstopaction(recursive = None, value = None, catcherror = None, **_):
+        @self._ctrl.observe
+        def _onstartcomputation(recursive = None): # pylint: disable=unused-variable
+            if not recursive and msg.get()[1] == 'normal':
+                msg.set((working, 'normal'))
+
+        def _observer(recursive = None, value = None, catcherror = None, **_):
             if not recursive:
                 if value is None:
                     if working == msg.get()[0]:
                         msg.set(('', 'normal'))
-                    return
-
-                if len(getattr(value, 'args', [])) == 2 and value.args[1] == 'treated':
-                    msg.set((str(value.args[0]), 'warning'))
-
                 else:
-                    msg.set((str(value), 'error'))
+                    args = value.args
 
-                catcherror[0] = catch.get()
-        self._ctrl.observe("stopaction", "stopcomputation", _onstopaction)
+                    msg.set((str(args[0]), args[1] if len(args) > 1 else 'error'))
+                    catcherror[0] = catch.get()
+        self._ctrl.observe("stopaction", "stopcomputation", _observer)
 
         templ = self._ctrl.getGlobal('config').message.getdict(..., fullnames = False)
         curr  = threading.current_thread().ident

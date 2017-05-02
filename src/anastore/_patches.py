@@ -32,5 +32,5 @@ class Patches:
                 data = fcn(data)
 
         elif vers > self.version:
-            raise IOError("Anastore file version is too high", "treated")
+            raise IOError("Anastore file version is too high", "warning")
         return data

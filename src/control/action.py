@@ -25,9 +25,9 @@ class _Calls:
             fcn  = self._calls # type: ignore
             code = getattr(fcn, '__code__')
             if code is not None:
-                self._calls = (getattr(code, 'co_filename', '?')      + "@"
-                               + getattr(code, 'co_firstlineno', '?') + " ["
-                               + getattr(fcn, '__qualname__', '')     + "]")
+                self._calls = "%s@%s [%s]" % (getattr(code, 'co_filename', '?'),
+                                              getattr(code, 'co_firstlineno', '?'),
+                                              getattr(fcn, '__qualname__', ''))
             else:
                 self._calls = getattr(fcn, '__qualname__', '')
 
@@ -62,7 +62,7 @@ class Action:
             LOGS.debug("done action %s", self._calls)
 
         elif val is not None:
-            if errvalue[0] and (len(val.args) != 2 or val.args[1] != 'treated'):
+            if errvalue[0] and (len(val.args) != 2 or val.args[1] != 'warning'):
                 LOGS.error("failed action %s", self._calls)
                 LOGS.exception(val)
             else:

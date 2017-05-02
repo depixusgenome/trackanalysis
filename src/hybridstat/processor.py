@@ -168,7 +168,7 @@ class HybridstatProcessor(Processor):
                             for i in match.groups()]
 
             raise KeyError("Could not find oligo names in {}".format(trkpath),
-                           "treated")
+                           "warning")
         return oligos
 
     @classmethod
@@ -199,7 +199,7 @@ class HybridstatProcessor(Processor):
                                   path        = paths.reporting)
         if '*' in rep.path:
             if rep.path.count('*') > 1:
-                raise KeyError("could not parse excel output path", "treated")
+                raise KeyError("could not parse excel output path", "warning")
             trk         = track.path[0] if isinstance(track.path, tuple) else track.path
             rep.path    = rep.path.replace('*', Path(trk).stem)
         return rep
