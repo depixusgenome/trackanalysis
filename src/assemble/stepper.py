@@ -92,7 +92,7 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
         print("len(swaps)=",len(swaps))
         with open("swaps.pickle","wb") as testfile:
             pickle.dump(swaps,testfile)
-        self.perms = from_swaps2perms(swaps)
+        self.perms = [] #from_swaps2perms(swaps)
 
     def __call__(self,xst):
         u'''
@@ -132,7 +132,7 @@ class Swap:
     u'''defines a swap
     already takes into account batch contraints
     '''
-    def __init__(self,swap:Tuple):
+    def __init__(self,swap:Tuple)->None:
         self.swap=swap
     def to_perm(self,size):
         u'returns Perm'
@@ -142,7 +142,7 @@ class Swap:
 
 class Perm:
     u'class to permutation'
-    def __init__(self,size):
+    def __init__(self,size:int)->None:
         self.size=size
         self.perm=numpy.array(range(size)) # defaults to neutral permutation
 

@@ -4,7 +4,7 @@ u'''
 Creates Classes and function to use with assemble sequence
 '''
 
-from typing import Callable
+from typing import Callable # pylint: disable=unused-import
 
 def shifted_overlap(ol1:str,ol2:str,shift=0)->str:
     u'''
@@ -112,6 +112,7 @@ class Batch:
         del other.oligos
 
 class CallFalse:
+    u'returns False at each call'
     def __call__(self,*args,**kwargs):
         return False
 # enum for rules retriction
@@ -123,9 +124,8 @@ class BatchModel:
         self.oligos=sorted(oligos,key=lambda x:getattr(x,sort_by))
         self.batches=[]
         self.can_peak_flip=kwa.get("flip_rule",CallFalse()) # type:Callable
-        
+
     def batch_by(self,attr="seq"):
         u'create Batch with groups of similar "attr" value'
         grps = {getattr(oli,attr) for oli in self.oligos}
         self.batches=[[oli for oli in self.oligos if getattr(oli,attr)==grp] for grp in grps]
-

@@ -4,29 +4,28 @@ u'''
 Creates Classes and function to use with assemble sequence
 '''
 from typing import List
-from utils import initdefaults
 import itertools
+from utils import initdefaults
+from ._types import SciDist # pylint: disable=unused-import
 
 class Oligo:
     u'''
     container for an oligo sequence, a position in nanometer
     and a position in base
     '''
-    seq:str=""
-    pos:int=-1
-    bpos:int=-1 # base position
+    seq="" # type: str
+    pos=-1 # type: int
+    bpos=-1 # type: int # base position
     @initdefaults
     def __init__(self,**kwa):
         pass
     @property
     def size(self):
+        u'returns len(seq)'
         return len(self.seq)
 
-    def overlap_with(self,other:Oligo):
-        Oligo.__tail_overlap(self.seq,other.seq)
-
     @staticmethod
-    def __tail_overlap(ol1:str, ol2:str)->str:
+    def tail_overlap(ol1:str, ol2:str)->str:
         u'''
         returns the end sequence of ol1 matching the start of ol2
         '''
@@ -46,14 +45,16 @@ class Oligo:
             if seq[i:]==self.seq[:len(seq)-i]:
                 return seq[:i]+self.seq
         return seq+self.seq
-        
+
 class OligoPeak(Oligo):
     u'represents peaks obtained from sequencing experiment'
-    batch_id:int=-1
-    dist:SciDist=kwa.get("dist",None)# type: List
-    poserr:float=-1.
-    pos0:float=-1. # initial (experimental) position in nanometer
-    bpos0:float=-1. # initial (experimental) base position
+    batch_id = -1 # type: int
+    dist = None # type: SciDist
+    poserr = -1. # type: float
+    # initial (experimental) position in nanometer
+    pos0 = -1. # type : float
+    # initial (experimental) base position
+    bpos0 = -1. # type : float
     @initdefaults
     def __init__(self,**kwa):
         super().__init__(**kwa)
@@ -62,8 +63,8 @@ class Batch:
     u'''
     Container for Oligo
     '''
-    oligos:List[OligoPeak]=[]
-    index:int=-1
+    oligos=[] # type: List[OligoPeak]
+    index=-1 # type: int
     @initdefaults
     def __init__(self,**kwa):
         pass
@@ -83,9 +84,9 @@ class Batch:
         oli1 = set(oli.seq for oli in self.oligos)
         oli2 = set(oli.seq for oli in other.oligos)
         for ite in itertools.product(oli1,oli2):
-            if len(Oligo.__tail_overlap(ite[0],ite[1]))>=min_overl:
+            if len(Oligo.tail_overlap(ite[0],ite[1]))>=min_overl:
                 return True
-            if len(Oligo.__tail_overlap(ite[1],ite[0]))>=min_overl:
+            if len(Oligo.tail_overlap(ite[1],ite[0]))>=min_overl:
                 return True
 
         return False
@@ -94,15 +95,16 @@ class BCollection:
     u'''
     Collection of batches
     '''
-    oligos:List[OligoPeak]=[]
-    batches:List[Batch] = []
+    oligos = [] # type: List[OligoPeak]
+    batches = [] # type: List[Batch]
     @initdefaults
     def __init__(self,**kwa):
         pass
 
-    def from_oligos(self,oligos): # read process (to processor)?
-        u''
+    @classmethod
+    def from_oligos(cls,oligos:List[OligoPeak],attr="seq"): # read process (to processor)?
+        u'from a list of OligoPeaks, creates BCollection'
         grps= {getattr(oli,attr) for oli in oligos}
-        batches=[Batch(oligos=[oli for oli in self.oligos if getattr(oli,attr)==grp],index=idx)
+        batches=[Batch(oligos=[oli for oli in oligos if getattr(oli,attr)==grp],index=idx)
                  for idx,grp in enumerate(grps)]
-        self.__init__(oligos=oligos,batches=batches)
+        return cls(oligos=oligos,batches=batches)

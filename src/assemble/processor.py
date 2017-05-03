@@ -6,35 +6,39 @@ regroups functions and classes to complement assembler
 '''
 
 import itertools
-from typing import List # pylint: disable=unused-import
-import collections
+from typing import List, Tuple, Set, NamedTuple # pylint: disable=unused-import
+import scipy
 import numpy
+
 from utils.logconfig import getLogger
 from utils import initdefaults
 
+from . import _utils as utils
 from . import data
 from ._types import SciDist
 
 LOGS = getLogger(__name__)
 
-OliBat = collections.namedtuple("OliBat",[oli,idinbat,batid])
+OliBat = NamedTuple("OliBat",[("oli",data.OligoPeak),
+                              ("idinbat",int),
+                              ("batid",int)])
 
 class OptiDistPerm:
     u'''
     optimize translational cost of permutation
     '''
-    perm:Tuple[int] = ()
-    dists:List[SciDist] = []
+    perm = (-1,) # type: Tuple[int]
+    dists = [] # type: List[SciDist]
     @initdefaults()
     def __init__(self,**kwa):
         pass
 
     @property
     def _epsi(self)->float:
-        try: 
+        try:
             return self._epsi
         except AttributeError:
-            self.__setattr__("_epsi",0.001*min([dists[i].std() for i  in perm]))
+            self.__setattr__("_epsi",0.001*min([self.dists[i].std() for i in self.perm]))
         return self._epsi
 
     def run(self)->numpy.ndarray:
@@ -42,16 +46,16 @@ class OptiDistPerm:
         constraints = []
         for idx in range(len(self.perm[:-1])):
             constraints.append({"type":"ineq",
-                                "fun":SOMConstraint(idx,self._epsi)})
+                                "fun":utils.SOMConstraint(idx,self._epsi)})
 
         xinit = [self.dists[i].mean() for i in self.perm]
-        fun = CostPermute(self.dists,self.perm)
+        fun = utils.CostPermute(self.dists,self.perm)
         return scipy.optimize.minimize(fun,xinit,constraints=constraints).x
 
 class CostPermute:
     u'returns the "cost" of translations due to permutation of oligo peaks'
-    perm:Tuple(int) = ()
-    dists:List[SciDist] = []
+    perm = (-1,) # type: Tuple[int]
+    dists = [] # type: List[SciDist]
     @initdefaults
     def __init__(self,**kwa):
         pass
@@ -61,8 +65,8 @@ class CostPermute:
 
 class SOMConstraint:
     u'functor for scipy.optimize.minimize constraints'
-    index:int = -1
-    _epsi:float = -1.0
+    index = -1 # type: int
+    _epsi = -1.0 # type: float
     @initdefaults
     def __init__(self,**kwa):
         pass
@@ -74,25 +78,27 @@ class SOMConstraint:
 class ComputeStates:
     u'Computes possible permutation between'
     # if need to merge 2 by 2 batches, create BCollection of 2 batches?
-    collection:BCollection=BCollection()
-    nscale:int=1
-    ooverl:int=1
-    __groups:List=list()
+    collection=data.BCollection() # type: data.BCollection
+    nscale=1 # type: int
+    ooverl=1 # type: int
+    __groups=list() # type: List
     def __init__(self,**kwa):
         pass
 
     @property
     def oligos(self):
+        u'returns the oligos in collection'
         return self.collection.oligos
 
-    def __group_overlapping_oligos(self)->List[OligoPeak]:
+    def __group_overlapping_oligos(self)->List[data.OligoPeak]:
         u'''
         returns groups of overlapping oligos
         '''
-        groups = group_overlapping_normdists([oli.dist for oli in oligos],nscale=self.nscale)[1]
-        return [[oligos[idx] for idx in grp] for grp in groups]
+        groups = _group_overlapping_normdists([oli.dist for oli in self.oligos],
+                                              nscale=self.nscale)[1]
+        return [[self.oligos[idx] for idx in grp] for grp in groups]
 
-    def __group_matching(self,groups:list[OliBat])->list[OliBat]: # to check
+    def __group_matching(self,groups:List[List[OliBat]])->List[List[OliBat]]: # to check
         u'''
         a grp is a list of tuples (oligo,oligo index, batch id)
         returns a list of list of (oligo,oligo index, batch id)
@@ -103,7 +109,7 @@ class ComputeStates:
         # do we put them in the same cluster?
         # yes, we compute arrangements between batches afterwards
 
-        clusters = []
+        clusters = [] # type: List[List[OliBat]]
 
         for grp in groups:
             seed = set([grp[0].oli.seq[:self.ooverl],grp[0].oli.seq[-self.ooverl:]])
@@ -113,11 +119,12 @@ class ComputeStates:
             seedsingrp = set(seed)
             while sum(len(i) for i in pergrp)!=len(grp):
                 # pick a new seed not in seed and restart
-                seed = [set([elmt[0].seq[:ooverl],elmt[0].seq[-ooverl:]])\
-                        for elmt in grp if not elmt[0].seq[:ooverl] in seedsingrp][0]
-                seed = _update_seed(ooverl,seed,grp)
+                seed = [set([elmt[0].seq[:self.ooverl],elmt[0].seq[-self.ooverl:]])\
+                        for elmt in grp if not elmt[0].seq[:self.ooverl] in seedsingrp][0]
+                seed = _update_seed(self.ooverl,seed,grp)
                 pergrp+=[[elmt for elmt in grp\
-                            if elmt[0].seq[:ooverl] in seed or elmt[0].seq[-ooverl:] in seed]]
+                            if elmt[0].seq[:self.ooverl] in seed or\
+                          elmt[0].seq[-self.ooverl:] in seed]]
                 seedsingrp.update(seed)
 
             clusters += pergrp
@@ -145,12 +152,12 @@ class ComputeStates:
         '''
         groups = self.__group_overlapping_oligos()
 
-        # move to BCollection 
+        # move to BCollection
         infogrp=[]
         for grp in groups:
             info=[]
             for val in grp:
-                for idx,bat in enumerate(self.batches):
+                for idx,bat in enumerate(self.collection.batches):
                     if val in bat.oligos:
                         info.append(OliBat(val,bat.oligos.index(val),idx))
                         break
@@ -158,13 +165,13 @@ class ComputeStates:
 
         LOGS.debug("before clustering, %i",len(infogrp))
         self.__groups = self.__group_matching(infogrp)
-        LOGS.debug("after clustering, %i",len(self.groupping))
+        LOGS.debug("after clustering, %i",len(self.__groups))
         # generate all arrangements between batches excluding within batch swaps
 
         # remove groups if there is not a representative of at least two batches
         self.__groups = [grp for grp in self.__groups if len(set(val[2] for val in grp))>1]
 
-        oswaps = []
+        oswaps = [] # type: List[data.OligoPeak]
         for grp in self.__groups:
             if len(grp)<2:
                 continue
@@ -173,10 +180,11 @@ class ComputeStates:
 
         LOGS.debug("len(oswaps)=%i", len(oswaps))
         # translate oswaps to xstates
-            
-        return swaps
+        # oswaps
+        # continue from here
+        return numpy.empty(shape=(1,),dtype=float) # to change
 
-        
+
 def _group_overlapping_normdists(dists,nscale=1): # to pytest !! # what if no intersection?
     u'''
     returns lists of indices [(i,j,k)] each element of the tuple has distribution which overlap
@@ -222,12 +230,11 @@ def _groupswaps_between_batches(grp:List[OliBat]):
         * no arrangements between batches
     assumes that oligo indices within the batch are ordered
     '''
-    bybat = dict()
     bids = sorted(set(i.batid for i in grp))
     lengths = []
     for bid in  bids:
         lengths.append(len([elm for elm in grp if elm.batid==bid]))
-        
+
     bybat=sorted(grp,key=lambda x:(x.batid,x.idinbat))
 
 
@@ -263,21 +270,21 @@ def optimal_perm_normdists(perm:List,dists:List[SciDist])->numpy.ndarray: # pyte
     constraints = []
     for idx in range(len(perm[:-1])):
         constraints.append({"type":"ineq",
-                            "fun":SOMConstraint(idx,_epsi)})
+                            "fun":utils.SOMConstraint(idx,_epsi)})
 
     xinit = [dists[i].mean() for i in perm]
-    fun = CostPermute(dists,perm)
+    fun = utils.CostPermute(dists,perm)
     return scipy.optimize.minimize(fun,xinit,constraints=constraints).x
 
 
-def combinationsbetweengroups(indices:Set[int],lengths:List[int]):
+def combinationsbetweengroups(indices:Set[int],lengths:List[int])->List[List[int]]:
     u'''
     returns the product of combinations of size lengths
     C(lengths[0],indices)*C(lengths[1],indices)*...
     '''
-    combs=[]
     if len(lengths)==1:
         return [sorted(indices)]
+    combs=[] # type: List[List[int]]
     for comb in itertools.combinations(indices,lengths[0]):
         combs+=[list(comb)+i for i in combinationsbetweengroups(indices-set(comb),lengths[1:])]
 

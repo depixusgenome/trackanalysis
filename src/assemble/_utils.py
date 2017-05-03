@@ -8,7 +8,6 @@ regroups functions and classes to complement assembler
 import itertools
 from copy import deepcopy
 from typing import Callable, List, Dict # pylint: disable=unused-import
-import pickle
 import scipy.stats
 import numpy
 from Bio import pairwise2
