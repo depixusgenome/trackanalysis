@@ -7,6 +7,7 @@ from typing import List
 import itertools
 from utils import initdefaults
 from ._types import SciDist # pylint: disable=unused-import
+from . import _utils as utils
 
 class Oligo:
     u'''
@@ -69,12 +70,12 @@ class Batch:
     def __init__(self,**kwa):
         pass
 
-    def fill_with(self,other:Batch)->None:
+    def fill_with(self,other)->None:
         u'adds oligos from other into self and empties other'
         self.oligos.extend(other.oligos)
         del other.oligos
 
-    def oligo_overlap(self,other:Batch,min_overl:int=1)->bool:
+    def oligo_overlap(self,other,min_overl:int=1)->bool:
         u'''
         compare the sequences of oligos in the two batch
         if any can tail_overlap
@@ -108,3 +109,23 @@ class BCollection:
         batches=[Batch(oligos=[oli for oli in oligos if getattr(oli,attr)==grp],index=idx)
                  for idx,grp in enumerate(grps)]
         return cls(oligos=oligos,batches=batches)
+
+    def group_overlapping_oligos(self,nscale)->List[List[OligoPeak]]:
+        u'returns groups of overlapping oligos'
+        groups = utils.group_overlapping_normdists([oli.dist for oli in self.oligos],
+                                                   nscale=nscale)[1]
+        return [[self.oligos[idx] for idx in grp] for grp in groups]
+
+    def group_overlapping_batches(self,nscale)->List[List[OligoPeak]]:
+        u'same as group_overlapping_oligos except that only oligos in batches are considered'
+        olis=[] # type: List[OligoPeak]
+        for bat in self.batches:
+            olis+=bat.oligos
+        groups = utils.group_overlapping_normdists([oli.dist for oli in olis],
+                                                   nscale=nscale)[1]
+        return [[olis[idx] for idx in grp] for grp in groups]
+
+
+    def oli2index(self,oli:OligoPeak)->int:
+        u'returns index of oli in oligos'
+        return self.oligos.index(oli)
