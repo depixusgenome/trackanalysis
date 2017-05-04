@@ -114,7 +114,7 @@ class Items(metaclass=ABCMeta):
 class TransformedItems:
     "Dictionnary that will transform its data when a value is requested"
     __slots__ = ('_data', '_parent', '_fcn')
-    def __init__(self, fcn, data, parent = None) -> None:
+    def __init__(self, fcn, data, parent) -> None:
         super().__init__()
         self._data   = data
         self._parent = parent
@@ -126,11 +126,10 @@ class TransformedItems:
         return getattr(self._data if self._parent is None else self._parent, 'track', None)
 
     def __getitem__(self, val):
-        if self._fcn is not None:
-            self._fcn(self._data, val)
-            if self._parent is not None:
-                self._parent.data = self._data
-        return self._data[val]
+        fcn, self._fcn = self._fcn, None
+        if fcn is not None:
+            self._parent.data = fcn(self._data)
+        return self._parent.data[val]
 
     def keys(self, _1 = None, _2 = None) -> Iterator:
         "iterates over keys"
@@ -231,7 +230,7 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
             self.actions.append(fcn)
         return self
 
-    def withdata(self:Self, dat, fcn = None, once = True) -> Self:
+    def withdata(self:Self, dat, fcn = None) -> Self:
         "sets the data"
         if fcn is None and callable(dat) and not hasattr(dat, '__getitem__'):
             dat, fcn  = self.data, dat
@@ -239,7 +238,7 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
         if fcn is None:
             self.data = dat
         else:
-            self.data = TransformedItems(fcn, dat, self if once else None)
+            self.data = TransformedItems(fcn, dat, self)
         return self
 
     def selecting(self:Self, cyc, clear = False) -> Self:
@@ -331,9 +330,10 @@ class TrackItems(_m_ConfigMixin, Items):
 
     def new(self:TSelf, tpe: Optional[type] = None, **kwa) -> TSelf:
         "returns a item containing self in the data field"
-        kwa.setdefault('track', self.track)
-        kwa.setdefault('data',  self)
-        kwa.setdefault('cycles', getattr(self, 'cycles', None))
+        kwa.setdefault('track',     self.track)
+        kwa.setdefault('data',      self)
+        kwa.setdefault('cycles',    getattr(self, 'cycles', None))
+        kwa.setdefault('parents',   self.parents)
         return (type(self) if tpe is None else tpe)(**kwa)
 
     def keys(self,
@@ -382,7 +382,7 @@ class Beads(TrackItems, Items):
     cycles = None # type: Optional[slice]
     def __init__(self, **kwa):
         super().__init__(self, **kwa)
-        self.withcycles(kwa.get('cycles', ...))
+        self.__withcycles(kwa.get('cycles', ...))
 
     def _keys(self, sel:Optional[Sequence], beadsonly: bool) -> Iterator[BEADKEY]:
         if (sel is not None or beadsonly) and isinstance(self.data, Beads):
@@ -416,16 +416,18 @@ class Beads(TrackItems, Items):
     def __getitem__(self, keys) -> Union['Beads',np.ndarray]:
         if isinstance(keys, tuple):
             if len(keys) == 2:
-                res = Cycles(track = self.track, data = self)
                 if isinstance(self.cycles, slice):
-                    if frozenset(keys).issubset(_m_ALL):
+                    cpy = shallowcopy(self).withcycles(...) # don't select cycles twice
+                    res = Cycles(track = self.track, data = cpy)
+                    if all(_m_ellipsis(i) for i in keys):
                         return res.selecting([(..., i) for i in self.cyclerange()])
-                    elif keys[1] in _m_ALL:
+                    elif _m_ellipsis(keys[1]):
                         return res.selecting([(keys[0], i) for i in self.cyclerange()])
                     elif keys[1] not in self.cyclerange():
                         return res.new(data = {}, direct = True)
                     else:
                         return res[keys]
+                res = Cycles(track = self.track, data = self)
                 return res if all(_m_ellipsis(i) for i in keys) else res[keys]
             raise NotImplementedError()
         return super().__getitem__(keys)
@@ -441,7 +443,16 @@ class Beads(TrackItems, Items):
             stop = self.track.ncycles
         return range(start, stop)
 
-    def withcycles(self, cyc:Optional[slice]) -> 'Beads':
+    def withcycles(self, cyc) -> 'Beads':
+        "specifies that only some cycles should be taken"
+        return self.__withcycles(cyc)
+
+    @staticmethod
+    def isbead(key:BEADKEY) -> bool:
+        "returns whether the key is one for a bead"
+        return isinstance(key, _m_INTS)
+
+    def __withcycles(self, cyc) -> 'Beads':
         "specifies that only some cycles should be taken"
         if cyc is None or cyc is Ellipsis:
             self.cycles = None
@@ -454,11 +465,6 @@ class Beads(TrackItems, Items):
             raise NotImplementedError()
         self.cycles = cyc
         return self
-
-    @staticmethod
-    def isbead(key:BEADKEY) -> bool:
-        "returns whether the key is one for a bead"
-        return isinstance(key, _m_INTS)
 
     if TYPE_CHECKING:
         def keys(self,
@@ -625,7 +631,7 @@ class Cycles(TrackItems, Items):
     def phase(self, cid:Optional[int] = None, pid:Optional[int] = None):
         "returns phase ids for the given cycle"
         vect = self.track.phases
-        if {cid, pid}.issubset(_m_ALL):
+        if _m_ellipsis(cid) and _m_ellipsis(pid):
             return vect         - vect[:,0]
         elif cid in _m_ALL:
             return vect[:,pid]  - vect[:,0]
