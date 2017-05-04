@@ -24,8 +24,16 @@ class Track:
     def __init__(self, **kwa) -> None:
         self._data = kwa.get('data', None)
 
+    def __getstate__(self):
+        info = dict(self.__dict__)
+        info.pop('_data')
+        return info
+
+    def __setstate__(self, values):
+        self.__init__(**values)
+
     def __unlazyfy(self, arg: bool):
-        if arg and self._data is None and self.path  is not None:
+        if arg and self._data is None and self.path is not None:
             opentrack(self)
 
     @property

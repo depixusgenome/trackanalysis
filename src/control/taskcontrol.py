@@ -11,6 +11,7 @@ It can add/delete/update tasks, emitting the corresponding events
 """
 from typing         import (Union, Iterator, Tuple, # pylint: disable=unused-import
                             Optional, Any, List, Iterable, Dict)
+from itertools      import chain
 
 from model.task     import Task, RootTask, TaskIsUniqueError
 from .event         import Controller, NoEmission
@@ -71,20 +72,22 @@ class ProcessorController:
         "clears data starting at *tsk*"
         self.data.delCache()
 
-    def run(self, tsk:Optional[Task] = None, copy = False):
+    def run(self, tsk:Optional[Task] = None, copy = False, pool = None):
         """
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
         """
-        return _runprocessors(self.model, self.data, tsk, copy = copy)
+        return _runprocessors(self.data, tsk, copy = copy, pool = pool)
 
     @classmethod
     def create(cls,
-               model     : Iterable[Task],
+               *models   : Task,
                processors: 'Union[Dict,Iterable[type],type,None]' = Processor
               ) -> 'ProcessorController':
         "creates a task pair for this model"
-        tasks = tuple(model)
+        tasks = tuple(chain(*(i if isinstance(i, (tuple, list)) else (i,) for i in models)))
+        assert all(isinstance(i, Task) for i in tasks)
+
         pair  = cls()
         if not isinstance(processors, Dict):
             processors = cls.register(processors)
@@ -119,11 +122,7 @@ class ProcessorController:
             cls.register(sclass, cache)
         return cache
 
-def create(model     : Iterable[Task],
-           processors: 'Union[Dict,Iterable[type],type,None]' = Processor
-          ) -> 'ProcessorController':
-    "creates a task pair for this model"
-    return ProcessorController.create(model, processors)
+create = ProcessorController.create # pylint: disable=invalid-name
 
 class TaskController(Controller):
     "Data controller class"
@@ -136,6 +135,12 @@ class TaskController(Controller):
 
         self.__openers = kwargs.get("openers", None)
         self.__savers  = kwargs.get("savers",  None)
+
+    @property
+    def __processors(self):
+        if self.__procs is None:
+            self.__procs = ProcessorController.register(Processor)
+        return self.__procs
 
     def setup(self, ctrl):
         "sets up the missing info"
@@ -190,12 +195,12 @@ class TaskController(Controller):
         "Returns the cache for a given task"
         return self.__items[parent].data.getCache(tsk)
 
-    def run(self, parent:RootTask, tsk:Task, copy = False):
+    def run(self, parent:RootTask, tsk:Task, copy = False, pool = None):
         """
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
         """
-        return self.__items[parent].run(tsk, copy = copy)
+        return self.__items[parent].run(tsk, copy = copy, pool = pool)
 
     @Controller.emit
     def saveTrack(self, path: str) -> None:
@@ -237,7 +242,7 @@ class TaskController(Controller):
         elif tasks[0] is not task:
             raise ValueError("model and root task does'nt coincide")
 
-        self.__items[task] = ProcessorController.create(tasks, self.__procs)
+        self.__items[task] = create(tasks, processors = self.__processors)
         return dict(controller = self, model = tasks)
 
     @Controller.emit
@@ -251,7 +256,7 @@ class TaskController(Controller):
     def addTask(self, parent:RootTask, task:Task, index = _m_none) -> dict:
         "opens a new file"
         old = tuple(self.__items[parent].model)
-        self.__items[parent].add(task, self.__procs[type(task)], index = index)
+        self.__items[parent].add(task, self.__processors[type(task)], index = index)
         return dict(controller = self, parent = parent, task = task, old = old)
 
     @Controller.emit

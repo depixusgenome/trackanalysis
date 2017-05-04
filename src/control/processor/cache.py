@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"List of processes and cache"
+from typing         import Union, Iterable, Optional, List # pylint: disable=unused-import
 from utils          import isfunction
 from .base          import Processor # pylint: disable=unused-import
 
@@ -17,6 +18,12 @@ class CacheItem:
     def __init__(self, proc):
         self._proc    = proc         # type: Processor
         self._cache   = (0, None)    # type: Tuple[int,Any]
+
+    def __getstate__(self):
+        return {'proc': (type(self._proc), self._proc.task)}
+
+    def __setstate__(self, values):
+        self.__init__(values['proc'][0](values['proc'][1]))
 
     def isitem(self, tsk) -> bool:
         u"returns the index of the provided task"
@@ -62,8 +69,12 @@ class CacheItem:
 class Cache:
     u"Contains the track and task-created data"
     __slots__ = ('_items',)
-    def __init__(self, order = None) -> None:
-        self._items = [] if order is None else order # type List[CacheItem]
+    def __init__(self, order: Optional[Iterable[Union[CacheItem, Processor]]] = None) -> None:
+        if order is None:
+            order = []
+        else:
+            order = [CacheItem(i) if isinstance(i, Processor) else i for i in order]
+        self._items = order # type: List[CacheItem]
 
     def index(self, tsk) -> int:
         u"returns the index of the provided task"
@@ -86,6 +97,11 @@ class Cache:
     def append(self, proc):
         u"appends a processor"
         self._items.append(CacheItem(proc))
+
+    def extend(self, procs):
+        u"appends processors"
+        self._items.extend(CacheItem(i) for i in procs)
+        return self
 
     def insert(self, index, proc):
         u"inserts a processor"
@@ -128,6 +144,12 @@ class Cache:
 
         for proc in self._items[ind:]:
             getattr(type(proc), 'clear', _clear)(proc, self, orig)
+
+    def __len__(self):
+        return len(self._items)
+
+    def __iter__(self):
+        yield from (i.proc for i in self._items)
 
     def __getitem__(self, ide):
         if isinstance(ide, slice):

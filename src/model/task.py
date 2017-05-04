@@ -80,6 +80,11 @@ class Task:
         "returns whether the class should be a root"
         return False
 
+    @classmethod
+    def isslow(cls) -> bool:
+        "whether this task implies long computations"
+        return False
+
     def config(self) -> dict:
         "returns a deepcopy of its dict which can be safely used in generators"
         return deepcopy(self.__dict__)

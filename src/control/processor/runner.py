@@ -3,8 +3,11 @@
 u"Deals with running a list of processes"
 from inspect        import signature
 from itertools      import groupby
+from functools      import partial
+from copy           import copy as shallowcopy
 from typing         import (Callable, Optional,     # pylint: disable=unused-import
-                            Iterable, Tuple, Sequence)
+                            Iterable, Tuple, Dict, Any, Sequence, Iterator, cast)
+
 import numpy
 
 from data           import TrackItems, createTrackItem
@@ -14,12 +17,31 @@ from .cache         import Cache
 
 class Runner:
     u"Arguments used for iterating"
-    __slots__ = ('model', 'data', 'level', 'gen')
-    def __init__(self, model, data):
-        self.model = model     # type: Sequence[Task]
+    __slots__ = ('data', 'pool', 'level', 'gen')
+    def __init__(self, data, pool = None, gen = None):
         self.data  = data      # type: Cache
-        self.gen   = None      # type: Optional[TrackItems]
+        self.pool  = pool      # type: Any
+        self.gen   = gen       # type: Optional[Iterator[TrackItems]]
         self.level = Level(0)
+
+    def __getstate__(self):
+        return {'data': self.data}
+
+    def __setstate__(self, values):
+        self.__init__(values['data'])
+
+    def __getitem__(self, sli) -> Cache:
+        "creates a Cache object with all tasks between start and end"
+        return Cache(self.data[sli])
+
+    def poolkwargs(self, task) -> Dict[str, Any]:
+        "returns kwargs needed for a pool"
+        return dict(pool = self.pool, data = self[:task])
+
+    @property
+    def model(self) -> Iterator[Task]:
+        "returns the model"
+        return iter(i.proc.task for i in self.data)
 
     @staticmethod
     def regroup(grp) -> 'Callable':
@@ -127,12 +149,57 @@ class Runner:
 
     first = property(lambda self: self.data.first)
 
-def run(model, data, tsk = None, copy = False):
+def poolchunk(items, nproc, iproc):
+    "returns a chunk of keys"
+    if isinstance(items, Iterator):
+        items = tuple(items)
+
+    nkeys    = len(items) if hasattr(items, '__len__') else items
+    nperproc = nkeys // nproc
+    rem      = nkeys %  nproc
+    istart   = nperproc * iproc     + min(rem, iproc)
+    istop    = nperproc * (iproc+1) + min(rem, iproc+1)
+    sli      = slice(istart, istop)
+    return items[sli] if hasattr(items, '__getitem__') else sli
+
+def _m_multi(data, start, parents, nproc, iproc):
+    frame = next(i for i in run(data, start = start) if i.parents == parents)
+    return {i: frame[i] for i in poolchunk(frame.keys(), nproc, iproc)}
+
+def pooledinput(pool, data, frame) -> dict:
+    u"returns a dictionary with all input"
+    if pool is None or not any(i.isslow() for i in data):
+        return dict(frame)
+
+    else:
+        res   = {} # type: dict
+        nproc = pool.nworkers
+        ind   = next((i for i, j in enumerate(list(data)[::-1]) if j.canpool()), None)
+        if ind is None:
+            gen  = None
+        else:
+            ind  = len(data)-cast(int, ind)
+            gen  = tuple(i.withdata(dict(i.data))
+                         for i in run(Cache(data[:ind]))
+                         if i.parents == frame.parents[:len(i.parents)])
+            data = Cache(data[ind:])
+
+        for val in pool.map(partial(_m_multi, data, gen, frame.parents, nproc), range(nproc)):
+            res.update(val)
+        return res
+
+def run(data, tsk = None, copy = False, pool = None, start = None):
     u"""
     Iterates through the list up to and including *tsk*.
     Iterates through all if *tsk* is None
     """
-    args  = Runner(model, data)
+    if pool is not None and not hasattr(pool, 'nworkers'):
+        raise TypeError('Pool should have an *nworkers* attribute')
+
+    # make sure the original input is not changed
+    gen   = iter(shallowcopy(i) for i in start) if start is not None else None
+
+    args  = Runner(data, pool = pool, gen = gen)
     ind   = None if tsk is None else data.index(tsk)+1
     first = True
     for proc in data[:ind]:

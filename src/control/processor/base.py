@@ -99,6 +99,15 @@ class Processor(metaclass=MetaProcessor):
         "returns the task's level"
         return (self.levelin, self.levelou)
 
+    def isslow(self) -> bool:
+        "wether computations take a long time or not"
+        return self.task.isslow()
+
+    @staticmethod
+    def canpool():
+        "returns whether this is pooled"
+        return False
+
     def config(self) -> dict:
         "Returns a copy of a task's dict"
         return self.task.config()
