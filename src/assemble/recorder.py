@@ -89,11 +89,11 @@ class SeqRecorder(Recorder):
     def get_oligohits(self,idx1,idx2=0):
         u'returns oligohits at mcmc step idx'
         pos = self.get_state(idx1,idx2)
-        return [oligohit.OligoHit(seq=val.seq,
-                                  pos=pos[idx],
-                                  pos0=val.pos0,
-                                  bpos=val.bpos,
-                                  bpos0=val.bpos0)\
+        return [oligohit.OligoPeak(seq=val.seq,
+                                   pos=pos[idx],
+                                   pos0=val.pos0,
+                                   bpos=val.bpos,
+                                   bpos0=val.bpos0)\
                 for idx,val in enumerate(self.oligohits)]
 
     def get_curr_oligohits(self,idx2=0):

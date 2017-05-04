@@ -19,7 +19,7 @@ import pickle
 import numpy
 from utils.logconfig import getLogger
 from .oligohit import Batch
-from . import _utils as utils
+#from . import _utils as utils
 
 # to add variability in (stretching,bias) for each batch (to estimate from hybridstat analyses)
 
@@ -119,7 +119,8 @@ def find_swaps(batches,nscale,min_overl):
     '''
     allswaps = []
     while len(batches)>1:
-        swaps = utils.swaps_between_batches([batches[0],batches[1]],nscale,min_overl)
+        print(nscale,min_overl)
+        swaps = [] # utils.swaps_between_batches([batches[0],batches[1]],nscale,min_overl)
         if any(numpy.array([len(i) for i in swaps])<2):
             LOGS.warning("problem with swap size")
         batches[0].fill_with(batches[1])
@@ -172,4 +173,5 @@ def oli_perm_to_xstate(oligos,argntsid)->numpy.ndarray:
     for key,value in ids2perm.items():
         permids[key]=value
 
-    return utils.optimal_perm_normdists(permids,[oli.dist for oli in oligos])[permids]
+    return numpy.empty(shape=(1,))
+    #return utils.optimal_perm_normdists(permids,[oli.dist for oli in oligos])[permids]

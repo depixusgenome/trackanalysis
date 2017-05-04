@@ -4,16 +4,16 @@
 u'''
 regroups functions and classes to complement assembler
 '''
-import math
 import itertools
-from typing import List, Tuple, Set, Callable, NamedTuple # pylint: disable=unused-import
-import pickle
+from typing import List, Iterator, Tuple, Set, Callable, NamedTuple, Sequence, Any # pylint: disable=unused-import
+#import pickle
 import scipy
 import numpy
 from utils.logconfig import getLogger
 from utils import initdefaults
 
 from . import data
+from . import scores
 from ._types import SciDist # pylint: disable=unused-import
 
 LOGS = getLogger(__name__)
@@ -124,24 +124,21 @@ class ComputeOSwaps:
         return clusters
 
     def compute(self)->List[List[data.OligoPeak]]:
-        # cf find_swaps
-        # CAREFUL, misinterpretation of what this function returns.
-        # the swap is the new arrangement of peak ids.
-        # this returns the indices of the peaks flipped which
-        # is in general different from the swap!!
         u'''
         returns the new xstates to explore
         the idea is to reduce the number of arrangements to the minimum.
         2 assumptions :
-                * oligos may swap positions if they are within 2 nscale from one another
-                * consecutive oligos must have overlap by ooverl bases
-        (1) group oligos which may swap due to measurement error
-        (2) within each group in (1), cluster oligos if they overlap with osize-1 bases
-        (3) compute all combinations of arrangements between batches within each cluster
-        (4) to do: not all arrangements between batches should be allowed
-                   need to discard those which do not have ooverl bases
-                   -> just use brute force. to discard arrangements
-        (5) returns the full list of arrangements to consider
+
+            * oligos may swap positions if they are within 2 nscale from one another
+            * consecutive oligos must have overlap by ooverl bases
+
+            1. group oligos which may swap due to measurement error
+            2. within each group in (1), cluster oligos if they overlap with osize-1 bases
+            3. compute all combinations of arrangements between batches within each cluster
+            4. to do: not all arrangements between batches should be allowed
+                need to discard those which do not have ooverl bases
+                -> just use brute force. to discard arrangements
+            5. returns the full list of arrangements to consider
         '''
         groups = self.collection.group_overlapping_batches(nscale=self.nscale)
         print("len(groups)=",len(groups))
@@ -159,35 +156,22 @@ class ComputeOSwaps:
         LOGS.debug("before clustering, %i",len(infogrp))
         self.__groups = self.__group_matching(infogrp)
         LOGS.debug("after clustering, %i",len(self.__groups))
-        # generate all arrangements between batches excluding within batch swaps
 
         # remove groups if there is not a representative of at least two batches
         self.__groups = [grp for grp in self.__groups if len(set(val.batid for val in grp))>1]
-        print("len(self.__groups)=",len(self.__groups))
-        print(sum([math.factorial(len(grp)) for grp in groups]))
+
         # need to carfully interpret self.__groups
         # each group in self.__groups corresponds to distinct (independent) permutations
         # we can define maps to apply on previous xstate values
         # if an oligo does not belong to the group its position remains unchanged
-        with open("groups.pickle","wb") as testfile:
-            pickle.dump(groups,testfile)
-        with open("clusters.pickle","wb") as testfile:
-            pickle.dump([grp for grp in self.__groups if len(grp)>=2],testfile)
-        print(sum([math.factorial(len(grp)) for grp in self.__groups if len(grp)>=2]))
 
-        return [grp for grp in self.__groups if len(grp)>=2]
-    # oswaps = [] # type: List[data.OligoPeak]
-    # for grp in self.__groups:
-    #    if len(grp)<2:
-    #        continue
-    #    oswaps.extend(oswaps_between_batches(grp))
-    # LOGS.debug("len(oswaps)=%i", len(oswaps))
-    # return oswaps
+        return list(map(oswaps_between_batches, self.__groups))
     # we can parallelise computation of score over each group
     # then reassemble the sequence having the best score with no overlapping groups
 
 
-def oswaps_between_batches(grp:List[OliBat])->List[data.OligoPeak]:
+#def oswaps_between_batches(grp:List[OliBat])->Iterator[data.OligoPeak]:
+def oswaps_between_batches(grp):
     # remove swaps which do not satisfy min_overl rule
     u'''
     find sequentially the possible arrangements of oligos such that:
@@ -197,18 +181,17 @@ def oswaps_between_batches(grp:List[OliBat])->List[data.OligoPeak]:
     '''
     bids = sorted(set(i.batid for i in grp))
     lengths = []
-    for bid in  bids:
+    for bid in bids:
         lengths.append(len([elm for elm in grp if elm.batid==bid]))
 
-    bybat = sorted(grp,key=lambda x:(x.batid,x.idinbat))
-
-
-    combs = combinationsbetweengroups(set(range(len(grp))),
-                                      lengths=lengths)
-
-    swaps = [sorted(zip(comb,bybat),key=lambda x:x[0]) for comb in combs]
-
-    return [[swp[1].oli for swp in swap] for swap in swaps]
+    def func(arg):
+        u'lambda'
+        return (arg.batid,arg.idinbat)
+    bybat = sorted(grp,key=func)
+    olibybat = numpy.array([i.oli for i in bybat])
+    combs = swaps2combs(swapsbetweengroups(set(range(len(grp))),
+                                           lengths=lengths))
+    return list(map(olibybat.__getitem__,combs))
 
 def _update_seed(ooverl,seed,grp):
     nseed = 0
@@ -223,66 +206,69 @@ def _update_seed(ooverl,seed,grp):
                 continue
     return seed
 
-def combinationsbetweengroups(indices:Set[int],lengths:List[int])->List[List[int]]:
+def __tocombs(swap):
+    return [i[1] for i in sorted([(v,k) for k,v in enumerate(swap)])]
+
+def swaps2combs(swaps):
+    u'reorder swaps to use as oligo[comb]'
+    return list(map(__tocombs,swaps))
+
+def swapsbetweengroups(indices:Set,lengths):
     u'''
-    returns the product of combinations of size lengths
+    returns the new index an oligo should have
+    ex : [1,2,0] then oligo 0 should go to position 1 in new order
+    see swaps2combs
     C(lengths[0],indices)*C(lengths[1],indices)*...
     '''
-    if len(lengths)==1:
-        return [sorted(indices)]
-    combs=[] # type: List[List[int]]
-    for comb in itertools.combinations(indices,lengths[0]):
-        combs+=[list(comb)+i for i in combinationsbetweengroups(indices-set(comb),lengths[1:])]
-
-    return combs
-
-
-class DefaultCallable:
-    u'defines a Default Callable'
-    def __init__(self,res):
-        self.res=res
-    def __call__(self,*args,**kwargs):
-        u'returns res'
-        return self.res
+    if len(indices)==len(lengths):
+        swaps=[i for i in itertools.permutations(indices)]
+    else:
+        swaps=[] # List[Tuple]
+        for swap in itertools.combinations(indices,lengths[0]):
+            swaps+=[swap+i for i in swapsbetweengroups(indices-set(swap),lengths[1:])]
+    return swaps
 
 class ScoreGroup:
     u'''
     assigns a score to each permutation of a group of oligos
     '''
-    oswap = [] # type: List[data.OligoPeak]
-    score = DefaultCallable(-1.0) # type: Callable
+    operm = [] # type: List[data.OligoPeak]
+    score = scores.DefaultCallable(-1.0) # type: ignore
     @initdefaults()
     def __init__(self,**kwa):
         pass
 
     def run(self)->List: # too long?
         u'returns (score,permutation)'
-        return [(self.score(it),it) for it in itertools.permutations(self.oswap)]
+        # wrong allows permutations between oligos within the same group
+        #return [(self.score(it),it) for it in itertools.permutations(self.oswap)]
+        # need to call oswaps_between_batches
+        return [oli for oli in self.operm] # to change
 
 class BestScoreAssemble:
     u'''
-    finds the best group of non overlapping oswaps
+    finds the best group of non overlapping operms
     with best (minimal) score
     '''
-    oswaps = [] # type: List[data.OligoPeak]
+    operms = [] # type: List[data.OligoPeak]
     # score between group
-    bg_score = DefaultCallable(-1.0) # type: Callable
+    bg_score = scores.DefaultCallable(-1.0) # type: ignore
     # score within group
-    wg_score = DefaultCallable(-1.0) # type: Callable
+    wg_score = scores.DefaultCallable(-1.0) # type: ignore
     __wg_scores = [] # type: List
-    assemble_grps=None # type:
+    #assemble_grps = None # type: Any
     @initdefaults()
     def __init__(self,**kwa):
         pass
 
     @property
     def scoregroups(self)->List[ScoreGroup]:
-        u'returns ScoreGroup objects from oswaps'
+        u'returns ScoreGroup objects from operms'
         if hasattr(self,"scoregroups"):
             return self.scoregroups
         setattr(self,"scoregroups",
-                [ScoreGroup(oswap=oswap,
-                            score=self.wg_score) for oswap in self.oswaps])
+                [ScoreGroup(operm=operm,
+                            score=self.wg_score) for operm in self.operms])
         return self.scoregroups
 
     def compute_wg_scores(self)->None: # multiprocess?
