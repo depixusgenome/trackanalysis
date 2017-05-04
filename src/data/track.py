@@ -16,7 +16,7 @@ IDTYPE = Union[None, int, slice] # missing Ellipsys as mypy won't accept it
 @levelprop(Level.project)
 class Track:
     "Model for track files. This must not contain actual data."
-    path      = ''
+    path      = None # type: Optional[str]
     framerate = 0.
     phases    = np.empty((0,9), dtype = 'i4')
     _data     = None # type: Optional[Dict[BEADKEY,np.ndarray]]
@@ -25,8 +25,11 @@ class Track:
         self._data = kwa.get('data', None)
 
     def __getstate__(self):
-        info = dict(self.__dict__)
-        info.pop('_data')
+        info = self.__dict__.copy()
+        if info['path'] is None:
+            info['data'] = info.pop('_data')
+        else:
+            info.pop('_data')
         return info
 
     def __setstate__(self, values):
