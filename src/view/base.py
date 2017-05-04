@@ -70,13 +70,17 @@ def enableOnTrack(ctrl, *aitms):
     getattr(ctrl, '_ctrl', ctrl).getGlobal("project").observe(_onproject)
 
 POOL = ThreadPoolExecutor(1)
-async def threadmethod(fcn, *args, **kwa):
+async def threadmethod(fcn, *args, pool = None, **kwa):
     "threads a method"
-    return await to_tornado_future(POOL.submit(fcn, *args, **kwa))
+    if pool is None:
+        pool = POOL
+    return await to_tornado_future(pool.submit(fcn, *args, **kwa))
 
-def spawn(fcn, *args, **kwa):
+def spawn(fcn, *args, loop = None, **kwa):
     "spawns method"
-    IOLoop.current().spawn_callback(fcn, *args, **kwa)
+    if loop is None:
+        loop = IOLoop.current()
+    loop.spawn_callback(fcn, *args, **kwa)
 
 class BokehView(View):
     "A view with a gui"
