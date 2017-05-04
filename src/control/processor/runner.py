@@ -7,6 +7,7 @@ from functools      import partial
 from copy           import copy as shallowcopy
 from typing         import (Callable, Optional,     # pylint: disable=unused-import
                             Iterable, Tuple, Dict, Any, Sequence, Iterator, cast)
+import pickle
 
 import numpy
 
@@ -91,35 +92,6 @@ class Runner:
         self.gen   = gen
         self.level = curr[1]
 
-    _REFUSED = (Task, Processor, Cache)
-
-    @classmethod
-    def _test(cls, item):
-        if isinstance(item, cls._REFUSED) or isinstance(item, cls):
-            raise MemoryError("Beware of closure side-effecs:"
-                              +" exclude {} from it".format(cls._REFUSED))
-        cls._check(item)
-
-    @classmethod
-    def _check(cls, arg):
-        if arg is None:
-            return
-
-        if callable(arg):
-            for param in signature(arg).parameters.values():
-                if param.default != param.empty:
-                    cls._test(param.default)
-
-        closure = getattr(arg, '__closure__', None)
-        if closure is not None:
-            for cell in closure:
-                cls._test(cell.cell_contents)
-
-        givars = getattr(getattr(arg,    'gi_code', None), 'co_freevars', tuple())
-        giloc  = getattr(getattr(arg, 'gi_frame', None), 'f_locals', {})
-        for var in givars:
-            cls._test(giloc.get(var, None))
-
     @classmethod
     def checkClosure(cls, fcn):
         u"""
@@ -128,7 +100,11 @@ class Runner:
         In this way, changing the task after implementing the iteration
         should have no effect.
         """
-        cls._check(fcn)
+        try:
+            cls.__check(fcn)
+        except MemoryError as exc:
+            raise cls.__exception(fcn) from exc
+
 
     def apply(self, fcn, *_, levels = None):
         u"Applies a function to generator's output"
@@ -149,6 +125,39 @@ class Runner:
 
     first = property(lambda self: self.data.first)
 
+    __REFUSED = (Task, Processor, Cache)
+
+    @classmethod
+    def __exception(cls, item):
+        return MemoryError("Beware of closure side-effecs:"
+                           +" exclude {} from ".format(cls.__REFUSED)
+                           +str(item))
+    @classmethod
+    def __test(cls, item):
+        if isinstance(item, cls.__REFUSED) or isinstance(item, cls):
+            raise cls.__exception(item)
+        cls.__check(item)
+
+    @classmethod
+    def __check(cls, arg):
+        if arg is None:
+            return
+
+        if callable(arg):
+            for param in signature(arg).parameters.values():
+                if param.default != param.empty:
+                    cls.__test(param.default)
+
+        closure = getattr(arg, '__closure__', None)
+        if closure is not None:
+            for cell in closure:
+                cls.__test(cell.cell_contents)
+
+        givars = getattr(getattr(arg,    'gi_code', None), 'co_freevars', tuple())
+        giloc  = getattr(getattr(arg, 'gi_frame', None), 'f_locals', {})
+        for var in givars:
+            cls.__test(giloc.get(var, None))
+
 def poolchunk(items, nproc, iproc):
     "returns a chunk of keys"
     if isinstance(items, Iterator):
@@ -166,8 +175,9 @@ def _m_multi(data, start, parents, nproc, iproc):
     frame = next(i for i in run(data, start = start) if i.parents == parents)
     return {i: frame[i] for i in poolchunk(frame.keys(), nproc, iproc)}
 
-def pooledinput(pool, data, frame) -> dict:
+def pooledinput(pool, pickled, frame) -> dict:
     u"returns a dictionary with all input"
+    data = pickle.loads(pickled)
     if pool is None or not any(i.isslow() for i in data):
         return dict(frame)
 

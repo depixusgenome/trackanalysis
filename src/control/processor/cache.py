@@ -86,6 +86,11 @@ class Cache:
             return next(i for i, opt in enumerate(self._items) if opt.isitem(tsk))
 
     @property
+    def model(self):
+        u"returns the data from the first task"
+        yield from (i.proc.task for i in self._items)
+
+    @property
     def first(self):
         u"returns the data from the first task"
         return self._items[0].getCache()
