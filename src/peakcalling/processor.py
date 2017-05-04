@@ -33,6 +33,11 @@ class FitToHairpinTask(Task):
         super().__init__()
 
     @classmethod
+    def isslow(cls) -> bool:
+        "whether this task implies long computations"
+        return True
+
+    @classmethod
     def read(cls, path : StreamUnion, oligos : Sequence[str]) -> 'FitToHairpinTask':
         "creates a BeadsByHairpin from a fasta file and a list of oligos"
         items = dict(HairpinDistance.read(path, oligos))

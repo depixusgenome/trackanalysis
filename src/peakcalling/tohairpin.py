@@ -45,10 +45,11 @@ class Hairpin:
                       1, 'constant', constant_values = (0, len(seq)))
 
     @classmethod
-    def read(cls, path:StreamUnion, oligos:Sequence[str]) -> 'Iterator[Tuple[str,Hairpin]]':
+    def read(cls, path:Union[StreamUnion, Dict], oligos:Sequence[str]
+            ) -> 'Iterator[Tuple[str,Hairpin]]':
         u"creates a list of *Hairpin* from a fasta file and a list of oligos"
-        return ((name, cls(peaks = cls.topeaks(seq, oligos)))
-                for name, seq in _read(path))
+        itr = path.items() if hasattr(path, 'items') else _read(path)
+        return ((name, cls(peaks = cls.topeaks(seq, oligos))) for name, seq in itr)
 
 Distance = NamedTuple('Distance', [('value', float), ('stretch', float), ('bias', float)])
 
