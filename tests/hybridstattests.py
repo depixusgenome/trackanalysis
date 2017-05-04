@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"testing hybridstat"
+"testing hybridstat"
 # pylint: disable=import-error,no-name-in-module
 from pathlib                        import Path
 from tempfile                       import mktemp, gettempdir
@@ -16,7 +16,7 @@ from control.taskcontrol            import create
 from testingcore                    import path as utfilepath
 
 def test_excel():
-    u"tests reporting"
+    "tests reporting"
     for path in Path(gettempdir()).glob("*_hybridstattest*.xlsx"):
         path.unlink()
     truth  = [np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')/1e-3,
@@ -83,7 +83,7 @@ def test_excel():
     assert Path(fname).exists()
 
 def test_ids():
-    u"tests identifications"
+    "tests identifications"
     for path in Path(gettempdir()).glob("*_hybridstattest*.xlsx"):
         path.unlink()
 
@@ -101,7 +101,7 @@ def test_ids():
     assert_allclose(val[2:], [1173.87, 1.87], atol = 2e-2)
 
 def test_excelprocessor():
-    u"tests reporting processor"
+    "tests reporting processor"
     for path in Path(gettempdir()).glob("*_hybridstattest*.xlsx"):
         path.unlink()
     truth  = [np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')/1e-3,
@@ -124,7 +124,12 @@ def test_excelprocessor():
                       data      = dat,
                       framerate = 1./30.,
                       phases    = (np.cumsum(cyc)-10).reshape((3,9)))
-        def __iter__(self):
+        new = lambda self, _: self
+        withdata = lambda self, fcn: fcn(self)
+
+        @staticmethod
+        def values():
+            "-"
             tmp2   = np.array([(5, np.zeros(5)), (5, np.zeros(5))],
                               dtype = EVENTS_DTYPE)
             evts1  = [(0.,  np.array([None, None, None])),
@@ -132,25 +137,24 @@ def test_excelprocessor():
                       (.1,  np.array([None, None, (0, np.zeros(5))])),
                       (.5,  np.array([None, None, tmp2])),
                       (1.,  np.array([None, None, (0, np.zeros(5))]))]
-            i =  [ByHairpinGroup('hp100',
-                                 [ByHairpinBead(100, .95, Distance(.1, 1000., 0.0),
-                                                np.array([(0., 0.),
-                                                          (.01, np.iinfo('i4').min),
-                                                          (.1, 100.),
-                                                          (.5, 500.),
-                                                          (1., 1000.)],
-                                                         dtype = PEAKS_DTYPE),
-                                                evts1)]),
-                  ByHairpinGroup(None,
-                                 [ByHairpinBead(101, -3, Distance(.1, 1000., 0.0),
-                                                np.array([(0., 0.)],
-                                                         dtype = PEAKS_DTYPE),
-                                                [(0., np.array([None, None,
-                                                                (0, np.zeros(5))]))]),
-                                  ByHairpinBead(102, -3, Distance(.1, 1000., 0.0),
-                                                np.empty((0,), dtype = PEAKS_DTYPE),
-                                                [])])]
-            return zip(range(len(i)), i)
+            return [ByHairpinGroup('hp100',
+                                   [ByHairpinBead(100, .95, Distance(.1, 1000., 0.0),
+                                                  np.array([(0., 0.),
+                                                            (.01, np.iinfo('i4').min),
+                                                            (.1, 100.),
+                                                            (.5, 500.),
+                                                            (1., 1000.)],
+                                                           dtype = PEAKS_DTYPE),
+                                                  evts1)]),
+                    ByHairpinGroup(None,
+                                   [ByHairpinBead(101, -3, Distance(.1, 1000., 0.0),
+                                                  np.array([(0., 0.)],
+                                                           dtype = PEAKS_DTYPE),
+                                                  [(0., np.array([None, None,
+                                                                  (0, np.zeros(5))]))]),
+                                    ByHairpinBead(102, -3, Distance(.1, 1000., 0.0),
+                                                  np.empty((0,), dtype = PEAKS_DTYPE),
+                                                  [])])]
 
 
     task = HybridstatExcelTask(path      = mktemp()+"_hybridstattest2.xlsx",
@@ -165,14 +169,20 @@ def test_excelprocessor():
         model = {1:2}
         @staticmethod
         def apply(fcn):
-            u"doc"
-            tuple(fcn(_Frame()))
+            "doc"
+            fcn(_Frame())
+
+        @staticmethod
+        def poolkwargs(_):
+            "doc"
+            return {'pool': None, 'data': _Runner}
+
     assert not Path(task.path).exists()
     proc.run(_Runner())
     assert Path(task.path).exists()
 
 def test_processor():
-    u"tests processor"
+    "tests processor"
     for path in Path(gettempdir()).glob("*_hybridstattest*.xlsx"):
         path.unlink()
     out   = mktemp()+"_hybridstattest3.xlsx"
@@ -192,4 +202,4 @@ def test_processor():
     assert Path(out).exists()
 
 if __name__ == '__main__':
-    test_ids()
+    test_processor()

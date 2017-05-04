@@ -17,12 +17,15 @@ import numpy                    as     np
 
 import sequences
 from signalfilter               import rawprecision
-from control.taskio             import ConfigTrackIO, ConfigGrFilesIO
+from control.taskcontrol        import create as _createdata
+from control.taskio             import (ConfigTrackIO, ConfigGrFilesIO, TaskIO,
+                                        currentmodelonly)
 from control.processor          import processors
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
 from peakfinding.processor      import PeakSelectorTask
 from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
-                                        FitBead, Distance, HairpinDistance)
+                                        FitBead, Distance, HairpinDistance,
+                                        BeadsByHairpinTask)
 
 from view.base                  import enableOnTrack
 from view.dialog                import FileDialog
@@ -37,6 +40,7 @@ from view.plots.sequence        import (readsequence, SequenceTicker, OligoListW
                                         FitParamProp    as _FitParamProp,
                                         SequenceKeyProp as _SequenceKeyProp)
 
+from ..reporting.processor      import HybridstatExcelTask
 from ..probabilities            import Probability
 from ..processor                import fittohairpintask
 
@@ -85,16 +89,20 @@ class _PeaksPlotModelAccess(TaskPlotModelAccess):
     oligos          = props.configroot[Optional[Sequence[str]]]('oligos')
     constraintspath = props.projectroot[Optional[str]]('constraints.path')
     useparams       = props.projectroot[bool]('constraints.useparams')
+    @property
+    def sequences(self):
+        "returns current sequences"
+        return readsequence(self.sequencepath)
 
     @property
     def defaultidenfication(self):
         "returns the default identification task"
         ols = self.oligos
-        seq = self.sequencepath
-        if ols is None or len(ols) == 0 or len(readsequence(seq)) == 0:
+        if ols is None or len(ols) == 0 or len(self.sequences) == 0:
             return None
         else:
-            return fittohairpintask(seq, ols, self.constraintspath, self.useparams)
+            return fittohairpintask(self.sequencepath,    ols,
+                                    self.constraintspath, self.useparams)
 
 class PeaksPlotModelAccess(_PeaksPlotModelAccess):
     "Access to peaks"
@@ -196,12 +204,12 @@ class PeaksPlotModelAccess(_PeaksPlotModelAccess):
         self.fits = FitToHairpinProcessor.compute((self.bead, peaks),
                                                   **task.config())[1]
 
-        for key in product(readsequence(self.sequencepath), names):
+        for key in product(self.sequences, names):
             dico[''.join(key)] = np.copy(dico[key[1]])
 
         strori  = self.css.stats.title.orientation.get()
         alldist = self.distances
-        for key, seq in readsequence(self.sequencepath).items():
+        for key, seq in self.sequences.items():
             if key not in alldist:
                 continue
 
@@ -474,7 +482,7 @@ class PeaksStatsWidget(WidgetCreator):
 
         if self._model.identification.task is not None:
             dist = self._model.distances
-            for key in readsequence(self._model.sequencepath):
+            for key in self._model.sequences:
                 if key in dist:
                     tab.sequencedependant(self._model, dist, key)
                     ret[key] = tab()
@@ -756,9 +764,32 @@ class _PeaksIOMixin:
 
 class PeaksConfigTrackIO(_PeaksIOMixin, ConfigTrackIO):
     "selects the default tasks"
+    EXT = 'xlsx', 'csv'
 
 class PeaksConfigGRFilesIO(_PeaksIOMixin, ConfigGrFilesIO):
     "selects the default tasks"
+
+@currentmodelonly
+class ConfigXlsxIO(TaskIO):
+    "Ana IO saving only the current project"
+    EXT = 'xlsx', 'csv', 'pkz'
+    def __init__(self, ctrl):
+        super().__init__(ctrl)
+        self.__model = PeaksPlotModelAccess(ctrl, 'config'+PeaksPlotCreator.key())
+
+    def save(self, path:str, models):
+        u"closes an ana file"
+        if self.__model.identification is None:
+            raise NotImplementedError('Excel reporting requires the sequence', "warning")
+        assert len(models) == 1 and models[-1] is self.__model.identification
+
+        fits   = BeadsByHairpinTask(*models[-1])
+        report = HybridstatExcelTask(path      = path,
+                                     oligos    = self.__model.oligos,
+                                     sequences = self.__model.sequences)
+        for frame in _createdata(*models[0], fits, report).run():
+            tuple(frame)
+        return True
 
 class PeaksPlotView(PlotView):
     "Peaks plot view"
@@ -773,3 +804,7 @@ class PeaksPlotView(PlotView):
                 + ('hybridstat.view.peaksplot.PeaksConfigGRFilesIO',
                    'hybridstat.view.peaksplot.PeaksConfigTrackIO'))
         tasks.io.open.default = vals
+
+        vals = (('hybridstat.view.peaksplot.XlsxIO',)
+                + tuple(tasks.io.save.get()))
+        tasks.io.save.default = vals

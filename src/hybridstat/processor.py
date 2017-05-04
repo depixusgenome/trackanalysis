@@ -59,7 +59,15 @@ def fittohairpintask(seqpath    : Union[Path, str],
         raise IOError("Could not find any sequence in "+str(seqpath))
     return readconstraints(task, idpath, useparams)
 
-class HybridstatTemplate:
+def beadsbyhairpintask(seqpath    : Union[Path, str],
+                       oligos     : Union[Sequence[str], str],
+                       idpath     : Union[None,Path,str] = None,
+                       useparams  : bool = True) -> BeadsByHairpinTask:
+    "creates and identification task from paths"
+    tsk = fittohairpintask(seqpath, oligos, idpath, useparams)
+    return BeadsByHairpinTask(**tsk.config())
+
+class HybridstatTemplate(Iterable):
     u"Template of tasks to run"
     alignment = None # type: Optional[ExtremumAlignmentTask]
     drift     = [DriftTask(onbeads = True)]
@@ -142,9 +150,9 @@ class HybridstatProcessor(Processor):
         cls.__identity(oligos, paths, modl)
         rep     = cls.__excel (oligos, track, paths, modl)
         if rep is None:
-            return [track]+[i for i in cast(Iterable, modl)]
+            return [track]+[i for i in modl]
         else:
-            return [track]+[i for i in cast(Iterable, modl)] + [rep]
+            return [track]+[i for i in modl] + [rep]
 
     def run(self, args):
         cnf = self.config()
@@ -181,8 +189,8 @@ class HybridstatProcessor(Processor):
                 modl.identity = None
             return
 
-        modl.identity = fittohairpintask(paths.sequence, oligos,
-                                         paths.idpath, paths.useparams)
+        modl.identity = beadsbyhairpintask(paths.sequence, oligos,
+                                           paths.idpath, paths.useparams)
 
     @staticmethod
     def __excel(oligos: Sequence[str],
@@ -191,12 +199,10 @@ class HybridstatProcessor(Processor):
                 modl  : HybridstatTemplate) -> Optional[HybridstatExcelTask]:
         if paths.reporting in (None, ''):
             return None
-        rep = HybridstatExcelTask(minduration = modl.detection.events.select.minduration,
-                                  hairpins    = modl.identity.distances,
-                                  knownbeads  = tuple(modl.identity.constraints.keys()),
-                                  sequences   = dict(readsequences(paths.sequence)),
-                                  oligos      = oligos,
-                                  path        = paths.reporting)
+        rep = HybridstatExcelTask(sequences = dict(readsequences(paths.sequence)),
+                                  oligos    = oligos,
+                                  path      = paths.reporting)
+        rep.frommodel(tuple(modl))
         if '*' in rep.path:
             if rep.path.count('*') > 1:
                 raise KeyError("could not parse excel output path", "warning")

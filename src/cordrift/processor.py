@@ -4,6 +4,7 @@
 from functools              import partial
 from typing                 import (Dict, Union,  # pylint: disable=unused-import
                                     Sequence, Tuple, Optional, Any, cast)
+import pickle
 
 import numpy as np
 
@@ -51,6 +52,12 @@ class _BeadDriftAction:
         assert not (self.task.events is None
                     and isinstance(self.task.collapse, CollapseToMean))
         assert self.task.zero is None or self.task.zero > 2
+
+    def __getstate__(self):
+        return self.task.config()
+
+    def __setstate__(self, vals):
+        self.__init__(vals)
 
     def __events(self, frame:Cycles) -> Events:
         if self.task.events is None:
@@ -110,28 +117,25 @@ class _BeadDriftAction:
 
         return beads.data
 
-    @classmethod
-    def __process(cls, task, data, nproc, iproc):
-        self = cls(task)
-        chk  = poolchunk(data.cyclerange(), nproc, iproc)
+    def __process(self, data, nproc, iproc):
+        chk = poolchunk(data.cyclerange(), nproc, iproc)
         for i in chk:
             self.run(i, data[..., i])
 
-        return iproc, dict(data.withcycles(slice(chk[0], chk[-1]+1)))
+        sli = slice(chk[0], chk[-1]+1)
+        return sli, dict(data.withcycles(sli))
 
-    def poolOnCycles(self, task, pool, data, frame):
+    def poolOnCycles(self, pool, pickled, frame):
         "Applies the cordrift subtraction to parallel cycles"
-        beads = frame.new(data = pooledinput(pool, data, frame[...].withbeadsonly()))
-
+        beads = frame.new(data = pooledinput(pool, pickled, frame[...].withbeadsonly()))
         nproc = pool.nworkers
-        for iproc, res in pool.map(partial(self.__process, task, beads, nproc),
-                                   range(nproc)):
-            chk = poolchunk(frame.cyclerange(), nproc, iproc)
-            sli = slice(chk[0], chk[-1]+1)
-            for i, j in zip(beads.withcycles(sli).values(), res.values()):
-                i[:] = j
 
-        return beads.data
+        data = dict(beads)
+        for sli, res in pool.map(partial(self.__process, beads, nproc), range(nproc)):
+            for i, j in res.items():
+                data[i][sli] = j
+
+        return data
 
 class DriftProcessor(Processor):
     "Deals with bead drift"
@@ -151,7 +155,7 @@ class DriftProcessor(Processor):
             fcn = lambda i: i.new().withdata(i, action.onCycles)
 
         else:
-            par = partial(action.poolOnCycles, kwa, pool, data)
+            par = partial(action.poolOnCycles, pool, pickle.dumps(data))
             fcn = lambda i: i.new().withdata(i, par)
         return fcn if toframe is None else fcn(toframe)
 
