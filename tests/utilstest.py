@@ -8,7 +8,7 @@ import pytest
 import numpy as np
 from   utils                import escapenans, fromstream
 from   utils.lazy           import LazyInstError, LazyInstanciator, LazyDict
-from   utils.attrdefaults   import fieldnames, changefields
+from   utils.attrdefaults   import fieldnames, changefields, initdefaults
 
 class TestLazy:
     u"test lazy stuff"
@@ -161,5 +161,43 @@ def test_changefields():
     except KeyError:
         assert val.attr == 1
 
+def test_init():
+    "tests initdefaults"
+    # pylint: disable=blacklisted-name
+    class _Aaa:
+        toto = 1.
+        titi = [2.]
+        @initdefaults(frozenset(locals()))
+        def __init__(self, **_):
+            pass
+
+    class _Bbb:
+        aaa  = tuple()
+        tata = tuple()
+        tutu = _Aaa()
+        @initdefaults(frozenset(locals()),
+                      tata = 'ignore',
+                      tutu = 'update',
+                      mmm  = lambda self, val: setattr(self, 'tata', val))
+        def __init__(self, **_):
+            pass
+
+    assert _Aaa().titi is not _Aaa.titi
+    assert _Aaa().titi == [2.]
+    assert _Aaa().toto == 1.
+    xxx = [3.]
+    assert _Aaa(titi = xxx).titi is xxx
+
+    assert _Bbb().tutu is not _Bbb.tutu
+    assert _Bbb(tata = (1,)).tata == tuple()
+    yyy = _Aaa()
+    assert _Bbb(tutu = yyy).tutu is yyy
+    assert _Bbb(toto = 2).tutu.toto == 2.
+
+    _Bbb(tutu = yyy, toto = 2)
+    assert yyy.toto == 2.
+
+    assert _Bbb(mmm = xxx).tata is xxx
+
 if __name__ == '__main__':
-    test_fromstream()
+    test_init()

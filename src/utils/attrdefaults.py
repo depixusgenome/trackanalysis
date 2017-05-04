@@ -136,7 +136,9 @@ class _Updater:
         self.update    = tuple(i for i in attrs if kwa.get(i, '') == 'update')
         self.call      = tuple((i, j) for i, j in kwa.items() if callable(j))
         self.ignore    = tuple(i for i in attrs if kwa.get(i, '') == 'ignore')
-        self.attrs     = tuple(i for i in attrs if kwa.get(i, '') != 'ignore')
+        self.attrs     = tuple(i for i in attrs
+                               if (kwa.get(i, '') != 'ignore'
+                                   and not callable(kwa.get(i, ''))))
         self.pipes     = None        # type: Optional[Sequence[Any]]
 
     def __init(self, obj):
@@ -184,7 +186,7 @@ def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
         attrs = tuple(i for i in getlocals(1).keys())
 
     assert len(attrs) and all(isinstance(i, str) for i in attrs)
-    attrs = set(i for i in attrs if i[0].upper() != i[0]) - set(kwa)
+    attrs = tuple(i for i in attrs if i[0].upper() != i[0])
 
     def _wrapper(fcn):
         val     = tuple(inspect.signature(fcn).parameters.values())[1]
