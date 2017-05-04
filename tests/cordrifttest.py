@@ -287,4 +287,4 @@ def test_cycleprocess_withalignment():
     assert val.shape == (1654,) # should be smaller because 2 cycles only selected
 
 if __name__ == '__main__':
-    test_cycleprocess()
+    test_cycleprocess_withalignment()

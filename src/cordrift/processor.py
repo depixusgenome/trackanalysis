@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Task & Processor for removing correlated drifts"
+"Task & Processor for removing correlated drifts"
 from functools              import partial
 from typing                 import (Dict, Union,  # pylint: disable=unused-import
                                     Sequence, Tuple, Optional, Any, cast)
@@ -10,6 +10,7 @@ import numpy as np
 from utils                      import initdefaults
 from model                      import Task, Level, PHASE
 from control.processor          import Processor
+from control.processor.runner   import pooledinput, poolchunk
 from data                       import Track, Cycles
 from eventdetection             import EventDetectionConfig
 from eventdetection.detection   import EventDetector, DerivateSplitDetector
@@ -19,7 +20,7 @@ from .collapse                  import (Range, Profile, # pylint: disable=unused
                                         StitchAlg, StitchByDerivate, StitchByInterpolation)
 
 class DriftTask(Task, EventDetectionConfig):
-    u"Removes correlations between cycles"
+    "Removes correlations between cycles"
     level     = Level.bead
     phases    = PHASE.measure, PHASE.measure # type: Optional[Tuple[int,int]]
     events    = EventDetector(split = DerivateSplitDetector())
@@ -33,8 +34,13 @@ class DriftTask(Task, EventDetectionConfig):
         Task.__init__(self)
         EventDetectionConfig.__init__(self, **kwa)
 
+    @classmethod
+    def isslow(cls) -> bool:
+        "whether this task implies long computations"
+        return True
+
 class _BeadDriftAction:
-    u"Action to be passed to a Cycles"
+    "Action to be passed to a Cycles"
     _DATA    = Sequence[np.ndarray]
     def __init__(self, args: Union[dict,DriftTask]) -> None:
         self.cache = {}     # type: Dict[Union[int,Sequence[int]], Any]
@@ -59,7 +65,7 @@ class _BeadDriftAction:
                 yield from (Range(evt['start'], evt['data']) for evt in evts)
 
     def profile(self, frame:Cycles, bcopy:bool) -> Profile:
-        u"action for removing bead drift"
+        "action for removing bead drift"
         data = []
         def _setcache(info):
             data.append(info[1])
@@ -80,7 +86,7 @@ class _BeadDriftAction:
         return prof
 
     def run(self, key, cycle:Cycles):
-        u"Applies the cordrift subtraction to a bead"
+        "Applies the cordrift subtraction to a bead"
         prof  = self.cache.get(key, None)
         if prof is not None:
             return
@@ -90,38 +96,74 @@ class _BeadDriftAction:
             vals[prof.xmin:prof.xmax] -= prof.value[:len(vals)-prof.xmin]
 
     def onBead(self, track:Track, info:Tuple[Any,np.ndarray]):
-        u"Applies the cordrift subtraction to a bead"
+        "Applies the cordrift subtraction to a bead"
         cyc = Cycles(track = track, data = dict((info,)))
         self.run((track.path, info[0]), cyc.withphases(self.task.phases))
         return info
 
-    def onCycles(self, frame, _):
-        u"Applies the cordrift subtraction to parallel cycles"
-        data = frame.new(data = dict(frame[...].withbeadsonly()))
+    def onCycles(self, frame):
+        "Applies the cordrift subtraction to parallel cycles"
+        beads  = frame.new(data = dict(frame[...].withbeadsonly()))
         for icyc in frame.cyclerange():
-            cyc = data[...,icyc].withphases(self.task.phases)
+            cyc = beads[...,icyc].withphases(self.task.phases)
             self.run(frame.parents+(icyc,), cyc)
 
-class DriftProcessor(Processor):
-    u"Deals with bead drift"
-    _ACTION  = _BeadDriftAction
+        return beads.data
+
     @classmethod
-    def apply(cls, toframe, **kwa):
+    def __process(cls, task, data, nproc, iproc):
+        self = cls(task)
+        chk  = poolchunk(data.cyclerange(), nproc, iproc)
+        for i in chk:
+            self.run(i, data[..., i])
+
+        return iproc, dict(data.withcycles(slice(chk[0], chk[-1]+1)))
+
+    def poolOnCycles(self, task, pool, data, frame):
+        "Applies the cordrift subtraction to parallel cycles"
+        beads = frame.new(data = pooledinput(pool, data, frame[...].withbeadsonly()))
+
+        nproc = pool.nworkers
+        for iproc, res in pool.map(partial(self.__process, task, beads, nproc),
+                                   range(nproc)):
+            chk = poolchunk(frame.cyclerange(), nproc, iproc)
+            sli = slice(chk[0], chk[-1]+1)
+            for i, j in zip(beads.withcycles(sli).values(), res.values()):
+                i[:] = j
+
+        return beads.data
+
+class DriftProcessor(Processor):
+    "Deals with bead drift"
+    _ACTION  = _BeadDriftAction
+    def canpool(self):
+        "returns whether this is pooled"
+        return self.task.onbeads
+
+    @classmethod
+    def apply(cls, toframe = None, pool = None, data = None, **kwa):
         "applies the task to a frame or returns a function that does so"
         action = cls._ACTION(kwa)
         if kwa.get('onbeads', True):
-            fcn = lambda frame: (frame
-                                 .new()
-                                 .withaction(partial(action.onBead, frame.track),
-                                             beadsonly = True))
+            fcn = lambda i: (i.new().withaction(partial(action.onBead, i.track),
+                                                beadsonly = True))
+        elif pool is None:
+            fcn = lambda i: i.new().withdata(i, action.onCycles)
+
         else:
-            fcn = lambda frame: frame.new().withdata(frame, action.onCycles)
+            par = partial(action.poolOnCycles, kwa, pool, data)
+            fcn = lambda i: i.new().withdata(i, par)
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
-        args.apply(self.apply(None, **self.config()), levels = self.levels)
+        if self.task.onbeads or args.pool is None:
+            args.apply(self.apply(**self.config()), levels = self.levels)
+        else:
+            args.apply(self.apply(**args.poolkwargs(self.task),
+                                  **self.config()),
+                       levels = self.levels)
 
     @classmethod
     def profile(cls, frame:Cycles, kwa:Union[dict,DriftTask]):
-        u"action for removing bead drift"
+        "action for removing bead drift"
         return cls._ACTION(kwa).profile(frame, True)

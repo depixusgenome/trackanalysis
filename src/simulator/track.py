@@ -109,7 +109,7 @@ class TrackSimulator:
     zmax         = [ 0., 0.,  1., 1.,  0., 0., -.3, -.3]
     events       = PoissonEvents()      # type: Callable[..., np.ndarray]
     brownian     = [.003] * 9           # type: Union[None, float, Sequence[float]]
-    baselineargs = (.1, 10.1, '')       # type: Optional[Tuple[float, float, str]]
+    baselineargs = (.1, 10.1, 'stairs') # type: Optional[Tuple[float, float, str]]
     driftargs    = (.1, 29.)            # type: Optional[Tuple[float, float]]
     __KEYS       = frozenset(locals())
     @initdefaults(__KEYS, events = 'update')
