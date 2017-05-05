@@ -79,11 +79,17 @@ class PrecisionAlg:
         val   = cache.get(ibead, None)
 
         if val is None:
-            beads = track.beadsonly
             if isinstance(ibead, int):
+                beads        = track.beads
                 cache[ibead] = val = nanhfsigma(beads[ibead])
             else:
-                ibead = set(beads) if ibead is None else set(ibead)
+                if ibead is None or ibead is Ellipsis:
+                    beads = track.beadsonly
+                    ibead = set(beads.keys())
+                else:
+                    beads = track.beads
+                    ibead = set(ibead)
+
                 cache.update((i, nanhfsigma(beads[i])) for i in ibead-set(cache))
                 val   = iter((i, cache[i]) for i in ibead)
         return val

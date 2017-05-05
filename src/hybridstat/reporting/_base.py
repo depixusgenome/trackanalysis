@@ -4,7 +4,7 @@
 Defines basic hybridstat related report objects and functions
 """
 from typing                 import (Optional, Sequence, # pylint:disable= unused-import
-                                    Callable, Dict)
+                                    Callable, Dict, Iterator)
 from abc                    import abstractmethod
 
 import numpy as np
@@ -13,15 +13,15 @@ from utils                  import initdefaults
 from model                  import PHASE
 from excelreports.creation  import Reporter as _Reporter, column_method, FILEOBJ
 from data.track             import Track, BEADKEY            # pylint: disable=unused-import
-from signalfilter           import PrecisionAlg
-from peakcalling.tohairpin  import Hairpin                   # pylint: disable=unused-import
+from signalfilter           import rawprecision
+from sequences              import read as readsequence
+from peakcalling.tohairpin  import Hairpin
 from peakcalling.processor  import (ByHairpinGroup as Group, # pylint: disable=unused-import
                                     ByHairpinBead  as Bead,
                                     Distance)
 
 class HasLengthPeak:
     u"Deals with the number of peaks"
-    haslengthpeak = False
     def __init__(self, base:'HasLengthPeak') -> None:
         self.haslengthpeak = getattr(base, 'haslengthpeak', False)
         self.hairpins      = getattr(base, 'hairpins', {}) # type: Dict[str, Hairpin]
@@ -123,23 +123,37 @@ class TrackInfo:
             self.path          = track.path
             self.framerate     = track.framerate
             self.ncycles       = track.ncycles
-            self.durations     = track.phaseduration(...,PHASE.measure)
-            self.uncertainties = {i: PrecisionAlg.rawprecision(track, i)
-                                  for i in track.beads.keys()}
+            self.durations     = track.phaseduration(..., PHASE.measure)
+            self.uncertainties = dict(rawprecision(track, ...))
 
 class ReporterInfo(HasLengthPeak):
     u"All info relevant to the current analysis report"
-    groups      = [] # type: Sequence[Group]
-    hairpins    = {} # type: Dict[str, Hairpin]
-    sequences   = {} # type: Dict[str, str]
-    oligos      = [] # type: Sequence[str]
-    knownbeads  = [] # type: Sequence[BEADKEY]
-    minduration = 1
-    track       = TrackInfo(None)
-    @initdefaults(frozenset(locals()) - {'track'})
-    def __init__(self, **kwa):
-        super().__init__(kwa)
-        self.track = TrackInfo(kwa['track'])
+    groups        = [] # type: Sequence[Group]
+    hairpins      = {} # type: Dict[str, Hairpin]
+    sequences     = {} # type: Dict[str, str]
+    oligos        = [] # type: Sequence[str]
+    knownbeads    = [] # type: Sequence[BEADKEY]
+    minduration   = 1
+    haslengthpeak = False
+    track         = TrackInfo(None)
+    @initdefaults(frozenset(locals()))
+    def __init__(self, *args:dict, **_) -> None:
+        kwa = args[0] # initdefaults will have set args to [kwargs]
+
+        if isinstance(kwa['groups'], Iterator):
+            kwa['groups'] = list(kwa['groups'])
+
+        elif callable(getattr(kwa['groups'], 'values', None)):
+            kwa['groups'] = list(getattr(kwa['groups'], 'values')()) # type: ignore
+
+        if isinstance(kwa['sequences'], str):
+            kwa['sequences'] = readsequence(kwa['sequences'])
+
+        if kwa.get('hairpins', None) is None:
+            kwa['hairpins'] = dict(Hairpin.read(kwa['sequences'], self.oligos))
+
+        kwa['track'] = TrackInfo(kwa['track'])
+        super().__init__(self)
 
     @staticmethod
     def sheettype(name:str):

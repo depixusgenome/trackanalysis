@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Batch creator for hybridstat tasks"
+"Batch creator for hybridstat tasks"
 from typing                     import (Optional, Tuple, # pylint: disable=unused-import
                                         Iterator, Union, Iterable, Sequence, cast)
 from copy                       import deepcopy
 from pathlib                    import Path
+from itertools                  import chain
+from functools                  import partial
 import re
 
-from utils                      import initdefaults
+from utils                      import initdefaults, updatecopy
 from data.trackio               import (checkpath,       # pylint: disable=unused-import
                                         PATHTYPES, PATHTYPE)
 from model.task                 import RootTask, Task, Level, TrackReaderTask
@@ -68,7 +70,7 @@ def beadsbyhairpintask(seqpath    : Union[Path, str],
     return BeadsByHairpinTask(**tsk.config())
 
 class HybridstatTemplate(Iterable):
-    u"Template of tasks to run"
+    "Template of tasks to run"
     alignment = None # type: Optional[ExtremumAlignmentTask]
     drift     = [DriftTask(onbeads = True)]
     detection = EventDetectionTask()    # type: Optional[EventDetectionTask]
@@ -78,8 +80,12 @@ class HybridstatTemplate(Iterable):
     def __init__(self, **kwa):
         pass
 
+    def config(self) -> dict:
+        "returns a copy of the dictionnary"
+        return deepcopy(self.__dict__)
+
     def activated(self, aobj:Union[str,Task]) -> bool:
-        u"Wether the task will be called"
+        "Wether the task will be called"
         obj = getattr(self, aobj) if isinstance(aobj, str) else aobj
         for i in self.__iter__():
             if i is obj:
@@ -105,7 +111,7 @@ OLIGO_PATTERNS = {1: (r'.*[_-]{}[-_].*'
                  }
 
 class HybridstatIO:
-    u"Paths (as regex) on which to run"
+    "Paths (as regex) on which to run"
     track     = ''                   # type: PATHTYPES
     sequence  = None                 # type: Optional[PATHTYPE]
     idpath    = None                 # type: Optional[PATHTYPE]
@@ -117,7 +123,7 @@ class HybridstatIO:
         pass
 
 class HybridstatTask(RootTask):
-    u"""
+    """
     Constructs a list of tasks depending on a template and paths.
     """
     levelin      = Level.project
@@ -129,21 +135,49 @@ class HybridstatTask(RootTask):
         super().__init__(**kwa)
 
     def addpaths(self, **kwa):
-        u"appends a HybridstatIO to the list"
+        "appends a HybridstatIO to the list"
         self.paths.append(HybridstatIO(**kwa))
 
 class HybridstatProcessor(Processor):
-    u"""
+    """
     Constructs a list of tasks depending on a template and paths.
     """
     @staticmethod
-    def create(mdl: Sequence[Task]) -> Iterator:
-        u"creates a specific model for each path"
-        return _create(mdl)
+    def create(mdl: Sequence[Task], **kwa) -> Iterator:
+        "creates a specific model for each path"
+        return _create(mdl).run(**kwa)
 
     @classmethod
-    def models(cls, paths: HybridstatIO, modl: HybridstatTemplate) -> Sequence[Task]:
-        u"creates a specific model for each path"
+    def models(cls, *paths, template = None, **kwa) -> Iterator[Sequence[Task]]:
+        "iterates through all instanciated models"
+        if template is None:
+            template = next((i for i in paths if isinstance(i, HybridstatTemplate)), None)
+            paths    = tuple(i for i in paths if not isinstance(i, HybridstatTemplate))
+
+        if len(paths) == 0:
+            return
+
+        if isinstance(paths[0], (tuple, list)) and len(paths) == 1:
+            paths = tuple(paths[0])
+
+        paths = tuple(i if isinstance(i, HybridstatIO) else HybridstatIO(**i) for i in paths)
+
+        if template is None:
+            template = HybridstatTemplate(**kwa)
+        elif len(kwa):
+            template = updatecopy(template, **kwa)
+
+        yield from(cls.model(i, template) for i in paths)
+
+    @classmethod
+    def reports(cls, *paths, template = None, pool = None, **kwa) -> Iterator[Sequence[Task]]:
+        "creates and runs models"
+        mdls = cls.models(paths, template = template, **kwa)
+        yield from chain.from_iterable(cls.create(i, pool = pool) for i in mdls)
+
+    @classmethod
+    def model(cls, paths: HybridstatIO, modl: HybridstatTemplate) -> Sequence[Task]:
+        "creates a specific model for each path"
         track   = TrackReaderTask(path = checkpath(paths.track).path, beadsonly = True)
         modl    = deepcopy(modl)
         oligos  = cls.__oligos(track, paths.oligos)
@@ -155,14 +189,9 @@ class HybridstatProcessor(Processor):
             return [track]+[i for i in modl] + [rep]
 
     def run(self, args):
-        cnf = self.config()
-        cls = type(self) # type: HybridstatProcessor
-        def _run():
-            for paths in cnf['paths']:
-                modl = cls.models(paths, cnf['template'])
-                yield from cls.create(modl).run()
-
-        args.apply(_run, levels = self.levels)
+        fcn   = partial(self.reports, *self.task.paths, pool = args.pool,
+                        **self.task.template.config())
+        args.apply(fcn, levels = self.levels)
 
     @staticmethod
     def __oligos(track:TrackReaderTask, oligos:Union[Sequence[str],str]):
@@ -209,3 +238,7 @@ class HybridstatProcessor(Processor):
             trk         = track.path[0] if isinstance(track.path, tuple) else track.path
             rep.path    = rep.path.replace('*', Path(trk).stem)
         return rep
+
+# pylint: disable=invalid-name
+createmodels   = HybridstatProcessor.models
+computereports = HybridstatProcessor.reports
