@@ -5,6 +5,7 @@ from typing                     import (Optional, Sequence, Tuple, List, Dict,
                                         Union, TYPE_CHECKING)
 from itertools                  import product
 from pathlib                    import Path
+from concurrent.futures         import ProcessPoolExecutor, ThreadPoolExecutor
 
 import bokeh.core.properties as props
 from bokeh                      import layouts
@@ -27,7 +28,7 @@ from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
                                         FitBead, Distance, HairpinDistance,
                                         BeadsByHairpinTask)
 
-from view.base                  import enableOnTrack
+from view.base                  import enableOnTrack, spawn, threadmethod
 from view.dialog                import FileDialog
 from view.intinput              import PathInput
 from view.plots                 import (PlotView, PlotAttrs, from_py_func,
@@ -772,23 +773,48 @@ class PeaksConfigGRFilesIO(_PeaksIOMixin, ConfigGrFilesIO):
 @currentmodelonly
 class ConfigXlsxIO(TaskIO):
     "Ana IO saving only the current project"
-    EXT = 'xlsx', 'csv', 'pkz'
+    EXT      = 'xlsx', 'csv', 'pkz'
+    RUNNING  = False
+    POOLTYPE = ProcessPoolExecutor
     def __init__(self, ctrl):
         super().__init__(ctrl)
         self.__model = PeaksPlotModelAccess(ctrl, 'config'+PeaksPlotCreator.key())
 
     def save(self, path:str, models):
-        u"closes an ana file"
-        if self.__model.identification is None:
-            raise NotImplementedError('Excel reporting requires the sequence', "warning")
-        assert len(models) == 1 and models[-1] is self.__model.identification
+        "creates a Hybridstat report"
+        return self._run(path, self.__model.oligos, self.__model.sequences, models[0])
 
-        fits   = BeadsByHairpinTask(*models[-1])
-        report = HybridstatExcelTask(path      = path,
-                                     oligos    = self.__model.oligos,
-                                     sequences = self.__model.sequences)
-        for frame in _createdata(*models[0], fits, report).run():
-            tuple(frame)
+    @classmethod
+    def _run(cls, path:str, oligos, seqs, model):
+        "creates a Hybridstat report"
+        if cls.RUNNING:
+            raise IOError("Can only run one at a time", "warning")
+        cls.RUNNING = True
+
+        if not isinstance(model[-1], FitToHairpinTask):
+            raise NotImplementedError('Excel reporting requires the oligos & sequences',
+                                      "warning")
+
+        cache  = _createdata(*model[:-1],
+                             BeadsByHairpinTask(**model[-1].config()),
+                             HybridstatExcelTask(path      = path,
+                                                 oligos    = oligos,
+                                                 sequences = seqs,
+                                                 model     = model))
+
+        def _process():
+            try:
+                with cls.POOLTYPE() as pool:
+                    for itm in cache.run(pool = pool):
+                        tuple(itm)
+            finally:
+                cls.RUNNING = False
+
+        async def _thread():
+            with ThreadPoolExecutor(1) as thread:
+                await threadmethod(_process, pool = thread)
+
+        spawn(_thread)
         return True
 
 class PeaksPlotView(PlotView):
