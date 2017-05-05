@@ -3,16 +3,15 @@
 u"Hybridstat excel reporting processor"
 from   typing               import (Sequence,       # pylint: disable=unused-import
                                     Dict, Iterator, Union, Optional, Any)
+from   pathlib              import Path
 import pickle
 
 from utils                      import initdefaults
 from model                      import Task, Level
 from control.processor          import Processor
-from control.processor.runner   import pooledinput, pooldump
 from anastore                   import dumps
 from excelreports.creation      import fileobj
 
-from signalfilter               import rawprecision
 from eventdetection             import EventDetectionConfig
 from peakcalling.processor      import FitToHairpinTask
 from data                       import TrackItems, BEADKEY # pylint: disable=unused-import
@@ -31,9 +30,10 @@ class HybridstatExcelTask(Task):
     knownbeads  = None  # type: Optional[Sequence[BEADKEY]]
     minduration = None  # type: Optional[int]
 
-    @initdefaults(frozenset(locals()) - {'level'})
-    def __init__(self, **_):
-        super().__init__(**_)
+    @initdefaults(frozenset(locals()) - {'level'},
+                  model = lambda self, i: self.frommodel(i))
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
 
     @classmethod
     def isslow(cls) -> bool:
@@ -52,33 +52,28 @@ class HybridstatExcelTask(Task):
             identity        = get(FitToHairpinTask)
             self.knownbeads = (tuple(identity.constraints.keys())
                                if identity else tuple())
+        trk  = model[0]
+        if '*' in self.path:
+            if self.path.count('*') > 1:
+                raise IOError("could not parse excel output path", "warning")
+            trk       = getattr(trk, 'path', trk)
+            trk       = trk[0] if isinstance(trk, tuple) else trk
+            self.path = self.path.replace('*', Path(trk).stem)
 
 class HybridstatExcelProcessor(Processor):
     u"Reporter for Hybridstat"
     @staticmethod
-    def apply(toframe = None, data = None, pool = None, **kwa):
+    def apply(toframe = None, model = None, **kwa):
         "applies the task to a frame or returns a function that does so"
-        model = list(data.model)
-        kwa['config'] = dumps(model, False) if data is not None else ''
-
-        if pool is None or not any(i.isslow() for i in data):
-            def _save(frame):
-                run(**kwa, track = frame.track, groups = frame)
-                return frame
-            save    = _save
-        else:
-            pickled = pooldump(data)
-            def _save(frame):
-                rawprecision(frame.track, frame.keys()) # compute & freeze precisions
-                run(**kwa, track = frame.track, groups = pooledinput(pool, pickled, frame))
-                return frame
-            save = _save
-
-        fcn  = lambda frame: frame.new(TrackItems).withdata(save)
+        kwa['config'] = dumps(model, False) if model is not None else ''
+        def _save(frame):
+            run(**kwa, track = frame.track, groups = frame)
+            return frame
+        fcn = lambda frame: frame.new(TrackItems).withdata(_save)
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
-        args.apply(self.apply(**args.poolkwargs(self.task), **self.config()))
+        args.apply(model = args.data.model, **self.apply(**self.config()))
 
 def run(path:str, config:str = '', **kwa):
     u"Creates a report."

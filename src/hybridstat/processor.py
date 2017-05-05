@@ -23,7 +23,6 @@ from peakcalling.processor      import (BeadsByHairpinTask, # pylint: disable=un
                                         FitToHairpinTask, DistanceConstraint,
                                         Constraints)
 from peakcalling.tohairpin      import Range
-from sequences                  import read as readsequences
 from .reporting.processor       import HybridstatExcelTask
 from .reporting.identification  import readparams
 
@@ -226,18 +225,11 @@ class HybridstatProcessor(Processor):
                 track : TrackReaderTask,
                 paths : HybridstatIO,
                 modl  : HybridstatTemplate) -> Optional[HybridstatExcelTask]:
-        if paths.reporting in (None, ''):
-            return None
-        rep = HybridstatExcelTask(sequences = dict(readsequences(paths.sequence)),
-                                  oligos    = oligos,
-                                  path      = paths.reporting)
-        rep.frommodel(tuple(modl))
-        if '*' in rep.path:
-            if rep.path.count('*') > 1:
-                raise KeyError("could not parse excel output path", "warning")
-            trk         = track.path[0] if isinstance(track.path, tuple) else track.path
-            rep.path    = rep.path.replace('*', Path(trk).stem)
-        return rep
+        if paths.reporting not in (None, ''):
+            return HybridstatExcelTask(sequences = paths.sequence,
+                                       oligos    = oligos,
+                                       path      = paths.reporting,
+                                       model     = [track] + list(modl))
 
 # pylint: disable=invalid-name
 createmodels   = HybridstatProcessor.models

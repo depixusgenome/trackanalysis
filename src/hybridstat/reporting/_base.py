@@ -147,10 +147,13 @@ class ReporterInfo(HasLengthPeak):
             kwa['groups'] = list(getattr(kwa['groups'], 'values')()) # type: ignore
 
         if isinstance(kwa['sequences'], str):
-            kwa['sequences'] = readsequence(kwa['sequences'])
+            kwa['sequences'] = dict(readsequence(kwa['sequences']))
 
         if kwa.get('hairpins', None) is None:
             kwa['hairpins'] = dict(Hairpin.read(kwa['sequences'], self.oligos))
+
+        if kwa.get('knownbeads', None) is None:
+            kwa.pop('knownbeads')
 
         kwa['track'] = TrackInfo(kwa['track'])
         super().__init__(self)

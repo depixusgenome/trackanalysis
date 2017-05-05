@@ -90,6 +90,7 @@ class PrecisionAlg:
                     beads = track.beads
                     ibead = set(ibead)
 
-                cache.update((i, nanhfsigma(beads[i])) for i in ibead-set(cache))
-                val   = iter((i, cache[i]) for i in ibead)
+                if len(ibead-set(cache)) > 0:
+                    cache.update((i, nanhfsigma(beads[i])) for i in ibead-set(cache))
+                val = iter((i, cache[i]) for i in ibead)
         return val

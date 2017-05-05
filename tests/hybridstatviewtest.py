@@ -2,14 +2,49 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-outer-name
 """ Tests views """
-from tempfile                   import mktemp
+from tempfile                   import mktemp, gettempdir
+from pathlib                    import Path
 from pytest                     import approx       # pylint: disable=no-name-in-module
 import numpy as np
 
+from tornado.gen                import sleep
+from tornado.ioloop             import IOLoop
+
+from testingcore                import path as utfilepath
 from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 from view.plots                 import DpxKeyedRow
-from hybridstat.reporting.identification import writeparams
 
+from hybridstat.reporting.identification import writeparams
+from hybridstat.processor                import createmodels
+from hybridstat.view.peaksplot           import ConfigXlsxIO
+
+def test_xlsxio():
+    "tests xlxs production"
+    itr  = createmodels(dict(track     = (Path(utfilepath("big_legacy")).parent/"*.trk",
+                                          utfilepath("CTGT_selection")),
+                             sequence  = utfilepath("hairpins.fasta")))
+    mdl  = next(itr)
+
+    for path in Path(gettempdir()).glob("*_hybridstattest*.xlsx"):
+        path.unlink()
+
+    out   = mktemp()+"_hybridstattest4.xlsx"
+    assert not Path(out).exists()
+    # pylint: disable=protected-access
+    ConfigXlsxIO._run(out, 'CTGT', utfilepath('hairpins.fasta'), mdl)
+
+    cnt = 0
+    async def _run():
+        nonlocal cnt
+        for i in range(100):
+            if ConfigXlsxIO.RUNNING is False:
+                break
+            cnt = i
+            await sleep(.1)
+
+    IOLoop.current().run_sync(_run)
+    assert Path(out).exists()
+    assert cnt > 0
 
 def test_peaksplot(bokehaction):
     "test peaksplot"
@@ -85,4 +120,4 @@ def test_hybridstat(bokehaction):
         server.change('Hybridstat:Tabs', 'active', 2)
 
 if __name__ == '__main__':
-    test_peaksplot(bokehaction(None))
+    test_xlsxio()
