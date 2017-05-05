@@ -8,10 +8,11 @@ import pickle
 from utils                      import initdefaults
 from model                      import Task, Level
 from control.processor          import Processor
-from control.processor.runner   import pooledinput
+from control.processor.runner   import pooledinput, pooldump
 from anastore                   import dumps
 from excelreports.creation      import fileobj
 
+from signalfilter               import rawprecision
 from eventdetection             import EventDetectionConfig
 from peakcalling.tohairpin      import Hairpin
 from peakcalling.processor      import FitToHairpinTask
@@ -70,8 +71,9 @@ class HybridstatExcelProcessor(Processor):
                 return frame
             save    = _save
         else:
-            pickled = pickle.dumps(data)
+            pickled = pooldump(data)
             def _save(frame):
+                rawprecision(frame.track, frame.keys()) # compute & freeze precisions
                 run(**kwa, track = frame.track, groups = pooledinput(pool, pickled, frame))
                 return frame
             save = _save

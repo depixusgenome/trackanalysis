@@ -4,15 +4,15 @@
 from functools              import partial
 from typing                 import (Dict, Union,  # pylint: disable=unused-import
                                     Sequence, Tuple, Optional, Any, cast)
-import pickle
 
 import numpy as np
 
 from utils                      import initdefaults
 from model                      import Task, Level, PHASE
 from control.processor          import Processor
-from control.processor.runner   import pooledinput, poolchunk
+from control.processor.runner   import pooledinput, poolchunk, pooldump
 from data                       import Track, Cycles
+from signalfilter               import rawprecision
 from eventdetection             import EventDetectionConfig
 from eventdetection.detection   import EventDetector, DerivateSplitDetector
 from eventdetection.data        import Events
@@ -43,8 +43,9 @@ class DriftTask(Task, EventDetectionConfig):
 class _BeadDriftAction:
     "Action to be passed to a Cycles"
     _DATA    = Sequence[np.ndarray]
-    def __init__(self, args: Union[dict,DriftTask]) -> None:
-        self.cache = {}     # type: Dict[Union[int,Sequence[int]], Any]
+    def __init__(self, args: Union[dict,DriftTask], cache = None) -> None:
+        self.cache = {} if cache is None else cache # type: Dict[Union[int,Sequence[int]], Any]
+        self.done  = set()                          # type: set
         self.task  = cast(DriftTask,
                           args if isinstance(args, DriftTask)
                           else DriftTask(**args))
@@ -69,7 +70,7 @@ class _BeadDriftAction:
                             events    = self.task.events,
                             precision = self.task.precision)
             for _, evts in events:
-                yield from (Range(evt['start'], evt['data']) for evt in evts)
+                yield from (Range(*i) for i in zip(evts['start'], evts['data']))
 
     def profile(self, frame:Cycles, bcopy:bool) -> Profile:
         "action for removing bead drift"
@@ -94,11 +95,14 @@ class _BeadDriftAction:
 
     def run(self, key, cycle:Cycles):
         "Applies the cordrift subtraction to a bead"
-        prof  = self.cache.get(key, None)
-        if prof is not None:
+        if key in self.done:
             return
 
-        self.cache[key] = prof = self.profile(cycle, False)
+        self.done.add(key)
+        prof = self.cache.get(key, None)
+        if prof is None:
+            self.cache[key] = prof = self.profile(cycle, False)
+
         for _, vals in cycle:
             vals[prof.xmin:prof.xmax] -= prof.value[:len(vals)-prof.xmin]
 
@@ -117,25 +121,33 @@ class _BeadDriftAction:
 
         return beads.data
 
-    def __process(self, data, nproc, iproc):
-        chk = poolchunk(data.cyclerange(), nproc, iproc)
-        for i in chk:
-            self.run(i, data[..., i])
-
-        sli = slice(chk[0], chk[-1]+1)
-        return sli, dict(data.withcycles(sli))
-
     def poolOnCycles(self, pool, pickled, frame):
         "Applies the cordrift subtraction to parallel cycles"
-        beads = frame.new(data = pooledinput(pool, pickled, frame[...].withbeadsonly()))
-        nproc = pool.nworkers
+        rawprecision(frame.track, frame[...].withbeadsonly().keys()) # compute & freeze precisions
+        if getattr(frame.cycles, 'start', None) is not None:
+            raise NotImplementedError("*you* do it!")
 
-        data = dict(beads)
-        for sli, res in pool.map(partial(self.__process, beads, nproc), range(nproc)):
-            for i, j in res.items():
-                data[i][sli] = j
+        orig   = frame.new(data   = pooledinput(pool, pickled, frame),
+                           cycles = frame.cycles)
 
-        return data
+        rng    = list(orig.cyclerange())
+        beads  = orig[...].withbeadsonly().withcycles(...)
+        cycles = []
+        for iproc in range(pool.nworkers):
+            chk = poolchunk(rng, pool.nworkers, iproc)
+            tmp = beads[..., chk].withphases(self.task.phases)
+            cycles.append(tmp.new(data = dict(tmp), direct = True))
+
+        for cyc, done in zip(cycles, pool.map(self._process, cycles)):
+            for i, j in done.items():
+                cyc[i][:] = j
+
+        return dict(orig)
+
+    def _process(self, data):
+        for i in set(i for _, i in data.keys()):
+            self.run(i, data[..., i])
+        return dict(data)
 
 class DriftProcessor(Processor):
     "Deals with bead drift"
@@ -145,9 +157,9 @@ class DriftProcessor(Processor):
         return self.task.onbeads
 
     @classmethod
-    def apply(cls, toframe = None, pool = None, data = None, **kwa):
+    def apply(cls, toframe = None, pool = None, data = None, cache = None, **kwa):
         "applies the task to a frame or returns a function that does so"
-        action = cls._ACTION(kwa)
+        action = cls._ACTION(kwa, cache = cache)
         if kwa.get('onbeads', True):
             fcn = lambda i: (i.new().withaction(partial(action.onBead, i.track),
                                                 beadsonly = True))
@@ -155,17 +167,17 @@ class DriftProcessor(Processor):
             fcn = lambda i: i.new().withdata(i, action.onCycles)
 
         else:
-            par = partial(action.poolOnCycles, pool, pickle.dumps(data))
+            par = partial(action.poolOnCycles, pool, pooldump(data))
             fcn = lambda i: i.new().withdata(i, par)
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
-        if self.task.onbeads or args.pool is None:
-            args.apply(self.apply(**self.config()), levels = self.levels)
-        else:
-            args.apply(self.apply(**args.poolkwargs(self.task),
-                                  **self.config()),
-                       levels = self.levels)
+        kwa          = self.config()
+        kwa['cache'] = args.data.setCacheDefault(self, {})
+        if not (self.task.onbeads or args.pool is None):
+            kwa.update(args.poolkwargs(self.task))
+
+        args.apply(self.apply(**kwa), levels = self.levels)
 
     @classmethod
     def profile(cls, frame:Cycles, kwa:Union[dict,DriftTask]):

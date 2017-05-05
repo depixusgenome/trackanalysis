@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "Tests cordrift"
 from   itertools                import product
+from   concurrent.futures       import ProcessPoolExecutor
 import random
 import numpy as np
 from   numpy.testing            import assert_allclose, assert_equal
@@ -255,7 +256,7 @@ def test_beadprocess():
         assert_allclose(val-val[0], 0., atol = 1e-2)
 
 def test_cycleprocess():
-    "tests that tracks are well simulated"
+    "tests drift removal on cycles"
     pair = create((TrackSimulatorTask(brownian  = 0.,
                                       events    = None,
                                       nbeads    = 30,
@@ -277,14 +278,38 @@ def test_cycleprocess():
         assert_allclose(val-val[0], 0., atol = 1e-2)
 
 def test_cycleprocess_withalignment():
-    "tests that tracks are well simulated"
-    pair = create((utpath("big_all"),
-                   DataSelectionTask(cycles = slice(2)),
-                   ExtremumAlignmentTask(phase = 1),
-                   DriftTask(onbeads = False)))
-    cycs = next(i for i in pair.run())
-    val  = cycs[0]
-    assert val.shape == (1654,) # should be smaller because 2 cycles only selected
+    "tests drift removal on cycles"
+    def _do(pool, drift = True):
+        tasks = (utpath("big_all"),
+                 DataSelectionTask(cycles = slice(2)),
+                 ExtremumAlignmentTask(phase = 1),
+                 DriftTask(onbeads = False))
+        pair = create(tasks[:4 if drift else 3])
+        ret  = dict(next(i for i in pair.run(pool = pool))[0,...].withphases(5))
+        ret  = {i: j - j.mean() for i, j in ret.items()}
+
+        cache = pair.data.getCache(-1)()
+        if cache is not None:
+            cache = {i[1] if isinstance(i, tuple) else i: j.value - j.value.mean()
+                     for i, j in cache.items()}
+        return ret, cache
+
+    val1, prof1 = _do(None)
+    val2, _     = _do(None, drift = False)
+    assert np.std(val2[0,0] - val1[0,0]) >  0.001
+
+    val2, prof2 = _do(type('_Dummy', (), {'nworkers': 2, 'map': staticmethod(map)})())
+    for i, j in prof2.items():
+        assert_allclose(prof1[i], j, atol = 1e-5, rtol = 1e-4)
+
+    for i, j in val2.items():
+        assert_allclose(val1[i], j, atol = 1e-5, rtol = 1e-4)
+
+    with ProcessPoolExecutor(2) as pool:
+        val2, _ = _do(pool)
+
+    for i, j in val2.items():
+        assert_allclose(val1[i], j, atol = 1e-5, rtol = 1e-4)
 
 if __name__ == '__main__':
     test_cycleprocess_withalignment()

@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Deals with running a list of processes"
-from inspect        import signature
-from itertools      import groupby
-from functools      import partial
-from copy           import copy as shallowcopy
-from typing         import (Callable, Optional,     # pylint: disable=unused-import
-                            Iterable, Tuple, Dict, Any, Sequence, Iterator, cast)
+from inspect            import signature
+from itertools          import groupby
+from functools          import partial
+from multiprocessing    import cpu_count
+from copy               import copy as shallowcopy
+from typing             import (Callable,   # pylint: disable=unused-import
+                                Iterable, Tuple, Dict, Any, Sequence,
+                                Optional, Iterator, cast)
 import pickle
 
 import numpy
 
-from data           import TrackItems, createTrackItem
-from model          import Task, Level
-from .base          import Processor
-from .cache         import Cache
+from data               import TrackItems, createTrackItem
+from model              import Task, Level
+from .base              import Processor
+from .cache             import Cache
 
 class Runner:
     u"Arguments used for iterating"
@@ -175,6 +177,7 @@ def _m_multi(data, start, parents, nproc, iproc):
     frame = next(i for i in run(data, start = start) if i.parents == parents)
     return {i: frame[i] for i in poolchunk(frame.keys(), nproc, iproc)}
 
+pooldump = pickle.dumps  # pylint: disable=invalid-name
 def pooledinput(pool, pickled, frame) -> dict:
     u"returns a dictionary with all input"
     data = pickle.loads(pickled)
@@ -203,11 +206,15 @@ def run(data, tsk = None, copy = False, pool = None, start = None):
     Iterates through the list up to and including *tsk*.
     Iterates through all if *tsk* is None
     """
-    if pool is not None and not hasattr(pool, 'nworkers'):
-        raise TypeError('Pool should have an *nworkers* attribute')
 
     # make sure the original input is not changed
     gen   = iter(shallowcopy(i) for i in start) if start is not None else None
+
+    if pool is not None and not hasattr(pool, 'nworkers'):
+        nproc = getattr(pool, '_max_workers', None)
+        if nproc is None:
+            nproc = cpu_count()
+        pool.nworkers = nproc
 
     args  = Runner(data, pool = pool, gen = gen)
     ind   = None if tsk is None else data.index(tsk)+1
