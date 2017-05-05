@@ -199,5 +199,42 @@ def test_init():
 
     assert _Bbb(mmm = xxx).tata is xxx
 
+    # pylint: disable=missing-docstring
+    class Cls:
+        attr    = []
+        ignored = 0
+        @initdefaults(frozenset(locals()),
+                      ignored = 'ignore',
+                      call    = lambda self, value: setattr(self, 'ignored', 2*value))
+        def __init__(self, **kwa):
+            pass
+
+    assert Cls().ignored == 0
+    assert Cls(call = 1).ignored == 2
+    assert Cls().attr    == []
+    assert Cls().attr    is not Cls.attr
+    lst = [2]
+    assert Cls(attr = lst).attr is lst
+
+    class Trans:
+        attr1 = 1
+        attr2 = 2
+        @initdefaults(frozenset(locals()))
+        def __init__(self, *kwa:dict, **_) -> None:
+            kwa[0].pop('attr1', None)
+            if 'attr2' in kwa[0]:
+                kwa[0]['attr2'] *= 2
+
+    assert Trans(attr1 = 100).attr1 == 1
+    assert Trans(attr2 = 100).attr2 == 200
+
+    class Agg:
+        elem = Cls()
+        @initdefaults(frozenset(locals()), elem = 'update')
+        def __init__(self, **kwa):
+            pass
+
+    assert Agg(attr = [2]).elem.attr == [2]
+
 if __name__ == '__main__':
     test_init()
