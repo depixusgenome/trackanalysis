@@ -55,7 +55,7 @@ class Events(Cycles, EventDetectionConfig, Items):
             if test:
                 gen = cycle
             else:
-                val  = evts.rawprecision(track, key[0]) if prec is None else prec
+                val  = self.getprecision(prec, track, key[0])
                 good = np.isfinite(cycle)
                 cnt  = good.sum()
                 if cnt == 0:

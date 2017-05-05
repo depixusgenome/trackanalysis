@@ -3,7 +3,8 @@
 u"""
 Base track file data.
 """
-from    typing      import Optional, Union, Dict
+from    typing      import Optional, Union, Dict, Tuple
+from    copy        import deepcopy
 import  numpy       as     np
 
 from    utils       import initdefaults
@@ -16,16 +17,20 @@ IDTYPE = Union[None, int, slice] # missing Ellipsys as mypy won't accept it
 @levelprop(Level.project)
 class Track:
     "Model for track files. This must not contain actual data."
-    path      = None # type: Optional[str]
     framerate = 0.
     phases    = np.empty((0,9), dtype = 'i4')
-    _data     = None # type: Optional[Dict[BEADKEY,np.ndarray]]
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **kwa) -> None:
-        self._data = kwa.get('data', None)
+    _data     = None # type: Optional[Dict[BEADKEY, np.ndarray]]
+    @initdefaults(frozenset(locals()),
+                  path = lambda self, i: setattr(self, '_path', i),
+                  data = lambda self, i: setattr(self, '_data', i))
+    def __init__(self, **_) -> None:
+        self._rawprecisions = {}   # type: Dict[BEADKEY, float]
+        self._data          = None # type: Optional[Dict[BEADKEY, np.ndarray]]
+        self._path          = None # type: Union[str, Tuple[str, ...]]
 
     def __getstate__(self):
         info = self.__dict__.copy()
+        info['path'] = info.pop('_path')
         if info['path'] is None:
             info['data'] = info.pop('_data')
         else:
@@ -81,15 +86,33 @@ class Track:
         return vect - orig
 
     @property
-    def data(self):
+    def path(self) -> Union[None, str, Tuple[str, ...]]:
+        "returns the current path(s)"
+        return self._path
+
+    @path.setter
+    def path(self, val) -> Union[None, str, Tuple[str, ...]]:
+        "sets the current path(s) and clears the data"
+        self._path = val
+
+        for name in ('framerate', 'phases'):
+            setattr(self, name, deepcopy(getattr((type(self)), name)))
+
+        self._data = None
+        self._rawprecisions.clear()
+        return self._path
+
+    @property
+    def data(self) -> Dict:
         u"returns the dataframe with all bead info"
         self.__unlazyfy(True)
         return self._data
 
     @data.setter
-    def data(self, data: Optional[Dict[BEADKEY,np.ndarray]]):
+    def data(self, data: Optional[Dict[BEADKEY, np.ndarray]]):
         u"sets the dataframe"
         self._data = data
+        self._rawprecisions.clear()
 
     @staticmethod
     def isbeadname(key) -> bool:

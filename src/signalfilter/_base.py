@@ -2,9 +2,8 @@
 # -*- coding: utf-8 -*-
 u"Signal Analysis: filters for removing noise"
 # pylint: disable=no-name-in-module,import-error
-from typing         import Union, Optional, Sequence, cast
+from typing         import Union, Iterator, Tuple, Optional, Sequence, cast
 from itertools      import chain
-from weakref        import WeakKeyDictionary
 
 import numpy as np
 
@@ -32,19 +31,24 @@ class PrecisionAlg:
     def __init__(self, **_):
         pass
 
-    def getprecision(self,
+    def getprecision(self,                  # pylint: disable=too-many-branches
                      precision:Optional[float] = None,
-                     data     :DATATYPE        = tuple()) -> float:
+                     data     :DATATYPE        = tuple(),
+                     beadid                    = None) -> float:
         u"""
         Returns the precision, possibly extracted from the data.
         Raises AttributeError if the precision was neither set nor could be
         extracted
         """
+
         if precision is None:
             precision = self.precision
 
         if np.isscalar(precision) and precision > 0.:
             return float(precision)
+
+        if beadid is not None:
+            return cast(float, self.rawprecision(data, beadid))
 
         if isinstance(data, Sequence[Sequence[np.ndarray]]):
             if len(data) == 1:
@@ -67,13 +71,19 @@ class PrecisionAlg:
 
         raise AttributeError('Could not extract precision: no data or set value')
 
-    __RP_CACHE = WeakKeyDictionary() # type: ignore
     @classmethod
-    def rawprecision(cls, track, ibead):
+    def rawprecision(cls, track, ibead) -> Union[float, Iterator[Tuple[int, float]]]:
         u"Obtain the raw precision for a given bead"
-        track = getattr(track, 'track', track) # in case this is a data.TrackItems
-        cache = cls.__RP_CACHE.setdefault(track, {})
+        track = getattr(track, 'track', track)
+        cache = getattr(track, '_rawprecisions')
         val   = cache.get(ibead, None)
+
         if val is None:
-            cache[ibead] = val = nanhfsigma(track.beads[ibead])
+            beads = track.beadsonly
+            if isinstance(ibead, int):
+                cache[ibead] = val = nanhfsigma(beads[ibead])
+            else:
+                ibead = set(beads) if ibead is None else set(ibead)
+                cache.update((i, nanhfsigma(beads[i])) for i in ibead-set(cache))
+                val   = iter((i, cache[i]) for i in ibead)
         return val
