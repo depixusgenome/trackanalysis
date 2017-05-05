@@ -125,17 +125,24 @@ class TransformedItems:
         "Returns the track if any"
         return getattr(self._data if self._parent is None else self._parent, 'track', None)
 
+    def values(self):
+        "Returns the values after running the computations"
+        self.__run()
+        yield from self._parent.data.values()
+
     def __getitem__(self, val):
-        fcn, self._fcn = self._fcn, None
-        if fcn is not None:
-            self._parent.data = fcn(self._data)
+        self.__run()
         return self._parent.data[val]
 
     def keys(self, _1 = None, _2 = None) -> Iterator:
         "iterates over keys"
-        assert _1 is None
-        assert _2 is None
+        assert _1 is None and _2 is None
         yield from self._data.keys()
+
+    def __run(self):
+        fcn, self._fcn = self._fcn, None
+        if fcn is not None:
+            self._parent.data = fcn(self._data)
 
 class _m_ConfigMixin: # pylint: disable=invalid-name
     data      = None    # type: Union[Items,TrackItems,TransformedItems,Dict,None]
@@ -642,6 +649,9 @@ class Cycles(TrackItems, Items):
 
     def maxsize(self):
         "returns the max size of cycles"
+        if self.direct and self.first is None and self.last is None:
+            return max((len(i) for i in self.data.values()), default = 0)
+
         if isfunction(self.track):
             self.track = self.track()
 
