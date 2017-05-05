@@ -4,6 +4,8 @@ u'''
 Creates Classes and function to use with assemble sequence
 '''
 
+from typing import Callable # pylint: disable=unused-import
+
 def shifted_overlap(ol1:str,ol2:str,shift=0)->str:
     u'''
     returns '-' when the two strings mismatch
@@ -24,7 +26,6 @@ def tail_overlap(ol1:str, ol2:str)->str:
     u'''
     returns the end sequence of ol1 matching the start of ol2
     '''
-
     for i in range(len(ol1)):
         if ol1[i:]==ol2[:len(ol1)-i]:
             return ol1[i:]
@@ -82,8 +83,6 @@ class Oligo:
 
         return noverlaps(self.seq,other.seq,shift=shift)
 
-
-
 class OligoPeak(Oligo):
     u'''
     represents peaks obtained from experiment adding attributes such as :
@@ -93,7 +92,7 @@ class OligoPeak(Oligo):
     def __init__(self,**kwa):
         super().__init__(**kwa)
         self.batch_id=kwa.get("batch_id",None)
-        self.dist=kwa.get("dist",None)
+        self.dist=kwa.get("dist",None)# type: List
         self.poserr=kwa.get("poserr",None)
         self.pos0=kwa.get("pos0",None) # initial (experimental) position in nanometer
         self.bpos0=kwa.get("bpos0",None) # initial (experimental) base position
@@ -111,3 +110,22 @@ class Batch:
         u'adds oligos from other into self and empties other'
         self.oligos.extend(other.oligos)
         del other.oligos
+
+class CallFalse:
+    u'returns False at each call'
+    def __call__(self,*args,**kwargs):
+        return False
+# enum for rules retriction
+class BatchModel:
+    u'''
+    Container class which controls batches and how they interact
+    '''
+    def __init__(self,oligos,sort_by="pos0",**kwa):
+        self.oligos=sorted(oligos,key=lambda x:getattr(x,sort_by))
+        self.batches=[]
+        self.can_peak_flip=kwa.get("flip_rule",CallFalse()) # type:Callable
+
+    def batch_by(self,attr="seq"):
+        u'create Batch with groups of similar "attr" value'
+        grps = {getattr(oli,attr) for oli in self.oligos}
+        self.batches=[[oli for oli in self.oligos if getattr(oli,attr)==grp] for grp in grps]
