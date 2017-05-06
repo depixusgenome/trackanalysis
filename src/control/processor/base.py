@@ -75,8 +75,14 @@ class Processor(metaclass=MetaProcessor):
     Main class for processing tasks
     """
     tasktype = None # type: Union[type, Tuple[type, ...]]
-    def __init__(self, task: _tasks.Task) -> None:
-        if not isinstance(task, self.tasktype):
+    def __init__(self, task: _tasks.Task = None, **cnf) -> None:
+        if task is None:
+            task = cast(type, self.tasktype)(**cnf) # pylint: disable=not-callable
+        elif isinstance(task, dict):
+            tmp  = cast(dict, task)
+            tmp.update(cnf)
+            task = cast(type, self.tasktype)(**tmp) # pylint: disable=not-callable
+        elif not isinstance(task, self.tasktype):
             raise TypeError('"task" must have type '+ str(self.tasktype))
         self.task = task
 
