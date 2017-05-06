@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Deals with running a list of processes"
+"Deals with running a list of processes"
 from inspect            import signature
 from itertools          import groupby
 from functools          import partial
@@ -19,9 +19,24 @@ from .base              import Processor
 from .cache             import Cache
 
 class Runner:
-    u"Arguments used for iterating"
+    "Arguments used for iterating"
     __slots__ = ('data', 'pool', 'level', 'gen')
-    def __init__(self, data, pool = None, gen = None):
+    def __init__(self, data, pool = None, gen = None, task = None):
+        if pool is not None and not hasattr(pool, 'nworkers'):
+            nproc = getattr(pool, '_max_workers', None)
+            if nproc is None:
+                nproc = cpu_count()
+            pool.nworkers = nproc
+
+        if   isinstance(data, Iterator):
+            data = Cache(list(data))
+        elif isinstance(data, (tuple, list)):
+            data = Cache(data)
+        data.keepupto(task)
+
+        # make sure the original input is not changed
+        gen = None if gen is None else iter(shallowcopy(i) for i in gen)
+
         self.data  = data      # type: Cache
         self.pool  = pool      # type: Any
         self.gen   = gen       # type: Optional[Iterator[TrackItems]]
@@ -48,7 +63,7 @@ class Runner:
 
     @staticmethod
     def regroup(grp) -> 'Callable':
-        u"regroups elements with a same key into an numpy.ndarray"
+        "regroups elements with a same key into an numpy.ndarray"
         def _regroup(cols = tuple(grp)):
             data = dict()
             for col in cols:
@@ -59,7 +74,7 @@ class Runner:
         return _regroup
 
     def tolevel(self, curr: 'Optional[Tuple[Level,Level]]'):
-        u"Changes a generator to fit the processor's level"
+        "Changes a generator to fit the processor's level"
         if curr in (None, Level.none):
             return
 
@@ -71,7 +86,7 @@ class Runner:
             return
 
         def collapse(gen):
-            u"""
+            """
             Collapses items from *gen* into a series of *TrackItem*s
             each of which contain sequential items with similar parents
             """
@@ -79,7 +94,7 @@ class Runner:
                 yield TrackItems(data = self.regroup(grp), parents = key)
 
         def expand(level:Level, gen):
-            u"Transforms *gen* into *TrackItem*s, one per item in gen"
+            "Transforms *gen* into *TrackItem*s, one per item in gen"
             yield from (createTrackItem(level,
                                         track   = frame.track,
                                         data    = frame[[key]],
@@ -96,7 +111,7 @@ class Runner:
 
     @classmethod
     def checkClosure(cls, fcn):
-        u"""
+        """
         We want the closure to be frozen.
 
         In this way, changing the task after implementing the iteration
@@ -109,7 +124,7 @@ class Runner:
 
 
     def apply(self, fcn, *_, levels = None):
-        u"Applies a function to generator's output"
+        "Applies a function to generator's output"
         self.tolevel(levels)
         if fcn is None:
             pass
@@ -179,50 +194,40 @@ def _m_multi(data, start, parents, nproc, iproc):
 
 pooldump = pickle.dumps  # pylint: disable=invalid-name
 def pooledinput(pool, pickled, frame) -> dict:
-    u"returns a dictionary with all input"
-    data = pickle.loads(pickled)
+    "returns a dictionary with all input"
+    data = pickle.loads(pickled) if isinstance(pickled, bytes) else pickled
     if pool is None or not any(i.isslow() for i in data):
         return dict(frame)
 
     else:
-        res   = {} # type: dict
-        nproc = pool.nworkers
-        ind   = next((i for i, j in enumerate(list(data)[::-1]) if j.canpool()), None)
+        ind = max((i for i, j in enumerate(data) if j.canpool()),
+                  default = None)
         if ind is None:
             gen  = None
         else:
-            ind  = len(data)-cast(int, ind)
-            gen  = tuple(i.withdata(dict(i.data))
-                         for i in run(Cache(data[:ind]))
+            ind  = cast(int, ind)+1
+            gen  = tuple(i.freeze()
+                         for i in run(data[:ind])
                          if i.parents == frame.parents[:len(i.parents)])
-            data = Cache(data[ind:])
+            data = list(data[ind:])
 
+        nproc = pool.nworkers
+        res   = {} # type: dict
         for val in pool.map(partial(_m_multi, data, gen, frame.parents, nproc), range(nproc)):
             res.update(val)
         return res
 
 def run(data, tsk = None, copy = False, pool = None, start = None):
-    u"""
+    """
     Iterates through the list up to and including *tsk*.
     Iterates through all if *tsk* is None
     """
-
-    # make sure the original input is not changed
-    gen   = iter(shallowcopy(i) for i in start) if start is not None else None
-
-    if pool is not None and not hasattr(pool, 'nworkers'):
-        nproc = getattr(pool, '_max_workers', None)
-        if nproc is None:
-            nproc = cpu_count()
-        pool.nworkers = nproc
-
-    args  = Runner(data, pool = pool, gen = gen)
-    ind   = None if tsk is None else data.index(tsk)+1
+    args  = Runner(data, pool = pool, gen = start, task = tsk)
     first = True
-    for proc in data[:ind]:
+    for proc in args.data:
         if not proc.task.disabled:
             proc.run(args)
             if first and copy:
                 args.gen = tuple(frame.withcopy(True) for frame in args.gen)
             first  = False
-    return args.gen
+    return () if args.gen is None else args.gen

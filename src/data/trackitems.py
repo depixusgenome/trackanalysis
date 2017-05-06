@@ -335,6 +335,13 @@ class TrackItems(_m_ConfigMixin, Items):
             cpy = shallowcopy(self)
             return cpy.selecting(keys, clear = True)
 
+    def freeze(self):
+        "returns data with all treatments applied"
+        if type(self) in (Cycles, Beads): # pylint: disable=unidiomatic-typecheck
+            # not for subclasses !!!
+            return self.new(data = dict(self))
+        return self.new(TrackItems, data = dict(self))
+
     def new(self:TSelf, tpe: Optional[type] = None, **kwa) -> TSelf:
         "returns a item containing self in the data field"
         kwa.setdefault('track',     self.track)
@@ -493,14 +500,27 @@ class Cycles(TrackItems, Items):
 
     * providing with a unique cycle id will extract all columns for that cycle
     """
-    level  = Level.cycle
-    first  = None   # type: Optional[int]
-    last   = None   # type: Optional[int]
-    direct = False  # type: bool
+    level   = Level.cycle
+    first   = None   # type: Optional[int]
+    last    = None   # type: Optional[int]
+    _direct = False  # type: bool
 
-    @initdefaults(frozenset(locals()))
+    @initdefaults(frozenset(locals()),
+                  direct = lambda i, j: setattr(i, '_direct', j))
     def __init__(self, **kw):
         super().__init__(**kw)
+
+    @property
+    def direct(self) -> bool:
+        "whether the data keys are directly cycle keys"
+        return (self._direct or isinstance(self.data, dict)
+                and len(self.data) > 0
+                and isinstance(next(iter(self.data)), tuple))
+
+    @direct.setter
+    def direct(self, i:bool):
+        "whether the data keys are directly cycle keys"
+        self._direct = i
 
     def __keysfrombeads(self, sel, beadsonly):
         beads     = tuple(Beads(track = self.track, data = self.data).keys(None, beadsonly))
