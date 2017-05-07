@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 u"testing peakcalling"
 # pylint: disable=import-error,no-name-in-module
+from concurrent.futures     import ProcessPoolExecutor
 import numpy as np
 from numpy.testing          import assert_allclose, assert_equal
 from pytest                 import approx
@@ -12,6 +13,7 @@ from peakcalling            import cost, match
 from peakcalling.processor  import (BeadsByHairpinProcessor, BeadsByHairpinTask,
                                     PeakIdentifier, HairpinDistance,
                                     DistanceConstraint)
+from testingcore            import DummyPool
 
 def test_cost_value():
     u"Tests peakcalling.cost.compute"
@@ -126,6 +128,15 @@ def test_control():
 
     beads = tuple(i for i in pair.run())[0]
     assert tuple(beads.keys()) == ('hp100',)
+
+    pair.clear()
+    beads = tuple(i for i in pair.run(pool = DummyPool()))[0]
+    assert tuple(beads.keys()) == ('hp100',)
+
+    pair.clear()
+    with ProcessPoolExecutor(2) as pool:
+        beads = tuple(i for i in pair.run(pool = pool))[0]
+        assert tuple(beads.keys()) == ('hp100',)
 
 if __name__ == '__main__':
     test_control()

@@ -60,3 +60,11 @@ def getmonkey():
     from    _pytest.monkeypatch import MonkeyPatch
     warnings.warn("Unsafe call to MonkeyPatch. Use only for manual debugging")
     return MonkeyPatch()
+
+class DummyPool:
+    "DummyPool"
+    nworkers = 2
+    @staticmethod
+    def map(*args):
+        "DummyPool"
+        return map(*args)

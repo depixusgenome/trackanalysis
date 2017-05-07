@@ -13,6 +13,7 @@ from model.task               import Task, RootTask, Level
 from data.trackitems          import TrackItems
 from control.processor        import Processor
 from control.processor.runner import Cache, pooledinput, run, poolchunk
+from testingcore              import DummyPool
 
 class _RootTask(RootTask):
     pass
@@ -102,13 +103,7 @@ def test_pooled(monkeypatch):
                   _AProcessor(_ATask(pool = False, name = 'c')),
                   _AProcessor(_ATask(pool = True,  name = 'd'))])
 
-    class _Dummy:
-        nworkers = 2
-        @staticmethod
-        def map(*args):
-            return map(*args)
-
-    vals = tuple(tuple(i) for i in run(data, pool = _Dummy))
+    vals = tuple(tuple(i) for i in run(data, pool = DummyPool))
     assert len(vals) == 1
     vals = vals[0]
     assert len(vals) == 3

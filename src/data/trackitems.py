@@ -8,7 +8,8 @@ from    itertools   import product
 from    functools   import wraps
 from    typing      import (Optional, Tuple, Union, # pylint: disable=unused-import
                             Any, List, Sequence, Iterable, Iterator,
-                            TypeVar, Hashable, TYPE_CHECKING, Dict, cast)
+                            TypeVar, Hashable, TYPE_CHECKING, Dict, Generator,
+                            cast)
 import  numpy as np
 
 from    utils       import isfunction, initdefaults
@@ -337,10 +338,14 @@ class TrackItems(_m_ConfigMixin, Items):
 
     def freeze(self):
         "returns data with all treatments applied"
-        if type(self) in (Cycles, Beads): # pylint: disable=unidiomatic-typecheck
-            # not for subclasses !!!
-            return self.new(data = dict(self))
-        return self.new(TrackItems, data = dict(self))
+        data = dict(self)
+        for i, j in data.items():
+            if isinstance(j, Generator):
+                data[i] = np.array(tuple(j), dtype = 'O')
+
+        # pylint: disable=unidiomatic-typecheck
+        tpe = None if type(self) in (Cycles, Beads) else TrackItems
+        return self.new(tpe, data = data)
 
     def new(self:TSelf, tpe: Optional[type] = None, **kwa) -> TSelf:
         "returns a item containing self in the data field"

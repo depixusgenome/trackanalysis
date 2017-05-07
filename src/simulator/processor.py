@@ -42,6 +42,13 @@ class SimulatorMixin:
         sim   = getattr(self.caller(), self._FCN)
         args.apply(self._generate(sim, items), levels = self.levels)
 
+    @staticmethod
+    def canpool():
+        """
+        This is to stop *pooledinput* from generating the data on multiple machines.
+        """
+        return True
+
 class TrackSimulatorProcessor(SimulatorMixin, Processor):
     u"Processes TrackSimulatorTask"
     _FCN     = 'beads'

@@ -18,7 +18,7 @@ from simulator.processor        import TrackSimulatorTask
 from eventdetection.processor   import ExtremumAlignmentTask
 from model.task                 import DataSelectionTask
 from control.taskcontrol        import create
-from testingcore                import path as utpath
+from testingcore                import path as utpath, DummyPool
 
 def test_collapse_to_mean():
     "Tests interval collapses"
@@ -298,7 +298,7 @@ def test_cycleprocess_withalignment():
     val2, _     = _do(None, drift = False)
     assert np.std(val2[0,0] - val1[0,0]) >  0.001
 
-    val2, prof2 = _do(type('_Dummy', (), {'nworkers': 2, 'map': staticmethod(map)})())
+    val2, prof2 = _do(DummyPool())
     for i, j in prof2.items():
         assert_allclose(prof1[i], j, atol = 1e-5, rtol = 1e-4)
 
