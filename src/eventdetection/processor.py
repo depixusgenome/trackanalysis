@@ -105,16 +105,17 @@ class ExtremumAlignmentProcessor(Processor):
         pulls      = cycles.bias(PHASE.pull,    window, edge)
 
         deltas     = initials-pulls
+        center     = np.nanmedian(deltas)*cls._get(kwa, 'factor')
 
-        factor     = cls._get(kwa, 'factor')
-        center     = np.median(deltas)
-        bad        = np.nonzero(deltas < center*factor)[0]
+        deltas[np.isnan(deltas)] = 0.
+        bad        = np.nonzero(deltas < center)[0]
         if len(bad):
             deltas = cycles.bias(PHASE.measure, window, True)-pulls
-            bad    = np.setdiff1d(bad, np.nonzero(deltas < center*factor)[0], True)
+            deltas[np.isnan(deltas)] = 0.
+            bad    = np.setdiff1d(bad, np.nonzero(deltas < center)[0], True)
 
         bias       = initials
-        bias[bad]  = pulls[bad]+np.median(initials-pulls)
+        bias[bad]  = pulls[bad]+np.nanmedian(initials-pulls)
         return cycles.translate(bias)
 
     @classmethod
@@ -128,7 +129,7 @@ class ExtremumAlignmentProcessor(Processor):
         if cls._get(kwa, 'phase') == PHASE.pull:
             init  = bias
             bias  = cycles.bias(PHASE.pull, window, edge)
-            bias -= np.median(bias+init)
+            bias -= np.nanmedian(bias+init)
 
         return cycles.translate(bias)
 
