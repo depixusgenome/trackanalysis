@@ -120,11 +120,11 @@ class Cache:
         self.delCache(ind)
         self._items.pop(ind)
 
-    def keepupto(self, task):
-        "removes tasks beyond *task*"
+    def keepupto(self, task) -> 'Cache':
+        "returns a Cache with tasks up to and including *task*"
         if task is None:
-            return
-        self._items = self._items[:self.index(task)+1]
+            return Cache(list(self._items))
+        return self if task is None else Cache(self._items[:self.index(task)+1])
 
     remove = pop
 

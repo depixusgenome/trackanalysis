@@ -32,7 +32,7 @@ class Runner:
             data = Cache(list(data))
         elif isinstance(data, (tuple, list)):
             data = Cache(data)
-        data.keepupto(task)
+        data = data.keepupto(task)
 
         # make sure the original input is not changed
         gen = None if gen is None else iter(shallowcopy(i) for i in gen)
