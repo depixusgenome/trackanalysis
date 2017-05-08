@@ -76,9 +76,19 @@ class FileDialog:
                     next((str(i.parent) for i in pot if i.parent.exists()), # type: ignore
                          None))
 
+    @staticmethod
+    def firstexistingparent(pot: List[Path]) -> Optional[str]:
+        "selects the first existing path from a list"
+        return next((str(i) for i in pot if i.parent.exists()), None) # type: ignore
+
     @classmethod
     def _getconfig(cls, ctrl, storage = None):
-        return lambda ext: cls.firstexistingpath(cls.storedpaths(ctrl, storage, ext))
+        def _get(ext, bopen):
+            if bopen:
+                return cls.firstexistingpath(cls.storedpaths(ctrl, storage, ext))
+            else:
+                return cls.firstexistingparent(cls.storedpaths(ctrl, storage, ext))
+        return _get
 
     @classmethod
     def _setconfig(cls, ctrl, storage = None):
@@ -122,11 +132,11 @@ class FileDialog:
         elif not self.defaultextension.startswith('.'):
             info[self._KEXT] = self.DEFAULTS[self.defaultextension.strip().lower()][1]
 
-    def _parse_path(self, info:dict):
+    def _parse_path(self, info:dict, bopen):
         if self.config is None:
             return
 
-        path = self.config[0](info[self._KFT])
+        path = self.config[0](info[self._KFT], bopen)
         if path is not None:
             apath = Path(path)
             if apath.is_dir():
@@ -135,14 +145,14 @@ class FileDialog:
                 info['initialdir']  = str(apath.parent)
                 info['initialfile'] = str(apath.name)
 
-    def _parse_all(self):
+    def _parse_all(self, bopen):
         info = {key: getattr(self, key)
                 for key in self.__dict__ if getattr(self, key) is not None}
         info.pop('config', None)
 
         self._parse_filetypes(info)
         self._parse_extension(info)
-        self._parse_path(info)
+        self._parse_path(info, bopen)
         return info
 
     def _tk_run(self, info:dict, dialog:Callable):
@@ -170,10 +180,10 @@ class FileDialog:
 
     def open(self):
         "Returns a filepath to be opened."
-        return self._tk_run(self._parse_all(), _tkopen)
+        return self._tk_run(self._parse_all(True), _tkopen)
 
     def save(self):
         "Returns a filepath where to save to."
-        info = self._parse_all()
+        info = self._parse_all(False)
         info.pop('multiple', None)
         return self._tk_run(info, _tksave)

@@ -11,19 +11,48 @@ from .dialog              import FileDialog
 from .intinput            import BeadInput, RejectedBeadsInput
 from .base                import BokehView, threadmethod, spawn
 
+STORAGE = 'open', 'save'
 class TrackFileDialog(FileDialog):
     "A file dialog that doesn't open .gr files first"
     def __init__(self, ctrl):
-        storage   = 'open'
         super().__init__(multiple  = 1,
-                         storage   = storage,
+                         storage   = STORAGE[0],
                          config    = ctrl)
 
-        def _defaultpath(ext):
-            pot = self.storedpaths(ctrl, storage, ext)
+        def _defaultpath(ext, bopen):
+            assert bopen
+
+            pot = self.storedpaths(ctrl, STORAGE[0], ext)
             if ctrl.getGlobal('project').track.get(default = None) is None:
                 pot = [i for i in pot if i.suffix != '.gr']
             return self.firstexistingpath(pot)
+        self.config = _defaultpath, self.config[1]
+
+class SaveFileDialog(FileDialog):
+    "A file dialog that adds a default save path"
+    def __init__(self, ctrl):
+        super().__init__(storage = STORAGE[1],
+                         config  = ctrl)
+
+        def _defaultpath(ext, bopen):
+            assert not bopen
+            pot = self.storedpaths(ctrl, STORAGE[0], ext)
+            ope = self.firstexistingpath(pot)
+
+            pot = self.storedpaths(ctrl, STORAGE[1], ext)
+            sav = self.firstexistingparent(pot)
+
+            if ope is None or sav is None or Path(ope).is_dir():
+                return sav
+
+            psa = Path(sav)
+            if psa.suffix == '':
+                sav = (psa/Path(ope).stem).with_suffix('.'+ ext[0][1])
+            else:
+                sav = (psa.parent/Path(ope).stem).with_suffix(psa.suffix)
+                self.defaultextension = psa.suffix[1:]
+            return str(sav)
+
         self.config = _defaultpath, self.config[1]
 
 class ToolBar(BokehView): # pylint: disable=too-many-instance-attributes
@@ -56,7 +85,7 @@ class ToolBar(BokehView): # pylint: disable=too-many-instance-attributes
                                           'quit'     : "Control-q"}
 
         self.__diagopen = TrackFileDialog(self._ctrl)
-        self.__diagsave = FileDialog(config = self._ctrl, storage = 'save')
+        self.__diagsave = SaveFileDialog(self._ctrl)
 
     def _getroots(self, _):
         "adds items to doc"

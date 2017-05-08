@@ -781,10 +781,6 @@ class ConfigXlsxIO(TaskIO):
         super().__init__(ctrl)
         self.__model = PeaksPlotModelAccess(ctrl)
 
-        path = ctrl.getGlobal('config').last.path
-        fcn = lambda itm: path.save.set(str(Path(itm.value).with_suffix('.xlsx')))
-        path.open.observe(fcn)
-
     def save(self, path:str, models):
         "creates a Hybridstat report"
         return self._run(path, self.__model.oligos, self.__model.sequences, models[0])
