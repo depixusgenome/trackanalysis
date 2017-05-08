@@ -539,7 +539,7 @@ class PeakIDPathWidget(WidgetCreator):
         self.__widget = None # type: Optional[PathInput]
         self.__dlg    = FileDialog(config    = self._ctrl,
                                    storage   = 'constraints.path',
-                                   filetypes = '*|xls')
+                                   filetypes = '*|xlsx')
 
         css          = self.css.constraints
         css.defaults = {'title': u'Id file path'}
@@ -770,15 +770,20 @@ class PeaksConfigTrackIO(_PeaksIOMixin, ConfigTrackIO):
 class PeaksConfigGRFilesIO(_PeaksIOMixin, ConfigGrFilesIO):
     "selects the default tasks"
 
+FileDialog.DEFAULTS['pkz'] = (u'pickled report', '.pkz')
 @currentmodelonly
 class ConfigXlsxIO(TaskIO):
     "Ana IO saving only the current project"
-    EXT      = 'xls', 'csv', 'pkz'
+    EXT      = 'xlsx', 'csv', 'pkz'
     RUNNING  = False
     POOLTYPE = ProcessPoolExecutor
     def __init__(self, ctrl):
         super().__init__(ctrl)
         self.__model = PeaksPlotModelAccess(ctrl)
+
+        path = ctrl.getGlobal('config').last.path
+        fcn = lambda itm: path.save.set(str(Path(itm.value).with_suffix('.xlsx')))
+        path.open.observe(fcn)
 
     def save(self, path:str, models):
         "creates a Hybridstat report"
@@ -831,6 +836,6 @@ class PeaksPlotView(PlotView):
                    'hybridstat.view.peaksplot.PeaksConfigTrackIO'))
         tasks.io.open.default = vals
 
-        vals = (('hybridstat.view.peaksplot.ConfigXlsxIO',)
-                + tuple(tasks.io.save.get()))
+        vals = (tuple(tasks.io.save.get())
+                +('hybridstat.view.peaksplot.ConfigXlsxIO',))
         tasks.io.save.default = vals

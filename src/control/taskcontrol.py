@@ -208,7 +208,7 @@ class TaskController(Controller):
         items = [item.model for item in self.__items.values()]
         ext   = path[path.rfind('.')+1:]
         for obj in self.__savers:
-            if ext in obj.EXT and obj.close(path, items):
+            if ext in obj.EXT and obj.save(path, items):
                 break
         else:
             raise IOError("Could not save in using file: %s" % path)

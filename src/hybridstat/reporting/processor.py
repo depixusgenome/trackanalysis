@@ -73,7 +73,7 @@ class HybridstatExcelProcessor(Processor):
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
-        args.apply(model = args.data.model, **self.apply(**self.config()))
+        args.apply(self.apply(model = args.data.model, **self.config()))
 
 def run(path:str, config:str = '', **kwa):
     u"Creates a report."

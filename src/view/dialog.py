@@ -3,7 +3,7 @@
 "Different file dialogs."
 import sys
 from pathlib            import Path
-from typing             import List, Optional, Callable
+from typing             import List, Optional, Callable, Dict # pylint: disable=unused-import
 from tkinter            import Tk as _Tk
 from tkinter.filedialog import (askopenfilename   as _tkopen,
                                 asksaveasfilename as _tksave)
@@ -23,8 +23,8 @@ class FileDialog:
                 'gr':       (u'graphics files',          '.gr'),
                 'ana':      (u'analysis files',          '.ana'),
                 'fasta':    (u'fasta files',             '.fasta'),
-                'xls':      (u'excel files',             '.xlsx'),
-                'csv':      (u'comma-separated files',   '.csv')}
+                'xlsx':     (u'excel files',             '.xlsx'),
+                'csv':      (u'comma-separated values',  '.csv')}
     DEFAULTS['any'] = DEFAULTS['all']
     DEFAULTS['*']   = DEFAULTS['all']
 
@@ -83,12 +83,17 @@ class FileDialog:
     @classmethod
     def _setconfig(cls, ctrl, storage = None):
         cnf = cls.globals(ctrl)
-        def _defaultpath(rets):
-            vals  = {}
+        def _defaultpath(rets, bcheck: bool = True):
+            vals  = {} # type: Dict[str, str]
             itr   = (rets,) if isinstance(rets, str) else rets
             first = None
             for ret in itr:
-                ret = Path(ret).resolve()
+                ret = Path(ret)
+                if bcheck:
+                    if not ret.exists():
+                        continue
+                    ret = ret.resolve() # pylint: disable=redefined-variable-type
+
                 if cnf.get(ret.suffix[1:], default = _m_none) is not _m_none:
                     vals.setdefault(ret.suffix[1:], str(ret))
                 if first is None:
@@ -160,7 +165,7 @@ class FileDialog:
         self.initialfile = str(ret.name)
 
         if self.config is not None:
-            self.config[1](rets)
+            self.config[1](rets, dialog is _tkopen)
         return rets
 
     def open(self):
