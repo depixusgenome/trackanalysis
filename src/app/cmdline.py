@@ -115,7 +115,11 @@ def _raiseerr(raiseerr):
 def _files(files):
     if len(files):
         import app.launcher as app
-        app.INITIAL_ORDERS.append(lambda ctrl: ctrl.openTrack(files))
+        def _open(ctrl):
+            ctrl.getGlobal('config').last.path.open.set(files[0])
+            print(ctrl.getGlobal('config').last.path.open.get())
+            ctrl.openTrack(files)
+        app.INITIAL_ORDERS.append(_open)
 
 def _launch(view, app, desktop, kwa):
     viewcls = _from_path(view)
