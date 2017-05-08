@@ -76,6 +76,8 @@ class SequenceKeyProp(_SequenceKeyProp):
 class _PeaksPlotModelAccess(TaskPlotModelAccess):
     "Access to identification"
     def __init__(self, ctrl, key: Optional[str] = None) -> None:
+        if key is None:
+            key = PeaksPlotCreator.key()
         super().__init__(ctrl, key)
         self.identification = FitToHairpinAccess(self)
 
@@ -187,7 +189,6 @@ class PeaksPlotModelAccess(_PeaksPlotModelAccess):
         elif task is not None and cur is None:
             self.identification.update(**task.config())
         return False
-
 
     def __set_ids_and_distances(self, peaks):
         task  = self.identification.task
@@ -609,7 +610,7 @@ class PeaksPlotCreator(TaskPlotCreator):
         self._ticker  = SequenceTicker()
         self._hover   = PeaksSequenceHover()
         if TYPE_CHECKING:
-            self._model = PeaksPlotModelAccess('', '')
+            self._model = PeaksPlotModelAccess(self)
 
     @property
     def model(self):
@@ -750,7 +751,7 @@ class PeaksPlotCreator(TaskPlotCreator):
 class _PeaksIOMixin:
     def __init__(self, ctrl):
         type(self).__bases__ [1].__init__(self, ctrl)
-        self.__model = _PeaksPlotModelAccess(ctrl, 'config'+PeaksPlotCreator.key())
+        self.__model = _PeaksPlotModelAccess(ctrl)
 
     def open(self, path:Union[str, Tuple[str,...]], model:tuple):
         "opens a track file and adds a alignment"
@@ -765,7 +766,6 @@ class _PeaksIOMixin:
 
 class PeaksConfigTrackIO(_PeaksIOMixin, ConfigTrackIO):
     "selects the default tasks"
-    EXT = 'xlsx', 'csv'
 
 class PeaksConfigGRFilesIO(_PeaksIOMixin, ConfigGrFilesIO):
     "selects the default tasks"
@@ -773,12 +773,12 @@ class PeaksConfigGRFilesIO(_PeaksIOMixin, ConfigGrFilesIO):
 @currentmodelonly
 class ConfigXlsxIO(TaskIO):
     "Ana IO saving only the current project"
-    EXT      = 'xlsx', 'csv', 'pkz'
+    EXT      = 'xls', 'csv', 'pkz'
     RUNNING  = False
     POOLTYPE = ProcessPoolExecutor
     def __init__(self, ctrl):
         super().__init__(ctrl)
-        self.__model = PeaksPlotModelAccess(ctrl, 'config'+PeaksPlotCreator.key())
+        self.__model = PeaksPlotModelAccess(ctrl)
 
     def save(self, path:str, models):
         "creates a Hybridstat report"
@@ -831,6 +831,6 @@ class PeaksPlotView(PlotView):
                    'hybridstat.view.peaksplot.PeaksConfigTrackIO'))
         tasks.io.open.default = vals
 
-        vals = (('hybridstat.view.peaksplot.XlsxIO',)
+        vals = (('hybridstat.view.peaksplot.ConfigXlsxIO',)
                 + tuple(tasks.io.save.get()))
         tasks.io.save.default = vals

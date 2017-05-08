@@ -113,7 +113,8 @@ class ToolBar(BokehView): # pylint: disable=too-many-instance-attributes
                         msg.set(('', 'normal'))
                 else:
                     args = value.args
-
+                    if len(args) == 0:
+                        args = str(value),
                     msg.set((str(args[0]), args[1] if len(args) > 1 else 'error'))
                     catcherror[0] = catch.get()
         self._ctrl.observe("stopaction", "stopcomputation", _observer)

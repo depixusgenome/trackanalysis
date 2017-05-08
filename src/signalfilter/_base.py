@@ -79,7 +79,7 @@ class PrecisionAlg:
         val   = cache.get(ibead, None)
 
         if val is None:
-            if isinstance(ibead, int):
+            if np.isscalar(ibead):
                 beads        = track.beads
                 cache[ibead] = val = nanhfsigma(beads[ibead])
             else:

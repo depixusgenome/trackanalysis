@@ -28,7 +28,7 @@ class TaskIO:
     @classmethod
     def extensions(cls, ctrl, attr:str):
         "returns the list of possible extensions"
-        return '|'.join(*(chain(i.EXT for i in cls.__get(ctrl, attr)[::-1])))
+        return '|'.join(chain.from_iterable(i.EXT for i in cls.__get(ctrl, attr)[::-1]))
 
 class TrackIO(TaskIO):
     "Deals with reading a track file"
