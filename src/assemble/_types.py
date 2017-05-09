@@ -18,6 +18,4 @@ class SciDist(metaclass=ABCMeta):
         u'density function'
         pass
 
-
-
 SciDist.register(scipy.stats._distn_infrastructure.rv_frozen) # pylint: disable=no-member,protected-access

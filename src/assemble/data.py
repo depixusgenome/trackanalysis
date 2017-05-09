@@ -3,11 +3,13 @@
 u'''
 Creates Classes and function to use with assemble sequence
 '''
-from typing import List
+from typing import List, NamedTuple, Tuple
 import itertools
+import numpy
 from utils import initdefaults
 from ._types import SciDist # pylint: disable=unused-import
 from . import _utils as utils
+
 
 class Oligo:
     u'''
@@ -59,6 +61,10 @@ class OligoPeak(Oligo):
     @initdefaults
     def __init__(self,**kwa):
         super().__init__(**kwa)
+
+OliBat = NamedTuple("OliBat",[("oli",OligoPeak),
+                              ("idinbat",int),
+                              ("batid",int)])
 
 class Batch:
     u'''
@@ -129,3 +135,24 @@ class BCollection:
     def oli2index(self,oli:OligoPeak)->int:
         u'returns index of oli in oligos'
         return self.oligos.index(oli)
+
+class KPerm:
+    u'''k-permutation is a partial permutation'''
+    def __init__(self,kperm:Tuple)->None:
+        self.kperm=kperm
+    def to_perm(self,size):
+        u'returns Perm'
+        perm = Perm(size)
+        perm.from_kperm(self)
+        return perm
+
+class Perm:
+    u'class to permutation'
+    def __init__(self,size:int)->None:
+        self.size=size
+        self.perm=numpy.array(range(size)) # defaults to neutral permutation
+    def from_kperm(self,kperm:KPerm):
+        u'translate a kperm of 2 or more indices to a full size permutation'
+        toperm={val:kperm.kperm[idx] for idx,val in enumerate(sorted(kperm.kperm))}
+        for key,val in toperm.items():
+            self.perm[key]=val

@@ -19,6 +19,7 @@ import pickle
 import numpy
 from utils.logconfig import getLogger
 from .oligohit import Batch
+from .data import KPerm
 #from . import _utils as utils
 
 # to add variability in (stretching,bias) for each batch (to estimate from hybridstat analyses)
@@ -88,7 +89,7 @@ class OptimOligoSwap(HoppingSteps): # not yet usable
         self.batches = [Batch(oligos=[i for i in self.oligos if i.batch_id==index],
                               index=index) for index in batchids]
         # batches from groups( = utils.group_oligos(self.oligos, by=self.seg))??
-        swaps = [Swap(i) for i in find_swaps(self.batches,self.nscale,self.min_overl)]
+        swaps = [KPerm(i) for i in find_swaps(self.batches,self.nscale,self.min_overl)]
         print("len(swaps)=",len(swaps))
         with open("swaps.pickle","wb") as testfile:
             pickle.dump(swaps,testfile)
@@ -127,31 +128,6 @@ def find_swaps(batches,nscale,min_overl):
         batches.pop(1)
         allswaps+=swaps
     return allswaps
-
-
-class Swap:
-    u'''defines a swap
-    already takes into account batch contraints
-    '''
-    def __init__(self,swap:Tuple)->None:
-        self.swap=swap
-    def to_perm(self,size):
-        u'returns Perm'
-        perm = Perm(size)
-        perm.from_swap(self)
-        return perm
-
-class Perm:
-    u'class to permutation'
-    def __init__(self,size:int)->None:
-        self.size=size
-        self.perm=numpy.array(range(size)) # defaults to neutral permutation
-
-    def from_swap(self,swap:Swap):
-        u'translate a swap of 2 or more indices to a full size permutation'
-        toperm={val:swap.swap[idx] for idx,val in enumerate(sorted(swap.swap))}
-        for key,val in toperm.items():
-            self.perm[key]=val
 
 def oli_perm_to_xstate(oligos,argntsid)->numpy.ndarray:
     u'''
