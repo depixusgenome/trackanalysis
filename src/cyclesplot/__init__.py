@@ -66,6 +66,7 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, ConfigMixin):
         super().observe()
         self._histobservers()
         self._configobservers()
+        self._model.config.eventdetection.isactive.observe(lambda: self.reset(('bead',)))
 
     def configuration(self):
         "modal dialog for configuration"
@@ -87,6 +88,6 @@ class CyclesPlotView(PlotView):
         self._keys.addKeyPress(('keypress.configuration', self._plotter.configuration))
 
         tasks         = self._ctrl.getGlobal('config').tasks
-        tasks.default = ['extremumalignment']
+        tasks.default = ['extremumalignment', 'eventdetection']
         tasks.io.open.default = (tuple(tasks.io.open.get()[:-1])
                                  + ('control.taskio.ConfigTrackIO',))

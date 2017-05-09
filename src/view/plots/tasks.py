@@ -167,7 +167,7 @@ class TaskAccess(TaskPlotModelAccess):
                 cnf.set(updatecopy(cnf.get(), **kwa))
 
     def update(self, **kwa):
-        "removes the task"
+        "adds/updates the task"
         root = self.roottask
         task = self._task
         cnf  = self.configtask
