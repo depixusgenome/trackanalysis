@@ -117,7 +117,6 @@ def _files(files):
         import app.launcher as app
         def _open(ctrl):
             ctrl.getGlobal('config').last.path.open.set(files[0])
-            print(ctrl.getGlobal('config').last.path.open.get())
             ctrl.openTrack(files)
         app.INITIAL_ORDERS.append(_open)
 

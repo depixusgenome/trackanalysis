@@ -11,6 +11,7 @@ It can add/delete/update tasks, emitting the corresponding events
 """
 from typing         import (Union, Iterator, Tuple, # pylint: disable=unused-import
                             Optional, Any, List, Iterable, Dict)
+from pathlib        import Path
 from itertools      import chain
 
 from model.task     import Task, RootTask, TaskIsUniqueError
@@ -211,7 +212,7 @@ class TaskController(Controller):
             if ext in obj.EXT and obj.save(path, items):
                 break
         else:
-            raise IOError("Could not save in using file: %s" % path)
+            raise IOError("Could not save: %s" % str(Path(path).name), 'warning')
 
     @Controller.emit
     def openTrack(self,
@@ -219,28 +220,21 @@ class TaskController(Controller):
                   model: Iterable[Task]             = tuple()) -> dict:
         "opens a new file"
         tasks = tuple(model)
-        if task is None:
-            if len(tasks) == 0:
-                raise NoEmission("Nothing to do")
+        if task is None and len(tasks) == 0:
+            raise NoEmission()
+
+        elif task is None:
             task = tasks[0]
 
         if not isinstance(task, RootTask):
-            for obj in self.__openers:
-                models = obj.open(task, tasks)
-                if models is not None:
-                    break
-            else:
-                raise IOError(u"IOError: Couldn't open "+str(getattr(task, 'path', 'path')))
-
-            for elem in models:
-                self.openTrack(elem[0], elem)
-            raise NoEmission("Done everything already")
+            self.__withopeners(task, tasks)
+            raise NoEmission()
 
         if len(tasks) == 0:
             tasks = (task,)
 
         elif tasks[0] is not task:
-            raise ValueError("model and root task does'nt coincide")
+            raise ValueError("model[0] ≠ root")
 
         self.__items[task] = create(tasks, processors = self.__processors)
         return dict(controller = self, model = tasks)
@@ -285,6 +279,28 @@ class TaskController(Controller):
         else:
             self.__items[parent].clear()
         return dict(controller = self, parent = parent)
+
+    def __withopeners(self, task, tasks):
+        for obj in self.__openers:
+            models = obj.open(task, tasks)
+            if models is not None:
+                break
+        else:
+            path = getattr(task, 'path', 'path')
+            if path is None or (isinstance(path, (list, tuple))) and len(path) == 0:
+                msg  = u"Couldn't open track"
+
+            elif isinstance(path, (tuple, list)):
+                msg  = u"Couldn't open: " + Path(str(path[0])).name
+                if len(path):
+                    msg += ", ..."
+            else:
+                msg  = u"Couldn't open: " + Path(str(path)).name
+
+            raise IOError(msg, 'warning')
+
+        for elem in models:
+            self.openTrack(elem[0], elem)
 
     @staticmethod
     def __undos__():

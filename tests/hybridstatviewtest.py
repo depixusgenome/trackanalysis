@@ -16,7 +16,7 @@ from view.plots                 import DpxKeyedRow
 
 from hybridstat.reporting.identification import writeparams
 from hybridstat.processor                import createmodels
-from hybridstat.view.peaksplot           import ConfigXlsxIO
+from hybridstat.view._io                 import ConfigXlsxIO
 
 def test_xlsxio():
     "tests xlxs production"
@@ -31,7 +31,10 @@ def test_xlsxio():
     out   = mktemp()+"_hybridstattest4.xlsx"
     assert not Path(out).exists()
     # pylint: disable=protected-access
-    ConfigXlsxIO._run(out, 'CTGT', utfilepath('hairpins.fasta'), mdl)
+    ConfigXlsxIO._run(dict(path      = out,
+                           oligos    = 'CTGT',
+                           sequences = utfilepath('hairpins.fasta')),
+                      mdl)
 
     cnt = 0
     async def _run():
