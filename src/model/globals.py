@@ -485,7 +485,8 @@ class Globals:
     def writeconfig(self, configpath:Callable, protocol, # pylint: disable=too-many-arguments
                     patchname = 'config',
                     index     = 0,
-                    overwrite = True):
+                    overwrite = True,
+                    **kwa):
         """
         Writes up the user preferences.
 
@@ -497,12 +498,11 @@ class Globals:
             maps = {i: j.maps[index] for i, j in self.__maps.items() if 'project' not in i}
             maps = {i: j for i, j in maps.items() if len(j)}
 
-        css  = self.getGlobal('css').config
         path = configpath(protocol.version(patchname))
         path.parent.mkdir(parents = True, exist_ok = True)
         path.touch(exist_ok = True)
 
-        protocol.dump(maps, path, patch = patchname, **css.getdict(..., fullnames = False))
+        protocol.dump(maps, path, patch = patchname, **kwa)
 
     def readconfig(self, configpath, protocol, patchname = 'config') -> Optional[dict]:
         "Sets-up the user preferences"

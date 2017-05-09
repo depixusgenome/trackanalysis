@@ -193,7 +193,9 @@ class BaseGlobalsController(Controller):
         If *overwrite* is *False*, the preferences are first read from file, then
         written again. Notwithstanding version patches, this is a no-change operation.
         """
-        self.__model.writeconfig(configpath, anastore, patchname, index, overwrite)
+        css = self.getGlobal('css').config.getdict(..., fullnames = False)
+        self.__model.writeconfig(configpath, anastore, patchname,
+                                 index, overwrite, **css)
 
     def readconfig(self, configpath, patchname = 'config'):
         "Sets-up the user preferences"
