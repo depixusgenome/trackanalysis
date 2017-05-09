@@ -348,7 +348,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         old, self.state = self.state, PlotState.resetting
         async def _reset_and_render():
             def _reset():
-                with BokehView.computation.type(self, calls = self.__doreset):
+                with BokehView.computation.type(self._ctrl, calls = self.__doreset):
                     try:
                         self._reset()
                         return tuple(self._bkmodels.items())
@@ -360,7 +360,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
 
             def _render():
                 if ret is not None:
-                    with BokehView.computation.type(self, calls = self.__doreset):
+                    with BokehView.computation.type(self._ctrl, calls = self.__doreset):
                         with self.resetting():
                             self._bkmodels.update(ret)
                 self._ctrl.handle('rendered', args = {'plot': self})

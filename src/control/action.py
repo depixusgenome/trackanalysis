@@ -45,6 +45,7 @@ class Action:
 
     def __init__(self, ctrl = None, calls = None, test = None) -> None:
         self._ctrl  = getattr(ctrl, '_ctrl', ctrl)
+        assert hasattr(self._ctrl, 'handle')
         self._test  = test
         if calls is not None:
             self._calls = _Calls(calls)
