@@ -150,7 +150,7 @@ class ReporterInfo(HasLengthPeak):
             kwa['sequences'] = dict(readsequence(kwa['sequences']))
 
         if kwa.get('hairpins', None) is None:
-            kwa['hairpins'] = dict(Hairpin.read(kwa['sequences'], self.oligos))
+            kwa['hairpins'] = dict(Hairpin.read(kwa['sequences'], kwa['oligos']))
 
         if kwa.get('knownbeads', None) is None:
             kwa.pop('knownbeads')
