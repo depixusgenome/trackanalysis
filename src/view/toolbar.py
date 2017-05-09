@@ -61,8 +61,10 @@ class SaveFileDialog(FileDialog):
 
         def _defaultpath(ext, bopen):
             assert not bopen
-            pot = self.storedpaths(ctrl, STORAGE[0], ext)
-            ope = self.firstexistingpath(pot)
+            pot = [i for i in self.storedpaths(ctrl, STORAGE[0], ext) if i.exists()]
+            ope = next((i for i in pot if not i.suffix in ('', '.gr')), None)
+            if ope is None:
+                ope = self.firstexistingpath(pot)
 
             pot = self.storedpaths(ctrl, STORAGE[1], ext)
             sav = self.firstexistingparent(pot)
