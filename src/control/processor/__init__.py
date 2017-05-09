@@ -40,6 +40,12 @@ It is then up to the user although the following functions are provided in
     1. *pooledinput*: get the input, computed in parallel should any previous task
     or its processor return *True* when *isslow* is called.
     2. *poolchunk*: divides keys in equal chunks between processes.
+    3. *pooldump*: needed to serialize a list of processors (`Cache` objet) requested
+    by *pooledinput*
+
+It's possible to have multiple multiprocessed processors one after the other. One
+should be careful to set "*canpool() == True* so that *pooledinput* calls on them
+only once per dataframe.
 
 # Examples:
 
