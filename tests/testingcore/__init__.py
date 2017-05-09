@@ -56,10 +56,13 @@ def path(name:str) -> Union[str, Sequence[str]]:
 
 def getmonkey():
     u"for calling with pudb"
-    import  pytest  # pylint: disable=unused-import,unused-variable
-    from    _pytest.monkeypatch import MonkeyPatch
-    warnings.warn("Unsafe call to MonkeyPatch. Use only for manual debugging")
-    return MonkeyPatch()
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', category = DeprecationWarning)
+        warnings.filterwarnings('ignore', category = PendingDeprecationWarning)
+        import  pytest  # pylint: disable=unused-import,unused-variable
+        from    _pytest.monkeypatch import MonkeyPatch
+        warnings.warn("Unsafe call to MonkeyPatch. Use only for manual debugging")
+        return MonkeyPatch()
 
 class DummyPool:
     "DummyPool"
