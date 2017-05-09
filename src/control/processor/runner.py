@@ -21,29 +21,32 @@ from .cache             import Cache
 class Runner:
     "Arguments used for iterating"
     __slots__ = ('data', 'pool', 'level', 'gen')
-    def __init__(self, data, pool = None, gen = None, task = None):
+    def __init__(self, **kwa):
+        pool = kwa.get('pool', None)
         if pool is not None and not hasattr(pool, 'nworkers'):
             nproc = getattr(pool, '_max_workers', None)
             if nproc is None:
                 nproc = cpu_count()
             pool.nworkers = nproc
 
+        data = kwa['data']
         if   isinstance(data, Iterator):
             data = Cache(list(data))
         elif isinstance(data, (tuple, list)):
             data = Cache(data)
-        data = data.keepupto(task)
+        data = data.keepupto(kwa.get('task', None))
 
         # make sure the original input is not changed
+        gen = kwa.get('start', kwa.get('gen', None))
         gen = None if gen is None else iter(shallowcopy(i) for i in gen)
 
         self.data  = data      # type: Cache
         self.pool  = pool      # type: Any
         self.gen   = gen       # type: Optional[Iterator[TrackItems]]
-        self.level = Level(0)
+        self.level = Level(kwa.get('level', 0))
 
     def __getstate__(self):
-        return {'data': self.data}
+        return {'data': self.data, }
 
     def __setstate__(self, values):
         self.__init__(values['data'])
@@ -175,6 +178,18 @@ class Runner:
         for var in givars:
             cls.__test(giloc.get(var, None))
 
+    def __call__(self, copy = False):
+        "runs over processors"
+        first = True
+        for proc in self.data:
+            if not proc.task.disabled:
+                proc.run(self)
+                if first and copy:
+                    self.gen = tuple(frame.withcopy(True) for frame in self.gen)
+                first  = False
+        return () if self.gen is None else self.gen
+
+
 def poolchunk(items, nproc, iproc):
     "returns a chunk of keys"
     if isinstance(items, Iterator):
@@ -188,8 +203,14 @@ def poolchunk(items, nproc, iproc):
     sli      = slice(istart, istop)
     return items[sli] if hasattr(items, '__getitem__') else sli
 
-def _m_multi(data, start, parents, nproc, iproc):
-    frame = next(i for i in run(data, start = start) if i.parents == parents)
+def _m_multi(cnf, iproc) -> dict:
+    runner  = Runner(**cnf)
+    parents = cnf.get('parents', tuple())
+    frame   = next((i for i in runner() if i.parents == parents), None)
+    if frame is None:
+        return {}
+
+    nproc = cnf['nproc']
     return {i: frame[i] for i in poolchunk(frame.keys(), nproc, iproc)}
 
 pooldump = pickle.dumps  # pylint: disable=invalid-name
@@ -203,31 +224,27 @@ def pooledinput(pool, pickled, frame) -> dict:
         ind = max((i for i, j in enumerate(data) if j.canpool()),
                   default = None)
         if ind is None:
-            gen  = None
+            cnf  = dict(data = data)
         else:
             ind  = cast(int, ind)+1
+            args = Runner(data = data[:ind], pool = pool)
+            for proc in args.data:
+                if not proc.task.disabled:
+                    proc.run(args)
             gen  = tuple(i.freeze()
-                         for i in run(data[:ind])
+                         for i in args.gen
                          if i.parents == frame.parents[:len(i.parents)])
-            data = list(data[ind:])
+            cnf  = dict(gen = gen, level = args.level, data = list(data[ind:]))
 
-        nproc = pool.nworkers
+        cnf.update(nproc = pool.nworkers, parents = frame.parents) # type: ignore
         res   = {} # type: dict
-        for val in pool.map(partial(_m_multi, data, gen, frame.parents, nproc), range(nproc)):
+        for val in pool.map(partial(_m_multi, cnf), range(cnf['nproc'])):
             res.update(val)
         return res
 
-def run(data, tsk = None, copy = False, pool = None, start = None):
+def run(data, tsk = None, copy = False, pool = None,  **kwa):
     """
     Iterates through the list up to and including *tsk*.
     Iterates through all if *tsk* is None
     """
-    args  = Runner(data, pool = pool, gen = start, task = tsk)
-    first = True
-    for proc in args.data:
-        if not proc.task.disabled:
-            proc.run(args)
-            if first and copy:
-                args.gen = tuple(frame.withcopy(True) for frame in args.gen)
-            first  = False
-    return () if args.gen is None else args.gen
+    return Runner(data = data, pool = pool, task = tsk, **kwa)(copy = copy)

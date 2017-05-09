@@ -19,11 +19,12 @@ class _RootTask(RootTask):
     pass
 
 class _RootProcessor(Processor):
-    DATA = None # type: dict
+    CNT  = 0
     @classmethod
     def _run(cls):
-        cls.DATA = {i: [(os.getpid(), 'r')] for i in range(3)}
-        return TrackItems(data = cls.DATA, parents = ('rr',)),
+        cls.CNT += 1
+        data = {i: [(os.getpid(), 'r')] for i in range(3)}
+        yield TrackItems(data = data, parents = ('rr',))
 
     @staticmethod
     def isslow():
@@ -89,14 +90,6 @@ def test_chunk():
 
 def test_pooled(monkeypatch):
     "testing pooled processors"
-    if monkeypatch is None:
-        # pylint: disable=unused-import,unused-variable
-        import pytest
-        import warnings
-        from _pytest.monkeypatch import MonkeyPatch
-        warnings.warn("Unsafe call to MonkeyPatch. Use only for manual debugging")
-        monkeypatch = MonkeyPatch()
-
     data = Cache([_RootProcessor(_RootTask()),
                   _AProcessor(_ATask(pool = False, name = 'a')),
                   _AProcessor(_ATask(pool = True,  name = 'b')),
@@ -111,7 +104,7 @@ def test_pooled(monkeypatch):
     assert set(len(i)   for _, i in vals) == {5}
     assert len(set(j[0] for _, i in vals for j in i)) == 1
     assert set(''.join(j[-1] for j in i) for _, i in vals) == {'rabcd'}
-    assert all(_RootProcessor.DATA[i] is j for i, j in vals)
+    assert _RootProcessor.CNT == 4
     assert _AProcessor.DONE_POOL == ['b', 'd']
     assert _AProcessor.DONE_NORM == list(product('ac', range(3)))
 
@@ -142,4 +135,5 @@ def test_pooled(monkeypatch):
     assert set(''.join(j[-1] for j in i) for _, i in processed) == {'rabcd'}
 
 if __name__ == '__main__':
-    test_pooled(None)
+    from testingcore import getmonkey
+    test_pooled(getmonkey())
