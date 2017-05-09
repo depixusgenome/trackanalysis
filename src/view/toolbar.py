@@ -67,16 +67,16 @@ class ToolBar(BokehView): # pylint: disable=too-many-instance-attributes
         self._tools = []
 
         self._ctrl.getGlobal('project').message.default = ''
-        msg = self._ctrl.getGlobal('config').message
-        msg.defaults = { 'normal':  '<p>{}</p>',
-                         'warning': '<p style="color:blue;">{}</p>',
-                         'error':   '<p style="color:red>   {}</p>'
-                       }
+        msg = self._ctrl.getGlobal('css').message
+        msg.defaults = dict(normal  = '<p>{}</p>',
+                            warning = '<p style="color:blue;">{}</p>',
+                            error   = '<p style="color:red;>  {}</p>',
+                            busy    = u'Please wait ...',
+                            width   = 480)
         css          = self._ctrl.getGlobal('css').title
         css.defaults = {'open': u'Open', 'save': u'Save', 'quit': u'Quit',
                         'open.dialog': u'Open a track or analysis file',
-                        'save.dialog': u'Save an analysis file',
-                        'working':     u'Please wait ...'}
+                        'save.dialog': u'Save an analysis file'}
 
         cnf = self._ctrl.getGlobal('config')
         cnf.catcherror.toolbar.default = True
@@ -97,7 +97,8 @@ class ToolBar(BokehView): # pylint: disable=too-many-instance-attributes
         if self._ctrl.ISAPP:
             self._quit = self.button(self._ctrl.close, css.quit.get())
             self._tools.append(self._quit)
-        self._text = Div(text = '                                     ')
+        self._text = Div(text = ' ',
+                         width = self._ctrl.getGlobal('css').message.width.get())
         self._tools.append(self._text)
 
         self.__diagopen.filetypes = '*|'+TaskIO.extensions(self._ctrl, 'openers')
@@ -121,24 +122,24 @@ class ToolBar(BokehView): # pylint: disable=too-many-instance-attributes
 
         self._ctrl.getGlobal("project").track.observe(_title)
 
-        msg     = self._ctrl.getGlobal('project').message
-        working = self._ctrl.getGlobal('css').title.working.get()
-        catch   = self._ctrl.getGlobal('config').catcherror.toolbar
+        msg   = self._ctrl.getGlobal('project').message
+        busy  = self._ctrl.getGlobal('css').message.busy.get()
+        catch = self._ctrl.getGlobal('config').catcherror.toolbar
 
         @self._ctrl.observe
         def _onstartaction(recursive = None):      # pylint: disable=unused-variable
             if not recursive:
-                msg.set((working, 'normal'))
+                msg.set((busy, 'normal'))
 
         @self._ctrl.observe
         def _onstartcomputation(recursive = None): # pylint: disable=unused-variable
             if not recursive and msg.get()[1] == 'normal':
-                msg.set((working, 'normal'))
+                msg.set((busy, 'normal'))
 
         def _observer(recursive = None, value = None, catcherror = None, **_):
             if not recursive:
                 if value is None:
-                    if working == msg.get()[0]:
+                    if busy == msg.get()[0]:
                         msg.set(('', 'normal'))
                 else:
                     args = value.args
@@ -148,7 +149,7 @@ class ToolBar(BokehView): # pylint: disable=too-many-instance-attributes
                     catcherror[0] = catch.get()
         self._ctrl.observe("stopaction", "stopcomputation", _observer)
 
-        templ = self._ctrl.getGlobal('config').message.getdict(..., fullnames = False)
+        templ = self._ctrl.getGlobal('css').message.getdict(..., fullnames = False)
         curr  = threading.current_thread().ident
         def _settext(text):
             msg = templ[text.value[1]].format(text.value[0])
