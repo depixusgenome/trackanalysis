@@ -65,7 +65,12 @@ class HybridstatExcelProcessor(Processor):
     @staticmethod
     def apply(toframe = None, model = None, **kwa):
         "applies the task to a frame or returns a function that does so"
-        kwa['config'] = dumps(model, False) if model is not None else ''
+        if model is not None:
+            css = {'indent': 4, 'ensure_ascii': False, 'sort_keys': True}
+            kwa['config'] = dumps(list(model), **css)
+        else:
+            kwa['config'] = ''
+
         def _save(frame):
             run(**kwa, track = frame.track, groups = frame)
             return frame
