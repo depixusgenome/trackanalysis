@@ -67,15 +67,21 @@ class SaveFileDialog(FileDialog):
             pot = self.storedpaths(ctrl, STORAGE[1], ext)
             sav = self.firstexistingparent(pot)
 
-            if ope is None or sav is None or Path(ope).is_dir():
+            if ope is None:
                 return sav
 
-            psa = Path(sav)
-            if psa.suffix == '':
-                sav = (psa/Path(ope).stem).with_suffix('.'+ ext[0][1])
+            if sav is None:
+                if Path(ope).is_dir():
+                    return ope
+                sav = Path(ope).with_suffix(ext[0][1])
             else:
-                sav = (psa.parent/Path(ope).stem).with_suffix(psa.suffix)
-                self.defaultextension = psa.suffix[1:]
+                psa = Path(sav)
+                if psa.suffix == '':
+                    sav = (psa/Path(ope).stem).with_suffix(ext[0][1])
+                else:
+                    sav = (psa.parent/Path(ope).stem).with_suffix(psa.suffix)
+
+            self.defaultextension = sav.suffix[1:] if sav.suffix != '' else None
             return str(sav)
 
         self.config  = _defaultpath, None
@@ -95,7 +101,6 @@ class SaveFileDialog(FileDialog):
                     self.__store(paths, False) # pylint: disable=not-callable
                     self.__ctrl.saveTrack(paths)
             self.__doc.add_next_tick_callback(_fcn)
-
 
 class ToolBar(BokehView): # pylint: disable=too-many-instance-attributes
     "Toolbar"
