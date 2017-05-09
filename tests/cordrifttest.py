@@ -311,5 +311,13 @@ def test_cycleprocess_withalignment():
     for i, j in val2.items():
         assert_allclose(val1[i], j, atol = 1e-5, rtol = 1e-4)
 
+def test_cycleprocess_emptycycles():
+    "tests drift removal on cycles"
+    tasks = (utpath("big_all"),
+             ExtremumAlignmentTask(phase = None),
+             DriftTask(onbeads = False))
+    ret = dict(next(i for i in create(tasks).run())[0,...].withphases(5))
+    assert ret is not None # check that computations don't crash
+
 if __name__ == '__main__':
-    test_cycleprocess_withalignment()
+    test_cycleprocess_emptycycles()
