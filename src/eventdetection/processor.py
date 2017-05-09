@@ -152,7 +152,7 @@ class EventDetectionProcessor(Processor):
     def apply(cls, toframe, **kwa):
         "applies the task to a frame or returns a function that does so"
         kwa['first'] = kwa['last'] = kwa.pop('phase')
-        fcn = lambda data: Events(track = data.track, data = data, **kwa)
+        fcn = lambda frame: frame.new(Events, **kwa)
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
