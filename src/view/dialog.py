@@ -43,10 +43,10 @@ class FileDialog:
         if hasattr(ctrl, 'getGlobal'):
             self.globals(ctrl).defaults = dict.fromkeys(self.DEFAULTS, None)
 
-        storage = kwa.get('storage', None)
         if isinstance(ctrl, (tuple, list)):
             self.config = ctrl
         else:
+            storage = kwa.get('storage', None)
             if storage is not None:
                 self.globals(ctrl)[storage].default = None
             self.config = self._getconfig(ctrl, storage), self._setconfig(ctrl, storage)
@@ -147,7 +147,8 @@ class FileDialog:
 
     def _parse_all(self, bopen):
         info = {key: getattr(self, key)
-                for key in self.__dict__ if getattr(self, key) is not None}
+                for key in self.__dict__
+                if getattr(self, key) is not None and key[0] != '_'}
         info.pop('config', None)
 
         self._parse_filetypes(info)
@@ -174,7 +175,7 @@ class FileDialog:
         self.initialdir  = str(ret.parent)
         self.initialfile = str(ret.name)
 
-        if self.config is not None:
+        if self.config is not None and self.config[1] is not None:
             self.config[1](rets, dialog is _tkopen)
         return rets
 

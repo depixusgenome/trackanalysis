@@ -63,12 +63,16 @@ class ConfigXlsxIO(TaskIO):
 
     def save(self, path:str, models):
         "creates a Hybridstat report"
+        def _end():
+            startfile(path)
+            self.__msg.set(None)
+
         try:
             ret = self._run(dict(path      = path,
                                  oligos    = self.__model.oligos,
                                  sequences = self.__model.sequences),
                             models[0],
-                            lambda: startfile(path))
+                            _end)
         except IOError as exc:
             if len(exc.args) == 1:
                 msg = self.__css.errors.get(exc.args[0], default = None)
