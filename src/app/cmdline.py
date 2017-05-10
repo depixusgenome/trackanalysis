@@ -147,33 +147,50 @@ def _port(port):
     else:
         return int(port)
 
+def _version(ctx, _, value):
+    import version
+    if not value or ctx.resilient_parsing:
+        return
+    click.echo('TrackAnalysis  ' + version.version())
+    click.echo(' - git hash:   ' + version.lasthash())
+    click.echo(' - created on: ' + version.hashdate())
+    click.echo(' - compiler:   ' + version.compiler())
+    ctx.exit()
+
 @click.command()
+@click.option('--version', is_flag = True, callback = _version,
+              expose_value = False, is_eager = True)
 @click.argument('view')
 @click.argument('files', nargs = -1, type = click.Path())
 @click.option("--app", default = 'app.BeadToolBar',
               help = 'Which app mixin to use')
-@click.option("--web", 'desktop', flag_value = False,
-              help = 'Serve to webbrowser rather than desktop app')
-@click.option("--desk", 'desktop', flag_value = True, default = True,
-              help = 'Launch as desktop app')
-@click.option("--show", flag_value = True, default = False,
-              help = 'If using webbrowser, launch it automatically')
+@click.option("-d", "--desk", 'apptype', flag_value = 'deskxul', default = 'xul',
+              help = 'Launch as a xul desktop app')
+@click.option("-e", "--electron", 'apptype', flag_value = 'deskelectron',
+              help = 'Launch as an eletron desktop app')
+@click.option("-s", "--server", 'apptype', flag_value = 'webserver',
+              help = 'Launches a webserver with the client')
+@click.option("-w", "--web", 'apptype', flag_value = 'webclient',
+              help = 'Launches a webserver *and* a webbrowser')
 @click.option("--port", default = '5006',
               help = 'Port used: use "random" for any')
 @click.option('-r', "--raiseerr", flag_value = True, default = False,
               help = 'Wether errors should be caught')
-def main(view, files, app, desktop, show, port, raiseerr): # pylint: disable=too-many-arguments
+def main(view, files, app,  # pylint: disable=too-many-arguments
+         apptype, port, raiseerr):
     "Launches an view"
     _raiseerr(raiseerr)
     _win_opts()
 
     kwargs = {'port': _port(port)}
-    if not desktop:
+    if 'xul' not in apptype:
         kwargs['unused_session_linger_milliseconds'] = 60000
 
-    server = _launch(view, app, desktop, kwargs)
-    if (not desktop) and show:
+    server = _launch(view, app, 'xul' in apptype, kwargs)
+    if 'electron' in apptype:
         server.io_loop.add_callback(lambda: _electron(server, port = kwargs['port']))
+    elif 'webclient' in apptype:
+        server.io_loop.add_callback(lambda: server.show("/"))
 
     log = lambda: LOGS.info(' http://%(address)s:%(port)s',
                             {'port': port, 'address': 'localhost'})

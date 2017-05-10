@@ -89,22 +89,24 @@ class _FunctionHandler(FunctionHandler):
             doc.title   = _title(view)
             self.__view = view.open(doc)
 
-            lst = list(INITIAL_ORDERS)
-            if len(lst):
-                def _cmd():
-                    if len(lst):
-                        with self.__view.action:
-                            lst.pop(0)(getattr(self.__view, '_ctrl'))
-                        doc.add_next_tick_callback(_cmd)
+            loaded = DpxLoaded()
+            doc.add_root(loaded)
 
-                loaded = DpxLoaded()
-                doc.add_root(loaded)
-                loaded.on_change('done', lambda attr, old, new: _cmd())
+            lst = list(INITIAL_ORDERS)
+            def _cmd():
+                if self.__gotone is False:
+                    LOGS.debug('GUI loaded')
+                self.__gotone = True
+                if len(lst):
+                    with self.__view.action:
+                        lst.pop(0)(getattr(self.__view, '_ctrl'))
+                    doc.add_next_tick_callback(_cmd)
+
+            loaded.on_change('done', lambda attr, old, new: _cmd())
         super().__init__(start)
 
     def on_session_created(self, session_context):
         LOGS.debug('started session')
-        self.__gotone = True
 
     def on_session_destroyed(self, session_context):
         LOGS.debug('destroyed session')
