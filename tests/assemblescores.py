@@ -18,10 +18,11 @@ DIST2 = stats.norm(loc=2.0,scale=0.5)
 OLI2 = data.OligoPeak(dist=DIST2)
 
 DIST3 = stats.norm(loc=3.0,scale=0.5)
+OLI3 = data.OligoPeak(dist=DIST3)
 
 def test_PDFCost():
     u'tests'
-    okp = scores.PDFCost(perm=(0,1),dists=[DIST1,DIST2])
+    okp = scores.PDFCost(dists=[DIST1,DIST2])
     assert okp([1,2])==approx(-0.636619772368,abs=1e-5)
     assert okp([0.5,2])==approx(-0.38612941052,abs=1e-5)
     assert okp([1,2.5])==approx(-0.38612941052,abs=1e-5)
@@ -69,3 +70,12 @@ def test_OptiKPerm():
     assert okp.cost()==approx(-0.23415,abs=1e-5)
 
     # permuting 3-elements...
+    kperm=[OLI2,OLI1,OLI3]
+    okp = scores.OptiKPerm(kperm=kperm)
+    assert_allclose(okp.pstate,array([1.4999,1.5000,3.000]),rtol=1e-4,atol=1e-4)
+    assert okp.cost()==approx(-0.18683,abs=1e-5)
+
+    kperm=[OLI3,OLI1,OLI2]
+    okp = scores.OptiKPerm(kperm=kperm)
+    assert_allclose(okp.pstate,array([ 1.9998,  1.9999,  2.000]),rtol=1e-4,atol=1e-4)
+    assert okp.cost()==approx(-0.009299,abs=1e-5)

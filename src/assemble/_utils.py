@@ -233,6 +233,7 @@ def pairwise2_alignment(seqrec): # uses bpos
 def group_overlapping_normdists(dists,nscale=1): # to pytest !! # what if no intersection?
     u'''
     returns lists of indices [(i,j,k)] each element of the tuple has distribution which overlap
+    # the last return value is not expected values? or is it?
     '''
     sdists=[(di.mean(),di.mean()-nscale*di.std(),di.mean()+nscale*di.std(),idx)\
             for idx,di in enumerate(dists)]
@@ -258,36 +259,3 @@ def group_overlapping_normdists(dists,nscale=1): # to pytest !! # what if no int
             continue
         uset.append(val)
     return ssets,uset
-
-
-def group_overlapping_oligos(oligos,nscale=1):
-    u'''
-    returns groups of overlapping oligos
-    '''
-    groups = group_overlapping_normdists([oli.dist for oli in oligos],nscale=nscale)[1]
-    return [[oligos[idx] for idx in grp] for grp in groups]
-
-def group_oligos(oligos,**kwa)->Dict: # pytest!
-    u''' returns dictionnary of oligos grouped by attr "by"
-    '''
-    byattr = kwa.get("by","batch_id")
-    attr = set([getattr(oli,byattr) for oli in oligos])
-    grouped = {atv:[oli for oli in oligos if getattr(oli,byattr)==atv] for atv in attr}
-    return grouped
-
-def can_oligos_overlap(bat1:oligohit.Batch,bat2:oligohit.Batch,min_overl=1):
-    u'''
-    compare the sequences of oligos in the two batch
-    if any can tail_overlap
-    return True
-    else return False
-    '''
-    oli1 = set(oli.seq for oli in bat1.oligos)
-    oli2 = set(oli.seq for oli in bat2.oligos)
-    for ite in itertools.product(oli1,oli2):
-        if len(oligohit.tail_overlap(ite[0],ite[1]))>=min_overl:
-            return True
-        if len(oligohit.tail_overlap(ite[1],ite[0]))>=min_overl:
-            return True
-
-    return False

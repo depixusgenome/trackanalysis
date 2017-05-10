@@ -5,7 +5,7 @@ u'''
 regroups functions and classes to complement assembler
 '''
 import itertools
-from typing import List, Tuple, Set, Callable, Any # pylint: disable=unused-import
+from typing import List, Tuple, Dict, Set, Callable, Any # pylint: disable=unused-import
 import numpy
 from utils.logconfig import getLogger
 from utils import initdefaults
@@ -182,6 +182,9 @@ class ScoreKPerm:
     u'Scores a K-permutation of oligos'
     kperm=[] # type: List[data.OligoPeak]
     score = scores.DefaultCallable(-1.0) # type: ignore
+    args = tuple() # type: Tuple
+    kwargs = dict() # type: Dict
+    #score = scores.OptiKPerm # type: ignore
 
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
@@ -191,7 +194,10 @@ class ScoreKPerm:
         u'''
         returns a Tuple of (score0,score1,...)
         '''
-        return self.score(self.kperm)
+        value = self.score(self.kperm)
+        if callable(value):
+            return value(*self.args,**self.kwargs)
+        return value
 
 class BestScoreAssemble:
     u'''

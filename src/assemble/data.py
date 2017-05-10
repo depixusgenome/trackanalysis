@@ -69,6 +69,7 @@ OliBat = NamedTuple("OliBat",[("oli",OligoPeak),
 class Batch:
     u'''
     Container for Oligo
+    could setattr BCollection id to each oligo
     '''
     oligos=[] # type: List[OligoPeak]
     index=-1 # type: int
