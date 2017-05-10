@@ -162,7 +162,7 @@ def app(bld):
                           ('hybridstat', 'hybridstat.view.HybridStatView')):
            with open(str(bld.options.APP_PATH.make_node(name+optext+ext)), 'w',
                       encoding = 'utf-8') as stream:
-                print(cmd + r"app/runapp.py " + val + opts + ' --port random',
+                print(cmd + r"app/cmdline.py " + val + opts + ' --port random',
                       file = stream)
 
     builder.os.chdir(str(Path("build")/"OUTPUT"))
