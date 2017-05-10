@@ -111,7 +111,7 @@ class PeaksStatsWidget(WidgetCreator):
                                   [u'reduced χ²',       '.1f']]}
 
     def create(self, _) -> List[Widget]:
-        self.__widget = PeaksStatsDiv(width = self.css.input.width.get())
+        self.__widget = PeaksStatsDiv()
         self.reset(None)
         return [self.__widget]
 

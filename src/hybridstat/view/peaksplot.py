@@ -4,6 +4,7 @@
 from typing                     import (Optional,   # pylint: disable=unused-import
                                         Tuple, List, Dict,
                                         Union, TYPE_CHECKING)
+from itertools                  import chain
 
 import bokeh.core.properties as props
 from bokeh                      import layouts
@@ -257,32 +258,18 @@ class PeaksPlotCreator(TaskPlotCreator):
 
     def __setup_widgets(self):
         action  = self.action()
-        widgets = {i: j.create(action) for i, j in self._widgets.items()}
-        enableOnTrack(self, self._fig, widgets)
+        wdg     = {i: j.create(action) for i, j in self._widgets.items()}
+        enableOnTrack(self, self._fig, wdg)
 
         self._widgets['peaks'].setsource(self._peaksrc)
         self._widgets['seq'].callbacks(self._hover,
                                        self._ticker,
-                                       widgets['stats'][-1],
-                                       widgets['peaks'][-1])
+                                       wdg['stats'][-1],
+                                       wdg['peaks'][-1])
 
-        mode   = self.css.sizing_mode.get()
-        border = self.css.widgets.border.get()
-        wwidth = self.css.input.width.get()
-        twidth = widgets['peaks'][-1].width+border
-
-        # pylint: disable=redefined-variable-type
-        lay = layouts.widgetbox(*widgets['seq'],
-                                *widgets['oligos'],
-                                *widgets['cstrpath'],
-                                width       = wwidth+border,
-                                sizing_mode = mode)
-        lay = layouts.row(lay, layouts.widgetbox(*widgets['stats']),
-                          width       = wwidth*2+border,
-                          sizing_mode = mode)
-        return layouts.column(lay, *widgets['peaks'],
-                              sizing_mode = mode,
-                              width       = twidth)
+        itr = chain.from_iterable(wdg[i] for i in ('seq','oligos','cstrpath'))
+        lay = layouts.row(layouts.widgetbox(*itr), layouts.widgetbox(*wdg['stats']))
+        return layouts.column(lay, *wdg['peaks'])
 
 class PeaksPlotView(PlotView):
     "Peaks plot view"

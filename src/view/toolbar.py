@@ -121,7 +121,7 @@ class ToolBar(BokehView): # pylint: disable=too-many-instance-attributes
                             warning = '<p style="color:blue;">{}</p>',
                             error   = '<p style="color:red;>  {}</p>',
                             busy    = u'Please wait ...',
-                            width   = 480)
+                            width   = 400)
         css          = self._ctrl.getGlobal('css').title
         css.defaults = {'open': u'Open', 'save': u'Save', 'quit': u'Quit',
                         'open.dialog': u'Open a track or analysis file',
