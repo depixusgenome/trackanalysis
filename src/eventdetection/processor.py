@@ -39,7 +39,7 @@ class ExtremumAlignmentTask(Task):
         simply to align on a given side (EdgeAlignment).
         * *phase:* Whether to align a specific phase or on the best.
         * *factor:* When aligning on the best phase, this factor is used to determine
-        cycles miss-aligned on phase 1.
+        cycles mis-aligned on phase 1.
     """
     level  = Level.bead
     window = 15
