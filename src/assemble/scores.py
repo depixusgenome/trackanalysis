@@ -72,7 +72,7 @@ class OptiKPerm: # need to complete pytest
         pass
 
     @property
-    def perm(self):
+    def __perm(self):
         u'returns perm for OptiDistPerm'
         return list(range(len(self.kperm)))
 
@@ -80,9 +80,8 @@ class OptiKPerm: # need to complete pytest
     def pstate(self):
         u'calls OptiDistPerm, returns permuted xstate'
         if self.__pstate==[]:
-            xinit = sorted(oli.dist.mean() for oli in self.kperm)
             dists = [oli.dist for oli in self.kperm]
-            self.__pstate = OptiDistPerm(perm=self.perm,dists=dists).run(xinit=xinit)
+            self.__pstate = OptiDistPerm(perm=self.__perm,dists=dists).run()
         return self.__pstate
 
     def cost(self):
