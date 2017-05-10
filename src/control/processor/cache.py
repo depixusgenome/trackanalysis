@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"List of processes and cache"
+"List of processes and cache"
+from typing         import Union, Iterable, Optional, List # pylint: disable=unused-import
 from utils          import isfunction
 from .base          import Processor # pylint: disable=unused-import
 
@@ -11,19 +12,25 @@ def _version():
         yield i
 
 class CacheItem:
-    u"Holds cache and its version"
+    "Holds cache and its version"
     __slots__ = ('_proc', '_cache')
     _VERSION  = _version()
     def __init__(self, proc):
         self._proc    = proc         # type: Processor
         self._cache   = (0, None)    # type: Tuple[int,Any]
 
+    def __getstate__(self):
+        return {'proc': (type(self._proc), self._proc.task)}
+
+    def __setstate__(self, values):
+        self.__init__(values['proc'][0](values['proc'][1]))
+
     def isitem(self, tsk) -> bool:
-        u"returns the index of the provided task"
+        "returns the index of the provided task"
         return tsk is self.proc or tsk is self.proc.task
 
     def _getCache(self, old):
-        u"Delayed access to the cache"
+        "Delayed access to the cache"
         def _call():
             version, cache = self._cache
             if old != version:
@@ -42,7 +49,7 @@ class CacheItem:
         return cache
 
     def setCache(self, cache, version = None):
-        u"Sets the cache and its version"
+        "Sets the cache and its version"
         if version is None:
             version = next(self._VERSION)
 
@@ -53,20 +60,24 @@ class CacheItem:
         return self._getCache(version)
 
     def getCache(self):
-        u"Delayed access to the cache"
+        "Delayed access to the cache"
         return self._getCache(self._cache[0])
 
     cache   = property(lambda self: self.getCache(), setCache)
     proc    = property(lambda self: self._proc)
 
 class Cache:
-    u"Contains the track and task-created data"
+    "Contains the track and task-created data"
     __slots__ = ('_items',)
-    def __init__(self, order = None) -> None:
-        self._items = [] if order is None else order # type List[CacheItem]
+    def __init__(self, order: Optional[Iterable[Union[CacheItem, Processor]]] = None) -> None:
+        if order is None:
+            order = []
+        else:
+            order = [CacheItem(i) if isinstance(i, Processor) else i for i in order]
+        self._items = order # type: List[CacheItem]
 
     def index(self, tsk) -> int:
-        u"returns the index of the provided task"
+        "returns the index of the provided task"
         if tsk is None:
             return 0
         elif isinstance(tsk, int):
@@ -75,48 +86,65 @@ class Cache:
             return next(i for i, opt in enumerate(self._items) if opt.isitem(tsk))
 
     @property
+    def model(self):
+        "returns the data from the first task"
+        yield from (i.proc.task for i in self._items)
+
+    @property
     def first(self):
-        u"returns the data from the first task"
+        "returns the data from the first task"
         return self._items[0].getCache()
 
     def last(self, tsk):
-        u"returns the data from the last task"
+        "returns the data from the last task"
         return self._items[self.index(tsk)].getCache()
 
-    def append(self, proc):
-        u"appends a processor"
+    def append(self, proc) -> 'Cache':
+        "appends a processor"
         self._items.append(CacheItem(proc))
+        return self
+
+    def extend(self, procs):
+        "appends processors"
+        self._items.extend(CacheItem(i) for i in procs)
+        return self
 
     def insert(self, index, proc):
-        u"inserts a processor"
+        "inserts a processor"
         self._items.insert(index, CacheItem(proc))
         self.delCache(index)
 
     def pop(self, ide):
-        u"removes a processor"
+        "removes a processor"
         ind = self.index(ide)
         self.delCache(ind)
         self._items.pop(ind)
 
+    def keepupto(self, task) -> 'Cache':
+        "returns a Cache with tasks up to and including *task*"
+        if task is None:
+            return Cache(list(self._items))
+        return self if task is None else Cache(self._items[:self.index(task)+1])
+
     remove = pop
 
     def getCache(self, ide):
-        u"access to processor's cache"
+        "access to processor's cache"
         return self._items[self.index(ide)].getCache()
 
     def setCacheDefault(self, ide, item):
-        u"""
+        """
         Sets the cache unless, it exists already.
         If the item is a lambda, the latter is executed before storing
         """
         return self._items[self.index(ide)].setCacheDefault(item)
 
     def setCache(self, ide, value):
-        u"sets a processor's cache"
+        "sets a processor's cache"
         return self._items[self.index(ide)].setCache(value)
 
     def delCache(self, tsk = None):
-        u"""
+        """
         Clears cache starting at *tsk*.
         Clears all if tsk is None
         """
@@ -128,6 +156,12 @@ class Cache:
 
         for proc in self._items[ind:]:
             getattr(type(proc), 'clear', _clear)(proc, self, orig)
+
+    def __len__(self):
+        return len(self._items)
+
+    def __iter__(self):
+        yield from (i.proc for i in self._items)
 
     def __getitem__(self, ide):
         if isinstance(ide, slice):

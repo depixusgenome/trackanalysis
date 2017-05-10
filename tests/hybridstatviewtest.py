@@ -2,25 +2,64 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-outer-name
 """ Tests views """
-from tempfile                   import mktemp
+from tempfile                   import mktemp, gettempdir
+from pathlib                    import Path
 from pytest                     import approx       # pylint: disable=no-name-in-module
 import numpy as np
 
+from tornado.gen                import sleep
+from tornado.ioloop             import IOLoop
+
+from testingcore                import path as utfilepath
 from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 from view.plots                 import DpxKeyedRow
-from hybridstat.reporting.identification import writeparams
 
+from hybridstat.reporting.identification import writeparams
+from hybridstat.processor                import createmodels
+from hybridstat.view._io                 import ConfigXlsxIO
+
+def test_xlsxio():
+    "tests xlxs production"
+    itr  = createmodels(dict(track     = (Path(utfilepath("big_legacy")).parent/"*.trk",
+                                          utfilepath("CTGT_selection")),
+                             sequence  = utfilepath("hairpins.fasta")))
+    mdl  = next(itr)
+
+    for path in Path(gettempdir()).glob("*_hybridstattest*.xlsx"):
+        path.unlink()
+
+    out   = mktemp()+"_hybridstattest4.xlsx"
+    assert not Path(out).exists()
+    # pylint: disable=protected-access
+    ConfigXlsxIO._run(dict(path      = out,
+                           oligos    = 'CTGT',
+                           sequences = utfilepath('hairpins.fasta')),
+                      mdl)
+
+    cnt = 0
+    async def _run():
+        nonlocal cnt
+        for i in range(100):
+            if ConfigXlsxIO.RUNNING is False:
+                break
+            cnt = i
+            await sleep(.1)
+
+    IOLoop.current().run_sync(_run)
+    assert Path(out).exists()
+    assert cnt > 0
 
 def test_peaksplot(bokehaction):
     "test peaksplot"
     vals = [0.]*2
     def _printrng(evts):
         if 'y' in evts:
-            vals[:2] = evts['y'].value
+            vals[:2] = [0. if i is None else i for i in evts['y'].value]
     with bokehaction.launch('hybridstat.view.peaksplot.PeaksPlotView',
                             'app.BeadToolBar') as server:
         server.ctrl.observe("globals.project.plot.peaks", _printrng)
-        server.load('big_legacy')
+        server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
+        server.load('big_legacy', andstop = False)
 
         krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))
         def _press(val, *truth):
@@ -32,10 +71,10 @@ def test_peaksplot(bokehaction):
             if fig.extra_x_ranges['duration'].end is None:
                 server.wait()
         _press('Shift- ',         0.,       0.)
-        _press('Shift-ArrowUp',   0.220088, 0.379895)
-        _press('Alt-ArrowUp',     0.252049, 0.411856)
-        _press('Alt-ArrowDown',   0.220088, 0.379895)
-        _press('Shift-ArrowDown', -0.09952, 0.699508)
+        _press('Shift-ArrowUp',   0.319146, 0.478953)
+        _press('Alt-ArrowUp',     0.351107, 0.510914)
+        _press('Alt-ArrowDown',   0.319146, 0.478953)
+        _press('Shift-ArrowDown', 0.,       0.)
 
         src = server.widget['Peaks:List'].source
         assert all(np.isnan(src.data['distance']))
@@ -84,4 +123,4 @@ def test_hybridstat(bokehaction):
         server.change('Hybridstat:Tabs', 'active', 2)
 
 if __name__ == '__main__':
-    test_peaksplot(bokehaction(None))
+    test_xlsxio()

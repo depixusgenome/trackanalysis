@@ -112,9 +112,8 @@ class RawMixin:
 
     def _resetraw(self):
         data, shape          = self.__data()
-        self._rawsource.data = data
-        self.setbounds(self._hist.y_range, 'y', data['z'])
-        self._hover.resetraw(self._raw, self._rawsource, shape)
+        self._bkmodels[self._rawsource]['data'] = data
+        self._hover.resetraw(self._raw, data, shape, self._bkmodels)
         return shape
 
     if TYPE_CHECKING:

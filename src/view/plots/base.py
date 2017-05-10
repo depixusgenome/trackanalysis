@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "The basic architecture"
-from    typing       import (Tuple, Optional, # pylint: disable=unused-import
-                             Iterator, List, Union, cast)
-from    enum         import Enum
-from    abc          import ABCMeta, abstractmethod
-from    contextlib   import contextmanager
-from    functools    import wraps
-import  inspect
+from    typing              import (Tuple, Optional,       # pylint: disable=unused-import
+                                    Iterator, List, Union, Dict, Any, cast)
+from    collections         import OrderedDict
+from    enum                import Enum
+from    abc                 import ABCMeta, abstractmethod
+from    contextlib          import contextmanager
+from    functools           import wraps
 
 import  numpy        as     np
 
 import  bokeh.palettes
-from    bokeh.models            import (Range1d, RadioButtonGroup,
+from    bokeh.document          import Document     # pylint: disable=unused-import
+from    bokeh.models            import (Range1d,    # pylint: disable=unused-import
+                                        RadioButtonGroup, Model,
                                         Paragraph, Widget, GlyphRenderer)
+
 from    control                 import Controller
 from    control.globalscontrol  import GlobalsAccess
-from    ..base                  import BokehView, Action
+from    ..base                  import BokehView, threadmethod, spawn
 from    .bokehext               import DpxHoverTool, from_py_func
 
 _m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
@@ -125,7 +128,7 @@ class WidgetCreator(GlobalsAccess, metaclass = ABCMeta):
         "Creates the widget"
 
     @abstractmethod
-    def reset(self):
+    def reset(self, resets):
         "resets the wiget when a new file is opened"
 
 class GroupWidget(WidgetCreator):
@@ -148,9 +151,9 @@ class GroupWidget(WidgetCreator):
             return [Paragraph(text = css.get()), self._widget]
         return [self._widget]
 
-    def reset(self):
+    def reset(self, resets):
         "updates the widget"
-        self._widget.update(**self._data())
+        resets[self._widget].update(**self._data())
 
     @abstractmethod
     def onclick_cb(self, value):
@@ -164,7 +167,7 @@ class PlotModelAccess(GlobalsAccess):
     "Default plot model"
     def __init__(self, model:Union[Controller, 'PlotModelAccess'], key = None) -> None:
         super().__init__(model, key)
-        self._ctrl  = getattr(model, '_ctrl', model)
+        self._ctrl   = getattr(model, '_ctrl', model)
 
     def clear(self):
         "clears the model's cache"
@@ -172,10 +175,20 @@ class PlotModelAccess(GlobalsAccess):
     def create(self, _):
         "creates the model"
 
+    @staticmethod
+    def reset() -> bool:
+        "resets the model"
+        return False
+
 class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     "Base plotter class"
     _MODEL = PlotModelAccess
     _RESET = frozenset(('track', 'bead'))
+    class _OrderedDict(OrderedDict):
+        def __missing__(self, key):
+            self[key] = value = OrderedDict()
+            return value
+
     def __init__(self, ctrl:Controller, *_) -> None:
         "sets up this plotter's info"
         ctrl.getGlobal("css.plot").defaults = {'ylabel'             : u'Z (nm)',
@@ -196,6 +209,8 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         super().__init__(ctrl, key)
         self._model                = self._MODEL(ctrl, key)
         self._ctrl                 = ctrl
+        self._bkmodels             = self._OrderedDict() # type: Dict[Model,Dict[str,Any]]
+        self._doc                  = None                # type: Optional[Document]
         self.project.state.default = PlotState.active
 
     state = cast(PlotState,
@@ -210,37 +225,23 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
             name = name[:name.rfind('plot')]
         return ".plot." + name
 
-    def action(self, fcn):
+    def action(self, fcn = None):
         u"decorator which starts a user action but only if state is set to active"
-        if tuple(inspect.signature(fcn).parameters) == ('attr', 'old', 'new'):
-            @wraps(fcn)
-            def _wrap_cb(attr, old, new):
-                if self.state is PlotState.active:
-                    with Action(self._ctrl):
-                        fcn(attr, old, new)
-            return _wrap_cb
-        elif tuple(inspect.signature(fcn).parameters)[1:] == ('attr', 'old', 'new'):
-            @wraps(fcn)
-            def _wrap_cb(self, attr, old, new):
-                if self.state is PlotState.active:
-                    with Action(self._ctrl):
-                        fcn(self, attr, old, new)
-            return _wrap_cb
-        else:
-            @wraps(fcn)
-            def _wrap_cb(*args, **kwa):
-                if self.state is PlotState.active:
-                    with Action(self._ctrl):
-                        fcn(*args, **kwa)
-            return _wrap_cb
+        test   = lambda *_1, **_2: self.state is PlotState.active
+        action = BokehView.action.type(self._ctrl, test = test)
+        return action if fcn is None else action(fcn)
 
     @contextmanager
     def resetting(self):
         "Stops on_change events for a time"
+        self._bkmodels.clear()
         old, self.state = self.state, PlotState.resetting
         try:
             yield self
+            for i, j in self._bkmodels.items():
+                i.update(**j)
         finally:
+            self._bkmodels.clear()
             self.state = old # pylint: disable=redefined-variable-type
 
     @staticmethod
@@ -279,21 +280,20 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         else:
             curr  = self.project[axis].get(default = (vmin, vmax))
 
-        attrs = dict(bounds        = (vmin, vmax),
-                     start         = vmin if curr[0]  is None else curr[0],
-                     end           = vmax if curr[1]  is None else curr[1],
-                     range_padding = over*100.)
-        if not hasattr(rng, 'range_padding'):
-            attrs.pop('range_padding')
+        attrs = OrderedDict(bounds = (vmin, vmax))                  # type: Dict[str, Any]
+        attrs.update(start = vmin if curr[0]  is None else curr[0], # type: ignore
+                     end   = vmax if curr[1]  is None else curr[1])
+        if hasattr(rng, 'range_padding'):
+            attrs['range_padding'] = over*100.
 
         return attrs
 
     def setbounds(self, rng, axis, arr, reinit = True):
         "Sets the range boundaries"
+        vals = self.newbounds(rng, axis, arr)
         if reinit and hasattr(rng, 'reinit'):
-            rng.update(reinit = not rng.reinit, **self.newbounds(rng, axis, arr))
-        else:
-            rng.update(**self.newbounds(rng, axis, arr))
+            vals['reinit'] = not rng.reinit
+        self._bkmodels[rng] = vals
 
     def bounds(self, arr):
         "Returns boundaries for a column"
@@ -309,6 +309,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
 
     def create(self, doc):
         "returns the figure"
+        self._doc = doc
         self._model.create(doc)
         with self.resetting():
             return self._create(doc)
@@ -317,9 +318,8 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         "activates the component: resets can occur"
         old        = self.state
         self.state = PlotState.active if val else PlotState.disabled
-        if val and old is PlotState.outofdate:
-            with self.resetting():
-                self._reset()
+        if val and (old is PlotState.outofdate):
+            self.__doreset()
 
     def reset(self, items:dict):
         "Updates the data"
@@ -334,35 +334,75 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
             self.state = PlotState.outofdate
 
         elif state is PlotState.active:
-            with self.resetting():
-                self._reset()
+            self.__doreset()
 
     def observe(self):
         "sets-up model observers"
         self.project.root.observe(self.reset)
 
+    def __doreset(self):
+        with self.resetting():
+            self._bkmodels.clear()
+            self._model.reset()
+
+        old, self.state = self.state, PlotState.resetting
+        async def _reset_and_render():
+            def _reset():
+                with BokehView.computation.type(self._ctrl, calls = self.__doreset):
+                    try:
+                        self._reset()
+                        return tuple(self._bkmodels.items())
+                    finally:
+                        self._bkmodels.clear()
+                        self.state = old # pylint: disable=redefined-variable-type
+
+            ret = await threadmethod(_reset)
+
+            def _render():
+                if ret is not None:
+                    with BokehView.computation.type(self._ctrl, calls = self.__doreset):
+                        with self.resetting():
+                            self._bkmodels.update(ret)
+                self._ctrl.handle('rendered', args = {'plot': self})
+
+            self._doc.add_next_tick_callback(_render)
+
+        spawn(_reset_and_render)
+
     def _addcallbacks(self, fig):
         "adds Range callbacks"
-        cnf       = self.project
-        def _onchangex_cb(attr, old, new):
-            if self.state is PlotState.active:
-                cnf.update(x = (fig.x_range.start, fig.x_range.end))
-        fig.x_range.on_change('start', _onchangex_cb)
-        fig.x_range.on_change('end',   _onchangex_cb)
+        updating = [False]
+        def _get(attr):
+            axis = getattr(fig, attr+'_range')
+            cnf  = getattr(self.project, attr)
 
-        def _onchangey_cb(attr, old, new):
-            if self.state is PlotState.active:
-                cnf.update(y = (fig.y_range.start, fig.y_range.end))
+            def _on_cb(attr, old, new):
+                if self.state is PlotState.active:
+                    vals = axis.start, axis.end
+                    if axis.bounds is not None:
+                        rng = 1e-3*(axis.bounds[1]-axis.bounds[0])
+                        vals = tuple(None if abs(i-j) < rng else j
+                                     for i, j in zip(axis.bounds, vals))
+                    updating[0] = True
+                    cnf.set(vals)
+                    updating[0] = False
 
-        fig.y_range.on_change('start', _onchangey_cb)
-        fig.y_range.on_change('end',   _onchangey_cb)
+            cnf.default = None, None
+            axis.on_change('start', _on_cb)
+            axis.on_change('end',   _on_cb)
 
-        cnf.defaults = dict(x = (None, None), y = (None, None))
+        _get('x')
+        _get('y')
 
         def _onobserve(items):
+            if updating[0]:
+                return
             for i in {'x', 'y'} & frozenset(items):
+                rng  = getattr(fig, i+'_range')
                 vals = items[i].value
-                getattr(fig, i+'_range').update(start = vals[0], end = vals[1])
+                bnds = rng.bounds
+                rng.update(start = bnds[0] if vals[0] is None else vals[0],
+                           end   = bnds[1] if vals[1] is None else vals[1])
 
         self.project.observe('x', 'y', _onobserve)
         return fig

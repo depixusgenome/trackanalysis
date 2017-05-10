@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 u"Task IO module"
 from typing         import Union, Tuple
+from itertools      import chain
 from copy           import deepcopy
 from model.task     import TrackReaderTask
 
@@ -16,7 +17,7 @@ class TaskIO:
         return None
 
     def save(self, path:str, models):
-        u"opens a file"
+        u"saves a file"
         return None
 
     @classmethod
@@ -27,11 +28,11 @@ class TaskIO:
     @classmethod
     def extensions(cls, ctrl, attr:str):
         "returns the list of possible extensions"
-        return '*|'+'|'.join(i.EXT for i in cls.__get(ctrl, attr)[::-1])
+        return '|'.join(chain.from_iterable(i.EXT for i in cls.__get(ctrl, attr)[::-1]))
 
 class TrackIO(TaskIO):
     "Deals with reading a track file"
-    EXT = 'trk'
+    EXT = 'trk',
     def open(self, path:Union[str, Tuple[str,...]], model:tuple):
         "opens a track file"
         if len(model):
@@ -40,7 +41,7 @@ class TrackIO(TaskIO):
 
 class ConfigTrackIO(TrackIO):
     "Adds an alignment to the tracks per default"
-    EXT = 'trk'
+    EXT = 'trk',
     def __init__(self, ctrl, *_):
         super().__init__(ctrl, *_)
         self._ctrl = ctrl.getGlobal('config').tasks
@@ -74,13 +75,13 @@ class _GrFilesIOMixin:
 
         track = self._track
         if track is None:
-            raise IOError(u"IOError: start by opening a track file!", "treated")
+            raise IOError(u"IOError: start by opening a track file!", "warning")
 
         return ((track.path,) if isinstance(track.path, str) else track.path) + path
 
 class GrFilesIO(TrackIO, _GrFilesIOMixin):
     "Adds an alignment to the tracks per default"
-    EXT = 'gr'
+    EXT = 'gr',
     def __init__(self, *_):
         TrackIO.__init__(self, *_)
         _GrFilesIOMixin.__init__(self, *_)
@@ -89,9 +90,27 @@ class GrFilesIO(TrackIO, _GrFilesIOMixin):
         path = self._open(path, _)
         return None if path is None else TrackIO.open(self, path, _)
 
+def currentmodelonly(cls):
+    "Adapts a class such that only the current model is saved"
+    def __init__(self, ctrl, *_):
+        cls.__init__(self, ctrl, *_)
+        self.currentmodel = ctrl.getGlobal('project').track.get
+
+    def save(self, path:str, models):
+        u"saves a file"
+        curr   = self.currentmodel()
+        models = [i for i in models if curr is i[0]]
+        if len(models):
+            return cls.save(self, path, models)
+        else:
+            raise IOError("Nothing to save", "warning")
+        return True
+
+    return type(cls.__name__, (cls,), {'__init__': __init__, 'save': save})
+
 class ConfigGrFilesIO(ConfigTrackIO, _GrFilesIOMixin):
     "Adds an alignment to the tracks per default"
-    EXT = 'gr'
+    EXT = 'gr',
     def __init__(self, *_):
         ConfigTrackIO.__init__(self, *_)
         _GrFilesIOMixin.__init__(self, *_)

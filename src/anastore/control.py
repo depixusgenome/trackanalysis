@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Sets things up for the taskcontroller"
+"Sets things up for the taskcontroller"
 
 from typing             import Union, Tuple
-from control.taskio     import TaskIO
+from control.taskio     import TaskIO, currentmodelonly
 from .                  import load, dump
 
 class AnaIO(TaskIO):
-    u"Ana IO"
-    EXT = 'ana'
+    "Ana IO"
+    EXT = 'ana',
     def open(self, path:Union[str, Tuple[str,...]], model:tuple):
         u"opens an ana file"
         if isinstance(path, tuple):
@@ -23,7 +23,10 @@ class AnaIO(TaskIO):
 
     def save(self, path:str, models):
         u"closes an ana file"
-        if not path.endswith(".ana"):
-            return False
-        dump(models, path)
+        if len(models):
+            dump(models, path)
+        else:
+            raise IOError("Nothing to save", "warning")
         return True
+
+ConfigAnaIO = currentmodelonly(AnaIO)

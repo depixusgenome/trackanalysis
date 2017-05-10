@@ -11,6 +11,8 @@ It can add/delete/update tasks, emitting the corresponding events
 """
 from typing         import (Union, Iterator, Tuple, # pylint: disable=unused-import
                             Optional, Any, List, Iterable, Dict)
+from pathlib        import Path
+from itertools      import chain
 
 from model.task     import Task, RootTask, TaskIsUniqueError
 from .event         import Controller, NoEmission
@@ -71,20 +73,22 @@ class ProcessorController:
         "clears data starting at *tsk*"
         self.data.delCache()
 
-    def run(self, tsk:Optional[Task] = None, copy = False):
+    def run(self, tsk:Optional[Task] = None, copy = False, pool = None):
         """
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
         """
-        return _runprocessors(self.model, self.data, tsk, copy = copy)
+        return _runprocessors(self.data, tsk, copy = copy, pool = pool)
 
     @classmethod
     def create(cls,
-               model     : Iterable[Task],
+               *models   : Task,
                processors: 'Union[Dict,Iterable[type],type,None]' = Processor
               ) -> 'ProcessorController':
         "creates a task pair for this model"
-        tasks = tuple(model)
+        tasks = tuple(chain(*(i if isinstance(i, (tuple, list)) else (i,) for i in models)))
+        assert all(isinstance(i, Task) for i in tasks)
+
         pair  = cls()
         if not isinstance(processors, Dict):
             processors = cls.register(processors)
@@ -119,11 +123,7 @@ class ProcessorController:
             cls.register(sclass, cache)
         return cache
 
-def create(model     : Iterable[Task],
-           processors: 'Union[Dict,Iterable[type],type,None]' = Processor
-          ) -> 'ProcessorController':
-    "creates a task pair for this model"
-    return ProcessorController.create(model, processors)
+create = ProcessorController.create # pylint: disable=invalid-name
 
 class TaskController(Controller):
     "Data controller class"
@@ -136,6 +136,12 @@ class TaskController(Controller):
 
         self.__openers = kwargs.get("openers", None)
         self.__savers  = kwargs.get("savers",  None)
+
+    @property
+    def __processors(self):
+        if self.__procs is None:
+            self.__procs = ProcessorController.register(Processor)
+        return self.__procs
 
     def setup(self, ctrl):
         "sets up the missing info"
@@ -190,20 +196,23 @@ class TaskController(Controller):
         "Returns the cache for a given task"
         return self.__items[parent].data.getCache(tsk)
 
-    def run(self, parent:RootTask, tsk:Task, copy = False):
+    def run(self, parent:RootTask, tsk:Task, copy = False, pool = None):
         """
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
         """
-        return self.__items[parent].run(tsk, copy = copy)
+        return self.__items[parent].run(tsk, copy = copy, pool = pool)
 
     @Controller.emit
     def saveTrack(self, path: str) -> None:
         "saves the current model"
         items = [item.model for item in self.__items.values()]
+        ext   = path[path.rfind('.')+1:]
         for obj in self.__savers:
-            if obj.close(path, items):
+            if ext in obj.EXT and obj.save(path, items):
                 break
+        else:
+            raise IOError("Could not save: %s" % str(Path(path).name), 'warning')
 
     @Controller.emit
     def openTrack(self,
@@ -211,30 +220,23 @@ class TaskController(Controller):
                   model: Iterable[Task]             = tuple()) -> dict:
         "opens a new file"
         tasks = tuple(model)
-        if task is None:
-            if len(tasks) == 0:
-                raise NoEmission("Nothing to do")
+        if task is None and len(tasks) == 0:
+            raise NoEmission()
+
+        elif task is None:
             task = tasks[0]
 
         if not isinstance(task, RootTask):
-            for obj in self.__openers:
-                models = obj.open(task, tasks)
-                if models is not None:
-                    break
-            else:
-                raise IOError(u"IOError: Couldn't open "+str(getattr(task, 'path', 'path')))
-
-            for elem in models:
-                self.openTrack(elem[0], elem)
-            raise NoEmission("Done everything already")
+            self.__withopeners(task, tasks)
+            raise NoEmission()
 
         if len(tasks) == 0:
             tasks = (task,)
 
         elif tasks[0] is not task:
-            raise ValueError("model and root task does'nt coincide")
+            raise ValueError("model[0] ≠ root")
 
-        self.__items[task] = ProcessorController.create(tasks, self.__procs)
+        self.__items[task] = create(tasks, processors = self.__processors)
         return dict(controller = self, model = tasks)
 
     @Controller.emit
@@ -248,7 +250,7 @@ class TaskController(Controller):
     def addTask(self, parent:RootTask, task:Task, index = _m_none) -> dict:
         "opens a new file"
         old = tuple(self.__items[parent].model)
-        self.__items[parent].add(task, self.__procs[type(task)], index = index)
+        self.__items[parent].add(task, self.__processors[type(task)], index = index)
         return dict(controller = self, parent = parent, task = task, old = old)
 
     @Controller.emit
@@ -277,6 +279,28 @@ class TaskController(Controller):
         else:
             self.__items[parent].clear()
         return dict(controller = self, parent = parent)
+
+    def __withopeners(self, task, tasks):
+        for obj in self.__openers:
+            models = obj.open(task, tasks)
+            if models is not None:
+                break
+        else:
+            path = getattr(task, 'path', 'path')
+            if path is None or (isinstance(path, (list, tuple))) and len(path) == 0:
+                msg  = u"Couldn't open track"
+
+            elif isinstance(path, (tuple, list)):
+                msg  = u"Couldn't open: " + Path(str(path[0])).name
+                if len(path):
+                    msg += ", ..."
+            else:
+                msg  = u"Couldn't open: " + Path(str(path)).name
+
+            raise IOError(msg, 'warning')
+
+        for elem in models:
+            self.openTrack(elem[0], elem)
 
     @staticmethod
     def __undos__():

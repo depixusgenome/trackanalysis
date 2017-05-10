@@ -43,7 +43,7 @@ class TaskPlotModelAccess(PlotModelAccess):
                                    val  = prec,
                                    max  = cnf.max.get())
             if throwerr:
-                raise ValueError(msg, 'treated')
+                raise ValueError(msg, 'warning')
             else:
                 self.project.root.message = (msg, 'warning')
             return True
@@ -167,7 +167,7 @@ class TaskAccess(TaskPlotModelAccess):
                 cnf.set(updatecopy(cnf.get(), **kwa))
 
     def update(self, **kwa):
-        "removes the task"
+        "adds/updates the task"
         root = self.roottask
         task = self._task
         cnf  = self.configtask

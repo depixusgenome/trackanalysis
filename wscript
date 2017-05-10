@@ -157,12 +157,12 @@ def app(bld):
     ext   = ".bat"                      if iswin else ".sh"
     cmd   = r"start /min %~dp0pythonw " if iswin else "./"
 
-    for optext, opts in (('', ''), ('_chrome', ' --web --show')):
+    for optext, opts in (('', ''), ('_chrome', ' --electron')):
         for name, val in (('cyclesplot', 'cyclesplot.CyclesPlotView'),
                           ('hybridstat', 'hybridstat.view.HybridStatView')):
            with open(str(bld.options.APP_PATH.make_node(name+optext+ext)), 'w',
                       encoding = 'utf-8') as stream:
-                print(cmd + r"app/runapp.py " + val + opts + ' --port random',
+                print(cmd + r"app/cmdline.py " + val + opts + ' --port random',
                       file = stream)
 
     builder.os.chdir(str(Path("build")/"OUTPUT"))

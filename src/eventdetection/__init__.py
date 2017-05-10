@@ -3,14 +3,13 @@
 u"Deals with event detection"
 from typing         import Optional
 from utils          import initdefaults
-from signalfilter   import NonLinearFilter, Filter
+from signalfilter   import NonLinearFilter, Filter, PrecisionAlg
 from .detection     import EventDetector
 
-class EventDetectionConfig:
+class EventDetectionConfig(PrecisionAlg):
     u"Config for an event detection: base class to various interfaces"
     filter      = NonLinearFilter() # type: Optional[Filter]
     events      = EventDetector()   # type: EventDetector
-    precision   = 0.                # type: Optional[float]
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
-        pass
+        super().__init__(**_)

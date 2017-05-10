@@ -1,230 +1,33 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
-from typing                     import (Optional, Sequence, Tuple, List, Dict,
+from typing                     import (Optional,   # pylint: disable=unused-import
+                                        Tuple, List, Dict,
                                         Union, TYPE_CHECKING)
-from itertools                  import product
-from pathlib                    import Path
+from itertools                  import chain
 
 import bokeh.core.properties as props
 from bokeh                      import layouts
 from bokeh.plotting             import figure, Figure    # pylint: disable=unused-import
 from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
-                                        DataTable, TableColumn, Model, Widget,
-                                        Div, StringFormatter, TapTool, CustomJS)
+                                        Model, TapTool, CustomJS)
 
 import numpy                    as     np
 
-import sequences
 from signalfilter               import rawprecision
-from control.taskio             import ConfigTrackIO, ConfigGrFilesIO
-from control.processor          import processors
-from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
-from peakfinding.processor      import PeakSelectorTask
-from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
-                                        FitBead, Distance, HairpinDistance)
 
 from view.base                  import enableOnTrack
-from view.dialog                import FileDialog
-from view.intinput              import PathInput
 from view.plots                 import (PlotView, PlotAttrs, from_py_func,
-                                        DpxNumberFormatter, WidgetCreator,
                                         DpxKeyedRow, PlotState)
-from view.plots.tasks           import (TaskPlotModelAccess, TaskPlotCreator,
-                                        TaskAccess)
-from view.plots.sequence        import (readsequence, SequenceTicker, OligoListWidget,
-                                        SequenceHoverMixin, SequencePathWidget,
-                                        FitParamProp    as _FitParamProp,
-                                        SequenceKeyProp as _SequenceKeyProp)
+from view.plots.tasks           import TaskPlotCreator
+from view.plots.sequence        import (SequenceTicker, OligoListWidget,
+                                        SequenceHoverMixin)
 
-from ..probabilities            import Probability
-from ..processor                import fittohairpintask
-
-class FitToHairpinAccess(TaskAccess):
-    "access to the FitToHairpinTask"
-    def __init__(self, ctrl):
-        super().__init__(ctrl, FitToHairpinTask)
-
-    @staticmethod
-    def _configattributes(kwa):
-        return {}
-
-class FitParamProp(_FitParamProp):
-    "access to bias or stretch"
-    def __get__(self, obj, tpe) -> Optional[str]:
-        if obj is not None:
-            dist = obj.distances.get(obj.sequencekey, None)
-            if dist is not None:
-                return getattr(dist, self._key)
-
-        return super().__get__(obj, tpe)
-
-class SequenceKeyProp(_SequenceKeyProp):
-    "access to the sequence key"
-    def __get__(self, obj, tpe) -> Optional[str]:
-        "returns the current sequence key"
-        if obj is not None and len(obj.distances) and self.fromglobals(obj) is None:
-            if len(obj.distances):
-                return min(obj.distances, key = obj.distances.__getitem__)
-        return super().__get__(obj, tpe)
-
-class _PeaksPlotModelAccess(TaskPlotModelAccess):
-    "Access to identification"
-    def __init__(self, ctrl, key: Optional[str] = None) -> None:
-        super().__init__(ctrl, key)
-        self.identification = FitToHairpinAccess(self)
-
-        cls = type(self)
-        cls.sequencepath    .setdefault(self, None)
-        cls.oligos          .setdefault(self, [], size = 4)
-        cls.constraintspath .setdefault(self, None)
-        cls.useparams       .setdefault(self, True)
-
-    props           = TaskPlotModelAccess.props
-    sequencepath    = props.configroot[Optional[str]]('last.path.sequence')
-    oligos          = props.configroot[Optional[Sequence[str]]]('oligos')
-    constraintspath = props.projectroot[Optional[str]]('constraints.path')
-    useparams       = props.projectroot[bool]('constraints.useparams')
-
-    @property
-    def defaultidenfication(self):
-        "returns the default identification task"
-        ols = self.oligos
-        seq = self.sequencepath
-        if ols is None or len(ols) == 0 or len(readsequence(seq)) == 0:
-            return None
-        else:
-            return fittohairpintask(seq, ols, self.constraintspath, self.useparams)
-
-class PeaksPlotModelAccess(_PeaksPlotModelAccess):
-    "Access to peaks"
-    def __init__(self, ctrl, key: Optional[str] = None) -> None:
-        super().__init__(ctrl, key)
-        self.config.root.tasks.extremumalignment.default = ExtremumAlignmentTask()
-
-        self.eventdetection     = TaskAccess(self, EventDetectionTask)
-        self.peakselection      = TaskAccess(self, PeakSelectorTask)
-        self.fits               = None   # type: Optional[FitBead]
-        self.peaks              = dict() # type: Dict[str, np.ndarray]
-        self.estimatedbias      = 0.
-
-        cls = type(self)
-        cls.sequencekey .setdefault(self, None) # type: ignore
-        cls.stretch     .setdefault(self)       # type: ignore
-        cls.bias        .setdefault(self)       # type: ignore
-
-    sequencekey  = SequenceKeyProp()
-    stretch      = FitParamProp('stretch')
-    bias         = FitParamProp('bias')
-
-    @property
-    def distances(self) -> Dict[str, Distance]:
-        "returns the distances which were computed"
-        return self.fits.distances if self.fits is not None else {}
-
-    def setpeaks(self, dtl) -> Optional[FitBead]:
-        "sets current bead peaks and computes the fits"
-        if dtl is None:
-            self.peaks = dict.fromkeys(('z', 'id', 'distance', 'sigma', 'bases',
-                                        'duration', 'count'), [])
-            self.fits  = None
-            return
-
-        nan        = lambda: np.full((len(peaks),), np.NaN, dtype = 'f4')
-        peaks      = tuple(self.peakselection.task.details2output(dtl))
-        self.peaks = dict(z        = np.array([i for i, _ in peaks], dtype = 'f4'),
-                          sigma    = nan(),
-                          duration = nan(),
-                          count    = nan())
-
-        self.estimatedbias  = self.peaks['z'][0]
-
-        self.__set_ids_and_distances(peaks)
-        self.__set_probas(peaks)
-
-        return self.peaks
-
-    def runbead(self):
-        "returns a tuple (dataitem, bead) to be displayed"
-        if self.track is None or self.checkbead(False):
-            return None
-
-        root  = self.roottask
-        ibead = self.bead
-        task  = self.eventdetection.task
-        if task is None:
-            task  = self.config.tasks.eventdetection.get()
-            ind   = self.eventdetection.index
-            beads = next(iter(self._ctrl.run(root, ind-1, copy = True)))
-            return next(processors(task)).apply(beads, **task.config())[ibead, ...]
-        else:
-            return next(iter(self._ctrl.run(root, task, copy = True)))[ibead, ...]
-
-    def reset(self):
-        "adds tasks if needed"
-        if self.eventdetection.task is None:
-            self.eventdetection.update()
-
-        if self.peakselection.task is None:
-            self.peakselection.update()
-
-        task = self.defaultidenfication
-        cur  = self.identification.task
-        if task is None and cur is not None:
-            self.identification.remove()
-        elif task is not None and cur is None:
-            self.identification.update(**task.config())
-
-    def __set_ids_and_distances(self, peaks):
-        task  = self.identification.task
-        dico  = self.peaks
-        names = 'bases', 'id', 'distance', 'orient'
-        nan   = np.full((len(peaks),), np.NaN, dtype = 'f4')
-
-        dico.update(**dict.fromkeys(names, nan))
-        dico['orient'] = np.array([' '] * len(nan))
-
-        if task is None:
-            dico['bases']  = (dico['z']-self.bias)*self.stretch
-            return
-
-        self.fits = FitToHairpinProcessor.compute((self.bead, peaks),
-                                                  **task.config())[1]
-
-        for key in product(readsequence(self.sequencepath), names):
-            dico[''.join(key)] = np.copy(dico[key[1]])
-
-        strori  = self.css.stats.title.orientation.get()
-        alldist = self.distances
-        for key, seq in readsequence(self.sequencepath).items():
-            if key not in alldist:
-                continue
-
-            dist = alldist[key].stretch, alldist[key].bias
-            tmp  = task.peakids[key](dico['z'], *dist)['key']
-            good = tmp >= 0
-            ori  = dict(sequences.peaks(seq, self.oligos))
-
-            dico[key+'bases']          = (dico['z'] - dist[1])*dist[0]
-            dico[key+'id']      [good] = tmp[good]
-            dico[key+'distance'][good] = (tmp - dico[key+'bases'])[good]
-            dico[key+'orient']  [good] = [strori[ori.get(int(i+0.01), 2)]
-                                          for i in dico[key+'id'][good]]
-
-        for key in names:
-            dico[key] = dico[self.sequencekey+key]
-
-    def __set_probas(self, peaks):
-        task = self.eventdetection.task
-        prob = Probability(framerate   = self.track.framerate,
-                           minduration = task.events.select.minduration)
-        dur  = self.track.phaseduration(..., task.phase)
-        ncyc = self.track.ncycles
-        for i, (_, evts) in enumerate(peaks):
-            val                       = prob(evts, dur)
-            self.peaks['duration'][i] = val.averageduration
-            self.peaks['sigma'][i]    = prob.resolution(evts)
-            self.peaks['count'][i]    = min(100., val.nevents / ncyc*100.)
+from ._model                    import PeaksPlotModelAccess
+from ._widget                   import (PeaksSequencePathWidget,
+                                        PeaksStatsWidget, PeakListWidget,
+                                        PeakIDPathWidget)
+from ._io                       import setupio
 
 class PeaksSequenceHover(Model, SequenceHoverMixin):
     "tooltip over peaks"
@@ -248,13 +51,36 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
                        code = 'cb_obj.apply_update(fig, source)')
         self.js_on_change("updating", jsc)
 
-    def reset(self):
+    def reset(self, resets):
         "Creates the hover tool for histograms"
         dist = self._model.distances
-        super().reset(biases    = {i: j.bias    for i, j in dist.items()},
+        super().reset(resets,
+                      biases    = {i: j.bias    for i, j in dist.items()},
                       stretches = {i: j.stretch for i, j in dist.items()})
 
-    def slaveaxes(self, fig, src, inpy = False): # pylint: disable=arguments-differ
+    def pyslaveaxes(self, fig, src, resets): # pylint: disable=arguments-differ
+        "slaves a histogram's axes to its y-axis"
+        yrng         = fig.y_range
+        bases        = fig.extra_y_ranges['bases']
+        resets[bases].update(start  = (yrng.start - self._model.bias)*self._model.stretch,
+                             end    = (yrng.end   - self._model.bias)*self._model.stretch)
+
+        zval = src["z"]
+        ix1  = 0
+        ix2  = len(zval)
+        for i in range(ix2):
+            if zval[i] < yrng.start:
+                ix1 = i+1
+                continue
+            if zval[i] > yrng.end:
+                ix2 = i
+                break
+
+        end = lambda x: (0. if len(zval) < 2 or ix1 == ix2 else max(src[x][ix1:ix2])+1)
+        resets[fig.extra_x_ranges['duration']].update(start = 0., end = end('duration'))
+        resets[fig.x_range]                   .update(start = 0., end = end('count'))
+
+    def jsslaveaxes(self, fig, src): # pylint: disable=arguments-differ
         "slaves a histogram's axes to its y-axis"
         # pylint: disable=too-many-arguments,protected-access
         hvr = self
@@ -291,268 +117,7 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
                 dur.end = max(src.data["duration"][ix1:ix2])
                 cnt.end = max(src.data["count"][ix1:ix2])
 
-        if inpy:
-            _onchangebounds()
-        else:
-            fig.y_range.callback = from_py_func(_onchangebounds)
-
-class PeaksSequencePathWidget(SequencePathWidget):
-    "Widget for setting the sequence to use"
-    def _sort(self, lst) -> List[str]:
-        dist = self._model.distances
-        if len(dist):
-            lst  = [i for i in lst if i in dist]
-            return sorted(lst, key = lambda i: dist[i].value)
-        else:
-            return super()._sort(lst)
-
-    def callbacks(self,                     # pylint: disable=arguments-differ
-                  hover: SequenceHoverMixin,
-                  tick1: SequenceTicker,
-                  div:   'PeaksStatsDiv',
-                  table: DataTable):
-        "sets-up callbacks for the tooltips and grids"
-        widget = self.widget
-        source = hover.source
-        tick2  = tick1.axis
-
-        @from_py_func
-        def _js_cb(hvr    = hover,  # pylint: disable=too-many-arguments
-                   src    = source,
-                   peaks  = table,
-                   stats  = div,
-                   tick1  = tick1,
-                   tick2  = tick2,
-                   cb_obj = None):
-            if cb_obj.value in src.column_names:
-                cb_obj.label     = cb_obj.value
-                tick1.key        = cb_obj.value
-                tick2.key        = cb_obj.value
-                src.data['text'] = src.data[cb_obj.value]
-                src.trigger("change")
-
-                if cb_obj.value in stats.data:
-                    stats.text   = stats.data   [cb_obj.value]
-
-                if cb_obj.value+'id' in peaks.source.column_names:
-                    for key in ('id', 'bases', 'distance', 'orient'):
-                        ref = cb_obj.value+key
-                        peaks.source.data[key] = peaks.source.data[ref]
-                    peaks.trigger("change")
-
-                if cb_obj.value in hvr.stretches:
-                    hvr.updating = 'seq'
-                    hvr.stretch  = hvr.stretches[cb_obj.value]
-                    hvr.bias     = hvr.biases   [cb_obj.value]
-                    hvr.updating = '*'
-                    hvr.updating = ''
-
-        widget.js_on_change('value', _js_cb)
-
-class PeaksStatsDiv(Div): # pylint: disable = too-many-ancestors
-    "div for displaying stats"
-    data               = props.Dict(props.String, props.String)
-    __implementation__ = """
-        import {Div, DivView} from "models/widgets/div"
-        import * as p from "core/properties"
-
-        export class PeaksStatsDiv extends Div
-          type: "PeaksStatsDiv"
-          default_view: DivView
-
-          @define {
-            data: [ p.Any,  {}]
-          }
-    """
-
-class PeaksStatsWidget(WidgetCreator):
-    "Table containing stats per peaks"
-    def __init__(self, model:PeaksPlotModelAccess) -> None:
-        super().__init__(model)
-        self.__widget = None # type: Optional[PeaksStatsDiv]
-        css = self.css.stats
-        css.defaults = {'title.format': '{}',
-                        'title.openhairpin': u' & open hairpin',
-                        'title.orientation': u'-+ ',
-                        'lines': [['css:title.stretch', '.4f'],
-                                  ['css:title.bias',    '.4f'],
-                                  [u'σ[HF] (µm)',       '.4f'],
-                                  [u'σ[Peaks] (µm)',    '.4f'],
-                                  [u'Peak count',       '.0f'],
-                                  [u'Sites found',      ''],
-                                  [u'Silhouette',       '.1f'],
-                                  [u'reduced χ²',       '.1f']]}
-
-    def create(self, _) -> List[Widget]:
-        self.__widget = PeaksStatsDiv(width = self.css.input.width.get())
-        self.reset()
-        return [self.__widget]
-
-    def reset(self):
-        data = self.__data()
-        if len(data) == 1:
-            self.__widget.text = next(iter(data.values()))
-        else:
-            self.__widget.text = data[self._model.sequencekey]
-        self.__widget.data = data
-
-    class _TableConstructor:
-        "creates the html table containing stats"
-        def __init__(self, css):
-            get         = lambda i: css[i[4:]].get() if i.startswith('css:') else i
-            self.titles = [(get(i[0]), i[1]) for i in css.stats.lines.get()]
-            self.values = ['']*len(self.titles) # type: List
-            self.line   = '<tr><td>'+css.stats.title.format.get()+'</td><td>{}</td></tr>'
-            self.openhp = css.stats.title.openhairpin.get()
-
-        def trackdependant(self, mdl):
-            "all track dependant stats"
-            if mdl.track is None:
-                return
-
-            self.values[0] = mdl.stretch
-            self.values[1] = mdl.bias
-            self.values[2] = rawprecision(mdl.track, mdl.bead)
-            if len(mdl.peaks['z']):
-                self.values[3] = np.mean(mdl.peaks['sigma'])
-            self.values[4] = max(0, len(mdl.peaks['z']) - 1)
-
-        def sequencedependant(self, mdl, dist, key):
-            "all sequence dependant stats"
-            task      = mdl.identification.task
-            remove    = task.peakids[key].peaks[[0,-1]]
-            nrem      = sum(i in remove for i in mdl.peaks[key+'id'])
-            nfound    = np.isfinite(mdl.peaks[key+'id']).sum()-nrem
-            npks      = len(task.peakids[key].hybridizations)
-            self.values[5] = '{}/{}'.format(nfound, npks)
-            if nrem == 2:
-                self.values[5] += self.openhp
-
-            self.values[6] = HairpinDistance.silhouette(dist, key)
-
-            if nfound > 2:
-                stretch        = dist[key].stretch
-                self.values[7] = (np.nanstd(mdl.peaks[key+'id'])
-                                  / ((self.values[3]*stretch)**2 * (nfound - 2)))
-
-        def __call__(self) -> str:
-            return ('<table>'
-                    + ''.join(self.line.format(i[0], self.__fmt(i[1], j))
-                              for i, j in zip(self.titles, self.values))
-                    +'</table>')
-
-        @staticmethod
-        def __fmt(fmt, val):
-            return val if isinstance(val, str) else ('{:'+fmt+'}').format(val)
-
-    def __data(self) -> Dict[str,str]:
-        tab = self._TableConstructor(self.css)
-        tab.trackdependant(self._model)
-
-        if self._model.identification.task is not None:
-            ret  = dict()
-            dist = self._model.distances
-            for key in readsequence(self._model.sequencepath):
-                if key not in dist:
-                    continue
-
-                tab.sequencedependant(self._model, dist, key)
-                ret[key] = tab()
-            return ret
-        else:
-            return {'': tab()}
-
-class PeakListWidget(WidgetCreator):
-    "Table containing stats per peaks"
-    def __init__(self, model:PeaksPlotModelAccess) -> None:
-        super().__init__(model)
-        self.__widget     = None # type: Optional[DataTable]
-        css               = self.css.peaks.columns
-        css.width.default = 65
-        css.default       = [['z',        'css:ylabel',    '0.0000'],
-                             ['bases',    u'Z (base)',     '0.0'],
-                             ['id',       u'Id',           '0'],
-                             ['orient',   u'Orientation',  ''],
-                             ['distance', u'Distance',     '0.0'],
-                             ['count',    'css:xlabel',    '0.0'],
-                             ['duration', 'css:xtoplabel', '0.000'],
-                             ['sigma',    u'σ (µm)',       '0.0000']]
-
-    def create(self, _) -> List[Widget]:
-        width = self.css.peaks.columns.width.get()
-        get   = lambda i: self.css[i[4:]].get() if i.startswith('css:') else i
-        fmt   = lambda i: (StringFormatter(text_align = 'center',
-                                           font_style = 'bold') if i == '' else
-                           DpxNumberFormatter(format = i, text_align = 'right'))
-        cols  = list(TableColumn(field      = i[0],
-                                 title      = get(i[1]),
-                                 formatter  = fmt(i[2]))
-                     for i in self.css.peaks.columns.get())
-
-        self.__widget = DataTable(source      = ColumnDataSource(self._model.peaks),
-                                  columns     = cols,
-                                  editable    = False,
-                                  row_headers = False,
-                                  width       = width*len(cols),
-                                  name        = "Peaks:List")
-        return [self.__widget]
-
-    def setsource(self, src):
-        "this widget has a source in common with the plots"
-        self.__widget.source = src
-
-    def reset(self):
-        pass
-
-class PeakIDPathWidget(WidgetCreator):
-    "Selects an id file"
-    def __init__(self, model:PeaksPlotModelAccess) -> None:
-        super().__init__(model)
-        self.__widget = None # type: Optional[PathInput]
-        self.__dlg    = FileDialog(config    = self._ctrl,
-                                   storage   = 'constraints.path',
-                                   filetypes = '*|xls')
-
-        css          = self.css.constraints
-        css.defaults = {'title': u'Id file path'}
-
-    def create(self, action) -> List[Widget]:
-        title         = self.css.constraints.title.get()
-        width         = self.css.input.width.get() - 10
-        self.__widget = PathInput(width = width, title = title,
-                                  placeholder = "", value = "",
-                                  name = 'Peaks:IDPath')
-
-        @action
-        def _onclick_cb(attr, old, new):
-            path = self.__dlg.open()
-            if path is not None:
-                self.__widget.value = str(Path(path).resolve())
-
-        @action
-        def _onchangetext_cb(attr, old, new):
-            path = self.__widget.value.strip()
-            if path == '':
-                self._model.constraintspath = None
-
-            elif not Path(path).exists():
-                self.reset()
-
-            else:
-                self._model.constraintspath = str(Path(path).resolve())
-
-        self.__widget.on_change('click', _onclick_cb)
-        self.__widget.on_change('value', _onchangetext_cb)
-
-        self.__dlg.title = title
-        return [self.__widget]
-
-    def reset(self):
-        path = self._model.constraintspath
-        if path is not None and Path(path).exists():
-            self.__widget.value = str(Path(path).resolve())
-        else:
-            self.__widget.value = ''
+        fig.y_range.callback = from_py_func(_onchangebounds)
 
 class PeaksPlotCreator(TaskPlotCreator):
     "Creates plots for peaks"
@@ -582,7 +147,7 @@ class PeaksPlotCreator(TaskPlotCreator):
         self._ticker  = SequenceTicker()
         self._hover   = PeaksSequenceHover()
         if TYPE_CHECKING:
-            self._model = PeaksPlotModelAccess('', '')
+            self._model = PeaksPlotModelAccess(self)
 
     @property
     def model(self):
@@ -591,7 +156,7 @@ class PeaksPlotCreator(TaskPlotCreator):
 
     def __data(self) -> Tuple[dict, dict]:
         cycles = self._model.runbead()
-        data   = dict.fromkeys(('z', 'duration', 'count'), [0., 1.])
+        data   = dict.fromkeys(('z', 'count'), [0., 1.])
         self._model.setpeaks(None)
         if cycles is None:
             return data, self._model.peaks
@@ -640,18 +205,16 @@ class PeaksPlotCreator(TaskPlotCreator):
             widget.observe()
 
     def _reset(self):
-        self._model.reset()
-
         data, peaks        = self.__data()
-        self._peaksrc.update(data = peaks, column_names = list(peaks.keys()))
-        self._histsrc.data = data
-        self._hover .reset()
-        self._ticker.reset()
+        self._bkmodels[self._peaksrc].update(data = peaks, column_names = list(peaks.keys()))
+        self._bkmodels[self._histsrc].update(data = data)
+        self._hover .reset(self._bkmodels)
+        self._ticker.reset(self._bkmodels)
         for widget in self._widgets.values():
-            widget.reset()
+            widget.reset(self._bkmodels)
 
         self.setbounds(self._fig.y_range, 'y', (data['z'][0], data['z'][-1]))
-        self._hover.slaveaxes(self._fig, self._peaksrc, inpy = True)
+        #self._hover.pyslaveaxes(self._fig, peaks, self._bkmodels)
 
     def __create_fig(self):
         self._fig = figure(**self._figargs(y_range = Range1d,
@@ -691,57 +254,22 @@ class PeaksPlotCreator(TaskPlotCreator):
         self._hover.create(self._fig, self._model, self)
         doc.add_root(self._hover)
         self._ticker.create(self._fig, self._model, self)
-        self._hover.slaveaxes(self._fig, self._peaksrc)
+        self._hover.jsslaveaxes(self._fig, self._peaksrc)
 
     def __setup_widgets(self):
-        widgets = {i: j.create(self.action) for i, j in self._widgets.items()}
-        enableOnTrack(self, self._fig, widgets)
+        action  = self.action()
+        wdg     = {i: j.create(action) for i, j in self._widgets.items()}
+        enableOnTrack(self, self._fig, wdg)
 
         self._widgets['peaks'].setsource(self._peaksrc)
         self._widgets['seq'].callbacks(self._hover,
                                        self._ticker,
-                                       widgets['stats'][-1],
-                                       widgets['peaks'][-1])
+                                       wdg['stats'][-1],
+                                       wdg['peaks'][-1])
 
-        mode   = self.css.sizing_mode.get()
-        border = self.css.widgets.border.get()
-        wwidth = self.css.input.width.get()
-        twidth = widgets['peaks'][-1].width+border
-
-        # pylint: disable=redefined-variable-type
-        lay = layouts.widgetbox(*widgets['seq'],
-                                *widgets['oligos'],
-                                *widgets['cstrpath'],
-                                width       = wwidth+border,
-                                sizing_mode = mode)
-        lay = layouts.row(lay, layouts.widgetbox(*widgets['stats']),
-                          width       = wwidth*2+border,
-                          sizing_mode = mode)
-        return layouts.column(lay, *widgets['peaks'],
-                              sizing_mode = mode,
-                              width       = twidth)
-
-class _PeaksIOMixin:
-    def __init__(self, ctrl):
-        type(self).__bases__ [1].__init__(self, ctrl)
-        self.__model = _PeaksPlotModelAccess(ctrl, 'config'+PeaksPlotCreator.key())
-
-    def open(self, path:Union[str, Tuple[str,...]], model:tuple):
-        "opens a track file and adds a alignment"
-        # pylint: disable=no-member
-        items = type(self).__bases__[1].open(self, path, model) # type: ignore
-
-        if items is not None:
-            task = self.__model.defaultidenfication
-            if task is not None:
-                items[0] += (task,)
-        return items
-
-class PeaksConfigTrackIO(_PeaksIOMixin, ConfigTrackIO):
-    "selects the default tasks"
-
-class PeaksConfigGRFilesIO(_PeaksIOMixin, ConfigGrFilesIO):
-    "selects the default tasks"
+        itr = chain.from_iterable(wdg[i] for i in ('seq','oligos','cstrpath'))
+        lay = layouts.row(layouts.widgetbox(*itr), layouts.widgetbox(*wdg['stats']))
+        return layouts.column(lay, *wdg['peaks'])
 
 class PeaksPlotView(PlotView):
     "Peaks plot view"
@@ -751,8 +279,4 @@ class PeaksPlotView(PlotView):
         "Alignment, ... is set-up by default"
         tasks = self._plotter.model.config.root.tasks
         tasks.default = ['extremumalignment', 'eventdetection', 'peakselector']
-
-        vals = (tuple(tasks.io.open.get()[:-2])
-                + ('hybridstat.view.peaksplot.PeaksConfigGRFilesIO',
-                   'hybridstat.view.peaksplot.PeaksConfigTrackIO'))
-        tasks.io.open.default = vals
+        setupio(self._plotter.model)

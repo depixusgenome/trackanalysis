@@ -1,3 +1,55 @@
+# tag cycles_v2.1
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+### Data Treatment
+
+Alignments can be performed on both phase 1 and phase 3 as follows:
+
+    1. Alignments are performed on phase 1.
+    2. Cycles with a small phase 1 to phase 3 extension are aligned using phase 3.
+    That extension should be less than 0.9 time the median of such extensions.
+    3. Step 2 is cancelled for cycles for which the bead did not open. These are
+    defined as those with a phase 3 to phase 5 extension smaller than 0.9 times the
+    median of such extensions.
+
+Alignments used to be performed on the min of a phase. It is now on the median of
+a selection of points in a phase:
+
+    * On phase 1: the 15 last points.
+    * On phase 3: the 15 first points.
+
+### Reporting
+
+The *Hybridstat* allows creating an excel report. Simply save a project using
+an *xlsx* extension. Computations are done in the background using as many processes
+are there are cores on the host computer.
+
+### Sequence alphabet
+
+The following alphabet is recognized: "a t g c k m r y s w b v h d n x u". Their
+meanings are the classic ones: "aas" is the same as the of oligos ("aag","aac").
+
+An exclamation point is added to define methylations. It must be added to the left
+of the methylated base: "aa!sa" is methylated on the "s".
+
+There are no distinctions between upper and lower cases.
+
+### Other Features
+
+    * Beads can be discarded using comma-separated values in a text box to the
+    right of the bead number.
+    * Beads with too high or too low a σ[HF] are discarded.
+    * Server GUI computations are threaded. This should improve the response time
+    of the application.
+    * In case of failure, a message is displayed at top right of the application.
+    The message is in *blue* if the failure is an expected one (incorrect file, ...).
+    Messages in *red* indicate a bug.
+
+### Solved Bugs
+
+    * Changing the *stretch* and *bias* resulted in infinite client-server loops.
+    * Could not load *.gr* files.
+
 # tag cycles_v2.0
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 New application for viewing peaks
@@ -15,7 +67,7 @@ There are 3 tabs:
         and their average duration (top).
         * The y-axis is the position of events in nm (left) or base number (right).
         * The kernel-smoothed histogram is the smooth blue curve.
-        * Detected peaks display the percentage of cycles (blue squares) and 
+        * Detected peaks display the percentage of cycles (blue squares) and
         their average durations (gray diamonds).
         * Global and peak-wise statistics are **repeated** in table on the left of
         the figure. Selecting a peak in the figure selects a line in the table and
@@ -77,24 +129,24 @@ New application for viewing cycles
     durations and number.
     * then open the *.gr* files. You can select all of them in one go.
 
-# tag ramp_v1.2 
+# tag ramp_v1.2
 ## Tagger: David Salthouse <david.salthouse@depixus.com>
     ### rampapp_v1.2
         * Definition of a good bead has changed:
             For a given bead, if less than 20% of cycles do not open and close has expected
-            the bead is tagged good. 
+            the bead is tagged good.
             Earlier versions of rampapp discarded a bead as soon
             as one of its cycle misbehaved.
         * creates a local server:
             once open the application runs in your webbrowser,
             to open another instance of rampapp, copy the address of rampapp (usually: http://localhost:5006/call_display)
-            into a new window 
+            into a new window
         * generates a ramp_discard.csv file for pias
-        * added a third graph to display the estimated size of each hairpin in the trk files 
-        
+        * added a third graph to display the estimated size of each hairpin in the trk files
+
 # tag ramp_v1.3
 ## Tagger: David Salthouse <david.salthouse@depixus.com>
     ### rampapp_v1.3
         * user has now access to a slider (top-right) which allows to specify the ratio of cycles which the algorithm defines as correct to tag a bead as "good".
-        Note that the 2 first cycles of the track file are still automatically discarded (as in pias) 
-        
+        Note that the 2 first cycles of the track file are still automatically discarded (as in pias)
+

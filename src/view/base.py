@@ -2,17 +2,25 @@
 # -*- coding: utf-8 -*-
 "basic view module"
 from typing               import Callable
+from concurrent.futures   import ThreadPoolExecutor
+
+from bokeh.document       import Document         # pylint: disable=unused-import
 from bokeh.models.widgets import Button
 from bokeh.themes         import Theme
 from bokeh.layouts        import layout
 
-from control        import Controller                   # pylint: disable=unused-import
-from control.action import ActionDescriptor, Action     # pylint: disable=unused-import
-from .keypress      import KeyPressManager              # pylint: disable=unused-import
+from tornado.ioloop             import IOLoop
+from tornado.platform.asyncio   import to_tornado_future
+
+from control        import Controller             # pylint: disable=unused-import
+from control.action import ActionDescriptor, Computation, Action
+from .keypress      import KeyPressManager        # pylint: disable=unused-import
+
 
 class View:
     "Classes to be passed a controller"
-    action = ActionDescriptor()
+    action      = ActionDescriptor(Action)
+    computation = ActionDescriptor(Computation)
     ISAPP  = False
     def __init__(self, **kwargs):
         "initializes the gui"
@@ -61,6 +69,19 @@ def enableOnTrack(ctrl, *aitms):
                 ite.disabled = val
     getattr(ctrl, '_ctrl', ctrl).getGlobal("project").observe(_onproject)
 
+POOL = ThreadPoolExecutor(1)
+async def threadmethod(fcn, *args, pool = None, **kwa):
+    "threads a method"
+    if pool is None:
+        pool = POOL
+    return await to_tornado_future(pool.submit(fcn, *args, **kwa))
+
+def spawn(fcn, *args, loop = None, **kwa):
+    "spawns method"
+    if loop is None:
+        loop = IOLoop.current()
+    loop.spawn_callback(fcn, *args, **kwa)
+
 class BokehView(View):
     "A view with a gui"
     def __init__(self, **kwargs):
@@ -86,10 +107,12 @@ class BokehView(View):
         css.theme.default       = 'dark'
 
         self._keys = kwargs['keys']  # type: KeyPressManager
+        self._doc  = None            # type: Optional[Document]
 
     def close(self):
         "closes the application"
         super().close()
+        self._doc  = None
         self._keys.close()
         self._keys = None
 
@@ -112,6 +135,7 @@ class BokehView(View):
             theme = self._ctrl.getGlobal('css').theme[theme].get(default = None)
         doc.theme = Theme(json = theme)
 
+        self._doc = doc
         self._keys.getroots(doc)
         roots = self.getroots(doc)
         if len(roots) == 1:

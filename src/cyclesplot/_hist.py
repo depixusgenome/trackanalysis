@@ -10,7 +10,7 @@ from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 
 import  numpy        as np
 
-from    view.plots          import PlotAttrs, checksizes, PlotState
+from    view.plots          import PlotAttrs, checksizes
 from    view.plots.sequence import SequenceTicker, estimatebias
 
 window = None # type: Any # pylint: disable=invalid-name
@@ -111,14 +111,16 @@ class HistMixin:
 
     def _histobservers(self):
         def _fcn():
-            if self.state is PlotState.active:
-                self._ticker.reset()
-                self._hover.resethist()
+            with self.resetting():
+                self._ticker.reset(self._bkmodels)
+                self._hover.resethist(self._bkmodels)
         self._model.observeprop('oligos', 'sequencepath', _fcn)
 
     def _resethist(self, data, shape):
-        self._histsource.data     = hist = self.__data(data, shape)
+        hist = self.__data(data, shape)
+
         self._model.estimatedbias = estimatebias(hist['bottom'], hist['cycles'])
-        self._hover.resethist()
-        self._ticker.reset()
-        self._hover.slaveaxes(self._hist, self._histsource, inpy = True)
+        self._hover.resethist(self._bkmodels)
+        self._ticker.reset(self._bkmodels)
+
+        self._bkmodels[self._histsource]['data'] = hist

@@ -130,7 +130,6 @@ class _Updater:
                  kwa:Dict[str,str]) -> None:
         self.roots     = roots
         self.mandatory = mandatory
-
         kwa            = {i: (j.lower() if isinstance(j, str) else j)
                           for i, j in kwa.items()}
         self.update    = tuple(i for i in attrs if kwa.get(i, '') == 'update')
@@ -138,6 +137,7 @@ class _Updater:
         self.ignore    = tuple(i for i in attrs if kwa.get(i, '') == 'ignore')
         self.attrs     = tuple(i for i in attrs if kwa.get(i, '') != 'ignore')
         self.pipes     = None        # type: Optional[Sequence[Any]]
+        assert len(set(i for i, _ in self.call)  & set(self.attrs) ) == 0
 
     def __init(self, obj):
         cls        = type(obj)
@@ -146,6 +146,12 @@ class _Updater:
         self.attrs = tuple(i for i in self.attrs if i not in self.pipes)
 
     def __call__(self, obj, kwargs, cpy = None, deepcpy = None):
+        if len(cpy) > 1:
+            raise TypeError("__init__ takes at most a single positional"
+                            +" argument as a copy constructor")
+        else:
+            cpy = cpy[0] if len(cpy) == 1 else None
+
         if self.pipes is None:
             self.__init(obj)
 
@@ -169,8 +175,52 @@ class _Updater:
 
 def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
     """
-    Uses the class attribute to initialize the object's fields if no keyword
-    arguments were provided.
+    Creates an *__init__* such that instance fields and their default value are
+    defined using class fields. The default values are deepcopied into each instance.
+
+    Exemple:
+
+        >>> class Cls:
+        >>>     attr    = [] # the default list will be deepcopied in each instance
+        >>>     ignored = 0  # field will not be initialized
+        >>>     @initdefaults(frozenset(locals()),
+        >>>                   ignored = 'ignore',
+        >>>                   call    = lambda self, value: setattr(self, 'ignored', 2*value))
+        >>>     def __init__(self, **kwa):
+        >>>         pass
+
+        >>> assert Cls().ignored == 0
+        >>> assert Cls(call = 1).ignored == 2
+        >>> assert Cls().attr    == []
+        >>> assert Cls().attr    is not Cls.attr
+        >>> lst = [2]
+        >>> assert Cls(attr = lst).attr is lst # no deep copy of passed values
+
+    By decorating the *__init__* as follows, it's possible to affect passed values
+
+        >>> class Trans:
+        >>>     attr1 = 1
+        >>>     attr2 = 2
+        >>>     @initdefaults(frozenset(locals()))
+        >>>     def __init__(self, *kwa:dict, **_) -> None: # _ is needed by pylint
+        >>>         kwa[0].pop('attr1', None)
+        >>>         if 'attr2' in kwa[0]:
+        >>>             kwa[0]['attr2'] *= 2
+
+        >>> assert Trans(attr1 = 100).attr1 == 1
+        >>> assert Trans(attr2 = 100).attr2 == 200
+
+
+    One can update grandchild fields using kwargs:
+
+        >>> class Agg:
+        >>>     elem = Cls()
+        >>>     @initdefaults(frozenset(locals()), elem = 'update')
+        >>>     def __init__(self, **kwa):
+        >>>         pass
+
+        >>> assert Agg(attr = [2]).elem.attr == [2]
+
     """
     fcn = None
     if len(attrs) == 1 and isinstance(attrs[0], Iterable) and not isinstance(attrs[0], str):
@@ -184,31 +234,40 @@ def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
         attrs = tuple(i for i in getlocals(1).keys())
 
     assert len(attrs) and all(isinstance(i, str) for i in attrs)
-    attrs = set(i for i in attrs if i[0].upper() != i[0]) - set(kwa)
+    attrs = tuple(i for i in attrs if i[0].upper() != i[0])
 
     def _wrapper(fcn):
-        val     = tuple(inspect.signature(fcn).parameters.values())[1]
-        updater = _Updater(attrs, roots, mandatory, kwa)
-        if val.kind  == val.VAR_KEYWORD:
-            @wraps(fcn)
+        sig       = inspect.signature(fcn).parameters
+        val       = tuple(sig.values())[1]
+        initafter = kwa.pop('initafter', False)
+        updater   = _Updater(attrs, roots, mandatory, kwa)
+        if val.kind  == val.VAR_KEYWORD and initafter:
             def __init__(self, *args, **kwargs):
-                fcn(self, **kwargs)
-                if len(args) > 1:
-                    raise TypeError("__init__ takes at most a single positional"
-                                    +" argument as a copy constructor")
-                elif len(args) == 1:
-                    updater(self, kwargs, cpy = args[0])
-                else:
-                    updater(self, kwargs)
-            __init__.KEYS = attrs
-            return __init__
-        else:
-            @wraps(fcn)
+                updater(self, kwargs, cpy = args)
+                fcn    (self, **kwargs)
+        elif val.kind  == val.VAR_KEYWORD and not initafter:
             def __init__(self, *args, **kwargs):
-                fcn(self, *args, **kwargs)
+                fcn    (self, **kwargs)
+                updater(self, kwargs, cpy = args)
+
+        elif initafter:
+            def __init__(self, *args, **kwargs):
                 updater(self, kwargs)
-            __init__.KEYS = attrs
-            return __init__
+                fcn    (self, *args, **kwargs)
+
+        elif ((val.annotation, val.kind) == (dict, val.VAR_POSITIONAL)
+              and (len(sig) == 2 or (len(sig) == 3 and tuple(sig)[2] == '_'))):
+            def __init__(self, *args, **kwargs):
+                fcn    (self, kwargs)
+                updater(self, kwargs, cpy = args)
+
+        else:
+            def __init__(self, *args, **kwargs):
+                fcn    (self, *args, **kwargs)
+                updater(self, kwargs)
+
+        __init__.KEYS = attrs
+        return wraps(fcn)(__init__)
 
     return _wrapper if fcn is None else _wrapper(fcn)
 

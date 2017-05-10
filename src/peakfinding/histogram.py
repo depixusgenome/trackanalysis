@@ -217,12 +217,12 @@ class SubPixelPeakPosition:
             def _fitfcn(i, j, k):
                 if i+2 < j:
                     fit = np.polyfit(range(i,j), hist[i:j], 2)
-                    if fit[0] >= 0.:
+                    if fit[0] < 0.:
                         return -fit[1]/fit[0]*.5
                 return k
             fitfcn = _fitfcn
         else:
-            fitfcn = lambda i, j, _: (True, np.average(range(i,j), weights = hist[i:j]))
+            fitfcn = lambda i, j, _: np.average(range(i,j), weights = hist[i:j])
 
         inds = (ainds,) if np.isscalar(ainds) else ainds
         for _ in range(self.fitcount):
@@ -360,6 +360,8 @@ class GroupByPeakAndBase(GroupByPeak):
 
     def _counts(self, elems, bins, inds):
         tags, cnts = super()._counts(elems, bins, inds)
+        if len(cnts) < inds[0]+1:
+            cnts = np.append(cnts, -1)
         imax       = max(inds[1:np.searchsorted(bins, bins[0]+self.baserange)+1],
                          default = -1, key = cnts.__getitem__)
         if imax >= 0:

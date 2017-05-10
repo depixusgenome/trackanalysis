@@ -10,7 +10,7 @@ import  numpy   as np
 import  bokeh.core.properties as props
 from    bokeh.models    import (LinearAxis,      # pylint: disable=unused-import
                                 Model, ColumnDataSource, Range1d,
-                                ContinuousTicker, BasicTicker, Ticker,
+                                BasicTicker, Ticker,
                                 Dropdown, Paragraph, AutocompleteInput,
                                 CustomJS, Widget)
 
@@ -44,38 +44,34 @@ def estimatebias(position: np.ndarray, cnt: np.ndarray) -> float:
                         key     = cnt.__getitem__,
                         default = (ind1+ind2)//2)]
 
-class SequenceTicker(ContinuousTicker):
+class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
     "Generate ticks at fixed, explicitly supplied locations."
     major      = props.Dict(props.String, props.Seq(props.Float), default = {'': []})
     minor      = props.Dict(props.String, props.Seq(props.Float), default = {'': []})
     key        = props.String(default = '')
     usedefault = props.Bool(default = True)
-    base       = props.Instance(Ticker, default = BasicTicker())
 
     __implementation__ = """
-        import {ContinuousTicker} from "models/tickers/continuous_ticker"
+        import {BasicTicker} from "models/tickers/basic_ticker"
         import *             as p from "core/properties"
 
-        export class SequenceTicker extends ContinuousTicker
+        export class SequenceTicker extends BasicTicker
             type: 'SequenceTicker'
 
             @define {
                 major:      [ p.Any, {} ]
                 minor:      [ p.Any, {} ]
                 key:        [ p.String, '']
-                usedefault: [ p.Bool,     true]
-                base:       [ p.Instance, null]
             }
 
             get_ticks_no_defaults: (data_low, data_high, cross_loc, desired_n_ticks) ->
-                if @usedefault
-                    return @base.get_ticks_no_defaults(data_low, data_high,
-                                                       cross_loc, desired_n_ticks)
-
-                return {
-                    major: @major[@key]
-                    minor: @minor[@key]
-                }
+                if @key not of @major
+                    return super(data_low, data_high, cross_loc, desired_n_ticks)
+                else
+                    return {
+                        major: @major[@key]
+                        minor: @minor[@key]
+                    }
     """
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -94,15 +90,23 @@ class SequenceTicker(ContinuousTicker):
         "Sets the ticks according to the configuration"
         self.__model = mdl
         self.__fig   = fig
-        if fig.ygrid[0].minor_grid_line_color is None:
-            # bokehjs will never draw minor lines unless the color is
-            # is set at startup
-            fig.ygrid[0].minor_grid_line_color = 'navy'
-            fig.ygrid[0].minor_grid_line_alpha = 0.
+        self.__axis  = type(self)()
+
+        fig.extra_y_ranges        = {"bases": Range1d(start = 0., end = 1.)}
+        fig.add_layout(LinearAxis(y_range_name = "bases",
+                                  axis_label   = cnf.css.yrightlabel.get(),
+                                  ticker       = self.__axis),
+                       'right')
+
+        # bokehjs will never draw minor lines unless the color is
+        # is set at startup
+        fig.ygrid[0].update(minor_grid_line_color = 'navy',
+                            minor_grid_line_alpha = 0.,
+                            ticker                = self,
+                            y_range_name          = 'bases')
 
         order  = tuple('grid_line_'+i for i in ('color', 'width', 'dash', 'alpha'))
         order += tuple('minor_'+i for i in order)  # type: ignore
-        order += 'y_range_name',                   # type: ignore
         self.__defaults = {i: getattr(fig.ygrid[0], i) for i in order}
 
         self.__withbase = dict()
@@ -110,18 +114,6 @@ class SequenceTicker(ContinuousTicker):
             gridprops = cnf.css.grid[cnf.css.theme.get()][name].get()
             self.__withbase['grid_line_'+name]       = gridprops[0]
             self.__withbase['minor_grid_line_'+name] = gridprops[1]
-
-        fig.extra_y_ranges        = {"bases": Range1d(start = 0., end = 1.)}
-        fig.ygrid[0].ticker       = self
-        fig.ygrid[0].y_range_name = 'bases'
-
-        if self.__axis is None:
-            self.__axis = type(self)()
-
-        fig.add_layout(LinearAxis(y_range_name = "bases",
-                                  axis_label   = cnf.css.yrightlabel.get(),
-                                  ticker       = self.__axis),
-                       'right')
 
     @staticmethod
     def defaultconfig(mdl):
@@ -135,32 +127,26 @@ class SequenceTicker(ContinuousTicker):
                                                 alpha = (.8,         .8),
                                                 dash  = ('solid',    'solid'))
 
-    def reset(self):
+    def reset(self, resets):
         "Updates the ticks according to the configuration"
-        mdl = self.__model
-        fig = self.__fig
-        key                    = mdl.sequencekey if len(mdl.oligos) else None
-        self.usedefault        = True
-        self.__axis.usedefault = True
-        if key is not None:
-            majors = {}
-            minors = {}
+        mdl    = self.__model
+        fig    = self.__fig
+        key    = mdl.sequencekey if len(mdl.oligos) else 'NONE'
+        majors = {}
+        minors = {}
+        if key == 'NONE':
+            resets[fig.ygrid[0]].update(self.__defaults)
+        else:
+            resets[fig.ygrid[0]].update(self.__withbase)
             for name, seq in readsequence(mdl.sequencepath).items():
                 peaks        = sequences.peaks(seq, mdl.oligos)
                 majors[name] = tuple(peaks['position'][peaks['orientation']])
                 minors[name] = tuple(peaks['position'][~peaks['orientation']])
 
-            self.update(major = majors, minor = minors, key = key)
-            self.__axis.update(major = {i: majors[i]+minors[i] for i in majors},
-                               minor = dict.fromkeys(majors.keys(), tuple()),
-                               key   = key)
-            self.usedefault        = False
-            self.__axis.usedefault = False
-
-        info = self.__defaults if self.usedefault else self.__withbase
-        for name in ('color', 'dash', 'width', 'alpha'):
-            setattr(fig.ygrid[0], 'grid_line_'+name, info['grid_line_'+name])
-            setattr(fig.ygrid[0], 'minor_grid_line_'+name, info['minor_grid_line_'+name])
+        resets[self].update(major = majors, minor = minors, key = key)
+        resets[self.__axis].update(major = {i: majors[i]+minors[i] for i in majors},
+                                   minor = dict.fromkeys(majors.keys(), tuple()),
+                                   key   = key)
 
 class SequenceHoverMixin:
     "controls keypress actions"
@@ -266,64 +252,17 @@ class SequenceHoverMixin:
                            mode      = 'hline',
                            renderers = [fig.circle(**args)])
 
-    def reset(self, **kwa):
+    def reset(self,  resets, **kwa):
         "updates the tooltips for a new file"
         if self.__tool is None:
             return
 
         data = self.__data()
-        self.__source.update(column_names = list(data.keys()), data = data)
+        resets[self.__source].update(column_names = list(data.keys()), data = data)
         kwa.setdefault('framerate', getattr(self._model.track, 'framerate', 1./30.))
         kwa.setdefault('bias',      self._model.bias)
         kwa.setdefault('stretch',   self._model.stretch)
-        self.update(**kwa)
-
-    def slaveaxes(self, fig, src, normal:str, extra:str, column:str, inpy = False):
-        "slaves a histogram's axes to its y-axis"
-        # pylint: disable=too-many-arguments,protected-access
-        hvr = self
-        def _onchangebounds(fig = fig, hvr = hvr, src = src):
-            yrng = fig.y_range
-            if hasattr(yrng, '_initial_start') and yrng.bounds is not None:
-                yrng._initial_start = yrng.bounds[0]
-                yrng._initial_end   = yrng.bounds[1]
-
-            if not hasattr(fig, 'extra_x_ranges'):
-                return
-
-            cycles = fig.extra_x_ranges[extra]
-            frames = fig.x_range
-
-            cycles.start = 0.
-            frames.start = 0.
-
-            bases        = fig.extra_y_ranges['bases']
-            bases.start  = (yrng.start - hvr.bias)*hvr.stretch
-            bases.end    = (yrng.end   - hvr.bias)*hvr.stretch
-
-            bottom       = src.data[column]
-            if len(bottom) < 2:
-                ind1 = 1
-                ind2 = 0
-            else:
-                delta = bottom[1]-bottom[0]
-                ind1  = min(len(bottom), max(0, int((yrng.start-bottom[0])/delta-1)))
-                ind2  = min(len(bottom), max(0, int((yrng.end  -bottom[0])/delta+1)))
-
-            if ind1 >= ind2:
-                cycles.end = 0
-                frames.end = 0
-            else:
-                frames.end = max(src.data[normal][ind1:ind2])+1
-                cycles.end = max(src.data[extra][ind1:ind2])+1
-
-        if inpy:
-            _onchangebounds()
-        else:
-            fig.y_range.callback = from_py_func(_onchangebounds,
-                                                normal = normal,
-                                                extra  = extra,
-                                                column = column)
+        resets[self].update(**kwa)
 
     @checksizes
     def __data(self):
@@ -389,11 +328,12 @@ class SequencePathWidget(WidgetCreator):
 
     def observe(self):
         "sets-up config observers"
-        self._model.observeprop('sequencekey', 'sequencepath', self.reset)
+        fcn = lambda: self.__widget.update(**self.__data())
+        self._model.observeprop('sequencekey', 'sequencepath', fcn)
 
-    def reset(self):
+    def reset(self, resets):
         "updates the widget"
-        self.__widget.update(**self.__data())
+        resets[self.__widget].update(**self.__data())
 
     @property
     def widget(self):
@@ -469,9 +409,9 @@ class OligoListWidget(WidgetCreator):
         widget.on_change('value', _py_cb)
         return [self.__widget]
 
-    def reset(self):
+    def reset(self, resets):
         "updates the widget"
-        self.__widget.update(**self.__data())
+        resets[self.__widget].update(**self.__data())
 
     def __data(self):
         hist = self.config.oligos.history.get()
@@ -481,7 +421,8 @@ class OligoListWidget(WidgetCreator):
 
     def observe(self):
         "sets-up config observers"
-        self._model.observeprop('oligos', self.reset)
+        fcn = lambda: self.__widget.update(**self.__data())
+        self._model.observeprop('oligos', fcn)
 
 class SequenceKeyProp(BeadProperty[Optional[str]]):
     "access to the sequence key"

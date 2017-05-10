@@ -75,8 +75,14 @@ class Processor(metaclass=MetaProcessor):
     Main class for processing tasks
     """
     tasktype = None # type: Union[type, Tuple[type, ...]]
-    def __init__(self, task: _tasks.Task) -> None:
-        if not isinstance(task, self.tasktype):
+    def __init__(self, task: _tasks.Task = None, **cnf) -> None:
+        if task is None:
+            task = cast(type, self.tasktype)(**cnf) # pylint: disable=not-callable
+        elif isinstance(task, dict):
+            tmp  = cast(dict, task)
+            tmp.update(cnf)
+            task = cast(type, self.tasktype)(**tmp) # pylint: disable=not-callable
+        elif not isinstance(task, self.tasktype):
             raise TypeError('"task" must have type '+ str(self.tasktype))
         self.task = task
 
@@ -98,6 +104,15 @@ class Processor(metaclass=MetaProcessor):
     def levels(self) -> Tuple[Level,Level]:
         "returns the task's level"
         return (self.levelin, self.levelou)
+
+    def isslow(self) -> bool:
+        "wether computations take a long time or not"
+        return self.task.isslow()
+
+    @staticmethod
+    def canpool():
+        "returns whether this is pooled"
+        return False
 
     def config(self) -> dict:
         "Returns a copy of a task's dict"

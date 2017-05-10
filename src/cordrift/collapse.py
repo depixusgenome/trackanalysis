@@ -364,6 +364,10 @@ class StitchByInterpolation:
         # get intervals with enough overlaps and enough points to do a fit
         filled = _getintervals(prof.count, self.minoverlaps, np.greater_equal)
         filled = filled[np.dot(filled, [-1, 1]) >= (self.fitorder+1)]
+        if len(filled) == 0:
+            prof.value[:] = 0
+            prof.count[:] = 0
+            return prof
 
         last   = None # Optional[int]
         delta  = 0.

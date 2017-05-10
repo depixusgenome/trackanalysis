@@ -1,31 +1,110 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Toolbar"
+from typing               import Callable # pylint: disable=unused-import
 from pathlib              import Path
 from bokeh.layouts        import Row, widgetbox
 from bokeh.models         import Div
+from bokeh.io             import curdoc
 
 from control.taskio       import TaskIO
 from .dialog              import FileDialog
 from .intinput            import BeadInput, RejectedBeadsInput
-from .                    import BokehView
+from .base                import BokehView, threadmethod, spawn, Action
 
+STORAGE = 'open', 'save'
 class TrackFileDialog(FileDialog):
     "A file dialog that doesn't open .gr files first"
     def __init__(self, ctrl):
-        storage   = 'open'
         super().__init__(multiple  = 1,
-                         storage   = storage,
+                         storage   = STORAGE[0],
                          config    = ctrl)
 
-        def _defaultpath(ext):
-            pot = self.storedpaths(ctrl, storage, ext)
+        self.__store = self.config[1] # type: Callable
+        self.__ctrl  = ctrl
+        self.__doc   = None
+
+        def _defaultpath(ext, bopen):
+            assert bopen
+
+            pot = self.storedpaths(ctrl, STORAGE[0], ext)
             if ctrl.getGlobal('project').track.get(default = None) is None:
                 pot = [i for i in pot if i.suffix != '.gr']
             return self.firstexistingpath(pot)
-        self.config = _defaultpath, self.config[1]
+        self.config    = _defaultpath, None
 
-class  ToolBar(BokehView):
+    def setup(self, doc):
+        "sets the document"
+        self.__doc = doc
+        self.filetypes = '*|'+TaskIO.extensions(self.__ctrl, 'openers')
+        self.title     = self.__ctrl.getGlobal('css').title.open.dialog.get()
+
+    async def run(self):
+        "runs the dialog"
+        paths = await threadmethod(self.open)
+        if paths is not None:
+            def _fcn():
+                with Action(self.__ctrl):
+                    self.__store(paths, True) # pylint: disable=not-callable
+                    self.__ctrl.openTrack(paths)
+            self.__doc.add_next_tick_callback(_fcn)
+
+class SaveFileDialog(FileDialog):
+    "A file dialog that adds a default save path"
+    def __init__(self, ctrl):
+        super().__init__(storage = STORAGE[1],
+                         config  = ctrl)
+
+        self.__store = self.config[1]
+        self.__ctrl  = ctrl
+        self.__doc   = None
+
+        def _defaultpath(ext, bopen):
+            assert not bopen
+            pot = [i for i in self.storedpaths(ctrl, STORAGE[0], ext) if i.exists()]
+            ope = next((i for i in pot if not i.suffix in ('', '.gr')), None)
+            if ope is None:
+                ope = self.firstexistingpath(pot)
+
+            pot = self.storedpaths(ctrl, STORAGE[1], ext)
+            sav = self.firstexistingparent(pot)
+
+            if ope is None:
+                return sav
+
+            if sav is None:
+                if Path(ope).is_dir():
+                    return ope
+                sav = Path(ope).with_suffix(ext[0][1])
+            else:
+                psa = Path(sav)
+                if psa.suffix == '':
+                    sav = (psa/Path(ope).stem).with_suffix(ext[0][1])
+                else:
+                    sav = (psa.parent/Path(ope).stem).with_suffix(psa.suffix)
+
+            self.defaultextension = sav.suffix[1:] if sav.suffix != '' else None
+            return str(sav)
+
+        self.config  = _defaultpath, None
+
+    def setup(self, doc):
+        "sets the document"
+        self.__doc = doc
+        self.filetypes = TaskIO.extensions(self.__ctrl, 'savers')
+        self.title     = self.__ctrl.getGlobal('css').title.save.dialog.get()
+
+    async def run(self):
+        "runs the dialog"
+        paths = await threadmethod(self.save)
+        if paths is not None:
+            def _fcn():
+                with Action(self.__ctrl):
+                    self.__store(paths, False) # pylint: disable=not-callable
+                    self.__ctrl.saveTrack(paths)
+            self.__doc.add_next_tick_callback(_fcn)
+
+class ToolBar(BokehView): # pylint: disable=too-many-instance-attributes
     "Toolbar"
     def __init__(self, **kwa):
         "Sets up the controller"
@@ -36,17 +115,17 @@ class  ToolBar(BokehView):
         self._text  = None
         self._tools = []
 
-        self._ctrl.getGlobal('project').message.default = ''
-        msg = self._ctrl.getGlobal('config').message
-        msg.defaults = { 'normal':  '<p>{}</p>',
-                         'warning': '<p style="color:blue;">{}</p>',
-                         'error':   '<p style="color:red>   {}</p>'
-                       }
+        self._ctrl.getGlobal('project').message.default = None
+        msg = self._ctrl.getGlobal('css').message
+        msg.defaults = dict(normal  = '<p>{}</p>',
+                            warning = '<p style="color:blue;">{}</p>',
+                            error   = '<p style="color:red;>  {}</p>',
+                            busy    = u'Please wait ...',
+                            width   = 400)
         css          = self._ctrl.getGlobal('css').title
         css.defaults = {'open': u'Open', 'save': u'Save', 'quit': u'Quit',
                         'open.dialog': u'Open a track or analysis file',
-                        'save.dialog': u'Save an analysis file',
-                        'working':     u'Please wait ...'}
+                        'save.dialog': u'Save an analysis file'}
 
         cnf = self._ctrl.getGlobal('config')
         cnf.catcherror.toolbar.default = True
@@ -55,9 +134,9 @@ class  ToolBar(BokehView):
                                           'quit'     : "Control-q"}
 
         self.__diagopen = TrackFileDialog(self._ctrl)
-        self.__diagsave = FileDialog(config = self._ctrl, storage = 'save')
+        self.__diagsave = SaveFileDialog(self._ctrl)
 
-    def _getroots(self, _):
+    def _getroots(self, doc):
         "adds items to doc"
         css         = self._ctrl.getGlobal('css').title
         self._open  = self.button(self._onOpen,  css.open.get())
@@ -67,16 +146,16 @@ class  ToolBar(BokehView):
         if self._ctrl.ISAPP:
             self._quit = self.button(self._ctrl.close, css.quit.get())
             self._tools.append(self._quit)
-        self._text = Div(text = '                                     ')
+        self._text = Div(text = ' ',
+                         width = self._ctrl.getGlobal('css').message.width.get())
         self._tools.append(self._text)
 
-        self.__diagopen.filetypes = TaskIO.extensions(self._ctrl, 'openers')
-        self.__diagopen.title     = css.open.dialog.get()
-        self.__diagsave.filetypes = TaskIO.extensions(self._ctrl, 'savers')
-        self.__diagsave.title     = css.save.dialog.get()
+        self.__diagopen.setup(doc)
+        self.__diagsave.setup(doc)
 
     def getroots(self, doc):
         "adds items to doc"
+        self._doc = doc
         self._getroots(doc)
 
         def _title(item):
@@ -90,34 +169,44 @@ class  ToolBar(BokehView):
 
         self._ctrl.getGlobal("project").track.observe(_title)
 
-        msg     = self._ctrl.getGlobal('project').message
-        working = self._ctrl.getGlobal('css').title.working.get()
-        catch   = self._ctrl.getGlobal('config').catcherror.toolbar
+        msg   = self._ctrl.getGlobal('project').message
+        busy  = self._ctrl.getGlobal('css').message.busy.get()
+        catch = self._ctrl.getGlobal('config').catcherror.toolbar
 
-        # pylint: disable=unused-variable
         @self._ctrl.observe
-        def _onstartaction(recursive = None):
+        def _onstartaction(recursive = None):      # pylint: disable=unused-variable
             if not recursive:
-                msg.set((working, 'normal'))
+                msg.set((busy, 'normal'))
 
         @self._ctrl.observe
-        def _onstopaction(recursive = None, value = None, catcherror = None, **_):
+        def _onstartcomputation(recursive = None): # pylint: disable=unused-variable
+            if recursive:
+                return
+            val = msg.get()
+            if val is None or val[1] == 'normal':
+                msg.set((busy, 'normal'))
+
+        def _observer(recursive = None, value = None, catcherror = None, **_):
             if not recursive:
                 if value is None:
-                    if working in self._text.text:
-                        msg.set(('', 'normal'))
-                    return
-
-                if len(getattr(value, 'args', [])) == 2 and value.args[1] == 'treated':
-                    msg.set((str(value.args[0]), 'warning'))
+                    val = msg.get()
+                    if val is not None and busy == val[0]:
+                        msg.set(None)
                 else:
-                    msg.set((str(value), 'error'))
+                    args = value.args
+                    if len(args) == 0:
+                        args = str(value),
+                    msg.set((str(args[0]), args[1] if len(args) > 1 else 'error'))
+                    catcherror[0] = catch.get()
+        self._ctrl.observe("stopaction", "stopcomputation", _observer)
 
-                catcherror[0] = catch.get()
-
-        templ = self._ctrl.getGlobal('config').message.getdict(..., fullnames = False)
+        templ = self._ctrl.getGlobal('css').message.getdict(..., fullnames = False)
         def _settext(text):
-            self._text.text = templ[text.value[1]].format(text.value[0])
+            val = '' if text.value is None else templ[text.value[1]].format(text.value[0])
+            if curdoc() is self._doc:
+                self._text.text = val
+            else:
+                self._doc.add_next_tick_callback(lambda: setattr(self._text, 'text', val))
 
         self._ctrl.getGlobal('project').message.observe(_settext)
 
@@ -135,22 +224,13 @@ class  ToolBar(BokehView):
         del self.__diagopen
         del self.__diagsave
 
-    @BokehView.action
     def _onOpen(self, *_):
-        paths = self.__diagopen.open()
-        if paths is not None:
-            self._ctrl.openTrack(paths)
+        spawn(self.__diagopen.run)
 
-    @BokehView.action
     def _onSave(self,  *_):
-        if self._save.disabled:
-            return
+        spawn(self.__diagsave.run)
 
-        path = self.__diagsave.save()
-        if path is not None:
-            self._ctrl.saveTrack(path)
-
-class  BeadToolBar(ToolBar):
+class BeadToolBar(ToolBar):
     "Toolbar with a bead spinner"
     def __init__(self, **kwa):
         super().__init__(**kwa)

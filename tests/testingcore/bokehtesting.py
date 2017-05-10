@@ -257,9 +257,10 @@ class _ManagedServerLoop:
                 fcn(*args, **kwargs)
                 self.loop.call_later(andwaiting, self.loop.stop)
         else:
-            _cmd = fcn
+            _cmd = lambda: fcn(*args, **kwargs)
         self.doc.add_next_tick_callback(_cmd)
-        self.loop.start()
+        if not self.loop._running: # pylint: disable=protected-access
+            self.loop.start()
 
     def wait(self, time = 2.):
         "wait some more"
@@ -273,14 +274,14 @@ class _ManagedServerLoop:
 
         self.cmd(_quit, andstop = False)
 
-    def load(self, path:str, andpress = True):
+    def load(self, path:str, andpress = True, **kwa):
         "loads a path"
         import view.dialog  # pylint: disable=import-error
         def _tkopen(*_1, **_2):
             return self.path(path)
         self.monkeypatch.setattr(view.dialog, '_tkopen', _tkopen)
         if andpress:
-            self.press('Control-o')
+            self.press('Control-o', **kwa)
 
     def get(self, clsname, attr):
         "Returns a private attribute in the view"
@@ -294,17 +295,17 @@ class _ManagedServerLoop:
 
         return self.view.__dict__[attr]
 
-    def press(self, key:str, src = None):
+    def press(self, key:str, src = None, **kwa):
         "press one key in python server"
         if src is None:
             for root in self.doc.roots:
                 if isinstance(root, KeyPressManager):
-                    self.cmd(self.loading.press, key, root)
+                    self.cmd(self.loading.press, key, root, **kwa)
                     break
             else:
                 raise KeyError("Missing KeyPressManager in doc.roots")
         else:
-            self.cmd(self.loading.press, key, src)
+            self.cmd(self.loading.press, key, src, **kwa)
 
     def click(self, model: Union[str,dict,Model], **kwa):
         "Clicks on a button on the browser side"

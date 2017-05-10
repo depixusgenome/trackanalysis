@@ -3,7 +3,7 @@
 "Different file dialogs."
 import sys
 from pathlib            import Path
-from typing             import List, Optional, Callable
+from typing             import List, Optional, Callable, Dict # pylint: disable=unused-import
 from tkinter            import Tk as _Tk
 from tkinter.filedialog import (askopenfilename   as _tkopen,
                                 asksaveasfilename as _tksave)
@@ -23,8 +23,8 @@ class FileDialog:
                 'gr':       (u'graphics files',          '.gr'),
                 'ana':      (u'analysis files',          '.ana'),
                 'fasta':    (u'fasta files',             '.fasta'),
-                'xls':      (u'excel files',             '.xlsx'),
-                'csv':      (u'comma-separated files',   '.csv')}
+                'xlsx':     (u'excel files',             '.xlsx'),
+                'csv':      (u'comma-separated values',  '.csv')}
     DEFAULTS['any'] = DEFAULTS['all']
     DEFAULTS['*']   = DEFAULTS['all']
 
@@ -43,10 +43,10 @@ class FileDialog:
         if hasattr(ctrl, 'getGlobal'):
             self.globals(ctrl).defaults = dict.fromkeys(self.DEFAULTS, None)
 
-        storage = kwa.get('storage', None)
         if isinstance(ctrl, (tuple, list)):
             self.config = ctrl
         else:
+            storage = kwa.get('storage', None)
             if storage is not None:
                 self.globals(ctrl)[storage].default = None
             self.config = self._getconfig(ctrl, storage), self._setconfig(ctrl, storage)
@@ -76,19 +76,34 @@ class FileDialog:
                     next((str(i.parent) for i in pot if i.parent.exists()), # type: ignore
                          None))
 
+    @staticmethod
+    def firstexistingparent(pot: List[Path]) -> Optional[str]:
+        "selects the first existing path from a list"
+        return next((str(i) for i in pot if i.parent.exists()), None) # type: ignore
+
     @classmethod
     def _getconfig(cls, ctrl, storage = None):
-        return lambda ext: cls.firstexistingpath(cls.storedpaths(ctrl, storage, ext))
+        def _get(ext, bopen):
+            if bopen:
+                return cls.firstexistingpath(cls.storedpaths(ctrl, storage, ext))
+            else:
+                return cls.firstexistingparent(cls.storedpaths(ctrl, storage, ext))
+        return _get
 
     @classmethod
     def _setconfig(cls, ctrl, storage = None):
         cnf = cls.globals(ctrl)
-        def _defaultpath(rets):
-            vals  = {}
+        def _defaultpath(rets, bcheck: bool = True):
+            vals  = {} # type: Dict[str, str]
             itr   = (rets,) if isinstance(rets, str) else rets
             first = None
             for ret in itr:
-                ret = Path(ret).resolve()
+                ret = Path(ret)
+                if bcheck:
+                    if not ret.exists():
+                        continue
+                    ret = ret.resolve() # pylint: disable=redefined-variable-type
+
                 if cnf.get(ret.suffix[1:], default = _m_none) is not _m_none:
                     vals.setdefault(ret.suffix[1:], str(ret))
                 if first is None:
@@ -117,11 +132,11 @@ class FileDialog:
         elif not self.defaultextension.startswith('.'):
             info[self._KEXT] = self.DEFAULTS[self.defaultextension.strip().lower()][1]
 
-    def _parse_path(self, info:dict):
+    def _parse_path(self, info:dict, bopen):
         if self.config is None:
             return
 
-        path = self.config[0](info[self._KFT])
+        path = self.config[0](info[self._KFT], bopen)
         if path is not None:
             apath = Path(path)
             if apath.is_dir():
@@ -130,14 +145,15 @@ class FileDialog:
                 info['initialdir']  = str(apath.parent)
                 info['initialfile'] = str(apath.name)
 
-    def _parse_all(self):
+    def _parse_all(self, bopen):
         info = {key: getattr(self, key)
-                for key in self.__dict__ if getattr(self, key) is not None}
+                for key in self.__dict__
+                if getattr(self, key) is not None and key[0] != '_'}
         info.pop('config', None)
 
         self._parse_filetypes(info)
         self._parse_extension(info)
-        self._parse_path(info)
+        self._parse_path(info, bopen)
         return info
 
     def _tk_run(self, info:dict, dialog:Callable):
@@ -159,16 +175,16 @@ class FileDialog:
         self.initialdir  = str(ret.parent)
         self.initialfile = str(ret.name)
 
-        if self.config is not None:
-            self.config[1](rets)
+        if self.config is not None and self.config[1] is not None:
+            self.config[1](rets, dialog is _tkopen)
         return rets
 
     def open(self):
         "Returns a filepath to be opened."
-        return self._tk_run(self._parse_all(), _tkopen)
+        return self._tk_run(self._parse_all(True), _tkopen)
 
     def save(self):
         "Returns a filepath where to save to."
-        info = self._parse_all()
+        info = self._parse_all(False)
         info.pop('multiple', None)
         return self._tk_run(info, _tksave)

@@ -58,7 +58,7 @@ class Task:
                 raise TypeError('"{}" must be of type Level'.format(name))
 
     def __setstate__(self, kwargs):
-        self.__dict__.update(self.__class__(**kwargs).__dict__)
+        self.__init__(**kwargs)
 
     def __eq__(self, obj):
         if obj.__class__ is not self.__class__:
@@ -78,6 +78,11 @@ class Task:
     @classmethod
     def isroot(cls):
         "returns whether the class should be a root"
+        return False
+
+    @classmethod
+    def isslow(cls) -> bool:
+        "whether this task implies long computations"
         return False
 
     def config(self) -> dict:
@@ -104,8 +109,8 @@ class TrackReaderTask(RootTask):
     def __init__(self,
                  path:     Union[str, Tuple[str,...], None] = None,
                  beadsonly:bool          = False,
-                 copy:     bool          = False) -> None:
-        super().__init__()
+                 copy:     bool          = False, **kwa) -> None:
+        super().__init__(**kwa)
         self.path      = path
         self.beadsonly = beadsonly
         self.copy      = copy

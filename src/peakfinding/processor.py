@@ -21,6 +21,11 @@ class PeakCorrelationAlignmentTask(PeakCorrelationAlignment, Task):
 class PeakCorrelationAlignmentProcessor(Processor):
     "Groups events per peak"
     @classmethod
+    def isslow(cls) -> bool:
+        "whether this task implies long computations"
+        return True
+
+    @classmethod
     def __action(cls, frame, cnf):
         cache = dict()
         tsk   = PeakCorrelationAlignment(**cnf)
@@ -52,6 +57,11 @@ class PeakSelectorTask(PeakSelector, Task):
     "Groups events per peak"
     levelin = Level.event
     levelou = Level.peak
+    @classmethod
+    def isslow(cls) -> bool:
+        "whether this task implies long computations"
+        return True
+
     def __init__(self, **kwa):
         Task.__init__(self)
         PeakSelector.__init__(self, **kwa)

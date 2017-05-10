@@ -22,6 +22,45 @@ class EmitPolicy(Enum):
     inputs      = 2
     nothing     = 3
     annotations = 4
+    @classmethod
+    def get(cls, policy:'EmitPolicy', fcn) -> 'EmitPolicy':
+        "returns the correct policy"
+        if policy not in (cls.annotations, None):
+            return policy
+
+        if policy is cls.annotations:
+            if isinstance(fcn, cast(type, staticmethod)):
+                fcn = getattr(fcn, '__func__')
+            try:
+                rta = fcn.__annotations__['return']
+            except KeyError as exc:
+                raise KeyError("Missing emission policy: "+str(fcn)) from exc
+        elif policy is None:
+            rta = fcn if fcn is None or isinstance(fcn, type) else type(fcn)
+
+        if rta is None:
+            return cls.nothing
+        elif issubclass(rta, Dict):
+            return cls.outasdict
+        elif issubclass(rta, (tuple, list)):
+            return cls.outastuple
+        else:
+            return policy
+
+    def run(self, allfcns: Set[Callable], args):
+        "runs provided observers"
+        if   self is self.outasdict:
+            for hdl in allfcns:
+                hdl(**cast(Dict, args))
+        elif self is self.outastuple:
+            for hdl in allfcns:
+                hdl(*args)
+        elif self is self.nothing:
+            for hdl in allfcns:
+                hdl()
+        else:
+            for hdl in allfcns:
+                hdl(*args[0], **args[1])
 
 class Event:
     "Event handler class"
@@ -41,15 +80,10 @@ class Event:
         "removes an event"
         self._handlers.get(name, set()).discard(fcn)
 
-    def handle(self,
-               lst   :'Union[str,Set[str]]',
-               policy:'Optional[EmitPolicy]'                 = None,
-               args  :'Optional[Union[Tuple,Sequence,Dict]]' = None):
-        "Call handlers only once: collect them all"
+    def getobservers(self, lst:Union[str,Set[str]]) -> Set[Callable]:
+        "returns the list of observers"
         if isinstance(lst, str):
             lst = {lst}
-
-        policy = self.__getpolicy(policy, args)
 
         allfcns = set() # type: Set[Callable]
         for name in lst.intersection(self._handlers):
@@ -58,19 +92,16 @@ class Event:
         for fcn, names in self._handlers.get('ㄡ', {}).items():
             if any(patt(key) for patt, key in product(names, lst)):
                 allfcns.add(fcn)
+        return allfcns
 
-        if   policy is EmitPolicy.outasdict:
-            for hdl in allfcns:
-                hdl(**cast(Dict, args))
-        elif policy is EmitPolicy.outastuple:
-            for hdl in allfcns:
-                hdl(*args)
-        elif policy is EmitPolicy.nothing:
-            for hdl in allfcns:
-                hdl()
-        else:
-            for hdl in allfcns:
-                hdl(*args[0], **args[1])
+    def handle(self,
+               lst   :Union[str,Set[str]],
+               policy:Optional[EmitPolicy]                 = None,
+               args  :Optional[Union[Tuple,Sequence,Dict]] = None):
+        "Call handlers only once: collect them all"
+        allfcns = self.getobservers(lst)
+        if len(allfcns):
+            EmitPolicy.get(policy, args).run(allfcns, args)
         return args
 
     def emit(self, *names, returns = EmitPolicy.annotations):
@@ -167,30 +198,6 @@ class Event:
         else:
             return frozenset(name.lower().strip() for name in names)
 
-    @classmethod
-    def __getpolicy(cls, policy, fcn):
-        if policy not in (cls.annotations, None):
-            return policy
-
-        if policy is cls.annotations:
-            if isinstance(fcn, cast(type, staticmethod)):
-                fcn = getattr(fcn, '__func__')
-            try:
-                rta = fcn.__annotations__['return']
-            except KeyError as exc:
-                raise KeyError("Missing emission policy: "+str(fcn)) from exc
-        elif policy is None:
-            rta = fcn if fcn is None or isinstance(fcn, type) else type(fcn)
-
-        if rta is None:
-            return EmitPolicy.nothing
-        elif issubclass(rta, Dict):
-            return cls.outasdict
-        elif issubclass(rta, (Sequence, Tuple)):
-            return cls.outastuple
-        else:
-            return policy
-
     @staticmethod
     def __handle_args(lst, policy, ret, args, kwargs):
         if policy in (EmitPolicy.outastuple, EmitPolicy.outasdict):
@@ -211,7 +218,7 @@ class Event:
     @classmethod
     def __decorate_meth(cls, this, lst, myrt, fcn):
         "returns a decorator for wrapping methods"
-        myrt = cls.__getpolicy(myrt, fcn)
+        myrt = EmitPolicy.get(myrt, fcn)
 
         @wraps(fcn)
         def _wrap(clsorself, *args, **kwargs):
@@ -226,7 +233,7 @@ class Event:
     @classmethod
     def __decorate_int(cls, lst, myrt, fcn):
         "returns a decorator for wrapping methods"
-        myrt = cls.__getpolicy(myrt, fcn)
+        myrt = EmitPolicy.get(myrt, fcn)
 
         @wraps(fcn)
         def _wrap(self, *args, **kwargs):
@@ -241,7 +248,7 @@ class Event:
     @classmethod
     def __decorate_func(cls, this, lst, myrt, fcn):
         "returns a decorator for wrapping free functions"
-        myrt = cls.__getpolicy(myrt, fcn)
+        myrt = EmitPolicy.get(myrt, fcn)
 
         @wraps(fcn)
         def _wrap(*args, **kwargs):

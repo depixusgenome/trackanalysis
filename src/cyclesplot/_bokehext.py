@@ -49,9 +49,9 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
                         'tooltips.radius' : 1.5}
         SequenceHoverMixin.defaultconfig(mdl)
 
-    def _createrawdata(self, source):
-        return dict(t = source.data['t'][:self.shape[1]],
-                    z = source.data['z'][:self.shape[1]])
+    @staticmethod
+    def _createrawdata(data, shape):
+        return dict(t = data['t'][:shape[1]], z = data['z'][:shape[1]])
 
     def createraw(self, fig, source, shape, model):
         "creates the hover tool"
@@ -62,7 +62,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         if len(hover) == 0:
             return
 
-        self._rawsource = ColumnDataSource(self._createrawdata(source))
+        self._rawsource = ColumnDataSource(self._createrawdata(source.data, shape))
         css             = self._model.css.raw
 
         sel             = css.selection[self._model.css.theme.get()].get()
@@ -123,20 +123,56 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         "Creates the hover tool for histograms"
         self.create(fig, mdl, cnf, 'cycles')
 
-    def slaveaxes(self, fig, src, inpy = False): # pylint: disable=arguments-differ
+    def slaveaxes(self, fig, src):
         "slaves a histogram's axes to its y-axis"
-        super().slaveaxes(fig, src, 'frames', 'cycles', 'bottom', inpy)
+        # pylint: disable=too-many-arguments,protected-access
+        hvr = self
+        def _onchangebounds(fig = fig, hvr = hvr, src = src):
+            yrng = fig.y_range
+            if hasattr(yrng, '_initial_start') and yrng.bounds is not None:
+                yrng._initial_start = yrng.bounds[0]
+                yrng._initial_end   = yrng.bounds[1]
 
-    def resetraw(self, fig, rdata, shape):
+            if not hasattr(fig, 'extra_x_ranges'):
+                return
+
+            cycles = fig.extra_x_ranges['cycles']
+            frames = fig.x_range
+
+            cycles.start = 0.
+            frames.start = 0.
+
+            bases        = fig.extra_y_ranges['bases']
+            bases.start  = (yrng.start - hvr.bias)*hvr.stretch
+            bases.end    = (yrng.end   - hvr.bias)*hvr.stretch
+
+            bottom       = src.data['bottom']
+            if len(bottom) < 2:
+                ind1 = 1
+                ind2 = 0
+            else:
+                delta = bottom[1]-bottom[0]
+                ind1  = min(len(bottom), max(0, int((yrng.start-bottom[0])/delta-1)))
+                ind2  = min(len(bottom), max(0, int((yrng.end  -bottom[0])/delta+1)))
+
+            if ind1 >= ind2:
+                cycles.end = 0
+                frames.end = 0
+            else:
+                frames.end = max(src.data['frames'][ind1:ind2])+1
+                cycles.end = max(src.data['cycles'][ind1:ind2])+1
+        fig.y_range.callback = CustomJS.from_py_func(_onchangebounds)
+
+    def resetraw(self, fig, rdata, shape, resets):
         "updates the tooltips for a new file"
         hover = fig.select(DpxHoverTool)
         if len(hover) == 0:
             return
 
-        self.shape                   = shape
-        self._rawsource.data         = self._createrawdata(rdata)
-        self._rawglyph.visible = False
+        resets[self]['shape']             = shape
+        resets[self._rawsource]['data']   = self._createrawdata(rdata, shape)
+        resets[self._rawglyph]['visible'] = False
 
-    def resethist(self):
+    def resethist(self, resets):
         "updates the tooltips for a new file"
-        self.reset()
+        self.reset(resets)

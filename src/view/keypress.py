@@ -4,6 +4,7 @@ u"controls keypress actions"
 from typing                 import Callable, Optional # pylint: disable=unused-import
 from bokeh.core.properties  import String, Int, List
 from bokeh.model            import Model
+from control.action         import Action
 
 class DpxKeyEvent(Model):
     u"controls keypress actions"
@@ -32,7 +33,8 @@ class DpxKeyEvent(Model):
         items = self._ctrl.getGlobal('config')
         for name, fcn in self._keys.items():
             if self.value == items[name].get():
-                fcn()
+                with Action(self, calls = name):
+                    fcn()
                 break
 
     def addKeyPress(self, *args, **kwargs):

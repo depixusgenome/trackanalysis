@@ -14,7 +14,9 @@ class UndoView(View):
                                  'redo'     : "Control-y"}
 
         if 'keys' in kwa:
-            kwa['keys'].addKeyPress('keypress', undo = self.undo, redo = self.redo)
+            kwa['keys'].addKeyPress('keypress',
+                                    undo = self._ctrl.undo,
+                                    redo = self._ctrl.redo)
 
         self._ctrl.observe('applicationstarted', self.__observe)
 
@@ -67,13 +69,3 @@ class UndoView(View):
     def close(self):
         'Removes the controller'
         del self._ctrl
-
-    @View.action
-    def undo(self):
-        'undoes one action'
-        self._ctrl.undo()
-
-    @View.action
-    def redo(self):
-        'redoes one action'
-        self._ctrl.redo()

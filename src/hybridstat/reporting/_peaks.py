@@ -122,7 +122,7 @@ class PositionInRef(HasLengthPeak):
                 if summ.columnname(col) == name:
                     return 'INDIRECT("{}!{}'.format(summ.sheet_name,
                                                     xl_col_to_name(i))+'{}") '
-            raise KeyError("Missing column", "treated")
+            raise KeyError("Missing column", "warning")
 
         def _colname(name):
             filt = iter(peaks.columnname(col) for col in peakcols)
