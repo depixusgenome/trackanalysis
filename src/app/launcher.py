@@ -15,6 +15,7 @@ from bokeh.application.handlers import FunctionHandler
 from bokeh.settings             import settings
 from bokeh.layouts              import layout
 from bokeh.model                import Model
+from bokeh.resources            import DEFAULT_SERVER_PORT
 import bokeh.core.properties as props
 
 
@@ -133,7 +134,9 @@ def _launch(view, **kwa):
     if isinstance(view, Server):
         server = view
     else:
-        server = _serve(view, **kwa.pop('server', {}))
+        skwa = kwa.pop('server', {})
+        skwa.setdefault('port', kwa.get('port', DEFAULT_SERVER_PORT))
+        server = _serve(view, **skwa)
 
     def run(self, __old__ = StreamReader.run):
         "Stop the stream reader"
@@ -141,7 +144,8 @@ def _launch(view, **kwa):
         server.stop()
     StreamReader.run = run
 
-    rtime = _flexxlaunch('http://localhost:{}/'.format(kwa.get('port', '5006')), **kwa)
+    port  = kwa.get('port', str(DEFAULT_SERVER_PORT))
+    rtime = _flexxlaunch('http://localhost:{}/'.format(port), **kwa)
     def close(self, __old__ = view.MainControl.close):
         "closes the application"
         top, self.topview = self.topview, None
