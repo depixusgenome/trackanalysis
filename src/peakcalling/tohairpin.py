@@ -80,7 +80,7 @@ class HairpinDistance(Hairpin):
         return np.arange(val.center-val.size, val.center+val.size+val.step*.1, val.step)
 
     @kwargsdefaults(__KEYS)
-    def __call__(self, peaks : np.ndarray) -> Distance:
+    def __call__(self, peaks: np.ndarray) -> Distance:
         best  = self.DEFAULT_BEST, self.stretch.center, (self.bias.center or 0.)
         delta = 0.
         if len(peaks) > 1:
@@ -113,6 +113,16 @@ class HairpinDistance(Hairpin):
                         best = out
 
         return Distance(best[0], best[1], delta-best[2]/best[1])
+
+    @kwargsdefaults(__KEYS)
+    def value(self, peaks: np.ndarray, stretch, bias) -> float:
+        "computes the cost value at a given stretch and bias"
+        hpin = self.peaks if self.lastpeak else self.peaks[:-1]
+        return _cost.compute(hpin, peaks - peaks[0],
+                             symmetry = self.symmetry,
+                             noise    = self.precision,
+                             stretch  = stretch,
+                             bias     = bias)
 
     @staticmethod
     def silhouette(dist, key = None) -> float:
