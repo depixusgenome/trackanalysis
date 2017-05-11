@@ -10,7 +10,8 @@ import inspect
 
 import click
 
-from   utils.logconfig import getLogger
+from utils.logconfig    import getLogger
+from bokeh.resources    import DEFAULT_SERVER_PORT
 LOGS = getLogger()
 
 def _from_path(view):
@@ -83,7 +84,8 @@ def _electron(server, **kwa):
             app.on('window-all-closed', () => { app.quit() })
 
             app.on('activate', () => { if (win === null) { createWindow() } })
-            """ % (server.MainView.APPNAME, kwa.get('port', 5006))
+            """ % (server.MainView.APPNAME,
+                   kwa.get('port', DEFAULT_SERVER_PORT))
 
         import tempfile
         path = tempfile.mktemp("_trackanalysis.js")
@@ -97,10 +99,14 @@ def _electron(server, **kwa):
 
 def _win_opts():
     if sys.platform.startswith("win"):
-        # get rid of console windows
+        # Get rid of console windows
         import bokeh.util.compiler as compiler
-        def _Popen(*args, __popen__ = subprocess.Popen, **kwargs):
-            return __popen__(*args, **kwargs, shell = True)
+        # First find the nodejs path. This must be done with shell == False
+        compiler._nodejs_path() # pylint: disable=protected-access
+        # Now set shell == True to get rid of consoles
+        def _Popen(*args, **kwargs):
+            kwargs['shell'] = True
+            return subprocess.Popen(*args, **kwargs)
         compiler.Popen = _Popen
 
 def _raiseerr(raiseerr):
@@ -143,7 +149,7 @@ def _launch(view, app, desktop, kwa):
 
 def _port(port):
     if port == 'random':
-        return random.randint(5000, 8000)
+        return int(random.randint(5000, 8000))
     else:
         return int(port)
 
@@ -172,7 +178,7 @@ def _version(ctx, _, value):
               help = 'Launches a webserver with the client')
 @click.option("-w", "--web", 'apptype', flag_value = 'webclient',
               help = 'Launches a webserver *and* a webbrowser')
-@click.option("--port", default = '5006',
+@click.option("--port", default = str(DEFAULT_SERVER_PORT),
               help = 'Port used: use "random" for any')
 @click.option('-r', "--raiseerr", flag_value = True, default = False,
               help = 'Wether errors should be caught')
@@ -193,7 +199,7 @@ def main(view, files, app,  # pylint: disable=too-many-arguments
         server.io_loop.add_callback(lambda: server.show("/"))
 
     log = lambda: LOGS.info(' http://%(address)s:%(port)s',
-                            {'port': port, 'address': 'localhost'})
+                            {'port': kwargs['port'], 'address': 'localhost'})
 
     _files(files)
 
