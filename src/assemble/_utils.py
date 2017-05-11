@@ -230,7 +230,7 @@ def pairwise2_alignment(seqrec): # uses bpos
     gap_known = ScaleGap(1000)(_gap_penalties)
     return pairwise2.align.globalxc(seqrec.sequence,exp_seq,gap_known,gap_exp,score_only=True) # pylint: disable=no-member
 
-def group_overlapping_normdists(dists,nscale=1): # to pytest !! # what if no intersection?
+def group_overlapping_normdists(dists,nscale=1): # to pytest !!!! # what if no intersection?
     u'''
     returns lists of indices [(i,j,k)] each element of the tuple has distribution which overlap
     # the last return value is not expected values? or is it?
@@ -253,9 +253,11 @@ def group_overlapping_normdists(dists,nscale=1): # to pytest !! # what if no int
     ssets.sort(reverse=True)
     if len(ssets)==0:
         return ssets,[]
-    uset=[ssets[0]]
-    for val in ssets[1:]:
-        if val.issubset(uset[-1]):
+
+    uset=[]
+    for val in ssets:
+        # add to uset the set if there is it has no superset
+        if any(numpy.array(ssets)>val):
             continue
-        uset.append(val)
-    return ssets,uset
+        uset.append(tuple(sorted(val)))
+    return ssets,sorted(set(uset))

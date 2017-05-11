@@ -6,6 +6,7 @@ regroups functions and classes to complement assembler
 '''
 import itertools
 from typing import List, Tuple, Dict, Set, Callable, Any # pylint: disable=unused-import
+#import pickle
 import numpy
 from utils.logconfig import getLogger
 from utils import initdefaults
@@ -23,6 +24,7 @@ class ComputeOPerms:
     nscale=1 # type: int
     ooverl=1 # type: int
     __groups=list() # type: List
+    __sort_by="pos" # non id permutation result in non ordered oligos by "pos" attr
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
         pass
@@ -32,6 +34,17 @@ class ComputeOPerms:
         u'returns the oligos in collection'
         return self.collection.oligos
 
+    def __isokperm(self,perm):
+        return all((getattr(perm[oid],self.__sort_by)<getattr(oli,self.__sort_by))|\
+                   (perm[oid].seq[-self.ooverl:]==oli.seq[:self.ooverl])
+                   for oid,oli in enumerate(perm[1:]))
+
+    def rm_notokperm(self,perms:List[data.OligoPeak]):
+        u'''discard permutations if exchanging the position of peaks
+        does not result in a good sequence overlap'''
+        return list(filter(self.__isokperm,perms))
+
+    # generates duplicates when adding contribution to each group in groups?
     def __group_matching(self,groups:List[List[data.OliBat]])->List[List[data.OliBat]]: # to check
         u'''
         a grp is a list of tuples (oligo,oligo index, batch id)
@@ -43,8 +56,8 @@ class ComputeOPerms:
         # do we put them in the same cluster?
         # yes, we compute arrangements between batches afterwards
 
-        clusters = [] # type: List[List[data.OliBat]]
-
+        clusters = [] # type: List[List[data.OliBat]] # previously
+        #clusters = {} # type: Dict
         for grp in groups:
             seed = set([grp[0].oli.seq[:self.ooverl],grp[0].oli.seq[-self.ooverl:]])
             seed = _update_seed(self.ooverl,seed,grp)
@@ -61,8 +74,11 @@ class ComputeOPerms:
                           elmt[0].seq[-self.ooverl:] in seed]]
                 seedsingrp.update(seed)
 
-            clusters += pergrp
-        return clusters
+            clusters += pergrp # previously
+            #clusters += [pgrp for pgrp in pergrp if len(pgrp)>1]
+            #clusters.update(tuple(sorted(pergrp,key=lambda x:(x.batid,x.idinbat))))
+
+        return list(clusters)
 
     def compute(self)->List[List[data.OligoPeak]]:
         u'''
@@ -94,7 +110,11 @@ class ComputeOPerms:
             infogrp.append(info)
 
         LOGS.debug("before clustering, %i",len(infogrp))
+        # generates duplicates
         self.__groups = self.__group_matching(infogrp)
+        #with open("selfgroups.pickle","wb") as testfile:
+        #    pickle.dump(self.__groups,testfile)
+
         LOGS.debug("after clustering, %i",len(self.__groups))
 
         # remove groups if there is not a representative of at least two batches
@@ -107,7 +127,8 @@ class ComputeOPerms:
         # we can define maps to apply on previous xstate values
         # if an oligo does not belong to the group its position remains unchanged
 
-        return list(map(operms_between_batches, self.__groups))
+        operms=list(map(operms_between_batches, self.__groups))
+        return [self.rm_notokperm(perms) for perms in operms]
     # we can parallelise computation of score over each group
     # then reassemble the sequence having the best score with no overlapping groups
 
