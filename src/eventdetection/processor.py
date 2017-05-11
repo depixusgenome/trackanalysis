@@ -43,8 +43,8 @@ class ExtremumAlignmentTask(Task):
     """
     level  = Level.bead
     window = 15
-    edge   = True
-    phase  = None # type: Optional[int]
+    edge   = 'right' # type: Optional[str]
+    phase  = None    # type: Optional[int]
     factor = .9
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_):
@@ -64,8 +64,7 @@ class ExtremumAlignmentProcessor(Processor):
         def bias(self, phase, window, edge):
             "aligns a phase"
             vals  = np.array(list(self.cycles.withphases(phase).values()), dtype = 'O')
-            if edge:
-                edge  = 'left' if phase == PHASE.pull else 'right'
+            if edge is not None:
                 align = PhaseEdgeAlignment(window = window, edge = edge)
             else:
                 mode  = 'min'  if phase == PHASE.pull else 'max'
@@ -110,7 +109,7 @@ class ExtremumAlignmentProcessor(Processor):
         deltas[np.isnan(deltas)] = 0.
         bad        = np.nonzero(deltas < center)[0]
         if len(bad):
-            deltas = cycles.bias(PHASE.measure, window, True)-pulls
+            deltas = cycles.bias(PHASE.measure, window, edge)-pulls
             deltas[np.isnan(deltas)] = 0.
             bad    = np.setdiff1d(bad, np.nonzero(deltas < center)[0], True)
 

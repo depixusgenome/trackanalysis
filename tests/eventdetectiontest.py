@@ -147,7 +147,7 @@ def test_minmaxprocessor():
 
     bead    = ExtremumAlignmentProcessor.apply(track.beadsonly,
                                                phase = PHASE.initial,
-                                               edge  = False)
+                                               edge  = None)
     corrpos = [i.mean() for i in bead[0,...].withphases(PHASE.initial).values()]
     assert np.std(inipos)  > .015
     assert np.std(corrpos) < .001
@@ -159,7 +159,7 @@ def test_edgeminmaxprocessor():
 
     bead    = ExtremumAlignmentProcessor.apply(track.beadsonly,
                                                phase = PHASE.initial,
-                                               edge  = True)
+                                               edge  = 'right')
     corrpos = [i.mean() for i in bead[0,...].withphases(PHASE.initial).values()]
     assert np.std(inipos)  > .015
     assert np.std(corrpos) < .001
