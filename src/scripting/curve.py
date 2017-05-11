@@ -90,6 +90,8 @@ class Curve(Multiplier):
             yield from (i for _, i in self.data)
         elif isinstance(self.data, dict):
             yield from self.data.values()
+        elif np.isscalar(self.data):
+            yield np.ones((len(self.pos),), dtype = 'f4')*self.data
         elif self.data is None:
             yield np.ones((len(self.pos),), dtype = 'f4')
         elif np.isscalar(self.data[0]):
