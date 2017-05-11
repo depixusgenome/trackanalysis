@@ -13,16 +13,15 @@ Alignments can be performed on both phase 1 and phase 3 as follows:
     median of such extensions.
 
 Alignments used to be performed on the min of a phase. It is now on the median of
-a selection of points in a phase:
-
-    * On phase 1: the 15 last points.
-    * On phase 3: the 15 first points.
+a the last 15 points in a phase.
 
 ### Reporting
 
 The *Hybridstat* allows creating an excel report. Simply save a project using
 an *xlsx* extension. Computations are done in the background using as many processes
 are there are cores on the host computer.
+
+Data treatments are those selected in the *Cycles* tab.
 
 ### Sequence alphabet
 
@@ -129,24 +128,27 @@ New application for viewing cycles
     durations and number.
     * then open the *.gr* files. You can select all of them in one go.
 
-# tag ramp_v1.2
-## Tagger: David Salthouse <david.salthouse@depixus.com>
-    ### rampapp_v1.2
-        * Definition of a good bead has changed:
-            For a given bead, if less than 20% of cycles do not open and close has expected
-            the bead is tagged good.
-            Earlier versions of rampapp discarded a bead as soon
-            as one of its cycle misbehaved.
-        * creates a local server:
-            once open the application runs in your webbrowser,
-            to open another instance of rampapp, copy the address of rampapp (usually: http://localhost:5006/call_display)
-            into a new window
-        * generates a ramp_discard.csv file for pias
-        * added a third graph to display the estimated size of each hairpin in the trk files
-
 # tag ramp_v1.3
 ## Tagger: David Salthouse <david.salthouse@depixus.com>
-    ### rampapp_v1.3
-        * user has now access to a slider (top-right) which allows to specify the ratio of cycles which the algorithm defines as correct to tag a bead as "good".
-        Note that the 2 first cycles of the track file are still automatically discarded (as in pias)
 
+User has now access to a slider (top-right) which allows to specify the ratio
+of cycles which the algorithm defines as correct to tag a bead as "good".
+
+Note that the 2 first cycles of the track file are still automatically
+discarded (as in pias)
+
+
+# tag ramp_v1.2
+## Tagger: David Salthouse <david.salthouse@depixus.com>
+
+* Definition of a good bead has changed:
+    For a given bead, if less than 20% of cycles do not open and close has expected
+    the bead is tagged good.
+    Earlier versions of rampapp discarded a bead as soon
+    as one of its cycle misbehaved.
+* creates a local server:
+    once open the application runs in your webbrowser,
+    to open another instance of rampapp, copy the address of rampapp (usually: http://localhost:5006/call_display)
+    into a new window
+* generates a ramp_discard.csv file for pias
+* added a third graph to display the estimated size of each hairpin in the trk files
