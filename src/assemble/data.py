@@ -3,7 +3,7 @@
 u'''
 Creates Classes and function to use with assemble sequence
 '''
-from typing import List, NamedTuple, Tuple
+from typing import List, NamedTuple
 import itertools
 import numpy
 from utils import initdefaults
@@ -137,23 +137,37 @@ class BCollection:
         u'returns index of oli in oligos'
         return self.oligos.index(oli)
 
-class KPerm:
-    u'''k-permutation is a partial permutation'''
-    def __init__(self,kperm:Tuple)->None:
-        self.kperm=kperm
-    def to_perm(self,size):
-        u'returns Perm'
-        perm = Perm(size)
-        perm.from_kperm(self)
-        return perm
 
-class Perm:
-    u'class to permutation'
-    def __init__(self,size:int)->None:
-        self.size=size
-        self.perm=numpy.array(range(size)) # defaults to neutral permutation
-    def from_kperm(self,kperm:KPerm):
-        u'translate a kperm of 2 or more indices to a full size permutation'
-        toperm={val:kperm.kperm[idx] for idx,val in enumerate(sorted(kperm.kperm))}
-        for key,val in toperm.items():
-            self.perm[key]=val
+
+class OligoPeakKPerm:
+    u'kpermutation of OligoPeak Object'
+    __kpermids = [] # type: List[int]
+    __perm = [] # type: List[OligoPeak]
+    __permids = [] # type: List[int]
+    def __init__(self,oligos:List[OligoPeak],kperm:List[OligoPeak])->None:
+        self.oligos=oligos
+        self.kperm=kperm
+
+    @property
+    def kpermids(self)->List[int]:
+        u'returns indices of the kperm'
+        if self.__kpermids==[]:
+            self.__kpermids=[self.oligos.index(oli) for oli in self.kperm]
+        return self.__kpermids
+
+    @property
+    def perm(self):
+        u'returns full permutation of oligos'
+        if self.__perm==[]:
+            self.__perm=numpy.array(self.oligos)[self.permids].tolist()
+        return self.__perm
+    @property
+    def permids(self):
+        u'returns full permutation of oligo indices'
+        if self.__permids==[]:
+            toperm={val:self.kpermids[idx] for idx,val in enumerate(sorted(self.kpermids))}
+            self.__permids=list(range(len(self.oligos)))
+            for key,val in toperm.items():
+                self.__permids[key]=val
+
+        return self.__permids

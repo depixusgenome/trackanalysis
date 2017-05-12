@@ -17,8 +17,10 @@ from ._types import SciDist # pylint: disable=unused-import
 
 LOGS = getLogger(__name__)
 
+# should include rm_notokperm earlier in the algorithm in order to
+# avoid mem shortage
 class ComputeOPerms:
-    u'Computes possible permutation between oligos'
+    u'Computes possible k-permutations between oligos'
     # if need to merge 2 by 2 batches, create BCollection of 2 batches?
     collection=data.BCollection() # type: data.BCollection
     nscale=1 # type: int
@@ -225,6 +227,7 @@ class BestScoreAssemble:
     finds the best group of non overlapping operms
     with best (minimal) score
     '''
+    # operms are possibly kpermutations of oligos
     operms = [] # type: List[data.OligoPeak]
     # score between group
     score = scores.DefaultCallable(-1.0) # type: ignore

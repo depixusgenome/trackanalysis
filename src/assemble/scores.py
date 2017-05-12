@@ -128,13 +128,28 @@ class PDFCost:
         return -numpy.product([self.get_dists[idp].pdf(val)
                                for idp,val in enumerate(xstate)])
 
-class ScoreAssembly:
-    u'given an assembly returns (number of overlaps,cost of permutation)'
-    assembly=[] # type: List
+class ScoreAssembly: # should be ok # but must be tested
+    u'''
+    given an assembly (list of oligos in the correct order)
+    returns (number of overlaps,cost of permutation)
+    '''
+    assembly=[] # type: List[data.OligoPeak]
+    ooverl=-1 # type: int
     @initdefaults
     def __init__(self,**kwa):
         pass
 
     def run(self):
         u'compute score'
-        pass
+        return tuple([self.__density,self.__overlaps])
+
+    def __density(self)->float:
+        return OptiKPerm(kperm=self.assembly).cost()
+
+    def __overlaps(self)->int:
+        u'''
+        returns the number of consecutive overlaps between oligos
+        '''
+        return len([idx for idx,val in enumerate(self.assembly[1:])
+                    if len(data.Oligo.tail_overlap(self.assembly[idx].seq,
+                                                   val.seq))==self.ooverl])
