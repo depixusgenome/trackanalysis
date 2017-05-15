@@ -15,11 +15,9 @@ In the case of OptimOligoSwap, we can run :
 
 import sys
 from typing import Callable, Iterable, List, Tuple # pylint: disable=unused-import
-import pickle
 import numpy
 from utils.logconfig import getLogger
-from .oligohit import Batch
-from .data import KPerm
+#from .data import KPerm
 #from . import _utils as utils
 
 # to add variability in (stretching,bias) for each batch (to estimate from hybridstat analyses)
@@ -65,53 +63,6 @@ class GaussAndFlip(HoppingSteps):
         xst[flip], xst[flip+1] = xst[flip+1],xst[flip]
         return xst
 
-class OptimOligoSwap(HoppingSteps): # not yet usable
-    u'''
-    trying to optimize the exploration of param space given hypotheses:
-    symetric distribution of z around z0 (gaussian at the moment)
-    find the distribution which overlap (and allow permutation of oligos)
-
-    batches need to be merged such that the previous merge are more contrainted than the laters
-    '''
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
-        self.oligos = kwargs.get("oligos",tuple())
-        self.nscale = kwargs.get("nscale",1)
-        self.seg = kwargs.get("seg","batch_id") # "batch", "sequence"
-        self.min_overl = kwargs.get("min_overl",1)
-        self.swaps = []
-
-        # create Batches from each batch_ids move from one Batch to another
-        batchids = list(set(i.batch_id for i in self.oligos))
-        # need to order batch : by decreasing number of peaks
-        # batch needs to be merged in a given order to maximize constraints
-        # can only merge batches if oligos overlap by n-1
-        self.batches = [Batch(oligos=[i for i in self.oligos if i.batch_id==index],
-                              index=index) for index in batchids]
-        # batches from groups( = utils.group_oligos(self.oligos, by=self.seg))??
-        swaps = [KPerm(i) for i in find_swaps(self.batches,self.nscale,self.min_overl)]
-        print("len(swaps)=",len(swaps))
-        with open("swaps.pickle","wb") as testfile:
-            pickle.dump(swaps,testfile)
-        self.perms = [] #from_swaps2perms(swaps)
-
-    def __call__(self,xst):
-        u'''
-        * problem when adding permutations:
-             -> if it overlaps with any other permutations
-                (a new permutation to test includes an oligo already permuted)
-             -> if the 2 permutations are independent (do not involve the same oligos)
-        * requires xstate to add permutations
-        * there should be no conflict when adding permutations by construction of the
-          optimal_perm_normdists (for 2 by 2 batches merging)
-
-        return the new position of the oligos
-        '''
-        LOGS.debug("len(self.batches)="+str(len(self.batches)))
-        for perm in self.perms:
-            # from permutations of oligos to permutated positions
-            yield oli_perm_to_xstate(self.oligos,perm)
-        return None
 
 
 def find_swaps(batches,nscale,min_overl):

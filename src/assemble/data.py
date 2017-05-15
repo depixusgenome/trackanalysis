@@ -144,13 +144,14 @@ class OligoPeakKPerm:
     __kpermids = [] # type: List[int]
     __perm = [] # type: List[OligoPeak]
     __permids = [] # type: List[int]
+    __changes = [] # type: List
     def __init__(self,oligos:List[OligoPeak],kperm:List[OligoPeak])->None:
         self.oligos=oligos
         self.kperm=kperm
 
     @property
     def kpermids(self)->List[int]:
-        u'returns indices of the kperm'
+        u'returns the indices of the kperm'
         if self.__kpermids==[]:
             self.__kpermids=[self.oligos.index(oli) for oli in self.kperm]
         return self.__kpermids
@@ -163,7 +164,7 @@ class OligoPeakKPerm:
         return self.__perm
     @property
     def permids(self):
-        u'returns full permutation of oligo indices'
+        u'returns the full permutation of oligo indices'
         if self.__permids==[]:
             toperm={val:self.kpermids[idx] for idx,val in enumerate(sorted(self.kpermids))}
             self.__permids=list(range(len(self.oligos)))
@@ -171,3 +172,57 @@ class OligoPeakKPerm:
                 self.__permids[key]=val
 
         return self.__permids
+
+    @property
+    def changes(self)->List:
+        u'''
+        return the sorted tuple of indices which will be changed by application of perm
+        should return [] if all sorted(perm)[i]==perm[i], ie: identity operator
+        will not work for a combination of kperms
+        '''
+        if self.__changes==[]:
+            self.__changes=self.get_changes(self.kpermids)
+        return self.__changes
+
+
+    @classmethod
+    def get_changes(cls,kperm,sort_by="pos"):
+        u'''
+        returns the smallest (contiguous) sorted list containing the permutations in kperm
+        '''
+        try:
+            sortedp=sorted(kperm,key=lambda x:getattr(x,sort_by))
+        except AttributeError:
+            sortedp=sorted(kperm)
+
+        issame=[sortedp[idx]==kperm[idx] for idx in range(len(kperm))]
+
+        try:
+            return sortedp[issame.index(False):-list(reversed(issame)).index(False)]
+        except ValueError:
+            return []
+
+    @classmethod
+    def add(cls,*args):
+        u'''
+        add all kperms in args
+        perm args[0] applied first,
+        then args[1], args[2], ...
+        '''
+        res = cls.__add2(*args[:2])
+        for kperm in args[2:]:
+            res = cls.__add2(res,kperm)
+        return res
+
+    @classmethod
+    def __add2(cls,kperm1:OligoPeakKPerm, kperm2:OligoPeakKPerm)->OligoPeakKPerm:
+        u'''
+        combine 2 OligoPeakKPerms
+        assumes that the 2 kperms
+        otherwise the order of the addition is important
+        oligos must be the same in the 2 sets
+        '''
+        permids = numpy.array(kperm1.permids)[kperm2.permids].tolist()
+        changes = cls.get_changes(permids)
+        kperm = numpy.array(kperm1.oligos)[changes].tolist()
+        return OligoPeakKPerm(oligos=kperm1.oligos,kperm=kperm)
