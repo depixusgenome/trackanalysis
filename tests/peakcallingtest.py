@@ -57,14 +57,14 @@ def test_onehairpincost():
     u"tests hairpin cost method"
     truth = np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')/8.8e-4
     bead  = (truth*1.03+1.)*8.8e-4
-    res   = HairpinDistance(peaks = truth)(bead[:-1])
+    res   = HairpinDistance(peaks = truth).optimize(bead[:-1])
     assert_allclose((bead-res[2])*res[1], truth, rtol = 1e-4, atol = 1e-2)
 
 def test_onehairpinid():
     u"tests haipin id method"
     truth = np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')/8.8e-4
-    bead  = np.array([0., 0.01, .1, .2, .5, 1.], dtype = 'f4') - .88e-4
-    res   = PeakIdentifier(peaks = truth)(bead, 1./8.8e-4, 10.)
+    bead  = np.array([0., 0.01, .1, .2, .5, 1.], dtype = 'f4') - 1.
+    res   = PeakIdentifier(peaks = truth).pair(bead, 1./8.8e-4, -1.)
     assert_allclose(res['zvalue'], bead)
     assert_allclose(res['key'], np.insert(np.int32(truth[:-1]+.1), 1, np.iinfo('i4').min))
 
@@ -139,4 +139,4 @@ def test_control():
         assert tuple(beads.keys()) == ('hp100',)
 
 if __name__ == '__main__':
-    test_control()
+    test_onehairpinid()

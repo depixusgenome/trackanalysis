@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"""
+"""
 Matching experimental peaks to hairpins
 """
 from   typing       import (Dict, Sequence, NamedTuple, # pylint: disable=unused-import
@@ -9,9 +9,9 @@ from   typing       import (Dict, Sequence, NamedTuple, # pylint: disable=unused
 from   itertools    import product
 import numpy        as np
 
-from utils              import StreamUnion, kwargsdefaults, initdefaults
-from sequences          import read as _read, peaks as _peaks
-from ._core             import cost as _cost, match as _match # pylint: disable=no-name-in-module
+from utils          import StreamUnion, kwargsdefaults, initdefaults
+from sequences      import read as _read, peaks as _peaks
+from ._core         import cost as _cost, match as _match # pylint: disable=no-name-in-module
 
 OptimisationParams = NamedTuple('OptimisationParams',
                                 [('threshold_param_rel', float),
@@ -19,17 +19,32 @@ OptimisationParams = NamedTuple('OptimisationParams',
                                  ('threshold_func_rel',  float),
                                  ('stopval',             float),
                                  ('maxeval',             int)])
+def _dict(cnf:OptimisationParams, **kwa) -> dict:
+    kwa.update(threshold_param_rel = cnf[0], # type: ignore
+               threshold_param_abs = cnf[1],
+               threshold_func_rel  = cnf[2],
+               stopval             = cnf[3],
+               maxeval             = cnf[4])
+    return kwa
+
 
 Range              = NamedTuple('Range',
-                                [('center', Optional[float]),
-                                 ('size',   float),
-                                 ('step',   float)])
+                                [('center',  Optional[float]),
+                                 ('size',    float),
+                                 ('step',    float)])
+
+Distance           = NamedTuple('Distance',
+                                [('value',   float),
+                                 ('stretch', float),
+                                 ('bias',    float)])
 
 class Hairpin:
-    u"Matching experimental peaks to hairpins"
-    peaks    = np.empty((0,), dtype = 'f4') # type: np.array
-    lastpeak = False
-    @initdefaults(frozenset(locals()))
+    "Class containing theoretical peaks and means for matching them to experimental ones"
+    DEFAULT_BEST = 1e20
+    peaks        = np.empty((0,), dtype = 'f4') # type: np.array
+    lastpeak     = False
+    _KEYS        = frozenset(locals())
+    @initdefaults(_KEYS)
     def __init__(self, **kwa):
         pass
 
@@ -40,89 +55,18 @@ class Hairpin:
 
     @staticmethod
     def topeaks(seq:str, oligos:Sequence[str]) -> np.ndarray:
-        u"creates a peak sequence from a dna sequence and a list of oligos"
+        "creates a peak sequence from a dna sequence and a list of oligos"
         return np.pad(np.array(_peaks(seq, oligos)['position'], dtype = 'i4'),
                       1, 'constant', constant_values = (0, len(seq)))
 
     @classmethod
     def read(cls, path:Union[StreamUnion, Dict], oligos:Sequence[str]
             ) -> 'Iterator[Tuple[str,Hairpin]]':
-        u"creates a list of *Hairpin* from a fasta file and a list of oligos"
+        "creates a list of *Hairpin* from a fasta file and a list of oligos"
         itr = (path         if isinstance(path, Iterator)               else
                path.items() if callable(getattr(path, 'items', None))   else
                _read(path))
         return ((name, cls(peaks = cls.topeaks(seq, oligos))) for name, seq in itr)
-
-Distance = NamedTuple('Distance', [('value', float), ('stretch', float), ('bias', float)])
-
-class HairpinDistance(Hairpin):
-    u"Matching experimental peaks to hairpins"
-    DEFAULT_BEST = 1e20
-    symmetry     = False
-    precision    = 15.
-    stretch      = Range(1./8.8e-4, 200., 100.)
-    bias         = Range(None,       20.,  20.)
-    optim        = OptimisationParams(1e-4, 1e-8, 1e-4, 1e-8, 100)
-    __KEYS       = frozenset(locals())
-    @initdefaults(__KEYS)
-    def __init__(self, **kwa):
-        super().__init__(**kwa)
-
-    def arange(self, attr: Optional[str] = None
-              ) -> Union[np.ndarray, Iterator[Tuple[float, ...]]]:
-        "returns the range on which the attribute is explored"
-        if attr is None:
-            return product(self.arange('stretch'), self.arange('bias'))
-
-        val = getattr(self, attr)
-        if val.center is None:
-            return np.arange(-val.size, val.size+val.step*.1, val.step)
-        return np.arange(val.center-val.size, val.center+val.size+val.step*.1, val.step)
-
-    @kwargsdefaults(__KEYS)
-    def __call__(self, peaks: np.ndarray) -> Distance:
-        best  = self.DEFAULT_BEST, self.stretch.center, (self.bias.center or 0.)
-        delta = 0.
-        if len(peaks) > 1:
-            rng  = lambda x, y, z: (('min_'+x, y-z), (x, y), ('max_'+x, y+z))
-            args = dict(symmetry            = self.symmetry, # type: ignore
-                        noise               = self.precision,
-                        threshold_param_rel = self.optim[0],
-                        threshold_param_abs = self.optim[1],
-                        threshold_func_rel  = self.optim[2],
-                        stopval             = self.optim[3],
-                        maxeval             = self.optim[4])
-
-            hpin  = self.peaks if self.lastpeak else self.peaks[:-1]
-            delta = peaks[0]
-            peaks = peaks - peaks[0]
-
-            optimize = _cost.optimize
-            for vals in self.arange():
-                args.update(rng('stretch', vals[0], self.stretch.step))
-                if self.bias.center is None:
-                    args.update(rng('bias', vals[1], self.bias.step))
-                else:
-                    args.update(rng('bias', vals[1]+delta*vals[0], self.bias.step))
-                try:
-                    out = optimize(hpin, peaks, **args)
-                except: # pylint: disable=bare-except
-                    continue
-                else:
-                    if out[0] < best[0]:
-                        best = out
-
-        return Distance(best[0], best[1], delta-best[2]/best[1])
-
-    @kwargsdefaults(__KEYS)
-    def value(self, peaks: np.ndarray, stretch, bias) -> float:
-        "computes the cost value at a given stretch and bias"
-        hpin = self.peaks if self.lastpeak else self.peaks[:-1]
-        return _cost.compute(hpin, peaks - peaks[0],
-                             symmetry = self.symmetry,
-                             noise    = self.precision,
-                             stretch  = stretch,
-                             bias     = bias)
 
     @staticmethod
     def silhouette(dist, key = None) -> float:
@@ -136,24 +80,190 @@ class HairpinDistance(Hairpin):
         else:
             return 1. if len(dist) == 1 else -3.
 
-PEAKS_DTYPE = np.dtype([('zvalue', 'f4'), ('key', 'i4')])
-PEAKS_TYPE  = Union[Sequence[Tuple[float,int]],np.ndarray]
-class PeakIdentifier(Hairpin):
-    u"Identifying experimental peaks with the theoretical ones"
-    window   = 10.
-    lastpeak = True
-    @initdefaults(frozenset(locals()))
+class HairpinDistance(Hairpin):
+    """
+    Matching experimental peaks to hairpins using a cost function:
+
+    If:
+
+        R(X, Y) = Σ_{i, j} exp(-((x_i -y_j)/σ)²)
+
+
+    Then the cost is:
+
+        1 - R(X, Y)/sqrt(R(X, X) R(Y, Y))
+    """
+    symmetry  = False
+    precision = 15.
+    stretch   = Range(1./8.8e-4, 200., 100.)
+    bias      = Range(None,       20.*8.8e-4, 20.*8.8e-4)
+    optim     = OptimisationParams(1e-4, 1e-8, 1e-4, 1e-8, 100)
+    __KEYS    = frozenset(locals())
+    @initdefaults(__KEYS)
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-    def __call__(self, peaks:np.ndarray, stretch = 1., bias = 0.) -> PEAKS_TYPE:
+    @kwargsdefaults(__KEYS)
+    def optimize(self, peaks: np.ndarray) -> Distance:
+        "optimizes the cost function"
+        best  = self.DEFAULT_BEST, self.stretch.center, (self.bias.center or 0.)
+        delta = 0.
+        if len(peaks) > 1:
+            rng   = lambda x, y, z: (('min_'+x, y-z), (x, y), ('max_'+x, y+z))
+            brng  = lambda w, x, y, z: rng(w, x[0]*(x[1]+y), z*x[0])
+            args  = _dict(self.optim, symmetry = self.symmetry, noise = self.precision)
+
+            hpin  = self.peaks if self.lastpeak else self.peaks[:-1]
+            delta = peaks[0]
+            peaks = peaks - peaks[0]
+            for vals in self.__arange():
+                args.update(rng('stretch', vals[0], self.stretch.step))
+                if self.bias.center is None:
+                    args.update(brng('bias', vals, 0.,    self.bias.step))
+                else:
+                    args.update(brng('bias', vals, delta, self.bias.step))
+                try:
+                    out = _cost.optimize(hpin, peaks, **args)
+                except: # pylint: disable=bare-except
+                    continue
+                else:
+                    if out[0] < best[0]:
+                        best = out
+
+        return Distance(best[0], best[1], delta-best[2]/best[1])
+
+    @kwargsdefaults(__KEYS)
+    def value(self, peaks: np.ndarray, stretch, bias) -> Tuple[float, float, float]:
+        "computes the cost value at a given stretch and bias as well as derivates"
+        if len(peaks) == 0:
+            return 0., 0., 0.
+        hpin = self.peaks if self.lastpeak else self.peaks[:-1]
+        return _cost.compute(hpin, peaks - peaks[0],
+                             symmetry = self.symmetry,
+                             noise    = self.precision,
+                             stretch  = stretch,
+                             bias     = (peaks[0]-bias)*stretch)
+
+    def __arange(self, attr: Optional[str] = None
+                ) -> Union[np.ndarray, Iterator[Tuple[float, ...]]]:
+        "returns the range on which the attribute is explored"
+        if attr is None:
+            return product(self.__arange('stretch'), self.__arange('bias'))
+
+        val = getattr(self, attr)
+        if val.center is None:
+            return np.arange(-val.size, val.size+val.step*.1, val.step)
+        return np.arange(val.center-val.size, val.center+val.size+val.step*.1, val.step)
+
+PEAKS_DTYPE = np.dtype([('zvalue', 'f4'), ('key', 'i4')])
+PEAKS_TYPE  = Union[Sequence[Tuple[float,int]],np.ndarray]
+class PeakIdentifier(Hairpin):
+    "Identifying experimental peaks with the theoretical ones"
+    window       = 10.
+    lastpeak     = True
+    nbasesabove  = 20
+    stretch      = Range(1./8.8e-4, 200., 50.)
+    bias         = Range(None,       20.*8.8e-4, 20.*8.8e-4)
+    optim        = OptimisationParams(1e-4, 1e-8, 1e-4, 1e-8, 100)
+    _precision   = 1., 1e-3
+    __KEYS       = frozenset(locals())
+    @initdefaults(__KEYS)
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
+    @kwargsdefaults(__KEYS)
+    def pair(self, peaks:np.ndarray, stretch = 1., bias = 0.) -> PEAKS_TYPE:
+        "returns experimental peaks paired to the theory"
         hpin           = self.peaks if self.lastpeak else self.peaks[:-1]
         ided           = np.empty((len(peaks),), dtype = PEAKS_DTYPE)
         ided['zvalue'] = peaks
         ided['key']    = np.iinfo('i4').min
 
         if len(peaks) > 0 and len(hpin) > 0:
-            peaks = stretch*peaks+bias-(stretch*peaks[0]+bias)
+            peaks = stretch*(peaks-bias)
             ids   = _match.compute(hpin, peaks, self.window)
             ided['key'][ids[:,1]] = np.int32(hpin[ids[:,0]]) # type: ignore
         return ided
+
+    @kwargsdefaults(__KEYS)
+    def nfound(self, peaks:np.ndarray, stretch = 1., bias = 0.) -> int:
+        "returns the number of paired peaks"
+        hpin = self.peaks if self.lastpeak else self.peaks[:-1]
+        if len(peaks) > 0 and len(hpin) > 0:
+            peaks = stretch*(peaks-bias)
+            return _match.nfound(hpin, peaks, self.window)
+        return 0
+
+    @kwargsdefaults(__KEYS)
+    def distance(self, peaks:np.ndarray, stretch = 1., bias = 0.) -> int:
+        """
+        Computes the square of the distance between matched peaks,
+        allowing a maximum distance of *sigma* to a match.
+
+        Outputs a tuple with:
+
+            1. Σ_{paired} (x_i - y_i)² / (σ²  N) + len(reference) + len(experiment) - 2*N
+            2. stretch gradient
+            3. bias gradient
+            4. N: number of paired peaks
+        """
+
+        hpin = self.peaks if self.lastpeak else self.peaks[:-1]
+        return _match.distance(hpin, peaks, self.window, stretch, -bias*stretch)
+
+    @kwargsdefaults(__KEYS)
+    def optimize(self, peaks:np.ndarray) -> Distance:
+        "Optimizes the distance"
+        best  = self.DEFAULT_BEST, self.stretch.center, (self.bias.center or 0.)
+        if len(peaks) > 1:
+            rng   = lambda x, y, z: (('min_'+x, y-z), (x, y), ('max_'+x, y+z))
+            args  = _dict(self.optim, window = self.window)
+            hpin  = self.peaks if self.lastpeak else self.peaks[:-1]
+            pots  = {i: self.distance(peaks, *i)[-1] for i in self.__arange(peaks)}
+            maxi  = max(pots.values(), default = self.DEFAULT_BEST)-1
+            good  = set((int(i[0]/self._precision[0]), int(i[1]/self._precision[1]))
+                        for i, j in pots.items() if j >= maxi)
+            for ivals in good:
+                vals = ivals[0]*self._precision[0], ivals[1]*self._precision[1]
+                args.update(rng('stretch',  vals[0],         self.stretch.step))
+                args.update(rng('bias',    -vals[0]*vals[1], self.bias.step*vals[0]))
+                try:
+                    out = _match.optimize(hpin, peaks, **args)
+                except: # pylint: disable=bare-except
+                    continue
+                else:
+                    if out[0] < best[0]:
+                        best = out
+
+        return Distance(best[0], best[1], -best[2]/best[1])
+
+    def __arange(self, exp:np.ndarray) -> Iterator[Tuple[float, float]]:
+        "computes stretch and bias for potential pairings"
+        ref        = self.peaks
+        minstretch = self.stretch.center - self.stretch.size
+        maxstretch = self.stretch.center + self.stretch.size
+        if self.bias.center is None:
+            minbias, maxbias = -1e5, 1e5
+        else:
+            minbias = self.bias.center - self.bias.size
+            maxbias = self.bias.center + self.bias.size
+
+        basemax    = self.peaks[-1] + self.nbasesabove
+        def _compute(iref, jref, iexp, jexp):
+            rho  = (ref[iref]-ref[jref])/(exp[iexp] - exp[jexp])
+            return rho, exp[iexp]-ref[iref]/rho
+
+        pot = iter(_compute(iref, jref, iexp, jexp)
+                   for iref in range(len(ref)-1)
+                   for jref in range(iref+1, len(ref))
+                   for iexp in range(len(exp)-1)
+                   for jexp in range(iexp+1, len(exp)))
+        valid = set((int(val[0]/self._precision[0]+0.5),
+                     int(val[1]/self._precision[1]+0.5)) for val in pot
+                    if (minstretch  <= val[0] <= maxstretch
+                        and minbias <= val[1] <= maxbias
+                        and val[0]*(exp[-1]-val[1]) < basemax
+                       ))
+        return iter((val[0]*self._precision[0], val[1]*self._precision[1])
+                    for val in valid)
+

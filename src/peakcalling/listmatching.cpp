@@ -1,5 +1,6 @@
 #include <list>
 #include <algorithm>
+#include "peakcalling/optimize.hpp"
 #include "peakcalling/listmatching.h"
 namespace peakcalling { namespace match
 {
@@ -92,23 +93,26 @@ namespace peakcalling { namespace match
 
             size_t  iX = 0, iY = 0;
             _MInfo  minc{true, 0, 0.f};
-
             list_t curlist;
-            for(auto maxc = pY(0); iX < size1 && iY < size2; minc.color ? ++iX : ++iY)
+
+            if(size1 > 0 && size2 > 0)
             {
-                minc = minc.color ? pX(iX) : pY(iY);
-                if(minc.pos > maxc.pos)
-                    std::swap(minc, maxc);
+                for(auto maxc = pY(0); iX < size1 && iY < size2; minc.color ? ++iX : ++iY)
+                {
+                    minc = minc.color ? pX(iX) : pY(iY);
+                    if(minc.pos > maxc.pos)
+                        std::swap(minc, maxc);
 
-                if(endoflist(curlist, minc) && empty(curlist))
-                    return;
+                    if(endoflist(curlist, minc) && empty(curlist))
+                        return;
 
-                curlist.push_back(minc);
+                    curlist.push_back(minc);
+                }
+
+                minc = iX == size1 ? pY(iY++) : pX(iX++);
+                if(!endoflist(curlist, minc))
+                    curlist.push_back(minc);
             }
-
-            minc = iX == size1 ? pY(iY++) : pX(iX++);
-            if(!endoflist(curlist, minc))
-                curlist.push_back(minc);
 
             while(iX < size1)
                 if(discard(pX(iX++)))
@@ -144,4 +148,75 @@ namespace peakcalling { namespace match
             }
         return m;
     }
+
+    size_t nfound( float          sigma
+                 , float const *  bead1
+                 , size_t         size1
+                 , float const *  bead2
+                 , size_t         size2
+                 )
+    {
+        size_t cnt = 0;
+        _matched(bead1, size1, bead2, size2, sigma,
+                 [&](auto const &, auto const &) { ++cnt; },
+                 [](...) { return false; });
+        return cnt;
+    }
+
+    std::tuple<double, double, double, size_t> distance( float          sigma
+                                                       , float          stretch
+                                                       , float          bias
+                                                       , float const *  bead1
+                                                       , size_t         size1
+                                                       , float const *  bead2
+                                                       , size_t         size2
+                                                       )
+    {
+        double res   = 0.;
+        double grads = 0.;
+        double gradb = 0.;
+        size_t cnt   = 0;
+        std::vector<float> conv(size2);
+        for(size_t i = size_t(0); i < size2; ++i)
+            conv[i] = bead2[i] * stretch + bias;
+
+        _matched(bead1, size1, conv.data(), size2, sigma,
+                 [&](auto const & a, auto const & b)
+                    {
+                        auto t = a.pos - b.pos;
+                        res   += t*t;
+                        grads -= bead2[b.ind]*t;
+                        gradb -= t;
+                        ++cnt;
+                    },
+                 [](...) { return false; });
+
+        if(cnt == 0)
+            return std::make_tuple(size2+size1+1.0, 0., 0., cnt);
+
+        double norm = 1./(sigma*sigma);
+        return std::make_tuple(size2+size1-2*cnt + res*norm,
+                               2.0*grads*norm,
+                               2.0*gradb*norm,
+                               cnt);
+    }
+
+    namespace
+    {
+        double  _compute(unsigned, double const * x, double * g, void * d)
+        {
+            auto const & cf = *((optimizer::NLOptCall<> const *) d);
+            auto res = distance(cf.params->sigma, x[0], x[1],
+                                cf.beads[0], cf.sizes[0],
+                                cf.beads[1], cf.sizes[1]);
+            g[0] = std::get<1>(res);
+            g[1] = std::get<2>(res);
+            return std::get<0>(res);
+        }
+    }
+
+    optimizer::Output optimize (Parameters const & cf,
+                                float const * bead1, size_t size1,
+                                float const * bead2, size_t size2)
+    { return optimizer::optimize(cf, bead1, size1, bead2, size2, _compute); }
 }}

@@ -1,36 +1,22 @@
-#include <limits>
-#include <sstream>
-#ifdef _MSC_VER
-# pragma warning( push )
-# pragma warning( disable : 4267)
-# include <nlopt.hpp>
-# pragma warning( pop )
-#else
-# include <nlopt.hpp>
-#endif
-#include <pybind11/pybind11.h>
+#include "peakcalling/optimize.hpp"
 #include "peakcalling/costfunction.h"
 
 namespace peakcalling { namespace cost
 {
     namespace
     {
-        struct NLOptCall
-        {
-            Parameters const * params;
-            float const      * beads[2];
-            size_t             sizes[2];
-        };
-
-        Output _compute  (Parameters const & cf, double stretch, double bias,
-                         float const * bead1, size_t size1,
-                         float const * bead2, size_t size2)
+        Output _computecf  (Parameters const & cf, double stretch, double bias,
+                            float const * bead1, size_t size1,
+                            float const * bead2, size_t size2)
         {
             auto cost = [](float const * pos1, size_t size1,
                            float const * pos2, size_t size2,
                            double alpha, double beta, double sig)
                         -> std::tuple<float, float, float>
                 {
+                    if(size1 == 0 || size2 == 0)
+                        return std::make_tuple(1.0f, 0.0f, 0.0f);
+
                     double sum       = 0.;
                     double norm1     = 0.;
                     double grsum [2] = {0., 0.};
@@ -87,10 +73,10 @@ namespace peakcalling { namespace cost
 
         double  _compute(unsigned, double const * x, double * g, void * d)
         {
-            NLOptCall const & cf = *((NLOptCall const *) d);
-            auto res = _compute(*cf.params, x[0], x[1],
-                                cf.beads[0], cf.sizes[0],
-                                cf.beads[1], cf.sizes[1]);
+            auto const & cf = *((optimizer::NLOptCall<Parameters> const *) d);
+            auto res = _computecf(*cf.params, x[0], x[1],
+                                  cf.beads[0], cf.sizes[0],
+                                  cf.beads[1], cf.sizes[1]);
             g[0] = std::get<1>(res);
             g[1] = std::get<2>(res);
             return std::get<0>(res);
@@ -100,42 +86,10 @@ namespace peakcalling { namespace cost
     Output compute  (Parameters const & cf,
                      float const * bead1, size_t size1,
                      float const * bead2, size_t size2)
-    { return _compute(cf, cf.current[0], cf.current[1], bead1, size1, bead2, size2); }
+    { return _computecf(cf, cf.current[0], cf.current[1], bead1, size1, bead2, size2); }
 
     Output optimize (Parameters const & cf,
                      float const * bead1, size_t size1,
                      float const * bead2, size_t size2)
-    {
-        nlopt::opt opt(nlopt::LD_LBFGS, size_t(2));
-        opt.set_xtol_rel(cf.xrel);
-        opt.set_ftol_rel(cf.frel);
-        opt.set_xtol_abs(cf.xabs);
-        opt.set_stopval (cf.stopval);
-        opt.set_maxeval (int(cf.maxeval));
-
-        NLOptCall call = {&cf, {bead1, bead2}, {size1, size2}};
-        opt.set_min_objective(_compute, static_cast<void*>(&call));
-
-        std::ostringstream stream;
-        for(size_t i = size_t(0), e = cf.lower.size(); i < e; ++i)
-        {
-            if(cf.lower[i] > cf.current[i])
-                stream << "lower[" << i << "] > current[" <<i << "]: "
-                       << cf.lower[i] << " > " << cf.current[i] << std::endl;
-            if(cf.upper[i] < cf.current[i])
-                stream << "current[" << i << "] > upper[" <<i << "]: "
-                       << cf.current[i] << " > " << cf.upper[i] << std::endl;
-        }
-        std::string err = stream.str();
-        if(err.size())
-            throw pybind11::value_error(err);
-
-        opt.set_lower_bounds(cf.lower);
-        opt.set_upper_bounds(cf.upper);
-
-        double minf = std::numeric_limits<double>::max();
-        std::vector<double> tmp = cf.current;
-        opt.optimize(tmp, minf);
-        return std::make_tuple(float(minf), float(tmp[0]), float(tmp[1]));
-    }
+    { return optimizer::optimize(cf, bead1, size1, bead2, size2, _compute); }
 }}

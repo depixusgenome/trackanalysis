@@ -115,13 +115,13 @@ class FitToHairpinProcessor(Processor):
         if cstr is not None:
             hpin = distances.get(cstr[0], None)
             if hpin is not None:
-                return {cstr[0]: updatecopy(hpin, **cstr[1])(bead)}
+                return {cstr[0]: updatecopy(hpin, **cstr[1]).optimize(bead)}
 
         if len(bead) > 0:
-            return {name: calc(bead) for name, calc in distances.items()}
+            return {name: calc.optimize(bead) for name, calc in distances.items()}
 
         else:
-            return {None: next(iter(distances.values()))(bead)}
+            return {None: next(iter(distances.values())).optimize(bead)}
 
     @staticmethod
     def __beadoutput(peakids : PeakIds,
@@ -133,7 +133,7 @@ class FitToHairpinProcessor(Processor):
         best = min(dist, key = dist.__getitem__)
         silh = HairpinDistance.silhouette(dist, best)
         alg  = peakids.get(best, PeakIdentifier())
-        ids  = alg(peaks, *dist.get(best, (0., 1., 0))[1:])
+        ids  = alg.pair(peaks, *dist.get(best, (0., 1., 0))[1:])
         return FitBead(key, silh, dist, ids, events)
 
 ByHairpinBead  = NamedTuple('ByHairpinBead',

@@ -23,7 +23,7 @@ namespace peakcalling
                     "input1"_a,          "input2"_a,
                     "symmetry"_a = true, "noise"_a = 0.003f,
                     "stretch"_a  = 1.f,  "bias"_a  = 0.f,
-                    "Computes the cost function value for given parameters.\n"
+                    "Computes the cost for given parameters.\n"
                     "Returns a tuple (value, stretch gradient, bias gradient)"
                     );
 
@@ -52,7 +52,7 @@ namespace peakcalling
                     "threshold_func_rel"_a  = 1e-4,
                     "stopval"_a             = 1e-8,
                     "maxeval"_a             = size_t(100),
-                    "Optimizes the cost function value for given parameters."
+                    "Optimizes the cost for given parameters."
                     "Returns a tuple (min cost, best stretch, best bias)");
         }
     }
@@ -77,9 +77,68 @@ namespace peakcalling
                         return pybind11::array(shape, strides, ret.data());
                     },
                     "reference"_a,   "experiment"_a, "sigma"_a = 20.,
-                    "Matches peaks from the experiment to the reference, with a\n"
-                    "max distance of *sigma*.\n\n"
+                    "Matches peaks from the experiment to the reference,\n"
+                    "allowing a maximum distance of *sigma*.\n\n"
                     "Output is a array of indexes");
+
+            ht.def("nfound", [](pybind11::array_t<float> const & bead1,
+                                pybind11::array_t<float> const & bead2,
+                                float s)
+                    {
+                        return nfound(s, bead1.data(), bead1.size(),
+                                         bead2.data(), bead2.size());
+                    },
+                    "reference"_a,   "experiment"_a, "sigma"_a = 20.,
+                    "Counts the number of matched peaks,\n"
+                    "allowing a maximum distance of *sigma* to a match.\n\n"
+                    "Output is a positive integer");
+
+            ht.def("distance", [](pybind11::array_t<float> const & bead1,
+                                  pybind11::array_t<float> const & bead2,
+                                  float s, float stretch, float bias)
+                    {
+                        return distance(s, stretch, bias,
+                                        bead1.data(), bead1.size(),
+                                        bead2.data(), bead2.size());
+                    },
+                    "reference"_a,   "experiment"_a, "sigma"_a = 20.,
+                    "stretch"_a = 1., "bias"_a = 0.,
+                    "Computes the square of the distance between matched peaks,"
+                    "allowing a maximum distance of *sigma* to a match.\n\n"
+                    "Outputs a tuple with:\n\n"
+                    "    1. Σ_{paired} (x_i - y_i)² / (σ² N) +"
+                        " len(reference)+len(experiment) - 2N\n"
+                    "    2. stretch gradient\n"
+                    "    3. bias gradient\n"
+                    "    4. N: number of paired peaks\n");
+
+            ht.def("optimize", [](pybind11::array_t<float> const & bead1,
+                                  pybind11::array_t<float> const & bead2,
+                                  float sig,
+                                  float  ls,   float cs, float us,
+                                  float  lb,   float cb, float ub,
+                                  double rpar, double apar, double rfcn, double stop,
+                                  size_t maxe
+                                 )
+                    {
+                        Parameters cf; cf.sigma = sig; cf.current = {cs, cb};
+                        cf.lower = {ls, lb}; cf.upper = {us, ub}; cf.xrel = rpar; cf.frel = rfcn;
+                        cf.xabs  = apar; cf.stopval = stop; cf.maxeval = maxe;
+                        return optimize(cf,
+                                        bead1.data(), bead1.size(),
+                                        bead2.data(), bead2.size());
+                    },
+                    "reference"_a,           "experiment"_a,
+                    "window"_a      = 10.0,
+                    "min_stretch"_a = 0.8f,    "stretch"_a = 1.f, "max_stretch"_a = 1.2f,
+                    "min_bias"_a    = -0.005f, "bias"_a    = 0.f, "max_bias"_a    = .005f,
+                    "threshold_param_rel"_a = 1e-4,
+                    "threshold_param_abs"_a = 1e-8,
+                    "threshold_func_rel"_a  = 1e-4,
+                    "stopval"_a             = 1e-8,
+                    "maxeval"_a             = size_t(100),
+                    "Optimizes the distance for given parameters."
+                    "Returns a tuple (min cost, best stretch, best bias)");
         }
     }
 
