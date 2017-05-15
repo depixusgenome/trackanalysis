@@ -99,7 +99,7 @@ class LegacyTrackIO(_TrackIO):
 class LegacyGRFilesIO(_TrackIO):
     u"checks and opens legacy GR files"
     __TITLE   = re.compile(r"\\stack{{Bead (?P<id>\d+) Z.*?phase\(s\)"
-                           +r"[^\d]*(?P<phases>[\d, ]*?)\]}}")
+                           +r"(?:[^\d]|\d(?!,))*(?P<phases>[\d, ]*?)\]}}")
     __GRTITLE = re.compile(r"Bead Cycle (?P<id>\d+) p.*")
     @classmethod
     @_checktype
@@ -182,7 +182,7 @@ class LegacyGRFilesIO(_TrackIO):
     def __update(cls, path:str, output:dict) -> int:
         u"verifies one gr"
         grdict = readgr(path)
-        tit    = cls.__TITLE.match(grdict['title'])
+        tit    = cls.__TITLE.match(grdict['title'].decode("utf8", "replace"))
 
         if tit is None:
             raise IOError("Could not match title in " + path, "warning")
@@ -199,7 +199,9 @@ class LegacyGRFilesIO(_TrackIO):
         bead    = output[beadid]
         bead[:] = np.NaN
         for title, vals in grdict.items():
-            tit = cls.__GRTITLE.match(title)
+            if not isinstance(title, bytes):
+                continue
+            tit = cls.__GRTITLE.match(title.decode("utf8", "replace"))
             if tit is None:
                 continue
 

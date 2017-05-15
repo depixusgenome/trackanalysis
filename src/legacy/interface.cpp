@@ -63,13 +63,13 @@ namespace legacy
         if(gr.isnone())
             return pybind11::none();
         pybind11::dict res;
-        res["title"] = pybind11::cast(gr.title());
+        res["title"] = pybind11::bytes(gr.title());
 
         auto get = [&](bool isx, size_t i)
                     { return pybind11::array(gr.size(isx, i), gr.data(isx, i)); };
 
         for(size_t i = 0; i < gr.size(); ++i)
-            res[pybind11::cast(gr.title(i))] = pybind11::make_tuple(get(true, i),
+            res[pybind11::bytes(gr.title(i))] = pybind11::make_tuple(get(true, i),
                                                                     get(false, i));
         return res;
     }
@@ -80,7 +80,7 @@ namespace legacy
         if(gr.isnone())
             return pybind11::none();
         pybind11::dict res;
-        res["title"] = pybind11::cast(gr.title());
+        res["title"] = pybind11::bytes(gr.title());
 
         auto dims = gr.dims();
 
