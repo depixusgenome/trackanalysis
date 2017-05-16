@@ -119,9 +119,9 @@ class ToolBar(BokehView): # pylint: disable=too-many-instance-attributes
         msg = self._ctrl.getGlobal('css').message
         msg.defaults = dict(normal  = '<p>{}</p>',
                             warning = '<p style="color:blue;">{}</p>',
-                            error   = '<p style="color:red;>  {}</p>',
+                            error   = '<p style="color:red;"> {}</p>',
                             busy    = u'Please wait ...',
-                            width   = 400)
+                            width   = 350)
         css          = self._ctrl.getGlobal('css').title
         css.defaults = {'open': u'Open', 'save': u'Save', 'quit': u'Quit',
                         'open.dialog': u'Open a track or analysis file',
@@ -183,7 +183,7 @@ class ToolBar(BokehView): # pylint: disable=too-many-instance-attributes
             if recursive:
                 return
             val = msg.get()
-            if val is None or val[1] == 'normal':
+            if val is None or (isinstance(val, tuple) and val[1] == 'normal'):
                 msg.set((busy, 'normal'))
 
         def _observer(recursive = None, value = None, catcherror = None, **_):
@@ -193,23 +193,29 @@ class ToolBar(BokehView): # pylint: disable=too-many-instance-attributes
                     if val is not None and busy == val[0]:
                         msg.set(None)
                 else:
-                    args = value.args
-                    if len(args) == 0:
-                        args = str(value),
-                    msg.set((str(args[0]), args[1] if len(args) > 1 else 'error'))
+                    msg.set(value)
                     catcherror[0] = catch.get()
         self._ctrl.observe("stopaction", "stopcomputation", _observer)
 
         templ = self._ctrl.getGlobal('css').message.getdict(..., fullnames = False)
         def _settext(text):
-            val = '' if text.value is None else templ[text.value[1]].format(text.value[0])
+            if text.value is None:
+                val = ''
+            elif isinstance(text.value, Exception):
+                args = getattr(text.value, 'args', tuple())
+                if len(args) == 1:
+                    args = text.value.args[0], 'error'
+                elif len(args) != 2:
+                    args = text.value,         'error'
+                val = templ[args[1]].format(str(args[0]))
+            else:
+                val = templ[text.value[1]].format(text.value[0])
             if curdoc() is self._doc:
                 self._text.text = val
             else:
                 self._doc.add_next_tick_callback(lambda: setattr(self._text, 'text', val))
 
         self._ctrl.getGlobal('project').message.observe(_settext)
-
         self.enableOnTrack(self._save)
 
         return Row(children = self._tools, sizing_mode = 'fixed'),

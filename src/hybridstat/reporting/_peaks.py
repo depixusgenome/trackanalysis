@@ -43,7 +43,8 @@ class Probabilities(HasLengthPeak):
             arr = np.array([getattr(i, name) for i in ite], dtype = 'f4')
             if len(arr) == 0:
                 return None
-            return np.median(arr)
+            ret = np.median(arr)
+            return ret if np.isfinite(ret) else None
         else:
             return getattr(self.__cache(bead, ipk), name)
 
