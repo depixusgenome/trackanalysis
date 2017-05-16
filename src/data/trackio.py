@@ -36,26 +36,6 @@ def _checktype(fcn):
         return None
     return _wrapper
 
-def _fromdict(fcn) -> Callable[..., 'Track']:
-    @wraps(fcn)
-    def _wrapper(*args):
-        trk    = args[-1]
-        path   = trk.path
-        if (not isinstance(path, (str, Path))) and len(path) == 1:
-            path = path[0]
-        kwargs = fcn(*args[:-1]+(path,))
-
-        if kwargs is None:
-            trk.data = dict()
-        else:
-            for name in {'phases', 'framerate'} & set(kwargs):
-                setattr(trk, name, kwargs.pop(name))
-
-            trk.data = dict(ite for ite in kwargs.items()
-                            if isinstance(ite[1], np.ndarray))
-        return trk
-    return _wrapper
-
 class _TrackIO:
     @staticmethod
     def check(path):
@@ -76,7 +56,6 @@ class PickleIO(_TrackIO):
         return path if Path(path).suffix == ".pk" else None
 
     @staticmethod
-    @_fromdict
     def open(path:PATHTYPE) -> dict:
         u"opens a track file"
         with open(str(path), 'rb') as stream:
@@ -91,7 +70,6 @@ class LegacyTrackIO(_TrackIO):
         return path if Path(path).suffix == ".trk" else None
 
     @staticmethod
-    @_fromdict
     def open(path:PATHTYPE) -> dict:
         u"opens a track file"
         return readtrack(str(path))
@@ -135,7 +113,6 @@ class LegacyGRFilesIO(_TrackIO):
             return (trk,) + grs
 
     @classmethod
-    @_fromdict
     def open(cls, paths:Tuple[PATHTYPE,PATHTYPE]) -> dict: # type: ignore
         u"opens the directory"
         output = readtrack(str(paths[0]))
@@ -221,18 +198,34 @@ class Handler:
         self.path    = path
         self.handler = handler
 
-    def __call__(self, track, beadsonly = False) -> "Track":
+    def __call__(self, track = None, beadsonly = False) -> "Track":
         from .track import Track    # pylint: disable=redefined-outer-name
-        if not isinstance(track, Track):
-            track = Track(path = self.path)
-        else:
-            track.path = self.path
 
-        track = self.handler.open(track)
-        if beadsonly:
-            for key in {i for i in track.data if not track.isbeadname(i)}:
-                track.data.pop(key) # pylint: disable=no-member
-        return track
+        path = self.path
+        if (not isinstance(path, (str, Path))) and len(path) == 1:
+            path = path[0]
+
+        kwargs = self.handler.open(path)
+        res    = dict(path = path, lazy = False)
+        if kwargs is None:
+            res['data'] = {}
+        else:
+            res.update(phases    = kwargs.pop('phases'), # type: ignore
+                       framerate = kwargs.pop('framerate'))
+
+            if beadsonly:
+                data = {i: j for i, j in kwargs.items()
+                        if Track.isbeadname(i) and isinstance(j, np.ndarray)}
+            else:
+                data = {i: j for i, j in kwargs.items()
+                        if isinstance(j, np.ndarray)}
+            res['data'] = data
+
+        if track is None:
+            return Track(**res)
+        else:
+            track.__setstate__(res)
+            return track
 
     @classmethod
     def check(cls, track) -> 'Handler':
@@ -244,8 +237,7 @@ class Handler:
 
         Upon success, it returns a handler with the correct protocol for this path.
         """
-        paths = getattr(track, 'path', track)
-
+        paths = getattr(track, '_path', track)
         if (not isinstance(paths, (str, Path))) and len(paths) == 1:
             paths = paths[0]
 
