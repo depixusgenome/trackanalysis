@@ -245,6 +245,9 @@ class Handler:
             if not Path(paths).exists():
                 raise IOError("Could not find path: " + str(paths), "warning")
         else:
+            for i in paths:
+                if not Path(str(i)).exists():
+                    raise IOError("Could not find path: " + str(i), "warning")
             paths = tuple(str(i) for i in paths)
 
         for caller in _CALLERS:
