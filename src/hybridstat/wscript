@@ -1,0 +1,5 @@
+make(locals())
+
+def startscripts(bld):
+    "creates start scripts"
+    bld.make_startup_script('hybridstat', 'hybridstat.view.HybridStatView')

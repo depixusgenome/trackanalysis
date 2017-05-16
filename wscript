@@ -145,25 +145,30 @@ def setup(cnf):
 class _CondaApp(BuildContext):
     fun = cmd = 'app'
 def app(bld):
+    out = git.version()
     bld.options.APP_PATH = bld.bldnode.make_node("OUTPUT")
 
     if bld.options.APP_PATH.exists():
         bld.options.APP_PATH.delete()
 
-    build(bld, [i for i in _getmodules(bld) if i != 'tests'])
+    mods = [i for i in _getmodules(bld) if i != 'tests']
+    build(bld, mods)
+
     builder.condasetup(bld, copy = 'build/OUTPUT', runtimeonly = True)
 
     iswin = builder.os.sys.platform.startswith("win")
     ext   = ".bat"                      if iswin else ".sh"
     cmd   = r"start /min %~dp0pythonw " if iswin else "./"
-
-    for optext, opts in (('', ''), ('_chrome', ' --electron')):
-        for name, val in (('cyclesplot', 'cyclesplot.CyclesPlotView'),
-                          ('hybridstat', 'hybridstat.view.HybridStatView')):
+    def make_startup_script(name, val):
+        "creates the startup script"
+        for optext, opts in (('', ''), ('_chrome', ' --electron')):
            with open(str(bld.options.APP_PATH.make_node(name+optext+ext)), 'w',
                       encoding = 'utf-8') as stream:
                 print(cmd + r"app/cmdline.py " + val + opts + ' --port random',
                       file = stream)
+
+    bld.make_startup_script = make_startup_script
+    bld.recurse(mods, "startscripts", mandatory = False)
 
     builder.os.chdir(str(Path("build")/"OUTPUT"))
     npm = 'npm' + ('.cmd' if iswin else '')
@@ -177,3 +182,7 @@ def app(bld):
         raise IOError("Could not install electron")
     builder.os.chdir("..")
     builder.os.chdir("..")
+
+    bld.add_group()
+    rule = lambda _: builder.os.rename(str(Path("build")/"OUTPUT"), str(Path(".")/git.version()))
+    bld(rule = rule, always = True)

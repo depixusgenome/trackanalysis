@@ -1,0 +1,5 @@
+make(locals())
+
+def startscripts(bld):
+    "creates start scripts"
+    bld.make_startup_script('cyclesplot', 'cyclesplot.CyclesPlotView')
