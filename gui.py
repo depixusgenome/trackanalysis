@@ -12,6 +12,9 @@ from   inspect     import ismethod as _ismeth, isfunction as _isfunc, getmembers
 from   enum        import Enum
 from   typing      import Union, Optional  # pylint: disable=unused-import
 from   .inspection import ismethod
+from   .logconfig  import getLogger
+
+LOGS = getLogger(__name__)
 
 def coffee(apath:'Union[str,pathlib.Path]', name:'Optional[str]' = None, **kwa) -> str:
     u"returns the javascript implementation code"
@@ -132,6 +135,7 @@ class MetaMixin(type):
 
 def startfile(filepath:str):
     u"launches default application for given file"
+    LOGS.info("Opening %s", filepath)
     if sys.platform.startswith('darwin'):
         subprocess.Popen(('open', filepath))
     elif os.name == 'nt':
@@ -141,4 +145,6 @@ def startfile(filepath:str):
         os.startfile(os.path.split(filepath)[-1])  # pylint: disable=no-member
         os.chdir(old)
     elif os.name == 'posix':
-        subprocess.Popen(('xdg-open', filepath))
+        subprocess.Popen(('xdg-open', filepath),
+                         stdout = subprocess.DEVNULL,
+                         stderr = subprocess.DEVNULL)
