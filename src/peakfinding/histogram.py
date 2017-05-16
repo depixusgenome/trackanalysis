@@ -119,7 +119,7 @@ class Histogram(PrecisionAlg):
     def __eventpositions(events, bias, fcn):
         res = np.empty((len(events),), dtype = 'O')
 
-        if fcn is None or np.isscalar(events[0][0]):
+        if fcn is None or np.isscalar(next(i[0] for i in events if len(i))):
             res[:] = [np.asarray(evts, dtype = 'f4') for evts in events]
             if bias is not None:
                 res[:]  = res + np.asarray(bias, dtype = 'f4')
