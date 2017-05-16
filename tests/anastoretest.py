@@ -7,22 +7,23 @@ import numpy
 import anastore
 from model.task import TrackReaderTask, CycleCreatorTask, TaggingTask
 
+BEENTHERE = []
+class _Toto(TaggingTask):
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+        self.attr = kwa['attr']
+
+    def __getstate__(self):
+        BEENTHERE.append(1)
+        return tuple(self.__dict__.items())
+
+    def __setstate__(self, args):
+        BEENTHERE.append(2)
+        self.__dict__.update(self.__class__(**dict(args)).__dict__)
+
 def test_storetasks(monkeypatch):
     u"tests storing tasks"
-    beenthere = []
-    class _Toto(TaggingTask):
-        def __init__(self, **kwa):
-            super().__init__(**kwa)
-            self.attr = kwa['attr']
-
-        def __getstate__(self):
-            beenthere.append(1)
-            return tuple(self.__dict__.items())
-
-        def __setstate__(self, args):
-            beenthere.append(2)
-            self.__dict__.update(self.__class__(**dict(args)).__dict__)
-
+    monkeypatch.setattr(sys.modules['__main__'], '_Toto', _Toto, False)
     monkeypatch.setattr(sys.modules.get('anastoretest', sys.modules['__main__']),
                         '_Toto', _Toto, False)
 
@@ -59,19 +60,21 @@ def test_storetasks(monkeypatch):
 
     loaded = anastore.loads(dumped)
     assert used   == list(range(5, 8))
-    assert beenthere == [1,2]
+    assert BEENTHERE == [1,2]
     for i, j in zip(loaded, tasks):
         assert i.__dict__ == j.__dict__, str(i)
 
 def test_storenumpy():
     u"tests storing arrays"
     vals = dict(a = numpy.array([None]*5), b = numpy.zeros((200,), dtype = numpy.int8),
-                c = numpy.arange(5, dtype = numpy.float32))
+                c = numpy.arange(5, dtype = numpy.float32),
+                d = numpy.nanmedian)
     loaded = anastore.loads(anastore.dumps(vals))
     assert set(vals.keys()) == set(loaded.keys()) # pylint: disable=no-member
     assert numpy.array_equal(vals['a'], loaded['a'])
     assert numpy.array_equal(vals['b'], loaded['b'])
     assert numpy.array_equal(vals['c'], loaded['c'])
+    assert loaded['d'] is numpy.nanmedian
 
 if __name__ == '__main__':
     test_storenumpy()
