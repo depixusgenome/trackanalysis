@@ -99,30 +99,32 @@ def kwargsdefaults(*items, asinit = True):
     return _wrapper(items[0]) if call else _wrapper
 
 def setdefault(self, name, kwargs, roots = ('',), # pylint: disable=too-many-arguments
-               cpy = None, deepcpy = None):
+               cpy = None, deepcpy = None, fieldname = None):
     """
     Uses the class attribute to initialize the object's fields if no keyword
     arguments were provided.
     """
-    clsdef = getattr(type(self), name)
+    if fieldname is None:
+        fieldname = name
+    clsdef = getattr(type(self), fieldname)
     for root in roots:
         kwdef = kwargs.get(root+name, NoArgs)
 
         if kwdef is NoArgs:
             continue
 
-        setattr(self, name, toenum(clsdef, kwdef))
+        setattr(self, fieldname, toenum(clsdef, kwdef))
         break
     else:
         if deepcpy is not None:
-            setattr(self, name, deepcopy(getattr(cpy, name)))
+            setattr(self, fieldname, deepcopy(getattr(cpy, fieldname)))
         elif cpy is not None:
-            setattr(self, name, getattr(cpy, name))
+            setattr(self, fieldname, getattr(cpy, fieldname))
         else:
-            setattr(self, name, deepcopy(clsdef))
+            setattr(self, fieldname, deepcopy(clsdef))
 
 class _Updater:
-    __slots__ = ('roots', 'mandatory', 'update', 'call', 'attrs', 'pipes', 'ignore')
+    __slots__ = ('roots', 'mandatory', 'update', 'call', 'attrs', 'ignore')
     def __init__(self,
                  attrs:Sequence[str],
                  roots:Sequence[str],
@@ -135,15 +137,10 @@ class _Updater:
         self.update    = tuple(i for i in attrs if kwa.get(i, '') == 'update')
         self.call      = tuple((i, j) for i, j in kwa.items() if callable(j))
         self.ignore    = tuple(i for i in attrs if kwa.get(i, '') == 'ignore')
-        self.attrs     = tuple(i for i in attrs if kwa.get(i, '') != 'ignore')
-        self.pipes     = None        # type: Optional[Sequence[Any]]
+        self.attrs     = tuple((i, i) for i in attrs if kwa.get(i, '') != 'ignore')
+        self.attrs    += tuple((i, j) for i, j in kwa.items()
+                               if isinstance(j, str) and j not in ('update', 'ignore'))
         assert len(set(i for i, _ in self.call)  & set(self.attrs) ) == 0
-
-    def __init(self, obj):
-        cls        = type(obj)
-        self.pipes = tuple(i for i in self.attrs
-                           if isinstance(cls.__dict__.get(i, None), AttrPipe))
-        self.attrs = tuple(i for i in self.attrs if i not in self.pipes)
 
     def __call__(self, obj, kwargs, cpy = None, deepcpy = None):
         if len(cpy) > 1:
@@ -152,22 +149,14 @@ class _Updater:
         else:
             cpy = cpy[0] if len(cpy) == 1 else None
 
-        if self.pipes is None:
-            self.__init(obj)
-
-        pipes = tuple(i for i in self.pipes if i in kwargs)
-
-        for name in self.attrs:
+        for name, field in self.attrs:
             if self.mandatory and cpy is None and deepcpy is None and name not in kwargs:
                 raise KeyError("Missing keyword '%s' in __init__" % name)
             else:
-                setdefault(obj, name, kwargs, self.roots, cpy, deepcpy)
+                setdefault(obj, name, kwargs, self.roots, cpy, deepcpy, field)
 
         for name in self.update:
             update(getattr(obj, name), **kwargs)
-
-        for name in pipes:
-            setattr(obj, name, toenum(getattr(type(obj), name), kwargs[name]))
 
         for name, fcn in self.call:
             if name in kwargs:
@@ -181,20 +170,24 @@ def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
     Exemple:
 
         >>> class Cls:
-        >>>     attr    = [] # the default list will be deepcopied in each instance
-        >>>     ignored = 0  # field will not be initialized
+        >>>     attr       = [] # the default list will be deepcopied in each instance
+        >>>     ignored    = 0  # field will not be initialized
+        >>>     _protected = 1  # field will be initialized with a specific keyword
         >>>     @initdefaults(frozenset(locals()),
         >>>                   ignored = 'ignore',
-        >>>                   call    = lambda self, value: setattr(self, 'ignored', 2*value))
+        >>>                   call    = lambda self, value: setattr(self, 'ignored', 2*value),
+        >>>                   protect = "_protected")
         >>>     def __init__(self, **kwa):
         >>>         pass
 
-        >>> assert Cls().ignored == 0
-        >>> assert Cls(call = 1).ignored == 2
-        >>> assert Cls().attr    == []
-        >>> assert Cls().attr    is not Cls.attr
+        >>> assert Cls().ignored               == 0
+        >>> assert Cls(call = 1).ignored       == 2
+        >>> assert Cls()._protected            == 1
+        >>> assert Cls(protect = 2)._protected == 2
+        >>> assert Cls().attr                  == []
+        >>> assert Cls().attr                  is not Cls.attr
         >>> lst = [2]
-        >>> assert Cls(attr = lst).attr is lst # no deep copy of passed values
+        >>> assert Cls(attr = lst).attr        is lst # no deep copy of passed values
 
     By decorating the *__init__* as follows, it's possible to affect passed values
 
@@ -305,25 +298,3 @@ def updatecopy(obj:T, **attrs) -> T:
 def updatedeepcopy(obj:T, **attrs) -> T:
     "Sets field to provided values on a deepcopied object"
     return _update(deepcopy, obj, **attrs)
-
-class AttrPipe:
-    "Pipes a field to a parent"
-    def __init__(self, name: str) -> None:
-        self.name = name.split('.')
-
-    def __get__(self, obj, tpe):
-        if obj is None:
-            obj = tpe
-
-        for i in self.name:
-            obj = getattr(obj, i)
-        return obj
-
-    def __set__(self, obj, val):
-        for i in self.name[:-1]:
-            obj = getattr(obj, i)
-        setattr(obj, self.name[-1], val)
-
-def pipe(name: str) -> AttrPipe:
-    "Pipes a field to a parent"
-    return AttrPipe(name)

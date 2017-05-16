@@ -201,11 +201,13 @@ def test_init():
 
     # pylint: disable=missing-docstring
     class Cls:
-        attr    = []
-        ignored = 0
+        attr       = []
+        ignored    = 0
+        _protected = 1
         @initdefaults(frozenset(locals()),
-                      ignored = 'ignore',
-                      call    = lambda self, value: setattr(self, 'ignored', 2*value))
+                      ignored   = 'ignore',
+                      protected = '_protected',
+                      call      = lambda self, value: setattr(self, 'ignored', 2*value))
         def __init__(self, **kwa):
             pass
 
@@ -213,6 +215,8 @@ def test_init():
     assert Cls(call = 1).ignored == 2
     assert Cls().attr    == []
     assert Cls().attr    is not Cls.attr
+    assert Cls()._protected == 1                # pylint: disable=protected-access
+    assert Cls(protected = 2)._protected == 2   # pylint: disable=protected-access
     lst = [2]
     assert Cls(attr = lst).attr is lst
 

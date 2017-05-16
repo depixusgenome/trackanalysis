@@ -6,7 +6,7 @@ from .inspection    import (signature, ismethod, isfunction,
 
 from .attrdefaults  import (toenum, changefields, kwargsdefaults, setdefault,
                             initdefaults, update, updatecopy, updatedeepcopy,
-                            pipe, NoArgs)
+                            NoArgs)
 
 from .decoration    import fromstream, escapenans, StreamUnion, cachedio, CachedIO
 from .array         import asdataarrays, asobjarray, EVENTS_DTYPE, EVENTS_TYPE
