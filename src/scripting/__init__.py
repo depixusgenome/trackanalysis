@@ -110,12 +110,24 @@ class Tasks(Enum):
     peakselector   = 'peakselector'
     fittohairpin   = 'fittohairpin'
 
-    def __call__(self, **kwa):
-        cnf = scriptapp.control.getGlobal("config").tasks
-        return updatedeepcopy(cnf[self.value].get(), **kwa)
+    @classmethod
+    def save(cls, task):
+        "saves the task to the default config"
+        cnf  = scriptapp.control.getGlobal("config").tasks
+        if isinstance(task, type(cls.driftpercycle)):
+            name = 'driftperbeads' if task.onbeads else 'driftpercycle'
+        else:
+            for name in cls._member_names_: # pylint: disable=no-member
+                if type(task) is type(cnf[name].get(default = None)):
+                    break
+            else:
+                raise TypeError('Unknown task: '+str(task))
+
+        cnf[name].set(deepcopy(task))
+        scriptapp.control.writeconfig()
 
     @classmethod
-    def get(cls, arg, **kwa):
+    def create(cls, arg, **kwa):
         "returns the task associated to the argument"
         if isinstance(arg, (str, cls)):
             return cls(arg)(**kwa)
@@ -129,15 +141,32 @@ class Tasks(Enum):
                 return updatedeepcopy(arg, **kwa)
             return arg
 
+    def __call__(self, **kwa):
+        cnf  = scriptapp.control.getGlobal("config").tasks
+        task = updatedeepcopy(cnf[self.value].get(), **kwa)
+        self.save(task)
+        return task
+
+    class _TaskGetter:
+        def __get__(self, obj, tpe):
+            return tpe.create if obj is None else obj
+
+    get = _TaskGetter()
+
 class Track(_Track):
     "Adding helper functions for simple calls"
     def __init__(self, path = None, **kwa):
+        cnf = scriptapp.control.getGlobal('config').last.path.trk
+        if path in (Ellipsis, 'prev', ''):
+            path = cnf.get()
+
         if path is None:
             path = scriptapp.trkdlg.open()
             if path is None:
                 path = ''
-        else:
-            scriptapp.control.getGlobal('config').last.path.trk.set(path)
+
+        if isinstance(path, (tuple, str)):
+            cnf.set(path)
             scriptapp.control.writeconfig()
         super().__init__(path = path, **kwa)
 
