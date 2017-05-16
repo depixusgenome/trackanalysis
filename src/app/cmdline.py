@@ -12,6 +12,7 @@ import click
 
 from utils.logconfig    import getLogger
 from bokeh.resources    import DEFAULT_SERVER_PORT
+from app.scripting      import INITIAL_ORDERS
 LOGS = getLogger()
 
 def _from_path(view):
@@ -120,18 +121,16 @@ def _raiseerr(raiseerr):
 
 def _files(files, output):
     if len(files):
-        import app.launcher as app
         def _open(ctrl):
             ctrl.getGlobal('config').last.path.open.set(files[0])
             ctrl.openTrack(files)
-        app.INITIAL_ORDERS.append(_open)
+        INITIAL_ORDERS.append(_open)
 
     if output is not None:
-        import app.launcher as app
         def _save(ctrl):
             ctrl.getGlobal('config').last.path.save.set(output)
             ctrl.saveTrack(output)
-        app.INITIAL_ORDERS.append(_save)
+        INITIAL_ORDERS.append(_save)
 
 def _launch(view, app, desktop, kwa):
     viewcls = _from_path(view)
@@ -197,23 +196,26 @@ def main(view, files, app,  # pylint: disable=too-many-arguments
     _raiseerr(raiseerr)
     _win_opts()
 
-    kwargs = {'port': _port(port)}
+    kwargs = dict(port    = _port(port),
+                  apponly = output is not None)
     if 'xul' not in apptype:
         kwargs['unused_session_linger_milliseconds'] = 60000
 
-    server = _launch(view, app, 'xul' in apptype, kwargs)
-    if 'electron' in apptype:
-        server.io_loop.add_callback(lambda: _electron(server, port = kwargs['port']))
-    elif 'webclient' in apptype:
-        server.io_loop.add_callback(lambda: server.show("/"))
-
-    log = lambda: LOGS.info(' http://%(address)s:%(port)s',
-                            {'port': kwargs['port'], 'address': 'localhost'})
-
     _files(files, output)
+    server = _launch(view, app, 'xul' in apptype, kwargs)
+    if output is not None:
+        LOGS.info('Running as script and exiting')
+        INITIAL_ORDERS.run(server)
+    else:
+        if 'electron' in apptype:
+            server.io_loop.add_callback(lambda: _electron(server, port = kwargs['port']))
+        elif 'webclient' in apptype:
+            server.io_loop.add_callback(lambda: server.show("/"))
 
-    server.io_loop.add_callback(log)
-    server.run_until_shutdown()
+        log = lambda: LOGS.info(' http://%(address)s:%(port)s',
+                                {'port': kwargs['port'], 'address': 'localhost'})
+        server.io_loop.add_callback(log)
+        server.run_until_shutdown()
     logging.shutdown()
 
 if __name__ == '__main__':

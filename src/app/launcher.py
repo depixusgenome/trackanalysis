@@ -14,10 +14,7 @@ from bokeh.application          import Application
 from bokeh.application.handlers import FunctionHandler
 from bokeh.settings             import settings
 from bokeh.layouts              import layout
-from bokeh.model                import Model
 from bokeh.resources            import DEFAULT_SERVER_PORT
-import bokeh.core.properties as props
-
 
 from utils.logconfig            import getLogger
 from utils                      import getlocals
@@ -27,9 +24,10 @@ from view                       import View, BokehView
 from view.keypress              import KeyPressManager
 import view.toolbar as toolbars
 
+from .scripting                 import INITIAL_ORDERS
+
 LOGS           = getLogger(__name__)
 DEFAULT_CONFIG = lambda x: None
-INITIAL_ORDERS = []     # type: List[Callable]
 DYN_LOADS      = ('modaldialog',) # type: Tuple[str,...]
 
 def _serverkwargs(kwa):
@@ -54,57 +52,21 @@ def _stop(self, wait=True, __old__ = Server.stop):
 Server.stop = _stop
 del _stop
 
-class DpxLoaded(Model):
-    """
-    This starts tests once flexx/browser window has finished loading
-    """
-    __implementation__ = """
-        import *        as $    from "jquery"
-        import *        as p    from "core/properties"
-        import {Model}          from "model"
-        import {BokehView} from "core/bokeh_view"
-
-        export class DpxLoadedView extends BokehView
-
-        export class DpxLoaded extends Model
-            default_view: DpxLoadedView
-            type: "DpxLoaded"
-            constructor : (attributes, options) ->
-                super(attributes, options)
-                $((e) => @done = 1)
-            @define {
-                done:  [p.Number, 0]
-            }
-                         """
-    done = props.Int(0)
-
 class _FunctionHandler(FunctionHandler):
     def __init__(self, view, stop = False):
-        self.__view          = None
         self.__gotone        = False
         self.server          = None
         self.stoponnosession = stop
 
-        def start(doc):
-            "Starts the application and adds itself to the document"
-            doc.title   = _title(view)
-            self.__view = view.open(doc)
-
-            loaded = DpxLoaded()
-            doc.add_root(loaded)
-
-            lst = list(INITIAL_ORDERS)
-            def _cmd():
-                if self.__gotone is False:
-                    LOGS.debug('GUI loaded')
+        def _onloaded():
+            if self.__gotone is False:
                 self.__gotone = True
-                if len(lst):
-                    with self.__view.action:
-                        lst.pop(0)(getattr(self.__view, '_ctrl'))
-                    doc.add_next_tick_callback(_cmd)
+                LOGS.debug("GUI loaded")
 
-            loaded.on_change('done', lambda attr, old, new: _cmd())
-        super().__init__(start)
+        def _start(doc):
+            doc.title = _title(view)
+            INITIAL_ORDERS.run(view, doc, _onloaded)
+        super().__init__(_start)
 
     def on_session_created(self, session_context):
         LOGS.debug('started session')
@@ -286,18 +248,25 @@ def setup(locs            = None, # pylint: disable=too-many-arguments
               controls = defaultcontrols,
               views    = defaultviews,
               creator  = creator,
+              apponly  = False,
               **kwa):
         "Creates a browser app"
-        return _serve(application(main, controls, views, creator), **kwa)
+        app = application(main, controls, views, creator)
+        if apponly:
+            return app
+        return _serve(app, **kwa)
 
     @decorate
     def launch(main     = mainview,
                controls = defaultcontrols,
                views    = defaultviews,
                creator  = creator,
+               apponly  = False,
                **kwa):
         "Creates a desktop app"
         app = application(main, controls, views, creator)
+        if apponly:
+            return app
         kwa.setdefault("title", _title(app))
         kwa.setdefault("size",  (1200, 1000))
         return _launch(app, **kwa)
