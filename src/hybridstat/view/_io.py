@@ -12,10 +12,13 @@ from peakcalling.processor      import FitToHairpinTask, BeadsByHairpinTask
 from view.base                  import spawn, threadmethod
 from view.dialog                import FileDialog
 
+from utils.logconfig            import getLogger
 from utils.gui                  import startfile
 
 from ..reporting.processor      import HybridstatExcelTask
 from ._model                    import IdentificationModelAccess, PeaksPlotModelAccess
+
+LOGS = getLogger(__name__)
 
 class _PeaksIOMixin:
     def __init__(self, ctrl):
@@ -63,9 +66,18 @@ class ConfigXlsxIO(TaskIO):
 
     def save(self, path:str, models):
         "creates a Hybridstat report"
-        def _end():
+        def _end(exc):
             startfile(path)
-            self.__msg.set(None)
+            if isinstance(exc, IOError) and len(exc.args) == 1:
+                if len(exc.args) == 1:
+                    msg = self.__css.errors.get(exc.args[0], default = None)
+                    if msg is not None:
+                        self.__msg.set(msg)
+                        LOGS.debug('Failed report creation with %s', msg[0])
+                        return
+            if exc is not None:
+                LOGS.exception(exc)
+            self.__msg.set(exc)
 
         try:
             ret = self._run(dict(path      = path,
@@ -79,6 +91,7 @@ class ConfigXlsxIO(TaskIO):
                 if msg is not None:
                     raise IOError(*msg) from exc
             raise
+
         if ret:
             self.__msg.set(self.__css.start.get())
         return ret
@@ -98,19 +111,30 @@ class ConfigXlsxIO(TaskIO):
                              HybridstatExcelTask(model     = model,
                                                  **xlscnf))
 
+        error  = [None]
         def _process():
             try:
                 with cls.POOLTYPE() as pool:
                     for itm in cache.run(pool = pool):
                         tuple(itm)
+            except Exception as exc:
+                error[0] = exc
+                raise
+
             finally:
                 cls.RUNNING = False
 
         async def _thread():
-            with ThreadPoolExecutor(1) as thread:
-                await threadmethod(_process, pool = thread)
-            if end is not None:
-                end()
+            try:
+                with ThreadPoolExecutor(1) as thread:
+                    await threadmethod(_process, pool = thread)
+            except Exception as exc:
+                error[0] = exc
+                raise
+
+            finally:
+                if end is not None:
+                    end(error[0])
 
         spawn(_thread)
         return True
