@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "IO for peaksplot"
 from typing                     import Tuple, Union
+from pathlib                    import Path
 from concurrent.futures         import ProcessPoolExecutor, ThreadPoolExecutor
 
 from control.taskcontrol        import create as _createdata
@@ -67,7 +68,9 @@ class ConfigXlsxIO(TaskIO):
     def save(self, path:str, models):
         "creates a Hybridstat report"
         def _end(exc):
-            startfile(path)
+            if exc is None and not Path(path).exists():
+                exc = IOError("Report file created but not not found!")
+
             if isinstance(exc, IOError) and len(exc.args) == 1:
                 if len(exc.args) == 1:
                     msg = self.__css.errors.get(exc.args[0], default = None)
@@ -77,6 +80,8 @@ class ConfigXlsxIO(TaskIO):
                         return
             if exc is not None:
                 LOGS.exception(exc)
+            else:
+                startfile(path)
             self.__msg.set(exc)
 
         try:
@@ -120,21 +125,14 @@ class ConfigXlsxIO(TaskIO):
             except Exception as exc:
                 error[0] = exc
                 raise
-
             finally:
                 cls.RUNNING = False
-
-        async def _thread():
-            try:
-                with ThreadPoolExecutor(1) as thread:
-                    await threadmethod(_process, pool = thread)
-            except Exception as exc:
-                error[0] = exc
-                raise
-
-            finally:
                 if end is not None:
                     end(error[0])
+
+        async def _thread():
+            with ThreadPoolExecutor(1) as thread:
+                await threadmethod(_process, pool = thread)
 
         spawn(_thread)
         return True
