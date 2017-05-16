@@ -118,13 +118,20 @@ def _raiseerr(raiseerr):
             ctrl.getGlobal('config').catcherror.toolbar.default = False
         app.DEFAULT_CONFIG = _cnf
 
-def _files(files):
+def _files(files, output):
     if len(files):
         import app.launcher as app
         def _open(ctrl):
             ctrl.getGlobal('config').last.path.open.set(files[0])
             ctrl.openTrack(files)
         app.INITIAL_ORDERS.append(_open)
+
+    if output is not None:
+        import app.launcher as app
+        def _save(ctrl):
+            ctrl.getGlobal('config').last.path.save.set(output)
+            ctrl.saveTrack(output)
+        app.INITIAL_ORDERS.append(_save)
 
 def _launch(view, app, desktop, kwa):
     viewcls = _from_path(view)
@@ -182,8 +189,10 @@ def _version(ctx, _, value):
               help = 'Port used: use "random" for any')
 @click.option('-r', "--raiseerr", flag_value = True, default = False,
               help = 'Wether errors should be caught')
+@click.option('-o', "--output", type = click.Path(), default = None,
+              help = 'Saves a report upon opening')
 def main(view, files, app,  # pylint: disable=too-many-arguments
-         apptype, port, raiseerr):
+         apptype, port, raiseerr, output):
     "Launches an view"
     _raiseerr(raiseerr)
     _win_opts()
@@ -201,7 +210,7 @@ def main(view, files, app,  # pylint: disable=too-many-arguments
     log = lambda: LOGS.info(' http://%(address)s:%(port)s',
                             {'port': kwargs['port'], 'address': 'localhost'})
 
-    _files(files)
+    _files(files, output)
 
     server.io_loop.add_callback(log)
     server.run_until_shutdown()
