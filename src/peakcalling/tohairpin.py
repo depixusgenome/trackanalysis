@@ -161,7 +161,7 @@ class PeakIdentifier(Hairpin):
     "Identifying experimental peaks with the theoretical ones"
     window       = 10.
     lastpeak     = True
-    nbasesabove  = 20
+    bases        = (20, 20)
     stretch      = Range(1./8.8e-4, 200., 50.)
     bias         = Range(None,       20.*8.8e-4, 20.*8.8e-4)
     optim        = OptimisationParams(1e-4, 1e-8, 1e-4, 1e-8, 100)
@@ -235,6 +235,8 @@ class PeakIdentifier(Hairpin):
                     if out[0] < best[0]:
                         best = out
 
+            print('good', len(good), maxi, best[0],
+                    self.nfound(peaks,best[1], -best[2]/best[1]))
         return Distance(best[0], best[1], -best[2]/best[1])
 
     def __arange(self, exp:np.ndarray) -> Iterator[Tuple[float, float]]:
@@ -248,7 +250,9 @@ class PeakIdentifier(Hairpin):
             minbias = self.bias.center - self.bias.size
             maxbias = self.bias.center + self.bias.size
 
-        basemax    = self.peaks[-1] + self.nbasesabove
+        basemax = self.peaks[-1] + self.bases[1]
+        zeromin = self.peaks[0]  - self.bases[0]
+        zeromax = self.peaks[0]  + self.bases[0]
         def _compute(iref, jref, iexp, jexp):
             rho  = (ref[iref]-ref[jref])/(exp[iexp] - exp[jexp])
             return rho, exp[iexp]-ref[iref]/rho
@@ -262,8 +266,8 @@ class PeakIdentifier(Hairpin):
                      int(val[1]/self._precision[1]+0.5)) for val in pot
                     if (minstretch  <= val[0] <= maxstretch
                         and minbias <= val[1] <= maxbias
-                        and val[0]*(exp[-1]-val[1]) < basemax
+                        and val[0]*(exp[-1]-val[1]) <= basemax
+                        and zeromin <= val[0]*(exp[0] -val[1]) <= zeromax
                        ))
         return iter((val[0]*self._precision[0], val[1]*self._precision[1])
                     for val in valid)
-
