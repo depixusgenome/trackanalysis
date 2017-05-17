@@ -26,10 +26,11 @@ _m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
 
 class PlotState(Enum):
     "plot state"
-    active    = 'active'
-    resetting = 'resetting'
-    disabled  = 'disabled'
-    outofdate = 'outofdate'
+    active       = 'active'
+    abouttoreset = 'abouttoreset'
+    resetting    = 'resetting'
+    disabled     = 'disabled'
+    outofdate    = 'outofdate'
 
 def checksizes(fcn):
     "Checks that the ColumnDataSource have same sizes"
@@ -336,6 +337,10 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         elif state is PlotState.active:
             self.__doreset()
 
+        elif state is PlotState.abouttoreset:
+            with self.resetting():
+                self._model.reset()
+
     def observe(self):
         "sets-up model observers"
         self.project.root.observe(self.reset)
@@ -345,9 +350,10 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
             self._bkmodels.clear()
             self._model.reset()
 
-        old, self.state = self.state, PlotState.resetting
+        old, self.state = self.state, PlotState.abouttoreset
         async def _reset_and_render():
             def _reset():
+                self.state = PlotState.resetting
                 with BokehView.computation.type(self._ctrl, calls = self.__doreset):
                     try:
                         self._reset()
