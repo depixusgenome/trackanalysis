@@ -3,7 +3,7 @@
 u'''
 Creates Classes and function to use with assemble sequence
 '''
-from typing import List, NamedTuple
+from typing import List, NamedTuple, Tuple
 import itertools
 import numpy
 from utils import initdefaults
@@ -138,13 +138,14 @@ class BCollection:
         return self.oligos.index(oli)
 
 
-
+# cannot annotate OligoPeakKPerm entries
+# should subclass OligoPeakKPerm has a KPerm class
 class OligoPeakKPerm:
     u'kpermutation of OligoPeak Object'
-    __kpermids = [] # type: List[int]
     __perm = [] # type: List[OligoPeak]
+    __kpermids = [] # type: List[int]
     __permids = [] # type: List[int]
-    __changes = [] # type: List
+    __changes = tuple() # type: Tuple[int, ...]
     def __init__(self,oligos:List[OligoPeak],kperm:List[OligoPeak])->None:
         self.oligos=oligos
         self.kperm=kperm
@@ -173,22 +174,10 @@ class OligoPeakKPerm:
 
         return self.__permids
 
-    @property
-    def changes(self)->List:
-        u'''
-        return the sorted tuple of indices which will be changed by application of perm
-        should return [] if all sorted(perm)[i]==perm[i], ie: identity operator
-        will not work for a combination of kperms
-        '''
-        if self.__changes==[]:
-            self.__changes=self.get_changes(self.kpermids)
-        return self.__changes
-
-
     @classmethod
-    def get_changes(cls,kperm,sort_by="pos"):
+    def get_changes(cls,kperm,sort_by="pos")->Tuple[int, ...]:
         u'''
-        returns the smallest (contiguous) sorted list containing the permutations in kperm
+        returns the smallest (contiguous) permutations of kperm
         '''
         try:
             sortedp=sorted(kperm,key=lambda x:getattr(x,sort_by))
@@ -198,9 +187,22 @@ class OligoPeakKPerm:
         issame=[sortedp[idx]==kperm[idx] for idx in range(len(kperm))]
 
         try:
-            return sortedp[issame.index(False):-list(reversed(issame)).index(False)]
+            # sorted version
+            #return sortedp[issame.index(False):-list(reversed(issame)).index(False)]
+            return tuple(kperm[issame.index(False):-list(reversed(issame)).index(False)])
         except ValueError:
-            return []
+            return tuple()
+
+    @property
+    def changes(self)->Tuple[int, ...]:
+        u'''
+        return the sorted tuple of indices which will be changed by application of perm
+        should return [] if all sorted(perm)[i]==perm[i], ie: identity operator
+        will not work for a combination of kperms
+        '''
+        if self.__changes==tuple():
+            self.__changes=self.get_changes(self.kpermids)
+        return self.__changes
 
     @classmethod
     def add(cls,*args):
@@ -208,21 +210,29 @@ class OligoPeakKPerm:
         add all kperms in args
         perm args[0] applied first,
         then args[1], args[2], ...
+        if args=(,)?
+        if len(args)==1 ?
         '''
+        if len(args)==1:
+            neutral = OligoPeakKPerm(oligos=args[0].oligos,
+                                     kperm=args[0].oligos)
+            return cls.__add2(args[0],neutral)
+
         res = cls.__add2(*args[:2])
         for kperm in args[2:]:
             res = cls.__add2(res,kperm)
         return res
 
     @classmethod
-    def __add2(cls,kperm1:OligoPeakKPerm, kperm2:OligoPeakKPerm)->OligoPeakKPerm:
+    def __add2(cls,kperm1, kperm2):
         u'''
         combine 2 OligoPeakKPerms
-        assumes that the 2 kperms
+        assumes that the 2 kperms have the same oligos
+        this is why _KPerm has no add method only a Perm class could have one
         otherwise the order of the addition is important
         oligos must be the same in the 2 sets
         '''
         permids = numpy.array(kperm1.permids)[kperm2.permids].tolist()
         changes = cls.get_changes(permids)
-        kperm = numpy.array(kperm1.oligos)[changes].tolist()
+        kperm = numpy.array(kperm1.oligos)[list(changes)].tolist()
         return OligoPeakKPerm(oligos=kperm1.oligos,kperm=kperm)

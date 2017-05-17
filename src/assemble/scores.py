@@ -65,7 +65,7 @@ class OptiKPerm: # need to complete pytest
     u'''
     returns the position of the permuted oligos
     '''
-    kperm=[] # type: List[data.OligoPeaks]
+    kperm=[] # type: List[data.OligoPeak]
     __pstate=[] # type: List[float]
     @initdefaults
     def __init__(self,**kwa):
@@ -141,7 +141,7 @@ class ScoreAssembly: # should be ok # but must be tested
 
     def run(self):
         u'compute score'
-        return tuple([self.__density,self.__overlaps])
+        return tuple([self.__density(),self.__overlaps()])
 
     def __density(self)->float:
         return OptiKPerm(kperm=self.assembly).cost()
