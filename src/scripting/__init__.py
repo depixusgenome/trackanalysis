@@ -39,7 +39,7 @@ except ImportError:
     pass
 import pandas               as pd
 
-from utils                  import updatedeepcopy
+from utils                  import update
 from model.task             import *  # pylint: disable=wildcard-import
 import control.processor
 from control.globalscontrol import GlobalsController
@@ -138,12 +138,12 @@ class Tasks(Enum):
         else:
             assert isinstance(arg, Task)
             if len(kwa):
-                return updatedeepcopy(arg, **kwa)
+                return update(deepcopy(arg), **kwa)
             return arg
 
     def __call__(self, **kwa):
         cnf  = scriptapp.control.getGlobal("config").tasks
-        task = updatedeepcopy(cnf[self.value].get(), **kwa)
+        task = update(deepcopy(cnf[self.value].get()), **kwa)
         self.save(task)
         return task
 

@@ -9,7 +9,7 @@ from itertools                  import chain
 from functools                  import partial
 import re
 
-from utils                      import initdefaults, updatecopy
+from utils                      import initdefaults, update
 from data.trackio               import (checkpath,       # pylint: disable=unused-import
                                         PATHTYPES, PATHTYPE)
 from model.task                 import RootTask, Task, Level, TrackReaderTask
@@ -164,7 +164,7 @@ class HybridstatProcessor(Processor):
         if template is None:
             template = HybridstatTemplate(**kwa)
         elif len(kwa):
-            template = updatecopy(template, **kwa)
+            template = update(deepcopy(template), **kwa)
 
         yield from(cls.model(i, template) for i in paths)
 
