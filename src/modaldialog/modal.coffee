@@ -322,12 +322,27 @@ class DpxModalDialogView extends Modal
     template: (data) ->
         return data['template']
 
+    render: (options) ->
+      super(options)
+      if not (@startvalues?)
+          @startvalues = $(@modalEl).find('form').serializeArray()
+      return this
+
+    cancel: () ->
+        delete @startvalues
+
     submit: () ->
         arr  = $(@modalEl).find('form').serializeArray()
         vals = {}
-        for val in arr
-            vals[val['name']] = val['value']
+        if @startvalues?
+            for val in arr
+                if @startvalues[val['name']] != val['value']
+                    vals[val['name']] = val['value']
+        else
+            for val in arr
+                vals[val['name']] = val['value']
 
+        delete @startvalues
         @model.results = vals
         @model.callback?.execute(@model.results)
 

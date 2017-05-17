@@ -51,7 +51,7 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, ConfigMixin):
                             toolbar  = next(i for i in plts.children
                                             if isinstance(i, ToolbarBox)))
 
-        self._dialog = dialog(doc)
+        self._dialog = dialog(doc, self._ctrl)
         return layouts.column([keyed, self._createconfig()])
 
     def _reset(self):

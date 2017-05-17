@@ -31,40 +31,48 @@ class Option(metaclass = ABCMeta):
         if storeempty is None:
             def _empty(model, key):
                 if elems[key]:
-                    self._setattr(model, key, None)
+                    self.setvalue(model, key, None)
                 elif self._cnv is str: # pylint: disable=no-member
-                    self._setattr(model, key, '')
+                    self.setvalue(model, key, '')
             storeempty = _empty
 
         def _apply(key, val):
             if key not in elems:
                 return False
 
-            if val != '' :
+            if val != '':
                 try:
                     converted = cnv(val)
                 except Exception as exc: # pylint: disable=broad-except
                     LOGS.exception(exc)
                 else:
-                    self._setattr(model, key, converted)
+                    self.setvalue(model, key, converted)
             else:
                 storeempty(model, key)
             return True
         return _apply
 
     @staticmethod
-    def _getattr(mdl, keystr, default):
-        keys = keystr.split('.')
-        for key in keys[:-1]:
-            mdl = getattr(mdl, key)
-        return getattr(mdl, keys[-1], default)
+    def getvalue(mdl, keystr, default):
+        "gets the value in the model"
+        if isinstance(mdl, dict):
+            return mdl[keystr]
+        else:
+            keys = keystr.split('.')
+            for key in keys[:-1]:
+                mdl = getattr(mdl, key)
+            return getattr(mdl, keys[-1], default)
 
     @staticmethod
-    def _setattr(mdl, keystr, val):
-        keys = keystr.split('.')
-        for key in keys[:-1]:
-            mdl = getattr(mdl, key)
-        setattr(mdl, keys[-1], val)
+    def setvalue(mdl, keystr, val):
+        "sets the value in the model"
+        if isinstance(mdl, dict):
+            mdl[keystr] = val
+        else:
+            keys = keystr.split('.')
+            for key in keys[:-1]:
+                mdl = getattr(mdl, key)
+            setattr(mdl, keys[-1], val)
 
 class TextOption(Option):
     "Converts a text tag to an html text input"
@@ -86,7 +94,7 @@ class TextOption(Option):
                     'step=1'    if size == 0    else
                     'step=0.'+'0'*(size-1)+'1')
 
-            val  = self._getattr(model, key, None)
+            val  = self.getvalue(model, key, None)
             if val is not None:
                 opt += ' value="{}"'.format(val)
 
@@ -118,7 +126,7 @@ class CSVOption(Option):
         def _replace(match):
             key = match.group(1)
             assert len(key), "keys must have a name"
-            val  = self._getattr(model, key, None)
+            val  = self.getvalue(model, key, None)
             opt  = (' value="{}"'.format(', '.join(str(i) for i in val))
                     if val is not None else '')
             opt += ' placeholder="comma separated values"'
@@ -163,17 +171,17 @@ class DpxModal(Model):
             callback: Union[Callable, Callback] = None,
             model                               = None):
         "runs the modal dialog"
-        self.__handler = self.__build_handler(callback, body, model)
+        self.__handler = self._build_handler(callback, body, model)
         self.__running = False
         self.update(title    = title,
-                    body     = self.__build_body(body, model),
-                    callback = self.__build_callback(callback),
+                    body     = self._build_body(body, model),
+                    callback = self._build_callback(callback),
                     results  = {})
         self.__running      = True
         self.startdisplay   = self.startdisplay+1
 
     @classmethod
-    def __build_body(cls, body, model):
+    def _build_body(cls, body, model):
         if isinstance(body, (tuple, list)):
             body = '<table>' + (''.join('<tr>'
                                         + ''.join('<td>'+i+'</td>' for i in j)
@@ -185,21 +193,23 @@ class DpxModal(Model):
         return body
 
     @staticmethod
-    def  __build_callback(callback):
+    def  _build_callback(callback):
         return callback if isinstance(callback, Callback) else None
 
     @classmethod
-    def  __build_handler(cls, callback, body, model):
-        if isinstance(callback, Callback):
+    def  _build_handler(cls, callback, body, model):
+        if isinstance(callback, Callback) or model is None:
             return None
 
-        if model is not None:
-            def _hdl(itms, __body__ = body):
-                if isinstance(__body__, (list, tuple)):
-                    __body__ = ' '.join(' '.join(i) for i in __body__)
+        def _hdl(itms, bdy = body):
+            if isinstance(bdy, (list, tuple)):
+                bdy = ' '.join(' '.join(i) for i in bdy)
 
-                converters = [i.converter(model, __body__) for i in cls.__OPTIONS]
-                for i in itms.items():
-                    any(cnv(*i) for cnv in converters)
-            return _hdl
-        return None
+            converters = [i.converter(model, bdy) for i in cls.__OPTIONS]
+            cls._setvalues(converters, itms)
+        return _hdl
+
+    @staticmethod
+    def _setvalues(converters, itms):
+        for i in itms.items():
+            any(cnv(*i) for cnv in converters)
