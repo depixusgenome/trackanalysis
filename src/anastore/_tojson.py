@@ -99,11 +99,12 @@ class _EnumIO(_ItemIO):
 class Runner:
     "runs item to json'able object"
     _Dummy = type('_Dummy', (), {})
-    def __init__(self, lookups = None):
+    def __init__(self, lookups = None, saveall = True):
         if lookups is None:
             self.lookups = tuple(_ItemIO.__subclasses__())
         else:
             self.lookups = lookups
+        self.saveall = saveall
 
     def __call__(self, item):
         if isjsonable(item):
@@ -123,22 +124,29 @@ class Runner:
                 attrs = (STATE, state),
 
         cls = type(item)
-        for name, val in attrs:
-            default = getattr(cls, name, self._Dummy)
-            if isinstance(default, type(val)):
-                if isinstance(val, np.ndarray) and isinstance(default, np.ndarray):
-                    if (val.shape == default.shape
-                            and val.dtype == default.dtype
-                            and all(i == j for i, j in zip(val, default))):
-                        continue
-                elif _dumps(val) == _dumps(default):
+        if self.saveall is False:
+            for name, val in attrs:
+                if self._isdefault(cls, name, val):
                     continue
 
-            state = self(val)
-            if isinstance(state, dict) and len(state) == 1 and TPE in state:
-                continue
-
-            dico[name] = self(val)
+                state = self(val)
+                if not (isinstance(state, dict) and len(state) == 1 and TPE in state):
+                    dico[name] = state
+        else:
+            for name, val in attrs:
+                dico[name] = self(val)
 
         dico[TPE] = item.__class__.__module__+'.'+item.__class__.__qualname__
         return dico
+
+    def _isdefault(self, tpe, name, val) -> bool:
+        default = getattr(tpe, name, self._Dummy)
+        if type(default) is type(val):
+            if isinstance(val, np.ndarray):
+                if (val.shape == default.shape
+                        and val.dtype == default.dtype
+                        and all(i == j for i, j in zip(val, default))):
+                    return True
+            elif val == default or _dumps(val) == _dumps(default):
+                return True
+        return False

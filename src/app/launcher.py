@@ -163,8 +163,9 @@ def _create(main, controls, views): # pylint: disable=unused-argument
                 self._callmixins("readconfig", lambda i: self.configpath(i, 'userconfig'))
                 DEFAULT_CONFIG(self)
 
-            def writeconfig(self, name = None, **kwa):
+            def writeconfig(self, name = None, saveall = False, **kwa):
                 "writes the config"
+                kwa['saveall'] = saveall
                 self._callmixins("writeconfig", lambda i: self.configpath(i, name), **kwa)
 
             def setup(self):
@@ -183,7 +184,7 @@ def _create(main, controls, views): # pylint: disable=unused-argument
             main.__init__(self, ctrl = ctrl, keys = keys)
             main.ismain(self)
 
-            ctrl.writeconfig('defaults',   index = 1)
+            ctrl.writeconfig('defaults',   index = 1, saveall   = True)
             ctrl.writeconfig('userconfig', index = 0, overwrite = False)
             ctrl.readconfig()
             ctrl.setup()

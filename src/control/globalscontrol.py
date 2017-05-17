@@ -186,7 +186,8 @@ class BaseGlobalsController(Controller):
     def writeconfig(self, configpath: Callable,
                     patchname = 'config',
                     index     = 0,
-                    overwrite = True):
+                    overwrite = True,
+                    ** kwa):
         """
         Writes up the user preferences.
 
@@ -195,7 +196,7 @@ class BaseGlobalsController(Controller):
         """
         css = self.getGlobal('css').config.getdict(..., fullnames = False)
         self.__model.writeconfig(configpath, anastore, patchname,
-                                 index, overwrite, **css)
+                                 index, overwrite, **kwa, **css)
 
     def readconfig(self, configpath, patchname = 'config'):
         "Sets-up the user preferences"

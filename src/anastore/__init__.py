@@ -24,16 +24,18 @@ def _apply(info, patch, patchfcn, inout):
 
     return inout()(getattr(patch, patchfcn)(info))
 
-def dumps(info:Any, patch = 'tasks', **kwa):
+def dumps(info:Any, patch = 'tasks', saveall = False, **kwa):
     u"Dumps data to json. This includes the version number"
-    return json.dumps(_apply(info, patch, 'dumps', _OutputRunner), **kwa)
+    runner = lambda: _OutputRunner(saveall = saveall)
+    return json.dumps(_apply(info, patch, 'dumps', runner), **kwa)
 
-def dump(info:Any, path:Union[str,Path,IO], patch = 'tasks', **kwa):
+def dump(info:Any, path:Union[str,Path,IO], patch = 'tasks', saveall = False, **kwa):
     u"Dumps data to json file. This includes the version number"
     if isinstance(path, (Path, str)):
         with open(str(Path(path).absolute()), 'w', encoding = 'utf-8') as stream:
-            return dump(info, stream, **kwa)
-    return json.dump(_apply(info, patch, 'dumps', _OutputRunner), path, **kwa)
+            return dump(info, stream, saveall = saveall, **kwa)
+    runner = lambda: _OutputRunner(saveall = saveall)
+    return json.dump(_apply(info, patch, 'dumps', runner), path, **kwa)
 
 def loads(stream:str, patch = 'tasks', **kwa):
     u"Dumps data to json. This includes the version number"
