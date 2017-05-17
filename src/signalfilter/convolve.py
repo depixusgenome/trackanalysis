@@ -37,6 +37,9 @@ class KernelConvolution:
     def __init__(self, **_):
         pass
 
+    def __setstate__(self, kwa):
+        self.__init__(**kwa)
+
     @kwargsdefaults(__KEYS)
     def kernel(self, **_) -> np.ndarray:
         "returns the kernel used for the convolution"
@@ -51,6 +54,9 @@ class KernelConvolution:
         elif self.mode is KernelMode.square:
             kern  = np.ones((size,), dtype = 'f4') / size
             kern /= len(kern)
+
+        else:
+            raise KeyError(self.mode)
         return kern
 
     def __call__(self, **kwa) -> Callable[[np.ndarray], np.ndarray]:

@@ -8,6 +8,7 @@ Classes defining a type of data treatment.
 from copy           import deepcopy
 from typing         import (Optional, Sequence,  # pylint: disable=unused-import
                             Dict, Callable, Set, Tuple, Union, List)
+from pickle         import dumps as _dumps
 from enum           import Enum, unique
 import numpy        as     np
 
@@ -32,8 +33,9 @@ class TaskIsUniqueError(Exception):
 
 class Task:
     "Class containing high-level configuration infos for a task"
+    disabled = False
     def __init__(self, **kwargs) -> None:
-        self.disabled = kwargs.get('disabled', False)
+        self.disabled = kwargs.get('disabled', type(self).disabled)
         if 'level' in kwargs:
             self.level = toenum(Level, kwargs['level']) # type: Level
         else:
@@ -66,7 +68,7 @@ class Task:
         if hasattr(self, '__getstate__'):
             return obj.__getstate__() == self.__getstate__() # pylint: disable=no-member
         else:
-            return obj.__dict__ == self.__dict__
+            return _dumps(self) == _dumps(obj)
 
     __hash__ = object.__hash__
 

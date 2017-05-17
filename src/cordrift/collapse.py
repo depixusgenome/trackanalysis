@@ -224,6 +224,9 @@ class CollapseByDerivate(_CollapseAlg):
     def __init__(self, **_):
         super().__init__(**_)
 
+    def __setstate__(self, kwa):
+        self.__init__(**kwa)
+
     @classmethod
     def __occupation(cls, inter:Sequence[Range], xmin:int, xmax:int) -> np.ndarray:
         "returns the number of overlapping intervals in the [xmin, xmax] range"

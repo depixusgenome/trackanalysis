@@ -205,6 +205,9 @@ class SubPixelPeakPosition:
     def __init__(self, **_):
         pass
 
+    def __setstate__(self, kwa):
+        self.__init__(**kwa)
+
     def __call__(self,
                  hist :Sequence[float],
                  ainds:Union[int, Sequence[int]],

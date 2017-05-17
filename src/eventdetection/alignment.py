@@ -32,6 +32,9 @@ class ExtremumAlignment:
     def __init__(self, **_):
         pass
 
+    def __setstate__(self, kwa):
+        self.__init__(**kwa)
+
     def __get(self, elem):
         if len(elem) <= 2:
             return np.NaN
