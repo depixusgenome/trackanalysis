@@ -3,7 +3,8 @@
 "Track Analysis conversion to json'able items."
 from    abc     import ABCMeta, abstractmethod
 from    enum    import Enum
-import  numpy
+from    pickle  import dumps as _dumps
+import  numpy   as     np
 
 from    ._utils import isjsonable, CNT, TPE, STATE
 
@@ -62,12 +63,12 @@ class _NDArrayIO(_ItemIO):
     @staticmethod
     def check(val):
         "returns wether this class deals with val"
-        return isinstance(val, numpy.ndarray)
+        return isinstance(val, np.ndarray)
 
     @staticmethod
     def run(val, runner):
         "returns thishe dict to be dumped"
-        if val.dtype == numpy.object:
+        if val.dtype == np.object:
             vals = [runner(ite) for ite in val]
             return {TPE: 'npo', CNT: vals}
         else:
@@ -77,7 +78,7 @@ class _NPFunction(_ItemIO):
     @staticmethod
     def check(val):
         "returns wether this class deals with val"
-        return getattr(numpy, getattr(val, '__name__', '_'), None) is val
+        return getattr(np, getattr(val, '__name__', '_'), None) is val
 
     @staticmethod
     def run(val, runner):
@@ -97,6 +98,7 @@ class _EnumIO(_ItemIO):
 
 class Runner:
     "runs item to json'able object"
+    _Dummy = type('_Dummy', (), {})
     def __init__(self, lookups = None):
         if lookups is None:
             self.lookups = tuple(_ItemIO.__subclasses__())
@@ -120,7 +122,22 @@ class Runner:
             else:
                 attrs = (STATE, state),
 
+        cls = type(item)
         for name, val in attrs:
+            default = getattr(cls, name, self._Dummy)
+            if isinstance(default, type(val)):
+                if isinstance(val, np.ndarray) and isinstance(default, np.ndarray):
+                    if (val.shape == default.shape
+                            and val.dtype == default.dtype
+                            and all(i == j for i, j in zip(val, default))):
+                        continue
+                elif _dumps(val) == _dumps(default):
+                    continue
+
+            state = self(val)
+            if isinstance(state, dict) and len(state) == 1 and TPE in state:
+                continue
+
             dico[name] = self(val)
 
         dico[TPE] = item.__class__.__module__+'.'+item.__class__.__qualname__
