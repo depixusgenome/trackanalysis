@@ -145,10 +145,10 @@ class OligoPeakKPerm:
     __perm = [] # type: List[OligoPeak]
     __kpermids = [] # type: List[int]
     __permids = [] # type: List[int]
-    __changes = tuple() # type: Tuple[int, ...]
-    def __init__(self,oligos:List[OligoPeak],kperm:List[OligoPeak])->None:
-        self.oligos=oligos
-        self.kperm=kperm
+    def __init__(self,**kwa)->None:
+        self.oligos=kwa.get("oligos",[]) # type: List[OligoPeak]
+        self.kperm=kwa.get("kperm",[]) # type: List[OligoPeak]
+        self.__changes = kwa.get("changes",tuple()) # type: Tuple[int, ...]
 
     @property
     def kpermids(self)->List[int]:
@@ -187,8 +187,8 @@ class OligoPeakKPerm:
         issame=[sortedp[idx]==kperm[idx] for idx in range(len(kperm))]
 
         try:
-            # sorted version
-            #return sortedp[issame.index(False):-list(reversed(issame)).index(False)]
+            if issame[-1] is False:
+                return tuple(kperm[issame.index(False):])
             return tuple(kperm[issame.index(False):-list(reversed(issame)).index(False)])
         except ValueError:
             return tuple()
@@ -196,7 +196,7 @@ class OligoPeakKPerm:
     @property
     def changes(self)->Tuple[int, ...]:
         u'''
-        return the sorted tuple of indices which will be changed by application of perm
+        returns the tuple of indices which will be changed by application of perm
         should return [] if all sorted(perm)[i]==perm[i], ie: identity operator
         will not work for a combination of kperms
         '''
@@ -214,9 +214,10 @@ class OligoPeakKPerm:
         if len(args)==1 ?
         '''
         if len(args)==1:
-            neutral = OligoPeakKPerm(oligos=args[0].oligos,
-                                     kperm=args[0].oligos)
-            return cls.__add2(args[0],neutral)
+            #neutral = OligoPeakKPerm(oligos=args[0].oligos,
+            #                         kperm=args[0].oligos)
+            #return cls.__add2(args[0],neutral)
+            return args[0]
 
         res = cls.__add2(*args[:2])
         for kperm in args[2:]:
@@ -229,10 +230,19 @@ class OligoPeakKPerm:
         combine 2 OligoPeakKPerms
         assumes that the 2 kperms have the same oligos
         this is why _KPerm has no add method only a Perm class could have one
-        otherwise the order of the addition is important
+        kperm1 and kperm2 must be independant,
+        the order of the addition is important
         oligos must be the same in the 2 sets
         '''
         permids = numpy.array(kperm1.permids)[kperm2.permids].tolist()
-        changes = cls.get_changes(permids)
-        kperm = numpy.array(kperm1.oligos)[list(changes)].tolist()
-        return OligoPeakKPerm(oligos=kperm1.oligos,kperm=kperm)
+        kpermids = cls.get_changes(permids)
+        kperm = numpy.array(kperm1.oligos)[list(kpermids)].tolist()
+        changes=kperm1.changes+kperm2.changes
+        return OligoPeakKPerm(oligos=kperm1.oligos,kperm=kperm,
+                              changes=changes)
+
+    def is_subgroup_of(self,kperm,attr="changes")->bool:
+        u'''
+        returns True if set(getattr(kperm,attr))>set(getattr(self,attr))
+        '''
+        return set(getattr(kperm,attr))>set(getattr(self,attr))

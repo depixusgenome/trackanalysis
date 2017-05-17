@@ -3,7 +3,7 @@
 u'''
 defines a list of scoring functors for sequence assembly
 '''
-from typing import Tuple, List # pylint: disable=unused-import
+from typing import Tuple, List, NamedTuple # pylint: disable=unused-import
 import scipy
 import numpy
 from utils import initdefaults
@@ -128,28 +128,65 @@ class PDFCost:
         return -numpy.product([self.get_dists[idp].pdf(val)
                                for idp,val in enumerate(xstate)])
 
-class ScoreAssembly: # should be ok # but must be tested
+
+ScoredKPerm = NamedTuple("ScoredKPerm",[("kperm",data.OligoPeakKPerm),
+                                        ("density_cost",float),
+                                        ("noverlaps",int)])
+
+# still incorrect since __density (PDFCOST) should only take into account peaks
+# whose position has changed
+# and __overlaps should only consider local oligos (i.e. kpermids)
+class ScoreAssembly:
     u'''
     given an assembly (list of oligos in the correct order)
     returns (number of overlaps,cost of permutation)
     '''
-    assembly=[] # type: List[data.OligoPeak]
+    okperm=data.OligoPeakKPerm() # type: data.OligoPeakKPerm
     ooverl=-1 # type: int
     @initdefaults
     def __init__(self,**kwa):
         pass
 
-    def run(self):
+    def run(self)->ScoredKPerm:
         u'compute score'
-        return tuple([self.__density(),self.__overlaps()])
+        return ScoredKPerm(kperm=self.okperm,
+                           density_cost=self.__density(),
+                           noverlaps=self.__overlaps())
 
-    def __density(self)->float:
-        return OptiKPerm(kperm=self.assembly).cost()
+    def __density(self)->float: # to check
+        changed=[self.okperm.kperm[idx]
+                 for idx,val in enumerate(self.okperm.kpermids)
+                 if val in self.okperm.changes]
+        return OptiKPerm(kperm=changed).cost()
 
-    def __overlaps(self)->int:
+    def __overlaps(self)->int: # to check
         u'''
-        returns the number of consecutive overlaps between oligos
+        returns the number of consecutive overlaps between oligos in kpermids
         '''
-        return len([idx for idx,val in enumerate(self.assembly[1:])
-                    if len(data.Oligo.tail_overlap(self.assembly[idx].seq,
+        kperm=self.okperm.kperm
+        return len([idx for idx,val in enumerate(kperm[1:])
+                    if len(data.Oligo.tail_overlap(kperm[idx].seq,
                                                    val.seq))==self.ooverl])
+
+    def __call__(self,okperm:data.OligoPeakKPerm)->ScoredKPerm:
+        self.okperm=okperm
+        return self.run()
+
+
+class ScoreFilter:
+    u'''
+    filter out ScoredKPerm which cannot lead to the 'best' score
+    '''
+    scorekperms=[] # type: List[ScoredKPerm]
+    @initdefaults(frozenset(locals()))
+    def __init__(self,**kwa):
+        pass
+
+    def run(self)->List[ScoredKPerm]:
+        u'''
+        implements minimal condition for optimal score
+        for the same value of overlaps, filters out 
+        the scores with density_cost > lower(density_cost)*(1-0.1)
+        '''
+        # to implement
+        return self.scorekperms
