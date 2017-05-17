@@ -106,6 +106,8 @@ class PeaksStatsWidget(WidgetCreator):
                                   [u'σ[HF] (µm)',       '.4f'],
                                   [u'σ[Peaks] (µm)',    '.4f'],
                                   [u'Peak count',       '.0f'],
+                                  [u'Events per Cycle', '.1f'],
+                                  [u'Load (s)',         '.1f'],
                                   [u'Sites found',      ''],
                                   [u'Silhouette',       '.1f'],
                                   [u'reduced χ²',       '.1f']]}
@@ -140,6 +142,8 @@ class PeaksStatsWidget(WidgetCreator):
             if len(mdl.peaks['z']):
                 self.values[3] = np.mean(mdl.peaks['sigma'])
             self.values[4] = max(0, len(mdl.peaks['z']) - 1)
+            self.values[5] = np.mean(mdl.peaks['count'][1:])/100.
+            self.values[6] = np.mean(mdl.peaks['averageduration'][0])
 
         def sequencedependant(self, mdl, dist, key):
             "all sequence dependant stats"
@@ -148,15 +152,15 @@ class PeaksStatsWidget(WidgetCreator):
             nrem      = sum(i in remove for i in mdl.peaks[key+'id'])
             nfound    = np.isfinite(mdl.peaks[key+'id']).sum()-nrem
             npks      = len(task.peakids[key].hybridizations)
-            self.values[5] = '{}/{}'.format(nfound, npks)
+            self.values[7] = '{}/{}'.format(nfound, npks)
             if nrem == 2:
-                self.values[5] += self.openhp
+                self.values[7] += self.openhp
 
-            self.values[6] = HairpinDistance.silhouette(dist, key)
+            self.values[8] = HairpinDistance.silhouette(dist, key)
 
             if nfound > 2:
                 stretch        = dist[key].stretch
-                self.values[7] = (np.nanstd(mdl.peaks[key+'id'])
+                self.values[9] = (np.nanstd(mdl.peaks[key+'id'])
                                   / ((self.values[3]*stretch)**2 * (nfound - 2)))
 
         def __call__(self) -> str:

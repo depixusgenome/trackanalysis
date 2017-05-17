@@ -10,6 +10,7 @@ import sequences
 from control.processor          import processors
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
 from peakfinding.processor      import PeakSelectorTask
+from peakfinding.probabilities  import Probability
 from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
                                         FitBead, Distance)
 
@@ -18,7 +19,6 @@ from view.plots.sequence        import (readsequence,
                                         FitParamProp    as _FitParamProp,
                                         SequenceKeyProp as _SequenceKeyProp)
 
-from ..probabilities            import Probability
 from ..processor                import fittohairpintask
 
 class FitToHairpinAccess(TaskAccess):

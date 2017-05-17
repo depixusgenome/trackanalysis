@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Hybridstat excel reporting processor"
+u"PeakFinding excel reporting processor"
 from   typing               import (Sequence,       # pylint: disable=unused-import
                                     Dict, Iterator, Union, Optional, Any)
 from   pathlib              import Path
@@ -9,25 +9,21 @@ import pickle
 from utils                      import initdefaults
 from model                      import Task, Level
 from control.processor          import Processor
+from control.processor.runner   import pooledinput, pooldump
 from anastore                   import dumps
 from excelreports.creation      import fileobj
 
 from eventdetection             import EventDetectionConfig
-from peakcalling.processor      import FitToHairpinTask
-from data                       import TrackItems, BEADKEY # pylint: disable=unused-import
+from data                       import TrackItems
 
 from ._base                     import ReporterInfo
 from ._summary                  import SummarySheet
 from ._peaks                    import PeaksSheet
 
-
-class HybridstatExcelTask(Task):
-    u"Reporter for Hybridstat"
+class PeakFindingExcelTask(Task):
+    u"Reporter for PeakFinding"
     level       = Level.peak
     path        = ""
-    oligos      = []    # type: Sequence[str]
-    sequences   = {}    # type: Dict[str,str]
-    knownbeads  = None  # type: Optional[Sequence[BEADKEY]]
     minduration = None  # type: Optional[int]
 
     @initdefaults(frozenset(locals()) - {'level'},
@@ -48,10 +44,6 @@ class HybridstatExcelTask(Task):
             self.minduration = (detection.events.select.minduration
                                 if detection else 0.)
 
-        if self.knownbeads is None:
-            identity        = get(FitToHairpinTask)
-            self.knownbeads = (tuple(identity.constraints.keys())
-                               if identity else tuple())
         trk  = model[0]
         if '*' in self.path:
             if self.path.count('*') > 1:
@@ -60,24 +52,34 @@ class HybridstatExcelTask(Task):
             trk       = trk[0] if isinstance(trk, tuple) else trk
             self.path = self.path.replace('*', Path(trk).stem)
 
-class HybridstatExcelProcessor(Processor):
-    u"Reporter for Hybridstat"
+class PeakFindingExcelProcessor(Processor):
+    u"Reporter for PeakFinding"
     @staticmethod
-    def apply(toframe = None, model = None, **kwa):
-        "applies the task to a frame or returns a function that does so"
-        path = kwa.pop('path')
-        cnf  = ''
-        if model is not None:
-            cnf = dumps(list(model), indent = 4, ensure_ascii = False, sort_keys = True)
+    def canpool():
+        return True
 
+    @staticmethod
+    def _tuple(info):
+        return info[0], tuple(info[1])
+
+    @classmethod
+    def apply(cls, toframe = None, data = None, pool = None, **kwa):
+        "applies the task to a frame or returns a function that does so"
+        data = data.append(cls(**kwa))
+        path = kwa.pop('path')
+        cnf  = dumps(list(data.model), indent = 4, ensure_ascii = False, sort_keys = True)
+        pick = pooldump(data)
         def _save(frame):
-            run(path, cnf, track = frame.track, groups = frame, **kwa)
+            frame.withaction(cls._tuple)
+            beads = frame if pool is None else pooledinput(pool, pick, frame).items()
+            run(path, cnf, track = frame.track, beads = beads, **kwa)
             return frame
+
         fcn = lambda frame: frame.new(TrackItems).withdata(_save)
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
-        args.apply(self.apply(model = args.data.model, **self.config()))
+        args.apply(self.apply(args.poolkwargs(self.task), **self.config()))
 
 def run(path:str, config:str = '', **kwa):
     u"Creates a report."

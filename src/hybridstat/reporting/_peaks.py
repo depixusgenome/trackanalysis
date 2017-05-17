@@ -10,10 +10,10 @@ from xlsxwriter.utility     import xl_col_to_name
 
 import numpy as np
 
-from excelreports.creation  import column_method, sheet_class, Columns
-from data.trackitems        import BEADKEY            # pylint: disable=unused-import
-from ..probabilities        import Probability
-from ._base                 import Reporter, HasLengthPeak, Group, Bead
+from excelreports.creation      import column_method, sheet_class, Columns
+from data.trackitems            import BEADKEY            # pylint: disable=unused-import
+from peakfinding.probabilities  import Probability
+from ._base                     import Reporter, HasLengthPeak, Group, Bead
 
 class Probabilities(HasLengthPeak):
     "Computes and caches probabilities"
