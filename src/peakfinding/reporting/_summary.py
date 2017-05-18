@@ -40,7 +40,7 @@ class SummarySheet(Reporter):
             return 0.0
         return cnt / len(outp[0][1])
 
-    @column_method("Off Time")
+    @column_method('Down Time Φ₅ (s)')
     def _offtime(self, _, outp:Tuple[PeakOutput]) -> float:
         "Average time in phase 5 a bead is fully zipped"
         if len(outp) == 0:

@@ -19,7 +19,7 @@ from view.plots.sequence        import (readsequence,
                                         FitParamProp    as _FitParamProp,
                                         SequenceKeyProp as _SequenceKeyProp)
 
-from ..processor                import fittohairpintask
+from ..reporting.batch          import fittohairpintask
 
 class FitToHairpinAccess(TaskAccess):
     "access to the FitToHairpinTask"
@@ -192,7 +192,7 @@ class PeaksPlotModelAccess(IdentificationModelAccess):
                 continue
 
             dist = alldist[key].stretch, alldist[key].bias
-            tmp  = task.peakids[key](dico['z'], *dist)['key']
+            tmp  = task.peakids[key].pair(dico['z'], *dist)['key']
             good = tmp >= 0
             ori  = dict(sequences.peaks(seq, self.oligos))
 

@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "IO for peaksplot"
-from typing                     import Tuple, Union
-from pathlib                    import Path
-from concurrent.futures         import ProcessPoolExecutor, ThreadPoolExecutor
+from typing                          import Tuple, Union
+from pathlib                         import Path
+from concurrent.futures              import ProcessPoolExecutor, ThreadPoolExecutor
 
-from control.taskcontrol        import create as _createdata
-from control.taskio             import (ConfigTrackIO, ConfigGrFilesIO, TaskIO,
-                                        currentmodelonly)
-from peakcalling.processor      import FitToHairpinTask, BeadsByHairpinTask
+from control.taskcontrol             import create as _createdata
+from control.taskio                  import (ConfigTrackIO, ConfigGrFilesIO, TaskIO,
+                                             currentmodelonly)
+from peakfinding.reporting.processor import PeakFindingExcelTask
+from peakcalling.processor           import FitToHairpinTask, BeadsByHairpinTask
 
-from view.base                  import spawn, threadmethod
-from view.dialog                import FileDialog
+from view.base                       import spawn, threadmethod
+from view.dialog                     import FileDialog
 
-from utils.logconfig            import getLogger
-from utils.gui                  import startfile
+from utils.logconfig                 import getLogger
+from utils.gui                       import startfile
 
-from ..reporting.processor      import HybridstatExcelTask
-from ._model                    import IdentificationModelAccess, PeaksPlotModelAccess
+from ..reporting.processor           import HybridstatExcelTask
+from ._model                         import IdentificationModelAccess, PeaksPlotModelAccess
 
 LOGS = getLogger(__name__)
 
@@ -62,8 +63,7 @@ class ConfigXlsxIO(TaskIO):
         css = ctrl.css.root.title.hybridstatreport
         css.defaults = {'start': (u'Report in progress ...', 'normal')}
         css = css.errors
-        css.defaults = {'running': ("Can only create one report at a time", "warning"),
-                        'missing': ('Oligos or sequences left undefined', "warning")}
+        css.defaults = {'running': ("Can only create one report at a time", "warning")}
 
     def save(self, path:str, models):
         "creates a Hybridstat report"
@@ -108,13 +108,15 @@ class ConfigXlsxIO(TaskIO):
             raise IOError("running")
         cls.RUNNING = True
 
-        if not isinstance(model[-1], FitToHairpinTask):
-            raise IOError('missing')
-
-        cache  = _createdata(*model[:-1],
-                             BeadsByHairpinTask(**model[-1].config()),
-                             HybridstatExcelTask(model     = model,
-                                                 **xlscnf))
+        if isinstance(model[-1], FitToHairpinTask):
+            cache  = _createdata(*model[:-1],
+                                 BeadsByHairpinTask(**model[-1].config()),
+                                 HybridstatExcelTask(model     = model,
+                                                     **xlscnf))
+        else:
+            cache  = _createdata(*model,
+                                 PeakFindingExcelTask(model     = model,
+                                                      **xlscnf))
 
         error  = [None]
         def _process():

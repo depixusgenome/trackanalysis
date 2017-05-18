@@ -107,7 +107,7 @@ class PeaksStatsWidget(WidgetCreator):
                                   [u'σ[Peaks] (µm)',    '.4f'],
                                   [u'Peak count',       '.0f'],
                                   [u'Events per Cycle', '.1f'],
-                                  [u'Load (s)',         '.1f'],
+                                  [u'Down Time Φ₅ (s)', '.1f'],
                                   [u'Sites found',      ''],
                                   [u'Silhouette',       '.1f'],
                                   [u'reduced χ²',       '.1f']]}
@@ -143,7 +143,7 @@ class PeaksStatsWidget(WidgetCreator):
                 self.values[3] = np.mean(mdl.peaks['sigma'])
             self.values[4] = max(0, len(mdl.peaks['z']) - 1)
             self.values[5] = np.mean(mdl.peaks['count'][1:])/100.
-            self.values[6] = np.mean(mdl.peaks['averageduration'][0])
+            self.values[6] = np.mean(mdl.peaks['duration'][0])
 
         def sequencedependant(self, mdl, dist, key):
             "all sequence dependant stats"

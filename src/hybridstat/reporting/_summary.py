@@ -135,7 +135,7 @@ class SummarySheet(Reporter):
             return 0.0
         return cnt / self.config.track.ncycles
 
-    @column_method("Off Time")
+    @column_method('Down Time Φ₅ (s)')
     def _offtime(self, _, bead:Bead) -> Optional[float]:
         "Average time in phase 5 a bead is fully zipped"
         if bead is None:
