@@ -79,7 +79,7 @@ class PeakFindingExcelProcessor(Processor):
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
-        args.apply(self.apply(args.poolkwargs(self.task), **self.config()))
+        args.apply(self.apply(**args.poolkwargs(self.task), **self.config()))
 
 def run(path:str, config:str = '', **kwa):
     u"Creates a report."

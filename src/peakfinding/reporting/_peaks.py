@@ -35,11 +35,17 @@ class Probabilities:
 @sheet_class("Peaks")
 class PeaksSheet(Reporter):
     "Creates peaks sheet"
+    _MINCHARTHEIGHT = 10
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._neig  = None
         self._pos   = None
         self._proba = Probabilities(self)
+
+    @classmethod
+    def chartheight(cls, npeaks:int) -> int:
+        "Returns the chart height"
+        return min(cls._MINCHARTHEIGHT, npeaks)
 
     def iterate(self) -> Iterator[Tuple[BEADKEY, int, PeakOutput]]:
         "Iterates through peaks of each bead"
@@ -93,3 +99,13 @@ class PeaksSheet(Reporter):
             UNCERTAINTY ~ TIME / sqrt(NUMBER OF HYBRIDISATIONS)
         """
         return self._proba('uncertainty', *args)
+
+    @column_method("", exclude = lambda x: not x.isxlsx())
+    def _chart(self, bead:int, ipk:int, _):
+        if ipk == 0:
+            return self.charting(next(j for i, j in self.config.beads if i == bead))
+
+    @staticmethod
+    def linemark(info) -> bool:
+        u"marks a line"
+        return info[1] == 0

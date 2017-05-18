@@ -160,7 +160,7 @@ class SummarySheet(Reporter):
             yield from ((group, bead) for bead in group.beads)
 
     def tablerow(self):
-        return len(self.__info('', True))
+        return len(self.__info('', True))+2
 
     def info(self, cnf = ''):
         "create header"

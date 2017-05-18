@@ -193,11 +193,9 @@ def test_reporting():
                                             utfilepath("CTGT_selection")),
                                 reporting= out))
 
-    pair = next(tasks)
+    itms = next(tasks)
     assert not Path(out).exists()
-    gen  = pair.run()
-    assert not Path(out).exists()
-    tuple(i for i in gen)
+    tuple(itms)
     assert Path(out).exists()
 
 if __name__ == '__main__':

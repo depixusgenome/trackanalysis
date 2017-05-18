@@ -15,6 +15,11 @@ from ._base                 import BEADKEY, PeakOutput, Reporter
 @sheet_class("Summary")
 class SummarySheet(Reporter):
     "creates the summary sheet"
+    @classmethod
+    def chartheight(cls, _) -> int:
+        "Returns the chart height"
+        return 1
+
     @column_method("Signal Noise", units = 'µm')
     def _uncert(self, bead:BEADKEY, _) -> float:
         "Standard deviation of the signal"
@@ -44,6 +49,10 @@ class SummarySheet(Reporter):
                            minduration = self.config.minduration)
         prob = prob(outp[0][1], self.config.track.durations)
         return prob.averageduration
+
+    @column_method("", exclude = lambda x: not x.isxlsx())
+    def _chart(self, _, outp:Tuple[PeakOutput]):
+        return self.charting(outp)
 
     def iterate(self):
         "Iterates through sheet's base objects and their hierarchy"

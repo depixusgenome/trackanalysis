@@ -16,6 +16,59 @@ from data.track             import Track, BEADKEY           # pylint: disable=un
 from signalfilter           import rawprecision
 from ..selector             import Output as PeakOutput     # pylint: disable=unused-import
 
+class ChartCreator:
+    "Creates charts"
+    _ERR    = .015
+    _WIDTH  = 400
+    _HUNIT  = 18
+    def __init__(self, parent : 'Reporter') -> None:
+        peakstype = parent.config.sheettype('peaks')
+        if isinstance(parent, peakstype):
+            peaks = parent
+        else:
+            peaks = peakstype(parent.book, parent.config)
+
+        self._pos    = tuple(peaks.columnindex(u'Peak Position',
+                                               u'Hybridisation Rate'))
+        self._parent = parent
+        self._rseries= None      # type: dict
+        self._row    = peaks.tablerow()+1
+        self._sheet  = peakstype.sheet_name
+
+    def _args(self, nrows:int, tpe:str, color:str) -> dict:
+        "return args for creating a chart"
+        def _pos(i):
+            return [self._sheet, self._row, self._pos[i], self._row+nrows-1, self._pos[i]]
+        return dict(name         = [self._sheet, self._row, 0],
+                    categories   = _pos(0),
+                    values       = _pos(1),
+                    marker       = dict(type  = tpe,
+                                        #size  = 0.1,
+                                        fill  = dict(color = color)),
+                    x_error_bars = dict(type  = 'fixed',
+                                        value = self._ERR,
+                                        line  = dict(color = color)))
+
+    def __call__(self, outp:Tuple[PeakOutput]):
+        "returns a chart for this bead if peak is peaks zero"
+        chart = self._parent.book.add_chart(dict(type = 'scatter'))
+        size  = len(outp)
+        self._rseries = self._args(size, 'square', 'blue')
+
+        chart.add_series(self._rseries)
+        chart.set_title (dict(none  = True))
+        chart.set_legend(dict(none  = True))
+        axis = dict(major_gridlines = dict(visible = False),
+                    label_position  = "none",
+                    visible         = True)
+        chart.set_x_axis(axis)
+        chart.set_y_axis(axis)
+
+        chart.set_size  (dict(width  = self._WIDTH,
+                              height = self._HUNIT*self._parent.chartheight(size)))
+        self._row += size
+        return chart
+
 class TrackInfo:
     u"""
     All info in Track which is relevant to Reporter.
@@ -40,8 +93,8 @@ class ReporterInfo:
     minduration   = 1
     track         = TrackInfo(None)
     @initdefaults(frozenset(locals()),
-                  track = TrackInfo,
-                  beads = lambda val: tuple((i, tuple(j)) for i, j in val))
+                  track = lambda obj, val: setattr(obj, 'track', TrackInfo(val)),
+                  beads = lambda obj, val: setattr(obj, 'beads', tuple(val)))
     def __init__(self, **_):
         pass
 
@@ -58,6 +111,7 @@ class Reporter(_Reporter):
     def __init__(self, book: FILEOBJ, cnf: ReporterInfo) -> None:
         super().__init__(book)
         self.config   = cnf
+        self.charting = ChartCreator(self)
 
     def uncertainty(self, bead:BEADKEY):
         u"returns uncertainties for all beads"
@@ -79,8 +133,3 @@ class Reporter(_Reporter):
     @abstractmethod
     def iterate(self):
         u"Iterates through sheet's base objects and their hierarchy"
-
-    @staticmethod
-    def linemark(info) -> bool:
-        u"marks a line"
-        return not bool(info[-1])
