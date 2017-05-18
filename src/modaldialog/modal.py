@@ -4,7 +4,7 @@
 Allows creating modals from anywhere
 """
 from    typing                  import (Optional,  # pylint: disable=unused-import
-                                        Callable, Union, Sequence)
+                                        Callable, Union, Sequence, Any)
 from    abc                     import ABCMeta, abstractmethod
 import  re
 
@@ -165,13 +165,14 @@ class DpxModal(Model):
                 self.__handler(new)
         self.on_change('results', _on_apply_cb)
 
-    def run(self,
+    def run(self,                                       # pylint: disable=too-many-arguments
             title   : str                       = "",
             body    : Union[Sequence[str],str]  = "",
             callback: Union[Callable, Callback] = None,
+            context : Callable[[str], Any]      = None,
             model                               = None):
         "runs the modal dialog"
-        self.__handler = self._build_handler(callback, body, model)
+        self.__handler = self._build_handler(callback, title, body, model, context)
         self.__running = False
         self.update(title    = title,
                     body     = self._build_body(body, model),
@@ -196,8 +197,8 @@ class DpxModal(Model):
     def  _build_callback(callback):
         return callback if isinstance(callback, Callback) else None
 
-    @classmethod
-    def  _build_handler(cls, callback, body, model):
+    def  _build_handler(self, callback, title, # pylint: disable=too-many-arguments
+                        body, model, context):
         if isinstance(callback, Callback) or model is None:
             return None
 
@@ -205,11 +206,12 @@ class DpxModal(Model):
             if isinstance(bdy, (list, tuple)):
                 bdy = ' '.join(' '.join(i) for i in bdy)
 
-            converters = [i.converter(model, bdy) for i in cls.__OPTIONS]
-            cls._setvalues(converters, itms)
+            converters = [i.converter(model, bdy) for i in self.__OPTIONS]
+            if context is None:
+                for i in itms.items():
+                    any(cnv(*i) for cnv in converters)
+            else:
+                with context(title):
+                    for i in itms.items():
+                        any(cnv(*i) for cnv in converters)
         return _hdl
-
-    @staticmethod
-    def _setvalues(converters, itms):
-        for i in itms.items():
-            any(cnv(*i) for cnv in converters)

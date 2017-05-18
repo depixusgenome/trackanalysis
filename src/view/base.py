@@ -148,7 +148,7 @@ class BokehView(View):
 
     def getroots(self, doc):
         "returns object root"
-        raise NotImplementedError("Add items to doc")
+        self._doc = doc
 
     def button(self, fcn:Callable, title:str, prefix = 'keypress', **kwa):
         "creates and connects a button"

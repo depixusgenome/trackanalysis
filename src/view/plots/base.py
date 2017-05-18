@@ -261,6 +261,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     def close(self):
         "Removes the controller"
         del self._ctrl
+        del self._doc
 
     def newbounds(self, rng, axis, arr) -> dict:
         "Sets the range boundaries"
@@ -523,6 +524,7 @@ class PlotView(BokehView):
 
     def getroots(self, doc):
         "adds items to doc"
+        super().getroots(doc)
         ret = self._plotter.create(doc)
         self._plotter.observe()
         return ret,

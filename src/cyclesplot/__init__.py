@@ -11,15 +11,14 @@ from    control.taskio      import ConfigTrackIO, GrFilesIO
 
 from    view.plots          import DpxKeyedRow, PlotView
 from    view.plots.tasks    import TaskPlotCreator
-from    modaldialog         import dialog
 
 from   ._bokehext           import DpxHoverModel
 from   ._model              import CyclesModelAccess
 from   ._raw                import RawMixin
 from   ._hist               import HistMixin
-from   ._config             import ConfigMixin
+from   ._widget             import WidgetMixin
 
-class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, ConfigMixin):
+class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, WidgetMixin):
     "Displays cycles and their projection"
     _MODEL = CyclesModelAccess
     def __init__(self, ctrl:Controller) -> None:
@@ -27,12 +26,11 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, ConfigMixin):
         TaskPlotCreator.__init__(self, ctrl)
         RawMixin       .__init__(self)
         HistMixin      .__init__(self)
-        ConfigMixin    .__init__(self)
+        WidgetMixin    .__init__(self)
 
         DpxHoverModel.defaultconfig(self)
-        self.config    .defaults = {'tools': 'ypan,ybox_zoom,reset,save,dpxhover'}
+        self.config.tools.default = 'ypan,ybox_zoom,reset,save,dpxhover'
         self._hover  = None # type: Optional[DpxHoverModel]
-        self._dialog = None # type: ignore
         if TYPE_CHECKING:
             self._model = CyclesModelAccess('', '')
 
@@ -51,29 +49,22 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, ConfigMixin):
                             toolbar  = next(i for i in plts.children
                                             if isinstance(i, ToolbarBox)))
 
-        self._dialog = dialog(doc, self._ctrl)
-        return layouts.column([keyed, self._createconfig()])
+        return layouts.column([keyed, self._createwidget()])
 
     def _reset(self):
         shape = self._resetraw()
         data  = self._bkmodels[self._rawsource]['data']
         self._resethist(data, shape)
         self.setbounds(self._hist.y_range, 'y', data['z'])
-        self._resetconfig()
+        self._resetwidget()
 
     def observe(self):
         "sets-up model observers"
         super().observe()
         self._histobservers()
-        self._configobservers()
-        self._model.config.eventdetection.isactive.observe(lambda: self.reset(('bead',)))
-
-    def configuration(self):
-        "modal dialog for configuration"
-        self._dialog.run(title = 'Cycles Plot Configuration',
-                         body  = (('Histogram bin width',      '%(binwidth)d'),
-                                  ('Minimum frames per cycle', '%(minframes)d')),
-                         model = self._model)
+        self._widgetobservers()
+        self._model.config.observe('eventdetection.isactive', 'binwidth', 'minframes',
+                                   lambda: self.reset(('bead',)))
 
 class CyclesPlotView(PlotView):
     "Cycles plot view"
@@ -84,9 +75,7 @@ class CyclesPlotView(PlotView):
 
     def ismain(self):
         "Alignment, ... is set-up by default"
-        self._ctrl.getGlobal('config').keypress.configuration.default = 'Alt-l'
-        self._keys.addKeyPress(('keypress.configuration', self._plotter.configuration))
-
+        self._plotter.ismain()
         tasks         = self._ctrl.getGlobal('config').tasks
         tasks.default = ['extremumalignment', 'eventdetection']
         tasks.io.open.default = (tuple(tasks.io.open.get()[:-1])

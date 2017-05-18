@@ -14,10 +14,12 @@ from    bokeh.models   import (ColumnDataSource,  # pylint: disable=unused-impor
                                CheckboxGroup, Widget)
 
 import  sequences
+from    control.action      import Action
 from    view.plots          import (PlotModelAccess, GroupWidget,
                                     WidgetCreator as _Widget, DpxNumberFormatter)
 from    view.plots.sequence import readsequence, OligoListWidget, SequencePathWidget
 from    view.base           import enableOnTrack
+from    modaldialog         import dialog
 
 from    ._bokehext          import DpxHoverModel      # pylint: disable=unused-import
 
@@ -242,8 +244,8 @@ class EventDetectionWidget(GroupWidget):
     def _data(self) -> dict:
         return dict(active = [] if self._model.eventdetection.task is None else [0])
 
-class ConfigMixin:
-    "Everything dealing with config"
+class WidgetMixin:
+    "Everything dealing with changing the config"
     def __init__(self):
         self.__widgets = dict(table   = PeaksTableWidget(self._model),
                               sliders = ConversionSlidersWidget(self._model),
@@ -253,11 +255,29 @@ class ConfigMixin:
                               drift   = DriftWidget(self._model),
                               events  = EventDetectionWidget(self._model))
 
-    def _configobservers(self):
+        self.config.root.keypress.configuration.default = 'Alt-l'
+        self.css.dialog.defaults = dict(title = 'Cycles Plot Configuration',
+                                        body  = ('Histogram bin width',
+                                                 'Minimum frames per cycle'))
+
+    def configuration(self):
+        "modal dialog for configuration"
+        css = self.css.dialog
+        dialog(self._doc,
+               title   = css.title.get(),
+               context = Action(self._ctrl, css.title.get()),
+               body    = tuple(zip(css.title.body.get(), ('%(binwidth)d', '%(minframes)d'))),
+               model   = self._model)
+
+    def ismain(self, keys):
+        "setup for when this is the main show"
+        keys.addKeyPress(('keypress.configuration', self.configuration))
+
+    def _widgetobservers(self):
         for widget in self.__widgets.values():
             widget.observe()
 
-    def _createconfig(self):
+    def _createwidget(self):
         self.__widgets['sliders'].addinfo(self._histsource)
 
         widgets = {i: j.create(self.action) for i, j in self.__widgets.items()}
@@ -275,7 +295,7 @@ class ConfigMixin:
                                [layouts.widgetbox(widgets[i])
                                 for i in ('align', 'drift', 'events')]])
 
-    def _resetconfig(self):
+    def _resetwidget(self):
         for ite in self.__widgets.values():
             ite.reset(self._bkmodels)
 

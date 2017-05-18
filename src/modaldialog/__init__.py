@@ -3,21 +3,26 @@
 """
 Allows creating modals from anywhere
 """
+from  inspect       import signature
 from  tornado.web   import StaticFileHandler
 from  .modal        import DpxModal, ROUTE
-from  .control      import ControlledDpxModal
 
 def server(kwa):
     "adds a router to the server"
     router = ("/%s/(.*)" % ROUTE, StaticFileHandler, { "path" : "static" })
     kwa['extra_patterns'] = [router]
 
-def dialog(doc, ctrl):
+_PARAMS = tuple(signature(DpxModal.run).parameters)[1:]
+def dialog(doc, **_):
     "returns the DpxModal in this doc"
+    runargs = {i: _.pop(i) for i in _PARAMS}
     for root in doc.roots:
         if isinstance(root, DpxModal):
             break
     else:
-        root = DpxModal() if ctrl is None else ControlledDpxModal(ctrl)
+        root = DpxModal(**_)
         doc.add_root(root)
-    return root
+    if len(runargs):
+        return root.run(**runargs)
+    else:
+        return root
