@@ -188,11 +188,12 @@ class XlsReporter(_BaseReporter):
     _REAL_FMT = "0.00"
     def __init__(self, arg):
         if isinstance(arg, XlsReporter):
-            rep       = cast(XlsReporter, arg)
-            self.book = rep.book                     # type: Workbook
-            self.fmt  = rep.fmt
+            rep            = cast(XlsReporter, arg)
+            self.book      = rep.book                      # type: Workbook
+            self.fmt       = rep.fmt
+            self._tablerow = getattr(rep, '_tablerow', 0)  # type: int
         else:
-            self.book = arg                          # type: Workbook
+            self.book = arg                                # type: Workbook
 
             marked    = dict(bg_color = 'gray')
             self.fmt  = {'marked'       : self.book.add_format(marked),
@@ -204,6 +205,7 @@ class XlsReporter(_BaseReporter):
             self.fmt[self._REAL_FMT].set_num_format(self._REAL_FMT)
             self.fmt['int']         .set_num_format(self._INT_FMT)
             self.fmt[self._INT_FMT ].set_num_format(self._INT_FMT)
+            self._tablerow = 0
 
         if not hasattr(self, 'sheet_name'):
             self.sheet_name = None                     # type: Optional[str]
@@ -288,10 +290,9 @@ class XlsReporter(_BaseReporter):
         irow = _write_data()
         _write_cond(irow)
 
-    @staticmethod
-    def tablerow():
+    def tablerow(self):
         u"start row of the table"
-        return 0
+        return self._tablerow
 
     @abstractmethod
     def iterate(self):
@@ -320,6 +321,7 @@ class Reporter(XlsReporter, CsvReporter):
             XlsReporter.header(self, data)
         else:
             CsvReporter.header(self, data)
+        self._tablerow += len(data)+1
 
     def table(self):
         u"creates table"
