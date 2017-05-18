@@ -45,7 +45,7 @@ class PeakFindingExcelTask(Task):
                                 if detection else 0.)
 
         trk  = model[0]
-        if '*' in self.path:
+        if self.path is not None and '*' in self.path:
             if self.path.count('*') > 1:
                 raise IOError("could not parse excel output path", "warning")
             trk       = getattr(trk, 'path', trk)
@@ -58,20 +58,19 @@ class PeakFindingExcelProcessor(Processor):
     def canpool():
         return True
 
-    @staticmethod
-    def _tuple(info):
-        return info[0], tuple(info[1])
-
     @classmethod
     def apply(cls, toframe = None, data = None, pool = None, **kwa):
         "applies the task to a frame or returns a function that does so"
+        pick = pooldump(data)
         data = data.append(cls(**kwa))
         path = kwa.pop('path')
         cnf  = dumps(list(data.model), indent = 4, ensure_ascii = False, sort_keys = True)
-        pick = pooldump(data)
+
         def _save(frame):
-            frame.withaction(cls._tuple)
-            beads = frame if pool is None else pooledinput(pool, pick, frame).items()
+            if pool is None:
+                beads = frame.withaction(lambda i: (i[0], tuple(i[1])))
+            else:
+                beads = pooledinput(pool, pick, frame).items()
             run(path, cnf, track = frame.track, beads = beads, **kwa)
             return frame
 

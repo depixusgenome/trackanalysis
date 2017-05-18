@@ -211,7 +211,8 @@ def _m_multi(cnf, iproc) -> dict:
         return {}
 
     nproc = cnf['nproc']
-    return {i: frame[i] for i in poolchunk(frame.keys(), nproc, iproc)}
+    res   = ((i, frame[i]) for i in poolchunk(frame.keys(), nproc, iproc))
+    return {i: tuple(j) if isinstance(j, Iterator) else j for i, j in res}
 
 pooldump = pickle.dumps  # pylint: disable=invalid-name
 def pooledinput(pool, pickled, frame) -> dict:

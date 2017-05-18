@@ -115,15 +115,14 @@ class HybridstatBatchProcessor(BatchProcessor):
     @classmethod
     def model(cls, paths: HybridstatIO, modl: HybridstatTemplate) -> Sequence[Task]:
         "creates a specific model for each path"
-        track   = TrackReaderTask(path = checkpath(paths.track).path, beadsonly = True)
         modl    = deepcopy(modl)
+
+        track   = TrackReaderTask(path = checkpath(paths.track).path, beadsonly = True)
         oligos  = cls.__oligos(track, paths.oligos)
         cls.__identity(oligos, paths, modl)
-        rep     = cls.__excel (oligos, track, paths, modl)
-        if rep is None:
-            return [track]+[i for i in modl]
-        else:
-            return [track]+[i for i in modl] + [rep]
+
+        model = [track] + list(modl) + [cls.__excel (oligos, track, paths, modl)]
+        return model[:-1 if model[-1] is None else None]
 
     @staticmethod
     def __oligos(track:TrackReaderTask, oligos:Union[Sequence[str],str]):

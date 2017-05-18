@@ -49,14 +49,11 @@ class PeakFindingBatchProcessor(BatchProcessor):
     @classmethod
     def model(cls, paths: PathIO, modl: PeakFindingBatchTemplate) -> Sequence[Task]:
         "creates a specific model for each path"
-        track   = TrackReaderTask(path = checkpath(paths.track).path, beadsonly = True)
-        modl    = deepcopy(modl)
-        if paths in (None, ''):
-            return [track]+[i for i in modl]
-        else:
-            return ([track]+[i for i in modl]
-                    + [cls.tasktype.reporttype()(path  = paths.reporting,
-                                                 model = [track] + list(modl))])
+        modl = deepcopy(list(iter(modl))) # type: ignore
+        modl.insert(0, TrackReaderTask(path = checkpath(paths.track).path, beadsonly = True))
+        if paths.reporting not in (None, ''):
+            modl.append(cls.tasktype.reporttype()(path = paths.reporting, model = modl))
+        return modl
 
 # pylint: disable=invalid-name
 createmodels   = PeakFindingBatchProcessor.models
