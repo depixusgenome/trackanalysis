@@ -138,7 +138,7 @@ class _Updater:
         self.call      = tuple((i, j) for i, j in kwa.items() if callable(j))
         self.ignore    = tuple(i for i in attrs if kwa.get(i, '') == 'ignore')
         self.attrs     = tuple((i, i) for i in attrs if kwa.get(i, '') != 'ignore')
-        self.attrs    += tuple((i, j) for i, j in kwa.items()
+        self.attrs    += tuple((i, j+i if j == '_' else j) for i, j in kwa.items()
                                if isinstance(j, str) and j not in ('update', 'ignore'))
         assert len(set(i for i, _ in self.call)  & set(self.attrs) ) == 0
 

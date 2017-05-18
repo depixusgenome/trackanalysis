@@ -17,7 +17,7 @@ from testingcore                    import path as utfilepath
 
 def test_excel():
     "tests reporting"
-    for path in Path(gettempdir()).glob("*_hybridstattest*.xlsx"):
+    for path in Path(gettempdir()).glob("*_hybridstattest*.*"):
         path.unlink()
     truth  = [np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')/1e-3,
               np.array([0., .1, .5, 1.2, 1.5], dtype = 'f4')/1e-3]

@@ -23,38 +23,37 @@ class Track:
     _path          = None # type: Union[str, Tuple[str, ...]]
     _rawprecisions = {}   # type: Dict[BEADKEY, float]
     _lazy          = True
-    @initdefaults(frozenset(locals()),
-                  phases       = '_phases',
-                  framerate    = '_framerate',
-                  path         = '_path',
-                  data         = '_data',
-                  rawprecision = '_rawprecisions')
+    @initdefaults(tuple(),
+                  framerate     = '_',
+                  phases        = '_',
+                  data          = '_',
+                  path          = '_',
+                  rawprecisions = '_')
     def __init__(self, **_) -> None:
-        self._lazy = len({'data', 'framerate', 'phases'} & set(_)) == 0
+        pass
 
     def __getstate__(self):
         info = self.__dict__.copy()
-        for name in ('path', 'framerate', 'rawprecision', 'data'):
-            val = info.pop('_', name)
+        for name in ('path', 'framerate', 'rawprecisions', 'data', 'lazy'):
+            val = info.pop('_'+name)
             if val !=  getattr(type(self), '_'+name):
                 info[name] = val
 
         val = info.pop('_phases')
-        if len(info['_phases']) > 0:
+        if len(val) > 0:
             info['phases'] = val
 
         if 'path' in info:
-            info.pop('data')
-        info.pop('_lazy')
+            info.pop('data', None)
         return info
 
     def __setstate__(self, values):
         self.__init__(**values)
 
     def __unlazyfy(self):
-        if self._lazy and self._data is None and self._path is not None:
+        if self._lazy:
             self._lazy = False
-            opentrack(self)
+            getattr(self, 'data') # call property: opens the file
 
     @property
     def phases(self) -> np.ndarray:
@@ -145,7 +144,8 @@ class Track:
     @property
     def data(self) -> Dict:
         "returns the dataframe with all bead info"
-        self.__unlazyfy()
+        if self._data is None and self._path is not None:
+            opentrack(self)
         return self._data
 
     @data.setter

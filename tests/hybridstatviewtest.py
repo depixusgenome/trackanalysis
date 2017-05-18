@@ -14,18 +14,20 @@ from testingcore                import path as utfilepath
 from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 from view.plots                 import DpxKeyedRow
 
+from peakfinding.reporting.batch         import createmodels as _pmodels
+
 from hybridstat.reporting.identification import writeparams
-from hybridstat.reporting.batch          import createmodels
+from hybridstat.reporting.batch          import createmodels as _hmodels
 from hybridstat.view._io                 import ConfigXlsxIO
 
-def test_xlsxio():
+def test_hybridstat_xlsxio():
     "tests xlxs production"
-    itr  = createmodels(dict(track     = (Path(utfilepath("big_legacy")).parent/"*.trk",
-                                          utfilepath("CTGT_selection")),
-                             sequence  = utfilepath("hairpins.fasta")))
+    itr  = _hmodels(dict(track     = (Path(utfilepath("big_legacy")).parent/"*.trk",
+                                      utfilepath("CTGT_selection")),
+                         sequence  = utfilepath("hairpins.fasta")))
     mdl  = next(itr)
 
-    for path in Path(gettempdir()).glob("*_hybridstattest*.xlsx"):
+    for path in Path(gettempdir()).glob("*_hybridstattest*.*"):
         path.unlink()
 
     out   = mktemp()+"_hybridstattest4.xlsx"
@@ -33,6 +35,36 @@ def test_xlsxio():
     # pylint: disable=protected-access
     ConfigXlsxIO._run(dict(path      = out,
                            oligos    = 'CTGT',
+                           sequences = utfilepath('hairpins.fasta')),
+                      mdl)
+
+    cnt = 0
+    async def _run():
+        nonlocal cnt
+        for i in range(100):
+            if ConfigXlsxIO.RUNNING is False:
+                break
+            cnt = i
+            await sleep(.1)
+
+    IOLoop.current().run_sync(_run)
+    assert Path(out).exists()
+    assert cnt > 0
+
+def test_peaks_xlsxio():
+    "tests xlxs production"
+    itr  = _pmodels(dict(track = (Path(utfilepath("big_legacy")).parent/"*.trk",
+                                  utfilepath("CTGT_selection"))))
+    mdl  = next(itr)
+
+    for path in Path(gettempdir()).glob("*_hybridstattest*.*"):
+        path.unlink()
+
+    out   = mktemp()+"_hybridstattest5.xlsx"
+    assert not Path(out).exists()
+    # pylint: disable=protected-access
+    ConfigXlsxIO._run(dict(path      = out,
+                           oligos    = [],
                            sequences = utfilepath('hairpins.fasta')),
                       mdl)
 
@@ -123,4 +155,4 @@ def test_hybridstat(bokehaction):
         server.change('Hybridstat:Tabs', 'active', 2)
 
 if __name__ == '__main__':
-    test_xlsxio()
+    test_peaks_xlsxio()
