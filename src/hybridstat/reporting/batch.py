@@ -1,30 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Batch creator for hybridstat tasks"
-from typing                     import (Optional, Tuple, # pylint: disable=unused-import
-                                        Iterator, Union, Iterable, Sequence, cast)
-from copy                       import deepcopy
-from pathlib                    import Path
-from itertools                  import chain
-from functools                  import partial
+from typing                         import (Optional, # pylint: disable=unused-import
+                                            Iterator, Union, Sequence)
+from copy                           import deepcopy
+from pathlib                        import Path
 import re
 
-from utils                      import initdefaults, update
-from data.trackio               import (checkpath,       # pylint: disable=unused-import
-                                        PATHTYPES, PATHTYPE)
-from model.task                 import RootTask, Task, Level, TrackReaderTask
-from control.taskcontrol        import create as _create
-from control.processor          import Processor
-from cordrift.processor         import DriftTask
-from eventdetection.processor   import (EventDetectionTask, # pylint: disable=unused-import
-                                        ExtremumAlignmentTask)
-from peakfinding.processor      import PeakSelectorTask
-from peakcalling.processor      import (BeadsByHairpinTask, # pylint: disable=unused-import
-                                        FitToHairpinTask, DistanceConstraint,
-                                        Constraints)
-from peakcalling.tohairpin      import Range
-from .reporting.processor       import HybridstatExcelTask
-from .reporting.identification  import readparams
+from utils                          import initdefaults
+from data.trackio                   import checkpath, PATHTYPE # pylint: disable=unused-import
+
+from model.task                     import Task, TrackReaderTask
+from control.processor.batch        import BatchTask, BatchProcessor, PathIO
+from peakfinding.reporting.batch    import PeakFindingBatchTemplate
+from peakcalling.processor          import (BeadsByHairpinTask, # pylint: disable=unused-import
+                                            FitToHairpinTask, DistanceConstraint,
+                                            Constraints)
+from peakcalling.tohairpin          import Range
+from .processor                     import HybridstatExcelTask
+from .identification                import readparams
 
 def readconstraints(idtask   : FitToHairpinTask,
                     idpath   : Union[Path, str, None],
@@ -68,37 +62,17 @@ def beadsbyhairpintask(seqpath    : Union[Path, str],
     tsk = fittohairpintask(seqpath, oligos, idpath, useparams)
     return BeadsByHairpinTask(**tsk.config())
 
-class HybridstatTemplate(Iterable):
+class HybridstatTemplate(PeakFindingBatchTemplate):
     "Template of tasks to run"
-    alignment = None # type: Optional[ExtremumAlignmentTask]
-    drift     = [DriftTask(onbeads = True)]
-    detection = EventDetectionTask()    # type: Optional[EventDetectionTask]
-    peaks     = PeakSelectorTask()      # type: Optional[PeakSelectorTask]
     identity  = BeadsByHairpinTask()    # type: Optional[BeadsByHairpinTask]
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
-        pass
-
-    def config(self) -> dict:
-        "returns a copy of the dictionnary"
-        return deepcopy(self.__dict__)
-
-    def activated(self, aobj:Union[str,Task]) -> bool:
-        "Wether the task will be called"
-        obj = getattr(self, aobj) if isinstance(aobj, str) else aobj
-        for i in self.__iter__():
-            if i is obj:
-                return True
-        return False
+        super().__init__(**kwa)
 
     def __iter__(self) -> Iterator[Task]:
-        if self.alignment:
-            yield self.alignment
-        yield from self.drift
-        for i in (self.detection, self.peaks, self.identity):
-            if i is None:
-                return
-            yield i
+        yield from super().__iter__()
+        if self.identity is not None:
+            yield self.identity
 
 ONE_OLIGO      = r'(?P<{}>(?:\[{{0,1}}[atgc]\]{{0,1}}){{3,4}})'
 OLIGO_PATTERNS = {1: (r'.*[_-]{}[-_].*'
@@ -109,71 +83,35 @@ OLIGO_PATTERNS = {1: (r'.*[_-]{}[-_].*'
                            .format(ONE_OLIGO.format('O1'), ONE_OLIGO.format('O2')))
                  }
 
-class HybridstatIO:
+class HybridstatIO(PathIO):
     "Paths (as regex) on which to run"
-    track     = ''                   # type: PATHTYPES
     sequence  = None                 # type: Optional[PATHTYPE]
     idpath    = None                 # type: Optional[PATHTYPE]
     useparams = False
     oligos    = OLIGO_PATTERNS[1]    # type: Union[Sequence[str], str]
-    reporting = None                 # type: Optional[PATHTYPE]
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **kwa):
-        pass
-
-class HybridstatTask(RootTask):
-    """
-    Constructs a list of tasks depending on a template and paths.
-    """
-    levelin      = Level.project
-    levelou      = Level.peak
-    paths        = []                   # type: Sequence[HybridstatIO]
-    template     = HybridstatTemplate()
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-    def addpaths(self, **kwa):
-        "appends a HybridstatIO to the list"
-        self.paths.append(HybridstatIO(**kwa))
-
-class HybridstatProcessor(Processor):
+class HybridstatBatchTask(BatchTask):
     """
     Constructs a list of tasks depending on a template and paths.
     """
+    template = HybridstatTemplate()
     @staticmethod
-    def create(mdl: Sequence[Task], **kwa) -> Iterator:
-        "creates a specific model for each path"
-        return _create(mdl).run(**kwa)
+    def pathtype() -> type:
+        "the type of paths"
+        return HybridstatIO
 
-    @classmethod
-    def models(cls, *paths, template = None, **kwa) -> Iterator[Sequence[Task]]:
-        "iterates through all instanciated models"
-        if template is None:
-            template = next((i for i in paths if isinstance(i, HybridstatTemplate)), None)
-            paths    = tuple(i for i in paths if not isinstance(i, HybridstatTemplate))
+    @staticmethod
+    def reporttype() -> type:
+        "the type of reports"
+        return HybridstatExcelTask
 
-        if len(paths) == 0:
-            return
-
-        if isinstance(paths[0], (tuple, list)) and len(paths) == 1:
-            paths = tuple(paths[0])
-
-        paths = tuple(i if isinstance(i, HybridstatIO) else HybridstatIO(**i) for i in paths)
-
-        if template is None:
-            template = HybridstatTemplate(**kwa)
-        elif len(kwa):
-            template = update(deepcopy(template), **kwa)
-
-        yield from(cls.model(i, template) for i in paths)
-
-    @classmethod
-    def reports(cls, *paths, template = None, pool = None, **kwa) -> Iterator[Sequence[Task]]:
-        "creates and runs models"
-        mdls = cls.models(paths, template = template, **kwa)
-        yield from chain.from_iterable(cls.create(i, pool = pool) for i in mdls)
-
+class HybridstatBatchProcessor(BatchProcessor):
+    """
+    Constructs a list of tasks depending on a template and paths.
+    """
     @classmethod
     def model(cls, paths: HybridstatIO, modl: HybridstatTemplate) -> Sequence[Task]:
         "creates a specific model for each path"
@@ -186,11 +124,6 @@ class HybridstatProcessor(Processor):
             return [track]+[i for i in modl]
         else:
             return [track]+[i for i in modl] + [rep]
-
-    def run(self, args):
-        fcn   = partial(self.reports, *self.task.paths, pool = args.pool,
-                        **self.task.template.config())
-        args.apply(fcn, levels = self.levels)
 
     @staticmethod
     def __oligos(track:TrackReaderTask, oligos:Union[Sequence[str],str]):
@@ -232,5 +165,5 @@ class HybridstatProcessor(Processor):
                                        model     = [track] + list(modl))
 
 # pylint: disable=invalid-name
-createmodels   = HybridstatProcessor.models
-computereports = HybridstatProcessor.reports
+createmodels   = HybridstatBatchProcessor.models
+computereports = HybridstatBatchProcessor.reports

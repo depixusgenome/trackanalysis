@@ -15,7 +15,7 @@ from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-imp
 from view.plots                 import DpxKeyedRow
 
 from hybridstat.reporting.identification import writeparams
-from hybridstat.processor                import createmodels
+from hybridstat.reporting.batch          import createmodels
 from hybridstat.view._io                 import ConfigXlsxIO
 
 def test_xlsxio():

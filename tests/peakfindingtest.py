@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Tests histogram  creation and analysis"
+from pathlib                    import Path
+from tempfile                   import mktemp, gettempdir
 import numpy as np
-from numpy.testing              import assert_equal, assert_allclose
-from numpy.lib.stride_tricks    import as_strided
+from numpy.testing               import assert_equal, assert_allclose
+from numpy.lib.stride_tricks     import as_strided
 
-from control.taskcontrol        import create
-from simulator                  import randpeaks
-from simulator.processor        import EventSimulatorTask
-from peakfinding.selector       import PeakSelector, EVENTS_DTYPE
-from peakfinding.processor      import PeakSelectorTask
-from peakfinding.histogram      import (Histogram, CWTPeakFinder,
-                                        ZeroCrossingPeakFinder, GroupByPeak)
-from peakfinding.alignment      import PeakCorrelationAlignment
+from control.taskcontrol         import create
+from simulator                   import randpeaks
+from simulator.processor         import EventSimulatorTask
+from peakfinding.selector        import PeakSelector, EVENTS_DTYPE
+from peakfinding.processor       import PeakSelectorTask
+from peakfinding.histogram       import (Histogram, CWTPeakFinder,
+                                         ZeroCrossingPeakFinder, GroupByPeak)
+from peakfinding.alignment       import PeakCorrelationAlignment
+from peakfinding.reporting.batch import computereports
+from testingcore                 import path as utfilepath
 
 CORR = lambda f, a, b, c, d, e, g: PeakCorrelationAlignment.run(f,
                                                                 precision     = 1.,
@@ -179,5 +183,22 @@ def test_control():
         tmp = [i.max() for i in evts['data']]
         assert_allclose(tmp, (peak,)*20, atol = 0.1)
 
+def test_reporting():
+    "tests processor"
+    for path in Path(gettempdir()).glob("*_peakfindingtest*.xlsx"):
+        path.unlink()
+    out   = mktemp()+"_peakfindingtest3.xlsx"
+
+    tasks = computereports(dict(track    = (Path(utfilepath("big_legacy")).parent/"*.trk",
+                                            utfilepath("CTGT_selection")),
+                                reporting= out))
+
+    pair = next(tasks)
+    assert not Path(out).exists()
+    gen  = pair.run()
+    assert not Path(out).exists()
+    tuple(i for i in gen)
+    assert Path(out).exists()
+
 if __name__ == '__main__':
-    test_randcorrelationalignment()
+    test_reporting()

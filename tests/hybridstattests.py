@@ -10,8 +10,8 @@ from peakcalling.processor          import ByHairpinGroup, ByHairpinBead, Distan
 from data                           import Track
 from utils                          import EVENTS_DTYPE
 from hybridstat.reporting           import run, HybridstatExcelProcessor, HybridstatExcelTask
-from hybridstat.reporting.identification import writeparams, readparams
-from hybridstat.processor           import HybridstatTask
+from hybridstat.reporting.identification  import writeparams, readparams
+from hybridstat.reporting.batch           import HybridstatBatchTask
 from control.taskcontrol            import create
 from testingcore                    import path as utfilepath
 
@@ -190,7 +190,7 @@ def test_processor():
         path.unlink()
     out   = mktemp()+"_hybridstattest3.xlsx"
 
-    task  = HybridstatTask()
+    task  = HybridstatBatchTask()
     task.addpaths(track    = (Path(utfilepath("big_legacy")).parent/"*.trk",
                               utfilepath("CTGT_selection")),
                   reporting= out,
