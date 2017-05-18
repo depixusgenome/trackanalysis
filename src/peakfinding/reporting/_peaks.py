@@ -52,10 +52,11 @@ class PeaksSheet(Reporter):
         "Peak position as measured (µm)"
         return peak[0]
 
-    @staticmethod
     @column_method("Peak Resolution")
-    def _peakresolution(_1, _2, peak:PeakOutput) -> float:
+    def _peakresolution(self, _1, _2, peak:PeakOutput) -> Optional[float]:
         "Standard deviation of event positions (µm)"
+        if self._nevt(_1, _2, peak) == 0:
+            return None
         return Probability.resolution(peak[1])
 
     @column_method("Event Count")

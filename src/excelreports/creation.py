@@ -132,9 +132,11 @@ class CsvReporter(_BaseReporter):
         if not hasattr(self, 'sheet_name'):
             self.sheet_name = None                     # type: Optional[str]
         if isinstance(filename, CsvReporter):
-            self.book  = filename.book
+            self.book      = filename.book
+            self._tablerow = getattr(filename, '_tablerow', 0)  # type: int
         else:
-            self.book  = filename
+            self.book      = filename
+            self._tablerow = 0
         self.sheet = self.sheet_name # type: Union[Worksheet,str]
 
     def _printtext(self, *args):

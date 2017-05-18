@@ -143,6 +143,9 @@ class SummarySheet(Reporter):
 
         prob = Probability(framerate   = self.config.track.framerate,
                            minduration = self.config.minduration)
+        if len(bead.events) == 0:
+            return Probability.FMAX
+
         prob = prob(bead.events[0][1], self.config.track.durations)
         return prob.averageduration
 
@@ -158,7 +161,7 @@ class SummarySheet(Reporter):
 
     def info(self, cnf = ''):
         "create header"
-        nbeads = len(self.config.beads)
+        nbeads = sum(len(i.beads) for i in self.config.groups)
         def _avg(fcn):
             vals = (fcn(*i) for i in self.iterate())
             return np.median([i for i in vals if i is not None])

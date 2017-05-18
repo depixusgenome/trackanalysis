@@ -37,21 +37,23 @@ class Probabilities(HasLengthPeak):
         "returns a probability value for a bead or the median for a hairpin"
         if bead is None:
             pkkey = np.int32(self.hairpins[ref.key].peaks[ipk]+.1) # type: ignore
-            arr   = np.array([self.__call__(name, None, i, j)
-                              for i in ref.beads
-                              for j in range(len(i.peaks))
-                              if i.peaks['key'][j] == pkkey],
-                             dtype = 'f4')
+            itr   = (self.__call__(name, None, i, j)
+                     for i in ref.beads
+                     for j in range(len(i.peaks))
+                     if i.peaks['key'][j] == pkkey)
+            arr   = np.array([i for i in itr if i is not None], dtype = 'f4')
             if len(arr) == 0:
                 return None
             ret = np.median(arr)
             return ret if np.isfinite(ret) else None
         else:
             val = self.__cache(bead, ipk)
-            if name not in val.__dict__:
+            if name == 'resolution' and name not in val.__dict__:
                 # Per default, the resolution is not computed. We do it here
-                assert name == 'resolution'
-                setattr(val, name, Probability.resolution(bead.events[ipk][1]))
+                if val.nevents == 0:
+                    setattr(val, name, None)
+                else:
+                    setattr(val, name, Probability.resolution(bead.events[ipk][1]))
 
             return getattr(val, name)
 

@@ -60,7 +60,7 @@ class Probability:
     nevents       = 0
     ntoolong      = 0
     totalduration = 0
-    FMAX          = np.finfo('f4').max # type: ignore
+    FMAX          = float(np.finfo('f4').max) # type: ignore
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -135,6 +135,9 @@ class Probability:
     @property
     def averageduration(self) -> float:
         u"Average duration of an event"
+        if self.nevents <= 0:
+            return 0.
+
         prob = 1.-self.probability
         if prob <= 0.:
             return 0.
