@@ -8,17 +8,13 @@ import numpy as np
 
 import version
 
-from excelreports.creation  import column_method, sheet_class
-from ._base                 import Bead, Reporter, Group
+from peakfinding.probabilities  import Probability
+from excelreports.creation      import column_method, sheet_class
+from ._base                     import Bead, Reporter, Group
 
 @sheet_class("Summary")
 class SummarySheet(Reporter):
     "creates the summary sheet"
-    @staticmethod
-    def tablerow():
-        "start row of the table"
-        return 10
-
     @staticmethod
     def chartheight(npeaks:int) -> int:
         "Returns the chart height"
@@ -59,12 +55,6 @@ class SummarySheet(Reporter):
         how likely this beads belongs to the group
         """
         return None if bead is None else bead.distance.value
-
-    @staticmethod
-    @column_method("Cycle Count")
-    def _ccount(_, bead:Bead) -> Optional[int]:
-        "Number of good cycles for this bead"
-        return None if bead is None else len(bead.events)
 
     @staticmethod
     @column_method("Stretch",
@@ -134,6 +124,28 @@ class SummarySheet(Reporter):
         else:
             return (bead.peaks['key'][1:] < 0).sum()
 
+    @column_method("Events per Cycle")
+    def _evts(self, _, bead:Bead) -> Optional[float]:
+        "Average number of events per cycle"
+        if bead is None:
+            return None
+
+        cnt = sum(1 for _, i in bead.events[1:] for j in i if j is not None) # type: ignore
+        if cnt == 0:
+            return 0.0
+        return cnt / self.config.track.ncycles
+
+    @column_method("Off Time")
+    def _offtime(self, _, bead:Bead) -> Optional[float]:
+        "Average time in phase 5 a bead is fully zipped"
+        if bead is None:
+            return None
+
+        prob = Probability(framerate   = self.config.track.framerate,
+                           minduration = self.config.minduration)
+        prob = prob(bead.events[0][1], self.config.track.durations)
+        return prob.averageduration
+
     @column_method("", exclude = lambda x: not x.isxlsx())
     def _chart(self, *args):
         return self.charting(*args)
@@ -146,18 +158,21 @@ class SummarySheet(Reporter):
 
     def info(self, cnf = ''):
         "create header"
-        sigmas = self.uncertainties()
+        nbeads = len(self.config.beads)
+        def _avg(fcn):
+            vals = (fcn(*i) for i in self.iterate())
+            return np.median([i for i in vals if i is not None])
+
         # pylint: disable=no-member
-        items  = [("GIT Version:",  version.version()),
-                  ("GIT Hash:",     version.lasthash()),
-                  ("GIT Date:",     version.hashdate()),
-                  ("Config:",       cnf),
-                  ("Median Noise:", np.median(sigmas))
+        items  = [("GIT Version:",      version.version()),
+                  ("GIT Hash:",         version.lasthash()),
+                  ("GIT Date:",         version.hashdate()),
+                  ("Config:",           cnf),
+                  ("Oligos:",           ', '.join(self.config.oligos)),
+                  ("Cycle  Count:",     self.config.track.ncycles),
+                  ("Bead Count",        nbeads),
+                  ("Median Noise:",     _avg(self._uncert)),
+                  ("Events per Cycle:", _avg(self._evts)),
+                  ("Off Time:",         _avg(self._offtime))
                  ]
-        if len(self.config.oligos) > 0:
-            items.append(("Oligos:", ','.join(self.config.oligos)))
-        if isinstance(self.config.track.path, tuple):
-            items.append(("Track", str(self.config.track.path[-1])))
-        else:
-            items.append(("Track", str(self.config.track.path)))
         self.header(items)

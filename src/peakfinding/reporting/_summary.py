@@ -15,11 +15,6 @@ from ._base                 import BEADKEY, PeakOutput, Reporter
 @sheet_class("Summary")
 class SummarySheet(Reporter):
     "creates the summary sheet"
-    @staticmethod
-    def tablerow():
-        "start row of the table"
-        return 10
-
     @column_method("Signal Noise", units = 'µm')
     def _uncert(self, bead:BEADKEY, _) -> float:
         "Standard deviation of the signal"
@@ -28,21 +23,21 @@ class SummarySheet(Reporter):
     @staticmethod
     @column_method("Peak Count")
     def _npeaks(_, outp:Tuple[PeakOutput]) -> int:
-        """ Number of peaks detected for that bead."""
+        "Number of peaks detected for that bead."
         return len(outp)
 
     @staticmethod
     @column_method("Events per Cycle")
-    def _ccount(_, outp:Tuple[PeakOutput]) -> float:
+    def _evts(_, outp:Tuple[PeakOutput]) -> float:
         "Average number of events per cycle"
         cnt = sum(1 for _, i in outp[1:] for j in i if j is not None) # type: ignore
         if cnt == 0:
             return 0.0
         return cnt / len(outp[0][1])
 
-    @column_method("Load")
-    def _load(self, _, outp:Tuple[PeakOutput]) -> float:
-        "Average time in peak 0"
+    @column_method("Off Time")
+    def _offtime(self, _, outp:Tuple[PeakOutput]) -> float:
+        "Average time in phase 5 a bead is fully zipped"
         if len(outp) == 0:
             return 0.
         prob = Probability(framerate   = self.config.track.framerate,
@@ -57,7 +52,9 @@ class SummarySheet(Reporter):
     def info(self, cnf = ''):
         "create header"
         nbeads = len(self.config.beads)
-        avg    = lambda fcn: np.median([fcn(*i) for i in self.config.beads])
+        def _avg(fcn):
+            vals = (fcn(*i) for i in self.iterate())
+            return np.median([i for i in vals if i is not None])
 
         # pylint: disable=no-member
         items  = [("GIT Version:",      version.version()),
@@ -66,8 +63,8 @@ class SummarySheet(Reporter):
                   ("Config:",           cnf),
                   ("Cycle  Count:",     self.config.track.ncycles),
                   ("Bead Count",        nbeads),
-                  ("Median Noise:",     avg(self._uncert)),
-                  ("Events per Cycle:", avg(self._ccount)),
-                  ("Load:",             avg(self._load))
+                  ("Median Noise:",     _avg(self._uncert)),
+                  ("Events per Cycle:", _avg(self._evts)),
+                  ("Off Time:",         _avg(self._offtime))
                  ]
         self.header(items)

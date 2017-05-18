@@ -37,16 +37,23 @@ class Probabilities(HasLengthPeak):
         "returns a probability value for a bead or the median for a hairpin"
         if bead is None:
             pkkey = np.int32(self.hairpins[ref.key].peaks[ipk]+.1) # type: ignore
-            ite = iter(self.__cache(i, j)
-                       for i in ref.beads for j in range(len(i.peaks))
-                       if i.peaks['key'][j] == pkkey)
-            arr = np.array([getattr(i, name) for i in ite], dtype = 'f4')
+            arr   = np.array([self.__call__(name, None, i, j)
+                              for i in ref.beads
+                              for j in range(len(i.peaks))
+                              if i.peaks['key'][j] == pkkey],
+                             dtype = 'f4')
             if len(arr) == 0:
                 return None
             ret = np.median(arr)
             return ret if np.isfinite(ret) else None
         else:
-            return getattr(self.__cache(bead, ipk), name)
+            val = self.__cache(bead, ipk)
+            if name not in val.__dict__:
+                # Per default, the resolution is not computed. We do it here
+                assert name == 'resolution'
+                setattr(val, name, Probability.resolution(bead.events[ipk][1]))
+
+            return getattr(val, name)
 
 class Neighbours(HasLengthPeak):
     "Peak bases and neighbours"
@@ -250,6 +257,11 @@ class PeaksSheet(Reporter):
     def _peakpos(_, bead:Bead, ipk:int) -> float:
         "Peak position as measured (µm)"
         return None if bead is None else bead.peaks['zvalue'][ipk]
+
+    @column_method("Peak Resolution")
+    def _peakresolution(self, *args) -> float:
+        "Standard deviation of event positions (µm)"
+        return self._proba('resolution', *args)
 
     @column_method("Peak Height")
     def _nevt(self, ref:Group, bead:Bead, ipk:int) -> int:
