@@ -165,16 +165,19 @@ def test_excelprocessor():
                                knownbeads= (98,),
                                minduration= 2)
     proc = HybridstatExcelProcessor(task)
+    # pylint: disable=missing-docstring
     class _Runner:
         model = {1:2}
         @staticmethod
         def apply(fcn):
-            "doc"
             fcn(_Frame())
+
+        @property
+        def data(self):
+            return  self
 
         @staticmethod
         def poolkwargs(_):
-            "doc"
             return {'pool': None, 'data': _Runner}
 
     assert not Path(task.path).exists()
@@ -202,4 +205,4 @@ def test_processor():
     assert Path(out).exists()
 
 if __name__ == '__main__':
-    test_processor()
+    test_excelprocessor()

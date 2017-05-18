@@ -17,6 +17,17 @@ if TYPE_CHECKING:
 PATHTYPE  = Union[str, Path]
 PATHTYPES = Union[PATHTYPE,Tuple[PATHTYPE,...]]
 
+def _glob(path:str):
+    ind  = path.find('*')
+    if ind == -1:
+        return path
+
+    root = Path(path[:ind])
+    if root != Path(path).parent:
+        return Path(str(root.parent)).glob(root.name+path[ind:])
+    else:
+        return Path(root).glob(path[ind:])
+
 def _checktype(fcn):
     sig = signature(fcn)
     tpe = tuple(sig.parameters.values())[-1].annotation
@@ -141,16 +152,8 @@ class LegacyGRFilesIO(_TrackIO):
         if cgr is None:
             raise IOError("No '.cgr' files in directory\n- {}".format(grs), "warning")
 
-        pot    = cgr.with_suffix('.trk').name
-        ind    = fname.find('*')
-        root   = Path(fname[:ind])
-        if root != Path(fname).parent:
-            glob   = root.name+fname[ind:]
-            parent = Path(str(root.parent))
-        else:
-            glob   = fname[ind:]
-            parent = root
-        trk    = next((i for i in parent.glob(glob) if i.name == pot), None)
+        pot = cgr.with_suffix('.trk').name
+        trk = next((i for i in _glob(fname) if i.name == pot), None)
         if trk is None:
             raise IOError("Could not find {} in {}".format(pot, fname), "warning")
         return trk, grs
@@ -245,10 +248,14 @@ class Handler:
             if not Path(paths).exists():
                 raise IOError("Could not find path: " + str(paths), "warning")
         else:
-            for i in paths:
-                if not Path(str(i)).exists():
-                    raise IOError("Could not find path: " + str(i), "warning")
             paths = tuple(str(i) for i in paths)
+            for i in paths:
+                if '*' in i:
+                    if next(_glob(i), None) is None:
+                        raise IOError("Path yields no file: " + i, "warning")
+
+                elif not Path(i).exists():
+                    raise IOError("Could not find path: " + i, "warning")
 
         for caller in _CALLERS:
             tmp = caller.check(paths)
