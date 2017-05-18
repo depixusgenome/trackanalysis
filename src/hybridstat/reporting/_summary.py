@@ -159,23 +159,32 @@ class SummarySheet(Reporter):
             yield (group, None)
             yield from ((group, bead) for bead in group.beads)
 
+    def tablerow(self):
+        return len(self.__info('', True))
+
     def info(self, cnf = ''):
         "create header"
-        nbeads = sum(len(i.beads) for i in self.config.groups)
+        self.header(self.__info(cnf, False))
+
+    def __info(self, cnf, sizeonly):
+        "creates the header table"
+        nbeads = 0 if sizeonly else sum(len(i.beads) for i in self.config.groups)
         def _avg(fcn):
+            if sizeonly:
+                return None
             vals = (fcn(*i) for i in self.iterate())
-            return np.median([i for i in vals if i is not None])
+            good = [i for i in vals if i is not None]
+            return None if len(good) == 0 else np.median(good)
 
         # pylint: disable=no-member
-        items  = [("GIT Version:",      version.version()),
-                  ("GIT Hash:",         version.lasthash()),
-                  ("GIT Date:",         version.hashdate()),
-                  ("Config:",           cnf),
-                  ("Oligos:",           ', '.join(self.config.oligos)),
-                  ("Cycle  Count:",     self.config.track.ncycles),
-                  ("Bead Count",        nbeads),
-                  ("Median Noise:",     _avg(self._uncert)),
-                  ("Events per Cycle:", _avg(self._evts)),
-                  ("Off Time:",         _avg(self._offtime))
-                 ]
-        self.header(items)
+        return [("GIT Version:",      version.version()),
+                ("GIT Hash:",         version.lasthash()),
+                ("GIT Date:",         version.hashdate()),
+                ("Config:",           cnf),
+                ("Oligos:",           ', '.join(self.config.oligos)),
+                ("Cycle  Count:",     self.config.track.ncycles),
+                ("Bead Count",        nbeads),
+                ("Median Noise:",     _avg(self._uncert)),
+                ("Events per Cycle:", _avg(self._evts)),
+                ("Off Time:",         _avg(self._offtime))
+               ]
