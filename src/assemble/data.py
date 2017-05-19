@@ -138,7 +138,7 @@ class BCollection:
         return self.oligos.index(oli)
 
 
-# cannot annotate OligoPeakKPerm entries
+# cannot annotate attributes as type OligoPeakKPerm
 # should subclass OligoPeakKPerm has a KPerm class
 class OligoPeakKPerm:
     u'kpermutation of OligoPeak Object'
@@ -246,3 +246,48 @@ class OligoPeakKPerm:
         returns True if set(getattr(kperm,attr))>set(getattr(self,attr))
         '''
         return set(getattr(kperm,attr))>set(getattr(self,attr))
+
+    def outer_seqs(self,ooverl:int)->Tuple[str, ...]:
+        u'''
+        returns the overlapping oligo seq of left most oligo and right most
+        as a tuple(left,right)
+        '''
+        return (self.kperm[0].seq[:ooverl],self.kperm[0].seq[-ooverl:])
+
+
+class KPermCollection:
+    u'''
+    Container for a list of OligoPeakKPerm
+    '''
+    kperms=[] # type: List[OligoPeakKPerm]
+
+    @initdefaults(frozenset(locals()))
+    def __init__(self,**kwa):
+        pass
+
+    @classmethod
+    def product(cls,first,second):
+        u'''
+        returns a KPermCollection with the product of kperms in first
+        and kperms in second
+        '''
+        if len(first.kperms)==[]:
+            return cls(kperms=second.kperms)
+
+        if len(second.kperms)==[]:
+            return cls(kperms=first.kperms)
+
+        kperms = list(OligoPeakKPerm.add(*prd)
+                      for prd in itertools.product(first.kperms,second.kperms))
+        return cls(kperms=kperms)
+
+
+    def intersect_with(self,other):
+        u'''
+        returns True if any OligoPeakKPerm is shared by the 2 collections
+        '''
+
+        for kpr in self.kperms:
+            if any(set(kpr.kperm).intersection(set(oth.kperm)) for oth in other.kperms):
+                return True
+        return False

@@ -4,8 +4,10 @@ u'''
 defines a list of scoring functors for sequence assembly
 '''
 from typing import Tuple, List, NamedTuple # pylint: disable=unused-import
+import itertools
 import scipy
 import numpy
+
 from utils import initdefaults
 from . import data # pylint: disable=unused-import
 from ._types import SciDist # pylint: disable=unused-import
@@ -20,7 +22,7 @@ class DefaultCallable:
 
 class SOMConstraint:
     u'functor for scipy.optimize.minimize constraints'
-    index=-1
+    index=-1 # type: int
     _epsi = 0.0001 # type: float
     @initdefaults
     def __init__(self,**kwa):
@@ -32,7 +34,7 @@ class OptiDistPerm:
     u'''
     minimize translational cost of permutation
     '''
-    perm = (-1,) # type: Tuple[int]
+    perm = tuple() # type: Tuple[int, ...]
     dists = [] # type: List[SciDist]
     __epsi=-1 # type:float
     @initdefaults()
@@ -90,7 +92,7 @@ class OptiKPerm: # need to complete pytest
 
 class CostPermute:
     u'returns the "cost" of translations due to permutation of oligo peaks'
-    perm = (-1,) # type: Tuple[int]
+    perm = tuple() # type: Tuple[int, ...]
     dists = [] # type: List[SciDist]
     oligos = [] # type: List[data.OligoPeak]
     @initdefaults()
@@ -129,19 +131,27 @@ class PDFCost:
                                for idp,val in enumerate(xstate)])
 
 
-ScoredKPerm = NamedTuple("ScoredKPerm",[("kperm",data.OligoPeakKPerm),
-                                        ("density_cost",float),
-                                        ("noverlaps",int)])
+class ScoredKPerm:
+    u'''
+    simple container for scores, and associated data.OligoPeakKPerm
+    '''
+    kperm=data.OligoPeakKPerm() # type: data.OligoPeakKPerm
+    pdfcost=0.0 # type: float
+    noverlaps=-1 # type: int
+    @initdefaults(frozenset(locals()))
+    def __init__(self,**kwa):
+        pass
 
-# still incorrect since __density (PDFCOST) should only take into account peaks
-# whose position has changed
-# and __overlaps should only consider local oligos (i.e. kpermids)
+    def intersect_with(self,other):
+        u'returns true if any oligo in kperm can be found in other'
+        return set(self.kperm.kperm).intersection(set(other.kperm.kperm))!=set()
+
 class ScoreAssembly:
     u'''
     given an assembly (list of oligos in the correct order)
     returns (number of overlaps,cost of permutation)
     '''
-    okperm=data.OligoPeakKPerm() # type: data.OligoPeakKPerm
+    kperm=data.OligoPeakKPerm() # type: data.OligoPeakKPerm
     ooverl=-1 # type: int
     @initdefaults
     def __init__(self,**kwa):
@@ -149,44 +159,90 @@ class ScoreAssembly:
 
     def run(self)->ScoredKPerm:
         u'compute score'
-        return ScoredKPerm(kperm=self.okperm,
-                           density_cost=self.__density(),
+        return ScoredKPerm(kperm=self.kperm,
+                           pdfcost=self.__density(),
                            noverlaps=self.__overlaps())
 
-    def __density(self)->float: # to check
-        changed=[self.okperm.kperm[idx]
-                 for idx,val in enumerate(self.okperm.kpermids)
-                 if val in self.okperm.changes]
-        return OptiKPerm(kperm=changed).cost()
+    def __density(self,attr="kperm")->float:
+        u'''
+        density must take into account all peaks in kperm (or perm)
+        to compute the pdfcost of neutral kperms (mandatory)
+        the pdfcost of 2 kperm are comparable iff set(kperm) are the same
+        '''
+        return OptiKPerm(kperm=getattr(self.kperm,attr)).cost()
 
     def __overlaps(self)->int: # to check
         u'''
         returns the number of consecutive overlaps between oligos in kpermids
         '''
-        kperm=self.okperm.kperm
+        kperm=self.kperm.kperm
         return len([idx for idx,val in enumerate(kperm[1:])
                     if len(data.Oligo.tail_overlap(kperm[idx].seq,
                                                    val.seq))==self.ooverl])
 
-    def __call__(self,okperm:data.OligoPeakKPerm)->ScoredKPerm:
-        self.okperm=okperm
+    def __call__(self,kperm:data.OligoPeakKPerm)->ScoredKPerm:
+        self.kperm=kperm
         return self.run()
 
 
 class ScoreFilter:
     u'''
-    filter out ScoredKPerm which cannot lead to the 'best' score
+    filter out ScoredKPerm which cannot lead to the 'best' score.
+    Care must be taken when filtering kperms.
+    At the moment we are considering kperms independently of the neighboring oligos
+    the solution (IMPLEMENTED) would be to consider groups of kperms
+    which have same outlying oligos
     '''
-    scorekperms=[] # type: List[ScoredKPerm]
+    scorekperms = [] # type: List[ScoredKPerm]
+    __pdfthreshold = 0.05 # type: float
+    ooverl=1 # type: int
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
         pass
 
-    def run(self)->List[ScoredKPerm]:
+    def __call__(self,sckperms):
+        u'''
+        functor calls run
+        '''
+        self.scorekperms = sckperms
+        return self.run()
+
+    def __filter1(self,scorekperms)->List[ScoredKPerm]:
         u'''
         implements minimal condition for optimal score
-        for the same value of overlaps, filters out 
-        the scores with density_cost > lower(density_cost)*(1-0.1)
+        for the same value of overlaps, filters out
+        the scores with pdfcost > lower(pdfcost)*(1-0.1)
         '''
-        # to implement
-        return self.scorekperms
+        out = [] # type: List[ScoredKPerm]
+        sorted_sckp= sorted(scorekperms,key=lambda x:x.noverlaps)
+
+        for group in itertools.groupby(sorted_sckp,lambda x:x.noverlaps):
+            sgroup = sorted(group[1],key=lambda x:x.pdfcost)
+            minpdf = sgroup[0].pdfcost*(1-self.__pdfthreshold)
+            out+=[grp for grp in sgroup if grp.pdfcost<minpdf]
+        return out
+
+
+    def __filter2(self,scorekperms)->List[ScoredKPerm]: # pylint: disable=no-self-use
+        u'''
+        discard solutions with higher pdfcost and fewer noverlaps
+        '''
+        return [sckp for sckp in scorekperms
+                if len([i for i in scorekperms
+                        if i.noverlaps>sckp.noverlaps
+                        and i.pdfcost<sckp.pdfcost])==0]
+
+    def run(self)->List[ScoredKPerm]:
+        u'runs filters in turn'
+        # group scorekperms by kperms with same outlying sequence
+        # this will work for kpermids which are connex.. needs to be more general
+        outseqs=set(sckp.kperm.outer_seqs(self.ooverl) for sckp in self.scorekperms)
+        groups = [[sckp for sckp in self.scorekperms
+                   if sckp.kperm.outer_seqs(self.ooverl)==out]
+                  for out in outseqs]
+        filtered=[] # type: List[ScoredKPerm]
+        for group in groups:
+            grp=self.__filter1(group)
+            grp=self.__filter2(grp)
+            filtered+=grp
+        return filtered

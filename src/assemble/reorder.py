@@ -11,7 +11,7 @@ import pickle
 import itertools
 import numpy
 from utils import initdefaults
-from .data import OligoPeakKPerm
+from .data import OligoPeakKPerm, KPermCollection
 from . import scores # needed to estimate the quality of each kperm
 
 class KPermAssessor:
@@ -154,6 +154,7 @@ class KPermCombiner:
     '''
     kpermassessor = KPermAssessor()
     scoring = lambda x: 0 # type: Callable
+    ooverl=-1 # type: int
     @initdefaults
     def __init__(self,**kwa):
         pass
@@ -169,6 +170,18 @@ class KPermCombiner:
                 for ats in attrsets]
         return groups
 
+    @classmethod
+    def __merge_kperms(cls,to_merge:List[KPermCollection])->KPermCollection:
+        u'''
+        merges groups of independant OligoKPerms
+        '''
+        # merge 2 KPermCollection at a time
+        # eventually (when correct implementation of scorefilter), filter at each step
+        out=KPermCollection()
+        for kpc in to_merge:
+            out=KPermCollection.product(out,kpc)
+        return out
+
     def run(self):
         u'''
         find supergroups, every possible kperm in a given supergroup is represented
@@ -180,6 +193,19 @@ class KPermCombiner:
         do not remove neutral permutations since :
         (1) few neutral permutations
         (2)allows neutral kperms to be ranked amongst each group
+
+
+        Can we abuse the ScoreFilter?
+        when the calculus of outseq wil be more general and take into account combination of
+        OligoPeakKPerm then we will be able to merge groups in mergeable, 2 at a time.
+        Each time a merge is performed, we could apply ScoreFilter to reduce the possible
+        permutations
+
+        possible improvements:
+        * mergeable counts for each element in disjoint to part in partition
+        -> duplicate on neutral k-permutation? could build a list/map/network
+        where each group are 2 by 2 disjoint instead of look for 2**(disjoints groups)
+
         '''
         # find groups of kperms
         groups = self.group_kperms()
@@ -187,31 +213,49 @@ class KPermCombiner:
         # reversed sort groups per size
         groups = sorted(groups,key=lambda x:-len(x))
 
-        scores=[[self.scoring(kpr) for kpr in grp] for grp in groups]
-        # compute score for each kperm in each group
-        # remove unwanted solution :
-        # for any factor such that E_tsl+factor*E_overl,
-        # we know that for same values of E_overl
-        # lower E_tsl values will result in worst scores
-        # reduces drastically the number of combinations between groups to explore
-        # for the same number of overlappings keep the kperms with lowest pdfcost (+-10 per cent)
+        scored=[[self.scoring(kpr) for kpr in grp] for grp in groups]
 
+        scfilter = scores.ScoreFilter(ooverl=self.ooverl)
+        filtered = [scfilter(grp) for grp in scored]
 
+        pickle.dump(filtered,open("scfiltered.pickle","wb"))
 
-        # reversed sort kperms by scoring value (tuple) in each group
-        for grpid,grp in enumerate(groups):
-            for kprid,kpr in enumerate(grp):
-                print(grpid,kprid,self.scoring(kpr))
+        # the partition is on the groups intersecting filtered[0] David!
+        # Oh, you are right. Cheers!
 
+        # we need to discard groups of a single elements (i.e. the neutral k-permutation)
+        filtered = list(filter(lambda x:len(x)>1,filtered))
 
+        filtered = [KPermCollection(kperms=[sckp.kperm for sckp in grp]) for grp in filtered]
+        pickle.dump(filtered,open("filtered.pickle","wb"))
+        partition = [kpc for kpc in filtered if kpc.intersect_with(filtered[0])]
+        print("len(filtered)=",len(filtered))
+        print("len(partition)=",len(partition))
+        # check this loop!!
+        to_merge=[]
+        for part in partition:
+            disjoints=[kpc for kpc in filtered if not kpc.intersect_with(part)]
+            print(len(disjoints))
+            mergeable = [list(itertools.compress(disjoints,comb))
+                         for comb in itertools.product([True,False],repeat=len(disjoints))]
+            # mergeable is a List[List[Collection]]
+            # if any collection in mergeable overlap discard merge
+            mergeok = [not any(kpc.intersect_with(other)
+                               for idx,kpc in enumerate(merge)
+                               for other in merge[idx+1:])
+                       for merge in mergeable]
+            to_merge.extend([[part]+ite for ite in itertools.compress(mergeable,mergeok)])
+            # [part]+ite for ite in itertools.compress(mergeable,mergeok), List[collections]
+        # partition # type: List[List[scorekperms]]
 
-        # can analyse each group to see if any constraints are not satisfied
-        # discard those solutions
+        pickle.dump(to_merge,open("to_merge.pickle","wb"))
 
-        # merge all groups (2 at a time?yes)
-        # merging 2 at a time we can start with the biggest group, and merge the next biggest
-        # giving us len(groups[0])*len(groups[1]) solutions. (should always be manageable)
-        # if kperms are ranked (better to worse (overlaps, pdfcost)) in each group
-        # then we can merge solutions until
+        #solutions=[]
+        #for grp in grpstomerge:
+        #    solutions+=self.__merge_kperms(grp)
+        #print("solutions=",solutions)
+        # rank solutions
 
-        return
+        # filter solutions
+        # return results
+        return filtered
