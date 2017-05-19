@@ -75,7 +75,7 @@ class CyclesPlotView(PlotView):
 
     def ismain(self):
         "Alignment, ... is set-up by default"
-        self._plotter.ismain()
+        self._plotter.ismain(self._keys)
         tasks         = self._ctrl.getGlobal('config').tasks
         tasks.default = ['extremumalignment', 'eventdetection']
         tasks.io.open.default = (tuple(tasks.io.open.get()[:-1])

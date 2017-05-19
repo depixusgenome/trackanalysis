@@ -6,12 +6,13 @@ from    typing          import (Optional, List,    # pylint: disable=unused-impo
                                 Tuple, TYPE_CHECKING)
 
 from    bokeh          import layouts
+from    bokeh.document import Document            # pylint: disable=unused-import
 from    bokeh.models   import (ColumnDataSource,  # pylint: disable=unused-import
                                Slider, CustomJS, Paragraph, Dropdown,
                                AutocompleteInput, DataTable, TableColumn,
                                IntEditor, NumberEditor, ToolbarBox,
                                RadioButtonGroup, CheckboxButtonGroup,
-                               CheckboxGroup, Widget)
+                               CheckboxGroup, Widget, Button)
 
 import  sequences
 from    control.action      import Action
@@ -244,34 +245,62 @@ class EventDetectionWidget(GroupWidget):
     def _data(self) -> dict:
         return dict(active = [] if self._model.eventdetection.task is None else [0])
 
-class WidgetMixin:
-    "Everything dealing with changing the config"
-    def __init__(self):
-        self.__widgets = dict(table   = PeaksTableWidget(self._model),
-                              sliders = ConversionSlidersWidget(self._model),
-                              seq     = SequencePathWidget(self._model),
-                              oligos  = OligoListWidget(self._model),
-                              align   = AlignmentWidget(self._model),
-                              drift   = DriftWidget(self._model),
-                              events  = EventDetectionWidget(self._model))
-
+class AdvancedWidget(_Widget):
+    "access to the modal dialog"
+    def __init__(self, model:PlotModelAccess) -> None:
+        super().__init__(model)
+        self.__widget = None # type: Optional[Button]
+        self.__doc    = None # type: Optional[Document]
         self.config.root.keypress.configuration.default = 'Alt-l'
-        self.css.dialog.defaults = dict(title = 'Cycles Plot Configuration',
-                                        body  = ('Histogram bin width',
-                                                 'Minimum frames per cycle'))
+        self.css.dialog.defaults = dict(title  = 'Cycles Plot Configuration',
+                                        button = 'Advanced',
+                                        body   = ('Histogram bin width',
+                                                  'Minimum frames per cycle'))
 
-    def configuration(self):
+    def on_click(self):
         "modal dialog for configuration"
         css = self.css.dialog
-        dialog(self._doc,
+        dialog(self.__doc,
                title   = css.title.get(),
-               context = Action(self._ctrl, css.title.get()),
-               body    = tuple(zip(css.title.body.get(), ('%(binwidth)d', '%(minframes)d'))),
+               context = lambda title: Action(self._ctrl, title),
+               body    = tuple(zip(css.body.get(), ('%(binwidth).3f', '%(minframes)d'))),
                model   = self._model)
+
+    def reset(self, _):
+        return
+
+    def create(self, action) -> List[Widget]:
+        "creates the widget"
+        width  = self.css.input.width.get()
+        height = self.css.input.height.get()
+        self.__widget = Button(width = width, height = height,
+                               label = self.css.dialog.button.get())
+        self.__widget.on_click(self.on_click)
+        return [self.__widget]
+
+    def callbacks(self, doc):
+        "adding callbacks"
+        self.__doc = doc
 
     def ismain(self, keys):
         "setup for when this is the main show"
-        keys.addKeyPress(('keypress.configuration', self.configuration))
+        keys.addKeyPress(('keypress.configuration', self.on_click))
+
+class WidgetMixin:
+    "Everything dealing with changing the config"
+    def __init__(self):
+        self.__widgets = dict(table    = PeaksTableWidget(self._model),
+                              sliders  = ConversionSlidersWidget(self._model),
+                              seq      = SequencePathWidget(self._model),
+                              oligos   = OligoListWidget(self._model),
+                              align    = AlignmentWidget(self._model),
+                              drift    = DriftWidget(self._model),
+                              events   = EventDetectionWidget(self._model),
+                              advanced = AdvancedWidget(self._model))
+
+    def ismain(self, keys):
+        "setup for when this is the main show"
+        self.__widgets['advanced'].ismain(keys)
 
     def _widgetobservers(self):
         for widget in self.__widgets.values():
@@ -284,16 +313,18 @@ class WidgetMixin:
 
         enableOnTrack(self, self._hist, self._raw, widgets)
 
-        self.__widgets['seq']    .callbacks(self._hover, self._ticker)
-        self.__widgets['sliders'].callbacks(self._hover)
-        self.__widgets['table']  .callbacks(self._hover)
+        self.__widgets['seq']     .callbacks(self._hover, self._ticker)
+        self.__widgets['sliders'] .callbacks(self._hover)
+        self.__widgets['table']   .callbacks(self._hover)
+        self.__widgets['advanced'].callbacks(self._doc)
         self.__slave_to_hover(widgets)
 
         return layouts.layout([[layouts.widgetbox(widgets['seq']+widgets['oligos']),
                                 layouts.widgetbox(widgets['sliders']),
                                 layouts.widgetbox(widgets['table'])],
                                [layouts.widgetbox(widgets[i])
-                                for i in ('align', 'drift', 'events')]])
+                                for i in ('align', 'drift', 'events')],
+                               [layouts.widgetbox(widgets['advanced'])]])
 
     def _resetwidget(self):
         for ite in self.__widgets.values():
