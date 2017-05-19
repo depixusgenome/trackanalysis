@@ -293,7 +293,7 @@ class TrackSimulator:
             if brownian > 0.:
                 cycles[:] += np.random.normal(0., brownian, cycles.shape)
 
-        elif isinstance(brownian, Sequence[Union[float,int]]):
+        elif isinstance(brownian, (tuple, list)):
             ends = np.insert(np.cumsum(self.durations), 0, 0)
             for i in range(len(self.durations)):
                 self.__addbrownian(cycles[:,ends[i]:ends[i+1]], brownian[i])
