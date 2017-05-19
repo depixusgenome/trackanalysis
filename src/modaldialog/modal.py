@@ -4,7 +4,8 @@
 Allows creating modals from anywhere
 """
 from    typing                  import (Optional,  # pylint: disable=unused-import
-                                        Callable, Union, Sequence, Any)
+                                        Callable, Union, Sequence, Any, cast)
+from    functools               import partial
 from    abc                     import ABCMeta, abstractmethod
 import  re
 
@@ -16,6 +17,7 @@ ROUTE = 'modaldialog'
 
 class Option(metaclass = ABCMeta):
     "Converts a text tag to an html input"
+    NAME = r'%\((?P<name>\w*)\)'
     @abstractmethod
     def replace(self, model, body:str) -> str:
         "replaces a pattern by an html tag"
@@ -26,31 +28,35 @@ class Option(metaclass = ABCMeta):
         "returns a method which sets values in a model"
         raise NotImplementedError()
 
+    @classmethod
+    def __default_empty(cls, elems, model, key):
+        if elems[key]:
+            cls.setvalue(model, key, None)
+        elif cls._cnv is str: # pylint: disable=no-member
+            cls.setvalue(model, key, '')
+
+    @classmethod
+    def __default_apply(cls, model, elems, # pylint: disable=too-many-arguments
+                        cnv, storeempty, key, val):
+        if key not in elems:
+            return False
+
+        if val != '':
+            try:
+                converted = cnv(val)
+            except Exception as exc: # pylint: disable=broad-except
+                LOGS.exception(exc)
+            else:
+                cls.setvalue(model, key, converted)
+        else:
+            storeempty(model, key)
+        return True
+
     def _converter(self, model, elems, cnv, storeempty = None) -> Callable:
         "returns a method which sets values in a model"
         if storeempty is None:
-            def _empty(model, key):
-                if elems[key]:
-                    self.setvalue(model, key, None)
-                elif self._cnv is str: # pylint: disable=no-member
-                    self.setvalue(model, key, '')
-            storeempty = _empty
-
-        def _apply(key, val):
-            if key not in elems:
-                return False
-
-            if val != '':
-                try:
-                    converted = cnv(val)
-                except Exception as exc: # pylint: disable=broad-except
-                    LOGS.exception(exc)
-                else:
-                    self.setvalue(model, key, converted)
-            else:
-                storeempty(model, key)
-            return True
-        return _apply
+            storeempty = partial(self.__default_empty, elems)
+        return cast(Callable, partial(self.__default_apply, model, elems, cnv, storeempty))
 
     @staticmethod
     def getvalue(mdl, keystr, default):
@@ -78,12 +84,12 @@ class TextOption(Option):
     "Converts a text tag to an html text input"
     def __init__(self, cnv, patt, step):
         self._cnv  = cnv
-        self._patt = re.compile(r'%\((.*?)\)'+patt)
+        self._patt = re.compile(self.NAME+patt)
         self._step = step
 
     def converter(self, model, body:str) -> Callable:
         "returns a method which sets values in a model"
-        elems = {i[0]: i[2] == 'o' for i in self._patt.findall(body)}
+        elems = {i.group('name'): i.group('opt') == 'o' for i in self._patt.finditer(body)}
         return self._converter(model, elems, self._cnv)
 
     def replace(self, model, body:str) -> str:
@@ -91,8 +97,8 @@ class TextOption(Option):
         def _replace(key, size, tpe):
             assert len(key), "keys must have a name"
             opt  = (''          if size is None else
-                    'step=1'    if size == 0    else
-                    'step=0.'+'0'*(size-1)+'1')
+                    'step=1'    if size == '0'  else
+                    'step=0.'+'0'*(int(size)-1)+'1')
 
             val  = self.getvalue(model, key, None)
             if val is not None:
@@ -103,9 +109,9 @@ class TextOption(Option):
 
         tpe = 'text' if self._cnv is str else 'number'
         if callable(self._step):
-            fcn = lambda i: _replace(i.group(1), self._step(i), tpe)
+            fcn = lambda i: _replace(i.group('name'), self._step(i), tpe)
         else:
-            fcn = lambda i: _replace(i.group(1), self._step, tpe)
+            fcn = lambda i: _replace(i.group('name'), self._step, tpe)
         return self._patt.sub(fcn, body)
 
 class CSVOption(Option):
@@ -114,17 +120,17 @@ class CSVOption(Option):
         super().__init__()
         split      = re.compile('[,;:]').split
         self._cnv  = lambda i: tuple(cnv(j) for j in split(i))
-        self._patt = re.compile(r'%\((.*?)\)'+patt)
+        self._patt = re.compile(self.NAME+patt)
 
     def converter(self, model, body:str) -> Callable:
         "returns a method which sets values in a model"
-        elems = {i[0]: i[2] == 'o' for i in self._patt.findall(body)}
+        elems = {i.group('name'): i.group('opt') == 'o' for i in self._patt.finditer(body)}
         return self._converter(model, elems, self._cnv)
 
     def replace(self, model, body:str) -> str:
         "replaces a pattern by an html tag"
         def _replace(match):
-            key = match.group(1)
+            key = match.group('name')
             assert len(key), "keys must have a name"
             val  = self.getvalue(model, key, None)
             opt  = (' value="{}"'.format(', '.join(str(i) for i in val))
@@ -138,12 +144,14 @@ class CSVOption(Option):
 
 class DpxModal(Model):
     "Modal dialog"
-    __OPTIONS          = (TextOption(int,   r'(o)*[id]',         1),
-                          TextOption(float, r'(?:\.(\d))*(o)*f', lambda i: i.group(2)),
-                          TextOption(str,   r'(o)*s',            None),
-                          CSVOption(int,   r'(o)*csv[id]'),
-                          CSVOption(float, r'(?:\.(\d))*(o)*csvf'),
-                          CSVOption(str,   r'(o)*csv'))
+    _PREC              = r'(?:\.(?P<prec>\d*))?'
+    _OPT               = r'(?P<opt>o)?'
+    __OPTIONS          = (TextOption(int,   _OPT+r'[id]',    1),
+                          TextOption(float, _PREC+_OPT+r'f', lambda i: i.group('prec')),
+                          TextOption(str,   _OPT+r's',       None),
+                          CSVOption(int,    _OPT+r'csv[id]'),
+                          CSVOption(float,  _OPT+r'csvf'),
+                          CSVOption(str,    _OPT+r'csv'))
     __css__            = [ROUTE+"/backbone.modal.css",
                           ROUTE+"/backbone.modal.theme.css"]
     __javascript__     =  ROUTE+"/underscore-min.js"

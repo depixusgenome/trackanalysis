@@ -12,17 +12,16 @@ def server(kwa):
     router = ("/%s/(.*)" % ROUTE, StaticFileHandler, { "path" : "static" })
     kwa['extra_patterns'] = [router]
 
-_PARAMS = tuple(signature(DpxModal.run).parameters)[1:]
+def document(doc):
+    "adds the DpxModal to this doc"
+    doc.add_root(DpxModal())
+
+_PARAMS = frozenset(tuple(signature(DpxModal.run).parameters)[1:])
 def dialog(doc, **_):
     "returns the DpxModal in this doc"
-    runargs = {i: _.pop(i) for i in _PARAMS}
     for root in doc.roots:
         if isinstance(root, DpxModal):
-            break
-    else:
-        root = DpxModal(**_)
-        doc.add_root(root)
-    if len(runargs):
-        return root.run(**runargs)
-    else:
-        return root
+            runargs = {i: _.pop(i) for i in _PARAMS & frozenset(_)}
+            return root.run(**runargs) if len(runargs) else root
+
+    raise RuntimeError('DpxModal is missing from the document')
