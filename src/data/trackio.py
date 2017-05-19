@@ -3,6 +3,7 @@
 u"Loading and save tracks"
 from    typing      import (Sequence, Callable, # pylint: disable=unused-import
                             Any, Union, Tuple, Optional, Iterator, TYPE_CHECKING)
+from    itertools   import chain
 from    inspect     import signature
 import  pickle
 import  re
@@ -21,9 +22,10 @@ def _glob(path:str):
     ind  = path.find('*')
     if ind == -1:
         return path
+    assert ind != 0
 
     root = Path(path[:ind])
-    if root != Path(path).parent:
+    if path[ind-1] not in ('/', '\\') and root != Path(path).parent:
         return Path(str(root.parent)).glob(root.name+path[ind:])
     else:
         return Path(root).glob(path[ind:])
@@ -87,6 +89,7 @@ class LegacyTrackIO(_TrackIO):
 
 class LegacyGRFilesIO(_TrackIO):
     u"checks and opens legacy GR files"
+    __CGR     = 'cgr_project'
     __TITLE   = re.compile(r"\\stack{{Bead (?P<id>\d+) Z.*?phase\(s\)"
                            +r"(?:[^\d]|\d(?!,))*(?P<phases>[\d, ]*?)\]}}")
     __GRTITLE = re.compile(r"Bead Cycle (?P<id>\d+) p.*")
@@ -103,12 +106,7 @@ class LegacyGRFilesIO(_TrackIO):
             return None
 
         if len(paths) == 2 and any(i.is_dir() for i in paths):
-            if paths[0].is_dir():
-                paths = paths[1], paths[0]
-
-            if all(i.suffix != '.gr' for i in paths[1].iterdir()):
-                raise IOError("No .gr files in directory\n- {}".format(paths[1]),
-                              "warning")
+            paths = cls.__findgrs(paths)
             fname = str(paths[0])
             if '*' in fname:
                 return cls.__findtrk(fname, paths[1])
@@ -144,6 +142,34 @@ class LegacyGRFilesIO(_TrackIO):
         for key in remove:
             output.pop(key)
         return output
+
+    @classmethod
+    def __findgrs(cls, paths):
+        cgr    = cls.__CGR
+        err    = lambda j: IOError(j+'\n -'+ '\n -'.join(str(i) for i in paths), 'warning')
+        hasgr  = lambda i: (i.is_dir()
+                            and (i.name == cgr
+                                 or any(j.suffix in ('.gr', '.cgr') for j in i.iterdir())))
+
+        grs    = [hasgr(i) for i in paths]
+        direct = sum(i for i, _ in grs)
+
+        if direct == 0:
+            grs    = [hasgr(i/cgr) for i in paths]
+            direct = sum(i for i, _ in grs)
+
+            if direct == 0:
+                raise err("No .gr files in directory:")
+
+            elif direct > 1:
+                raise err("All sub-directories have .gr files:")
+
+            return paths[1 if grs[0] else 0], paths[0 if grs[0] else 1]/cgr
+
+        elif direct > 1:
+            raise err("All directories have .gr files:")
+
+        return paths[1 if grs[0] else 0], paths[0 if grs[0] else 1]
 
     @staticmethod
     def __findtrk(fname:str, grs:PATHTYPE) -> Tuple[PATHTYPE,PATHTYPE]:
@@ -192,6 +218,34 @@ class LegacyGRFilesIO(_TrackIO):
             inds = np.int32(vals[0]+.1+starts[cyc]) # type: ignore
             bead[inds] = vals[1]
         return beadid
+
+    @classmethod
+    def scancgr(cls, trkdirs: Union[str, Sequence[str]], grdirs: Union[str, Sequence[str]]):
+        """
+        Scans for pairs
+
+        Returns:
+
+            * pairs of (trk file, gr directory)
+            * gr directories with missing trk files
+            * trk files with missing gr directories
+        """
+        grdirs  = (grdirs,)  if isinstance(grdirs,  (Path, str)) else grdirs  # type: ignore
+        trkdirs = (trkdirs,) if isinstance(trkdirs, (Path, str)) else trkdirs # type: ignore
+
+        cgr    = cls.__CGR
+        ichain = lambda lst, fcn: chain.from_iterable(_glob(fcn(str(k))) for k in lst)
+        scan   = lambda lst, fcn: {i.stem: i for i in ichain(lst, fcn)}
+
+        trks   = scan(trkdirs, lambda i: i if i.endswith('.trk') else i+'/**/*.trk')
+        cgrs   = scan(grdirs,  lambda i: i if cgr in i           else i+'/**/'+cgr+'/*.cgr')
+
+        pairs    = frozenset(trks) & frozenset(cgrs)
+        good     = tuple((trks[i], cgrs[i].parent) for i in pairs)
+        lonegrs  = tuple(cgrs[i].parent for i in frozenset(cgrs) - pairs)
+        lonetrks = tuple(trks[i]        for i in frozenset(trks) - pairs)
+
+        return good, lonegrs, lonetrks
 
 _CALLERS = _TrackIO.__subclasses__()
 

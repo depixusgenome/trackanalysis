@@ -3,7 +3,7 @@
 u""" access to files """
 import  json
 import  warnings
-from    typing  import Union, Sequence
+from    typing  import Union, Sequence, Optional
 from    pathlib import Path
 import  numpy as np
 
@@ -35,14 +35,18 @@ PATHS = dict(small_pickle   = "small_pickle.pk",
              big_selected   = big_selected,
              big_all        = big_all)
 
-def path(name:str) -> Union[str, Sequence[str]]:
+def path(name:Optional[str]) -> Union[str, Sequence[str]]:
     u"returns the path to the data"
+    directory = Path("../tests/"+__package__+"/")
+    if name is None:
+        return str(directory)
+
     default = PATHS.get(name.lower().strip(), name)
     if callable(default):
         return default()
 
     def _test(i):
-        val = Path("../tests/"+__package__+"/"+i)
+        val = directory/i
         if not val.exists():
             val = Path(i)
             if not val.exists():

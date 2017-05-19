@@ -8,7 +8,8 @@ import numpy as np
 from   legacy           import readtrack   # pylint: disable=import-error,no-name-in-module
 import data
 from   data.trackitems  import Items
-from   testingcore      import path as utpath
+from   data.trackio     import LegacyGRFilesIO
+from   testingcore      import path as utpath, getmonkey
 
 # pylint: disable=missing-docstring,protected-access
 class _MyItem(Items):
@@ -202,5 +203,21 @@ def test_findgrdir():
              24, 25, 26, 27, 28, 29, 2, 34, 35, 37, 3, 4, 6, 7}
     assert set(track.beadsonly.keys()) == keys
 
+def test_scancgr(monkeypatch):
+    "tests LegacyGRFilesIO.scancgr"
+    assert LegacyGRFilesIO.scancgr("dummy", "dummy") == ((), (), ())
+
+    directory        = Path(utpath(None))
+    pairs, grs, trks = LegacyGRFilesIO.scancgr(directory, directory)
+    assert (pairs, grs) == ((), ())
+    assert sorted(trks) == sorted(Path(directory).glob("*.trk"))
+
+    monkeypatch.setattr(LegacyGRFilesIO, '_LegacyGRFilesIO__CGR', 'CTGT_selection')
+    pairs, grs, trks = LegacyGRFilesIO.scancgr(directory, directory)
+    assert len(grs) == 0
+    assert pairs    == ((directory/'test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.trk',
+                         directory/'CTGT_selection'),)
+    assert len(trks) == len(tuple(Path(directory).glob("*.trk"))) - len(pairs)
+
 if __name__ == '__main__':
-    test_cycles_mixellipsisnumbers()
+    test_scancgr(getmonkey())
