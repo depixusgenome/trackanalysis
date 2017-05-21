@@ -15,12 +15,11 @@ from    bokeh.models   import (ColumnDataSource,  # pylint: disable=unused-impor
                                CheckboxGroup, Widget, Button)
 
 import  sequences
-from    control.action      import Action
 from    view.plots          import (PlotModelAccess, GroupWidget,
                                     WidgetCreator as _Widget, DpxNumberFormatter)
 from    view.plots.sequence import readsequence, OligoListWidget, SequencePathWidget
 from    view.base           import enableOnTrack
-from    modaldialog         import dialog
+from    modaldialog.view    import AdvancedWidgetMixin
 
 from    ._bokehext          import DpxHoverModel      # pylint: disable=unused-import
 
@@ -245,46 +244,17 @@ class EventDetectionWidget(GroupWidget):
     def _data(self) -> dict:
         return dict(active = [] if self._model.eventdetection.task is None else [0])
 
-class AdvancedWidget(_Widget):
+class AdvancedWidget(AdvancedWidgetMixin, _Widget):
     "access to the modal dialog"
+    _TITLE = 'Cycles Plot Configuration'
+    _BODY  = (('Histogram bin width',         '%(binwidth).3f'),
+              ('Minimum frames per position', '%(minframes)d'))
     def __init__(self, model:PlotModelAccess) -> None:
-        super().__init__(model)
-        self.__widget = None # type: Optional[Button]
-        self.__doc    = None # type: Optional[Document]
-        self.config.root.keypress.configuration.default = 'Alt-l'
-        self.css.dialog.defaults = dict(title  = 'Cycles Plot Configuration',
-                                        button = 'Advanced',
-                                        body   = ('Histogram bin width',
-                                                  'Minimum frames per cycle'))
+        _Widget.__init__(self, model)
+        AdvancedWidgetMixin.__init__(self)
 
-    def on_click(self):
-        "modal dialog for configuration"
-        css = self.css.dialog
-        dialog(self.__doc,
-               title   = css.title.get(),
-               context = lambda title: Action(self._ctrl, title),
-               body    = tuple(zip(css.body.get(), ('%(binwidth).3f', '%(minframes)d'))),
-               model   = self._model)
-
-    def reset(self, _):
-        return
-
-    def create(self, action) -> List[Widget]:
-        "creates the widget"
-        width  = self.css.input.width.get()
-        height = self.css.input.height.get()
-        self.__widget = Button(width = width, height = height,
-                               label = self.css.dialog.button.get())
-        self.__widget.on_click(self.on_click)
-        return [self.__widget]
-
-    def callbacks(self, doc):
-        "adding callbacks"
-        self.__doc = doc
-
-    def ismain(self, keys):
-        "setup for when this is the main show"
-        keys.addKeyPress(('keypress.configuration', self.on_click))
+    def _args(self, **kwa):
+        return super()._args(model = self._model, **kwa)
 
 class WidgetMixin:
     "Everything dealing with changing the config"

@@ -277,6 +277,5 @@ class PeaksPlotView(PlotView):
 
     def ismain(self):
         "Alignment, ... is set-up by default"
-        tasks = self._plotter.model.config.root.tasks
-        tasks.default = ['extremumalignment', 'eventdetection', 'peakselector']
-        setupio(self._plotter.model)
+        self._ismain(tasks = ['extremumalignment', 'eventdetection', 'peakselector'],
+                     **setupio(self._plotter.model))

@@ -17,7 +17,7 @@ ROUTE = 'modaldialog'
 
 class Option(metaclass = ABCMeta):
     "Converts a text tag to an html input"
-    NAME = r'%\((?P<name>\w*)\)'
+    NAME = r'%\((?P<name>[\w\.]*)\)'
     @abstractmethod
     def replace(self, model, body:str) -> str:
         "replaces a pattern by an html tag"
@@ -29,15 +29,15 @@ class Option(metaclass = ABCMeta):
         raise NotImplementedError()
 
     @classmethod
-    def __default_empty(cls, elems, model, key):
+    def _default_empty(cls, elems, model, key):
         if elems[key]:
             cls.setvalue(model, key, None)
         elif cls._cnv is str: # pylint: disable=no-member
             cls.setvalue(model, key, '')
 
     @classmethod
-    def __default_apply(cls, model, elems, # pylint: disable=too-many-arguments
-                        cnv, storeempty, key, val):
+    def _default_apply(cls, model, elems, # pylint: disable=too-many-arguments
+                       cnv, storeempty, key, val):
         if key not in elems:
             return False
 
@@ -48,15 +48,19 @@ class Option(metaclass = ABCMeta):
                 LOGS.exception(exc)
             else:
                 cls.setvalue(model, key, converted)
+        elif isinstance(storeempty, Exception):
+            raise storeempty
         else:
             storeempty(model, key)
         return True
 
-    def _converter(self, model, elems, cnv, storeempty = None) -> Callable:
+    @classmethod
+    def _converter(cls, model, elems, cnv, storeempty = None) -> Callable:
         "returns a method which sets values in a model"
         if storeempty is None:
-            storeempty = partial(self.__default_empty, elems)
-        return cast(Callable, partial(self.__default_apply, model, elems, cnv, storeempty))
+            storeempty = partial(cls._default_empty, elems)
+        fcn = partial(cls._default_apply, model, elems, cnv, storeempty)
+        return cast(Callable, fcn)
 
     @staticmethod
     def getvalue(mdl, keystr, default):
@@ -79,6 +83,26 @@ class Option(metaclass = ABCMeta):
             for key in keys[:-1]:
                 mdl = getattr(mdl, key)
             setattr(mdl, keys[-1], val)
+
+class CheckOption(Option):
+    "Converts a text tag to an html check"
+    _PATT = re.compile(Option.NAME+'b')
+    @classmethod
+    def converter(cls, model, body:str) -> Callable:
+        "returns a method which sets values in a model"
+        elems = frozenset(i.group('name') for i in cls._PATT.finditer(body))
+        return cls._converter(model, elems, bool, AssertionError())
+
+    @classmethod
+    def replace(cls, model, body:str) -> str:
+        "replaces a pattern by an html tag"
+        def _replace(match):
+            key = match.group('name')
+            assert len(key), "keys must have a name"
+            val = str(bool(cls.getvalue(model, key, False))).lower()
+            return '<input type="checkbox" name="{}" checked={}/>'.format(key, val)
+
+        return cls._PATT.sub(_replace, body)
 
 class TextOption(Option):
     "Converts a text tag to an html text input"
@@ -146,7 +170,8 @@ class DpxModal(Model):
     "Modal dialog"
     _PREC              = r'(?:\.(?P<prec>\d*))?'
     _OPT               = r'(?P<opt>o)?'
-    __OPTIONS          = (TextOption(int,   _OPT+r'[id]',    1),
+    __OPTIONS          = (CheckOption(),
+                          TextOption(int,   _OPT+r'[id]',    1),
                           TextOption(float, _PREC+_OPT+r'f', lambda i: i.group('prec')),
                           TextOption(str,   _OPT+r's',       None),
                           CSVOption(int,    _OPT+r'csv[id]'),
@@ -215,11 +240,12 @@ class DpxModal(Model):
                 bdy = ' '.join(' '.join(i) for i in bdy)
 
             converters = [i.converter(model, bdy) for i in self.__OPTIONS]
+            ordered    = sorted(itms.items(), key = lambda i: bdy.index('%('+i[0]+')'))
             if context is None:
-                for i in itms.items():
+                for i in ordered:
                     any(cnv(*i) for cnv in converters)
             else:
                 with context(title):
-                    for i in itms.items():
+                    for i in ordered:
                         any(cnv(*i) for cnv in converters)
         return _hdl

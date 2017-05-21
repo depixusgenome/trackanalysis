@@ -58,6 +58,9 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, WidgetMixin):
         self.setbounds(self._hist.y_range, 'y', data['z'])
         self._resetwidget()
 
+    def ismain(self, keypressmanager):
+        WidgetMixin.ismain(self, keypressmanager)
+
     def observe(self):
         "sets-up model observers"
         super().observe()
@@ -75,8 +78,5 @@ class CyclesPlotView(PlotView):
 
     def ismain(self):
         "Alignment, ... is set-up by default"
-        self._plotter.ismain(self._keys)
-        tasks         = self._ctrl.getGlobal('config').tasks
-        tasks.default = ['extremumalignment', 'eventdetection']
-        tasks.io.open.default = (tuple(tasks.io.open.get()[:-1])
-                                 + ('control.taskio.ConfigTrackIO',))
+        super()._ismain(tasks  = ['extremumalignment', 'eventdetection'],
+                        ioopen = [slice(None, -1), 'control.taskio.ConfigTrackIO'])

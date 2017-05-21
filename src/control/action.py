@@ -75,6 +75,11 @@ class Action:
         self._logstart()
         return self._ctrl
 
+    def withcalls(self, calls) -> 'Action':
+        "sets calls"
+        self._calls = _Calls(calls)
+        return self
+
     def __call__(self, fcn: Callable, calls = None, test = None):
         if test is None:
             test = self._test

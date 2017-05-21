@@ -323,6 +323,9 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         if val and (old is PlotState.outofdate):
             self.__doreset()
 
+    def ismain(self, _):
+        "Set-up things if this view is the main one"
+
     def reset(self, items:dict):
         "Updates the data"
         if not self._needsreset(items):
@@ -511,6 +514,27 @@ class PlotView(BokehView):
     def plotter(self):
         "returns the plot creator"
         return self._plotter
+
+    def _ismain(self, tasks = None, ioopen = None, iosave = None):
+        "Set-up things if this view is the main one"
+        self._plotter.ismain(self._keys)
+
+        cnf = self._ctrl.getGlobal('config').tasks
+        if tasks is not None:
+            cnf.default = tasks
+
+        for name, vals in (('open', ioopen), ('save', iosave)):
+            if vals is None:
+                continue
+
+            old = cnf.io[name].get()
+            new = []
+            for i in vals:
+                if isinstance(i, (str, int)):
+                    new.append(old[i] if isinstance(i, int) else i)
+                elif isinstance(i, slice) or i is Ellipsis:
+                    new.extend(old if i is Ellipsis else old[i])
+            cnf.io[name].default = new
 
     def close(self):
         "remove controller"

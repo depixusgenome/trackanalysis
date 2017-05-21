@@ -235,8 +235,6 @@ class PeakIdentifier(Hairpin):
                     if out[0] < best[0]:
                         best = out
 
-            print('good', len(good), maxi, best[0],
-                    self.nfound(peaks,best[1], -best[2]/best[1]))
         return Distance(best[0], best[1], -best[2]/best[1])
 
     def __arange(self, exp:np.ndarray) -> Iterator[Tuple[float, float]]:
