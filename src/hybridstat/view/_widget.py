@@ -21,7 +21,7 @@ from view.plots                 import from_py_func, DpxNumberFormatter, WidgetC
 from view.plots.sequence        import (SequenceTicker, SequenceHoverMixin,
                                         SequencePathWidget)
 from peakfinding.selector       import PeakSelector # pylint: disable=unused-import
-from modaldialog.view           import AdvancedWidgetMixin, AdvancedTaskMixin
+from modaldialog.view           import AdvancedTaskMixin
 from ._model                    import PeaksPlotModelAccess
 
 class PeaksSequencePathWidget(SequencePathWidget):
@@ -279,7 +279,7 @@ class PeakIDPathWidget(WidgetCreator):
             txt = str(Path(path).resolve())
         (self.__widget if resets is None else resets[self.__widget]).update(value = txt)
 
-class AdvancedWidget(AdvancedWidgetMixin, AdvancedTaskMixin, WidgetCreator):
+class AdvancedWidget(AdvancedTaskMixin, WidgetCreator):
     "access to the modal dialog"
     _TITLE = 'Hybridstat Configuration'
     _BODY  = (('Minimum frame count per event', '%(_framecount)d'),
@@ -288,10 +288,9 @@ class AdvancedWidget(AdvancedWidgetMixin, AdvancedTaskMixin, WidgetCreator):
 
     def __init__(self, model:PeaksPlotModelAccess) -> None:
         WidgetCreator.__init__(self, model)
-        AdvancedWidgetMixin.__init__(self)
         AdvancedTaskMixin.__init__(self)
         self._outp  = {} # type: Dict[str, Dict[str, Any]]
 
-    _framecount = AdvancedTaskMixin.attr('eventdetection.task.select.minlength')
-    _eventcount = AdvancedTaskMixin.attr('peakselection.task.group.mincount')
-    _align5     = AdvancedTaskMixin.none('peakselection.task.align')
+    _framecount = AdvancedTaskMixin.attr('eventdetection.events.select.minlength')
+    _eventcount = AdvancedTaskMixin.attr('peakselection.group.mincount')
+    _align5     = AdvancedTaskMixin.none('peakselection.align')
