@@ -110,15 +110,19 @@ class Action:
             return _wrap_normal
 
     def __exit__(self, tpe, val, bkt):
+        assert val is None or isinstance(val, Exception)
         self._CNT[0] -= 1
         errvalue = [self._ctrl.getGlobal('config').catcherror.get()]
-        self._ctrl.handle(self._STOPEVT,
-                          args = {'type':       tpe,
-                                  'value':      val,
-                                  'catcherror': errvalue,
-                                  'backtrace':  bkt,
-                                  'recursive':  self._CNT[0] > 0})
-        self._logstop(val, errvalue)
+        try:
+            self._ctrl.handle(self._STOPEVT,
+                              args = {'type':       tpe,
+                                      'value':      val,
+                                      'catcherror': errvalue,
+                                      'backtrace':  bkt,
+                                      'recursive':  self._CNT[0] > 0})
+            self._logstop(val, errvalue)
+        except Exception as exc: # pylint: disable=broad-except
+            LOGS.exception(exc)
         return errvalue[0]
 
 class Computation(Action):
