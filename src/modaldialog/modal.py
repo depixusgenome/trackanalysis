@@ -87,6 +87,10 @@ class Option(metaclass = ABCMeta):
 class CheckOption(Option):
     "Converts a text tag to an html check"
     _PATT = re.compile(Option.NAME+'b')
+    @staticmethod
+    def __cnv(val):
+        return val == 'on'
+
     @classmethod
     def converter(cls, model, body:str) -> Callable:
         "returns a method which sets values in a model"
@@ -99,8 +103,8 @@ class CheckOption(Option):
         def _replace(match):
             key = match.group('name')
             assert len(key), "keys must have a name"
-            val = str(bool(cls.getvalue(model, key, False))).lower()
-            return '<input type="checkbox" name="{}" checked={}/>'.format(key, val)
+            val = 'checked' if bool(cls.getvalue(model, key, False)) else ''
+            return '<input type="checkbox" name="{}" {} />'.format(key, val)
 
         return cls._PATT.sub(_replace, body)
 
@@ -120,8 +124,8 @@ class TextOption(Option):
         "replaces a pattern by an html tag"
         def _replace(key, size, tpe):
             assert len(key), "keys must have a name"
-            opt  = (''          if size is None else
-                    'step=1'    if size == '0'  else
+            opt  = (''          if size is None   else
+                    'step=1'    if int(size) == 0 else
                     'step=0.'+'0'*(int(size)-1)+'1')
 
             val  = self.getvalue(model, key, None)
@@ -171,7 +175,7 @@ class DpxModal(Model):
     _PREC              = r'(?:\.(?P<prec>\d*))?'
     _OPT               = r'(?P<opt>o)?'
     __OPTIONS          = (CheckOption(),
-                          TextOption(int,   _OPT+r'[id]',    1),
+                          TextOption(int,   _OPT+r'[id]',    0),
                           TextOption(float, _PREC+_OPT+r'f', lambda i: i.group('prec')),
                           TextOption(str,   _OPT+r's',       None),
                           CSVOption(int,    _OPT+r'csv[id]'),
@@ -241,6 +245,7 @@ class DpxModal(Model):
 
             converters = [i.converter(model, bdy) for i in self.__OPTIONS]
             ordered    = sorted(itms.items(), key = lambda i: bdy.index('%('+i[0]+')'))
+            print(ordered)
             if context is None:
                 for i in ordered:
                     any(cnv(*i) for cnv in converters)

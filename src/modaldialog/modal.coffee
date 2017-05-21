@@ -322,27 +322,35 @@ class DpxModalDialogView extends Modal
     template: (data) ->
         return data['template']
 
+    _form_values: () ->
+        vals = {}
+        for val in $(@modalEl).find('#dpxbbmform').serializeArray()
+            vals[val.name] = val.value
+
+        for val in $(@modalEl).find('#dpxbbmform input[type=checkbox]:not(:checked)')
+            vals[val.name] = 'off'
+        return vals
+
     render: (options) ->
       super(options)
       if not (@startvalues?)
-          @startvalues = $(@modalEl).find('form').serializeArray()
+          @startvalues = @_form_values()
       return this
 
     cancel: () ->
         delete @startvalues
 
     submit: () ->
-        arr  = $(@modalEl).find('form').serializeArray()
-        vals = {}
         if @startvalues?
-            for val in arr
-                if @startvalues[val['name']] != val['value']
-                    vals[val['name']] = val['value']
-        else
-            for val in arr
-                vals[val['name']] = val['value']
+            vals = {}
+            for key, val of @_form_values()
+                if @startvalues[key] != val
+                    vals[key] = val
 
-        delete @startvalues
+            delete @startvalues
+        else
+            vals = @_form_values()
+
         @model.results = vals
         @model.callback?.execute(@model.results)
 
@@ -367,7 +375,7 @@ export class DpxModal       extends Model
                 "</div>"
 
         body  = "<div class='bbm-modal__section'>"     +
-                    "<form>" + @body + "</form>"       +
+                    '<form id="dpxbbmform">' + @body + "</form>"       +
                 "</div>"
 
         btns  = "<div class='bbm-modal__bottombar'>"                            +

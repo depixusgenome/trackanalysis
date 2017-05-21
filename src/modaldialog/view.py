@@ -68,9 +68,10 @@ class AdvancedWidgetMixin:
         "setup for when this is the main show"
         keys.addKeyPress(('keypress.advanced', self.on_click))
 
-class AdvancedTaskMixin:
+class AdvancedTaskMixin(AdvancedWidgetMixin):
     "Means for configuring tasks with a modal dialog"
     def __init__(self):
+        super().__init__()
         self.__outp = {} # type: Dict[str, Dict[str, Any]]
 
     def __enter__(self, *args):
@@ -94,7 +95,8 @@ class AdvancedTaskMixin:
         assert len(keys) >= 2
         # pylint: disable=protected-access
         def _get(self):
-            mdl = getattr(self._model, keys[0]).task
+            mdl = getattr(self._model, keys[0])
+            mdl = getattr(mdl, 'task', mdl)
             for key in keys[1:]:
                 mdl = getattr(mdl, key)
             return mdl if getter is None else getter(mdl)
@@ -102,12 +104,13 @@ class AdvancedTaskMixin:
         def _set(self, val):
             tsk = getattr(self._model, keys[0]).task
             if len(keys) == 2:
-                self._outp[keys[0]][keys[1]] = val if setter is None else setter(tsk, val)
+                val = val if setter is None else setter(tsk, val)
+                self.__outp.setdefault(keys[0], {})[keys[1]] = val
             else:
-                mdl = self._outp.get(keys[0], {}).get(keys[1], self.__none)
+                mdl = self.__outp.setdefault(keys[0], {}).get(keys[1], self.__none)
                 if mdl is self.__none:
                     mdl = deepcopy(getattr(tsk, keys[1]))
-                    self._outp[keys[0]][keys[1]] = mdl
+                    self.__outp[keys[0]][keys[1]] = mdl
 
                 for key in keys[2:-1]:
                     mdl = getattr(mdl, key)
