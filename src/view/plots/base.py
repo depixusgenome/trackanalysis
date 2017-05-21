@@ -349,35 +349,43 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         "sets-up model observers"
         self.project.root.observe(self.reset)
 
-    def __doreset(self):
-        with self.resetting():
-            self._bkmodels.clear()
-            self._model.reset()
+    if False: # pylint: disable=using-constant-test
+        # use this for single-thread debugging
+        def __doreset(self):
+            with self.resetting():
+                self._model.reset()
+                self._reset()
+            self._ctrl.handle('rendered', args = {'plot': self})
+    else:
+        def __doreset(self):
+            with self.resetting():
+                self._bkmodels.clear()
+                self._model.reset()
 
-        old, self.state = self.state, PlotState.abouttoreset
-        async def _reset_and_render():
-            def _reset():
-                self.state = PlotState.resetting
-                with BokehView.computation.type(self._ctrl, calls = self.__doreset):
-                    try:
-                        self._reset()
-                        return tuple(self._bkmodels.items())
-                    finally:
-                        self._bkmodels.clear()
-                        self.state = old # pylint: disable=redefined-variable-type
-
-            ret = await threadmethod(_reset)
-
-            def _render():
-                if ret is not None:
+            old, self.state = self.state, PlotState.abouttoreset
+            async def _reset_and_render():
+                def _reset():
+                    self.state = PlotState.resetting
                     with BokehView.computation.type(self._ctrl, calls = self.__doreset):
-                        with self.resetting():
-                            self._bkmodels.update(ret)
-                self._ctrl.handle('rendered', args = {'plot': self})
+                        try:
+                            self._reset()
+                            return tuple(self._bkmodels.items())
+                        finally:
+                            self._bkmodels.clear()
+                            self.state = old # pylint: disable=redefined-variable-type
 
-            self._doc.add_next_tick_callback(_render)
+                ret = await threadmethod(_reset)
 
-        spawn(_reset_and_render)
+                def _render():
+                    if ret is not None:
+                        with BokehView.computation.type(self._ctrl, calls = self.__doreset):
+                            with self.resetting():
+                                self._bkmodels.update(ret)
+                    self._ctrl.handle('rendered', args = {'plot': self})
+
+                self._doc.add_next_tick_callback(_render)
+
+            spawn(_reset_and_render)
 
     def _addcallbacks(self, fig):
         "adds Range callbacks"
