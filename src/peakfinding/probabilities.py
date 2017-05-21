@@ -75,7 +75,7 @@ class Probability:
                maxdurs: Sequence[int]
               ) -> None:
         u"Updates stats"
-        arrs = np.array([isinstance(i, (list, np.ndarray)) for i in events])
+        arrs = np.array([isinstance(i, (list, np.ndarray)) for i in events], dtype = 'bool')
         if any(arrs):
             evts = events [arrs]
             dur  = [i['start'][-1]-i['start'][0]+len(i['data'][-1]) for i in evts]

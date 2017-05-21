@@ -31,32 +31,34 @@ class PeakSelector:
 
     @staticmethod
     def __move(evts, deltas):
-        if deltas is None:
-            return evts
-
         first = next((i for i in evts if i is not None), None)
         if first is None:
             return evts
 
-        if isinstance(first, tuple) or first.dtype == EVENTS_DTYPE:
-            def _add(evt, delta):
-                if len(evt) == 0:
-                    return None
-                elif len(evt) == 1:
-                    return evt[0][0], evt[0][1]+delta
-                else:
-                    evt['data'] += delta
-                    return evt
-        else:
-            def _add(evt, delta):
-                if len(evt) == 0:
-                    return None
-                elif len(evt) == 1:
-                    return evt[0]+delta
-                else:
-                    return evt + delta
+        if deltas is None:
+            objs = tuple(i if len(i) else None for i in evts)
 
-        objs = tuple(_add(*item) for item in zip(evts, deltas))
+        else:
+            if isinstance(first, tuple) or first.dtype == EVENTS_DTYPE:
+                def _add(evt, delta):
+                    if len(evt) == 0:
+                        return None
+                    elif len(evt) == 1:
+                        return evt[0][0], evt[0][1]+delta
+                    else:
+                        evt['data'] += delta
+                        return evt
+            else:
+                def _add(evt, delta):
+                    if len(evt) == 0:
+                        return None
+                    elif len(evt) == 1:
+                        return evt[0]+delta
+                    else:
+                        return evt + delta
+
+            objs = tuple(_add(*item) for item in zip(evts, deltas))
+
         if isinstance(first, tuple) or first.dtype == EVENTS_DTYPE:
             if all(isinstance(i, tuple) for i in objs):
                 ret = np.empty((len(objs),), dtype = EVENTS_DTYPE)
