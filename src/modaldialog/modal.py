@@ -245,7 +245,6 @@ class DpxModal(Model):
 
             converters = [i.converter(model, bdy) for i in self.__OPTIONS]
             ordered    = sorted(itms.items(), key = lambda i: bdy.index('%('+i[0]+')'))
-            print(ordered)
             if context is None:
                 for i in ordered:
                     any(cnv(*i) for cnv in converters)

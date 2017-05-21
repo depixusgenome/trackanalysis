@@ -79,8 +79,8 @@ class AdvancedTaskMixin(AdvancedWidgetMixin):
         super().__enter__()
 
     def __exit__(self, tpe, val, bkt):
-        for key, val in self.__outp.items():
-            getattr(self._model, key).update(**val)
+        for key, elems in self.__outp.items():
+            getattr(self._model, key).update(**elems)
 
         super().__exit__(tpe, val, bkt)
 
