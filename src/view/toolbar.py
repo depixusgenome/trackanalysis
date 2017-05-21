@@ -170,13 +170,13 @@ class ToolBar(BokehView): # pylint: disable=too-many-instance-attributes
         self._ctrl.getGlobal("project").track.observe(_title)
 
         msg   = self._ctrl.getGlobal('project').message
-        busy  = self._ctrl.getGlobal('css').message.busy.get()
+        busy  = self._ctrl.getGlobal('css').message.busy.get(), 'normal'
         catch = self._ctrl.getGlobal('config').catcherror.toolbar
 
         @self._ctrl.observe
         def _onstartaction(recursive = None):      # pylint: disable=unused-variable
             if not recursive:
-                msg.set((busy, 'normal'))
+                msg.set(busy)
 
         @self._ctrl.observe
         def _onstartcomputation(recursive = None): # pylint: disable=unused-variable
@@ -184,13 +184,12 @@ class ToolBar(BokehView): # pylint: disable=too-many-instance-attributes
                 return
             val = msg.get()
             if val is None or (isinstance(val, tuple) and val[1] == 'normal'):
-                msg.set((busy, 'normal'))
+                msg.set(busy)
 
         def _observer(recursive = None, value = None, catcherror = None, **_):
             if not recursive:
                 if value is None:
-                    val = msg.get()
-                    if val is not None and busy == val[0]:
+                    if busy == msg.get():
                         msg.set(None)
                 else:
                     msg.set(value)
