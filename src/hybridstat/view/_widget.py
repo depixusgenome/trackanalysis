@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
 from typing                     import (Optional,   # pylint: disable=unused-import
-                                        List, Dict)
+                                        List, Dict, Any, Type)
 from pathlib                    import Path
 
 import bokeh.core.properties as props
@@ -20,7 +20,8 @@ from view.intinput              import PathInput
 from view.plots                 import from_py_func, DpxNumberFormatter, WidgetCreator
 from view.plots.sequence        import (SequenceTicker, SequenceHoverMixin,
                                         SequencePathWidget)
-
+from peakfinding.selector       import PeakSelector # pylint: disable=unused-import
+from modaldialog.view           import AdvancedWidgetMixin, AdvancedTaskMixin
 from ._model                    import PeaksPlotModelAccess
 
 class PeaksSequencePathWidget(SequencePathWidget):
@@ -277,3 +278,20 @@ class PeakIDPathWidget(WidgetCreator):
         if path is not None and Path(path).exists():
             txt = str(Path(path).resolve())
         (self.__widget if resets is None else resets[self.__widget]).update(value = txt)
+
+class AdvancedWidget(AdvancedWidgetMixin, AdvancedTaskMixin, WidgetCreator):
+    "access to the modal dialog"
+    _TITLE = 'Hybridstat Configuration'
+    _BODY  = (('Minimum frame count per event', '%(_framecount)d'),
+              ('Minimum event count per peak',  '%(_eventcount)d'),
+              ('Align on phase 5',              '%(_align5)b'))
+
+    def __init__(self, model:PeaksPlotModelAccess) -> None:
+        WidgetCreator.__init__(self, model)
+        AdvancedWidgetMixin.__init__(self)
+        AdvancedTaskMixin.__init__(self)
+        self._outp  = {} # type: Dict[str, Dict[str, Any]]
+
+    _framecount = AdvancedTaskMixin.attr('eventdetection.task.select.minlength')
+    _eventcount = AdvancedTaskMixin.attr('peakselection.task.group.mincount')
+    _align5     = AdvancedTaskMixin.none('peakselection.task.align')

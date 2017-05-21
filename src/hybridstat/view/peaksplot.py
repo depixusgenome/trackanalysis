@@ -26,7 +26,7 @@ from view.plots.sequence        import (SequenceTicker, OligoListWidget,
 from ._model                    import PeaksPlotModelAccess
 from ._widget                   import (PeaksSequencePathWidget,
                                         PeaksStatsWidget, PeakListWidget,
-                                        PeakIDPathWidget)
+                                        PeakIDPathWidget, AdvancedWidget)
 from ._io                       import setupio
 
 class PeaksSequenceHover(Model, SequenceHoverMixin):
@@ -143,7 +143,8 @@ class PeaksPlotCreator(TaskPlotCreator):
                              oligos   = OligoListWidget(self._model),
                              stats    = PeaksStatsWidget(self._model),
                              peaks    = PeakListWidget(self._model),
-                             cstrpath = PeakIDPathWidget(self._model))
+                             cstrpath = PeakIDPathWidget(self._model),
+                             advanced = AdvancedWidget(self._model))
         self._ticker  = SequenceTicker()
         self._hover   = PeaksSequenceHover()
         if TYPE_CHECKING:
@@ -204,6 +205,9 @@ class PeaksPlotCreator(TaskPlotCreator):
         for widget in self._widgets.values():
             widget.observe()
 
+    def ismain(self, keypressmanager):
+        self._widgets['advanced'].ismain(keypressmanager)
+
     def _reset(self):
         data, peaks        = self.__data()
         self._bkmodels[self._peaksrc].update(data = peaks, column_names = list(peaks.keys()))
@@ -257,17 +261,18 @@ class PeaksPlotCreator(TaskPlotCreator):
         self._hover.jsslaveaxes(self._fig, self._peaksrc)
 
     def __setup_widgets(self):
-        action  = self.action()
+        action  = self.action
         wdg     = {i: j.create(action) for i, j in self._widgets.items()}
         enableOnTrack(self, self._fig, wdg)
 
+        self._widgets['advanced'].callbacks(self._doc)
         self._widgets['peaks'].setsource(self._peaksrc)
         self._widgets['seq'].callbacks(self._hover,
                                        self._ticker,
                                        wdg['stats'][-1],
                                        wdg['peaks'][-1])
 
-        itr = chain.from_iterable(wdg[i] for i in ('seq','oligos','cstrpath'))
+        itr = chain.from_iterable(wdg[i] for i in ('seq','oligos','cstrpath', 'advanced'))
         lay = layouts.row(layouts.widgetbox(*itr), layouts.widgetbox(*wdg['stats']))
         return layouts.column(lay, *wdg['peaks'])
 

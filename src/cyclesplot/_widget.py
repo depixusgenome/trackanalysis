@@ -32,7 +32,7 @@ class PeaksTableWidget(_Widget):
                                    'title'  : u'dna ↔ nm',
                                    'zformat': '0.0000'}
 
-    def create(self, action) -> List[Widget]:
+    def create(self, _) -> List[Widget]:
         "creates the widget"
         width  = self.css.input.width.get()
         css    = self.css.table
@@ -124,7 +124,7 @@ class ConversionSlidersWidget(_Widget):
         "adds info to the widget"
         self.__figdata = histsource
 
-    def create(self, action) -> List[Widget]:
+    def create(self, _) -> List[Widget]:
         "creates the widget"
         widget = lambda x, s, e, n: Slider(value = getattr(self._model, x),
                                            title = self.css.title[x].get(),

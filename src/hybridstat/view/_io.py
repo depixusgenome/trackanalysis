@@ -142,11 +142,8 @@ class ConfigXlsxIO(TaskIO):
 def setupio(ctrl):
     "sets the io up"
     ConfigXlsxIO.setup(ctrl)
-
-    tasks = ctrl.config.root.tasks
-    vals  = (tuple(tasks.io.open.get()[:-2])
-             + (__name__+'.PeaksConfigGRFilesIO', __name__+'.PeaksConfigTrackIO'))
-    tasks.io.open.default = vals
-
-    vals = (tuple(tasks.io.save.get())+(__name__+'.ConfigXlsxIO',))
-    tasks.io.save.default = vals
+    name = lambda i: __name__ + '.'+i
+    return dict(ioopen = (slice(None, -2),
+                          name('PeaksConfigGRFilesIO'),
+                          name('PeaksConfigTrackIO')),
+                iosave = (..., name('ConfigXlsxIO')))
