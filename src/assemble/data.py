@@ -285,6 +285,9 @@ class KPermCollection:
     def intersect_with(self,other):
         u'''
         returns True if any OligoPeakKPerm is shared by the 2 collections
+        REMINDER: 2 groups intersecting (i.e. which share the same oligos)
+        both contain the kperm related to the intersecting oligos.
+        So one has to consider only 1 of the 2 intersecting subgroups.
         '''
 
         for kpr in self.kperms:
