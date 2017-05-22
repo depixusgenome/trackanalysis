@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # encoding: utf-8
 from pathlib import Path
+from zipfile import ZipFile
+from shutil  import rmtree
+import py_compile
 try:
     import wafbuilder as builder
 except ImportError:
@@ -144,45 +147,76 @@ def setup(cnf):
 
 class _CondaApp(BuildContext):
     fun = cmd = 'app'
+
+    def __clean(self):
+        out = git.version()
+        self.options.APP_PATH = self.bldnode.make_node("OUTPUT")
+
+        if self.options.APP_PATH.exists():
+            self.options.APP_PATH.delete()
+
+    def __startscripts(self, mods):
+        iswin = builder.os.sys.platform.startswith("win")
+        ext   = ".bat"                      if iswin else ".sh"
+        cmd   = r"start /min %~dp0pythonw " if iswin else "./"
+        def make_startup_script(name, val):
+            "creates the startup script"
+            for optext, opts in (('', ''), ('_chrome', ' --electron')):
+               with open(str(self.options.APP_PATH.make_node(name+optext+ext)), 'w',
+                          encoding = 'utf-8') as stream:
+                    print(cmd + r"app/cmdline.py " + val + opts + ' --port random',
+                          file = stream)
+
+        self.make_startup_script = make_startup_script
+        self.recurse(mods, "startscripts", mandatory = False)
+
+    def __electron(self):
+        old = Path(".").resolve()
+        builder.os.chdir(str(Path("build")/"OUTPUT"))
+        npm = 'npm' + ('.cmd' if iswin else '')
+        for path in ('.', 'bin', 'Scripts'):
+            if (Path(path)/npm).exists():
+                cmd = str(Path(path)/npm) + " install electron"
+                Logs.info(cmd)
+                builder.os.system(cmd)
+                break
+        else:
+            raise IOError("Could not install electron")
+        builder.os.chdir(str(old))
+
+    def __final(self, mods):
+        path = Path("build")/"OUTPUT"
+
+        def _compile(fname):
+            with open(str(fname), encoding = 'utf-8') as stream:
+                if not any('from_py_func' in i for i in stream):
+                    out = str(fname.with_suffix('.pyc'))
+                    py_compile.compile(str(fname), out)
+                    fname.unlink()
+
+        for val in path.glob("*.py"):
+            _compile(val)
+
+        for mod in mods:
+            for val in (path/mod[mod.find('/')+1:]).glob("**/*.py"):
+                _compile(val)
+
+        out = Path(".")/git.version()
+        if out.exists():
+            rmtree(str(out))
+        builder.os.rename(str(path), str(out))
+
+    def build_app(self):
+        self.__clean()
+
+        mods = [i for i in _getmodules(self) if i != 'tests']
+        build(self, mods)
+        builder.condasetup(self, copy = 'build/OUTPUT', runtimeonly = True)
+        self.__startscripts()
+        self.__electron()
+
+        self.add_group()
+        self(rule = lambda _: self.__final(mods), always = True)
+
 def app(bld):
-    out = git.version()
-    bld.options.APP_PATH = bld.bldnode.make_node("OUTPUT")
-
-    if bld.options.APP_PATH.exists():
-        bld.options.APP_PATH.delete()
-
-    mods = [i for i in _getmodules(bld) if i != 'tests']
-    build(bld, mods)
-
-    builder.condasetup(bld, copy = 'build/OUTPUT', runtimeonly = True)
-
-    iswin = builder.os.sys.platform.startswith("win")
-    ext   = ".bat"                      if iswin else ".sh"
-    cmd   = r"start /min %~dp0pythonw " if iswin else "./"
-    def make_startup_script(name, val):
-        "creates the startup script"
-        for optext, opts in (('', ''), ('_chrome', ' --electron')):
-           with open(str(bld.options.APP_PATH.make_node(name+optext+ext)), 'w',
-                      encoding = 'utf-8') as stream:
-                print(cmd + r"app/cmdline.py " + val + opts + ' --port random',
-                      file = stream)
-
-    bld.make_startup_script = make_startup_script
-    bld.recurse(mods, "startscripts", mandatory = False)
-
-    builder.os.chdir(str(Path("build")/"OUTPUT"))
-    npm = 'npm' + ('.cmd' if iswin else '')
-    for path in ('.', 'bin', 'Scripts'):
-        if (Path(path)/npm).exists():
-            cmd = str(Path(path)/npm) + " install electron"
-            Logs.info(cmd)
-            builder.os.system(cmd)
-            break
-    else:
-        raise IOError("Could not install electron")
-    builder.os.chdir("..")
-    builder.os.chdir("..")
-
-    bld.add_group()
-    rule = lambda _: builder.os.rename(str(Path("build")/"OUTPUT"), str(Path(".")/git.version()))
-    bld(rule = rule, always = True)
+    bld.build_app()
