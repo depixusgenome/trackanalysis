@@ -335,6 +335,10 @@ class WidgetMixin:
 
         self._hover.js_on_change("updating", _js_cb)
 
+    def advanced(self):
+        "triggers the advanced dialog"
+        self.__widgets['advanced'].on_click()
+
     if TYPE_CHECKING:
         # pylint: disable=no-self-use,unused-argument
         config    = None    # type: ignore

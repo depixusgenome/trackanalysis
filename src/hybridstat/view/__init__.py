@@ -40,6 +40,12 @@ class HybridStatView(BokehView):
     def ismain(self):
         "Allows setting-up stuff only when the view is the main one"
         self._panels[-1].ismain()
+        def _advanced():
+            for panel in self._panels:
+                if self.__state(panel).get() is PlotState.active:
+                    getattr(panel, 'advanced', lambda:None)()
+                    break
+        self._keys.addKeyPress(('keypress.advanced', _advanced))
 
     def getroots(self, doc):
         "returns object root"

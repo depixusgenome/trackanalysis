@@ -10,8 +10,7 @@ import bokeh.core.properties as props
 from bokeh                      import layouts
 from bokeh.plotting             import figure, Figure    # pylint: disable=unused-import
 from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
-                                        Model, TapTool, CustomJS)
-
+                                        Model, TapTool, CustomJS, ToolbarBox)
 import numpy                    as     np
 
 from signalfilter               import rawprecision
@@ -185,7 +184,14 @@ class PeaksPlotCreator(TaskPlotCreator):
         self.__create_fig()
         rends = self.__add_curves()
         self.__setup_tools(doc, rends)
-        return layouts.row(self.__setup_widgets(), DpxKeyedRow(self, self._fig))
+
+        plts  = layouts.gridplot([[self._fig]],
+                                 toolbar_location = self.css.toolbar_location.get())
+        keyed = DpxKeyedRow(self, self._fig,
+                            children = [plts],
+                            toolbar  = next(i for i in plts.children
+                                            if isinstance(i, ToolbarBox)))
+        return layouts.row(self.__setup_widgets(), keyed)
 
     def observe(self):
         super().observe()
@@ -276,9 +282,16 @@ class PeaksPlotCreator(TaskPlotCreator):
         lay = layouts.row(layouts.widgetbox(*itr), layouts.widgetbox(*wdg['stats']))
         return layouts.column(lay, *wdg['peaks'])
 
+    def advanced(self):
+        "triggers the advanced dialog"
+        self._widgets['advanced'].on_click()
+
 class PeaksPlotView(PlotView):
     "Peaks plot view"
     PLOTTER = PeaksPlotCreator
+    def advanced(self):
+        "triggers the advanced dialog"
+        self._plotter.advanced()
 
     def ismain(self):
         "Alignment, ... is set-up by default"
