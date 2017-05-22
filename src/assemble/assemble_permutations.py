@@ -45,7 +45,6 @@ def subdivide_then_partition(collections:List[data.KPermCollection],sort_by="kpe
     # order collection by indices (?) yes, could do
     # as long as we make sure that overlapping kpcs are together
     # group intersecting kpcs? it is not a requirement IF are carefull when merging
-
     ocollect = tuple(sorted(collections,key = lambda x:min(getattr(x.kperms[0],sort_by))))
     print("len(ocollect)=",len(ocollect))
     subdivision=[tuple(ocollect[max_size*i:(i+1)*max_size])
@@ -102,13 +101,19 @@ def reduce_collection(collection:data.KPermCollection)->data.KPermCollection:
     u'''
     score the kpermutations
     this function could potentially discard good (but likely) permutations
+    need to check why some kperms have very high pdfcost 1e-5 when it should be neutral permutation
     '''
     score=scores.ScoreAssembly(ooverl=3)
     scored=[score(kperm) for kperm in collection.kperms]
-    scored=sorted(scored,lambda x:(x.pdfcost,x.noverlaps))
+    for sc in scored:
+        print(sc.kperm.kpermids,sc.kperm.changes,sc.pdfcost,sc.noverlaps)
+    scored=sorted(scored,key=lambda x:(x.pdfcost,x.noverlaps))
+    print([i.pdfcost for i in scored])
+    minpdfcost=min([x.pdfcost for x in scored])
+    return data.KPermCollection(kperms=[scperm.kperm
+                                        for scperm in scored
+                                        if scperm.pdfcost/minpdfcost>0.5])
 
-    data.KPermCollection
-    return 
 
 if __name__=='__main__':
     import pickle
@@ -117,13 +122,19 @@ if __name__=='__main__':
 
     print("len(filtered)=",len(filtered))
     #filtered=filtered[-30:]
-
+    
     # reduce each KPermCollection to the best ones pdfcost-wise
-    reduced = [reduce_collection(kpc) for kpc in filtered]
+    filtered = [reduce_collection(kpc) for kpc in filtered]
+    # may create kpc with only neutral element
+    filtered = [kpc for kpc in filtered if len(kpc.kperms)>1]
+    #print("filtered=",filtered)
+    with open("reduced.pickle","wb") as testfile:
+        pickle.dump(filtered,testfile)
 
     per_subdivision=subdivide_then_partition(filtered)
-    pickle.dump(open("per_subdivision_backup.pickle","wb"))
-    per_subdivision=pickle.load(open("per_subdivision_backup.pickle","rb"))
+    #pickle.dump(per_subdivision,open("per_subdivision_backup.pickle","wb"))
+    stop
+    #per_subdivision=pickle.load(open("per_subdivision_backup.pickle","rb"))
     # per_subdivision is a List[List[List[KPermCollection]]]
     for subd in per_subdivision:
         print("new subdivision to merge")
