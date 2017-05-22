@@ -164,5 +164,9 @@ class HybridstatBatchProcessor(BatchProcessor):
                                        model     = [track] + list(modl))
 
 # pylint: disable=invalid-name
-createmodels   = HybridstatBatchProcessor.models
-computereports = HybridstatBatchProcessor.reports
+createmodels     = HybridstatBatchProcessor.models
+computereporters = HybridstatBatchProcessor.reports
+def generatereports(*paths, template = None, pool = None, **kwa):
+    "generates reports"
+    for itm in computereporters(*paths, template = template, pool = pool, **kwa):
+        tuple(itm)

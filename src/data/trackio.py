@@ -152,11 +152,11 @@ class LegacyGRFilesIO(_TrackIO):
                                  or any(j.suffix in ('.gr', '.cgr') for j in i.iterdir())))
 
         grs    = [hasgr(i) for i in paths]
-        direct = sum(i for i, _ in grs)
+        direct = sum(i for i in grs)
 
         if direct == 0:
             grs    = [hasgr(i/cgr) for i in paths]
-            direct = sum(i for i, _ in grs)
+            direct = sum(i for i in grs)
 
             if direct == 0:
                 raise err("No .gr files in directory:")
@@ -220,7 +220,7 @@ class LegacyGRFilesIO(_TrackIO):
         return beadid
 
     @classmethod
-    def scancgr(cls, trkdirs: Union[str, Sequence[str]], grdirs: Union[str, Sequence[str]]):
+    def scan(cls, trkdirs: Union[str, Sequence[str]], grdirs: Union[str, Sequence[str]]):
         """
         Scans for pairs
 

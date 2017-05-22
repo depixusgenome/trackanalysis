@@ -205,15 +205,15 @@ def test_findgrdir():
 
 def test_scancgr(monkeypatch):
     "tests LegacyGRFilesIO.scancgr"
-    assert LegacyGRFilesIO.scancgr("dummy", "dummy") == ((), (), ())
+    assert LegacyGRFilesIO.scan("dummy", "dummy") == ((), (), ())
 
     directory        = Path(utpath(None))
-    pairs, grs, trks = LegacyGRFilesIO.scancgr(directory, directory)
+    pairs, grs, trks = LegacyGRFilesIO.scan(directory, directory)
     assert (pairs, grs) == ((), ())
     assert sorted(trks) == sorted(Path(directory).glob("*.trk"))
 
     monkeypatch.setattr(LegacyGRFilesIO, '_LegacyGRFilesIO__CGR', 'CTGT_selection')
-    pairs, grs, trks = LegacyGRFilesIO.scancgr(directory, directory)
+    pairs, grs, trks = LegacyGRFilesIO.scan(directory, directory)
     assert len(grs) == 0
     assert pairs    == ((directory/'test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.trk',
                          directory/'CTGT_selection'),)

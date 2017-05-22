@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Batch creator basics"
-from typing        import (Optional,  # pylint: disable=unused-import
-                           Iterator, Union, Iterable, Sequence)
-from copy          import deepcopy
-from itertools     import chain
-from functools     import partial
+from typing             import (Optional,  # pylint: disable=unused-import
+                                Iterator, Union, Iterable, Sequence)
+from pathlib            import Path
+from copy               import deepcopy, copy as shallowcopy
+from itertools          import chain
+from functools          import partial
 
-from utils         import initdefaults, update
-from data.trackio  import PATHTYPES, PATHTYPE # pylint: disable=unused-import
+from utils              import initdefaults, update
+from data.trackitems    import TrackItems
+from data.trackio       import PATHTYPES, PATHTYPE # pylint: disable=unused-import
 
-from model.task    import RootTask, Task, Level
-from .base         import Processor
+from model.task         import RootTask, Task, Level
+from .base              import Processor
 
 class BatchTemplate(Iterable):
     "Template of tasks to run"
@@ -91,8 +93,8 @@ class BatchProcessor(Processor):
         if isinstance(paths[0], (tuple, list)) and len(paths) == 1:
             paths = tuple(paths[0])
 
-        paths = tuple(i if isinstance(i, tsk.pathtype()) else tsk.pathtype()(**i)
-                      for i in paths)
+        pathtype = tsk.pathtype()
+        paths    = tuple(cls.path(pathtype, i, **kwa) for i in paths)
 
         if template is None:
             template = tsk.templatetype()(**kwa)
@@ -102,10 +104,25 @@ class BatchProcessor(Processor):
         yield from(cls.model(i, template) for i in paths)
 
     @classmethod
-    def reports(cls, *paths, template = None, pool = None, **kwa) -> Iterator[Sequence[Task]]:
-        "creates and runs models"
+    def reports(cls, *paths, template = None, pool = None, **kwa) -> Iterator[TrackItems]:
+        "creates TrackItems"
         mdls = cls.models(paths, template = template, **kwa)
         yield from chain.from_iterable(cls.create(i, pool = pool) for i in mdls)
+
+    @classmethod
+    def path(cls, pathtype, path, **kwa):
+        "creates a path using provided arguments"
+        if isinstance(path, dict):
+            return pathtype(**path, **kwa)
+
+        elif isinstance(path, pathtype):
+            return update(shallowcopy(path), **kwa)
+
+        elif isinstance(path, (tuple, str, Path)):
+            return pathtype(track = path, **kwa)
+
+        else:
+            raise TypeError('Could not create {} using {}'.format(pathtype, path))
 
     @classmethod
     def model(cls, paths: PathIO, modl: BatchTemplate) -> Sequence[Task]:

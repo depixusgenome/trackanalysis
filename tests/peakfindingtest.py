@@ -15,7 +15,7 @@ from peakfinding.processor       import PeakSelectorTask
 from peakfinding.histogram       import (Histogram, CWTPeakFinder,
                                          ZeroCrossingPeakFinder, GroupByPeak)
 from peakfinding.alignment       import PeakCorrelationAlignment
-from peakfinding.reporting.batch import computereports
+from peakfinding.reporting.batch import computereporters
 from testingcore                 import path as utfilepath
 
 CORR = lambda f, a, b, c, d, e, g: PeakCorrelationAlignment.run(f,
@@ -189,9 +189,9 @@ def test_reporting():
         path.unlink()
     out   = mktemp()+"_peakfindingtest3.xlsx"
 
-    tasks = computereports(dict(track    = (Path(utfilepath("big_legacy")).parent/"*.trk",
-                                            utfilepath("CTGT_selection")),
-                                reporting= out))
+    tasks = computereporters(dict(track    = (Path(utfilepath("big_legacy")).parent/"*.trk",
+                                              utfilepath("CTGT_selection")),
+                                  reporting= out))
 
     itms = next(tasks)
     assert not Path(out).exists()

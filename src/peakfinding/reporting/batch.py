@@ -56,5 +56,9 @@ class PeakFindingBatchProcessor(BatchProcessor):
         return modl
 
 # pylint: disable=invalid-name
-createmodels   = PeakFindingBatchProcessor.models
-computereports = PeakFindingBatchProcessor.reports
+createmodels     = PeakFindingBatchProcessor.models
+computereporters = PeakFindingBatchProcessor.reports
+def generatereports(*paths, template = None, pool = None, **kwa):
+    "generates reports"
+    for itm in computereporters(*paths, template = template, pool = pool, **kwa):
+        tuple(itm)
