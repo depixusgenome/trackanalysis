@@ -4,42 +4,64 @@
 from   pathlib import Path
 import logging
 import sys
+import glob
 import subprocess
 import random
 import inspect
 
 import click
 
+sys.path.extend(glob.glob("*.pyz"))
+# pylint: disable=wrong-import-position
 from utils.logconfig    import getLogger
 from bokeh.resources    import DEFAULT_SERVER_PORT
 from app.scripting      import INITIAL_ORDERS
 LOGS = getLogger()
 
-def _from_path(view):
-    pview = Path(view)
-    if not pview.exists():
-        return
-    vname   = str(pview.parent/pview.stem).replace('/', '.').replace('\\', '.')
+def _without_cls(vname, cname):
     viewmod = __import__(vname)
     for name in vname.split('.')[1:]:
         viewmod = getattr(viewmod, name)
 
-    name = pview.stem+'view'
-    if name == 'viewview':
-        name = pview.parent.stem+'view'
     pred = lambda i: (isinstance(i, type)
                       and i.__module__ == viewmod.__name__
-                      and i.__name__.lower() == name)
+                      and i.__name__.lower() == cname)
     pot  = tuple(i for _, i in inspect.getmembers(viewmod, pred))
     assert len(pot) == 1
     return pot[0]
 
+def _from_path(view):
+    pview = Path(view)
+    if pview.exists():
+        name = pview.stem+'view'
+        if name == 'viewview':
+            name = pview.parent.stem+'view'
+
+        mod = str(pview.parent/pview.stem).replace('/', '.').replace('\\', '.')
+        return _without_cls(mod, name)
+
 def _from_module(view):
+    if '/' in view or '\\' in view:
+        view = view.replace('/', '.').replace('\\', '.')
+        if view.endswith('.py'):
+            view = view[:-3]
+
     if view.startswith('view.'):
         view = view[5:]
 
     if '.' not in view:
         view = view.lower()+'.'+view
+    try:
+        ind  = view.rfind('.')
+        name = view[ind+1:]+'view'
+        if name == 'viewview':
+            name = view[:ind][view[:ind].rfind('.')+1:]+'view'
+        val = _without_cls(view, name)
+        if val is not None:
+            return val
+    except: # pylint: disable=bare-except
+        pass
+
     try:
         viewmod  = __import__(view[:view.rfind('.')],
                               fromlist = view[view.rfind('.')+1:])
