@@ -165,14 +165,11 @@ class _ManagedServerLoop:
 
     def __init__(self, mkpatch, kwa:dict) -> None:
         self.monkeypatch = self._Dummy() if mkpatch is None else mkpatch # type: ignore
-        self.server  = None # type: Server
-        self.view    = None # type: ignore
-        self.doc     = None # type: Document
-        self.kwa     = kwa
-
-    def __exit__(self, *_):
-        if self.server is not None:
-            self.quit()
+        self.server      = None # type: Server
+        self.view        = None # type: ignore
+        self.doc         = None # type: Document
+        self.kwa         = kwa
+        self.__warnings  = None # type: ignore
 
     def __buildserver(self, kwa):
         kwa['io_loop'] = IOLoop()
@@ -206,7 +203,6 @@ class _ManagedServerLoop:
             app  = pot[0]
 
         launch = getattr(_import(mod), fcn)
-
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', '.*inspect.getargspec().*')
             server = launch(app, server = kwa)
@@ -214,10 +210,8 @@ class _ManagedServerLoop:
         @classmethod
         def _open(_, doc, _func_ = server.MainView.open):
             self.doc = doc
-            with warnings.catch_warnings():
-                warnings.filterwarnings('ignore', '.*inspect.getargspec().*')
-                doc.add_root(DpxTestLoaded())
-                self.view = _func_(doc)
+            doc.add_root(DpxTestLoaded())
+            self.view = _func_(doc)
             return self.view
         server.MainView.open = _open
 
@@ -230,7 +224,10 @@ class _ManagedServerLoop:
         return server
 
     def __enter__(self):
-        self.server = self.__buildserver(self.kwa)
+        self.server     = self.__buildserver(self.kwa)
+        self.__warnings = warnings.catch_warnings()
+        self.__warnings.__enter__()
+        warnings.filterwarnings('ignore', '.*inspect.getargspec().*')
 
         def _start():
             "Waiting for the document to load"
@@ -243,6 +240,11 @@ class _ManagedServerLoop:
         self.server.start()
         self.loop.start()
         return self
+
+    def __exit__(self, *_):
+        if self.server is not None:
+            self.quit()
+        self.__warnings.__exit__(*_)
 
     @staticmethod
     def path(path:str) -> str:
