@@ -12,8 +12,7 @@ from    model.level import Level
 from    data        import Track
 
 if TYPE_CHECKING:
-    # pylint: disable=unused-import,wrong-import-order,ungrouped-imports
-    from .runner    import Runner
+    from .runner    import Runner # pylint: disable=unused-import
 
 _PROTECTED = 'tasktype',
 class ProtectedDict(dict):
