@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Hybridstat excel reporting processor"
+"Hybridstat excel reporting processor"
 from   typing               import (Sequence,       # pylint: disable=unused-import
                                     Dict, Iterator, Union, Optional, Any)
 from   pathlib              import Path
@@ -22,7 +22,7 @@ from ._peaks                    import PeaksSheet
 
 
 class HybridstatExcelTask(Task):
-    u"Reporter for Hybridstat"
+    "Reporter for Hybridstat"
     level       = Level.peak
     path        = ""
     oligos      = []    # type: Sequence[str]
@@ -52,16 +52,20 @@ class HybridstatExcelTask(Task):
             identity        = get(FitToHairpinTask)
             self.knownbeads = (tuple(identity.constraints.keys())
                                if identity else tuple())
-        trk  = model[0]
-        if '*' in self.path:
-            if self.path.count('*') > 1:
-                raise IOError("could not parse excel output path", "warning")
-            trk       = getattr(trk, 'path', trk)
-            trk       = trk[0] if isinstance(trk, tuple) else trk
-            self.path = self.path.replace('*', Path(trk).stem)
+
+        if '*' in self.path or Path(self.path).is_dir():
+            trkpath = getattr(model[0], 'path', model[0])
+            stem    = Path(trkpath[0] if isinstance(trkpath, tuple) else trkpath).stem
+
+            if '*' in self.path:
+                if self.path.count('*') > 1:
+                    raise IOError("could not parse excel output path", "warning")
+                self.path = self.path.replace('*', stem)
+            else:
+                self.path = str((Path(self.path)/stem).with_suffix('.xlsx'))
 
 class HybridstatExcelProcessor(Processor):
-    u"Reporter for Hybridstat"
+    "Reporter for Hybridstat"
     @staticmethod
     def apply(toframe = None, model = None, **kwa):
         "applies the task to a frame or returns a function that does so"
@@ -80,7 +84,7 @@ class HybridstatExcelProcessor(Processor):
         args.apply(self.apply(model = args.data.model, **self.config()))
 
 def run(path:str, config:str = '', **kwa):
-    u"Creates a report."
+    "Creates a report."
     self = ReporterInfo(**kwa)
     if str(path).endswith('.pkz'):
         with open(path, 'wb') as book:
