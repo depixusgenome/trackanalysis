@@ -103,7 +103,7 @@ class Neighbours(HasLengthPeak):
         return tot if oli is None else self.__get(tot, oli)
 
     def orientation(self, ref:Group, bead:Bead, ipk:int) -> Optional[bool]:
-        "Oligo Orientation"
+        "Strand on which the oligo sticks"
         if self.isstructural(ref, bead, ipk):
             return None
 
@@ -279,8 +279,9 @@ class PeaksSheet(Reporter):
     def _neighbours(self, *args) -> Optional[str]:
         return self._neig.neighbours(*args)
 
-    @column_method("Orientation", exclude = Reporter.nohairpin)
+    @column_method("Strand", exclude = Reporter.nohairpin)
     def _orientation(self, *args) -> Optional[bool]:
+        "Strand on which the oligo sticks"
         return self._neig.orientation(*args)
 
     @column_method("Hybridisation Rate")

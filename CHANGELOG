@@ -1,3 +1,26 @@
+# tag cycles_v2.2
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+### Reporting
+
+Excel reports can be created without specifying a sequence. Any information or
+column pertaining to the sequence is discarded.
+
+Two pieces of information are addded:
+
+    * *Down Time Φ₅* is the average amount of time spent with a bead completely zipped
+    in phase 5.
+    * *Events per Cycle* is the average number of events detected per cycle.
+
+For better throughput, one should have both a low down time and multiple events
+per cycle. A higher number of events per cycle will also increase the
+precision on peak positions.
+
+### Configuration
+
+An *Advanced* button has been added which gives access to more configuration both
+for the *Cycles* and the *Peaks* tab.
+
 # tag cycles_v2.1
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
