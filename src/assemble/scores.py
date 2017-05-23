@@ -37,7 +37,7 @@ class OptiDistPerm:
     perm = tuple() # type: Tuple[int, ...]
     dists = [] # type: List[SciDist]
     __epsi=-1 # type:float
-    @initdefaults()
+    @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
         pass
 
@@ -131,14 +131,7 @@ class PDFCost:
         return -numpy.product([self.get_dists[idp].pdf(val)
                                for idp,val in enumerate(xstate)])
 
-class ScoredKPermCollection:
-    u'''
-    handles a list of ScoredKPerm
-    '''
 
-    def __init__(self,sckperms:List[ScoredKPerm]):
-        self.sckperms=sckperms
-    
 class ScoredKPerm:
     u'''
     simple container for scores, and associated data.OligoPeakKPerm
@@ -154,7 +147,23 @@ class ScoredKPerm:
         u'returns true if any oligo in kperm can be found in other'
         return set(self.kperm.kperm).intersection(set(other.kperm.kperm))!=set()
 
-    
+    @classmethod
+    def add(cls,args):
+        u'combine kperms and scores'
+        if len(args)==1:
+            return args[0]
+        res=cls.__add2(*args[:2])
+        for sckp in args[2:]:
+            res = cls.__add2(res,sckp)
+        return res
+
+    @classmethod
+    def __add2(cls,first,second):
+        u'combine kperms and density scores'
+        kperm=data.OligoPeakKPerm.add(first.kperm,second.kperm)
+        pdfcost=first.pdfcost*second.pdfcost
+        return cls(kperm=kperm,pdfcost=pdfcost,noverlaps=0)
+
 class ScoreAssembly:
     u'''
     given an assembly (list of oligos in the correct order)
@@ -193,6 +202,39 @@ class ScoreAssembly:
         self.kperm=kperm
         return self.run()
 
+class ScoredKPermCollection:
+    u'''
+    handles a list of ScoredKPerm
+    '''
+
+    def __init__(self,sckperms:List[ScoredKPerm])->None:
+        self.sckperms=sckperms
+
+    @classmethod
+    def product(cls,args):
+        u'''
+        returns the product of any 2 elements in 2 different ScoredKPermCollection
+        '''
+        if len(args)==1:
+            return args[0]
+
+        res = cls.__product2(*args[:2])
+        for sckpm in args[2:]:
+            res = cls.__product2(res,sckpm)
+        return res
+
+    @classmethod
+    def __product2(cls,first,second):
+        u'returns  the product of 2 ScoredKPermCollection'
+        sckpm=list(ScoredKPerm.add(*prd)
+                   for prd in itertools.product(first.sckperms,second.sckperms))
+        return cls(sckperms=sckpm)
+
+    def compute_noverlaps(self,score:ScoreAssembly)->None:
+        u'calls score on each sckperm to update noverlap valuex'
+        for sckpm in self.sckperms:
+            score.kperm=sckpm.kperm
+            sckpm.noverlaps=score.noverlaps()
 
 class ScoreFilter:
     u'''

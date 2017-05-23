@@ -9,52 +9,38 @@ import assemble.data as data
 import assemble.scores as scores
 # pylint: disable=invalid-name
 
-class _DensityKPerm: # use ScoredKPerm instead
-    u'an OligoPeakKPerm and a score'
-    
-    def __init__(self,**kwa):
-        self.kperm=kwa.get("kperm",[]) # type: data.OligoPeakKPerm
-        self.density=OptiKPerm(kperm=self.kperm.kperm).cost()
-
-class _DensityCollection:
-    u'''
-    utilitary class for merge collections
-    combines a KPermCollection a pdf score
-    for each kperm in the collection
-    '''
-    
-    @initdefaults(frozenset(locals()))
-    def __init__(self,**kwa):
-        pass
-
-    @classmethod
-    def product(cls,*args):
-        
-    @classmethod
-    def __product2(cls,first,second):
-        
-
 def merge_collections(collections:List[data.KPermCollection],ooverl=3)->List[data.OligoPeakKPerm]:
     u'''
     each element in  collections is now supposed independant
     kpermutations can now be apply simultaneously to find best match (except for boundary effects)
     '''
 
+    scollections=[]
+    for coll in collections:
+        scollections.append(scores.ScoredKPermCollection(sckperm=[Scores.ScoredKPerm(kperm=kpm.kperm,pdfcost=OptiKPerm(kperm=kpm.kperm).cost()) for kpm in coll.kperms]))
+
+    scfilter=scores.ScoreFilter(ooverl=ooverl)
+
+    merged=scores.ScoredKPermCollection.product(*scollection[:2])
+    print("before, len(merged.kperms)=",len(merged.kperms))
+    # for each sckperms in merged add the noverlaps
+    merged=scores.ScoredKPermCollection.product(*scollection[:2])
+    # apply scorefilter
+    merged.sckperms=scfilter(merged.sckperms)
+    # and repeat
     # convert collections into ScoredKPermCollection
     # the product of any two ScoredKPerm is pdf1*pdf2 and OligoPeakKPerm.add(KPerm1,KPerm2)
     # then define the product of 2 ScoredKPermCollections
     # this leads to the calculation of pdfcost once per KPerm instead of each time 2 KPerms are added then scored
-    scoredkperms=[Scores.ScoredKPerm(kperm=kpm.kperm,pdfcost=OptiKPerm(kperm=kpm.kperm).cost()) ]
-    # because the pdfcost is long to compute we can compute it once for each kperm in collections
-    densities={kpm:OptiKPerm(kperm=kpm.kperm).cost() for kpc in collections for kpm in kpc.kperms}
     
-    # this is the function to optimize!
-    # can "easily" reduce the number of permutations to the ones which have highest "score"
+    # because the pdfcost is long to compute we can compute it once for each kperm in collections
+
     # per # of overlaps and outer_seq-
     # I need to find an condition
     # to restrict the number of kperms to the bare minimum.
     # each time 2 collections are merged, 
 
+    # the following seems to work but is too long
     merged=data.KPermCollection.product(*collections[:2])
     print("before, len(merged.kperms)=",len(merged.kperms))
     score=scores.ScoreAssembly(ooverl=ooverl)
@@ -71,9 +57,6 @@ def merge_collections(collections:List[data.KPermCollection],ooverl=3)->List[dat
         print("after, len(merged.kperms)=",len(merged.kperms))
     return merged
 
-def apply_score():
-    score=scores.Score_Assembly(ooverl=3)
-    
 def subdivide_then_partition(collections:List[data.KPermCollection],sort_by="kpermids",max_size=25):
     u'''
     args:

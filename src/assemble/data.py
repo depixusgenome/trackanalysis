@@ -299,11 +299,11 @@ class KPermCollection:
         u'''
         takes the product of 2 elements at a time
         '''
-        if len(first.kperms)==[]:
-            return cls(kperms=second.kperms)
+        #if first.kperms==[]:
+        #    return cls(kperms=second.kperms)
 
-        if len(second.kperms)==[]:
-            return cls(kperms=first.kperms)
+        #if second.kperms==[]:
+        #    return cls(kperms=first.kperms)
 
         kperms = list(OligoPeakKPerm.add(*prd)
                       for prd in itertools.product(first.kperms,second.kperms))
