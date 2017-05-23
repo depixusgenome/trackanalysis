@@ -102,7 +102,7 @@ class PeaksStatsWidget(WidgetCreator):
         css.defaults = {'title.format': '{}',
                         'title.openhairpin': u' & open hairpin',
                         'title.orientation': u'-+ ',
-                        'lines': [['css:title.stretch', '.4f'],
+                        'lines': [['css:title.stretch', '.1f'],
                                   ['css:title.bias',    '.4f'],
                                   [u'σ[HF] (µm)',       '.4f'],
                                   [u'σ[Peaks] (µm)',    '.4f'],
@@ -193,11 +193,11 @@ class PeakListWidget(WidgetCreator):
         super().__init__(model)
         self.__widget     = None # type: Optional[DataTable]
         css               = self.css.peaks.columns
-        css.width.default = 65
+        css.width.default = 60
         css.default       = [['z',        'css:ylabel',    '0.0000'],
                              ['bases',    u'Z (base)',     '0.0'],
                              ['id',       u'Id',           '0'],
-                             ['orient',   u'Orientation',  ''],
+                             ['orient',   u'Strand',       ''],
                              ['distance', u'Distance',     '0.0'],
                              ['count',    'css:xlabel',    '0.0'],
                              ['duration', 'css:xtoplabel', '0.000'],
