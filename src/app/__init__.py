@@ -5,10 +5,13 @@ import sys
 import glob
 from   pathlib import Path
 
-paths = (str(Path(__file__).parent.parent.resolve()),)+tuple(glob.glob("*.pyz"))
-for path in paths:
-    if path not in sys.path:
-        sys.path.append(path)
+def _add_sys_paths():
+    paths = (str(Path(__file__).parent.parent.resolve()),)+tuple(glob.glob("*.pyz"))
+    for path in paths:
+        if path not in sys.path:
+            sys.path.append(path)
+_add_sys_paths()
 
+# pylint: disable=wrong-import-position
 import utils.logconfig # make sure logging is configured
 from .launcher  import Defaults, ToolBar, BeadToolBar, setup

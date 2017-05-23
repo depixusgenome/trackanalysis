@@ -11,10 +11,12 @@ import inspect
 
 import click
 
-paths = (str(Path(__file__).parent.parent.resolve()),)+tuple(glob.glob("*.pyz"))
-for path in paths:
-    if path not in sys.path:
-        sys.path.append(path)
+def _add_sys_paths():
+    paths = (str(Path(__file__).parent.parent.resolve()),)+tuple(glob.glob("*.pyz"))
+    for path in paths:
+        if path not in sys.path:
+            sys.path.append(path)
+_add_sys_paths()
 
 # pylint: disable=wrong-import-position
 from utils.logconfig    import getLogger
