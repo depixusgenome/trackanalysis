@@ -151,10 +151,16 @@ class _CondaApp(BuildContext):
 
     def __clean(self):
         out = git.version()
-        self.options.APP_PATH = self.bldnode.make_node("OUTPUT")
 
+        self.options.APP_PATH = self.bldnode.make_node("OUTPUT_PY")
         if self.options.APP_PATH.exists():
             self.options.APP_PATH.delete()
+
+        path = self.bldnode.make_node("OUTPUT")
+        if path.exists():
+            path.delete()
+
+        path.mkdir()
 
     def __startscripts(self, mods):
         iswin = builder.os.sys.platform.startswith("win")
@@ -188,41 +194,61 @@ class _CondaApp(BuildContext):
         builder.os.chdir(str(old))
 
     def __final(self, mods):
-        path = Path("build")/"OUTPUT"
-
-        def _compile(fname):
-            with open(str(fname), encoding = 'utf-8') as stream:
-                if not any('from_py_func' in i for i in stream):
-                    out = str(fname.with_suffix('.pyc'))
-                    opt = optimize = 0 if 'reporting' in out else 2
-                    py_compile.compile(str(fname), out, optimize = opt)
-                    fname.unlink()
-
-        for val in path.glob("*.py"):
-            _compile(val)
+        path = Path("build")/"OUTPUT_PY"
 
         mods = [path/Path(mod).name for mod in mods]
-        for mod in mods:
-            for val in mod.glob("**/*.py"):
-                _compile(val)
-
         zips = [mod for mod in mods
                 if (mod.exists() and 'app' != mod.name
                     and next(mod.glob("_core.cpy*.*"), None) is None
                     and next(mod.glob("**/*.coffee"), None) is None)]
 
+        def _compile(inp, outp):
+            with open(str(inp), encoding = 'utf-8') as stream:
+                if not any('from_py_func' in i for i in stream):
+                    cur = outp/inp.relative_to(path).with_suffix('.pyc')
+                    out = str(cur)
+                    opt = optimize = 0 if 'reporting' in out else 2
+                    py_compile.compile(str(inp), out, optimize = opt)
+                    return cur
+            return inp
+
+        out = Path("build")/"OUTPUT"
         if len(zips):
-            with ZipFile(str(path/"trackanalysis.pyz"), "w") as zfile:
+            with ZipFile(str(out/"trackanalysis.pyz"), "w") as zfile:
+                for pyc in path.glob("*.py"):
+                    pyc = _compile(pyc, path)
+                    zfile.write(str(pyc), str(pyc.relative_to(path)))
+
                 for mod in zips:
                     for pyc in chain(mod.glob("**/*.pyc"), mod.glob("**/*.py")):
-                        val = str(pyc)
-                        zfile.write(val, val[val.rfind('OUTPUT')+len('OUTPUT')+1:])
-                    rmtree(str(mod))
+                        pyc = _compile(pyc, path)
+                        zfile.write(str(pyc), str(pyc.relative_to(path)))
 
-        out = Path(".")/git.version()
-        if out.exists():
-            rmtree(str(out))
-        builder.os.rename(str(path), str(out))
+
+        for mod in mods:
+            if mod in zips:
+                continue
+
+            for name in chain(mod.glob('**/*.coffee'), mod.glob("_core.cpy*.*")):
+                outp = out/name.relative_to(path)
+                outp.parent.mkdir(exist_ok = True, parents = True)
+                name.rename(outp)
+
+            for pyc in mod.glob('**/*.py'):
+                outp = _compile(pyc, out)
+                if outp == pyc:
+                    pyc.rename(out/pyc.relative_to(path))
+
+        for name in path.glob('*.cpython-*.*'):
+            outp = out/name.relative_to(path)
+            outp.parent.mkdir(exist_ok = True, parents = True)
+            name.rename(outp)
+
+        final = Path(".")/git.version()
+        if final.exists():
+            rmtree(str(final))
+        builder.os.rename(str(out), str(final))
+        rmtree(str(path))
 
     def build_app(self):
         self.__clean()
