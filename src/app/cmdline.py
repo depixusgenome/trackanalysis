@@ -11,7 +11,11 @@ import inspect
 
 import click
 
-sys.path.extend(glob.glob("*.pyz"))
+paths = (str(Path(__file__).parent.parent.resolve()),)+tuple(glob.glob("*.pyz"))
+for path in paths:
+    if path not in sys.path:
+        sys.path.append(path)
+
 # pylint: disable=wrong-import-position
 from utils.logconfig    import getLogger
 from bokeh.resources    import DEFAULT_SERVER_PORT

@@ -156,22 +156,21 @@ class _CondaApp(BuildContext):
         if self.options.APP_PATH.exists():
             self.options.APP_PATH.delete()
 
-        path = self.bldnode.make_node("OUTPUT")
-        if path.exists():
-            path.delete()
-
-        path.mkdir()
+        self.options.STARTSCRIPT_PATH = self.bldnode.make_node("OUTPUT")
+        if self.options.STARTSCRIPT_PATH.exists():
+            self.options.STARTSCRIPT_PATH.delete()
+        self.options.STARTSCRIPT_PATH.mkdir()
 
     def __startscripts(self, mods):
         iswin = builder.os.sys.platform.startswith("win")
         ext   = ".bat"                      if iswin else ".sh"
-        cmd   = r"start /min %~dp0pythonw " if iswin else "./"
+        cmd   = r"start /min %~dp0pythonw -I " if iswin else "./"
         def make_startup_script(name, val):
             "creates the startup script"
             for optext, opts in (('', ''), ('_chrome', ' --electron')):
-               with open(str(self.options.APP_PATH.make_node(name+optext+ext)), 'w',
+               with open(str(self.options.STARTSCRIPT_PATH.make_node(name+optext+ext)), 'w',
                           encoding = 'utf-8') as stream:
-                    print(cmd + r"app/cmdline.py " + val + opts + ' --port random',
+                    print(cmd + r"app/cmdline.pyc " + val + opts + ' --port random',
                           file = stream)
 
         self.make_startup_script = make_startup_script
@@ -194,12 +193,15 @@ class _CondaApp(BuildContext):
         builder.os.chdir(str(old))
 
     def __final(self, mods):
-        path = Path("build")/"OUTPUT_PY"
+        path  = Path("build")/"OUTPUT_PY"
+        iswin = builder.os.sys.platform.startswith("win")
+        dll   = '.cp*-win*.pyd' if iswin else '.cpython-*.so'
+
 
         mods = [path/Path(mod).name for mod in mods]
         zips = [mod for mod in mods
                 if (mod.exists() and 'app' != mod.name
-                    and next(mod.glob("_core.cpy*.*"), None) is None
+                    and next(mod.glob("_core"+dll), None) is None
                     and next(mod.glob("**/*.coffee"), None) is None)]
 
         def _compile(inp, outp):
@@ -229,7 +231,7 @@ class _CondaApp(BuildContext):
             if mod in zips:
                 continue
 
-            for name in chain(mod.glob('**/*.coffee'), mod.glob("_core.cpy*.*")):
+            for name in chain(mod.glob('**/*.coffee'), mod.glob("_core"+dll)):
                 outp = out/name.relative_to(path)
                 outp.parent.mkdir(exist_ok = True, parents = True)
                 name.rename(outp)
@@ -239,10 +241,13 @@ class _CondaApp(BuildContext):
                 if outp == pyc:
                     pyc.rename(out/pyc.relative_to(path))
 
-        for name in path.glob('*.cpython-*.*'):
+        for name in path.glob('*'+dll):
             outp = out/name.relative_to(path)
             outp.parent.mkdir(exist_ok = True, parents = True)
             name.rename(outp)
+
+        if (path/'static').exists():
+            (path/'static').rename(out/'static')
 
         final = Path(".")/git.version()
         if final.exists():
