@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # encoding: utf-8
-from pathlib import Path
-from zipfile import ZipFile
-from shutil  import rmtree
+from pathlib    import Path
+from itertools  import chain
+from zipfile    import ZipFile
+from shutil     import rmtree
 import py_compile
 try:
     import wafbuilder as builder
@@ -171,9 +172,11 @@ class _CondaApp(BuildContext):
         self.recurse(mods, "startscripts", mandatory = False)
 
     def __electron(self):
-        old = Path(".").resolve()
+        old   = Path(".").resolve()
         builder.os.chdir(str(Path("build")/"OUTPUT"))
-        npm = 'npm' + ('.cmd' if iswin else '')
+
+        iswin = builder.os.sys.platform.startswith("win")
+        npm   = 'npm' + ('.cmd' if iswin else '')
         for path in ('.', 'bin', 'Scripts'):
             if (Path(path)/npm).exists():
                 cmd = str(Path(path)/npm) + " install electron"
@@ -191,15 +194,30 @@ class _CondaApp(BuildContext):
             with open(str(fname), encoding = 'utf-8') as stream:
                 if not any('from_py_func' in i for i in stream):
                     out = str(fname.with_suffix('.pyc'))
-                    py_compile.compile(str(fname), out)
+                    opt = optimize = 0 if 'reporting' in out else 2
+                    py_compile.compile(str(fname), out, optimize = opt)
                     fname.unlink()
 
         for val in path.glob("*.py"):
             _compile(val)
 
+        mods = [path/Path(mod).name for mod in mods]
         for mod in mods:
-            for val in (path/mod[mod.find('/')+1:]).glob("**/*.py"):
+            for val in mod.glob("**/*.py"):
                 _compile(val)
+
+        zips = [mod for mod in mods
+                if (mod.exists() and 'app' != mod.name
+                    and next(mod.glob("_core.cpy*.*"), None) is None
+                    and next(mod.glob("**/*.coffee"), None) is None)]
+
+        if len(zips):
+            with ZipFile(str(path/"trackanalysis.pyz"), "w") as zfile:
+                for mod in zips:
+                    for pyc in chain(mod.glob("**/*.pyc"), mod.glob("**/*.py")):
+                        val = str(pyc)
+                        zfile.write(val, val[val.rfind('OUTPUT')+len('OUTPUT')+1:])
+                    rmtree(str(mod))
 
         out = Path(".")/git.version()
         if out.exists():
@@ -209,10 +227,10 @@ class _CondaApp(BuildContext):
     def build_app(self):
         self.__clean()
 
-        mods = [i for i in _getmodules(self) if i != 'tests']
+        mods = [i for i in _getmodules(self) if not any(j in i for j in ('tests','scripting'))]
         build(self, mods)
         builder.condasetup(self, copy = 'build/OUTPUT', runtimeonly = True)
-        self.__startscripts()
+        self.__startscripts(mods)
         self.__electron()
 
         self.add_group()
