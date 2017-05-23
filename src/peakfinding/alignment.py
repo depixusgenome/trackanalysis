@@ -79,14 +79,14 @@ class PeakCorrelationAlignment:
                 return bias
 
             if self.subpixel and subpixel:
-                def _argmax(cur):
+                def _argmax(ref, cur):
                     arr  = cost[0](np.dot(cur, ref))
                     ind  = np.argmax(arr)
                     subp = subpixel(arr, ind)
                     return ind if subp is None else subp
                 argmax = _argmax
             else:
-                argmax = lambda cur: np.argmax(cost[0](np.dot(cur, ref)))
+                argmax = lambda ref, cur: np.argmax(cost[0](np.dot(cur, ref)))
 
             hists, _, width = projector(data[good],
                                         bias     = bias if bias is None else bias[good],
@@ -99,7 +99,7 @@ class PeakCorrelationAlignment:
                           for cur in hists)
 
             ref   = np.mean([i[maxt//2] for i in hists], 0)
-            found = np.array([argmax(i) for i in hists])
+            found = np.array([argmax(ref, i) for i in hists])
 
             if bias is None:
                 bias = np.zeros((len(data),), dtype = 'f4')
