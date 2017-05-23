@@ -83,6 +83,7 @@ class OptiKPerm: # need to complete pytest
         u'calls OptiDistPerm, returns permuted xstate'
         if self.__pstate==[]:
             dists = [oli.dist for oli in self.kperm]
+            # this line is time expensive
             self.__pstate = OptiDistPerm(perm=self.__perm,dists=dists).run()
         return self.__pstate
 
@@ -130,7 +131,14 @@ class PDFCost:
         return -numpy.product([self.get_dists[idp].pdf(val)
                                for idp,val in enumerate(xstate)])
 
+class ScoredKPermCollection:
+    u'''
+    handles a list of ScoredKPerm
+    '''
 
+    def __init__(self,sckperms:List[ScoredKPerm]):
+        self.sckperms=sckperms
+    
 class ScoredKPerm:
     u'''
     simple container for scores, and associated data.OligoPeakKPerm
@@ -146,6 +154,7 @@ class ScoredKPerm:
         u'returns true if any oligo in kperm can be found in other'
         return set(self.kperm.kperm).intersection(set(other.kperm.kperm))!=set()
 
+    
 class ScoreAssembly:
     u'''
     given an assembly (list of oligos in the correct order)
@@ -160,10 +169,10 @@ class ScoreAssembly:
     def run(self)->ScoredKPerm:
         u'compute score'
         return ScoredKPerm(kperm=self.kperm,
-                           pdfcost=self.__density(),
-                           noverlaps=self.__overlaps())
+                           pdfcost=self.density(),
+                           noverlaps=self.noverlaps())
 
-    def __density(self,attr="kperm")->float:
+    def density(self,attr="kperm")->float:
         u'''
         density must take into account all peaks in kperm (or perm)
         to compute the pdfcost of neutral kperms (mandatory)
@@ -171,7 +180,7 @@ class ScoreAssembly:
         '''
         return OptiKPerm(kperm=getattr(self.kperm,attr)).cost()
 
-    def __overlaps(self)->int: # to check
+    def noverlaps(self)->int: # to check
         u'''
         returns the number of consecutive overlaps between oligos in kpermids
         '''
@@ -211,7 +220,7 @@ class ScoreFilter:
         u'''
         implements minimal condition for optimal score
         for the same value of overlaps, filters out
-        the scores with pdfcost > lower(pdfcost)*(1-0.1)
+        the scores with pdfcost > lower(pdfcost)*(1-__pdfthreshold)
         '''
         out = [] # type: List[ScoredKPerm]
         sorted_sckp= sorted(scorekperms,key=lambda x:x.noverlaps)

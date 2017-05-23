@@ -227,10 +227,18 @@ class KPermCombiner:
         filtered = list(filter(lambda x:len(x)>1,filtered))
 
         filtered = [KPermCollection(kperms=[sckp.kperm for sckp in grp]) for grp in filtered]
+        # problem with filtered collections. Some are duplicated and
+        # sometimes a copy of the neutral permutation
+        filtered = [kpc for kpc in filtered
+                    if not all([len(kpm.changes)==0 for kpm in kpc.kperms])]
+
         pickle.dump(filtered,open("filtered.pickle","wb"))
         partition = [kpc for kpc in filtered if kpc.intersect_with(filtered[0])]
         print("len(filtered)=",len(filtered))
         print("len(partition)=",len(partition))
+
+
+
         # check this loop!!
         to_merge=[]
         for part in partition:

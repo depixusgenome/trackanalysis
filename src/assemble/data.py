@@ -183,7 +183,6 @@ class OligoPeakKPerm:
             sortedp=sorted(kperm,key=lambda x:getattr(x,sort_by))
         except AttributeError:
             sortedp=sorted(kperm)
-
         issame=[sortedp[idx]==kperm[idx] for idx in range(len(kperm))]
 
         try:
@@ -214,9 +213,6 @@ class OligoPeakKPerm:
         if len(args)==1 ?
         '''
         if len(args)==1:
-            #neutral = OligoPeakKPerm(oligos=args[0].oligos,
-            #                         kperm=args[0].oligos)
-            #return cls.__add2(args[0],neutral)
             return args[0]
 
         res = cls.__add2(*args[:2])
@@ -234,11 +230,20 @@ class OligoPeakKPerm:
         the order of the addition is important
         oligos must be the same in the 2 sets
         '''
-        permids = numpy.array(kperm1.permids)[kperm2.permids].tolist()
-        kpermids = cls.get_changes(permids)
-        kperm = numpy.array(kperm1.oligos)[list(kpermids)].tolist()
-        changes=kperm1.changes+kperm2.changes
-        return OligoPeakKPerm(oligos=kperm1.oligos,kperm=kperm,
+        kpermids = sorted(kperm1.kpermids+kperm2.kpermids)
+        # apply permutations from 1 and 2 on kpermids, supposed independant
+        toperm={val:kperm1.kpermids[idx] for idx,val in enumerate(sorted(kperm1.kpermids))}
+        toperm.update({val:kperm2.kpermids[idx] for idx,val in enumerate(sorted(kperm2.kpermids))})
+        kpermids=[toperm[i] for i in kpermids]
+        #kpermids = list(cls.get_changes(permids)) # broken, needs kpermids non empty
+        kperm = numpy.array(kperm1.oligos)[kpermids].tolist()
+        changes = kperm1.changes+kperm2.changes
+        if len(kpermids)!=len(set(kpermids)):
+            print("pb")
+            print("kperm1.kpermids=",kperm1.kpermids)
+            print("kperm2.kpermids=",kperm2.kpermids)
+        return OligoPeakKPerm(oligos=kperm1.oligos,
+                              kperm=kperm,
                               changes=changes)
 
     def is_subgroup_of(self,kperm,attr="changes")->bool:
@@ -252,8 +257,18 @@ class OligoPeakKPerm:
         returns the overlapping oligo seq of left most oligo and right most
         as a tuple(left,right)
         '''
-        return (self.kperm[0].seq[:ooverl],self.kperm[0].seq[-ooverl:])
+        indices = sorted(self.kpermids)
+        inner = [[self.oligos[indices[idx]].seq[-ooverl:],self.oligos[val].seq[:ooverl]]
+                 for idx,val in enumerate(indices[1:])
+                 if indices[idx]+1!=val]
 
+        outer=[self.kperm[0].seq[:ooverl]]
+        for iseq in inner:
+            outer+=iseq
+        outer+=[self.kperm[-1].seq[-ooverl:]]
+        return tuple(outer)
+        # must be made more general!
+        #return (self.kperm[0].seq[:ooverl],self.kperm[-1].seq[-ooverl:])
 
 class KPermCollection:
     u'''
@@ -266,10 +281,23 @@ class KPermCollection:
         pass
 
     @classmethod
-    def product(cls,first,second):
+    def product(cls,*args):
         u'''
         returns a KPermCollection with the product of kperms in first
         and kperms in second
+        '''
+        if len(args)==1:
+            return args[0]
+
+        res = cls.__product2(*args[:2])
+        for kpc in args[2:]:
+            res = cls.__product2(res,kpc)
+        return res
+
+    @classmethod
+    def __product2(cls,first,second):
+        u'''
+        takes the product of 2 elements at a time
         '''
         if len(first.kperms)==[]:
             return cls(kperms=second.kperms)
