@@ -1,4 +1,4 @@
-# tag cycles_v2.2
+# tag cycles_v4.1
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
 ### Reporting
@@ -8,7 +8,7 @@ column pertaining to the sequence is discarded.
 
 Two pieces of information are addded:
 
-    * *Down Time Φ₅* is the average amount of time spent with a bead completely zipped
+    * *Down Time* is the average amount of time spent with a bead completely zipped
     in phase 5.
     * *Events per Cycle* is the average number of events detected per cycle.
 
@@ -26,7 +26,7 @@ for the *Cycles* and the *Peaks* tab.
 The application is now created stripped of source code and documentation whenever
 possible. This is necessary for security reasons.
 
-# tag cycles_v2.1
+# tag cycles_v4.0
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
 ### Data Treatment
