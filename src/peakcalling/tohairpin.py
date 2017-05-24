@@ -49,6 +49,11 @@ class Hairpin:
         pass
 
     @property
+    def expectedpeaks(self):
+        "returns the peaks +- the hairpin extension"
+        return self.peaks if self.lastpeak else self.peaks[:-1]
+
+    @property
     def hybridizations(self):
         "returns only peaks linked to hibridizations"
         return self.peaks[1:-1]
@@ -113,7 +118,7 @@ class HairpinDistance(Hairpin):
             brng  = lambda w, x, y, z: rng(w, x[0]*(x[1]+y), z*x[0])
             args  = _dict(self.optim, symmetry = self.symmetry, noise = self.precision)
 
-            hpin  = self.peaks if self.lastpeak else self.peaks[:-1]
+            hpin  = self.expectedpeaks
             delta = peaks[0]
             peaks = peaks - peaks[0]
             for vals in self.__arange():
@@ -137,7 +142,7 @@ class HairpinDistance(Hairpin):
         "computes the cost value at a given stretch and bias as well as derivates"
         if len(peaks) == 0:
             return 0., 0., 0.
-        hpin = self.peaks if self.lastpeak else self.peaks[:-1]
+        hpin = self.expectedpeaks
         return _cost.compute(hpin, peaks - peaks[0],
                              symmetry = self.symmetry,
                              noise    = self.precision,
@@ -171,10 +176,15 @@ class PeakIdentifier(Hairpin):
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
+    @property
+    def expectedpeaks(self):
+        "returns the peaks +- the hairpin extension"
+        return self.peaks if self.lastpeak else self.peaks[:-1]
+
     @kwargsdefaults(__KEYS)
     def pair(self, peaks:np.ndarray, stretch = 1., bias = 0.) -> PEAKS_TYPE:
         "returns experimental peaks paired to the theory"
-        hpin           = self.peaks if self.lastpeak else self.peaks[:-1]
+        hpin           = self.expectedpeaks
         ided           = np.empty((len(peaks),), dtype = PEAKS_DTYPE)
         ided['zvalue'] = peaks
         ided['key']    = np.iinfo('i4').min
@@ -188,7 +198,7 @@ class PeakIdentifier(Hairpin):
     @kwargsdefaults(__KEYS)
     def nfound(self, peaks:np.ndarray, stretch = 1., bias = 0.) -> int:
         "returns the number of paired peaks"
-        hpin = self.peaks if self.lastpeak else self.peaks[:-1]
+        hpin = self.expectedpeaks
         if len(peaks) > 0 and len(hpin) > 0:
             peaks = stretch*(peaks-bias)
             return _match.nfound(hpin, peaks, self.window)
@@ -208,7 +218,7 @@ class PeakIdentifier(Hairpin):
             4. N: number of paired peaks
         """
 
-        hpin = self.peaks if self.lastpeak else self.peaks[:-1]
+        hpin = self.expectedpeaks
         return _match.distance(hpin, peaks, self.window, stretch, -bias*stretch)
 
     @kwargsdefaults(__KEYS)
@@ -218,7 +228,7 @@ class PeakIdentifier(Hairpin):
         if len(peaks) > 1:
             rng   = lambda x, y, z: (('min_'+x, y-z), (x, y), ('max_'+x, y+z))
             args  = _dict(self.optim, window = self.window)
-            hpin  = self.peaks if self.lastpeak else self.peaks[:-1]
+            hpin  = self.expectedpeaks
             pots  = {i: self.distance(peaks, *i)[-1] for i in self.__arange(peaks)}
             maxi  = max(pots.values(), default = self.DEFAULT_BEST)-1
             good  = set((int(i[0]/self._precision[0]), int(i[1]/self._precision[1]))

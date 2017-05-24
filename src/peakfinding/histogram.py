@@ -88,18 +88,15 @@ class Histogram(PrecisionAlg):
                        zmeasure : Union[None,type,Callable]    = NoArgs) -> np.ndarray:
         "Returns event positions as will be added to the histogram"
         events = asdataarrays(aevents)
-        if events is None:
-            return np.empty((0,), dtype = 'f4')
-
-        first = next((i for i in events if len(i)), None)
+        first  = None if events is None else next((i for i in events if len(i)), None)
         if first is None:
             return np.empty((0,), dtype = 'f4')
 
         assert getattr(first, 'dtype', 'f') != EVENTS_DTYPE
         if np.isscalar(first[0]):
-            events = events,
-
-        fcn = self.zmeasure if zmeasure is NoArgs else zmeasure
+            fcn = None
+        else:
+            fcn = self.zmeasure if zmeasure is NoArgs else zmeasure
         return self.__eventpositions(events, bias, fcn)
 
     def kernelarray(self) -> np.ndarray:
@@ -154,6 +151,15 @@ class Histogram(PrecisionAlg):
                 cnt = np.bincount(pos, minlength = lenv, weights = weight)
             yield kern(cnt)
 
+    def apply(self, minv, bwidth, lenv, arr):
+        "Applies to one array"
+        osamp = (int(self.oversampling)//2) * 2 + 1
+        tmp   = np.int32(np.rint((arr-minv)/bwidth))
+        res   = np.bincount(tmp[tmp >= 0], minlength = lenv)[:lenv]
+        if self.kernel is not None:
+            return self.kernel(oversampling = osamp, range = 'same')(res)
+        return res
+
     def __compute(self,
                   events   : Sequence[Sequence[np.ndarray]],
                   bias     : Union[None,float,np.ndarray],
@@ -170,14 +176,13 @@ class Histogram(PrecisionAlg):
         maxv   = max(max(i) for i in zmeas if len(i)) + self.edge*bwidth*osamp
         lenv   = int((maxv-minv)/bwidth)+1
 
-        zmeas -= minv
-        zmeas /= bwidth
-
         if self.kernel is not None:
             kern = self.kernel(oversampling = osamp, range = 'same')
         else:
             kern = lambda x: x
 
+        zmeas  -= minv
+        zmeas  /= bwidth
         items   = (np.int32(np.rint(i)) for i in zmeas)      # type: ignore
         weight  = self.__weights(self.weight,   events)
 

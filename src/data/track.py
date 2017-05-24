@@ -28,6 +28,7 @@ class Track:
                   phases        = '_',
                   data          = '_',
                   path          = '_',
+                  lazy          = '_',
                   rawprecisions = '_')
     def __init__(self, **_) -> None:
         pass

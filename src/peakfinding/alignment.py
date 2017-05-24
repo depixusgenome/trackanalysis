@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Cycle alignment: define an absolute zero common to all cycles"
+"Cycle alignment: define an absolute zero common to all cycles"
 from   typing                   import (Union, Optional, # pylint: disable=unused-import
                                         Sequence, Iterable, Iterator,
                                         cast)
@@ -13,7 +13,7 @@ from   utils                    import (initdefaults, updatecopy, kwargsdefaults
 from   .histogram               import Histogram, SubPixelPeakPosition
 
 class PeakCorrelationAlignment:
-    u"""
+    """
     Finds biases which correlate best a cycle's histogram to the histogram of
     all cycles. This repeated multiple times with the latter histogram taking
     prior biases into account.
@@ -26,8 +26,16 @@ class PeakCorrelationAlignment:
     * *subpixel*:  algorithm for subpixel precision on the correlation peaks
     * *projector*: how to project cycles unto an axis
     """
+    class WorkTable:
+        "Contains data to be saved from action to action"
+        def __init__(self, parent, precision, data, **_):
+            self.parent    = parent
+            self.precision = precision
+            self.data      = data
+            self.cost      = 1,
+
     class Action:
-        u"""
+        """
         Container class for computing a bias with given options.
 
         Attributes:
@@ -48,14 +56,14 @@ class PeakCorrelationAlignment:
         def __init__(self, **_):
             pass
 
-        def costarray(self, projector, arr) -> Union[int,np.ndarray]:
+        def costarray(self, wtab, projector) -> Union[int,np.ndarray]:
             "computes a z-cost array"
             if not self.zcost:
                 return lambda x: x,
 
             osamp = projector.exactoversampling
-            if arr[1:] == (self.maxmove, self.zcost, osamp):
-                return arr
+            if wtab.cost[1:] == (self.maxmove, self.zcost, osamp):
+                return wtab.cost
 
             arr   = np.arange(1,  self.maxmove*osamp)
             cost  = self.zcost/osamp
@@ -63,49 +71,81 @@ class PeakCorrelationAlignment:
 
             return lambda x: x*arr, self.maxmove, self.zcost, osamp
 
-        def projector(self, projector, precision):
+        def projector(self, wtab):
             "projects the data"
-            edge = (self.maxmove + projector.kernel.width)*2
-            return updatecopy(projector,
+            edge = (self.maxmove + wtab.parent.projector.kernel.width)*2
+            return updatecopy(wtab.parent.projector,
                               zmeasure  = None,
                               edge      = edge,
-                              precision = precision*self.factor)
+                              precision = wtab.precision*self.factor)
 
-        def bias(self,                  # pylint: disable=too-many-arguments
-                 projector, data, bias, cost, subpixel):
-            "finds the bias"
-            good = np.array([len(i) for i in data]) >= self.minevents
+        def reference(self, _, projector, hists):
+            "computes a reference"
+            maxt = projector.exactoversampling*self.maxmove*2
+            return np.mean([i[maxt//2] for i in hists[0]], 0)
+
+        @staticmethod
+        def center(bias):
+            "centers the bias"
+            bias -= np.median(bias)
+            return bias
+
+        def good(self, wtab):
+            "finds cycles to align"
+            good = np.array([len(i) for i in wtab.data]) >= self.minevents
             if not np.any(good):
-                return bias
+                return None
+            return good
 
-            if self.subpixel and subpixel:
+        def argmax(self, wtab):
+            "computes the argmax function"
+            cost     = wtab.cost[0]
+            subpixel = wtab.parent.subpixel
+            if self.subpixel and callable(subpixel):
                 def _argmax(ref, cur):
-                    arr  = cost[0](np.dot(cur, ref))
+                    arr  = cost(np.dot(cur, ref))
                     ind  = np.argmax(arr)
                     subp = subpixel(arr, ind)
                     return ind if subp is None else subp
-                argmax = _argmax
+                return _argmax
             else:
-                argmax = lambda ref, cur: np.argmax(cost[0](np.dot(cur, ref)))
+                return lambda ref, cur: np.argmax(cost(np.dot(cur, ref)))
 
-            hists, _, width = projector(data[good],
-                                        bias     = bias if bias is None else bias[good],
-                                        separate = True)
+        def hists(self, wtab, projector, bias, good):
+            "creates the histograms"
+            bias  = bias if bias is None else bias[good]
+            hists = projector(wtab.data[good], bias = bias, separate = True)
 
-            maxt  = projector.exactoversampling*self.maxmove*2
-            hists = tuple(as_strided(cur,
-                                     shape   = (maxt, len(cur)-maxt),
-                                     strides = (cur.strides[0],)*2)
-                          for cur in hists)
+            maxt   = projector.exactoversampling*self.maxmove*2
+            matrix = tuple(as_strided(cur,
+                                      shape   = (maxt, len(cur)-maxt),
+                                      strides = (cur.strides[0],)*2)
+                           for cur in hists[0])
+            return (matrix,)+hists[1:]
 
-            ref   = np.mean([i[maxt//2] for i in hists], 0)
-            found = np.array([argmax(ref, i) for i in hists])
+        def bias(self, wtab, projector, bias):
+            "finds the bias"
+            good = self.good(wtab)
+            if good is None:
+                return bias
+
+            hists = self.hists(wtab, projector, bias, good)
+            ref   = self.reference(wtab, projector, hists)
+
+            argmax = self.argmax(wtab)
+            found  = np.array([argmax(ref, i) for i in hists[0]])
 
             if bias is None:
-                bias = np.zeros((len(data),), dtype = 'f4')
-            bias[good] -= (found - maxt//2)*width
-            bias       -= np.median(bias)
-            return bias
+                bias = np.zeros((len(wtab.data),), dtype = 'f4')
+
+            maxt        = projector.exactoversampling*self.maxmove*2
+            bias[good] -= (found - maxt//2)*hists[2]
+            return self.center(bias)
+
+        def __call__(self, wtab, bias):
+            projector = self.projector(wtab)
+            wtab.cost = self.costarray(wtab, projector)
+            return self.bias(wtab, projector, bias)
 
     actions   = [Action(),
                  Action(),
@@ -147,11 +187,11 @@ class PeakCorrelationAlignment:
     @kwargsdefaults(__KEYS)
     def __call__(self,
                  data:      Union[np.ndarray, Iterable[np.ndarray]],
-                 precision: Optional[float] = None) -> np.ndarray:
+                 precision: float = None, **kwa) -> np.ndarray:
         data  = asobjarray(data)
         first = next((i for i in data if len(i)), None)
         if first is None:
-            return
+            return None
 
         if getattr(first, 'dtype', 'f') == EVENTS_DTYPE or not np.isscalar(first[0]):
             precision = self.projector.getprecision(precision, data)
@@ -159,15 +199,13 @@ class PeakCorrelationAlignment:
         elif precision is None:
             precision = self.projector.precision
 
-        cost  = 1,
-        bias  = None
+        wtab = self.WorkTable(self, precision, data, **kwa) # type: ignore
+        bias = None
         for action in self.actions:
-            projector = action.projector(self.projector, precision)
-            cost      = action.costarray(projector, cost)
-            bias      = action.bias     (projector, data, bias, cost, self.subpixel)
+            bias = action(wtab, bias)
         return bias
 
     @classmethod
     def run(cls, data: Iterable[np.ndarray], **kwa):
-        u"runs the algorithm"
+        "runs the algorithm"
         return cls(**kwa)(data)
