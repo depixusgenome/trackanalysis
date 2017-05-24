@@ -86,7 +86,8 @@ class ExtremumAlignmentProcessor(Processor):
     @classmethod
     def apply(cls, toframe = None, **kwa):
         "applies the task to a frame or returns a function that does so"
-        action = (cls.__apply_best       if cls._get(kwa, 'phase') is None else
+        action = (cls.__apply_best13  if cls._get(kwa, 'phase') is None          else
+                  cls.__apply_best513 if cls._get(kwa, 'phase') == PHASE.measure else
                   cls.__apply_onephase)
 
         def _apply(frame):
@@ -95,27 +96,52 @@ class ExtremumAlignmentProcessor(Processor):
         return _apply if toframe is None else _apply(toframe)
 
     @classmethod
-    def __apply_best(cls, kwa, frame, info):
-        "applies the task to a frame or returns a function that does so"
-        window     = cls._get(kwa, 'window')
-        edge       = cls._get(kwa, 'edge')
-        cycles     = cls._Utils(frame, info)
-        initials   = cycles.bias(PHASE.initial, window, edge)
-        pulls      = cycles.bias(PHASE.pull,    window, edge)
+    def __args(cls, kwa, frame, info, meas):
+        cycles  = cls._Utils(frame, info)
+        window  = cls._get(kwa, 'window')
+        edge    = cls._get(kwa, 'edge')
+        inits   = cycles.bias(PHASE.initial, window, edge)
+        pulls   = cycles.bias(PHASE.pull, window, edge)
+        if meas:
+            return cycles, inits, pulls, cycles.bias(PHASE.measure, window, 'right')
 
-        deltas     = initials-pulls
-        center     = np.nanmedian(deltas)*cls._get(kwa, 'factor')
+        else:
+            return cycles, inits, pulls
 
-        deltas[np.isnan(deltas)] = 0.
-        bad        = np.nonzero(deltas < center)[0]
-        if len(bad):
-            deltas = cycles.bias(PHASE.measure, window, edge)-pulls
+    @classmethod
+    def __deltas(cls, deltas, kwa):
+        rho = np.nanmedian(deltas)*cls._get(kwa, 'factor')
+        if rho <= 0.:
+            deltas[:] = 2.
+        else:
+            deltas /= rho
             deltas[np.isnan(deltas)] = 0.
-            bad    = np.setdiff1d(bad, np.nonzero(deltas < center)[0], True)
+        return deltas
 
-        bias       = initials
-        bias[bad]  = pulls[bad]+np.nanmedian(initials-pulls)
-        return cycles.translate(bias)
+    @classmethod
+    def __apply_best513(cls, kwa, frame, info):
+        args = cls.__args(kwa, frame, info, True)
+        bias = args[3]
+
+        dlt5 = cls.__deltas(args[3]-args[2], kwa)
+        bad  = dlt5 < 1
+        if any(bad):
+            dlt1      = cls.__deltas(args[1]-args[2], kwa)
+            bad       = np.logical_and(bad, dlt1 >= 1.)
+            bias[bad] = args[1][bad]+np.nanmedian(args[3]-args[1])
+        return args[0].translate(bias)
+
+    @classmethod
+    def __apply_best13(cls, kwa, frame, info):
+        args = cls.__args(kwa, frame, info, False)
+        bias = args[1]
+
+        bad  = cls.__deltas(args[1]-args[2], kwa) < 1.
+        if any(bad):
+            meas      = args[0].bias(PHASE.measure, cls._get(kwa, 'window'), 'right')
+            bad       = np.logical_and(bad, cls.__deltas(meas-args[2], kwa) >= 1.)
+            bias[bad] = args[2][bad]+np.nanmedian(args[1]-args[2])
+        return args[0].translate(bias)
 
     @classmethod
     def __apply_onephase(cls, kwa, frame, info):

@@ -180,24 +180,24 @@ class AlignmentWidget(GroupWidget):
     INPUT = RadioButtonGroup
     def __init__(self, model:PlotModelAccess) -> None:
         super().__init__(model)
-        self.css.title.alignment.labels.default = [u'None', u'Both', u'Phase 1', u'Phase 3']
+        self.css.title.alignment.labels.default = [u'ø', u'Best', u'Φ 1', u'Φ 3']
         self.css.title.alignment.default        = u'Alignment'
+
+    @property
+    def __phases(self):
+        cnf = self.config.root.phase
+        return ['ø']+[cnf[i].get() for i in ('measure', 'initial', 'pull')]
 
     def onclick_cb(self, value):
         "action to be performed when buttons are clicked"
         if value == 0:
             self._model.alignment.remove()
         else:
-            cnf   = self.config.root.phase
-            phase = [None, cnf.initial.get(), cnf.pull.get()][value-1]
-            self._model.alignment.update(phase = phase)
+            self._model.alignment.update(phase = self.__phases[value])
 
     def _data(self):
         task   = self._model.alignment.task
-        active = (0 if task       is None else
-                  1 if task.phase is None else
-                  2 if task.phase == 1    else
-                  3)
+        active = self.__phases.index(getattr(task, 'phase', 'ø'))
         return dict(active = active)
 
 class DriftWidget(GroupWidget):

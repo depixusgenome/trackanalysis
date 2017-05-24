@@ -178,6 +178,22 @@ def test_bestalignmentprocessor():
     assert_allclose(inipos[1:], corrpos[1:], atol = 0.05)
     assert corrpos[0] > .4
 
+def test_best_phase5_alignment():
+    u"align on 1 phase or another as needed"
+    track   = randtrack(driftargs = None, baselineargs = (.1, .05, 'rand'))
+    for i in range(3):
+        ini  = track.cycles.withphases(PHASE.initial)[0,i]
+        ini += (track.cycles.withphases(PHASE.pull)[0,i].mean()-ini.mean())*.5
+
+    for i in range(5):
+        ini  = track.cycles.withphases(PHASE.measure)[0,i]
+        ini += (track.cycles.withphases(PHASE.pull)[0,i].mean()-ini.mean())*.5
+
+    bead    = ExtremumAlignmentProcessor.apply(track.beads, phase = PHASE.measure)
+    corrpos = [i.mean() for i in bead       [0,...].withphases(PHASE.pull).values()]
+    inipos  = [i.mean() for i in track.beads[0,...].withphases(PHASE.pull).values()]
+    assert_allclose(inipos, corrpos, atol = 0.05)
+
 def test_correlationalignment():
     u"align on best correlation"
     data = [np.zeros((100,)) for i in range(3)]
@@ -199,4 +215,4 @@ def test_correlationalignment():
     assert_allclose(biases, [1., 0., -1.], rtol = 1e-4, atol = 1e-4)
 
 if __name__ == '__main__':
-    test_bestalignmentprocessor()
+    test_best_phase5_alignment()
