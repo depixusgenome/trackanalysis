@@ -24,6 +24,7 @@ We add some methods and change the default behaviour:
 # pylint: disable=unused-import,invalid-name
 from typing                 import cast
 from copy                   import copy as shallowcopy, deepcopy
+from itertools              import product
 from functools              import wraps
 from enum                   import Enum
 import inspect
@@ -205,31 +206,18 @@ class Track(_Track):
     def events(self) -> Events:
         "returns events in phase 5 only"
         phase = scriptapp.control.getGlobal('config').phase.measure.get()
-        return Events(track = self, beadsonly = True,
-                      first = phase, last = phase,
-                      parents= (self.path,))
+        return Events(track   = self,  data = self.beadsonly,
+                      first   = phase, last = phase,
+                      parents = (self.path,))
 
-def _copied(fcn):
-    if hasattr(fcn, '__old__'):
-        return fcn
+def _addprop(name):
+    fcn = getattr(_Track, name).fget
+    setattr(Track, name, property(lambda self: fcn(self).withcopy()))
 
-    @wraps(fcn)
-    def _fcn(self, *args, __old__ = fcn, **kwargs):
-        stack = inspect.stack()
-        if len(stack) > 1 and stack[1].filename.endswith('trackitems.py'):
-            cpy = self
-        else:
-            cpy = shallowcopy(self)
-        __old__(cpy, *args, **kwargs)
-        return cpy
-    _fcn.__old__ = fcn
-    return _fcn
-
-for _cls in (Beads, Cycles, Events):
-    _cls._COPY = True # pylint: disable=protected-access
-    for itm in inspect.getmembers(_cls, callable):
-        if itm[0].startswith('with') and not hasattr(itm[1], '__old__'):
-            setattr(_cls, itm[0], _copied(itm[1]))
+for tname in product(('beads', 'cycles'), ('only', '')):
+    _addprop(''.join(tname))
+    del tname
+del _addprop
 
 def _withfilter(self, tpe = NonLinearFilter, **kwa):
     "applies the filter to the data"
@@ -239,8 +227,6 @@ def _withfilter(self, tpe = NonLinearFilter, **kwa):
     return self.withaction(fcn)
 
 for _cls in (Beads, Cycles, Events):
-    _cls.withfilter   = _withfilter
-
-del _cls
-del _copied
+    _cls.withfilter = _withfilter
+    del _cls
 del _withfilter
