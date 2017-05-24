@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from typing import List, Set, Callable, NamedTuple, Tuple # pylint: disable=unused-import
+import pickle
 import numpy
 import functools
 import itertools
@@ -9,25 +10,103 @@ import assemble.data as data
 import assemble.scores as scores
 # pylint: disable=invalid-name
 
+
+def faster_merge_division2(division:List[List[scores.ScoredKPermCollection]]):
+    u'''
+    should replace merge_collections
+    '''
+
+    for idx,div in enumerate(division):
+        print("idx=",idx)
+        if len(div)==1:
+            continue
+        while len(div)>1:
+            print("len(div)=",len(div))
+            sckp1,sckp2=div[:2]
+            merged=scores.ScoredKPermCollection.product(sckp1,sckp2)
+            for divi in division[idx:]:
+                if sckp1 in divi and sckp2 in divi:
+                    divi.remove(sckp1)
+                    divi.remove(sckp2)
+                    divi.append(merged)
+
+    return division
+
+# actually slower. but nice try.
+def faster_merge_division(division:List[List[scores.ScoredKPermCollection]]):
+    u'''
+    should replace merge_collections
+    '''
+    set_coll = set(sckpc for divi in division for sckpc in divi)
+    pickle.dump(division,open("division.pickle","wb"))
+    while any(len(divi)>1 for divi in division):
+        print("mean(len(divi))=",numpy.mean([len(divi) for divi in division]))
+        # find the most common ScoredKPermCollection in divi of len>1 ->sckp1
+        ranks=sorted(((len([divi for divi in division if sckp in divi and len(divi)>1]),sckp) for sckp in set_coll),
+                     key=lambda x:x[0])
+
+        sckp1 = ranks[-1][1]
+        # find the next common ScoredKPermCollection which also have sckp1 ->sckp2
+        ranks=list(([divi for divi in division if sckp in divi and sckp1 in divi],sckp)
+                   for sckp in set_coll if sckp!=sckp1)
+        ranks = sorted(ranks,key=lambda x:len(x[0]))
+        sckp2 = ranks[-1][1]
+        # merge sckp1 and sckp2 -> msckp
+        merged=scores.ScoredKPermCollection.product(sckp1,sckp2)
+        # for each sckperms in merged add the noverlaps
+        # filter msckp -> msckp
+
+        #merged.sckperms=scfilter(merged.sckperms) 
+        pickle.dump(division,open("merging_division.pickle","wb"))
+        # replace sckp1 and sckp2 by msckp in all division
+        print("len(ranks[-1][0])=",len(ranks[-1][0]))
+        for divi in ranks[-1][0]:
+            divi.remove(sckp1)
+            divi.remove(sckp2)
+            divi.append(merged)
+            set_coll=set_coll.union({merged})
+
+    return division
+
 def merge_collections(collections:List[data.KPermCollection],ooverl=3)->List[data.OligoPeakKPerm]:
     u'''
     each element in  collections is now supposed independant
     kpermutations can now be apply simultaneously to find best match (except for boundary effects)
+
+    need to consider: 
+    (1,2,3,4,5)+(7,8,9,10,11)
+    when 6 is out, how do I score the noverlaps?
+    No! that's the point of keeping track of outer sequences 
     '''
+
+    score=scores.ScoreAssembly(ooverl=ooverl)
+    scfilter=scores.ScoreFilter(ooverl=ooverl)
 
     scollections=[]
     for coll in collections:
-        scollections.append(scores.ScoredKPermCollection(sckperm=[Scores.ScoredKPerm(kperm=kpm.kperm,pdfcost=OptiKPerm(kperm=kpm.kperm).cost()) for kpm in coll.kperms]))
+        #scollections.append(scores.ScoredKPermCollection(sckperms=[scores.ScoredKPerm(kperm=kpm,
+        #                                                                             pdfcost=scores.OptiKPerm(kperm=kpm.kperm).cost(),
+        #                                                                             noverlaps=) for kpm in coll.kperms]))
+        scollections.append(scores.ScoredKPermCollection(sckperms=[score(kpm) for kpm in coll.kperms]))
 
-    scfilter=scores.ScoreFilter(ooverl=ooverl)
+    #pickle.dump(scollections,open("scollections.pickle","wb"))
+    #pickle.dump(collections,open("collections.pickle","wb"))
 
-    merged=scores.ScoredKPermCollection.product(*scollection[:2])
-    print("before, len(merged.kperms)=",len(merged.kperms))
+    merged=scores.ScoredKPermCollection.product(*scollections[:2])
+    print("before, len(merged.sckperms)=",len(merged.sckperms))
     # for each sckperms in merged add the noverlaps
-    merged=scores.ScoredKPermCollection.product(*scollection[:2])
     # apply scorefilter
     merged.sckperms=scfilter(merged.sckperms)
+    print("after, len(merged.sckperms)=",len(merged.sckperms))
     # and repeat
+    for tocombine in scollections[2:]:
+        merged=scores.ScoredKPermCollection.product(merged,tocombine)
+        print("before, len(merged.sckperms)=",len(merged.sckperms))
+        # apply scorefilter
+        merged.sckperms=scfilter(merged.sckperms)
+        print("after, len(merged.sckperms)=",len(merged.sckperms))
+
+
     # convert collections into ScoredKPermCollection
     # the product of any two ScoredKPerm is pdf1*pdf2 and OligoPeakKPerm.add(KPerm1,KPerm2)
     # then define the product of 2 ScoredKPermCollections
@@ -41,6 +120,7 @@ def merge_collections(collections:List[data.KPermCollection],ooverl=3)->List[dat
     # each time 2 collections are merged, 
 
     # the following seems to work but is too long
+    '''
     merged=data.KPermCollection.product(*collections[:2])
     print("before, len(merged.kperms)=",len(merged.kperms))
     score=scores.ScoreAssembly(ooverl=ooverl)
@@ -55,9 +135,13 @@ def merge_collections(collections:List[data.KPermCollection],ooverl=3)->List[dat
         scmerged=[score(i) for i in merged.kperms]
         merged.kperms=[i.kperm for i in scfiltre(scmerged)]
         print("after, len(merged.kperms)=",len(merged.kperms))
+    '''
     return merged
 
-def subdivide_then_partition(collections:List[data.KPermCollection],sort_by="kpermids",max_size=25):
+# needs to be modified  to use ScoredKPermCollections instead
+def subdivide_then_partition(collections:List[scores.ScoredKPermCollection],
+                             sort_by="kpermids",
+                             max_size=25):
     u'''
     args:
     max_size argument is a tricky one.
@@ -78,23 +162,21 @@ def subdivide_then_partition(collections:List[data.KPermCollection],sort_by="kpe
     # !!!!!! it is not really possible to ensure that overlapping kpc are together since
     # !!!!!! they might be dependant 2 by 2
     # group intersecting kpcs? it is not a requirement IF are careful when merging
-    ocollect = tuple(sorted(collections,key = lambda x:min(getattr(x.kperms[0],sort_by))))
+    ocollect = tuple(sorted(collections,key = lambda x:min(getattr(x.sckperms[0].kperm,sort_by))))
     print("len(ocollect)=",len(ocollect))
     subdivision=[tuple(ocollect[max_size*i:(i+1)*max_size])
                  for i in range(int(numpy.ceil(len(ocollect)/max_size)))]
     print("sumlentopart",sum(len(i)for i in subdivision))
     print("len of each partition ",list(len(i) for i in subdivision))
-
     per_subdivision=[]
     for subd in subdivision:
         partitions=[]
-        seeds = [kpc for kpc in subd if kpc.intersect_with(subd[0])]
+        seeds = [sckpc for sckpc in subd if sckpc.intersect_with(subd[0])]
         for seed in seeds:
             partitions.extend(find_partitions(seed,
-                                              [kpc for kpc in subd
-                                               if not kpc.intersect_with(seed)]))
+                                              [sckpc for sckpc in subd
+                                               if not sckpc.intersect_with(seed)]))
         per_subdivision.append(partitions)
-
 
     pickle.dump(per_subdivision,open("per_subdivision_backup.pickle","wb"))
     # for each partition, get seeds.
@@ -104,8 +186,8 @@ def subdivide_then_partition(collections:List[data.KPermCollection],sort_by="kpe
 
 # seems to work correctly but is too long. memoisation problem? no!
 # it appears that recursion is slow for python. Try a reimplementation using while loop
-def find_partitions(part:data.KPermCollection,
-                    collections:List[data.KPermCollection])->List[List[data.KPermCollection]]:
+def find_partitions(part:scores.ScoredKPermCollection,
+                    collections:List[scores.ScoredKPermCollection])->List[List[scores.ScoredKPermCollection]]:
     u'''
     part should not be in collections nor any collection which intersects with part
     recursive call
@@ -150,42 +232,63 @@ def reduce_collection(collection:data.KPermCollection)->data.KPermCollection:
 
 if __name__=='__main__':
     import pickle
+
+    ooverl=3
     with open("filtered.pickle","rb") as testfile:
         filtered=pickle.load(testfile)
 
     print("len(filtered)=",len(filtered))
-    #filtered=filtered[-30:]
-    
-    # reduce each KPermCollection to the best ones pdfcost-wise
-    filtered = [reduce_collection(kpc) for kpc in filtered]
-    # may create kpc with only neutral element
-    filtered = [kpc for kpc in filtered if len(kpc.kperms)>1]
-    #print("filtered=",filtered)
-    with open("reduced.pickle","wb") as testfile:
-        pickle.dump(filtered,testfile)
 
-    #per_subdivision=subdivide_then_partition(filtered)
+    # work on ScoreKPermCollection from here!
+
+    # reduce each KPermCollection to the best ones pdfcost-wise not really useful as is
+    #filtered = [reduce_collection(kpc) for kpc in filtered]
+    # may create kpc with only neutral element
+    #filtered = [kpc for kpc in filtered if len(kpc.kperms)>1]
+    #with open("reduced.pickle","wb") as testfile:
+    #    pickle.dump(filtered,testfile)
+
+
+    # filtered: List[data.KpermCollection]
+    score=scores.ScoreAssembly(ooverl=ooverl)
+
+    scfilter=scores.ScoreFilter(ooverl=ooverl)
+
+    # Pol suggested doing matrix multiplication here, probably here?
+
+    scfiltered=[]
+    for coll in filtered:
+        scfiltered.append(scores.ScoredKPermCollection(sckperms=[score(kpm) for kpm in coll.kperms]))
+
+    #per_subdivision=subdivide_then_partition(scfiltered)
     per_subdivision=pickle.load(open("per_subdivision_backup.pickle","rb"))
 
+    # a lot of the per_subdivision have common merging. Lots of room for improvements here!
+    # approximated 8 fold speed increase -> down to roughly 1 hour calculation
+    # compute the merge of 2 collections in subdivision and replace these 2 by the merged value in all subdivisions
+
     # per_subdivision is a List[List[List[KPermCollection]]]
-    for subd in per_subdivision:
-        print("new subdivision to merge")
-        for idx,collections in enumerate(subd):
-            print("new collections merging ",idx)
-            merge_collections(collections)
+    print("len(per_subdivision)=",len(per_subdivision))
+    print("list(len(i) for i in per_subdivision)=",list(len(i) for i in per_subdivision))
+    #for subd in per_subdivision:
+    #    print("new subdivision to merge")
+    #    for idx,collections in enumerate(subd):
+    #        print("new collections merging ",idx)
+    #        merged=merge_collections(collections)
+    #        pickle.dump(merged,open("merged_subd.pickle","wb"))
+    #        stop
+    #pickle.dump(merge_collections,open("merge_collections.pickle","wb"))
     # merge collections
     # each kpc in a collection in  now independant and can be applied in any order
     
     # compute the scores
     # return the best
 
+    # new (hopefully) faster way of merging the subdivisions
+    merged=[]
+    for division in per_subdivision:
+        merged.append(faster_merge_division(division))
+
+    pickle.dump(merged,open("merged_division.pickle","wb"))
     stop
-    # alternate take.
-    # 2 intersecting collections cannot be chosen simultaneously
-    # compare intersecting collections.
-    score=scores.ScoreAssembly(ooverl=3)
-    for kpc in seeds:
-        print(kpc)
-        for kpm in kpc.kperms:
-            print(kpm.kpermids,score(kpm).noverlaps,score(kpm).pdfcost)
                        

@@ -267,8 +267,6 @@ class OligoPeakKPerm:
             outer+=iseq
         outer+=[self.kperm[-1].seq[-ooverl:]]
         return tuple(outer)
-        # must be made more general!
-        #return (self.kperm[0].seq[:ooverl],self.kperm[-1].seq[-ooverl:])
 
 class KPermCollection:
     u'''

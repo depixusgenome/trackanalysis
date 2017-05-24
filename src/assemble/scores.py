@@ -148,10 +148,16 @@ class ScoredKPerm:
         return set(self.kperm.kperm).intersection(set(other.kperm.kperm))!=set()
 
     @classmethod
-    def add(cls,args):
-        u'combine kperms and scores'
+    def add(cls,*args):
+        u'''
+        combine kperms and scores
+        if keeping track of outer_seqs
+        we can combine pdfcost by multiplication
+        and noverlaps by addition
+        '''
         if len(args)==1:
             return args[0]
+
         res=cls.__add2(*args[:2])
         for sckp in args[2:]:
             res = cls.__add2(res,sckp)
@@ -161,8 +167,9 @@ class ScoredKPerm:
     def __add2(cls,first,second):
         u'combine kperms and density scores'
         kperm=data.OligoPeakKPerm.add(first.kperm,second.kperm)
-        pdfcost=first.pdfcost*second.pdfcost
-        return cls(kperm=kperm,pdfcost=pdfcost,noverlaps=0)
+        pdfcost=-first.pdfcost*second.pdfcost
+        noverlaps=first.noverlaps+second.noverlaps
+        return cls(kperm=kperm,pdfcost=pdfcost,noverlaps=noverlaps)
 
 class ScoreAssembly:
     u'''
@@ -211,7 +218,7 @@ class ScoredKPermCollection:
         self.sckperms=sckperms
 
     @classmethod
-    def product(cls,args):
+    def product(cls,*args):
         u'''
         returns the product of any 2 elements in 2 different ScoredKPermCollection
         '''
@@ -235,6 +242,16 @@ class ScoredKPermCollection:
         for sckpm in self.sckperms:
             score.kperm=sckpm.kperm
             sckpm.noverlaps=score.noverlaps()
+
+    def intersect_with(self,other):
+        u'''
+        returns True if any OligoPeakKPerm in self is also in other
+        '''
+        for sckpm in self.sckperms:
+            if any(set(sckpm.kperm.kperm).intersection(set(oth.kperm.kperm))
+                   for oth in other.sckperms):
+                return True
+        return False
 
 class ScoreFilter:
     u'''

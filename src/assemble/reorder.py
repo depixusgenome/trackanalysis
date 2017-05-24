@@ -67,8 +67,6 @@ class DownTopSearcher:
         '''
         if len(subgroups)==1:
             return subgroups
-        print("len(subgroups)=",len(subgroups))
-        pickle.dump(subgroups,open("subgroups.pickle","wb"))
         merged=[]
         for ite in itertools.product([False,True],repeat=len(subgroups)):
             subs=[sgrp for idx,sgrp in enumerate(subgroups) if ite[idx]] # filter
