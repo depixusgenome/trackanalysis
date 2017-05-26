@@ -3,6 +3,7 @@
 
 from typing import List, Set, Callable, NamedTuple, Tuple # pylint: disable=unused-import
 import pickle
+import time
 import numpy
 import functools
 import itertools
@@ -11,11 +12,13 @@ import assemble.scores as scores
 # pylint: disable=invalid-name
 
 
-def faster_merge_division2(division:List[List[scores.ScoredKPermCollection]]):
+def faster_merge_division2(division:List[List[scores.ScoredKPermCollection]],ooverl):
     u'''
     should replace merge_collections
+    reduces the kpermcollection of each element in division to 1 KPermCollection
+    before moving to the next one
     '''
-
+    scfilter=scores.ScoreFilter(ooverl=ooverl)
     for idx,div in enumerate(division):
         print("idx=",idx)
         if len(div)==1:
@@ -24,6 +27,7 @@ def faster_merge_division2(division:List[List[scores.ScoredKPermCollection]]):
             print("len(div)=",len(div))
             sckp1,sckp2=div[:2]
             merged=scores.ScoredKPermCollection.product(sckp1,sckp2)
+            merged.sckperms=scfilter(merged.sckperms)
             for divi in division[idx:]:
                 if sckp1 in divi and sckp2 in divi:
                     divi.remove(sckp1)
@@ -32,10 +36,11 @@ def faster_merge_division2(division:List[List[scores.ScoredKPermCollection]]):
 
     return division
 
-# actually slower. but nice try.
 def faster_merge_division(division:List[List[scores.ScoredKPermCollection]]):
     u'''
     should replace merge_collections
+    Looks at the collections merging the most, 
+    merges them apply it to all List having these collections
     '''
     set_coll = set(sckpc for divi in division for sckpc in divi)
     pickle.dump(division,open("division.pickle","wb"))
@@ -169,6 +174,7 @@ def subdivide_then_partition(collections:List[scores.ScoredKPermCollection],
     print("sumlentopart",sum(len(i)for i in subdivision))
     print("len of each partition ",list(len(i) for i in subdivision))
     per_subdivision=[]
+
     for subd in subdivision:
         partitions=[]
         seeds = [sckpc for sckpc in subd if sckpc.intersect_with(subd[0])]
@@ -176,12 +182,11 @@ def subdivide_then_partition(collections:List[scores.ScoredKPermCollection],
             partitions.extend(find_partitions(seed,
                                               [sckpc for sckpc in subd
                                                if not sckpc.intersect_with(seed)]))
+            # looking for duplicates
+            
         per_subdivision.append(partitions)
 
     pickle.dump(per_subdivision,open("per_subdivision_backup.pickle","wb"))
-    # for each partition, get seeds.
-    # compute the partitions for each seed
-
     return per_subdivision
 
 # seems to work correctly but is too long. memoisation problem? no!
@@ -191,9 +196,6 @@ def find_partitions(part:scores.ScoredKPermCollection,
     u'''
     part should not be in collections nor any collection which intersects with part
     recursive call
-    kpseed is a kpermcollection
-    collections in a list of kpermcollection
-    returns duplicated results with part:data.KPermCollection
     '''
     if len(collections)==0:
         return []
@@ -215,7 +217,7 @@ def find_partitions(part:scores.ScoredKPermCollection,
 def reduce_collection(collection:data.KPermCollection)->data.KPermCollection:
     u'''
     score the kpermutations
-    this function could potentially discard good (but likely) permutations
+    this function could potentially discard good (but unlikely) permutations
     need to check why some kperms have very high pdfcost 1e-5 when it should be neutral permutation
     '''
     score=scores.ScoreAssembly(ooverl=3)
@@ -254,18 +256,13 @@ if __name__=='__main__':
 
     scfilter=scores.ScoreFilter(ooverl=ooverl)
 
-    # Pol suggested doing matrix multiplication here, probably here?
-
     scfiltered=[]
     for coll in filtered:
         scfiltered.append(scores.ScoredKPermCollection(sckperms=[score(kpm) for kpm in coll.kperms]))
 
-    #per_subdivision=subdivide_then_partition(scfiltered)
+    # creation of duplicates!!
+    per_subdivision=subdivide_then_partition(scfiltered)
     per_subdivision=pickle.load(open("per_subdivision_backup.pickle","rb"))
-
-    # a lot of the per_subdivision have common merging. Lots of room for improvements here!
-    # approximated 8 fold speed increase -> down to roughly 1 hour calculation
-    # compute the merge of 2 collections in subdivision and replace these 2 by the merged value in all subdivisions
 
     # per_subdivision is a List[List[List[KPermCollection]]]
     print("len(per_subdivision)=",len(per_subdivision))
@@ -284,11 +281,25 @@ if __name__=='__main__':
     # compute the scores
     # return the best
 
-    # new (hopefully) faster way of merging the subdivisions
+    # new faster way of merging the subdivisions
     merged=[]
-    for division in per_subdivision:
-        merged.append(faster_merge_division(division))
-
-    pickle.dump(merged,open("merged_division.pickle","wb"))
+    #for division in per_subdivision:
+    #    merged.append(faster_merge_division2(division,ooverl=ooverl))
+    ttime=time.time()
+    #mtest=faster_merge_division2(per_subdivision[1],ooverl=ooverl)
+    #print("faster_merge_division2 took:",time.time()-ttime)
+    #pickle.dump(mtest,open("merged_division_backup.pickle","wb"))
+    #pickle.dump(mtest,open("merged_division1_backup.pickle","wb"))
+    merged=[pickle.load(open("merged_division_backup.pickle","rb")),pickle.load(open("merged_division1_backup.pickle","rb"))]
+    # it appears that no collections in merged_division_backup.pickle intersect_with any of merged_division1_backup.pickle ...
+    # but it will not be a general rule!
+    merged_flat0=[lkpc[0] for lkpc in merged[0]]
+    merged_flat1=[lkpc[0] for lkpc in merged[1]]
+    ttime=time.time()
+    full_merge=[scores.ScoredKPermCollection.product(first,second) for first,second in itertools.product(merged_flat0,merged_flat1)]
+    #if not first.intersect_with(second)]
+    print("fullmerging took",time.time()-ttime)
+    pickle.dump(full_merge,open("full_merge.pickle","wb"))
+    print(len(full_merge))
     stop
                        

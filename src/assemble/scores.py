@@ -171,6 +171,9 @@ class ScoredKPerm:
         noverlaps=first.noverlaps+second.noverlaps
         return cls(kperm=kperm,pdfcost=pdfcost,noverlaps=noverlaps)
 
+    def __mul__(self,other):
+        return self.__add2(self,other)
+
 class ScoreAssembly:
     u'''
     given an assembly (list of oligos in the correct order)
@@ -253,6 +256,9 @@ class ScoredKPermCollection:
                 return True
         return False
 
+    def __mul__(self,other):
+        return numpy.matrix(self.sckperms).T*numpy.matrix(other.sckperms)
+
 class ScoreFilter:
     u'''
     filter out ScoredKPerm which cannot lead to the 'best' score.
@@ -262,7 +268,7 @@ class ScoreFilter:
     which have same outlying oligos
     '''
     scorekperms = [] # type: List[ScoredKPerm]
-    __pdfthreshold = 0.05 # type: float
+    __pdfthreshold = 0.0 # type: float
     ooverl=1 # type: int
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
@@ -287,7 +293,8 @@ class ScoreFilter:
         for group in itertools.groupby(sorted_sckp,lambda x:x.noverlaps):
             sgroup = sorted(group[1],key=lambda x:x.pdfcost)
             minpdf = sgroup[0].pdfcost*(1-self.__pdfthreshold)
-            out+=[grp for grp in sgroup if grp.pdfcost<minpdf]
+            out+=[sgroup[0]]
+            out+=[grp for grp in sgroup[1:] if grp.pdfcost<minpdf]
         return out
 
 

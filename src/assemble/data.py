@@ -268,6 +268,10 @@ class OligoPeakKPerm:
         outer+=[self.kperm[-1].seq[-ooverl:]]
         return tuple(outer)
 
+    def __mul__(self,other):
+        return self.__add2(self, other)
+
+
 class KPermCollection:
     u'''
     Container for a list of OligoPeakKPerm
@@ -297,12 +301,6 @@ class KPermCollection:
         u'''
         takes the product of 2 elements at a time
         '''
-        #if first.kperms==[]:
-        #    return cls(kperms=second.kperms)
-
-        #if second.kperms==[]:
-        #    return cls(kperms=first.kperms)
-
         kperms = list(OligoPeakKPerm.add(*prd)
                       for prd in itertools.product(first.kperms,second.kperms))
         return cls(kperms=kperms)
@@ -320,3 +318,8 @@ class KPermCollection:
             if any(set(kpr.kperm).intersection(set(oth.kperm)) for oth in other.kperms):
                 return True
         return False
+
+    def __mul__(self,other):
+        u'''use numpy.matrix multiplication for speed up
+        '''
+        return numpy.matrix(self.kperms).T*numpy.matrix(other.kperms)
