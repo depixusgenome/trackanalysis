@@ -5,6 +5,8 @@ import sys
 import numpy
 
 import anastore
+from anastore._patches import (modifyclasses, # pylint: disable=protected-access
+                               TPE, DELETE, RESET)
 from model.task import TrackReaderTask, CycleCreatorTask, TaggingTask
 
 BEENTHERE = []
@@ -76,5 +78,27 @@ def test_storenumpy():
     assert numpy.array_equal(vals['c'], loaded['c'])
     assert loaded['d'] is numpy.nanmedian
 
+def test_modifyclass():
+    "tests class modifications"
+    # pylint: disable=redefined-variable-type
+    val = [{TPE: 'toto'}, {TPE: 'titi', 'attr': 1}]
+    modifyclasses(val, 'toto', DELETE, 'titi', RESET)
+    assert val == [{TPE: 'titi'}]
+
+    val = {'a':{TPE: 'toto'}, 'b': {TPE: 'titi', 'attr': 1}}
+    modifyclasses(val, 'toto', DELETE, 'titi', RESET)
+    assert val == {'b': {TPE: 'titi'}}
+
+    val = [{'a':{TPE: 'toto', 'delete': 1, 'change': 2, 'reset' : 3, 'reset2': 4}}]
+    modifyclasses(val, 'titi', dict(), 'toto',
+                  dict(delete   = DELETE,
+                       reset    = RESET,
+                       reset2   = lambda x: RESET,
+                       delete2  = lambda x: DELETE,
+                       change   = lambda x: x*2,
+                       __name__ = 'tata'))
+    assert val == [{'a': {TPE: 'tata', 'change': 4}}]
+
+
 if __name__ == '__main__':
-    test_storenumpy()
+    test_modifyclass()

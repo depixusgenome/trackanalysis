@@ -1,14 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"""
-patches for tasks and configs
+Patches for tasks and configs.
+
+Please check the *modifyclasses* documentation.
+
+
+**Note**: If a default value has changed, do not set to the new value.  Return
+or raise *RESET*.
+
+**Note**: If a value should be set to default, do not set it.  Return or raise
+*RESET*.
 """
-from ._patches  import Patches, modifyclasses
+from ._patches  import Patches, modifyclasses, RESET
 
 def _v0(data:dict) -> dict:
     modifyclasses(data,
                   "eventdetection.processor.ExtremumAlignmentTask",
-                  dict(edge = lambda val: 'right' if val else None))
+                  dict(edge   = lambda val: 'right' if val else RESET,
+                       factor = RESET))
 
     data.get('config', {}).pop('precision.max', None)
     return data
