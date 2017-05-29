@@ -83,4 +83,6 @@ class CyclesPlotView(PlotView):
     def ismain(self):
         "Alignment, ... is set-up by default"
         super()._ismain(tasks  = ['extremumalignment', 'eventdetection'],
-                        ioopen = [slice(None, -1), 'control.taskio.ConfigTrackIO'])
+                        ioopen = [slice(None, -2),
+                                  'control.taskio.ConfigGrFilesIO',
+                                  'control.taskio.ConfigTrackIO'])
