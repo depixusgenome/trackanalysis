@@ -186,7 +186,7 @@ class AlignmentWidget(GroupWidget):
     @property
     def __phases(self):
         cnf = self.config.root.phase
-        return ['None']+[cnf[i].get() for i in ('measure', 'initial', 'pull')]
+        return ['ø']+[cnf[i].get() for i in ('measure', 'initial', 'pull')]
 
     def onclick_cb(self, value):
         "action to be performed when buttons are clicked"
@@ -196,8 +196,10 @@ class AlignmentWidget(GroupWidget):
             self._model.alignment.update(phase = self.__phases[value])
 
     def _data(self):
-        task   = self._model.alignment.task
-        active = self.__phases.index(getattr(task, 'phase', 'None'))
+        val    = getattr(self._model.alignment.task, 'phase', 'ø')
+        if val is None:
+            val = 5
+        active = self.__phases.index(val)
         return dict(active = active)
 
 class DriftWidget(GroupWidget):
