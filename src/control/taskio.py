@@ -32,7 +32,7 @@ class TaskIO:
 
 class TrackIO(TaskIO):
     "Deals with reading a track file"
-    EXT = 'trk',
+    EXT = 'trk', # type: Tuple[str, ...]
     def open(self, path:Union[str, Tuple[str,...]], model:tuple):
         "opens a track file"
         if len(model):
@@ -41,7 +41,6 @@ class TrackIO(TaskIO):
 
 class ConfigTrackIO(TrackIO):
     "Adds an alignment to the tracks per default"
-    EXT = 'trk',
     def __init__(self, ctrl, *_):
         super().__init__(ctrl, *_)
         self._ctrl = ctrl.getGlobal('config').tasks
@@ -60,6 +59,7 @@ class ConfigTrackIO(TrackIO):
 
 class _GrFilesIOMixin:
     "Adds an alignment to the tracks per default"
+    EXT = TrackIO.EXT+('gr',) # type: Tuple[str, ...]
     def __init__(self, ctrl):
         self._track = None
         fcn         = lambda itm: setattr(self, '_track', itm.value)
@@ -70,18 +70,23 @@ class _GrFilesIOMixin:
         if isinstance(path, str):
             path = path,
 
-        if not all(i.endswith('.gr') for i in path):
+        trks = tuple(i for i in path if any(i.endswith(j) for j in TrackIO.EXT))
+        grs  = tuple(i for i in path if i.endswith(self.EXT[-1]))
+        if len(trks) + len(grs) < len(path) or len(trks) > 1 or len(grs) < 1:
             return None
 
-        track = self._track
-        if track is None:
-            raise IOError(u"IOError: start by opening a track file!", "warning")
+        if len(trks) == 0:
+            track = self._track
+            if track is None:
+                raise IOError(u"IOError: start by opening a track file!", "warning")
 
-        return ((track.path,) if isinstance(track.path, str) else track.path) + path
+            return ((track.path,) if isinstance(track.path, str) else track.path) + path
+        else:
+            return trks+grs
 
 class GrFilesIO(TrackIO, _GrFilesIOMixin):
     "Adds an alignment to the tracks per default"
-    EXT = 'gr',
+    EXT = _GrFilesIOMixin.EXT
     def __init__(self, *_):
         TrackIO.__init__(self, *_)
         _GrFilesIOMixin.__init__(self, *_)
@@ -110,7 +115,7 @@ def currentmodelonly(cls):
 
 class ConfigGrFilesIO(ConfigTrackIO, _GrFilesIOMixin):
     "Adds an alignment to the tracks per default"
-    EXT = 'gr',
+    EXT = _GrFilesIOMixin.EXT
     def __init__(self, *_):
         ConfigTrackIO.__init__(self, *_)
         _GrFilesIOMixin.__init__(self, *_)
