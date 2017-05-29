@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Processors apply tasks to a data flow"
-from   typing             import Optional # pylint: disable=unused-import
+from   typing             import Optional, NamedTuple # pylint: disable=unused-import
 from   functools          import partial
 
 import numpy              as     np
@@ -79,6 +79,12 @@ class ExtremumAlignmentProcessor(Processor):
                     val += delta
             return next(iter(self.cycles.data.items()))
 
+    _Args = NamedTuple('_Args',
+                       [('cycles',  _Utils),
+                        ('initial', np.ndarray),
+                        ('pull',    np.ndarray),
+                        ('measure', Optional[np.ndarray])])
+
     @classmethod
     def _get(cls, kwa:dict, name:str):
         return kwa.get(name, getattr(cls.tasktype, name))
@@ -86,8 +92,8 @@ class ExtremumAlignmentProcessor(Processor):
     @classmethod
     def apply(cls, toframe = None, **kwa):
         "applies the task to a frame or returns a function that does so"
-        action = (cls.__apply_best13  if cls._get(kwa, 'phase') is None          else
-                  cls.__apply_best513 if cls._get(kwa, 'phase') == PHASE.measure else
+        action = (cls.__apply_best13 if cls._get(kwa, 'phase') is None          else
+                  cls.__apply_best51 if cls._get(kwa, 'phase') == PHASE.measure else
                   cls.__apply_onephase)
 
         def _apply(frame):
@@ -96,21 +102,29 @@ class ExtremumAlignmentProcessor(Processor):
         return _apply if toframe is None else _apply(toframe)
 
     @classmethod
-    def __args(cls, kwa, frame, info, meas):
+    def __args(cls, kwa, frame, info, meas) -> 'ExtremumAlignmentProcessor._Args':
         cycles  = cls._Utils(frame, info)
         window  = cls._get(kwa, 'window')
         edge    = cls._get(kwa, 'edge')
         inits   = cycles.bias(PHASE.initial, window, edge)
         pulls   = cycles.bias(PHASE.pull, window, edge)
         if meas:
-            return cycles, inits, pulls, cycles.bias(PHASE.measure, window, 'right')
+            return cls._Args(cycles, inits, pulls,
+                             cycles.bias(PHASE.measure, window, 'right'))
 
         else:
-            return cycles, inits, pulls
+            return cls._Args(cycles, inits, pulls, None)
 
     @classmethod
-    def __deltas(cls, deltas, kwa):
-        rho = np.nanmedian(deltas)*cls._get(kwa, 'factor')
+    def __deltas(cls, attr:str, args:_Args, kwa):
+        arr = getattr(args, attr)
+        if arr is None:
+            edge = 'right' if attr == 'measure' else cls._get(kwa, 'edge')
+            wind = cls._get(kwa, 'window')
+            arr  = args.cycles.bias(getattr(PHASE, attr), wind, edge)
+
+        deltas = arr - args.pull
+        rho    = np.nanmedian(deltas)*cls._get(kwa, 'factor')
         if rho <= 0.:
             deltas[:] = 2.
         else:
@@ -119,29 +133,26 @@ class ExtremumAlignmentProcessor(Processor):
         return deltas
 
     @classmethod
-    def __apply_best513(cls, kwa, frame, info):
+    def __apply_best51(cls, kwa, frame, info):
         args = cls.__args(kwa, frame, info, True)
-        bias = args[3]
+        bias = args.measure
 
-        dlt5 = cls.__deltas(args[3]-args[2], kwa)
-        bad  = dlt5 < 1
+        bad  = cls.__deltas('measure', args, kwa) < 1.
         if any(bad):
-            dlt1      = cls.__deltas(args[1]-args[2], kwa)
-            bad       = np.logical_and(bad, dlt1 >= 1.)
-            bias[bad] = args[1][bad]+np.nanmedian(args[3]-args[1])
-        return args[0].translate(bias)
+            bad       = np.logical_and(bad, cls.__deltas('initial', args, kwa) >= 1.)
+            bias[bad] = args.initial[bad]+np.nanmedian(args.measure-args.initial)
+        return args.cycles.translate(bias)
 
     @classmethod
     def __apply_best13(cls, kwa, frame, info):
         args = cls.__args(kwa, frame, info, False)
-        bias = args[1]
+        bias = args.initial
 
-        bad  = cls.__deltas(args[1]-args[2], kwa) < 1.
+        bad  = cls.__deltas('initial', args, kwa) < 1.
         if any(bad):
-            meas      = args[0].bias(PHASE.measure, cls._get(kwa, 'window'), 'right')
-            bad       = np.logical_and(bad, cls.__deltas(meas-args[2], kwa) >= 1.)
-            bias[bad] = args[2][bad]+np.nanmedian(args[1]-args[2])
-        return args[0].translate(bias)
+            bad       = np.logical_and(bad, cls.__deltas('measure', args, kwa) >= 1.)
+            bias[bad] = args.pull[bad]+np.nanmedian(args.initial-args.pull)
+        return args.cycles.translate(bias)
 
     @classmethod
     def __apply_onephase(cls, kwa, frame, info):
