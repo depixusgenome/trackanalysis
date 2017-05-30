@@ -62,14 +62,17 @@ def modifyclasses(data, *args):
         ...               "modulename2.classname2", dict(attr2 = lambda val: val/2,
         ...                                              attr3 = Reset,
         ...                                              __name__ = 'newmod.newcls'),
+        ...               "modulename2.classname2", dict(attr4 = 'newname'),
         ...               "modulename3.classname3", _Delete,
-        ...               "modulename4.classname4", dict(__call__ = specific))
+        ...               "*.classname4", dict(__call__ = specific)) # using regex
 
 
     Use *DELETE* to remove a class or attribute. Use *RESET* to reset an
     attribute to it's - possibly new - default value. In practice, using
     *DELETE* has the same effect as *Reset*: the key is removed from the
     dictionnary.
+
+    A same class can have multiple dictionnaries, allowing incremental changes.
 
     **Note**: If a default value has changed, do not set to the new value.
     Return or raise *RESET*.
@@ -132,6 +135,10 @@ def modifyclasses(data, *args):
             fcn = cur[key]
             if fcn is _Delete or fcn is _Reset:
                 itm.pop(key)
+
+            elif isinstance(fcn, str):
+                itm[fcn] = itm.pop(key)
+
             elif callable(fcn):
                 try:
                     val = fcn(itm[key])

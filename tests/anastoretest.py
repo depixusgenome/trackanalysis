@@ -99,6 +99,10 @@ def test_modifyclass():
                        __name__ = 'tata'))
     assert val == [{'a': {TPE: 'tata', 'change': 4}}]
 
+    val = [{'a':{TPE: 'toto', 'attr': 1}}]
+    modifyclasses(val, 'toto', dict(attr = 'newname'),
+                  'toto', dict(newname = lambda x: x*2))
+    assert val == [{'a': {TPE: 'toto', 'newname': 2}}]
 
 if __name__ == '__main__':
     test_modifyclass()
