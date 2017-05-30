@@ -169,10 +169,8 @@ class ScoredKPerm:
         kperm=data.OligoPeakKPerm.add(first.kperm,second.kperm)
         pdfcost=-first.pdfcost*second.pdfcost
         noverlaps=first.noverlaps+second.noverlaps
-        return cls(kperm=kperm,pdfcost=pdfcost,noverlaps=noverlaps)
+        return ScoredPerm(kperm=kperm,pdfcost=pdfcost,noverlaps=noverlaps)
 
-    def __mul__(self,other):
-        return self.__add2(self,other)
 
 class ScoreAssembly:
     u'''
@@ -233,12 +231,40 @@ class ScoredKPermCollection:
             res = cls.__product2(res,sckpm)
         return res
 
+
     @classmethod
-    def __product2(cls,first,second):
-        u'returns  the product of 2 ScoredKPermCollection'
-        sckpm=list(ScoredKPerm.add(*prd)
-                   for prd in itertools.product(first.sckperms,second.sckperms))
-        return cls(sckperms=sckpm)
+    def __product2(cls,collection1,collection2): # pylint: disable=too-many-locals
+        u'''
+        assumes that the 2 kpermutation are independant
+        work on permids and changes only
+        '''
+        pdfcost1=numpy.matrix([i.pdfcost for i in collection1.sckperms])
+        pdfcost2=numpy.matrix([i.pdfcost for i in collection2.sckperms])
+        noverlaps1=numpy.matrix([i.noverlaps for i in collection1.sckperms])
+        noverlaps2=numpy.matrix([i.noverlaps for i in collection2.sckperms])
+        kperms1=numpy.matrix([i.kperm.permids for i in collection1.sckperms])
+        kperms2=numpy.matrix([i.kperm.permids for i in collection2.sckperms])
+        kpids1=[i.kperm.kpermids for i in collection1.sckperms]
+        kpids2=[i.kperm.kpermids for i in collection2.sckperms]
+        merged_permids=kperms1[:,kperms2]
+        merged_pdfcost=-pdfcost1.T*pdfcost2
+        merged_noverlaps=noverlaps1.T+noverlaps2
+        convert=data.Permids2OligoPeakKPerm(oligos=collection1.sckperms[0].kperm.oligos)
+        scores = [ScoredKPerm(pdfcost=merged_pdfcost[i1,i2],
+                              noverlaps=merged_noverlaps[i1,i2],
+                              kperm=convert(merged_permids[i1,i2,:].\
+                                            reshape((1,kperms2.shape[1])).tolist()[0],
+                                            kpermids=kpids1[i1]+kpids2[i2]))
+                  for i1 in range(len(collection1.sckperms))
+                  for i2 in range(len(collection2.sckperms))]
+        return ScoredKPermCollection(sckperms=scores)
+
+    #@classmethod
+    #def __product2(cls,first,second):
+    #    u'returns  the product of 2 ScoredKPermCollection'
+    #    sckpm=list(ScoredKPerm.add(*prd)
+    #               for prd in itertools.product(first.sckperms,second.sckperms))
+    #    return cls(sckperms=sckpm)
 
     def compute_noverlaps(self,score:ScoreAssembly)->None:
         u'calls score on each sckperm to update noverlap valuex'
@@ -256,8 +282,6 @@ class ScoredKPermCollection:
                 return True
         return False
 
-    def __mul__(self,other):
-        return numpy.matrix(self.sckperms).T*numpy.matrix(other.sckperms)
 
 class ScoreFilter:
     u'''

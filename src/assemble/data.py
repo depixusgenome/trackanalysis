@@ -140,15 +140,16 @@ class BCollection:
 
 # cannot annotate attributes as type OligoPeakKPerm
 # should subclass OligoPeakKPerm has a KPerm class
+# careful with the use of kperms. it is only meaningful iff it is not a combined kpermutation
 class OligoPeakKPerm:
     u'kpermutation of OligoPeak Object'
-    __perm = [] # type: List[OligoPeak]
-    __kpermids = [] # type: List[int]
-    __permids = [] # type: List[int]
     def __init__(self,**kwa)->None:
         self.oligos=kwa.get("oligos",[]) # type: List[OligoPeak]
         self.kperm=kwa.get("kperm",[]) # type: List[OligoPeak]
         self.__changes = kwa.get("changes",tuple()) # type: Tuple[int, ...]
+        self.__perm = kwa.get("perm",[]) # type: List[OligoPeak]
+        self.__kpermids = kwa.get("kpermids",[]) # type: List[int]
+        self.__permids = kwa.get("permids",[]) # type: List[int]
 
     @property
     def kpermids(self)->List[int]:
@@ -163,6 +164,7 @@ class OligoPeakKPerm:
         if self.__perm==[]:
             self.__perm=numpy.array(self.oligos)[self.permids].tolist()
         return self.__perm
+
     @property
     def permids(self):
         u'returns the full permutation of oligo indices'
@@ -178,6 +180,7 @@ class OligoPeakKPerm:
     def get_changes(cls,kperm,sort_by="pos")->Tuple[int, ...]:
         u'''
         returns the smallest (contiguous) permutations of kperm
+        will not work for a combination of kperms
         '''
         try:
             sortedp=sorted(kperm,key=lambda x:getattr(x,sort_by))
@@ -197,7 +200,6 @@ class OligoPeakKPerm:
         u'''
         returns the tuple of indices which will be changed by application of perm
         should return [] if all sorted(perm)[i]==perm[i], ie: identity operator
-        will not work for a combination of kperms
         '''
         if self.__changes==tuple():
             self.__changes=self.get_changes(self.kpermids)
@@ -242,16 +244,18 @@ class OligoPeakKPerm:
             print("pb")
             print("kperm1.kpermids=",kperm1.kpermids)
             print("kperm2.kpermids=",kperm2.kpermids)
-        return OligoPeakKPerm(oligos=kperm1.oligos,
-                              kperm=kperm,
-                              changes=changes)
+        return OligoPerm(oligos=kperm1.oligos,
+                         kperm=kperm,
+                         changes=changes)
 
-    def is_subgroup_of(self,kperm,attr="changes")->bool:
-        u'''
-        returns True if set(getattr(kperm,attr))>set(getattr(self,attr))
-        '''
-        return set(getattr(kperm,attr))>set(getattr(self,attr))
+    #def is_subgroup_of(self,kperm,attr="changes")->bool:
+    #    u'''
+    #    returns True if set(getattr(kperm,attr))>set(getattr(self,attr))
+    #    '''
+    #    return set(getattr(kperm,attr))>set(getattr(self,attr))
 
+    # to correct
+    # needs to work on permids
     def outer_seqs(self,ooverl:int)->Tuple[str, ...]:
         u'''
         returns the overlapping oligo seq of left most oligo and right most
@@ -268,9 +272,22 @@ class OligoPeakKPerm:
         outer+=[self.kperm[-1].seq[-ooverl:]]
         return tuple(outer)
 
-    def __mul__(self,other):
-        return self.__add2(self, other)
 
+
+
+class Permids2OligoPeakKPerm:
+    u'Convertion class'
+    oligos=[] # type: List[OligoPeak]
+    @initdefaults(frozenset(locals()))
+    def __init__(self,**kwa):
+        u'initialize before call'
+        pass
+    def __call__(self,permids:List[int],kpermids:Tuple[int, ...])->OligoPeakKPerm:
+        u'convert using permids'
+        return OligoPeakKPerm(kperm=[self.oligos[i] for i in kpermids],
+                              oligos=self.oligos,
+                              permids=permids,
+                              kpermids=kpermids)
 
 class KPermCollection:
     u'''
@@ -318,8 +335,3 @@ class KPermCollection:
             if any(set(kpr.kperm).intersection(set(oth.kperm)) for oth in other.kperms):
                 return True
         return False
-
-    def __mul__(self,other):
-        u'''use numpy.matrix multiplication for speed up
-        '''
-        return numpy.matrix(self.kperms).T*numpy.matrix(other.kperms)
