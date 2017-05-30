@@ -105,9 +105,11 @@ class Curve(Multiplier):
             name = axis+'_range_name'
             rng  = getattr(plot, 'extra_{}_ranges'.format(axis))
             if name in self.kwa:
-                if self.kwa[name] not in rng:
-                    plot = plot*ExtraAxis(self.kwa[name], axis)
-                ranges.append(rng[self.kwa[name]])
+                axname = self.kwa[name]
+                if axname not in rng:
+                    plot = plot*ExtraAxis(axname, axis)
+                    rng  = getattr(plot, 'extra_{}_ranges'.format(axis))
+                ranges.append(rng[axname])
             else:
                 ranges.append(getattr(plot, axis+'_range'))
         return ranges
