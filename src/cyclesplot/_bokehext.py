@@ -15,22 +15,47 @@ from    view.plots          import PlotAttrs, DpxHoverTool
 class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-instance-attributes
     "controls keypress actions"
     shape     = props.Tuple(props.Int, props.Int, default = (0, 0))
-    cycle     = props.Int(0)
+    cycle     = props.Int(-1)
     framerate = props.Float(1.)
     bias      = props.Float(0.)
     stretch   = props.Float(0.)
     updating  = props.String('')
 
-    # 1 & 2: dummy variables because js_on_change is bugged
-    updating1 = props.String('')
-    updating2 = props.String('')
-    __implementation__ = SequenceHoverMixin.impl('DpxHoverModel',
-                                                 """
-                                                 shape    : [p.Array,  [0, 0]],
-                                                 cycle    : [p.Int,  0],
-                                                 updating1: [p.String, ''],
-                                                 updating2: [p.String, '']
-                                                 """)
+    impl      = SequenceHoverMixin.impl
+    __implementation__ = impl('DpxHoverModel',
+                              'shape: [p.Array,  [2, 1]], cycle: [p.Int,  -1],',
+                              '''
+                              set_hover: (rawsrc, hvrsrc, glyph, inds, value) ->
+                                  if @_hvr_cnt != value
+                                      return
+
+                                  inds.sort((a,b) => a - b)
+                                  ind = inds[Math.floor(inds.length*0.5)]
+                                  ind = Math.floor(ind/@shape[1]) * @shape[1]
+                                  if ind == @cycle
+                                      return
+
+                                  @cycle           = ind
+                                  hvrsrc.data['z'] = rawsrc.data['z'][ind...(ind+@shape[1])]
+                                  glyph.visible    = true
+                                  hvrsrc.trigger('change')
+
+                              launch_hover: (rawsrc, hvrsrc, glyph, data) ->
+                                  if @shape[1] == 2
+                                      return
+
+                                  @_hvr_cnt = if @_hvr_cnt? then @_hvr_cnt + 1 else 0
+                                  inds      = data.index['1d'].indices
+                                  if (not inds?) || inds.length == 0
+                                      if glyph.visible
+                                          glyph.visible = false
+                                          glyph.trigger('change')
+                                      return
+
+                                  window.setTimeout(((a,b,c,d,e) => @set_hover(a,b,c,d,e)),
+                                                    100, rawsrc, hvrsrc, glyph,
+                                                    inds, @_hvr_cnt)
+                              ''')
     def __init__(self, **kwa):
         super().__init__(**kwa)
         SequenceHoverMixin.__init__(self)
@@ -68,44 +93,15 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         sel             = css.selection[self._model.css.theme.get()].get()
         self._rawglyph  = sel.addto(fig,  x = 't', y = 'z', source = self._rawsource)
 
-        def _onhover(source  = self._rawsource, # pylint: disable=too-many-arguments
-                     hvrsrc  = source,
-                     glyph   = self._rawglyph,
-                     mdl     = self,
-                     cb_data = None,
-                     window  = None):
-            if mdl.shape == (1, 2):
-                return
-
-            if not cb_data.index['1d'].indices.length:
-                if glyph.visible:
-                    glyph.visible = False
-                    glyph.trigger('change')
-                return
-
-            yval = cb_data['geometry'].y
-            best = cb_data.index['1d'].indices[0]
-            dist = window.Math.abs(hvrsrc.data['z'][best] - yval)
-            for ind in cb_data.index['1d'].indices[1:]:
-                tmp = window.Math.abs(hvrsrc.data['z'][ind] - yval)
-                if tmp < dist:
-                    dist = tmp
-                    best = ind
-
-            ind                 = best//mdl.shape[1]
-            if ind == mdl.cycle:
-                return
-
-            mdl.cycle           = ind
-            ind                *= mdl.shape[1]
-            source.data['z']    = hvrsrc.data['z'][ind:ind+mdl.shape[1]]
-            glyph.visible = True
-            source.trigger('change')
-
-        hover[0].callback = CustomJS.from_py_func(_onhover)
+        args = dict(hvr    = self,
+                    hvrsrc = self._rawsource,
+                    rawsrc = source,
+                    glyph  = self._rawglyph)
+        code = "hvr.launch_hover(rawsrc, hvrsrc, glyph, cb_data)"
+        hover[0].callback = CustomJS(code = code, args = args)
         hover[0].tooltips = None
 
-        tooltips  = css.tooltips.get()
+        tooltips = css.tooltips.get()
         if tooltips is None or len(tooltips) == 0:
             return
 
