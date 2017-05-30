@@ -17,18 +17,25 @@ class ExtremumAlignmentTask(Task):
     """
     Task for aligning on a given phase.
 
-    If no phase is selected, alignment is performed on phase 1 for all then
-    phase 3 for outliers. This is done the following way:
+    Alignment is performed on *phase* for all then only on outliers using
+    either phase 3, if *phase* is 1, or phase 1 if *phase* is 5. This is done
+    the following way:
 
-        1. Algnments are performed on phase 1.
+        1. Algnments are performed on *phase*.
         2. The extension between phases 3 and 1 and 3 and 5 are computed.
         3. Cycles are considered miss-aligned only if the bead opened during that
         cycle. The test is:
 
-            * 1-3 extension < (median 1-3 extension) x factor
-            * 3-5 extension > (median 1-3 extension) x factor
+            * *phase* to phase 3 extension < median x outlier
+            * 3-5 extension                > median x outlier
 
-        4. Mis-aligned cycles are aligned to the median value in *aligned* phase 3
+        4. Mis-aligned cycles are aligned to the median value of *aligned* values
+        of the outlier phase.
+
+    Finally, if *phase* is 5, cycles with the following property are aligned on phase 3:
+
+            * |phase 3 - median| > pull
+            * (3-5 extension > median x opening) or (1-5 extension > median x opening)
 
     Attributes:
 
@@ -38,14 +45,17 @@ class ExtremumAlignmentTask(Task):
         * *edge:* Whether to look at the extremum etremorum (ExtremumAlignment) or
         simply to align on a given side (EdgeAlignment).
         * *phase:* Whether to align a specific phase or on the best.
-        * *factor:* When aligning on the best phase, this factor is used to determine
-        cycles mis-aligned on phase 1.
+        * *opening:* This factor is used to determine cycles mis-aligned on *phase*.
+        * *pull:* maximum absolute distance from the median phase 3 value.
     """
-    level  = Level.bead
-    window = 15
-    edge   = 'right' # type: Optional[str]
-    phase  = None    # type: Optional[int]
-    factor = .9
+    level     = Level.bead
+    window    = 15
+    edge      = 'right' # type: Optional[str]
+    phase     = None    # type: Optional[int]
+    outlier   = .9
+    pull      = .1
+    opening   = .5
+
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_):
         super().__init__()
@@ -116,7 +126,7 @@ class ExtremumAlignmentProcessor(Processor):
             return cls._Args(cycles, inits, pulls, None)
 
     @classmethod
-    def __deltas(cls, attr:str, args:_Args, kwa):
+    def __deltas(cls, attr:str, outlier: str, args:_Args, kwa):
         arr = getattr(args, attr)
         if arr is None:
             edge = 'right' if attr == 'measure' else cls._get(kwa, 'edge')
@@ -124,7 +134,7 @@ class ExtremumAlignmentProcessor(Processor):
             arr  = args.cycles.bias(getattr(PHASE, attr), wind, edge)
 
         deltas = arr - args.pull
-        rho    = np.nanmedian(deltas)*cls._get(kwa, 'factor')
+        rho    = np.nanmedian(deltas)*cls._get(kwa, outlier)
         if rho <= 0.:
             deltas[:] = 2.
         else:
@@ -133,24 +143,42 @@ class ExtremumAlignmentProcessor(Processor):
         return deltas
 
     @classmethod
+    def __align_on_3(cls, bias, args, kwa):
+        tmp  = bias-args.pull
+        tmp -= np.nanmedian(tmp)
+        tmp /= cls._get(kwa, 'pull')
+        tmp[np.isnan(tmp)] = 0.
+
+        tmp  = np.abs(tmp) > 1.
+        if any(tmp):
+            bad  = np.logical_or(cls.__deltas('initial', 'opening', args, kwa) >= 1.,
+                                 cls.__deltas('measure', 'opening', args, kwa) >= 1.)
+
+            np.logical_and(bad, tmp, bad)
+            bias[bad] = args.pull[bad]+np.nanmedian(args.measure-args.pull)
+        return args.cycles.translate(bias)
+
+    @classmethod
     def __apply_best51(cls, kwa, frame, info):
         args = cls.__args(kwa, frame, info, True)
         bias = args.measure
 
-        bad  = cls.__deltas('measure', args, kwa) < 1.
+        dtl5 = cls.__deltas('measure', 'outlier', args, kwa)
+        bad  = dtl5 < 1.
         if any(bad):
-            bad       = np.logical_and(bad, cls.__deltas('initial', args, kwa) >= 1.)
+            bad       = np.logical_and(bad, cls.__deltas('initial', 'outlier', args, kwa) >= 1.)
             bias[bad] = args.initial[bad]+np.nanmedian(args.measure-args.initial)
-        return args.cycles.translate(bias)
+
+        return cls.__align_on_3(bias, args, kwa)
 
     @classmethod
     def __apply_best13(cls, kwa, frame, info):
         args = cls.__args(kwa, frame, info, False)
         bias = args.initial
 
-        bad  = cls.__deltas('initial', args, kwa) < 1.
+        bad  = cls.__deltas('initial', 'outlier', args, kwa) < 1.
         if any(bad):
-            bad       = np.logical_and(bad, cls.__deltas('measure', args, kwa) >= 1.)
+            bad       = np.logical_and(bad, cls.__deltas('measure', 'outlier', args, kwa) >= 1.)
             bias[bad] = args.pull[bad]+np.nanmedian(args.initial-args.pull)
         return args.cycles.translate(bias)
 
