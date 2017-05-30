@@ -138,18 +138,109 @@ class BCollection:
         return self.oligos.index(oli)
 
 
-# cannot annotate attributes as type OligoPeakKPerm
-# should subclass OligoPeakKPerm has a KPerm class
-# careful with the use of kperms. it is only meaningful iff it is not a combined kpermutation
-class OligoPeakKPerm:
-    u'kpermutation of OligoPeak Object'
-    def __init__(self,**kwa)->None:
+class OligoPerm:
+    u'base class. full n-permutation'
+    def __init__(self,**kwa):
         self.oligos=kwa.get("oligos",[]) # type: List[OligoPeak]
-        self.kperm=kwa.get("kperm",[]) # type: List[OligoPeak]
         self.__changes = kwa.get("changes",tuple()) # type: Tuple[int, ...]
         self.__perm = kwa.get("perm",[]) # type: List[OligoPeak]
-        self.__kpermids = kwa.get("kpermids",[]) # type: List[int]
-        self.__permids = kwa.get("permids",[]) # type: List[int]
+        self.__permids = kwa.get("permids",numpy.array([],dtype=int)) # type: List[int]
+        self.__domain =  kwa.get("domain",set()) # type: Set[int]
+
+    @property
+    def permids(self):
+        u'returns value'
+        return self.__permids
+
+    @property
+    def perm(self):
+        u'perm may not be needed, compute iff necessary'
+        if self.__perm==[]:
+            self.__perm=numpy.array(self.oligos)[self.permids].tolist()
+        return self.__perm
+
+    @property
+    def changes(self):
+        u'returns value'
+        return self.__changes
+
+    @property
+    def domain(self):
+        u'returns value'
+        return self.__domain
+
+    @classmethod
+    def add(cls,*args):
+        u'''
+        add all perms in args
+        perm args[0] applied first,
+        then args[1], args[2], ...
+        if args=(,)?
+        if len(args)==1 ?
+        '''
+        if len(args)==1:
+            return args[0]
+
+        res = cls.__add2(*args[:2])
+        for perm in args[2:]:
+            res = cls.__add2(res,perm)
+        return res
+
+    @classmethod
+    def __add2(cls,perm1, perm2):
+        u'''
+        combine 2 OligoPerms
+        assumes that the 2 perms have the same oligos
+        '''
+        if len(set(perm1.domain).intersection(set(perm2.domain)))>0:
+            raise ValueError("perm1 and perm2 are not independant")
+        changes = perm1.changes+perm2.changes
+        permids = perm1.permids[perm2.permids]
+        perm=[]
+        if not perm1.oligos==[]:
+            perm=[perm1.oligos[i] for i in permids]
+        return OligoPerm(oligos=perm1.oligos,
+                         changes=changes,
+                         perm=perm,
+                         permids=permids,
+                         domain=perm1.domain.union(perm2.domain))
+
+
+    # TO CHECK! Expand pytest
+    def outer_seqs(self,ooverl:int)->Tuple[str, ...]:
+        u'''
+        returns the overlapping oligo seq of left most oligo and right most
+        as a tuple(left,right)
+        '''
+        changed=[val in self.changes for idx,val in enumerate(self.permids)]
+
+        # "l" for left, take the first ooverl chars in sequence
+        # "r" for right
+        sides=[("l",0)] if changed[0] else []
+        for idx,val in enumerate(changed[1:]):
+            if changed[idx]!=val:
+                if changed[idx]:
+                    sides.append(("r",idx))
+                else:
+                    sides.append(("l",idx+1))
+        if changed[-1]:
+            sides.append(('r',len(changed)-1))
+
+        return tuple(self.perm[val].seq[:ooverl]
+                     if lorr=="l"
+                     else self.perm[val].seq[-ooverl:]
+                     for lorr,val in sides)
+
+
+class OligoKPerm(OligoPerm):
+    u'''
+    kpermutation of OligoPeak Object
+    As soon as 2 OligoKPerms are combine we work on OligoPerm objects
+    '''
+    def __init__(self,**kwa)->None:
+        super().__init__(**kwa)
+        self.kperm=kwa.get("kperm",[]) # type: List[OligoPeak]
+        self.__kpermids = kwa.get("kpermids",numpy.array([],dtype=int)) # type: numpy.array
 
     @property
     def kpermids(self)->List[int]:
@@ -173,7 +264,6 @@ class OligoPeakKPerm:
             self.__permids=list(range(len(self.oligos)))
             for key,val in toperm.items():
                 self.__permids[key]=val
-
         return self.__permids
 
     @classmethod
@@ -196,6 +286,13 @@ class OligoPeakKPerm:
             return tuple()
 
     @property
+    def domain(self):
+        u'returns the set of indices onto which the k-permutation applies'
+        if self.__domain==set():
+            self.__domain=set(self.kpermids)
+        return self.__domain
+
+    @property
     def changes(self)->Tuple[int, ...]:
         u'''
         returns the tuple of indices which will be changed by application of perm
@@ -205,95 +302,28 @@ class OligoPeakKPerm:
             self.__changes=self.get_changes(self.kpermids)
         return self.__changes
 
-    @classmethod
-    def add(cls,*args):
-        u'''
-        add all kperms in args
-        perm args[0] applied first,
-        then args[1], args[2], ...
-        if args=(,)?
-        if len(args)==1 ?
-        '''
-        if len(args)==1:
-            return args[0]
-
-        res = cls.__add2(*args[:2])
-        for kperm in args[2:]:
-            res = cls.__add2(res,kperm)
-        return res
-
-    @classmethod
-    def __add2(cls,kperm1, kperm2):
-        u'''
-        combine 2 OligoPeakKPerms
-        assumes that the 2 kperms have the same oligos
-        this is why _KPerm has no add method only a Perm class could have one
-        kperm1 and kperm2 must be independant,
-        the order of the addition is important
-        oligos must be the same in the 2 sets
-        '''
-        kpermids = sorted(kperm1.kpermids+kperm2.kpermids)
-        # apply permutations from 1 and 2 on kpermids, supposed independant
-        toperm={val:kperm1.kpermids[idx] for idx,val in enumerate(sorted(kperm1.kpermids))}
-        toperm.update({val:kperm2.kpermids[idx] for idx,val in enumerate(sorted(kperm2.kpermids))})
-        kpermids=[toperm[i] for i in kpermids]
-        #kpermids = list(cls.get_changes(permids)) # broken, needs kpermids non empty
-        kperm = numpy.array(kperm1.oligos)[kpermids].tolist()
-        changes = kperm1.changes+kperm2.changes
-        if len(kpermids)!=len(set(kpermids)):
-            print("pb")
-            print("kperm1.kpermids=",kperm1.kpermids)
-            print("kperm2.kpermids=",kperm2.kpermids)
-        return OligoPerm(oligos=kperm1.oligos,
-                         kperm=kperm,
-                         changes=changes)
-
-    #def is_subgroup_of(self,kperm,attr="changes")->bool:
-    #    u'''
-    #    returns True if set(getattr(kperm,attr))>set(getattr(self,attr))
-    #    '''
-    #    return set(getattr(kperm,attr))>set(getattr(self,attr))
-
-    # to correct
-    # needs to work on permids
-    def outer_seqs(self,ooverl:int)->Tuple[str, ...]:
-        u'''
-        returns the overlapping oligo seq of left most oligo and right most
-        as a tuple(left,right)
-        '''
-        indices = sorted(self.kpermids)
-        inner = [[self.oligos[indices[idx]].seq[-ooverl:],self.oligos[val].seq[:ooverl]]
-                 for idx,val in enumerate(indices[1:])
-                 if indices[idx]+1!=val]
-
-        outer=[self.kperm[0].seq[:ooverl]]
-        for iseq in inner:
-            outer+=iseq
-        outer+=[self.kperm[-1].seq[-ooverl:]]
-        return tuple(outer)
-
-
-
-
-class Permids2OligoPeakKPerm:
+class Permids2OligoPerm:
     u'Convertion class'
     oligos=[] # type: List[OligoPeak]
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
         u'initialize before call'
         pass
-    def __call__(self,permids:List[int],kpermids:Tuple[int, ...])->OligoPeakKPerm:
+    def __call__(self,permids:List[int])->OligoPerm:
         u'convert using permids'
-        return OligoPeakKPerm(kperm=[self.oligos[i] for i in kpermids],
-                              oligos=self.oligos,
-                              permids=permids,
-                              kpermids=kpermids)
+        # leaves perms list iff necessary
+        return OligoPerm(oligos=self.oligos,
+                         permids=permids,
+                         changes=,
+                         domain=)
 
+
+# replace with OligoPerm
 class KPermCollection:
     u'''
-    Container for a list of OligoPeakKPerm
+    Container for a list of OligoKPerm
     '''
-    kperms=[] # type: List[OligoPeakKPerm]
+    kperms=[] # type: List[OligoKPerm]
 
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
@@ -318,19 +348,18 @@ class KPermCollection:
         u'''
         takes the product of 2 elements at a time
         '''
-        kperms = list(OligoPeakKPerm.add(*prd)
+        kperms = list(OligoKPerm.add(*prd)
                       for prd in itertools.product(first.kperms,second.kperms))
         return cls(kperms=kperms)
 
 
     def intersect_with(self,other):
         u'''
-        returns True if any OligoPeakKPerm is shared by the 2 collections
+        returns True if any OligoKPerm is shared by the 2 collections
         REMINDER: 2 groups intersecting (i.e. which share the same oligos)
         both contain the kperm related to the intersecting oligos.
         So one has to consider only 1 of the 2 intersecting subgroups.
         '''
-
         for kpr in self.kperms:
             if any(set(kpr.kperm).intersection(set(oth.kperm)) for oth in other.kperms):
                 return True
