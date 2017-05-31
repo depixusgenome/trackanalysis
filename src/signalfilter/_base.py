@@ -50,24 +50,25 @@ class PrecisionAlg:
         if beadid is not None:
             return cast(float, self.rawprecision(data, beadid))
 
-        if isinstance(data, Sequence[Sequence[np.ndarray]]):
-            if len(data) == 1:
-                data = data[0]
-            else:
-                return np.median(tuple(nanhfsigma(i) for i in chain(iter(*data))))
-
-        if (isinstance(data, Sequence[np.ndarray])
-                and len(cast(np.ndarray, data[0]).shape) == 1):
-            if len(data) == 1:
-                data = data[0]
-            else:
-                return np.median(tuple(nanhfsigma(i) for i in data))
-
         if isinstance(data, (float, int)):
             return float(data)
 
-        if isinstance(data, np.ndarray):
-            return nanhfsigma(data)
+        if isinstance(data, (Sequence, np.ndarray)):
+            if len(data) == 0:
+                pass
+            elif isinstance(data[0], (Sequence, np.ndarray)):
+                if len(data) == 1:
+                    return self.getprecision(PrecisionAlg, data[0], beadid)
+
+                first = next((i for i in data if len(i)), None)
+                if first is not None:
+                    if isinstance(first, (Sequence, np.ndarray)):
+                        ret = np.median(tuple(nanhfsigma(chain(*i)) for i in data if len(i)))
+                    else:
+                        ret = np.median(tuple(nanhfsigma(i) for i in data if len(i)))
+                    return ret
+            else:
+                return nanhfsigma(data)
 
         raise AttributeError('Could not extract precision: no data or set value')
 

@@ -21,8 +21,8 @@ class Profile(Sized):
     "A bead profile: the behaviour common to all stretches of data"
     def __init__(self, inter:Union[Sequence[Range],int]) -> None:
         if isinstance(inter, _m_INTS):
-            self.xmin = 0      # type: int
-            self.xmax = inter  # type: int
+            self.xmin = 0                 # type: int
+            self.xmax = cast(int, inter)  # type: int
         else:
             self.xmin = min(i.start               for i in inter)
             self.xmax = max(i.start+len(i.values) for i in inter)

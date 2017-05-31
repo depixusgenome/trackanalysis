@@ -207,7 +207,7 @@ class BestScoreAssemble:
     operms = [] # type: List[data.OligoPeak]
     # score between group
     score = scores.DefaultCallable(-1.0) # type: ignore
-    assemblies = set() # type: set[data.OligoPeak]
+    assemblies = set() # type: Set[data.OligoPeak]
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
         pass

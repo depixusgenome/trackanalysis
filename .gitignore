@@ -16,3 +16,4 @@ pyenv/
 *.sln
 *.lastbuild
 *.lastbuildstate
+.mypy_cache

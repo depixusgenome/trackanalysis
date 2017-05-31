@@ -301,7 +301,7 @@ class ProtocolProcessor(Processor):
     def run(self, args:'Runner'):
         args.apply(self.apply(**self.config()))
 
-def processors(atask: Union[_tasks.Task, type]) -> Iterator[Type[Processor]]:
+def processors(atask: Union[_tasks.Task, type]) -> Iterator[type]:
     "yields processor types which can handle this task"
     task = type(atask) if not isinstance(atask, type) else atask
     procs = Processor.__subclasses__()

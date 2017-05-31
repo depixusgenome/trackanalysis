@@ -71,6 +71,7 @@ class Hairpin:
         itr = (path         if isinstance(path, Iterator)               else
                path.items() if callable(getattr(path, 'items', None))   else
                _read(path))
+        itr = cast(Iterator[Tuple[str,Any]], itr)
         return ((name, cls(peaks = cls.topeaks(seq, oligos))) for name, seq in itr)
 
     @staticmethod

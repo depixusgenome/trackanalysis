@@ -137,7 +137,7 @@ class GroupWidget(WidgetCreator):
     INPUT = RadioButtonGroup
     def __init__(self, model) -> None:
         super().__init__(model)
-        self._widget  = None # type: ignore
+        self._widget  = None # type: Optional[RadioButtonGroup]
 
     def create(self, action) -> List[Widget]:
         "creates the widget"

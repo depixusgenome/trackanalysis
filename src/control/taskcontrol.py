@@ -106,7 +106,7 @@ class ProcessorController:
         if cache is None:
             cache = dict()
 
-        if isinstance(processor, Iterable[Processor]):
+        if isinstance(processor, Iterable):
             for proc in processor:
                 cls.register(proc, cache)
             return cache
