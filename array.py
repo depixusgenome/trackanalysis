@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"utils"
+"utils for dealing with arrays"
 from   typing import (Iterable, Optional, # pylint: disable=unused-import
                       Iterator, Sequence, Tuple, cast)
 import numpy as np
@@ -29,8 +29,8 @@ def _m_asarray(arr:Iterable)-> np.array:
     vals[:] = tmp
     return vals
 
-def asobjarray(arr:Iterable)->np.ndarray:
-    u"converts  an Iterable to a np.array"
+def asobjarray(arr:Iterable, view: type = None, **kwa)->np.ndarray:
+    "converts  an Iterable to a np.array"
     tmp = None # type: Optional[Sequence]
     if isinstance(arr, Iterator):
         tmp = tuple(arr)
@@ -42,20 +42,33 @@ def asobjarray(arr:Iterable)->np.ndarray:
         tmp = tuple(arr)
 
     if tmp is None:
-        return arr
+        vals    = cast(np.ndarray, arr)
+    else:
 
-    vals    = np.empty((len(tmp),), dtype = 'O')
-    vals[:] = tmp
-    return vals
+        vals    = np.empty((len(tmp),), dtype = 'O')
+        vals[:] = tmp
 
-def asdataarrays(aevents:Iterable[Iterable])->np.ndarray:
-    u"converts  an Iterable[Iterable] to a np.array"
+    return asview(vals, view, **kwa)
+
+def asdataarrays(aevents:Iterable[Iterable], view: type = None, **kwa)-> Optional[np.ndarray]:
+    "converts  an Iterable[Iterable] to a np.array"
     events = _m_asarray(aevents)
     first  = next((evt for evt in events if len(evt)), None)
     if first is None:
         return None
 
     if getattr(first, 'dtype', 'f') == EVENTS_DTYPE or not np.isscalar(first[0]):
-        for i, evt in enumerate(events):
-            events[i] = _m_asarray(evt)
-    return events
+        for j, evt in enumerate(events):
+            events[j] = _m_asarray(evt)
+
+    return asview(events, view, **kwa)
+
+def asview(vals:np.ndarray, view:type, **kwa) -> np.ndarray:
+    "converts to a given view"
+    if view is None:
+        return vals
+
+    vals = vals.view(view)
+    for i, j in kwa.items():
+        setattr(vals, i, j)
+    return vals
