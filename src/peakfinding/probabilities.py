@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"""
+"""
     Computing the MLE for the probability of an hybridization such that:
 
     #. It was observed at during at least Δ_{self.minduration} time
@@ -54,10 +54,11 @@ import  numpy   as np
 from    utils   import initdefaults, EVENTS_TYPE
 
 class Probability:
-    u"Computes probabilities"
+    "Computes probabilities"
     minduration   = 5
     framerate     = 30.
     nevents       = 0
+    ncycles       = 0
     ntoolong      = 0
     totalduration = 0
     FMAX          = float(np.finfo('f4').max) # type: ignore
@@ -74,7 +75,7 @@ class Probability:
                events : Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]],
                maxdurs: Sequence[int]
               ) -> None:
-        u"Updates stats"
+        "Updates stats"
         arrs = np.array([isinstance(i, (list, np.ndarray)) for i in events], dtype = 'bool')
         if any(arrs):
             evts = events [arrs]
@@ -89,7 +90,8 @@ class Probability:
             dur  = np.array([len(i) for _, i in evts], dtype = 'i4')
             self.__apply(dur, dur + [i for i, _ in evts], maxdurs[arrs])
 
-        self.nevents -= (events.discarded if hasattr(events, 'discarded') else # type: ignore
+        self.ncycles += len(events)
+        self.ncycles -= (events.discarded if hasattr(events, 'discarded') else # type: ignore
                          sum(getattr(i, 'discarded', 0) for i in events))
 
     @staticmethod
@@ -110,7 +112,7 @@ class Probability:
                  events : Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]],
                  maxdurs: Sequence[int]
                 ) -> 'Probability':
-        u"Returns an object containing stats related to provided events"
+        "Returns an object containing stats related to provided events"
         obj = Probability(minduration = self.minduration,
                           framerate   = self.framerate)
         obj.update(events, maxdurs)
@@ -118,7 +120,7 @@ class Probability:
 
     @property
     def good(self) -> bool:
-        u"Wether the probability is mathematically sound"
+        "Wether the probability is mathematically sound"
         if self.nevents <= 0:
             return False
 
@@ -127,7 +129,7 @@ class Probability:
 
     @property
     def probability(self) -> float:
-        u"Off probability"
+        "Off probability"
         if self.nevents <= self.ntoolong:
             return 0.
 
@@ -137,7 +139,7 @@ class Probability:
 
     @property
     def averageduration(self) -> float:
-        u"Average duration of an event"
+        "Average duration of an event"
         if self.nevents <= 0:
             return 0.
 
@@ -149,8 +151,13 @@ class Probability:
         return self.FMAX if lnp <= 0. else 1./lnp if np.isfinite(lnp) else 0.
 
     @property
+    def hybridizationrate(self) -> float:
+        "Probability of observing a hybridization"
+        return 0. if self.ncycles <= 0 else min(1., self.nevents/self.ncycles)
+
+    @property
     def stddev(self) -> float:
-        u"Standard deviation to the probability"
+        "Standard deviation to the probability"
         if self.nevents <= 0:
             return 0.
 
@@ -164,7 +171,7 @@ class Probability:
 
     @property
     def uncertainty(self) -> float:
-        u"Measure uncertainty"
+        "Measure uncertainty"
         if self.nevents <= self.ntoolong:
             return self.FMAX
 

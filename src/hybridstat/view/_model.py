@@ -210,9 +210,8 @@ class PeaksPlotModelAccess(IdentificationModelAccess):
         prob = Probability(framerate   = self.track.framerate,
                            minduration = task.events.select.minduration)
         dur  = self.track.phaseduration(..., task.phase)
-        ncyc = self.track.ncycles
         for i, (_, evts) in enumerate(peaks):
             val                       = prob(evts, dur)
             self.peaks['duration'][i] = val.averageduration
             self.peaks['sigma'][i]    = prob.resolution(evts)
-            self.peaks['count'][i]    = min(100., val.nevents / ncyc*100.)
+            self.peaks['count'][i]    = min(100., val.hybridizationrate*100.)

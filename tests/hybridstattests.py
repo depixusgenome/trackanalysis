@@ -9,9 +9,11 @@ from peakcalling.tohairpin          import np, Hairpin, PEAKS_DTYPE
 from peakcalling.processor          import ByHairpinGroup, ByHairpinBead, Distance
 from data                           import Track
 from utils                          import EVENTS_DTYPE
-from hybridstat.reporting           import run, HybridstatExcelProcessor, HybridstatExcelTask
+from hybridstat.reporting           import (run, HybridstatExcelProcessor,
+                                            HybridstatExcelTask)
 from hybridstat.reporting.identification  import writeparams, readparams
-from hybridstat.reporting.batch           import HybridstatBatchTask
+from hybridstat.reporting.batch           import (HybridstatBatchTask,
+                                                  computereporters)
 from control.taskcontrol            import create
 from testingcore                    import path as utfilepath
 
@@ -202,6 +204,22 @@ def test_processor():
     assert not Path(out).exists()
     items = tuple(i for i in gen)
     items = tuple(tuple(i) for i in items)
+    assert Path(out).exists()
+
+def test_reporting():
+    "tests processor"
+    for path in Path(gettempdir()).glob("*_hybridstattest*.*"):
+        path.unlink()
+    out   = mktemp()+"_hybridstattest5.xlsx"
+
+    tasks = computereporters(dict(track    = (Path(utfilepath("big_legacy")).parent/"*.trk",
+                                              utfilepath("CTGT_selection")),
+                                  reporting= out,
+                                  sequence = utfilepath("hairpins.fasta")))
+
+    itms = next(tasks)
+    assert not Path(out).exists()
+    tuple(itms)
     assert Path(out).exists()
 
 if __name__ == '__main__':

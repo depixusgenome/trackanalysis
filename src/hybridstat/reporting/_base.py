@@ -148,6 +148,7 @@ class ReporterInfo(HasLengthPeak):
 
         if isinstance(kwa['sequences'], str):
             kwa['sequences'] = dict(readsequence(kwa['sequences']))
+        kwa['sequences'] = {i: j.lower() for i, j in kwa['sequences'].items()}
 
         if kwa.get('hairpins', None) is None:
             kwa['hairpins'] = dict(Hairpin.read(kwa['sequences'], kwa['oligos']))

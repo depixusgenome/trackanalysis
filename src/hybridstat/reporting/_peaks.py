@@ -5,15 +5,37 @@ Creates peaks sheet
 """
 from typing                 import (Tuple, Iterator,  # pylint: disable=unused-import
                                     Optional, Dict)
+from functools              import wraps
 from math                   import floor
 from xlsxwriter.utility     import xl_col_to_name
 
 import numpy as np
 
-from excelreports.creation      import column_method, sheet_class, Columns
+from excelreports.creation      import column_method as _column_method, sheet_class, Columns
 from data.trackitems            import BEADKEY            # pylint: disable=unused-import
 from peakfinding.probabilities  import Probability
 from ._base                     import Reporter, HasLengthPeak, Group, Bead
+
+@wraps(_column_method)
+def column_method(*args, median = False, **kwa):
+    "same as _column_method but adding some doc"
+    meta  = _column_method(*args, **kwa)
+    lines = ("For a hairpin, this is set to the median of values",
+             "found in its group for that peak.")
+    def _wrapper(fcn):
+        if median:
+            if fcn.__doc__ is None or fcn.__doc__.strip() == "":
+                return meta(fcn)
+
+            if fcn.__doc__[-1] != '\n':
+                fcn.__doc__ += '\n'
+
+            if "        " in fcn.__doc__:
+                fcn.__doc__ += "\n"+"".join("        "+i+"\n" for i in lines)
+            else:
+                fcn.__doc__ += "\n"+"".join(i+"\n" for i in lines)
+        return meta(fcn)
+    return _wrapper
 
 class Probabilities(HasLengthPeak):
     "Computes and caches probabilities"
@@ -82,11 +104,11 @@ class Neighbours(HasLengthPeak):
             self._oldbead = (ref, bead)
 
         if bead is None:
-            i = int(self.hairpins[ref.key].peaks[ipk]+1)
+            i = int(self.hairpins[ref.key].peaks[ipk])
         elif bead.peaks['key'][ipk] < 0:
-            i = int(floor(self.basevalue(bead, ipk)+1.5))
+            i = int(floor(self.basevalue(bead, ipk)+.5))
         else:
-            i = bead.peaks['key'][ipk]+1
+            i = bead.peaks['key'][ipk]
 
         return max(0, i-self._sz)
 
@@ -264,19 +286,14 @@ class PeaksSheet(Reporter):
         "Peak position as measured (µm)"
         return None if bead is None else bead.peaks['zvalue'][ipk]
 
-    @column_method("Peak Resolution")
+    @column_method("Peak Resolution", median = True)
     def _peakresolution(self, *args) -> float:
         "Standard deviation of event positions (µm)"
         return self._proba('resolution', *args)
 
-    @column_method("Peak Height")
+    @column_method("Peak Height", median = True)
     def _nevt(self, ref:Group, bead:Bead, ipk:int) -> int:
-        """
-        Number of hybridizations in that peak.
-
-        For a hairpin, this is set to the median of values
-        found in its group for that peak.
-        """
+        "Number of hybridizations in that peak."
         return self._proba('nevents', ref, bead, ipk)
 
     @column_method("Neighbours", exclude = Reporter.nohairpin)
@@ -288,59 +305,32 @@ class PeaksSheet(Reporter):
         "Strand on which the oligo sticks"
         return self._neig.orientation(*args)
 
-    @column_method("Hybridisation Rate")
-    def _hrate(self, ref:Group, bead:Bead, ipk:int) -> Optional[float]:
-        """
-        Peak height divided by number of cycles.
+    @column_method("Hybridisation Rate", median = True)
+    def _hrate(self, *args) -> Optional[float]:
+        "Number of events divided by number of cycles."
+        return self._proba('hybridizationrate', *args)
 
-        For a hairpin, this is set to the median of values
-        found in its group for that peak.
-        """
-        if bead is None:
-            arr  = self._proba.array('nevents', ref, ipk)
-            ncy  = [self.beadncycles(j) for j in ref.beads]
-            vals = [i/j for i, j in zip(arr, ncy) if i is not None and j > 0]
-            return None if len(vals) == 0 else np.median(vals)
-        else:
-            val = self._proba('nevents', ref, bead, ipk)
-            if val is None:
-                return None
-
-            ncy = self.beadncycles(bead)
-            if ncy == 0:
-                return None
-            return val/ncy
-
-    @column_method("Hybridisation Time", units = 'seconds')
+    @column_method("Hybridisation Time", units = 'seconds', median = True)
     def _averageduration(self, *args) -> Optional[float]:
         """
         Average time to de-hybridization, for a frame rate of 30Hz.
         Note that: TIME = -1/(RATE * log(1.-PROBABILITY)
-
-        For a hairpin, this is set to the median of values
-        found in its group for that peak.
         """
         return self._proba('averageduration', *args)
 
-    @column_method("Hybridisation Time Probability")
+    @column_method("Hybridisation Time Probability", median = True)
     def _prob(self, *args) -> Optional[float]:
         """
         Probability to de-hybridize between 2 time frames.
         Note that: TIME = -1/(RATE * log(1.-PROBABILITY)
-
-        For a hairpin, this is set to the median of values
-        found in its group for that peak.
         """
         return self._proba('probability', *args)
 
-    @column_method("Hybridisation Time Uncertainty", units = 'seconds')
+    @column_method("Hybridisation Time Uncertainty", units = 'seconds', median = True)
     def _uncert(self, *args) -> Optional[float]:
         """
         1-sigma uncertainty on the de-hybridization time:
             UNCERTAINTY ~ TIME / sqrt(NUMBER OF HYBRIDISATIONS)
-
-        For a hairpin, this is set to the median of values
-        found in its group for that peak.
         """
         return self._proba('uncertainty', *args)
 
