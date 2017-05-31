@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "The basic architecture"
 from    typing              import (Tuple, Optional,       # pylint: disable=unused-import
-                                    Iterator, List, Union, Dict, Any, cast)
+                                    Iterator, Sequence, List, Union, Dict, Any, cast)
 from    collections         import OrderedDict
 from    enum                import Enum
 from    abc                 import ABCMeta, abstractmethod
@@ -184,7 +184,8 @@ class PlotModelAccess(GlobalsAccess):
 class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     "Base plotter class"
     _MODEL = PlotModelAccess
-    _RESET = frozenset(('track', 'bead'))
+    _RESET = frozenset(('bead',))
+    _CLEAR = frozenset(('track',))
     class _OrderedDict(OrderedDict):
         def __missing__(self, key):
             self[key] = value = OrderedDict()
@@ -326,13 +327,17 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     def ismain(self, _):
         "Set-up things if this view is the main one"
 
-    def reset(self, items:dict):
+    def reset(self, items:Union[bool, Dict[str,Any]]):
         "Updates the data"
-        if not self._needsreset(items):
-            return
+        if isinstance(items, bool):
+            if items:
+                self._model.clear()
 
-        if 'track' in items:
+        elif not self._CLEAR.isdisjoint(cast(Sequence, items)):
             self._model.clear()
+
+        elif self._RESET.isdisjoint(cast(Sequence, items)):
+            return
 
         state = self.state
         if   state is PlotState.disabled:
@@ -482,10 +487,6 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
             if args.get(name, _m_none) is Range1d:
                 args[name] = Range1d(start = 0., end = 0.)
         return args
-
-    @classmethod
-    def _needsreset(cls, items) -> bool:
-        return not cls._RESET.isdisjoint(items)
 
     @abstractmethod
     def _create(self, doc):

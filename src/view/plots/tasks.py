@@ -68,7 +68,17 @@ class TaskPlotModelAccess(PlotModelAccess):
         "returns the current track"
         return self._ctrl.track(self.roottask)
 
-    def checktask(self, root, task):
+    def impacts(self, root:RootTask, task:Task) -> bool:
+        "returns whether changing this tasks affects the model output"
+        if root is not self.roottask:
+            return False
+
+        order = tuple(taskorder(self.config.tasks.order.get()))
+        order = order[order.index(type(task)):]
+        return any(val.tasktype in order for val in self.__dict__.values()
+                   if isinstance(val, TaskAccess))
+
+    def checktask(self, root:RootTask, task:Task) -> bool:
         "checks wether a task belongs to the model"
         if not any(val.check(task) for val in self.__dict__.values()
                    if isinstance(val, TaskAccess)):
@@ -252,14 +262,10 @@ class TaskPlotCreator(PlotCreator):
         super().observe()
 
         if any(isinstance(i, TaskAccess) for i in self._model.__dict__.values()):
-            self._ctrl.observe("updatetask", "addtask", "removetask",
-                               lambda **items: self.reset(items))
-
-    def _needsreset(self, items) -> bool:
-        if 'parent' in items:
-            return self._model.checktask(items['parent'], items['task'])
-        else:
-            return super()._needsreset(items)
+            def _ontask(parent = None, task = None, **_):
+                if self._model.impacts(parent, task):
+                    self.reset(False)
+            self._ctrl.observe("updatetask", "addtask", "removetask", _ontask)
 
     def _create(self, doc):
         raise NotImplementedError()

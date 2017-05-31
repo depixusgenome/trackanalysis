@@ -67,7 +67,7 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, WidgetMixin):
         self._histobservers()
         self._widgetobservers()
         self._model.config.observe('eventdetection.isactive', 'binwidth', 'minframes',
-                                   lambda: self.reset(('bead',)))
+                                   lambda: self.reset(False))
 
 class CyclesPlotView(PlotView):
     "Cycles plot view"
