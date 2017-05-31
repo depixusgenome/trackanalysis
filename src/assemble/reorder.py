@@ -6,19 +6,20 @@ given k-permutations, attempts to reconstruct the most likely order of oligohits
 kperms, should (or not?) include neutral operators. Depends on the solution Searcher
 '''
 
-from typing import List, Dict, Tuple, Callable # pylint: disable=unused-import
+from typing import List, Dict, Set, NamedTuple, Tuple, Callable # pylint: disable=unused-import
 import pickle
 import itertools
 import numpy
 from utils import initdefaults
-from .data import OligoPeakKPerm, KPermCollection
-from . import scores # needed to estimate the quality of each kperm
+from . import data
+from . import scores
 
+# mostly obsolete...
 class KPermAssessor:
     u'''
     rank the kperms by importance (quality)
     '''
-    kperms = [] # type: List[OligoPeakKPerm]
+    kperms = [] # type: List[data.OligoKPerm]
     __scorekperm=dict() # type: Dict
     __ranking=[] # type: List[Tuple]
     @initdefaults(frozenset(locals()))
@@ -59,7 +60,7 @@ class DownTopSearcher:
         pass
 
     @classmethod
-    def merge(cls,subgroups,attr="changes")->List[OligoPeakKPerm]: # to check # no duplicates
+    def merge(cls,subgroups,attr="changes")->List[data.OligoKPerm]: # to check # no duplicates
         u'''
         no grp in subgroups contains any other grp
         combine groups if they do not overlap
@@ -78,12 +79,12 @@ class DownTopSearcher:
                    for sub2 in subs[idx1+1:]):
                 continue
             # otherwise add the set of k-permutations
-            merged.append(OligoPeakKPerm.add(*subs))
+            merged.append(data.OligoKPerm.add(*subs))
             # if len(subs)==1 the kperm is added
         print("len(merged)=",len(merged))
         return merged
 
-    def merge_subgroups(self,supergroup:OligoPeakKPerm)->List[OligoPeakKPerm]:
+    def merge_subgroups(self,supergroup:data.OligoKPerm)->List[data.OligoKPerm]:
         u'''
         recursively find subgroups
         merge subgroups
@@ -136,7 +137,7 @@ class DownTopSearcher:
 
         return supergroups
 
-    def find_subgroups(self,kperm:OligoPeakKPerm,attr="changes")->List[OligoPeakKPerm]:
+    def find_subgroups(self,kperm:data.OligoKPerm,attr="changes")->List[data.OligoKPerm]:
         u'''
         returns the list whose attr are subgroups of kperm
         kperm must be excluded from the list for iterative purposes
@@ -157,28 +158,16 @@ class KPermCombiner:
     def __init__(self,**kwa):
         pass
 
-    def group_kperms(self,kperms=None,attr="kpermids")->List[List[OligoPeakKPerm]]:
+    def group_perms(self,perms=None,attr="domain")->List[List[data.OligoPerm]]:
         u'''
-        find kperms whose getattr(kperm,attr) is not included by any other kperm
+        find perms whose getattr(kperm,attr) is not included by any other kperm
         '''
-        if kperms is None:
-            kperms=list(self.kpermassessor.kperms)
-        attrsets=set(tuple(sorted(getattr(i,attr))) for i in kperms)
-        groups=[[kperm for kperm in kperms if tuple(sorted(getattr(kperm,attr)))==ats]
+        if perms is None:
+            perms=list(self.kpermassessor.kperms)
+        attrsets=set(tuple(sorted(getattr(i,attr))) for i in perms)
+        groups=[[perm for perm in perms if tuple(sorted(getattr(perm,attr)))==ats]
                 for ats in attrsets]
         return groups
-
-    @classmethod
-    def __merge_kperms(cls,to_merge:List[KPermCollection])->KPermCollection:
-        u'''
-        merges groups of independant OligoKPerms
-        '''
-        # merge 2 KPermCollection at a time
-        # eventually (when correct implementation of scorefilter), filter at each step
-        out=KPermCollection()
-        for kpc in to_merge:
-            out=KPermCollection.product(out,kpc)
-        return out
 
     def run(self):
         u'''
@@ -192,76 +181,153 @@ class KPermCombiner:
         (1) few neutral permutations
         (2)allows neutral kperms to be ranked amongst each group
 
-
-        Can we abuse the ScoreFilter?
-        when the calculus of outseq wil be more general and take into account combination of
-        OligoPeakKPerm then we will be able to merge groups in mergeable, 2 at a time.
-        Each time a merge is performed, we could apply ScoreFilter to reduce the possible
-        permutations
-
         possible improvements:
         * mergeable counts for each element in disjoint to part in partition
         -> duplicate on neutral k-permutation? could build a list/map/network
         where each group are 2 by 2 disjoint instead of look for 2**(disjoints groups)
 
         '''
-        # find groups of kperms
-        groups = self.group_kperms()
+        pickle.dump(list(self.kpermassessor.kperms),open("perms2group.pickle","wb"))
+        # find groups of kperms (perms ?!), does it make collections of perms??
+        groups = self.group_perms()
 
         # reversed sort groups per size
         groups = sorted(groups,key=lambda x:-len(x))
 
-        scored=[[self.scoring(kpr) for kpr in grp] for grp in groups]
-
+        # scored, List[List[ScoredPerm]]
+        scored=[[self.scoring(prm) for prm in grp] for grp in groups]
+        pickle.dump(scored,open("scored.pickle","wb"))
         scfilter = scores.ScoreFilter(ooverl=self.ooverl)
+        print("before filtering",[len(grp) for grp in scored])
         filtered = [scfilter(grp) for grp in scored]
 
-        pickle.dump(filtered,open("scfiltered.pickle","wb"))
-
-        # the partition is on the groups intersecting filtered[0] David!
+        # the partition is on the groups intersecting filtered[0] David
         # Oh, you are right. Cheers!
 
         # we need to discard groups of a single elements (i.e. the neutral k-permutation)
         filtered = list(filter(lambda x:len(x)>1,filtered))
-
-        filtered = [KPermCollection(kperms=[sckp.kperm for sckp in grp]) for grp in filtered]
-        # problem with filtered collections. Some are duplicated and
-        # sometimes a copy of the neutral permutation
-        filtered = [kpc for kpc in filtered
-                    if not all([len(kpm.changes)==0 for kpm in kpc.kperms])]
-
+        # remove collections consisting only of neutral permutations
+        print("after filtering",[len(grp) for grp in filtered])
+        filtered =  [scp for scp in filtered
+                     if not all([len(scprm.perm.changes)==0 for scprm in scp])]
+        filtered = [scores.ScoredPermCollection(scperms=grp) for grp in filtered]
         pickle.dump(filtered,open("filtered.pickle","wb"))
-        partition = [kpc for kpc in filtered if kpc.intersect_with(filtered[0])]
-        print("len(filtered)=",len(filtered))
-        print("len(partition)=",len(partition))
+        divisions=self.subdivide_then_partition(filtered)
+        stop
+        # for each dubdivision
+        # merge each division separately
+        # then merge the results together
+        merged_divi=[]
+        for idx,divi in enumerate(divisions):
+            merged_divi.append(self.merge_division(divi))
+            pickle.dump(merged_divi[-1],open("merged_divisions_backup"+str(idx)+".pickle","wb"))
 
 
+        # continue from here
+        # it appears that no collections in merged_division_backup.pickle intersect_with any of
+        # merged_division1_backup.pickle ...
+        # but it will not be a general rule!
+        #merged_flat0=[lkpc[0] for lkpc in merged[0]]
+        #merged_flat1=[lkpc[0] for lkpc in merged[1]]
+        #full_merge=[scores.ScoredPermCollection.product(first,second)
+        #for first,second in itertools.product(merged_flat0,merged_flat1)]
+        #pickle.dump(full_merge,open("full_merge.pickle","wb"))
+        #print(len(full_merge))
 
-        # check this loop!!
-        to_merge=[]
-        for part in partition:
-            disjoints=[kpc for kpc in filtered if not kpc.intersect_with(part)]
-            print(len(disjoints))
-            mergeable = [list(itertools.compress(disjoints,comb))
-                         for comb in itertools.product([True,False],repeat=len(disjoints))]
-            # mergeable is a List[List[Collection]]
-            # if any collection in mergeable overlap discard merge
-            mergeok = [not any(kpc.intersect_with(other)
-                               for idx,kpc in enumerate(merge)
-                               for other in merge[idx+1:])
-                       for merge in mergeable]
-            to_merge.extend([[part]+ite for ite in itertools.compress(mergeable,mergeok)])
-            # [part]+ite for ite in itertools.compress(mergeable,mergeok), List[collections]
-        # partition # type: List[List[scorekperms]]
+        return merged_divi
 
-        pickle.dump(to_merge,open("to_merge.pickle","wb"))
 
-        #solutions=[]
-        #for grp in grpstomerge:
-        #    solutions+=self.__merge_kperms(grp)
-        #print("solutions=",solutions)
-        # rank solutions
+    # pylint: disable=no-self-use
+    def merge_division(self,division:List[List[scores.ScoredPermCollection]]):
+        u'''
+        reduces the permcollection of each element in division to 1 scores.ScoredPermCollection
+        before moving to the next one
+        application of ScoreFilter made useless by construction of ScoredPermCollection (good)
+        plus ScoreFilter should be applied to same permutation 
+        within a collection (i.e. same domain)
+        '''
+        for idx,div in enumerate(division):
+            print("idx=",idx)
+            if len(div)==1:
+                continue
+            while len(div)>1:
+                print("len(div)=",len(div))
+                scp1,scp2=div[:2]
+                merged=scores.ScoredPermCollection.product(scp1,scp2)
+                for divi in division[idx:]:
+                    if scp1 in divi and scp2 in divi:
+                        divi.remove(scp1)
+                        divi.remove(scp2)
+                        divi.append(merged)
 
-        # filter solutions
-        # return results
-        return filtered
+        return division
+
+    def subdivide_then_partition(self,
+                                 collections:List[scores.ScoredPermCollection],
+                                 sort_by="domain",
+                                 max_size=50):
+        u'''
+        it is not really possible to ensure that overlapping kpc are together since
+        they might be dependant 2 by 2
+        args:
+        max_size argument is a tricky one.
+        Until find_partitions is reimplemented, max_size can struggle for too high values.
+        the bigger the max_size, the fewer the partitions to merge.
+        find_partitions is too long for more than 30 data.KPermCollections
+
+        Order the data.KPermCollection
+        subdivide into 30 data.KPermCollection segments
+        for each subdivision compute the partitions
+        for each partition, merge the data.KPermCollection
+        * each subdivision will have many partition,
+        ranking (deleting worse) partition should take place
+        * the end result of the mergin is a new data.KPermCollection
+        each kperm in the collection is a merge of multiple ones
+        '''
+        ocollect = tuple(sorted(collections,
+                                key = lambda x:min(getattr(x.scperms[0].perm,sort_by))))
+        print("len(ocollect)=",len(ocollect))
+        subdivision=[tuple(ocollect[max_size*i:(i+1)*max_size])
+                     for i in range(int(numpy.ceil(len(ocollect)/max_size)))]
+        print("sumlentopart",sum(len(i)for i in subdivision))
+        print("len of each partition ",list(len(i) for i in subdivision))
+        per_subdivision=[]
+
+        for subd in subdivision:
+            partitions=[]
+            seeds = [scpc for scpc in subd if scpc.intersect_with(subd[0])]
+            for seed in seeds:
+                partitions.extend(self.find_partitions(seed,
+                                                       [scpc for scpc in subd
+                                                        if not scpc.intersect_with(seed)]))
+                # looking for duplicates
+
+            per_subdivision.append(partitions)
+
+        pickle.dump(per_subdivision,open("per_subdivision_backup.pickle","wb"))
+        return per_subdivision
+
+    # it appears that recursion is slow for python. Try a reimplementation using while loop
+    def find_partitions(self,
+                        part:scores.ScoredPermCollection,
+                        collections:List[scores.ScoredPermCollection])\
+                        ->List[List[scores.ScoredPermCollection]]:
+        u'''
+        part should not be in collections nor any collection which intersects with part
+        recursive call
+        '''
+        if len(collections)==0:
+            return [[part]]
+        # look at each collection and see if they overlap with others
+        intersections = list([i for i,v in enumerate(collections)
+                              if scpc.intersect_with(v)] for scpc in collections)
+        intersections = sorted(intersections,key=len,reverse=True)
+        # if they only overlap with themselves, then they can all be merged
+        if len(intersections[0])==1:
+            return [[part]+collections]
+
+        return [[part]+toadd
+                for i in intersections[0]
+                for toadd in self.find_partitions(collections[i],
+                                                  [scpc for scpc in collections
+                                                   if not scpc.intersect_with(collections[i])])]

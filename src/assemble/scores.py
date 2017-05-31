@@ -6,7 +6,7 @@ defines a list of scoring functors for sequence assembly
 from typing import Tuple, List, NamedTuple # pylint: disable=unused-import
 import itertools
 import scipy
-import numpy
+import numpy as np
 
 from utils import initdefaults
 from . import data # pylint: disable=unused-import
@@ -48,7 +48,7 @@ class OptiDistPerm:
             self.__setattr__("__epsi",0.001*min([self.dists[i].std() for i in self.perm]))
         return self.__epsi
 
-    def run(self,xinit=None)->numpy.ndarray:
+    def run(self,xinit=None)->np.ndarray:
         u'returns the PERMUTATED state which maximise the probability'
         constraints = []
         for idx in range(len(self.perm[:-1])):
@@ -108,8 +108,8 @@ class CostPermute:
         return self.dists
 
     def __call__(self,xstate)->float:
-        return -numpy.product([self.get_dists[vlp].pdf(xstate[idp])
-                               for idp,vlp in enumerate(self.perm)])
+        return -np.product([self.get_dists[vlp].pdf(xstate[idp])
+                            for idp,vlp in enumerate(self.perm)])
 
 
 class PDFCost:
@@ -128,8 +128,8 @@ class PDFCost:
         return self.dists
 
     def __call__(self,xstate)->float:
-        return -numpy.product([self.get_dists[idp].pdf(val)
-                               for idp,val in enumerate(xstate)])
+        return -np.product([self.get_dists[idp].pdf(val)
+                            for idp,val in enumerate(xstate)])
 
 class ScoredPerm:
     u'''
@@ -147,6 +147,7 @@ class ScoredPerm:
         u'returns true if any oligo in kperm can be found in other'
         return set(self.perm.perm).intersection(set(other.perm.perm))!=set()
 
+    # not used, to remove
     @classmethod
     def add(cls,*args):
         u'''
@@ -163,6 +164,7 @@ class ScoredPerm:
             res = cls.__add2(res,sckp)
         return res
 
+    # not used, to remove
     @classmethod
     def __add2(cls,first,second):
         u'combine kperms and density scores'
@@ -210,7 +212,10 @@ class ScoreAssembly:
 
     def __call__(self,kperm:data.OligoKPerm)->ScoredPerm:
         u'kperm is a k-permutation (not a more general OligoPerm)'
-        assert hasattr(kperm,"kperm")
+        try:
+            getattr(kperm,"kperm")
+        except AttributeError:
+            raise AttributeError("ScoreAssembly needs kperm attribute")
         self.perm=kperm
         return self.run()
 
@@ -236,35 +241,33 @@ class ScoredPermCollection:
         return res
 
 
+    # to optimize
     @classmethod
-    def __product2(cls,collection1,collection2): # pylint: disable=too-many-locals
+    def __product2(cls,collection1,collection2):
         u'''
         assumes that the 2 kpermutation are independant
         work on permids and changes only
         '''
-        perms1=numpy.matrix([i.perm.permids for i in collection1.scperms])
-        perms2=numpy.matrix([i.perm.permids for i in collection2.scperms])
+        perms1=np.matrix([i.perm.permids for i in collection1.scperms])
+        perms2=np.matrix([i.perm.permids for i in collection2.scperms])
         merged_permids=perms1[:,perms2]
-        merged_pdfcost=-numpy.matrix([i.pdfcost for i in collection1.scperms])*numpy.matrix\
+        merged_pdfcost=-np.matrix([i.pdfcost for i in collection1.scperms]).T*np.matrix\
             ([i.pdfcost for i in collection2.scperms])
-        merged_noverlaps=numpy.matrix([i.noverlaps for i in collection1.scperms]).T\
-                          +numpy.matrix([i.noverlaps for i in collection2.scperms])
-        # need changes and domains for OligoPerm
-        convert=data.Permids2OligoPerm(oligos=collection1.scperms[0].perm.oligos)
+        merged_noverlaps=np.matrix([i.noverlaps for i in collection1.scperms]).T\
+                          +np.matrix([i.noverlaps for i in collection2.scperms])
         scores=[ScoredPerm(pdfcost=merged_pdfcost[i1,i2],
                            noverlaps=merged_noverlaps[i1,i2],
-                           perm=convert(permids=merged_permids[i1,i2,:].\
-                                    reshape((1,perms2.shape[1])).tolist()[0]))
+                           perm=data.OligoPerm(permids=merged_permids[i1,i2,:].\
+                                               reshape((1,perms2.shape[1])).tolist()[0],
+                                               oligos=collection1.scperms[0].perm.oligos,
+                                               changes=collection1.scperms[i1].perm.changes+\
+                                               collection2.scperms[i2].perm.changes,
+                                               domain=collection1.scperms[i1].perm.\
+                                               domain.union(collection2.scperms[i2].perm.domain)))
                 for i1 in range(len(collection1.scperms))
                 for i2 in range(len(collection2.scperms))]
         return ScoredPermCollection(scperms=scores)
 
-    #@classmethod
-    #def __product2(cls,first,second):
-    #    u'returns  the product of 2 ScoredPermCollection'
-    #    sckpm=list(ScoredPerm.add(*prd)
-    #               for prd in itertools.product(first.sckperms,second.sckperms))
-    #    return cls(sckperms=sckpm)
 
     def compute_noverlaps(self,score:ScoreAssembly)->None:
         u'calls score on each scperm to update noverlap valuex'
@@ -277,7 +280,7 @@ class ScoredPermCollection:
         returns True if any OligoPerm in self is also in other
         '''
         for scpm in self.scperms:
-            if any(set(scpm.perm.perm).intersection(set(oth.perm.perm))
+            if any(scpm.perm.domain.intersection(oth.perm.domain)
                    for oth in other.scperms):
                 return True
         return False
@@ -300,12 +303,13 @@ class ScoreFilter:
 
     def __call__(self,scperms):
         u'''
-        functor calls run
+        apply reduction on collection of permutations
+        each collection are assumed to have the same domain
         '''
         self.scoreperms = scperms
         return self.run()
 
-    def __filter1(self,scorekperms)->List[ScoredPerm]:
+    def _filter1(self,scorekperms)->List[ScoredPerm]:
         u'''
         implements minimal condition for optimal score
         for the same value of overlaps, filters out
@@ -322,7 +326,7 @@ class ScoreFilter:
         return out
 
 
-    def __filter2(self,scoreperms)->List[ScoredPerm]: # pylint: disable=no-self-use
+    def _filter2(self,scoreperms)->List[ScoredPerm]: # pylint: disable=no-self-use
         u'''
         discard solutions with higher pdfcost and fewer noverlaps
         '''
@@ -333,15 +337,13 @@ class ScoreFilter:
 
     def run(self)->List[ScoredPerm]:
         u'runs filters in turn'
-        # group scoreperms by perms with same outlying sequence
-        # this will wor for permids which are connex.. needs to be more general
         outseqs=set(scp.perm.outer_seqs(self.ooverl) for scp in self.scoreperms)
         groups = [[scp for scp in self.scoreperms
                    if scp.perm.outer_seqs(self.ooverl)==out]
                   for out in outseqs]
         filtered=[] # type: List[ScoredPerm]
         for group in groups:
-            grp=self.__filter1(group)
-            grp=self.__filter2(grp)
+            grp=self._filter1(group)
+            grp=self._filter2(grp)
             filtered+=grp
         return filtered

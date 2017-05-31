@@ -3,7 +3,7 @@
 u'''
 Creates Classes and function to use with assemble sequence
 '''
-from typing import List, NamedTuple, Tuple
+from typing import List, NamedTuple, Tuple, Set
 import itertools
 import numpy
 from utils import initdefaults
@@ -110,7 +110,7 @@ class BCollection:
         pass
 
     @classmethod
-    def from_oligos(cls,oligos:List[OligoPeak],attr="seq"): # read process (to processor)?
+    def from_oligos(cls,oligos:List[OligoPeak],attr="seq"):
         u'from a list of OligoPeaks, creates BCollection'
         grps= {getattr(oli,attr) for oli in oligos}
         batches=[Batch(oligos=[oli for oli in oligos if getattr(oli,attr)==grp],index=idx)
@@ -142,32 +142,32 @@ class OligoPerm:
     u'base class. full n-permutation'
     def __init__(self,**kwa):
         self.oligos=kwa.get("oligos",[]) # type: List[OligoPeak]
-        self.__changes = kwa.get("changes",tuple()) # type: Tuple[int, ...]
-        self.__perm = kwa.get("perm",[]) # type: List[OligoPeak]
-        self.__permids = kwa.get("permids",numpy.array([],dtype=int)) # type: List[int]
-        self.__domain =  kwa.get("domain",set()) # type: Set[int]
+        self._changes = kwa.get("changes",tuple()) # type: Tuple[int, ...]
+        self._perm = kwa.get("perm",[]) # type: List[OligoPeak]
+        self._permids = kwa.get("permids",numpy.array([],dtype=int)) # type: List[int]
+        self._domain =  kwa.get("domain",set()) # type: Set[int]
 
     @property
     def permids(self):
         u'returns value'
-        return self.__permids
+        return self._permids
 
     @property
     def perm(self):
         u'perm may not be needed, compute iff necessary'
-        if self.__perm==[]:
-            self.__perm=numpy.array(self.oligos)[self.permids].tolist()
-        return self.__perm
+        if self._perm==[]:
+            self._perm=numpy.array(self.oligos)[self.permids].tolist()
+        return self._perm
 
     @property
     def changes(self):
         u'returns value'
-        return self.__changes
+        return self._changes
 
     @property
     def domain(self):
         u'returns value'
-        return self.__domain
+        return self._domain
 
     @classmethod
     def add(cls,*args):
@@ -206,14 +206,12 @@ class OligoPerm:
                          domain=perm1.domain.union(perm2.domain))
 
 
-    # TO CHECK! Expand pytest
     def outer_seqs(self,ooverl:int)->Tuple[str, ...]:
         u'''
         returns the overlapping oligo seq of left most oligo and right most
         as a tuple(left,right)
         '''
         changed=[val in self.changes for idx,val in enumerate(self.permids)]
-
         # "l" for left, take the first ooverl chars in sequence
         # "r" for right
         sides=[("l",0)] if changed[0] else []
@@ -240,31 +238,31 @@ class OligoKPerm(OligoPerm):
     def __init__(self,**kwa)->None:
         super().__init__(**kwa)
         self.kperm=kwa.get("kperm",[]) # type: List[OligoPeak]
-        self.__kpermids = kwa.get("kpermids",numpy.array([],dtype=int)) # type: numpy.array
+        self._kpermids = kwa.get("kpermids",numpy.array([],dtype=int)) # type: numpy.array
 
     @property
     def kpermids(self)->List[int]:
         u'returns the indices of the kperm'
-        if self.__kpermids==[]:
-            self.__kpermids=[self.oligos.index(oli) for oli in self.kperm]
-        return self.__kpermids
+        if len(self._kpermids)==0:
+            self._kpermids=[self.oligos.index(oli) for oli in self.kperm]
+        return self._kpermids
 
     @property
     def perm(self):
         u'returns full permutation of oligos'
-        if self.__perm==[]:
-            self.__perm=numpy.array(self.oligos)[self.permids].tolist()
-        return self.__perm
+        if len(self._perm)==0:
+            self._perm=numpy.array(self.oligos)[self.permids].tolist()
+        return self._perm
 
     @property
     def permids(self):
         u'returns the full permutation of oligo indices'
-        if self.__permids==[]:
+        if len(self._permids)==0:
             toperm={val:self.kpermids[idx] for idx,val in enumerate(sorted(self.kpermids))}
-            self.__permids=list(range(len(self.oligos)))
+            self._permids=list(range(len(self.oligos)))
             for key,val in toperm.items():
-                self.__permids[key]=val
-        return self.__permids
+                self._permids[key]=val
+        return self._permids
 
     @classmethod
     def get_changes(cls,kperm,sort_by="pos")->Tuple[int, ...]:
@@ -288,9 +286,9 @@ class OligoKPerm(OligoPerm):
     @property
     def domain(self):
         u'returns the set of indices onto which the k-permutation applies'
-        if self.__domain==set():
-            self.__domain=set(self.kpermids)
-        return self.__domain
+        if len(self._domain)==0:
+            self._domain=set(self.kpermids)
+        return self._domain
 
     @property
     def changes(self)->Tuple[int, ...]:
@@ -298,10 +296,11 @@ class OligoKPerm(OligoPerm):
         returns the tuple of indices which will be changed by application of perm
         should return [] if all sorted(perm)[i]==perm[i], ie: identity operator
         '''
-        if self.__changes==tuple():
-            self.__changes=self.get_changes(self.kpermids)
-        return self.__changes
+        if len(self._changes)==0:
+            self._changes=self.get_changes(self.kpermids)
+        return self._changes
 
+# no longer used, to remove
 class Permids2OligoPerm:
     u'Convertion class'
     oligos=[] # type: List[OligoPeak]
@@ -309,13 +308,16 @@ class Permids2OligoPerm:
     def __init__(self,**kwa):
         u'initialize before call'
         pass
-    def __call__(self,permids:List[int])->OligoPerm:
+    def __call__(self,
+                 permids:List[int],
+                 changes:Tuple[int, ...],
+                 domain:Set[int])->OligoPerm:
         u'convert using permids'
         # leaves perms list iff necessary
         return OligoPerm(oligos=self.oligos,
                          permids=permids,
-                         changes=,
-                         domain=)
+                         changes=changes,
+                         domain=domain)
 
 
 # replace with OligoPerm
