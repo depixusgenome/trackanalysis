@@ -89,6 +89,9 @@ class Probability:
             dur  = np.array([len(i) for _, i in evts], dtype = 'i4')
             self.__apply(dur, dur + [i for i, _ in evts], maxdurs[arrs])
 
+        self.nevents -= (events.discarded if hasattr(events, 'discarded') else # type: ignore
+                         sum(getattr(i, 'discarded', 0) for i in events))
+
     @staticmethod
     def resolution(events):
         "returns the average position and resolution"

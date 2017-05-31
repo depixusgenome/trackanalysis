@@ -33,15 +33,19 @@ class Probabilities(HasLengthPeak):
         self._values[key] = val = self._proba(bead.events[ipk][1], self._ends)
         return val
 
+    def array(self, name: str, ref:Group, ipk:int):
+        "returns an array of values for this hairpin peak"
+        pkkey = np.int32(self.hairpins[ref.key].peaks[ipk]+.1) # type: ignore
+        itr   = (self.__call__(name, None, i, j)
+                 for i in ref.beads
+                 for j in range(len(i.peaks))
+                 if i.peaks['key'][j] == pkkey)
+        return np.array([i for i in itr if i is not None], dtype = 'f4')
+
     def __call__(self, name: str, ref:Group, bead:Bead, ipk:int):
         "returns a probability value for a bead or the median for a hairpin"
         if bead is None:
-            pkkey = np.int32(self.hairpins[ref.key].peaks[ipk]+.1) # type: ignore
-            itr   = (self.__call__(name, None, i, j)
-                     for i in ref.beads
-                     for j in range(len(i.peaks))
-                     if i.peaks['key'][j] == pkkey)
-            arr   = np.array([i for i in itr if i is not None], dtype = 'f4')
+            arr = self.array(name, ref, ipk)
             if len(arr) == 0:
                 return None
             ret = np.median(arr)
@@ -285,15 +289,27 @@ class PeaksSheet(Reporter):
         return self._neig.orientation(*args)
 
     @column_method("Hybridisation Rate")
-    def _hrate(self, *args) -> Optional[float]:
+    def _hrate(self, ref:Group, bead:Bead, ipk:int) -> Optional[float]:
         """
         Peak height divided by number of cycles.
 
         For a hairpin, this is set to the median of values
         found in its group for that peak.
         """
-        val = self._proba('nevents', *args)
-        return 0. if val is None else val/self.config.track.ncycles
+        if bead is None:
+            arr  = self._proba.array('nevents', ref, ipk)
+            ncy  = [self.beadncycles(j) for j in ref.beads]
+            vals = [i/j for i, j in zip(arr, ncy) if i is not None and j > 0]
+            return None if len(vals) == 0 else np.median(vals)
+        else:
+            val = self._proba('nevents', ref, bead, ipk)
+            if val is None:
+                return None
+
+            ncy = self.beadncycles(bead)
+            if ncy == 0:
+                return None
+            return val/ncy
 
     @column_method("Hybridisation Time", units = 'seconds')
     def _averageduration(self, *args) -> Optional[float]:

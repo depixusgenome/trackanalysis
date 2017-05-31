@@ -77,7 +77,7 @@ class TrackInfo:
     path            = ''
     framerate       = 0.
     ncycles         = 0
-    uncertainties   = {}    # type: Dict[BEADKEY,float]
+    uncertainties   = {}    # type: Dict[BEADKEY, float]
     durations       = []    # type: Sequence[int]
     def __init__(self, track: Optional[Track]) -> None:
         if track is not None:

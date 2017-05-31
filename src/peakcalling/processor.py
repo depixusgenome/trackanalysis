@@ -8,7 +8,7 @@ import numpy        as np
 
 from utils                      import StreamUnion, initdefaults, updatecopy, asobjarray
 from data.trackitems            import BEADKEY, TrackItems
-from peakfinding.selector       import Output as PeakFindingOutput
+from peakfinding.selector       import Output as PeakFindingOutput, PeaksArray
 from peakfinding.processor      import PeaksDict
 from model                      import Task, Level
 from control.processor          import Processor
@@ -97,14 +97,17 @@ class FitToHairpinProcessor(Processor):
         if isinstance(evts, Iterator):
             evts = tuple(evts)
 
-        if len(evts) == 0:
-            return np.empty((0,), dtype = 'f4'), np.empty((0,), dtype = 'O')
-
         if getattr(evts, 'dtype', 'O') == 'f4':
-            return evts, np.empty((0,), dtype = 'O')
+            return evts, PeaksArray([], dtype = 'O')
+
         else:
-            evts = asobjarray((i, asobjarray(j)) for i, j in evts)
-            return (np.array([i for i, _ in evts], dtype = 'f4'), evts)
+            disc = (getattr(evts, 'discarded', 0) if hasattr(evts, 'discarded') else
+                    0                             if len(evts) == 0             else
+                    getattr(evts[0][1], 'discarded', 0))
+            evts = asobjarray(((i, asobjarray(j)) for i, j in evts),
+                              view      = PeaksArray,
+                              discarded = disc)
+            return np.array([i for i, _ in evts], dtype = 'f4'), evts
 
     @staticmethod
     def __distances(distances   : Distances,

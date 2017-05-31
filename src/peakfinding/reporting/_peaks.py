@@ -71,10 +71,10 @@ class PeaksSheet(Reporter):
         return self._proba('nevents', *args)
 
     @column_method("Hybridisation Rate")
-    def _hrate(self, *args) -> float:
+    def _hrate(self, _1, _2, peak:PeakOutput) -> float:
         "Event count divided by the number of cycles"
-        val = self._proba('nevents', *args)
-        return val/self.config.track.ncycles
+        val = self._proba('nevents', _1, _2, peak)
+        return val/(self.config.track.ncycles - getattr(peak[1], 'discarded', 0))
 
     @column_method("Hybridisation Time", units = 'seconds')
     def _averageduration(self, *args) -> float:

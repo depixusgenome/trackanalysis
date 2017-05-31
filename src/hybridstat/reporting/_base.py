@@ -197,6 +197,13 @@ class Reporter(_Reporter):
                          for bead  in group.beads],
                         dtype = 'f4')
 
+    def beadncycles(self, bead:Bead) -> int:
+        "returns the number of cycles for this bead"
+        ncyc = self.config.track.ncycles
+        if bead is not None:
+            ncyc -= getattr(bead.events, 'discarded', 0)
+        return ncyc
+
     @staticmethod
     @column_method(u"Bead")
     def _beadid(ref:Group, bead:Bead, *_) -> str:

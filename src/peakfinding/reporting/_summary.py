@@ -28,17 +28,25 @@ class SummarySheet(Reporter):
     @staticmethod
     @column_method("Peak Count")
     def _npeaks(_, outp:Tuple[PeakOutput]) -> int:
-        "Number of peaks detected for that bead."
+        "Number of peaks detected for a given bead."
         return len(outp)
 
-    @staticmethod
+    @column_method("Valid Cycles")
+    def _ncycles(self, _, outp:Tuple[PeakOutput]) -> int:
+        "Number of valid cycles for a given bead."
+        ncyc = self.config.track.ncycles
+        if len(outp) > 0:
+            ncyc -= getattr(outp[0][1], 'discarded', 0)
+        return ncyc
+
     @column_method("Events per Cycle")
-    def _evts(_, outp:Tuple[PeakOutput]) -> float:
+    def _evts(self, _, outp:Tuple[PeakOutput]) -> float:
         "Average number of events per cycle"
         cnt = sum(1 for _, i in outp[1:] for j in i if j is not None) # type: ignore
         if cnt == 0:
             return 0.0
-        return cnt / len(outp[0][1])
+        ncy = self._ncycles(_, outp)
+        return 0. if ncy == 0 else (cnt / ncy)
 
     @column_method('Down Time Φ₅ (s)')
     def _offtime(self, _, outp:Tuple[PeakOutput]) -> float:

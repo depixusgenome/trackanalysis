@@ -124,6 +124,11 @@ class SummarySheet(Reporter):
         else:
             return (bead.peaks['key'][1:] < 0).sum()
 
+    @column_method("Valid Cycles")
+    def _ncycles(self, _, bead:Bead) -> int:
+        "Number of valid cycles for a given bead."
+        return None if bead is None else self.beadncycles(bead)
+
     @column_method("Events per Cycle")
     def _evts(self, _, bead:Bead) -> Optional[float]:
         "Average number of events per cycle"
@@ -133,7 +138,7 @@ class SummarySheet(Reporter):
         cnt = sum(1 for _, i in bead.events[1:] for j in i if j is not None) # type: ignore
         if cnt == 0:
             return 0.0
-        return cnt / self.config.track.ncycles
+        return cnt / self.beadncycles(bead)
 
     @column_method('Down Time Φ₅ (s)')
     def _offtime(self, _, bead:Bead) -> Optional[float]:

@@ -8,8 +8,22 @@ from functools        import wraps
 import numpy          as     np
 
 from data.trackitems  import Items, Cycles, Level, CYCLEKEY
-from utils            import EVENTS_TYPE, EVENTS_DTYPE
+from utils            import EVENTS_TYPE, EVENTS_DTYPE, asview
 from .                import EventDetectionConfig
+
+class EventsArray(np.ndarray):
+    """Array with metadata."""
+    # pylint: disable=unused-argument
+    def __new__(cls, array, dtype=None, order=None, discarded = False):
+        obj  = np.asarray(array, dtype = EVENTS_DTYPE, order=order).view(cls)
+        obj.discarded = discarded
+        return obj
+
+    def __array_finalize__(self, obj):
+        if obj is None:
+            return
+        # pylint: disable=attribute-defined-outside-init
+        self.discarded = getattr(obj, 'discarded', False)
 
 class Events(Cycles, EventDetectionConfig, Items):
     u"""
@@ -53,18 +67,18 @@ class Events(Cycles, EventDetectionConfig, Items):
             if test is None:
                 test = cycle.dtype == EVENTS_DTYPE or cycle.dtype == 'O'
             if test:
-                gen = cycle
+                gen  = asview(cycle, EventsArray,
+                              discarded = getattr(cycle, 'discarded', False))
             else:
                 val  = self.getprecision(prec, track, key[0])
                 good = np.isfinite(cycle)
                 cnt  = good.sum()
                 if cnt == 0:
-                    gen  = np.empty((0,), dtype = EVENTS_DTYPE)
+                    gen = EventsArray([], discarded = True)
                 else:
                     fdt = fcn(cycle, None if cnt == len(cycle) else good, val)
-                    gen = np.array([(i, cycle[i:j])
-                                    for i, j in evts(fdt, precision = val)],
-                                   dtype = EVENTS_DTYPE)
+                    gen = EventsArray([(i, cycle[i:j])
+                                       for i, j in evts(fdt, precision = val)])
             yield (key, gen)
 
     if TYPE_CHECKING:
