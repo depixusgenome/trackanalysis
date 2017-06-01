@@ -277,24 +277,25 @@ def fieldnames(obj) -> FrozenSet[str]:
                          and not getattr(tpe, 'fset', '') is None))
     return dico | desc # type: ignore
 
-def _update(cpy: Optional[Callable[[T], T]], obj:T, **attrs) -> T:
+def _update(cpy: Optional[Callable[[T], T]], obj:T, always:bool, **attrs) -> T:
     "Sets field to provided values"
     fields = fieldnames(obj) & frozenset(attrs)
+    if cpy and (always or len(fields)):
+        obj = cpy(obj)
+
     if len(fields):
-        if cpy:
-            obj = cpy(obj)
         for name in fieldnames(obj) & frozenset(attrs):
             setattr(obj, name, attrs[name])
     return obj
 
 def update(obj:T, **attrs) -> T:
     "Sets field to provided values"
-    return _update(None, obj, **attrs)
+    return _update(None, obj, False, **attrs)
 
-def updatecopy(obj:T, **attrs) -> T:
+def updatecopy(obj:T, _always_ = False, **attrs) -> T:
     "Sets field to provided values on a copied object"
-    return _update(copy, obj, **attrs)
+    return _update(copy, obj, _always_, **attrs)
 
-def updatedeepcopy(obj:T, **attrs) -> T:
+def updatedeepcopy(obj:T, _always_ = False, **attrs) -> T:
     "Sets field to provided values on a deepcopied object"
-    return _update(deepcopy, obj, **attrs)
+    return _update(deepcopy, obj, _always_, **attrs)
