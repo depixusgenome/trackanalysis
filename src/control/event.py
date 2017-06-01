@@ -3,13 +3,15 @@
 "Base event handler"
 import re
 
-from itertools      import product
-from functools      import wraps
-from enum           import Enum, unique
-from typing         import (Dict, Union, Sequence, # pylint: disable=unused-import
-                            Callable, Tuple, Any, Set, Optional, cast)
+from itertools          import product
+from functools          import wraps
+from enum               import Enum, unique
+from typing             import (Dict, Union, Sequence, # pylint: disable=unused-import
+                                Callable, Tuple, Any, Set, Optional, cast)
 
-from utils          import ismethod, isfunction, toenum
+from utils              import ismethod, isfunction, toenum
+from utils.logconfig    import getLogger
+LOGS = getLogger(__name__)
 
 class NoEmission(Exception):
     "can be raised to stop an emission"
@@ -62,6 +64,7 @@ class EmitPolicy(Enum):
             for hdl in allfcns:
                 hdl(*args[0], **args[1])
 
+_CNT = 0
 class Event:
     "Event handler class"
     outasdict   = EmitPolicy.outasdict
@@ -101,7 +104,11 @@ class Event:
         "Call handlers only once: collect them all"
         allfcns = self.getobservers(lst)
         if len(allfcns):
+            global _CNT # pylint: disable=global-statement
+            _CNT += 1
+            LOGS.debug("[%d] Handling %s", _CNT, lst)
             EmitPolicy.get(policy, args).run(allfcns, args)
+            LOGS.debug("[%d] Handled", _CNT)
         return args
 
     def emit(self, *names, returns = EmitPolicy.annotations):

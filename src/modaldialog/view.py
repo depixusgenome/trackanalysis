@@ -3,11 +3,13 @@
 """
 Allows creating modals from anywhere
 """
-from typing         import List, Tuple, TYPE_CHECKING   # pylint: disable=unused-import
-from copy           import deepcopy
-from bokeh.document import Document                     # pylint: disable=unused-import
-from bokeh.models   import Widget, Button
-from .              import dialog
+from typing             import List, Tuple, TYPE_CHECKING   # pylint: disable=unused-import
+from copy               import deepcopy
+from bokeh.document     import Document                     # pylint: disable=unused-import
+from bokeh.models       import Widget, Button
+from utils.logconfig    import getLogger
+from .                  import dialog
+LOGS = getLogger(__name__)
 
 class AdvancedWidgetMixin:
     "A button to access the modal dialog"
@@ -79,6 +81,7 @@ class AdvancedTaskMixin(AdvancedWidgetMixin):
         super().__enter__()
 
     def __exit__(self, tpe, val, bkt):
+        LOGS.debug(self._TITLE+ " output => %s", self.__outp)
         for key, elems in self.__outp.items():
             getattr(self._model, key).update(**elems)
 
