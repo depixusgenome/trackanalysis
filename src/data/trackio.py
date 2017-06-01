@@ -201,7 +201,7 @@ class LegacyGRFilesIO(_TrackIO):
         if set(np.diff(phases)) != {1}:
             raise IOError("Phases must be sequencial in "+ path, "warning")
 
-        starts  = output['phases'][:, phases[0]] - output['phases'][0,phases[0]]
+        starts  = output['phases'][:, phases[0]] - output['phases'][0,0]
         bead    = output[beadid]
         bead[:] = np.NaN
         for title, vals in grdict.items():

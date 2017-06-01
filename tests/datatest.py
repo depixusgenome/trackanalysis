@@ -189,6 +189,7 @@ def test_loadgrdir():
         good  = {i[1] for i, j in track.cycles[28,...] if not np.all(np.isnan(j))}
         assert good == keys
         assert len(good) < track.ncycles
+        assert all(np.isfinite(j).sum() == 0 for _, j in track.cycles.withphases(0)[28,...])
 
 def test_findgrdir():
     paths = str(Path(utpath("big_legacy")).parent/'*.trk'), utpath("big_grlegacy")
