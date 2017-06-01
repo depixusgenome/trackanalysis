@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 u"Task IO module"
 from typing             import Union, Tuple
+from pathlib            import Path
 from itertools          import chain
 from copy               import deepcopy
 from model.task         import TrackReaderTask
@@ -39,7 +40,7 @@ class TrackIO(TaskIO):
         "opens a track file"
         if len(model):
             raise NotImplementedError()
-        LOGS.info('path = %s', path)
+        LOGS.info('%s -> path = %s', type(self).__name__, path)
         return [(TrackReaderTask(path = path),)]
 
 class ConfigTrackIO(TrackIO):
@@ -53,7 +54,7 @@ class ConfigTrackIO(TrackIO):
         if isinstance(path, str):
             path = path,
 
-        items = [TrackIO().open(path, model)[0][0]]
+        items = [TrackIO.open(self, path, model)[0][0]]
         for name in self._ctrl.get(default = tuple()):
             task = self._ctrl[name].get(default = None)
             if not getattr(task, 'disabled', True):
@@ -74,7 +75,7 @@ class _GrFilesIOMixin:
             path = path,
 
         trks = tuple(i for i in path if any(i.endswith(j) for j in TrackIO.EXT))
-        grs  = tuple(i for i in path if i.endswith(self.EXT[-1]))
+        grs  = tuple(i for i in path if i.endswith(self.EXT[-1]) or Path(i).is_dir())
         if len(trks) + len(grs) < len(path) or len(trks) > 1 or len(grs) < 1:
             return None
 
