@@ -282,9 +282,11 @@ class PeakIDPathWidget(WidgetCreator):
 class AdvancedWidget(AdvancedTaskMixin, WidgetCreator):
     "access to the modal dialog"
     _TITLE = 'Hybridstat Configuration'
-    _BODY  = (('Minimum frame count per event', '%(_framecount)d'),
-              ('Minimum event count per peak',  '%(_eventcount)d'),
-              ('Align on phase 5',              '%(_align5)b'))
+    _BODY  = (('Minimum frame count per event',    '%(_framecount)d'),
+              ('Minimum event count per peak',     '%(_eventcount)d'),
+              ('Align on phase 5',                 '%(_align5)b'),
+              ('Peak kernel size (blank ⇒ auto)',  '%(_precision)of'),
+             )
 
     def __init__(self, model:PeaksPlotModelAccess) -> None:
         WidgetCreator.__init__(self, model)
@@ -294,3 +296,4 @@ class AdvancedWidget(AdvancedTaskMixin, WidgetCreator):
     _framecount = AdvancedTaskMixin.attr('eventdetection.events.select.minlength')
     _eventcount = AdvancedTaskMixin.attr('peakselection.group.mincount')
     _align5     = AdvancedTaskMixin.none('peakselection.align')
+    _precision  = AdvancedTaskMixin.attr('peakselection.precision')

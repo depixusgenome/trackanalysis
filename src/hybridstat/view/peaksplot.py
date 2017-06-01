@@ -13,8 +13,6 @@ from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
                                         Model, TapTool, CustomJS, ToolbarBox)
 import numpy                    as     np
 
-from signalfilter               import rawprecision
-
 from view.base                  import enableOnTrack
 from view.plots                 import (PlotView, PlotAttrs, from_py_func,
                                         DpxKeyedRow, PlotState)
@@ -170,7 +168,7 @@ class PeaksPlotCreator(TaskPlotCreator):
             return data, self._model.peaks
 
         track = self._model.track
-        dtl   = peaks.detailed(items, rawprecision(track, self._model.bead))
+        dtl   = peaks.detailed(items, (track, self._model.bead))
 
         maxv  = max(peaks.histogram.kernelarray())
         data  = dict(z     = (dtl.binwidth*np.arange(len(dtl.histogram), dtype = 'f4')
