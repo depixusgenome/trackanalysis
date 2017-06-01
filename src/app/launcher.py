@@ -16,7 +16,7 @@ from bokeh.settings             import settings
 from bokeh.layouts              import layout
 from bokeh.resources            import DEFAULT_SERVER_PORT
 
-from utils.logconfig            import getLogger
+from utils.logconfig            import getLogger, logToFile
 from utils                      import getlocals
 from utils.gui                  import MetaMixin
 from control                    import Controller
@@ -150,9 +150,8 @@ def _create(main, controls, views): # pylint: disable=unused-argument
             @classmethod
             def configpath(cls, version, stem = None) -> Path:
                 "returns the path to the config file"
-                name = cls.APPNAME.replace(' ', '_').lower()
-                path = Path(appdirs.user_config_dir('depixus', 'depixus', name+"/"+version))
-                return path/(('autosave' if stem is None else stem)+'.txt')
+                fname = ('autosave' if stem is None else stem)+'.txt'
+                return cls.apppath()/str(version)/fname
 
             def readconfig(self):
                 """
@@ -177,8 +176,15 @@ def _create(main, controls, views): # pylint: disable=unused-argument
                 self.writeconfig()
                 self._callmixins("close")
 
+            @classmethod
+            def apppath(cls) -> Path:
+                "returns the path to local appdata directory"
+                name = cls.APPNAME.replace(' ', '_').lower()
+                return Path(appdirs.user_config_dir('depixus', 'depixus', name))
+
         def __init__(self):
             "sets up the controller, then initializes the view"
+
             ctrl = self.MainControl(handlers = dict(), topview = self)
             keys = KeyPressManager(ctrl = ctrl)
             main.__init__(self, ctrl = ctrl, keys = keys)
@@ -198,6 +204,7 @@ def _create(main, controls, views): # pylint: disable=unused-argument
                 getattr(sys.modules.get(mdl, None), 'document', lambda x: None)(doc)
             super().addtodoc(doc)
 
+    logToFile(str(Main.MainControl.apppath()/"logs.txt"))
     return Main
 
 def setup(locs            = None, # pylint: disable=too-many-arguments
