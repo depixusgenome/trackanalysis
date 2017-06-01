@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Sets-up the logging"
+from   pathlib  import Path
 import logging
 import logging.config
 import os
@@ -27,6 +28,14 @@ def logToFile(path):
     assert not any(hdl.get_name() == 'file' for hdl in getLogger().handlers)
     if path is None:
         return
+
+    if not Path(path).parent.exists(): # pylint: disable=no-member
+        # pylint: disable=no-member,bare-except
+        try:
+            Path(path).parent.mkdir(parents = True, exist_ok = True)
+        except:
+            getLogger().exception('Could not log to file')
+            return
 
     hdl = logging.handlers.RotatingFileHandler(path,
                                                maxBytes    = 1024,
