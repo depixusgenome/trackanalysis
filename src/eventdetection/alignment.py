@@ -89,8 +89,9 @@ class PhaseEdgeAlignment:
         left  = 'left'
         right = 'right'
 
-    window = 15
-    edge   = Mode.left
+    window     = 15
+    edge       = Mode.left
+    percentile = 75.
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -98,7 +99,9 @@ class PhaseEdgeAlignment:
     def __call__(self, data, subtract = True) -> np.ndarray:
         sli = (slice(self.window) if self.edge is self.Mode.left else
                slice(-self.window, None))
-        res = np.fromiter((-np.median(i[sli]) for i in data), dtype = np.float32)
+        res = np.fromiter((-np.percentile(i[sli], self.percentile) for i in data),
+                          dtype = 'f4')
+
         if subtract:
             return np.subtract(res, np.nanmedian(res), out = res)
         else:

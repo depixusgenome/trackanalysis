@@ -17,25 +17,25 @@ class ExtremumAlignmentTask(Task):
     """
     Task for aligning on a given phase.
 
-    Alignment is performed on *phase* for all then only on outliers using
-    either phase 3, if *phase* is 1, or phase 1 if *phase* is 5. This is done
-    the following way:
+    Alignment modes are:
 
-        1. Algnments are performed on *phase*.
-        2. The extension between phases 3 and 1 and 3 and 5 are computed.
-        3. Cycles are considered miss-aligned only if the bead opened during that
-        cycle. The test is:
+        * *phase* = 1: alignment on phase 1
+        * *phase* = 3: alignment on phase 3
+        * *phase* = None: alignment is performed phase 1. Outliers are then
+        re-aligned on phase 3. Outliers are defined as:
 
-            * *phase* to phase 3 extension < median x outlier
-            * 3-5 extension                > median x outlier
+            * |phase 3 - median(phase 3)| > 'pull'
+            * at least one of the extension between phase 1 and 3 or 3 and 5
+            are such that: (extension > median(extension) x 'opening')
+            that between phase 1 and 3 or 3 and 5.
 
-        4. Mis-aligned cycles are aligned to the median value of *aligned* values
-        of the outlier phase.
+        * *phase* = 5: alignment is performed on phase 5. If outliers are found
+        on phase 5:
 
-    Finally, if *phase* is 5, cycles with the following property are aligned on phase 3:
-
-            * |phase 3 - median| > pull
-            * (3-5 extension > median x opening) or (1-5 extension > median x opening)
+            * if more than 'fiveratio' cycles are further than 'pull' from the
+            median, a *phase* = None alignment is returned.
+            * otherwise outliers are aligned on phase 1. Finally phase 3
+            outliers are re-aligned on phase 3.
 
     Attributes:
 
@@ -48,13 +48,15 @@ class ExtremumAlignmentTask(Task):
         * *opening:* This factor is used to determine cycles mis-aligned on *phase*.
         * *pull:* maximum absolute distance from the median phase 3 value.
     """
-    level     = Level.bead
-    window    = 15
-    edge      = 'right' # type: Optional[str]
-    phase     = None    # type: Optional[int]
-    outlier   = .9
-    pull      = .1
-    opening   = .5
+    level      = Level.bead
+    window     = 15
+    edge       = 'right' # type: Optional[str]
+    phase      = None    # type: Optional[int]
+    percentile = 25.
+    fiveratio  = .4
+    outlier    = .9
+    pull       = .1
+    opening    = .5
 
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_):
@@ -71,11 +73,13 @@ class ExtremumAlignmentProcessor(Processor):
                 phases            = frame.track.phases[frame.cycles,:]
                 self.cycles.track = updatecopy(frame.track, phases = phases)
 
-        def bias(self, phase, window, edge):
+        def bias(self, phase, window, edge, percentile):
             "aligns a phase"
             vals  = np.array(list(self.cycles.withphases(phase).values()), dtype = 'O')
             if edge is not None:
-                align = PhaseEdgeAlignment(window = window, edge = edge)
+                align = PhaseEdgeAlignment(window     = window,
+                                           edge       = edge,
+                                           percentile = percentile)
             else:
                 mode  = 'min'  if phase == PHASE.pull else 'max'
                 # pylint: disable=redefined-variable-type
@@ -102,6 +106,7 @@ class ExtremumAlignmentProcessor(Processor):
     @classmethod
     def apply(cls, toframe = None, **kwa):
         "applies the task to a frame or returns a function that does so"
+        assert cls._get(kwa, 'percentile') <= 50.
         action = (cls.__apply_best13 if cls._get(kwa, 'phase') is None          else
                   cls.__apply_best51 if cls._get(kwa, 'phase') == PHASE.measure else
                   cls.__apply_onephase)
@@ -113,14 +118,16 @@ class ExtremumAlignmentProcessor(Processor):
 
     @classmethod
     def __args(cls, kwa, frame, info, meas) -> 'ExtremumAlignmentProcessor._Args':
-        cycles  = cls._Utils(frame, info)
-        window  = cls._get(kwa, 'window')
-        edge    = cls._get(kwa, 'edge')
-        inits   = cycles.bias(PHASE.initial, window, edge)
-        pulls   = cycles.bias(PHASE.pull, window, edge)
+        cycles     = cls._Utils(frame, info)
+        window     = cls._get(kwa, 'window')
+        edge       = cls._get(kwa, 'edge')
+        percentile = cls._get(kwa, 'percentile')
+
+        inits = cycles.bias(PHASE.initial, window, edge,      percentile) # ≈ min
+        pulls = cycles.bias(PHASE.pull,    window, edge, 100.-percentile) # ≈ max
         if meas:
             return cls._Args(cycles, inits, pulls,
-                             cycles.bias(PHASE.measure, window, 'right'))
+                             cycles.bias(PHASE.measure, window, 'right', percentile))
 
         else:
             return cls._Args(cycles, inits, pulls, None)
@@ -131,7 +138,10 @@ class ExtremumAlignmentProcessor(Processor):
         if arr is None:
             edge = 'right' if attr == 'measure' else cls._get(kwa, 'edge')
             wind = cls._get(kwa, 'window')
-            arr  = args.cycles.bias(getattr(PHASE, attr), wind, edge)
+            perc = cls._get(kwa, 'percentile')
+            if attr == 'pull':
+                perc = 100. - perc
+            arr  = args.cycles.bias(getattr(PHASE, attr), wind, edge, perc)
 
         deltas = arr - args.pull
         rho    = np.nanmedian(deltas)*cls._get(kwa, outlier)
@@ -143,19 +153,23 @@ class ExtremumAlignmentProcessor(Processor):
         return deltas
 
     @classmethod
-    def __align_on_3(cls, bias, args, kwa):
+    def __distance_to_3(cls, bias, args, kwa):
         tmp  = bias-args.pull
         tmp -= np.nanmedian(tmp)
         tmp /= cls._get(kwa, 'pull')
-        tmp[np.isnan(tmp)] = 0.
+        np.abs(tmp, tmp)
+        tmp[np.isnan(tmp)] = -1.
+        return tmp
 
-        tmp  = np.abs(tmp) > 1.
+    @classmethod
+    def __align_on_3(cls, attr, bias, args, kwa):
+        tmp = cls.__distance_to_3(bias, args, kwa) > 1.
         if any(tmp):
             bad  = np.logical_or(cls.__deltas('initial', 'opening', args, kwa) >= 1.,
                                  cls.__deltas('measure', 'opening', args, kwa) >= 1.)
 
             np.logical_and(bad, tmp, bad)
-            bias[bad] = args.pull[bad]+np.nanmedian(args.measure-args.pull)
+            bias[bad] = args.pull[bad]+np.nanmedian(getattr(args, attr)-args.pull)
         return args.cycles.translate(bias)
 
     @classmethod
@@ -166,33 +180,34 @@ class ExtremumAlignmentProcessor(Processor):
         dtl5 = cls.__deltas('measure', 'outlier', args, kwa)
         bad  = dtl5 < 1.
         if any(bad):
+            tmp = cls.__distance_to_3(bias, args, kwa)
+            if (tmp > 1).sum() > (tmp >= 0).sum() * cls._get(kwa, 'fiveratio'):
+                # too many cycles are saturated
+                return cls.__align_on_3('initial', args.initial, args, kwa)
+
             bad       = np.logical_and(bad, cls.__deltas('initial', 'outlier', args, kwa) >= 1.)
+            bias      = np.copy(bias)
             bias[bad] = args.initial[bad]+np.nanmedian(args.measure-args.initial)
 
-        return cls.__align_on_3(bias, args, kwa)
+        return cls.__align_on_3('measure', bias, args, kwa)
 
     @classmethod
     def __apply_best13(cls, kwa, frame, info):
         args = cls.__args(kwa, frame, info, False)
-        bias = args.initial
-
-        bad  = cls.__deltas('initial', 'outlier', args, kwa) < 1.
-        if any(bad):
-            bad       = np.logical_and(bad, cls.__deltas('measure', 'outlier', args, kwa) >= 1.)
-            bias[bad] = args.pull[bad]+np.nanmedian(args.initial-args.pull)
-        return args.cycles.translate(bias)
+        return cls.__align_on_3('initial', args.initial, args, kwa)
 
     @classmethod
     def __apply_onephase(cls, kwa, frame, info):
         window = cls._get(kwa, 'window')
         edge   = cls._get(kwa, 'edge')
+        perc   = cls._get(kwa, 'percentile')
         cycles = cls._Utils(frame, info)
 
-        bias   = cycles.bias(PHASE.initial, window, edge)
+        bias   = cycles.bias(PHASE.initial, window, edge, perc)
 
         if cls._get(kwa, 'phase') == PHASE.pull:
             init  = bias
-            bias  = cycles.bias(PHASE.pull, window, edge)
+            bias  = cycles.bias(PHASE.pull, window, edge, 100.-perc)
             bias -= np.nanmedian(bias+init)
 
         return cycles.translate(bias)
