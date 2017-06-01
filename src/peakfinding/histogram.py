@@ -76,6 +76,15 @@ class Histogram(PrecisionAlg):
         tmp, minv, bwidth = self(aevents, bias, separate = False, **kwa)
         return next(tmp), minv, bwidth
 
+    def apply(self, minv, bwidth, lenv, arr):
+        "Applies to one array"
+        osamp = (int(self.oversampling)//2) * 2 + 1
+        tmp   = np.int32(np.rint((arr-minv)/bwidth))
+        res   = np.bincount(tmp[tmp >= 0], minlength = lenv)[:lenv]
+        if self.kernel is not None:
+            return self.kernel(oversampling = osamp, range = 'same')(res)
+        return res
+
     @property
     def exactoversampling(self) -> int:
         "returns the exact oversampling used"
@@ -150,15 +159,6 @@ class Histogram(PrecisionAlg):
             else:
                 cnt = np.bincount(pos, minlength = lenv, weights = weight)
             yield kern(cnt)
-
-    def apply(self, minv, bwidth, lenv, arr):
-        "Applies to one array"
-        osamp = (int(self.oversampling)//2) * 2 + 1
-        tmp   = np.int32(np.rint((arr-minv)/bwidth))
-        res   = np.bincount(tmp[tmp >= 0], minlength = lenv)[:lenv]
-        if self.kernel is not None:
-            return self.kernel(oversampling = osamp, range = 'same')(res)
-        return res
 
     def __compute(self,
                   events   : Sequence[Sequence[np.ndarray]],
