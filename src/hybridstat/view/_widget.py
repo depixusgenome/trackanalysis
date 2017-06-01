@@ -284,7 +284,7 @@ class AdvancedWidget(AdvancedTaskMixin, WidgetCreator):
     _TITLE = 'Hybridstat Configuration'
     _BODY  = (('Minimum frame count per event',    '%(_framecount)d'),
               ('Minimum event count per peak',     '%(_eventcount)d'),
-              ('Align on phase 5',                 '%(_align5)b'),
+              ('Align cycles using peaks',         '%(_align5)b'),
               ('Peak kernel size (blank ⇒ auto)',  '%(_precision)of'),
              )
 

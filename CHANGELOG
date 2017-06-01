@@ -7,7 +7,7 @@ Previously, the number of cycles was only reported for the track file as a
 whole.  Now, the number of valid cycles per bead is also reported. This number
 is also used for computing hybridization rates. The latter are thus more exact.
 
-Multiple bugs in the neighbouring sequence detection were removed
+Multiple bugs in the neighbouring sequence detection were removed.
 
 ### Peak detection
 
@@ -22,7 +22,7 @@ Such a value is computed independently for each bead. The factor '2' was set to
 
 ### Data Treatment
 
-Alignments have been improved. There are now five of them:
+Prior alignments have been improved. There are now five of them:
 
     0. no alignment. This is the default when loading gr files.
     1. If at least 40 percent of cycles end up fully zipped, then these cycles
@@ -32,6 +32,9 @@ Alignments have been improved. There are now five of them:
     2. Alignment occurs on phase one then phase three for any outliers.
     3. Alignment occurs on phase one only.
     4. Alignment occurs on phase three only.
+
+These alignments can be selected in the *Cycles* tab. They do not rely on the
+detection of events as does the one which can be selected in the *Peaks* tab.
 
 # tag cycles_v4.1
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
