@@ -1,3 +1,38 @@
+# tag cycles_v4.2
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+### Reporting
+
+Previously, the number of cycles was only reported for the track file as a
+whole.  Now, the number of valid cycles per bead is also reported. This number
+is also used for computing hybridization rates. The latter are thus more exact.
+
+Multiple bugs in the neighbouring sequence detection were removed
+
+### Peak detection
+
+The *smearing* field found in *pias* can now be configured as well. This is the
+"Peak kernel size" field in the Peaks/Advanced dialog. Roughly, the field
+defines the minimum distance between two detected peaks. Peaks closer together
+end-up merged together.
+
+If "Peak kernel size" is left blank, the minimum distance is set to: σ[HF] x 2.
+Such a value is computed independently for each bead. The factor '2' was set to
+'1' in previous versions.
+
+### Data Treatment
+
+Alignments have been improved. There are now five of them:
+
+    0. no alignment. This is the default when loading gr files.
+    1. If at least 40 percent of cycles end up fully zipped, then these cycles
+    are are aligned on the end of phase five. Remaining events are aligned on phase
+    one. Outliers are detected on phase three. They are re-aligned on that
+    phase. This is the default when loading trk files.
+    2. Alignment occurs on phase one then phase three for any outliers.
+    3. Alignment occurs on phase one only.
+    4. Alignment occurs on phase three only.
+
 # tag cycles_v4.1
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
