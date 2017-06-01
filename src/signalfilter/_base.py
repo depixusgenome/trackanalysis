@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Signal Analysis: filters for removing noise"
+"Signal Analysis: filters for removing noise"
 # pylint: disable=no-name-in-module,import-error
-from typing         import Union, Iterator, Tuple, Optional, Sequence, cast
+from typing         import Union, Iterator, Tuple, Sequence, cast
 from itertools      import chain
 
 import numpy as np
@@ -11,7 +11,7 @@ from utils          import initdefaults
 from ._core.stats   import hfsigma
 
 def nanhfsigma(arr: np.ndarray):
-    u"hfsigma which takes care of nans"
+    "hfsigma which takes care of nans"
     arr = arr.ravel()
     if len(arr) == 0:
         return
@@ -20,28 +20,32 @@ def nanhfsigma(arr: np.ndarray):
         arr = np.float32(arr) # type: ignore
     return hfsigma(arr[~np.isnan(arr)])
 
+DATATYPE  = Union[Sequence[Sequence[np.ndarray]],
+                  Sequence[np.ndarray],
+                  np.ndarray,
+                  None]
+PRECISION = Union[float, Tuple[DATATYPE, int], None]
+
 class PrecisionAlg:
-    u"Implements precision extraction from data"
-    DATATYPE  = Union[Sequence[Sequence[np.ndarray]],
-                      Sequence[np.ndarray],
-                      np.ndarray,
-                      None]
-    precision = None # type: Optional[float]
+    "Implements precision extraction from data"
+    precision = None # type: float
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 
-    def getprecision(self,                  # pylint: disable=too-many-branches
-                     precision:Optional[float] = None,
-                     data     :DATATYPE        = tuple(),
-                     beadid                    = None) -> float:
-        u"""
-        Returns the precision, possibly extracted from the data.
-        Raises AttributeError if the precision was neither set nor could be
-        extracted
+    def getprecision(self, # pylint: disable=too-many-branches
+                     precision:PRECISION = None,
+                     data     :DATATYPE  = tuple(),
+                     beadid   :int       = None) -> float:
         """
+        Returns the precision, possibly extracted from the data.  Raises
+        AttributeError if the precision was neither set nor could be extracted
+        """
+        if isinstance(precision, tuple):
+            data, beadid = precision
+            precision    = self.precision
 
-        if precision is None:
+        elif precision is None:
             precision = self.precision
 
         if np.isscalar(precision) and precision > 0.:
@@ -74,7 +78,7 @@ class PrecisionAlg:
 
     @classmethod
     def rawprecision(cls, track, ibead) -> Union[float, Iterator[Tuple[int, float]]]:
-        u"Obtain the raw precision for a given bead"
+        "Obtain the raw precision for a given bead"
         track = getattr(track, 'track', track)
         cache = getattr(track, '_rawprecisions')
         val   = cache.get(ibead, None)
