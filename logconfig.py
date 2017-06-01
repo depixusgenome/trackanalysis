@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 "Sets-up the logging"
 import logging
+import logging.config
 import os
-import sys
 try:
     # setup using bokeh if available
     import bokeh # pylint: disable=unused-import
@@ -22,6 +22,23 @@ def getLogger(arg = None):
     else:
         return logging.getLogger(LOGGER+'.'+arg)
 
+def logToFile(path):
+    "adds a log to file"
+    assert not any(hdl.get_name() == 'file' for hdl in getLogger().handlers)
+    if path is None:
+        return
+
+    hdl = logging.handlers.RotatingFileHandler(path,
+                                               maxBytes    = 1024,
+                                               backupCount = 3,
+                                               encoding    = 'utf-8')
+    hdl.set_name('file')
+    hdl.setLevel(getEnvironLevel())
+    fmt  = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    date = '%m/%d/%Y %I:%M:%S %p'
+    hdl.setFormatter(logging.Formatter(fmt, date))
+    getLogger().addHandler(hdl)
+
 def getEnvironLevel():
     "sets the level"
     var    = os.environ.get(PREFIX+'LOG_LEVEL', 'info').strip().lower()
@@ -34,19 +51,24 @@ def getEnvironLevel():
     return levels[var]
 
 if not (logging.getLogger().handlers or getLogger().handlers):
-    DEFAULT = logging.StreamHandler(sys.stdout)
-    DEFAULT.setFormatter(logging.Formatter(logging.BASIC_FORMAT))
-    getLogger().addHandler(DEFAULT)
-    getLogger().propagate = False
-    getLogger().setLevel(getEnvironLevel())
-else:
-    DEFAULT = None
+    def _setdefault():
+        lvl = getEnvironLevel()
+        cnf = {'version'   : 1,
+               'formatters': {'brief'  : {'format'   : logging.BASIC_FORMAT}},
+               'handlers'  : {'console': {'class'    : 'logging.StreamHandler',
+                                          'formatter': 'brief',
+                                          'level'    : lvl,
+                                          'stream'   : 'ext://sys.stdout'}},
+               'loggers'   : {LOGGER   : {'level'    : lvl,
+                                          'propagate': False,
+                                          'handlers' : ['console']}}}
+        logging.config.dictConfig(cnf)
+
+    _setdefault()
 
 def basicConfig(*args, **kwargs):
     "A logging.basicConfig() wrapper that also undoes the default configuration."
-    global DEFAULT # pylint: disable=global-statement
-    if DEFAULT is not None:
-        getLogger().removeHandler(DEFAULT)
-        getLogger().propagate = True
-        DEFAULT = None
+    for hdl in tuple(getLogger().handlers):
+        getLogger().removeHandler(hdl)
+    getLogger().propagate = True
     return logging.basicConfig(*args, **kwargs)
