@@ -6,6 +6,9 @@ from    typing      import (Generic, TypeVar, Type, # pylint: disable=unused-imp
 from    collections import ChainMap, namedtuple
 import  inspect
 
+from    utils.logconfig import getLogger
+LOGS    = getLogger(__name__)
+
 _CNT    = 2
 _m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
 T       = TypeVar('T')
@@ -506,15 +509,19 @@ class Globals:
 
     def readconfig(self, configpath, protocol, patchname = 'config') -> Optional[dict]:
         "Sets-up the user preferences"
-        cnf = None
+        cnf   = None
+        first = True
         for version in protocol.iterversions(patchname):
             path = configpath(version)
             if not path.exists():
                 continue
             try:
                 cnf = protocol.load(path, patch = patchname)
-            except: # pylint: disable=bare-except
+            except Exception as exc: # pylint: disable=broad-except
+                LOGS.warning("Failed loading %s", path, exc_info = exc)
+                first = False
                 continue
+            (LOGS.debug if first else LOGS.info)("Loaded %s", path)
             break
 
         if cnf is None:
