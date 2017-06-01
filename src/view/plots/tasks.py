@@ -4,6 +4,7 @@
 from typing            import (Tuple, Optional, # pylint: disable =unused-import
                                Iterator, List, Union, Any, Callable, Dict,
                                TYPE_CHECKING)
+from functools         import wraps
 
 from signalfilter      import rawprecision
 from model.task        import RootTask, Task, taskorder, TASK_ORDER
@@ -123,14 +124,19 @@ class TaskPlotModelAccess(PlotModelAccess):
             for obs in prop.OBSERVERS:
                 keys.setdefault(obs, []).append(prop.key)
 
-        def _check(*_1, **_2):
-            return self.project.state.get() is PlotState.active
+        state = self.project.state
+        @wraps(fcn)
+        def _wrapped(*args, **kwargs):
+            if state.get() is PlotState.active:
+                fcn(*args, **kwargs)
+            elif state.get() is PlotState.disabled:
+                state.set(PlotState.outofdate)
 
         for key, items in keys.items():
             val = self
             for attr in key.split('.'):
                 val = getattr(val, attr)
-            val.observe(*items, fcn, argstest = _check) # pylint: disable=no-member
+            val.observe(*items, _wrapped) # pylint: disable=no-member
 
     class props: # pylint: disable=invalid-name
         "access to property builders"
