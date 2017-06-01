@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Selects peaks and yields all events related to each peak"
-from   typing       import Iterable, Iterator, Tuple, Optional, Union, Sequence
-from   copy         import copy
+from   typing       import Iterable, Iterator, Tuple, Union, Sequence
 from   collections  import namedtuple
 import numpy    as      np
 
-from utils      import (initdefaults, asobjarray, asdataarrays, asview,
-                        EVENTS_TYPE, EVENTS_DTYPE)
-from .alignment import PeakCorrelationAlignment
-from .histogram import (Histogram, PeakFinder, # pylint: disable=unused-import
-                        ZeroCrossingPeakFinder, GroupByPeakAndBase, GroupByPeak)
+from utils          import (initdefaults, asobjarray, asdataarrays, asview,
+                            updatecopy, EVENTS_TYPE, EVENTS_DTYPE)
+from signalfilter   import PrecisionAlg, PRECISION
+from .alignment     import PeakCorrelationAlignment
+from .histogram     import (Histogram, PeakFinder, # pylint: disable=unused-import
+                            ZeroCrossingPeakFinder, GroupByPeakAndBase, GroupByPeak)
 
 EventsOutput        = Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]]
 Input               = Union[Iterable[Iterable[np.ndarray]], Sequence[EVENTS_TYPE]]
@@ -33,7 +33,7 @@ class PeaksArray(np.ndarray):
         # pylint: disable=attribute-defined-outside-init
         self.discarded = getattr(obj, 'discarded', 0)
 
-class PeakSelector:
+class PeakSelector(PrecisionAlg):
     u"Selects peaks and yields all events related to each peak"
     histogram = Histogram(edge = 2)
     align     = PeakCorrelationAlignment()
@@ -41,7 +41,7 @@ class PeakSelector:
     group     = GroupByPeakAndBase()     # type: GroupByPeak
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
-        pass
+        super().__init__(**_)
 
     @staticmethod
     def __move(evts, deltas, discarded) -> PeaksArray:
@@ -111,15 +111,15 @@ class PeakSelector:
         vals = [_measure(i) for i in evts if i is not None]
         return zmeas(np.concatenate(vals))
 
-    def detailed(self, evts: Input, precision: Optional[float] = None) -> PeakSelectorDetails:
+    def detailed(self, evts: Input, precision: PRECISION = None) -> PeakSelectorDetails:
         "returns computation details"
         orig   = asobjarray(evts)
         orig   = asview(orig, PeaksArray,
                         discarded = sum(getattr(i, 'discarded', 0) for i in orig))
         events = asdataarrays(tuple(orig)) # create a copy before passing to function
 
-        projector = copy(self.histogram)
-        projector.precision = projector.getprecision(precision, events)
+        precision = self.getprecision(precision, events)
+        projector = updatecopy(self.histogram, True, precision = precision)
 
         pos = projector.eventpositions(events)
         if self.align is not None:
@@ -141,5 +141,5 @@ class PeakSelector:
                 evts = self.__move(good, dtl.corrections, dtl.events.discarded)
                 yield (self.__measure(peak, evts), evts)
 
-    def __call__(self, evts: Input, precision: Optional[float] = None) -> Iterator[Output]:
+    def __call__(self, evts: Input, precision: PRECISION = None) -> Iterator[Output]:
         yield from self.details2output(self.detailed(evts, precision))

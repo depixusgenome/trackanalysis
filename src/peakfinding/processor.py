@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Tasks related to peakfinding"
 from typing             import (Iterator, Tuple, # pylint: disable=unused-import
-                                Optional, Sequence, List, Set)
+                                Sequence, List, Set, Optional)
 
 from model.task         import Task, Level
 from control.processor  import Processor
@@ -83,7 +83,17 @@ class PeaksDict(TrackItems):
 
         self.__keys = None
 
-    def _keys(self, sel:Optional[Sequence] = None, _ = None) -> Iterator[BEADKEY]:
+    def compute(self, ibead, precision: float = None) -> Iterator[PeakOutput]:
+        "Computes values for one bead"
+        vals = iter(i for _, i in self.data[ibead,...])
+        yield from self.config(vals, self.__precision(ibead, precision))
+
+    def detailed(self, ibead, precision: float = None):
+        "detailed output from config"
+        return self.config.detailed(iter(i for _, i in self.data[ibead,...]),
+                                    self.__precision(ibead, precision))
+
+    def _keys(self, sel:Sequence = None, _ = None) -> Iterator[BEADKEY]:
         if self.__keys is None:
             self.__keys = frozenset(i for i, _ in self.data.keys() if Beads.isbead(i))
 
@@ -92,19 +102,11 @@ class PeaksDict(TrackItems):
         else:
             yield from (i for i in self.__keys if i in sel)
 
-    def __run(self, ibead) -> Iterator[PeakOutput]:
-        vals = iter(i for _, i in self.data[ibead,...])
-        prec = rawprecision(self.data.track, ibead)
-        yield from self.config(vals, prec)
+    def _iter(self, sel:Sequence = None) -> Iterator[Output]:
+        yield from ((bead, self.compute(bead)) for bead in self.keys(sel))
 
-    def _iter(self, sel:Optional[Sequence] = None) -> Iterator[Output]:
-        yield from ((bead, self.__run(bead)) for bead in self.keys(sel))
-
-    def detailed(self, ibead, precision = None):
-        "detailed output from config"
-        if precision is None:
-            precision = rawprecision(self.data.track, ibead)
-        return self.config.detailed(iter(i for _, i in self.data[ibead,...]), precision)
+    def __precision(self, ibead: int, precision: Optional[float]):
+        return self.config.getprecision(precision, self.data.track, ibead)
 
 class PeakSelectorProcessor(Processor):
     "Groups events per peak"
