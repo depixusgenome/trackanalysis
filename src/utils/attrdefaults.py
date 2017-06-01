@@ -238,10 +238,13 @@ def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
             def __init__(self, *args, **kwargs):
                 updater(self, kwargs, cpy = args)
                 fcn    (self, **kwargs)
+            __init__.IS_GET_STATE = True
+
         elif val.kind  == val.VAR_KEYWORD and not initafter:
             def __init__(self, *args, **kwargs):
                 fcn    (self, **kwargs)
                 updater(self, kwargs, cpy = args)
+            __init__.IS_GET_STATE = True
 
         elif initafter:
             def __init__(self, *args, **kwargs):
@@ -253,13 +256,14 @@ def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
             def __init__(self, *args, **kwargs):
                 fcn    (self, kwargs)
                 updater(self, kwargs, cpy = args)
+            __init__.IS_GET_STATE = True
 
         else:
             def __init__(self, *args, **kwargs):
                 fcn    (self, *args, **kwargs)
                 updater(self, kwargs)
 
-        __init__.KEYS = attrs
+        __init__.KEYS         = attrs
         return wraps(fcn)(__init__)
 
     return _wrapper if fcn is None else _wrapper(fcn)
@@ -280,7 +284,7 @@ def fieldnames(obj) -> FrozenSet[str]:
 def _update(cpy: Optional[Callable[[T], T]], obj:T, always:bool, **attrs) -> T:
     "Sets field to provided values"
     fields = fieldnames(obj) & frozenset(attrs)
-    if cpy and (always or len(fields)):
+    if cpy is not None and (always or len(fields)):
         obj = cpy(obj)
 
     if len(fields):

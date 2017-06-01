@@ -82,9 +82,12 @@ class Runner:
             if cls.check(item):
                 return cls.run(item, self)
 
-        assert TPE in item and '.' in item[TPE]
+        obj = self.__create_obj(item.pop(TPE))
+        return self.__init_obj(obj, item)
 
-        elems = item.pop(TPE).split('.')
+    @staticmethod
+    def __create_obj(item):
+        elems = item.split('.')
         for i in range(-1, -len(elems), -1):
             try:
                 cls = getattr(__import__('.'.join(elems[:i]), fromlist = elems[i]),
@@ -99,16 +102,19 @@ class Runner:
 
         if hasattr(cls, '__getnewargs_ex__'):
             i, j = cls.__getnewargs_ex__()
-            obj = cls.__new__(*i, **j)
+            return cls.__new__(*i, **j)
         elif hasattr(cls, '__getnewargs__'):
-            obj = cls.__new__(*cls.__getnewargs__())
+            return cls.__new__(*cls.__getnewargs__())
         else:
-            obj = cls.__new__(cls)
+            return cls.__new__(cls)
 
+    def __init_obj(self, obj, item):
         state = {name: self(val) for name, val in item.items()}
         state = state.get(STATE, state)
         if hasattr(obj, '__setstate__'):
             getattr(obj, '__setstate__')(state)
+        elif hasattr(obj, '__init__') and getattr(obj.__init__, 'IS_GET_STATE', False):
+            obj.__init__(**state)
         else:
             obj.__dict__.update(state)
         return obj
