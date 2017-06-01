@@ -3,6 +3,7 @@
 "Track Analysis conversion to json'able items."
 from    abc     import ABCMeta, abstractmethod
 from    enum    import Enum
+from    pathlib import Path
 from    pickle  import dumps as _dumps
 import  numpy   as     np
 
@@ -95,6 +96,17 @@ class _EnumIO(_ItemIO):
     def run(val, runner):
         "returns the dict to be dumped"
         return val.name
+
+class _PathIO(_ItemIO):
+    @staticmethod
+    def check(val):
+        "returns wether this class deals with val"
+        return isinstance(val, Path)
+
+    @staticmethod
+    def run(val, runner):
+        "returns the dict to be dumped"
+        return str(val)
 
 class Runner:
     "runs item to json'able object"
