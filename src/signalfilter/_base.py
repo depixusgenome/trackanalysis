@@ -29,6 +29,7 @@ PRECISION = Union[float, Tuple[DATATYPE, int], None]
 class PrecisionAlg:
     "Implements precision extraction from data"
     precision = None # type: float
+    rawfactor = 1.
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -52,7 +53,7 @@ class PrecisionAlg:
             return float(precision)
 
         if beadid is not None:
-            return cast(float, self.rawprecision(data, beadid))
+            return cast(float, self.rawprecision(data, beadid))*self.rawfactor
 
         if isinstance(data, (float, int)):
             return float(data)
@@ -70,9 +71,9 @@ class PrecisionAlg:
                         ret = np.median(tuple(nanhfsigma(chain(*i)) for i in data if len(i)))
                     else:
                         ret = np.median(tuple(nanhfsigma(i) for i in data if len(i)))
-                    return ret
+                    return ret*self.rawfactor
             else:
-                return nanhfsigma(data)
+                return nanhfsigma(data)*self.rawfactor
 
         raise AttributeError('Could not extract precision: no data or set value')
 

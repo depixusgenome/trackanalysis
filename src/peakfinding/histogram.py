@@ -45,7 +45,7 @@ class Histogram(PrecisionAlg):
     """
     edge         = 0
     oversampling = 5
-    zmeasure     = np.nanmean           # type: Optional[Callable]
+    zmeasure     = 'nanmean'            # type: Union[str, Callable, None]
     weight       = None                 # type: Optional[Callable]
     kernel       = KernelConvolution()  # type: Optional[KernelConvolution]
 
@@ -106,6 +106,8 @@ class Histogram(PrecisionAlg):
             fcn = None
         else:
             fcn = self.zmeasure if zmeasure is NoArgs else zmeasure
+            if isinstance(fcn, str):
+                fcn = getattr(np, fcn)
         return self.__eventpositions(events, bias, fcn)
 
     def kernelarray(self) -> np.ndarray:

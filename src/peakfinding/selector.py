@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Selects peaks and yields all events related to each peak"
-from   typing       import Iterable, Iterator, Tuple, Union, Sequence
-from   collections  import namedtuple
-import numpy    as      np
+from   typing               import (Iterable, Iterator, Tuple, Union, Sequence,
+                                    Callable, cast)
+from   collections          import namedtuple
+import numpy    as              np
 
-from utils          import (initdefaults, asobjarray, asdataarrays, asview,
-                            updatecopy, EVENTS_TYPE, EVENTS_DTYPE)
-from signalfilter   import PrecisionAlg, PRECISION
-from .alignment     import PeakCorrelationAlignment
-from .histogram     import (Histogram, PeakFinder, # pylint: disable=unused-import
-                            ZeroCrossingPeakFinder, GroupByPeakAndBase, GroupByPeak)
+from utils                  import (initdefaults, asobjarray, asdataarrays, asview,
+                                    updatecopy, EVENTS_TYPE, EVENTS_DTYPE)
+from signalfilter           import PrecisionAlg, PRECISION
+from .alignment             import PeakCorrelationAlignment
+from .histogram             import (Histogram, # pylint: disable=unused-import
+                                    ZeroCrossingPeakFinder, PeakFinder,
+                                    GroupByPeakAndBase, GroupByPeak)
 
 EventsOutput        = Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]]
 Input               = Union[Iterable[Iterable[np.ndarray]], Sequence[EVENTS_TYPE]]
@@ -35,11 +37,12 @@ class PeaksArray(np.ndarray):
 
 class PeakSelector(PrecisionAlg):
     u"Selects peaks and yields all events related to each peak"
+    rawfactor = 2.
     histogram = Histogram(edge = 2)
     align     = PeakCorrelationAlignment()
     find      = ZeroCrossingPeakFinder() # type: PeakFinder
     group     = GroupByPeakAndBase()     # type: GroupByPeak
-    @initdefaults(frozenset(locals()))
+    @initdefaults(frozenset(locals()) - {'rawfactor'})
     def __init__(self, **_):
         super().__init__(**_)
 
@@ -87,9 +90,12 @@ class PeakSelector(PrecisionAlg):
         return asobjarray(objs, PeaksArray, discarded = discarded)
 
     def __measure(self, peak, evts):
-        zmeas = self.histogram.zmeasure
-        if zmeas is None:
+        if self.histogram.zmeasure is None:
             return peak
+        elif isinstance(self.histogram.zmeasure, str):
+            zmeas = getattr(np, self.histogram.zmeasure)
+        else:
+            zmeas = cast(Callable, self.histogram.zmeasure)
 
         first = next((i for i in evts if i is not None), None)
         if first is None:
@@ -119,9 +125,10 @@ class PeakSelector(PrecisionAlg):
         events = asdataarrays(tuple(orig)) # create a copy before passing to function
 
         precision = self.getprecision(precision, events)
+
         projector = updatecopy(self.histogram, True, precision = precision)
 
-        pos = projector.eventpositions(events)
+        pos       = projector.eventpositions(events)
         if self.align is not None:
             delta  = self.align(pos, projector = projector)
             pos   += delta
