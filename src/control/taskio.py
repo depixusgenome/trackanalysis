@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Task IO module"
-from typing         import Union, Tuple
-from itertools      import chain
-from copy           import deepcopy
-from model.task     import TrackReaderTask
+from typing             import Union, Tuple
+from itertools          import chain
+from copy               import deepcopy
+from model.task         import TrackReaderTask
+from utils.logconfig    import getLogger
+LOGS = getLogger(__name__)
 
 class TaskIO:
     u"base class for opening files"
@@ -37,6 +39,7 @@ class TrackIO(TaskIO):
         "opens a track file"
         if len(model):
             raise NotImplementedError()
+        LOGS.info('path = %s', path)
         return [(TrackReaderTask(path = path),)]
 
 class ConfigTrackIO(TrackIO):
