@@ -9,7 +9,9 @@ from numpy.lib.stride_tricks     import as_strided
 
 from control.taskcontrol         import create
 from simulator                   import randpeaks
-from simulator.processor         import EventSimulatorTask
+from simulator.processor         import EventSimulatorTask, TrackSimulatorTask
+from simulator.track             import PoissonEvents
+from eventdetection.processor    import EventDetectionTask
 from peakfinding.selector        import PeakSelector, EVENTS_DTYPE
 from peakfinding.processor       import PeakSelectorTask
 from peakfinding.histogram       import (Histogram, CWTPeakFinder,
@@ -198,5 +200,23 @@ def test_reporting():
     tuple(itms)
     assert Path(out).exists()
 
+def test_precision():
+    "tests that peaks can be found with a given precision"
+    sim  = dict(durations = [15,  30,  15,  60,  60, 200,  15, 100],
+                drift     = None,
+                baseline  = None,
+                events    = PoissonEvents(rates = [.05, .05, .1, .1, .2, .2],
+                                          sizes = [20,   10, 20, 10, 20, 10],
+                                          peaks = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
+                seed      = 0,
+                nbeads    = 2,
+                ncycles   = 100)
+
+    pair  = create((TrackSimulatorTask(**sim), EventDetectionTask(), PeakSelectorTask()))
+    vals  = next(pair.run())
+
+    peaks = np.array([i for i, _ in vals[0]])
+    assert_allclose(peaks, [0., .1, .2, .3, .4, .5, .6], rtol = 1e-3, atol = 1e-3)
+
 if __name__ == '__main__':
-    test_reporting()
+    test_precision()

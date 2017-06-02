@@ -62,7 +62,7 @@ class Runner:
     @property
     def model(self) -> Iterator[Task]:
         "returns the model"
-        return iter(i.proc.task for i in self.data)
+        return iter(i.task for i in self.data)
 
     @staticmethod
     def regroup(grp) -> 'Callable':

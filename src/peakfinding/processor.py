@@ -3,13 +3,17 @@
 "Tasks related to peakfinding"
 from typing             import (Iterator, Tuple, # pylint: disable=unused-import
                                 Sequence, List, Set, Optional)
+from functools          import partial
 
-from model.task         import Task, Level
+from utils              import initdefaults
+from model              import Task, Level, PHASE
 from control.processor  import Processor
 from data.trackitems    import BEADKEY, TrackItems, Beads
 from signalfilter       import rawprecision
+from eventdetection     import EventDetectionConfig
 from .alignment         import PeakCorrelationAlignment
 from .selector          import PeakSelector, Output as PeakOutput
+from .probabilities     import Probability
 
 class PeakCorrelationAlignmentTask(PeakCorrelationAlignment, Task):
     "Aligns cycles using peaks"
@@ -119,3 +123,35 @@ class PeakSelectorProcessor(Processor):
 
     def run(self, args):
         args.apply(self.apply(**self.config()), levels = self.levels)
+
+class PeakProbabilityTask(Task):
+    "Computes probabilities for each peak"
+    level       = Level.peak
+    minduration = None # type: float
+    framerate   = None # type: float
+    @initdefaults(frozenset(locals()) - {'level'})
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
+class PeakProbabilityProcessor(Processor):
+    "Computes probabilities for each peak"
+    @staticmethod
+    def __action(frame, minduration, framerate, info):
+        rate = frame.track.framerate if framerate is None else framerate
+        prob = Probability(minduration = minduration, framerate = rate)
+        ends = frame.track.phaseduration(..., PHASE.measure)
+        return info[0], iter((i[0], prob(i[1], ends)) for i in info[1])
+
+    @classmethod
+    def apply(cls, toframe = None, model = None, minduration = None, framerate = None, **_):
+        "applies the task to a frame or returns a function that does so"
+        if minduration is None:
+            events      = next(i for i in tuple(model)[::-1]
+                               if isinstance(i, EventDetectionConfig))
+            minduration = events.events.select.minduration
+
+        fcn = lambda i: i.withaction(partial(cls.__action, i, minduration, framerate))
+        return fcn if toframe is None else fcn(toframe)
+
+    def run(self, args):
+        args.apply(self.apply(model = args.model, **self.config()))

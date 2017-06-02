@@ -143,6 +143,14 @@ class Probability:
         if self.nevents <= 0:
             return 0.
 
+        return (self.totalduration/self.nevents) * self.framerate
+
+    @property
+    def likelyduration(self) -> float:
+        "Average duration of an event computed with an MLE"
+        if self.nevents <= 0:
+            return 0.
+
         prob = 1.-self.probability
         if prob <= 0.:
             return 0.
