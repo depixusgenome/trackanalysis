@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Simulates track files"
+"Simulates track files"
 from    typing          import (Sequence, Union, # pylint: disable=unused-import
                                 Optional, NamedTuple, Iterable,
                                 Callable, Iterator, Any, Tuple)
@@ -9,14 +9,39 @@ from    itertools       import chain
 from    collections     import OrderedDict
 
 import  numpy as np
+from    numpy.lib.index_tricks  import as_strided
 
 from    utils           import initdefaults, kwargsdefaults, EVENTS_DTYPE
 from    model           import PHASE
 from    data            import Track
 from    data.trackitems import Cycles, Level, TrackItems
 
+class SingleStrandClosing:
+    "Closes the strand in phase 4"
+    strandsize  = .9
+    closing     = .5
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+    def __call__(self, durations: np.ndarray, cycles: np.ndarray) -> np.ndarray:
+        phase  = PHASE.measure-1
+        first  = sum(durations[:phase])
+        last   = first+durations[phase]
+        mid    = int(self.closing*(last-first))+first
+        rho    = (self.strandsize-cycles[:,first-1])/(mid-first+1)
+
+        cycles[:,first:mid]  = np.outer(rho, np.arange(1, mid-first+1))
+        cycles[:,first:mid] += as_strided(cycles[:,first-1].ravel(),
+                                          shape   = cycles[:,first:mid].shape,
+                                          strides = (cycles.strides[1], 0))
+        cycles[:,mid:last]   = np.outer(-rho, np.arange(last-mid, 0, -1))
+        cycles[:,mid:last]  += as_strided(cycles[:,last].ravel(),
+                                          shape   = cycles[:,mid:last].shape,
+                                          strides = (cycles.strides[1], 0))
+
 class LadderEvents:
-    u""" Creates events on a given range """
+    """ Creates events on a given range """
     randzargs    = (0., .1, .9)     # type: Optional[Tuple[float, float, float]]
     randtargs    = (10, 100)        # type: Optional[Tuple[int, int]]
     @initdefaults(frozenset(locals()))
@@ -24,18 +49,18 @@ class LadderEvents:
         pass
 
     def randz(self, pos):
-        u"Random z value for an event."
+        "Random z value for an event."
         floor, scale, maxz = self.randzargs
         if pos is None:
             pos = maxz
         return random.randint(int(floor/scale), int(pos/scale))*scale
 
     def randt(self, _):
-        u"random event duration"
+        "random event duration"
         return random.randint(*self.randtargs)
 
     def __call__(self, cycles: np.ndarray) -> np.ndarray:
-        u"add events to the cycles"
+        "add events to the cycles"
         if None in (self.randtargs, self.randzargs):
             return
 
@@ -48,7 +73,7 @@ class LadderEvents:
                 cyc        = cyc[len(cyc[:ind]):]
 
 class PoissonEvents:
-    u"""
+    """
     Creates events using provided positions, rates and durations.
 
     Fields are:
@@ -73,46 +98,57 @@ class PoissonEvents:
     def __init__(self, **_):
         pass
 
-    def __sizes(self, occ, cycsize):
-        peaks = np.asarray(self.peaks, dtype = 'f4')
-        sorts = np.argsort(peaks)[::-1]
-        peaks = peaks[sorts]
-        if not self.sizes:
-            dur = np.repeat(cycsize//(np.sum(occ, 1)+1), len(peaks))
-            dur = dur.reshape(occ.shape)
+    def __rates(self, sorts, cycsize):
+        if self.rates is None:
+            rates = 1.
+        elif np.isscalar(self.rates):
+            rates = self.rates
         else:
-            if isinstance(self.sizes, (float, int)):
-                dur = np.random.poisson(self.sizes, occ.shape)
-            else:
-                values = np.asarray(self.sizes)[sorts]
-                dur = np.array([np.random.poisson(val, len(peaks))
-                                for val in values], dtype = 'i4')
+            assert len(sorts) == len(self.rates)
+            rates = np.asarray(self.rates, dtype = 'f4')[sorts]
+
+        return np.random.rand(cycsize, len(sorts)) < rates  # type: ignore
+
+    def __sizes(self, sorts, occ, cycsize):
+        if not self.sizes:
+            dur = np.repeat(cycsize//(np.sum(occ, 1)+1), len(self.peaks))
+            dur = dur.reshape(occ.shape)
+        elif isinstance(self.sizes, (float, int)):
+            dur = np.random.poisson(self.sizes, occ.shape)
+        else:
+            values = np.asarray(self.sizes)[sorts]
+            dur    = np.random.poisson(values, occ.shape)
+
         dur[~occ] = 0
         np.cumsum(dur, 1, out = dur)
-        return peaks, dur
+        return dur
 
     def __call__(self, cycles: np.ndarray) -> np.ndarray:
-        u"add events to the cycles"
-        rates       = self.rates if self.rates else 1.
-        occs        = np.random.rand(len(cycles), len(self.peaks)) < rates  # type: ignore
-        peaks, durs = self.__sizes(occs, cycles.shape[1])
-        inds        = 1+np.apply_along_axis(np.searchsorted, 1, durs, cycles.shape[1])
+        "add events to the cycles"
+        sorts = np.argsort(np.asarray(self.peaks, dtype = 'f4'))[::-1]
+
+        peaks = np.asarray(self.peaks, dtype = 'f4')[sorts]
+        occs  = self.__rates(sorts,       cycles.shape[0])
+        durs  = self.__sizes(sorts, occs, cycles.shape[1])
+        inds  = 1+np.apply_along_axis(np.searchsorted, 1, durs, cycles.shape[1])
+
         for ind, cyc, dur, occ in zip(inds, cycles, durs, occs):
             occ = occ[:ind]
             for rng, peak in zip(np.split(cyc, dur[:ind][occ]), peaks[:ind][occ]):
                 rng[:] = peak
 
 class TrackSimulator:
-    u"Simulates bead data over a number of cycles"
+    "Simulates bead data over a number of cycles"
     ncycles      = 15
-    durations    = [ 1,  15,  1,  15,  1,  100,  1,  15]
-    zmax         = [ 0., 0.,  1., 1.,  0., 0., -.3, -.3]
-    events       = PoissonEvents()      # type: Callable[..., np.ndarray]
+    durations    = [ 1,  15,  1,  15,  1,  100,   1,  15]
+    zmax         = [ 0., 0.,  1., 1.,  0.,  0., -.3, -.3]
+    events       = PoissonEvents()
+    closing      = SingleStrandClosing()
     brownian     = [.003] * 9           # type: Union[None, float, Sequence[float]]
     baselineargs = (.1, 10.1, 'stairs') # type: Optional[Tuple[float, float, str]]
     driftargs    = (.1, 29.)            # type: Optional[Tuple[float, float]]
     __KEYS       = frozenset(locals())
-    @initdefaults(__KEYS, events = 'update')
+    @initdefaults(__KEYS, events = 'update', drift = 'driftargs', baseline = 'baselineargs')
     def __init__(self, **_):
         pass
 
@@ -121,7 +157,7 @@ class TrackSimulator:
         return self.__apply(np.ravel)
 
     def baseline(self, ncycles):
-        u"The shape of the baseline"
+        "The shape of the baseline"
         size = sum(self.durations)
         if self.baselineargs is None:
             return np.zeros((ncycles, size), dtype = 'f4')
@@ -146,7 +182,7 @@ class TrackSimulator:
         return base
 
     def drift(self, cycles = None):
-        u"drift shape"
+        "drift shape"
         if cycles is None:
             cycles = np.zeros((1, sum(self.durations)), dtype = 'f4')
 
@@ -168,31 +204,31 @@ class TrackSimulator:
 
     @property
     def phases(self):
-        u"returns an array of cycles start positions"
+        "returns an array of cycles start positions"
         ends = np.repeat([list(self.durations)], self.ncycles, axis = 0).cumsum()
         return np.insert(ends, 0, 0)[:-1].reshape((self.ncycles, len(self.durations)))
 
     @staticmethod
     def seed(seed):
-        u"sets the random seeds to a single value"
+        "sets the random seeds to a single value"
         if seed is not None:
             np.random.seed(seed)
             random.seed(seed)
 
     @kwargsdefaults(__KEYS)
     def track(self, nbeads = 1, seed = None):
-        u"creates a simulated track"
+        "creates a simulated track"
         self.seed(seed)
         return Track(data = {i: self() for i in range(nbeads)}, phases = self.phases)
 
     @kwargsdefaults(__KEYS)
     def beads(self, nbeads = 1, seed = None):
-        u"creates a simulated track"
+        "creates a simulated track"
         return self.track(nbeads, seed).beads
 
     @kwargsdefaults(__KEYS)
     def bybeadevents(self, nbeads, seed = None) -> Cycles: # pylint: disable=arguments-differ
-        u"Creates events in a Events object"
+        "Creates events in a Events object"
         self.seed(seed)
 
         track = Track(data = None, phases = self.phases)
@@ -212,7 +248,7 @@ class TrackSimulator:
 
     @kwargsdefaults(__KEYS)
     def bypeakevents(self, nbeads, seed = None):
-        u"Creates events grouped by peaks"
+        "Creates events grouped by peaks"
         self.seed(seed)
 
         track = Track(data = {i: None for i in range(nbeads)}, phases = self.phases)
@@ -252,11 +288,14 @@ class TrackSimulator:
             yield np.array(evts, dtype = dtpe)
 
     def __apply(self, fcn:Callable[...,Any], *args):
-        u"Creates events in a Events object"
+        "Creates events in a Events object"
         cycles = np.zeros((self.ncycles, sum(self.durations)), dtype = 'f4')
         self.__addtemplate(cycles)
         if self.events is not None:
             self.events(self.__cyclephase(cycles, PHASE.measure))
+
+        if self.closing is not None:
+            self.closing(self.durations, cycles)
 
         ret = fcn(cycles, *args)
 
@@ -272,7 +311,7 @@ class TrackSimulator:
         return cycles[:,first:first+self.durations[phase]]
 
     def __addtemplate(self, cycles):
-        u"basic shape of a cycle, without drift or events"
+        "basic shape of a cycle, without drift or events"
         rng  = [self.zmax[-1]]+list(self.zmax)
         ends = np.insert(np.cumsum(self.durations), 0, 0)
         for i in range(len(self.durations)):
@@ -282,7 +321,7 @@ class TrackSimulator:
 
     _NONE = type('__none__', tuple(), {})
     def __addbrownian(self, cycles, brownian = _NONE):
-        u"add brownian noise to the cycles"
+        "add brownian noise to the cycles"
         if brownian is self._NONE:
             brownian = self.brownian
 
@@ -300,3 +339,8 @@ class TrackSimulator:
 
         elif callable(brownian):
             cycles[:] += np.random.normal(0., brownian(cycles), cycles.shape)
+
+    def __set(self, attr, val):
+        if isinstance(val, dict):
+            val = type(getattr(type(self), attr))(**val)
+        setattr(self, attr, val)

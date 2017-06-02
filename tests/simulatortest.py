@@ -9,7 +9,7 @@ from    simulator       import (TrackSimulator, randpeaks, randbead, randevents,
 
 def test_track_simulator():
     u"testing raw data simulation"
-    bead  = TrackSimulator(ncycles = 1, baselineargs = None)
+    bead  = TrackSimulator(ncycles = 1, baseline = None)
     drift = bead.drift()
     data  = bead(seed = 0)
 
@@ -20,14 +20,15 @@ def test_track_simulator():
     assert data.shape ==  (149,)
     assert all(data == bead(seed = 0))
 
-    data = randbead(ncycles = 5, baselineargs = None)
+    data = randbead(ncycles = 5, baseline = None)
     assert data.shape == (149*5,)
     assert any(data[:149] != data[149:149*2])
 
-    sim    = TrackSimulator(ncycles      = 2,
-                            brownian     = None,
-                            events       = None,
-                            baselineargs = None)
+    sim    = TrackSimulator(ncycles  = 2,
+                            brownian = None,
+                            events   = None,
+                            closing  = None,
+                            baseline = None)
     data   = sim()
     cycles = slice(*sim.phases[0][[5,6]])
     drift  = sim.drift()[cycles]
@@ -35,11 +36,11 @@ def test_track_simulator():
     assert all(data[:149] == data[149:149*2])
     assert_allclose(data[cycles], drift)
 
-    bline  = TrackSimulator(baselineargs = (1., 5, False)).baseline(10)
+    bline  = TrackSimulator(baseline = (1., 5, 'cos')).baseline(10)
     assert bline.shape == (10, 149)
     assert_allclose(bline.ravel(), np.cos(np.arange(1490)*.4*np.pi/149.))
 
-    bline  = TrackSimulator(baselineargs = (1., 5, True)).baseline(2)
+    bline  = TrackSimulator(baseline = (1., 5, 'stairs')).baseline(2)
     assert bline.shape == (2, 149)
     assert_allclose(bline[0], [1.]*149)
     assert_allclose(bline[1], [np.cos(.4*np.pi)]*149)
@@ -65,13 +66,13 @@ def test_events_simulator():
 
 def test_bypeaksevents_simulator():
     u"testing event simulation"
-    ares = randbypeakevents(1, seed      = 0,
-                            ncycles      = 100,
-                            peaks        = np.array([.1, .2, .5]),
-                            rates        = .5,
-                            brownian     = None,
-                            driftargs    = None,
-                            baselineargs = None)
+    ares = randbypeakevents(1, seed  = 0,
+                            ncycles  = 100,
+                            peaks    = np.array([.1, .2, .5]),
+                            rates    = .5,
+                            brownian = None,
+                            drift    = None,
+                            baseline = None)
     res  = tuple(ares)
     assert len(res) == 1
     assert res[0][0] == 0
@@ -84,4 +85,4 @@ def test_bypeaksevents_simulator():
             assert np.abs(k-i).sum() < 1e-3
 
 if __name__ == '__main__':
-    test_bypeaksevents_simulator()
+    test_track_simulator()
