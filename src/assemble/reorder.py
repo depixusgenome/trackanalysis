@@ -116,7 +116,7 @@ class DownTopSearcher:
         supergroups = self.find_supergroups()
         print("len(supergroups)=",len(supergroups))
         groupings=[]
-        for sgrp in supergroups: # test on first index
+        for sgrp in supergroups:
             print("supergroup=",sgrp.changes)
             groupings.append(self.merge_subgroups(sgrp))
 
@@ -193,10 +193,17 @@ class KPermCombiner:
 
         # reversed sort groups per size
         groups = sorted(groups,key=lambda x:-len(x))
-
         # scored, List[List[ScoredPerm]]
         scored=[[self.scoring(prm) for prm in grp] for grp in groups]
         pickle.dump(scored,open("scored.pickle","wb"))
+        testing='11,14,10,12,13' # for test
+        for scp1 in scored: # for test
+            for scperm in scp1: # for test
+                print("testing=",testing) # for test
+                print("against =",",".join(str(ids) for ids in scperm.perm.permids)) # for test
+                if testing in ",".join(str(ids) for ids in scperm.perm.permids): # for test
+                    print("testing in filtered") # for test
+
         scfilter = scores.ScoreFilter(ooverl=self.ooverl)
         print("before filtering",[len(grp) for grp in scored])
         filtered = [scfilter(grp) for grp in scored]
@@ -212,17 +219,26 @@ class KPermCombiner:
                      if not all([len(scprm.perm.changes)==0 for scprm in scp])]
         filtered = [scores.ScoredPermCollection(scperms=grp) for grp in filtered]
         pickle.dump(filtered,open("filtered.pickle","wb"))
-
+        testing='11,14,10,12,13' # for test
+        print("testing in filtered") # for test
+        for scp in filtered: # for test
+            for scperm in scp.scperms:
+                print("filtered against=",",".join(str(ids) for ids in scperm.perm.permids)) # test
+                print(",".join(str(ids) for ids in scperm.perm.permids)+"with domain",scperm.\
+                      perm.domain)
+                #if any(testing in ",".join(str(ids) for ids in scperm.perm.permids) # for test
+                #   for scperm in scp.scperms): # for test
+        # up to here we have 35 elmt in filtered having the desired permutationsx
         # FROM THIS POINT USE LightScPermCollection instead
         divisions=self.subdivide_then_partition(filtered)
+        pickle.dump(divisions,open("test_divisions_backup.pickle","wb"))
         #stop
         # for each dubdivision
         # merge each division separately
         # then merge the results together
         merged_divi=[]
-        for idx,divi in enumerate(divisions):
+        for divi in divisions:
             merged_divi.append(self.merge_division(divi))
-            pickle.dump(merged_divi[-1],open("merged_divisions_backup"+str(idx)+".pickle","wb"))
 
 
         # continue from here

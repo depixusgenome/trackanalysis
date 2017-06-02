@@ -126,6 +126,7 @@ class BCollection:
     def group_overlapping_batches(self,nscale)->List[List[OligoPeak]]:
         u'same as group_overlapping_oligos except that only oligos in batches are considered'
         olis=[] # type: List[OligoPeak]
+        print("nscale=",nscale)
         for bat in self.batches:
             olis+=bat.oligos
         groups = utils.group_overlapping_normdists([oli.dist for oli in olis],
