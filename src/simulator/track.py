@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 "Simulates track files"
 from    typing          import (Sequence, Union, # pylint: disable=unused-import
-                                Optional, NamedTuple, Iterable,
-                                Callable, Iterator, Any, Tuple)
+                                Optional, NamedTuple, Iterable, List,
+                                Callable, Iterator, Any, Tuple, Dict)
 import  random
 from    itertools       import chain
 from    collections     import OrderedDict
@@ -91,12 +91,13 @@ class PoissonEvents:
     **Note:** the peak at zero is implicit. It occurs unless stochastic events
     last too long.
     """
-    peaks = [.1, .3, .5, .9, 1.5]   # type: Sequence[float]
-    rates = 1.                      # type: Union[None,float,Sequence[float]]
-    sizes = None                    # type: Union[None,float,Sequence[float]]
+    peaks  = [.1, .3, .5, .9, 1.5]   # type: Sequence[float]
+    rates  = 1.                      # type: Union[None,float,Sequence[float]]
+    sizes  = None                    # type: Union[None,float,Sequence[float]]
+    store  = []                      # type: List[str]
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
-        pass
+        self.__store = {} # type: Dict[str,np.ndarray]
 
     def __rates(self, sorts, cycsize):
         if self.rates is None:
@@ -107,7 +108,12 @@ class PoissonEvents:
             assert len(sorts) == len(self.rates)
             rates = np.asarray(self.rates, dtype = 'f4')[sorts]
 
-        return np.random.rand(cycsize, len(sorts)) < rates  # type: ignore
+        rands = np.random.rand(cycsize, len(sorts)) < rates  # type: ignore
+        if 'rates' in self.store:
+            self.__store['rates'] = rands
+        if 'ratestats' in self.store:
+            self.__store['ratestats'] = np.sum(rands, axis = 0)
+        return rands
 
     def __sizes(self, sorts, occ, cycsize):
         if not self.sizes:
@@ -120,8 +126,17 @@ class PoissonEvents:
             dur    = np.random.poisson(values, occ.shape)
 
         dur[~occ] = 0
+        if 'size' in self.store:
+            self.__store['sizes']     = np.copy(dur)
+        if 'sizestats' in self.store:
+            self.__store['sizestats'] = np.array([np.mean(i[i>0]) for i in dur.T], dtype = 'f4')
+
         np.cumsum(dur, 1, out = dur)
+        if 'cumsizes' in self.store:
+            self.__store['cumsizes']  = dur
         return dur
+
+    stored = property(lambda self: self.__store)
 
     def __call__(self, cycles: np.ndarray) -> np.ndarray:
         "add events to the cycles"
@@ -137,6 +152,9 @@ class PoissonEvents:
             for rng, peak in zip(np.split(cyc, dur[:ind][occ]), peaks[:ind][occ]):
                 rng[:] = peak
 
+        sorts = np.argsort(sorts)
+        self.__store = {i: j[sorts] for i, j in self.__store.items()}
+
 class TrackSimulator:
     "Simulates bead data over a number of cycles"
     ncycles      = 15
@@ -148,7 +166,10 @@ class TrackSimulator:
     baselineargs = (.1, 10.1, 'stairs') # type: Optional[Tuple[float, float, str]]
     driftargs    = (.1, 29.)            # type: Optional[Tuple[float, float]]
     __KEYS       = frozenset(locals())
-    @initdefaults(__KEYS, events = 'update', drift = 'driftargs', baseline = 'baselineargs')
+    @initdefaults(__KEYS,
+                  events   = 'update',
+                  drift    = lambda self, val: setattr(self, 'driftargs', val),
+                  baseline = lambda self, val: setattr(self, 'baselineargs', val))
     def __init__(self, **_):
         pass
 
@@ -219,7 +240,9 @@ class TrackSimulator:
     def track(self, nbeads = 1, seed = None):
         "creates a simulated track"
         self.seed(seed)
-        return Track(data = {i: self() for i in range(nbeads)}, phases = self.phases)
+        track = Track(data = {i: self() for i in range(nbeads)}, phases = self.phases)
+        setattr(track, 'simulator', self.events.store)
+        return track
 
     @kwargsdefaults(__KEYS)
     def beads(self, nbeads = 1, seed = None):
