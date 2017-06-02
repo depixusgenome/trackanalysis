@@ -212,8 +212,10 @@ class KPermCombiner:
                      if not all([len(scprm.perm.changes)==0 for scprm in scp])]
         filtered = [scores.ScoredPermCollection(scperms=grp) for grp in filtered]
         pickle.dump(filtered,open("filtered.pickle","wb"))
+
+        # FROM THIS POINT USE LightScPermCollection instead
         divisions=self.subdivide_then_partition(filtered)
-        stop
+        #stop
         # for each dubdivision
         # merge each division separately
         # then merge the results together
@@ -243,7 +245,7 @@ class KPermCombiner:
         reduces the permcollection of each element in division to 1 scores.ScoredPermCollection
         before moving to the next one
         application of ScoreFilter made useless by construction of ScoredPermCollection (good)
-        plus ScoreFilter should be applied to same permutation 
+        plus ScoreFilter should be applied to same permutation
         within a collection (i.e. same domain)
         '''
         for idx,div in enumerate(division):

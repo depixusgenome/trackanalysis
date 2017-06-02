@@ -201,11 +201,11 @@ class ScoreAssembly:
         '''
         return OptiKPerm(kperm=getattr(self.perm,attr)).cost()
 
-    def noverlaps(self)->int: # to check
+    def noverlaps(self,attr="kperm")->int: # to check
         u'''
         returns the number of consecutive overlaps between oligos in kpermids
         '''
-        kperm=self.perm.kperm
+        kperm=getattr(self.perm,attr)
         return len([idx for idx,val in enumerate(kperm[1:])
                     if len(data.Oligo.tail_overlap(kperm[idx].seq,
                                                    val.seq))==self.ooverl])
@@ -218,6 +218,23 @@ class ScoreAssembly:
             raise AttributeError("ScoreAssembly needs kperm attribute")
         self.perm=kperm
         return self.run()
+
+
+class LightScPermCollection:
+    u'''
+    lighter version of ScoredPermCollection
+    used to merged large collections together
+    oligo seqs and perms information is lost but can be recovered
+    '''
+    def __init__(self,**kwa):
+        u'init'
+        self.pdfcosts=kwa.get("pdfcosts",np.matrix([],float))
+        self.noverlaps=kwa.get("noverlaps",np.matrix([],int))
+
+    @classmethod
+    def __product2(cls,first,second):
+        u'return a '
+        pass
 
 class ScoredPermCollection:
     u'''
@@ -289,10 +306,8 @@ class ScoredPermCollection:
 class ScoreFilter:
     u'''
     filter out ScoredPerm which cannot lead to the 'best' score.
-    Care must be taken when filtering kperms.
-    At the moment we are considering kperms independently of the neighboring oligos
-    the solution (IMPLEMENTED) would be to consider groups of kperms
-    which have same outlying oligos
+    works only on OligoKPerms
+    by construction of OligoPerms from OligoKPerms ScoreFilter is useless
     '''
     scoreperms = [] # type: List[ScoredPerm]
     __pdfthreshold = 0.0 # type: float

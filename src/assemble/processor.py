@@ -6,7 +6,7 @@ regroups functions and classes to complement assembler
 '''
 import itertools
 from typing import List, Tuple, Dict, Set, Callable, Any # pylint: disable=unused-import
-#import pickle
+import pickle
 import numpy
 from utils.logconfig import getLogger
 from utils import initdefaults
@@ -40,6 +40,15 @@ class ComputeOPerms:
         return all((getattr(perm[oid],self.__sort_by)<getattr(oli,self.__sort_by))|\
                    (perm[oid].seq[-self.ooverl:]==oli.seq[:self.ooverl])
                    for oid,oli in enumerate(perm[1:]))
+
+    # to check
+    def __isolibatpermok(self,obperm):
+        u'''
+        returns True if obperm does not permute oligos except if they overlap
+        '''
+        return all((getattr(obperm[obid].oli,self.__sort_by)<getattr(obat.oli,self.__sort_by))|\
+                   (obperm[obid].oli.seq[-self.ooverl:]==obat.oli.seq[:self.ooverl])
+                   for obid,obat in enumerate(obperm[1:]))
 
     def rm_notokperm(self,perms:List[data.OligoPeak]):
         u'''discard permutations if exchanging the position of peaks
@@ -82,6 +91,27 @@ class ComputeOPerms:
 
         return list(clusters)
 
+    # to check
+    def wrongswapsbetweengroups2(self,
+                            olibats:List[data.OliBat],
+                            lengths): #->List[Tuple[data.OliBat, ...]]:
+        u'''
+        considers swaps of OliBat objects instead of indices
+        '''
+        # each oligo correspond to a different batch. permute freely
+        if len(olibats)==len(lengths):
+            swaps=[i for i in itertools.permutations(olibats)]
+        else:
+            swaps=[] # List[Tuple]
+            for swap in itertools.combinations(olibats,lengths[0]):
+                if self.__isolibatpermok(swap):
+                    swaps+=[swap+i
+                            for i in self.swapsbetweengroups2(list(set(olibats)-set(swap)),
+                                                              lengths[1:])
+                            if self.__isolibatpermok(i)]
+
+        return swaps
+
     def compute(self)->List[List[data.OligoPeak]]:
         u'''
         returns a list of k-permutations of oligos
@@ -111,11 +141,10 @@ class ComputeOPerms:
                         break
             infogrp.append(info)
 
+        # infogrp is a List[List[OliBat]]
         LOGS.debug("before clustering, %i",len(infogrp))
         # generates duplicates
         self.__groups = self.__group_matching(infogrp)
-        #with open("selfgroups.pickle","wb") as testfile:
-        #    pickle.dump(self.__groups,testfile)
 
         LOGS.debug("after clustering, %i",len(self.__groups))
 
@@ -129,10 +158,32 @@ class ComputeOPerms:
         # we can define maps to apply on previous xstate values
         # if an oligo does not belong to the group its position remains unchanged
 
-        operms=list(map(operms_between_batches, self.__groups))
-        return [self.rm_notokperm(perms) for perms in operms]
-    # we can parallelise computation of score over each group
-    # then reassemble the sequence having the best score with no overlapping groups
+        # self.__groups is List[List[data.OliBat]]
+        # now I need to find permutation between batches and keep the permutation
+        # if the permutation is ok.
+        # call self.swapsbetweengroups2
+
+        pickle.dump(self.__groups,open("groups","wb"))
+        operms=list(map(operms_between_batches, self.__groups)) # before
+        return [self.rm_notokperm(perms) for perms in operms] # before
+
+    # to test
+    def wrongoperms_between_batches2(self,grp):
+        # remove swaps which do not satisfy min_overl rule
+        u'''
+        find sequentially the possible arrangements of oligos such that:
+        * at least min_overl overlapping bases between consecutive oligos
+        * no arrangements between batches
+        assumes that oligo indices within the batch are ordered
+        '''
+        bids = sorted(set(i.batid for i in grp))
+        lengths = []
+        for bid in bids:
+            lengths.append(len([elm for elm in grp if elm.batid==bid]))
+
+        bybat = sorted(grp,key=lambda x: (x.batid,x.idinbat))
+        return self.swapsbetweengroups2(bybat,
+                                        lengths=lengths)
 
 
 #def operms_between_batches(grp:List[data.OliBat])->Iterator[data.OligoPeak]:
@@ -155,8 +206,10 @@ def operms_between_batches(grp):
         return (arg.batid,arg.idinbat)
     bybat = sorted(grp,key=func)
     olibybat = numpy.array([i.oli for i in bybat])
+    print("about to call swaps2combs")
     combs = swaps2combs(swapsbetweengroups(set(range(len(grp))),
                                            lengths=lengths))
+    print("finished swaps2combs")
     return list(map(olibybat.__getitem__,combs))
 
 def _update_seed(ooverl,seed,grp):
@@ -178,6 +231,7 @@ def __tocombs(swap):
 def swaps2combs(swaps):
     u'reorder swaps to use as oligo[comb]'
     return list(map(__tocombs,swaps))
+
 
 def swapsbetweengroups(indices:Set[int],lengths):
     # PB, creates duplicates
