@@ -7,3 +7,6 @@ from .noisereduction    import (RollingFilter, NonLinearFilter,
                                 ForwardBackwardFilter, Filter)
 
 rawprecision = PrecisionAlg.rawprecision # pylint: disable=invalid-name
+
+__all__ = ['RollingFilter', 'NonLinearFilter', 'ForwardBackwardFilter',
+           'hfsigma', 'nanhfsigma', 'rawprecision']
