@@ -165,6 +165,7 @@ class TrackSimulator:
     brownian     = [.003] * 9           # type: Union[None, float, Sequence[float]]
     baselineargs = (.1, 10.1, 'stairs') # type: Optional[Tuple[float, float, str]]
     driftargs    = (.1, 29.)            # type: Optional[Tuple[float, float]]
+    framerate    = 30.
     __KEYS       = frozenset(locals())
     @initdefaults(__KEYS,
                   events    = 'update',
@@ -241,7 +242,7 @@ class TrackSimulator:
     def track(self, nbeads = 1, seed = None):
         "creates a simulated track"
         self.seed(seed)
-        track = Track(data = {}, phases = self.phases)
+        track = Track(data = {}, phases = self.phases, framerate = self.framerate)
         sim   = {}
         for i in range(nbeads):
             track.data[i] = self()
