@@ -7,6 +7,7 @@ from copy             import deepcopy
 from functools        import wraps
 import numpy          as     np
 
+from model            import PHASE
 from data.trackitems  import Items, Cycles, Level, CYCLEKEY
 from utils            import EVENTS_TYPE, EVENTS_DTYPE, asview
 from .                import EventDetectionConfig
@@ -38,6 +39,8 @@ class Events(Cycles, EventDetectionConfig, Items):
 
     """
     level = Level.event
+    first = PHASE.measure
+    last  = PHASE.measure
     def __init__(self, **kw) -> None:
         super().__init__(**kw)
         EventDetectionConfig.__init__(self, **kw)

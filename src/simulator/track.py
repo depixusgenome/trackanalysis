@@ -109,10 +109,11 @@ class PoissonEvents:
             rates = np.asarray(self.rates, dtype = 'f4')[sorts]
 
         rands = np.random.rand(cycsize, len(sorts)) < rates  # type: ignore
+        asort = np.argsort(sorts)
         if 'rates' in self.store:
-            self.__store['rates'] = rands
+            self.__store['rates'] = rands[:,asort]
         if 'ratestats' in self.store:
-            self.__store['ratestats'] = np.sum(rands, axis = 0)
+            self.__store['ratestats'] = np.sum(rands, axis = 0)[asort]
         return rands
 
     def __sizes(self, sorts, occ, cycsize):
@@ -126,14 +127,16 @@ class PoissonEvents:
             dur    = np.random.poisson(values, occ.shape)
 
         dur[~occ] = 0
-        if 'size' in self.store:
-            self.__store['sizes']     = np.copy(dur)
+        asort     = np.argsort(sorts)
+        if 'sizes' in self.store:
+            self.__store['sizes']     = dur[:,asort]
         if 'sizestats' in self.store:
-            self.__store['sizestats'] = np.array([np.mean(i[i>0]) for i in dur.T], dtype = 'f4')
+            tmp = np.array([np.mean(i[i>0]) for i in dur.T], dtype = 'f4')
+            self.__store['sizestats'] = tmp[asort]
 
         np.cumsum(dur, 1, out = dur)
         if 'cumsizes' in self.store:
-            self.__store['cumsizes']  = dur
+            self.__store['cumsizes']  = dur[:,asort]
         return dur
 
     stored = property(lambda self: self.__store)
@@ -152,9 +155,6 @@ class PoissonEvents:
             for rng, peak in zip(np.split(cyc, dur[:ind][occ]), peaks[:ind][occ]):
                 rng[:] = peak
 
-        sorts = np.argsort(sorts)
-        self.__store = {i: j[sorts] for i, j in self.__store.items()}
-
 class TrackSimulator:
     "Simulates bead data over a number of cycles"
     ncycles      = 15
@@ -167,9 +167,10 @@ class TrackSimulator:
     driftargs    = (.1, 29.)            # type: Optional[Tuple[float, float]]
     __KEYS       = frozenset(locals())
     @initdefaults(__KEYS,
-                  events   = 'update',
-                  drift    = lambda self, val: setattr(self, 'driftargs', val),
-                  baseline = lambda self, val: setattr(self, 'baselineargs', val))
+                  events    = 'update',
+                  drift     = lambda self, val: setattr(self, 'driftargs',    val),
+                  baseline  = lambda self, val: setattr(self, 'baselineargs', val),
+                  poisson   = lambda self, val: setattr(self, 'events', PoissonEvents(**val)))
     def __init__(self, **_):
         pass
 
@@ -240,8 +241,14 @@ class TrackSimulator:
     def track(self, nbeads = 1, seed = None):
         "creates a simulated track"
         self.seed(seed)
-        track = Track(data = {i: self() for i in range(nbeads)}, phases = self.phases)
-        setattr(track, 'simulator', self.events.store)
+        track = Track(data = {}, phases = self.phases)
+        sim   = {}
+        for i in range(nbeads):
+            track.data[i] = self()
+            if len(self.events.stored):
+                sim[i] = dict(self.events.stored)
+        if len(sim):
+            setattr(track, 'simulator', sim)
         return track
 
     @kwargsdefaults(__KEYS)

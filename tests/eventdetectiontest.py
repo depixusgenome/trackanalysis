@@ -10,8 +10,9 @@ from eventdetection.detection import (DerivateSplitDetector, EventMerger, EventS
 from eventdetection.alignment import (ExtremumAlignment, CorrelationAlignment,
                                       PhaseEdgeAlignment)
 from eventdetection.processor import ExtremumAlignmentProcessor
-from signalfilter             import samples
+from eventdetection.data      import Events
 from simulator                import randtrack
+from signalfilter             import samples
 
 def test_detectsplits():
     u"Tests flat stretches detection"
@@ -214,5 +215,24 @@ def test_correlationalignment():
     biases = corr(data, 5, 2, 1, 3, 2.)
     assert_allclose(biases, [1., 0., -1.], rtol = 1e-4, atol = 1e-4)
 
+def test_precision():
+    "tests that peaks can be found with a given precision"
+    track  = randtrack(durations = [15,  30,  15,  60,  60, 200,  15, 100],
+                       drift    = None,
+                       baseline = None,
+                       poisson  = dict(rates = [.05, .05, .1, .1, .2, .2],
+                                       sizes = [20,   10, 20, 10, 20, 10],
+                                       peaks = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+                                       store = ['sizes']),
+                       seed     = 0,
+                       nbeads   = 1,
+                       ncycles  = 100)
+
+    data  = track.beadsonly.new(Events)
+    found = np.array([len(i) for _, i in data[0,...]], dtype = 'i4')
+    sizes = getattr(track, 'simulator')[0]['sizes']
+    sim   = np.sum(sizes >= data.events.select.minduration, 1)
+    assert list(np.nonzero(found-sim-1)[0]) == []
+
 if __name__ == '__main__':
-    test_best_phase5_alignment()
+    test_precision()
