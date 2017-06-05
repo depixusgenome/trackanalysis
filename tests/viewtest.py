@@ -44,11 +44,20 @@ def test_beadtoolbar(bokehaction):
         server.load('big_legacy')
         assert frozenset(beads._BeadInput__beads) == frozenset(range(39))
 
+        server.change('Beads:Rejected', 'value', '0,1,3')
+        assert frozenset(beads._BeadInput__beads) == (frozenset(range(39))-{0,1,3})
+
+        server.change('Beads:Rejected', 'value', '')
+        assert frozenset(beads._BeadInput__beads) == frozenset(range(39))
+
         server.load('CTGT_selection/Z(t)bd1track10.gr')
         assert frozenset(beads._BeadInput__beads) == frozenset((1,))
 
         server.load('CTGT_selection/Z(t)bd0track10.gr')
         assert frozenset(beads._BeadInput__beads) == frozenset((0, 1))
+
+        server.change('Beads:Rejected', 'value', '0')
+        assert frozenset(beads._BeadInput__beads) == frozenset((1,))
 
 def test_beadplot(bokehaction):
     "test plot"
@@ -77,11 +86,10 @@ def test_beadplot(bokehaction):
         _press('Alt-ArrowUp',      831.8504, 931.34982,  0.46629, 0.69815)
         _press('Alt-ArrowRight',   851.7503, 951.2497,   0.46629, 0.69815)
         _press('Alt-ArrowDown',    851.7503, 951.2497,   0.41992, 0.65178)
-        print('****')
         _press('Shift-ArrowLeft',  0.,       0.,         0.41992, 0.65178)
         _press('Shift-ArrowDown',  0.,       0.,         0.,      0.)
         _press('Shift-ArrowUp',    0.,       0.,         0.41992, 0.65178)
         server.press('Ctrl-z')
 
 if __name__ == '__main__':
-    test_beadplot(bokehaction(None))
+    test_beadtoolbar(bokehaction(None))

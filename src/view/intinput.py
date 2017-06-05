@@ -168,7 +168,8 @@ class  RejectedBeadsInput(BeadView):
     def getroots(self, doc):
         "Adds keypress for changin beads"
         css = self._ctrl.getGlobal("css")
-        self._inp = DpxTextInput(**css.rejectedbeads.getitems('title', 'width', 'height'))
+        self._inp = DpxTextInput(**css.rejectedbeads.getitems('title', 'width', 'height'),
+                                 name  = "Beads:Rejected")
         self._inp.on_change('value', self.__ondiscarded_cb)
         self._ctrl.observe("updatetask", "addtask", self.__onupdatetask)
         self._ctrl.observe("removetask",            self.__onremovetask)
