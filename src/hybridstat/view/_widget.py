@@ -144,7 +144,11 @@ class PeaksStatsWidget(WidgetCreator):
                 self.values[3] = np.mean(mdl.peaks['sigma'])
             self.values[4] = max(0, len(mdl.peaks['z']) - 1)
             self.values[5] = np.mean(mdl.peaks['count'][1:])/100.
-            self.values[6] = np.mean(mdl.peaks['duration'][0])
+
+            if len(mdl.peaks['duration']):
+                self.values[6] = np.mean(mdl.peaks['duration'][0])
+            else:
+                self.values[6] = np.NaN
 
         def sequencedependant(self, mdl, dist, key):
             "all sequence dependant stats"
