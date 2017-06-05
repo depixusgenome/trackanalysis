@@ -25,7 +25,9 @@ def getLogger(arg = None):
 
 def logToFile(path):
     "adds a log to file"
-    assert not any(hdl.get_name() == 'file' for hdl in getLogger().handlers)
+    if any(hdl.get_name() == 'file' for hdl in getLogger().handlers):
+        return
+
     if path is None:
         return
 
