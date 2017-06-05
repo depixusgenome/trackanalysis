@@ -117,5 +117,11 @@ def test_cyclesplot2(bokehaction):
         assert rng.end   < vals[1]
         assert rng.end   < 350
 
+        server.change('Beads:Rejected', 'value', '0')
+        server.wait()
+        server.change('Cycles:Drift', 'value', [0])
+        server.wait()
+        server.wait()
+
 if __name__ == '__main__':
     test_cyclesplot2(bokehaction(None))
