@@ -167,14 +167,6 @@ class TaggingTask(Task):
         "Removes tags not in the parent"
         self.selection &= set(self.tags)
 
-class DiscardedBeadsTask(Task):
-    "Class for removing beads ..."
-    level = Level.bead
-    beads = [] # type: List[int]
-    @initdefaults('beads')
-    def __init__(self, **_) -> None:
-        super().__init__()
-
 class CycleCreatorTask(Task):
     "Task for dividing a bead's data into cycles"
     levelin = Level.bead

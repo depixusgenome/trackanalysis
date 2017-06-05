@@ -8,7 +8,7 @@ import numpy as np
 from bokeh.models.widgets.inputs  import (InputWidget, Callback, String,
                                           Float, Int, Instance)
 
-from model.task import DiscardedBeadsTask
+from model.task import DataSelectionTask
 from .base import BokehView
 
 class DpxIntInput(InputWidget):
@@ -77,7 +77,7 @@ class BeadView(BokehView):
         return self._ctrl.getGlobal("project").bead.set(val)
 
     def _isdiscardedbeads(self, parent, task):
-        return isinstance(task, DiscardedBeadsTask) and parent is self._root
+        return isinstance(task, DataSelectionTask) and parent is self._root
 
 class BeadInput(BeadView):
     "Spinner for controlling the current bead"
@@ -117,8 +117,8 @@ class BeadInput(BeadView):
         if track is None:
             return []
 
-        task  = self._ctrl.task(root, DiscardedBeadsTask)
-        beads = set(track.beadsonly.keys()) - set(getattr(task, 'beads', []))
+        task  = self._ctrl.task(root, DataSelectionTask)
+        beads = set(track.beadsonly.keys()) - set(getattr(task, 'discarded', []))
 
         self.__beads = np.sort(tuple(beads)) if len(beads) else np.empty((0,), dtype = 'i4')
 
@@ -183,14 +183,17 @@ class  RejectedBeadsInput(BeadView):
             except ValueError:
                 continue
 
-        root = self._root
-        task = self._ctrl.task(root, DiscardedBeadsTask)
-        if vals == set(getattr(task, 'beads', [])):
+        root  = self._root
+        task  = self._ctrl.task(root, DataSelectionTask)
+        beads = getattr(task, 'discarded', None)
+        if beads is None:
+            beads = []
+        if vals == set(beads):
             return
 
         with self.action:
             if task is None:
-                self._ctrl.addTask(root, DiscardedBeadsTask(beads = list(vals)), index = 1)
+                self._ctrl.addTask(root, DataSelectionTask(discarded = list(vals)), index = 1)
             elif len(vals) == 0:
                 self._ctrl.removeTask(root, task)
             else:
@@ -198,7 +201,7 @@ class  RejectedBeadsInput(BeadView):
 
     def __onupdatetask(self, parent = None, task = None, **_):
         if self._isdiscardedbeads(parent, task):
-            self._inp.value = ', '.join(str(i) for i in sorted(task.beads))
+            self._inp.value = ', '.join(str(i) for i in sorted(task.discarded))
 
     def __onremovetask(self, parent = None, task = None, **_):
         if self._isdiscardedbeads(parent, task):
@@ -206,5 +209,6 @@ class  RejectedBeadsInput(BeadView):
 
     def __onproject(self):
         root  = self._root
-        beads = getattr(self._ctrl.task(root, DiscardedBeadsTask), 'beads', [])
-        self._inp.value = ', '.join(str(i) for i in sorted(beads))
+        beads = getattr(self._ctrl.task(root, DataSelectionTask), 'discarded', None)
+        if beads is not None:
+            self._inp.value = ', '.join(str(i) for i in sorted(beads))
