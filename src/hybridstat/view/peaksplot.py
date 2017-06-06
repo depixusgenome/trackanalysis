@@ -14,8 +14,7 @@ from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
 import numpy                    as     np
 
 from view.base                  import enableOnTrack
-from view.plots                 import (PlotView, PlotAttrs, from_py_func,
-                                        DpxKeyedRow, PlotState)
+from view.plots                 import PlotView, PlotAttrs, from_py_func, DpxKeyedRow
 from view.plots.tasks           import TaskPlotCreator
 from view.plots.sequence        import (SequenceTicker, OligoListWidget,
                                         SequenceHoverMixin)
@@ -193,19 +192,7 @@ class PeaksPlotCreator(TaskPlotCreator):
 
     def observe(self):
         super().observe()
-        def _observe(_):
-            if self.state is not PlotState.active:
-                return
-
-            task = self._model.defaultidenfication
-            if task is None:
-                self._model.identification.remove()
-            else:
-                self._model.identification.update(**task.config())
-
-        self._model.observeprop('oligos', 'sequencepath',
-                                'constraintspath', 'useparams',
-                                _observe)
+        self._model.observe()
         for widget in self._widgets.values():
             widget.observe()
 

@@ -290,6 +290,7 @@ class AdvancedWidget(AdvancedTaskMixin, WidgetCreator):
               ('Minimum event count per peak',     '%(_eventcount)d'),
               ('Align cycles using peaks',         '%(_align5)b'),
               ('Peak kernel size (blank ⇒ auto)',  '%(_precision)of'),
+              ('Max distance to theoretical peak', '%(_dist2theo)d'),
              )
 
     def __init__(self, model:PeaksPlotModelAccess) -> None:
@@ -301,3 +302,12 @@ class AdvancedWidget(AdvancedTaskMixin, WidgetCreator):
     _eventcount = AdvancedTaskMixin.attr('peakselection.group.mincount')
     _align5     = AdvancedTaskMixin.none('peakselection.align')
     _precision  = AdvancedTaskMixin.attr('peakselection.precision')
+
+    @property
+    def _dist2theo(self) -> int:
+        mdl = self._model.identification.default('peakids')
+        return mdl.window
+
+    @_dist2theo.setter
+    def _dist2theo(self, val:int):
+        self._model.identification.updatedefault('peakids', window = val)

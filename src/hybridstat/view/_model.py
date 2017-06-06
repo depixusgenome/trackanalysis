@@ -7,10 +7,12 @@ from itertools                  import product
 import numpy                    as     np
 
 import sequences
+from utils                      import updatecopy
 from control.processor          import processors
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
 from peakfinding.processor      import PeakSelectorTask
 from peakfinding.probabilities  import Probability
+from peakcalling.tohairpin      import HairpinDistance, PeakIdentifier
 from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
                                         FitBead, Distance)
 
@@ -25,10 +27,59 @@ class FitToHairpinAccess(TaskAccess):
     "access to the FitToHairpinTask"
     def __init__(self, ctrl):
         super().__init__(ctrl, FitToHairpinTask)
+        self.__defaults = self.config.root.tasks.fittohairpin
+        self.__defaults.defaults = {'distances': HairpinDistance(),
+                                    'peakids':   PeakIdentifier()}
+
+    def setobservers(self, mdl):
+        "observes the global model"
+        def _observe(_):
+            task = mdl.defaultidenfication
+            if task is None:
+                self.remove()
+            else:
+                self.update(**task.config())
+
+        mdl.observeprop('oligos', 'sequencepath', 'constraintspath', 'useparams',
+                        'config.root.tasks.fittohairpin.peakids',
+                        'config.root.tasks.fittohairpin.distances',
+                        _observe)
 
     @staticmethod
     def _configattributes(kwa):
         return {}
+
+    def updatedefault(self, attr, **kwa):
+        "updates the identifiers for this task"
+        if len(kwa) == 0:
+            return
+
+        cnf = self.__defaults[attr]
+        cnf.set(updatecopy(cnf.get(), **kwa))
+
+    def default(self, mdl):
+        "returns the default identification task"
+        if isinstance(mdl, str):
+            return self.__defaults[mdl].get()
+
+        ols = mdl.oligos
+        if ols is None or len(ols) == 0 or len(mdl.sequences) == 0:
+            return None
+        else:
+            dist = self.__defaults.distances.get()
+            pid  = self.__defaults.peakids.get()
+            return fittohairpintask(mdl.sequencepath,    ols,
+                                    mdl.constraintspath, mdl.useparams,
+                                    distance = dist, identifier = pid)
+
+    def resetmodel(self, mdl):
+        "resets the model"
+        task = self.default(mdl)
+        cur  = self.task
+        if task is None and cur is not None:
+            self.remove()
+        elif task is not None and cur is None:
+            self.update(**task.config())
 
 class FitParamProp(_FitParamProp):
     "access to bias or stretch"
@@ -76,12 +127,7 @@ class IdentificationModelAccess(TaskPlotModelAccess):
     @property
     def defaultidenfication(self):
         "returns the default identification task"
-        ols = self.oligos
-        if ols is None or len(ols) == 0 or len(self.sequences) == 0:
-            return None
-        else:
-            return fittohairpintask(self.sequencepath,    ols,
-                                    self.constraintspath, self.useparams)
+        return self.identification.default(self)
 
 class PeaksPlotModelAccess(IdentificationModelAccess):
     "Access to peaks"
@@ -158,13 +204,12 @@ class PeaksPlotModelAccess(IdentificationModelAccess):
         if self.peakselection.task is None:
             self.peakselection.update()
 
-        task = self.defaultidenfication
-        cur  = self.identification.task
-        if task is None and cur is not None:
-            self.identification.remove()
-        elif task is not None and cur is None:
-            self.identification.update(**task.config())
+        self.identification.resetmodel(self)
         return False
+
+    def observe(self):
+        "observes the global model"
+        self.identification.setobservers(self)
 
     def __set_ids_and_distances(self, peaks):
         task  = self.identification.task
