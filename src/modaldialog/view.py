@@ -90,51 +90,68 @@ class AdvancedTaskMixin(AdvancedWidgetMixin):
     def _args(self, **_):
         return super()._args(model = self, **_)
 
-    __none = type('_None', (), {})
-    @staticmethod
-    def attr(akeys:str, getter = None, setter = None):
-        "sets a task's attribute"
-        keys = akeys.split('.')
-        assert len(keys) >= 2
-        # pylint: disable=protected-access
-        def _get(self):
-            mdl = getattr(self._model, keys[0])
+    def _get_output(self):
+        return self.__outp
+
+    class TaskAcccessor:
+        "Access to a task"
+        __slots__ = ('_keys', '_fget', '_fset')
+        __none    = type('_None', (), {})
+        def __init__(self, akeys:str, fget = None, fset = None) -> None:
+            self._keys = akeys.split('.')
+            self._fget = fget
+            self._fset = fset
+            assert len(self._keys) >= 2
+
+        def __model(self, obj):
+            return getattr(obj._model, self._keys[0]) # pylint: disable=protected-access
+
+        def __get__(self, obj, tpe):
+            if obj is None:
+                return self
+
+            mdl = self.__model(obj)
             mdl = getattr(mdl, 'task', mdl)
-            for key in keys[1:]:
+            for key in self._keys[1:]:
                 mdl = getattr(mdl, key)
-            return mdl if getter is None else getter(mdl)
+            return mdl if self._fget is None else self._fget(mdl)
 
-        def _set(self, val):
-            tsk = getattr(self._model, keys[0]).task
-            if len(keys) == 2:
-                val = val if setter is None else setter(tsk, val)
-                self.__outp.setdefault(keys[0], {})[keys[1]] = val
+        def __set__(self, obj, val):
+            tsk  = self.__model(obj).task
+            outp = obj._get_output() # pylint: disable=protected-access
+            if len(self._keys) == 2:
+                val = val if self._fset is None else self._fset(tsk, val)
+                outp.setdefault(self._keys[0], {})[self._keys[1]] = val
             else:
-                mdl = self.__outp.setdefault(keys[0], {}).get(keys[1], self.__none)
+                mdl = outp.setdefault(self._keys[0], {}).get(self._keys[1], self.__none)
                 if mdl is self.__none:
-                    mdl = deepcopy(getattr(tsk, keys[1]))
-                    self.__outp[keys[0]][keys[1]] = mdl
+                    mdl = deepcopy(getattr(tsk, self._keys[1]))
+                    outp[self._keys[0]][self._keys[1]] = mdl
 
-                for key in keys[2:-1]:
+                for key in self._keys[2:-1]:
                     mdl = getattr(mdl, key)
 
-                if setter is None:
-                    setattr(mdl, keys[-1], val)
+                if self._fset is None:
+                    setattr(mdl, self._keys[-1], val)
                 else:
-                    setattr(mdl, keys[-1], setter(mdl, val))
+                    setattr(mdl, self._keys[-1], self._fset(mdl, val))
 
-        return property(_get, _set)
+    @classmethod
+    def attr(cls, akeys:str, fget = None, fset = None):
+        "sets a task's attribute"
+        return cls.TaskAcccessor(akeys, fget, fset)
 
     @classmethod
     def none(cls, akeys:str):
         "sets a task's attribute to None or the default value"
         key = akeys.split('.')[-1]
-        def _setter(obj, val):
-            if not val:
+        def _fset(obj, val):
+            if val:
                 return None
+
             attr = getattr(obj, key)
             if attr is None:
                 attr = deepcopy(getattr(type(obj), key))
             return attr
 
-        return cls.attr(akeys, lambda i: i is not None, _setter)
+        return cls.TaskAcccessor(akeys, lambda i: i is not None, _fset)
