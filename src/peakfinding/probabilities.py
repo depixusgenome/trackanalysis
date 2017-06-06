@@ -143,7 +143,7 @@ class Probability:
         if self.nevents <= 0:
             return 0.
 
-        return (self.totalduration/self.nevents) * self.framerate
+        return (self.totalduration/self.nevents) / self.framerate
 
     @property
     def likelyduration(self) -> float:
@@ -183,4 +183,4 @@ class Probability:
         if self.nevents <= self.ntoolong:
             return self.FMAX
 
-        return self.averageduration / np.sqrt(self.nevents-self.ntoolong)
+        return self.likelyduration / np.sqrt(self.nevents-self.ntoolong)

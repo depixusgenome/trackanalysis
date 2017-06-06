@@ -141,7 +141,7 @@ class SummarySheet(Reporter):
         return cnt / self.beadncycles(bead)
 
     @column_method('Down Time Φ₅ (s)')
-    def _offtime(self, _, bead:Bead) -> Optional[float]:
+    def _downtime(self, _, bead:Bead) -> Optional[float]:
         "Average time in phase 5 a bead is fully zipped"
         if bead is None:
             return None
@@ -191,5 +191,5 @@ class SummarySheet(Reporter):
                 ("Bead Count",        nbeads),
                 ("Median Noise:",     _avg(self._uncert)),
                 ("Events per Cycle:", _avg(self._evts)),
-                ("Off Time:",         _avg(self._offtime))
+                ("Down Time Φ₅ (s):", _avg(self._downtime))
                ]
