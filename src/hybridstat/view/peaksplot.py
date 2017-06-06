@@ -129,7 +129,9 @@ class PeaksPlotCreator(TaskPlotCreator):
                              'widgets.border'  : 10}
         self.css.peaks.defaults = {'duration'  : PlotAttrs('gray',     'diamond', 10),
                                    'count'     : PlotAttrs('lightblue', 'square',  10)}
-        self.css.peaks.colors.defaults = {'found': 'gray', 'missing': 'red'}
+
+        found = 'black' if self.css.root.theme.get() != 'dark' else 'white'
+        self.css.peaks.colors.defaults = {'found': found, 'missing': 'red'}
         self.config.defaults = {'tools'      : 'ypan,ybox_zoom,reset,save,dpxhover,tap'}
         PeaksSequenceHover.defaultconfig(self)
         SequenceTicker.defaultconfig(self)
@@ -226,7 +228,6 @@ class PeaksPlotCreator(TaskPlotCreator):
             widget.reset(self._bkmodels)
 
         self.setbounds(self._fig.y_range, 'y', (data['z'][0], data['z'][-1]))
-        #self._hover.pyslaveaxes(self._fig, peaks, self._bkmodels)
 
     def __create_fig(self):
         self._fig = figure(**self._figargs(y_range = Range1d,
