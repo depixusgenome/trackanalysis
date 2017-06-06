@@ -63,7 +63,7 @@ class PeaksSequencePathWidget(SequencePathWidget):
                     stats.text   = stats.data   [cb_obj.value]
 
                 if cb_obj.value+'id' in peaks.source.column_names:
-                    for key in ('id', 'bases', 'distance', 'orient'):
+                    for key in ('id', 'bases', 'distance', 'orient', 'color'):
                         ref = cb_obj.value+key
                         peaks.source.data[key] = peaks.source.data[ref]
                     peaks.trigger("change")

@@ -11,6 +11,7 @@ from bokeh                      import layouts
 from bokeh.plotting             import figure, Figure    # pylint: disable=unused-import
 from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
                                         Model, TapTool, CustomJS, ToolbarBox)
+import bokeh.colors             as     bkcolors
 import numpy                    as     np
 
 from view.base                  import enableOnTrack
@@ -126,8 +127,9 @@ class PeaksPlotCreator(TaskPlotCreator):
                              'xtoplabel'       : u'Duration (s)',
                              'xlabel'          : u'Rate (%)',
                              'widgets.border'  : 10}
-        self.css.peaks.defaults = {'duration'  : PlotAttrs('gray', 'diamond', 10),
+        self.css.peaks.defaults = {'duration'  : PlotAttrs('gray',     'diamond', 10),
                                    'count'     : PlotAttrs('lightblue', 'square',  10)}
+        self.css.peaks.colors.defaults = {'found': 'gray', 'missing': 'red'}
         self.config.defaults = {'tools'      : 'ypan,ybox_zoom,reset,save,dpxhover,tap'}
         PeaksSequenceHover.defaultconfig(self)
         SequenceTicker.defaultconfig(self)
@@ -151,20 +153,36 @@ class PeaksPlotCreator(TaskPlotCreator):
         "returns the model"
         return self._model
 
+    def __peaks(self, vals = None):
+        peaks  = dict(self._model.setpeaks(vals))
+        colors = [getattr(bkcolors, j).to_hex()
+                  for j in self.css.peaks.colors.get('found', 'missing')]
+
+        if vals is None or self._model.identification.task is None:
+            peaks['color'] = [colors[0]]*len(peaks['id'])
+        else:
+            alldist = self._model.distances
+            for key in self._model.sequences:
+                if key not in alldist:
+                    continue
+                peaks[key+'color'] = np.where(np.isfinite(peaks[key+'id']), *colors)
+
+            peaks['color'] = peaks[self._model.sequencekey+'color']
+        return peaks
+
     def __data(self) -> Tuple[dict, dict]:
         cycles = self._model.runbead()
         data   = dict.fromkeys(('z', 'count'), [0., 1.])
-        self._model.setpeaks(None)
         if cycles is None:
-            return data, self._model.peaks
+            return data, self.__peaks(None)
 
         items = tuple(i for _, i in cycles)
         if len(items) == 0 or not any(len(i) for i in items):
-            return data, self._model.peaks
+            return data, self.__peaks(None)
 
         peaks = self._model.peakselection.task
         if peaks is None:
-            return data, self._model.peaks
+            return data, self.__peaks(None)
 
         track = self._model.track
         dtl   = peaks.detailed(items, (track, self._model.bead))
@@ -173,8 +191,7 @@ class PeaksPlotCreator(TaskPlotCreator):
         data  = dict(z     = (dtl.binwidth*np.arange(len(dtl.histogram), dtype = 'f4')
                               +dtl.minvalue),
                      count = dtl.histogram/(maxv*track.ncycles)*100.)
-
-        return data, self._model.setpeaks(dtl)
+        return data, self.__peaks(dtl)
 
     def _create(self, doc):
         "returns the figure"
@@ -200,7 +217,7 @@ class PeaksPlotCreator(TaskPlotCreator):
         self._widgets['advanced'].ismain(keypressmanager)
 
     def _reset(self):
-        data, peaks        = self.__data()
+        data, peaks = self.__data()
         self._bkmodels[self._peaksrc].update(data = peaks, column_names = list(peaks.keys()))
         self._bkmodels[self._histsrc].update(data = data)
         self._hover .reset(self._bkmodels)
@@ -218,7 +235,7 @@ class PeaksPlotCreator(TaskPlotCreator):
         self._fig.extra_x_ranges = {"duration": Range1d(start = 0., end = 0.)}
         axis  = LinearAxis(x_range_name          = "duration",
                            axis_label            = self.css.xtoplabel.get(),
-                           axis_label_text_color = self.css.peaks.duration.get().color
+                           axis_label_text_color = self.css.peaks.colors.found.get()
                           )
         self._fig.xaxis[0].axis_label_text_color = self.css.count.get().color
         self._fig.add_layout(axis, 'above')
@@ -232,11 +249,13 @@ class PeaksPlotCreator(TaskPlotCreator):
         for key in ('count', 'peaks.count', 'peaks.duration'):
             src = self._peaksrc if 'peaks' in key else self._histsrc
             rng = 'duration' if 'duration' in key else None
-            val = css[key].addto(self._fig,
-                                 y            = 'z',
-                                 x            = key.split('.')[-1],
-                                 source       = src,
-                                 x_range_name = rng)
+            args= dict(y            = 'z',
+                       x            = key.split('.')[-1],
+                       source       = src,
+                       x_range_name = rng)
+            if 'peaks' in key:
+                args['line_color'] = 'color'
+            val = css[key].addto(self._fig, **args)
             if 'peaks' in key:
                 rends.append(val)
         return rends

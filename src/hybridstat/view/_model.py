@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Model for peaksplot"
-from typing                     import Optional, Sequence, Dict
+from typing                     import Optional, Sequence, Dict, Any
 from itertools                  import product
 
 import numpy                    as     np
@@ -13,8 +13,8 @@ from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
 from peakfinding.processor      import PeakSelectorTask
 from peakfinding.probabilities  import Probability
 from peakcalling.tohairpin      import HairpinDistance, PeakIdentifier
-from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
-                                        FitBead, Distance)
+from peakcalling.processor      import (FitToHairpinTask, # pylint: disable=unused-import
+                                        FitToHairpinProcessor, FitBead, Distance)
 
 from view.plots.tasks           import TaskPlotModelAccess, TaskAccess
 from view.plots.sequence        import (readsequence,
@@ -155,13 +155,13 @@ class PeaksPlotModelAccess(IdentificationModelAccess):
         "returns the distances which were computed"
         return self.fits.distances if self.fits is not None else {}
 
-    def setpeaks(self, dtl) -> Optional[FitBead]:
+    def setpeaks(self, dtl) -> Dict[str, Any]:
         "sets current bead peaks and computes the fits"
         if dtl is None:
             self.peaks = dict.fromkeys(('z', 'id', 'distance', 'sigma', 'bases',
                                         'duration', 'count'), [])
             self.fits  = None
-            return
+            return self.peaks
 
         nan        = lambda: np.full((len(peaks),), np.NaN, dtype = 'f4')
         peaks      = tuple(self.peakselection.task.details2output(dtl))
@@ -174,7 +174,6 @@ class PeaksPlotModelAccess(IdentificationModelAccess):
 
         self.__set_ids_and_distances(peaks)
         self.__set_probas(peaks)
-
         return self.peaks
 
     def runbead(self):
