@@ -23,7 +23,7 @@ def getLogger(arg = None):
     else:
         return logging.getLogger(LOGGER+'.'+arg)
 
-def logToFile(path):
+def logToFile(path, **kwa):
     "adds a log to file"
     if any(hdl.get_name() == 'file' for hdl in getLogger().handlers):
         return
@@ -40,8 +40,8 @@ def logToFile(path):
             return
 
     hdl = logging.handlers.RotatingFileHandler(path,
-                                               maxBytes    = 1024,
-                                               backupCount = 3,
+                                               maxBytes    = kwa.get('maxBytes', 1024**2),
+                                               backupCount = kwa.get('backupCount', 3),
                                                encoding    = 'utf-8')
     hdl.set_name('file')
     hdl.setLevel(getEnvironLevel())
