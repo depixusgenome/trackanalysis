@@ -111,19 +111,8 @@ class TaskPlotModelAccess(PlotModelAccess):
             return False
         self._ctrl.observe(*args, argstest = _check, **kwa)
 
-    def observeprop(self, *args):
-        "observe an attribute set through props"
-        fcn   = next (i for i in args if callable(i))
-        attrs = tuple(i for i in args if isinstance(i, str))
-        assert len(attrs) + 1 == len(args)
-
-        keys = dict() # type: Dict[str, List[str]]
-        cls  = type(self)
-        for attr in attrs:
-            prop = getattr(cls, attr)
-            for obs in prop.OBSERVERS:
-                keys.setdefault(obs, []).append(prop.key)
-
+    def wrapobserver(self, fcn):
+        "wraps an observing function"
         state = self.project.state
         @wraps(fcn)
         def _wrapped(*args, **kwargs):
@@ -131,12 +120,31 @@ class TaskPlotModelAccess(PlotModelAccess):
                 fcn(*args, **kwargs)
             elif state.get() is PlotState.disabled:
                 state.set(PlotState.outofdate)
+        return _wrapped
+
+    def observeprop(self, *args):
+        "observe an attribute set through props"
+        fcn   = self.wrapobserver(next(i for i in args if callable(i)))
+        attrs = tuple(i for i in args if isinstance(i, str))
+        assert len(attrs) + 1 == len(args)
+
+        keys = dict() # type: Dict[str, List[str]]
+        cls  = type(self)
+        for attr in attrs:
+            if '.' in attr:
+                for key in ('config.root.', 'project.root.', 'project.', 'config.'):
+                    if attr.startswith(key):
+                        keys.setdefault(key[:-1], []).append(attr[len(key):])
+            else:
+                prop = getattr(cls, attr)
+                for obs in prop.OBSERVERS:
+                    keys.setdefault(obs, []).append(prop.key)
 
         for key, items in keys.items():
             val = self
             for attr in key.split('.'):
                 val = getattr(val, attr)
-            val.observe(*items, _wrapped) # pylint: disable=no-member
+            val.observe(*items, fcn) # pylint: disable=no-member
 
     class props: # pylint: disable=invalid-name
         "access to property builders"
