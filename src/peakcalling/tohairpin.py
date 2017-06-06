@@ -65,14 +65,14 @@ class Hairpin:
                       1, 'constant', constant_values = (0, len(seq)))
 
     @classmethod
-    def read(cls, path:Union[StreamUnion, Dict], oligos:Sequence[str]
+    def read(cls, path:Union[StreamUnion, Dict], oligos:Sequence[str], **kwa
             ) -> 'Iterator[Tuple[str,Hairpin]]':
         "creates a list of *Hairpin* from a fasta file and a list of oligos"
         itr = (path         if isinstance(path, Iterator)               else
                path.items() if callable(getattr(path, 'items', None))   else
                _read(path))
         itr = cast(Iterator[Tuple[str,Any]], itr)
-        return ((name, cls(peaks = cls.topeaks(seq, oligos))) for name, seq in itr)
+        return ((name, cls(**kwa, peaks = cls.topeaks(seq, oligos))) for name, seq in itr)
 
     @staticmethod
     def silhouette(dist, key = None) -> float:

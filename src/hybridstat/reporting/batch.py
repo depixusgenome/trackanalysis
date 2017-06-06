@@ -47,9 +47,10 @@ def readconstraints(idtask   : FitToHairpinTask,
 def fittohairpintask(seqpath    : Union[Path, str],
                      oligos     : Union[Sequence[str], str],
                      idpath     : Union[None,Path,str] = None,
-                     useparams  : bool = True) -> FitToHairpinTask:
+                     useparams  : bool                 = True,
+                     **kwa) -> FitToHairpinTask:
     "creates and identification task from paths"
-    task = FitToHairpinTask.read(seqpath, oligos)
+    task = FitToHairpinTask.read(seqpath, oligos, **kwa)
     if len(task.distances) == 0:
         raise IOError("Could not find any sequence in "+str(seqpath))
     return readconstraints(task, idpath, useparams)

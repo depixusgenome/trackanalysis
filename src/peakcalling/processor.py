@@ -39,11 +39,22 @@ class FitToHairpinTask(Task):
         return True
 
     @classmethod
-    def read(cls, path : StreamUnion, oligos : Sequence[str]) -> 'FitToHairpinTask':
+    def read(cls,
+             path   : StreamUnion,
+             oligos : Sequence[str],
+             distance:   HairpinDistance = None,
+             identifier: PeakIdentifier  = None
+            ) -> 'FitToHairpinTask':
         "creates a BeadsByHairpin from a fasta file and a list of oligos"
         items = dict(HairpinDistance.read(path, oligos))
+        if distance is not None:
+            items = {i: updatecopy(distance, True, peaks = j.peaks)
+                     for i, j in items.items()}
+
+        if identifier is None:
+            identifier = PeakIdentifier()
         return cls(distances = items,
-                   peakids   = {key: PeakIdentifier(peaks = value.peaks)
+                   peakids   = {key: updatecopy(identifier, True, peaks = value.peaks)
                                 for key, value in items.items()})
 
 class BeadsByHairpinTask(FitToHairpinTask):
