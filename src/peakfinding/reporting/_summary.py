@@ -49,7 +49,7 @@ class SummarySheet(Reporter):
         return 0. if ncy == 0 else (cnt / ncy)
 
     @column_method('Down Time Φ₅ (s)')
-    def _offtime(self, _, outp:Tuple[PeakOutput]) -> float:
+    def _downtime(self, _, outp:Tuple[PeakOutput]) -> float:
         "Average time in phase 5 a bead is fully zipped"
         if len(outp) == 0:
             return 0.
@@ -82,6 +82,6 @@ class SummarySheet(Reporter):
                   ("Bead Count",        nbeads),
                   ("Median Noise:",     _avg(self._uncert)),
                   ("Events per Cycle:", _avg(self._evts)),
-                  ("Off Time:",         _avg(self._offtime))
+                  ("Down Time Φ₅ (s):", _avg(self._downtime))
                  ]
         self.header(items)

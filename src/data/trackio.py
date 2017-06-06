@@ -125,6 +125,9 @@ class LegacyGRFilesIO(_TrackIO):
     def open(cls, paths:Tuple[PATHTYPE,PATHTYPE]) -> dict: # type: ignore
         u"opens the directory"
         output = readtrack(str(paths[0]))
+        if output is None:
+            raise IOError("Could not open track. "
+                          "This could be because of a *root* mounted samba path")
         remove = set(i for i in output if isinstance(i, int))
 
         if len(paths) == 2 and Path(paths[1]).is_dir():
@@ -219,8 +222,15 @@ class LegacyGRFilesIO(_TrackIO):
             bead[inds] = vals[1]
         return beadid
 
+    @staticmethod
+    def __scan(lst, fcn):
+        return {i.stem: i for i in chain.from_iterable(_glob(fcn(str(k))) for k in lst)}
+
     @classmethod
-    def scan(cls, trkdirs: Union[str, Sequence[str]], grdirs: Union[str, Sequence[str]]):
+    def scan(cls,
+             trkdirs: Union[str, Sequence[str]],
+             grdirs:  Union[str, Sequence[str]],
+             matchfcn: Callable[[Path, Path], bool] = None):
         """
         Scans for pairs
 
@@ -233,17 +243,28 @@ class LegacyGRFilesIO(_TrackIO):
         grdirs  = (grdirs,)  if isinstance(grdirs,  (Path, str)) else grdirs  # type: ignore
         trkdirs = (trkdirs,) if isinstance(trkdirs, (Path, str)) else trkdirs # type: ignore
 
-        cgr    = cls.__CGR
-        ichain = lambda lst, fcn: chain.from_iterable(_glob(fcn(str(k))) for k in lst)
-        scan   = lambda lst, fcn: {i.stem: i for i in ichain(lst, fcn)}
+        cgr  = cls.__CGR
+        trks = cls.__scan(trkdirs, lambda i: i if i.endswith('.trk') else i+'/**/*.trk')
+        cgrs = cls.__scan(grdirs,  lambda i: i if cgr in i           else i+'/**/'+cgr+'/*.cgr')
 
-        trks   = scan(trkdirs, lambda i: i if i.endswith('.trk') else i+'/**/*.trk')
-        cgrs   = scan(grdirs,  lambda i: i if cgr in i           else i+'/**/'+cgr+'/*.cgr')
-
-        pairs    = frozenset(trks) & frozenset(cgrs)
-        good     = tuple((trks[i], cgrs[i].parent) for i in pairs)
-        lonegrs  = tuple(cgrs[i].parent for i in frozenset(cgrs) - pairs)
-        lonetrks = tuple(trks[i]        for i in frozenset(trks) - pairs)
+        if matchfcn is None:
+            pairs    = frozenset(trks) & frozenset(cgrs)
+            good     = tuple((trks[i], cgrs[i].parent) for i in pairs)
+            lonegrs  = tuple(cgrs[i].parent for i in frozenset(cgrs) - pairs)
+            lonetrks = tuple(trks[i]        for i in frozenset(trks) - pairs)
+        else:
+            tgood     = []
+            tlonetrks = []
+            for trk in trks.values():
+                key = next((j for j in cgrs.values() if matchfcn(trk, j)), None)
+                if key is None:
+                    tlonetrks.append(trk)
+                else:
+                    tgood.append((trk, key.parent))
+                    cgrs.pop(key.stem)
+            good     = tuple(tgood)
+            lonetrks = tuple(tlonetrks)
+            lonegrs  = tuple(i.parent for i in cgrs.values())
 
         return good, lonegrs, lonetrks
 
