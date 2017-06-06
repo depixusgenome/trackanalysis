@@ -21,6 +21,8 @@ from    view.plots.sequence import readsequence, OligoListWidget, SequencePathWi
 from    view.base           import enableOnTrack
 from    modaldialog.view    import AdvancedWidgetMixin
 
+from    eventdetection.processor import AlignmentTactic
+
 from    ._bokehext          import DpxHoverModel      # pylint: disable=unused-import
 
 class PeaksTableWidget(_Widget):
@@ -177,27 +179,24 @@ class ConversionSlidersWidget(_Widget):
 
 class AlignmentWidget(GroupWidget):
     "Allows aligning the cycles on a given phase"
-    INPUT = RadioButtonGroup
+    INPUT   = RadioButtonGroup
+    __ORDER = (None, AlignmentTactic.pull, AlignmentTactic.onlyinitial,
+               AlignmentTactic.onlypull)
     def __init__(self, model:PlotModelAccess) -> None:
         super().__init__(model)
-        self.css.title.alignment.labels.default = [u'ø', u'Φ5-1-3', u'Φ1-3', u'Φ1', u'Φ3']
+        self.css.title.alignment.labels.default = [u'ø', u'best', u'Φ1', u'Φ3']
         self.css.title.alignment.default        = u'Alignment'
-
-    @property
-    def __phases(self):
-        cnf = self.config.root.phase
-        return ['ø', cnf.measure.get(), None] + [cnf[i].get() for i in ('initial', 'pull')]
 
     def onclick_cb(self, value):
         "action to be performed when buttons are clicked"
         if value == 0:
             self._model.alignment.remove()
         else:
-            self._model.alignment.update(phase = self.__phases[value])
+            self._model.alignment.update(phase = self.__ORDER[value])
 
     def _data(self):
-        val    = getattr(self._model.alignment.task, 'phase', 'ø')
-        active = self.__phases.index(val)
+        val    = getattr(self._model.alignment.task, 'phase', None)
+        active = 0 if val is None else self.__ORDER.index(AlignmentTactic(val))
         return dict(active = active)
 
 class DriftWidget(GroupWidget):

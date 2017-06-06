@@ -17,19 +17,14 @@ from ._patches  import Patches, modifyclasses, RESET
 def _v0task(data:dict) -> dict:
     modifyclasses(data,
                   "eventdetection.processor.ExtremumAlignmentTask",
-                  dict(edge   = lambda val: 'right' if val else RESET,
-                       factor = RESET))
+                  dict(edge  = lambda val: 'right' if val else RESET,
+                       phase = RESET, factor = RESET))
     return data
 
 __TASKS__   = Patches(_v0task)
 
 def _v0cnf(data:dict) -> dict:
-    modifyclasses(data,
-                  "eventdetection.processor.ExtremumAlignmentTask",
-                  dict(edge   = lambda val: 'right' if val else RESET,
-                       factor = RESET,
-                       phase  = lambda val: 5 if val is None else val))
-
+    data = _v0task(data)
     data.get('config', {}).pop('precision.max', None)
     return data
 __CONFIGS__ = Patches(_v0cnf)

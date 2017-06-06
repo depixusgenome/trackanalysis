@@ -9,7 +9,7 @@ from eventdetection.detection import (DerivateSplitDetector, EventMerger, EventS
                                       MinMaxSplitDetector, tocycles)
 from eventdetection.alignment import (ExtremumAlignment, CorrelationAlignment,
                                       PhaseEdgeAlignment)
-from eventdetection.processor import ExtremumAlignmentProcessor
+from eventdetection.processor import ExtremumAlignmentProcessor, AlignmentTactic
 from eventdetection.data      import Events
 from simulator                import randtrack
 from signalfilter             import samples
@@ -147,7 +147,7 @@ def test_minmaxprocessor():
     inipos  = [i.mean() for i in track.cycles.withphases(PHASE.initial).values()]
 
     bead    = ExtremumAlignmentProcessor.apply(track.beadsonly,
-                                               phase = PHASE.initial,
+                                               phase = AlignmentTactic.initial,
                                                edge  = None)
     corrpos = [i.mean() for i in bead[0,...].withphases(PHASE.initial).values()]
     assert np.std(inipos)  > .015
@@ -159,13 +159,13 @@ def test_edgeminmaxprocessor():
     inipos  = [i.mean() for i in track.cycles.withphases(PHASE.initial).values()]
 
     bead    = ExtremumAlignmentProcessor.apply(track.beadsonly,
-                                               phase = PHASE.initial,
+                                               phase = AlignmentTactic.onlyinitial,
                                                edge  = 'right')
     corrpos = [i.mean() for i in bead[0,...].withphases(PHASE.initial).values()]
     assert np.std(inipos)  > .015
     assert np.std(corrpos) < .001
 
-def test_bestalignmentprocessor():
+def test_initial_alignment():
     u"align on 1 phase or another as needed"
     def _create(phase):
         track   = randtrack(driftargs = None, baselineargs = (.1, .05, 'rand'))
@@ -174,12 +174,28 @@ def test_bestalignmentprocessor():
         bead    = ExtremumAlignmentProcessor.apply(track.beadsonly, phase = phase)
         return [i.mean() for i in bead[0,...].withphases(PHASE.initial).values()]
 
-    inipos  = _create(PHASE.initial)
-    corrpos = _create(None)
+    inipos  = _create(AlignmentTactic.onlyinitial)
+    corrpos = _create(AlignmentTactic.initial)
     assert_allclose(inipos[1:], corrpos[1:], atol = 0.05)
     assert corrpos[0] > .4
 
-def test_best_phase5_alignment():
+def test_pull_alignment():
+    u"align on 1 phase or another as needed"
+    track   = randtrack(driftargs = None, baselineargs = (.1, .05, 'rand'))
+    for i in range(3):
+        ini  = track.cycles.withphases(PHASE.initial)[0,i]
+        ini += (track.cycles.withphases(PHASE.pull)[0,i].mean()-ini.mean())*.5
+
+        ini  = track.cycles.withphases(PHASE.measure)[0,i]
+        ini += (track.cycles.withphases(PHASE.pull)[0,i].mean()-ini.mean())*.5
+
+    bead    = ExtremumAlignmentProcessor.apply(track.beads, phase = AlignmentTactic.pull)
+    inipos  = [i.mean() for i in track.beads[0,...].withphases(PHASE.pull).values()]
+    corrpos = [i.mean() for i in bead       [0,...].withphases(PHASE.pull).values()]
+    assert np.std(inipos[3:]) > 40*np.std(corrpos[3:])
+    assert all(i < .6 for i in corrpos[:3])
+
+def test_measure_alignment():
     u"align on 1 phase or another as needed"
     track   = randtrack(driftargs = None, baselineargs = (.1, .05, 'rand'))
     for i in range(3):
@@ -190,10 +206,11 @@ def test_best_phase5_alignment():
         ini  = track.cycles.withphases(PHASE.measure)[0,i]
         ini += (track.cycles.withphases(PHASE.pull)[0,i].mean()-ini.mean())*.5
 
-    bead    = ExtremumAlignmentProcessor.apply(track.beads, phase = PHASE.measure)
-    corrpos = [i.mean() for i in bead       [0,...].withphases(PHASE.pull).values()]
+    bead    = ExtremumAlignmentProcessor.apply(track.beads, phase = AlignmentTactic.measure)
     inipos  = [i.mean() for i in track.beads[0,...].withphases(PHASE.pull).values()]
-    assert_allclose(inipos, corrpos, atol = 0.05)
+    corrpos = [i.mean() for i in bead       [0,...].withphases(PHASE.pull).values()]
+    assert np.std(inipos[3:]) > 10*np.std(corrpos[3:])
+    assert all(i > .95 for i in corrpos[:3])
 
 def test_correlationalignment():
     u"align on best correlation"
@@ -235,4 +252,4 @@ def test_precision():
     assert list(np.nonzero(found-sim-1)[0]) == []
 
 if __name__ == '__main__':
-    test_precision()
+    test_measure_alignment()

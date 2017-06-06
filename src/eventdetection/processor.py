@@ -3,6 +3,7 @@
 "Processors apply tasks to a data flow"
 from   typing             import Optional, NamedTuple # pylint: disable=unused-import
 from   functools          import partial
+from   enum               import Enum
 
 import numpy              as     np
 from   utils              import initdefaults, updatecopy
@@ -13,24 +14,39 @@ from   .data              import Events
 from   .alignment         import ExtremumAlignment, PhaseEdgeAlignment
 from   .                  import EventDetectionConfig
 
+class AlignmentTactic(Enum):
+    "possible alignments"
+    onlyinitial = 'onlyinitial'
+    onlypull    = 'onlypull'
+    measure     = 'measure'
+    initial     = 'initial'
+    pull        = 'pull'
+
 class ExtremumAlignmentTask(Task):
     """
     Task for aligning on a given phase.
 
     Alignment modes are:
 
-        * *phase* = 1: alignment on phase 1
-        * *phase* = 3: alignment on phase 3
-        * *phase* = None: alignment is performed phase 1. Outliers are then
-        re-aligned on phase 3. Outliers are defined as:
+        * *phase* = 'onlyinitial': alignment on phase 1
+        * *phase* = 'onlypull': alignment on phase 3
+        * *phase* = 'initial': alignment is performed phase 1. Outliers are
+        then re-aligned on phase 3. Outliers are defined as:
 
             * |phase 3 - median(phase 3)| > 'pull'
             * at least one of the extension between phase 1 and 3 or 3 and 5
             are such that: (extension > median(extension) x 'opening')
             that between phase 1 and 3 or 3 and 5.
 
-        * *phase* = 5: alignment is performed on phase 5. If outliers are found
-        on phase 5:
+        * *phase* = 'pull': alignment is performed phase 3. Outliers are
+        then re-aligned on phase 1. Outliers are defined as:
+
+            * both extension between phase 1 and 3 or 3 and 5
+            are such that: (extension < median(extension) x 'pull')
+            that between phase 1 and 3 or 3 and 5.
+
+        * *phase* = 'measure': alignment is performed on phase 5. If outliers
+        are found on phase 5:
 
             * if more than 'fiveratio' cycles are further than 'pull' from the
             median, a *phase* = None alignment is returned.
@@ -51,7 +67,7 @@ class ExtremumAlignmentTask(Task):
     level      = Level.bead
     window     = 15
     edge       = 'right' # type: Optional[str]
-    phase      = None    # type: Optional[int]
+    phase      = AlignmentTactic.pull  # type: AlignmentTactic
     percentile = 25.
     fiveratio  = .4
     outlier    = .9
@@ -104,17 +120,51 @@ class ExtremumAlignmentProcessor(Processor):
         return kwa.get(name, getattr(cls.tasktype, name))
 
     @classmethod
-    def apply(cls, toframe = None, **kwa):
-        "applies the task to a frame or returns a function that does so"
-        assert cls._get(kwa, 'percentile') <= 50.
-        action = (cls.__apply_best13 if cls._get(kwa, 'phase') is None          else
-                  cls.__apply_best51 if cls._get(kwa, 'phase') == PHASE.measure else
-                  cls.__apply_onephase)
+    def _apply_initial(cls, kwa, frame, info):
+        args = cls.__args(kwa, frame, info, False)
+        return cls.__align_on_3('initial', args.initial, args, kwa)
 
-        def _apply(frame):
-            return frame.withaction(partial(action, kwa, frame),
-                                    beadsonly = True)
-        return _apply if toframe is None else _apply(toframe)
+    @classmethod
+    def _apply_pull(cls, kwa, frame, info):
+        args = cls.__args(kwa, frame, info, True)
+        bias = args.pull + np.nanmedian(args.initial-args.pull)
+
+        bad  = cls.__deltas('measure', 'pull', args, kwa) < 1.
+        if any(bad):
+            bad       = np.logical_and(bad, cls.__deltas('initial', 'pull', args, kwa) < 1.)
+            bias[bad] = args.initial[bad]
+
+        return args.cycles.translate(bias)
+
+    @classmethod
+    def _apply_measure(cls, kwa, frame, info):
+        args = cls.__args(kwa, frame, info, True)
+        bias = args.measure
+
+        dtl5 = cls.__deltas('measure', 'outlier', args, kwa)
+        bad  = dtl5 < 1.
+        if any(bad):
+            tmp = cls.__distance_to_3(bias, args, kwa)
+            if (tmp > 1).sum() > (tmp >= 0).sum() * cls._get(kwa, 'fiveratio'):
+                # too many cycles are saturated
+                return cls.__align_on_3('initial', args.initial, args, kwa)
+
+            bad       = np.logical_and(bad, cls.__deltas('initial', 'outlier', args, kwa) >= 1.)
+            bias      = np.copy(bias)
+            bias[bad] = args.initial[bad]+np.nanmedian(args.measure-args.initial)
+
+        return cls.__align_on_3('measure', bias, args, kwa)
+
+    @classmethod
+    def _apply_onlyinitial(cls, kwa, frame, info):
+        args = cls.__args(kwa, frame, info, False)
+        return args.cycles.translate(args.initial)
+
+    @classmethod
+    def _apply_onlypull(cls, kwa, frame, info):
+        args = cls.__args(kwa, frame, info, False)
+        bias = args.pull + np.nanmedian(args.initial-args.pull)
+        return args.cycles.translate(bias)
 
     @classmethod
     def __args(cls, kwa, frame, info, meas) -> 'ExtremumAlignmentProcessor._Args':
@@ -173,47 +223,20 @@ class ExtremumAlignmentProcessor(Processor):
         return args.cycles.translate(bias)
 
     @classmethod
-    def __apply_best51(cls, kwa, frame, info):
-        args = cls.__args(kwa, frame, info, True)
-        bias = args.measure
+    def apply(cls, toframe = None, **kwa):
+        "applies the task to a frame or returns a function that does so"
+        assert cls._get(kwa, 'percentile') <= 50.
+        mode   = cls._get(kwa, 'phase')
+        action = getattr(cls, '_apply_'+mode.value)
 
-        dtl5 = cls.__deltas('measure', 'outlier', args, kwa)
-        bad  = dtl5 < 1.
-        if any(bad):
-            tmp = cls.__distance_to_3(bias, args, kwa)
-            if (tmp > 1).sum() > (tmp >= 0).sum() * cls._get(kwa, 'fiveratio'):
-                # too many cycles are saturated
-                return cls.__align_on_3('initial', args.initial, args, kwa)
-
-            bad       = np.logical_and(bad, cls.__deltas('initial', 'outlier', args, kwa) >= 1.)
-            bias      = np.copy(bias)
-            bias[bad] = args.initial[bad]+np.nanmedian(args.measure-args.initial)
-
-        return cls.__align_on_3('measure', bias, args, kwa)
-
-    @classmethod
-    def __apply_best13(cls, kwa, frame, info):
-        args = cls.__args(kwa, frame, info, False)
-        return cls.__align_on_3('initial', args.initial, args, kwa)
-
-    @classmethod
-    def __apply_onephase(cls, kwa, frame, info):
-        window = cls._get(kwa, 'window')
-        edge   = cls._get(kwa, 'edge')
-        perc   = cls._get(kwa, 'percentile')
-        cycles = cls._Utils(frame, info)
-
-        bias   = cycles.bias(PHASE.initial, window, edge, perc)
-
-        if cls._get(kwa, 'phase') == PHASE.pull:
-            init  = bias
-            bias  = cycles.bias(PHASE.pull, window, edge, 100.-perc)
-            bias -= np.nanmedian(bias+init)
-
-        return cycles.translate(bias)
+        def _apply(frame):
+            return frame.withaction(partial(action, kwa, frame),
+                                    beadsonly = True)
+        return _apply if toframe is None else _apply(toframe)
 
     def run(self, args):
         args.apply(self.apply(**self.config()))
+
 
 class EventDetectionTask(EventDetectionConfig, Task):
     "Config for an event detection"
