@@ -159,16 +159,20 @@ class KPermCombiner:
 
     def group_perms(self,perms=None)->List[List[data.OligoPerm]]:
         u'''
-        find perms whose getattr(kperm,attr) is not included by any other kperm
-        group OligoKPerm according to kpermids in order to have neutral perm in each group
+        groups OligoKPerm such that each element in the group share the same domain
+        2 groups with different domains can be combined
+        each group must include the neutral permutation
         '''
-        attr="kpermids"
+        attr="domain"
         if perms is None:
             perms=list(self.kpermassessor.kperms)
-        attrsets=set(tuple(sorted(getattr(i,attr))) for i in perms)
-        groups=[[perm for perm in perms if tuple(sorted(getattr(perm,attr)))==ats]
-                for ats in attrsets]
-        return groups
+        #attrsets=set(tuple(sorted(getattr(i,attr))) for i in perms)
+        # does not include neutral permutation in attrsets
+        attrsets=set(tuple(sorted(getattr(i,attr))) for i in perms if len(getattr(i,attr))>0)
+        same_domain=[[perm for perm in perms if tuple(sorted(getattr(perm,attr)))==ats]
+                     for ats in attrsets]
+        # to each group with the same domain, add the neutral permutation with same domain
+        return [grp+[grp[0].identity_perm()] for grp in same_domain]
 
     def run(self):
         u'''
@@ -189,11 +193,9 @@ class KPermCombiner:
 
         '''
         pickle.dump(list(self.kpermassessor.kperms),open("perms2group.pickle","wb"))
-        # find groups of kperms (perms ?!), does it make collections of perms??
+        # Each group must have the neutral permutation,
+        # and each elements in the same group must share the same domain
         groups = self.group_perms()
-        # here is where the bug lies:
-        # Each group must have the neutral permutation.
-        # At the moment, this is not the case
 
         # reversed sort groups per size
         groups = sorted(groups,key=lambda x:-len(x))
@@ -205,16 +207,13 @@ class KPermCombiner:
         print("before filtering",[len(grp) for grp in scored])
         filtered = [scfilter(grp) for grp in scored]
 
-        # the partition is on the groups intersecting filtered[0] David
-        # Oh, you are right. Cheers!
-
         # we need to discard groups of a single elements (i.e. the neutral k-permutation)
-        #filtered = list(filter(lambda x:len(x)>1,filtered))
-        # remove collections consisting only of neutral permutations
+        filtered = list(filter(lambda x:len(x)>1,filtered))
         print("after filtering",[len(grp) for grp in filtered])
 
-        filtered =  [scp for scp in filtered
-                     if not all([len(scprm.perm.changes)==0 for scprm in scp])]
+        # redundant with above
+        #filtered =  [scp for scp in filtered
+        #             if not all([len(scprm.perm.changes)==0 for scprm in scp])]
 
         filtered = [scores.ScoredPermCollection(scperms=grp) for grp in filtered]
         pickle.dump(filtered,open("filtered.pickle","wb"))

@@ -289,7 +289,7 @@ class OligoKPerm(OligoPerm):
         u'returns the set of indices onto which the k-permutation applies'
         if len(self._domain)==0:
             #self._domain=set(self.kpermids) # not restrictive enough
-            self._domain=set(self.changes) # after, not  retrictive enough (?) to test!
+            self._domain=set(self.changes)
         return self._domain
 
     @property
@@ -301,6 +301,17 @@ class OligoKPerm(OligoPerm):
         if len(self._changes)==0:
             self._changes=self.get_changes(self.kpermids)
         return self._changes
+
+    def identity_perm(self):
+        u'''
+        returns an OligoKPerm with identity permutation
+        but with same domain
+        '''
+        skperm = sorted(zip(self.kpermids,self.kperm))
+        return OligoKPerm(oligos=self.oligos,
+                          kperm=[i[1] for i in skperm],
+                          kpermids=[i[0] for i in skperm],
+                          domain=self.domain)
 
 # no longer used, to remove
 class Permids2OligoPerm:

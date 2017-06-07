@@ -265,7 +265,9 @@ class ScoredPermCollection:
         assumes that the 2 permutation are independant
         work on permids and changes only
         '''
-        if collection1.scperms[0].perm.domain==collection2.scperms[0].perm.domain:
+        if collection1.intersect_with(collection2):
+            print(collection1.scperms[0].perm.domain)
+            print(collection2.scperms[0].perm.domain)
             print("pb the 2 permutations are not independant")
         perms1=np.matrix([i.perm.permids for i in collection1.scperms])
         perms2=np.matrix([i.perm.permids for i in collection2.scperms])
