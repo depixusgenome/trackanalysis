@@ -23,7 +23,7 @@ class PeakFindingBatchTemplate(BatchTemplate):
     peaks     = PeakSelectorTask()      # type: Optional[PeakSelectorTask]
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
-        pass
+        super().__init__(**kwa)
 
     def __iter__(self) -> Iterator[Task]:
         if self.alignment:

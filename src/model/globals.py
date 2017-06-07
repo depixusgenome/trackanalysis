@@ -178,7 +178,7 @@ class SingleMapAccess:
             return self._map.pop(self._base)
         return self._map.pop(*(self._key+i for i in keys))
 
-class GlobalsChild(ChainMap):
+class GlobalsChild(ChainMap): # pylint: disable=too-many-ancestors
     "Dictionnary with defaults values. It can be reset to these."
     __NAME    = 'の'
     __slots__ = ('__name',)
