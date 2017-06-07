@@ -23,8 +23,8 @@ def coffee(apath:'Union[str,pathlib.Path]', name:'Optional[str]' = None, **kwa) 
         path = path.parent / name # type: ignore
 
     src = pathlib.Path(path.with_suffix(".coffee")).read_text()
-    for name, val in kwa.items():
-        src = src.replace("$$"+name, val)
+    for title, val in kwa.items():
+        src = src.replace("$$"+title, val)
     return src.replace('$$', '')
 
 class MetaMixin(type):

@@ -18,10 +18,7 @@ LOGGER = 'trackanalysis'
 
 def getLogger(arg = None):
     "the root logger"
-    if arg is None:
-        return logging.getLogger(LOGGER)
-    else:
-        return logging.getLogger(LOGGER+'.'+arg)
+    return logging.getLogger(LOGGER if arg is None else (LOGGER+'.'+arg))
 
 def logToFile(path, **kwa):
     "adds a log to file"

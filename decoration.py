@@ -63,23 +63,23 @@ def fromstream(streamopts):
 
             _wrapgen.__annotations__[ppos.name] = StreamUnion
             return _wrapgen
-        else:
-            @wraps(fcn)
-            def _wrapfcn(*args, **kwa):
-                path = ppos.path(args, kwa)
-                if isinstance(path, pathlib.Path):
-                    path = str(path)
 
-                if isinstance(path, str):
-                    with open(path, streamopts) as stream:
-                        args, kwa = ppos.args(stream, args, kwa)
-                        return fcn(*args, **kwa)
-                else:
-                    args, kwa = ppos.args(path, args, kwa)
+        @wraps(fcn)
+        def _wrapfcn2(*args, **kwa):
+            path = ppos.path(args, kwa)
+            if isinstance(path, pathlib.Path):
+                path = str(path)
+
+            if isinstance(path, str):
+                with open(path, streamopts) as stream:
+                    args, kwa = ppos.args(stream, args, kwa)
                     return fcn(*args, **kwa)
+            else:
+                args, kwa = ppos.args(path, args, kwa)
+                return fcn(*args, **kwa)
 
-            _wrapfcn.__annotations__[ppos.name] = StreamUnion
-            return _wrapfcn
+        _wrapfcn2.__annotations__[ppos.name] = StreamUnion
+        return _wrapfcn2
     return _wrapper
 
 @contextmanager
@@ -151,8 +151,7 @@ def escapenans(*arrays: np.ndarray, reset = True):
             with _escapenans(*arrs, reset = reset) as currs:
                 return fcn(*currs)
         return _wrap
-    else:
-        return _escapenans(*arrays, reset = reset)
+    return _escapenans(*arrays, reset = reset)
 
 T = TypeVar("T")
 class CachedIO(Generic[T]):
