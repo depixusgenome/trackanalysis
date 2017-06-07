@@ -24,7 +24,7 @@ require(python = {'python': 3.5, 'numpy': '1.11.2', 'pandas': '0.19.0'},
 
 require(python = {'pybind11' : '2.1.0',
                   'pylint'   : '1.7.1',
-                  'astroid'  : '1.4.8',
+                  'astroid'  : '1.5.3',
                   'mypy'     : '0.511'},
         rtime  = False)
 
