@@ -73,9 +73,6 @@ class DerivateSplitDetector(BaseSplitDetector):
     The sigma (precision) is either provided or measured. In the latter case,
     the estimation used is the median-deviation of the derivate of the data.
     """
-    def __init__(self, **kwa):
-        super().__init__(**kwa)
-
     def deltas(self, data : np.ndarray) -> np.ndarray:
         "all deltas"
         window = self.window
@@ -95,9 +92,8 @@ class DerivateSplitDetector(BaseSplitDetector):
         precision = self.getprecision(precision, data)
         if self.confidence is None or self.confidence <= 0.:
             return precision
-        else:
-            return norm.threshold(True, self.confidence, precision,
-                                  self.window, self.window)
+        return norm.threshold(True, self.confidence, precision,
+                              self.window, self.window)
 
     def _compute(self, precision:Optional[float], data : np.ndarray) -> np.ndarray:
         return self.deltas(data) <= -self.threshold(precision, data)*self.window
@@ -144,8 +140,7 @@ class MinMaxSplitDetector(BaseSplitDetector):
         precision = self.getprecision(precision, data)
         if self.confidence is None or self.confidence <= 0.:
             return precision
-        else:
-            return norm.threshold(True, self.confidence, precision)
+        return norm.threshold(True, self.confidence, precision)
 
     def _compute(self, precision:Optional[float], data : np.ndarray) -> np.ndarray:
         return self.deltas(data) < -self.threshold(precision, data)

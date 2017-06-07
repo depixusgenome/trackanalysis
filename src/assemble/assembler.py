@@ -142,7 +142,7 @@ class MCAssembler(Assembler):
     def run(self,*args,**kwargs)->None: # pylint:disable = unused-argument
         u'''runs a specified number of steps
         '''
-        if not "niter" in kwargs.keys():
+        if "niter" not in kwargs.keys():
             kwargs["niter"]=1
         if self.state is None:
             self.state=self.state_init

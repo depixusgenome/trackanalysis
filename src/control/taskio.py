@@ -35,7 +35,7 @@ class TaskIO:
 
 class TrackIO(TaskIO):
     "Deals with reading a track file"
-    EXT = 'trk', # type: Tuple[str, ...]
+    EXT = ('trk',) # type: Tuple[str, ...]
     def open(self, path:Union[str, Tuple[str,...]], model:tuple):
         "opens a track file"
         if len(model):
@@ -52,7 +52,7 @@ class ConfigTrackIO(TrackIO):
     def open(self, path:Union[str, Tuple[str,...]], model:tuple):
         "opens a track file and adds a alignment"
         if isinstance(path, str):
-            path = path,
+            path = (path,)
 
         items = [TrackIO.open(self, path, model)[0][0]]
         for name in self._ctrl.get(default = tuple()):
@@ -72,7 +72,7 @@ class _GrFilesIOMixin:
     def _open(self, path:Union[str, Tuple[str,...]], _):
         "opens a track file and adds a alignment"
         if isinstance(path, str):
-            path = path,
+            path = (path,)
 
         trks = tuple(i for i in path if any(i.endswith(j) for j in TrackIO.EXT))
         grs  = tuple(i for i in path if i.endswith(self.EXT[-1]) or Path(i).is_dir())

@@ -65,10 +65,11 @@ class Task:
     def __eq__(self, obj):
         if obj.__class__ is not self.__class__:
             return False
+
         if hasattr(self, '__getstate__'):
             return obj.__getstate__() == self.__getstate__() # pylint: disable=no-member
-        else:
-            return _dumps(self) == _dumps(obj)
+
+        return _dumps(self) == _dumps(obj)
 
     __hash__ = object.__hash__
 
@@ -196,8 +197,8 @@ class DataFunctorTask(Task):
         if self.copy:
             fcn = lambda val: cpy(np.copy(val)) # pylint: disable=not-callable
             return lambda dat: dat.withfunction(fcn, beadsonly = self.beadsonly)
-        else:
-            return lambda dat: dat.withfunction(cpy, beadsonly = self.beadsonly)
+
+        return lambda dat: dat.withfunction(cpy, beadsonly = self.beadsonly)
 
 TASK_ORDER = ('model.task.RootTask',
               'model.task.DataSelectionTask',

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint: disable=arguments-differ
 u"Loading and save tracks"
 from    typing      import (Sequence, Callable, # pylint: disable=unused-import
                             Any, Union, Tuple, Optional, Iterator, TYPE_CHECKING)
@@ -27,8 +28,7 @@ def _glob(path:str):
     root = Path(path[:ind])
     if path[ind-1] not in ('/', '\\') and root != Path(path).parent:
         return Path(str(root.parent)).glob(root.name+path[ind:])
-    else:
-        return Path(root).glob(path[ind:])
+    return Path(root).glob(path[ind:])
 
 def _checktype(fcn):
     sig = signature(fcn)
@@ -301,9 +301,9 @@ class Handler:
 
         if track is None:
             return Track(**res)
-        else:
-            track.__setstate__(res)
-            return track
+
+        track.__setstate__(res)
+        return track
 
     @classmethod
     def check(cls, track) -> 'Handler':

@@ -41,14 +41,14 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
                                                  ''')
 
 
-    def create(self, fig, *args, **kwa):
+    def create(self, fig, *args, **kwa):   # pylint: disable=arguments-differ
         "Creates the hover tool for histograms"
         super().create(fig, *args, **kwa)
         jsc = CustomJS(args = {'fig': fig, 'source': self.source},
                        code = 'cb_obj.apply_update(fig, source)')
         self.js_on_change("updating", jsc)
 
-    def reset(self, resets):
+    def reset(self, resets):                # pylint: disable=arguments-differ
         "Creates the hover tool for histograms"
         dist = self._model.distances
         super().reset(resets,

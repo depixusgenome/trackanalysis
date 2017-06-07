@@ -49,7 +49,7 @@ class SingleMapAccessController(SingleMapAccess):
 
 class SingleMapController(Controller):
     "Dictionnary with defaults values. It can be reset to these."
-    __slots__ = '__items',
+    __slots__ = ('__items',)
     def __init__(self, mdl:GlobalsChild, **kwargs) -> None:
         super().__init__(**kwargs)
         self.__items = mdl # type: GlobalsChild
@@ -78,7 +78,10 @@ class SingleMapController(Controller):
         "returns the name of the root"
         return self.__items.name
 
-    def observe(self, *names, decorate = None, argstest = None):
+    def observe(self, *names,   # pylint: disable=arguments-differ
+                decorate = None,
+                argstest = None):
+
         "observes items in the current root"
         fcn = next((i for i in names if not isinstance(i, str)), None)
         if fcn is None:

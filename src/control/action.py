@@ -93,7 +93,8 @@ class Action:
                     with action:
                         fcn(attr, old, new)
             return _wrap_cb
-        elif tuple(signature(fcn).parameters)[1:] == ('attr', 'old', 'new'):
+
+        if tuple(signature(fcn).parameters)[1:] == ('attr', 'old', 'new'):
             # Special Bokeh callback context
             @wraps(fcn)
             def _wraps_cb(self, attr, old, new):
@@ -101,13 +102,13 @@ class Action:
                     with action:
                         fcn(self, attr, old, new)
             return _wraps_cb
-        else:
-            @wraps(fcn)
-            def _wrap_normal(*args, **kwargs):
-                if test is None or test(*args, **kwargs):
-                    with action:
-                        return fcn(*args, **kwargs)
-            return _wrap_normal
+
+        @wraps(fcn)
+        def _wrap_normal(*args, **kwargs):
+            if test is None or test(*args, **kwargs):
+                with action:
+                    return fcn(*args, **kwargs)
+        return _wrap_normal
 
     def __exit__(self, tpe, val, bkt):
         assert val is None or isinstance(val, Exception)
@@ -152,13 +153,13 @@ class ActionDescriptor:
                     with self.type(this, calls = calls):
                         fcn(this, attr, old, new)
             return _wrap_cb
-        else:
-            @wraps(fcn)
-            def _wrap_cb(this, *args, **kwa):
-                if self.test is None or self.test(*args, **kwa):
-                    with self.type(this, calls = calls):
-                        fcn(this, *args, **kwa)
-            return _wrap_cb
+
+        @wraps(fcn)
+        def _wrap_cb2(this, *args, **kwa):
+            if self.test is None or self.test(*args, **kwa):
+                with self.type(this, calls = calls):
+                    fcn(this, *args, **kwa)
+        return _wrap_cb2
 
     def __get__(self, obj, tpe):
         if obj is None:

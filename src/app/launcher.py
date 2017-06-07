@@ -18,7 +18,7 @@ from bokeh.resources            import DEFAULT_SERVER_PORT
 
 from utils.logconfig            import getLogger, logToFile
 from utils                      import getlocals
-from utils.gui                  import MetaMixin
+from utils.gui                  import MetaMixin # pylint: disable=unused-import
 from control                    import Controller
 from view                       import View, BokehView
 from view.keypress              import KeyPressManager
@@ -313,9 +313,9 @@ class WithToolbar:
                 children = [self._bar.getroots(doc), self._mainview.getroots(doc)]
                 if self._ctrl.getGlobal('css').responsive.get():
                     return layout(children, responsive = True),
-                else:
-                    mode = self._ctrl.getGlobal('css').sizing_mode.get()
-                    return layout(children, sizing_mode = mode),
+
+                mode = self._ctrl.getGlobal('css').sizing_mode.get()
+                return layout(children, sizing_mode = mode),
 
         return ViewWithToolbar
 

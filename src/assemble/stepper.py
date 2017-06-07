@@ -44,7 +44,7 @@ class PreFixedSteps(HoppingSteps):
     u'''
     calls predefined fixed distributions
     '''
-    def __call__(self,*args):
+    def __call__(self,*args): # pylint: disable=arguments-differ
         return numpy.array([i.rvs(random_state=self.random_state) for i in self.dists])
 
 
@@ -59,11 +59,11 @@ class GaussAndFlip(HoppingSteps):
         if self.count==0:
             self.count=1
             return numpy.array([i.rvs(random_state=self.random_state) for i in self.dists])
-        else:
-            self.count=0
-            flip = numpy.random.randint(len(xst)-1)
-            xst[flip], xst[flip+1] = xst[flip+1],xst[flip]
-            return xst
+
+        self.count=0
+        flip = numpy.random.randint(len(xst)-1)
+        xst[flip], xst[flip+1] = xst[flip+1],xst[flip]
+        return xst
 
 class OptimOligoSwap(HoppingSteps): # not yet usable
     u'''

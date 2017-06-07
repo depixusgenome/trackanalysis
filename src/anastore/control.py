@@ -8,7 +8,7 @@ from .                  import load, dump
 
 class AnaIO(TaskIO):
     "Ana IO"
-    EXT = 'ana',
+    EXT = ('ana',)
     def open(self, path:Union[str, Tuple[str,...]], model:tuple):
         u"opens an ana file"
         if isinstance(path, tuple):

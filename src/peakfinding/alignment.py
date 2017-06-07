@@ -32,7 +32,7 @@ class PeakCorrelationAlignment:
             self.parent    = parent
             self.precision = precision
             self.data      = data
-            self.cost      = 1,
+            self.cost      = (1,)
 
     class Action:
         """
@@ -108,8 +108,8 @@ class PeakCorrelationAlignment:
                     subp = subpixel(arr, ind)
                     return ind if subp is None else subp
                 return _argmax
-            else:
-                return lambda ref, cur: np.argmax(cost(np.dot(cur, ref)))
+
+            return lambda ref, cur: np.argmax(cost(np.dot(cur, ref)))
 
         def hists(self, wtab, projector, bias, good):
             "creates the histograms"

@@ -58,16 +58,12 @@ class ExtremumAlignment:
         itr = (self.__get(j) for j in data) if self.binsize > 2 else data
         fcn = getattr(np, self.mode.value)
         res = np.fromiter((-fcn(i) for i in itr), dtype = np.float32)
-        if subtract:
-            return np.subtract(res, np.nanmedian(res), out = res)
-        else:
-            return res
+        return np.subtract(res, np.nanmedian(res), out = res) if subtract else res
 
     def __call__(self, data) -> np.ndarray:
         if isinstance(data, np.ndarray) and np.isscalar(data[0]):
             return self.one(data)
-        else:
-            return self.many(data)
+        return self.many(data)
 
     @classmethod
     def run(cls, data, **kwa):
@@ -102,10 +98,7 @@ class PhaseEdgeAlignment:
         res = np.fromiter((-np.percentile(i[sli], self.percentile) for i in data),
                           dtype = 'f4')
 
-        if subtract:
-            return np.subtract(res, np.nanmedian(res), out = res)
-        else:
-            return res
+        return np.subtract(res, np.nanmedian(res), out = res) if subtract else res
 
     @classmethod
     def run(cls, data, **kwa):

@@ -182,10 +182,7 @@ def _launch(view, app, desktop, kwa):
     return launch(viewcls, **kwa)
 
 def _port(port):
-    if port == 'random':
-        return int(random.randint(5000, 8000))
-    else:
-        return int(port)
+    return int(random.randint(5000, 8000)) if port == 'random' else int(port)
 
 def _version(ctx, _, value):
     import version

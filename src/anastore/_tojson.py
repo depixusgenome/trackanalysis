@@ -52,13 +52,11 @@ class _DictIO(_ItemIO):
     def run(val, runner):
         "returns the dict to be dumped"
         if all(isinstance(key, str) for key in val):
-            if isjsonable(val):
-                return val
-            else:
-                return {name: runner(ite) for name, ite in val.items()}
-        else:
-            vals = [[runner(name), runner(ite)] for name, ite in val.items()]
-            return {TPE: 'd', CNT: vals}
+            return (val if isjsonable(val) else
+                    {name: runner(ite) for name, ite in val.items()})
+
+        vals = [[runner(name), runner(ite)] for name, ite in val.items()]
+        return {TPE: 'd', CNT: vals}
 
 class _NDArrayIO(_ItemIO):
     @staticmethod
@@ -72,8 +70,7 @@ class _NDArrayIO(_ItemIO):
         if val.dtype == np.object:
             vals = [runner(ite) for ite in val]
             return {TPE: 'npo', CNT: vals}
-        else:
-            return {TPE: 'np'+str(val.dtype), CNT: val.tolist()}
+        return {TPE: 'np'+str(val.dtype), CNT: val.tolist()}
 
 class _NPFunction(_ItemIO):
     @staticmethod

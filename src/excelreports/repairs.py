@@ -35,7 +35,8 @@ class UpdateableZipFile(ZipFile):
         # Whether the with statement was called
         self._allow_updates = False
 
-    def writestr(self, zinfo_or_arcname, byts, compress_type=None):
+    def writestr(self, zinfo_or_arcname, # pylint: disable=arguments-differ
+                 byts, compress_type=None):
         if isinstance(zinfo_or_arcname, ZipInfo):
             name = zinfo_or_arcname.filename
         else:

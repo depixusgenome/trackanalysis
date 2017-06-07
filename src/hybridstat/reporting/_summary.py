@@ -84,13 +84,13 @@ class SummarySheet(Reporter):
             return None
 
         good = bead.peaks['key'] >= 0
-        if any(good):
-            dist = bead.distance
-            chi2 = (((bead.peaks['zvalue'][good]-dist.bias)*dist.stretch
-                     -bead.peaks['key'][good])**2).mean()
-            return chi2/((dist.stretch*self.uncertainty(bead))**2)
-        else:
+        if not any(good):
             return None
+
+        dist = bead.distance
+        chi2 = (((bead.peaks['zvalue'][good]-dist.bias)*dist.stretch
+                 -bead.peaks['key'][good])**2).mean()
+        return chi2/((dist.stretch*self.uncertainty(bead))**2)
 
     @column_method("Peak Count")
     def _npeaks(self, ref:Group, bead:Bead) -> Optional[int]:
@@ -118,11 +118,10 @@ class SummarySheet(Reporter):
 
             peaks = self.config.hairpins[ref.key].peaks[1:-1]
             theor = set(np.int32(peaks+.1)) # type: ignore
-            for bead in ref.beads:
-                theor.difference_update(bead.peaks['key'])
+            for itm in ref.beads:
+                theor.difference_update(itm.peaks['key'])
             return len(theor)
-        else:
-            return (bead.peaks['key'][1:] < 0).sum()
+        return (bead.peaks['key'][1:] < 0).sum()
 
     @column_method("Valid Cycles")
     def _ncycles(self, _, bead:Bead) -> int:

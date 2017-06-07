@@ -94,10 +94,7 @@ class PlotAttrs:
             return [colors[int((i-minv)/(maxv-minv)*npal)] for i in indexes]
         else:
             colors  = palette(count)
-            if indexes is not None:
-                return [colors[i] for i in indexes]
-            else:
-                return colors
+            return [colors[i] for i in indexes] if indexes is not None else colors
 
     def addto(self, fig, **kwa) -> GlyphRenderer:
         "adds itself to plot: defines color, size and glyph to use"
@@ -244,7 +241,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                 i.update(**j)
         finally:
             self._bkmodels.clear()
-            self.state = old # pylint: disable=redefined-variable-type
+            self.state = old
 
     @staticmethod
     def fixreset(arng):
@@ -377,7 +374,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                             return tuple(self._bkmodels.items())
                         finally:
                             self._bkmodels.clear()
-                            self.state = old # pylint: disable=redefined-variable-type
+                            self.state = old
 
                 ret = await threadmethod(_reset)
 

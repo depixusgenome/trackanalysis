@@ -73,9 +73,6 @@ class CyclesPlotView(PlotView):
     "Cycles plot view"
     PLOTTER = CyclesPlotCreator
     APPNAME = 'Track Cycles'
-    def __init__(self, *args, **kwa):
-        super().__init__(*args, **kwa)
-
     def advanced(self):
         "triggers the advanced dialog"
         self._plotter.advanced()

@@ -50,10 +50,7 @@ class LazyDict:
     def get(self, key, default = None):
         u"as for dict"
         val =  self._data.get(key, None)
-        if val is None:
-            return default()
-        else:
-            return val()
+        return default() if val is None else val()
 
     def setdefault(self, key, default = None):
         u"as for dict"
@@ -67,9 +64,8 @@ class LazyDict:
         u"as for dict"
         if keeplazy:
             return self._data.popitem()
-        else:
-            key, val = self._data.popitem()
-            return key, val()
+        key, val = self._data.popitem()
+        return key, val()
 
     def pop(self, key, default = None, keeplazy = False):
         u"as for dict"

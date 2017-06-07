@@ -261,16 +261,15 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
         "returns a function performing all actions"
         if actions is None:
             actions = self.actions
+
         if len(actions) > 1:
             def _act(item):
                 for action in actions:
                     item = action(item)
                 return item
             return _act
-        elif len(actions) == 1:
-            return actions[0]
-        else:
-            return None
+
+        return actions[0] if len(actions) == 1 else None
 
 class TrackItems(_m_ConfigMixin, Items):
     "Class for iterating over beads or creating a new list of data"
@@ -440,12 +439,11 @@ class Beads(TrackItems, Items):
                     res = Cycles(track = self.track, data = cpy)
                     if all(_m_ellipsis(i) for i in keys):
                         return res.selecting([(..., i) for i in self.cyclerange()])
-                    elif _m_ellipsis(keys[1]):
+                    if _m_ellipsis(keys[1]):
                         return res.selecting([(keys[0], i) for i in self.cyclerange()])
-                    elif keys[1] not in self.cyclerange():
+                    if keys[1] not in self.cyclerange():
                         return res.new(data = {}, direct = True)
-                    else:
-                        return res[keys]
+                    return res[keys]
                 res = Cycles(track = self.track, data = self)
                 return res if all(_m_ellipsis(i) for i in keys) else res[keys]
             raise NotImplementedError()
@@ -665,12 +663,11 @@ class Cycles(TrackItems, Items):
         vect = self.track.phases
         if _m_ellipsis(cid) and _m_ellipsis(pid):
             return vect         - vect[:,0]
-        elif cid in _m_ALL:
+        if cid in _m_ALL:
             return vect[:,pid]  - vect[:,0]
-        elif pid in _m_ALL:
+        if pid in _m_ALL:
             return vect[cid,:]  - vect[cid,0]
-        else:
-            return vect[cid,pid]- vect[cid,0]
+        return vect[cid,pid]- vect[cid,0]
 
     def maxsize(self):
         "returns the max size of cycles"
@@ -683,9 +680,8 @@ class Cycles(TrackItems, Items):
         first = self.track.phase(..., 0 if self.first is None else self.first)
         if self.last is None or self.last == self.track.nphases-1:
             return np.max(np.diff(first))
-        else:
-            last = self.track.phase(..., self.last+1)
-            return np.max(last - first)
+        last = self.track.phase(..., self.last+1)
+        return np.max(last - first)
 
     @staticmethod
     def isbead(key:CYCLEKEY) -> bool:
@@ -693,6 +689,7 @@ class Cycles(TrackItems, Items):
         return isinstance(key[0], _m_INTS)
 
     if TYPE_CHECKING:
+        # pylint: disable=useless-super-delegation
         def __getitem__(self, keys) -> Union['Cycles',np.ndarray]:
             return super().__getitem__(keys)
 
@@ -700,7 +697,6 @@ class Cycles(TrackItems, Items):
                  sel      :Optional[Sequence] = None,
                  beadsonly:Optional[bool]     = None) -> Iterator[CYCLEKEY]:
             yield from super().keys(sel)
-
 
         def __iter__(self) -> Iterator[Tuple[CYCLEKEY, np.ndarray]]:
             yield from super().__iter__()

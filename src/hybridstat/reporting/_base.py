@@ -33,8 +33,8 @@ class HasLengthPeak:
 
         if bead is None:
             return len(self.hairpins[ref.key].peaks) == ipk+1
-        else:
-            return ipk == 0 or (self.haslengthpeak and ipk == len(bead.peaks)-1)
+
+        return ipk == 0 or (self.haslengthpeak and ipk == len(bead.peaks)-1)
 
     @staticmethod
     def basevalue(bead, ipk):
@@ -78,8 +78,7 @@ class ChartCreator:
     def _peaks(self, ref:Group, bead:Bead):
         if bead is None:
             return self._parent.config.hairpins[ref.key].peaks
-        else:
-            return bead.peaks['zvalue']
+        return bead.peaks['zvalue']
 
     def __call__(self, ref:Group, bead:Bead):
         "returns a chart for this bead if peak is peaks zero"

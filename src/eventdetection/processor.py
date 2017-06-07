@@ -98,7 +98,6 @@ class ExtremumAlignmentProcessor(Processor):
                                            percentile = percentile)
             else:
                 mode  = 'min'  if phase == PHASE.pull else 'max'
-                # pylint: disable=redefined-variable-type
                 align = ExtremumAlignment(binsize = window, mode = mode).many
             return align(vals, subtract = False)
 
@@ -179,8 +178,7 @@ class ExtremumAlignmentProcessor(Processor):
             return cls._Args(cycles, inits, pulls,
                              cycles.bias(PHASE.measure, window, 'right', percentile))
 
-        else:
-            return cls._Args(cycles, inits, pulls, None)
+        return cls._Args(cycles, inits, pulls, None)
 
     @classmethod
     def __deltas(cls, attr:str, outlier: str, args:_Args, kwa):

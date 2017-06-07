@@ -28,9 +28,9 @@ class Probabilities:
         self._values[key] = val = self._proba(peak[1], self._ends)
         return val
 
-    def __call__(self, name: str, *args):
+    def __call__(self, name:str, bead:BEADKEY, ipk:int, peak:PeakOutput):
         "returns a probability value for a bead"
-        return getattr(self.__cache(*args), name)
+        return getattr(self.__cache(bead, ipk, peak), name)
 
 @sheet_class("Peaks")
 class PeaksSheet(Reporter):

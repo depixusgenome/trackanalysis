@@ -60,19 +60,17 @@ class PeakSelector(PrecisionAlg):
                 def _add(evt, delta):
                     if len(evt) == 0:
                         return None
-                    elif len(evt) == 1:
+
+                    if len(evt) == 1:
                         return evt[0][0], evt[0][1]+delta
-                    else:
-                        evt['data'] += delta
-                        return evt
+
+                    evt['data'] += delta
+                    return evt
             else:
                 def _add(evt, delta):
-                    if len(evt) == 0:
-                        return None
-                    elif len(evt) == 1:
-                        return evt[0]+delta
-                    else:
-                        return evt + delta
+                    return (None         if len(evt) == 0 else
+                            evt[0]+delta if len(evt) == 1 else
+                            evt + delta)
 
             objs = tuple(_add(*item) for item in zip(evts, deltas))
 
@@ -103,16 +101,12 @@ class PeakSelector(PrecisionAlg):
 
         if isinstance(first, tuple) or first.dtype == EVENTS_DTYPE:
             def _measure(item):
-                if isinstance(item, tuple):
-                    return [zmeas(item[1])]
-                else:
-                    return [zmeas(i) for i in item['data']]
+                return ([zmeas(item[1])]    if isinstance(item, tuple)  else
+                        [zmeas(i) for i in item['data']])
         else:
             def _measure(item):
-                if np.isscalar(item[0]):
-                    return [zmeas(item)]
-                else:
-                    return [zmeas(i[1]) for i in item]
+                return ([zmeas(item)]       if np.isscalar(item[0])     else
+                        [zmeas(i[1]) for i in item])
 
         vals = [_measure(i) for i in evts if i is not None]
         return zmeas(np.concatenate(vals))

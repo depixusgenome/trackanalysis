@@ -21,10 +21,7 @@ class UndoModel:
     def pop(self, isundoing):
         u"Pops a list of undos"
         queue = self.undos if isundoing else self.redos
-        if len(queue) == 0:
-            return tuple()
-        else:
-            return queue.pop()
+        return tuple() if len(queue) == 0 else queue.pop()
 
     def append(self, isundoing, items):
         u"Appends to a list of undos"

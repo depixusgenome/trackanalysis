@@ -14,7 +14,7 @@ from    data        import Track
 if TYPE_CHECKING:
     from .runner    import Runner # pylint: disable=unused-import
 
-_PROTECTED = 'tasktype',
+_PROTECTED = ('tasktype',)
 class ProtectedDict(dict):
     "Dictionary with read-only keys"
     def __setitem__(self, key, val):

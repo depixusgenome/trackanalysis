@@ -86,8 +86,7 @@ class FileDialog:
         def _get(ext, bopen):
             if bopen:
                 return cls.firstexistingpath(cls.storedpaths(ctrl, storage, ext))
-            else:
-                return cls.firstexistingparent(cls.storedpaths(ctrl, storage, ext))
+            return cls.firstexistingparent(cls.storedpaths(ctrl, storage, ext))
         return _get
 
     @classmethod
@@ -102,7 +101,7 @@ class FileDialog:
                 if bcheck:
                     if not ret.exists():
                         continue
-                    ret = ret.resolve() # pylint: disable=redefined-variable-type
+                    ret = ret.resolve()
 
                 if cnf.get(ret.suffix[1:], default = _m_none) is not _m_none:
                     vals.setdefault(ret.suffix[1:], str(ret))

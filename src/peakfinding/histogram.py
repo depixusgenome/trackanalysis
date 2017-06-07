@@ -65,7 +65,7 @@ class Histogram(PrecisionAlg):
 
         if (self.zmeasure is not None
                 and np.isscalar(next(i[0] for i in events if len(i)))):
-            events = events,
+            events = (events,)
 
         gen          = self.__compute(events, bias, separate)
         minv, bwidth = next(gen)
@@ -115,8 +115,8 @@ class Histogram(PrecisionAlg):
         if self.kernel is not None:
             osamp = (int(self.oversampling)//2) * 2 + 1
             return self.kernel.kernel(oversampling = osamp, range = 'same')
-        else:
-            return np.array([1.], dtype = 'f4')
+
+        return np.array([1.], dtype = 'f4')
 
     @classmethod
     def run(cls, *args, **kwa):
@@ -141,12 +141,9 @@ class Histogram(PrecisionAlg):
 
     @staticmethod
     def __weights(fcn, events):
-        if fcn is None:
-            return itertools.repeat(1., len(events))
-        elif isinstance(fcn, np.ndarray):
-            return fcn
-        else:
-            return (fcn(evts) for evts in events)
+        return (itertools.repeat(1., len(events)) if fcn is None                 else
+                fcn                               if isinstance(fcn, np.ndarray) else
+                (fcn(evts) for evts in events))
 
     @staticmethod
     def __generate(lenv, kern, zmeas, weights):

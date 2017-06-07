@@ -31,8 +31,7 @@ class PeaksSequencePathWidget(SequencePathWidget):
         if len(dist):
             lst  = [i for i in lst if i in dist]
             return sorted(lst, key = lambda i: dist[i].value)
-        else:
-            return super()._sort(lst)
+        return super()._sort(lst)
 
     def callbacks(self,                     # pylint: disable=arguments-differ
                   hover: SequenceHoverMixin,

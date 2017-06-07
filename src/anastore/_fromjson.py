@@ -103,10 +103,9 @@ class Runner:
         if hasattr(cls, '__getnewargs_ex__'):
             i, j = cls.__getnewargs_ex__()
             return cls.__new__(*i, **j)
-        elif hasattr(cls, '__getnewargs__'):
+        if hasattr(cls, '__getnewargs__'):
             return cls.__new__(*cls.__getnewargs__())
-        else:
-            return cls.__new__(cls)
+        return cls.__new__(cls)
 
     def __init_obj(self, obj, item):
         state = {name: self(val) for name, val in item.items()}

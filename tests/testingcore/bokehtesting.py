@@ -128,9 +128,8 @@ class WidgetAccess:
                 itms += tuple(doc.select({'name': value}))
             if len(itms) > 0:
                 return WidgetAccess(itms)
-            else:
-                key = value if self._key is None else self._key + '.' + value
-                return WidgetAccess(tuple(self._docs), key)
+            key = value if self._key is None else self._key + '.' + value
+            return WidgetAccess(tuple(self._docs), key)
 
     def __getattr__(self, key):
         return super().__getattribute__(key) if key[0] == '_' else getattr(self(), key)

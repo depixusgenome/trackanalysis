@@ -138,9 +138,9 @@ class Curve(Multiplier):
 
         if source is None:
             return ColumnDataSource(data = {'z': data, 't': time})
-        else:
-            source.data = {'z': data, 't': time}
-            return source
+
+        source.data = {'z': data, 't': time}
+        return source
 
     def plot(self, plot, source):
         "plots a source"

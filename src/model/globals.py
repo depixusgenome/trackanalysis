@@ -64,10 +64,8 @@ class SingleMapAccess:
         return type(self)(self.__dict__['_map'], self._key+name+'.')
 
     def __getitem__(self, name):
-        if isinstance(name, (tuple, list)):
-            return self._map.get(*name)
-        else:
-            return self.__getattr__(name)
+        return (self._map.get(*name)     if isinstance(name, (tuple, list)) else
+                self.__getattr__(name))
 
     def __eq__(self, other):
         return self.get() == other
@@ -82,14 +80,10 @@ class SingleMapAccess:
     def __delattr__(self, name):
         if name[0] == '_' or name in SingleMapAccess.PROPS:
             return super().__delattr__(name)
-        else:
-            return self._map.pop(self._key+name)
+        return self._map.pop(self._key+name)
 
     def __delitem__(self, name):
-        if isinstance(name, (tuple, list)):
-            return self.pop(*name)
-        else:
-            return self.pop(name)
+        return self.pop(*name) if isinstance(name, (tuple, list)) else self.pop(name)
 
     def __kwargs(self, args, kwargs):
         if len(args) == 1 and isinstance(args[0], dict):
@@ -187,7 +181,7 @@ class SingleMapAccess:
 class GlobalsChild(ChainMap):
     "Dictionnary with defaults values. It can be reset to these."
     __NAME    = 'の'
-    __slots__ = '__name'
+    __slots__ = ('__name',)
     def __init__(self, name:str, parent: Optional['GlobalsChild'] = None) -> None:
         maps = [dict() for i in range(_CNT)] # type: ignore
         if parent is not None:
@@ -228,48 +222,46 @@ class GlobalsChild(ChainMap):
             return ret
         return None
 
-    def pop(self, *args):
-        "removes view information"
-        return self.update(dict.fromkeys(args, delete))
-
     @property
     def name(self) -> str:
         "returns the name of the root"
         return self.__name
 
-    def keys(self, base = ''):   # pylint: disable = arguments-differ
+    def pop(self, *args):                       # pylint: disable=arguments-differ
+        "removes view information"
+        return self.update(dict.fromkeys(args, delete))
+
+    def keys(self, base = ''):                  # pylint: disable = arguments-differ
         "returns all keys starting with base"
         return iter(key for key in super().keys() if key.startswith(base))
 
-    def values(self, base = ''): # pylint: disable = arguments-differ
+    def values(self, base = ''):                # pylint: disable = arguments-differ
         "returns all values with keys starting with base"
         return iter(val for key, val in super().items() if key.startswith(base))
 
-    def items(self, base = ''):  # pylint: disable = arguments-differ
+    def items(self, base = ''):                 # pylint: disable = arguments-differ
         "returns all items with keys starting with base"
         return iter(key for key in super().items() if key[0].startswith(base))
 
-    def get(self, *keys, default = delete):
+    def get(self, *keys, default = delete):     # pylint: disable=arguments-differ
         "returns values associated to the keys"
         if len(keys) == 2 and keys[1] is Ellipsis:
             root = keys[0]
             base = keys[0]+'.'
-            return {i: j for i, j in super().items()
-                    if i == root or i.startswith(base)}
+            return {i: j for i, j in super().items() if i == root or i.startswith(base)}
 
         if default is not delete:
             if len(keys) == 1:
                 return super().get(keys[0], default)
 
-            elif isinstance(default, list):
-                return iter(super().get(key, val)
-                            for key, val in zip(keys, default))
-            else:
-                return iter(super().get(key, default) for key in keys)
-        else:
-            if len(keys) == 1:
-                return self.__getitem__(keys[0])
-            return iter(self.__getitem__(key) for key in keys)
+            if isinstance(default, list):
+                return iter(super().get(key, val) for key, val in zip(keys, default))
+
+            return iter(super().get(key, default) for key in keys)
+
+        if len(keys) == 1:
+            return self.__getitem__(keys[0])
+        return iter(self.__getitem__(key) for key in keys)
 
     def __setitem__(self, key, val):
         return self.update({key: val})
@@ -290,7 +282,7 @@ def getglobalsproperties(cls:Type[T], obj) -> Iterator[T]:
 
 class ConfigRootProperty(Generic[T]):
     "a property which links to the config"
-    OBSERVERS = 'config.root',
+    OBSERVERS = ('config.root',)
     def __init__(self, key:str) -> None:
         self.key = key
 
@@ -309,7 +301,7 @@ class ConfigRootProperty(Generic[T]):
 
 class ProjectRootProperty(Generic[T]):
     "a property which links to the project"
-    OBSERVERS = 'project.root',
+    OBSERVERS = ('project.root',)
     def __init__(self, key:str) -> None:
         self.key = key
 
@@ -328,7 +320,7 @@ class ProjectRootProperty(Generic[T]):
 
 class ConfigProperty(Generic[T]):
     "a property which links to the root config"
-    OBSERVERS = 'config',
+    OBSERVERS = ('config',)
     def __init__(self, key:str) -> None:
         self.key = key
 
@@ -395,11 +387,11 @@ class _GlobalsAccess:
             return super().__getattribute__(key)
         if key == 'root':
             return self._ctrl.getGlobal(self._name)
-        elif key == 'plot':
+        if key == 'plot':
             return self._ctrl.getGlobal(self._name+'.plot')
-        else:
-            ctrl = self._ctrl.getGlobal(self._name+self._key)
-            return getattr(ctrl, key)
+
+        ctrl = self._ctrl.getGlobal(self._name+self._key)
+        return getattr(ctrl, key)
 
     __getitem__ = __getattr__
 

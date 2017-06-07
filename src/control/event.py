@@ -40,14 +40,10 @@ class EmitPolicy(Enum):
         elif policy is None:
             rta = fcn if fcn is None or isinstance(fcn, type) else type(fcn)
 
-        if rta is None:
-            return cls.nothing
-        elif issubclass(rta, Dict):
-            return cls.outasdict
-        elif issubclass(rta, (tuple, list)):
-            return cls.outastuple
-        else:
-            return policy
+        return (cls.nothing     if rta is None                      else
+                cls.outasdict   if issubclass(rta, Dict)            else
+                cls.outastuple  if issubclass(rta, (tuple, list))   else
+                policy)
 
     def run(self, allfcns: Set[Callable], args):
         "runs provided observers"
@@ -116,10 +112,8 @@ class Event:
         def _wrapper(fcn:Callable, myrt = toenum(EmitPolicy, returns)):
             lst = self.__emit_list(names, fcn)
 
-            if ismethod(fcn):
-                return self.__decorate_meth(self, lst, myrt, fcn)
-            else:
-                return self.__decorate_func(self, lst, myrt, fcn)
+            return (self.__decorate_meth(self, lst, myrt, fcn) if ismethod(fcn) else
+                    self.__decorate_func(self, lst, myrt, fcn))
         return self.__return(names, _wrapper)
 
     @classmethod
@@ -159,10 +153,7 @@ class Event:
                 name  = fcn.__name__
             match = self.__OBS_NAME(name)
 
-            if match is None:
-                return add((name,), fcn)
-            else:
-                return add((match.group(1),), fcn)
+            return add((name,), fcn) if match is None else add((match.group(1),), fcn)
 
         if len(names) == 1:
             if hasattr(names[0], 'items'):
@@ -202,25 +193,21 @@ class Event:
         if len(names) == 0 or names[0] is fcn:
             tmp = (cls.__EM_NAME(fcn.__name__).group(1),)
             return frozenset(name.lower().strip() for name in tmp)
-        else:
-            return frozenset(name.lower().strip() for name in names)
+
+        return frozenset(name.lower().strip() for name in names)
 
     @staticmethod
     def __handle_args(lst, policy, ret, args, kwargs):
         if policy in (EmitPolicy.outastuple, EmitPolicy.outasdict):
             return (lst, policy, ret)
-        elif policy == EmitPolicy.nothing:
+        if policy == EmitPolicy.nothing:
             return (lst, policy)
-        else:
-            return (lst, policy, (args, kwargs))
+        return (lst, policy, (args, kwargs))
 
     @staticmethod
     def __return(names, fcn):
         "Applies a wrapVper now or later"
-        if len(names) == 1:
-            return fcn(names[0])
-        else:
-            return fcn
+        return fcn(names[0]) if len(names) == 1 else fcn
 
     @classmethod
     def __decorate_meth(cls, this, lst, myrt, fcn):
@@ -301,9 +288,9 @@ class Event:
 class Controller(Event):
     "Main controller class"
     @classmethod
-    def emit(cls, *args, **kwargs):
+    def emit(cls, *names, returns = EmitPolicy.annotations):
         "decorator for emitting signals: can only be applied to *Controller* classes"
-        return Event.internalemit(*args, **kwargs)
+        return Event.internalemit(*names, returns = returns)
 
     @staticmethod
     def updateModel(model, **kwargs) -> dict:

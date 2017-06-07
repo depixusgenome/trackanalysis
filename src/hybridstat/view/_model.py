@@ -65,12 +65,12 @@ class FitToHairpinAccess(TaskAccess):
         ols = mdl.oligos
         if ols is None or len(ols) == 0 or len(mdl.sequences) == 0:
             return None
-        else:
-            dist = self.__defaults.distances.get()
-            pid  = self.__defaults.peakids.get()
-            return fittohairpintask(mdl.sequencepath,    ols,
-                                    mdl.constraintspath, mdl.useparams,
-                                    distance = dist, identifier = pid)
+
+        dist = self.__defaults.distances.get()
+        pid  = self.__defaults.peakids.get()
+        return fittohairpintask(mdl.sequencepath,    ols,
+                                mdl.constraintspath, mdl.useparams,
+                                distance = dist, identifier = pid)
 
     def resetmodel(self, mdl):
         "resets the model"
@@ -189,8 +189,7 @@ class PeaksPlotModelAccess(IdentificationModelAccess):
             ind   = self.eventdetection.index
             beads = next(iter(self._ctrl.run(root, ind-1, copy = True)))
             return next(processors(task)).apply(beads, **task.config())[ibead, ...]
-        else:
-            return next(iter(self._ctrl.run(root, task, copy = True)))[ibead, ...]
+        return next(iter(self._ctrl.run(root, task, copy = True)))[ibead, ...]
 
     def reset(self) -> bool:
         "adds tasks if needed"

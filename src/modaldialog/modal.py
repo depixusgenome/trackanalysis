@@ -67,11 +67,11 @@ class Option(metaclass = ABCMeta):
         "gets the value in the model"
         if isinstance(mdl, dict):
             return mdl[keystr]
-        else:
-            keys = keystr.split('.')
-            for key in keys[:-1]:
-                mdl = getattr(mdl, key)
-            return getattr(mdl, keys[-1], default)
+
+        keys = keystr.split('.')
+        for key in keys[:-1]:
+            mdl = getattr(mdl, key)
+        return getattr(mdl, keys[-1], default)
 
     @staticmethod
     def setvalue(mdl, keystr, val):

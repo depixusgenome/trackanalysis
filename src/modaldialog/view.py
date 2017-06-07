@@ -76,7 +76,7 @@ class AdvancedTaskMixin(AdvancedWidgetMixin):
         super().__init__()
         self.__outp = {} # type: Dict[str, Dict[str, Any]]
 
-    def __enter__(self, *args):
+    def __enter__(self):
         self.__outp.clear()
         super().__enter__()
 

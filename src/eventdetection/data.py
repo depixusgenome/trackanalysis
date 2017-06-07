@@ -85,6 +85,7 @@ class Events(Cycles, EventDetectionConfig, Items):
             yield (key, gen)
 
     if TYPE_CHECKING:
+        # pylint: disable=useless-super-delegation
         def keys(self, sel = None, beadsonly:Optional[bool] = None) -> Iterator[CYCLEKEY]:
             yield from super().keys(sel, beadsonly)
 

@@ -13,19 +13,17 @@ def _id(row, ibead):
     val = row[ibead].value
     if val is None:
         return
-    elif isinstance(val, str):
+
+    if isinstance(val, str):
         try:
-            if 'B' in val:
-                return int(val.split('B')[-1])
-            else:
-                return int(val)
+            return int(val.split('B')[-1]) if 'B' in val else int(val)
         except ValueError:
             return
-    else:
-        try:
-            return int(val)
-        except ValueError:
-            return
+
+    try:
+        return int(val)
+    except ValueError:
+        return
 
 def _tofloat(row, ibead):
     val = row[ibead].value
@@ -39,19 +37,17 @@ def _add(info, row, ibead, ref):
     val = row[ibead].value
     if val is None:
         return
-    elif isinstance(val, str):
+
+    if isinstance(val, str):
         try:
-            if 'B' in val:
-                return int(val.split('B')[-1])
-            else:
-                return int(val)
+            return int(val.split('B')[-1]) if 'B' in val else int(val)
         except ValueError:
             return
-    else:
-        try:
-            beadid = int(val)
-        except ValueError:
-            return
+
+    try:
+        beadid = int(val)
+    except ValueError:
+        return
 
     info.setdefault(ref, []).append(beadid)
 

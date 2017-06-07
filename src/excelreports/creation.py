@@ -46,8 +46,7 @@ class _ColumnMethod(object):
 
         if other is not None:
             return _deco(other)
-        else:
-            return _deco
+        return _deco
 
 def column_method(name:str, other = None, _functor = _ColumnMethod(), **kwargs):
     u"decorator for signaling that a method is responsible for a column of data"
@@ -63,8 +62,7 @@ def sheet_class(name: str, other = None, **kwargs):
 
     if other is not None:
         return _deco(other)
-    else:
-        return _deco
+    return _deco
 
 class _BaseReporter(metaclass=ABCMeta):
     def comments(self, fcn: Callable[['_BaseReporter'], str]) -> Optional[str]:
@@ -79,12 +77,11 @@ class _BaseReporter(metaclass=ABCMeta):
 
         if units is None and comments is None:
             return None
-        elif comments is None:
+        if comments is None:
             return u'Units: '+units
-        elif units is None:
+        if units is None:
             return comments
-        else:
-            return comments+u'\nUnits: '+units
+        return comments+u'\nUnits: '+units
 
     @staticmethod
     def columnname(col: Column):
@@ -165,9 +162,8 @@ class CsvReporter(_BaseReporter):
             comment = self.comments(fcn)
             if comment is None:
                 return None
-            else:
-                comment = comment.strip(' \n')
-                return comment.replace('\n', '\n'+self._TEXT_HEADER+'\t\t\t')
+            comment = comment.strip(' \n')
+            return comment.replace('\n', '\n'+self._TEXT_HEADER+'\t\t\t')
 
         txt     = self.columns()
         header  = [('TABLE: ', self.sheet)]
@@ -255,10 +251,9 @@ class XlsReporter(_BaseReporter):
 
                 if ret is float or ret == Union[float, ret]:
                     return self.fmt['real']
-                elif ret is int or ret == Union[int, ret]:
+                if ret is int or ret == Union[int, ret]:
                     return self.fmt['int']
-                else:
-                    return fmt
+                return fmt
 
             fcns = tuple((*i, _get(i[1])) for i in enumerate(self.columns()))
 

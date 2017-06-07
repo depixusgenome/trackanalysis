@@ -163,12 +163,12 @@ class PeakSimulator:
             if len(cycle):
                 tbead[:nframes] += np.repeat(cycle, tsize[:npeaks])
 
-            rngs         = np.insert(np.cumsum(tsize[:npeaks]), 0, 0)
-            rngs         = as_strided(rngs,
-                                      shape   = (len(cycle), 2),
-                                      strides = (rngs.strides[0],)*2)
+            rngs = np.insert(np.cumsum(tsize[:npeaks]), 0, 0)
+            rngs = as_strided(rngs,
+                              shape   = (len(cycle), 2),
+                              strides = (rngs.strides[0],)*2)
 
-            events[cid]        = np.empty((len(cycle),), dtype = 'O')
+            events[cid] = np.empty((len(cycle),), dtype = 'O')
             if len(cycle):
                 events[cid][:] = [tbead[i:j] for i, j in rngs]
 

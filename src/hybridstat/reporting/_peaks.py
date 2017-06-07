@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint: disable=no-value-for-parameter
 """
 Creates peaks sheet
 """
@@ -139,8 +140,7 @@ class Neighbours(HasLengthPeak):
         neg = sum(1 if val.endswith(oli) else 0 for oli in self._neg)
         if pos == 0 and neg == 0:
             return None
-        else:
-            return pos >= neg
+        return pos >= neg
 
 class PositionInRef(HasLengthPeak):
     "Deals with positions"
@@ -184,8 +184,7 @@ class PositionInRef(HasLengthPeak):
 
         if bead is None:
             return self._hpins[ref.key].peaks[ipk]
-        else:
-            return self.basevalue(bead, ipk)
+        return self.basevalue(bead, ipk)
 
     def distance(self, ref:Group, bead:Bead, ipk:int):
         "computes distance to that peak"
@@ -242,6 +241,7 @@ class PeaksSheet(Reporter):
 
         def _get(fmt, val1, val2 = None):
             fmt = self.book.add_format(dict(bg_color = fmt))
+            # pylint: disable=invalid-unary-operand-type
             return (__get(fmt,  val1, True  if val2 is None else  val2),
                     __get(fmt, -val1, False if val2 is None else -val2))
 
@@ -261,9 +261,8 @@ class PeaksSheet(Reporter):
             return 0
         if bead is None:
             return self.config.hairpins[ref.key].peaks[ipk]
-        else:
-            val = bead.peaks['key'][ipk]
-            return val if val >= 0 else None
+        val = bead.peaks['key'][ipk]
+        return val if val >= 0 else None
 
     @column_method("Peak Position in Reference",
                    units = Reporter.baseunits,

@@ -321,7 +321,7 @@ class RampData: # pylint: disable=too-many-public-methods
         returns a boolean map. True if a plateau in z(t) is detected. False otherwise.
         '''
         se_map = self.dzdt[(self.det) & (self.dzdt<0)].apply(_se_map)
-        return (se_map) & (~self.det)
+        return (se_map) & (~self.det) # pylint: disable=invalid-unary-operand-type
 
     def z_blockings(self):
         u'''

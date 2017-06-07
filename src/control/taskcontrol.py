@@ -189,7 +189,7 @@ class TaskController(Controller):
         if task is None:
             return iter(tuple())
         if task is Ellipsis:
-            return iter(self.tasks(tsk) for tsk in self.__items.keys())
+            return iter(self.tasks(tsk) for tsk in self.__items)
         return iter(tsk for tsk in self.__items[task].model)
 
     def cache(self, parent:RootTask, tsk:Optional[Task]):

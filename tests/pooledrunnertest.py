@@ -57,13 +57,13 @@ class _AProcessor(Processor):
                 return data
 
             return lambda i: i.new().withdata(_fcn)
-        else:
-            def _act(info):
-                cls.DONE_NORM.append((cnf['name'], info[0]))
-                info[1].append((os.getpid(), cnf['name']))
-                return info
 
-            return lambda i: i.withaction(_act)
+        def _act(info):
+            cls.DONE_NORM.append((cnf['name'], info[0]))
+            info[1].append((os.getpid(), cnf['name']))
+            return info
+
+        return lambda i: i.withaction(_act)
 
     def run(self, args):
         args.apply(self._run(self.task.config(), args.poolkwargs(self.task)))

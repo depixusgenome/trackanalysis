@@ -39,7 +39,7 @@ class HistMixin:
     def __data(self, data, shape):
         bins  = np.array([-1, 1])
         zeros = np.zeros((1,), dtype = 'f4')
-        items = zeros,
+        items = (zeros,)
         if shape != (1, 2):
             phase = self.config.root.phase.measure.get()
             zvals = data['z'].reshape(shape)
@@ -66,7 +66,7 @@ class HistMixin:
                          for i in items]
                 zeros = np.zeros((len(bins)-1,), dtype = 'f4')
             else:
-                items = zeros,
+                items = (zeros,)
 
         threshold = self._model.minframes
         return dict(frames  = np.sum(items, axis = 0),

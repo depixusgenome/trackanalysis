@@ -78,12 +78,9 @@ class Cache:
 
     def index(self, tsk) -> int:
         "returns the index of the provided task"
-        if tsk is None:
-            return 0
-        elif isinstance(tsk, int):
-            return tsk
-        else:
-            return next(i for i, opt in enumerate(self._items) if opt.isitem(tsk))
+        return (0       if tsk is None          else
+                tsk     if isinstance(tsk, int) else
+                next(i for i, opt in enumerate(self._items) if opt.isitem(tsk)))
 
     @property
     def model(self):

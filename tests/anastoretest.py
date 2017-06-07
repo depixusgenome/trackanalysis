@@ -80,7 +80,6 @@ def test_storenumpy():
 
 def test_modifyclass():
     "tests class modifications"
-    # pylint: disable=redefined-variable-type
     val = [{TPE: 'toto'}, {TPE: 'titi', 'attr': 1}]
     modifyclasses(val, 'toto', DELETE, 'titi', RESET)
     assert val == [{TPE: 'titi'}]

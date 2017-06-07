@@ -154,7 +154,7 @@ class Runner:
                            +str(item))
     @classmethod
     def __test(cls, item):
-        if isinstance(item, cls.__REFUSED) or isinstance(item, cls):
+        if isinstance(item, cls.__REFUSED+(cls,)):
             raise cls.__exception(item)
         cls.__check(item)
 

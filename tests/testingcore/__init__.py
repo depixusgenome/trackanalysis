@@ -53,10 +53,8 @@ def path(name:Optional[str]) -> Union[str, Sequence[str]]:
                 raise KeyError("Check your file name!!! {}".format(val))
         return str(val.resolve())
 
-    if isinstance(default, tuple):
-        return tuple(_test(i) for i in default)
-    else:
-        return _test(default)
+    return (tuple(_test(i) for i in default) if isinstance(default, tuple) else
+            _test(default))
 
 def getmonkey():
     u"for calling with pudb"
