@@ -20,21 +20,25 @@ If "Peak kernel size" is left blank, the minimum distance is set to: σ[HF] x 2.
 Such a value is computed independently for each bead. The factor '2' was set to
 '1' in previous versions.
 
+Experimental peaks are assigned their closest theoretical peak unless the
+distance to one from the other is greater than "Max distance to theoretical peak".
+This is available in the *Peaks/Advanced* dialog.
+
+
 ### Data Treatment
 
-Prior alignments have been improved. There are now five of them:
+Alignments  in the *Cycles* tab have been improved. Choices available are:
 
-    0. no alignment. This is the default when loading gr files.
-    1. If at least 40 percent of cycles end up fully zipped, then these cycles
-    are are aligned on the end of phase five. Remaining events are aligned on phase
-    one. Outliers are detected on phase three. They are re-aligned on that
-    phase. This is the default when loading trk files.
-    2. Alignment occurs on phase one then phase three for any outliers.
-    3. Alignment occurs on phase one only.
-    4. Alignment occurs on phase three only.
+    * "ø": no alignment. This is the default when loading gr files.
+    * "Best": Alignment occurs on phase three then phase one cycles detected as unopened.
+    * "Φ₁": Alignment occurs on phase one only.
+    * "Φ₃": Alignment occurs on phase three only.
 
-These alignments can be selected in the *Cycles* tab. They do not rely on the
-detection of events as does the one which can be selected in the *Peaks* tab.
+The *best* choice is different from the previous version which used to align
+primarily on phase 1 then align phase 3 outliers on the median of phase 3.
+
+These alignments do not rely on the detection of events as does the one which
+can be de-selected in the *Peaks/Advanced* dialog.
 
 # tag cycles_v4.1
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
