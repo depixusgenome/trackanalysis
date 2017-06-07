@@ -133,9 +133,8 @@ class ComputeOPerms:
         # call self.swapsbetweengroups2
 
         # the following a list of iterators.
-        #operms=list(map(operms_between_batches, self.__groups)) # before
         operms=map(operms_between_batches, self.__groups)
-        return [self.rm_notokperm(perms) for perms in operms] # before
+        return [self.rm_notokperm(perms) for perms in operms]
 
 
 

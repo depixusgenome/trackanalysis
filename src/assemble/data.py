@@ -288,7 +288,8 @@ class OligoKPerm(OligoPerm):
     def domain(self):
         u'returns the set of indices onto which the k-permutation applies'
         if len(self._domain)==0:
-            self._domain=set(self.kpermids)
+            #self._domain=set(self.kpermids) # not restrictive enough
+            self._domain=set(self.changes) # after, not  retrictive enough (?) to test!
         return self._domain
 
     @property

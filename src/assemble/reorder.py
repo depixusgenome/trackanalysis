@@ -14,10 +14,9 @@ from utils import initdefaults
 from . import data
 from . import scores
 
-# mostly obsolete...
 class KPermAssessor:
     u'''
-    rank the kperms by importance (quality)
+    rank the data.OligoKPerms by importance (quality)
     '''
     kperms = [] # type: List[data.OligoKPerm]
     __scorekperm=dict() # type: Dict
@@ -158,10 +157,12 @@ class KPermCombiner:
     def __init__(self,**kwa):
         pass
 
-    def group_perms(self,perms=None,attr="domain")->List[List[data.OligoPerm]]:
+    def group_perms(self,perms=None)->List[List[data.OligoPerm]]:
         u'''
         find perms whose getattr(kperm,attr) is not included by any other kperm
+        group OligoKPerm according to kpermids in order to have neutral perm in each group
         '''
+        attr="kpermids"
         if perms is None:
             perms=list(self.kpermassessor.kperms)
         attrsets=set(tuple(sorted(getattr(i,attr))) for i in perms)
@@ -190,19 +191,15 @@ class KPermCombiner:
         pickle.dump(list(self.kpermassessor.kperms),open("perms2group.pickle","wb"))
         # find groups of kperms (perms ?!), does it make collections of perms??
         groups = self.group_perms()
+        # here is where the bug lies:
+        # Each group must have the neutral permutation.
+        # At the moment, this is not the case
 
         # reversed sort groups per size
         groups = sorted(groups,key=lambda x:-len(x))
         # scored, List[List[ScoredPerm]]
         scored=[[self.scoring(prm) for prm in grp] for grp in groups]
         pickle.dump(scored,open("scored.pickle","wb"))
-        testing='11,14,10,12,13' # for test
-        for scp1 in scored: # for test
-            for scperm in scp1: # for test
-                print("testing=",testing) # for test
-                print("against =",",".join(str(ids) for ids in scperm.perm.permids)) # for test
-                if testing in ",".join(str(ids) for ids in scperm.perm.permids): # for test
-                    print("testing in filtered") # for test
 
         scfilter = scores.ScoreFilter(ooverl=self.ooverl)
         print("before filtering",[len(grp) for grp in scored])
@@ -212,30 +209,20 @@ class KPermCombiner:
         # Oh, you are right. Cheers!
 
         # we need to discard groups of a single elements (i.e. the neutral k-permutation)
-        filtered = list(filter(lambda x:len(x)>1,filtered))
+        #filtered = list(filter(lambda x:len(x)>1,filtered))
         # remove collections consisting only of neutral permutations
         print("after filtering",[len(grp) for grp in filtered])
+
         filtered =  [scp for scp in filtered
                      if not all([len(scprm.perm.changes)==0 for scprm in scp])]
+
         filtered = [scores.ScoredPermCollection(scperms=grp) for grp in filtered]
         pickle.dump(filtered,open("filtered.pickle","wb"))
-        testing='11,14,10,12,13' # for test
-        print("testing in filtered") # for test
-        for scp in filtered: # for test
-            for scperm in scp.scperms:
-                print("filtered against=",",".join(str(ids) for ids in scperm.perm.permids)) # test
-                print(",".join(str(ids) for ids in scperm.perm.permids)+"with domain",scperm.\
-                      perm.domain)
-                #if any(testing in ",".join(str(ids) for ids in scperm.perm.permids) # for test
-                #   for scperm in scp.scperms): # for test
-        # up to here we have 35 elmt in filtered having the desired permutationsx
+
         # FROM THIS POINT USE LightScPermCollection instead
         divisions=self.subdivide_then_partition(filtered)
         pickle.dump(divisions,open("test_divisions_backup.pickle","wb"))
-        #stop
-        # for each dubdivision
-        # merge each division separately
-        # then merge the results together
+
         merged_divi=[]
         for divi in divisions:
             merged_divi.append(self.merge_division(divi))
@@ -303,7 +290,7 @@ class KPermCombiner:
         each kperm in the collection is a merge of multiple ones
         '''
         ocollect = tuple(sorted(collections,
-                                key = lambda x:min(getattr(x.scperms[0].perm,sort_by))))
+                                key = lambda x:len(getattr(x.scperms[0].perm,sort_by))))
         print("len(ocollect)=",len(ocollect))
         subdivision=[tuple(ocollect[max_size*i:(i+1)*max_size])
                      for i in range(int(numpy.ceil(len(ocollect)/max_size)))]

@@ -143,9 +143,9 @@ class ScoredPerm:
     def __init__(self,**kwa):
         pass
 
-    def intersect_with(self,other):
-        u'returns true if any oligo in kperm can be found in other'
-        return set(self.perm.perm).intersection(set(other.perm.perm))!=set()
+    #def intersect_with(self,other):
+    #    u'returns true if any oligo in kperm can be found in other'
+    #    return set(self.perm.perm).intersection(set(other.perm.perm))!=set()
 
     # not used, to remove
     @classmethod
