@@ -8,6 +8,7 @@ from    enum                import Enum
 from    abc                 import ABCMeta, abstractmethod
 from    contextlib          import contextmanager
 from    functools           import wraps
+from    time                import time
 
 import  numpy        as     np
 
@@ -17,11 +18,13 @@ from    bokeh.models            import (Range1d,    # pylint: disable=unused-imp
                                         RadioButtonGroup, Model,
                                         Paragraph, Widget, GlyphRenderer)
 
+from    utils.logconfig         import getLogger
 from    control                 import Controller
 from    control.globalscontrol  import GlobalsAccess
 from    ..base                  import BokehView, threadmethod, spawn
 from    .bokehext               import DpxHoverTool, from_py_func
 
+LOGS    = getLogger(__name__)
 _m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
 
 class PlotState(Enum):
@@ -365,8 +368,10 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                 self._model.reset()
 
             old, self.state = self.state, PlotState.abouttoreset
+            durations       = []
             async def _reset_and_render():
                 def _reset():
+                    start = time()
                     self.state = PlotState.resetting
                     with BokehView.computation.type(self._ctrl, calls = self.__doreset):
                         try:
@@ -375,16 +380,19 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                         finally:
                             self._bkmodels.clear()
                             self.state = old
+                            durations.append(time() - start)
 
                 ret = await threadmethod(_reset)
 
                 def _render():
+                    start = time()
                     if ret is not None:
                         with BokehView.computation.type(self._ctrl, calls = self.__doreset):
                             with self.resetting():
                                 self._bkmodels.update(ret)
                     self._ctrl.handle('rendered', args = {'plot': self})
-
+                    LOGS.debug("%s.reset done in %.3f+%.3f",
+                               type(self).__qualname__, durations[0], time() - start)
                 self._doc.add_next_tick_callback(_render)
 
             spawn(_reset_and_render)

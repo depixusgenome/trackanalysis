@@ -158,14 +158,16 @@ def _create(main, controls, views): # pylint: disable=unused-argument
                 reads the config: first the stuff saved automatically, then
                 anything the user wishes to impose.
                 """
-                self._callmixins("readconfig", self.configpath)
-                self._callmixins("readconfig", lambda i: self.configpath(i, 'userconfig'))
+                ctrl = self.globalscontroller # pylint: disable=no-member
+                ctrl.readconfig(self.configpath)
+                ctrl.readconfig(self.configpath, lambda i: self.configpath(i, 'userconfig'))
                 DEFAULT_CONFIG(self)
 
             def writeconfig(self, name = None, saveall = False, **kwa):
                 "writes the config"
                 kwa['saveall'] = saveall
-                self._callmixins("writeconfig", lambda i: self.configpath(i, name), **kwa)
+                ctrl = self.globalscontroller # pylint: disable=no-member
+                ctrl.writeconfig(lambda i: self.configpath(i, name), **kwa)
 
             def setup(self):
                 "writes the config"

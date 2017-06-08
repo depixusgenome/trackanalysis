@@ -8,6 +8,7 @@ import glob
 import subprocess
 import random
 import inspect
+import warnings
 
 import click
 
@@ -17,6 +18,10 @@ def _add_sys_paths():
         if path not in sys.path:
             sys.path.append(path)
 _add_sys_paths()
+
+with warnings.catch_warnings():
+    warnings.filterwarnings('ignore', category = FutureWarning)
+    import pandas.tslib # discard bokeh warning # pylint: disable=unused-import
 
 # pylint: disable=wrong-import-position
 from utils.logconfig    import getLogger

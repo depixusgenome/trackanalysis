@@ -111,14 +111,13 @@ class FitToHairpinProcessor(Processor):
         if getattr(evts, 'dtype', 'O') == 'f4':
             return evts, PeaksArray([], dtype = 'O')
 
-        else:
-            disc = (getattr(evts, 'discarded', 0) if hasattr(evts, 'discarded') else
-                    0                             if len(evts) == 0             else
-                    getattr(evts[0][1], 'discarded', 0))
-            evts = asobjarray(((i, asobjarray(j)) for i, j in evts),
-                              view      = PeaksArray,
-                              discarded = disc)
-            return np.array([i for i, _ in evts], dtype = 'f4'), evts
+        disc = (getattr(evts, 'discarded', 0) if hasattr(evts, 'discarded') else
+                0                             if len(evts) == 0             else
+                getattr(evts[0][1], 'discarded', 0))
+        evts = asobjarray(((i, asobjarray(j)) for i, j in evts),
+                          view      = PeaksArray,
+                          discarded = disc)
+        return np.array([i for i, _ in evts], dtype = 'f4'), evts
 
     @staticmethod
     def __distances(distances   : Distances,
@@ -134,8 +133,7 @@ class FitToHairpinProcessor(Processor):
         if len(bead) > 0:
             return {name: calc.optimize(bead) for name, calc in distances.items()}
 
-        else:
-            return {None: next(iter(distances.values())).optimize(bead)}
+        return {None: next(iter(distances.values())).optimize(bead)}
 
     @staticmethod
     def __beadoutput(peakids : PeakIds,

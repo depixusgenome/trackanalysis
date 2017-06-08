@@ -3,8 +3,10 @@
 "allows fencing multiple events between 2 *startaction* and *stopaction* events"
 
 from typing             import Callable, Optional, Tuple # pylint: disable=unused-import
+from pathlib            import Path
 from functools          import wraps
 from inspect            import signature
+from time               import time
 
 from utils.logconfig    import getLogger, logging
 LOGS = getLogger(__name__)
@@ -13,23 +15,37 @@ class _Calls:
     "Dummy class which delays calls to _m_defaults"
     def __init__(self, calls):
         self._calls = calls
+        self._start  = None
 
     def __str__(self):
         if self._calls is None:
             self._calls = "!?!"
+            self._start  = time()
 
         elif isinstance(self._calls, tuple):
-            self._calls = "%s@%s [%s]" % self._calls
+            path  = Path(self._calls[0])
+            fname = str(path.relative_to(path.parent.parent))
+            self._calls = fname+"@%s [%s]" % self._calls[1:]
+            self._start = time()
 
         elif hasattr(self._calls, '__code__'):
             fcn  = self._calls # type: ignore
             code = getattr(fcn, '__code__')
             if code is not None:
-                self._calls = "%s@%s [%s]" % (getattr(code, 'co_filename', '?'),
+                fname = '?'
+                if hasattr(code, 'co_filename'):
+                    path  = Path(code.co_filename)
+                    fname = str(path.relative_to(path.parent.parent))
+
+                self._calls = "%s@%s [%s]" % (fname,
                                               getattr(code, 'co_firstlineno', '?'),
                                               getattr(fcn, '__qualname__', ''))
+                self._start = time()
             else:
                 self._calls = getattr(fcn, '__qualname__', '')
+                self._start = time()
+        else:
+            return self._calls + ' T%.3f' % (time() - self._start)
 
         return self._calls
 
@@ -55,7 +71,7 @@ class Action:
             self._calls = _Calls(None)
 
     def _logstart(self):
-        if self._CNT == 1:
+        if self._CNT[0] == 1:
             LOGS.debug("current action is %s", self._calls)
 
     def _logstop(self, val, errvalue):
