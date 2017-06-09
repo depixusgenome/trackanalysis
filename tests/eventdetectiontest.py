@@ -184,19 +184,26 @@ def test_pull_alignment():
     track   = randtrack(driftargs = None, baselineargs = (.1, .05, 'rand'))
     for i in range(3):
         ini  = track.cycles.withphases(PHASE.initial)[0,i]
-        ini += (track.cycles.withphases(PHASE.pull)[0,i].mean()-ini.mean())*.5
+        ini -= ini.mean()
+
+        pull  = track.cycles.withphases(PHASE.pull)[0,i]
+        pull += .3 - pull.mean()
 
         meas    = track.cycles.withphases(PHASE.measure)[0,i]
-        meas[:] = ini.mean()
+        meas[:] = 0.
 
-    for i in range(3,5):
-        ini  = track.cycles.withphases(PHASE.initial)[0,i]
-        ini += (track.cycles.withphases(PHASE.pull)[0,i].mean()-ini.mean())*.5
+    pull    = track.cycles.withphases(PHASE.pull)[0,3].mean()
+    meas    = track.cycles.withphases(PHASE.measure)[0,3]
+    meas[:] = pull.mean()-.3
+
+    pull    = track.cycles.withphases(PHASE.pull)[0,4].mean()
+    meas    = track.cycles.withphases(PHASE.initial)[0,4]
+    meas[:] = pull.mean()-.3
 
     bead    = ExtremumAlignmentProcessor.apply(track.beads, phase = AlignmentTactic.pull)
     inipos  = [i.mean() for i in track.beads[0,...].withphases(PHASE.pull).values()]
     corrpos = [i.mean() for i in bead       [0,...].withphases(PHASE.pull).values()]
-    assert np.std(inipos[3:]) > 40*np.std(corrpos[3:])
+    assert np.std(inipos[3:]) > 20*np.std(corrpos[3:])
     assert all(i < .6 for i in corrpos[:3])
 
 def test_measure_alignment():

@@ -42,7 +42,9 @@ class ExtremumAlignmentTask(Task):
         then re-aligned on phase 1. Outliers satisfy all conditions:
 
             * |phase 3 - phase 5| < 'outlier' x median
+            * |phase 3 - phase 1| < 'outlier' x median
             * |phase 1 - phase 5| < 'delta'
+            * std(phase 3)        < 'deviation'
 
         * *phase* = 'measure': alignment is performed on phase 5. If outliers
         are found on phase 5:
@@ -73,6 +75,7 @@ class ExtremumAlignmentTask(Task):
     pull       = .1
     opening    = .5
     delta      = .2
+    deviation  = .1
 
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_):
@@ -128,12 +131,17 @@ class ExtremumAlignmentProcessor(Processor):
         args = cls.__args(kwa, frame, info, True)
         bias = args.pull + np.nanmedian(args.initial-args.pull)
 
-        bad  = cls.__deltas('measure', 'outlier', args, kwa) < 1.
+        bad  = args.measure-args.pull < cls._get(kwa, 'opening')
+        bad &= args.initial-args.pull < cls._get(kwa, 'opening')
         if any(bad):
             bad = np.nonzero(bad)[0]
             bad = bad[np.abs(args.initial[bad]-args.measure[bad]) < cls._get(kwa, 'delta')]
             if len(bad):
-                bias[bad] = args.initial[bad]
+                cyc = args.cycles.cycles.withphases(PHASE.measure)[..., list(bad)].values()
+                std = np.array([np.nanstd(i[cls._get(kwa, 'window'):]) for i in cyc])
+                bad = bad[std < cls._get(kwa, 'deviation')]
+                if len(bad):
+                    bias[bad] = args.initial[bad]
 
         return args.cycles.translate(bias)
 
