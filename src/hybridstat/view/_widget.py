@@ -140,14 +140,10 @@ class PeaksStatsWidget(WidgetCreator):
             self.values[1] = mdl.bias
             self.values[2] = rawprecision(mdl.track, mdl.bead)
             if len(mdl.peaks['z']):
-                self.values[3] = np.mean(mdl.peaks['sigma'])
+                self.values[3] = mdl.peaks['sigma']
             self.values[4] = max(0, len(mdl.peaks['z']) - 1)
-            self.values[5] = np.mean(mdl.peaks['count'][1:])/100.
-
-            if len(mdl.peaks['duration']):
-                self.values[6] = np.mean(mdl.peaks['duration'][0])
-            else:
-                self.values[6] = np.NaN
+            self.values[5] = 0. if self.values[4] < 1 else mdl.peaks['count'][1:]/100.
+            self.values[6] = mdl.peaks['duration'][0]
 
         def sequencedependant(self, mdl, dist, key):
             "all sequence dependant stats"
@@ -164,7 +160,7 @@ class PeaksStatsWidget(WidgetCreator):
 
             if nfound > 2:
                 stretch        = dist[key].stretch
-                self.values[9] = (np.nanstd(mdl.peaks[key+'id'])
+                self.values[9] = (np.nanstd(mdl.peaks[key+'distance'])
                                   / ((self.values[3]*stretch)**2 * (nfound - 2)))
 
         def __call__(self) -> str:
@@ -175,7 +171,17 @@ class PeaksStatsWidget(WidgetCreator):
 
         @staticmethod
         def __fmt(fmt, val):
-            return val if isinstance(val, str) else ('{:'+fmt+'}').format(val)
+            if isinstance(val, str):
+                return val
+
+            if np.isscalar(val):
+                return ('{:'+fmt+'}').format(val)
+
+            if isinstance(val, np.ndarray):
+                if len(val) == 0:
+                    return '0 ± ∞'
+                val = np.mean(val), np.std(val)
+            return ('{:'+fmt+'} ± {:'+fmt+'}').format(*val)
 
     def __data(self) -> Dict[str,str]:
         tab = self._TableConstructor(self.css)
