@@ -3,7 +3,7 @@
 u'''
 Creates Classes and function to use with assemble sequence
 '''
-from typing import List, NamedTuple, Tuple, Set
+from typing import List, NamedTuple, Tuple, Set, Dict # pylint: disable=unused-import
 import itertools
 import numpy
 from utils import initdefaults
@@ -105,6 +105,7 @@ class BCollection:
     '''
     oligos = [] # type: List[OligoPeak]
     batches = [] # type: List[Batch]
+    idsperbatch = dict() # type: Dict[int,List[int]]
     @initdefaults
     def __init__(self,**kwa):
         pass
@@ -115,7 +116,11 @@ class BCollection:
         grps= {getattr(oli,attr) for oli in oligos}
         batches=[Batch(oligos=[oli for oli in oligos if getattr(oli,attr)==grp],index=idx)
                  for idx,grp in enumerate(grps)]
-        return cls(oligos=oligos,batches=batches)
+        idsperbatch={grpid:[idx for idx,oli in enumerate(oligos) if getattr(oli,attr)==grp]
+                     for grpid, grp in enumerate(grps)}
+        return cls(oligos=sorted(oligos,key=lambda x:x.pos),# oligos=oligos,
+                   batches=batches,
+                   idsperbatch=idsperbatch)
 
     def group_overlapping_oligos(self,nscale)->List[List[OligoPeak]]:
         u'returns groups of overlapping oligos'
@@ -302,6 +307,7 @@ class OligoKPerm(OligoPerm):
             self._changes=self.get_changes(self.kpermids)
         return self._changes
 
+    # to check
     def identity_perm(self):
         u'''
         returns an OligoKPerm with identity permutation

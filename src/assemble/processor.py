@@ -5,7 +5,7 @@ u'''
 regroups functions and classes to complement assembler
 '''
 import itertools
-from typing import List, Tuple, Dict, Set, Callable, Any # pylint: disable=unused-import
+from typing import List, Tuple, Dict, Set, Callable, Any, Generator # pylint: disable=unused-import
 #import pickle
 import numpy
 from utils.logconfig import getLogger
@@ -13,6 +13,7 @@ from utils import initdefaults
 
 from . import data
 from . import scores
+from . import _utils as utils
 from ._types import SciDist # pylint: disable=unused-import
 
 LOGS = getLogger(__name__)
@@ -26,6 +27,7 @@ class ComputeOPerms:
     ooverl=1 # type: int
     __groups=list() # type: List
     __sort_by="pos" # non id permutation result in non ordered oligos by "pos" attr
+    kmax=8 # maximal number of simultaneous permutations
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
         pass
@@ -133,10 +135,77 @@ class ComputeOPerms:
         # call self.swapsbetweengroups2
 
         # the following a list of iterators.
-        operms=map(operms_between_batches, self.__groups)
-        return [self.rm_notokperm(perms) for perms in operms]
+        operms=map(operms_between_batches, self.__groups) # (mem pb)
+        return [self.rm_notokperm(perms) for perms in operms] # (mem pb)
 
+    def update_seed(self,seed,group:List[int]):
+        u'add sequences which may overlap between elements in group'
+        nseed = 0
+        while nseed!=len(seed):
+            nseed=len(seed)
+            for elmt in group[1:]:
+                if self.oligos[elmt].seq[:self.ooverl] in seed:
+                    seed.update([self.oligos[elmt].seq[:self.ooverl],
+                                 self.oligos[elmt].seq[-self.ooverl:]])
+                    continue
+                if self.oligos[elmt].seq[-self.ooverl:] in seed:
+                    seed.update([self.oligos[elmt].seq[:self.ooverl],
+                                 self.oligos[elmt].seq[-self.ooverl:]])
+                    continue
+        return seed
 
+    def matching_group(self,groups:List[List[int]])->List[List[int]]: # to check
+        u'''
+        returns groups of oligos indices that which can overlap
+        '''
+        # if two oligos are in the same batch they should at least have ooverl overlaps
+        # do we put them in the same cluster?
+        # yes, we compute arrangements between batches afterwards
+
+        clusters = [] # type: List[List[data.OliBat]] # previously
+        for grp in groups:
+            seed = set([self.oligos[grp[0]].seq[:self.ooverl],
+                        self.oligos[grp[0]].seq[-self.ooverl:]])
+            seed = self.update_seed(seed,grp)
+            pergrp = [[elmt for elmt in grp if self.oligos[elmt].seq[:self.ooverl] in seed or\
+                       self.oligos[elmt].seq[-self.ooverl:] in seed]]
+            seedsingrp = set(seed)
+            while sum(len(i) for i in pergrp)!=len(grp):
+                # pick a new seed not in seed and restart
+                seed = [set([self.oligos[elmt].seq[:self.ooverl]
+                             ,self.oligos[elmt].seq[-self.ooverl:]])
+                        for elmt in grp
+                        if not self.oligos[elmt].seq[:self.ooverl] in seedsingrp][0]
+                seed = self.update_seed(seed,grp)
+                pergrp+=[[elmt for elmt in grp if self.oligos[elmt].seq[:self.ooverl] in seed or\
+                       self.oligos[elmt].seq[-self.ooverl:] in seed]]
+
+                seedsingrp.update(seed)
+
+            clusters += pergrp
+        return list(clusters)
+
+    def test_compute(self)->Generator:
+        u'''
+        newer version of compute
+        '''
+        # groups indices of oligos which may overlap
+        groups = utils.group_overlapping_normdists([oli.dist for oli in self.oligos],
+                                                   nscale=self.nscale)[1]
+
+        groups = self.matching_group(groups) # not sure how useful this is
+        idsperbatch=self.collection.idsperbatch
+        batchfilter=BetweenBatchFilter(idsperbatch=idsperbatch)
+        ooverlfilter=RequireOverlapFilter(oligos=self.oligos,
+                                          min_ooverl=self.ooverl)
+        for grp in groups:
+            # compute all possible permutations # brute force
+            permids=itertools.permutations(grp) # generator
+            firstfiltered = filter(ooverlfilter,permids) # type: ignore
+            secondfiltered = filter(batchfilter,firstfiltered) # type: ignore
+
+            for permid in secondfiltered:
+                yield permid
 
 #def operms_between_batches(grp:List[data.OliBat])->Iterator[data.OligoPeak]:
 # by adding attribute to grp, can easily return the permuted indices instead of oligos.
@@ -185,6 +254,7 @@ def swaps2combs(swaps):
     return list(map(__tocombs,swaps))
 
 
+
 def swapsbetweengroups(indices:Set[int],lengths):
     # PB, creates duplicates
     # finds k-permutations
@@ -205,6 +275,7 @@ def swapsbetweengroups(indices:Set[int],lengths):
         for swap in itertools.combinations(indices,lengths[0]):
             swaps+=[swap+i for i in swapsbetweengroups(indices-set(swap),lengths[1:])]
     return swaps
+
 
 # k-perm is more general than perm
 class ScoreKPerm:
@@ -257,3 +328,114 @@ class BestScoreAssemble:
     def rank_assemblies(self): # multiprocess? no. multiprocecssing should be higher level
         u'compute score of ordered list of oligos'
         return [(self.score(asm))+(asm,) for asm in self.assemblies]
+
+def ncycle2perm(cycle)->Tuple[int, ...]:
+    u'converts n-cycle into permutation of size n'
+    toperm={idx:val for idx,val in enumerate(cycle)}
+    return tuple(toperm[idx] for idx in range(len(cycle)))
+
+def nonid_kperms(size)->numpy.array:
+    u'''
+    return the non neutral cyclic permutations of elements in  range(size)
+    '''
+    if size>3:
+        raise NotImplementedError
+    cycles = ([0]+list(i) for i in itertools.permutations(range(1,size)))
+    addprm = ([size-1]+list(i)+[0] for i in itertools.permutations(range(1,size-1)))
+    for i in cycles:
+        yield ncycle2perm(i)
+    for i in addprm:
+        yield i
+
+def generate_fixedkpermids(kvalue,permids:List[int]):
+    u'''
+    generate only k-permutations
+    returns an iterator of indices
+    '''
+    # for kvalue=2 (1,0) perm to apply to all indices
+    # for kvalue=3 (2,0,1) and (1,2,0) to apply to all indices
+    if kvalue==0:
+        yield permids
+    for kprm in nonid_kperms(kvalue):
+        # apply kprm for each i in range(len(permids))
+        for i in range(len(permids)-kvalue+1):
+            yield permids[:i]+list(kprm+i)+permids[i+kvalue:]
+    return
+
+def generate_kpermids(kmin,kmax,permids:List[int]):
+    u'''
+    generate all k-permutations with values between kmin (incuded) and kmax (excluded)
+    '''
+    for kval in range(kmin,kmax):
+        for permids in generate_fixedkpermids(kval,permids):
+            yield permids
+
+class BetweenBatchFilter:
+    u'''
+    functor
+    filters out the permutation which permutes the position of OligoPeaks from the same batch
+    lists in idsperbatch are supposed sorted
+    '''
+    def __init__(self,idsperbatch:Dict[int,List[int]])->None:
+        u'''
+        initiates the filter
+        idsperbatch[i] =[ids of elements which must not be swap]
+        '''
+        self.idsperbatch=idsperbatch
+
+    def __call__(self,permids:Tuple[int, ...]):
+        for batch in self.idsperbatch.values():
+            # compare the two next lines
+            check=[i for i in permids if i in batch]
+            #check=[list(permids).index(i) for i in batch]
+            if any(check[idx]>val for idx,val in enumerate(check[1:])):
+                return False
+        return True
+
+
+class RequireOverlapFilter:
+    u'''
+    functor
+    filters out permutations if the permutations does not lead
+    to minimal overlap between swapped OligoPeaks
+    '''
+    def __init__(self,oligos:List[data.OligoPeak],min_ooverl)->None:
+        self.oligos=oligos
+        self.min_ooverl=min_ooverl
+
+    def __call__(self,permids:List[int]):
+        u'''
+        permids are the indices of the oligos
+        '''
+        for idx,val in enumerate(permids[1:]):
+            if permids[idx]>val:
+                if len(data.OligoPeak.tail_overlap(
+                        self.oligos[permids[idx]].seq,
+                        self.oligos[val].seq))<self.min_ooverl:
+                    return False
+        return True
+
+
+class EXAMPLEFindValidPerms:
+    u'example (not finished) way to generate valid permutation'
+    def __init__(self,oligos:List[data.OligoPeak],
+                 min_ooverl:int,
+                 kmax:int)->None:
+        self.oligos=oligos
+        self.min_ooverl=min_ooverl
+        self.kmax=kmax
+
+    def run(self):
+        u'''
+        computes the permutations
+        '''
+        permids=generate_kpermids(kmin=0,
+                                  kmax=self.kmax,
+                                  permids=list(range(self.oligos)))
+        idsperbatch=[]
+        batchfilter=BetweenBatchFilter(idsperbatch=idsperbatch)
+        ooverlfilter=RequireOverlapFilter(oligos=self.oligos,
+                                          min_ooverl=self.min_ooverl)
+        bfiltered = filter(batchfilter,permids)
+        oofiltered = filter(ooverlfilter,bfiltered)
+        return oofiltered # list of?
