@@ -159,7 +159,7 @@ class PeaksPlotModelAccess(IdentificationModelAccess):
         "sets current bead peaks and computes the fits"
         if dtl is None:
             self.peaks = dict.fromkeys(('z', 'id', 'distance', 'sigma', 'bases',
-                                        'duration', 'count'), [])
+                                        'duration', 'count', 'skew'), [])
             self.fits  = None
             return self.peaks
 
@@ -167,6 +167,7 @@ class PeaksPlotModelAccess(IdentificationModelAccess):
         peaks      = tuple(self.peakselection.task.details2output(dtl))
         self.peaks = dict(z        = np.array([i for i, _ in peaks], dtype = 'f4'),
                           sigma    = nan(),
+                          skew     = nan(),
                           duration = nan(),
                           count    = nan())
 
@@ -258,3 +259,4 @@ class PeaksPlotModelAccess(IdentificationModelAccess):
             self.peaks['duration'][i] = val.averageduration
             self.peaks['sigma'][i]    = prob.resolution(evts)
             self.peaks['count'][i]    = min(100., val.hybridizationrate*100.)
+            self.peaks['skew'][i]     = np.nanmedian(prob.skew(evts))

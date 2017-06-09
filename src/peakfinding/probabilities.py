@@ -52,6 +52,7 @@
 from    typing  import Union, Sequence
 import  numpy   as np
 from    utils   import initdefaults, EVENTS_TYPE
+from    scipy.stats import skew as _skew
 
 class Probability:
     "Computes probabilities"
@@ -95,8 +96,20 @@ class Probability:
                          sum(getattr(i, 'discarded', 0) for i in events))
 
     @staticmethod
+    def skew(events):
+        "returns the resolution"
+        arrs  = np.array([isinstance(i, (list, np.ndarray)) for i in events])
+        skews = [_skew(np.concatenate(list(i['data']))) for i in events[arrs]]
+
+        arrs  = np.array([isinstance(i, (tuple, np.void)) for i in events])
+        if any(arrs):
+            skews.extend(_skew(i[1]) for i in events[arrs])
+
+        return skews
+
+    @staticmethod
     def resolution(events):
-        "returns the average position and resolution"
+        "returns the resolution"
         arrs = np.array([isinstance(i, (list, np.ndarray)) for i in events])
         stds = [np.average([np.nanmean(j)    for j in i['data']],
                            weights = [len(j) for j in i['data']])
@@ -104,7 +117,7 @@ class Probability:
 
         arrs = np.array([isinstance(i, (tuple, np.void)) for i in events])
         if any(arrs):
-            stds += [np.nanmean(i[1]) for i in events[arrs]]
+            stds.extend(np.nanmean(i[1]) for i in events[arrs])
 
         return np.nanstd(stds)
 

@@ -105,6 +105,7 @@ class PeaksStatsWidget(WidgetCreator):
                                   ['css:title.bias',    '.4f'],
                                   [u'σ[HF] (µm)',       '.4f'],
                                   [u'σ[Peaks] (µm)',    '.4f'],
+                                  [u'Average Skew ',    '.2f'],
                                   [u'Peak count',       '.0f'],
                                   [u'Events per Cycle', '.1f'],
                                   [u'Down Time Φ₅ (s)', '.1f'],
@@ -141,9 +142,10 @@ class PeaksStatsWidget(WidgetCreator):
             self.values[2] = rawprecision(mdl.track, mdl.bead)
             if len(mdl.peaks['z']):
                 self.values[3] = mdl.peaks['sigma']
-            self.values[4] = max(0, len(mdl.peaks['z']) - 1)
-            self.values[5] = 0. if self.values[4] < 1 else mdl.peaks['count'][1:]/100.
-            self.values[6] = mdl.peaks['duration'][0]
+            self.values[4] = mdl.peaks['skew']
+            self.values[5] = max(0, len(mdl.peaks['z']) - 1)
+            self.values[6] = 0.     if self.values[5] < 1 else mdl.peaks['count'][1:]/100.
+            self.values[7] = np.NaN if self.values[5] < 1 else mdl.peaks['duration'][0]
 
         def sequencedependant(self, mdl, dist, key):
             "all sequence dependant stats"
@@ -152,16 +154,17 @@ class PeaksStatsWidget(WidgetCreator):
             nrem      = sum(i in remove for i in mdl.peaks[key+'id'])
             nfound    = np.isfinite(mdl.peaks[key+'id']).sum()-nrem
             npks      = len(task.peakids[key].hybridizations)
-            self.values[7] = '{}/{}'.format(nfound, npks)
+            self.values[8] = '{}/{}'.format(nfound, npks)
             if nrem == 2:
-                self.values[7] += self.openhp
+                self.values[8] += self.openhp
 
-            self.values[8] = HairpinDistance.silhouette(dist, key)
+            self.values[9] = HairpinDistance.silhouette(dist, key)
 
             if nfound > 2:
-                stretch        = dist[key].stretch
-                self.values[9] = (np.nanstd(mdl.peaks[key+'distance'])
-                                  / ((self.values[3]*stretch)**2 * (nfound - 2)))
+                stretch         = dist[key].stretch
+                self.values[10] = (np.nanstd(mdl.peaks[key+'distance'])
+                                   / ((np.mean(self.values[3]*stretch))**2
+                                      * (nfound - 2)))
 
         def __call__(self) -> str:
             return ('<table>'
@@ -210,7 +213,8 @@ class PeakListWidget(WidgetCreator):
                              ['distance', u'Distance',     '0.0'],
                              ['count',    'css:xlabel',    '0.0'],
                              ['duration', 'css:xtoplabel', '0.000'],
-                             ['sigma',    u'σ (µm)',       '0.0000']]
+                             ['sigma',    u'σ (µm)',       '0.0000'],
+                             ['skew',     u'skew',         '0.00']]
 
     def create(self, _) -> List[Widget]:
         width = self.css.peaks.columns.width.get()
