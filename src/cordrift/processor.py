@@ -28,7 +28,8 @@ class DriftTask(Task, EventDetectionConfig):
     collapse  = CollapseToMean()             # type: Optional[CollapseAlg]
     stitch    = StitchByInterpolation()      # type: Optional[StitchAlg]
     zero      = 10
-    precision = 0.
+    precision = None
+    rawfactor = 1.
     onbeads   = True
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **kwa):
@@ -62,15 +63,10 @@ class _BeadDriftAction:
 
     def __events(self, frame:Cycles) -> Events:
         if self.task.events is None:
-            yield from (Range(0, cycle) for _, cycle in frame)
+            yield from (Range(0, i) for _, i in frame)
         else:
-            events = Events(track     = frame.track,
-                            data      = frame,
-                            filter    = self.task.filter,
-                            events    = self.task.events,
-                            precision = self.task.precision)
-            for _, evts in events:
-                yield from (Range(*i) for i in zip(evts['start'], evts['data']))
+            for _, evts in frame.new(Events, **self.task.config()):
+                yield from (Range(*i) for i in evts)
 
     def profile(self, frame:Cycles, bcopy:bool) -> Profile:
         "action for removing bead drift"
