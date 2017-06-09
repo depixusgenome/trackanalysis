@@ -186,7 +186,11 @@ def test_pull_alignment():
         ini  = track.cycles.withphases(PHASE.initial)[0,i]
         ini += (track.cycles.withphases(PHASE.pull)[0,i].mean()-ini.mean())*.5
 
-        ini  = track.cycles.withphases(PHASE.measure)[0,i]
+        meas    = track.cycles.withphases(PHASE.measure)[0,i]
+        meas[:] = ini.mean()
+
+    for i in range(3,5):
+        ini  = track.cycles.withphases(PHASE.initial)[0,i]
         ini += (track.cycles.withphases(PHASE.pull)[0,i].mean()-ini.mean())*.5
 
     bead    = ExtremumAlignmentProcessor.apply(track.beads, phase = AlignmentTactic.pull)
@@ -252,4 +256,4 @@ def test_precision():
     assert list(np.nonzero(found-sim-1)[0]) == []
 
 if __name__ == '__main__':
-    test_measure_alignment()
+    test_pull_alignment()

@@ -39,11 +39,10 @@ class ExtremumAlignmentTask(Task):
             that between phase 1 and 3 or 3 and 5.
 
         * *phase* = 'pull': alignment is performed phase 3. Outliers are
-        then re-aligned on phase 1. Outliers are defined as:
+        then re-aligned on phase 1. Outliers satisfy all conditions:
 
-            * both extension between phase 1 and 3 or 3 and 5
-            are such that: (extension < median(extension) x 'pull')
-            that between phase 1 and 3 or 3 and 5.
+            * |phase 3 - phase 5| < 'outlier' x median
+            * |phase 1 - phase 5| < 'delta'
 
         * *phase* = 'measure': alignment is performed on phase 5. If outliers
         are found on phase 5:
@@ -73,6 +72,7 @@ class ExtremumAlignmentTask(Task):
     outlier    = .9
     pull       = .1
     opening    = .5
+    delta      = .2
 
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_):
@@ -128,10 +128,12 @@ class ExtremumAlignmentProcessor(Processor):
         args = cls.__args(kwa, frame, info, True)
         bias = args.pull + np.nanmedian(args.initial-args.pull)
 
-        bad  = cls.__deltas('measure', 'pull', args, kwa) < 1.
+        bad  = cls.__deltas('measure', 'outlier', args, kwa) < 1.
         if any(bad):
-            bad       = np.logical_and(bad, cls.__deltas('initial', 'pull', args, kwa) < 1.)
-            bias[bad] = args.initial[bad]
+            bad = np.nonzero(bad)[0]
+            bad = bad[np.abs(args.initial[bad]-args.measure[bad]) < cls._get(kwa, 'delta')]
+            if len(bad):
+                bias[bad] = args.initial[bad]
 
         return args.cycles.translate(bias)
 
