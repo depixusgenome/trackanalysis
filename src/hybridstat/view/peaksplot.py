@@ -35,10 +35,8 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
     biases    = props.Dict(props.String, props.Float)
     stretches = props.Dict(props.String, props.Float)
     __implementation__ = SequenceHoverMixin.impl('PeaksSequenceHover',
-                                                 '''
-                                                 stretches: [p.Any, {}],
-                                                 biases:    [p.Any, {}],
-                                                 ''')
+                                                 ('stretches: [p.Any, {}], '
+                                                  'biases:    [p.Any, {}],'))
 
 
     def create(self, fig, *args, **kwa):   # pylint: disable=arguments-differ

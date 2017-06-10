@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "Cycles plot view"
 from typing         import Optional, Tuple      # pylint: disable=unused-import
+from pathlib        import Path
 
 import  bokeh.core.properties as props
 from    bokeh.model    import Model
@@ -22,40 +23,10 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
     updating  = props.String('')
 
     impl      = SequenceHoverMixin.impl
-    __implementation__ = impl('DpxHoverModel',
-                              'shape: [p.Array,  [2, 1]], cycle: [p.Int,  -1],',
-                              '''
-                              set_hover: (rawsrc, hvrsrc, glyph, inds, value) ->
-                                  if @_hvr_cnt != value
-                                      return
+    __implementation__ = (impl('DpxHoverModel',
+                               'shape: [p.Array, [2,1]], cycle: [p.Int, -1],')
+                          + '\n'+''.join(open(str(Path(__file__).with_suffix('.coffee')))))
 
-                                  inds.sort((a,b) => a - b)
-                                  ind = inds[Math.floor(inds.length*0.5)]
-                                  ind = Math.floor(ind/@shape[1]) * @shape[1]
-                                  if ind == @cycle
-                                      return
-
-                                  @cycle           = ind
-                                  hvrsrc.data['z'] = rawsrc.data['z'][ind...(ind+@shape[1])]
-                                  glyph.visible    = true
-                                  hvrsrc.trigger('change')
-
-                              launch_hover: (rawsrc, hvrsrc, glyph, data) ->
-                                  if @shape[1] == 2
-                                      return
-
-                                  @_hvr_cnt = if @_hvr_cnt? then @_hvr_cnt + 1 else 0
-                                  inds      = data.index['1d'].indices
-                                  if (not inds?) || inds.length == 0
-                                      if glyph.visible
-                                          glyph.visible = false
-                                          glyph.trigger('change')
-                                      return
-
-                                  window.setTimeout(((a,b,c,d,e) => @set_hover(a,b,c,d,e)),
-                                                    100, rawsrc, hvrsrc, glyph,
-                                                    inds, @_hvr_cnt)
-                              ''')
     def __init__(self, **kwa):
         super().__init__(**kwa)
         SequenceHoverMixin.__init__(self)

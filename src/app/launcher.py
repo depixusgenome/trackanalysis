@@ -82,9 +82,22 @@ class _FunctionHandler(FunctionHandler):
                 LOGS.info('no more sessions -> stopping server')
                 server.stop()
 
+def _monkeypatch(view):
+    output = view.MainControl.APPNAME.lower()
+    if output == 'track cycles':
+        output = 'cyclesplot'
+    output += ".js"
+    if Path(output).exists():
+        LOGS.debug('monkeypatching bokeh compiler with '+output)
+        def _bundle():
+            return ''.join(open(output))
+        import bokeh.embed      as embed
+        embed.bundle_all_models = _bundle
+
 def _serve(view, **kwa):
     "Launches a bokeh server"
     fcn    = _FunctionHandler(view)
+    _monkeypatch(view)
     server = Server(Application(fcn), **_serverkwargs(kwa))
     fcn.server = server
     server.MainView    = view

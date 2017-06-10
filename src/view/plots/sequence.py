@@ -51,28 +51,8 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
     key        = props.String(default = '')
     usedefault = props.Bool(default = True)
 
-    __implementation__ = """
-        import {BasicTicker} from "models/tickers/basic_ticker"
-        import *             as p from "core/properties"
+    __implementation__ = "sequenceticker.coffee"
 
-        export class SequenceTicker extends BasicTicker
-            type: 'SequenceTicker'
-
-            @define {
-                major:      [ p.Any, {} ]
-                minor:      [ p.Any, {} ]
-                key:        [ p.String, '']
-            }
-
-            get_ticks_no_defaults: (data_low, data_high, cross_loc, desired_n_ticks) ->
-                if @key not of @major
-                    return super(data_low, data_high, cross_loc, desired_n_ticks)
-                else
-                    return {
-                        major: @major[@key]
-                        minor: @minor[@key]
-                    }
-    """
     def __init__(self, **kwa):
         super().__init__(**kwa)
         self.__defaults = dict() # type: Any
@@ -157,69 +137,12 @@ class SequenceHoverMixin:
         self._model   = None # type: Any
 
     @staticmethod
-    def impl(name, atts, morecode = None):
+    def impl(name, fields):
         "returns the coffeescript implementation"
-        code = """
-               import * as p  from "core/properties"
-               import {Model} from "model"
-               import {BokehView} from "core/bokeh_view"
-
-               export class %sView extends BokehView
-               export class %s extends Model
-                   default_view: %sView
-                   type:"%s"
-
-                   setsource: (source, value) ->
-                       if @_callcount != value
-                           return
-                       if @updating   != ''
-                           return
-
-                       @_callcount = value
-                       tmp = source.data["values"]
-                       source.data["z"] = tmp.map(((x)-> x/@stretch+@bias), @)
-                       source.trigger('change:data')
-
-                   apply_update: (fig, ttip) ->
-                       if @updating == ''
-                           return
-
-                       @_callcount = @_callcount + 1
-
-                       bases       = fig.extra_y_ranges['bases']
-                       yrng        = fig.y_range
-                       bases.start = (yrng.start - @bias) * @stretch
-                       bases.end   = (yrng.end   - @bias) * @stretch
-
-                       window.setTimeout(((b, c) => @setsource(b, c)),
-                                         800, ttip, @_callcount)
-                       @updating   = ''
-
-                   @define {
-                       %s
-                       framerate : [p.Number, 1],
-                       stretch   : [p.Number, 0],
-                       bias      : [p.Number, 0],
-                       updating  : [p.String, '']
-                   }
-
-                   @internal { _callcount: [p.Number, 0] }
-               """
-        def _corr(string, ind):
-            if len(string.strip()) == 0:
-                return ''
-            if '\n' not in string:
-                return string
-
-            lcode = string.split('\n')[1:]
-            size  = len(lcode[-1])-ind*4
-            return '\n'.join(i[size:] for i in lcode)
-        code  = _corr(code, 0)
-        code %= name, name, name, name, _corr(atts, 2)
-
-        if morecode is not None:
-            code += '\n'+ _corr(morecode, 1)
-        return code
+        code = ''.join(open(str(Path(__file__).with_suffix('.coffee'))))
+        code = code.replace('NAME', name)
+        code = code.replace('@define {', '@define {\n        '+fields)
+        return code+"\n"
 
     @staticmethod
     def defaultconfig(mdl):

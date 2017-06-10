@@ -1,3 +1,3 @@
 require(python = dict(nodejs = '6.6.0', flexx = '0.4.1', bokeh = '0.12.5'), rtime = True)
 require(coffee = '1.10.0',                                                  rtime = False)
-make(locals(), builders = ['python', 'coffee'])
+make(locals())

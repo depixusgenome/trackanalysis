@@ -79,18 +79,7 @@ class PeaksSequencePathWidget(SequencePathWidget):
 class PeaksStatsDiv(Div): # pylint: disable = too-many-ancestors
     "div for displaying stats"
     data               = props.Dict(props.String, props.String)
-    __implementation__ = """
-        import {Div, DivView} from "models/widgets/div"
-        import * as p from "core/properties"
-
-        export class PeaksStatsDiv extends Div
-          type: "PeaksStatsDiv"
-          default_view: DivView
-
-          @define {
-            data: [ p.Any,  {}]
-          }
-    """
+    __implementation__ = "peakstats.coffee"
 
 class PeaksStatsWidget(WidgetCreator):
     "Table containing stats per peaks"

@@ -8,7 +8,7 @@ from    pathlib     import Path
 fname = Path.cwd()/"wafbuilder"/"bin"/"waf"
 if not fname.exists():
     msg  = "Missing wafbuilder: do\n"
-    msg += "    git clone http://gitlab.picoseq.org/build-system/wafbuilder.git\n"
+    msg += "    git submodules update --init --recursive\n"
     raise IOError(msg)
 
 args = tuple(sys.argv)
@@ -18,6 +18,6 @@ else:
     args = args[1:]
 
 if sys.platform.startswith('win'):
-    subprocess.run([str(Path("wafbuilder")/"bin"/"waf.bat")] + list(args))
+    subprocess.run([str(fname.with_suffix(".bat"))] + list(args))
 else:
-    subprocess.run([str(Path("wafbuilder")/"bin"/"waf")] + list(args))
+    subprocess.run([str(fname)] + list(args))
