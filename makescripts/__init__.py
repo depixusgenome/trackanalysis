@@ -17,4 +17,5 @@ from .              import base
 from ._conda        import *
 from ._tests        import *
 from ._utils        import *
-from .bokehcompiler import *
+from ._gui          import *
+__builtins__['guimake'] = guimake # type: ignore

@@ -41,23 +41,6 @@ def monkeypatch(output):
             return ''.join(open(output))
         _compiler.bundle_all_models = _bundle
 
-def build_bokehjs(bld, module):
-    "compiles the bokeh js code"
-    from wafbuilder import copyroot
-
-    srcs  = bld.path.ant_glob('**/*.coffee')
-    srcs += bld.path.parent.ant_glob('view/**/*.coffee')
-    srcs += bld.path.parent.ant_glob('app/**/*.coffee')
-    tgt   = copyroot(bld, module+'.js')
-    bld(source      = srcs,
-        name        = module+':bokeh',
-        color       = 'BLUE',
-        rule        = '../makescripts/bokehcompiler.py '+module+' -o ${TGT}',
-        target      = tgt,
-        cls_keyword = lambda _: 'Bokeh',
-        group       = 'bokeh')
-
-__all__ = ['build_bokehjs']
 if __name__ == '__main__':
     # pylint: disable=no-value-for-parameter
     import click
