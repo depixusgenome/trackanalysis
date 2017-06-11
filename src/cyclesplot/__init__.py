@@ -72,7 +72,7 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, WidgetMixin):
 class CyclesPlotView(PlotView):
     "Cycles plot view"
     PLOTTER = CyclesPlotCreator
-    APPNAME = 'Track Cycles'
+    APPNAME = 'cyclesplot'
     def advanced(self):
         "triggers the advanced dialog"
         self._plotter.advanced()

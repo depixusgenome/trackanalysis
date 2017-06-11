@@ -83,10 +83,7 @@ class _FunctionHandler(FunctionHandler):
                 server.stop()
 
 def _monkeypatch(view):
-    output = view.MainControl.APPNAME.lower()
-    if output == 'track cycles':
-        output = 'cyclesplot'
-    output += ".js"
+    output = view.MainControl.APPNAME.lower() + '.js'
     if Path(output).exists():
         LOGS.debug('monkeypatching bokeh compiler with '+output)
         def _bundle():

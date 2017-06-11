@@ -1,10 +1,9 @@
 import {build_views} from "core/build_views"
-import {logger} from "core/logging"
 import * as p from "core/properties"
 
 import {InputWidget, InputWidgetView} from "models/widgets/input_widget"
 
-export class DpxIntInputView extends InputWidgetView
+export class DpxTextInputView extends InputWidgetView
     tagName: "div"
     className: "bk-widget-form-group"
     events:
@@ -21,10 +20,9 @@ export class DpxIntInputView extends InputWidgetView
         mdl   = @model
         style = "margin-right: 5px; margin-top: 9px; margin-left: 5px"
         label = "<tr><td><label for=#{@id}>#{mdl.title}</label></td>"
-        input = "<td> <input class='bk-widget-form-input'   type='number'"  +
-                      "id=#{@id}           name=#{mdl.name}"                +
-                      "min=#{mdl.start}    max=#{mdl.end}"                  +
-                      "step=#{mdl.step}    value=#{mdl.value}"              +
+        input = "<td> <input class='bk-widget-form-input'   type='text'"        +
+                      "id=#{@id} name=#{mdl.name}"                              +
+                      "placeholder=#{mdl.placeholder} value='#{mdl.value}'"   +
                 "></td>"
         @$el.html("<table class='dpx-int-input' style='#{style}'>#{label} #{input}</table>")
 
@@ -35,23 +33,14 @@ export class DpxIntInputView extends InputWidgetView
         return @
 
     change_input: () ->
-        value = @_convert(@$el.find('input').val())
-        if isNaN(value)
-            @$el.find('input').val(model.value)
-        else
-            logger.debug("widget/int_input: value = #{value}")
-            @model.value = value
+        @model.value = @$el.find('input').val()
         super()
 
-    _convert: parseInt
-
-export class DpxIntInput extends InputWidget
-    type: "DpxIntInput"
-    default_view: DpxIntInputView
+export class DpxTextInput extends InputWidget
+    type: "DpxTextInput"
+    default_view: DpxTextInputView
 
     @define {
-        value:        [p.Int, 0 ]
-        start:        [p.Int, 0]
-        step:         [p.Int, 1]
-        end:          [p.Int, 10]
+        value:        [p.String, ""]
+        placeholder:  [p.String, ""]
     }

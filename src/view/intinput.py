@@ -6,10 +6,10 @@
 import re
 import numpy as np
 from bokeh.models.widgets.inputs  import (InputWidget, Callback, String,
-                                          Float, Int, Instance)
+                                          Int, Instance)
 
 from model.task import DataSelectionTask
-from .base import BokehView
+from .base      import BokehView
 
 class DpxIntInput(InputWidget):
     """ Single-line input widget. """
@@ -20,18 +20,9 @@ class DpxIntInput(InputWidget):
     step     = Int(default=1,  help="step value which can be input")
     end      = Int(default=10, help="max value which can be input")
 
-class DpxFloatInput(InputWidget):
-    """ Single-line input widget. """
-    __implementation__ = "intinput.coffee"
-
-    value    = Float(default=0.,  help="Initial or entered int value")
-    start    = Float(default=0.,  help="min value which can be input")
-    step     = Float(default=1.,  help="step value which can be input")
-    end      = Float(default=10., help="max value which can be input")
-
 class DpxTextInput(InputWidget):
     """ Single-line input widget. """
-    __implementation__ = "intinput.coffee"
+    __implementation__ = "textinput.coffee"
 
     value       = String(default="", help="Initial or entered int value")
     placeholder = String(default="", help="Placeholder for empty input field")
