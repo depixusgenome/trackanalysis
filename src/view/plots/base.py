@@ -395,7 +395,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                                type(self).__qualname__, durations[0], time() - start)
                 self._doc.add_next_tick_callback(_render)
 
-            spawn(_reset_and_render)
+            self._doc.add_next_tick_callback(lambda: spawn(_reset_and_render))
 
     def _addcallbacks(self, fig):
         "adds Range callbacks"
