@@ -146,7 +146,11 @@ def _win_opts():
             return subprocess.Popen(*args, **kwargs)
         compiler.Popen = _Popen
 
-def _raiseerr(raiseerr):
+def _debug(raiseerr, singlethread):
+    if singlethread:
+        import view.base as _base
+        _base.SINGLE_THREAD = True
+
     if raiseerr:
         import app.launcher as app
 
@@ -155,7 +159,7 @@ def _raiseerr(raiseerr):
             ctrl.getGlobal('config').catcherror.toolbar.default = False
         app.DEFAULT_CONFIG = _cnf
 
-def _files(files, output):
+def _files(files, bead):
     def _started(_, start = time()):
         LOGS.info("done loading in %d seconds", time()-start)
     INITIAL_ORDERS.append(_started)
@@ -164,13 +168,9 @@ def _files(files, output):
         def _open(ctrl):
             ctrl.getGlobal('config').last.path.open.set(files[0])
             ctrl.openTrack(files)
+            if bead is not None:
+                ctrl.getGlobal("project").bead.set(bead)
         INITIAL_ORDERS.append(_open)
-
-    if output is not None:
-        def _save(ctrl):
-            ctrl.getGlobal('config').last.path.save.set(output)
-            ctrl.saveTrack(output)
-        INITIAL_ORDERS.append(_save)
 
 def _launch(view, app, desktop, kwa):
     viewcls = _from_path(view)
@@ -211,48 +211,47 @@ def _version(ctx, _, value):
               expose_value = False, is_eager = True)
 @click.argument('view')
 @click.argument('files', nargs = -1, type = click.Path())
-@click.option("--app", default = 'app.BeadToolBar',
-              help = 'Which app mixin to use')
-@click.option("-d", "--desk", 'apptype', flag_value = 'deskxul', default = 'xul',
-              help = 'Launch as a xul desktop app')
-@click.option("-e", "--electron", 'apptype', flag_value = 'deskelectron',
-              help = 'Launch as an eletron desktop app')
-@click.option("-s", "--server", 'apptype', flag_value = 'webserver',
-              help = 'Launches a webserver with the client')
-@click.option("-w", "--web", 'apptype', flag_value = 'webclient',
-              help = 'Launches a webserver *and* a webbrowser')
-@click.option("--port", default = str(DEFAULT_SERVER_PORT),
-              help = 'Port used: use "random" for any')
-@click.option('-r', "--raiseerr", flag_value = True, default = False,
-              help = 'Wether errors should be caught')
-@click.option('-o', "--output", type = click.Path(), default = None,
-              help = 'Saves a report upon opening')
-def main(view, files, app,  # pylint: disable=too-many-arguments
-         apptype, port, raiseerr, output):
+@click.option('-b', "--bead",
+              type       = int,
+              default    = None,
+              help       = 'Opens to this bead')
+@click.option("-g", "--gui",
+              type       = click.Choice(['firefox', 'chrome', 'default', 'none']),
+              default    = 'firefox',
+              help       = 'The type of browser to use.')
+@click.option('-p', "--port",
+              default    = str(DEFAULT_SERVER_PORT),
+              help       = 'Port used: use "random" for any')
+@click.option("--raiseerr",
+              flag_value = True,
+              default    = False,
+              help       = '[DEBUG] Wether errors should be caught')
+@click.option("--singlethread",
+              flag_value = True,
+              default    = False,
+              help       = '[DEBUG] Runs plots in single thread')
+def main(view, files, bead,  # pylint: disable=too-many-arguments
+         gui, port, raiseerr, singlethread):
     "Launches an view"
-    _raiseerr(raiseerr)
+    _debug(raiseerr, singlethread)
     _win_opts()
 
-    kwargs = dict(port    = _port(port),
-                  apponly = output is not None)
-    if 'xul' not in apptype:
+    kwargs = dict(port = _port(port), apponly = False)
+    if gui != 'firefox':
         kwargs['unused_session_linger_milliseconds'] = 60000
 
-    _files(files, output)
-    server = _launch(view, app, 'xul' in apptype, kwargs)
-    if output is not None:
-        LOGS.info('Running as script and exiting')
-        INITIAL_ORDERS.run(server)
-    else:
-        if 'electron' in apptype:
-            server.io_loop.add_callback(lambda: _electron(server, port = kwargs['port']))
-        elif 'webclient' in apptype:
-            server.io_loop.add_callback(lambda: server.show("/"))
+    _files(files, bead)
+    server = _launch(view, 'app.BeadToolBar', gui == 'firefox', kwargs)
 
-        log = lambda: LOGS.info(' http://%(address)s:%(port)s',
-                                {'port': kwargs['port'], 'address': 'localhost'})
-        server.io_loop.add_callback(log)
-        server.run_until_shutdown()
+    if gui == 'chrome':
+        server.io_loop.add_callback(lambda: _electron(server, port = kwargs['port']))
+    elif gui == 'default':
+        server.io_loop.add_callback(lambda: server.show("/"))
+
+    log = lambda: LOGS.info(' http://%(address)s:%(port)s',
+                            {'port': kwargs['port'], 'address': 'localhost'})
+    server.io_loop.add_callback(log)
+    server.run_until_shutdown()
     logging.shutdown()
 
 if __name__ == '__main__':

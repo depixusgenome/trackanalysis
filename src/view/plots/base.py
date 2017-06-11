@@ -21,7 +21,7 @@ from    bokeh.models            import (Range1d,    # pylint: disable=unused-imp
 from    utils.logconfig         import getLogger
 from    control                 import Controller
 from    control.globalscontrol  import GlobalsAccess
-from    ..base                  import BokehView, threadmethod, spawn
+from    ..base                  import BokehView, threadmethod, spawn, SINGLE_THREAD
 from    .bokehext               import DpxHoverTool, from_py_func
 
 LOGS    = getLogger(__name__)
@@ -354,7 +354,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         "sets-up model observers"
         self.project.root.observe(self.reset)
 
-    if False: # pylint: disable=using-constant-test
+    if SINGLE_THREAD: # pylint: disable=using-constant-test
         # use this for single-thread debugging
         def __doreset(self):
             with self.resetting():

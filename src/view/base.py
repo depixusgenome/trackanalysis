@@ -16,6 +16,7 @@ from control        import Controller             # pylint: disable=unused-impor
 from control.action import ActionDescriptor, Computation, Action
 from .keypress      import KeyPressManager        # pylint: disable=unused-import
 
+SINGLE_THREAD = False
 
 class View:
     "Classes to be passed a controller"
