@@ -39,6 +39,8 @@ def _without_cls(vname, cname):
                       and i.__module__ == viewmod.__name__
                       and i.__name__.lower() == cname)
     pot  = tuple(i for _, i in inspect.getmembers(viewmod, pred))
+    if len(pot) == 0:
+        return _without_cls(vname+".view", cname)
     assert len(pot) == 1
     return pot[0]
 
