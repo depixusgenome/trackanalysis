@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "Runs an app"
 from   pathlib import Path
+from   time    import time
 import logging
 import sys
 import glob
@@ -153,6 +154,10 @@ def _raiseerr(raiseerr):
         app.DEFAULT_CONFIG = _cnf
 
 def _files(files, output):
+    def _started(_, start = time()):
+        LOGS.info("done loading in %d seconds", time()-start)
+    INITIAL_ORDERS.append(_started)
+
     if len(files):
         def _open(ctrl):
             ctrl.getGlobal('config').last.path.open.set(files[0])

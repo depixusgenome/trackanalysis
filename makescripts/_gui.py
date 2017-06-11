@@ -3,16 +3,16 @@
 "Compiles the JS code once and for all"
 from wafbuilder import copyroot, make
 
-def build_bokehjs(bld, module):
+def build_bokehjs(bld, *modules):
     "compiles the bokeh js code"
     srcs  = bld.path.ant_glob('**/*.coffee')
     srcs += bld.path.parent.ant_glob('view/**/*.coffee')
     srcs += bld.path.parent.ant_glob('app/**/*.coffee')
-    tgt   = copyroot(bld, module+'.js')
+    tgt   = copyroot(bld, modules[0]+'.js')
     bld(source      = srcs,
-        name        = module+':bokeh',
+        name        = modules[0]+':bokeh',
         color       = 'BLUE',
-        rule        = '../makescripts/bokehcompiler.py '+module+' -o ${TGT}',
+        rule        = '../makescripts/bokehcompiler.py '+' '.join(modules)+' -o ${TGT}',
         target      = tgt,
         cls_keyword = lambda _: 'Bokeh',
         group       = 'bokeh')
@@ -31,7 +31,14 @@ def guimake(viewname, locs):
     def build(bld):
         "build gui"
         old(bld)
-        build_bokehjs(bld, locs['APPNAME'])
+        modules = [locs['APPNAME']]
+        if '.' in viewname:
+            for i in viewname.split('.'):
+                if i[0] == i[0].upper():
+                    break
+                modules.append(modules[-1]+'.'+i)
+
+        build_bokehjs(bld, *modules)
 
     locs['build'] = build
 
