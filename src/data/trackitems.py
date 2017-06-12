@@ -275,7 +275,7 @@ class TrackItems(_m_ConfigMixin, Items):
     "Class for iterating over beads or creating a new list of data"
     level     = Level.none
     track     = None  # type: Any
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kw) -> None:
         super().__init__(**kw)
 
