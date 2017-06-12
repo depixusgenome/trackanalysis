@@ -12,7 +12,7 @@ from waflib             import Logs
 
 import wafbuilder
 from   ._utils          import BaseContext, BuildContext, MODULES
-from   .base            import build as _basebuild
+from   ._base           import build as _basebuild
 
 class _CondaEnv(BuildContext):
     fun = cmd = 'condaenv'

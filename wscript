@@ -16,13 +16,4 @@ require(python = {'pybind11' : '2.1.0',
                   'mypy'     : '0.511'},
         rtime  = False)
 
-def options(opt):
-    base.options(opt)
-
-def configure(opt):
-    base.configure(opt)
-
-def build(opt):
-    base.build(opt)
-
 MODULES.addbuild(locals())
