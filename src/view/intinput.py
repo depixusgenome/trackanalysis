@@ -167,6 +167,11 @@ class  RejectedBeadsInput(BeadView):
         self._ctrl.getGlobal('project').track.observe(self.__onproject)
         return self._inp
 
+    def append(self, bead: int):
+        "adds a bead to discarded beads"
+        old  = self._inp.value
+        self.__ondiscarded_cb('value', old, old+', '+str(bead))
+
     def __ondiscarded_cb(self, attr, old, new):
         vals = set()
         for i in re.split('[:;,]', new):

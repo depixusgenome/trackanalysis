@@ -4,7 +4,7 @@
 from typing               import Callable # pylint: disable=unused-import
 from pathlib              import Path
 from bokeh.layouts        import Row, widgetbox
-from bokeh.models         import Div
+from bokeh.models         import Div, Button
 from bokeh.io             import curdoc
 
 from control.taskio       import TaskIO
@@ -241,7 +241,15 @@ class BeadToolBar(ToolBar):
         super().__init__(**kwa)
         self._beads     = BeadInput(**kwa)
         self._discarded = RejectedBeadsInput(**kwa)
-        self._ctrl.getGlobal('css').beadtoobar.boxwidth.default = 200
+        self._delbead   = None
+        css = self._ctrl.getGlobal("css").beadtoobar
+        css.defaults = {'boxwidth': 200,
+                        'delbead.title': '-',
+                        'delbead.width': 15 ,
+                        'delbead.height': 15 }
+
+        cnf = self._ctrl.getGlobal('config')
+        cnf.keypress.defaults = {'delbead' : "Suppr"}
 
     @property
     def __beadchildren(self):
@@ -249,14 +257,25 @@ class BeadToolBar(ToolBar):
 
     def _getroots(self, doc):
         super()._getroots(doc)
-        width    = self._ctrl.getGlobal("css").beadtoobar.boxwidth.get()
+        css      = self._ctrl.getGlobal("css").beadtoobar
+        width    = css.boxwidth.get()
         children = self.__beadchildren
         for attr in children:
             attr.getroots(doc)
 
-        self._tools.insert(2, widgetbox(self._beads.input, width = 2*self._beads.input.width))
+        self._delbead = Button(label  = css.delbead.title.get(),
+                               width  = css.delbead.width.get(),
+                               height = css.delbead.height.get())
+        self._delbead.on_click(self._onDelBead)
+        self._keys.addKeyPress(('keypress.delbead', self._onDelBead))
+
+        self._tools.insert(2, widgetbox(self._beads.input,     width = 3*self._beads.input.width))
         self._tools.insert(3, widgetbox(self._discarded.input, width = width))
+        self._tools.insert(4, widgetbox(self._delbead,         width = css.delbead.width.get()))
         self.enableOnTrack(*(i.input for i in children))
+
+    def _onDelBead(self, *_):
+        self._discarded.append(self._ctrl.getGlobal('project').bead.get())
 
     def close(self):
         "Sets up the controller"
