@@ -78,21 +78,27 @@ class CollapseToMean(_CollapseAlg):
 
     The collapse starts from the right-most interval and moves left.
     """
+    measure = 'mean'
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
     def _run(self, inter:Sequence[Range], prof:Profile) -> Profile:
         key   = lambda i: (-i.start-len(i.values), -len(i.values))
-        cnt   = np.zeros_like(prof.count)
+        cnt   = np.copy(prof.count)
         edge  = self._edge
         inner = slice(edge, None if edge is None else -edge)
+        diff  = getattr(np, self.measure)
         for inds, cur in _iter_ranges(prof.xmin, sorted(inter, key = key)):
             rho                      = cnt[inds]*1.
             vals                     = prof.value[inds]
 
             if any(rho):
-                cur                 += (vals-cur)[rho>0].mean()
+                cur                 += diff((vals-cur)[rho>0])
                 rho                 /= rho+1.
                 prof.value[inds]     = rho*vals + (1.-rho)*cur
             else:
-                prof.value[inds]     = cur - cur.mean()
+                prof.value[inds]     = cur - diff(cur)
 
             cnt       [inds]        += 1
             prof.count[inds[inner]] += 1
