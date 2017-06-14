@@ -135,7 +135,7 @@ class MetaMixin(type):
 
 def startfile(filepath:str):
     u"launches default application for given file"
-    LOGS.info("Opening %s", filepath)
+    LOGS.info("Launching %s", filepath)
     if sys.platform.startswith('darwin'):
         subprocess.Popen(('open', filepath))
     elif os.name == 'nt':
