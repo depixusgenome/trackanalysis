@@ -3,7 +3,7 @@
 u'''
 defines a list of scoring functors for sequence assembly
 '''
-from typing import Tuple, List, NamedTuple # pylint: disable=unused-import
+from typing import Tuple, List, NamedTuple, Set # pylint: disable=unused-import
 import itertools
 import scipy
 import numpy as np
@@ -201,7 +201,7 @@ class ScoreAssembly:
         '''
         return OptiKPerm(kperm=getattr(self.perm,attr)).cost()
 
-    def noverlaps(self,attr="kperm")->int: # to check
+    def noverlaps(self,attr="kperm")->int:
         u'''
         returns the number of consecutive overlaps between oligos in kpermids
         '''
@@ -219,28 +219,111 @@ class ScoreAssembly:
         self.perm=kperm
         return self.run()
 
+class LScPerm:
+    u'''
+    lighter version of ScoredPermCollection
+    contains only pdfcost, noverlaps and perrmids
+    '''
+    pdfcost=0.0 # type: float
+    noverlaps=-1 # type: int
+    permids=[] # type: List[int]
+    domain=set() # type: Set[int]
+    @initdefaults(frozenset(locals()))
+    def __init__(self,**kwa):
+        pass
 
-class LightScPermCollection:
+    def __hash__(self)->int:
+        return hash((tuple(sorted(self.domain)),tuple(self.permids)))
+
+    @classmethod
+    def product(cls,*args):
+        u'''
+        returns the product of any 2 elements in 2 different ScoredPermCollection
+        '''
+        print("args=",args)
+        if len(args)==1:
+            return args[0]
+
+        res = cls.__product2(*args[:2])
+        #print("res=",res)
+        for sckpm in args[2:]:
+            #print("sckpm=",sckpm)
+            res = cls.__product2(res,sckpm)
+        return res
+
+    @classmethod
+    def __product2(cls,first,second):
+        return LScPerm(permids=np.array(first.permids)[second.permids],
+                       domain=first.domain.union(second.domain),
+                       pdfcost=-first.pdfcost*second.pdfcost,
+                       noverlaps=first.noverlaps+second.noverlaps)
+
+
+class LScPermCollection:
     u'''
     lighter version of ScoredPermCollection
     used to merged large collections together
     oligo seqs and perms information is lost but can be recovered
     '''
-    def __init__(self,**kwa):
+    def __init__(self,scperms:List[LScPerm])->None:
         u'init'
-        self.pdfcosts=kwa.get("pdfcosts",np.matrix([],float))
-        self.noverlaps=kwa.get("noverlaps",np.matrix([],int))
+        self.scperms=scperms
 
     @classmethod
-    def __product2(cls,first,second):
-        u'return a '
-        pass
+    def product(cls,*args):
+        u'''
+        returns the product of any 2 elements in 2 different ScoredPermCollection
+        '''
+        if len(args)==1:
+            return args[0]
+
+        res = cls.__product2(*args[:2])
+        for sckpm in args[2:]:
+            res = cls.__product2(res,sckpm)
+        return res
+
+    @classmethod
+    def __product2(cls,collection1,collection2):
+        u'product of 2 LScPermCollections'
+        if __debug__:
+            if collection1.intersect_with(collection2):
+                print(collection1.scperms[0].domain)
+                print(collection2.scperms[0].domain)
+                print("pb the 2 permutations are not independant")
+        perms1=np.matrix([i.permids for i in collection1.scperms])
+        perms2=np.matrix([i.permids for i in collection2.scperms])
+        merged_permids=perms1[:,perms2]
+        merged_pdfcost=-np.matrix([i.pdfcost for i in collection1.scperms]).T*np.matrix\
+            ([i.pdfcost for i in collection2.scperms])
+        merged_noverlaps=np.matrix([i.noverlaps for i in collection1.scperms]).T\
+                          +np.matrix([i.noverlaps for i in collection2.scperms])
+
+        scores=[LScPerm(pdfcost=merged_pdfcost[i1,i2],
+                        noverlaps=merged_noverlaps[i1,i2],
+                        domain=collection1.scperms[i1].\
+                        domain.union(collection2.scperms[i2].domain),
+                        permids=merged_permids[i1,i2,:].\
+                        reshape((1,perms2.shape[1])).tolist()[0])
+                for i1 in range(len(collection1.scperms))
+                for i2 in range(len(collection2.scperms))]
+
+        return LScPermCollection(scperms=scores)
+
+    def intersect_with(self,other):
+        u'''
+        returns True if any OligoPerm in self is also in other
+        '''
+        for scpm in self.scperms:
+            if any(scpm.domain.intersection(oth.domain)
+                   for oth in other.scperms):
+                return True
+        return False
+
 
 class ScoredPermCollection:
     u'''
     handles a list of ScoredPerm
     '''
-
     def __init__(self,scperms:List[ScoredPerm])->None:
         self.scperms=scperms
 

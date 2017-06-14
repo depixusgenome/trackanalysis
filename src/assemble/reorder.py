@@ -102,7 +102,6 @@ class DownTopSearcher:
         print("merging=",[i.changes for i in groupings])
         test=self.merge(groupings)
         print("merged=",[i.changes for i in test])
-
         return self.merge(groupings)
 
     def run(self):
@@ -192,39 +191,57 @@ class KPermCombiner:
         where each group are 2 by 2 disjoint instead of look for 2**(disjoints groups)
 
         '''
-        pickle.dump(list(self.kpermassessor.kperms),open("perms2group.pickle","wb"))
+        #pickle.dump(list(self.kpermassessor.kperms),open("perms2group.pickle","wb"))
         # Each group must have the neutral permutation,
         # and each elements in the same group must share the same domain
         groups = self.group_perms()
 
         # reversed sort groups per size
         groups = sorted(groups,key=lambda x:-len(x))
+        if __debug__:
+            pickle.dump(groups,open("permgroups.pickle","wb"))
         # scored, List[List[ScoredPerm]]
         scored=[[self.scoring(prm) for prm in grp] for grp in groups]
-        pickle.dump(scored,open("scored.pickle","wb"))
+        if __debug__:
+            pickle.dump(scored,open("scored.pickle","wb"))
 
         scfilter = scores.ScoreFilter(ooverl=self.ooverl)
         print("before filtering",[len(grp) for grp in scored])
         filtered = [scfilter(grp) for grp in scored]
 
+        # TO CHANGE! the following command line will never be useful as is.
         # we need to discard groups of a single elements (i.e. the neutral k-permutation)
         filtered = list(filter(lambda x:len(x)>1,filtered))
+
         print("after filtering",[len(grp) for grp in filtered])
 
-        # redundant with above
-        #filtered =  [scp for scp in filtered
-        #             if not all([len(scprm.perm.changes)==0 for scprm in scp])]
-
-        filtered = [scores.ScoredPermCollection(scperms=grp) for grp in filtered]
-        pickle.dump(filtered,open("filtered.pickle","wb"))
 
         # FROM THIS POINT USE LightScPermCollection instead
-        divisions=self.subdivide_then_partition(filtered)
-        pickle.dump(divisions,open("test_divisions_backup.pickle","wb"))
+        #filtered = [scores.ScoredPermCollection(scperms=grp) for grp in filtered]
 
-        merged_divi=[]
+        filtered=[scores.LScPermCollection(scperms=[scores.LScPerm(pdfcost=scperm.pdfcost,
+                                                                   noverlaps=scperm.noverlaps,
+                                                                   permids=scperm.perm.permids,
+                                                                   domain=scperm.perm.domain)
+                                                    for scperm in grp])
+                  for grp in filtered]
+
+        # find the list of collections to merge
+        divisions=self.subdivide_then_partition(filtered)
+        if __debug__:
+            pickle.dump(divisions,open("partitions2merge.pickle","wb"))
+
+        merged=[]
+        scperms=[]
         for divi in divisions:
-            merged_divi.append(self.merge_division(divi))
+            # use self.seqmerge_partitions(divi)
+            merged=self.merge_partitions(divi)
+            scperms.append(list(set(scperm for coll in merged for scperm in coll.scperms)))
+
+        # delete duplicates between scperms
+        # scperms=list(set(scperms))
+        # recreate collections : each element in a collection has the same domain
+
 
 
         # continue from here
@@ -238,36 +255,62 @@ class KPermCombiner:
         #pickle.dump(full_merge,open("full_merge.pickle","wb"))
         #print(len(full_merge))
 
-        return merged_divi
+        return scperms
 
 
     # pylint: disable=no-self-use
-    def merge_division(self,division:List[List[scores.ScoredPermCollection]]):
+    def merge_partitions(self,
+                         partitions:List[List[scores.LScPermCollection]])\
+                         ->List[scores.LScPermCollection]:
         u'''
-        reduces the permcollection of each element in division to 1 scores.ScoredPermCollection
+        elements in the list are lists of collections which forms a partition
+        these collections are must be merged
+        reduces the permcollection of each element in partitions to 1 scores.ScoredPermCollection
         before moving to the next one
-        application of ScoreFilter made useless by construction of ScoredPermCollection (good)
-        plus ScoreFilter should be applied to same permutation
-        within a collection (i.e. same domain)
+        application of ScoreFilter made useless by construction of ScoredPermCollection
+        -> This is good!
         '''
-        for idx,div in enumerate(division):
+        for idx,div in enumerate(partitions):
             print("idx=",idx)
+            # a partition of 1 element is already merged
             if len(div)==1:
                 continue
             while len(div)>1:
                 print("len(div)=",len(div))
                 scp1,scp2=div[:2]
-                merged=scores.ScoredPermCollection.product(scp1,scp2)
-                for divi in division[idx:]:
+                #merged=scores.ScoredPermCollection.product(scp1,scp2)
+                if __debug__:
+                    pickle.dump(scp1,open("tomerge1.pickle","wb"))
+                    pickle.dump(scp2,open("tomerge2.pickle","wb"))
+                merged=scores.LScPermCollection.product(scp1,scp2)
+                for divi in partitions[idx:]:
                     if scp1 in divi and scp2 in divi:
                         divi.remove(scp1)
                         divi.remove(scp2)
                         divi.append(merged)
 
-        return division
+        return [part[0] for part in partitions]
+
+    @classmethod
+    def seqmerge_partitions(cls,partitions):
+        u'''
+        merges partitions sequentially (avoid memory overload)
+        '''
+        for part in partitions:
+            for prod in cls.sequential_partition_merge(part):
+                yield prod
+
+    @classmethod
+    def sequential_partition_merge(cls,partition):
+        u'''
+        same principle as merge_partitions but yield the product of LScPerms sequentially
+        '''
+        tomerge=itertools.product(*[i.scperms for i in partition])
+        for scperms in tomerge:
+            yield scores.LScPerm.product(*scperms)
 
     def subdivide_then_partition(self,
-                                 collections:List[scores.ScoredPermCollection],
+                                 collections:List[scores.LScPermCollection],
                                  sort_by="domain",
                                  max_size=50):
         u'''
@@ -280,7 +323,7 @@ class KPermCombiner:
         find_partitions is too long for more than 30 data.KPermCollections
 
         Order the data.KPermCollection
-        subdivide into 30 data.KPermCollection segments
+        subdivide into max_size data.KPermCollection segments
         for each subdivision compute the partitions
         for each partition, merge the data.KPermCollection
         * each subdivision will have many partition,
@@ -289,7 +332,7 @@ class KPermCombiner:
         each kperm in the collection is a merge of multiple ones
         '''
         ocollect = tuple(sorted(collections,
-                                key = lambda x:len(getattr(x.scperms[0].perm,sort_by))))
+                                key = lambda x:len(getattr(x.scperms[0],sort_by))))
         print("len(ocollect)=",len(ocollect))
         subdivision=[tuple(ocollect[max_size*i:(i+1)*max_size])
                      for i in range(int(numpy.ceil(len(ocollect)/max_size)))]
@@ -308,7 +351,6 @@ class KPermCombiner:
 
             per_subdivision.append(partitions)
 
-        pickle.dump(per_subdivision,open("per_subdivision_backup.pickle","wb"))
         return per_subdivision
 
     # it appears that recursion is slow for python. Try a reimplementation using while loop
