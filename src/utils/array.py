@@ -8,6 +8,34 @@ import numpy as np
 EVENTS_TYPE  = Tuple[int, np.ndarray]
 EVENTS_DTYPE = np.dtype([('start', 'i4'), ('data', 'O')])
 
+class EventsArray(np.ndarray):
+    """Array with metadata."""
+    # pylint: disable=unused-argument
+    _discarded = False
+    _dtype     = EVENTS_DTYPE
+    _order     = None
+    def __new__(cls, array, **kwa):
+        obj  = np.asarray(array,
+                          dtype = kwa.get('dtype', cls._dtype),
+                          order = kwa.get('order', cls._order)
+                         ).view(cls)
+        obj.discarded = kwa.get('discarded', cls._discarded)
+        return obj
+
+    def __array_finalize__(self, obj):
+        if obj is None:
+            return
+        # pylint: disable=attribute-defined-outside-init
+        self.discarded = getattr(obj, 'discarded', False)
+
+    def __reduce_ex__(self, arg):
+        fcn, red, state = super().__reduce_ex__(arg)
+        return fcn, red, (state, self.discarded)
+
+    def __setstate__(self, vals):
+        super().__setstate__(vals[0])
+        self.discarded = vals[1] # pylint: disable=attribute-defined-outside-init
+
 def _m_asarray(arr:Iterable)-> np.array:
     tmp = None # type: Optional[Sequence]
     if isinstance(arr, Iterator):

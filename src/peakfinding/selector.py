@@ -7,7 +7,7 @@ from   collections          import namedtuple
 import numpy    as              np
 
 from utils                  import (initdefaults, asobjarray, asdataarrays, asview,
-                                    updatecopy, EVENTS_TYPE, EVENTS_DTYPE)
+                                    updatecopy, EVENTS_TYPE, EVENTS_DTYPE, EventsArray)
 from signalfilter           import PrecisionAlg, PRECISION
 from .alignment             import PeakCorrelationAlignment
 from .histogram             import (Histogram, # pylint: disable=unused-import
@@ -21,19 +21,10 @@ PeakSelectorDetails = namedtuple('PeakSelectorDetails',
                                  ['positions', 'histogram', 'minvalue', 'binwidth',
                                   'corrections', 'peaks', 'events', 'ids'])
 
-class PeaksArray(np.ndarray):
+class PeaksArray(EventsArray):
     """Array with metadata."""
-    # pylint: disable=unused-argument
-    def __new__(cls, array, dtype=None, order=None, discarded = 0):
-        obj  = np.asarray(array, dtype=dtype, order=order).view(cls)
-        obj.discarded = discarded
-        return obj
-
-    def __array_finalize__(self, obj):
-        if obj is None:
-            return
-        # pylint: disable=attribute-defined-outside-init
-        self.discarded = getattr(obj, 'discarded', 0)
+    _discarded = 0
+    _dtype     = None
 
 class PeakSelector(PrecisionAlg):
     u"Selects peaks and yields all events related to each peak"

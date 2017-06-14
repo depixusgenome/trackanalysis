@@ -9,22 +9,8 @@ import numpy          as     np
 
 from model            import PHASE
 from data.trackitems  import Items, Cycles, Level, CYCLEKEY
-from utils            import EVENTS_TYPE, EVENTS_DTYPE, asview
+from utils            import EVENTS_TYPE, EVENTS_DTYPE, asview, EventsArray
 from .                import EventDetectionConfig
-
-class EventsArray(np.ndarray):
-    """Array with metadata."""
-    # pylint: disable=unused-argument
-    def __new__(cls, array, dtype=None, order=None, discarded = False):
-        obj  = np.asarray(array, dtype = EVENTS_DTYPE, order=order).view(cls)
-        obj.discarded = discarded
-        return obj
-
-    def __array_finalize__(self, obj):
-        if obj is None:
-            return
-        # pylint: disable=attribute-defined-outside-init
-        self.discarded = getattr(obj, 'discarded', False)
 
 class Events(Cycles, EventDetectionConfig, Items):
     u"""
