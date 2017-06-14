@@ -4,7 +4,6 @@
 from    typing         import List, Optional, Tuple      # pylint: disable=unused-import
 from    collections    import OrderedDict
 from    pathlib        import Path
-import  re
 import  numpy   as np
 
 import  bokeh.core.properties as props
@@ -332,11 +331,9 @@ class OligoListWidget(WidgetCreator):
                                           name        = 'Cycles:Oligos')
 
         widget = self.__widget
-        match  = re.compile(r'(?:[^atgc]*)([atgc]+)(?:[^atgc]+|$)*',
-                            re.IGNORECASE).findall
         @action
         def _py_cb(attr, old, new):
-            ols  = sorted(i.lower() for i in match(new))
+            ols  = sequences.splitoligos(new)
             hist = self.config.plot.oligos.history
             lst  = list(i for i in hist.get() if i != ols)[:hist.maxlength.get()]
             hist.set(([ols] if len(ols) else []) + lst)

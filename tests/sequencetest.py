@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "All sequences-related stuff"
-from sequences import peaks, overlap
+from sequences import peaks, overlap, splitoligos
 
 def test_peaks():
     "tests peaks"
@@ -53,6 +53,14 @@ def test_overlap():
     assert  not overlap('CATA', 'ATAT', minoverlap = 4)
     assert  not overlap('CCAT', 'ATAT', minoverlap = 3)
     assert  not overlap('CCCA', 'ATAT', minoverlap = 2)
+
+def test_splits():
+    "testing oligo splitting"
+    assert splitoligos('AtG') == ['atg']
+    assert splitoligos(':AtG;') == ['atg']
+    assert splitoligos('AtG;ttt') == ['atg', 'ttt']
+    assert splitoligos('AtG;ttt;') == ['atg', 'ttt']
+    assert splitoligos('AtG;ttwt;') == ['atg', 'ttwt']
 
 if __name__ == '__main__':
     test_peaks()

@@ -40,61 +40,36 @@ def read(stream:TextIO) -> 'Iterator[Tuple[str,str]]':
 PEAKS_DTYPE = [('position', 'i4'), ('orientation', np.bool8)]
 PEAKS_TYPE  = Sequence[Tuple[int, bool]]
 
-def peaks(seq:str, oligs:'Union[Sequence[str], str]',
-          flags       = re.IGNORECASE,
-          methylation = '!') -> np.ndarray:
-    """
-    Returns the peak positions and orientation associated to a sequence.
+class Translator:
+    "Translates a sequence to peaks"
+    __SYMBOL = '!'
+    __METHS  = ((re.compile('.'+__SYMBOL), lambda x: '('+x.string[x.start()]+')'),
+                (re.compile(__SYMBOL+'.'), lambda x: '('+x.string[x.end()-1]+')'))
+    __TRANS  = {'k': '[gt]', 'm': '[ac]', 'r': '[ag]', 'y': '[ct]', 's': '[cg]',
+                'w': '[at]', 'b': '[^a]', 'v': '[^t]', 'h': '[^g]', 'd': '[^c]',
+                'n': '.',    'x': '.', 'u': 't'}
 
-    A peak position is the end position of a match. With indexes starting at 0,
-    that's the indexe of the first base *after* the match.
+    __TRAFIND = re.compile('['+''.join(__TRANS)+']')
+    __ALPHABET= 'atgc'+''.join(__TRANS)+__SYMBOL
+    __SPLIT   = re.compile((r'(?:[^%(alph)s]*)([%(alph)s]+)(?:[^%(alph)s]+|$)*'
+                            % dict(alph =__ALPHABET)), re.IGNORECASE)
 
-    The orientation is *True* if the oligo was matched and false otherwise. Palindromic
-    cases are *True*.
+    @classmethod
+    def __trarep(cls, item):
+        return cls.__TRANS[item.string[slice(*item.span())]]
 
-    Matches are **case sensitive**.
-
-    Example:
-
-        >>> import numpy as np
-        >>> seq = "atcgATATATgtcgCCCaaGGG"
-        >>> res = peaks(seq, ('ATAT', 'CCC'))
-        >>> assert len(res) == 4
-        >>> assert all(a == b for a, b in zip(res['position'],    [8, 10, 17, 22]))
-        >>> assert all(a == b for a, b in zip(res['orientation'], [True]*3+[False]))
-        >>> res = peaks(seq, 'ATAT')
-        >>> assert len(res) == 2
-        >>> assert all(a == b for a, b in zip(res['position'],    [8, 10]))
-        >>> assert all(a == b for a, b in zip(res['orientation'], [True]*2))
-        >>> seq = "c"*5+"ATC"+"g"*5+"TAG"+"c"*5
-        >>> res = peaks(seq, 'wws')
-        >>> assert len(res) == 4
-    """
-    if isinstance(oligs, str):
-        oligs = (oligs,)
-
-    if len(oligs) == 0:
-        return np.empty((0,), dtype = PEAKS_DTYPE)
-
-    meths = ((re.compile('.'+methylation), lambda x: '('+x.string[x.start()]+')'),
-             (re.compile(methylation+'.'), lambda x: '('+x.string[x.end()-1]+')'))
-
-    trans = {'k': '[gt]', 'm': '[ac]', 'r': '[ag]', 'y': '[ct]', 's': '[cg]',
-             'w': '[at]', 'b': '[^a]', 'v': '[^t]', 'h': '[^g]', 'd': '[^c]',
-             'n': '.',    'x': '.', 'u': 't'}
-    trafind = re.compile('['+''.join(trans)+']')
-    trarep  = lambda x: trans[x.string[slice(*x.span())]]
-
-    def _translate(olig, state):
+    @classmethod
+    def __translate(cls, olig, state):
         if not state:
             olig = str(Seq(olig).reverse_complement())
-        if methylation in olig:
-            olig = meths[state][0].sub(meths[state][1], olig)
-        return trafind.sub(trarep, olig)
+        if cls.__SYMBOL in olig:
+            olig = cls.__METHS[state][0].sub(cls.__METHS[state][1], olig)
+        return cls.__TRAFIND.sub(cls.__trarep, olig)
 
-    def _get(state):
+    @classmethod
+    def __get(cls, state, seq, oligs, flags):
         for oli in oligs:
-            patt = _translate(oli, state)
+            patt = cls.__translate(oli, state)
             reg  = re.compile(patt, flags)
             val  = reg.search(seq, 0)
 
@@ -109,10 +84,54 @@ def peaks(seq:str, oligs:'Union[Sequence[str], str]',
                     yield (val.end(), state)
                     val = reg.search(seq, val.start()+1)
 
-    vals = dict() # type: Dict[int, bool]
-    vals.update(_get(False))
-    vals.update(_get(True))
-    return np.array(sorted(vals.items()), dtype = PEAKS_DTYPE)
+    @classmethod
+    def peaks(cls, seq:str, oligs:Union[Sequence[str], str],
+              flags = re.IGNORECASE) -> np.ndarray:
+        """
+        Returns the peak positions and orientation associated to a sequence.
+
+        A peak position is the end position of a match. With indexes starting at 0,
+        that's the indexe of the first base *after* the match.
+
+        The orientation is *True* if the oligo was matched and false otherwise. Palindromic
+        cases are *True*.
+
+        Matches are **case sensitive**.
+
+        Example:
+
+            >>> import numpy as np
+            >>> seq = "atcgATATATgtcgCCCaaGGG"
+            >>> res = peaks(seq, ('ATAT', 'CCC'))
+            >>> assert len(res) == 4
+            >>> assert all(a == b for a, b in zip(res['position'],    [8, 10, 17, 22]))
+            >>> assert all(a == b for a, b in zip(res['orientation'], [True]*3+[False]))
+            >>> res = peaks(seq, 'ATAT')
+            >>> assert len(res) == 2
+            >>> assert all(a == b for a, b in zip(res['position'],    [8, 10]))
+            >>> assert all(a == b for a, b in zip(res['orientation'], [True]*2))
+            >>> seq = "c"*5+"ATC"+"g"*5+"TAG"+"c"*5
+            >>> res = peaks(seq, 'wws')
+            >>> assert len(res) == 4
+        """
+        if isinstance(oligs, str):
+            oligs = (oligs,)
+
+        if len(oligs) == 0:
+            return np.empty((0,), dtype = PEAKS_DTYPE)
+
+        vals = dict() # type: Dict[int, bool]
+        vals.update(cls.__get(False, seq, oligs, flags))
+        vals.update(cls.__get(True, seq, oligs, flags))
+        return np.array(sorted(vals.items()), dtype = PEAKS_DTYPE)
+
+    @classmethod
+    def split(cls, oligs:str)->Sequence[str]:
+        "splits a string of oligos into a list"
+        return sorted(i.lower() for i in cls.__SPLIT.findall(oligs))
+
+peaks       = Translator.peaks # pylint: disable=invalid-name
+splitoligos = Translator.split # pylint: disable=invalid-name
 
 def marksequence(seq:str, oligs: Sequence[str]) -> str:
     u"Returns a sequence with oligos to upper case"
