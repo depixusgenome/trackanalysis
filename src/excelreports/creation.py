@@ -183,7 +183,7 @@ class CsvReporter(_BaseReporter):
 class XlsReporter(_BaseReporter):
     u"All generic methods for creating an XLS report"
     _INT_FMT  = "0"
-    _REAL_FMT = "0.00"
+    _REAL_FMT = "0.0000"
     def __init__(self, arg):
         if isinstance(arg, XlsReporter):
             rep            = cast(XlsReporter, arg)
