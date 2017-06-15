@@ -1,3 +1,23 @@
+# tag cycles_v4.3
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+### Reporting
+
+Header in summary is now in multiple columns with the most irrelevant information
+set last.
+
+Column names have changed. They are now the same in the GUI and the reports.
+
+A *σ[PEAKS]* and a *Ratios* column has been added to the summary.
+
+### Data Treatment
+
+The *best* alignment has changed somewhat to better detect abnormal cycles.
+
+### Other
+
+Various bugs have been corrected. The warm-up time has been divided by 4.
+
 # tag cycles_v4.2
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
