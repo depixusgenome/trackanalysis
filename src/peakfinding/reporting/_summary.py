@@ -8,13 +8,42 @@ import numpy as np
 
 import version
 
+from xlsxwriter.utility     import xl_col_to_name
 from excelreports.creation  import column_method, sheet_class
 from ..probabilities        import Probability
 from ._base                 import BEADKEY, PeakOutput, Reporter
 
+class SigmaPeaks:
+    "Creates the formula for σ[Peaks]"
+    def __init__(self, parent : 'Reporter') -> None:
+        peakstype     = parent.config.sheettype('peaks')
+        peaks         = peakstype(parent.book, parent.config)
+
+        self._row     = peaks.tablerow()+1
+        self._formula = ''
+
+        for i, col in enumerate(peaks.columns()):
+            if peaks.columnname(col) == 'σ[Peaks]':
+                self._formula = ('=MEDIAN(INDIRECT("{sheet}!{col}:{col}"))'
+                                 .format(sheet = peaks.sheet_name,
+                                         col   = xl_col_to_name(i)+'{}'))
+                break
+        else:
+            raise KeyError("Missing column")
+
+    def __call__(self, outp:Tuple[PeakOutput]):
+        "returns a chart for this bead if peak is peaks zero"
+        row        = self._row+1
+        self._row += len(outp)
+        return self._formula.format(row, self._row)
+
 @sheet_class("Summary")
 class SummarySheet(Reporter):
     "creates the summary sheet"
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._sigmap = None
+
     @classmethod
     def chartheight(cls, _) -> int:
         "Returns the chart height"
@@ -28,6 +57,15 @@ class SummarySheet(Reporter):
         This is the median deviation of the movement from frame to frame
         """
         return self.uncertainty(bead)
+
+    @column_method("σ[Peaks]", units = 'µm', exclude = lambda x: not x.isxlsx())
+    def _sigmapeaks(self, _, outp:Tuple[PeakOutput]) -> float:
+        """
+        Median uncertainty on peak positions.
+        """
+        if self._sigmap is None:
+            self._sigmap = SigmaPeaks(self)
+        return self._sigmap(outp)
 
     @staticmethod
     @column_method("Peak Count")
@@ -84,7 +122,7 @@ class SummarySheet(Reporter):
                   ("Config:",           cnf),
                   ("Cycle  Count:",     self.config.track.ncycles),
                   ("Bead Count",        nbeads),
-                  ("Median σ[HF]:",     _avg(self._uncert)),
+                  ("σ[HF]:",            _avg(self._uncert)),
                   ("Events per Cycle:", _avg(self._evts)),
                   ("Down Time Φ₅ (s):", _avg(self._downtime))
                  ]
