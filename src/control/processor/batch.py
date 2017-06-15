@@ -17,6 +17,9 @@ from .base              import Processor
 
 class BatchTemplate(Iterable):
     "Template of tasks to run"
+    def __init__(self, **_):
+        pass
+
     def config(self) -> dict:
         "returns a copy of the dictionnary"
         return deepcopy(self.__dict__)

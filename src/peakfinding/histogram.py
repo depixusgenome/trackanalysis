@@ -132,6 +132,8 @@ class Histogram(PrecisionAlg):
             if bias is not None:
                 res[:]  = res + np.asarray(bias, dtype = 'f4')
         else:
+            if isinstance(fcn, str):
+                fcn = getattr(np, fcn)
             res[:] = [np.array([fcn(i) for i in evts], dtype = 'f4')
                       for evts in events]
 
@@ -141,6 +143,8 @@ class Histogram(PrecisionAlg):
 
     @staticmethod
     def __weights(fcn, events):
+        if isinstance(fcn, str):
+            fcn = getattr(np, fcn)
         return (itertools.repeat(1., len(events)) if fcn is None                 else
                 fcn                               if isinstance(fcn, np.ndarray) else
                 (fcn(evts) for evts in events))
