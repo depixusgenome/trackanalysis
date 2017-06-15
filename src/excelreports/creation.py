@@ -183,7 +183,8 @@ class CsvReporter(_BaseReporter):
 class XlsReporter(_BaseReporter):
     u"All generic methods for creating an XLS report"
     _INT_FMT  = "0"
-    _REAL_FMT = "0.0000"
+    _REAL_FMT = "0.00"
+    _MARKED   = dict(bg_color='gray')
     def __init__(self, arg):
         if isinstance(arg, XlsReporter):
             rep            = cast(XlsReporter, arg)
@@ -193,10 +194,9 @@ class XlsReporter(_BaseReporter):
         else:
             self.book = arg                                # type: Workbook
 
-            marked    = dict(bg_color = 'gray')
-            self.fmt  = {'marked'       : self.book.add_format(marked),
-                         self._INT_FMT : self.book.add_format(marked),
-                         self._REAL_FMT: self.book.add_format(marked),
+            self.fmt  = {'marked'       : self.book.add_format(self._MARKED),
+                         self._INT_FMT : self.book.add_format(self._MARKED),
+                         self._REAL_FMT: self.book.add_format(self._MARKED),
                          'real'        : self.book.add_format(),
                          'int'         : self.book.add_format()}
             self.fmt['real']        .set_num_format(self._REAL_FMT)
@@ -242,7 +242,14 @@ class XlsReporter(_BaseReporter):
                     fmt = fmt(self)
 
                 if isinstance(fmt, str):
-                    return getattr(self, fmt, None)
+                    res = self.fmt.get('s'+fmt, None)
+                    if res is None:
+                        self.fmt['s'+fmt] = self.book.add_format()
+                        self.fmt[fmt]     = self.book.add_format(self._MARKED)
+                        self.fmt['s'+fmt].set_num_format(fmt)
+                        self.fmt[fmt]    .set_num_format(fmt)
+                        return self.fmt['s'+fmt]
+                    return res
 
                 if fmt is None:
                     ret = fcn.__annotations__.get('return')

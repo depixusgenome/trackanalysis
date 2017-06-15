@@ -45,7 +45,7 @@ class SummarySheet(Reporter):
         "Returns the chart height"
         return 1
 
-    @column_method("σ[HF]", units = 'µm')
+    @column_method("σ[HF]", units = 'µm', fmt = '0.0000')
     def _uncert(self, bead:BEADKEY, _) -> float:
         """
         High-frequency noise.
@@ -54,7 +54,10 @@ class SummarySheet(Reporter):
         """
         return self.uncertainty(bead)
 
-    @column_method("σ[Peaks]", units = 'µm', exclude = lambda x: not x.isxlsx())
+    @column_method("σ[Peaks]",
+                   units   = 'µm',
+                   fmt     = '0.0000',
+                   exclude = lambda x: not x.isxlsx())
     def _sigmapeaks(self, _, outp:Tuple[PeakOutput]) -> float:
         """
         Median uncertainty on peak positions.
@@ -110,21 +113,19 @@ class SummarySheet(Reporter):
             return np.median([i for i in vals if i is not None])
 
         # pylint: disable=no-member
-        itemsa = [("Cycle  Count:",     self.config.track.ncycles),
-                  ("Bead Count",        nbeads),
-                  ("σ[HF]:",            _avg(self._uncert)),
+        items = ([("Cycle Count:",      self.config.track.ncycles),
+                  ("Bead Count",        nbeads)],
+                 [("σ[HF] (µm):",       _avg(self._uncert)),
                   ("Events per Cycle:", _avg(self._evts)),
-                  ("Down Time Φ₅ (s):", _avg(self._downtime))
-                 ]
-        itemsb = [("GIT Version:",      version.version()),
+                  ("Down Time Φ₅ (s):", _avg(self._downtime))],
+                 [("GIT Version:",      version.version()),
                   ("GIT Hash:",         version.lasthash()),
                   ("GIT Date:",         version.hashdate()),
-                  ("Config:",           cnf)]
+                  ("Config:",           cnf)])
 
-        if len(itemsa) > len(itemsb):
-            itemsb.extend((('', ''),)*(len(itemsa)-len(itemsb)))
+        maxlen = max(len(i) for i in items)
+        for lst in items:
+            if len(lst) < maxlen:
+                lst.extend((('', ''),)*(maxlen-len(lst)))
 
-        elif len(itemsb) > len(itemsa):
-            itemsa.extend((('', ''),)*(len(itemsb)-len(itemsa)))
-
-        self.header([i+(('',)*5)+j for i, j in zip(itemsa, itemsb)])
+        self.header([i+('',)+j+(('',)*2)+k for i, j, k in zip(*items)])

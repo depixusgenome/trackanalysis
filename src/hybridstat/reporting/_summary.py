@@ -3,18 +3,43 @@
 """
 Creates the summary sheet
 """
-from typing                 import Optional
+from typing                     import Optional
 import numpy as np
 
 import version
 
+from xlsxwriter.utility         import xl_col_to_name
 from peakfinding.probabilities  import Probability
 from excelreports.creation      import column_method, sheet_class
 from ._base                     import Bead, Reporter, Group
 
+class SigmaPeaks:
+    "Creates the formula for σ[Peaks]"
+    def __init__(self, parent : 'Reporter') -> None:
+        peakstype     = parent.config.sheettype('peaks')
+        peaks         = peakstype(parent.book, parent.config)
+
+        self._row     = peaks.tablerow()+1
+        self._formula = ''
+
+        ind           = next(iter(peaks.columnindex('σ[Peaks]')))
+        self._formula = ('=MEDIAN(INDIRECT("{sheet}!{col}:{col}"))'
+                         .format(sheet = peaks.sheet_name,
+                                 col   = xl_col_to_name(ind)+'{}'))
+
+    def __call__(self, npeaks):
+        "returns a chart for this bead if peak is peaks zero"
+        row        = self._row+1
+        self._row += npeaks
+        return self._formula.format(row, self._row)
+
 @sheet_class("Summary")
 class SummarySheet(Reporter):
     "creates the summary sheet"
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._sigmap = SigmaPeaks(self)
+
     @staticmethod
     def chartheight(npeaks:int) -> int:
         "Returns the chart height"
@@ -28,7 +53,7 @@ class SummarySheet(Reporter):
         """
         return None if bead is None else bead.key not in self.config.knownbeads
 
-    @column_method("σ[HF]", units = 'µm')
+    @column_method("σ[HF]", units = 'µm', fmt = '0.0000')
     def _uncert(self, _, bead:Bead) -> Optional[float]:
         """
         High-frequency noise.
@@ -37,6 +62,22 @@ class SummarySheet(Reporter):
         """
         return None if bead is None else self.uncertainty(bead)
 
+    @column_method("σ[Peaks]",
+                   units   = 'µm',
+                   fmt     = '0.0000',
+                   exclude = lambda x: not x.isxlsx())
+    def _sigmapeaks(self, ref:Group, bead:Bead) -> float:
+        """
+        Median uncertainty on peak positions.
+        """
+        if bead is None:
+            if ref.key is None:
+                return None
+            else:
+                npeaks = len(self.config.hairpins[ref.key].peaks[:-1])
+            return self._sigmap(npeaks)
+
+        return self._sigmap(len(bead.peaks))
 
     @staticmethod
     @column_method("Silhouette", cond = dict(type = 'data_bar'))
@@ -62,8 +103,7 @@ class SummarySheet(Reporter):
         return None if bead is None else bead.distance.value
 
     @staticmethod
-    @column_method("Stretch",
-                   units = lambda x: None if x.nohairpin() else 'base/µm')
+    @column_method("Stretch", units = lambda x: None if x.nohairpin() else 'base/µm')
     def _stretch(_, bead:Bead) -> Optional[float]:
         """
         Parameter A in the formula "x_hpin = A*(x_bead-B)"
@@ -99,9 +139,11 @@ class SummarySheet(Reporter):
 
     @column_method("Peak Count")
     def _npeaks(self, ref:Group, bead:Bead) -> Optional[int]:
-        """ Number of peaks detected for that bead."""
+        """Number of peaks detected for that bead."""
+        if bead is None and ref.key is None:
+            return None
         if bead is None:
-            return None if ref.key is None else len(self.config.hairpins[ref.key].peaks[:-1])
+            return len(self.config.hairpins[ref.key].peaks[:-1])
         return len(bead.peaks)
 
     @column_method("Unidentified Peak Count", exclude = Reporter.nohairpin)
@@ -126,7 +168,18 @@ class SummarySheet(Reporter):
             for itm in ref.beads:
                 theor.difference_update(itm.peaks['key'])
             return len(theor)
+
         return (bead.peaks['key'][1:] < 0).sum()
+
+    @column_method("Ratios")
+    def _sens(self, ref:Group, bead:Bead) -> Optional[str]:
+        """Ratios: Identified peaks / Expected peaks,  Unknown peaks/ Found peaks"""
+        npks   = self._npeaks(ref, bead)
+        ntheo  = self._npeaks(ref, None)
+        nundef = self._unidentifiedpeaks(ref, bead)
+        if None in (npks, nundef, ntheo):
+            return None
+        return '{}% / {}%'.format(int(100.*(npks-nundef)/ntheo), int(100.*nundef/npks))
 
     @column_method("Valid Cycles")
     def _ncycles(self, _, bead:Bead) -> int:
@@ -186,14 +239,20 @@ class SummarySheet(Reporter):
             return None if len(good) == 0 else np.median(good)
 
         # pylint: disable=no-member
-        return [("GIT Version:",      version.version()),
-                ("GIT Hash:",         version.lasthash()),
-                ("GIT Date:",         version.hashdate()),
-                ("Config:",           cnf),
-                ("Oligos:",           ', '.join(self.config.oligos)),
-                ("Cycle  Count:",     self.config.track.ncycles),
-                ("Bead Count",        nbeads),
-                ("Median σ[HF]:",     _avg(self._uncert)),
-                ("Events per Cycle:", _avg(self._evts)),
-                ("Down Time Φ₅ (s):", _avg(self._downtime))
-               ]
+        items = ([("Oligos:",           ', '.join(self.config.oligos)),
+                  ("Cycle Count:",     self.config.track.ncycles),
+                  ("Bead Count",        nbeads)],
+                 [("σ[HF] (µm):",       _avg(self._uncert)),
+                  ("Events per Cycle:", _avg(self._evts)),
+                  ("Down Time Φ₅ (s):", _avg(self._downtime))],
+                 [("GIT Version:",      version.version()),
+                  ("GIT Hash:",         version.lasthash()),
+                  ("GIT Date:",         version.hashdate()),
+                  ("Config:",           cnf)])
+
+        maxlen = max(len(i) for i in items)
+        for lst in items:
+            if len(lst) < maxlen:
+                lst.extend((('', ''),)*(maxlen-len(lst)))
+
+        return [i+('',)+j+(('',)*2)+k for i, j, k in zip(*items)]
