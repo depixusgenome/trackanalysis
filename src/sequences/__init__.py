@@ -15,6 +15,7 @@ def read(stream:TextIO) -> 'Iterator[Tuple[str,str]]':
     title = None
     seq   = ""
     ind   = 0
+    first = True
     for line in stream:
         line = line.strip()
         if len(line) == 0:
@@ -25,7 +26,8 @@ def read(stream:TextIO) -> 'Iterator[Tuple[str,str]]':
 
         if line[0] == '>':
             if len(seq):
-                yield ("hairpin %d" % ind if title is None else title, seq)
+                first = False
+                yield ("hairpin %d" % (ind+1) if title is None else title, seq)
                 ind += 1
 
             title = line[1:].strip()
@@ -35,7 +37,10 @@ def read(stream:TextIO) -> 'Iterator[Tuple[str,str]]':
             seq += line
 
     if len(seq):
-        yield ("hairpin %d" % ind if title is None else title, seq)
+        if first and title is None and getattr(stream, 'name', None) is not None:
+            yield (pathlib.Path(str(stream.name)).stem, seq)
+        else:
+            yield ("hairpin %d" % (ind+1) if title is None else title, seq)
 
 PEAKS_DTYPE = [('position', 'i4'), ('orientation', np.bool8)]
 PEAKS_TYPE  = Sequence[Tuple[int, bool]]
