@@ -58,7 +58,7 @@ class PeaksSheet(Reporter):
         "Peak position as measured (µm)"
         return peak[0]
 
-    @column_method("Peak Resolution")
+    @column_method("σ[Peaks]", median = True, units = 'µm')
     def _peakresolution(self, _1, _2, peak:PeakOutput) -> Optional[float]:
         "Standard deviation of event positions (µm)"
         if self._nevt(_1, _2, peak) == 0:

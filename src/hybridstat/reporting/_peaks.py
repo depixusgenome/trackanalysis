@@ -285,9 +285,9 @@ class PeaksSheet(Reporter):
         "Peak position as measured (µm)"
         return None if bead is None else bead.peaks['zvalue'][ipk]
 
-    @column_method("Peak Resolution", median = True)
+    @column_method("σ[Peaks]", median = True, units = 'µm')
     def _peakresolution(self, *args) -> float:
-        "Standard deviation of event positions (µm)"
+        "Median deviation for event positions"
         return self._proba('resolution', *args)
 
     @column_method("Peak Height", median = True)

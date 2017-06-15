@@ -28,10 +28,15 @@ class SummarySheet(Reporter):
         """
         return None if bead is None else bead.key not in self.config.knownbeads
 
-    @column_method("Signal Noise", units = 'µm')
+    @column_method("σ[HF]", units = 'µm')
     def _uncert(self, _, bead:Bead) -> Optional[float]:
-        "Standard deviation of the signal"
+        """
+        High-frequency noise.
+
+        This is the median deviation of the movement from frame to frame
+        """
         return None if bead is None else self.uncertainty(bead)
+
 
     @staticmethod
     @column_method("Silhouette", cond = dict(type = 'data_bar'))
@@ -188,7 +193,7 @@ class SummarySheet(Reporter):
                 ("Oligos:",           ', '.join(self.config.oligos)),
                 ("Cycle  Count:",     self.config.track.ncycles),
                 ("Bead Count",        nbeads),
-                ("Median Noise:",     _avg(self._uncert)),
+                ("Median σ[HF]:",     _avg(self._uncert)),
                 ("Events per Cycle:", _avg(self._evts)),
                 ("Down Time Φ₅ (s):", _avg(self._downtime))
                ]

@@ -20,9 +20,13 @@ class SummarySheet(Reporter):
         "Returns the chart height"
         return 1
 
-    @column_method("Signal Noise", units = 'µm')
+    @column_method("σ[HF]", units = 'µm')
     def _uncert(self, bead:BEADKEY, _) -> float:
-        "Standard deviation of the signal"
+        """
+        High-frequency noise.
+
+        This is the median deviation of the movement from frame to frame
+        """
         return self.uncertainty(bead)
 
     @staticmethod
@@ -80,7 +84,7 @@ class SummarySheet(Reporter):
                   ("Config:",           cnf),
                   ("Cycle  Count:",     self.config.track.ncycles),
                   ("Bead Count",        nbeads),
-                  ("Median Noise:",     _avg(self._uncert)),
+                  ("Median σ[HF]:",     _avg(self._uncert)),
                   ("Events per Cycle:", _avg(self._evts)),
                   ("Down Time Φ₅ (s):", _avg(self._downtime))
                  ]
