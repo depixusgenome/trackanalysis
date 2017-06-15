@@ -49,26 +49,30 @@ export class DpxToolbarView extends LayoutDOMView
         btn   = ['<td><button type="button" style="margin-right: 5px; width: 20px;"'+
                  ' class="dpx-tb-open bk-bs-btn bk-bs-btn-default">',
                  '</button></td>']
-        bead  = '<td><label for=".dpx-tb-bead" style="margin-right: 5px">'      +
-                'Bead</label></td>'                                             +
-                '<td><input class="dpx-tb-bead bk-widget-form-input"'           +
-                ' type="number"'                                                +
+        bead  = '<td><label for=".dpx-tb-bead" style="margin-right: 5px">' +
+                'Bead</label></td>'                                        +
+                '<td><input class="dpx-tb-bead bk-widget-form-input"'      +
+                ' type="number"'                                           +
                 "min=0  max=10000 step=1  value=#{mdl.bead}></td>"
-        disc  = '<td><label for=".dpx-tb-discard" style="margin-right: 5px">'   +
-                'Discarded</label></td>'                                        +
-                '<td><input class="dpx-tb-bead bk-widget-form-input"'           +
+        disc  = '<td><label for=".dpx-tb-discard" style="margin-right: 5px">' +
+                'Discarded</label></td>'                                      +
+                '<td><input class="dpx-tb-bead bk-widget-form-input"'         +
                 " type='text' value=#{mdl.discarded}></td>"
-        rej   = '<td><button type="button" style="margin-right: 5px; width: 200px;"'+
-                ' class="dpx-tb-del bk-bs-btn bk-bs-btn-default">'                  +
+        rej   = '<td><button type="button" style="margin-right: 5px;"' +
+                ' class="dpx-tb-del bk-bs-btn bk-bs-btn-default">'     +
                 '-</button></td>'
-        msg   = '<td><label for=".dpx-tb-message" style="margin-right: 5px">'   +
+        msg   = '<td><label for=".dpx-tb-message"'         +
+                ' style="margin-right: 5px; width=200px">' +
                 "#{mdl.message}</label></td>"
         html  = '<table><tr>'           +
                 btn[0]+'Open'+btn[1]    +
                 btn[0]+'Save'+btn[1]    +
                 bead + discarded + rej  +
-                msg                     +
-                btn[0]+'Quit'+btn[1]
+                msg
+
+        if @mdl.hasquit
+            html = html + btn[0]+'Quit'+btn[1]
+
         @$el.html("<table class='dpx-tb'> #{html}</table>")
         if mdl.disabled then
             @$el.find('.dpx-tb-save').prop('disabled', true)
@@ -81,10 +85,12 @@ export class DpxToolbar extends LayoutDOM
     type: 'DpxToolbar'
     default_view: DpxToolbarView
     @define {
-        click:      [p.Number,  0]
+        open:       [p.Number,  0]
+        save:       [p.Number,  0]
+        quit:       [p.Number,  0]
         bead:       [p.Number,  -1]
         discarded:  [p.String,  '']
         message:    [p.String,  '']
         disabled:   [p.Bool,    false]
+        hasquit:    [p.Bool,    false]
     }
-
