@@ -22,19 +22,15 @@ class SigmaPeaks:
         self._row     = peaks.tablerow()+1
         self._formula = ''
 
-        for i, col in enumerate(peaks.columns()):
-            if peaks.columnname(col) == 'σ[Peaks]':
-                self._formula = ('=MEDIAN(INDIRECT("{sheet}!{col}:{col}"))'
-                                 .format(sheet = peaks.sheet_name,
-                                         col   = xl_col_to_name(i)+'{}'))
-                break
-        else:
-            raise KeyError("Missing column")
+        ind           = next(iter(peaks.columnindex('σ[Peaks]')))
+        self._formula = ('=MEDIAN(INDIRECT("{sheet}!{col}:{col}"))'
+                         .format(sheet = peaks.sheet_name,
+                                 col   = xl_col_to_name(ind)+'{}'))
 
-    def __call__(self, outp:Tuple[PeakOutput]):
+    def __call__(self, npeaks):
         "returns a chart for this bead if peak is peaks zero"
         row        = self._row+1
-        self._row += len(outp)
+        self._row += npeaks
         return self._formula.format(row, self._row)
 
 @sheet_class("Summary")
@@ -42,7 +38,7 @@ class SummarySheet(Reporter):
     "creates the summary sheet"
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._sigmap = None
+        self._sigmap = SigmaPeaks(self)
 
     @classmethod
     def chartheight(cls, _) -> int:
@@ -63,9 +59,7 @@ class SummarySheet(Reporter):
         """
         Median uncertainty on peak positions.
         """
-        if self._sigmap is None:
-            self._sigmap = SigmaPeaks(self)
-        return self._sigmap(outp)
+        return self._sigmap(len(outp))
 
     @staticmethod
     @column_method("Peak Count")
@@ -116,14 +110,21 @@ class SummarySheet(Reporter):
             return np.median([i for i in vals if i is not None])
 
         # pylint: disable=no-member
-        items  = [("GIT Version:",      version.version()),
-                  ("GIT Hash:",         version.lasthash()),
-                  ("GIT Date:",         version.hashdate()),
-                  ("Config:",           cnf),
-                  ("Cycle  Count:",     self.config.track.ncycles),
+        itemsa = [("Cycle  Count:",     self.config.track.ncycles),
                   ("Bead Count",        nbeads),
                   ("σ[HF]:",            _avg(self._uncert)),
                   ("Events per Cycle:", _avg(self._evts)),
                   ("Down Time Φ₅ (s):", _avg(self._downtime))
                  ]
-        self.header(items)
+        itemsb = [("GIT Version:",      version.version()),
+                  ("GIT Hash:",         version.lasthash()),
+                  ("GIT Date:",         version.hashdate()),
+                  ("Config:",           cnf)]
+
+        if len(itemsa) > len(itemsb):
+            itemsb.extend((('', ''),)*(len(itemsa)-len(itemsb)))
+
+        elif len(itemsb) > len(itemsa):
+            itemsa.extend((('', ''),)*(len(itemsb)-len(itemsa)))
+
+        self.header([i+(('',)*5)+j for i, j in zip(itemsa, itemsb)])
