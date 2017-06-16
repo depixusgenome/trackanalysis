@@ -6,7 +6,7 @@ import numpy  as np
 from   numpy.testing          import assert_allclose
 from model                    import PHASE
 from eventdetection.detection import (DerivateSplitDetector, EventMerger, EventSelector,
-                                      MinMaxSplitDetector, tocycles)
+                                      MinMaxSplitDetector)
 from eventdetection.alignment import (ExtremumAlignment, CorrelationAlignment,
                                       PhaseEdgeAlignment)
 from eventdetection.processor import ExtremumAlignmentProcessor, AlignmentTactic
@@ -115,18 +115,6 @@ def test_select():
     assert det(0, 0, ((0,0),(1,1)))                 == ((0,0), (1,1))
     assert det(0, 5, ((0,0),(1,1),(5,10)))          == ((5,10),)
     assert det(1, 5, ((0,0),(1,1),(5,10), (20,30))) == ((21,29),)
-
-def test_tocycles():
-    u"Tests interval assignment to cycles"
-    starts = np.arange(10)*10
-    inters = ((0,5), (3, 5), (0,15), (2, 21), (11,15), (11, 22), (16, 33),
-              (80, 89), (80, 90), (80, 91), (83, 100), (83, 101), (90,120),
-              (95, 95), (88, 88))
-    inters = tuple(slice(*i) for i in inters)
-
-    truth  = (0, 0, 0, 1, 1, 1, 2, 8, 8, 8, 9, 9, 9, 9, 8)
-    vals   = tuple(i.cycle for i in tocycles(starts, inters))
-    assert vals == truth
 
 def test_minmaxalign():
     u"align on min/max value"
