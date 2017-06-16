@@ -278,3 +278,22 @@ class EXAMPLEFindValidPerms:
         bfiltered = filter(batchfilter,permids)
         oofiltered = filter(ooverlfilter,bfiltered)
         return oofiltered # list of?
+
+# finish implementation
+class UpdateOligoBPos:
+    u'''
+    Estimates the new values of bpos for each oligo given a list of permuted oligos
+    or a collection and a list of permuted indices (permids)
+    '''
+    oligos=[] # type: list[data.OligoPeak]
+    collection=data.BCollection() # type: data.BCollection
+    @initdefaults(frozenset(locals()))
+    def __init__(self,**kwa):
+        pass
+
+    def __call__(self,permids=None):
+        if permids is None:
+            # compute bpos from the list of permuted oligos, oligos
+            return self.oligos
+        # compute bpos from collection and permuted indices
+        return self.collection.oligos

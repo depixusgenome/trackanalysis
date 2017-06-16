@@ -49,18 +49,46 @@ class Oligo:
                 return seq[:i]+self.seq
         return seq+self.seq
 
+# it is bpos which needs to be updated
+# If 2 oligos are too far from one another there is a
+# unknown number of bases between the 2
+# because of this the stretch is unknown (lower or higher bound known though)
+# If the contiguous set of oligos of unknown stretch contains an oligo
+# from the same batch as another
+# we can reestimate the stretch bias
+# Should we modify the bias?
 class OligoPeak(Oligo):
     u'represents peaks obtained from sequencing experiment'
     batch_id = -1 # type: int
     dist = None # type: SciDist
     poserr = -1. # type: float
     # initial (experimental) position in nanometer
-    pos0 = -1. # type : float
+    pos0 = -1. # type: float
     # initial (experimental) base position
-    bpos0 = -1. # type : float
+    bpos0 = -1. # type: float
+    bpos = 0 # type: int
+    appliedstretch = 1 # type: float
+    appliedbias = 0 # type: float
     @initdefaults
     def __init__(self,**kwa):
         super().__init__(**kwa)
+
+    @property
+    def bias(self):
+        u'returns bias'
+        return self.appliedbias
+
+    @property
+    def stretch(self):
+        u'''
+        recomputes stretch from current position
+        takes into account modifications due to permutations
+        '''
+        try:
+            return (self.bpos-self.bias)/self.pos
+        except ZeroDivisionError:
+            return 0
+
 
 OliBat = NamedTuple("OliBat",[("oli",OligoPeak),
                               ("idinbat",int),
@@ -198,8 +226,9 @@ class OligoPerm:
         combine 2 OligoPerms
         assumes that the 2 perms have the same oligos
         '''
-        if len(set(perm1.domain).intersection(set(perm2.domain)))>0:
-            raise ValueError("perm1 and perm2 are not independant")
+        if __debug__:
+            if len(set(perm1.domain).intersection(set(perm2.domain)))>0:
+                raise ValueError("perm1 and perm2 are not independant")
         changes = perm1.changes+perm2.changes
         permids = perm1.permids[perm2.permids]
         perm=[]
@@ -211,6 +240,8 @@ class OligoPerm:
                          permids=permids,
                          domain=perm1.domain.union(perm2.domain))
 
+    def __hash__(self)->int:
+        return hash((tuple(sorted(self.domain)),tuple(self.permids)))
 
     def outer_seqs(self,ooverl:int)->Tuple[str, ...]:
         u'''
@@ -306,6 +337,9 @@ class OligoKPerm(OligoPerm):
         if len(self._changes)==0:
             self._changes=self.get_changes(self.kpermids)
         return self._changes
+
+    def __hash__(self)->int:
+        return hash((tuple(sorted(self.domain)),tuple(self.kpermids)))
 
     # to check
     def identity_perm(self):

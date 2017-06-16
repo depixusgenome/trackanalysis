@@ -80,7 +80,6 @@ class DownTopSearcher:
             # otherwise add the set of k-permutations
             merged.append(data.OligoKPerm.add(*subs))
             # if len(subs)==1 the kperm is added
-        print("len(merged)=",len(merged))
         return merged
 
     def merge_subgroups(self,supergroup:data.OligoKPerm)->List[data.OligoKPerm]:
@@ -99,9 +98,6 @@ class DownTopSearcher:
         # for each group in grouping merge
         # can compute a score here for each grp in groupings
         # if the difference in scores is above a given threshold discard the groups
-        print("merging=",[i.changes for i in groupings])
-        test=self.merge(groupings)
-        print("merged=",[i.changes for i in test])
         return self.merge(groupings)
 
     def run(self):
@@ -112,10 +108,8 @@ class DownTopSearcher:
         '''
         # find supergroups
         supergroups = self.find_supergroups()
-        print("len(supergroups)=",len(supergroups))
         groupings=[]
         for sgrp in supergroups:
-            print("supergroup=",sgrp.changes)
             groupings.append(self.merge_subgroups(sgrp))
 
         return self.merge(groupings)
@@ -312,7 +306,7 @@ class KPermCombiner:
     def subdivide_then_partition(self,
                                  collections:List[scores.LScPermCollection],
                                  sort_by="domain",
-                                 max_size=50):
+                                 max_size=1000):
         u'''
         it is not really possible to ensure that overlapping kpc are together since
         they might be dependant 2 by 2

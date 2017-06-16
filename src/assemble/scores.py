@@ -240,14 +240,11 @@ class LScPerm:
         u'''
         returns the product of any 2 elements in 2 different ScoredPermCollection
         '''
-        print("args=",args)
         if len(args)==1:
             return args[0]
 
         res = cls.__product2(*args[:2])
-        #print("res=",res)
         for sckpm in args[2:]:
-            #print("sckpm=",sckpm)
             res = cls.__product2(res,sckpm)
         return res
 
