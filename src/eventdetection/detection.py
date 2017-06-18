@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Interval detection: finding flat sections in the signal"
+"Interval detection: finding flat sections in the signal"
 
 from    typing import (NamedTuple, Optional, # pylint: disable=unused-import
-                       Iterator, Iterable, Sequence, Union, Callable, cast)
+                       Iterator, Iterable, Sequence, Union, Callable,
+                       TYPE_CHECKING, cast)
 import  numpy as np
 from    numpy.lib.stride_tricks import as_strided
 
@@ -12,35 +13,19 @@ from    signalfilter import samples as _samples, PrecisionAlg
 norm = _samples.normal.knownsigma # pylint: disable=invalid-name
 
 class BaseSplitDetector(PrecisionAlg):
-    u"""
+    """
     Detects flat stretches of value
 
-    Flatness is defined pointwise: 2 points are flat if close enough one to the
-    other. This closeness is defined using a p-value for 2 points belonging to
-    the same normal distribution with a known sigma.
-
-    The sigma (precision) is either provided or measured. In the latter case,
+    The precision is either provided or measured. In the latter case,
     the estimation used is the median-deviation of the derivate of the data.
     """
-    confidence = 0.1 # type: Optional[float]
-    window     = 1   # type: int
+    window = 2
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-    def __call__(self,
-                 data     : np.ndarray,
-                 precision: Optional[float] = None
-                ) -> np.ndarray:
-        if len(data) > 1:
-            nans = np.isnan(data)
-            if any(nans):
-                data = data[~nans]
-
-        if len(data) <= 1:
-            return np.empty((0,2), dtype = 'i4')
-
-        ends = self._compute(precision, data).nonzero()[0]
+    @staticmethod
+    def _tointervals(nans, data, ends):
         if len(ends) == 0:
             return np.array(((0,len(nans)),), dtype = 'i4')
 
@@ -54,25 +39,34 @@ class BaseSplitDetector(PrecisionAlg):
                           strides = (ends.strides[0],)*2)
         return ends[np.nonzero(np.diff(ends, 1).ravel() > 1)[0]]
 
+    @staticmethod
+    def _init(data):
+        nans = None
+        if len(data) > 1:
+            nans = np.isnan(data)
+            if any(nans):
+                data = data[~nans] # pylint: disable=invalid-unary-operand-type
+
+        if len(data) <= 1:
+            return None, None
+
+        return nans, data
+
+    def __call__(self,
+                 data     : np.ndarray,
+                 precision: Optional[float] = None
+                ) -> np.ndarray:
+        nans, data = self._init(data)
+        if data is None:
+            return np.empty((0,2), dtype = 'i4')
+        ends = self._compute(precision, data).nonzero()[0]
+        return self._tointervals(nans, data, ends)
+
     @classmethod
     def run(cls, data, **kwa):
-        u"instantiates and calls class"
+        "instantiates and calls class"
         return cls(**kwa)(data)
 
-    def _compute(self, precision:Optional[float], data : np.ndarray) -> np.ndarray:
-        raise NotImplementedError()
-
-class DerivateSplitDetector(BaseSplitDetector):
-    u"""
-    Detects flat stretches of value
-
-    Flatness is defined pointwise: 2 points are flat if close enough one to the
-    other. This closeness is defined using a p-value for 2 points belonging to
-    the same normal distribution with a known sigma.
-
-    The sigma (precision) is either provided or measured. In the latter case,
-    the estimation used is the median-deviation of the derivate of the data.
-    """
     def deltas(self, data : np.ndarray) -> np.ndarray:
         "all deltas"
         window = self.window
@@ -83,7 +77,26 @@ class DerivateSplitDetector(BaseSplitDetector):
         delta[:window] -= np.arange(window+1)[-1:0:-1] * data[0]
         if window > 1:
             delta[1-window:] += np.arange(window)[1:] * data[-1]
-        return delta
+        return np.abs(delta)/self.window
+
+    def _compute(self, precision:Optional[float], data : np.ndarray) -> np.ndarray:
+        raise NotImplementedError()
+
+class DerivateSplitDetector(BaseSplitDetector):
+    """
+    Detects flat stretches of value
+
+    Flatness is defined pointwise: 2 points are flat if close enough one to the
+    other. This closeness is defined using a p-value for 2 points belonging to
+    the same normal distribution with a known sigma.
+
+    The precision is either provided or measured. In the latter case,
+    the estimation used is the median-deviation of the derivate of the data.
+    """
+    confidence = 0.005 # type: Optional[float]
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
 
     def threshold(self,
                   precision: Optional[float]      = None,
@@ -96,20 +109,21 @@ class DerivateSplitDetector(BaseSplitDetector):
                               self.window, self.window)
 
     def _compute(self, precision:Optional[float], data : np.ndarray) -> np.ndarray:
-        return self.deltas(data) <= -self.threshold(precision, data)*self.window
+        return self.deltas(data) > self.threshold(precision, data)
 
 class MinMaxSplitDetector(BaseSplitDetector):
-    u"""
+    """
     Detects flat stretches of value
 
     Flatness is defined pointwise: 1 point is flat versus it prior if there
     exist a window *N* such that the prior *N* are lower than this and the next
-    *N-1* points by a given margin
+    *N-1* points by a given margin (precision).
 
-    The margin (precision) is either provided or measured. In the latter case,
+    The precision is either provided or measured. In the latter case,
     the estimation used is the median-deviation of the derivate of the data.
     """
-    window = 5
+    window     = 5
+    confidence = 0.1 # type: Optional[float]
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -131,7 +145,7 @@ class MinMaxSplitDetector(BaseSplitDetector):
 
             out[:window]  -= [data[0]]+[min(data[:i]) for i in range(1,window)]
             out[window:]  -= np.min(dt2d, axis = 1)[:-1]
-        return out
+        return np.abs(out)
 
     def threshold(self,
                   precision: Optional[float]      = None,
@@ -143,10 +157,89 @@ class MinMaxSplitDetector(BaseSplitDetector):
         return norm.threshold(True, self.confidence, precision)
 
     def _compute(self, precision:Optional[float], data : np.ndarray) -> np.ndarray:
-        return self.deltas(data) < -self.threshold(precision, data)
+        return self.deltas(data) > self.threshold(precision, data)
+
+class OutlierDerivateSplitDetector(BaseSplitDetector):
+    """
+    Detects outliers in derivates and uses those as the boundaries for splits.
+
+    Flatness is defined pointwise: 2 points are flat if close enough one to the
+    other. This closeness is defined using a p-value for 2 points belonging to
+    the same normal distribution with a known sigma.
+
+    The sigma (precision) is either provided or measured. In the latter case,
+    the estimation used is the median-deviation of the derivate of the data.
+    """
+    window     = 3
+    percentile = 50.
+    distance   = 2.
+    def __call__(self,
+                 data     : np.ndarray,
+                 precision: Optional[float] = None
+                ) -> np.ndarray:
+        nans, tmp = self._init(data)
+        if tmp is None:
+            return np.empty((0,2), dtype = 'i4')
+
+        deltas    = self.deltas(tmp)
+        precision = self.__precision(precision, deltas)
+        thr       = np.percentile(deltas, self.percentile) + self.distance*precision
+
+        ends      = self._tointervals(nans, tmp, (deltas > thr).nonzero()[0])
+        return self.__extend(ends, data, precision)
+
+    if TYPE_CHECKING:
+        def _compute(self, _1, _2):
+            assert False
+
+    def __precision(self, precision, deltas):
+        if precision is None and self.precision is None:
+            return np.median(np.abs(deltas-np.median(deltas)))
+        return self.precision if precision is None else precision
+
+    def __right(self, ends, data, meds, precision):
+        last   = list(data[ends[-1,1]:])+[1e30]*(self.window-len(data)+ends[-1,1])
+
+        right  = np.array([data[i:i+self.window] for i in ends[:-1,1]]+[last]).T
+        np.abs(np.subtract(right, meds, out = right), out = right)
+
+        right  = np.hstack([np.ones((right.shape[1], 1), dtype = 'bool'),
+                            right.T < precision])
+
+        inds   = np.arange(right.shape[1])
+        newmax = ends[:,1] + [inds[i][-1] for i in right]
+        return newmax
+
+    def __left(self, ends, data, meds, precision):
+        first  = list(data[:ends[0,0]])+[1e30]*(self.window-ends[0,0])
+        left   = np.array([first]+[data[i-self.window:i] for i in ends[1:,0]]).T
+        np.abs(np.subtract(left, meds, out = left), out = left)
+
+        left   = np.hstack([left.T < precision, np.ones((left.shape[1], 1), dtype = 'bool')])
+
+        inds   = np.arange(left.shape[1])[::-1]
+        newmin = ends[:,0] - [inds[i][0] for i in left]
+        return newmin
+
+    def __extend(self, ends, data, precision):
+        if self.window <= 1 or len(ends) < 1:
+            return ends
+
+        meds   = np.array([np.nanmedian(data[i:j]) for i, j in ends], dtype = 'f4').T
+        newmax = self.__right(ends, data, meds, precision)
+        newmin = self.__left (ends, data, meds, precision)
+
+        over = np.nonzero(newmax[:-1] > newmin[1:])[0]
+        if len(over) != 0:
+            newmax[over]   = (newmin[over+1]+newmax[over])//2
+            newmin[over+1] = newmax[over]
+
+        ends[:,0] = newmin
+        ends[:,1] = newmax
+        return ends
 
 class EventMerger(PrecisionAlg):
-    u"""
+    """
     Merges neighbouring stretches of data.
 
     Two intervals are merged whenever the mean for the second cannot be
@@ -250,11 +343,11 @@ class EventMerger(PrecisionAlg):
 
     @classmethod
     def run(cls, *args, **kwa):
-        u"instantiates and calls class"
+        "instantiates and calls class"
         return cls(**kwa)(*args)
 
 class EventSelector:
-    u"""
+    """
     Filters flat stretches:
 
     * clips the edges
@@ -268,7 +361,7 @@ class EventSelector:
 
     @property
     def minduration(self) -> int:
-        u"returns 2*edgelength+minlength"
+        "returns 2*edgelength+minlength"
         return 2*self.edgelength+self.minlength
 
     def __call__(self, intervals: np.ndarray) -> np.ndarray:
@@ -285,13 +378,13 @@ class EventSelector:
 
     @classmethod
     def run(cls, *args, **kwa):
-        u"instantiates and calls class"
+        "instantiates and calls class"
         return cls(**kwa)(*args)
 
 class EventDetector(PrecisionAlg):
-    u"detects, mergers and selects intervals"
-    split  = MinMaxSplitDetector()
-    merge  = EventMerger  ()
+    "detects, mergers and selects intervals"
+    split  = OutlierDerivateSplitDetector()
+    merge  = EventMerger()
     select = EventSelector()
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
@@ -303,5 +396,5 @@ class EventDetector(PrecisionAlg):
 
     @classmethod
     def run(cls, *args, **kwa):
-        u"instantiates and calls class"
+        "instantiates and calls class"
         return cls(**kwa)(*args)

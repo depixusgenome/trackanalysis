@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Tests interval detection"
+"Tests interval detection"
 
 import numpy  as np
 from   numpy.testing          import assert_allclose
 from model                    import PHASE
 from eventdetection.detection import (DerivateSplitDetector, EventMerger, EventSelector,
-                                      MinMaxSplitDetector)
+                                      MinMaxSplitDetector, OutlierDerivateSplitDetector)
 from eventdetection.alignment import (ExtremumAlignment, CorrelationAlignment,
                                       PhaseEdgeAlignment)
 from eventdetection.processor import ExtremumAlignmentProcessor, AlignmentTactic
@@ -15,12 +15,12 @@ from simulator                import randtrack
 from signalfilter             import samples
 
 def test_detectsplits():
-    u"Tests flat stretches detection"
+    "Tests flat stretches detection"
     inst  = DerivateSplitDetector(precision = 1., confidence = 0.1, window = 1)
     det   = lambda  i: tuple(tuple(j) for j in inst(i))
     items = np.zeros((30,))
-    thr   = samples.normal.knownsigma.threshold(True, inst.confidence, inst.precision,
-                                                inst.window, inst.window)
+    thr   = 1.01*samples.normal.knownsigma.threshold(True, inst.confidence, inst.precision,
+                                                     inst.window, inst.window)
 
     assert det([])    == tuple()
     assert det(items) == ((0, 30),)
@@ -42,8 +42,8 @@ def test_detectsplits():
     items[[0, 10, 25, 29]] = np.nan
     assert det(items) == ((0, 11), (11,20), (21,30))
 
-def test_multiscalesplits():
-    u"Tests flat stretches detection"
+def test_minmaxsplitdetector():
+    "Tests flat stretches detection"
     for i in range(1,3):
         inst  = MinMaxSplitDetector(precision  = 1.,
                                     confidence = 0.1,
@@ -73,8 +73,20 @@ def test_multiscalesplits():
         items[[0, 10, 25, 29]] = np.nan
         assert det(items) == ((0, 11), (11,20), (21,30))
 
+def test_outliersplitdetector():
+    "Tests flat stretches detection"
+    data = np.ones((20, 2), dtype = 'f4')
+    data[:,1]  = -1
+    data       = data.ravel()
+    data[10:] += 1.01
+    data[20:] += 2.01
+    data[30:] += 3.01
+
+    detector = OutlierDerivateSplitDetector(window = 1, precision = 1.)
+    assert_allclose(detector(data), [[0,20], [20,30], [30,40]])
+
 def _merges(oneperrange):
-    u"Tests flat stretches merging"
+    "Tests flat stretches merging"
     inst  = EventMerger(precision = 1., confidence = 0.1, isequal = True,
                         oneperrange = oneperrange)
     det   = lambda  i, j: tuple(tuple(_) for _ in inst(i, np.array(j)))
@@ -100,15 +112,15 @@ def _merges(oneperrange):
     assert det(items, ((0, 10),(11,20),(22,30))) == ((0,10),(11,30))
 
 def test_fastmerge():
-    u"Tests merging events, all at a time"
+    "Tests merging events, all at a time"
     _merges(False)
 
 def test_slowmerge():
-    u"Tests merging events, one by one"
+    "Tests merging events, one by one"
     _merges(True)
 
 def test_select():
-    u"Tests flat stretches filtering"
+    "Tests flat stretches filtering"
     det   = lambda  i, j, k: tuple(tuple(_)
                                    for _ in EventSelector(edgelength = i, minlength = j)
                                    (np.array(k)))
@@ -117,7 +129,7 @@ def test_select():
     assert det(1, 5, ((0,0),(1,1),(5,10), (20,30))) == ((21,29),)
 
 def test_minmaxalign():
-    u"align on min/max value"
+    "align on min/max value"
     data = np.zeros((5,25), dtype = np.float32)
     for i in range(5):
         data[i,:] = np.arange(25)+i*1.
@@ -130,7 +142,7 @@ def test_minmaxalign():
         assert_allclose(PhaseEdgeAlignment.run(data, edge = tpe), truth)
 
 def test_minmaxprocessor():
-    u"align on min/max value"
+    "align on min/max value"
     track   = randtrack(driftargs = None, baselineargs = (.1, None, 'rand'))
     inipos  = [i.mean() for i in track.cycles.withphases(PHASE.initial).values()]
 
@@ -142,7 +154,7 @@ def test_minmaxprocessor():
     assert np.std(corrpos) < .001
 
 def test_edgeminmaxprocessor():
-    u"align on min/max value"
+    "align on min/max value"
     track   = randtrack(driftargs = None, baselineargs = (.1, None, 'rand'))
     inipos  = [i.mean() for i in track.cycles.withphases(PHASE.initial).values()]
 
@@ -154,7 +166,7 @@ def test_edgeminmaxprocessor():
     assert np.std(corrpos) < .001
 
 def test_initial_alignment():
-    u"align on 1 phase or another as needed"
+    "align on 1 phase or another as needed"
     def _create(phase):
         track   = randtrack(driftargs = None, baselineargs = (.1, .05, 'rand'))
         ini     = track.cycles.withphases(PHASE.initial)[0,0]
@@ -168,7 +180,7 @@ def test_initial_alignment():
     assert corrpos[0] > .4
 
 def test_pull_alignment():
-    u"align on 1 phase or another as needed"
+    "align on 1 phase or another as needed"
     track   = randtrack(driftargs = None, baselineargs = (.1, .05, 'rand'))
     for i in range(3):
         ini  = track.cycles.withphases(PHASE.initial)[0,i]
@@ -195,7 +207,7 @@ def test_pull_alignment():
     assert all(i < .6 for i in corrpos[:3])
 
 def test_measure_alignment():
-    u"align on 1 phase or another as needed"
+    "align on 1 phase or another as needed"
     track   = randtrack(driftargs = None, baselineargs = (.1, .05, 'rand'))
     for i in range(3):
         ini  = track.cycles.withphases(PHASE.initial)[0,i]
@@ -212,7 +224,7 @@ def test_measure_alignment():
     assert all(i > .95 for i in corrpos[:3])
 
 def test_correlationalignment():
-    u"align on best correlation"
+    "align on best correlation"
     data = [np.zeros((100,)) for i in range(3)]
     for i in range(3):
         data[i][20+i] = 1.
@@ -251,4 +263,4 @@ def test_precision():
     assert list(np.nonzero(found-sim-1)[0]) == []
 
 if __name__ == '__main__':
-    test_pull_alignment()
+    test_precision()
