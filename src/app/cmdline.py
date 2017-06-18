@@ -238,7 +238,7 @@ def main(view, files, bead,  # pylint: disable=too-many-arguments
         kwargs['unused_session_linger_milliseconds'] = 60000
 
     _files(files, bead)
-    server = _launch(view, 'app.BeadToolBar', gui == 'firefox', kwargs)
+    server = _launch(view, 'app.BeadToolbar', gui == 'firefox', kwargs)
 
     if gui == 'chrome':
         server.io_loop.add_callback(lambda: _electron(server, port = kwargs['port']))

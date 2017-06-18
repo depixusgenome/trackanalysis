@@ -14,4 +14,4 @@ _add_sys_paths()
 
 # pylint: disable=wrong-import-position
 import utils.logconfig # make sure logging is configured
-from .launcher  import Defaults, ToolBar, BeadToolBar, setup
+from .launcher  import Defaults, BeadToolbar, setup

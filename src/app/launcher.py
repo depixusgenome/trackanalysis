@@ -343,14 +343,9 @@ class Defaults:
     "Empty app"
     setup(locals(), defaultcontrols = CONTROLS, defaultviews = VIEWS)
 
-class ToolBar:
+class BeadToolbar:
     "App with a toolbar"
-    setup(locals(), creator         = WithToolbar(toolbars.ToolBar),
+    setup(locals(),
+          creator         = WithToolbar(toolbars.BeadToolbar),
           defaultcontrols = CONTROLS,
-          defaultviews    = VIEWS+("view.toolbar.ToolBar",))
-
-class BeadToolBar:
-    "App with a toolbar containing a bead spinner"
-    setup(locals(), creator         = WithToolbar(toolbars.BeadToolBar),
-          defaultcontrols = CONTROLS,
-          defaultviews    = VIEWS+("view.toolbar.BeadToolBar",))
+          defaultviews    = VIEWS+("view.toolbar.BeadToolbar",))

@@ -9,18 +9,18 @@ from view.plots                 import DpxKeyedRow
 
 def test_toolbar(bokehaction):
     "test the toolbar"
-    with bokehaction.launch('view.toolbar.ToolBar', 'app.Defaults') as server:
-        save = server.get('ToolBar', 'tools')[1]
+    with bokehaction.launch('view.toolbar.BeadToolbar', 'app.Defaults') as server:
+        tbar = server.widget['Main:toolbar'].get()
         ctrl = server.ctrl
         curr = ctrl.getGlobal('project')
         def _checknone():
-            assert save.disabled, ('???', save, save.disabled)
+            assert tbar.disabled
             assert curr.get('track', default = None) is None
             assert curr.get('task',  default = None) is None
 
         def _checkopen():
             track = curr.track.get()
-            assert not save.disabled, (save, save.disabled)
+            assert not tbar.disabled
             assert track.path  == server.path('small_legacy')
             assert track       is curr.task.get()
             assert ctrl.getGlobal('config').last.path.trk.get() == track.path
@@ -36,18 +36,17 @@ def test_toolbar(bokehaction):
 
 def test_beadtoolbar(bokehaction):
     "test the toolbar"
-    with bokehaction.launch('view.toolbar.BeadToolBar', 'app.Defaults') as server:
-        beads = server.get('BeadToolBar', '_beads')
+    with bokehaction.launch('view.toolbar.BeadToolbar', 'app.Defaults') as server:
+        beads = server.get('BeadToolbar', '_BeadToolbar__beads')
 
         # pylint: disable=protected-access
-        assert beads.input.disabled
         server.load('big_legacy')
         assert frozenset(beads._BeadInput__beads) == frozenset(range(39))
 
-        server.change('Beads:Rejected', 'value', '0,1,3')
+        server.change('Main:toolbar', 'discarded', '0,1,3')
         assert frozenset(beads._BeadInput__beads) == (frozenset(range(39))-{0,1,3})
 
-        server.change('Beads:Rejected', 'value', '')
+        server.change('Main:toolbar', 'discarded', '')
         assert frozenset(beads._BeadInput__beads) == frozenset(range(39))
 
         server.load('CTGT_selection/Z(t)bd1track10.gr')
@@ -56,7 +55,7 @@ def test_beadtoolbar(bokehaction):
         server.load('CTGT_selection/Z(t)bd0track10.gr')
         assert frozenset(beads._BeadInput__beads) == frozenset((0, 1))
 
-        server.change('Beads:Rejected', 'value', '0')
+        server.change('Main:toolbar', 'value', '0')
         assert frozenset(beads._BeadInput__beads) == frozenset((1,))
 
 def test_beadplot(bokehaction):

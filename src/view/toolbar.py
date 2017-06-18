@@ -40,6 +40,7 @@ class TrackFileDialog(FileDialog):
     def setup(self, doc):
         "sets the document"
         self.__doc = doc
+        assert doc is not None
         self.filetypes = '*|'+TaskIO.extensions(self.__ctrl, 'openers')
         self.title     = self.__ctrl.getGlobal('css').title.open.dialog.get()
 
@@ -110,13 +111,14 @@ class SaveFileDialog(FileDialog):
 
 class DpxToolbar(LayoutDOM):
     "Toolbar model"
+    __implementation__ = 'toolbar.coffee'
     open      = props.Int(0)
     save      = props.Int(0)
     quit      = props.Int(0)
     bead      = props.Int(0)
     discarded = props.String('')
     message   = props.String('')
-    disabled  = props.Bool(False)
+    frozen    = props.Bool(True)
     hasquit   = props.Bool(False)
 
 class MessagesInput(BokehView):
@@ -132,10 +134,9 @@ class MessagesInput(BokehView):
                             busy    = u'Please wait ...',
                             width   = 350)
 
-    def setup(self, toolbar):
+    def setup(self, toolbar, doc):
         "sets-up the gui"
         ctrl  = self._ctrl
-        doc   = self._doc
 
         msg   = ctrl.getGlobal('project').message
         busy  = ctrl.getGlobal('css').message.busy.get(), 'normal'
@@ -187,18 +188,8 @@ class MessagesInput(BokehView):
 
 class BeadView(BokehView):
     "Widget for controlling the current beads"
-    def __init__(self, **kwa):
-        "Sets up the controller"
-        super().__init__(**kwa)
-        self._inp   = None
-
     def getroots(self, doc):
         raise NotImplementedError()
-
-    @property
-    def input(self):
-        "returns the bokeh model"
-        return self._inp
 
     @property
     def _root(self):
@@ -224,22 +215,23 @@ class BeadInput(BeadView):
         cnf.keypress.defaults = {'beadup'   : 'PageUp',
                                  'beaddown' : 'PageDown'}
 
-        self.__beads = np.empty((0,), dtype = 'i4')
+        self.__beads   = np.empty((0,), dtype = 'i4')
+        self.__toolbar = None
 
     def getroots(self, _):
         assert False
 
     def setup(self, toolbar):
         "adds items to doc"
+        self.__toolbar  = toolbar
         toolbar.on_change('bead', self.__onchange_cb)
         self._ctrl.getGlobal('project').observe('track', 'bead', self.__onproject)
         self._ctrl.observe("updatetask", "addtask", "removetask", self.__onupdatetask)
 
         self._keys.addKeyPress(('keypress.beadup',
-                                lambda: self.__onchange_cb('', '', self._inp.value+1)))
+                                lambda: self.__onchange_cb('', '', toolbar.bead+1)))
         self._keys.addKeyPress(('keypress.beaddown',
-                                lambda: self.__onchange_cb('', '', self._inp.value-1)))
-        return self._inp
+                                lambda: self.__onchange_cb('', '', toolbar.bead-1)))
 
     def __setbeads(self):
         "returns the active beads"
@@ -253,15 +245,8 @@ class BeadInput(BeadView):
 
         self.__beads = np.sort(tuple(beads)) if len(beads) else np.empty((0,), dtype = 'i4')
 
-        upd = {'disabled': len(self.__beads) == 0, 'value': self._bead}
-        if len(self.__beads):
-            upd['start'] = self.__beads[0]
-            upd['end']   = self.__beads[-1]
-
-        self._inp.update(**upd)
-
     def __setvalue(self, bead):
-        if self._inp.disabled:
+        if len(self.__beads) == 0:
             return
 
         if bead is None:
@@ -271,7 +256,7 @@ class BeadInput(BeadView):
                                     np.searchsorted(self.__beads, bead))]
 
         if bead == self._bead:
-            self._inp.value = bead
+            self.__toolbar.bead = bead
         else:
             with self.action:
                 self._bead = bead
@@ -290,7 +275,11 @@ class BeadInput(BeadView):
             self.__setvalue(self._bead)
 
 class RejectedBeadsInput(BeadView):
-    "Toolbar with a bead spinner"
+    "Text dealing with rejected beads"
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+        self.__toolbar = None
+
     def setup(self, toolbar):
         "sets-up the gui"
         self._keys.addKeyPress(('keypress.delbead', self.__ondiscard_current))
@@ -298,6 +287,7 @@ class RejectedBeadsInput(BeadView):
         self._ctrl.observe("updatetask", "addtask", self.__onupdatetask)
         self._ctrl.observe("removetask",            self.__onremovetask)
         self._ctrl.getGlobal('project').track.observe(self.__onproject)
+        self.__toolbar = toolbar
 
     def getroots(self, _):
         assert False
@@ -337,25 +327,23 @@ class RejectedBeadsInput(BeadView):
 
     def __onupdatetask(self, parent = None, task = None, **_):
         if self._isdiscardedbeads(parent, task):
-            self._inp.value = ', '.join(str(i) for i in sorted(task.discarded))
+            self.__toolbar.discarded = ', '.join(str(i) for i in sorted(task.discarded))
 
     def __onremovetask(self, parent = None, task = None, **_):
         if self._isdiscardedbeads(parent, task):
-            self._inp.value = ''
+            self.__toolbar.discarded = ''
 
     def __onproject(self):
         root  = self._root
         beads = getattr(self._ctrl.task(root, DataSelectionTask), 'discarded', None)
         if beads is not None:
-            self._inp.value = ', '.join(str(i) for i in sorted(beads))
+            self.__toolbar.discarded = ', '.join(str(i) for i in sorted(beads))
 
-class BeadToolBar(BokehView): # pylint: disable=too-many-instance-attributes
+class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
     "Toolbar"
     def __init__(self, **kwa):
         "Sets up the controller"
         super().__init__(**kwa)
-        MessageViewMixins.globals(self._ctrl)
-
         css          = self._ctrl.getGlobal('css').title
         css.defaults = {'open': u'Open', 'save': u'Save', 'quit': u'Quit',
                         'open.dialog': u'Open a track or analysis file',
@@ -377,20 +365,38 @@ class BeadToolBar(BokehView): # pylint: disable=too-many-instance-attributes
 
     def getroots(self, doc):
         "adds items to doc"
+        assert doc is not None
         self._doc = doc
 
         self.__toolbar  = DpxToolbar(hasquit = self._ctrl.ISAPP)
-        self._keys.addKeyPress(('keypress.open',    self._onOpen),
-                               ('keypress.save',    self._onSave),
-                               ('keypress.quit',    self._ctrl.close))
+
+        def _onbtn_cb(attr, old, new):
+            if attr == 'open':
+                spawn(self.__diagopen.run)
+            elif attr == 'save':
+                spawn(self.__diagsave.run)
+            elif attr == 'quit':
+                self._ctrl.close()
+            raise RuntimeError()
+
+        self.__toolbar.on_change('open', _onbtn_cb)
+        self.__toolbar.on_change('save', _onbtn_cb)
+        self.__toolbar.on_change('quit', _onbtn_cb)
+        self._keys.addKeyPress(('keypress.open',  lambda: _onbtn_cb('open', 0, 0)),
+                               ('keypress.save',  lambda: _onbtn_cb('save', 0, 0)),
+                               ('keypress.quit',  lambda: _onbtn_cb('save', 0, 0)))
+
         self.__diagopen.setup(doc)
         self.__diagsave.setup(doc)
-        self.__messages.setup(self.__toolbar)
+        self.__messages.setup(self.__toolbar, doc)
         self.__bead    .setup(self.__toolbar)
         self.__rejected.setup(self.__toolbar)
-        self.__setup_title()
+        self.__setup_title(doc)
 
-        self.enableOnTrack(self.__toolbar)
+        def _onproject(items):
+            if 'track' in items:
+                self.__toolbar.frozen = items['track'].value is items.empty
+        self._ctrl.getGlobal("project").observe(_onproject)
         return self.__toolbar,
 
     def close(self):
@@ -403,13 +409,7 @@ class BeadToolBar(BokehView): # pylint: disable=too-many-instance-attributes
         del self.__diagopen
         del self.__diagsave
 
-    def _onOpen(self, *_):
-        spawn(self.__diagopen.run)
-
-    def _onSave(self,  *_):
-        spawn(self.__diagsave.run)
-
-    def __setup_title(self):
+    def __setup_title(self, doc):
         def _title(item):
             path = getattr(item.value, 'path', None)
             if isinstance(path, (list, tuple)):
