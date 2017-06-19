@@ -131,15 +131,15 @@ class ExtremumAlignmentProcessor(Processor):
         args = cls.__args(kwa, frame, info, True)
         bias = args.pull + np.nanmedian(args.initial-args.pull)
 
-        bad  = args.measure-args.pull < cls._get(kwa, 'opening')
-        bad &= args.initial-args.pull < cls._get(kwa, 'opening')
+        bad  = cls.__less(args.measure-args.pull, kwa, 'opening')
+        bad &= cls.__less(args.initial-args.pull, kwa, 'opening')
         if any(bad):
             bad = np.nonzero(bad)[0]
-            bad = bad[np.abs(args.initial[bad]-args.measure[bad]) < cls._get(kwa, 'delta')]
+            bad = cls.__less(args.initial[bad]-args.measure[bad], kwa, 'delta')
             if len(bad):
                 cyc = args.cycles.cycles.withphases(PHASE.measure)[..., list(bad)].values()
                 std = np.array([np.nanstd(i[cls._get(kwa, 'window'):]) for i in cyc])
-                bad = bad[std < cls._get(kwa, 'deviation')]
+                bad = bad[cls.__less(std, kwa, 'deviation')]
                 if len(bad):
                     bias[bad] = args.initial[bad]
 
@@ -209,6 +209,12 @@ class ExtremumAlignmentProcessor(Processor):
             deltas /= rho
             deltas[np.isnan(deltas)] = 0.
         return deltas
+
+    @classmethod
+    def __less(cls, array, kwa, name):
+        val                    =  cls._get(kwa, name)
+        array[np.isnan(array)] = val
+        return array < val
 
     @classmethod
     def __distance_to_3(cls, bias, args, kwa):
