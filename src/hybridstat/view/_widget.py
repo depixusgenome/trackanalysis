@@ -16,7 +16,7 @@ from signalfilter               import rawprecision
 from peakcalling.processor      import HairpinDistance
 
 from view.dialog                import FileDialog
-from view.intinput              import PathInput
+from view.pathinput             import PathInput
 from view.plots                 import from_py_func, DpxNumberFormatter, WidgetCreator
 from view.plots.sequence        import (SequenceTicker, SequenceHoverMixin,
                                         SequencePathWidget)
