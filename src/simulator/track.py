@@ -246,7 +246,7 @@ class TrackSimulator:
         sim   = {}
         for i in range(nbeads):
             track.data[i] = self()
-            if len(self.events.stored):
+            if len(getattr(self.events, 'stored', tuple())):
                 sim[i] = dict(self.events.stored)
         if len(sim):
             setattr(track, 'simulator', sim)
