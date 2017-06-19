@@ -8,8 +8,8 @@ from .detection     import EventDetector
 
 class EventDetectionConfig(PrecisionAlg):
     u"Config for an event detection: base class to various interfaces"
-    filter      = NonLinearFilter() # type: Optional[Filter]
-    events      = EventDetector()   # type: EventDetector
+    filter = NonLinearFilter() # type: Optional[Filter]
+    events = EventDetector()   # type: EventDetector
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__(**_)

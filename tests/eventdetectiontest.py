@@ -6,7 +6,7 @@ import numpy  as np
 from   numpy.testing          import assert_allclose
 from model                    import PHASE
 from eventdetection.detection import (DerivateSplitDetector, EventMerger, EventSelector,
-                                      MinMaxSplitDetector, OutlierDerivateSplitDetector)
+                                      MinMaxSplitDetector)
 from eventdetection.alignment import (ExtremumAlignment, CorrelationAlignment,
                                       PhaseEdgeAlignment)
 from eventdetection.processor import ExtremumAlignmentProcessor, AlignmentTactic
@@ -72,18 +72,6 @@ def test_minmaxsplitdetector():
         items[21:] -= thr
         items[[0, 10, 25, 29]] = np.nan
         assert det(items) == ((0, 11), (11,20), (21,30))
-
-def test_outliersplitdetector():
-    "Tests flat stretches detection"
-    data = np.ones((20, 2), dtype = 'f4')
-    data[:,1]  = -1
-    data       = data.ravel()
-    data[10:] += 1.01
-    data[20:] += 2.01
-    data[30:] += 3.01
-
-    detector = OutlierDerivateSplitDetector(window = 1, precision = 1.)
-    assert_allclose(detector(data), [[0,20], [20,30], [30,40]])
 
 def _merges(oneperrange):
     "Tests flat stretches merging"

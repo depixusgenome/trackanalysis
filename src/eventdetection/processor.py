@@ -245,7 +245,6 @@ class ExtremumAlignmentProcessor(Processor):
     def run(self, args):
         args.apply(self.apply(**self.config()))
 
-
 class EventDetectionTask(EventDetectionConfig, Task):
     "Config for an event detection"
     levelin = Level.bead

@@ -19,7 +19,7 @@ class BaseSplitDetector(PrecisionAlg):
     The precision is either provided or measured. In the latter case,
     the estimation used is the median-deviation of the derivate of the data.
     """
-    window = 2
+    window = 3
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -56,18 +56,21 @@ class BaseSplitDetector(PrecisionAlg):
                  data     : np.ndarray,
                  precision: Optional[float] = None
                 ) -> np.ndarray:
-        nans, data = self._init(data)
-        if data is None:
+        nans, tmp = self._init(data)
+        if tmp is None:
             return np.empty((0,2), dtype = 'i4')
-        ends = self._compute(precision, data).nonzero()[0]
-        return self._tointervals(nans, data, ends)
+        deltas    = self._deltas(tmp)
+        precision = self._precision(tmp, deltas, precision)
+        threshold = self._threshold(tmp, deltas, precision)
+        ends      = (deltas > threshold).nonzero()[0]
+        return self._extend(self._tointervals(nans, tmp, ends), data, precision)
 
     @classmethod
     def run(cls, data, **kwa):
         "instantiates and calls class"
         return cls(**kwa)(data)
 
-    def deltas(self, data : np.ndarray) -> np.ndarray:
+    def _deltas(self, data : np.ndarray) -> np.ndarray:
         "all deltas"
         window = self.window
         kern   = np.ones((window*2,))
@@ -79,8 +82,91 @@ class BaseSplitDetector(PrecisionAlg):
             delta[1-window:] += np.arange(window)[1:] * data[-1]
         return np.abs(delta)/self.window
 
-    def _compute(self, precision:Optional[float], data : np.ndarray) -> np.ndarray:
+    def _precision(self, data:np.ndarray, _:np.ndarray, precision:Optional[float]) -> float:
+        return self.getprecision(precision, data)
+
+    def _extend(self,
+                ends:np.ndarray,
+                data:np.ndarray,
+                precision:Optional[float]
+               ) -> np.ndarray:
+        return IntervalExtension.extend(ends, data, precision, self.window)
+
+    def _threshold(self, data:np.ndarray, deltas:np.ndarray, precision:float) -> np.ndarray:
         raise NotImplementedError()
+
+class IntervalExtension:
+    """
+    Extends intervals beyond the computed range up to a limit given by *window*.
+
+    This means to remove the range size bias created by using a window to compute
+    derivates.
+    """
+    @staticmethod
+    def __right(ends, data, meds, precision, window):
+        inters        = np.repeat(ends[:,1], 2)
+        inters[1::2] += window
+        right         = np.concatenate(np.split(data, inters)[1::2])
+
+        right         = np.concatenate([right, [1e30]*(len(ends)*window-len(right))])
+        right         = right.reshape((len(meds),window)).T
+
+        np.abs(np.subtract(right, meds, out = right), out = right)
+
+        right         = np.hstack([np.ones((right.shape[1],1), dtype = 'bool'),
+                                   right.T < precision])
+        fcn           = lambda i: np.max(np.nonzero(i)[0])
+        vals          = ends[:,1]+np.apply_along_axis(fcn, 1, right)
+        vals[:-1]     = np.minimum(vals[:-1], ends[1:,0]) # no merging intervals!
+        return vals
+
+    @staticmethod
+    def __left(ends, data, meds, precision, window):
+        inters       = np.repeat(ends[:,0], 2)
+        inters[::2]  = np.maximum(0, inters[::2]-window)
+        left         = np.concatenate(np.split(data, inters)[1::2])
+
+        left         = np.concatenate([[1e30]*(len(ends)*window-len(left)), left])
+        left         = left.reshape((len(meds), window)).T
+
+        np.abs(np.subtract(left, meds, out = left), out = left)
+
+        left         = np.hstack([left.T < precision,
+                                  np.ones((left.shape[1],1), dtype = 'bool')])
+        fcn          = lambda i: len(i)-np.min(np.nonzero(i)[0])-1
+        vals         = ends[:,0]-np.apply_along_axis(fcn, 1, left)
+        vals[1:]     = np.maximum(vals[1:], ends[:-1,1]) # no merging intervals!
+        return vals
+
+    @classmethod
+    def extend(cls, ends, data, precision, window):
+        "extends the provided ranges by as much as *window*"
+        if window <= 1 or len(ends) < 1:
+            return ends
+
+        meds   = np.array([np.nanmedian(data[i:j]) for i, j in ends], dtype = 'f4').T
+        newmax = cls.__right(ends, data, meds, precision, window)
+        newmin = cls.__left (ends, data, meds, precision, window)
+
+        over = np.nonzero(newmax[:-1] > newmin[1:])[0]
+        if len(over) != 0:
+            newmax[over]   = (newmin[over+1]+newmax[over])//2
+            newmin[over+1] = newmax[over]
+
+        ends[:,0] = newmin
+        ends[:,1] = newmax
+        return ends
+
+class MedianThreshold:
+    "A threshold relying on the deltas"
+    percentile = 75.
+    distance   = 3.
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+    def __call__(self, _, deltas:np.ndarray, precision:float) -> np.ndarray:
+        return np.percentile(deltas, self.percentile) + self.distance*precision
 
 class DerivateSplitDetector(BaseSplitDetector):
     """
@@ -93,23 +179,30 @@ class DerivateSplitDetector(BaseSplitDetector):
     The precision is either provided or measured. In the latter case,
     the estimation used is the median-deviation of the derivate of the data.
     """
-    confidence = 0.005 # type: Optional[float]
+    confidence = MedianThreshold() # type: Union[None, float, MedianThreshold]
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-    def threshold(self,
-                  precision: Optional[float]      = None,
-                  data:      Optional[np.ndarray] = None) -> float:
+    def _precision(self,
+                   data     :np.ndarray,
+                   deltas   :np.ndarray,
+                   precision:Optional[float]
+                  ) -> float:
+        if self.precision == 'deltas':
+            return np.median(np.abs(deltas-np.median(deltas)))
+        return self.getprecision(precision, data)
+
+    def _threshold(self, data:np.ndarray, deltas:np.ndarray, precision:float) -> np.ndarray:
         "the threshold applied to alphas"
-        precision = self.getprecision(precision, data)
+        if callable(self.confidence):
+            return self.confidence(data, deltas, precision) # pylint: disable=not-callable
+
         if self.confidence is None or self.confidence <= 0.:
             return precision
+
         return norm.threshold(True, self.confidence, precision,
                               self.window, self.window)
-
-    def _compute(self, precision:Optional[float], data : np.ndarray) -> np.ndarray:
-        return self.deltas(data) > self.threshold(precision, data)
 
 class MinMaxSplitDetector(BaseSplitDetector):
     """
@@ -128,7 +221,7 @@ class MinMaxSplitDetector(BaseSplitDetector):
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-    def deltas(self, data   : np.ndarray) -> np.ndarray:
+    def _deltas(self, data   : np.ndarray) -> np.ndarray:
         "all deltas"
         window = self.window
         out    = np.empty(len(data), dtype = 'f4')
@@ -147,96 +240,11 @@ class MinMaxSplitDetector(BaseSplitDetector):
             out[window:]  -= np.min(dt2d, axis = 1)[:-1]
         return np.abs(out)
 
-    def threshold(self,
-                  precision: Optional[float]      = None,
-                  data:      Optional[np.ndarray] = None) -> float:
+    def _threshold(self, data:np.ndarray, _, precision:float) -> np.ndarray:
         "the threshold applied to alphas"
-        precision = self.getprecision(precision, data)
         if self.confidence is None or self.confidence <= 0.:
             return precision
         return norm.threshold(True, self.confidence, precision)
-
-    def _compute(self, precision:Optional[float], data : np.ndarray) -> np.ndarray:
-        return self.deltas(data) > self.threshold(precision, data)
-
-class OutlierDerivateSplitDetector(BaseSplitDetector):
-    """
-    Detects outliers in derivates and uses those as the boundaries for splits.
-
-    Flatness is defined pointwise: 2 points are flat if close enough one to the
-    other. This closeness is defined using a p-value for 2 points belonging to
-    the same normal distribution with a known sigma.
-
-    The sigma (precision) is either provided or measured. In the latter case,
-    the estimation used is the median-deviation of the derivate of the data.
-    """
-    window     = 3
-    percentile = 50.
-    distance   = 2.
-    def __call__(self,
-                 data     : np.ndarray,
-                 precision: Optional[float] = None
-                ) -> np.ndarray:
-        nans, tmp = self._init(data)
-        if tmp is None:
-            return np.empty((0,2), dtype = 'i4')
-
-        deltas    = self.deltas(tmp)
-        precision = self.__precision(precision, deltas)
-        thr       = np.percentile(deltas, self.percentile) + self.distance*precision
-
-        ends      = self._tointervals(nans, tmp, (deltas > thr).nonzero()[0])
-        return self.__extend(ends, data, precision)
-
-    if TYPE_CHECKING:
-        def _compute(self, _1, _2):
-            assert False
-
-    def __precision(self, precision, deltas):
-        if precision is None and self.precision is None:
-            return np.median(np.abs(deltas-np.median(deltas)))
-        return self.precision if precision is None else precision
-
-    def __right(self, ends, data, meds, precision):
-        last   = list(data[ends[-1,1]:])+[1e30]*(self.window-len(data)+ends[-1,1])
-
-        right  = np.array([data[i:i+self.window] for i in ends[:-1,1]]+[last]).T
-        np.abs(np.subtract(right, meds, out = right), out = right)
-
-        right  = np.hstack([np.ones((right.shape[1], 1), dtype = 'bool'),
-                            right.T < precision])
-
-        inds   = np.arange(right.shape[1])
-        newmax = ends[:,1] + [inds[i][-1] for i in right]
-        return newmax
-
-    def __left(self, ends, data, meds, precision):
-        first  = list(data[:ends[0,0]])+[1e30]*(self.window-ends[0,0])
-        left   = np.array([first]+[data[i-self.window:i] for i in ends[1:,0]]).T
-        np.abs(np.subtract(left, meds, out = left), out = left)
-
-        left   = np.hstack([left.T < precision, np.ones((left.shape[1], 1), dtype = 'bool')])
-
-        inds   = np.arange(left.shape[1])[::-1]
-        newmin = ends[:,0] - [inds[i][0] for i in left]
-        return newmin
-
-    def __extend(self, ends, data, precision):
-        if self.window <= 1 or len(ends) < 1:
-            return ends
-
-        meds   = np.array([np.nanmedian(data[i:j]) for i, j in ends], dtype = 'f4').T
-        newmax = self.__right(ends, data, meds, precision)
-        newmin = self.__left (ends, data, meds, precision)
-
-        over = np.nonzero(newmax[:-1] > newmin[1:])[0]
-        if len(over) != 0:
-            newmax[over]   = (newmin[over+1]+newmax[over])//2
-            newmin[over+1] = newmax[over]
-
-        ends[:,0] = newmin
-        ends[:,1] = newmax
-        return ends
 
 class EventMerger(PrecisionAlg):
     """
@@ -383,7 +391,7 @@ class EventSelector:
 
 class EventDetector(PrecisionAlg):
     "detects, mergers and selects intervals"
-    split  = OutlierDerivateSplitDetector()
+    split  = DerivateSplitDetector()
     merge  = EventMerger()
     select = EventSelector()
     @initdefaults(frozenset(locals()))
