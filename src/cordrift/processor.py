@@ -14,7 +14,7 @@ from control.processor.runner   import pooledinput, poolchunk, pooldump
 from data                       import Track, Cycles
 from signalfilter               import rawprecision
 from eventdetection             import EventDetectionConfig
-from eventdetection.detection   import EventDetector, DerivateSplitDetector
+from eventdetection.detection   import EventDetector
 from eventdetection.data        import Events
 from .collapse                  import (Range, Profile, # pylint: disable=unused-import
                                         CollapseAlg, CollapseByMerging, CollapseToMean,
@@ -24,7 +24,7 @@ class DriftTask(Task, EventDetectionConfig):
     "Removes correlations between cycles"
     level     = Level.bead
     phases    = PHASE.measure, PHASE.measure # type: Optional[Tuple[int,int]]
-    events    = EventDetector(split = DerivateSplitDetector())
+    events    = EventDetector()
     collapse  = CollapseToMean()             # type: Optional[CollapseAlg]
     stitch    = StitchByInterpolation()      # type: Optional[StitchAlg]
     zero      = 10
