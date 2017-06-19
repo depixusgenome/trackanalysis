@@ -15,16 +15,9 @@ export class DpxToolbarView extends LayoutDOMView
         elem.find('.dpx-tb-discard').prop('disabled', @model.frozen)
         elem.find('.dpx-tb-del')    .prop('disabled', @model.frozen)
 
-    on_message: () ->
-        $(@el).find('.dpx-tb-message').val(@model.message)
-
     on_bead:    () ->
         val = $(@el).find('.dpx-tb-bead').val()
         @model.bead = parseInt(val)
-
-    on_open: () ->
-        console.log('*************')
-        @model.open = @model.open+1
 
     on_discard_current: () ->
         ele = $(@el)
@@ -37,9 +30,13 @@ export class DpxToolbarView extends LayoutDOMView
     initialize: (options) ->
         super(options)
         @render()
-        @listenTo(@model,         'change', @render)
-        @listenTo(@model.frozen,  'change', () => @on_frozen())
-        @listenTo(@model.message, 'change', () => @on_message())
+        @listenTo(@model, 'change:bead',
+                  () => $(@el).find('.dpx-tb-bead').val("#{@model.bead}"))
+        @listenTo(@model, 'change:discarded',
+                  () => $(@el).find('.dpx-tb-discarded').val(@model.discarded))
+        @listenTo(@model, 'change:message',
+                  () => $(@el).find('.dpx-tb-message').val(@model.message))
+        @listenTo(@model, 'change:frozen',   () => @on_frozen())
 
     make_btn: (name, label, width = '60px') ->
         str = "<td><button type='button' style='width:#{width};height:25px;'" +
@@ -72,7 +69,7 @@ export class DpxToolbarView extends LayoutDOMView
 
         elem = $(@el)
         elem.html("<table class='dpx-tb'> #{html}</table>")
-        elem.find('.dpx-tb-open').click(() => @on_open())
+        elem.find('.dpx-tb-open').click(() => @model.open = @model.open+1)
         elem.find('.dpx-tb-save').click(() => @model.save = @model.save+1)
         elem.find('.dpx-tb-quit').click(() => @model.quit = @model.quit+1)
         elem.find('.dpx-tb-del') .click(() => @on_discard_current())
@@ -86,12 +83,12 @@ export class DpxToolbar extends LayoutDOM
     type: 'DpxToolbar'
     default_view: DpxToolbarView
     @define {
+        frozen:     [p.Bool,    true]
         open:       [p.Number,  0]
         save:       [p.Number,  0]
         quit:       [p.Number,  0]
         bead:       [p.Number,  -1]
         discarded:  [p.String,  '']
         message:    [p.String,  '']
-        frozen:     [p.Bool,    false]
         hasquit:    [p.Bool,    false]
     }

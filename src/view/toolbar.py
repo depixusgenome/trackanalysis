@@ -377,7 +377,8 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
                 spawn(self.__diagsave.run)
             elif attr == 'quit':
                 self._ctrl.close()
-            raise RuntimeError()
+            else:
+                raise RuntimeError('Unknown toolbar button: '+attr)
 
         self.__toolbar.on_change('open', _onbtn_cb)
         self.__toolbar.on_change('save', _onbtn_cb)
