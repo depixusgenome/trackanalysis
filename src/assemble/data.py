@@ -228,6 +228,8 @@ class OligoPerm:
         '''
         if __debug__:
             if len(set(perm1.domain).intersection(set(perm2.domain)))>0:
+                print("perm1.domain",perm1.domain)
+                print("perm2.domain",perm2.domain)
                 raise ValueError("perm1 and perm2 are not independant")
         changes = perm1.changes+perm2.changes
         permids = perm1.permids[perm2.permids]
@@ -296,7 +298,7 @@ class OligoKPerm(OligoPerm):
         u'returns the full permutation of oligo indices'
         if len(self._permids)==0:
             toperm={val:self.kpermids[idx] for idx,val in enumerate(sorted(self.kpermids))}
-            self._permids=list(range(len(self.oligos)))
+            self._permids=numpy.array(range(len(self.oligos)))
             for key,val in toperm.items():
                 self._permids[key]=val
         return self._permids

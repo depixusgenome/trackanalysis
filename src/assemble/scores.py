@@ -83,7 +83,7 @@ class OptiKPerm: # need to complete pytest
         u'calls OptiDistPerm, returns permuted xstate'
         if self.__pstate==[]:
             dists = [oli.dist for oli in self.kperm]
-            # this line is time expensive
+            # this line is time consuming
             self.__pstate = OptiDistPerm(perm=self.__perm,dists=dists).run()
         return self.__pstate
 

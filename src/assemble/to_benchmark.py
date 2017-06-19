@@ -1,15 +1,17 @@
 import pickle
-import numpy
-import time
-
-from typing import List, Tuple
 import itertools
+import re
+from typing import List, Tuple
+import numpy
+
 from utils import initdefaults
 import assemble.processor as processor
 import assemble.scores as scores
 import assemble.data as data
 import assemble._utils as utils
-import re
+
+#  for code which needs improvements : see comments  # must be improved
+
 
 # to finish
 class PiecewiseAssemble:
@@ -17,10 +19,16 @@ class PiecewiseAssemble:
     much faster version of assembler
     sequence is assembled sequentially starting from the first oligos
     adding iteratively groups of oligos which can permute
+    call as :
+    PiecewiseAssemble(nscale=1,
+                      collection=collection,
+                      ooverl=3,
+                      scoring=scores.ScoreAssembly(ooverl=3))
     '''
     nscale=1 # type: float
     collection=data.BCollection() # type: data.BCollection
     ooverl=1
+    scoring=scores.ScoreAssembly()
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
         pass
@@ -36,52 +44,141 @@ class PiecewiseAssemble:
         '''
         # oligos should be ordered by pos (for a given stretch and bias)
         groupedids = utils.group_overlapping_normdists([oli.dist for oli in self.oligos],nscale=1)[1]
-        # find set of groups which are indepedent and partitions the set of oligos
-        cores=[groupedids[0]] # partition the range of ids
-        correctives={} # groups for correction
-        for i in groupedids[1:]:
-            if len(set(cores[-1]).intersection(i))==0:
-                cores.append(i)
-            else:
-                try:
-                    correctives[cores[-1]].append(i)
-                except KeyError:
-                    correctives[cores[-1]]=[i]
-        assembled=[]
-        # reconstruct 2 cores at a time
-        test1=[]
-        test2=[]
-        partitions=[]
-        # kperms of cores[1:-1] are computed twice, unnecessary
-        last_only=False
-        for idcore, core in enumerate(cores[1:]):
-            if idcore>0:
-                last_only=True
-            # find the core permutations and the corrections permutations
-            core_okperms,corr_okperms=self.find_kperms_coresandcorrs(cores=[cores[idcore],core],
-                                                                     corrections=correctives[cores[idcore]])
+        if __debug__:
+            pickle.dump(groupedids,open("groupedids.pickle","wb"))
+        all_kperms = [] # kperms which reconstruct the sequence
+        # compute for the first group then correct as we had more to it
+        all_kperms = self.find_kperms(groupedids[0])
+
+        #partitions = []
+        partitions=[[kperm] for kperm in all_kperms]
+        for groupid,group in enumerate(groupedids[1:]):
+            add_kperms=[i for i in self.find_kperms(group) if i.domain-set(groupedids[groupid])]
+            print("len(add_kperms)=",len(add_kperms))
+            if len(add_kperms)==0:
+                continue
+            if __debug__:
+                pickle.dump(add_kperms,open("add_kperms"+str(groupid)+".pickle","wb"))
+            if __debug__:
+                pickle.dump(all_kperms,open("all_kperms"+str(groupid)+".pickle","wb"))
+
+            # for each kperm in add kperms look if they present a better match than previous ones
+            # filter out the others
+            # can be optimized but basically compute the partitions
+
+            # compute the scores to each partitions
+            # this partitions also kperms which are from the same group (useless, generates duplicates) # TO FIX!
+            #partitions=self.find_kpermpartitions(all_kperms+add_kperms)
+            print("starting add2partitions")
+            partitions=self.add2partitions(partitions,[[kpr] for kpr in add_kperms])
+            if __debug__:
+                pickle.dump(partitions,open("partitions.pickle","wb"))
+            print("ended add2partitions")
+            print("len(partitions)=",len(partitions))
+            ranked_partitions=self.rank_partitions(partitions)
+
+            # discards the worst, keep the ones with max overlaps + the 10% best ones 
+            max_overlaps=max([rkpart[0] for rkpart in ranked_partitions])
             
-            test1.append(core_okperms)
-            test2.append(corr_okperms)
+            keepbest=[rkd for idx,rkd in enumerate(ranked_partitions) if rkd[0]==max_overlaps or idx<0.15*len(partitions)]
 
-            # must be optimized, will change
-            # find all ways to combine the permutations, 
-            # There could be a better way to do that
-            # if we look at each kperm in corr_okperms and see if there is a kperm which is better
-            # we might miss combination of permutations
-            # see if there is a combination (?) of permutations which is better
-            partitions.append(self.find_kpermpartitions(core_okperms+corr_okperms))
-
+            partitions=[rkd[2] for rkd in keepbest]
+            # if assembling of the partition is greater than the horizon we can merge kperms which are in the same patitions beyond the horizon!
+            # as soon as some kperms
             # add the kpermutations
+            all_kperms+=add_kperms
 
             # rank combined kperms
 
-        return test1,test2,partitions
+        #partitions=self.find_kpermpartitions(all_kperms)
+        return partitions,[data.OligoPerm.add(*part) for part in partitions]
 
-    # to optimize, will be improved
-    def find_kperms_coresandcorrs(self,
-                                  cores:List[Tuple[int, ...]],
-                                  corrections:List[Tuple[int, ...]])->List[data.OligoPerm]:
+    # must be improved
+    def add2partitions(self,
+                       partitions1:List[List[data.OligoKPerm]],
+                       partitions2:List[List[data.OligoKPerm]])->List[List[data.OligoKPerm]]:
+        u'''
+        adds 2 partitions together
+        can combine any partition in part1 with any in part2
+        but cannot combine kperms belonging to the same partition
+
+        # before, wrong
+        result=[]
+        for part1 in partitions1:
+            kperms1=[kpr for kpr in part1 if kpr.domain]
+            set1=set()
+            for kpr in kperms1:
+                set1.update(kpr.domain)
+            for part2 in partitions2:
+                kperms2=[kpr for kpr in part2 if kpr.domain]
+                set2=set()
+                for kpr in kperms2:
+                    set2.update(kpr.domain)
+                # if all independant, add to result
+                if not set1.intersection(set2):
+                    result.append(part1+part2)
+
+        # then tried...
+        # to add a kperm to an existing partition
+        # check if the kperm intersects with any kperm in partition
+        # if no, append the kperm to the partition
+        # else, collect intersecting kperms find partitions of collected kperms
+        # and replace into the partitions
+        combined=[]
+        for part1 in partitions1:
+            print("part1")
+            #kperms1=[kpr for kpr in part1 if kpr.domain]
+            for part2 in partitions2:
+                print("part2")
+                topartition=[]
+                rmkpr1=[]
+                # add to partition if intersect or domain==set()
+                for kpr1,kpr2 in itertools.product(part1,part2):
+                    if kpr1.domain.intersection(kpr2.domain):
+                        topartition.extend([kpr1,kpr2])
+                        rmkpr1.append(kpr1)
+                print("len(topartition)=",len(topartition))
+                for kpr1 in part1:
+                    print(kpr1.kpermids)
+                for kpr2 in part2:
+                    print(kpr2.kpermids)
+                if len(topartition)>0:
+                    core=[kpr for kpr in part1 if not kpr in rmkpr1]
+                    print("len(core)=",len(core))
+                    patches=self.find_kpermpartitions(list(set(topartition)))
+                    combined.extend([core+patch for patch in patches])
+                else:
+                    combined.extend([part1+part2])
+        return combined
+        '''
+        # can be modified to reduce calculations
+        # works but slow
+        kperms1=set()
+        for part1 in partitions1:
+            kperms1.update(part1)
+        kperms2=set()
+        for part2 in partitions2:
+            kperms2.update(part2)
+        if __debug__:
+            pickle.dump(kperms1,open("kperms1.pickle","wb"))
+            pickle.dump(kperms2,open("kperms2.pickle","wb"))
+        return self.find_kpermpartitions(list(kperms1)+list(kperms2))
+
+    def rank_partitions(self,partitions):
+        u'''
+        computes the pdfcost and the noverlaps for each partitions
+        calculus is done over the whole sequence, TO FIX!
+        '''
+        merged_partitions = [data.OligoPerm.add(*kperms) for kperms in partitions]
+        merged_kperms=[data.OligoKPerm(kperm=prm.perm) for prm in merged_partitions]
+        scored=[]
+        for kprmid,kprm in enumerate(merged_kperms):
+            score= self.scoring(kprm)
+            scored.append((score.noverlaps,score.pdfcost,partitions[kprmid]))
+        return sorted(scored,key=lambda x:(-x[0],x[1]))
+
+    # must be improved
+    def find_kperms(self,group:Tuple[int, ...])->List[data.OligoPerm]:
         u'''
         finds the permutations of oligos in cores
         and permutations from corrections (changed indices must be in both core_groups)
@@ -90,36 +187,21 @@ class PiecewiseAssemble:
         batchfilter=processor.BetweenBatchFilter(idsperbatch=idsperbatch)
         ooverlfilter=processor.RequireOverlapFilter(oligos=self.oligos,
                                                     min_ooverl=self.ooverl)
-        core_okperms=[]
-        for core in cores:
-            # compute all possible permutations # brute force
-            permids=itertools.permutations(core) # generator
-            firstfiltered = filter(ooverlfilter,permids) # type: ignore
-            secondfiltered = filter(batchfilter,firstfiltered) # type: ignore
-            for permid in secondfiltered:
-                core_okperms.append(data.OligoKPerm(oligos=self.oligos,
-                                                    kperm=[self.oligos[i] for i in permid],
-                                                    kpermids=permid))
-        corr_okperms=[]
-        for corr in corrections:
-            # compute all possible permutations # brute force
-            permids=itertools.permutations(corr) # generator
-            firstfiltered = filter(ooverlfilter,permids) # type: ignore
-            secondfiltered = filter(batchfilter,firstfiltered) # type: ignore
-            for permid in secondfiltered:
-                corr_okprm=data.OligoKPerm(oligos=self.oligos,
+        okperms=[]
+        # compute all possible permutations # brute force
+        permids=itertools.permutations(group) # generator
+        firstfiltered = filter(ooverlfilter,permids) # type: ignore
+        secondfiltered = filter(batchfilter,firstfiltered) # type: ignore
+        for permid in secondfiltered:
+            okperms.append(data.OligoKPerm(oligos=self.oligos,
                                            kperm=[self.oligos[i] for i in permid],
-                                           kpermids=permid)
-                if corr_okprm.domain.intersection(set(cores[0]))\
-                   and corr_okprm.domain.intersection(set(cores[1])):
-                    corr_okperms.append(corr_okprm)
-
+                                           kpermids=permid))
             
-        return core_okperms,list(set(corr_okperms))
+        return okperms
 
     # ooverl will eventually be be the minimal number of overlapping 
     def test_find_kperms(self,oligos:List[data.OligoPeak],
-                         ooverl=1:int,
+                         ooverl=1,
                          fixed=None)->List[data.OligoKPerm]:
         u'''
         trying to find alternative way to compute possible permutations of oligos
@@ -140,7 +222,7 @@ class PiecewiseAssemble:
                 continue
             torightof=[idx+oliid+1 for idx,val in enumerate(left[oliid+1:]) if val==oligo.seq[-ooverl:]]
             toleftof=[idx+1+oliid+1 for idx,val in enumerate(right[oliid+1:]) if val==oligo.seq[ooverl:]]
-            kperms+=[[oligos[:oliid]+oligos[oliid+1:] ]]
+            kperms+=[[oligos[:oliid]+oligos[oliid+1:]]]
         return kperms
     
     def find_kpermpartitions(self,kperms):
@@ -148,7 +230,9 @@ class PiecewiseAssemble:
         finds the kperms which can be combined
         '''
         parts=[]
-        seeds = [kperms[0]]+[kpr for kpr in kperms[1:] if kpr.domain.intersection(kperms[0].domain)]
+        seeds=[kpr for kpr in kperms if kpr.domain==set()]
+        if seeds==[]:
+            seeds=[kperms[0]]+[kpr for kpr in kperms[1:] if kpr.domain.intersection(kperms[0].domain)]
         print("seeds=",seeds)
         for seed in seeds:
             parts.extend(self.partition_from_seed(seed,
@@ -180,31 +264,6 @@ class PiecewiseAssemble:
                                                       [kpr for kpr
                                                        in kperms
                                                        if not kpr.domain.intersection(kperms[i].domain)])]
-
-    # not used 
-    def assemble_groupedids(self,groupedids:List[List[int]])->List[List[int]]:
-        u'''
-        uset is the output of utils.group_overlapping_normdist [1]
-        '''
-        # find all groupedids intersecting with uset[0]
-        inter=[]
-        for i in range(len(groupedids)):
-            if len(set(groupedids[i]).intersection(groupedids[0]))>0:
-                inter.append(i)
-            else:
-                break
-        # ... and the first uset independent with 0
-        indep=inter[-1]+1 # groupedids should be sorted by construction
-        # compute all kperms in groupedids[0] and groupedids[indep]
-        # compute kperms in groupedids[i] for i in inter if they have both indices from 0 and indep
-        # find possible combinations of kperm using subdivide_and_partition
-        # rank
-
-        # resume with new values of inter[] (previous value of indep) and new value of indep 
-
-        return [[]]
-
-
 
     
 def operms(oligos,ooverl):
