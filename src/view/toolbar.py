@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Toolbar"
-from typing               import Callable # pylint: disable=unused-import
+from typing               import Callable, TYPE_CHECKING # pylint: disable=unused-import
 from pathlib              import Path
 import re
 
@@ -115,7 +115,7 @@ class DpxToolbar(LayoutDOM):
     open      = props.Int(0)
     save      = props.Int(0)
     quit      = props.Int(0)
-    bead      = props.Int(0)
+    bead      = props.Int(-1)
     discarded = props.String('')
     message   = props.String('')
     frozen    = props.Bool(True)
@@ -128,9 +128,10 @@ class MessagesInput(BokehView):
         super().__init__(*args, **kwargs)
         self._ctrl.getGlobal('project').message.default = None
         msg = self._ctrl.getGlobal('css').message
-        msg.defaults = dict(normal  = '<p>{}</p>',
-                            warning = '<p style="color:blue;">{}</p>',
-                            error   = '<p style="color:red;"> {}</p>',
+        siz = 'heigth: 28px; margin-top: 0px;'
+        msg.defaults = dict(normal  = '<p style="%s">{}</p>' % siz,
+                            warning = '<p style="%s color:blue;">{}</p>' % siz,
+                            error   = '<p style="%s color:red;"> {}</p>' % siz,
                             busy    = u'Please wait ...',
                             width   = 350)
 
@@ -188,9 +189,6 @@ class MessagesInput(BokehView):
 
 class BeadView(BokehView):
     "Widget for controlling the current beads"
-    def getroots(self, doc):
-        raise NotImplementedError()
-
     @property
     def _root(self):
         return self._ctrl.getGlobal("project").track.get()
@@ -206,6 +204,10 @@ class BeadView(BokehView):
     def _isdiscardedbeads(self, parent, task):
         return isinstance(task, DataSelectionTask) and parent is self._root
 
+    if TYPE_CHECKING:
+        def getroots(self, doc):
+            assert False
+
 class BeadInput(BeadView):
     "Spinner for controlling the current bead"
     def __init__(self, **kwa):
@@ -217,9 +219,6 @@ class BeadInput(BeadView):
 
         self.__beads   = np.empty((0,), dtype = 'i4')
         self.__toolbar = None
-
-    def getroots(self, _):
-        assert False
 
     def setup(self, toolbar):
         "adds items to doc"
@@ -242,8 +241,9 @@ class BeadInput(BeadView):
 
         task  = self._ctrl.task(root, DataSelectionTask)
         beads = set(track.beadsonly.keys()) - set(getattr(task, 'discarded', []))
-
         self.__beads = np.sort(tuple(beads)) if len(beads) else np.empty((0,), dtype = 'i4')
+        if self.__toolbar.bead not in self.__beads:
+            self.__setvalue(self.__beads[0])
 
     def __setvalue(self, bead):
         if len(self.__beads) == 0:
@@ -288,9 +288,6 @@ class RejectedBeadsInput(BeadView):
         self._ctrl.observe("removetask",            self.__onremovetask)
         self._ctrl.getGlobal('project').track.observe(self.__onproject)
         self.__toolbar = toolbar
-
-    def getroots(self, _):
-        assert False
 
     def __current(self):
         root  = self._root

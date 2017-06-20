@@ -8,13 +8,6 @@ import {LayoutDOMView, LayoutDOM} from "models/layouts/layout_dom"
 export class DpxToolbarView extends LayoutDOMView
     tagName: "div"
 
-    on_frozen:  () ->
-        elem = $(@el)
-        elem.find('.dpx-tb-save')   .prop('disabled', @model.frozen)
-        elem.find('.dpx-tb-bead')   .prop('disabled', @model.frozen)
-        elem.find('.dpx-tb-discard').prop('disabled', @model.frozen)
-        elem.find('.dpx-tb-del')    .prop('disabled', @model.frozen)
-
     on_bead:    () ->
         val = $(@el).find('.dpx-tb-bead').val()
         @model.bead = parseInt(val)
@@ -27,42 +20,54 @@ export class DpxToolbarView extends LayoutDOMView
     on_discard: () ->
         @model.discarded = $(@el).find('.dpx-tb-discarded').val()
 
+    on_change_frozen:  () ->
+        $(@el).find('.dpx-tb-freeze').prop('disabled', @model.frozen)
+
+    on_change_bead: () ->
+        val = "#{@model.bead}"
+        $(@el).find('.dpx-tb-bead').val(val)
+
+    on_change_discarded: () ->
+        $(@el).find('.dpx-tb-discarded').val(@model.discarded)
+
+    on_change_message: () ->
+        $(@el).find('.dpx-tb-message').html(@model.message)
+
     initialize: (options) ->
         super(options)
         @render()
-        @listenTo(@model, 'change:bead',
-                  () => $(@el).find('.dpx-tb-bead').val("#{@model.bead}"))
-        @listenTo(@model, 'change:discarded',
-                  () => $(@el).find('.dpx-tb-discarded').val(@model.discarded))
-        @listenTo(@model, 'change:message',
-                  () => $(@el).find('.dpx-tb-message').val(@model.message))
-        @listenTo(@model, 'change:frozen',   () => @on_frozen())
+        @listenTo(@model, 'change:bead',      () => @on_change_bead())
+        @listenTo(@model, 'change:discarded', () => @on_change_discarded())
+        @listenTo(@model, 'change:message',   () => @on_change_message())
+        @listenTo(@model, 'change:frozen',    () => @on_change_frozen())
 
-    make_btn: (name, label, width = '60px') ->
-        str = "<td><button type='button' style='width:#{width};height:25px;'" +
-              " class='dpx-tb-#{name} bk-bs-btn bk-bs-btn-default'"           +
+    make_btn: (name, label, freeze = true, width = '60px') ->
+        str = "<td><button type='button' style='width: #{width};'"+
+              " class='dpx-tb-#{name} bk-bs-btn bk-bs-btn-default'"+
               ">#{label}</button></td>"
+        if freeze
+            $(str).addClass('dpx-tb-freeze')
         return str
 
     render: () ->
         super()
         mdl   = @model
-        bead  = '<td><label for=".dpx-tb-bead" style="margin-left: 5px">' +
-                'Bead</label></td>'                                        +
-                '<td><input class="dpx-tb-bead bk-widget-form-input"'      +
-                ' type="number" style="width: 60px; height: 25px"'         +
+        bead  = '<td><label for=".dpx-tb-bead" style="margin-left: 5px">'+
+                'Bead</label></td>'+
+                '<td><input class="dpx-tb-bead dpx-tb-freeze bk-widget-form-input"'+
+                ' type="number" style="width: 40px; height: 28px;"'+
                 "min=0  max=10000 step=1  value=#{mdl.bead}></td>"
-        disc  = '<td><label for=".dpx-tb-discard" style="margin-left: 1px">' +
-                'Discarded</label></td>'                                     +
-                '<td><input class="dpx-tb-bead bk-widget-form-input"'        +
-                ' type="text" style="width: 60px; height: 25px" '            +
+        disc  = '<td><label for=".dpx-tb-discard" style="margin-left: 1px">'+
+                'Discarded</label></td>'+
+                '<td><input class="dpx-tb-bead dpx-tb-freeze bk-widget-form-input"'+
+                ' type="text" style="width: 60px; height: 28px" '+
                 "value=#{mdl.discarded}></td>"
-        msg   = '<td><label for=".dpx-tb-message"'         +
-                ' style="margin-right: 5px; width=200px">' +
-                "#{mdl.message}</label></td>"
-        html  = '<table><tr>'+ @make_btn('open', 'Open')   +
-                @make_btn('save', 'Save')                  +
-                bead + disc + @make_btn('del', '━', '5px') + msg
+        msg   = '<td><div class="dpx-tb-message bk-markup"'+
+                ' style="margin-right: 5px; margin-left: 5px; width: 200px; height: 28px;">'+
+                "#{mdl.message}</div></td>"
+        html  = '<table><tr>'+ @make_btn('open', 'Open', false)+
+                @make_btn('save', 'Save')+
+                bead + disc + @make_btn('del', '━', true, '5px') + msg
 
         if @model.hasquit
             html = html + @make_btn('quit', 'Quit')
@@ -76,7 +81,7 @@ export class DpxToolbarView extends LayoutDOMView
         elem.find('.dpx-tb-bead').change(() => @on_bead())
         elem.find('.dpx-tb-discard').change(() => @on_discard())
 
-        @on_frozen()
+        @on_change_frozen()
         return @
 
 export class DpxToolbar extends LayoutDOM
