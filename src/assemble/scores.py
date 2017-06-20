@@ -5,7 +5,6 @@ defines a list of scoring functors for sequence assembly
 '''
 from typing import Tuple, List, NamedTuple, Set # pylint: disable=unused-import
 import itertools
-import scipy
 import numpy as np
 
 from utils import initdefaults
@@ -36,32 +35,11 @@ class OptiDistPerm:
     '''
     perm = tuple() # type: Tuple[int, ...]
     dists = [] # type: List[SciDist]
-    __epsi=-1 # type:float
-    delta_xmin=1.1 # minimal distance between 2 oligos
+    epsi=1.1 # type:float
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
+        u'init'
         pass
-
-    @property
-    def epsi(self)->float:
-        u'returns float precision'
-        if self.__epsi==-1:
-            self.__setattr__("__epsi",0.001*min([self.dists[i].std() for i in self.perm]))
-        return self.__epsi
-
-    def old_run(self,xinit=None)->np.ndarray:
-        u'returns the PERMUTATED state which maximise the probability'
-        constraints = []
-        for idx in range(len(self.perm[:-1])):
-            constraints.append({"type":"ineq",
-                                "fun":SOMConstraint(index=idx,
-                                                    _epsi=self.epsi)})
-
-        if xinit is None:
-            xinit = [self.dists[i].mean() for i in self.perm]
-
-        fun = CostPermute(perm=self.perm,dists=self.dists)
-        return scipy.optimize.minimize(fun,xinit,constraints=constraints).x
 
     def find_subs(self):
         u'find sub-kpermutations within the permutation'
@@ -71,7 +49,7 @@ class OptiDistPerm:
         for val in srtprm:
             kpr=[val]
             if self.perm[srtprm.index(val)]==kpr[0]:
-                subkprms.append(kpr)
+                subkprms.append(tuple(kpr))
                 continue
             kpr.append(self.perm[srtprm.index(val)])
             while kpr[-1]!=kpr[0]:
@@ -90,7 +68,7 @@ class OptiDistPerm:
             scalef=sum([1/i.std()**2 for i in subdists])
             # x intersection of gaussians
             xopt=locscalef/scalef
-            perm_x=np.array([i*self.delta_xmin for i in sub])
+            perm_x=np.array([i*self.epsi for i in sub])
             perm_x=perm_x-np.mean(perm_x)+xopt
             perm_xs.extend(perm_x)
 
