@@ -37,6 +37,7 @@ class OptiDistPerm:
     perm = tuple() # type: Tuple[int, ...]
     dists = [] # type: List[SciDist]
     __epsi=-1 # type:float
+    delta_xmin=1.1 # minimal distance between 2 oligos
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
         pass
@@ -48,7 +49,7 @@ class OptiDistPerm:
             self.__setattr__("__epsi",0.001*min([self.dists[i].std() for i in self.perm]))
         return self.__epsi
 
-    def run(self,xinit=None)->np.ndarray:
+    def old_run(self,xinit=None)->np.ndarray:
         u'returns the PERMUTATED state which maximise the probability'
         constraints = []
         for idx in range(len(self.perm[:-1])):
@@ -62,6 +63,38 @@ class OptiDistPerm:
         fun = CostPermute(perm=self.perm,dists=self.dists)
         return scipy.optimize.minimize(fun,xinit,constraints=constraints).x
 
+    def find_subs(self):
+        u'find sub-kpermutations within the permutation'
+        # compute the new positions for each sub-kperm
+        srtprm=sorted(self.perm)
+        subkprms=[]
+        for val in srtprm:
+            kpr=[val]
+            if self.perm[srtprm.index(val)]==kpr[0]:
+                subkprms.append(kpr)
+                continue
+            kpr.append(self.perm[srtprm.index(val)])
+            while kpr[-1]!=kpr[0]:
+                kpr.append(self.perm[srtprm.index(kpr[-1])])
+            subkprms.append(tuple(sorted(kpr[:-1])))
+        return list(set(subkprms))
+
+    def run(self):
+        u'testing faster alternative to run'
+        subs=self.find_subs()
+        perm_xs=[]
+        srtprm=sorted(self.perm)
+        for sub in subs:
+            subdists=[self.dists[srtprm.index(i)] for i in sub]
+            locscalef=sum([i.mean()/i.std()**2 for i in subdists])
+            scalef=sum([1/i.std()**2 for i in subdists])
+            # x intersection of gaussians
+            xopt=locscalef/scalef
+            perm_x=np.array([i*self.delta_xmin for i in sub])
+            perm_x=perm_x-np.mean(perm_x)+xopt
+            perm_xs.extend(perm_x)
+
+        return sorted(perm_xs)
 
 class OptiKPerm: # need to complete pytest
     u'''
