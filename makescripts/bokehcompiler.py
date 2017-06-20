@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Compiles the JS code once and for all"
+import sys
 from typing     import List
 from functools  import wraps
 from pathlib    import Path
@@ -8,6 +9,7 @@ import re
 
 import bokeh.util.compiler as _compiler
 
+sys.path.append(str(Path(".").resolve()))
 def finddependencies(*modules) -> List[str]:
     "compiles the application as would a normal call to bokeh"
     for mod in modules:
