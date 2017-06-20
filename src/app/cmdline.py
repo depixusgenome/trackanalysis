@@ -225,7 +225,7 @@ def _version(ctx, _, value):
 @click.option("--raiseerr",
               flag_value = True,
               default    = False,
-              help       = '[DEBUG] Wether errors should be caught')
+              help       = '[DEBUG] Whether errors should be caught')
 @click.option("--singlethread",
               flag_value = True,
               default    = False,
