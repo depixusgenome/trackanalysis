@@ -135,7 +135,7 @@ class ExtremumAlignmentProcessor(Processor):
         bad &= cls.__less(args.initial-args.pull, kwa, 'opening')
         if any(bad):
             bad = np.nonzero(bad)[0]
-            bad = cls.__less(args.initial[bad]-args.measure[bad], kwa, 'delta')
+            bad = bad[cls.__less(args.initial[bad]-args.measure[bad], kwa, 'delta')]
             if len(bad):
                 cyc = args.cycles.cycles.withphases(PHASE.measure)[..., list(bad)].values()
                 std = np.array([np.nanstd(i[cls._get(kwa, 'window'):]) for i in cyc])
