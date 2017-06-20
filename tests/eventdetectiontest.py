@@ -5,8 +5,8 @@
 import numpy  as np
 from   numpy.testing          import assert_allclose
 from model                    import PHASE
-from eventdetection.detection import (DerivateSplitDetector, EventMerger, EventSelector,
-                                      MinMaxSplitDetector)
+from eventdetection.detection import DerivateSplitDetector, EventMerger, EventSelector
+from eventdetection.splitting import MinMaxSplitDetector
 from eventdetection.alignment import (ExtremumAlignment, CorrelationAlignment,
                                       PhaseEdgeAlignment)
 from eventdetection.processor import ExtremumAlignmentProcessor, AlignmentTactic
@@ -44,7 +44,7 @@ def test_detectsplits():
 
 def test_minmaxsplitdetector():
     "Tests flat stretches detection"
-    for i in range(1,3):
+    for i in range(3,4):
         inst  = MinMaxSplitDetector(precision  = 1.,
                                     confidence = 0.1,
                                     window     = i)
@@ -251,4 +251,4 @@ def test_precision():
     assert list(np.nonzero(found-sim-1)[0]) == []
 
 if __name__ == '__main__':
-    test_precision()
+    test_minmaxsplitdetector()
