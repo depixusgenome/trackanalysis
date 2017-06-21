@@ -17,6 +17,8 @@ with warnings.catch_warnings():
     from bokeh.model           import Model
     from bokeh.document        import Document  # pylint: disable=unused-import
     from bokeh.server.server   import Server    # pylint: disable=unused-import
+    warnings.filterwarnings('ignore', category = FutureWarning)
+    import pandas.tslib                         # pylint: disable=unused-import
 
 from view.keypress         import KeyPressManager
 
