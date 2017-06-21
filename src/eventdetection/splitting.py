@@ -11,6 +11,156 @@ from    utils        import initdefaults
 from    signalfilter import samples as _samples, PrecisionAlg
 norm = _samples.normal.knownsigma # pylint: disable=invalid-name
 
+class IntervalExtension:
+    """
+    Extends intervals beyond the computed range up to a limit given by *window*.
+
+    This means to remove the range size bias created by using a window to compute
+    derivates.
+    """
+    @classmethod
+    def extend(cls, ends, data, precision, window):
+        "extends the provided ranges by as much as *window*"
+        if window <= 1 or len(ends) < 1:
+            return ends
+
+        newmin = cls.__apply(ends, data, precision, -window)
+        newmax = cls.__apply(ends, data, precision,  window)
+
+        over   = np.nonzero(newmax[:-1] > newmin[1:])[0]
+        if len(over) != 0:
+            newmax[over]   = (newmin[over+1]+newmax[over])//2
+            newmin[over+1] = newmax[over]
+
+        ends[:,0] = newmin
+        ends[:,1] = newmax
+        return ends
+
+    def __call__(self, ends, data, precision, window):
+        return self.extend(ends, data, precision, window)
+
+    @staticmethod
+    def _sidedata(inters, data, window, default, imax = None):
+        side   = 1 if window > 0 else 0
+        inters = np.repeat(inters, 2)
+        out    = inters[side::2]
+        out   += window
+        if   window < 0:
+            np.maximum(0         if imax is None else imax, out, out = out)
+        else:
+            np.minimum(len(data) if imax is None else imax, out, out = out)
+
+        rngs = np.split(data, inters)[1::2]
+        diff = abs(window)-np.diff(inters)[::2]
+        inds = np.nonzero(diff)[0][::-1]
+        for i, j in zip(inds, diff[inds]):
+            rngs.insert(i+side, [default]*j)
+        return np.concatenate(rngs).reshape((len(inters)//2, abs(window))).T
+
+    @classmethod
+    def __apply(cls, ends, data, precision, window):
+        side = 1 if window > 0 else 0
+        inds = ends[:,side], ends[:,1-side]
+
+        test = cls._test(inds, data, precision, window)
+        good = np.ones((test.shape[0], 1), dtype = 'bool')
+        test = np.hstack([good, test] if side else [test, good])
+
+        if side:
+            fcn = lambda i: np.max(np.nonzero(i)[0])
+        else:
+            fcn = lambda i: np.min(np.nonzero(i)[0])+1-len(i)
+        res = inds[0]+np.apply_along_axis(fcn, 1, test)
+
+        if side:
+            res[:-1] = np.minimum(res[:-1], inds[1][1:])  # no merging intervals!
+        else:
+            res[1:]  = np.maximum(res[1:],  inds[1][:-1]) # no merging intervals!
+        return res
+
+    @classmethod
+    def _test(cls, inds, data, precision, window):
+        raise NotImplementedError()
+
+class IntervalExtensionAroundMean(IntervalExtension):
+    """
+    Extends intervals beyond the computed range up to a limit given by *window*.
+    The range is extended:
+
+        1. by at most *window* points in any direction.
+        2. up to and including the farthest point within *mean ± precision*
+        where the mean is the average of the *window* points at the interval edge.
+
+        For a window of 3, where upper triangles are the current selection, the
+        range is extended to the left by 2 (up to ☺)
+
+            ^
+            |   X
+            |              △
+            |
+            |     ⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯      
+            |                 △
+            |     ☺ 
+            |     ⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯
+            |
+            |           △
+            |
+            |       X
+            +----------------------->
+    This means to remove the range size bias created by using a window to compute
+    derivates.
+    """
+    @classmethod
+    def _test(cls, inds, data, precision, window):
+        vals = cls._sidedata(inds[0], data, window, 1e30)
+        meds = np.nanmean(cls._sidedata(inds[0], data, -window, np.NaN, inds[1]), 0)
+
+        np.abs(np.subtract(vals, meds, out = vals), out = vals)
+        vals[np.isnan(vals)] = 0.
+        return (vals < precision).T
+
+class IntervalExtensionAroundRange(IntervalExtension):
+    """
+    Extends intervals beyond the computed range up to a limit given by *window*.
+    The range is extended:
+
+        1. by at most *window* points in any direction.
+        2. up to and including the farthest point within *mean ± precision*
+        where the mean is the average of the *window* points at the interval edge.
+        2. up to and including the farthest point within in the same range of values
+        as the *window* points at the interval edge:
+
+        For a window of 3, where upper triangles are the current selection, the
+        range is extended to the left by 2 (up to ☺)
+
+            ^
+            |   X
+            |     ⋯⋯⋯⋯⋯⋯⋯⋯ △
+            |
+            |
+            |                   △
+            |     ☺ 
+            |
+            |     ⋯⋯⋯⋯⋯ △
+            |
+            |       X
+            +----------------------->
+
+
+
+    This means to remove the range size bias created by using a window to compute
+    derivates.
+    """
+    @classmethod
+    def _test(cls, inds, data, precision, window):
+        vals  = cls._sidedata(inds[0], data, window, 1e30)
+        refs  = cls._sidedata(inds[0], data, -window, np.NaN, inds[1])
+        meanv = np.nanmean(refs, 0)
+        maxv  = np.maximum(np.nanmax(refs, 0), meanv+precision)
+        minv  = np.minimum(np.nanmin(refs, 0), meanv-precision)
+        vals[np.isnan(vals)] = 0.
+        return np.logical_and(vals <= maxv, vals >= minv).T
+
 class BaseSplitDetector(PrecisionAlg):
     """
     Detects flat stretches of value
@@ -19,6 +169,7 @@ class BaseSplitDetector(PrecisionAlg):
     the estimation used is the median-deviation of the derivate of the data.
     """
     window = 3
+    extend = IntervalExtensionAroundRange() # type: Optional[IntervalExtension]
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -61,8 +212,10 @@ class BaseSplitDetector(PrecisionAlg):
         deltas    = self._deltas(tmp)
         precision = self._precision(tmp, deltas, precision)
         threshold = self._threshold(tmp, deltas, precision)
-        ends      = (deltas > threshold).nonzero()[0]
-        return self._extend(self._tointervals(nans, tmp, ends), data, precision)
+        ends      = self._tointervals(nans, tmp, (deltas > threshold).nonzero()[0])
+        if self.extend is not None:
+            return self.extend(ends, data, precision, self.window)
+        return ends
 
     @classmethod
     def run(cls, data, **kwa):
@@ -84,82 +237,8 @@ class BaseSplitDetector(PrecisionAlg):
     def _precision(self, data:np.ndarray, _:np.ndarray, precision:Optional[float]) -> float:
         return self.getprecision(precision, data)
 
-    def _extend(self,
-                ends:np.ndarray,
-                data:np.ndarray,
-                precision:Optional[float]
-               ) -> np.ndarray:
-        return IntervalExtension.extend(ends, data, precision, self.window)
-
     def _threshold(self, data:np.ndarray, deltas:np.ndarray, precision:float) -> np.ndarray:
         raise NotImplementedError()
-
-class IntervalExtension:
-    """
-    Extends intervals beyond the computed range up to a limit given by *window*.
-
-    This means to remove the range size bias created by using a window to compute
-    derivates.
-    """
-    @staticmethod
-    def __sidedata(inters, data, window, default, imax = None):
-        side   = 1 if window > 0 else 0
-        inters = np.repeat(inters, 2)
-        if   window < 0:
-            inters[side::2]  = np.maximum(0 if imax is None else imax, inters[::2]+window)
-        elif imax is None:
-            inters[side::2] += window
-        else:
-            inters[side::2]  = np.minimum(imax, inters[::2]+window)
-
-        vals = np.concatenate(np.split(data, inters)[1::2])
-        vals = np.insert(vals, 0 if window < 0 else len(vals),
-                         [default] * (len(inters)//2*abs(window)-len(vals)))
-        return vals.reshape((len(inters)//2, abs(window))).T
-
-    @classmethod
-    def __apply(cls, ends, data, precision, window):
-        side = 1 if window > 0 else 0
-        inds = ends[:,side], ends[:,1-side]
-
-        vals = cls.__sidedata(inds[0], data, window, 1e30)
-        meds = np.nanmean(cls.__sidedata(inds[0], data, -window, np.NaN, inds[1]), 0)
-
-        np.abs(np.subtract(vals, meds, out = vals), out = vals)
-
-        zeros = np.zeros((vals.shape[1], 1), dtype = 'f4')
-        vals  = np.hstack([zeros, vals.T] if side else [vals.T, zeros])
-        vals[np.isnan(vals)] = 0.
-
-        if side:
-            fcn = lambda i: np.max(np.nonzero(i)[0])
-        else:
-            fcn = lambda i: np.max(np.nonzero(i)[0])+1-len(i)
-        res = inds[0]+np.apply_along_axis(fcn, 1, vals < precision)
-
-        if side:
-            res[:-1] = np.minimum(res[:-1], inds[1][1:])  # no merging intervals!
-        else:
-            res[1:]  = np.maximum(res[1:],  inds[1][:-1]) # no merging intervals!
-        return res
-
-    @classmethod
-    def extend(cls, ends, data, precision, window):
-        "extends the provided ranges by as much as *window*"
-        if window <= 1 or len(ends) < 1:
-            return ends
-
-        newmin = cls.__apply(ends, data, precision, -window)
-        newmax = cls.__apply(ends, data, precision,  window)
-
-        over   = np.nonzero(newmax[:-1] > newmin[1:])[0]
-        if len(over) != 0:
-            newmax[over]   = (newmin[over+1]+newmax[over])//2
-            newmin[over+1] = newmax[over]
-
-        ends[:,0] = newmin
-        ends[:,1] = newmax
-        return ends
 
 class MedianThreshold:
     "A threshold relying on the deltas"
