@@ -41,39 +41,56 @@ export class DpxToolbarView extends LayoutDOMView
         @listenTo(@model, 'change:message',   () => @on_change_message())
         @listenTo(@model, 'change:frozen',    () => @on_change_frozen())
 
-    make_btn: (name, label, freeze = true, width = '60px') ->
-        str = "<td><button type='button' style='width: #{width};'"+
+    make_btn: (name, label, freeze = true, style = 'width: 60px;') ->
+        str = "<button type='button' style='#{style}'"+
               " class='dpx-tb-#{name} bk-bs-btn bk-bs-btn-default'"+
-              ">#{label}</button></td>"
+              ">#{label}</button>"
         if freeze
             $(str).addClass('dpx-tb-freeze')
         return str
 
     render: () ->
         super()
-        mdl   = @model
-        bead  = '<td><label for=".dpx-tb-bead" style="margin-left: 5px">'+
-                'Bead</label></td>'+
-                '<td><input class="dpx-tb-bead dpx-tb-freeze bk-widget-form-input"'+
-                ' type="number" style="width: 40px; height: 28px;"'+
-                "min=0  max=10000 step=1  value=#{mdl.bead}></td>"
-        disc  = '<td><label for=".dpx-tb-discard" style="margin-left: 1px">'+
-                'Discarded</label></td>'+
-                '<td><input class="dpx-tb-bead dpx-tb-freeze bk-widget-form-input"'+
-                ' type="text" style="width: 60px; height: 28px" '+
-                "value=#{mdl.discarded}></td>"
-        msg   = '<td><div class="dpx-tb-message bk-markup"'+
-                ' style="margin-right: 5px; margin-left: 5px; width: 200px; height: 28px;">'+
-                "#{mdl.message}</div></td>"
-        html  = '<table><tr>'+ @make_btn('open', 'Open', false)+
-                @make_btn('save', 'Save')+
-                bead + disc + @make_btn('del', '━', true, '5px') + msg
-
+        mdl  = @model
         if @model.hasquit
-            html = html + @make_btn('quit', 'Quit')
+            quit = @make_btn('quit', 'Quit', 'width: 60px; align-self: right;')
+        else
+            quit =''
+
+        html = "<table class='dpx-tb' style='width: 100vw'><tr style='width: 100vw'>"+
+               "<td style='width: 60px'> #{@make_btn('open', 'Open', false)} </td>"+
+               "<td style='width: 60px'> #{@make_btn('save', 'Save')} </td>"+
+               "<td style='width: 20px'>"+
+                   "<label for='.dpx-tb-bead' style='margin-left: 5px'>Bead</label>"+
+               "</td>"+
+               "<td style='width: 40px'>"+
+                   "<input class='dpx-tb-bead dpx-tb-freeze bk-widget-form-input'"+
+                         " type='number' style='width: 40px; height: 28px;'"+
+                         " min=0  max=10000 step=1  value=#{mdl.bead}>"+
+               "</td>"+
+               "<td style='width: 20px'>"+
+                    "<label for='.dpx-tb-discard' style='margin-left: 1px'>Discarded</label>"+
+               "</td>"+
+               "<td style='width: 60px'>"+
+                    "<input class='dpx-tb-bead dpx-tb-freeze bk-widget-form-input'"+
+                          " type='text' style='width: 60px; height: 28px'"+
+                          " value=#{mdl.discarded}>"+
+               "</td>"+
+               "<td style='width: 5px'>"+
+                    "#{@make_btn('del', '━', true, 'width: 5px')}"+
+               "</td>"+
+               "<td style='width:auto'>"+
+                    "<div class='dpx-tb-message bk-markup'"+
+                        " style='margin-right: 5px;margin-left: 5px;align-self: center;"+
+                                "width:auto;height: 28px;'>"+
+                        "#{mdl.message}"+
+                    "</div>"+
+               "</td>"+
+               "<td style='width:auto'>#{quit}</td>"+
+               "</tr></table>"
 
         elem = $(@el)
-        elem.html("<table class='dpx-tb'> #{html}</table>")
+        elem.html(html)
         elem.find('.dpx-tb-open').click(() => @model.open = @model.open+1)
         elem.find('.dpx-tb-save').click(() => @model.save = @model.save+1)
         elem.find('.dpx-tb-quit').click(() => @model.quit = @model.quit+1)

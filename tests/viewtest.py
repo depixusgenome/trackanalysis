@@ -10,17 +10,17 @@ from view.plots                 import DpxKeyedRow
 def test_toolbar(bokehaction):
     "test the toolbar"
     with bokehaction.launch('view.toolbar.BeadToolbar', 'app.Defaults') as server:
-        tbar = server.widget['Main:toolbar'].get()
+        tbar = server.widget['Main:toolbar']
         ctrl = server.ctrl
         curr = ctrl.getGlobal('project')
         def _checknone():
-            assert tbar.disabled
+            assert tbar.frozen
             assert curr.get('track', default = None) is None
             assert curr.get('task',  default = None) is None
 
         def _checkopen():
             track = curr.track.get()
-            assert not tbar.disabled
+            assert not tbar.frozen
             assert track.path  == server.path('small_legacy')
             assert track       is curr.task.get()
             assert ctrl.getGlobal('config').last.path.trk.get() == track.path
@@ -91,4 +91,4 @@ def test_beadplot(bokehaction):
         server.press('Ctrl-z')
 
 if __name__ == '__main__':
-    test_beadtoolbar(bokehaction(None))
+    test_toolbar(bokehaction(None))

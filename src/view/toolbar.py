@@ -120,6 +120,8 @@ class DpxToolbar(LayoutDOM):
     message   = props.String('')
     frozen    = props.Bool(True)
     hasquit   = props.Bool(False)
+    def __init__(self, **kwa):
+        super().__init__(name = 'Main:toolbar', **kwa)
 
 class MessagesInput(BokehView):
     "Everything related to messages"
@@ -290,8 +292,7 @@ class RejectedBeadsInput(BeadView):
         self.__toolbar = toolbar
 
     def __current(self):
-        root  = self._root
-        task  = self._ctrl.task(root, DataSelectionTask)
+        task = self._ctrl.task(self._root, DataSelectionTask)
         return set(getattr(task, 'discarded', []))
 
     def __ondiscard_current(self, *_):
@@ -331,10 +332,9 @@ class RejectedBeadsInput(BeadView):
             self.__toolbar.discarded = ''
 
     def __onproject(self):
-        root  = self._root
-        beads = getattr(self._ctrl.task(root, DataSelectionTask), 'discarded', None)
-        if beads is not None:
-            self.__toolbar.discarded = ', '.join(str(i) for i in sorted(beads))
+        task  = self._ctrl.task(self._root, DataSelectionTask)
+        beads = getattr(task, 'discarded', ())
+        self.__toolbar.discarded = ', '.join(str(i) for i in sorted(beads))
 
 class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
     "Toolbar"
