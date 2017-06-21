@@ -24,6 +24,7 @@ map only needs specify those default values that should be changed for this type
 of plot.
 """
 from    typing        import Callable, Optional
+from    functools     import partial
 from    itertools     import product
 import  inspect
 
@@ -246,7 +247,7 @@ class GlobalsController(BaseGlobalsController):
         def _onglobals(items):
             vals = {i: j.old for i, j in items.items()}
             if len(vals):
-                return lambda: self.updateGlobal(items.name, **vals)
+                return partial(self.updateGlobal, items.name, **vals)
         maps = self._BaseGlobalsController__maps # pylint: disable=protected-access,no-member
         yield tuple('globals.' + i for i in maps
                     if not i.startswith('project')) + (_onglobals,)

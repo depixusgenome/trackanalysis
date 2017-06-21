@@ -13,6 +13,7 @@ from typing         import (Union, Iterator, Tuple, # pylint: disable=unused-imp
                             Optional, Any, List, Iterable, Dict)
 from pathlib        import Path
 from itertools      import chain
+from functools      import partial
 
 from model.task     import Task, RootTask, TaskIsUniqueError
 from .event         import Controller, NoEmission
@@ -183,7 +184,8 @@ class TaskController(Controller):
              task   : Union[Task,int,type],
              noemission = False) -> Task:
         "returns a task"
-        return self.__items[parent].task(task, noemission = noemission)
+        ctrl = ProcessorController() if parent is None else self.__items[parent]
+        return ctrl.task(task, noemission = noemission)
 
     def track(self, parent : Optional[RootTask]):
         "returns the root cache, i;e. the track"
@@ -317,22 +319,19 @@ class TaskController(Controller):
     def __undos__():
         "yields all undoable user actions"
         # pylint: disable=unused-variable
-        _1  = None
-        def _onOpenTrack(controller = _1, model = _1, **_):
-            task = model[0]
-            return lambda: controller.closeTrack(task)
+        def _onOpenTrack (controller = None, model = None, **_2):
+            return partial(controller.closeTrack, model[0])
 
-        def _onCloseTrack(controller = _1, model = _1, **_):
-            return lambda: controller.openTrack(model[0], model)
+        def _onCloseTrack(controller = None, model = None, **_2):
+            return partial(controller.openTrack, model[0], model)
 
-        def _onAddTask(controller = _1, parent = _1, task = _1, **_):
-            return lambda: controller.removeTask(parent, task)
+        def _onAddTask   (controller = None, parent = None, task = None, **_2):
+            return partial(controller.removeTask, parent, task)
 
-        def _onUpdateTask(controller = _1, parent = _1, task = _1,  old = _1, **_):
-            return lambda: controller.updateTask(parent, task, **old)
+        def _onUpdateTask(controller = None, parent = None, task = None, old = None, **_):
+            return partial(controller.updateTask, parent, task, **old)
 
-        def _onRemoveTask(controller = _1, parent = _1, task = _1,  old = _1, **_):
-            ind = old.index(task)
-            return lambda: controller.addTask(parent, task, ind)
+        def _onRemoveTask(controller = None, parent = None, task = None, old = None, **_):
+            return partial(controller.addTask, parent, task, old.index(task))
 
         yield from (fcn for name, fcn in locals().items() if name[:3] == '_on')
