@@ -171,6 +171,10 @@ class BCollection:
         u'returns index of oli in oligos'
         return self.oligos.index(oli)
 
+# to implement
+class Partition:
+    u'container for indepent OligoPerm objects'
+    pass
 
 class OligoPerm:
     u'base class. full n-permutation'
@@ -244,6 +248,11 @@ class OligoPerm:
 
     def __hash__(self)->int:
         return hash((tuple(sorted(self.domain)),tuple(self.permids)))
+
+    def __eq__(self,other)->bool:
+        if isinstance(other,OligoPerm) and self.__hash__()==other.__hash__():
+            return True
+        return False
 
     def outer_seqs(self,ooverl:int)->Tuple[str, ...]:
         u'''
@@ -342,6 +351,11 @@ class OligoKPerm(OligoPerm):
 
     def __hash__(self)->int:
         return hash((tuple(sorted(self.domain)),tuple(self.kpermids)))
+
+    def __eq__(self,other)->bool:
+        if isinstance(other,OligoKPerm) and self.__hash__()==other.__hash__():
+            return True
+        return False
 
     # to check
     def identity_perm(self):

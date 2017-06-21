@@ -1,8 +1,10 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+u'class for oligo assemby'
 import pickle
 import itertools
-import re
 from typing import List, Tuple
-import numpy
 
 from utils import initdefaults
 import assemble.processor as processor
@@ -10,8 +12,10 @@ import assemble.scores as scores
 import assemble.data as data
 import assemble._utils as utils
 
-#  for code which needs improvements : see comments  # must be improved
+# should define a Partition class as a container for List[data.OligoPerm]
+# with fix_horizon(group), add2partitions as methods
 
+#  for code which needs improvements : see comments  # must be improved
 class QOli:
     u'small class to combine to find kperms of OligoPeaks'
     def __init__(self,**kwa):
@@ -21,17 +25,16 @@ class QOli:
     def __add__(self,other):
         return QOli(seq=self.seq+other.seq,idxs=self.idxs+other.idxs)
 
-# to finish
-class PiecewiseAssemble:
+class PieceAssemble:
     u'''
     much faster version of assembler
     sequence is assembled sequentially starting from the first oligos
     adding iteratively groups of oligos which can permute
     call as :
-    PiecewiseAssemble(nscale=1,
-                      collection=collection,
-                      ooverl=3,
-                      scoring=scores.ScoreAssembly(ooverl=3))
+    PieceAssemble(nscale=1,
+                  collection=collection,
+                  ooverl=3,
+                  scoring=scores.ScoreAssembly(ooverl=3))
     '''
     nscale=1 # type: float
     collection=data.BCollection() # type: data.BCollection
@@ -51,16 +54,26 @@ class PiecewiseAssemble:
         reorder the oligos piecewise
         '''
         # oligos should be ordered by pos (for a given stretch and bias)
-        groupedids = utils.group_overlapping_normdists([oli.dist for oli in self.oligos],nscale=1)[1]
+        groupedids = utils.group_overlapping_normdists([oli.dist
+                                                        for oli in self.oligos],nscale=1)[1]
         if __debug__:
             pickle.dump(groupedids,open("groupedids.pickle","wb"))
         all_kperms = [] # kperms which reconstruct the sequence
         # compute for the first group then correct as we had more to it
         all_kperms = self.find_kperms(groupedids[0])
 
-        #partitions = []
         partitions=[[kperm] for kperm in all_kperms]
         for groupid,group in enumerate(groupedids[1:]):
+            if __debug__:
+                print("groupid=",groupid)
+                print("before len of partitions=",[len(i) for i in partitions])
+                pickle.dump(partitions,open("beforepartitions"+str(groupid)+".pickle","wb"))
+            # check that fix_horizon works properly
+            partitions=self.fix_horizon(partitions,group)
+            if __debug__:
+                pickle.dump(partitions,open("afterpartitions"+str(groupid)+".pickle","wb"))
+                print("after len of partitions=",[len(i) for i in partitions])
+
             add_kperms=[i for i in self.find_kperms(group) if i.domain-set(groupedids[groupid])]
             print("len(add_kperms)=",len(add_kperms))
             if len(add_kperms)==0:
@@ -75,33 +88,39 @@ class PiecewiseAssemble:
             # can be optimized but basically compute the partitions
 
             # compute the scores to each partitions
-            # this partitions also kperms which are from the same group (useless, generates duplicates) # TO FIX!
-            #partitions=self.find_kpermpartitions(all_kperms+add_kperms)
-            print("starting add2partitions")
             partitions=self.add2partitions(partitions,[[kpr] for kpr in add_kperms])
-            if __debug__:
-                pickle.dump(partitions,open("partitions.pickle","wb"))
-            print("ended add2partitions")
             print("len(partitions)=",len(partitions))
+            if __debug__:
+                pickle.dump(partitions,open("addedpartitions"+str(groupid)+".pickle","wb"))
 
-            # keep the ones with max noverlaps or noverlaps such that 10% of the best according to noverlaps  
+            partitions=self.reduce_partitions(partitions)
+            print("len(partitions)=",len(partitions))
+            # keep the ones with max noverlaps or
+            # noverlaps such that 10% of the best according to noverlaps
             # discards the worst, keep the ones with max overlaps + the 10% best ones
 
-            # faster to discard partitions with low noverlaps
+            # faster to discard partitions with low noverlaps first
             by_noverlaps=self.rank_byoverlaps(partitions)
             if __debug__:
-                print("consider keeping 10% best including pdfcost")
-            #min_overlaps=by_noverlaps[int(0.1*len(partitions))+1][0] # still too slow  for large prec
-            min_overlaps=by_noverlaps[0][0]
-            
+                print("consider keeping 10% best including pdfcost, from")
+                print(len(by_noverlaps))
+            # still too slow  for large prec
+            #min_overlaps=by_noverlaps[int(0.1*len(partitions))+1][0]
+            min_overlaps=by_noverlaps[-1][0] # test
+            #min_overlaps=by_noverlaps[0][0] # test
+
             bestooverl=[rkd for idx,rkd in enumerate(by_noverlaps) if rkd[0]>=min_overlaps]
 
             ranked_partitions=self.rank_partitions([i[1] for i in bestooverl])
-            max_overlaps=max([rkpart[0] for rkpart in ranked_partitions])
-            keepbest=[rkd for idx,rkd in enumerate(ranked_partitions) if rkd[0]==max_overlaps or idx<0.1*len(partitions)]
 
+            #max_overlaps=max([rkpart[0] for rkpart in ranked_partitions])
+            #keepbest=[rkd for idx,rkd in enumerate(ranked_partitions)
+            #          if rkd[0]==max_overlaps
+            #          or idx<0.1*len(partitions)]
+            keepbest=list(ranked_partitions) # test
             partitions=[rkd[2] for rkd in keepbest]
-            # if assembling of the partition is greater than the horizon we can merge kperms which are in the same patitions beyond the horizon!
+            # if assembling of the partition is greater than the horizon
+            # we can merge kperms which are in the same patitions beyond the horizon!
             # as soon as some kperms
             # add the kpermutations
             all_kperms+=add_kperms
@@ -111,7 +130,32 @@ class PiecewiseAssemble:
         #partitions=self.find_kpermpartitions(all_kperms)
         return partitions,[data.OligoPerm.add(*part) for part in partitions]
 
-    # must be improved
+
+    # tocheck
+    #pylint: disable=no-self-use
+    def reduce_partitions(self,partitions:List[List[data.OligoPerm]])->List[List[data.OligoPerm]]:
+        u'''
+        if two partitions result in the same permids, keep the one with
+        '''
+        merged=[data.OligoPerm.add(*part) for part in partitions]
+        smerged=sorted([(tuple(val.permids),
+                         tuple(sorted(val.domain)),
+                         partitions[idx])
+                        for idx,val in enumerate(merged)],
+                       key=lambda x: x[0])
+        reduced=[]
+        for grp in itertools.groupby(smerged,key=lambda x:x[0]):
+            consider=list(grp[1])
+            domains=set(i[1] for i in consider)
+            tokeep=[]
+            for dom in domains:
+                if not any(set(i) < set(dom) for i in domains):
+                    tokeep.append(dom)
+            for tkp in tokeep:
+                reduced.append([i[2] for i in consider if i[1]==tkp][0])
+        return reduced
+
+    # could be improved
     def add2partitions(self,
                        partitions1:List[List[data.OligoKPerm]],
                        partitions2:List[List[data.OligoKPerm]])->List[List[data.OligoKPerm]]:
@@ -196,6 +240,7 @@ class PiecewiseAssemble:
             scored.append((score.noverlaps(),score.density(),partitions[kprmid]))
         return sorted(scored,key=lambda x:(-x[0],x[1]))
 
+    # merge with rank_partitions
     def rank_byoverlaps(self,partitions):
         u'''
         computes the noverlaps for each partitions
@@ -229,10 +274,28 @@ class PiecewiseAssemble:
             okperms.append(data.OligoKPerm(oligos=self.oligos,
                                            kperm=[self.oligos[i] for i in permid],
                                            kpermids=permid))
-            
+
         return okperms
 
-    
+    # needs better implementation
+    # pylint: disable=no-self-use
+    def fix_horizon(self,
+                    partitions:List[List[data.OligoPerm]],
+                    group:Tuple[int, ...])->List[List[data.OligoPerm]]:
+        u'horizon is the ensemble of kperms which cannot modify by any subsequent combination'
+        horizon=set(group)
+        for partid,part in enumerate(partitions):
+            if len(part)==1:
+                continue
+            to_fix=[(idx,kpr) for idx,kpr in enumerate(part)
+                    if not kpr.domain.intersection(horizon)]
+            if len(to_fix)==0:
+                continue
+            merged=data.OligoPerm.add(*[fix[1] for fix in to_fix])
+            fixed=[fix[0] for fix in to_fix]
+            partitions[partid]=[merged]+[part[i] for i in range(len(part)) if not i in fixed]
+        return partitions
+
     def qkpermsfromqolis(self,qolis:List[QOli])->List[List[QOli]]:
         u'''
         recursive function
@@ -241,48 +304,49 @@ class PiecewiseAssemble:
         # if qidx==rpair: continue
         if len(qolis)==1:
             return [qolis]
-        qkperms=[]
+        qkperms=[] # type: List[List[QOli]]
         left=[oli.seq[:self.ooverl] for oli in qolis]
         right=[oli.seq[-self.ooverl:] for oli in qolis]
         for qidx,qoli in enumerate(qolis):
-            rpairswith=[idx for idx,val in enumerate(right) if val==qoli.seq[:self.ooverl]]
+            rpairswith=[idx for idx,val in enumerate(right) if val==qoli.seq[:self.ooverl]
+                        and idx!=qidx]
             for rpair in rpairswith:
-                if qidx==rpair:
-                    continue
-                #print('rpairing',qolis[rpair].seq,qoli.seq)
                 pair=qolis[rpair]+qoli
                 qkperm=list(qolis)
                 qkperm[rpair]=pair
                 qkperm.pop(qidx)
-                qkperms+=[qkperm]+self.qkpermsfromqolis(qkperm)
+                qkperms+=[qkperm]
+            if len(rpairswith)>0:
+                qkperms+=self.qkpermsfromqolis(qkperm)
 
-            lpairswith=[idx for idx,val in enumerate(left) if val==qoli.seq[-self.ooverl:]]
+            lpairswith=[idx for idx,val in enumerate(left) if val==qoli.seq[-self.ooverl:]
+                        and idx!=qidx]
             for lpair in lpairswith:
-                if qidx==lpair:
-                    continue
                 #print('lpairing',qoli.seq,qolis[lpair].seq)
                 pair=qoli+qolis[lpair]
                 qkperm=list(qolis)
                 qkperm[lpair]=pair
                 qkperm.pop(qidx)
-                qkperms+=[qkperm]+self.qkpermsfromqolis(qkperm)
+                qkperms+=[qkperm]
+            if len(lpairswith)>0:
+                qkperms+=self.qkpermsfromqolis(qkperm)
         return qkperms
 
-    # ooverl will eventually be be the minimal number of overlapping 
+    # ooverl will eventually be be the minimal number of overlapping
     def test_find_kperms(self,
                          group:Tuple[int, ...])->List[data.OligoKPerm]:
         u'''
         trying to find alternative way to compute possible permutations of oligos
-        (which is long and very inefficient for prec>5nm 
+        (which is long and very inefficient for prec>5nm
         call as find_kperms([oligos[i] for i in core])
-        will still need to filter out permutations of oligos amongst the same batch 
+        will still need to filter out permutations of oligos amongst the same batch
         '''
-        
+
         qolis=[QOli(seq=self.oligos[i].seq,idxs=[i]) for i in group]
         qkperms=self.qkpermsfromqolis(qolis)
         kperms=[]
         for qkprm in qkperms:
-            kpr=[]
+            kpr=[] # type: List[int]
             for qoli in qkprm:
                 kpr+=qoli.idxs
             kperms.append(kpr)
@@ -291,7 +355,7 @@ class PiecewiseAssemble:
         batchfilter=processor.BetweenBatchFilter(idsperbatch=idsperbatch)
 
         return list(filter(batchfilter,kperms))
-    
+
     def find_kpermpartitions(self,kperms):
         u'''
         finds the kperms which can be combined
@@ -299,12 +363,14 @@ class PiecewiseAssemble:
         parts=[]
         seeds=[kpr for kpr in kperms if kpr.domain==set()]
         if seeds==[]:
-            seeds=[kperms[0]]+[kpr for kpr in kperms[1:] if kpr.domain.intersection(kperms[0].domain)]
+            seeds=[kperms[0]]+[kpr for kpr in kperms[1:]
+                               if kpr.domain.intersection(kperms[0].domain)]
         print("seeds=",seeds)
         for seed in seeds:
-            parts.extend(self.partition_from_seed(seed,
-                                                  [kpr for kpr in kperms
-                                                   if not kpr in seeds]))
+            no_inter=[kpr for kpr in kperms
+                      if not kpr in seeds
+                      and not kpr.domain.intersection(seed.domain)]
+            parts.extend(self.partition_from_seed(seed,no_inter))
         return parts
 
     def partition_from_seed(self,
@@ -327,87 +393,8 @@ class PiecewiseAssemble:
 
         return [[seed]+toadd
                 for i in intersections[0]
-                for toadd in self.partition_from_seed(kperms[i],
-                                                      [kpr for kpr
-                                                       in kperms
-                                                       if not kpr.domain.intersection(kperms[i].domain)])]
-
-
-
-
-    
-def operms(oligos,ooverl):
-    u'''
-    assume all oligos may permute
-    should not return the neutral permutation
-    '''
-    end_seqs=[oli.seq[-ooverl:] for oli in oligos]
-    start_seqs=[oli.seq[:ooverl] for oli in oligos]
-    # use finditer
-    [i.start() for i in re.finditer()]
-
-    
-
-def obsolete_analyse(division):
-    merged=[scores.ScoredPermCollection.product(*i) for i in division[0]]
-    oligohits=sorted(merged[0].scperms[0].perm.oligos,key=lambda x: x.pos0) # must be sorted by pos0
-    correct_perms=[val for m in merged for idx,val in enumerate(m.scperms) if val.perm.perm==oligohits]
-    print("len(correct_perms)=",len(correct_perms))
-    noverlaps=[scores.ScoreAssembly(perm=scperm.perm,ooverl=3).noverlaps(attr="perm") for m in merged for scperm in m.scperms]
-    print("len(noverlaps)=",len(noverlaps))
-    pdfcosts=[scores.OptiKPerm(kperm=scperm.perm.perm).cost() for m in merged for scperm in m.scperms] 
-    return pdfcosts,noverlaps,correct_perms
-
-def analyse(scperms,oligos):
-    # compute the pdfcost for each of the scperms
-    # if only oligos which are not indexed in the domain are to add to the pdfcost
-    print("computing pdfcost")
-    scales=[i.dist.std() for i in oligos]
-    assert all(scales[0]==i for i in scales[1:])
-    factor=1/numpy.sqrt(2*numpy.pi*oligos[0].dist.std())
-    
-    pdfcosts=[i.pdfcost*(len(oligos)-len(i.domain))*factor for i in scperms]
-    # compute the noverlaps for each
-    print("computing noverlaps")
-    noverlaps=[scores.ScoreAssembly(perm=
-                                    data.OligoKPerm(kperm=
-                                                    [oligos[i]
-                                                     for i in scperm.permids]),
-                                    ooverl=3).noverlaps(attr="kperm")
-               for scperm in scperms]
-
-    good_permid=[oligos.index(val) for val in sorted(oligos,key=lambda x:x.pos0)]
-    print("correct permutation=",good_permid)
-    correct_perms=[scperm for scperm in scperms if tuple(scperm.permids)==tuple(good_permid)]
-    print("len(correct_perms)=",len(correct_perms))
-    return pdfcosts,noverlaps,correct_perms,good_permid
-
-
-if __name__=='__main__':
-    #division0=pickle.load(open("full100bsubdivision_first_element_backup.pickle","rb"))
-    #division=pickle.load(open("full100bsubdivision_backup.pickle","rb"))
-    # collection0=division[0][0][0] is 7053120 times in division[0]
-    division=pickle.load(open("per_subdivision_backup.pickle","rb"))
-    
-    
-
-    # main problems:
-    # problem reduction:
-    # is there a way to tell without knowing the permutations or the oligo sequences
-    # -> no outer_seqs (reminder , outerr_seqs was only used for ScoreFilter)
-    # which are good, which are bad?
-    # Check this I would need to have 1) pdfcost, noverlaps and permutations and sequence and see
-    # where true solution lies
-    # cannot rely only on noverlaps because of FPos and FNeg
-
-    # Try to recover the correct order!
-    # for 20p sequence and 2 exp pre. we can do the full calculus
-    
-    # for each merged we need to :
-    # recompute the full pdfcost? 
-    # no! too long. If all have same precision distribution,
-    # we can rescale pdfcost such that unmoved oligopeaks have null cost.
-    # for each kperm. numpy.log(density)-1
-
-    # recompute the number of overlaps for the same reason
-
+                for toadd in\
+                self.partition_from_seed(kperms[i],
+                                         [kpr for kpr
+                                          in kperms
+                                          if not kpr.domain.intersection(kperms[i].domain)])]
