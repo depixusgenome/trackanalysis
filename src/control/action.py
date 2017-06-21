@@ -20,13 +20,11 @@ class _Calls:
     def __str__(self):
         if self._calls is None:
             self._calls = "!?!"
-            self._start  = time()
 
         elif isinstance(self._calls, tuple):
             path  = Path(self._calls[0])
             fname = str(path.relative_to(path.parent.parent))
             self._calls = fname+"@%s [%s]" % self._calls[1:]
-            self._start = time()
 
         elif hasattr(self._calls, '__code__'):
             fcn  = self._calls # type: ignore
@@ -40,13 +38,13 @@ class _Calls:
                 self._calls = "%s@%s [%s]" % (fname,
                                               getattr(code, 'co_firstlineno', '?'),
                                               getattr(fcn, '__qualname__', ''))
-                self._start = time()
             else:
                 self._calls = getattr(fcn, '__qualname__', '')
-                self._start = time()
-        else:
+
+        elif self._start is not None:
             return self._calls + ' T%.3f' % (time() - self._start)
 
+        self._start = time()
         return self._calls
 
 class Action:
@@ -87,8 +85,8 @@ class Action:
 
     def __enter__(self):
         self._CNT[0] += 1
-        self._ctrl.handle(self._STARTEVT, args = {'recursive': self._CNT[0] > 1})
         self._logstart()
+        self._ctrl.handle(self._STARTEVT, args = {'recursive': self._CNT[0] > 1})
         return self._ctrl
 
     def withcalls(self, calls) -> 'Action':
