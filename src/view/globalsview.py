@@ -21,9 +21,11 @@ class GlobalsView(View):
             if cnf.track.value is model[0]:
                 tasks += ('task',)
 
-            try:
-                inst = next(next(ctrl.tasks(...)))
-            except StopIteration:
+            inst = next(ctrl.tasks(...), None)
+            if inst is not None:
+                inst = next(iter(inst), None)
+
+            if inst is None:
                 del cnf[tasks]
             else:
                 cnf.items = {i: inst for i in tasks}
