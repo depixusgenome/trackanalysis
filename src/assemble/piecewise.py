@@ -60,7 +60,7 @@ class PieceAssemble:
                                                         for oli in self.oligos],nscale=1)[1]
         if __debug__:
             pickle.dump(groupedids,open("groupedids.pickle","wb"))
-        all_kperms = [] # kperms which reconstruct the sequence
+        #all_kperms = [] # kperms which reconstruct the sequence
         # compute for the first group then correct as we had more to it
         all_kperms = self.find_kperms(groupedids[0])
 
@@ -76,7 +76,10 @@ class PieceAssemble:
                 pickle.dump(partitions,open("afterpartitions"+str(groupid)+".pickle","wb"))
                 #print("after len of partitions=",[len(i) for i in partitions])
 
-            add_kperms=[i for i in self.find_kperms(group) if i.domain-set(groupedids[groupid])]
+            # next command line is too restrictive in some cases..
+            #add_kperms=[i for i in self.find_kperms(group) if i.domain-set(groupedids[groupid])]
+            # should include a test to discard already test kperms using set().intersection()
+            add_kperms=self.find_kperms(group)
             print("len(add_kperms)=",len(add_kperms))
             if len(add_kperms)==0:
                 continue
@@ -109,8 +112,10 @@ class PieceAssemble:
             # still too slow  for large prec
             #min_overlaps=by_noverlaps[int(0.1*len(partitions))+1][0]
             #min_overlaps=by_noverlaps[-1][0] # test, keeps all
-            #min_overlaps=by_noverlaps[0][0] # test, keeps best noverlaps
-            min_overlaps=sorted(set(i[0] for i in by_noverlaps),reverse=True)[3]
+            min_overlaps=by_noverlaps[0][0] # test, keeps best noverlaps
+            print("set of noverlaps=",sorted(set(i[0] for i in by_noverlaps),reverse=True))
+            # need to formalise the next line
+            #min_overlaps=sorted(set(i[0] for i in by_noverlaps),reverse=True)[1]
 
             bestooverl=[rkd for idx,rkd in enumerate(by_noverlaps) if rkd[0]>=min_overlaps]
 
@@ -123,16 +128,9 @@ class PieceAssemble:
             keepbest=list(ranked_partitions) # test
 
             partitions=[rkd[2] for rkd in keepbest]
-            # if assembling of the partition is greater than the horizon
-            # we can merge kperms which are in the same patitions beyond the horizon!
-            # as soon as some kperms
-            # add the kpermutations
-            all_kperms+=add_kperms
 
-            # rank combined kperms
 
-        #partitions=self.find_kpermpartitions(all_kperms)
-        return partitions,[data.OligoPerm.add(*part) for part in partitions]
+        return partitions,[data.OligoPerm.add(*part) for part in partitions],ranked_partitions
 
 
     # tocheck
@@ -186,7 +184,7 @@ class PieceAssemble:
 
     # needs testing
     def add2partitions(self,partitions1,partitions2):
-        u'testing new (faster) implementation'
+        u'new (faster) implementation'
         addedpartitions=[]
         for part2 in partitions2:
             modified_dom=set()
