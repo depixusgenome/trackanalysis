@@ -15,7 +15,9 @@ import assemble._utils as utils
 # should define a Partition class as a container for List[data.OligoPerm]
 # with fix_horizon(group), add2partitions as methods
 
-#  for code which needs improvements : see comments  # must be improved
+# two things to change: the fix_horizon cdt on all(i <group for i in kperm.domain)
+# keep noverlaps max -1 and -2 ?
+# for code which needs improvements : see comments  # must be improved
 class QOli:
     u'small class to combine to find kperms of OligoPeaks'
     def __init__(self,**kwa):
@@ -65,14 +67,14 @@ class PieceAssemble:
         partitions=[[kperm] for kperm in all_kperms]
         for groupid,group in enumerate(groupedids[1:]):
             if __debug__:
-                print("groupid=",groupid)
-                print("before len of partitions=",[len(i) for i in partitions])
+                print("groupid="+str(groupid)+" out of "+str(len(groupedids[1:])))
+                #print("before len of partitions=",[len(i) for i in partitions])
                 pickle.dump(partitions,open("beforepartitions"+str(groupid)+".pickle","wb"))
             # check that fix_horizon works properly
             partitions=self.fix_horizon(partitions,group)
             if __debug__:
                 pickle.dump(partitions,open("afterpartitions"+str(groupid)+".pickle","wb"))
-                print("after len of partitions=",[len(i) for i in partitions])
+                #print("after len of partitions=",[len(i) for i in partitions])
 
             add_kperms=[i for i in self.find_kperms(group) if i.domain-set(groupedids[groupid])]
             print("len(add_kperms)=",len(add_kperms))
@@ -89,12 +91,12 @@ class PieceAssemble:
 
             # compute the scores to each partitions
             partitions=self.add2partitions(partitions,[[kpr] for kpr in add_kperms])
-            print("len(partitions)=",len(partitions))
+            print("before reduce len(partitions)=",len(partitions))
             if __debug__:
                 pickle.dump(partitions,open("addedpartitions"+str(groupid)+".pickle","wb"))
 
             partitions=self.reduce_partitions(partitions)
-            print("len(partitions)=",len(partitions))
+            print("before reduce len(partitions)=",len(partitions))
             # keep the ones with max noverlaps or
             # noverlaps such that 10% of the best according to noverlaps
             # discards the worst, keep the ones with max overlaps + the 10% best ones
@@ -106,8 +108,9 @@ class PieceAssemble:
                 print(len(by_noverlaps))
             # still too slow  for large prec
             #min_overlaps=by_noverlaps[int(0.1*len(partitions))+1][0]
-            min_overlaps=by_noverlaps[-1][0] # test
-            #min_overlaps=by_noverlaps[0][0] # test
+            #min_overlaps=by_noverlaps[-1][0] # test, keeps all
+            #min_overlaps=by_noverlaps[0][0] # test, keeps best noverlaps
+            min_overlaps=sorted(set(i[0] for i in by_noverlaps),reverse=True)[3]
 
             bestooverl=[rkd for idx,rkd in enumerate(by_noverlaps) if rkd[0]>=min_overlaps]
 
@@ -118,6 +121,7 @@ class PieceAssemble:
             #          if rkd[0]==max_overlaps
             #          or idx<0.1*len(partitions)]
             keepbest=list(ranked_partitions) # test
+
             partitions=[rkd[2] for rkd in keepbest]
             # if assembling of the partition is greater than the horizon
             # we can merge kperms which are in the same patitions beyond the horizon!
@@ -156,62 +160,16 @@ class PieceAssemble:
         return reduced
 
     # could be improved
-    def add2partitions(self,
-                       partitions1:List[List[data.OligoKPerm]],
-                       partitions2:List[List[data.OligoKPerm]])->List[List[data.OligoKPerm]]:
+    def old_add2partitions(self,
+                           partitions1:List[List[data.OligoKPerm]],
+                           partitions2:List[List[data.OligoKPerm]])->List[List[data.OligoKPerm]]:
         u'''
         adds 2 partitions together
         can combine any partition in part1 with any in part2
         but cannot combine kperms belonging to the same partition
-
-        # before, wrong
-        result=[]
-        for part1 in partitions1:
-            kperms1=[kpr for kpr in part1 if kpr.domain]
-            set1=set()
-            for kpr in kperms1:
-                set1.update(kpr.domain)
-            for part2 in partitions2:
-                kperms2=[kpr for kpr in part2 if kpr.domain]
-                set2=set()
-                for kpr in kperms2:
-                    set2.update(kpr.domain)
-                # if all independant, add to result
-                if not set1.intersection(set2):
-                    result.append(part1+part2)
-
-        # then tried...
-        # to add a kperm to an existing partition
-        # check if the kperm intersects with any kperm in partition
-        # if no, append the kperm to the partition
-        # else, collect intersecting kperms find partitions of collected kperms
-        # and replace into the partitions
-        combined=[]
-        for part1 in partitions1:
-            print("part1")
-            #kperms1=[kpr for kpr in part1 if kpr.domain]
-            for part2 in partitions2:
-                print("part2")
-                topartition=[]
-                rmkpr1=[]
-                # add to partition if intersect or domain==set()
-                for kpr1,kpr2 in itertools.product(part1,part2):
-                    if kpr1.domain.intersection(kpr2.domain):
-                        topartition.extend([kpr1,kpr2])
-                        rmkpr1.append(kpr1)
-                print("len(topartition)=",len(topartition))
-                for kpr1 in part1:
-                    print(kpr1.kpermids)
-                for kpr2 in part2:
-                    print(kpr2.kpermids)
-                if len(topartition)>0:
-                    core=[kpr for kpr in part1 if not kpr in rmkpr1]
-                    print("len(core)=",len(core))
-                    patches=self.find_kpermpartitions(list(set(topartition)))
-                    combined.extend([core+patch for patch in patches])
-                else:
-                    combined.extend([part1+part2])
-        return combined
+        # pb with this implementation :
+        # slow
+        # reconsiders partitions which may have been discarded
         '''
         # can be modified to reduce calculations
         # works but slow
@@ -225,6 +183,23 @@ class PieceAssemble:
             pickle.dump(kperms1,open("kperms1.pickle","wb"))
             pickle.dump(kperms2,open("kperms2.pickle","wb"))
         return self.find_kpermpartitions(list(kperms1)+list(kperms2))
+
+    # needs testing
+    def add2partitions(self,partitions1,partitions2):
+        u'testing new (faster) implementation'
+        addedpartitions=[]
+        for part2 in partitions2:
+            modified_dom=set()
+            for kpr in part2:
+                modified_dom.update(kpr.domain)
+            for part1 in partitions1:
+                tocombine=[kpr for kpr in part1 if kpr.domain.intersection(modified_dom)]
+                tocombine+=part2
+                fixed=[kpr for kpr in part1 if not kpr.domain.intersection(modified_dom)]
+                combined=self.find_kpermpartitions(tocombine)
+                for comb in combined:
+                    addedpartitions.append(fixed+comb)
+        return addedpartitions
 
     def rank_partitions(self,partitions):
         u'''
@@ -283,12 +258,14 @@ class PieceAssemble:
                     partitions:List[List[data.OligoPerm]],
                     group:Tuple[int, ...])->List[List[data.OligoPerm]]:
         u'horizon is the ensemble of kperms which cannot modify by any subsequent combination'
-        horizon=set(group)
+        horizon=min(group) # set(group)
         for partid,part in enumerate(partitions):
             if len(part)==1:
                 continue
+            #to_fix=[(idx,kpr) for idx,kpr in enumerate(part)
+            #        if not kpr.domain.intersection(horizon)]
             to_fix=[(idx,kpr) for idx,kpr in enumerate(part)
-                    if not kpr.domain.intersection(horizon)]
+                    if all(i<horizon for i in  kpr.domain)]
             if len(to_fix)==0:
                 continue
             merged=data.OligoPerm.add(*[fix[1] for fix in to_fix])
@@ -365,7 +342,7 @@ class PieceAssemble:
         if seeds==[]:
             seeds=[kperms[0]]+[kpr for kpr in kperms[1:]
                                if kpr.domain.intersection(kperms[0].domain)]
-        print("seeds=",seeds)
+        #print("seeds=",seeds)
         for seed in seeds:
             no_inter=[kpr for kpr in kperms
                       if not kpr in seeds
