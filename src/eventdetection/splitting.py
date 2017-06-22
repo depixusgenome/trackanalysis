@@ -98,9 +98,9 @@ class IntervalExtensionAroundMean(IntervalExtension):
             |   X
             |              △
             |
-            |     ⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯      
+            |     ⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯
             |                 △
-            |     ☺ 
+            |     ☺
             |     ⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯
             |
             |           △
@@ -139,7 +139,7 @@ class IntervalExtensionAroundRange(IntervalExtension):
             |
             |
             |                   △
-            |     ☺ 
+            |     ☺
             |
             |     ⋯⋯⋯⋯⋯ △
             |

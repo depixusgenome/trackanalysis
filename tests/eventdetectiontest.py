@@ -6,7 +6,8 @@ import numpy  as np
 from   numpy.testing          import assert_allclose
 from model                    import PHASE
 from eventdetection.detection import DerivateSplitDetector, EventMerger, EventSelector
-from eventdetection.splitting import MinMaxSplitDetector
+from eventdetection.splitting import (MinMaxSplitDetector, IntervalExtensionAroundMean,
+                                      IntervalExtensionAroundRange)
 from eventdetection.alignment import (ExtremumAlignment, CorrelationAlignment,
                                       PhaseEdgeAlignment)
 from eventdetection.processor import ExtremumAlignmentProcessor, AlignmentTactic
@@ -44,7 +45,7 @@ def test_detectsplits():
 
 def test_minmaxsplitdetector():
     "Tests flat stretches detection"
-    for i in range(3,4):
+    for i in (1,3):
         inst  = MinMaxSplitDetector(precision  = 1.,
                                     confidence = 0.1,
                                     window     = i)
@@ -72,6 +73,35 @@ def test_minmaxsplitdetector():
         items[21:] -= thr
         items[[0, 10, 25, 29]] = np.nan
         assert det(items) == ((0, 11), (11,20), (21,30))
+
+def test_intervalextension():
+    "test interval extension"
+    rngs = np.array([[0, 5], [7, 9], [20, 25]])
+    data = np.ones(30, dtype = 'f4')
+    data[7:]  += 5.
+    data[9:]  += 5.
+    data[15:] += 5.
+    data[26:] += 5.
+    data[[17,19]] += 5.
+    data[27]  -= 5.
+
+    vals = IntervalExtensionAroundMean.extend(rngs, data, 1.1, 3)
+    assert_allclose(vals, [[0,7],[7,9],[18,28]])
+
+    rngs = np.array([[0, 5], [7, 9], [20, 25]])
+    vals = IntervalExtensionAroundRange.extend(rngs, data, 1.1, 3)
+    assert_allclose(vals, [[0,7],[7,9],[18,28]])
+
+    data[17]  -= 3.
+    data[22]  += 2.
+
+    rngs = np.array([[0, 5], [7, 9], [20, 25]])
+    vals = IntervalExtensionAroundMean.extend(rngs, data, 1.1, 3)
+    assert_allclose(vals, [[0,7],[7,9],[18,28]])
+
+    rngs = np.array([[0, 5], [7, 9], [20, 25]])
+    vals = IntervalExtensionAroundRange.extend(rngs, data, 1.1, 3)
+    assert_allclose(vals, [[0,7],[7,9],[17,28]])
 
 def _merges(oneperrange):
     "Tests flat stretches merging"
@@ -251,4 +281,4 @@ def test_precision():
     assert list(np.nonzero(found-sim-1)[0]) == []
 
 if __name__ == '__main__':
-    test_minmaxsplitdetector()
+    test_intervalextension()
