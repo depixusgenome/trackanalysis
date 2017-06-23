@@ -15,6 +15,7 @@ from control.taskio       import TaskIO
 from model.task           import DataSelectionTask
 from .dialog              import FileDialog
 from .base                import BokehView, threadmethod, spawn, Action
+from .static              import ROUTE
 
 STORAGE = 'open', 'save'
 class TrackFileDialog(FileDialog):
@@ -111,6 +112,7 @@ class SaveFileDialog(FileDialog):
 
 class DpxToolbar(LayoutDOM):
     "Toolbar model"
+    __css__            = ROUTE+"/view.css"
     __implementation__ = 'toolbar.coffee'
     open      = props.Int(0)
     save      = props.Int(0)

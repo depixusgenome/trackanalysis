@@ -1,0 +1,61 @@
+/* GRIDDING */
+.dpx-row::after {
+    content: "";
+    clear: both;
+    display: table;
+}
+
+/* For mobile phones: */
+[class*="dpx-col-"] {
+    width: 100%;
+}
+
+@media only screen and (min-width: 600px) {
+    /* For tablets: */
+    .dpx-col-m-1 {width: 8.33%;}
+    .dpx-col-m-2 {width: 16.66%;}
+    .dpx-col-m-3 {width: 25%;}
+    .dpx-col-m-4 {width: 33.33%;}
+    .dpx-col-m-5 {width: 41.66%;}
+    .dpx-col-m-6 {width: 50%;}
+    .dpx-col-m-7 {width: 58.33%;}
+    .dpx-col-m-8 {width: 66.66%;}
+    .dpx-col-m-9 {width: 75%;}
+    .dpx-col-m-10 {width: 83.33%;}
+    .dpx-col-m-11 {width: 91.66%;}
+    .dpx-col-m-12 {width: 100%;}
+}
+
+@media only screen and (min-width: 768px) {
+    /* For desktop: */
+    .dpx-col-1 {width: 8.33%;}
+    .dpx-col-2 {width: 16.66%;}
+    .dpx-col-3 {width: 25%;}
+    .dpx-col-4 {width: 33.33%;}
+    .dpx-col-5 {width: 41.66%;}
+    .dpx-col-6 {width: 50%;}
+    .dpx-col-7 {width: 58.33%;}
+    .dpx-col-8 {width: 66.66%;}
+    .dpx-col-9 {width: 75%;}
+    .dpx-col-10 {width: 83.33%;}
+    .dpx-col-11 {width: 91.66%;}
+    .dpx-col-12 {width: 100%;}
+} 
+
+/* the toolbar */
+#dpxtbbead    { width: 40px; height: 28px}
+#dpx-tb-discard { width: 60px; height: 28px}
+#dpx-tb-message {
+    margin-right: 5px;
+    margin-left: 5px;
+    align-self: center; 
+    width:auto; 
+    height: 28px;
+}
+#dpx-tb-quit { width: 60px; align-self: right; }
+
+.dpx-inner      { display: inline-block; }
+.dpx-tb label   { margin-left: 9px; margin-top: 3px; margin-right: 3px; }
+.dpx-tb span    { display: -webkit-inline-box; }
+.dpx-tb input   { height: 28px; }
+

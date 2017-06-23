@@ -28,7 +28,7 @@ from .scripting                 import INITIAL_ORDERS
 
 LOGS           = getLogger(__name__)
 DEFAULT_CONFIG = lambda x: None
-DYN_LOADS      = ('modaldialog',) # type: Tuple[str,...]
+DYN_LOADS      = ('modaldialog', 'view') # type: Tuple[str,...]
 
 def _serverkwargs(kwa):
     kwargs                         = dict(kwa)

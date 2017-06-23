@@ -10,7 +10,7 @@ from  .modal        import DpxModal, ROUTE
 def server(kwa):
     "adds a router to the server"
     router = ("/%s/(.*)" % ROUTE, StaticFileHandler, { "path" : "static" })
-    kwa['extra_patterns'] = [router]
+    kwa.setdefault('extra_patterns', []).append(router)
 
 def document(doc):
     "adds the DpxModal to this doc"
