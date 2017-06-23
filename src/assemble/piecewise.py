@@ -4,7 +4,7 @@
 u'class for oligo assemby'
 import pickle
 import itertools
-from typing import List, Tuple
+from typing import List, Tuple, Dict # pylint: disable=unused-import
 
 from utils import initdefaults
 import assemble.processor as processor
@@ -27,6 +27,11 @@ class QOli:
     def __add__(self,other):
         return QOli(seq=self.seq+other.seq,idxs=self.idxs+other.idxs)
 
+# need to call generators as often as possible
+# find a better way to compute the kperms
+# can add each additionnal kperm at a time and keep only those that are not already represented
+# then compute rank  and discard the other ones
+# do not reconsider kperms already tested with add_kperms
 class PieceAssemble:
     u'''
     much faster version of assembler
@@ -60,25 +65,30 @@ class PieceAssemble:
                                                         for oli in self.oligos],nscale=1)[1]
         if __debug__:
             pickle.dump(groupedids,open("groupedids.pickle","wb"))
-        #all_kperms = [] # kperms which reconstruct the sequence
+
         # compute for the first group then correct as we had more to it
         all_kperms = self.find_kperms(groupedids[0])
+        # reduce the number of kperms
+        # keep the best
 
         partitions=[[kperm] for kperm in all_kperms]
+        # need to add more structure, call method to reduce the number of partitions
+        by_noverlaps=self.rank_byoverlaps(partitions)
+        min_overlaps=sorted(set(i[0] for i in by_noverlaps),reverse=True)[0]
+        bestooverl=[rkd for idx,rkd in enumerate(by_noverlaps) if rkd[0]>=min_overlaps]
+        partitions=[rkd[1] for rkd in bestooverl]
+
         for groupid,group in enumerate(groupedids[1:]):
             if __debug__:
                 print("groupid="+str(groupid)+" out of "+str(len(groupedids[1:])))
-                #print("before len of partitions=",[len(i) for i in partitions])
                 pickle.dump(partitions,open("beforepartitions"+str(groupid)+".pickle","wb"))
             # check that fix_horizon works properly
             partitions=self.fix_horizon(partitions,group)
             if __debug__:
                 pickle.dump(partitions,open("afterpartitions"+str(groupid)+".pickle","wb"))
-                #print("after len of partitions=",[len(i) for i in partitions])
 
-            # next command line is too restrictive in some cases..
-            #add_kperms=[i for i in self.find_kperms(group) if i.domain-set(groupedids[groupid])]
             # should include a test to discard already test kperms using set().intersection()
+            # can generate the kperms sequentially
             add_kperms=self.find_kperms(group)
             print("len(add_kperms)=",len(add_kperms))
             if len(add_kperms)==0:
@@ -89,8 +99,8 @@ class PieceAssemble:
                 pickle.dump(all_kperms,open("all_kperms"+str(groupid)+".pickle","wb"))
 
             # for each kperm in add kperms look if they present a better match than previous ones
-            # filter out the others
-            # can be optimized but basically compute the partitions
+
+            # can add kperms in add_kperms sequentially and keep the best
 
             # compute the scores to each partitions
             partitions=self.add2partitions(partitions,[[kpr] for kpr in add_kperms])
@@ -109,23 +119,17 @@ class PieceAssemble:
             if __debug__:
                 print("consider keeping 10% best including pdfcost, from")
                 print(len(by_noverlaps))
-            # still too slow  for large prec
+            # still too slow for large prec
             #min_overlaps=by_noverlaps[int(0.1*len(partitions))+1][0]
-            #min_overlaps=by_noverlaps[-1][0] # test, keeps all
-            min_overlaps=by_noverlaps[0][0] # test, keeps best noverlaps
             print("set of noverlaps=",sorted(set(i[0] for i in by_noverlaps),reverse=True))
             # need to formalise the next line
-            #min_overlaps=sorted(set(i[0] for i in by_noverlaps),reverse=True)[1]
+            min_overlaps=sorted(set(i[0] for i in by_noverlaps),reverse=True)[0]
 
             bestooverl=[rkd for idx,rkd in enumerate(by_noverlaps) if rkd[0]>=min_overlaps]
 
             ranked_partitions=self.rank_partitions([i[1] for i in bestooverl])
 
-            #max_overlaps=max([rkpart[0] for rkpart in ranked_partitions])
-            #keepbest=[rkd for idx,rkd in enumerate(ranked_partitions)
-            #          if rkd[0]==max_overlaps
-            #          or idx<0.1*len(partitions)]
-            keepbest=list(ranked_partitions) # test
+            keepbest=list(ranked_partitions)
 
             partitions=[rkd[2] for rkd in keepbest]
 
@@ -135,16 +139,20 @@ class PieceAssemble:
 
     # tocheck
     #pylint: disable=no-self-use
-    def reduce_partitions(self,partitions:List[List[data.OligoPerm]])->List[List[data.OligoPerm]]:
+    def oldreduce_partitions(self,
+                             partitions:List[List[data.OligoPerm]])->List[List[data.OligoPerm]]:
         u'''
-        if two partitions result in the same permids, keep the one with
+        if two partitions result in the same permids, keep the one with smallest domain
         '''
+        # before
         merged=[data.OligoPerm.add(*part) for part in partitions]
+        print("merged done")
         smerged=sorted([(tuple(val.permids),
                          tuple(sorted(val.domain)),
                          partitions[idx])
                         for idx,val in enumerate(merged)],
                        key=lambda x: x[0])
+        print("smerged done")
         reduced=[]
         for grp in itertools.groupby(smerged,key=lambda x:x[0]):
             consider=list(grp[1])
@@ -157,30 +165,31 @@ class PieceAssemble:
                 reduced.append([i[2] for i in consider if i[1]==tkp][0])
         return reduced
 
-    # could be improved
-    def old_add2partitions(self,
-                           partitions1:List[List[data.OligoKPerm]],
-                           partitions2:List[List[data.OligoKPerm]])->List[List[data.OligoKPerm]]:
-        u'''
-        adds 2 partitions together
-        can combine any partition in part1 with any in part2
-        but cannot combine kperms belonging to the same partition
-        # pb with this implementation :
-        # slow
-        # reconsiders partitions which may have been discarded
-        '''
-        # can be modified to reduce calculations
-        # works but slow
-        kperms1=set()
-        for part1 in partitions1:
-            kperms1.update(part1)
-        kperms2=set()
-        for part2 in partitions2:
-            kperms2.update(part2)
-        if __debug__:
-            pickle.dump(kperms1,open("kperms1.pickle","wb"))
-            pickle.dump(kperms2,open("kperms2.pickle","wb"))
-        return self.find_kpermpartitions(list(kperms1)+list(kperms2))
+    def reduce_partitions(self,
+                          partitions:List[List[data.OligoPerm]])->List[List[data.OligoPerm]]:
+        u'reduce mem overload'
+        all_merged=dict() # type: Dict[Tuple[int,...],List[data.OligoPerm]]
+        for part in partitions:
+            #print(idx)
+            merged=data.OligoPerm.add(*part)
+            try:
+                cmp_with=all_merged[tuple(merged.permids)]
+                dealt=False
+                for oidx,opart in enumerate(cmp_with):
+                    if opart[0]<=merged.domain:
+                        # less constrained was already found
+                        dealt=True
+                        break
+                    if opart[0]>merged.domain:
+                        # replace with less constrained partition
+                        all_merged[tuple(merged.permids)][oidx]=(merged,part)
+                        dealt=True
+                        break
+                if not dealt:
+                    all_merged[tuple(merged.permids)].append((merged.domain,part))
+            except KeyError:
+                all_merged[tuple(merged.permids)]=[(merged.domain,part)]
+        return [mpart[1] for value in all_merged.values() for mpart in value]
 
     # needs testing
     def add2partitions(self,partitions1,partitions2):

@@ -242,16 +242,29 @@ class RequireOverlapFilter:
         self.oligos=oligos
         self.min_ooverl=min_ooverl
 
+    # to check: needs to check both sides of conflicted oligos
     def __call__(self,permids:List[int]):
         u'''
         permids are the indices of the oligos
-        '''
         for idx,val in enumerate(permids[1:]):
             if permids[idx]>val:
                 if len(data.OligoPeak.tail_overlap(
                         self.oligos[permids[idx]].seq,
                         self.oligos[val].seq))<self.min_ooverl:
                     return False
+        '''
+        for idx,val in enumerate(permids[1:]):
+            if permids[idx]>val:
+                if len(data.OligoPeak.tail_overlap(
+                        self.oligos[permids[idx]].seq,
+                        self.oligos[val].seq))<self.min_ooverl:
+                    if idx==0:
+                        return False # or continue?
+                    if len(data.OligoPeak.tail_overlap(
+                            self.oligos[permids[idx-1]].seq,
+                            self.oligos[permids[idx]].seq))<self.min_ooverl:
+                        return False
+
         return True
 
 
