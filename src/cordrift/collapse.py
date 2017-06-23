@@ -78,29 +78,50 @@ class CollapseToMean(_CollapseAlg):
 
     The collapse starts from the right-most interval and moves left.
     """
+    weight  = None # type: Optional[str]
     measure = 'mean'
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
+    @staticmethod
+    def __chisquare(vals):
+        fin  = np.isfinite(vals)
+        if any(fin):
+            vals = vals[np.isfinite(vals)]
+
+        if len(vals) <= 5:
+            return 1e-3
+
+        chis = vals-vals.mean()
+        chis*= chis
+        val  = chis.sum()/(len(chis)-1.)
+        return 1./max(val, 1e3)
+
     def _run(self, inter:Sequence[Range], prof:Profile) -> Profile:
-        key   = lambda i: (-i.start-len(i.values), -len(i.values))
-        cnt   = np.copy(prof.count)
-        edge  = self._edge
-        inner = slice(edge, None if edge is None else -edge)
-        diff  = getattr(np, self.measure)
+        key    = lambda i: (-i.start-len(i.values), -len(i.values))
+        cnt    = np.array(prof.count, dtype = 'f4')
+        edge   = self._edge
+        inner  = slice(edge, None if edge is None else -edge)
+        diff   = getattr(np, self.measure)
+        weight = ((lambda _:1)              if self.weight is None        else
+                  getattr(np, self.weight)  if self.weight != 'chisquare' else
+                  self.__chisquare)
         for inds, cur in _iter_ranges(prof.xmin, sorted(inter, key = key)):
             rho                      = cnt[inds]*1.
             vals                     = prof.value[inds]
 
             if any(rho):
                 cur                 += diff((vals-cur)[rho>0])
-                rho                 /= rho+1.
+                wcur                 = weight(cur)
+                rho                 /= rho+wcur
                 prof.value[inds]     = rho*vals + (1.-rho)*cur
             else:
-                prof.value[inds]     = cur - diff(cur)
+                cur                 -= diff(cur)
+                wcur                 = weight(cur)
+                prof.value[inds]     = cur*wcur
 
-            cnt       [inds]        += 1
+            cnt       [inds]        += wcur
             prof.count[inds[inner]] += 1
 
         if callable(self.filter):
