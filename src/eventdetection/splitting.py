@@ -2,10 +2,12 @@
 # -*- coding: utf-8 -*-
 "Interval detection: splitting the trace into flat events"
 
-from    typing import Optional, Union, Callable # pylint: disable=unused-import
+from    typing import (Optional, # pylint: disable=unused-import
+                       Tuple, Union, Callable)
 
 import  numpy as np
 from    numpy.lib.stride_tricks import as_strided
+from    scipy.ndimage.filters   import correlate1d
 
 from    utils        import initdefaults
 from    signalfilter import samples as _samples, PrecisionAlg
@@ -168,8 +170,8 @@ class BaseSplitDetector(PrecisionAlg):
     The precision is either provided or measured. In the latter case,
     the estimation used is the median-deviation of the derivate of the data.
     """
-    window = 3
-    extend = IntervalExtensionAroundRange() # type: Optional[IntervalExtension]
+    window  = 3
+    extend  = IntervalExtensionAroundRange() # type: Optional[IntervalExtension]
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -222,20 +224,12 @@ class BaseSplitDetector(PrecisionAlg):
         "instantiates and calls class"
         return cls(**kwa)(data)
 
-    def _deltas(self, data : np.ndarray) -> np.ndarray:
-        "all deltas"
-        window = self.window
-        kern   = np.ones((window*2,))
-        kern[-window:] = -1.
-
-        delta           = np.convolve(data, kern, mode = 'same')
-        delta[:window] -= np.arange(window+1)[-1:0:-1] * data[0]
-        if window > 1:
-            delta[1-window:] += np.arange(window)[1:] * data[-1]
-        return np.abs(delta)/self.window
-
     def _precision(self, data:np.ndarray, _:np.ndarray, precision:Optional[float]) -> float:
         return self.getprecision(precision, data)
+
+    def _deltas(self, data : np.ndarray) -> np.ndarray:
+        "all deltas"
+        raise NotImplementedError()
 
     def _threshold(self, data:np.ndarray, deltas:np.ndarray, precision:float) -> np.ndarray:
         raise NotImplementedError()
@@ -243,7 +237,7 @@ class BaseSplitDetector(PrecisionAlg):
 class MedianThreshold:
     "A threshold relying on the deltas"
     percentile = 75.
-    distance   = 3.
+    distance   = 2.
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -262,10 +256,13 @@ class DerivateSplitDetector(BaseSplitDetector):
     The precision is either provided or measured. In the latter case,
     the estimation used is the median-deviation of the derivate of the data.
     """
+    shape      = 'square'
+    truncate   = 4
     confidence = MedianThreshold() # type: Union[None, float, MedianThreshold]
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
+        self._kernel = None # type: Optional[Tuple[Tuple[int, int, str], np.ndarray]]
 
     def _precision(self,
                    data     :np.ndarray,
@@ -275,6 +272,27 @@ class DerivateSplitDetector(BaseSplitDetector):
         if self.precision == 'deltas':
             return np.median(np.abs(deltas-np.median(deltas)))
         return self.getprecision(precision, data)
+
+    def _deltas(self, data : np.ndarray) -> np.ndarray:
+        "all deltas"
+        window = self.window
+        if self._kernel is None or self._kernel[0] != (window, self.truncate, self.shape):
+            if self.shape == 'square':
+                kern   = np.ones((window*2,), dtype = 'f4')
+                kern[-window:] = -1.
+                kern  /= self.window
+            elif self.shape == 'gaussian':
+                kern  = np.linspace(-self.truncate, self.truncate,
+                                    window*self.truncate*2+1, dtype = 'f4')
+                kern *= -np.exp(-kern**2/2.)
+                kern /= abs(kern[:len(kern)//2+1].sum())
+            else:
+                raise KeyError(self.shape+' is unknown in DerivateSplitDetector')
+            self._kernel = (window, self.truncate, self.shape), kern
+        else:
+            kern = self._kernel[1]
+        delta = correlate1d(data, kern, mode = 'nearest')
+        return np.abs(delta)
 
     def _threshold(self, data:np.ndarray, deltas:np.ndarray, precision:float) -> np.ndarray:
         "the threshold applied to alphas"
