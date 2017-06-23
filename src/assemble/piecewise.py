@@ -100,7 +100,9 @@ class PieceAssemble:
 
             # for each kperm in add kperms look if they present a better match than previous ones
 
-            # can add kperms in add_kperms sequentially and keep the best
+            # can add kperms in add_kperms sequentially
+            # and remove duplicated partitions sequentially
+            # (and keep the best ??)
 
             # compute the scores to each partitions
             partitions=self.add2partitions(partitions,[[kpr] for kpr in add_kperms])
@@ -144,12 +146,12 @@ class PieceAssemble:
         could test using set(object with hash from permids, domain and __eq__ if domain is the same)
         before keeping partitions with smaller domains
         '''
-        all_merged=dict() # type: Dict[Tuple[int,...],List[data.OligoPerm]]
+        all_merged=dict() # type: Dict[int,List[data.OligoPerm]]
         for part in partitions:
             #print(idx)
             merged=data.OligoPerm.add(*part)
             try:
-                cmp_with=all_merged[tuple(merged.permids)]
+                cmp_with=all_merged[hash(merged.permids.tobytes())]
                 dealt=False
                 for oidx,opart in enumerate(cmp_with):
                     if opart[0]<=merged.domain:
@@ -158,13 +160,13 @@ class PieceAssemble:
                         break
                     if opart[0]>merged.domain:
                         # replace with less constrained partition
-                        all_merged[tuple(merged.permids)][oidx]=(merged,part)
+                        all_merged[hash(merged.permids.tobytes())][oidx]=(merged,part)
                         dealt=True
                         break
                 if not dealt:
-                    all_merged[tuple(merged.permids)].append((merged.domain,part))
+                    all_merged[hash(merged.permids.tobytes())]+=[(merged.domain,part)]
             except KeyError:
-                all_merged[tuple(merged.permids)]=[(merged.domain,part)]
+                all_merged[hash(merged.permids.tobytes())]=[(merged.domain,part)]
         return [mpart[1] for value in all_merged.values() for mpart in value]
 
     # needs testing
