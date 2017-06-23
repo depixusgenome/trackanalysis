@@ -136,38 +136,14 @@ class PieceAssemble:
 
         return partitions,[data.OligoPerm.add(*part) for part in partitions],ranked_partitions
 
-
-    # tocheck
     #pylint: disable=no-self-use
-    def oldreduce_partitions(self,
-                             partitions:List[List[data.OligoPerm]])->List[List[data.OligoPerm]]:
-        u'''
-        if two partitions result in the same permids, keep the one with smallest domain
-        '''
-        # before
-        merged=[data.OligoPerm.add(*part) for part in partitions]
-        print("merged done")
-        smerged=sorted([(tuple(val.permids),
-                         tuple(sorted(val.domain)),
-                         partitions[idx])
-                        for idx,val in enumerate(merged)],
-                       key=lambda x: x[0])
-        print("smerged done")
-        reduced=[]
-        for grp in itertools.groupby(smerged,key=lambda x:x[0]):
-            consider=list(grp[1])
-            domains=set(i[1] for i in consider)
-            tokeep=[]
-            for dom in domains:
-                if not any(set(i) < set(dom) for i in domains):
-                    tokeep.append(dom)
-            for tkp in tokeep:
-                reduced.append([i[2] for i in consider if i[1]==tkp][0])
-        return reduced
-
     def reduce_partitions(self,
                           partitions:List[List[data.OligoPerm]])->List[List[data.OligoPerm]]:
-        u'reduce mem overload'
+        u'''
+        if two partitions result in the same permids, keep the one with smallest domain
+        could test using set(object with hash from permids, domain and __eq__ if domain is the same)
+        before keeping partitions with smaller domains
+        '''
         all_merged=dict() # type: Dict[Tuple[int,...],List[data.OligoPerm]]
         for part in partitions:
             #print(idx)
