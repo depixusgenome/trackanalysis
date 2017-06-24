@@ -54,22 +54,21 @@ export class DpxToolbarView extends LayoutDOMView
         else
             quit =''
 
-        html = "<div class='dpx-row dpx-tb'>"+
-                    "<span class='dpx-col-8'>"+
-                        "#{@make_btn('open', 'Open', '')}"+
-                        "#{@make_btn('save', 'Save')}"+
-                        "<label>Bead</label>"+
-                        "<input id='dpx-tb-bead'"+
-                            " class='dpx-tb-freeze bk-widget-form-input'"+
-                            " type='number' min=0  max=10000 step=1  value=#{mdl.bead}>"+
-                        "<label>Discarded</label>"+
-                        "<input id='dpx-tb-discard'"+
-                            " class='dpx-tb-freeze bk-widget-form-input'"+
-                            " type='text' value=#{mdl.discarded}>"+
-                        "#{@make_btn('del', '━', true)}</span>"+
-                    "<span id='dpx-tb-message' class='bk-markup dpx-col10'>"+
-                        "#{mdl.message}</span>"+
-                    "#{quit}</div>"
+        html = "<div class='dpx-row dpx-tb'><span>"+
+                    "#{@make_btn('open', 'Open', '')}"+
+                    "#{@make_btn('save', 'Save')}"+
+                    "<label>Bead</label>"+
+                    "<input id='dpx-tb-bead'"+
+                        " class='dpx-tb-freeze bk-widget-form-input'"+
+                        " type='number' min=0  max=10000 step=1  value=#{mdl.bead}>"+
+                    "<label>Discarded</label>"+
+                    "<input id='dpx-tb-discard'"+
+                        " class='dpx-tb-freeze bk-widget-form-input'"+
+                        " type='text' value=#{mdl.discarded}>"+
+                    "#{@make_btn('del', '━', true)}"+
+                    "<div id='dpx-tb-message' class='bk-markup'>"+
+                        "#{mdl.message}</div>"+
+                    "#{quit}</span></div>"
 
         elem = $(@el)
         elem.html(html)
