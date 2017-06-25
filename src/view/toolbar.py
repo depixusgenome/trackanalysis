@@ -283,6 +283,7 @@ class RejectedBeadsInput(BeadView):
     def __init__(self, **kwa):
         super().__init__(**kwa)
         self.__toolbar = None
+        self._ctrl.getGlobal('config').keypress.defaults = {'delbead': 'Shift-Delete'}
 
     def setup(self, toolbar):
         "sets-up the gui"
@@ -352,7 +353,7 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         cnf.catcherror.toolbar.default = True
         cnf.keypress.defaults = {'open':    "Control-o",
                                  'save':    "Control-s",
-                                 'delbead': 'Suppr',
+                                 'delbead': 'Shift-Delete',
                                  'quit':    "Control-q"}
 
         self.__bead     = BeadInput(**kwa)

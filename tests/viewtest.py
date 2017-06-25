@@ -49,6 +49,14 @@ def test_beadtoolbar(bokehaction):
         server.change('Main:toolbar', 'discarded', '')
         assert frozenset(beads._BeadInput__beads) == frozenset(range(39))
 
+        bead1 = server.widget['Main:toolbar'].bead
+        server.press('Shift-Delete')
+        assert frozenset(beads._BeadInput__beads) == frozenset(range(39))-{bead1}
+
+        bead2 = server.widget['Main:toolbar'].bead
+        server.press('Shift-Delete')
+        assert frozenset(beads._BeadInput__beads) == frozenset(range(39))-{bead1, bead2}
+
         server.load('CTGT_selection/Z(t)bd1track10.gr')
         assert frozenset(beads._BeadInput__beads) == frozenset((1,))
 
