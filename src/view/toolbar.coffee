@@ -15,10 +15,10 @@ export class DpxToolbarView extends LayoutDOMView
     on_discard_current: () ->
         ele = $(@el)
         val = ele.find('#dpx-tb-bead').val()
-        @model.discarded = ele.find('#dpx-tb-discarded').val()+", .{val}"
+        @model.discarded = ele.find('#dpx-tb-discard').val()+",#{val}"
 
     on_discard: () ->
-        @model.discarded = $(@el).find('#dpx-tb-discarded').val()
+        @model.discarded = $(@el).find('#dpx-tb-discard').val()
 
     on_change_frozen:  () ->
         $(@el).find('.dpx-tb-freeze').prop('disabled', @model.frozen)
@@ -28,7 +28,7 @@ export class DpxToolbarView extends LayoutDOMView
         $(@el).find('#dpx-tb-bead').val(val)
 
     on_change_discarded: () ->
-        $(@el).find('#dpx-tb-discarded').val(@model.discarded)
+        $('#dpx-tb-discard').val("'#{@model.discarded}'")
 
     on_change_message: () ->
         $(@el).find('#dpx-tb-message').html(@model.message)
@@ -64,7 +64,7 @@ export class DpxToolbarView extends LayoutDOMView
                     "<label>Discarded</label>"+
                     "<input id='dpx-tb-discard'"+
                         " class='dpx-tb-freeze bk-widget-form-input'"+
-                        " type='text' value=#{mdl.discarded}>"+
+                        " type='text' value='#{mdl.discarded}'>"+
                     "#{@make_btn('del', '━', true)}"+
                     "<div id='dpx-tb-message' class='bk-markup'>"+
                         "#{mdl.message}</div>"+

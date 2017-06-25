@@ -323,11 +323,11 @@ class RejectedBeadsInput(BeadView):
             elif len(vals) == 0:
                 self._ctrl.removeTask(root, task)
             else:
-                self._ctrl.updateTask(root, task, beads = list(vals))
+                self._ctrl.updateTask(root, task, discarded = list(vals))
 
     def __onupdatetask(self, parent = None, task = None, **_):
         if self._isdiscardedbeads(parent, task):
-            self.__toolbar.discarded = ', '.join(str(i) for i in sorted(task.discarded))
+            self.__toolbar.discarded = ','.join(str(i) for i in sorted(task.discarded))
 
     def __onremovetask(self, parent = None, task = None, **_):
         if self._isdiscardedbeads(parent, task):

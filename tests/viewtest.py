@@ -37,7 +37,7 @@ def test_toolbar(bokehaction):
 def test_beadtoolbar(bokehaction):
     "test the toolbar"
     with bokehaction.launch('view.toolbar.BeadToolbar', 'app.Defaults') as server:
-        beads = server.get('BeadToolbar', '_BeadToolbar__beads')
+        beads = server.get('BeadToolbar', '_BeadToolbar__bead')
 
         # pylint: disable=protected-access
         server.load('big_legacy')
@@ -55,7 +55,7 @@ def test_beadtoolbar(bokehaction):
         server.load('CTGT_selection/Z(t)bd0track10.gr')
         assert frozenset(beads._BeadInput__beads) == frozenset((0, 1))
 
-        server.change('Main:toolbar', 'value', '0')
+        server.change('Main:toolbar', 'discarded', '0')
         assert frozenset(beads._BeadInput__beads) == frozenset((1,))
 
 def test_beadplot(bokehaction):
@@ -91,4 +91,4 @@ def test_beadplot(bokehaction):
         server.press('Ctrl-z')
 
 if __name__ == '__main__':
-    test_toolbar(bokehaction(None))
+    test_beadtoolbar(bokehaction(None))
