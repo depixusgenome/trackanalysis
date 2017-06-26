@@ -30,8 +30,9 @@ class QOli:
 # need to call generators as often as possible
 # find a better way to compute the kperms
 # can add each additionnal kperm at a time and keep only those that are not already represented
+# -> need to discard kperms which are already computed
+# (if no part contains latest max(group) then this partition has already been computed)
 # then compute rank  and discard the other ones
-# do not reconsider kperms already tested with add_kperms
 class PieceAssemble:
     u'''
     much faster version of assembler
@@ -148,7 +149,6 @@ class PieceAssemble:
         '''
         all_merged=dict() # type: Dict[int,List[data.OligoPerm]]
         for part in partitions:
-            #print(idx)
             merged=data.OligoPerm.add(*part)
             try:
                 cmp_with=all_merged[hash(merged.permids.tobytes())]
@@ -160,13 +160,15 @@ class PieceAssemble:
                         break
                     if opart[0]>merged.domain:
                         # replace with less constrained partition
-                        all_merged[hash(merged.permids.tobytes())][oidx]=(merged,part)
+                        replace=all_merged[hash(merged.permids.tobytes())][:oidx]+(merged,part)+\
+                                 all_merged[hash(merged.permids.tobytes())][oidx+1:]
+                        all_merged[hash(merged.permids.tobytes())][oidx]=replace
                         dealt=True
                         break
                 if not dealt:
-                    all_merged[hash(merged.permids.tobytes())]+=[(merged.domain,part)]
+                    all_merged[hash(merged.permids.tobytes())]+=((merged.domain,part),)
             except KeyError:
-                all_merged[hash(merged.permids.tobytes())]=[(merged.domain,part)]
+                all_merged[hash(merged.permids.tobytes())]=((merged.domain,part),)
         return [mpart[1] for value in all_merged.values() for mpart in value]
 
     # needs testing
@@ -278,7 +280,6 @@ class PieceAssemble:
                 qkperm[rpair]=pair
                 qkperm.pop(qidx)
                 qkperms+=[qkperm]
-            if len(rpairswith)>0:
                 qkperms+=self.qkpermsfromqolis(qkperm)
 
             lpairswith=[idx for idx,val in enumerate(left) if val==qoli.seq[-self.ooverl:]
@@ -290,21 +291,23 @@ class PieceAssemble:
                 qkperm[lpair]=pair
                 qkperm.pop(qidx)
                 qkperms+=[qkperm]
-            if len(lpairswith)>0:
+            if len(lpairswith)>0 or len(rpairswith)>0:
                 qkperms+=self.qkpermsfromqolis(qkperm)
+
         return qkperms
 
     # ooverl will eventually be be the minimal number of overlapping
     def test_find_kperms(self,
-                         group:Tuple[int, ...])->List[data.OligoKPerm]:
+                         group:Tuple[int, ...]):
         u'''
         trying to find alternative way to compute possible permutations of oligos
         (which is long and very inefficient for prec>5nm
         call as find_kperms([oligos[i] for i in core])
         will still need to filter out permutations of oligos amongst the same batch
-        '''
-
-        qolis=[QOli(seq=self.oligos[i].seq,idxs=[i]) for i in group]
+        use addpartitions but this time permutations may not be independent
+        find all 2-permutations
+        take possible combinations of 2 permutations
+        filter out
         qkperms=self.qkpermsfromqolis(qolis)
         kperms=[]
         for qkprm in qkperms:
@@ -313,10 +316,81 @@ class PieceAssemble:
                 kpr+=qoli.idxs
             kperms.append(kpr)
 
+        # if qidx==rpair: continue
+        if len(qolis)==1:
+            return [qolis]
+        qkperms=[] # type: List[List[QOli]]
+        for qidx,qoli in enumerate(qolis):
+            rpairswith=[idx for idx,val in enumerate(right) if val==qoli.seq[:self.ooverl]
+                        and idx!=qidx]
+            for rpair in rpairswith:
+                pair=qolis[rpair]+qoli
+                qkperm=list(qolis)
+                qkperm[rpair]=pair
+                qkperm.pop(qidx)
+                qkperms+=[qkperm]
+                qkperms+=self.qkpermsfromqolis(qkperm)
+
+            lpairswith=[idx for idx,val in enumerate(left) if val==qoli.seq[-self.ooverl:]
+                        and idx!=qidx]
+            for lpair in lpairswith:
+                #print('lpairing',qoli.seq,qolis[lpair].seq)
+                pair=qoli+qolis[lpair]
+                qkperm=list(qolis)
+                qkperm[lpair]=pair
+                qkperm.pop(qidx)
+                qkperms+=[qkperm]
+            if len(lpairswith)>0 or len(rpairswith)>0:
+                qkperms+=self.qkpermsfromqolis(qkperm)
         idsperbatch=self.collection.idsperbatch
         batchfilter=processor.BetweenBatchFilter(idsperbatch=idsperbatch)
 
-        return list(filter(batchfilter,kperms))
+
+        '''
+        # probably won't work
+
+        qolis=tuple(QOli(seq=self.oligos[i].seq,idxs=[i]) for i in group)
+        left=tuple(oli.seq[:self.ooverl] for oli in qolis)
+        right=tuple(oli.seq[-self.ooverl:] for oli in qolis)
+
+        # convert this into permutations
+        permsof2=[]
+        for qidx,qoli in enumerate(qolis):
+            base=group[:qidx]+group[qidx+1:]
+            for idx,val in enumerate(right):
+                if val==qoli.seq[:self.ooverl]:
+                    if idx<qidx:
+                        print("idx=",idx)
+                        print("qidx=",qidx)
+                        print("right=",base[:idx]+(qidx,)+base[idx:])
+                        permsof2.append(base[:idx-1]+(qidx,)+base[idx-1:])
+                    else:
+                        print("idx=",idx)
+                        print("qidx=",qidx)
+                        print("right=",base[:idx+1]+(qidx,)+base[idx+1:])
+                        permsof2.append(base[:idx]+(qidx,)+base[idx:])
+
+
+            for idx,val in enumerate(left):
+                if val==qoli.seq[-self.ooverl:]:
+                    if idx<qidx:
+                        print("idx=",idx)
+                        print("qidx=",qidx)
+                        print("left=",base[:idx-1]+(qidx,)+base[idx-1:])
+                        permsof2.append(base[:idx-1]+(qidx,)+base[idx-1:])
+                    else:
+                        print("idx=",idx)
+                        print("qidx=",qidx)
+                        print("left=",base[:idx]+(qidx,)+base[idx:])
+                        permsof2.append(base[:idx]+(qidx,)+base[idx:])
+
+        # apply filter on the 2-perms
+        print(len(permsof2))
+
+        # take 2**len(permsof2)
+
+        return permsof2#list(filter(batchfilter,kperms))
+
 
     def find_kpermpartitions(self,kperms):
         u'''
