@@ -9,6 +9,7 @@ from    typing          import (Optional, Union, Sized, # pylint: disable=unused
                                 Callable, NamedTuple, Sequence, Iterable,
                                 Any, Tuple, Iterator, cast)
 from    enum            import Enum
+from    functools       import partial
 import  pandas
 import  numpy as np
 from    utils           import initdefaults
@@ -19,10 +20,13 @@ _m_INTS = (int, cast(type, np.integer))
 
 class Profile(Sized):
     "A bead profile: the behaviour common to all stretches of data"
-    def __init__(self, inter:Union[Sequence[Range],int]) -> None:
+    def __init__(self, inter:Union[Sequence[Range], 'Profile', int]) -> None:
         if isinstance(inter, _m_INTS):
             self.xmin = 0                 # type: int
             self.xmax = cast(int, inter)  # type: int
+        elif isinstance(inter, Profile):
+            self.xmin = cast(int, inter.xmin)
+            self.xmax = cast(int, inter.xmax)
         else:
             self.xmin = min(i.start               for i in inter)
             self.xmax = max(i.start+len(i.values) for i in inter)
@@ -57,14 +61,17 @@ class _CollapseAlg:
     def _edge(self):
         return None if self.edge is None or self.edge < 1 else int(self.edge)
 
-    def __call__(self, inter:Iterable[Range], prof: Optional[Profile] = None) -> Profile:
+    def __call__(self,
+                 inter     : Iterable[Range],
+                 prof      : Profile = None,
+                 precision : float   = None) -> Profile:
         if isinstance(inter, Iterator):
             inter = tuple(inter)
         inter = cast(Sequence[Range], inter)
         prof  = Profile(inter) if prof is None else prof
-        return self._run(inter, prof)
+        return self._run(inter, prof, precision)
 
-    def _run(self, inter:Sequence[Range], prof:Profile) -> Profile:
+    def _run(self, inter:Sequence[Range], prof:Profile, precision:Optional[float]) -> Profile:
         raise NotImplementedError()
 
     @classmethod
@@ -72,53 +79,99 @@ class _CollapseAlg:
         "creates the configuration and runs the algorithm"
         return cls(**kwa)(inter)
 
+    def totable(self, inter:Sequence[Range], prof:Profile = None) -> np.ndarray:
+        "collapse intervals to a table"
+        if isinstance(inter, Iterator):
+            inter = tuple(inter)
+        prof  = Profile(inter) if prof is None else prof
+        return self._totable(inter, prof)
+
+    @classmethod
+    def __occupation(cls, inter:Sequence[Range], xmin:int, xmax:int) -> np.ndarray:
+        "returns the number of overlapping intervals in the [xmin, xmax] range"
+        ret = np.zeros((xmax-xmin,), dtype = np.int32)
+        for rng in inter:
+            ret[max(rng.start-xmin,0) : max(rng.start+len(rng.values)-xmin, 0)] += 1
+        return ret
+
+    def _totable(self, inter:Sequence[Range], prof:Profile) -> np.ndarray:
+        "collapse intervals to a table"
+        prof  = Profile(inter) if prof is None else prof
+        vals  = np.full((prof.count.shape[0],
+                         max(self.__occupation(inter, prof.xmin, prof.xmax))),
+                        np.NaN,
+                        dtype = np.float32)
+        cnt   = np.zeros_like(prof.count)
+        occ   = prof.count
+        inner = slice(self._edge, None)
+
+        # compactify all derivatives into a single 2D table
+        # missing values are coded as NaN
+        for inds, cur in _iter_ranges(prof.xmin, inter):
+            if len(inds) == 0:
+                continue
+
+            vals[inds, max(cnt[inds])] = cur
+            cnt[inds]                 += 1
+            occ[inds[inner]]          += 1
+        return vals
+
+
 class CollapseToMean(_CollapseAlg):
     """
     Collapses intervals together using their mean values.
 
     The collapse starts from the right-most interval and moves left.
     """
-    weight  = None # type: Optional[str]
+    weight  = None # type: Union[None, Callable, str]
     measure = 'mean'
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
     @staticmethod
-    def __chisquare(vals):
-        fin  = np.isfinite(vals)
-        if any(fin):
-            vals = vals[np.isfinite(vals)]
-
+    def _chisquare(prec, _, vals) -> float:
         if len(vals) <= 5:
             return 1e-3
-
-        chis = vals-vals.mean()
+        chis = (vals-vals.mean())/prec
         chis*= chis
         val  = chis.sum()/(len(chis)-1.)
         return 1./max(val, 1e3)
 
-    def _run(self, inter:Sequence[Range], prof:Profile) -> Profile:
+    def _weight_function(self, _, precision) -> Callable[[np.ndarray, np.ndarray], float]:
+        if callable(self.weight):
+            return self.weight
+
+        if self.weight is None:
+            return lambda *_: 1
+
+        if self.weight == 'chisquare':
+            fcn = partial(self._chisquare, 1. if precision is None else precision)
+            return cast(Callable[[np.ndarray, np.ndarray], float], fcn)
+
+        fcn = getattr(np, self.weight)
+        return lambda _, i: fcn(i)
+
+    def _run(self, inter:Sequence[Range], prof:Profile, precision: float = None) -> Profile:
         key    = lambda i: (-i.start-len(i.values), -len(i.values))
         cnt    = np.array(prof.count, dtype = 'f4')
         edge   = self._edge
         inner  = slice(edge, None if edge is None else -edge)
         diff   = getattr(np, self.measure)
-        weight = ((lambda _:1)              if self.weight is None        else
-                  getattr(np, self.weight)  if self.weight != 'chisquare' else
-                  self.__chisquare)
+
+        weight = self._weight_function(prof, precision)
         for inds, cur in _iter_ranges(prof.xmin, sorted(inter, key = key)):
             rho                      = cnt[inds]*1.
             vals                     = prof.value[inds]
 
             if any(rho):
                 cur                 += diff((vals-cur)[rho>0])
-                wcur                 = weight(cur)
+                wcur                 = weight(inds, cur)
                 rho                 /= rho+wcur
                 prof.value[inds]     = rho*vals + (1.-rho)*cur
             else:
                 cur                 -= diff(cur)
-                wcur                 = weight(cur)
+                wcur                 = weight(inds, cur)
                 prof.value[inds]     = cur*wcur
 
             cnt       [inds]        += wcur
@@ -127,6 +180,36 @@ class CollapseToMean(_CollapseAlg):
         if callable(self.filter):
             self.filter(prof.value)     # pylint: disable=not-callable
         return prof
+
+class CollapseBestToMean(CollapseToMean):
+    "Collapses twice, the second time using first results to discard faulty events"
+    weight  = 'chisquare' # type: Optional[str]
+    @staticmethod
+    def _chisquare(prec, prof, inds, vals): # pylint: disable=arguments-differ
+        if len(vals) <= 5:
+            return 1e-3
+
+        chis = (vals-prof[inds])/prec
+        chis*= chis
+        val  = chis.sum()/(len(chis)-1.)
+        return 1./max(val, 1e3)
+
+    def _run(self, inter:Sequence[Range], prof:Profile, precision: float = None) -> Profile:
+        precision  = 1. if precision is None else precision
+        cnf        = CollapseToMean(**self.__dict__)
+
+        cnf.weight = None
+        cpy        = cnf(inter, Profile(prof), precision)
+        if self.weight is None:
+            return prof
+
+        if self.weight == 'chisquare':
+            cpy.values[cpy.count <= 0] = np.NaN
+            cnf.weight                 = partial(self._chisquare, precision, cpy.values)
+        else:
+            cnf.weight                 = self.weight
+
+        return cnf(inter, prof, precision)
 
 class CollapseByMerging(_CollapseAlg):
     """
@@ -207,7 +290,7 @@ class CollapseByMerging(_CollapseAlg):
             if ix2 > ix1:
                 prof.count[ix1-prof.xmin:ix2-prof.xmin] = cnt [ix1-start:ix2-start]
 
-    def _run(self, inter:Sequence[Range], prof:Profile) -> Profile:
+    def _run(self, inter:Sequence[Range], prof:Profile, _) -> Profile:
         inters       = self.__init_inters(inter)
         rngs, common = self.__init_common(inters)
         ncols        = common.shape[1]
@@ -262,7 +345,16 @@ class CollapseByDerivate(_CollapseAlg):
             ret[max(rng.start-xmin,0) : max(rng.start+len(rng.values)-xmin, 0)] += 1
         return ret
 
-    def _run(self, inter:Sequence[Range], prof:Profile) -> Profile:
+    def totable(self, inter:Sequence[Range], prof:Profile = None) -> Tuple[np.ndarray,...]:
+        "collapse intervals to a table"
+        if isinstance(inter, Iterator):
+            inter = tuple(inter)
+        prof  = Profile(inter) if prof is None else prof
+        return self._totable(inter, prof)
+
+    def _totable(self, inter:Sequence[Range], prof:Profile) -> Tuple[np.ndarray,...]:
+        "collapse intervals to a table"
+        prof  = Profile(inter) if prof is None else prof
         vals  = np.full((prof.count.shape[0],
                          max(self.__occupation(inter, prof.xmin, prof.xmax))),
                         np.inf,
@@ -284,7 +376,11 @@ class CollapseByDerivate(_CollapseAlg):
             occ[inds[inner]]          += 1
 
         vals[vals >= self.maxder] = np.NaN
-        vals[:,0][cnt == 0]       = 0 # suppress all NaN warning
+        return vals, cnt
+
+    def _run(self, inter:Sequence[Range], prof:Profile, _) -> Profile:
+        vals, cnt           = self._totable(inter, prof)
+        vals[:,0][cnt == 0] = 0 # suppress all NaN warning
 
         fcn    = getattr(np, 'nan'+DerivateMode(self.mode).value)
         values = fcn(vals, axis = 1)
