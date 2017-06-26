@@ -14,7 +14,6 @@ def finddependencies(*modules) -> List[str]:
     "compiles the application as would a normal call to bokeh"
     for mod in modules:
         __import__(mod)
-    __import__('app.launcher')
     old = _compiler.nodejs_compile
     lst = []
     def _deps(_1, lang="javascript", file=None): # pylint: disable=unused-argument

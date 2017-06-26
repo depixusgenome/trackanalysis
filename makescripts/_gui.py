@@ -38,7 +38,7 @@ def guimake(viewname, locs):
                     break
                 modules.append(modules[-1]+'.'+i)
 
-        build_bokehjs(bld, *modules)
+        build_bokehjs(bld, *modules, 'app.launcher', 'undo')
 
     locs['build'] = build
 
