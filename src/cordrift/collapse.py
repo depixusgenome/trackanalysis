@@ -35,6 +35,20 @@ class Profile(Sized):
         self.count = np.zeros((length,), dtype = np.int32)
         self.value = np.zeros((length,), dtype = np.float32)
 
+    def fit(self, rng:Range):
+        "returns the range with values fit to the profile"
+        ix1  = rng[0] - self.xmin
+        ix2  = ix1 + len(rng[1])
+        inds = self.count[ix1:ix2] > 0
+        mean = np.nanmean(self.value[ix1:ix2][inds]-rng[1][inds])
+        return Range(rng[0], rng[1]+mean)
+
+    def subtracted(self, rng:Range):
+        "returns the range with values fit to the profile"
+        ix1 = rng[0] - self.xmin
+        ix2 = ix1 + len(rng[1])
+        return Range(rng[0], rng[1]-self.value[ix1:ix2])
+
     def __len__(self):
         return len(self.count)
 
@@ -116,15 +130,15 @@ class _CollapseAlg:
             occ[inds[inner]]          += 1
         return vals
 
-
 class CollapseToMean(_CollapseAlg):
     """
     Collapses intervals together using their mean values.
 
     The collapse starts from the right-most interval and moves left.
     """
-    weight  = None # type: Union[None, Callable, str]
-    measure = 'mean'
+    PRECISION = 0.003
+    weight    = None # type: Union[None, Callable, str]
+    measure   = 'mean'
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -136,7 +150,7 @@ class CollapseToMean(_CollapseAlg):
         chis = (vals-vals.mean())/prec
         chis*= chis
         val  = chis.sum()/(len(chis)-1.)
-        return 1./max(val, 1e3)
+        return 1./max(min(val, 1e3), 1e-3)
 
     def _weight_function(self, _, precision) -> Callable[[np.ndarray, np.ndarray], float]:
         if callable(self.weight):
@@ -146,7 +160,7 @@ class CollapseToMean(_CollapseAlg):
             return lambda *_: 1
 
         if self.weight == 'chisquare':
-            fcn = partial(self._chisquare, 1. if precision is None else precision)
+            fcn = partial(self._chisquare, self.PRECISION if precision is None else precision)
             return cast(Callable[[np.ndarray, np.ndarray], float], fcn)
 
         fcn = getattr(np, self.weight)
@@ -183,32 +197,49 @@ class CollapseToMean(_CollapseAlg):
 
 class CollapseBestToMean(CollapseToMean):
     "Collapses twice, the second time using first results to discard faulty events"
-    weight  = 'chisquare' # type: Optional[str]
+    ROBUST = .1, .9
+    weight = 'median' # type: Optional[str]
     @staticmethod
     def _chisquare(prec, prof, inds, vals): # pylint: disable=arguments-differ
         if len(vals) <= 5:
             return 1e-3
-
-        chis = (vals-prof[inds])/prec
+        good = prof.count[inds] > 0
+        chis = (vals[good]-prof.value[inds[good]])/prec
         chis*= chis
-        val  = chis.sum()/(len(chis)-1.)
-        return 1./max(val, 1e3)
+        val  = np.nanmean(chis)
+        return 1./max(min(val, 1e3), 1e-3)
 
     def _run(self, inter:Sequence[Range], prof:Profile, precision: float = None) -> Profile:
-        precision  = 1. if precision is None else precision
-        cnf        = CollapseToMean(**self.__dict__)
+        if self.weight is None:
+            return super().__call__(inter, prof, precision)
+
+        precision = self.PRECISION if precision is None else precision
+        cnf       = CollapseToMean(**self.__dict__)
 
         cnf.weight = None
         cpy        = cnf(inter, Profile(prof), precision)
-        if self.weight is None:
+        if self.weight in ('median', 'robustmean'):
+            table         = self._totable([cpy.fit(i) for i in inter], cpy)
+            prof.count    = np.sum(np.isfinite(table), axis = 1)
+            good          = prof.count > 0
+            table         = table[good]
+            prof.value[:] = 0
+            if self.weight == 'median':
+                prof.value[good] = np.nanmedian(table, axis = 1)
+            else:
+                table     = np.sort(table, axis = 1)
+                inds      = np.round(np.outer(prof.count[good], self.ROBUST))
+                inds[:,1] = np.minimum(inds[:,1]+1, prof.count[good])
+                inds      = np.int32(inds) #type: ignore
+                prof.value[good] = [vals[i:j].mean() for vals, (i, j) in zip(table, inds)]
+
             return prof
 
         if self.weight == 'chisquare':
-            cpy.values[cpy.count <= 0] = np.NaN
-            cnf.weight                 = partial(self._chisquare, precision, cpy.values)
+            cpy.value[cpy.count <= 0] = np.NaN
+            cnf.weight                = partial(self._chisquare, precision, cpy)
         else:
-            cnf.weight                 = self.weight
-
+            cnf.weight                = self.weight
         return cnf(inter, prof, precision)
 
 class CollapseByMerging(_CollapseAlg):
