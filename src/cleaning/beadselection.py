@@ -55,6 +55,38 @@ class BeadSelectionTask(BeadSelection, Task):
 
 class BeadSelectionException(Exception):
     "Exception thrown when a bead is not selected"
+    class ErrorMessage:
+        "creates the error message upon request"
+        def __init__(self, stats, cnf, tasktype):
+            self.stats    = stats
+            self.config   = cnf
+            self.tasktype = tasktype
+
+        def __str__(self):
+            return self.message(self.tasktype, self.stats, **self.config)
+
+        @classmethod
+        def message(cls, tasktype, stats, **cnf) -> str:
+            "returns a message if the test is invalid"
+            stats = {i.name: i  for i in stats}
+            get   = lambda i, j: (getattr(stats[i], j),
+                                  cnf.get(j+i, getattr(tasktype, j+i)))
+            msg   = ('%d cycles: σ[HF] < %.4f'   % get('hfsigma', 'min'),
+                     '%d cycles: σ[HF] > %.4f'   % get('hfsigma', 'max'),
+                     '%d cycles: z range < %.2f' % get('extent', 'min'),
+                     '%d cycles: z range > %.2f' % get('extent', 'max'))
+
+            return '\n'.join(i for i in msg if i[0] != '0')
+
+    def __init__(self, tasktype, stats, **cnf):
+        super().__init__(self.ErrorMessage(tasktype, stats, cnf), 'warning')
+
+    @classmethod
+    def test(cls, tasktype, stats, **cnf) -> Optional['BeadSelectionException']:
+        "creates a BeadSelectionException if needed"
+        if stats[-1].good.sum() < cnf.get('ncycles', getattr(tasktype, 'ncycles')):
+            return cls(tasktype, stats, **cnf)
+        return None
 
 class BeadSelectionProcessor(Processor):
     "Processor for bead selection"
@@ -71,21 +103,6 @@ class BeadSelectionProcessor(Processor):
             out  = getattr(sel, name)(cycs, good = good)
             good = out.good
             yield out
-
-    @classmethod
-    def errormessage(cls, res, **cnf) -> Optional[str]:
-        "returns a message if the test is invalid"
-        ncyc = cls.__get('ncycles', cnf)
-        if res[-1].good.sum() < ncyc:
-            stats = {i.name: i  for i in res}
-            get   = lambda i, j: (getattr(stats[i], j), cls.__get(j+i, cnf))
-            msg   = ('%d cycles: σ[HF] < %.4f'   % get('hfsigma', 'min'),
-                     '%d cycles: σ[HF] > %.4f'   % get('hfsigma', 'max'),
-                     '%d cycles: z range < %.2f' % get('extent', 'min'),
-                     '%d cycles: z range > %.2f' % get('extent', 'max'))
-
-            return '\n'.join(i for i in msg if i[0] != '0')
-        return None
 
     @classmethod
     def compute(cls, frame, info, cache = None, **cnf) -> Tuple[PARTIAL]:
@@ -107,9 +124,9 @@ class BeadSelectionProcessor(Processor):
         "applies the task to a frame or returns a method that will"
         def _compute(frame, info):
             res = cls.compute(frame.track, info, cache = cache, **cnf)
-            msg = cls.errormessage(res, **cnf)
+            msg = BeadSelectionException.test(cls.tasktype, res, **cnf)
             if msg is not None:
-                raise BeadSelectionException(msg, 'warning')
+                raise msg
             return info
 
         fcn = lambda frame: frame.withaction(partial(_compute, frame))
