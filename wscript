@@ -7,7 +7,7 @@ require(cxx    = {'msvc'     : 14.0,
                   'g++'      : 5.4},
         rtime = False)
 
-require(python = {'python': 3.5, 'numpy': '1.11.2', 'pandas': '0.19.0'},
+require(python = {'python': 3.6, 'numpy': '1.11.2', 'pandas': '0.19.0'},
         rtime  = True)
 
 require(python = {'pybind11' : '2.1.0',
