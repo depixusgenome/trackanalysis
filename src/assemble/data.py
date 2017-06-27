@@ -219,7 +219,8 @@ class OligoPerm:
         if len(args)==1:
             return args[0]
 
-        res = cls.__add2(*args[:2])
+        #res = cls.__add2(*args[:2])
+        res = cls.__add2(args[0],args[1])
         for perm in args[2:]:
             res = cls.__add2(res,perm)
         return res
@@ -276,6 +277,13 @@ class OligoPerm:
                      if lorr=="l"
                      else self.perm[val].seq[-ooverl:]
                      for lorr,val in sides)
+
+    def __del__(self):
+        del self.oligos
+        del self._changes
+        del self._perm
+        del self._permids
+        del self._domain
 
 
 class OligoKPerm(OligoPerm):
@@ -369,6 +377,10 @@ class OligoKPerm(OligoPerm):
                           kpermids=[i[0] for i in skperm],
                           domain=self.domain)
 
+    def __del__(self):
+        del self.kperm
+        del self._kpermids
+
 # no longer used, to remove
 class Permids2OligoPerm:
     u'Convertion class'
@@ -409,7 +421,8 @@ class KPermCollection:
         if len(args)==1:
             return args[0]
 
-        res = cls.__product2(*args[:2])
+        #res = cls.__product2(*args[:2])
+        res = cls.__product2(args[0],args[1])
         for kpc in args[2:]:
             res = cls.__product2(res,kpc)
         return res

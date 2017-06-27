@@ -150,8 +150,9 @@ class PieceAssemble:
         all_merged=dict() # type: Dict[int,List[data.OligoPerm]]
         for part in partitions:
             merged=data.OligoPerm.add(*part)
+            hashid=hash(merged.permids.tobytes())
             try:
-                cmp_with=all_merged[hash(merged.permids.tobytes())]
+                cmp_with=all_merged[hashid]
                 dealt=False
                 for oidx,opart in enumerate(cmp_with):
                     if opart[0]<=merged.domain:
@@ -160,15 +161,16 @@ class PieceAssemble:
                         break
                     if opart[0]>merged.domain:
                         # replace with less constrained partition
-                        replace=all_merged[hash(merged.permids.tobytes())][:oidx]+(merged,part)+\
-                                 all_merged[hash(merged.permids.tobytes())][oidx+1:]
-                        all_merged[hash(merged.permids.tobytes())][oidx]=replace
+                        # type: ignore
+                        replace=all_merged[hashid][:oidx]+[(merged,part)]+\
+                                 all_merged[hashid][oidx+1:]
+                        all_merged[hashid][oidx]=replace
                         dealt=True
                         break
                 if not dealt:
-                    all_merged[hash(merged.permids.tobytes())]+=((merged.domain,part),)
+                    all_merged[hashid]+=[(merged.domain,part)]
             except KeyError:
-                all_merged[hash(merged.permids.tobytes())]=((merged.domain,part),)
+                all_merged[hashid]=[(merged.domain,part)]
         return [mpart[1] for value in all_merged.values() for mpart in value]
 
     # needs testing

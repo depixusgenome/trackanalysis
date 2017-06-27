@@ -170,7 +170,8 @@ class ScoredPerm:
         if len(args)==1:
             return args[0]
 
-        res=cls.__add2(*args[:2])
+        #res=cls.__add2(*args[:2])
+        res=cls.__add2(args[0],args[1])
         for sckp in args[2:]:
             res = cls.__add2(res,sckp)
         return res
@@ -254,7 +255,8 @@ class LScPerm:
         if len(args)==1:
             return args[0]
 
-        res = cls.__product2(*args[:2])
+        #res = cls.__product2(*args[:2])
+        res = cls.__product2(args[0],args[1])
         for sckpm in args[2:]:
             res = cls.__product2(res,sckpm)
         return res
@@ -285,7 +287,8 @@ class LScPermCollection:
         if len(args)==1:
             return args[0]
 
-        res = cls.__product2(*args[:2])
+        #res = cls.__product2(*args[:2])
+        res = cls.__product2(args[0],args[1])
         for sckpm in args[2:]:
             res = cls.__product2(res,sckpm)
         return res
@@ -343,7 +346,7 @@ class ScoredPermCollection:
         if len(args)==1:
             return args[0]
 
-        res = cls.__product2(*args[:2])
+        res = cls.__product2(args[0],args[1])
         for sckpm in args[2:]:
             res = cls.__product2(res,sckpm)
         return res

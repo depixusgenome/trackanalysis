@@ -206,8 +206,8 @@ def generate_kpermids(kmin,kmax,permids:List[int]):
     generate all k-permutations with values between kmin (incuded) and kmax (excluded)
     '''
     for kval in range(kmin,kmax):
-        for permids in generate_fixedkpermids(kval,permids):
-            yield permids
+        for prm in generate_fixedkpermids(kval,permids):
+            yield prm
 
 class BetweenBatchFilter:
     u'''
@@ -298,7 +298,7 @@ class UpdateOligoBPos:
     Estimates the new values of bpos for each oligo given a list of permuted oligos
     or a collection and a list of permuted indices (permids)
     '''
-    oligos=[] # type: list[data.OligoPeak]
+    oligos=[] # type: List[data.OligoPeak]
     collection=data.BCollection() # type: data.BCollection
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
