@@ -42,7 +42,7 @@ class OptiDistPerm:
         pass
 
     def find_subs(self):
-        u'find sub-kpermutations within the permutation'
+        u'find sub-kpermutations (cyclic notation) within the permutation'
         # compute the new positions for each sub-kperm
         srtprm=sorted(self.perm)
         subkprms=[]
@@ -55,7 +55,7 @@ class OptiDistPerm:
             while kpr[-1]!=kpr[0]:
                 kpr.append(self.perm[srtprm.index(kpr[-1])])
             subkprms.append(tuple(sorted(kpr[:-1])))
-        return list(set(subkprms))
+        return list(frozenset(subkprms))
 
     def run(self):
         u'testing faster alternative to run'

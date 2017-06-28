@@ -3,7 +3,7 @@
 u'''
 Creates Classes and function to use with assemble sequence
 '''
-from typing import List, NamedTuple, Tuple, Set, Dict # pylint: disable=unused-import
+from typing import List, NamedTuple, Tuple, FrozenSet, Set, Dict # pylint: disable=unused-import
 import itertools
 import numpy
 from utils import initdefaults
@@ -166,7 +166,6 @@ class BCollection:
                                                    nscale=nscale)[1]
         return [[olis[idx] for idx in grp] for grp in groups]
 
-
     def oli2index(self,oli:OligoPeak)->int:
         u'returns index of oli in oligos'
         return self.oligos.index(oli)
@@ -180,10 +179,10 @@ class OligoPerm:
     u'base class. full n-permutation'
     def __init__(self,**kwa):
         self.oligos=kwa.get("oligos",[]) # type: List[OligoPeak]
-        self._changes = kwa.get("changes",tuple()) # type: Tuple[int, ...]
+        #self._changes = kwa.get("changes",tuple()) # type: Tuple[int, ...]
         self._perm = kwa.get("perm",[]) # type: List[OligoPeak]
-        self._permids = kwa.get("permids",numpy.array([],dtype=int)) # type: List[int]
-        self._domain =  kwa.get("domain",set()) # type: Set[int]
+        self._permids = kwa.get("permids",numpy.empty(0,dtype='i4')) # type: List[int]
+        self._domain =  kwa.get("domain",frozenset()) # type: FrozenSet[int]
 
     @property
     def permids(self):
@@ -193,14 +192,15 @@ class OligoPerm:
     @property
     def perm(self):
         u'perm may not be needed, compute iff necessary'
-        if self._perm==[]:
+        if len(self._perm)==0:
             self._perm=numpy.array(self.oligos)[self.permids].tolist()
         return self._perm
 
     @property
     def changes(self):
         u'returns value'
-        return self._changes
+        #return self._changes
+        return tuple(self._domain)
 
     @property
     def domain(self):
@@ -219,7 +219,6 @@ class OligoPerm:
         if len(args)==1:
             return args[0]
 
-        #res = cls.__add2(*args[:2])
         res = cls.__add2(args[0],args[1])
         for perm in args[2:]:
             res = cls.__add2(res,perm)
@@ -232,17 +231,16 @@ class OligoPerm:
         assumes that the 2 perms have the same oligos
         '''
         if __debug__:
-            if len(set(perm1.domain).intersection(set(perm2.domain)))>0:
+            if len(frozenset(perm1.domain).intersection(frozenset(perm2.domain)))>0:
                 print("perm1.domain",perm1.domain)
                 print("perm2.domain",perm2.domain)
                 raise ValueError("perm1 and perm2 are not independant")
-        changes = perm1.changes+perm2.changes
+        #changes = perm1.changes+perm2.changes
         permids = perm1.permids[perm2.permids]
         perm=[]
-        if not perm1.oligos==[]:
+        if not len(perm1.oligos)==0:
             perm=[perm1.oligos[i] for i in permids]
         return OligoPerm(oligos=perm1.oligos,
-                         changes=changes,
                          perm=perm,
                          permids=permids,
                          domain=perm1.domain.union(perm2.domain))
@@ -255,32 +253,8 @@ class OligoPerm:
             return True
         return False
 
-    def outer_seqs(self,ooverl:int)->Tuple[str, ...]:
-        u'''
-        returns the overlapping oligo seq of left most oligo and right most
-        as a tuple(left,right)
-        '''
-        changed=[val in self.changes for idx,val in enumerate(self.permids)]
-        # "l" for left, take the first ooverl chars in sequence
-        # "r" for right
-        sides=[("l",0)] if changed[0] else []
-        for idx,val in enumerate(changed[1:]):
-            if changed[idx]!=val:
-                if changed[idx]:
-                    sides.append(("r",idx))
-                else:
-                    sides.append(("l",idx+1))
-        if changed[-1]:
-            sides.append(('r',len(changed)-1))
-
-        return tuple(self.perm[val].seq[:ooverl]
-                     if lorr=="l"
-                     else self.perm[val].seq[-ooverl:]
-                     for lorr,val in sides)
-
     def __del__(self):
         del self.oligos
-        del self._changes
         del self._perm
         del self._permids
         del self._domain
@@ -294,7 +268,7 @@ class OligoKPerm(OligoPerm):
     def __init__(self,**kwa)->None:
         super().__init__(**kwa)
         self.kperm=kwa.get("kperm",[]) # type: List[OligoPeak]
-        self._kpermids = kwa.get("kpermids",numpy.array([],dtype=int)) # type: numpy.array
+        self._kpermids = kwa.get("kpermids",numpy.empty(0, dtype='i4')) # type: numpy.array
 
     @property
     def kpermids(self)->List[int]:
@@ -321,7 +295,7 @@ class OligoKPerm(OligoPerm):
         return self._permids
 
     @classmethod
-    def get_changes(cls,kperm,sort_by="pos")->Tuple[int, ...]:
+    def get_changes(cls,kperm,sort_by="pos")->FrozenSet[int]:
         u'''
         returns the smallest (contiguous) permutations of kperm
         will not work for a combination of kperms
@@ -334,17 +308,16 @@ class OligoKPerm(OligoPerm):
 
         try:
             if issame[-1] is False:
-                return tuple(kperm[issame.index(False):])
-            return tuple(kperm[issame.index(False):-list(reversed(issame)).index(False)])
+                return frozenset(kperm[issame.index(False):])
+            return frozenset(kperm[issame.index(False):-list(reversed(issame)).index(False)])
         except ValueError:
-            return tuple()
+            return frozenset()
 
     @property
     def domain(self):
         u'returns the set of indices onto which the k-permutation applies'
         if len(self._domain)==0:
-            #self._domain=set(self.kpermids) # not restrictive enough
-            self._domain=set(self.changes)
+            self._domain=self.get_changes(self.kpermids)
         return self._domain
 
     @property
@@ -353,9 +326,7 @@ class OligoKPerm(OligoPerm):
         returns the tuple of indices which will be changed by application of perm
         should return [] if all sorted(perm)[i]==perm[i], ie: identity operator
         '''
-        if len(self._changes)==0:
-            self._changes=self.get_changes(self.kpermids)
-        return self._changes
+        return tuple(self.domain)
 
     def __hash__(self)->int:
         return hash((tuple(sorted(self.domain)),tuple(self.kpermids)))
@@ -381,27 +352,8 @@ class OligoKPerm(OligoPerm):
         del self.kperm
         del self._kpermids
 
-# no longer used, to remove
-class Permids2OligoPerm:
-    u'Convertion class'
-    oligos=[] # type: List[OligoPeak]
-    @initdefaults(frozenset(locals()))
-    def __init__(self,**kwa):
-        u'initialize before call'
-        pass
-    def __call__(self,
-                 permids:List[int],
-                 changes:Tuple[int, ...],
-                 domain:Set[int])->OligoPerm:
-        u'convert using permids'
-        # leaves perms list iff necessary
-        return OligoPerm(oligos=self.oligos,
-                         permids=permids,
-                         changes=changes,
-                         domain=domain)
 
-
-# replace with OligoPerm
+# replaced by OligoPerm
 class KPermCollection:
     u'''
     Container for a list of OligoKPerm

@@ -4,8 +4,9 @@
 u'class for oligo assemby'
 import pickle
 import itertools
-from typing import List, Tuple, Dict # pylint: disable=unused-import
+from typing import List, Tuple, Dict, Generator # pylint: disable=unused-import
 
+import numpy
 from utils import initdefaults
 import assemble.processor as processor
 import assemble.scores as scores
@@ -33,7 +34,7 @@ class QOli:
 # -> need to discard kperms which are already computed
 # (if no part contains latest max(group) then this partition has already been computed)
 # then compute rank  and discard the other ones
-class PieceAssemble:
+class PieceAssemble: # pylint:disable=too-many-public-methods
     u'''
     much faster version of assembler
     sequence is assembled sequentially starting from the first oligos
@@ -47,6 +48,7 @@ class PieceAssemble:
     nscale=1 # type: float
     collection=data.BCollection() # type: data.BCollection
     ooverl=1
+    noverl_tol=1 # keep only the best partitions noverlaps wise
     #scoring=scores.ScoreAssembly()
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
@@ -57,7 +59,7 @@ class PieceAssemble:
         u'returns oligos'
         return self.collection.oligos
 
-    def compute(self):
+    def compute(self): # pylint: disable=too-many-locals
         u'''
         reorder the oligos piecewise
         '''
@@ -68,17 +70,29 @@ class PieceAssemble:
             pickle.dump(groupedids,open("groupedids.pickle","wb"))
 
         # compute for the first group then correct as we had more to it
-        all_kperms = self.find_kperms(groupedids[0])
+        # instead of kperms take the list(set(subkperms))
+        all_kperms = list(set(self.find_groupperms(groupedids[0])))
         # reduce the number of kperms
         # keep the best
 
-        partitions=[[kperm] for kperm in all_kperms]
+        partitions=[[kpr] for kpr in all_kperms]
+        print("computing first partition, done")
         # need to add more structure, call method to reduce the number of partitions
         by_noverlaps=self.rank_byoverlaps(partitions)
-        min_overlaps=sorted(set(i[0] for i in by_noverlaps),reverse=True)[0]
+        min_overlaps=sorted(set(i[0] for i in by_noverlaps),reverse=True)[self.noverl_tol]
         bestooverl=[rkd for idx,rkd in enumerate(by_noverlaps) if rkd[0]>=min_overlaps]
-        partitions=[rkd[1] for rkd in bestooverl]
+        partskept=[rkd[1] for rkd in bestooverl] # must subdivide into subkperms
+        partitions=[]
 
+        for part in partskept:
+            adding=[]
+            for kpr in part:
+                adding=self.kperm2minkperms(self.oligos,self.ooverl,kpr)
+                #adding+=self.find_subkperms_from_permids(kpr.kpermids)
+            partitions.append(list(set(adding)))
+
+        print("done")
+        #prev_kperms=frozenset(list(set(self.find_kperms(groupedids[0]))))
         for groupid,group in enumerate(groupedids[1:]):
             if __debug__:
                 print("groupid="+str(groupid)+" out of "+str(len(groupedids[1:])))
@@ -90,7 +104,9 @@ class PieceAssemble:
 
             # should include a test to discard already test kperms using set().intersection()
             # can generate the kperms sequentially
-            add_kperms=self.find_kperms(group)
+            #add_kperms=list(frozenset(self.find_kperms(group)))
+            add_kperms=self.find_min_kperms(group)
+
             print("len(add_kperms)=",len(add_kperms))
             if len(add_kperms)==0:
                 continue
@@ -106,11 +122,30 @@ class PieceAssemble:
             # (and keep the best ??)
 
             # compute the scores to each partitions
+            # only considering kperms which have not been considered previously
+            # to_add=list(frozenset(add_kperms)-frozenset(prev_kperms)) # before
+            # partitions=self.add2partitions(partitions,[[kpr] for kpr in add_kperms]) # before
+
             partitions=self.add2partitions(partitions,[[kpr] for kpr in add_kperms])
+            #prev_kperms=frozenset(add_kperms)
+
             print("before reduce len(partitions)=",len(partitions))
             if __debug__:
                 pickle.dump(partitions,open("addedpartitions"+str(groupid)+".pickle","wb"))
 
+            # worth it?
+            def filter_oldkprms(part):
+                'remove partitions formed only by previous kperms'
+                for prm in part:
+                    try:
+                        if max(group) in prm.kpermids: # pylint:disable=cell-var-from-loop
+                            return True
+                    except AttributeError:
+                        pass
+                return False
+
+            # filter out partitions which only have kperms from previously
+            partitions=list(filter(filter_oldkprms,partitions))
             partitions=self.reduce_partitions(partitions)
             print("before reduce len(partitions)=",len(partitions))
             # keep the ones with max noverlaps or
@@ -126,7 +161,7 @@ class PieceAssemble:
             #min_overlaps=by_noverlaps[int(0.1*len(partitions))+1][0]
             print("set of noverlaps=",sorted(set(i[0] for i in by_noverlaps),reverse=True))
             # need to formalise the next line
-            min_overlaps=sorted(set(i[0] for i in by_noverlaps),reverse=True)[0]
+            min_overlaps=sorted(frozenset(i[0] for i in by_noverlaps),reverse=True)[self.noverl_tol]
 
             bestooverl=[rkd for idx,rkd in enumerate(by_noverlaps) if rkd[0]>=min_overlaps]
 
@@ -139,9 +174,8 @@ class PieceAssemble:
 
         return partitions,[data.OligoPerm.add(*part) for part in partitions],ranked_partitions
 
-    #pylint: disable=no-self-use
-    def reduce_partitions(self,
-                          partitions:List[List[data.OligoPerm]])->List[List[data.OligoPerm]]:
+    @staticmethod
+    def reduce_partitions(partitions:List[List[data.OligoPerm]])->List[List[data.OligoPerm]]:
         u'''
         if two partitions result in the same permids, keep the one with smallest domain
         could test using set(object with hash from permids, domain and __eq__ if domain is the same)
@@ -161,19 +195,18 @@ class PieceAssemble:
                         break
                     if opart[0]>merged.domain:
                         # replace with less constrained partition
-                        # type: ignore
-                        replace=all_merged[hashid][:oidx]+[(merged,part)]+\
-                                 all_merged[hashid][oidx+1:]
-                        all_merged[hashid][oidx]=replace
+                        all_merged[hashid][oidx]=(merged.domain,part)
                         dealt=True
                         break
                 if not dealt:
                     all_merged[hashid]+=[(merged.domain,part)]
             except KeyError:
                 all_merged[hashid]=[(merged.domain,part)]
-        return [mpart[1] for value in all_merged.values() for mpart in value]
+        toout=[mpart[1] for value in all_merged.values() for mpart in value]
+        all_merged.clear()
+        del all_merged
+        return toout
 
-    # needs testing
     def add2partitions(self,partitions1,partitions2):
         u'new (faster) implementation'
         addedpartitions=[]
@@ -185,7 +218,8 @@ class PieceAssemble:
                 tocombine=[kpr for kpr in part1 if kpr.domain.intersection(modified_dom)]
                 tocombine+=part2
                 fixed=[kpr for kpr in part1 if not kpr.domain.intersection(modified_dom)]
-                combined=self.find_kpermpartitions(tocombine)
+                #combined=self.find_kpermpartitions(tocombine) # before
+                combined=self.find_kpermpartitions(list(frozenset(tocombine)))
                 for comb in combined:
                     addedpartitions.append(fixed+comb)
         return addedpartitions
@@ -219,8 +253,93 @@ class PieceAssemble:
             scored.append((score.noverlaps(),partitions[kprmid]))
         return sorted(scored,key=lambda x:-x[0])
 
-    # must be improved
-    def find_kperms(self,group:Tuple[int, ...])->List[data.OligoPerm]:
+
+    @staticmethod
+    def find_cyclicsubs(perm:Tuple[int, ...]):
+        u'find sub-kpermutations within the permutation'
+        # compute the new positions for each sub-kperm
+        srtprm=sorted(perm)
+        subkprms=[]
+        for val in srtprm:
+            kpr=[val]
+            if perm[srtprm.index(val)]==kpr[0]:
+                subkprms.append(tuple(kpr))
+                continue
+            kpr.append(perm[srtprm.index(val)])
+            while kpr[-1]!=kpr[0]:
+                kpr.append(perm[srtprm.index(kpr[-1])])
+
+            subkprms.append(tuple(kpr[:-1]))
+
+        return list(set(subkprms))
+
+    @staticmethod
+    def cperm2kperm(oligos,cpermids:Tuple[int,...])->data.OligoKPerm:
+        u'translates cyclic permutation to kperm'
+        toprm={cpermids[k]:v for k,v in enumerate(cpermids[1:])}
+        toprm.update({cpermids[-1]:cpermids[0]})
+        kpermids=tuple(toprm[i] if i in toprm else i for i in range(min(cpermids),max(cpermids)+1))
+        return data.OligoKPerm(oligos=oligos,
+                               kperm=[oligos[i] for i in kpermids],
+                               kpermids=numpy.array(kpermids),
+                               domain=frozenset(cpermids))
+
+
+    def find_min_kperms(self,group:Tuple[int, ...])->List[data.OligoKPerm]:
+        u'''
+        computes the kperms of the group
+        then find subperms corresponding to each permutations
+        '''
+        grpkperms=self.find_groupperms(group)
+        subkperms=[] # type: List[data.OligoKPerm]
+        for gprm in grpkperms:
+            subkperms+=self.kperm2minkperms(self.oligos,self.ooverl,gprm)
+
+        return list(frozenset(subkperms))
+
+    # to check!
+    @staticmethod
+    def kperm2minkperms(oligos:List[data.OligoPeak],
+                        ooverl:int,
+                        kperm:data.OligoKPerm)->List[data.OligoKPerm]:
+        u'''input: oligos, a kperm
+        the kperm was computed from the find_groupperms
+        uses oligo sequences to find the sub-permutation
+        could use arrays
+        itertools
+        '''
+        if len(kperm.kpermids)<2:
+            return kperm
+
+        marker=0
+        cluster=[]
+        for idx,val in enumerate(kperm.kpermids[:-1]):
+            cluster.append((marker,val))
+            # if not contiguous change marker
+            if oligos[val].seq[-ooverl:]!=oligos[kperm.kpermids[idx+1]].seq[:ooverl]:
+                marker+=1
+
+        cluster.append((marker,kperm.kpermids[-1]))
+        subs=[]
+        for grp in itertools.groupby(cluster,key=lambda x:x[0]):
+            subids=tuple(i[1] for i in grp[1])
+            subs.append(data.OligoKPerm(oligos=oligos,
+                                        kperm=[oligos[i] for i in subids],
+                                        kpermids=numpy.array(subids),
+                                        domain=frozenset(subids))) # to check
+        return subs
+
+    # not used anymore
+    def find_subkperms_from_permids(self,kpermids:Tuple[int, ...])->List[data.OligoKPerm]:
+        u'''finds all sub kperms within a permids
+        eg : (0,2,1,3,6,4,5) will return kperms conrresponding to [(0,),(1,2),(4,6,5)]
+        '''
+        cyclicsubs=self.find_cyclicsubs(kpermids)
+        kperms=list(frozenset(self.cperm2kperm(self.oligos,sub) for sub in cyclicsubs))
+        return kperms
+
+    # not used anymore
+    def find_kperms(self,group:Tuple[int, ...])->Generator:
         u'''
         finds the permutations of oligos in cores
         and permutations from corrections (changed indices must be in both core_groups)
@@ -229,17 +348,32 @@ class PieceAssemble:
         batchfilter=processor.BetweenBatchFilter(idsperbatch=idsperbatch)
         ooverlfilter=processor.RequireOverlapFilter(oligos=self.oligos,
                                                     min_ooverl=self.ooverl)
-        okperms=[]
         # compute all possible permutations # brute force
-        permids=itertools.permutations(group) # generator
-        firstfiltered = filter(ooverlfilter,permids) # type: ignore
+        kpermids=itertools.permutations(group) # generator
+        firstfiltered = filter(ooverlfilter,kpermids) # type: ignore
         secondfiltered = filter(batchfilter,firstfiltered) # type: ignore
-        for permid in secondfiltered:
-            okperms.append(data.OligoKPerm(oligos=self.oligos,
-                                           kperm=[self.oligos[i] for i in permid],
-                                           kpermids=permid))
+        for kprid in secondfiltered:
+            for kpr in self.find_subkperms_from_permids(kprid):
+                yield kpr
 
-        return okperms
+    def find_groupperms(self,group:Tuple[int, ...])->Generator:
+        u'''
+        finds the permutations of oligos of a group
+        and permutations from corrections (changed indices must be in both core_groups)
+        '''
+        idsperbatch=self.collection.idsperbatch
+        batchfilter=processor.BetweenBatchFilter(idsperbatch=idsperbatch)
+        ooverlfilter=processor.RequireOverlapFilter(oligos=self.oligos,
+                                                    min_ooverl=self.ooverl)
+        # compute all possible permutations # brute force
+        kpermids=itertools.permutations(group) # generator
+        firstfiltered = filter(ooverlfilter,kpermids) # type: ignore
+        secondfiltered = filter(batchfilter,firstfiltered) # type: ignore
+        for kprid in secondfiltered:
+            yield data.OligoKPerm(oligos=self.oligos,
+                                  kperm=[self.oligos[i] for i in kprid],
+                                  kpermids=numpy.array(kprid),
+                                  domain=frozenset(kprid))
 
     # needs better implementation
     # pylint: disable=no-self-use
@@ -394,7 +528,7 @@ class PieceAssemble:
         return permsof2#list(filter(batchfilter,kperms))
 
 
-    def find_kpermpartitions(self,kperms):
+    def find_kpermpartitions(self,kperms:List[data.OligoKPerm]):
         u'''
         finds the kperms which can be combined
         '''
