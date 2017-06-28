@@ -195,10 +195,10 @@ class CollapseToMean(_CollapseAlg):
             self.filter(prof.value)     # pylint: disable=not-callable
         return prof
 
-class CollapseBestToMean(CollapseToMean):
+class CollapseToSock(CollapseToMean):
     "Collapses twice, the second time using first results to discard faulty events"
-    ROBUST = .1, .9
-    weight = 'median' # type: Optional[str]
+    robustness = .1, .9
+    weight     = 'robustmean' # type: Optional[str]
     @staticmethod
     def _chisquare(prec, prof, inds, vals): # pylint: disable=arguments-differ
         if len(vals) <= 5:
@@ -208,6 +208,26 @@ class CollapseBestToMean(CollapseToMean):
         chis*= chis
         val  = np.nanmean(chis)
         return 1./max(min(val, 1e3), 1e-3)
+
+    def __fromsock(self, cpy, inter, prof):
+        table = self._totable([cpy.fit(i) for i in inter], cpy)
+        cnt   = np.sum(np.isfinite(table), axis = 1)
+        good  = cnt > 0
+        table = table[good]
+
+        prof.value[:] = 0
+        prof.count    = cpy.count
+
+        if self.weight == 'median':
+            prof.value[good] = np.nanmedian(table, axis = 1)
+        else:
+            table     = np.sort(table, axis = 1)
+            inds      = np.round(np.outer(cnt[good], self.robustness))
+            inds[:,1] = np.minimum(inds[:,1]+1, cnt[good])
+            inds      = np.int32(inds) #type: ignore
+            prof.value[good] = [vals[i:j].mean() for vals, (i, j) in zip(table, inds)]
+
+        return prof
 
     def _run(self, inter:Sequence[Range], prof:Profile, precision: float = None) -> Profile:
         if self.weight is None:
@@ -219,21 +239,7 @@ class CollapseBestToMean(CollapseToMean):
         cnf.weight = None
         cpy        = cnf(inter, Profile(prof), precision)
         if self.weight in ('median', 'robustmean'):
-            table         = self._totable([cpy.fit(i) for i in inter], cpy)
-            prof.count    = np.sum(np.isfinite(table), axis = 1)
-            good          = prof.count > 0
-            table         = table[good]
-            prof.value[:] = 0
-            if self.weight == 'median':
-                prof.value[good] = np.nanmedian(table, axis = 1)
-            else:
-                table     = np.sort(table, axis = 1)
-                inds      = np.round(np.outer(prof.count[good], self.ROBUST))
-                inds[:,1] = np.minimum(inds[:,1]+1, prof.count[good])
-                inds      = np.int32(inds) #type: ignore
-                prof.value[good] = [vals[i:j].mean() for vals, (i, j) in zip(table, inds)]
-
-            return prof
+            return self.__fromsock(cpy, inter, prof)
 
         if self.weight == 'chisquare':
             cpy.value[cpy.count <= 0] = np.NaN

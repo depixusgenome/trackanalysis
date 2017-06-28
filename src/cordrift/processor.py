@@ -17,7 +17,8 @@ from eventdetection             import EventDetectionConfig
 from eventdetection.detection   import EventDetector
 from eventdetection.data        import Events
 from .collapse                  import (Range, Profile, # pylint: disable=unused-import
-                                        CollapseAlg, CollapseByMerging, CollapseToMean,
+                                        CollapseAlg, CollapseByMerging,
+                                        CollapseToMean, CollapseToSock,
                                         StitchAlg, StitchByDerivate, StitchByInterpolation)
 
 class DriftTask(Task, EventDetectionConfig):
@@ -25,7 +26,7 @@ class DriftTask(Task, EventDetectionConfig):
     level     = Level.bead
     phases    = PHASE.measure, PHASE.measure # type: Optional[Tuple[int,int]]
     events    = EventDetector()
-    collapse  = CollapseToMean()             # type: Optional[CollapseAlg]
+    collapse  = CollapseToSock()             # type: Optional[CollapseAlg]
     stitch    = StitchByInterpolation()      # type: Optional[StitchAlg]
     zero      = 10
     precision = None
