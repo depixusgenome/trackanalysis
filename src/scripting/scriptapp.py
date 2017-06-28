@@ -57,8 +57,28 @@ class ScriptingView(View):
         "returns the controller"
         return self._ctrl
 
+RESET = type('Reset', (), {})
 class Tasks(Enum):
-    "possible tasks"
+    """
+    Possible tasks
+
+    These can be created as follows:
+
+        >>> task = Tasks.alignment()
+        >>> assert isinstance(task, ExtremumAlignmentTask)
+
+    Attribute values can be set. The choice is saved for future creations
+    within the session and in the next ones.  This can be reset by passing the
+    attribute name or an ellipsis.
+
+        >>> assert Tasks.peakselector().align is not None         # default value
+        >>> assert Tasks.peakselector(align = None).align is None # change default
+        >>> assert Tasks.peakselector().align is None             # default has changed
+        >>> assert Tasks.peakselector('align').align is not None  # back to true default
+        >>> assert Tasks.peakselector(align = None).align is None # change default
+        >>> assert Tasks.peakselector(...) is not None            # back to true default
+
+    """
     selection      = 'selection'
     alignment      = 'alignment'
     driftperbead   = 'driftperbead'
@@ -99,9 +119,16 @@ class Tasks(Enum):
                 return update(deepcopy(arg), **kwa)
             return arg
 
-    def __call__(self, **kwa):
-        cnf  = scriptapp.control.getGlobal("config").tasks
-        task = update(deepcopy(cnf[self.value].get()), **kwa)
+    def __call__(self, *resets, **kwa):
+        cnf  = scriptapp.control.getGlobal("config").tasks[self.value].get()
+        cls  = type(cnf)
+        if Ellipsis in resets:
+            cnf    = cls()
+            resets = tuple(i for i in resets if i is not Ellipsis)
+
+        kwa.update({i: getattr(cls, i) for i, j in kwa.items() if j is RESET})
+        kwa.update({i: getattr(cls, i) for i in resets})
+        task = update(deepcopy(cnf), **kwa)
         self.save(task)
         return task
 
