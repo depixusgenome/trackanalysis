@@ -48,7 +48,7 @@ class PieceAssemble: # pylint:disable=too-many-public-methods
     nscale=1 # type: float
     collection=data.BCollection() # type: data.BCollection
     ooverl=1
-    noverl_tol=1 # keep only the best partitions noverlaps wise
+    noverl_tol=0 # keep only the best partitions noverlaps wise
     #scoring=scores.ScoreAssembly()
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
@@ -72,6 +72,8 @@ class PieceAssemble: # pylint:disable=too-many-public-methods
         # compute for the first group then correct as we had more to it
         # instead of kperms take the list(set(subkperms))
         all_kperms = list(set(self.find_groupperms(groupedids[0])))
+        # can't use find_kperms because we need sub permutation
+        #all_kperms = list(set(self.find_kperms(groupedids[0])))
         # reduce the number of kperms
         # keep the best
 
@@ -82,12 +84,14 @@ class PieceAssemble: # pylint:disable=too-many-public-methods
         min_overlaps=sorted(set(i[0] for i in by_noverlaps),reverse=True)[self.noverl_tol]
         bestooverl=[rkd for idx,rkd in enumerate(by_noverlaps) if rkd[0]>=min_overlaps]
         partskept=[rkd[1] for rkd in bestooverl] # must subdivide into subkperms
-        partitions=[]
+        #partitions=[rkd[1] for rkd in bestooverl]
 
+        partitions=[]
         for part in partskept:
             adding=[]
             for kpr in part:
-                adding=self.kperm2minkperms(self.oligos,self.ooverl,kpr)
+                adding+=[self.cperm2kperm(self.oligos,i)
+                         for i in self.find_cyclicsubs(kpr.kpermids)]
                 #adding+=self.find_subkperms_from_permids(kpr.kpermids)
             partitions.append(list(set(adding)))
 
@@ -104,8 +108,9 @@ class PieceAssemble: # pylint:disable=too-many-public-methods
 
             # should include a test to discard already test kperms using set().intersection()
             # can generate the kperms sequentially
-            #add_kperms=list(frozenset(self.find_kperms(group)))
-            add_kperms=self.find_min_kperms(group)
+            #add_kperms=self.find_min_kperms(group)
+            add_kperms=list(set(self.find_kperms(group)))
+            #add_kperms=list(set(self.find_groupperms(group)))
 
             print("len(add_kperms)=",len(add_kperms))
             if len(add_kperms)==0:
@@ -116,10 +121,6 @@ class PieceAssemble: # pylint:disable=too-many-public-methods
                 pickle.dump(all_kperms,open("all_kperms"+str(groupid)+".pickle","wb"))
 
             # for each kperm in add kperms look if they present a better match than previous ones
-
-            # can add kperms in add_kperms sequentially
-            # and remove duplicated partitions sequentially
-            # (and keep the best ??)
 
             # compute the scores to each partitions
             # only considering kperms which have not been considered previously
@@ -133,19 +134,6 @@ class PieceAssemble: # pylint:disable=too-many-public-methods
             if __debug__:
                 pickle.dump(partitions,open("addedpartitions"+str(groupid)+".pickle","wb"))
 
-            # worth it?
-            def filter_oldkprms(part):
-                'remove partitions formed only by previous kperms'
-                for prm in part:
-                    try:
-                        if max(group) in prm.kpermids: # pylint:disable=cell-var-from-loop
-                            return True
-                    except AttributeError:
-                        pass
-                return False
-
-            # filter out partitions which only have kperms from previously
-            partitions=list(filter(filter_oldkprms,partitions))
             partitions=self.reduce_partitions(partitions)
             print("before reduce len(partitions)=",len(partitions))
             # keep the ones with max noverlaps or
@@ -218,7 +206,6 @@ class PieceAssemble: # pylint:disable=too-many-public-methods
                 tocombine=[kpr for kpr in part1 if kpr.domain.intersection(modified_dom)]
                 tocombine+=part2
                 fixed=[kpr for kpr in part1 if not kpr.domain.intersection(modified_dom)]
-                #combined=self.find_kpermpartitions(tocombine) # before
                 combined=self.find_kpermpartitions(list(frozenset(tocombine)))
                 for comb in combined:
                     addedpartitions.append(fixed+comb)
@@ -254,6 +241,7 @@ class PieceAssemble: # pylint:disable=too-many-public-methods
         return sorted(scored,key=lambda x:-x[0])
 
 
+    # ok but k-cycles are k duplicated
     @staticmethod
     def find_cyclicsubs(perm:Tuple[int, ...]):
         u'find sub-kpermutations within the permutation'
@@ -284,11 +272,11 @@ class PieceAssemble: # pylint:disable=too-many-public-methods
                                kpermids=numpy.array(kpermids),
                                domain=frozenset(cpermids))
 
-
-    def find_min_kperms(self,group:Tuple[int, ...])->List[data.OligoKPerm]:
+    # WRONG!
+    def find_min_orders(self,group:Tuple[int, ...])->List[data.OligoKPerm]:
         u'''
-        computes the kperms of the group
-        then find subperms corresponding to each permutations
+        computes the segments of permuted elements of the group
+        such that elements in the segment overlap
         '''
         grpkperms=self.find_groupperms(group)
         subkperms=[] # type: List[data.OligoKPerm]
@@ -297,7 +285,6 @@ class PieceAssemble: # pylint:disable=too-many-public-methods
 
         return list(frozenset(subkperms))
 
-    # to check!
     @staticmethod
     def kperm2minkperms(oligos:List[data.OligoPeak],
                         ooverl:int,
@@ -329,7 +316,6 @@ class PieceAssemble: # pylint:disable=too-many-public-methods
                                         domain=frozenset(subids))) # to check
         return subs
 
-    # not used anymore
     def find_subkperms_from_permids(self,kpermids:Tuple[int, ...])->List[data.OligoKPerm]:
         u'''finds all sub kperms within a permids
         eg : (0,2,1,3,6,4,5) will return kperms conrresponding to [(0,),(1,2),(4,6,5)]
@@ -338,7 +324,6 @@ class PieceAssemble: # pylint:disable=too-many-public-methods
         kperms=list(frozenset(self.cperm2kperm(self.oligos,sub) for sub in cyclicsubs))
         return kperms
 
-    # not used anymore
     def find_kperms(self,group:Tuple[int, ...])->Generator:
         u'''
         finds the permutations of oligos in cores
@@ -372,8 +357,7 @@ class PieceAssemble: # pylint:disable=too-many-public-methods
         for kprid in secondfiltered:
             yield data.OligoKPerm(oligos=self.oligos,
                                   kperm=[self.oligos[i] for i in kprid],
-                                  kpermids=numpy.array(kprid),
-                                  domain=frozenset(kprid))
+                                  kpermids=numpy.array(kprid))
 
     # needs better implementation
     # pylint: disable=no-self-use

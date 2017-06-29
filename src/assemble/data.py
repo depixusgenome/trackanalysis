@@ -294,6 +294,7 @@ class OligoKPerm(OligoPerm):
                 self._permids[key]=val
         return self._permids
 
+    # not used anymore
     @classmethod
     def get_changes(cls,kperm,sort_by="pos")->FrozenSet[int]:
         u'''
@@ -305,7 +306,6 @@ class OligoKPerm(OligoPerm):
         except AttributeError:
             sortedp=sorted(kperm)
         issame=[sortedp[idx]==kperm[idx] for idx in range(len(kperm))]
-
         try:
             if issame[-1] is False:
                 return frozenset(kperm[issame.index(False):])
@@ -313,11 +313,23 @@ class OligoKPerm(OligoPerm):
         except ValueError:
             return frozenset()
 
+    @classmethod
+    def get_domain(cls,kperm,sort_by="pos")->FrozenSet[int]:
+        u'''
+        return the elements of kperm which are changed by application of the kpermutation
+        '''
+        try:
+            sortedp=sorted(kperm,key=lambda x:getattr(x,sort_by))
+        except AttributeError:
+            sortedp=sorted(kperm)
+        issame=[sortedp[idx]==kperm[idx] for idx in range(len(kperm))]
+        return frozenset(val for idx,val in enumerate(kperm) if not issame[idx])
+
     @property
     def domain(self):
         u'returns the set of indices onto which the k-permutation applies'
         if len(self._domain)==0:
-            self._domain=self.get_changes(self.kpermids)
+            self._domain=self.get_domain(self.kpermids)
         return self._domain
 
     @property
