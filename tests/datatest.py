@@ -3,6 +3,7 @@
 u""" Tests data access """
 from   pathlib      import Path
 from   itertools    import product
+import re
 import numpy as np
 
 from   legacy           import readtrack   # pylint: disable=import-error,no-name-in-module
@@ -213,7 +214,8 @@ def test_scancgr(monkeypatch):
     assert (pairs, grs) == ((), ())
     assert sorted(trks) == sorted(Path(directory).glob("*.trk"))
 
-    monkeypatch.setattr(LegacyGRFilesIO, '_LegacyGRFilesIO__CGR', 'CTGT_selection')
+    monkeypatch.setattr(LegacyGRFilesIO, '_LegacyGRFilesIO__CGR', re.compile('CTGT_selection'))
+    monkeypatch.setattr(LegacyGRFilesIO, '_LegacyGRFilesIO__GRDIR', 'CTGT_selection')
     pairs, grs, trks = LegacyGRFilesIO.scan(directory, directory)
     assert len(grs) == 0
     assert pairs    == ((directory/'test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.trk',

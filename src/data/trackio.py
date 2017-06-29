@@ -3,7 +3,8 @@
 # pylint: disable=arguments-differ
 u"Loading and save tracks"
 from    typing      import (Sequence, Callable, # pylint: disable=unused-import
-                            Any, Union, Tuple, Optional, Iterator, TYPE_CHECKING)
+                            Any, Union, Tuple, Optional, Iterator, Dict,
+                            TYPE_CHECKING)
 from    itertools   import chain
 from    inspect     import signature
 import  pickle
@@ -76,11 +77,12 @@ class PickleIO(_TrackIO):
 
 class LegacyTrackIO(_TrackIO):
     u"checks and opens legacy track paths"
-    @staticmethod
+    __TRKEXT = '.trk'
+    @classmethod
     @_checktype
-    def check(path:PATHTYPE) -> Optional[PATHTYPE]:
+    def check(cls, path:PATHTYPE) -> Optional[PATHTYPE]: # type: ignore
         u"checks the existence of a path"
-        return path if Path(path).suffix == ".trk" else None
+        return path if Path(path).suffix == cls.__TRKEXT else None
 
     @staticmethod
     def open(path:PATHTYPE) -> dict:
@@ -89,9 +91,13 @@ class LegacyTrackIO(_TrackIO):
 
 class LegacyGRFilesIO(_TrackIO):
     u"checks and opens legacy GR files"
-    __CGR     = 'cgr_project'
-    __TITLE   = re.compile(r"\\stack{{Bead (?P<id>\d+) Z.*?phase\(s\)"
-                           +r"(?:[^\d]|\d(?!,))*(?P<phases>[\d, ]*?)\]}}")
+    __TRKEXT = '.trk'
+    __GREXT  = '.gr'
+    __CGREXT = '.cgr'
+    __GRDIR  = 'cgr_project'
+    __CGR    = re.compile(rf'\b{__GRDIR}\b')
+    __TITLE  = re.compile(r"\\stack{{Bead (?P<id>\d+) Z.*?phase\(s\)"
+                          +r"(?:[^\d]|\d(?!,))*(?P<phases>[\d, ]*?)\]}}")
     __GRTITLE = re.compile(r"Bead Cycle (?P<id>\d+) p.*")
     @classmethod
     @_checktype
@@ -102,7 +108,7 @@ class LegacyGRFilesIO(_TrackIO):
             return None
 
         paths = tuple(Path(i) for i in apaths)
-        if sum(1 for i in paths if i.suffix == '.trk') != 1:
+        if sum(1 for i in paths if i.suffix == cls.__TRKEXT) != 1:
             return None
 
         if len(paths) == 2 and any(i.is_dir() for i in paths):
@@ -117,7 +123,7 @@ class LegacyGRFilesIO(_TrackIO):
             return paths
 
         else:
-            trk = next(i for i in paths if i.suffix == '.trk')
+            trk = next(i for i in paths if i.suffix == cls.__TRKEXT)
             grs = tuple(i for i in paths if i.suffix  == '.gr')
             return (trk,) + grs
 
@@ -148,17 +154,18 @@ class LegacyGRFilesIO(_TrackIO):
 
     @classmethod
     def __findgrs(cls, paths):
-        cgr    = cls.__CGR
+        grdir  = cls.__GRDIR
+        ext    = cls.__GREXT, cls.__CGREXT
         err    = lambda j: IOError(j+'\n -'+ '\n -'.join(str(i) for i in paths), 'warning')
         hasgr  = lambda i: (i.is_dir()
-                            and (i.name == cgr
-                                 or any(j.suffix in ('.gr', '.cgr') for j in i.iterdir())))
+                            and (i.name == grdir
+                                 or any(j.suffix in ext for j in i.iterdir())))
 
         grs    = [hasgr(i) for i in paths]
         direct = sum(i for i in grs)
 
         if direct == 0:
-            grs    = [hasgr(i/cgr) for i in paths]
+            grs    = [hasgr(i/grdir) for i in paths]
             direct = sum(i for i in grs)
 
             if direct == 0:
@@ -167,24 +174,24 @@ class LegacyGRFilesIO(_TrackIO):
             elif direct > 1:
                 raise err("All sub-directories have .gr files:")
 
-            return paths[1 if grs[0] else 0], paths[0 if grs[0] else 1]/cgr
+            return paths[1 if grs[0] else 0], paths[0 if grs[0] else 1]/grdir
 
         elif direct > 1:
             raise err("All directories have .gr files:")
 
         return paths[1 if grs[0] else 0], paths[0 if grs[0] else 1]
 
-    @staticmethod
-    def __findtrk(fname:str, grs:PATHTYPE) -> Tuple[PATHTYPE,PATHTYPE]:
-        cgr  = next((i for i in Path(grs).iterdir() if i.suffix == '.cgr'),
+    @classmethod
+    def __findtrk(cls, fname:str, grs:PATHTYPE) -> Tuple[PATHTYPE,PATHTYPE]:
+        cgr  = next((i for i in Path(grs).iterdir() if i.suffix == cls.__CGREXT),
                     None)
         if cgr is None:
-            raise IOError("No '.cgr' files in directory\n- {}".format(grs), "warning")
+            raise IOError(f"No {cls.__CGREXT} files in directory\n- {grs}", "warning")
 
-        pot = cgr.with_suffix('.trk').name
+        pot = cgr.with_suffix(cls.__TRKEXT).name
         trk = next((i for i in _glob(fname) if i.name == pot), None)
         if trk is None:
-            raise IOError("Could not find {} in {}".format(pot, fname), "warning")
+            raise IOError(f"Could not find {pot} in {fname}", "warning")
         return trk, grs
 
     @classmethod
@@ -223,8 +230,19 @@ class LegacyGRFilesIO(_TrackIO):
         return beadid
 
     @staticmethod
-    def __scan(lst, fcn):
+    def __scan(lst, fcn) -> Dict[str, Path]:
         return {i.stem: i for i in chain.from_iterable(_glob(fcn(str(k))) for k in lst)}
+
+    @classmethod
+    def __scantrk(cls, trkdirs) -> Dict[str, Path]:
+        trk = cls.__TRKEXT
+        return cls.__scan(trkdirs, lambda i: i if i.endswith(trk) else i+'/**/*'+trk)
+
+    @classmethod
+    def __scangrs(cls, grdirs) -> Dict[str, Path]:
+        cgr   = cls.__CGR.search
+        grdir = '/**/'+cls.__GRDIR+'/*'+cls.__CGREXT
+        return cls.__scan(grdirs,  lambda i: i if cgr(i) else i + grdir)
 
     @classmethod
     def scan(cls,
@@ -243,9 +261,8 @@ class LegacyGRFilesIO(_TrackIO):
         grdirs  = (grdirs,)  if isinstance(grdirs,  (Path, str)) else grdirs  # type: ignore
         trkdirs = (trkdirs,) if isinstance(trkdirs, (Path, str)) else trkdirs # type: ignore
 
-        cgr  = cls.__CGR
-        trks = cls.__scan(trkdirs, lambda i: i if i.endswith('.trk') else i+'/**/*.trk')
-        cgrs = cls.__scan(grdirs,  lambda i: i if cgr in i           else i+'/**/'+cgr+'/*.cgr')
+        trks    = cls.__scantrk(trkdirs)
+        cgrs    = cls.__scangrs(grdirs)
 
         if matchfcn is None:
             pairs    = frozenset(trks) & frozenset(cgrs)
