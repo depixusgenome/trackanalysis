@@ -221,11 +221,19 @@ class TaskAccess(TaskPlotModelAccess):
 
     @property
     def processor(self) -> Optional[Processor]:
-        "returns the task if it exists"
+        "returns the processor if it exists"
         task = self.task
         if task is None:
             return None
         return next((t for t in self._ctrl.tasks(self.roottask) if self.check(t)), None)
+
+    @property
+    def cache(self):
+        "returns the processor's cache if it exists"
+        task = self.task
+        if task is None:
+            return None
+        return self._ctrl.cache(self.roottask, task)
 
     def _check(self, task, parent = NoArgs) -> bool:
         "wether this controller deals with this task"
