@@ -22,9 +22,14 @@ We add some methods and change the default behaviour:
         * *with...* methods return an updated copy
 """
 # pylint: disable=unused-import
+from   itertools import chain, product, repeat
+from   functools import wraps, partial
+
 import inspect
+import re
 import numpy                 as np
 import pandas                as pd
+
 try:
     import matplotlib.pyplot as plt     # pylint: disable=import-error
 except ImportError:
@@ -48,14 +53,6 @@ try:
 except ImportError:
     pass
 
-_frame = None
-for _frame in inspect.stack()[1:]:
-    if 'importlib' not in _frame.filename:
-        assert (_frame.filename == '<stdin>'
-                or _frame.filename.startswith('<ipython'))
-        break
-del _frame
-
 if 'ipykernel_launcher' in inspect.stack()[-3].filename:
     try:
         from IPython import get_ipython
@@ -64,3 +61,14 @@ if 'ipykernel_launcher' in inspect.stack()[-3].filename:
         get_ipython().magic('matplotlib inline')
     except:                                         # pylint: disable=bare-except
         pass
+
+_frame = None
+for _frame in inspect.stack()[1:]:
+    if 'importlib' not in _frame.filename:
+        if (_frame.filename != '<stdin>'
+                and not _frame.filename.startswith('<ipython')
+                and not _frame.filename.endswith('/trackanalysis.py')
+                and not 'ipython/extensions' in _frame.filename):
+            assert False, _frame.filename
+        break
+del _frame
