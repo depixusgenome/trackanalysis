@@ -9,19 +9,16 @@ can be optimised
 
 import itertools
 from typing import Tuple, List, Generator, Dict # pylint: disable=unused-import
+import pickle
 import numpy
 import assemble.data as data
 import assemble.scores as scores
 import assemble.processor as processor
 import assemble._utils as utils
 
-
-# The Problem is that when we add permutation up until the index (or above)
-# the full scaffolding of permutation is not entirely reconstructed
-# before being scored and eventually discarded.
-# What happens then is that optimal partition are not entirely reconstructed up until the index
-# and discarded before having a chance to perform as well as the optimal
-
+# can select a sub set of the full_kperms to construct the scaffolding
+# can only check the overlap on the previous oligo in rank_by_noverlaps
+# can merge partitions right after ranking so that we don't merge the first kperms each time
 class BaseWise:
     u'align oligo by maximising the overlap one index at a time'
     def __init__(self,**kwa):
@@ -72,7 +69,6 @@ class BaseWise:
         if all(i in merged.domain for i in range(index)):
             return [base]
 
-        # to continue
         next_id=min([idx for idx in range(index) if not idx in merged.domain])
         to_return=[] # type: List[List[data.OligoKPerm]]
         to_add=[kprm for kprm in add_kperms if not merged.domain.intersection(kprm.domain)
@@ -83,13 +79,16 @@ class BaseWise:
         return to_return
 
 
-    def base_per_base(self,pwassemble):
+    def base_per_base(self):
         'constructs the sequence with maximal overlapping one base at a time'
         groupedids=utils.group_overlapping_normdists([oli.dist for oli in self.oligos],
                                                      nscale=self.nscale)[1]
         full_kperms=set([]) # can be updated sequentially
         for group in groupedids:
             full_kperms.update(set(self.find_kperms(group)))
+
+        if __debug__:
+            pickle.dump(full_kperms,open("full_kperms.pickle","wb"))
 
         add_kperms=[kpr for kpr in full_kperms if kpr.domain.intersection({0})]
 
@@ -100,22 +99,15 @@ class BaseWise:
                     or len(kpr.domain)==1]
         partitions=[[kpr] for kpr in add_kperms]
 
-        for index in range(1,len(pwassemble.oligos)):
+        for index in range(1,len(self.oligos)):
             print("len(partitions)=",len(partitions))
             print("index=",index)
             add_kperms=[kpr for kpr in full_kperms if frozenset(kpr.permids).intersection({index})]
             print("len(add_kperms)=",len(add_kperms))
             added_partitions=[]
             for part in partitions:
-                #mx_idx=max([max(kpr.kpermids) for kpr in part])
-                # before was checking that the max_idx was lower than<index to complement
-                # instead always complement
-                # if the partition is too short
-                # then extend the partition until all indices<index are in domain
+                # extend the part until all indices<index are in domain
                 # kpr in add_kperms which do not intersect with part
-                #new_parts=construct_scaffold(part,[kpr for kpr in add_kperms
-                #                                   if not any(prm.domain.intersection(kpr.domain)
-                #                                              for prm in part)],index)
                 new_parts=self.construct_scaffold(part,full_kperms,index)
                 added_partitions+=new_parts
 
@@ -127,6 +119,9 @@ class BaseWise:
             # too restrictive?
             #partitions=pwassemble.add2partitions(partitions,[[kpr] for kpr in add_kperms])
             partitions=[part for score,part in ranked if score==max_overlap]
+            if __debug__:
+                pickle.dump(partitions,open("partitions"+str(index)+".pickle","wb"))
+                pickle.dump(ranked,open("ranked"+str(index)+".pickle","wb"))
         # for each base from 0 to len(oligos)-1
         # select all kperms which intersect this base
         # keep all partitions
