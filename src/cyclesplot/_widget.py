@@ -21,7 +21,7 @@ from    view.plots.sequence import readsequence, OligoListWidget, SequencePathWi
 from    view.base           import enableOnTrack
 from    modaldialog.view    import AdvancedWidgetMixin
 
-from    eventdetection.processor import AlignmentTactic
+from    eventdetection.view import AlignmentWidget, EventDetectionWidget
 
 from    ._bokehext          import DpxHoverModel      # pylint: disable=unused-import
 
@@ -177,28 +177,6 @@ class ConversionSlidersWidget(_Widget):
             mdl.updating  = 'bias'
         bias   .js_on_change('value', _js_bias_cb)
 
-class AlignmentWidget(GroupWidget):
-    "Allows aligning the cycles on a given phase"
-    INPUT   = RadioButtonGroup
-    __ORDER = (None, AlignmentTactic.pull, AlignmentTactic.onlyinitial,
-               AlignmentTactic.onlypull)
-    def __init__(self, model:PlotModelAccess) -> None:
-        super().__init__(model)
-        self.css.title.alignment.labels.default = [u'ø', u'best', u'Φ1', u'Φ3']
-        self.css.title.alignment.default        = u'Alignment'
-
-    def onclick_cb(self, value):
-        "action to be performed when buttons are clicked"
-        if value == 0:
-            self._model.alignment.remove()
-        else:
-            self._model.alignment.update(phase = self.__ORDER[value])
-
-    def _data(self):
-        val    = getattr(self._model.alignment.task, 'phase', None)
-        active = 0 if val is None else self.__ORDER.index(AlignmentTactic(val))
-        return dict(active = active)
-
 class DriftWidget(GroupWidget):
     "Allows removing the drifts"
     INPUT = CheckboxButtonGroup
@@ -224,24 +202,6 @@ class DriftWidget(GroupWidget):
         if self._model.driftpercycle.task is not None:
             value += [1]
         return dict(active = value)
-
-class EventDetectionWidget(GroupWidget):
-    "Allows displaying only events"
-    INPUT = CheckboxGroup
-    def __init__(self, model:PlotModelAccess) -> None:
-        super().__init__(model)
-        self.css.title.eventdetection.labels.default = [u'Find events']
-
-    def onclick_cb(self, value):
-        "action to be performed when buttons are clicked"
-        task = self._model.eventdetection.task
-        if 0 in value and task is None:
-            self._model.eventdetection.update()
-        elif 0 not in value and task is not None:
-            self._model.eventdetection.remove()
-
-    def _data(self) -> dict:
-        return dict(active = [] if self._model.eventdetection.task is None else [0])
 
 class AdvancedWidget(AdvancedWidgetMixin, _Widget):
     "access to the modal dialog"

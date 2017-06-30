@@ -6,7 +6,7 @@ from    typing         import Dict, Sequence, Tuple, TYPE_CHECKING
 
 from    bokeh.plotting import figure, Figure
 from    bokeh.models   import LinearAxis, ColumnDataSource, CustomJS, Range1d
-from    bokeh.model    import Model
+from    bokeh.model    import LayoutDOM
 import  bokeh.core.properties as props
 import  bokeh.colors
 
@@ -19,7 +19,7 @@ from    control                 import Controller
 
 from    ._model                 import CyclesModelAccess
 
-class DpxCyclesPlot(Model):
+class DpxCleaning(LayoutDOM):
     "This starts tests once flexx/browser window has finished loading"
     __implementation__ = "_cycles.coffee"
     framerate          = props.Float(30.)
@@ -36,7 +36,7 @@ class CyclesPlotCreator(TaskPlotCreator):
         cnf.colors.dark .defaults = dict(good = 'gray', bad = 'red', extent = 'orange')
         self.css.figure.width.default  = 500
         self.__source = None # type: ColumnDataSource
-        self.__client = None # type: DpxCyclesPlot
+        self.__client = None # type: DpxCleaning
         if TYPE_CHECKING:
             self._model = CyclesModelAccess(self._ctrl, '')
 
@@ -44,7 +44,7 @@ class CyclesPlotCreator(TaskPlotCreator):
         self.__source = ColumnDataSource(data = self.__data())
 
         fig           = figure(**self._figargs(y_range = Range1d, name = 'Clean:Cycles'))
-        self.__client = DpxCyclesPlot(figure = fig)
+        self.__client = DpxCleaning(figure = fig)
         doc.add_root(self.__client)
 
         self.css.cycles.points.addto(fig, x = 't', y = 'z', source = self.__source)
