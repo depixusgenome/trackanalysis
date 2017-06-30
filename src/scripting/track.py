@@ -160,11 +160,11 @@ class BeadsDict(dict):
 
     def __missing__(self, key):
         trk   = self.tracks[key[0]]
-        tasks = trk.tasklist(self.tasks if len(key) == 2 else tuple(key[2:]))
+        tasks = trk.tasklist(*(self.tasks if len(key) == 2 else key[2:]))
         if len(tasks) == 1:
             return trk.beads[key[1]]
 
-        val = list(trk.apply(tasks)[key[1],...].values())
+        val = list(trk.apply(*tasks[1:])[key[1],...].values())
         key = key[0], key[1], pickle.dumps(tasks[1:])
         self.__setitem__(key, val)
         return val

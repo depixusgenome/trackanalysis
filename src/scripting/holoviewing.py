@@ -17,6 +17,8 @@ if 'ipykernel_launcher' in inspect.stack()[-3].filename:
         import bokeh.io as _io
         _io.output_notebook()
         hv.notebook_extension('bokeh')
+        from IPython import get_ipython
+        get_ipython().magic('output size=150')
     except:                                         # pylint: disable=bare-except
         pass
 
