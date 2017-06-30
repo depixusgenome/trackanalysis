@@ -114,10 +114,6 @@ class BaseWise:
             print(len(added_partitions))
             ranked=self.rank_by_noverlaps(added_partitions,self.ooverl,index)
             max_overlap=max(i[0] for i in ranked)
-            # compute the noverlaps of data.OligoPerm.add(*part).perm between 0 and i<index
-            # keep only the partitions which have maximal noverlaps
-            # too restrictive?
-            #partitions=pwassemble.add2partitions(partitions,[[kpr] for kpr in add_kperms])
             partitions=[part for score,part in ranked if score==max_overlap]
             if __debug__:
                 pickle.dump(partitions,open("partitions"+str(index)+".pickle","wb"))
