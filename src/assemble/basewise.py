@@ -5,6 +5,7 @@ permutes oligos to find maximal overlapping
 checks base per base that the constructed sequence is optimal
 allows for multiple possibilities
 can be optimised
+can be modified (1 line) # HERE to look for all suboptimal solutions
 '''
 
 import itertools
@@ -16,6 +17,7 @@ import assemble.scores as scores
 import assemble.processor as processor
 import assemble._utils as utils
 
+# possible optimisations:
 # can select a sub set of the full_kperms to construct the scaffolding
 # can only check the overlap on the previous oligo in rank_by_noverlaps
 # can merge partitions right after ranking so that we don't merge the first kperms each time
@@ -108,22 +110,19 @@ class BaseWise:
             for part in partitions:
                 # extend the part until all indices<index are in domain
                 # kpr in add_kperms which do not intersect with part
-                new_parts=self.construct_scaffold(part,full_kperms,index)
+                #new_parts=self.construct_scaffold(part,full_kperms,index) # works
+                new_parts=self.construct_scaffold(part,add_kperms,index) # test should be faster
                 added_partitions+=new_parts
 
             print(len(added_partitions))
             ranked=self.rank_by_noverlaps(added_partitions,self.ooverl,index)
             max_overlap=max(i[0] for i in ranked)
             partitions=[part for score,part in ranked if score==max_overlap]
+            # HERE
+            # if needed: partitions=[part for score,part in ranked if score>max_overlap-2]
             if __debug__:
                 pickle.dump(partitions,open("partitions"+str(index)+".pickle","wb"))
                 pickle.dump(ranked,open("ranked"+str(index)+".pickle","wb"))
-        # for each base from 0 to len(oligos)-1
-        # select all kperms which intersect this base
-        # keep all partitions
-        # we can discard a partition iff:
-        # we know that no permutation will never affect oligos before i
-        # and that the (merged) partitition up to i-1 has lower noverlaps
         return partitions
 
     def find_kperms(self,group:Tuple[int, ...])->Generator:
@@ -183,39 +182,6 @@ class BaseWise:
         return list(set(subkprms))
 
     # check if these methods could be useful here
-    @staticmethod
-    def reduce_partitions(partitions:List[List[data.OligoPerm]])->List[List[data.OligoPerm]]:
-        u'''
-        if two partitions result in the same permids, keep the one with smallest domain
-        could test using set(object with hash from permids, domain and __eq__ if domain is the same)
-        before keeping partitions with smaller domains
-        '''
-        all_merged=dict() # type: Dict[int,List[data.OligoPerm]]
-        for part in partitions:
-            merged=data.OligoPerm.add(*part)
-            hashid=hash(merged.permids.tobytes())
-            try:
-                cmp_with=all_merged[hashid]
-                dealt=False
-                for oidx,opart in enumerate(cmp_with):
-                    if opart[0]<=merged.domain:
-                        # less constrained was already found
-                        dealt=True
-                        break
-                    if opart[0]>merged.domain:
-                        # replace with less constrained partition
-                        all_merged[hashid][oidx]=(merged.domain,part)
-                        dealt=True
-                        break
-                if not dealt:
-                    all_merged[hashid]+=[(merged.domain,part)]
-            except KeyError:
-                all_merged[hashid]=[(merged.domain,part)]
-        toout=[mpart[1] for value in all_merged.values() for mpart in value]
-        all_merged.clear()
-        del all_merged
-        return toout
-
 
     def find_groupperms(self,group:Tuple[int, ...])->Generator:
         u'''
