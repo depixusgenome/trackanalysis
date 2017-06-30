@@ -22,8 +22,12 @@ We add some methods and change the default behaviour:
         * *with...* methods return an updated copy
 """
 from itertools              import product
+from pathlib                import Path
+import pickle
+import re
 
 from data                   import Track as _Track, Beads, Cycles
+from data.trackio           import LegacyGRFilesIO
 from signalfilter           import PrecisionAlg, NonLinearFilter
 from control.taskcontrol    import create as _create
 from model.task             import TrackReaderTask
@@ -113,4 +117,56 @@ def _withfilter(self, tpe = NonLinearFilter, **kwa):
 for _cls in (Beads, Cycles, Events):
     _cls.withfilter = _withfilter
 
-__all__ = ['Track']
+class TracksDict(dict):
+    "Dictionnary of tracks"
+    def __init__(self, trks, grs, reg = None, *tasks, **kwa):
+        super().__init__()
+        paths      = LegacyGRFilesIO.scan(trks, grs)[0]
+        match      = (lambda _: True) if reg is None else lambda i: re.match(reg, str(i[0]))
+        self.paths = {match(i).group(1): i for i in paths if match(i)}
+
+        self.tasks = tasks
+        self.update(**kwa)
+
+    def __setitem__(self, key, val):
+        if isinstance(val, (str, Path, tuple, list, set)):
+            self.paths[key] = val
+            return val
+
+        if isinstance(val, _Track) and not isinstance(val, Track):
+            val = _Track(**val.__dict__)
+
+        if len(self.tasks):
+            val = val.apply(*self.tasks)
+        super().__setitem__(key, val)
+        return val
+
+    def update(self, *args, **kwargs):
+        "adds paths or tracks to self"
+        info = {}
+        info.update(*args, **kwargs)
+        for i, j in info.items():
+            self.__setitem__(i, j)
+
+    def __missing__(self, olig):
+        return self.__setitem__(olig, Track(path = self.paths.get(olig, olig)))
+
+class BeadsDict(dict):
+    "A dictionnary of potentially transformed bead data"
+    def __init__(self, tracks, *tasks):
+        super().__init__(self)
+        self.tracks = tracks
+        self.tasks  = tasks
+
+    def __missing__(self, key):
+        trk   = self.tracks[key[0]]
+        tasks = trk.tasklist(self.tasks if len(key) == 2 else tuple(key[2:]))
+        if len(tasks) == 1:
+            return trk.beads[key[1]]
+
+        val = list(trk.apply(tasks)[key[1],...].values())
+        key = key[0], key[1], pickle.dumps(tasks[1:])
+        self.__setitem__(key, val)
+        return val
+
+__all__ = ['Track', 'TracksDict', 'BeadsDict']

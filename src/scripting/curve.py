@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "for speeding up the creation of figures"
+import warnings
 from itertools      import chain
 import numpy as np
-from bokeh.plotting import Figure, figure
-from bokeh.io       import show as _show
-from bokeh.models   import DataRange1d, LinearAxis, ColumnDataSource
 
-from data           import TrackItems
-from utils          import EVENTS_DTYPE
+with warnings.catch_warnings():
+    warnings.filterwarnings('ignore', category = FutureWarning)
+    import pandas.tslib # pylint: disable=unused-import
+
+from bokeh.io               import output_notebook
+from bokeh.models.widgets   import Panel, Tabs # pylint: disable=unused-import
+from bokeh.plotting         import Figure, figure
+from bokeh.io               import show as _show
+from bokeh.models           import DataRange1d, LinearAxis, ColumnDataSource
+
+from data                   import TrackItems
+from utils                  import EVENTS_DTYPE
 
 class Multiplier:
     "basic right multiplier"
@@ -172,3 +180,6 @@ def rcurve(*data, axis = 'y', bias = 0., stretch = 1., positions = None, **kwa):
 def extra(*args, **kwa):
     "adds a right axis"
     return ExtraAxis(*args, **kwa)
+
+__all__ = ['output_notebook', 'Panel', 'Tabs', 'Figure', 'figure',
+           'show', 'curve', 'rcurve', 'extra']
