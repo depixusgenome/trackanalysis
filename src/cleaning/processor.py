@@ -1,19 +1,24 @@
-#!/usr/bin/env python4
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Selecting beads"
 
-from    typing              import (Optional, # pylint: disable=unused-import
-                                    NamedTuple, Tuple, Union)
-from    itertools           import repeat
-from    functools           import partial
-import  numpy               as     np
+from    typing                import (Optional, # pylint: disable=unused-import
+                                      NamedTuple, Tuple, Union)
+from    itertools             import repeat
+from    functools             import partial
+import  numpy                 as     np
+from    scipy.ndimage.filters import correlate1d
 
-from    utils               import initdefaults
-from    signalfilter        import nanhfsigma
-from    model               import Task, Level, PHASE
-from    control.processor   import Processor
+from    utils                 import initdefaults
+from    signalfilter          import nanhfsigma
+from    model                 import Task, Level, PHASE
+from    control.processor     import Processor
 
-Partial = NamedTuple('Partial', [('name', str), ('min', np.ndarray), ('max', np.ndarray)])
+Partial = NamedTuple('Partial',
+                     [('name', str),
+                      ('min', np.ndarray),
+                      ('max', np.ndarray),
+                      ('values', np.ndarray)])
 
 class DataCleaning:
     "bead selection"
@@ -35,7 +40,16 @@ class DataCleaning:
             high = np.nonzero(test >= getattr(self, 'max'+name))[0]
         else:
             high = np.zeros(0)
-        return Partial(name, low, high)
+        return Partial(name, low, high, test)
+
+    @staticmethod
+    def badcycles(stats):
+        "returns all bad cycles"
+        bad = np.empty(0, dtype = 'i4')
+        for stat in stats:
+            bad = np.union1d(bad, stat.min)
+            bad = np.union1d(bad, stat.max)
+        return bad
 
     def hfsigma(self, cycs: np.ndarray) -> Partial:
         "computes noisy cycles"
@@ -104,10 +118,7 @@ class DataCleaningException(Exception):
     @classmethod
     def test(cls, tasktype, stats, **cnf) -> Optional['DataCleaningException']:
         "creates a DataCleaningException if needed"
-        bad = np.empty(0, dtype = 'i4')
-        for stat in stats:
-            bad = np.union1d(bad, stat.min)
-            bad = np.union1d(bad, stat.max)
+        bad = tasktype.badcycles(stats)
         if len(bad) < cnf.get('ncycles', getattr(tasktype, 'ncycles')):
             return cls(tasktype, stats, **cnf)
         return bad

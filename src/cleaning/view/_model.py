@@ -3,7 +3,6 @@
 "access to the model"
 import numpy as np
 
-from model.task                 import DataSelectionTask
 from eventdetection.processor   import ExtremumAlignmentTask
 from view.plots.tasks           import TaskPlotModelAccess, TaskAccess
 
@@ -27,10 +26,18 @@ class DataCleaningAccess(TaskAccess):
             cache.setdefault(i, Partial(i,  *self.__DEFAULT))
         return cache
 
-class CyclesModelAccess(TaskPlotModelAccess):
+    @property
+    def badcycles(self):
+        "returns bad cycles"
+        mem   = super().cache()
+        cache = None if mem is None else {i.name: i for i in mem.get(self.bead, ())}
+        if cache is None:
+            return np.ones(0, dtype = 'i4')
+        return DataCleaningTask.badcycles(cache)
+
+class DataCleaningModelAccess(TaskPlotModelAccess):
     "Model for Cycles View"
     def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
-        self.alignment     = TaskAccess(self, ExtremumAlignmentTask)
-        self.dataselection = TaskAccess(self, DataSelectionTask)
-        self.cleaning      = DataCleaningAccess(self)
+        self.alignment = TaskAccess(self, ExtremumAlignmentTask)
+        self.cleaning  = DataCleaningAccess(self)
