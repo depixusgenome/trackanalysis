@@ -57,12 +57,34 @@ class BaseWise:
 
         return sorted(scored,key=lambda x:x[0],reverse=True)
 
+    @staticmethod
+    def increment_noverlaps(partitions:List[data.Partition],
+                            ooverl:int,
+                            index:int):
+        'increments the noverlaps value up to index'
+        for partid,part in enumerate(partitions):
+            merged=part.merge()
+            if __debug__:
+                if not all(i in merged.domain for i in range(index)):
+                    print("missing index values in "+str(merged.domain))
+                    print("index=",index)
+                    raise ValueError
+
+
+            kprm=data.OligoKPerm(kperm=merged.perm[index-2:index])
+
+            score=scores.ScoreAssembly(perm=kprm,
+                                       ooverl=ooverl)
+            partitions[partid].noverlaps+=score.noverlaps()
+
+        return
+
     @classmethod
-    def construct_scaffold(cls,
-                           base:List[data.OligoPerm],
-                           add_kperms:List[data.OligoKPerm],
-                           index:int)->List[List[data.OligoKPerm]]:
-        u'''
+    def old_construct_scaffold(cls,
+                               base:List[data.OligoPerm],
+                               add_kperms:List[data.OligoKPerm],
+                               index:int)->List[List[data.OligoKPerm]]:
+        '''
         the base is the starting partition is expand up to index.
         ie until domain for merged base
         does not produce duplicates
@@ -76,12 +98,45 @@ class BaseWise:
         to_add=[kprm for kprm in add_kperms if not merged.domain.intersection(kprm.domain)
                 and next_id in kprm.domain]
         for kprm in to_add:
-            to_return+=cls.construct_scaffold(base+[kprm],add_kperms,index)
+            to_return+=cls.old_construct_scaffold(base+[kprm],add_kperms,index)
 
         return to_return
 
+    @classmethod
+    def construct_scaffold(cls,
+                           base:data.Partition,
+                           add_kperms:List[data.OligoKPerm],
+                           index:int)->List[data.Partition]:
+        '''
+        the base is the starting partition is expand up to index-1
+        i.e. until domain for merged base
+        no recursion
+        '''
+        merged=base.merge()
+        if all(i in merged.domain for i in range(index)):
+            return [base]
 
-    def base_per_base(self):
+        completed=[] # type: List[data.Partition]
+        to_complete=[base]
+        while True:
+            if len(to_complete)==0:
+                break
+            to_add=[] # type: List[data.Partition]
+            for part in to_complete:
+                merged=part.merge()
+                next_ids=[idx for idx in range(index) if not idx in merged.domain]
+                if len(next_ids)==0:
+                    completed.append(part)
+                    continue
+                to_add+=[part.add(kprm,in_place=False) for kprm in add_kperms
+                         if not merged.domain.intersection(kprm.domain)
+                         and next_ids[0] in kprm.domain]
+            to_complete=to_add
+
+        return completed
+
+
+    def base_per_base(self)->List[data.Partition]:
         'constructs the sequence with maximal overlapping one base at a time'
         groupedids=utils.group_overlapping_normdists([oli.dist for oli in self.oligos],
                                                      nscale=self.nscale)[1]
@@ -99,30 +154,34 @@ class BaseWise:
         add_kperms=[kpr for kpr in add_kperms
                     if data.OligoPeak.tail_overlap(kpr.perm[0].seq,kpr.perm[1].seq)
                     or len(kpr.domain)==1]
-        partitions=[[kpr] for kpr in add_kperms]
+        #partitions=[[kpr] for kpr in add_kperms] # before
+        partitions=[data.Partition(perms=[kpr]) for kpr in add_kperms]
 
         for index in range(1,len(self.oligos)):
             print("len(partitions)=",len(partitions))
             print("index=",index)
             add_kperms=[kpr for kpr in full_kperms if frozenset(kpr.permids).intersection({index})]
             print("len(add_kperms)=",len(add_kperms))
-            added_partitions=[]
+            added_partitions=[] # type: List[data.Partition]
             for part in partitions:
                 # extend the part until all indices<index are in domain
                 # kpr in add_kperms which do not intersect with part
                 #new_parts=self.construct_scaffold(part,full_kperms,index) # works
+                #new_parts=self.construct_scaffold(part,add_kperms,index) # test should be faster
                 new_parts=self.construct_scaffold(part,add_kperms,index) # test should be faster
                 added_partitions+=new_parts
 
-            print(len(added_partitions))
-            ranked=self.rank_by_noverlaps(added_partitions,self.ooverl,index)
-            max_overlap=max(i[0] for i in ranked)
-            partitions=[part for score,part in ranked if score==max_overlap]
+            #ranked=self.rank_by_noverlaps(added_partitions,self.ooverl,index)
+            self.increment_noverlaps(added_partitions,self.ooverl,index)
+            #max_overlap=max(i[0] for i in ranked) # before
+            max_overlap=max(part.noverlaps for part in added_partitions) # pylint: disable=no-member
+            #partitions=[part for score,part in ranked if score==max_overlap] # before
+            partitions=[part for part in added_partitions if part.noverlaps==max_overlap] # pylint: disable=no-member
             # HERE
             # if needed: partitions=[part for score,part in ranked if score>max_overlap-2]
+            # can add a restriction on the stretch,bias
             if __debug__:
                 pickle.dump(partitions,open("partitions"+str(index)+".pickle","wb"))
-                pickle.dump(ranked,open("ranked"+str(index)+".pickle","wb"))
         return partitions
 
     def find_kperms(self,group:Tuple[int, ...])->Generator:
