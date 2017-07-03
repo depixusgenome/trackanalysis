@@ -74,10 +74,10 @@ class DataCleaning:
 
 class DataCleaningTask(DataCleaning, Task):
     "bead selection task"
-    level         = Level.bead
-    hfsigmaphases = PHASE.measure, PHASE.measure
-    extentphases  = PHASE.initial, PHASE.measure
-    mincycles     = 50
+    level            = Level.bead
+    hfsigmaphases    = PHASE.measure, PHASE.measure
+    populationphases = PHASE.measure, PHASE.measure
+    extentphases     = PHASE.initial, PHASE.measure
     @initdefaults
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -133,7 +133,7 @@ class DataCleaningProcessor(Processor):
     def __test(cls, frame, cnf):
         sel = DataCleaningTask(**cnf)
         for name in ('population', 'hfsigma', 'extent'):
-            cycs = tuple(frame.withphases(*cls.__get(name, cnf)).values())
+            cycs = tuple(frame.withphases(*cls.__get(name+'phases', cnf)).values())
             yield getattr(sel, name)(cycs)
 
     @classmethod

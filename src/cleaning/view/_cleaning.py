@@ -45,7 +45,7 @@ class DataCleaningPlotCreator(TaskPlotCreator, WidgetMixin):
         fig.add_layout(axis, 'above')
 
         self._addcallbacks(fig)
-        return self._keyedlayout(fig, widgets = self._createwidget(fig))
+        return self._keyedlayout(fig, bottom = self._createwidget(fig))
 
     def _reset(self):
         if self._model.colorstore is not None:

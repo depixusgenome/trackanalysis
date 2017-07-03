@@ -10,7 +10,7 @@ import bokeh.core.properties as props
 from bokeh                      import layouts
 from bokeh.plotting             import figure, Figure    # pylint: disable=unused-import
 from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
-                                        Model, TapTool, CustomJS, ToolbarBox)
+                                        Model, TapTool, CustomJS)
 import bokeh.colors             as     bkcolors
 import numpy                    as     np
 
