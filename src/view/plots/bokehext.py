@@ -4,7 +4,9 @@
 from itertools               import product
 import re
 
-from bokeh.models            import Row, Model, HoverTool, CustomJS, NumberFormatter
+from bokeh                   import layouts
+from bokeh.models            import (Row, Model, HoverTool, CustomJS,
+                                     NumberFormatter, ToolbarBox)
 from bokeh.plotting.figure   import Figure
 
 import bokeh.core.properties   as     props
@@ -59,6 +61,22 @@ class DpxKeyedRow(Row): # pylint: disable=too-many-ancestors
                          zoomrate = cnf.zoom.rate.get(),
                          panrate  = cnf.pan.rate.get(),
                          **kwa)
+
+    @classmethod
+    def keyedlayout(cls, plot, main, *figs, bottom = None, left = None):
+        "sets up a DpxKeyedRow layout"
+        figs  = (main,) + figs
+        plts  = layouts.gridplot([[*figs]], toolbar_location = plot.css.toolbar_location.get())
+        keyed = cls(plot, main, children = [plts],
+                    toolbar  = next(i for i in plts.children if isinstance(i, ToolbarBox)))
+
+        if left is None and bottom is None:
+            return keyed
+        if left is None:
+            return layouts.column([keyed, bottom])
+        if bottom is None:
+            return layouts.row([left, keyed])
+        return layouts.column(layouts.row([left, keyed]), bottom)
 
 class DpxHoverTool(HoverTool): # pylint: disable=too-many-ancestors
     "sorts indices before displaying tooltips"

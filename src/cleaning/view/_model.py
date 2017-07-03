@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "access to the model"
+from   typing         import Tuple #pylint: disable=unused-import
 import numpy as np
 
 from eventdetection.processor   import ExtremumAlignmentTask
@@ -41,3 +42,8 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
         super().__init__(ctrl, key)
         self.alignment = TaskAccess(self, ExtremumAlignmentTask)
         self.cleaning  = DataCleaningAccess(self)
+        self.colorstore = None # type: Tuple[int, np.ndarray, Tuple[int,...]]
+
+    def reset(self) -> bool:
+        self.colorstore = None
+        return super().reset()

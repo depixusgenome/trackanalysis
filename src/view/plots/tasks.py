@@ -165,7 +165,7 @@ class TaskAccess(TaskPlotModelAccess):
                                   tasktype.__name__.lower()[:-len('Task')])
 
         # pylint: disable=not-callable
-        self.config.root.tasks.order.default = TASK_ORDER
+        self.config.root.tasks.order.default = list(TASK_ORDER)
 
         cur = self.config.root.tasks.get(self.configname, default = None)
         assert cur is None or isinstance(cur, tasktype)

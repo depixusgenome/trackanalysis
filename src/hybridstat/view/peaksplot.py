@@ -15,7 +15,7 @@ import bokeh.colors             as     bkcolors
 import numpy                    as     np
 
 from view.base                  import enableOnTrack
-from view.plots                 import PlotView, PlotAttrs, from_py_func, DpxKeyedRow
+from view.plots                 import PlotView, PlotAttrs, from_py_func
 from view.plots.tasks           import TaskPlotCreator
 from view.plots.sequence        import (SequenceTicker, OligoListWidget,
                                         SequenceHoverMixin)
@@ -198,14 +198,7 @@ class PeaksPlotCreator(TaskPlotCreator):
         self.__create_fig()
         rends = self.__add_curves()
         self.__setup_tools(doc, rends)
-
-        plts  = layouts.gridplot([[self._fig]],
-                                 toolbar_location = self.css.toolbar_location.get())
-        keyed = DpxKeyedRow(self, self._fig,
-                            children = [plts],
-                            toolbar  = next(i for i in plts.children
-                                            if isinstance(i, ToolbarBox)))
-        return layouts.row(self.__setup_widgets(), keyed)
+        return self._keyedlayout(self._fig, bottom = self.__setup_widgets())
 
     def observe(self):
         super().observe()

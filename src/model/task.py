@@ -202,12 +202,14 @@ class DataFunctorTask(Task):
 
 TASK_ORDER = ('model.task.RootTask',
               'model.task.DataSelectionTask',
+              'cleaning.processor.DataCleaningTask',
               'eventdetection.processor.ExtremumAlignmentTask',
               'cordrift.processor.DriftTask',
               'eventdetection.processor.EventDetectionTask',
               'peakfinding.processor.PeakSelectorTask',
               'peakcalling.processor.FitToHairpinTask',
              )
+
 def taskorder(lst):
     "yields a list of task types in the right order"
     for itm in lst:

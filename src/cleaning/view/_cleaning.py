@@ -15,14 +15,16 @@ from    view.plots.tasks        import TaskPlotCreator
 from    control                 import Controller
 
 from    ._model                 import DataCleaningModelAccess
+from    ._widget                import WidgetMixin
 from    ..processor             import DataCleaningException
 
-class DataCleaningPlotCreator(TaskPlotCreator):
+class DataCleaningPlotCreator(TaskPlotCreator, WidgetMixin):
     "Building the graph of cycles"
     _MODEL = DataCleaningModelAccess
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
+        WidgetMixin.__init__(self)
         cnf = self.css.cycles
         cnf.points      .default  = PlotAttrs('color',  'circle', 1, alpha   = .5)
         cnf.colors.basic.defaults = dict(good = 'blue', bad = 'red', extent = 'orange')
@@ -30,7 +32,6 @@ class DataCleaningPlotCreator(TaskPlotCreator):
         self.css.figure.width.default  = 500
 
         self.__source  = None                 # type: ColumnDataSource
-        self.__store   = (np.ones(0), (0, 0)) # type: Tuple[np.ndarray, Tuple[int,...]]
         if TYPE_CHECKING:
             self._model = DataCleaningModelAccess(self._ctrl, '')
 
@@ -44,16 +45,16 @@ class DataCleaningPlotCreator(TaskPlotCreator):
         fig.add_layout(axis, 'above')
 
         self._addcallbacks(fig)
-        self._createwidget(fig)
-        return self.__model.figure
+        return self._keyedlayout(fig, widgets = self._createwidget(fig))
 
     def _reset(self):
-        self._bkmodels[self.__source]['data']      = self.__data()
-
-        info = dict(framerate = getattr(self._model.track, 'framerate', 1./30.))
-        task = self._model.cleaning.task
-        if task is not None:
-            info.update(task.config())
+        if self._model.colorstore is not None:
+            color = self.__color()
+            if not np.all_close(color, self.__source.data['color']):
+                self.__source.stream(dict(color = color), rollover = len(color))
+        else:
+            self._bkmodels[self.__source]['data'] = self.__data()
+        self._resetwidget()
 
     def __data(self) -> Dict[str, np.ndarray]:
         try:
@@ -71,11 +72,6 @@ class DataCleaningPlotCreator(TaskPlotCreator):
                    color = self.__color(items, val).ravel())
         assert all(len(i) == val.size for  i in res.values())
         return res
-
-    def __ondatacleaning(self):
-        color = self.__update_color(**self.__store)
-        if any(i != j for i, j in zip(color, self.__source.data['color'])):
-            self.__source.stream(dict(color = color), rollover = len(color))
 
     @staticmethod
     def __zvalue(items) -> np.ndarray:
@@ -95,11 +91,12 @@ class DataCleaningPlotCreator(TaskPlotCreator):
         tmp = np.array([i[-1] for i, _ in items], dtype = 'i4')
         return as_strided(tmp, shape = val.shape, strides = (tmp.strides[0], 0))
 
-    def __color(self, items, val) -> np.ndarray:
-        self.__store = np.argsort([i[-1] for i, _ in items]), val.shape
-        return self.__update_color(*self.__store)
+    def __color(self, items = None, val = None) -> np.ndarray:
+        assert (val is None) is (items is None)
+        if items is not None:
+            self._model.colorstore = np.argsort([i[-1] for i, _ in items]), val.shape
+        inds, shape = self._model.colorstore
 
-    def __update_color(self, inds, shape) -> np.ndarray:
         cnf   = self.css.colors[self.css.theme.get()]
         hexes = {i: getattr(bokeh.colors, cnf[i].get()).to_hex()
                  for i in ('good', 'hfsigma', 'extent')}
@@ -116,5 +113,8 @@ class DataCleaningPlotView(PlotView):
     "Peaks plot view"
     PLOTTER = DataCleaningPlotCreator
     def ismain(self):
-        "Alignment, ... is set-up by default"
-        raise NotImplementedError()
+        "Cleaning and alignment, ... are set-up by default"
+        super()._ismain(tasks  = ['datacleaning', 'extremumalignment'],
+                        ioopen = [slice(None, -2),
+                                  'control.taskio.ConfigGrFilesIO',
+                                  'control.taskio.ConfigTrackIO'])

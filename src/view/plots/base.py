@@ -22,7 +22,7 @@ from    utils.logconfig         import getLogger
 from    control                 import Controller
 from    control.globalscontrol  import GlobalsAccess
 from    ..base                  import BokehView, threadmethod, spawn, SINGLE_THREAD
-from    .bokehext               import DpxHoverTool, from_py_func
+from    .bokehext               import DpxHoverTool, from_py_func, DpxKeyedRow
 
 LOGS    = getLogger(__name__)
 _m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
@@ -492,6 +492,9 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
             if args.get(name, _m_none) is Range1d:
                 args[name] = Range1d(start = 0., end = 0.)
         return args
+
+    def _keyedlayout(self, main, *figs, left = None, bottom = None):
+        return DpxKeyedRow.keyedlayout(self, main, *figs, left = left, bottom = bottom)
 
     @abstractmethod
     def _create(self, doc):

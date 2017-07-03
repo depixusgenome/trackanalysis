@@ -3,13 +3,10 @@
 "Cycles plot"
 from    typing              import Optional, TYPE_CHECKING # pylint: disable=unused-import
 
-from    bokeh               import layouts
-from    bokeh.models        import ToolbarBox
-
 from    control             import Controller
 from    control.taskio      import ConfigTrackIO, GrFilesIO
 
-from    view.plots          import DpxKeyedRow, PlotView
+from    view.plots          import PlotView
 from    view.plots.tasks    import TaskPlotCreator
 
 from   ._bokehext           import DpxHoverModel
@@ -38,18 +35,8 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, WidgetMixin):
         "returns the figure"
         self._hover = DpxHoverModel()
         doc.add_root(self._hover)
-
-        shape       = self._createraw()
-        self._createhist(self._rawsource.data, shape, self._raw.y_range)
-
-        plts  = layouts.gridplot([[self._raw, self._hist]],
-                                 toolbar_location = self.css.toolbar_location.get())
-        keyed = DpxKeyedRow(self, self._raw,
-                            children = [plts],
-                            toolbar  = next(i for i in plts.children
-                                            if isinstance(i, ToolbarBox)))
-
-        return layouts.column([keyed, self._createwidget()])
+        self._createhist(self._rawsource.data, self._createraw(), self._raw.y_range)
+        return self._keyedlayout(self._raw, self._hist, bottom = self._createwidget())
 
     def _reset(self):
         shape = self._resetraw()

@@ -90,8 +90,9 @@ class CleaningFilterWidget(WidgetCreator):
         if task is None:
             task = self._model.cleaning.configtask
 
-        itm = self.__widget if resets is None else resets[self.__widget]
-        itm.update(**{i:j for i, j in task.config() if hasattr(self.__widget, i)})
+        info = {i:j for i, j in task.config() if hasattr(self.__widget, i)}
+        info['framerate'] = getattr(self._model.track, 'framerate', 1./30.)
+        (self.__widget if resets is None else resets[self.__widget]).update(**info)
 
     def setfigure(self, fig):
         "sets the figure"
