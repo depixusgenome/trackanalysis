@@ -18,17 +18,24 @@ from    ._model                 import DataCleaningModelAccess
 from    ._widget                import WidgetMixin
 from    ..processor             import DataCleaningException
 
-class DataCleaningPlotCreator(TaskPlotCreator, WidgetMixin):
+class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
     "Building the graph of cycles"
     _MODEL = DataCleaningModelAccess
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
         WidgetMixin.__init__(self)
-        cnf = self.css.cycles
+        cnf = self.css
         cnf.points      .default  = PlotAttrs('color',  'circle', 1, alpha   = .5)
-        cnf.colors.basic.defaults = dict(good = 'blue', bad = 'red', extent = 'orange')
-        cnf.colors.dark .defaults = dict(good = 'gray', bad = 'red', extent = 'orange')
+
+        colors = dict(good       = 'blue',
+                      hfsigma    = 'red',
+                      extent     = 'orange',
+                      population = 'hotpink')
+        cnf.colors.basic.defaults = colors
+        colors['good'] = 'gray'
+        cnf.colors.dark .defaults = colors
+
         self.css.figure.width.default  = 500
 
         self.__source  = None                 # type: ColumnDataSource
@@ -38,8 +45,8 @@ class DataCleaningPlotCreator(TaskPlotCreator, WidgetMixin):
     def _create(self, doc):
         self.__source = ColumnDataSource(data = self.__data())
 
-        fig            = figure(**self._figargs(y_range = Range1d, name = 'Clean:Cycles'))
-        self.css.cycles.points.addto(fig, x = 't', y = 'z', source = self.__source)
+        fig = figure(**self._figargs(y_range = Range1d, name = 'Clean:Cycles'))
+        self.css.points.addto(fig, x = 't', y = 'z', source = self.__source)
         fig.extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
         axis = LinearAxis(x_range_name = "time", axis_label = self.css.xtoplabel.get())
         fig.add_layout(axis, 'above')
@@ -57,10 +64,14 @@ class DataCleaningPlotCreator(TaskPlotCreator, WidgetMixin):
         self._resetwidget()
 
     def __data(self) -> Dict[str, np.ndarray]:
-        try:
-            items = list(self._model.runbead())
-        except DataCleaningException:
+        cycles = self._model.runbead()
+        if cycles is None:
             items = None
+        else:
+            try:
+                items = list(cycles)
+            except DataCleaningException:
+                items = None
 
         if items is None or len(items) == 0 or not any(len(i) for _, i in items):
             items = [((0,0), [])]
@@ -99,7 +110,7 @@ class DataCleaningPlotCreator(TaskPlotCreator, WidgetMixin):
 
         cnf   = self.css.colors[self.css.theme.get()]
         hexes = {i: getattr(bokeh.colors, cnf[i].get()).to_hex()
-                 for i in ('good', 'hfsigma', 'extent')}
+                 for i in ('good', 'hfsigma', 'extent', 'population')}
 
         tmp   = np.full(len(inds), hexes['good'], dtype = '<U7')
         cache = self._model.cleaning.cache
@@ -109,9 +120,9 @@ class DataCleaningPlotCreator(TaskPlotCreator, WidgetMixin):
 
         return as_strided(tmp, shape = shape, strides = (tmp.strides[0], 0))
 
-class DataCleaningPlotView(PlotView):
+class CleaningView(PlotView):
     "Peaks plot view"
-    PLOTTER = DataCleaningPlotCreator
+    PLOTTER = CleaningPlotCreator
     def ismain(self):
         "Cleaning and alignment, ... are set-up by default"
         super()._ismain(tasks  = ['datacleaning', 'extremumalignment'],

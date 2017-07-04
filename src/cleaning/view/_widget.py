@@ -22,15 +22,20 @@ class CyclesListWidget(WidgetCreator):
     def __init__(self, model:DataCleaningModelAccess) -> None:
         super().__init__(model)
         self.__widget     = None # type: Optional[DataTable]
-        css               = self.css.cycles.columns
+        css               = self.__config
         css.width.default = 60
         css.default       = [['population', u'% good',      '0.0'],
                              ['hfsigma',    'σ[HF]',        '0.0000'],
                              ['extent',     u'Δz',          '0.0'],
                              ['accepted',   u'Accepted',    '']]
 
+    @property
+    def __config(self):
+        return self.css.table.columns
+
     def create(self, _) -> List[Widget]:
-        width = self.css.peaks.columns.width.get()
+        cnf   = self.__config
+        width = cnf.width.get()
         get   = lambda i: self.css[i[4:]].get() if i.startswith('css:') else i
         fmt   = lambda i: (StringFormatter(text_align = 'center',
                                            font_style = 'bold') if i == '' else
@@ -38,7 +43,7 @@ class CyclesListWidget(WidgetCreator):
         cols  = list(TableColumn(field      = i[0],
                                  title      = get(i[1]),
                                  formatter  = fmt(i[2]))
-                     for i in self.css.cycles.columns.get())
+                     for i in cnf.get())
 
         self.__widget = DataTable(source      = ColumnDataSource(self.__data()),
                                   columns     = cols,
@@ -55,17 +60,17 @@ class CyclesListWidget(WidgetCreator):
         itm.update(data = data)
 
     def __data(self) -> dict:
-        cache = self._model.datacleaning.cache
+        cache = self._model.cleaning.cache
         if cache is None:
-            return {i: [] for i, _1, _2 in self.css.cycles.get()}
-        info     = {i: cache[i].values for i in ('hfsigma', 'extent', 'population')}
+            return {i: [] for i, _1, _2 in self.__config.get()}
+        info             = {i: cache[i].values for i in ('hfsigma', 'extent', 'population')}
         info['accepted'] = np.ones(self._model.track.ncycles, dtype = 'bool')
-        info['accepted'][self._model.datacleaning.badcycles] = False
+        info['accepted'][self._model.cleaning.badcycles] = False
         return info
 
 class DpxCleaning(LayoutDOM):
     "This starts tests once flexx/browser window has finished loading"
-    __implementation__ = "_cycles.coffee"
+    __implementation__ = "_cleaning.coffee"
     framerate          = props.Float(30.)
     figure             = props.Instance(Figure)
     maxabsvalue        = props.Float(DataCleaningTask.maxabsvalue)
@@ -115,7 +120,11 @@ class WidgetMixin:
         widgets = {i: j.create(self.action) for i, j in self.__widgets.items()}
         self.__widgets['cleaning'].setfigure(fig)
         enableOnTrack(self, widgets)
-        return layouts.widgetbox(widgets['align'], widgets['cleaning'], widgets['table'])
+
+        lst  = widgets['align']
+        lst += widgets['cleaning']
+        lst += widgets['table']
+        return layouts.column(lst)
 
     def _resetwidget(self):
         for ite in self.__widgets.values():

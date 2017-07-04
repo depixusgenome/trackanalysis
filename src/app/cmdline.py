@@ -33,7 +33,8 @@ def _without_cls(vname, cname):
         viewmod = getattr(viewmod, name)
 
     pred = lambda i: (isinstance(i, type)
-                      and i.__module__ == viewmod.__name__
+                      and (i.__module__ == viewmod.__name__
+                           or i.__module__.startswith(viewmod.__name__+'.'))
                       and i.__name__.lower() == cname)
     pot  = tuple(i for _, i in inspect.getmembers(viewmod, pred))
     if len(pot) == 0:
