@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-outer-name
 """ Tests views """
+from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 from cleaning.processor import DataCleaning, DataCleaningProcessor
 from simulator          import randtrack, setseed
 import numpy as np
@@ -38,6 +39,12 @@ def test_processor():
     tmp = cache[(None,), 0]
     DataCleaningProcessor.apply(trk, cache)[0]
     assert tmp is cache[(None,), 0]
+
+def test_view(bokehaction):
+    "test the view"
+    with bokehaction.launch('cleaning.view.CleaningPlot', 'app.BeadToolbar') as server:
+        server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
+        server.load('big_legacy', andstop = False)
 
 if __name__ == '__main__':
     test_processor()

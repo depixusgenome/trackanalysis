@@ -88,7 +88,7 @@ def test_peaksplot(bokehaction):
         if 'y' in evts:
             vals[:2] = [0. if i is None else i for i in evts['y'].value]
     with bokehaction.launch('hybridstat.view.peaksplot.PeaksPlotView',
-                            'app.BeadToolBar') as server:
+                            'app.BeadToolbar') as server:
         server.ctrl.observe("globals.project.plot.peaks", _printrng)
         server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
         server.load('big_legacy', andstop = False)
@@ -139,7 +139,7 @@ def test_peaksplot(bokehaction):
 
 def test_hybridstat(bokehaction):
     "test hybridstat"
-    with bokehaction.launch('hybridstat.view', 'app.BeadToolBar') as server:
+    with bokehaction.launch('hybridstat.view', 'app.BeadToolbar') as server:
         server.change('Hybridstat:Tabs', 'active', 0)
         server.change('Hybridstat:Tabs', 'active', 1)
         server.change('Hybridstat:Tabs', 'active', 2)

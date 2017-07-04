@@ -76,7 +76,7 @@ def test_beadplot(bokehaction):
         if 'y' in evts:
             vals[2:] = [0. if i is None else i for i in evts['y'].value]
 
-    with bokehaction.launch('view.beadplot.BeadPlotView', 'app.ToolBar') as server:
+    with bokehaction.launch('view.beadplot.BeadPlotView', 'app.BeadToolbar') as server:
         server.ctrl.observe("globals.project.plot.bead", _printrng)
         server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
         server.load('small_legacy', andstop = False)
