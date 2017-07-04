@@ -23,3 +23,5 @@ def randevents(nbeads = 1, seed = None, **kwa):
 def randbypeakevents(nbeads = 1, seed = None, **kwa):
     u"Random events. See PeakSimulator documentation"
     return TrackSimulator(**kwa).bypeakevents(nbeads, seed)
+
+setseed = TrackSimulator.seed # pylint: disable=invalid-name

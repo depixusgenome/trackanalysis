@@ -28,6 +28,7 @@ class DataCleaning:
     minhfsigma    = 1e-4
     maxhfsigma    = 1e-2
     minextent     = .5
+    __ZERO        = np.zeros(0)
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -39,7 +40,7 @@ class DataCleaning:
         if hasattr(self, 'max'+name):
             high = np.nonzero(test >= getattr(self, 'max'+name))[0]
         else:
-            high = np.zeros(0)
+            high = self.__ZERO
         return Partial(name, low, high, test)
 
     @staticmethod
@@ -66,11 +67,24 @@ class DataCleaning:
         return self.__test('population', test)
 
     def aberrant(self, bead:np.ndarray) -> bool:
-        "removes aberrant values"
-        der = correlate1d([.5, -1., .5], bead, mode = 'nearest')
-        bead[np.abs(der)  > self.maxderivate] = np.NaN
-        bead[np.abs(bead) < self.maxabsvalue] = np.NaN
-        return np.isfinite(bead).sum() <= len(bead) * self.minpopulation * 1e-2
+        """
+        Removes aberrant values.
+        Returns *True* if the number of remaining values is too low
+        """
+        fin  = np.isfinite(bead)
+        good = bead[fin]
+        if len(good) < len(bead) * self.minpopulation * 1e-2:
+            return True
+
+        der  = correlate1d(good, [.5, -1., .5], mode = 'nearest')
+
+        good[np.logical_or(np.abs(good) > self.maxabsvalue,
+                           np.abs(der)  > self.maxderivate)] = np.NaN
+        if len(good)-np.isnan(good).sum() <= len(bead) * self.minpopulation * 1e-2:
+            return True
+
+        bead[fin] = good
+        return False
 
 class DataCleaningTask(DataCleaning, Task):
     "bead selection task"
@@ -112,16 +126,8 @@ class DataCleaningException(Exception):
 
             return '\n'.join(i for i in msg if i[0] != '0')
 
-    def __init__(self, tasktype, stats, **cnf):
+    def __init__(self, stats, cnf, tasktype):
         super().__init__(self.ErrorMessage(tasktype, stats, cnf), 'warning')
-
-    @classmethod
-    def test(cls, tasktype, stats, **cnf) -> Optional['DataCleaningException']:
-        "creates a DataCleaningException if needed"
-        bad = tasktype.badcycles(stats)
-        if len(bad) < cnf.get('ncycles', getattr(tasktype, 'ncycles')):
-            return cls(tasktype, stats, **cnf)
-        return bad
 
 class DataCleaningProcessor(Processor):
     "Processor for bead selection"
@@ -137,43 +143,52 @@ class DataCleaningProcessor(Processor):
             yield getattr(sel, name)(cycs)
 
     @classmethod
-    def compute(cls, frame, info, cache = None, **cnf) -> Tuple[Partial]:
-        "returns the result of the beadselection"
-        if cache is not None:
-            key = (frame.parents, info[0])
-            val = cache.get(key, '')
-            if val is None:
-                return None
+    def __compute(cls, frame, info, cache = None, **cnf):
+        res = cls.compute(frame, info, cache = cache, **cnf)
+        if res is None:
+            return info
+        raise res
 
-            if val == '':
-                DataCleaning(**cnf).aberrant(info[1])
-                return val
+    @classmethod
+    def compute(cls, frame, info, cache = None, **cnf) -> Optional[DataCleaningException]:
+        "returns the result of the beadselection"
+        tested = False
+        if cache is not None:
+            key          = (frame.parents, info[0])
+            val, discard = cache.get(key, ('', False))
+            if discard:
+                return DataCleaningException(val, cnf, cls.tasktype)
+            tested       = val != ''
 
         if DataCleaning(**cnf).aberrant(info[1]):
-            val = None
+            val, discard = None, True
         else:
-            cycs = frame.track.cycles.withdata({info[0]: info[1]})
-            val  = tuple(cls.__test(cycs, cnf))
-            if cache is not None:
-                cache[key] = val
-        return val
+            if not tested:
+                cycs = frame.track.cycles.withdata({info[0]: info[1]})
+                val  = tuple(cls.__test(cycs, cnf))
+
+            bad = cls.tasktype.badcycles(val)
+            if len(bad):
+                for _, cyc in (frame.track.cycles
+                               .withdata({info[0]: info[1]})
+                               .selecting(zip(repeat(info[0]), bad))):
+                    cyc[:] = np.NaN
+
+                if not tested:
+                    minpop  = 1.-cls.__get('minpopulation', cnf)*1e-2
+                    discard = not tested and np.isnan(info[1]).sum() > len(info[1]) * minpop
+            elif not tested:
+                discard = False
+
+        if not (tested or cache is None):
+            cache[key] = val, discard
+        return DataCleaningException(val, cnf, cls.tasktype) if discard else None
 
     @classmethod
     def apply(cls, toframe = None, cache = None, **cnf):
         "applies the task to a frame or returns a method that will"
-        def _compute(frame, info):
-            res = cls.compute(frame.track, info, cache = cache, **cnf)
-            msg = DataCleaningException.test(cls.tasktype, res, **cnf)
-            if isinstance(msg, Exception):
-                raise msg
-
-            for _, val in (frame.track.cycles
-                           .withdata({info[0]: info[1]})
-                           .selecting(zip(repeat(info[0]), msg))):
-                val[:] = np.NaN
-            return info
-
-        fcn = lambda frame: frame.withaction(partial(_compute, frame))
+        cnf['cache'] = cache
+        fcn = lambda frame: frame.withaction(partial(cls.__compute, frame, **cnf))
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
