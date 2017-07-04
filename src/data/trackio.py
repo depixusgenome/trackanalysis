@@ -234,12 +234,22 @@ class LegacyGRFilesIO(_TrackIO):
         return {i.stem: i for i in chain.from_iterable(_glob(fcn(str(k))) for k in lst)}
 
     @classmethod
-    def __scantrk(cls, trkdirs) -> Dict[str, Path]:
+    def scantrk(cls, trkdirs) -> Dict[str, Path]:
+        "scan for track files"
+        if not isinstance(trkdirs, (tuple, list, set, frozenset)):
+            trkdirs = (trkdirs,)
+        trkdirs = tuple(str(i) for i in trkdirs)
+
         trk = cls.__TRKEXT
         return cls.__scan(trkdirs, lambda i: i if i.endswith(trk) else i+'/**/*'+trk)
 
     @classmethod
-    def __scangrs(cls, grdirs) -> Dict[str, Path]:
+    def scangrs(cls, grdirs) -> Dict[str, Path]:
+        "scan for gr files"
+        if not isinstance(grdirs, (tuple, list, set, frozenset)):
+            grdirs = (grdirs,)
+        grdirs = tuple(str(i) for i in grdirs)
+
         cgr   = cls.__CGR.search
         grdir = '/**/'+cls.__GRDIR+'/*'+cls.__CGREXT
         return cls.__scan(grdirs,  lambda i: i if cgr(i) else i + grdir)
@@ -261,8 +271,8 @@ class LegacyGRFilesIO(_TrackIO):
         grdirs  = (grdirs,)  if isinstance(grdirs,  (Path, str)) else grdirs  # type: ignore
         trkdirs = (trkdirs,) if isinstance(trkdirs, (Path, str)) else trkdirs # type: ignore
 
-        trks    = cls.__scantrk(trkdirs)
-        cgrs    = cls.__scangrs(grdirs)
+        trks    = cls.scantrk(trkdirs)
+        cgrs    = cls.scangrs(grdirs)
 
         if matchfcn is None:
             pairs    = frozenset(trks) & frozenset(cgrs)
