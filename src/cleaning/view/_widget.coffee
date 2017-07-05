@@ -18,17 +18,19 @@ export class DpxCleaningView extends LayoutDOMView
 
     render: () ->
         super()
-        html = "<div class='dpx-cleaning'><span class='dpx-row'>"+
-                   "<label>|z|     ≤</label>#{@mk_inp("maxabsvalue")}"+
-                   "<label>|dz/dt| ≤</label>#{@mk_inp("maxderivate")}"+
-               "</span><span class='dpx-row'>"+
-                   "<label>Δz      ≥</label>#{@mk_inp("minextent")}"+
-                   "<label>% good  ≥</label>#{@mk_inp("minpopulation", step = 0.1)}"+
-               "</span><span class='dpx-row'>"+
-                   "#{@mk_inp("minhfsigma", step = 0.0001, maxv = 0.01)}"+
-                   "<label>≤ σ[HF] ≤</label>"+
-                   "#{@mk_inp("maxhfsigma", step = 0.0001, maxv = 0.01)}"+
-               "</span></div>"
+        html = "<div class='dpx-cleaning dpx-widget'>"+
+                    "<div class='dpx-span'>"+
+                        "<div><p>|z| ≤</p><p>Δz  ≥</p></div>"+
+                        "<div>#{@mk_inp("maxabsvalue")}#{@mk_inp("minextent")}</div>"+
+                    "</div><div class='dpx-span'>"+
+                        "<div><p>|dz/dt| ≤</p><p>% good  ≥</p></div>"+
+                        "<div>#{@mk_inp("maxderivate")}"+
+                             "#{@mk_inp("minpopulation", step = 0.1)}</div>"+
+                    "</div><div class='dpx-span'>"+
+                        "#{@mk_inp("minhfsigma", step = 0.0001, maxv = 0.01)}"+
+                        "<p>≤ σ[HF] ≤</p>"+
+                        "#{@mk_inp("maxhfsigma", step = 0.0001, maxv = 0.01)}"+
+                    "</div></div>"
 
         elem = $(@el)
         elem.html(html)
@@ -56,7 +58,7 @@ export class DpxCleaning extends LayoutDOM
     onchangebounds: () ->
         trng = @figure.extra_x_ranges['time']
         xrng = @figure.x_range
-        if xrng.bounds is not None
+        if xrng.bounds?
             xrng._initial_start = xrng.bounds[0]
             xrng._initial_end   = xrng.bounds[1]
 
@@ -66,7 +68,7 @@ export class DpxCleaning extends LayoutDOM
     @define {
         frozen: [p.Bool, true],
         framerate: [p.Number, 30],
-        figure: [p.Instance, {}],
+        figure: [p.Instance],
         maxabsvalue: [p.Number, 5],
         maxderivate: [p.Number, 2],
         minpopulation: [p.Number, 80],

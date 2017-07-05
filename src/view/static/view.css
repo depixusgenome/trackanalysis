@@ -43,7 +43,7 @@
 } 
 
 /* the toolbar */
-.dpx-tb { float: left; }
+.dpx-tb { float: left; height:30px; }
 #dpx-tb-bead    { width: 40px; height: 28px}
 #dpx-tb-discard { width: 60px; height: 28px}
 #dpx-tb-message {
@@ -55,8 +55,7 @@
 }
 #dpx-tb-quit { float: right; }
 
-.dpx-inner      { display: inline-block; }
-.dpx-tb label   { margin-left: 9px; margin-top: 3px; margin-right: 3px; }
-.dpx-tb span    { display: -webkit-inline-box; }
-.dpx-tb input   { height: 28px; }
-
+.dpx-inner { display: inline-block; }
+.dpx-span  { display: -webkit-inline-box; }
+.dpx-widget label { margin-left: 9px; margin-top: 3px; margin-right: 3px; }
+.dpx-widget input { height: 28px; }

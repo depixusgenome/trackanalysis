@@ -70,7 +70,7 @@ class CyclesListWidget(WidgetCreator):
 
 class DpxCleaning(LayoutDOM):
     "This starts tests once flexx/browser window has finished loading"
-    __implementation__ = "_cleaning.coffee"
+    __implementation__ = "_widget.coffee"
     framerate          = props.Float(30.)
     figure             = props.Instance(Figure)
     maxabsvalue        = props.Float(DataCleaningTask.maxabsvalue)

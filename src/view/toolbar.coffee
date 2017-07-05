@@ -21,7 +21,7 @@ export class DpxToolbarView extends LayoutDOMView
         @model.discarded = $(@el).find('#dpx-tb-discard').val()
 
     on_change_frozen:  () ->
-        $(@el).find('.dpx-tb-freeze').prop('disabled', @model.frozen)
+        $(@el).find('.dpx-freeze').prop('disabled', @model.frozen)
 
     on_change_bead: () ->
         val = "#{@model.bead}"
@@ -41,7 +41,7 @@ export class DpxToolbarView extends LayoutDOMView
         @listenTo(@model, 'change:message',   () => @on_change_message())
         @listenTo(@model, 'change:frozen',    () => @on_change_frozen())
 
-    make_btn: (name, label, freeze = 'dpx-tb-freeze') ->
+    make_btn: (name, label, freeze = 'dpx-freeze') ->
         str = "<button type='button' id='dpx-tb-#{name}' "+
               "class='#{freeze} bk-bs-btn bk-bs-btn-default'>#{label}</button>"
         return str
@@ -54,21 +54,21 @@ export class DpxToolbarView extends LayoutDOMView
         else
             quit =''
 
-        html = "<div class='dpx-row dpx-tb'><span>"+
+        html = "<div class='dpx-row dpx-widget dpx-tb dpx-span'>"+
                     "#{@make_btn('open', 'Open', '')}"+
                     "#{@make_btn('save', 'Save')}"+
                     "<label>Bead</label>"+
                     "<input id='dpx-tb-bead'"+
-                        " class='dpx-tb-freeze bk-widget-form-input'"+
+                        " class='dpx-freeze bk-widget-form-input'"+
                         " type='number' min=0  max=10000 step=1  value=#{mdl.bead}>"+
                     "<label>Discarded</label>"+
                     "<input id='dpx-tb-discard'"+
-                        " class='dpx-tb-freeze bk-widget-form-input'"+
+                        " class='dpx-freeze bk-widget-form-input'"+
                         " type='text' value='#{mdl.discarded}'>"+
                     "#{@make_btn('del', '━', true)}"+
                     "<div id='dpx-tb-message' class='bk-markup'>"+
                         "#{mdl.message}</div>"+
-                    "#{quit}</span></div>"
+                    "#{quit}</div>"
 
         elem = $(@el)
         elem.html(html)
