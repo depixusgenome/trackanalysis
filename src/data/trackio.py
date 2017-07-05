@@ -125,6 +125,9 @@ class LegacyGRFilesIO(_TrackIO):
         else:
             trk = next(i for i in paths if i.suffix == cls.__TRKEXT)
             grs = tuple(i for i in paths if i.suffix  == '.gr')
+            if len(grs) == 0:
+                return None
+
             return (trk,) + grs
 
     @classmethod

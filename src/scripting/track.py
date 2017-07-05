@@ -126,14 +126,14 @@ class TracksDict(dict):
 
         >>> tracks = "/path/to/my/trackfiles/**/with/recursive/search/*.trk"
         >>> grs    = ("/more/than/a/single/path/**", "/is/possible/**")
-        >>> match  = r".*test045_(?\w\w\w)_BNA.*" # select only test 045 and define the key
+        >>> match  = r".*test045_(?\\w\\w\\w)_BNA.*" # select only test 045 and define the key
         >>> TRACKS = TracksDict(tracks, grs, match)
         >>> TRACKS['AAA'].cycles                  # access the track
 
     By default, the name of the track file is used as the key. Using the *match*
     requires defining a group which will be used as the key.
     """
-    def __init__(self, tracks, grs, match = None, *tasks, **kwa):
+    def __init__(self, tracks = None, grs = None, match = None, *tasks, **kwa):
         super().__init__()
         self.paths = {}     # type: Dict[str, Tuple[str,...]]
         self.tasks = tasks
@@ -161,15 +161,18 @@ class TracksDict(dict):
 
         assert sum(i is None for i in (tracks, grs)) in (0, 2)
         if tracks is not None:
+
+            if isinstance(match, str) or hasattr(match, 'match'):
+                tmp   = re.compile(match) if isinstance(match, str) else match
+                match = lambda i: tmp.match(str(i[0]))
+                itr   = ((match(i), i) for i in LegacyGRFilesIO.scan(tracks, grs)[0])
+                self.paths.update({i.group(1): j for i, j in itr if i})
+                return
+
             if match is None:
                 match = lambda i: Path(str(i[0])).name
-            elif isinstance(match, str) or hasattr(match, 'match'):
-                tmp   = re.compile(match) if isinstance(match, str) else match
-                match = lambda i: tmp.match(str(i[0])).group(1)
-
-            itr        = ((match(i), i) for i in LegacyGRFilesIO.scan(tracks, grs)[0])
-            self.paths.update({i: j for i, j in itr if i})
-
+            itr   = ((match(i), i) for i in LegacyGRFilesIO.scan(tracks, grs)[0])
+            self.paths.update({i: j for i, j in itr})
 
     def __missing__(self, olig):
         return self.__setitem__(olig, Track(path = self.paths.get(olig, olig)))
