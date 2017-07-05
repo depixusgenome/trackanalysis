@@ -52,10 +52,10 @@ def evtcurve(self, *keys, labels = None, tpe = hv.Curve, overlay = True):
 
     conc = lambda x: np.concatenate(list(chain.from_iterable(zip(x, repeat([np.NaN])))))
     vals = lambda x: (conc([np.arange(i[0], i[0]+len(i[1])) for i in x]), conc(x['data']))
-    if len(crvs < 3) or labels is True:
-        crvs = [tpe(vals(j), label = str(i)) for i, j in crvs]
+    if len(crvs) < 3 or labels is True:
+        crvs = [tpe(vals(j), label = str(i)) for i, j in crvs if len(j)]
     else:
-        crvs = [tpe(vals(j)) for _, j in crvs]
+        crvs = [tpe(vals(j)) for _, j in crvs if len(j)]
 
     return crvs[0] if len(crvs) == 1 else hv.Overlay(crvs)
 
