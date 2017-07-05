@@ -10,7 +10,7 @@ can be modified (1 line) # HERE to look for all suboptimal solutions
 
 import itertools
 from typing import Tuple, List, Generator, Dict # pylint: disable=unused-import
-import pickle
+#import pickle
 import numpy
 import assemble.data as data
 import assemble.scores as scores
@@ -18,9 +18,17 @@ import assemble.processor as processor
 import assemble._utils as utils
 
 # possible optimisations:
+
 # can select a sub set of the full_kperms to construct the scaffolding
+
 # can only check the overlap on the previous oligo in rank_by_noverlaps
+
 # can merge partitions right after ranking so that we don't merge the first kperms each time
+# if there is alternatives sequences:
+# keep in memory the alternatives but resume calculation keeping (only) the common core
+
+# can recompute segment wise the possible partitions
+
 class BaseWise:
     u'align oligo by maximising the overlap one index at a time'
     def __init__(self,**kwa):
@@ -145,7 +153,8 @@ class BaseWise:
             full_kperms.update(set(self.find_kperms(group)))
 
         if __debug__:
-            pickle.dump(full_kperms,open("full_kperms.pickle","wb"))
+            pass
+            #pickle.dump(full_kperms,open("full_kperms.pickle","wb"))
 
         add_kperms=[kpr for kpr in full_kperms if kpr.domain.intersection({0})]
 
@@ -181,7 +190,8 @@ class BaseWise:
             # if needed: partitions=[part for score,part in ranked if score>max_overlap-2]
             # can add a restriction on the stretch,bias
             if __debug__:
-                pickle.dump(partitions,open("partitions"+str(index)+".pickle","wb"))
+                pass
+                #pickle.dump(partitions,open("partitions"+str(index)+".pickle","wb"))
         return partitions
 
     def find_kperms(self,group:Tuple[int, ...])->Generator:

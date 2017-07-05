@@ -11,6 +11,7 @@ from ._types import SciDist # pylint: disable=unused-import
 from . import _utils as utils
 
 REVERSE={"a":"t","c":"g","g":"c","t":"a"}
+REVERSE.update({"A":"T","C":"G","G":"C","T":"A"})
 
 class Oligo:
     '''
