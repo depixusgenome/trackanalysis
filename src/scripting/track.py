@@ -21,6 +21,7 @@ We add some methods and change the default behaviour:
         * a *rawprecision* method is added
         * *with...* methods return an updated copy
 """
+from typing                 import Dict, Tuple # pylint: disable=unused-import
 from itertools              import product
 from pathlib                import Path
 import pickle
@@ -118,15 +119,25 @@ for _cls in (Beads, Cycles, Events):
     _cls.withfilter = _withfilter
 
 class TracksDict(dict):
-    "Dictionnary of tracks"
-    def __init__(self, trks, grs, reg = None, *tasks, **kwa):
-        super().__init__()
-        paths      = LegacyGRFilesIO.scan(trks, grs)[0]
-        match      = (lambda _: True) if reg is None else lambda i: re.match(reg, str(i[0]))
-        self.paths = {match(i).group(1): i for i in paths if match(i)}
+    """
+    Dictionnary of tracks
 
+    It can be initialized using list of directories
+
+        >>> tracks = "/path/to/my/trackfiles/**/with/recursive/search/*.trk"
+        >>> grs    = ("/more/than/a/single/path/**", "/is/possible/**")
+        >>> match  = r".*test045_(?\w\w\w)_BNA.*" # select only test 045 and define the key
+        >>> TRACKS = TracksDict(tracks, grs, match)
+        >>> TRACKS['AAA'].cycles                  # access the track
+
+    By default, the name of the track file is used as the key. Using the *match*
+    requires defining a group which will be used as the key.
+    """
+    def __init__(self, tracks, grs, match = None, *tasks, **kwa):
+        super().__init__()
+        self.paths = {}     # type: Dict[str, Tuple[str,...]]
         self.tasks = tasks
-        self.update(**kwa)
+        self.update(tracks = tracks, grs = grs, match = match, **kwa)
 
     def __setitem__(self, key, val):
         if isinstance(val, (str, Path, tuple, list, set)):
@@ -141,18 +152,34 @@ class TracksDict(dict):
         super().__setitem__(key, val)
         return val
 
-    def update(self, *args, **kwargs):
+    def update(self, *args, tracks = None, grs = None, match = None, **kwargs):
         "adds paths or tracks to self"
         info = {}
         info.update(*args, **kwargs)
         for i, j in info.items():
             self.__setitem__(i, j)
 
+        assert sum(i is None for i in (tracks, grs)) in (0, 2)
+        if tracks is not None:
+            if match is None:
+                match = lambda i: Path(str(i[0])).name
+            elif isinstance(match, str) or hasattr(match, 'match'):
+                tmp   = re.compile(match) if isinstance(match, str) else match
+                match = lambda i: tmp.match(str(i[0])).group(1)
+
+            itr        = ((match(i), i) for i in LegacyGRFilesIO.scan(tracks, grs)[0])
+            self.paths.update({i: j for i, j in itr if i})
+
+
     def __missing__(self, olig):
         return self.__setitem__(olig, Track(path = self.paths.get(olig, olig)))
 
 class BeadsDict(dict):
-    "A dictionnary of potentially transformed bead data"
+    """
+    A dictionnary of potentially transformed bead data.
+
+    Keys are combinations of a track key and a bead number.
+    """
     def __init__(self, tracks, *tasks):
         super().__init__(self)
         self.tracks = tracks
