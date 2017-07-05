@@ -10,7 +10,7 @@ can be modified (1 line) # HERE to look for all suboptimal solutions
 
 import itertools
 from typing import Tuple, List, Generator, Dict # pylint: disable=unused-import
-#import pickle
+import pickle
 import numpy
 import assemble.data as data
 import assemble.scores as scores
@@ -88,29 +88,6 @@ class BaseWise:
         return
 
     @classmethod
-    def old_construct_scaffold(cls,
-                               base:List[data.OligoPerm],
-                               add_kperms:List[data.OligoKPerm],
-                               index:int)->List[List[data.OligoKPerm]]:
-        '''
-        the base is the starting partition is expand up to index.
-        ie until domain for merged base
-        does not produce duplicates
-        '''
-        merged=data.OligoPerm.add(*base)
-        if all(i in merged.domain for i in range(index)):
-            return [base]
-
-        next_id=min([idx for idx in range(index) if not idx in merged.domain])
-        to_return=[] # type: List[List[data.OligoKPerm]]
-        to_add=[kprm for kprm in add_kperms if not merged.domain.intersection(kprm.domain)
-                and next_id in kprm.domain]
-        for kprm in to_add:
-            to_return+=cls.old_construct_scaffold(base+[kprm],add_kperms,index)
-
-        return to_return
-
-    @classmethod
     def construct_scaffold(cls,
                            base:data.Partition,
                            add_kperms:List[data.OligoKPerm],
@@ -166,7 +143,7 @@ class BaseWise:
         #partitions=[[kpr] for kpr in add_kperms] # before
         partitions=[data.Partition(perms=[kpr]) for kpr in add_kperms]
 
-        for index in range(1,len(self.oligos)):
+        for index in range(len(self.oligos)):
             print("len(partitions)=",len(partitions))
             print("index=",index)
             add_kperms=[kpr for kpr in full_kperms if frozenset(kpr.permids).intersection({index})]
@@ -175,23 +152,19 @@ class BaseWise:
             for part in partitions:
                 # extend the part until all indices<index are in domain
                 # kpr in add_kperms which do not intersect with part
-                #new_parts=self.construct_scaffold(part,full_kperms,index) # works
-                #new_parts=self.construct_scaffold(part,add_kperms,index) # test should be faster
-                new_parts=self.construct_scaffold(part,add_kperms,index) # test should be faster
+                new_parts=self.construct_scaffold(part,add_kperms,index+1) # test should be faster
                 added_partitions+=new_parts
 
             #ranked=self.rank_by_noverlaps(added_partitions,self.ooverl,index)
-            self.increment_noverlaps(added_partitions,self.ooverl,index)
+            self.increment_noverlaps(added_partitions,self.ooverl,index+1)
             #max_overlap=max(i[0] for i in ranked) # before
             max_overlap=max(part.noverlaps for part in added_partitions) # pylint: disable=no-member
-            #partitions=[part for score,part in ranked if score==max_overlap] # before
-            partitions=[part for part in added_partitions if part.noverlaps>max_overlap-3] # pylint: disable=no-member
+            partitions=[part for part in added_partitions if part.noverlaps==max_overlap] # pylint: disable=no-member
             # HERE
-            # if needed: partitions=[part for score,part in ranked if score>max_overlap-2]
+            #partitions=[part for part in added_partitions if part.noverlaps>max_overlap-3] # pylint: disable=no-member
             # can add a restriction on the stretch,bias
             if __debug__:
-                pass
-                #pickle.dump(partitions,open("partitions"+str(index)+".pickle","wb"))
+                pickle.dump(partitions,open("debugpartitions"+str(index)+".pickle","wb"))
         return partitions
 
     def find_kperms(self,group:Tuple[int, ...])->Generator:
