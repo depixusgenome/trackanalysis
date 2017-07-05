@@ -163,6 +163,10 @@ class BaseWise:
             # HERE
             #partitions=[part for part in added_partitions if part.noverlaps>max_overlap-3] # pylint: disable=no-member
             # can add a restriction on the stretch,bias
+
+            # if 2 partitions differ locally (i.e. by a segment), save the segments
+            # and recreate a partitions using the shared perms (domain inter) at index
+            diff_segments=data.Partition.identify_ambiguity(partitions)
             if __debug__:
                 pickle.dump(partitions,open("debugpartitions"+str(index)+".pickle","wb"))
         return partitions

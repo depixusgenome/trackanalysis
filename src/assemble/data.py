@@ -295,6 +295,40 @@ class Partition:
                          noverlaps=self.noverlaps,
                          pdfcost=self.pdfcost)
 
+
+    @staticmethod
+    def identify_ambiguity(partitions:List[Partition]):
+        '''If 2 partitions differ locally, save the different segments,
+        recreate partitions using the shared perms'''
+        pass
+
+    @staticmethod
+    def has_ambiguous_segment(part1,part2,index)->bool:
+        '''
+        by construction, partitions share a common segment only if they have
+        a different segment before index
+        if the ambiguous region is complete could return the ambiguous segment
+        and the point where solutions merges
+        '''
+        perm1=frozenset(prm for prm in part1.perms if prm.domain.intersection({index}))
+        perm2=frozenset(prm for prm in part2.perms if prm.domain.intersection({index}))
+        if len(perm1.symmetric_difference(perm2))==0:
+            return True # return ambiguity,perm1
+        return False
+
+    def common_core(self,other)->FrozenSet[OligoPerm]:
+        'returns shared perms'
+        return frozenset(self.perms).intersection(frozenset(other.perms))
+
+    def first_common_id(self,other):
+        'to define'
+        selfm=self.merge()
+        otherm=other.merge()
+        for idx,val in enumerate(selfm.permids):
+            if val==otherm.permids[idx]:
+                return idx
+        return -1
+
 class OligoKPerm(OligoPerm):
     '''
     kpermutation of OligoPeak Object
