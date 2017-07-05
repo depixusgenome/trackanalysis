@@ -10,6 +10,7 @@ from utils import initdefaults
 from ._types import SciDist # pylint: disable=unused-import
 from . import _utils as utils
 
+REVERSE={"a":"t","c":"g","g":"c","t":"a"}
 
 class Oligo:
     '''
@@ -26,6 +27,11 @@ class Oligo:
     def size(self):
         'returns len(seq)'
         return len(self.seq)
+
+    @staticmethod
+    def reverse_complement(seq)->str:
+        'returns reverse complement of string seq'
+        return ''.join(REVERSE[i] for i in reversed(seq))
 
     @staticmethod
     def tail_overlap(ol1:str, ol2:str)->str:

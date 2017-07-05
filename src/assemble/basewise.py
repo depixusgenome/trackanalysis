@@ -176,7 +176,7 @@ class BaseWise:
             #max_overlap=max(i[0] for i in ranked) # before
             max_overlap=max(part.noverlaps for part in added_partitions) # pylint: disable=no-member
             #partitions=[part for score,part in ranked if score==max_overlap] # before
-            partitions=[part for part in added_partitions if part.noverlaps==max_overlap] # pylint: disable=no-member
+            partitions=[part for part in added_partitions if part.noverlaps>max_overlap-3] # pylint: disable=no-member
             # HERE
             # if needed: partitions=[part for score,part in ranked if score>max_overlap-2]
             # can add a restriction on the stretch,bias
