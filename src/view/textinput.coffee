@@ -13,7 +13,7 @@ export class DpxTextInputView extends InputWidgetView
         super(options)
         @_height = null
         @render()
-        @listenTo(@model, 'change', @render)
+        @connect(@model.change, @render)
 
     render: () ->
         super()

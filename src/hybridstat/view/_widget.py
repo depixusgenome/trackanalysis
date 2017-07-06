@@ -56,7 +56,7 @@ class PeaksSequencePathWidget(SequencePathWidget):
                 tick1.key        = cb_obj.value
                 tick2.key        = cb_obj.value
                 src.data['text'] = src.data[cb_obj.value]
-                src.trigger("change")
+                src.change.emit()
 
                 if cb_obj.value in stats.data:
                     stats.text   = stats.data   [cb_obj.value]
@@ -65,7 +65,7 @@ class PeaksSequencePathWidget(SequencePathWidget):
                     for key in ('id', 'bases', 'distance', 'orient', 'color'):
                         ref = cb_obj.value+key
                         peaks.source.data[key] = peaks.source.data[ref]
-                    peaks.trigger("change")
+                    peaks.change.emit()
 
                 if cb_obj.value in hvr.stretches:
                     hvr.updating = 'seq'

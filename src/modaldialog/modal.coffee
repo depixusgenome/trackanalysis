@@ -1,11 +1,10 @@
 import * as $               from "jquery"
 import * as p               from "core/properties"
-import * as Backbone        from "core/backbone"
+import {DOMView}            from "core/dom_view"
 import {Model}              from "model"
-import {BokehView}          from "core/bokeh_view"
 
 # Modal was copied from backbone-modal
-class Modal extends Backbone.View
+class Modal extends DOMView
     prefix: 'bbm'
     animate: true
     keyControl: true
@@ -13,7 +12,7 @@ class Modal extends Backbone.View
 
     constructor: ->
       @args = Array::slice.apply(arguments)
-      Backbone.View::constructor.apply(this, @args)
+      DOMView::constructor.apply(this, @args)
 
       # get all options
       @setUIElements()
@@ -74,8 +73,8 @@ class Modal extends Backbone.View
       @animate        = @getOption('animate')
 
       # check if everything is right
-      throw new Error('No template or views defined for Backbone.Modal') if _.isUndefined(@template) and _.isUndefined(@views)
-      throw new Error('No viewContainer defined for Backbone.Modal') if @template and @views and _.isUndefined(@viewContainer)
+      throw new Error('No template or views defined for Modal') if _.isUndefined(@template) and _.isUndefined(@views)
+      throw new Error('No viewContainer defined for Modal') if @template and @views and _.isUndefined(@viewContainer)
 
     getOption: (option) ->
       # get class instance property
@@ -155,14 +154,14 @@ class Modal extends Backbone.View
       return templateFunction(data)
 
     buildView: (viewType, options) ->
-      # returns a Backbone.View instance, a function or an object
+      # returns a DOMView instance, a function or an object
       return unless viewType
       options = options() if options and _.isFunction(options)
 
       if _.isFunction(viewType)
         view = new viewType(options or @args[0])
 
-        if view instanceof Backbone.View
+        if view instanceof DOMView
           return {el: view.render().$el, view: view}
         else
           return {el: viewType(options or @args[0])}
@@ -365,7 +364,7 @@ export class DpxModal       extends Model
     type:"DpxModal"
     constructor : (attributes, options) ->
         super(attributes, options)
-        @listenTo(@, 'change:startdisplay', () => @_startdisplaymodal())
+        @connect(@properties.startdisplay.change, () => @_startdisplaymodal())
 
     toJSON: () ->
         title = "<div class='bbm-modal__topbar'>"      +

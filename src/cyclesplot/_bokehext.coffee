@@ -11,7 +11,7 @@
         @cycle           = ind
         hvrsrc.data['z'] = rawsrc.data['z'][ind...(ind+@shape[1])]
         glyph.visible    = true
-        hvrsrc.trigger('change')
+        hvrsrc.change.emit()
 
     launch_hover: (rawsrc, hvrsrc, glyph, data) ->
         if @shape[1] == 2
@@ -22,7 +22,7 @@
         if (not inds?) || inds.length == 0
             if glyph.visible
                 glyph.visible = false
-                glyph.trigger('change')
+                glyph.change.emit()
             return
 
         window.setTimeout(((a,b,c,d,e) => @set_hover(a,b,c,d,e)),

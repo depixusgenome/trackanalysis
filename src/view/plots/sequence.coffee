@@ -1,6 +1,6 @@
 import * as p  from "core/properties"
 import {Model} from "model"
-import {BokehView} from "core/bokeh_view"
+import {DOMView} from "core/dom_view"
 
 export class NAMEView extends BokehView
 export class NAME     extends Model
@@ -16,7 +16,7 @@ export class NAME     extends Model
         @_callcount = value
         tmp = source.data["values"]
         source.data["z"] = tmp.map(((x)-> x/@stretch+@bias), @)
-        source.trigger('change:data')
+        source.properties.data.change.emit()
 
     apply_update: (fig, ttip) ->
         if @updating == ''

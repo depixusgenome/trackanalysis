@@ -1,9 +1,9 @@
 import * as $  from "jquery"
 import * as p  from "core/properties"
 import {Model} from "model"
-import {BokehView} from "core/bokeh_view"
+import {DOMView} from "core/dom_view"
 
-export class DpxKeyEventView extends BokehView
+export class DpxKeyEventView extends DOMView
 
 export class DpxKeyEvent extends Model
     default_view: DpxKeyEventView

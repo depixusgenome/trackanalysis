@@ -322,7 +322,7 @@ class WidgetMixin:
                     return
 
                 table.data["z"] = [aval, bval]
-                table.trigger('change:data') # pylint: disable=no-member
+                table.properties.data.change.emit() # pylint: disable=no-member
 
             if cb_obj.updating != 'stretch':
                 stretch.value = cb_obj.stretch

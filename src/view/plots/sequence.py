@@ -286,7 +286,7 @@ class SequencePathWidget(WidgetCreator):
                 tick1.key        = cb_obj.value
                 tick2.key        = cb_obj.value
                 src.data['text'] = src.data[cb_obj.value]
-                src.trigger("change")
+                src.change.emit()
         self.__widget.js_on_change('value', _js_cb)
         return self.__widget
 
