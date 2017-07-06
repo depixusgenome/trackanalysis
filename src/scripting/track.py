@@ -21,7 +21,7 @@ We add some methods and change the default behaviour:
         * a *rawprecision* method is added
         * *with...* methods return an updated copy
 """
-from typing                 import Dict, Tuple # pylint: disable=unused-import
+from typing                 import Dict, KeysView, Tuple # pylint: disable=unused-import
 from itertools              import product
 from pathlib                import Path
 import pickle
@@ -133,6 +133,7 @@ class TracksDict(dict):
     By default, the name of the track file is used as the key. Using the *match*
     requires defining a group which will be used as the key.
     """
+    __SCAN_OPTS = ('cgrdir',)
     def __init__(self, tracks = None, grs = None, match = None, *tasks, **kwa):
         super().__init__()
         self.paths = {}     # type: Dict[str, Tuple[str,...]]
@@ -152,27 +153,36 @@ class TracksDict(dict):
         super().__setitem__(key, val)
         return val
 
+    def scan(self, tracks, grs, match = None, **opts) -> KeysView[str]:
+        "scans for trks and grs"
+        if isinstance(match, str) or hasattr(match, 'match'):
+            grp = True
+            tmp = re.compile(match) if isinstance(match, str) else match
+            fcn = lambda i: tmp.match(str(i[0]))
+        else:
+            grp = False
+            fcn = lambda i: Path(str(i[0])).name if match is None else match
+
+        itr  = ((fcn(i), i) for i in LegacyGRFilesIO.scan(tracks, grs, **opts)[0])
+        info = dict((i.group(1), j) for i, j in itr if i) if grp else dict(itr)
+        self.paths.update(info)
+        return info.keys()
+
     def update(self, *args, tracks = None, grs = None, match = None, **kwargs):
         "adds paths or tracks to self"
+        scan = {}
+        for i in self.__SCAN_OPTS:
+            if i in kwargs:
+                scan[i] = kwargs.pop(i)
+
         info = {}
         info.update(*args, **kwargs)
         for i, j in info.items():
             self.__setitem__(i, j)
 
-        assert sum(i is None for i in (tracks, grs)) in (0, 2)
         if tracks is not None:
-
-            if isinstance(match, str) or hasattr(match, 'match'):
-                tmp   = re.compile(match) if isinstance(match, str) else match
-                match = lambda i: tmp.match(str(i[0]))
-                itr   = ((match(i), i) for i in LegacyGRFilesIO.scan(tracks, grs)[0])
-                self.paths.update({i.group(1): j for i, j in itr if i})
-                return
-
-            if match is None:
-                match = lambda i: Path(str(i[0])).name
-            itr   = ((match(i), i) for i in LegacyGRFilesIO.scan(tracks, grs)[0])
-            self.paths.update({i: j for i, j in itr})
+            assert sum(i is None for i in (tracks, grs)) in (0, 2)
+            self.scan(tracks, grs, match, **scan)
 
     def __missing__(self, olig):
         return self.__setitem__(olig, Track(path = self.paths.get(olig, olig)))

@@ -9,7 +9,7 @@ from    itertools   import chain
 from    inspect     import signature
 import  pickle
 import  re
-from    functools   import wraps
+from    functools   import wraps, partial
 from    pathlib     import Path
 import  numpy       as     np
 
@@ -252,12 +252,18 @@ class LegacyGRFilesIO(_TrackIO):
         "scan for gr files"
         if not isinstance(grdirs, (tuple, list, set, frozenset)):
             grdirs = (grdirs,)
-        grdirs = tuple(str(i) for i in grdirs)
 
-        proj  = opts.get("cgrdir", cls.__GRDIR)
-        cgr   = re.compile(rf'\b{proj}\b').search
-        grdir = f'/**/{proj}/*{cls.__CGREXT}'
-        return cls.__scan(grdirs,  lambda i: i if cgr(i) else i + grdir)
+        grdirs   = tuple(str(i) for i in grdirs)
+        projects = opts.get("cgrdir", cls.__GRDIR)
+        if isinstance(projects, str):
+            projects = (projects,)
+
+        res = {}
+        fcn = lambda cgr, i: (i if cgr(i) else i + grdir)
+        for proj in projects:
+            cgr = partial(fcn, re.compile(rf'\b{proj}\b').search)
+            res.update(cls.__scan(f'/**/{proj}/*{cls.__CGREXT}', cgr))
+        return res
 
     @classmethod
     def scan(cls,
