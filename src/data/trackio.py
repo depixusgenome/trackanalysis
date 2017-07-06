@@ -259,10 +259,11 @@ class LegacyGRFilesIO(_TrackIO):
             projects = (projects,)
 
         res = {}
-        fcn = lambda cgr, i: (i if cgr(i) else i + grdir)
+        fcn = lambda match, grdir, i: (i if match(i) else i + grdir)
         for proj in projects:
-            cgr = partial(fcn, re.compile(rf'\b{proj}\b').search)
-            res.update(cls.__scan(f'/**/{proj}/*{cls.__CGREXT}', cgr))
+            grdir = f'/**/{proj}/*{cls.__CGREXT}'
+            part  = partial(fcn, re.compile(rf'\b{proj}\b').search, grdir)
+            res.update(cls.__scan(grdirs, part))
         return res
 
     @classmethod
