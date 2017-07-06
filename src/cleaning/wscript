@@ -1,0 +1,5 @@
+make(locals())
+
+@patch
+def postfix_build(bld):
+    bld.transfer_static_html()

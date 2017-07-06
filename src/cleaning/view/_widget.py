@@ -13,6 +13,7 @@ from    bokeh.models    import (ColumnDataSource, DataTable, TableColumn,
 import  numpy       as     np
 
 from    view.base           import enableOnTrack
+from    view.static         import ROUTE
 from    view.plots          import DpxNumberFormatter, WidgetCreator
 from    eventdetection.view import AlignmentWidget
 from    ._model             import DataCleaningModelAccess, DataCleaningTask
@@ -70,6 +71,7 @@ class CyclesListWidget(WidgetCreator):
 
 class DpxCleaning(LayoutDOM):
     "This starts tests once flexx/browser window has finished loading"
+    __css__            = ROUTE+"/cleaning.css"
     __implementation__ = "_widget.coffee"
     framerate          = props.Float(30.)
     figure             = props.Instance(Figure)

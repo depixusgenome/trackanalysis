@@ -20,16 +20,14 @@ export class DpxCleaningView extends LayoutDOMView
         super()
         html = "<div class='dpx-cleaning dpx-widget'>"+
                     "<div class='dpx-span'>"+
-                        "<div><p>|z| ≤</p><p>Δz  ≥</p></div>"+
-                        "<div>#{@mk_inp("maxabsvalue")}#{@mk_inp("minextent")}</div>"+
-                    "</div><div class='dpx-span'>"+
-                        "<div><p>|dz/dt| ≤</p><p>% good  ≥</p></div>"+
+                        "<div><p>|z| ≤</p><p>Δz  ≥</p><p/></div>"+
+                        "<div>#{@mk_inp("maxabsvalue")}"+
+                             "#{@mk_inp("minextent")}"+
+                             "#{@mk_inp("minhfsigma", step = 0.0001, maxv = 0.01)}</div>"+
+                        "<div><p>|dz/dt| ≤</p><p>% good  ≥</p><p>≤ σ[HF] ≤</p></div>"+
                         "<div>#{@mk_inp("maxderivate")}"+
-                             "#{@mk_inp("minpopulation", step = 0.1)}</div>"+
-                    "</div><div class='dpx-span'>"+
-                        "#{@mk_inp("minhfsigma", step = 0.0001, maxv = 0.01)}"+
-                        "<p>≤ σ[HF] ≤</p>"+
-                        "#{@mk_inp("maxhfsigma", step = 0.0001, maxv = 0.01)}"+
+                             "#{@mk_inp("minpopulation", step = 0.1)}"+
+                             "#{@mk_inp("maxhfsigma", step = 0.0001, maxv = 0.01)}</diV>"+
                     "</div></div>"
 
         elem = $(@el)
@@ -49,7 +47,6 @@ export class DpxCleaningView extends LayoutDOMView
                     " value=#{@model[name]} disabled=true>"
 
     set_pyevent: (name) ->
-
 
 export class DpxCleaning extends LayoutDOM
     default_view: DpxCleaningView
