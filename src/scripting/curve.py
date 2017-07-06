@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "for speeding up the creation of figures"
-import warnings
 from itertools      import chain
 import numpy as np
 
-with warnings.catch_warnings():
-    warnings.filterwarnings('ignore', category = FutureWarning)
-    import pandas.tslib # pylint: disable=unused-import
+from utils                  import EVENTS_DTYPE
+import utils.warnings       #  pylint: disable=unused-import
 
 from bokeh.io               import output_notebook
 from bokeh.models.widgets   import Panel, Tabs # pylint: disable=unused-import
@@ -16,7 +14,6 @@ from bokeh.io               import show as _show
 from bokeh.models           import DataRange1d, LinearAxis, ColumnDataSource
 
 from data                   import TrackItems
-from utils                  import EVENTS_DTYPE
 
 class Multiplier:
     "basic right multiplier"

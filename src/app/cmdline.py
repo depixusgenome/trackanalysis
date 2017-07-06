@@ -9,7 +9,6 @@ import glob
 import subprocess
 import random
 import inspect
-import warnings
 
 import click
 
@@ -20,11 +19,9 @@ def _add_sys_paths():
             sys.path.append(path)
 _add_sys_paths()
 
-with warnings.catch_warnings():
-    warnings.filterwarnings('ignore', category = FutureWarning)
-    import pandas.tslib # discard bokeh warning # pylint: disable=unused-import
 
 # pylint: disable=wrong-import-position
+import utils.warnings   #  pylint: disable=unused-import
 from utils.logconfig    import getLogger
 from bokeh.resources    import DEFAULT_SERVER_PORT
 from app.scripting      import INITIAL_ORDERS
