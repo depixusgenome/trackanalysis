@@ -13,3 +13,6 @@ with warnings.catch_warnings():
         import bokeh.charts # discard bokeh warning # pylint: disable=unused-import
     except ImportError:
         pass
+warnings.filterwarnings('ignore',
+                        category = DeprecationWarning,
+                        message  = '.* deprecated in Bokeh 0.12.6 .*')
