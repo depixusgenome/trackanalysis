@@ -42,7 +42,7 @@ class BaseWise:
         return self.collection.oligos
 
     @staticmethod
-    def rank_by_noverlaps(partitions:List[List[data.OligoKPerm]],ooverl,index:int):
+    def rank_by_noverlaps(partitions:List[data.Partition],ooverl,index:int):
         '''
         to check that the score is computed on the correct index
         if we construct partitions index per index discarding those that are not optimal
@@ -50,10 +50,10 @@ class BaseWise:
         '''
         scored=[]
         for part in partitions:
-            merged=data.OligoPerm.add(*part)
+            merged=part.merge()
             if __debug__:
-                if not all(i in merged.domain for i in range(index)):
-                    print("missing index values in "+str(merged.domain))
+                if not all(i in part.domain for i in range(index)):
+                    print("missing index values in "+str(part.domain))
                     print("index=",index)
                     raise ValueError
 
@@ -73,8 +73,8 @@ class BaseWise:
         for partid,part in enumerate(partitions):
             merged=part.merge()
             if __debug__:
-                if not all(i in merged.domain for i in range(index)):
-                    print("missing index values in "+str(merged.domain))
+                if not all(i in part.domain for i in range(index)):
+                    print("missing index values in "+str(part.domain))
                     print("index=",index)
                     raise ValueError
 
@@ -94,11 +94,9 @@ class BaseWise:
                            index:int)->List[data.Partition]:
         '''
         the base is the starting partition is expand up to index-1
-        i.e. until domain for merged base
         no recursion
         '''
-        merged=base.merge()
-        if all(i in merged.domain for i in range(index)):
+        if all(i in base.domain for i in range(index)):
             return [base]
 
         completed=[] # type: List[data.Partition]
@@ -108,13 +106,12 @@ class BaseWise:
                 break
             to_add=[] # type: List[data.Partition]
             for part in to_complete:
-                merged=part.merge()
-                next_ids=[idx for idx in range(index) if not idx in merged.domain]
+                next_ids=[idx for idx in range(index) if not idx in part.domain]
                 if len(next_ids)==0:
                     completed.append(part)
                     continue
                 to_add+=[part.add(kprm,in_place=False) for kprm in add_kperms
-                         if not merged.domain.intersection(kprm.domain)
+                         if not part.domain.intersection(kprm.domain)
                          and next_ids[0] in kprm.domain]
             to_complete=to_add
 
@@ -130,8 +127,7 @@ class BaseWise:
             full_kperms.update(set(self.find_kperms(group)))
 
         if __debug__:
-            pass
-            #pickle.dump(full_kperms,open("full_kperms.pickle","wb"))
+            pickle.dump(full_kperms,open("debugfull_kperms.pickle","wb"))
 
         add_kperms=[kpr for kpr in full_kperms if kpr.domain.intersection({0})]
 
@@ -141,7 +137,7 @@ class BaseWise:
                     if data.OligoPeak.tail_overlap(kpr.perm[0].seq,kpr.perm[1].seq)
                     or len(kpr.domain)==1]
         #partitions=[[kpr] for kpr in add_kperms] # before
-        partitions=[data.Partition(perms=[kpr]) for kpr in add_kperms]
+        partitions=[data.Partition(perms=[kpr],domain=kpr.domain) for kpr in add_kperms]
 
         for index in range(len(self.oligos)):
             print("len(partitions)=",len(partitions))
@@ -161,14 +157,19 @@ class BaseWise:
             max_overlap=max(part.noverlaps for part in added_partitions) # pylint: disable=no-member
             partitions=[part for part in added_partitions if part.noverlaps==max_overlap] # pylint: disable=no-member
             # HERE
+            # TESTING! comment the following command
             #partitions=[part for part in added_partitions if part.noverlaps>max_overlap-3] # pylint: disable=no-member
             # can add a restriction on the stretch,bias
 
             # if 2 partitions differ locally (i.e. by a segment), save the segments
             # and recreate a partitions using the shared perms (domain inter) at index
-            diff_segments=data.Partition.identify_ambiguity(partitions)
+            ambiguities,resume_parts=data.Partition.identify_ambiguity(partitions,index)
             if __debug__:
                 pickle.dump(partitions,open("debugpartitions"+str(index)+".pickle","wb"))
+                pickle.dump(resume_parts,open("debugresume_parts"+str(index)+".pickle","wb"))
+                pickle.dump(ambiguities,open("debugambiguities"+str(index)+".pickle","wb"))
+
+            partitions=resume_parts # still testing
         return partitions
 
     def find_kperms(self,group:Tuple[int, ...])->Generator:

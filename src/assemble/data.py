@@ -185,7 +185,8 @@ class OligoPerm:
         #self._changes = kwa.get("changes",tuple()) # type: Tuple[int, ...]
         self._perm = kwa.get("perm",[]) # type: List[OligoPeak]
         self._permids = kwa.get("permids",numpy.empty(0,dtype='i4')) # type: List[int]
-        self._domain =  kwa.get("domain",frozenset()) # type: FrozenSet[int]
+        self._domain = kwa.get("domain",frozenset()) # type: FrozenSet[int]
+        self.__span = kwa.get("__span",frozenset()) # type: FrozenSet[int]
 
     @property
     def permids(self):
@@ -200,10 +201,9 @@ class OligoPerm:
         return self._perm
 
     @property
-    def changes(self):
-        'returns value'
-        #return self._changes
-        return tuple(self._domain)
+    def span(self)->FrozenSet[int]:
+        'to detect when ambiguity converge'
+        return self.__span
 
     @property
     def domain(self):
@@ -246,7 +246,8 @@ class OligoPerm:
         return OligoPerm(oligos=perm1.oligos,
                          perm=perm,
                          permids=permids,
-                         domain=perm1.domain.union(perm2.domain))
+                         domain=perm1.domain.union(perm2.domain),
+                         __span=perm1.span.union(perm2.span))
 
     def __hash__(self)->int:
         return hash((tuple(sorted(self.domain)),tuple(self.permids)))
@@ -264,13 +265,14 @@ class OligoPerm:
 
 class Partition:
     'container for indepent OligoPerm objects'
-    perms=[]  # type: List[OligoPerm]
-    scores=tuple() # type: Tuple[float, ...]
-    noverlaps=0 # type: int
-    pdfcost=0 # type: float
-    @initdefaults
     def __init__(self,**kwa):
-        pass
+        self.perms=kwa.get("perms",[])  # type: List[OligoPerm]
+        self.scores=kwa.get("scores",tuple()) # type: Tuple[float, ...]
+        self.noverlaps=kwa.get("noverlaps",0) # type: int
+        self.pdfcost=kwa.get("pdfcost",0) # type: float
+        self.domain=kwa.get("domain",None) # type: FrozenSet[int]
+        if self.domain is None:
+            self.domain=frozenset().union(*[prm.domain for prm in self.perms])
 
     def merge(self)->OligoPerm:
         'returns the merged perms'
@@ -283,51 +285,79 @@ class Partition:
         '''
         if in_place:
             self.perms+=[perm]
+            self.domain=self.domain.union(perm.domain)
         else:
-            return self.__copy__(perms=self.perms+[perm])
+            return self.__copy__(perms=self.perms+[perm],
+                                 domain=self.domain.union(perm.domain))
 
-    def __copy__(self,perms=None):
+    def __copy__(self,**kwa):
         'returns copied Partition'
-        if perms is None:
-            return Partition(**self.__dict__)
-        return Partition(perms=perms,
-                         scores=self.scores,
-                         noverlaps=self.noverlaps,
-                         pdfcost=self.pdfcost)
+        mod=dict(list(self.__dict__.items())+list(kwa.items()))
+        return Partition(**mod)
 
+    def copy(self,**kwa):
+        'copy call'
+        return self.__copy__(**kwa)
 
     @staticmethod
-    def identify_ambiguity(partitions:List[Partition]):
+    def old_identify_ambiguity(partitions:List,index:int)->Tuple[List,List]:
         '''If 2 partitions differ locally, save the different segments,
         recreate partitions using the shared perms'''
-        pass
+        ambiguities=[] # type: List # list of partitions
+        resumep=[] # type: List # List of partitions to use to resume the calculations
+        for part1,part2 in itertools.combinations(partitions,2):
+            if Partition.has_ambiguity(part1,part2,index):
+                perm1=frozenset(part1.perms)
+                perm2=frozenset(part2.perms)
+                ambiguities.append(Partition(perms=list(perm1-perm2)))
+                ambiguities.append(Partition(perms=list(perm2-perm1)))
+                # will need refinement
+                common=Partition(perms=list(perm1.intersection(perm2)),
+                                 domain=part1.domain.intersection(part2.domain))
+                resumep.append(common)
+
+        # set list(frozenset(resumep)) to further reduce degenerate cases
+        # must include in resumep partitions which are not merged with another
+        # for partid,part in enumerate(partitions):
+        #ambiguous_with need to compare i with j such that i>j
+        return ambiguities,list(frozenset(resumep))
 
     @staticmethod
-    def has_ambiguous_segment(part1,part2,index)->bool:
+    def identify_ambiguity(partitions:List,index:int)->Tuple[List,List]:
+        '''If 2 partitions differ locally, save the different segments,
+        recreate partitions using the shared perms'''
+        ambiguities=[] # type: List # list of partitions
+        resumep=[] # type: List # List of partitions to use to resume the calculations
+        keyparts=sorted([(hash(tuple(prm for prm in part.perms if prm.span.intersection({index}))),
+                          part) for part in partitions],
+                        key=lambda x:x[0])
+        for grp in itertools.groupby(keyparts,key=lambda x:x[0]):
+            # if they have the same key, ambiguity
+            parts=list(i[1] for i in grp[1])
+            ambiguities.append([part.copy() for part in parts])
+
+            perms=frozenset(parts[0].perms).intersection(*[frozenset(part.perms)
+                                                           for part in parts[1:]])
+            domain=parts[0].domain.intersection(*[frozenset(part.domain)
+                                                  for part in parts[1:]])
+            common=Partition(perms=list(perms),
+                             domain=domain)
+            resumep.append(common)
+        return ambiguities,resumep
+
+    @staticmethod
+    def has_ambiguity(part1,part2,index)->bool:
         '''
-        by construction, partitions share a common segment only if they have
+        by construction, 2 different partitions share a common segment only if they have
         a different segment before index
         if the ambiguous region is complete could return the ambiguous segment
         and the point where solutions merges
         '''
-        perm1=frozenset(prm for prm in part1.perms if prm.domain.intersection({index}))
-        perm2=frozenset(prm for prm in part2.perms if prm.domain.intersection({index}))
+        perm1=frozenset(prm for prm in part1.perms if prm.span.intersection({index}))
+        perm2=frozenset(prm for prm in part2.perms if prm.span.intersection({index}))
         if len(perm1.symmetric_difference(perm2))==0:
-            return True # return ambiguity,perm1
+            return True
         return False
-
-    def common_core(self,other)->FrozenSet[OligoPerm]:
-        'returns shared perms'
-        return frozenset(self.perms).intersection(frozenset(other.perms))
-
-    def first_common_id(self,other):
-        'to define'
-        selfm=self.merge()
-        otherm=other.merge()
-        for idx,val in enumerate(selfm.permids):
-            if val==otherm.permids[idx]:
-                return idx
-        return -1
 
 class OligoKPerm(OligoPerm):
     '''
@@ -362,6 +392,11 @@ class OligoKPerm(OligoPerm):
             for key,val in toperm.items():
                 self._permids[key]=val
         return self._permids
+
+    @property
+    def span(self)->FrozenSet[int]:
+        'to detect when ambiguity converge'
+        return frozenset(range(min(self.domain),max(self.domain)+1))
 
     # not used anymore
     @classmethod
@@ -401,13 +436,6 @@ class OligoKPerm(OligoPerm):
             self._domain=self.get_domain(self.kpermids)
         return self._domain
 
-    @property
-    def changes(self)->Tuple[int, ...]:
-        '''
-        returns the tuple of indices which will be changed by application of perm
-        should return [] if all sorted(perm)[i]==perm[i], ie: identity operator
-        '''
-        return tuple(self.domain)
 
     def __hash__(self)->int:
         return hash((tuple(sorted(self.domain)),tuple(self.kpermids)))
