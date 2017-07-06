@@ -33,7 +33,8 @@ def _glob(path:str):
 
 def _checktype(fcn):
     sig = signature(fcn)
-    tpe = tuple(sig.parameters.values())[-1].annotation
+    tpe = tuple(i for i in sig.parameters.values()
+                if i.kind is not i.VAR_KEYWORD)[-1].annotation
     if tpe is sig.empty:
         tpe = Any
     elif tpe == Tuple[PATHTYPE,...]:
@@ -52,7 +53,7 @@ def _checktype(fcn):
 
 class _TrackIO:
     @staticmethod
-    def check(path):
+    def check(path, **_):
         u"checks the existence of a path"
         raise NotImplementedError()
 
@@ -65,7 +66,7 @@ class PickleIO(_TrackIO):
     u"checks and opens pickled paths"
     @staticmethod
     @_checktype
-    def check(path:PATHTYPE) -> Optional[PATHTYPE]:
+    def check(path:PATHTYPE, **_) -> Optional[PATHTYPE]:
         u"checks the existence of a path"
         return path if Path(path).suffix == ".pk" else None
 
@@ -80,7 +81,7 @@ class LegacyTrackIO(_TrackIO):
     __TRKEXT = '.trk'
     @classmethod
     @_checktype
-    def check(cls, path:PATHTYPE) -> Optional[PATHTYPE]: # type: ignore
+    def check(cls, path:PATHTYPE, **_) -> Optional[PATHTYPE]: # type: ignore
         u"checks the existence of a path"
         return path if Path(path).suffix == cls.__TRKEXT else None
 
@@ -95,14 +96,14 @@ class LegacyGRFilesIO(_TrackIO):
     __GREXT  = '.gr'
     __CGREXT = '.cgr'
     __GRDIR  = 'cgr_project'
-    __CGR    = re.compile(rf'\b{__GRDIR}\b')
     __TITLE  = re.compile(r"\\stack{{Bead (?P<id>\d+) Z.*?phase\(s\)"
                           +r"(?:[^\d]|\d(?!,))*(?P<phases>[\d, ]*?)\]}}")
     __GRTITLE = re.compile(r"Bead Cycle (?P<id>\d+) p.*")
     @classmethod
     @_checktype
-    def check(cls, apaths:Tuple[PATHTYPE,...] # type: ignore
-             ) -> Optional[Tuple[PATHTYPE,...]]:
+    def check(cls, # type: ignore
+              apaths:Tuple[PATHTYPE,...],
+              **kwa) -> Optional[Tuple[PATHTYPE,...]]:
         u"checks the existence of paths"
         if len(apaths) < 2:
             return None
@@ -112,7 +113,7 @@ class LegacyGRFilesIO(_TrackIO):
             return None
 
         if len(paths) == 2 and any(i.is_dir() for i in paths):
-            paths = cls.__findgrs(paths)
+            paths = cls.__findgrs(paths, kwa)
             fname = str(paths[0])
             if '*' in fname:
                 return cls.__findtrk(fname, paths[1])
@@ -156,8 +157,8 @@ class LegacyGRFilesIO(_TrackIO):
         return output
 
     @classmethod
-    def __findgrs(cls, paths):
-        grdir  = cls.__GRDIR
+    def __findgrs(cls, paths, opts):
+        grdir  = opts.get('cgrdir', cls.__GRDIR)
         ext    = cls.__GREXT, cls.__CGREXT
         err    = lambda j: IOError(j+'\n -'+ '\n -'.join(str(i) for i in paths), 'warning')
         hasgr  = lambda i: (i.is_dir()
@@ -247,21 +248,22 @@ class LegacyGRFilesIO(_TrackIO):
         return cls.__scan(trkdirs, lambda i: i if i.endswith(trk) else i+'/**/*'+trk)
 
     @classmethod
-    def scangrs(cls, grdirs) -> Dict[str, Path]:
+    def scangrs(cls, grdirs, **opts) -> Dict[str, Path]:
         "scan for gr files"
         if not isinstance(grdirs, (tuple, list, set, frozenset)):
             grdirs = (grdirs,)
         grdirs = tuple(str(i) for i in grdirs)
 
-        cgr   = cls.__CGR.search
-        grdir = '/**/'+cls.__GRDIR+'/*'+cls.__CGREXT
+        proj  = opts.get("cgrdir", cls.__GRDIR)
+        cgr   = re.compile(rf'\b{proj}\b').search
+        grdir = f'/**/{proj}/*{cls.__CGREXT}'
         return cls.__scan(grdirs,  lambda i: i if cgr(i) else i + grdir)
 
     @classmethod
     def scan(cls,
              trkdirs: Union[str, Sequence[str]],
              grdirs:  Union[str, Sequence[str]],
-             matchfcn: Callable[[Path, Path], bool] = None):
+             matchfcn: Callable[[Path, Path], bool] = None, **opts):
         """
         Scans for pairs
 
@@ -275,7 +277,7 @@ class LegacyGRFilesIO(_TrackIO):
         trkdirs = (trkdirs,) if isinstance(trkdirs, (Path, str)) else trkdirs # type: ignore
 
         trks    = cls.scantrk(trkdirs)
-        cgrs    = cls.scangrs(grdirs)
+        cgrs    = cls.scangrs(grdirs, **opts)
 
         if matchfcn is None:
             pairs    = frozenset(trks) & frozenset(cgrs)
@@ -336,7 +338,7 @@ class Handler:
         return track
 
     @classmethod
-    def check(cls, track) -> 'Handler':
+    def check(cls, track, **opts) -> 'Handler':
         u"""
         Checks that a path exists without actually opening the track.
 
@@ -363,7 +365,7 @@ class Handler:
                     raise IOError("Could not find path: " + i, "warning")
 
         for caller in _CALLERS:
-            tmp = caller.check(paths)
+            tmp = caller.check(paths, **opts)
             if tmp is not None:
                 res = cls(tmp, caller)
                 break
@@ -372,7 +374,7 @@ class Handler:
 
         return res
 
-def checkpath(track) -> Handler:
+def checkpath(track, **opts) -> Handler:
     u"""
     Checks that a path exists without actually opening the track.
 
@@ -381,7 +383,7 @@ def checkpath(track) -> Handler:
 
     Upon success, it returns a handler with the correct protocol for this path.
     """
-    return Handler.check(track)
+    return Handler.check(track, **opts)
 
 def opentrack(track, beadsonly = False):
     u"Opens a track depending on its extension"

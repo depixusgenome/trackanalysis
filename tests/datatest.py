@@ -3,14 +3,13 @@
 u""" Tests data access """
 from   pathlib      import Path
 from   itertools    import product
-import re
 import numpy as np
 
 from   legacy           import readtrack   # pylint: disable=import-error,no-name-in-module
 import data
 from   data.trackitems  import Items
 from   data.trackio     import LegacyGRFilesIO
-from   testingcore      import path as utpath, getmonkey
+from   testingcore      import path as utpath
 
 # pylint: disable=missing-docstring,protected-access
 class _MyItem(Items):
@@ -205,7 +204,7 @@ def test_findgrdir():
              24, 25, 26, 27, 28, 29, 2, 34, 35, 37, 3, 4, 6, 7}
     assert set(track.beadsonly.keys()) == keys
 
-def test_scancgr(monkeypatch):
+def test_scancgr():
     "tests LegacyGRFilesIO.scancgr"
     assert LegacyGRFilesIO.scan("dummy", "dummy") == ((), (), ())
 
@@ -214,13 +213,11 @@ def test_scancgr(monkeypatch):
     assert (pairs, grs) == ((), ())
     assert sorted(trks) == sorted(Path(directory).glob("*.trk"))
 
-    monkeypatch.setattr(LegacyGRFilesIO, '_LegacyGRFilesIO__CGR', re.compile('CTGT_selection'))
-    monkeypatch.setattr(LegacyGRFilesIO, '_LegacyGRFilesIO__GRDIR', 'CTGT_selection')
-    pairs, grs, trks = LegacyGRFilesIO.scan(directory, directory)
+    pairs, grs, trks = LegacyGRFilesIO.scan(directory, directory, cgrdir = 'CTGT_selection')
     assert len(grs) == 0
     assert pairs    == ((directory/'test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.trk',
                          directory/'CTGT_selection'),)
     assert len(trks) == len(tuple(Path(directory).glob("*.trk"))) - len(pairs)
 
 if __name__ == '__main__':
-    test_scancgr(getmonkey())
+    test_scancgr()
