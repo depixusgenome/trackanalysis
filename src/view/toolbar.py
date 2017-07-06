@@ -8,7 +8,7 @@ import re
 import numpy                   as np
 import bokeh.core.properties   as props
 
-from bokeh.models         import LayoutDOM
+from bokeh.models         import Widget
 from bokeh.io             import curdoc
 
 from control.taskio       import TaskIO
@@ -110,7 +110,7 @@ class SaveFileDialog(FileDialog):
                     self.__ctrl.saveTrack(paths)
             self.__doc.add_next_tick_callback(_fcn)
 
-class DpxToolbar(LayoutDOM):
+class DpxToolbar(Widget):
     "Toolbar model"
     __css__            = ROUTE+"/view.css"
     __implementation__ = 'toolbar.coffee'

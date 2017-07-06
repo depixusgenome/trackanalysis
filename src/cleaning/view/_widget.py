@@ -8,7 +8,7 @@ import  bokeh.core.properties as props
 from    bokeh           import layouts
 from    bokeh.plotting  import Figure
 from    bokeh.models    import (ColumnDataSource, DataTable, TableColumn,
-                                Widget, StringFormatter, LayoutDOM, CustomJS)
+                                Widget, StringFormatter, CustomJS)
 
 import  numpy       as     np
 
@@ -69,7 +69,7 @@ class CyclesListWidget(WidgetCreator):
         info['accepted'][self._model.cleaning.badcycles] = False
         return info
 
-class DpxCleaning(LayoutDOM):
+class DpxCleaning(Widget):
     "This starts tests once flexx/browser window has finished loading"
     __css__            = ROUTE+"/cleaning.css"
     __implementation__ = "_widget.coffee"

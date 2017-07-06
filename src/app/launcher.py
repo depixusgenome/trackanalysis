@@ -13,7 +13,7 @@ from bokeh.server.server        import Server
 from bokeh.application          import Application
 from bokeh.application.handlers import FunctionHandler
 from bokeh.settings             import settings
-from bokeh.layouts              import layout
+from bokeh.layouts              import layout, column
 from bokeh.resources            import DEFAULT_SERVER_PORT
 
 from utils.logconfig            import getLogger, logToFile
@@ -322,12 +322,18 @@ class WithToolbar:
 
             def getroots(self, doc):
                 "adds items to doc"
-                children = [self._bar.getroots(doc), self._mainview.getroots(doc)]
+                tbar     = self._bar.getroots(doc)[0]
+                others   = self._mainview.getroots(doc)
+                if len(others) == 1:
+                    children = [tbar, others[0]]
+                else:
+                    children = [tbar, layout(children)]
+
                 if self._ctrl.getGlobal('css').responsive.get():
-                    return layout(children, responsive = True),
+                    return column(children, responsive = True),
 
                 mode = self._ctrl.getGlobal('css').sizing_mode.get()
-                return layout(children, sizing_mode = mode),
+                return column(children, sizing_mode = mode),
 
         return ViewWithToolbar
 

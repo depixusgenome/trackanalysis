@@ -3,9 +3,9 @@ import {logger}         from "core/logging"
 import * as p           from "core/properties"
 import * as $           from "jquery"
 
-import {LayoutDOMView, LayoutDOM} from "models/layouts/layout_dom"
+import {WidgetView, Widget} from "models/widgets/widget"
 
-export class DpxToolbarView extends LayoutDOMView
+export class DpxToolbarView extends WidgetView
     tagName: "div"
 
     on_bead:    () ->
@@ -33,13 +33,12 @@ export class DpxToolbarView extends LayoutDOMView
     on_change_message: () ->
         $(@el).find('#dpx-tb-message').html(@model.message)
 
-    initialize: (options) ->
-        super(options)
-        @render()
-        @listenTo(@model, 'change:bead',      () => @on_change_bead())
-        @listenTo(@model, 'change:discarded', () => @on_change_discarded())
-        @listenTo(@model, 'change:message',   () => @on_change_message())
-        @listenTo(@model, 'change:frozen',    () => @on_change_frozen())
+    connect_signals: () ->
+        super()
+        @connect(@model.properties.bead.change,      () => @on_change_bead())
+        @connect(@model.properties.discarded.change, () => @on_change_discarded())
+        @connect(@model.properties.message.change,   () => @on_change_message())
+        @connect(@model.properties.frozen.change,    () => @on_change_frozen())
 
     make_btn: (name, label, freeze = 'dpx-freeze') ->
         str = "<button type='button' id='dpx-tb-#{name}' "+
@@ -82,9 +81,16 @@ export class DpxToolbarView extends LayoutDOMView
         @on_change_frozen()
         return @
 
-export class DpxToolbar extends LayoutDOM
+  get_width_height: () ->
+      [width, height] = LayoutDOMView::get_width_height()
+      return [width, 30]
+
+  get_height: () -> 30
+
+export class DpxToolbar extends Widget
     type: 'DpxToolbar'
     default_view: DpxToolbarView
+
     @define {
         frozen:     [p.Bool,    true]
         open:       [p.Number,  0]

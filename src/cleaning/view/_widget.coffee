@@ -2,19 +2,18 @@ import {build_views}    from "core/build_views"
 import {logger}         from "core/logging"
 import *        as $    from "jquery"
 import *        as p    from "core/properties"
-import {LayoutDOMView, LayoutDOM} from "models/layouts/layout_dom"
+import {WidgetView, Widget} from "models/widgets/widget"
 
-export class DpxCleaningView extends LayoutDOMView
+export class DpxCleaningView extends WidgetView
     tagName: "div"
 
-    initialize: (options) ->
-        super(options)
-        @render()
+    connect_signals: () ->
+        super()
         for evt in @cl_inputs
-            @listenTo(@model, 'change:#{name}', do (evt, me = @) ->
+            @connect(@model.properties[evt].change, do (evt, me = @) ->
                       () -> $(me.el).find("#dpx-cl-#{evt}").val("#{me.model[evt]}"))
-        @listenTo(@model, 'change:frozen',
-                  () => $(@el).find('.dpx-cl-freeze').prop('disabled', @model.frozen))
+        @connect(@model.properties.frozen.change,
+                 () => $(@el).find('.dpx-cl-freeze').prop('disabled', @model.frozen))
 
     render: () ->
         super()
@@ -48,7 +47,7 @@ export class DpxCleaningView extends LayoutDOMView
 
     set_pyevent: (name) ->
 
-export class DpxCleaning extends LayoutDOM
+export class DpxCleaning extends Widget
     default_view: DpxCleaningView
     type:         "DpxCleaning"
 

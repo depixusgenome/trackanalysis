@@ -9,9 +9,8 @@ export class PathInputView extends InputWidgetView
     "click button": "change_click"
   }
 
-  initialize: (options) ->
-    super(options)
-    @render()
+  connect_signals: () ->
+    super()
     @connect(@model.change, @render)
 
   render: () ->
