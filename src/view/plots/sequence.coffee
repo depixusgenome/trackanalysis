@@ -2,7 +2,7 @@ import * as p  from "core/properties"
 import {Model} from "model"
 import {DOMView} from "core/dom_view"
 
-export class NAMEView extends BokehView
+export class NAMEView extends DOMView
 export class NAME     extends Model
     default_view: NAMEView
     type: "NAME"

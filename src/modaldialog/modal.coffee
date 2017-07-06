@@ -353,7 +353,7 @@ class DpxModalDialogView extends Modal
         @model.results = vals
         @model.callback?.execute(@model.results)
 
-export class DpxModalView   extends BokehView
+export class DpxModalView   extends DOMView
     className: 'dpx-modal-view'
     initialize: (options) ->
         super(options)
