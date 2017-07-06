@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # encoding: utf-8
 "basic configuration"
+from   waflib.Configure import conf
 import wafbuilder
 from ._utils import MODULES
 
@@ -25,3 +26,10 @@ def build(bld, mods = None):
     wafbuilder.build(bld)
     wafbuilder.findpyext(bld, set(mod for mod in mods if mod != 'tests'))
     bld.recurse(mods, 'build')
+
+@conf
+def transfer_static_html(bld):
+    "transfers static files"
+    files = bld.path.ant_glob(['static/*.css', 'static/*.js', 'static/*.map',
+                               '*/static/*.css', '*/static/*.js', '*/static/*.map'])
+    wafbuilder.copyfiles(bld, 'static', files)
