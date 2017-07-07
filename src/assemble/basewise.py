@@ -117,8 +117,7 @@ class BaseWise:
 
         return completed
 
-
-    def base_per_base(self)->List[data.Partition]:
+    def base_per_base(self)->Tuple[List[data.Partition],List[List[data.Partition]]]:
         'constructs the sequence with maximal overlapping one base at a time'
         groupedids=utils.group_overlapping_normdists([oli.dist for oli in self.oligos],
                                                      nscale=self.nscale)[1]
@@ -139,10 +138,11 @@ class BaseWise:
         #partitions=[[kpr] for kpr in add_kperms] # before
         partitions=[data.Partition(perms=[kpr],domain=kpr.domain) for kpr in add_kperms]
 
+        all_ambiguities=[] # type: List[List[data.Partition]]
         for index in range(len(self.oligos)):
             print("len(partitions)=",len(partitions))
             print("index=",index)
-            add_kperms=[kpr for kpr in full_kperms if frozenset(kpr.permids).intersection({index})]
+            add_kperms=[kpr for kpr in full_kperms if kpr.span.intersection({index})]
             print("len(add_kperms)=",len(add_kperms))
             added_partitions=[] # type: List[data.Partition]
             for part in partitions:
@@ -164,13 +164,16 @@ class BaseWise:
             # if 2 partitions differ locally (i.e. by a segment), save the segments
             # and recreate a partitions using the shared perms (domain inter) at index
             ambiguities,resume_parts=data.Partition.identify_ambiguity(partitions,index)
+            all_ambiguities.append(ambiguities)
             if __debug__:
                 pickle.dump(partitions,open("debugpartitions"+str(index)+".pickle","wb"))
                 pickle.dump(resume_parts,open("debugresume_parts"+str(index)+".pickle","wb"))
                 pickle.dump(ambiguities,open("debugambiguities"+str(index)+".pickle","wb"))
 
             partitions=resume_parts # still testing
-        return partitions
+            # implement reconstruction method
+            # write the method to list the final result (i.e. all possible partitions)
+        return partitions,all_ambiguities
 
     def find_kperms(self,group:Tuple[int, ...])->Generator:
         u'''

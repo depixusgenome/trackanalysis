@@ -300,29 +300,6 @@ class Partition:
         return self.__copy__(**kwa)
 
     @staticmethod
-    def old_identify_ambiguity(partitions:List,index:int)->Tuple[List,List]:
-        '''If 2 partitions differ locally, save the different segments,
-        recreate partitions using the shared perms'''
-        ambiguities=[] # type: List # list of partitions
-        resumep=[] # type: List # List of partitions to use to resume the calculations
-        for part1,part2 in itertools.combinations(partitions,2):
-            if Partition.has_ambiguity(part1,part2,index):
-                perm1=frozenset(part1.perms)
-                perm2=frozenset(part2.perms)
-                ambiguities.append(Partition(perms=list(perm1-perm2)))
-                ambiguities.append(Partition(perms=list(perm2-perm1)))
-                # will need refinement
-                common=Partition(perms=list(perm1.intersection(perm2)),
-                                 domain=part1.domain.intersection(part2.domain))
-                resumep.append(common)
-
-        # set list(frozenset(resumep)) to further reduce degenerate cases
-        # must include in resumep partitions which are not merged with another
-        # for partid,part in enumerate(partitions):
-        #ambiguous_with need to compare i with j such that i>j
-        return ambiguities,list(frozenset(resumep))
-
-    @staticmethod
     def identify_ambiguity(partitions:List,index:int)->Tuple[List,List]:
         '''If 2 partitions differ locally, save the different segments,
         recreate partitions using the shared perms'''
@@ -334,8 +311,8 @@ class Partition:
         for grp in itertools.groupby(keyparts,key=lambda x:x[0]):
             # if they have the same key, ambiguity
             parts=list(i[1] for i in grp[1])
-            ambiguities.append([part.copy() for part in parts])
-
+            #ambiguities.append([part.copy() for part in parts])
+            ambiguities.append(Partition.list_ambiguities(parts))
             perms=frozenset(parts[0].perms).intersection(*[frozenset(part.perms)
                                                            for part in parts[1:]])
             domain=parts[0].domain.intersection(*[frozenset(part.domain)
@@ -345,19 +322,19 @@ class Partition:
             resumep.append(common)
         return ambiguities,resumep
 
+    # to check but should be ok
     @staticmethod
-    def has_ambiguity(part1,part2,index)->bool:
+    def list_ambiguities(partitions)->List:
         '''
-        by construction, 2 different partitions share a common segment only if they have
-        a different segment before index
-        if the ambiguous region is complete could return the ambiguous segment
-        and the point where solutions merges
+        returns a list of perms for each partitions
+        the perms corresponds to the difference of a particular partition to any other
         '''
-        perm1=frozenset(prm for prm in part1.perms if prm.span.intersection({index}))
-        perm2=frozenset(prm for prm in part2.perms if prm.span.intersection({index}))
-        if len(perm1.symmetric_difference(perm2))==0:
-            return True
-        return False
+        ambi=[]
+        for idx,val in enumerate(partitions):
+            others=tuple(frozenset(part.perms) for part in partitions[:idx]+partitions[idx+1:])
+            ambi.append(Partition(perms=list(frozenset(val.perms)-frozenset.intersection(*others))))
+
+        return ambi
 
 class OligoKPerm(OligoPerm):
     '''
