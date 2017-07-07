@@ -53,21 +53,20 @@ export class DpxToolbarView extends WidgetView
         else
             quit =''
 
-        html = "<div class='dpx-row dpx-widget dpx-tb dpx-span'>"+
-                    "#{@make_btn('open', 'Open', '')}"+
-                    "#{@make_btn('save', 'Save')}"+
-                    "<label>Bead</label>"+
-                    "<input id='dpx-tb-bead'"+
-                        " class='dpx-freeze bk-widget-form-input'"+
-                        " type='number' min=0  max=10000 step=1  value=#{mdl.bead}>"+
-                    "<label>Discarded</label>"+
-                    "<input id='dpx-tb-discard'"+
-                        " class='dpx-freeze bk-widget-form-input'"+
-                        " type='text' value='#{mdl.discarded}'>"+
-                    "#{@make_btn('del', '━', true)}"+
-                    "<div id='dpx-tb-message' class='bk-markup'>"+
-                        "#{mdl.message}</div>"+
-                    "#{quit}</div>"
+        html = "#{@make_btn('open', 'Open', '')}"+
+               "#{@make_btn('save', 'Save')}"+
+               "<label>Bead</label>"+
+               "<input id='dpx-tb-bead'"+
+                   " class='dpx-freeze bk-widget-form-input'"+
+                   " type='number' min=0  max=10000 step=1  value=#{mdl.bead}>"+
+               "<label>Discarded</label>"+
+               "<input id='dpx-tb-discard'"+
+                   " class='dpx-freeze bk-widget-form-input'"+
+                   " type='text' value='#{mdl.discarded}'>"+
+               "#{@make_btn('del', '━', true)}"+
+               "<div id='dpx-tb-message' class='bk-markup'>"+
+                   "#{mdl.message}</div>"+
+               "#{quit}"
 
         elem = $(@el)
         elem.html(html)
@@ -90,6 +89,10 @@ export class DpxToolbarView extends WidgetView
 export class DpxToolbar extends Widget
     type: 'DpxToolbar'
     default_view: DpxToolbarView
+
+    initialize: (attributes, options) ->
+        super(attributes, options)
+        @css_classes = ["dpx-row", "dpx-widget", "dpx-tb", "dpx-span"]
 
     @define {
         frozen:     [p.Bool,    true]

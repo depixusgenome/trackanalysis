@@ -126,7 +126,7 @@ class WidgetMixin:
         lst  = widgets['align']
         lst += widgets['cleaning']
         lst += widgets['table']
-        return layouts.column(lst)
+        return layouts.widgetbox(lst, responsive = True)
 
     def _resetwidget(self):
         for ite in self.__widgets.values():

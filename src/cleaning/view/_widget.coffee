@@ -17,17 +17,16 @@ export class DpxCleaningView extends WidgetView
 
     render: () ->
         super()
-        html = "<div class='dpx-cleaning dpx-widget'>"+
-                    "<div class='dpx-span'>"+
-                        "<div><p>|z| ≤</p><p>Δz  ≥</p><p/></div>"+
-                        "<div>#{@mk_inp("maxabsvalue")}"+
-                             "#{@mk_inp("minextent")}"+
-                             "#{@mk_inp("minhfsigma", step = 0.0001, maxv = 0.01)}</div>"+
-                        "<div><p>|dz/dt| ≤</p><p>% good  ≥</p><p>≤ σ[HF] ≤</p></div>"+
-                        "<div>#{@mk_inp("maxderivate")}"+
-                             "#{@mk_inp("minpopulation", step = 0.1)}"+
-                             "#{@mk_inp("maxhfsigma", step = 0.0001, maxv = 0.01)}</diV>"+
-                    "</div></div>"
+        html = "<div class='dpx-span'>"+
+                   "<div><p>|z| ≤</p><p>Δz  ≥</p><p/></div>"+
+                   "<div>#{@mk_inp("maxabsvalue")}"+
+                        "#{@mk_inp("minextent")}"+
+                        "#{@mk_inp("minhfsigma", step = 0.0001, maxv = 0.01)}</div>"+
+                   "<div><p>|dz/dt| ≤</p><p>% good  ≥</p><p>≤ σ[HF] ≤</p></div>"+
+                   "<div>#{@mk_inp("maxderivate")}"+
+                        "#{@mk_inp("minpopulation", step = 0.1)}"+
+                        "#{@mk_inp("maxhfsigma", step = 0.0001, maxv = 0.01)}</diV>"+
+               "</div>"
 
         elem = $(@el)
         elem.html(html)
@@ -50,6 +49,10 @@ export class DpxCleaningView extends WidgetView
 export class DpxCleaning extends Widget
     default_view: DpxCleaningView
     type:         "DpxCleaning"
+
+    initialize: (attributes, options) ->
+        super(attributes, options)
+        @css_classes = ["dpx-cleaning", "dpx-widget"]
 
     onchangebounds: () ->
         trng = @figure.extra_x_ranges['time']

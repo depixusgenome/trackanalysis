@@ -5,8 +5,8 @@ import {ToolbarBox}   from "models/tools/toolbar_box"
 
 export class DpxKeyedRowView extends RowView
     className: "dpx-bk-grid-row"
-    initialize: (options) ->
-        super(options)
+    render: () ->
+        super()
         @el.setAttribute("tabindex", 1)
         $(@el).keydown((evt) => @model.dokeydown(evt))
         $(@el).keyup((evt) => @model.dokeyup(evt))
