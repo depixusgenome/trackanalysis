@@ -56,6 +56,22 @@ class Oligo:
                 return seq[:i]+self.seq
         return seq+self.seq
 
+    def __add__(self,bias):
+        kwa=dict(self.__dict__)
+        kwa["pos"]=kwa["pos"]+bias
+        return Oligo(**kwa)
+
+    def __radd__(self,bias):
+        return self.__add__(bias)
+
+    def __mul__(self,scale):
+        kwa=dict(self.__dict__)
+        kwa["pos"]=kwa["pos"]*scale
+        return Oligo(**kwa)
+
+    def __rmul__(self,scale):
+        return self.__mul__(scale)
+
 # it is bpos which needs to be updated
 # If 2 oligos are too far from one another there is a
 # unknown number of bases between the 2
@@ -95,6 +111,22 @@ class OligoPeak(Oligo):
             return (self.bpos-self.bias)/self.pos
         except ZeroDivisionError:
             return 0
+
+    def __add__(self,bias):
+        kwa=dict(self.__dict__)
+        kwa["pos"]=kwa["pos"]+bias
+        return OligoPeak(**kwa)
+
+    def __radd__(self,bias):
+        return self.__add__(bias)
+
+    def __mul__(self,scale):
+        kwa=dict(self.__dict__)
+        kwa["pos"]=kwa["pos"]*scale
+        return OligoPeak(**kwa)
+
+    def __rmul__(self,scale):
+        return self.__mul__(scale)
 
 
 OliBat = NamedTuple("OliBat",[("oli",OligoPeak),
