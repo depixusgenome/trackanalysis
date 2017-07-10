@@ -343,7 +343,6 @@ class Partition:
         for grp in itertools.groupby(keyparts,key=lambda x:x[0]):
             # if they have the same key, ambiguity
             parts=list(i[1] for i in grp[1])
-            #ambiguities.append([part.copy() for part in parts])
             ambiguities.append(Partition.list_ambiguities(parts))
             perms=frozenset(parts[0].perms).intersection(*[frozenset(part.perms)
                                                            for part in parts[1:]])
@@ -364,6 +363,8 @@ class Partition:
         ambi=[]
         for idx,val in enumerate(partitions):
             others=tuple(frozenset(part.perms) for part in partitions[:idx]+partitions[idx+1:])
+            if len(others)==0:
+                continue
             ambi.append(Partition(perms=list(frozenset(val.perms)-frozenset.intersection(*others))))
 
         return ambi
