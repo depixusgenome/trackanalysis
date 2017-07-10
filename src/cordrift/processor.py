@@ -16,22 +16,20 @@ from signalfilter               import rawprecision
 from eventdetection             import EventDetectionConfig
 from eventdetection.detection   import EventDetector
 from eventdetection.data        import Events
-from .collapse                  import (Range, Profile, # pylint: disable=unused-import
-                                        CollapseAlg, CollapseByMerging,
-                                        CollapseToMean, CollapseToSock,
-                                        StitchAlg, StitchByDerivate, StitchByInterpolation)
+from .collapse                  import Range, Profile, CollapseAlg, CollapseToSock
+from .stitching                 import StitchAlg, SingleFitStitch
 
 class DriftTask(Task, EventDetectionConfig):
     "Removes correlations between cycles"
-    level     = Level.bead
-    phases    = PHASE.measure, PHASE.measure # type: Optional[Tuple[int,int]]
-    events    = EventDetector()
-    collapse  = CollapseToSock()             # type: Optional[CollapseAlg]
-    stitch    = StitchByInterpolation()      # type: Optional[StitchAlg]
-    zero      = 10
-    precision = None
-    rawfactor = 1.
-    onbeads   = True
+    level                 = Level.bead
+    phases                = PHASE.measure, PHASE.measure
+    events                = EventDetector()
+    collapse: CollapseAlg = CollapseToSock()
+    stitch:   StitchAlg   = SingleFitStitch()
+    zero                  = 10
+    precision: float      = None
+    rawfactor             = 1.
+    onbeads               = True
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **kwa):
         Task.__init__(self)
@@ -42,18 +40,16 @@ class DriftTask(Task, EventDetectionConfig):
         "whether this task implies long computations"
         return True
 
+_DRIFT_CACHE = Dict[Union[int,Sequence[int]], Any]
 class _BeadDriftAction:
     "Action to be passed to a Cycles"
-    _DATA    = Sequence[np.ndarray]
+    _DATA  = Sequence[np.ndarray]
     def __init__(self, args: Union[dict,DriftTask], cache = None) -> None:
-        self.cache = {} if cache is None else cache # type: Dict[Union[int,Sequence[int]], Any]
-        self.done  = set()                          # type: set
-        self.task  = cast(DriftTask,
-                          args if isinstance(args, DriftTask)
-                          else DriftTask(**args))
-
-        assert not (self.task.events is None
-                    and isinstance(self.task.collapse, CollapseToMean))
+        self.cache: _DRIFT_CACHE = {} if cache is None else cache
+        self.done:  set          = set()
+        self.task:  DriftTask    = cast(DriftTask,
+                                        args if isinstance(args, DriftTask)
+                                        else DriftTask(**args))
         assert self.task.zero is None or self.task.zero > 2
 
     def __getstate__(self):
@@ -86,7 +82,7 @@ class _BeadDriftAction:
             self.task.stitch(prof, (Range(0, cycle) for cycle in data))
 
         if self.task.zero is not None:
-            prof.value -= np.nanmedian(prof.value[-self.task.zero:]) # type: ignore
+            prof.value -= np.nanmedian(prof.value[-self.task.zero:])
 
         return prof
 

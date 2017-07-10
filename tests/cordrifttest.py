@@ -8,10 +8,11 @@ import numpy as np
 from   numpy.testing            import assert_allclose, assert_equal
 from   pytest                   import approx # pylint: disable = no-name-in-module
 
-from cordrift.collapse          import (CollapseToMean,        CollapseByDerivate,
+from cordrift.collapse          import (CollapseToMean, CollapseByDerivate,
                                         CollapseByMerging,
-                                        StitchByInterpolation, Profile, _getintervals,
-                                        StitchByDerivate, Range)
+                                        Profile, Range)
+from cordrift.stitching         import (StitchByInterpolation, _getintervals,
+                                        StitchByDerivate, SingleFitStitch)
 from cordrift.processor         import DriftTask, DriftProcessor
 from simulator                  import TrackSimulator
 from simulator.processor        import TrackSimulatorTask
@@ -19,6 +20,31 @@ from eventdetection.processor   import ExtremumAlignmentTask
 from model.task                 import DataSelectionTask
 from control.taskcontrol        import create
 from testingcore                import path as utpath, DummyPool
+
+def test_singlefitstitch():
+    "Tests single fit sticht"
+    prof = Profile(120)
+    prof.value    = np.arange(120, dtype = 'f4') + np.random.rand(120)*.1
+    prof.count[:] = 20
+    SingleFitStitch.run(prof, [])
+    assert_allclose(prof.value, np.arange(120, dtype = 'f4'), atol = 1e-1, rtol = 1e-2)
+
+    prof.value    = np.arange(120, dtype = 'f4') + np.random.rand(120)*.1
+    prof.count[:] = 20
+    for i in range(1,6):
+        prof.value[15*i:] += i
+        prof.count[15*i-1:15*i+1] = 0
+
+    SingleFitStitch.run(prof, [])
+    assert_allclose(prof.value, np.arange(120, dtype = 'f4'), atol = 1e-1, rtol = 1e-2)
+
+    prof.value        = np.arange(120, dtype = 'f4') + np.random.rand(120)*.1
+    prof.count[:]     = 20
+    prof.value[5:]   += 10
+    prof.count[5:7]   = 0
+    prof.count[15:16] = 0
+    SingleFitStitch.run(prof, [])
+    assert_allclose(prof.value, np.arange(120, dtype = 'f4'), atol = 1e-1, rtol = 1e-2)
 
 def test_collapse_to_mean():
     "Tests interval collapses"
@@ -320,4 +346,4 @@ def test_cycleprocess_emptycycles():
     assert ret is not None # check that computations don't crash
 
 if __name__ == '__main__':
-    test_cycleprocess_emptycycles()
+    test_singlefitstitch()

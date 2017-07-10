@@ -5,15 +5,15 @@ Collapse intervals. The idea is to measure the behaviour common to all
 stretches of data. This should be removed as it's source is either a (thermal,
 electric, ...) drift or a mechanical vibration.
 """
-from    typing          import (Optional, Union, Sized, # pylint: disable=unused-import
+from    typing          import (Optional, Union, Sized,
                                 Callable, NamedTuple, Sequence, Iterable,
-                                Any, Tuple, Iterator, cast)
+                                Tuple, Iterator, cast)
 from    enum            import Enum
 from    functools       import partial
 import  pandas
 import  numpy as np
 from    utils           import initdefaults
-from    signalfilter    import Filter, NonLinearFilter  # pylint: disable=unused-import
+from    signalfilter    import Filter
 
 Range   = NamedTuple('Range', [('start', int), ('values', np.ndarray)])
 _m_INTS = (int, cast(type, np.integer))
@@ -22,8 +22,8 @@ class Profile(Sized):
     "A bead profile: the behaviour common to all stretches of data"
     def __init__(self, inter:Union[Sequence[Range], 'Profile', int]) -> None:
         if isinstance(inter, _m_INTS):
-            self.xmin = 0                 # type: int
-            self.xmax = cast(int, inter)  # type: int
+            self.xmin: int = 0
+            self.xmax: int = cast(int, inter)
         elif isinstance(inter, Profile):
             self.xmin = cast(int, inter.xmin)
             self.xmax = cast(int, inter.xmax)
@@ -52,7 +52,7 @@ class Profile(Sized):
     def __len__(self):
         return len(self.count)
 
-def _iter_ranges(xmin:int, inter:Sequence[Range]) -> 'Iterable[Tuple[np.ndarray, np.ndarray]]':
+def _iter_ranges(xmin:int, inter:Sequence[Range]) -> Iterable[Tuple[np.ndarray, np.ndarray]]:
     for rng in inter:
         if len(rng.values) == 0 or rng.start+len(rng.values) <= xmin:
             continue
@@ -65,8 +65,8 @@ def _iter_ranges(xmin:int, inter:Sequence[Range]) -> 'Iterable[Tuple[np.ndarray,
 
 class _CollapseAlg:
     "base class for collapse. Deals with stitching as well"
-    edge   = 1    # type: Optional[int]
-    filter = None # type: Optional[Filter]
+    edge:   int    = 1
+    filter: Filter = None
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
@@ -136,9 +136,9 @@ class CollapseToMean(_CollapseAlg):
 
     The collapse starts from the right-most interval and moves left.
     """
-    PRECISION = 0.003
-    weight    = None # type: Union[None, Callable, str]
-    measure   = 'mean'
+    PRECISION                    = 0.003
+    weight: Union[Callable, str] = None
+    measure                      = 'mean'
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -197,8 +197,8 @@ class CollapseToMean(_CollapseAlg):
 
 class CollapseToSock(CollapseToMean):
     "Collapses twice, the second time using first results to discard faulty events"
-    robustness = .1, .9
-    weight     = 'robustmean' # type: Optional[str]
+    robustness  = .1, .9
+    weight: str = 'robustmean'
     @staticmethod
     def _chisquare(prec, prof, inds, vals): # pylint: disable=arguments-differ
         if len(vals) <= 5:
@@ -261,7 +261,7 @@ class CollapseByMerging(_CollapseAlg):
             fin = np.isfinite(vals)
             inters.append((start,
                            np.where(fin, vals, 0.) - np.nanmean(vals),
-                           np.int32(fin))) # type: ignore
+                           np.int32(fin)))
         return inters
 
     @staticmethod
@@ -365,8 +365,8 @@ class CollapseByDerivate(_CollapseAlg):
     each time frame. Either the mean or the median is defined as the profile
     derivate.
     """
-    maxder = np.inf    # type: float
-    mode   = 'median'  # type: Union[str,DerivateMode]
+    maxder: float                    = np.inf
+    mode:   Union[str, DerivateMode] = 'median'
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__(**_)
@@ -426,136 +426,4 @@ class CollapseByDerivate(_CollapseAlg):
         prof.value = pandas.Series(values[::-1]).cumsum().values[::-1]
         return prof
 
-def _getintervals(cnt:np.ndarray, minv:int, neq:Callable) -> np.ndarray:
-    "returns a 2D array containing ranges with prof.count < minv"
-    holes  = np.zeros((len(cnt)+2,), dtype = 'bool')
-    neq(cnt, minv, out = holes[1:len(cnt)+1])
-    inters = np.nonzero(holes[1:] != holes[:-1])[0]
-    return inters.reshape((len(inters)//2,2))
-
-class StitchByDerivate(CollapseByDerivate):
-    """
-    Fills holes using CollapseByDerivate as a method
-    CollapseByDerivate for filling holes.
-    """
-    minoverlaps = 10
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **kwa):
-        super().__init__(**kwa)
-
-    # pylint: disable=arguments-differ,signature-differs
-    def __call__(self, prof:Profile, data:Iterable[Range]) -> Profile: # type: ignore
-        if hasattr(data, '__next__'):
-            data = tuple(data)
-        data  = cast(Sequence[Range], data)
-
-        der   = super().__call__
-        last  = None # type: Optional[int]
-        tmp   = None # type: Optional[Profile]
-        for start, stop in _getintervals(prof.count, self.minoverlaps, np.less):
-            if tmp is not None:
-                prof.value[last:start] += tmp.value[-1]-prof.value[last]
-
-            sli  = slice(max(start-1, 0), stop+1)
-            mins = (max(sli.start, rng.start)                  for rng in data)
-            lens = (max(sli.stop-max(sli.start, rng.start), 0) for rng in data)
-            tmp  = der(Range(start, rng.values[start-rng.start:start-rng.start+stop])
-                       for start, stop, rng in zip(mins, lens, data))
-
-            ind  = 0 if start == 0 else 1
-
-            # assert all(np.isfinite(tmp.value)) # DEBUG check
-            tmp.value += prof.value[max(start-1, 0)] - tmp.value[0]
-
-            prof.value[start:stop] = tmp.value[ind:ind+stop-start]
-            prof.count[start:stop] = tmp.count[ind:ind+stop-start]
-
-            last  = stop
-
-        if tmp is not None and last < len(prof):
-            prof.value[last:] += tmp.value[-1]-prof.value[last]
-        return prof
-
-    @classmethod
-    def run(cls, prof:Profile, data:'Iterable[Range]', **kwa) -> Profile: # type: ignore
-        "creates the configuration and runs the algorithm"
-        return cls(**kwa)(prof, data)
-
-class StitchByInterpolation:
-    """
-    Ensures the continuity of a profile using bilinear interpolation
-    """
-    fitlength   = 10
-    fitorder    =  1
-    minoverlaps = 10
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **kwa):
-        pass
-
-    def __fit(self, rng, side, vals):
-        if side:
-            imin, imax = rng[0], min(rng[0]+self.fitlength, rng[1])
-            xvals      = range(0, imax-imin)
-        else:
-            imin, imax = max(rng[0], rng[1]-self.fitlength), rng[1]
-            xvals      = range(imin-imax+1, 1)
-        return np.polyfit(xvals, vals[imin:imax], self.fitorder)
-
-    def __ranges(self, prof, filled):
-        # fit a polynomial to each end of these intervals
-        leftpars  = np.apply_along_axis(self.__fit, 1, filled, False, prof.value)
-        rightpars = np.apply_along_axis(self.__fit, 1, filled, True,  prof.value)
-
-        # remove ends: no extrapolation
-        holes = filled.ravel()[1:-1].reshape((len(filled)-1,2))
-        return zip(leftpars[:-1], rightpars[1:], holes)
-
-    def __interp(self, left, right, rng, delta):
-        length = rng[1]-rng[0]+1
-        coeff  = np.polyval(np.polyder(right, 1), 0)
-        coeff -= np.polyval(np.polyder(left,  1), length)
-        coeff /= 2.*length
-
-        params              = np.zeros((max(3, self.fitorder+1),), dtype = 'f4')
-        params[-len(left):] = left
-        params[-1]         += delta
-        params[-3]         += coeff
-
-        return tuple(np.polyval(params, i) for i in range(1, length+1))
-
-    def __call__(self, prof:Profile, *_) -> Profile:
-        # get intervals with enough overlaps and enough points to do a fit
-        filled = _getintervals(prof.count, self.minoverlaps, np.greater_equal)
-        filled = filled[np.dot(filled, [-1, 1]) >= (self.fitorder+1)]
-        if len(filled) == 0:
-            prof.value[:] = 0
-            prof.count[:] = 0
-            return prof
-
-        last   = None # Optional[int]
-        delta  = 0.
-        for left, right, rng in self.__ranges(prof, filled):
-            if last is not None:
-                prof.value[last:rng[0]] += delta
-
-            vals                    = self.__interp(left, right, rng, delta)
-            prof.value[slice(*rng)] = vals[:-1]
-            delta, last             = vals[-1]-np.polyval(right, 0), rng[1]
-
-        if last is not None:
-            prof.value[last:filled[-1,-1]] += delta
-
-        if filled[0][0] != 0:           # extrapolate around 0
-            prof.value[:filled[0][0]]   = prof.value[filled[0][0]]
-
-        if filled[-1][-1] < len(prof):  # extrapolate around the end
-            prof.value[filled[-1][-1]:] = prof.value[filled[-1][-1]-1]
-        return prof
-
-    @classmethod
-    def run(cls, prof:Profile, *_, **kwa) -> Profile:
-        "creates the configuration and runs the algorithm"
-        return cls(**kwa)(prof)
-
 CollapseAlg = Union[CollapseByDerivate, CollapseToMean, CollapseByMerging]
-StitchAlg   = Union[StitchByDerivate,   StitchByInterpolation]
