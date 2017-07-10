@@ -303,6 +303,7 @@ class Partition:
         self.noverlaps=kwa.get("noverlaps",0) # type: int
         self.pdfcost=kwa.get("pdfcost",0) # type: float
         self.domain=kwa.get("domain",None) # type: FrozenSet[int]
+        self.ambi=kwa.get("ambi",[]) # type: List # to make private after testing
         if self.domain is None:
             self.domain=frozenset().union(*[prm.domain for prm in self.perms])
 
@@ -331,10 +332,13 @@ class Partition:
         'copy call'
         return self.__copy__(**kwa)
 
+    # must check creation and propagation of ambi
     @staticmethod
     def identify_ambiguity(partitions:List,index:int)->Tuple[List,List]:
-        '''If 2 partitions differ locally, save the different segments,
-        recreate partitions using the shared perms'''
+        '''
+        If 2 partitions differ locally, save the different segments,
+        recreate partitions using the shared perms
+        '''
         ambiguities=[] # type: List # list of partitions
         resumep=[] # type: List # List of partitions to use to resume the calculations
         keyparts=sorted([(hash(tuple(prm for prm in part.perms if prm.span.intersection({index}))),
@@ -343,13 +347,16 @@ class Partition:
         for grp in itertools.groupby(keyparts,key=lambda x:x[0]):
             # if they have the same key, ambiguity
             parts=list(i[1] for i in grp[1])
-            ambiguities.append(Partition.list_ambiguities(parts))
+            prev_ambi=[part.ambi for part in parts]
+            ambi=Partition.list_ambiguities(parts)
+            ambiguities.append(ambi)
             perms=frozenset(parts[0].perms).intersection(*[frozenset(part.perms)
                                                            for part in parts[1:]])
             domain=parts[0].domain.intersection(*[frozenset(part.domain)
                                                   for part in parts[1:]])
             common=Partition(perms=list(perms),
-                             domain=domain)
+                             domain=domain,
+                             ambi=[[ambi]]+prev_ambi)
             resumep.append(common)
         return ambiguities,resumep
 

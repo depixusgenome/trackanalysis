@@ -29,6 +29,10 @@ import assemble._utils as utils
 
 # can recompute segment wise the possible partitions
 
+# must be updated to include a maximal value on the non-linearity (valve for overlapping)
+# OligoPeak to far from one another may not be considered as overlapping
+# must include a stretch,pos score
+
 class BaseWise:
     u'align oligo by maximising the overlap one index at a time'
     def __init__(self,**kwa):
@@ -156,6 +160,9 @@ class BaseWise:
             #max_overlap=max(i[0] for i in ranked) # before
             max_overlap=max(part.noverlaps for part in added_partitions) # pylint: disable=no-member
             partitions=[part for part in added_partitions if part.noverlaps==max_overlap] # pylint: disable=no-member
+            if __debug__:
+                pickle.dump(partitions,open("debugpartitions"+str(index)+".pickle","wb"))
+
             # HERE
             # TESTING! comment the following command
             #partitions=[part for part in added_partitions if part.noverlaps>max_overlap-3] # pylint: disable=no-member
@@ -166,7 +173,6 @@ class BaseWise:
             ambiguities,resume_parts=data.Partition.identify_ambiguity(partitions,index)
             all_ambiguities.append(ambiguities)
             if __debug__:
-                pickle.dump(partitions,open("debugpartitions"+str(index)+".pickle","wb"))
                 pickle.dump(resume_parts,open("debugresume_parts"+str(index)+".pickle","wb"))
                 pickle.dump(ambiguities,open("debugambiguities"+str(index)+".pickle","wb"))
 
