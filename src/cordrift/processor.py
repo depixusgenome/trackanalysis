@@ -2,8 +2,7 @@
 # -*- coding: utf-8 -*-
 "Task & Processor for removing correlated drifts"
 from functools              import partial
-from typing                 import (Dict, Union,  # pylint: disable=unused-import
-                                    Sequence, Tuple, Optional, Any, cast)
+from typing                 import Dict, Union, Sequence, Tuple, Any, cast
 
 import numpy as np
 
