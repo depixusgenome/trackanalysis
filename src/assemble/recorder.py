@@ -9,9 +9,8 @@ from typing import Callable, Iterable # pylint: disable=unused-import
 import pickle
 import pandas
 import numpy
-from . import oligohit
 from . import assembler
-
+from . import data
 class Recorder:
     u'''
     keeps the results the assembler at each time step
@@ -89,11 +88,11 @@ class SeqRecorder(Recorder):
     def get_oligohits(self,idx1,idx2=0):
         u'returns oligohits at mcmc step idx'
         pos = self.get_state(idx1,idx2)
-        return [oligohit.OligoPeak(seq=val.seq,
-                                   pos=pos[idx],
-                                   pos0=val.pos0,
-                                   bpos=val.bpos,
-                                   bpos0=val.bpos0)\
+        return [data.OligoPeak(seq=val.seq,
+                               pos=pos[idx],
+                               pos0=val.pos0,
+                               bpos=val.bpos,
+                               bpos0=val.bpos0)
                 for idx,val in enumerate(self.oligohits)]
 
     def get_curr_oligohits(self,idx2=0):

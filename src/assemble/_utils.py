@@ -10,9 +10,8 @@ from copy import deepcopy
 from typing import Callable, List, Dict # pylint: disable=unused-import
 import scipy.stats
 import numpy
-from Bio import pairwise2
 from utils.logconfig import getLogger
-from . import oligohit
+from . import data
 
 LOGS = getLogger(__name__)
 
@@ -79,7 +78,7 @@ def sum_tail_overlap(oligos):
     u''' returns the sum of all overlap shared by consecutive oligos
     '''
     oligo_sort = sorted(oligos,key=lambda x :x.pos)
-    overlaps = numpy.array([len(oligohit.tail_overlap(oli.seq,oligo_sort[idx+1].seq))\
+    overlaps = numpy.array([len(data.OligoPeak.tail_overlap(oli.seq,oligo_sort[idx+1].seq))\
                         for idx,oli in enumerate(oligo_sort[:-1])])
     return sum(overlaps[overlaps!=numpy.array(None)])
 
@@ -105,7 +104,8 @@ def test3_scaled_energies(oligos):
     bp_to_nm = 1.100
     # sorted oligos
     solis = sorted(oligos,key=lambda x :x.pos)
-    overlaps = bp_to_nm*numpy.array([len(oligohit.tail_overlap(vx.seq,solis[ix+1].seq))/vx.poserr\
+    overlaps = bp_to_nm*numpy.array([len(data.OligoPeak.\
+                                         tail_overlap(vx.seq,solis[ix+1].seq))/vx.poserr\
                                      for ix,vx in enumerate(solis[:-1])])
     overlaps = numpy.hstack((overlaps,0))
     tsl_e = numpy.array([((i.pos-i.pos0)/i.poserr)**2 for i in solis]) # khi2
@@ -120,7 +120,7 @@ def test4_scaled_energies(oligos):
     solis = sorted(oligos,key=lambda x :x.pos)
     proba_tsl = numpy.array([scipy.stats.norm(loc=i.pos0,scale=i.poserr).logpdf(i.pos)\
                              for i in solis]).sum()
-    overlaps = numpy.array([len(oligohit.tail_overlap(vx.seq,solis[ix+1].seq))/vx.poserr\
+    overlaps = numpy.array([len(data.OligoPeak.tail_overlap(vx.seq,solis[ix+1].seq))/vx.poserr\
                             for ix,vx in enumerate(solis[:-1])])
     prob_overl = -(0.25)**sum(overlaps) # taylor decomposition
     return -proba_tsl-prob_overl
@@ -153,37 +153,10 @@ def tail_overlap_energy(oligos)->float:
     sort by pos and apply tail_overlap
     '''
     oligo_sort = sorted(oligos,key=lambda x :x.pos)
-    overlaps = numpy.array([len(oligohit.tail_overlap(oli.seq,oligo_sort[idx+1].seq))\
-                        for idx,oli in enumerate(oligo_sort[:-1])])
+    overlaps = numpy.array([len(data.OligoPeak.tail_overlap(oli.seq,oligo_sort[idx+1].seq))\
+                            for idx,oli in enumerate(oligo_sort[:-1])])
     return -sum(overlaps[overlaps!=numpy.array(None)]**2)
 
-def seq_from_bpos(srec):
-    u'''
-    assumes known the bpos for each oligo.
-    pile the sequences
-    returns the sequence and possible shift
-    '''
-    curr_olis = srec.get_curr_oligohits()
-    bposes = [i.bpos for i in curr_olis]
-    shift = min(bposes)
-    size_rseq = max([i.bpos+len(i.seq) for i in curr_olis])-shift
-    rseq = size_rseq*"-"
-    for oli in curr_olis:
-        rseq = oligohit.pile_oligo(rseq,oli,-shift)
-    return rseq,shift
-
-def max_overlap_assemble(oligos):
-    u'''
-    returns the sequence such that the overlap of consecutive oligos is maximised
-    assuming only the orders of sorted (according to pos) oligos is correct
-    '''
-    if len(oligos)==0:
-        return ""
-    soli = sorted(oligos,key=lambda x :x.pos)
-    seq=soli[0].seq
-    for oli in soli[1:]:
-        seq = oligohit.max_overlap_pile(seq,oli.seq)
-    return seq
 
 def match_sequence(srec,srec2seq:Callable,align_strs:Callable,asmrid:int=0):
     u'''
@@ -222,13 +195,6 @@ def _gap_penalties(x,y): # pylint:disable=unused-argument,invalid-name
         return 0
     return -1
 
-def pairwise2_alignment(seqrec): # uses bpos
-    u'''uses Bio.pairwise2 alignment to compute the best score of
-    sequence from oligohits and known sequence'''
-    exp_seq = seq_from_bpos(seqrec)[0]
-    gap_exp = ScaleGap(1)(_gap_penalties)
-    gap_known = ScaleGap(1000)(_gap_penalties)
-    return pairwise2.align.globalxc(seqrec.sequence,exp_seq,gap_known,gap_exp,score_only=True) # pylint: disable=no-member
 
 def group_overlapping_normdists(dists,nscale=1): # to pytest !!!! # what if no intersection?
     u'''

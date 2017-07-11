@@ -123,13 +123,10 @@ def count_matches(peaks1,peaks2,fprecision=1e-3):
     '''
     peaks1 and peaks2 are 2 scaled arrays
     this function is asymmetric!
-    need to be cautious.
-    Cannot use this method to rank matching OPeakArray and use the fprecision
-    to account for non-linearity (has valve to fitting)
     '''
     count=0
-    for peak in peaks2: # reverse role of peak1 and peak2??
-        if numpy.isclose(peaks1,peak,atol=fprecision).any():
+    for peak in peaks1:
+        if numpy.isclose(peak,peaks2,atol=fprecision).any():
             count+=1
     return count
 
@@ -241,11 +238,12 @@ class OPeakArray:
 
         return match
 
-    def count_matches(self,scaled): #->int:
+    def count_matches(self,scaled,nlampli)->int:
         '''
-        maximum number of matches in self.peak
+        maximum number of matches in len(self.arr)
+        asymmetric function
         '''
-        pass
+        return count_matches(self.arr,scaled.arr,fprecision=nlampli)
 
 def no_orientation(oligos:List[data.OligoPeak]):
     'each oligo has its sequence changed so that we loose the information on the orientation'
@@ -298,6 +296,12 @@ class Scaler:
         scaleperpeak={peak:peakarr0.match_to(peak,self.bstretch,self.bbias,self.with_reverse)
                       for peak in toscale}
         scaleperpeak={k:v for k,v in scaleperpeak.items() if len(v)>0}
+        for peak,scales in scaleperpeak.items():
+            print("peak=",peak)
+            for scale in scales:
+                print("scale=",scale,peakarr0.count_matches(scale(peak)))
+        #[peakarr0.count_matches(scale(peak))
+        #for peak,scales in scaleperpeak.items() for scale in scales]
         # find the combinaison of scales for each of the peaks matched peakarr0
         # per peak rank the scales according to matches
         # we can merge OligoPeaks if we can identify the overlapping
