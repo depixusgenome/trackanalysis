@@ -33,7 +33,7 @@ import assemble._utils as utils
 # OligoPeak to far from one another may not be considered as overlapping
 # must include a stretch,pos score
 
-class BaseWise:
+class Shuffler:
     u'align oligo by maximising the overlap one index at a time'
     def __init__(self,**kwa):
         self.collection=kwa.get("collection",data.BCollection()) # type:data.BCollection

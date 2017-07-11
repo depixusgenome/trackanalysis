@@ -34,6 +34,18 @@ class Oligo:
         'returns reverse complement of string seq'
         return ''.join(REVERSE[i] for i in reversed(seq))
 
+    @classmethod
+    def do_overlap(cls,ol1:str,ol2:str,min_overl:int=1)->bool:
+        '''
+        returns true if len(tail_overlap(ol1, ol2))>=min_overl
+        or len(tail_overlap(ol2, ol1))>=min_overl
+        '''
+        if len(cls.tail_overlap(ol1, ol2))>=min_overl:
+            return True
+        if len(cls.tail_overlap(ol2, ol1))>=min_overl:
+            return True
+        return False
+
     @staticmethod
     def tail_overlap(ol1:str, ol2:str)->str:
         '''
