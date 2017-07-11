@@ -3,21 +3,13 @@
 """
 Saves stuff from session to session
 """
-from copy                   import deepcopy
-from enum                   import Enum
 import inspect
+from   copy        import deepcopy
 
-from utils                  import update
-
-from model.task                 import DataSelectionTask, CycleCreatorTask, Task
-from cordrift.processor         import DriftTask
-from eventdetection.processor   import ExtremumAlignmentTask, EventDetectionTask
-from peakfinding.processor      import PeakSelectorTask
-from peakcalling.processor      import FitToHairpinTask
-
-from   view                   import View
-from   view.dialog            import FileDialog
-from   app                    import Defaults
+from   view        import View
+from   view.dialog import FileDialog
+from   app         import Defaults
+from   .task       import Tasks
 
 _frame = None
 for _frame in inspect.stack()[1:]:
@@ -57,9 +49,7 @@ class ScriptingView(View):
         "returns the controller"
         return self._ctrl
 
-RESET = type('Reset', (), {})
-class Tasks(Enum):
-    """
+Tasks.__doc__ = """
     Possible tasks
 
     These can be created as follows:
@@ -77,66 +67,32 @@ class Tasks(Enum):
         >>> assert Tasks.peakselector('align').align is not None  # back to true default
         >>> assert Tasks.peakselector(align = None).align is None # change default
         >>> assert Tasks.peakselector(...) is not None            # back to true default
-
     """
-    selection      = 'selection'
-    alignment      = 'alignment'
-    driftperbead   = 'driftperbead'
-    driftpercycle  = 'driftpercycle'
-    cycles         = 'cycles'
-    eventdetection = 'eventdetection'
-    peakselector   = 'peakselector'
-    fittohairpin   = 'fittohairpin'
 
-    @classmethod
-    def save(cls, task):
-        "saves the task to the default config"
-        cnf  = scriptapp.control.getGlobal("config").tasks
-        if isinstance(task, type(cls.driftpercycle)):
-            name = 'driftperbeads' if task.onbeads else 'driftpercycle'
+def save(cls, task):
+    "saves the task to the default config"
+    cnf  = scriptapp.control.getGlobal("config").tasks
+    if isinstance(task, type(cnf.driftpercycle.get())):
+        name = 'driftperbeads' if task.onbeads else 'driftpercycle'
+    else:
+        for name in cls._member_names_: # pylint: disable=protected-access
+            if type(task) is type(cnf[name].get(default = None)):
+                assert name not in ('driftpercycle', 'driftperbeads')
+                break
         else:
-            for name in cls._member_names_: # pylint: disable=no-member
-                if type(task) is type(cnf[name].get(default = None)):
-                    break
-            else:
-                raise TypeError('Unknown task: '+str(task))
+            raise TypeError('Unknown task: '+str(task))
 
-        cnf[name].set(deepcopy(task))
-        scriptapp.control.writeconfig()
+    cnf[name].set(deepcopy(task))
+    scriptapp.control.writeconfig()
+Tasks.save = classmethod(save)
 
-    @classmethod
-    def create(cls, arg, **kwa):
-        "returns the task associated to the argument"
-        if isinstance(arg, (str, cls)):
-            return cls(arg)(**kwa)
-
-        elif isinstance(arg, tuple):
-            return cls(arg[0])(**arg[1], **kwa)
-
-        else:
-            assert isinstance(arg, Task)
-            if len(kwa):
-                return update(deepcopy(arg), **kwa)
-            return arg
-
-    def __call__(self, *resets, **kwa):
-        cnf  = scriptapp.control.getGlobal("config").tasks[self.value].get()
-        cls  = type(cnf)
-        if Ellipsis in resets:
-            cnf    = cls()
-            resets = tuple(i for i in resets if i is not Ellipsis)
-
-        kwa.update({i: getattr(cls, i) for i, j in kwa.items() if j is RESET})
-        kwa.update({i: getattr(cls, i) for i in resets})
-        task = update(deepcopy(cnf), **kwa)
-        self.save(task)
-        return task
-
-    class _TaskGetter:
-        def __get__(self, obj, tpe):
-            return tpe.create if obj is None else obj
-
-    get = _TaskGetter()
+def __call__(self, *resets, __old__ = Tasks.__call__, **kwa):
+    if Ellipsis in resets:
+        cnf = self.default()
+    else:
+        cnf = scriptapp.control.getGlobal("config").tasks[self.value].get()
+    return __old__(self, *resets, current = cnf, **kwa)
+Tasks.__call__ = __call__
 
 # pylint: disable=no-member,invalid-name
 scriptapp = Defaults.application(main = ScriptingView)()

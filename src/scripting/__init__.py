@@ -41,7 +41,7 @@ from peakfinding.processor      import PeakSelectorTask
 
 # pylint: disable=wildcard-import
 from signalfilter               import *
-from model.task                 import *
+from .task                      import *
 from .track                     import *
 from .scriptapp                 import *
 try:
