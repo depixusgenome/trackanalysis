@@ -33,6 +33,9 @@ import assemble._utils as utils
 # OligoPeak to far from one another may not be considered as overlapping
 # must include a stretch,pos score
 
+
+
+
 class Shuffler:
     u'align oligo by maximising the overlap one index at a time'
     def __init__(self,**kwa):
@@ -271,6 +274,18 @@ class Shuffler:
             subkprms.append(tuple(kpr[:-1]))
 
         return list(set(subkprms))
+
+    @staticmethod
+    def reconstruct_partitions(partitions:List[data.Partition])->Generator:
+        '''
+        generates all partitions from possible combinations of ambiguities
+        '''
+        # something along the lines of...
+        for part in partitions:
+            # thanks itertools
+            for choice in itertools.product(*[ambi for ambi in part.ambi if ambi]):
+                yield choice # needs to combine the part with choice but that's easy
+
 
     # check if these methods could be useful here
 
