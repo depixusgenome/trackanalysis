@@ -12,6 +12,7 @@ def test_group_normdists():
     dist1 = stats.norm(loc=0.0,scale=0.5)
     dist2 = stats.norm(loc=0.5,scale=0.5)
     dist3 = stats.norm(loc=1.0,scale=0.5)
+    dist4 = stats.norm(loc=3.0,scale=0.5)
 
     # tests on nscale
     assert (0,1) in utils.group_overlapping_normdists(dists=[dist1,dist2,dist3],nscale=1)[1]
@@ -25,6 +26,7 @@ def test_group_normdists():
     assert (0,1,2) not in utils.group_overlapping_normdists(dists=[dist1,dist2,dist3],nscale=0.9)[1]
     assert (0,1) in utils.group_overlapping_normdists(dists=[dist1,dist2,dist3],nscale=0.9) [1]
     assert (1,2) in utils.group_overlapping_normdists(dists=[dist1,dist2,dist3],nscale=0.9)[1]
+    assert (3,) in utils.group_overlapping_normdists(dists=[dist1,dist2,dist3,dist4],nscale=0.9)[1]
 
     dist1 = stats.norm(loc=0.0,scale=0.1)
     dist2 = stats.norm(loc=0.5,scale=0.5)

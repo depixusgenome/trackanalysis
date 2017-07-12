@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-u'''
+'''
 regroups functions and classes to complement assembler
 '''
 
@@ -16,11 +16,11 @@ from . import data
 LOGS = getLogger(__name__)
 
 class OligoWrap:
-    u'''
+    '''
     functor to convert function taking array as input into function taking oligohits
     '''
     def __init__(self,oligohits,arr2oligohits,to_call):
-        u'''
+        '''
         oligohits, list of original oligohits (contains sequence)
         arr2oligohits, function converting array into new oligohits
         to_call, function taking oligohits
@@ -29,7 +29,7 @@ class OligoWrap:
         self.arr2oligohits = arr2oligohits # type: Callable
         self.to_call = to_call # type: Callable
     def __call__(self,*args):
-        u'''returns a function which takes new positions of oligos
+        '''returns a function which takes new positions of oligos
         instead of new oligos
         required for basinhopping
         '''
@@ -37,7 +37,7 @@ class OligoWrap:
         return self.to_call(oligos)
 
 def pos2oligos(olis,pos):
-    u'''
+    '''
     returns a function which takes an array of pos instead of oligos
     '''
     assert len(olis)==len(pos)
@@ -48,7 +48,7 @@ def pos2oligos(olis,pos):
     return oligos
 
 def bpos2oligos(olis,bpos):
-    u'''
+    '''
     returns a function which takes an array of pos instead of oligos
     '''
     assert len(olis)==len(bpos)
@@ -58,7 +58,7 @@ def bpos2oligos(olis,bpos):
     return oligos
 
 def noverlaps_energy(oligos):
-    u'''use noverlap_bpos to compute energy
+    '''use noverlap_bpos to compute energy
     '''
     energy=0
     for ol1,ol2 in itertools.combinations(oligos,2):
@@ -66,7 +66,7 @@ def noverlaps_energy(oligos):
     return energy
 
 def tsl_energy(oligos):
-    u'''
+    '''
     energy cost related to translation of oligos away from its experimental position
     '''
     energy = 0
@@ -75,7 +75,7 @@ def tsl_energy(oligos):
     return energy
 
 def sum_tail_overlap(oligos):
-    u''' returns the sum of all overlap shared by consecutive oligos
+    ''' returns the sum of all overlap shared by consecutive oligos
     '''
     oligo_sort = sorted(oligos,key=lambda x :x.pos)
     overlaps = numpy.array([len(data.OligoPeak.tail_overlap(oli.seq,oligo_sort[idx+1].seq))\
@@ -83,7 +83,7 @@ def sum_tail_overlap(oligos):
     return sum(overlaps[overlaps!=numpy.array(None)])
 
 def test_scaled_energies(oligos):
-    u''' testing a new combination of energies
+    ''' testing a new combination of energies
     '''
     bp_to_nm = 1.100
     energy = - bp_to_nm*sum_tail_overlap(oligos)
@@ -91,7 +91,7 @@ def test_scaled_energies(oligos):
     return energy # could raise the power to further penalise extreme values
 
 def test2_scaled_energies(oligos):
-    u''' second test for combining energies
+    ''' second test for combining energies
     '''
     bp_to_nm = 1.100
     energy = - bp_to_nm*sum_tail_overlap(oligos)
@@ -99,7 +99,7 @@ def test2_scaled_energies(oligos):
     return energy
 
 def test3_scaled_energies(oligos):
-    u'''third test for combining energies
+    '''third test for combining energies
     '''
     bp_to_nm = 1.100
     # sorted oligos
@@ -113,7 +113,7 @@ def test3_scaled_energies(oligos):
 
 
 def test4_scaled_energies(oligos):
-    u'''
+    '''
     can work with (log) probabilities only
     '''
     # sorted oligos
@@ -127,7 +127,7 @@ def test4_scaled_energies(oligos):
 
 def noverlaps_tsl_energy(oligos,ratio=0.01):
     # can't use as is because of relationship between bpos and pos
-    u'''
+    '''
     computes the energy of overlapping oligos
     and a penalty for translation of oligos position
     ratio=0.01, is the ratio between the two energies
@@ -138,7 +138,7 @@ def noverlaps_tsl_energy(oligos,ratio=0.01):
     return energy
 
 def tail_tsl_energy(oligos,ratio=0.01):
-    u'''
+    '''
     computes the energy of tail overlapping oligos
     and a penalty for translation of oligos position
     ratio=0.01, is the ratio between the two energies
@@ -149,7 +149,7 @@ def tail_tsl_energy(oligos,ratio=0.01):
     return energy
 
 def tail_overlap_energy(oligos)->float:
-    u'''
+    '''
     sort by pos and apply tail_overlap
     '''
     oligo_sort = sorted(oligos,key=lambda x :x.pos)
@@ -159,7 +159,7 @@ def tail_overlap_energy(oligos)->float:
 
 
 def match_sequence(srec,srec2seq:Callable,align_strs:Callable,asmrid:int=0):
-    u'''
+    '''
     given a SeqRecorder object, reconstructs the sequence given by oligos using srec2seq.
     return the overlap between reconstructed sequence and the sequence.
     '''
@@ -168,7 +168,7 @@ def match_sequence(srec,srec2seq:Callable,align_strs:Callable,asmrid:int=0):
     return align_strs(known_seq,exp_seq)
 
 def score_match(srec,srec2seq:Callable,align_strs:Callable,asmrid:int=0):
-    u'''
+    '''
     returns the ratio of characters in match_sequence not "-"
     '''
     match = match_sequence(srec,srec2seq,align_strs,asmrid)
@@ -177,17 +177,17 @@ def score_match(srec,srec2seq:Callable,align_strs:Callable,asmrid:int=0):
     return 1-(match.count("-")+match.count("?"))/len(match)
 
 class ScaleGap:
-    u'rescales _gap_penalities to forbid gaps in known sequence'
+    'rescales _gap_penalities to forbid gaps in known sequence'
     def __init__(self,value):
         self.val=value
     def __call__(self,func):
         def wrapped(*args,**kwargs):
-            u'scales the output'
+            'scales the output'
             return self.val*func(*args,**kwargs)
         return wrapped
 
 def _gap_penalties(x,y): # pylint:disable=unused-argument,invalid-name
-    u'''
+    '''
     x, gap position in seq
     y, gap length
     '''
@@ -197,7 +197,7 @@ def _gap_penalties(x,y): # pylint:disable=unused-argument,invalid-name
 
 
 def group_overlapping_normdists(dists,nscale=1): # to pytest !!!! # what if no intersection?
-    u'''
+    '''
     returns lists of indices [(i,j,k)] each element of the tuple has distribution which overlap
     # the last return value is not expected values? or is it?
     '''
@@ -209,14 +209,19 @@ def group_overlapping_normdists(dists,nscale=1): # to pytest !!!! # what if no i
     bounds+= [(di.mean()+nscale*di.std(),idx) for idx,di in enumerate(dists)]
     bounds.sort()
     overlaps=[]
+    #for regid in range(len(bounds[:-1])):
+    #   beflag = set(idx[1] for idx in bounds[:regid+1])
+    #   aflag = set(idx[1] for idx in bounds[regid+1:])
+
+    #    overlaps.append(sorted(beflag.intersection(aflag)))
+
     for regid in range(len(bounds[:-1])):
         beflag = set(idx[1] for idx in bounds[:regid+1])
-        aflag = set(idx[1] for idx in bounds[regid+1:])
-
+        aflag = set(idx[1] for idx in bounds[regid:])
         overlaps.append(sorted(beflag.intersection(aflag)))
 
-    ssets = [set(overl) for overl in overlaps if len(overl)>1]
-    ssets.sort(reverse=True)
+    ssets=list(set(tuple(sorted(overl)) for overl in overlaps if len(overl)>0))
+    ssets = [set(overl) for overl in ssets]
     if len(ssets)==0:
         return ssets,[]
 
