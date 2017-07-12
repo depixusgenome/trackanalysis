@@ -5,6 +5,7 @@ from    typing         import Dict, Tuple, TYPE_CHECKING #pylint: disable=unused
 
 from    bokeh.plotting import figure, Figure # pylint: disable=unused-import
 from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
+from    bokeh          import layouts
 import  bokeh.colors
 
 import  numpy                   as     np
@@ -52,7 +53,12 @@ class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
         fig.add_layout(axis, 'above')
 
         self._addcallbacks(fig)
-        return self._keyedlayout(fig, bottom = self._createwidget(fig))
+        widgets = self._createwidget(fig)
+        bottom  = layouts.widgetbox(widgets['align'])
+        left    = layouts.widgetbox(widgets['cleaning']+widgets['table'])
+        col     = layouts.column([self._keyedlayout(fig), bottom], responsive = True)
+        row     = layouts.row([left, col], responsive = True)
+        return row
 
     def _reset(self):
         if self._model.colorstore is not None:

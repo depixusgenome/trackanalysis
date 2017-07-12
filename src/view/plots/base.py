@@ -201,8 +201,9 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                                                'toolbar_sticky'     : False,
                                                'input.width'        : 205,
                                                'figure.width'       : 800,
-                                               'figure.height'      : 500,
-                                               'figure.responsive'  : True}
+                                               'figure.height'      : 200,
+                                               'figure.sizing_mode' : 'scale_width',
+                                               'figure.responsive'  : False}
 
         key = type(self).key()
         for name in 'config', 'project', 'css':

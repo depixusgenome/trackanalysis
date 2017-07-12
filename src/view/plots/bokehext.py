@@ -60,11 +60,9 @@ class DpxKeyedRow(Row): # pylint: disable=too-many-ancestors
     def __sizingmode(plotter, kwa = None):
         kwa = dict() if kwa is None else kwa
         if plotter.css.responsive.get():
-            kwa['responsive'] = True
-            kwa.pop('sizing_mode', None)
+            kwa['sizing_mode'] = 'scale_width'
         else:
             kwa['sizing_mode'] = plotter.css.sizing_mode.get()
-            kwa.pop('responsive', None)
         return kwa
 
     @classmethod
@@ -72,7 +70,7 @@ class DpxKeyedRow(Row): # pylint: disable=too-many-ancestors
         "sets up a DpxKeyedRow layout"
         figs  = (main,) + figs
         plts  = layouts.gridplot([[*figs]],
-                                 responsive       = True,
+                                 **cls.__sizingmode(plot),
                                  toolbar_location = plot.css.toolbar_location.get())
         keyed = cls(plot, main, children = [plts],
                     toolbar  = next(i for i in plts.children if isinstance(i, ToolbarBox)))

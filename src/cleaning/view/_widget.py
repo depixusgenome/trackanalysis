@@ -5,7 +5,6 @@ from typing         import (Optional,   # pylint: disable=unused-import
                             List, Dict, Any, Type, TYPE_CHECKING)
 
 import  bokeh.core.properties as props
-from    bokeh           import layouts
 from    bokeh.plotting  import Figure
 from    bokeh.models    import (ColumnDataSource, DataTable, TableColumn,
                                 Widget, StringFormatter, CustomJS)
@@ -122,11 +121,7 @@ class WidgetMixin:
         widgets = {i: j.create(self.action) for i, j in self.__widgets.items()}
         self.__widgets['cleaning'].setfigure(fig)
         enableOnTrack(self, widgets)
-
-        lst  = widgets['align']
-        lst += widgets['cleaning']
-        lst += widgets['table']
-        return layouts.widgetbox(lst, responsive = True)
+        return widgets
 
     def _resetwidget(self):
         for ite in self.__widgets.values():

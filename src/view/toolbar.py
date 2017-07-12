@@ -8,6 +8,7 @@ import re
 import numpy                   as np
 import bokeh.core.properties   as props
 
+from bokeh                import layouts
 from bokeh.models         import Widget
 from bokeh.io             import curdoc
 
@@ -398,7 +399,7 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
             if 'track' in items:
                 self.__toolbar.frozen = items['track'].value is items.empty
         self._ctrl.getGlobal("project").observe(_onproject)
-        return self.__toolbar,
+        return (layouts.widgetbox(self.__toolbar, height = 30, responsive = True),)
 
     def close(self):
         "Sets up the controller"
