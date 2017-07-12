@@ -87,7 +87,15 @@ class ProcessorController:
               ) -> 'ProcessorController':
         "creates a task pair for this model"
         tasks = tuple(chain(*(i if isinstance(i, (tuple, list)) else (i,) for i in models)))
-        assert all(isinstance(i, Task) for i in tasks)
+        if len(tasks) == 0:
+            raise IndexError('no models were provided')
+
+        if not isinstance(tasks[0], RootTask):
+            raise TypeError(f'Argument #0 ({tasks[0]}) should  be a RootTask')
+
+        if not all(isinstance(i, Task) for i in tasks):
+            ind, wrong = next((i, j) for i, j in enumerate(tasks) if not isinstance(j, Task))
+            raise TypeError(f'Argument #{ind} ({wrong}) should  be a Task')
 
         pair  = cls()
         if not isinstance(processors, Dict):

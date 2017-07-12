@@ -21,17 +21,16 @@ We add some methods and change the default behaviour:
         * a *rawprecision* method is added
         * *with...* methods return an updated copy
 """
-from typing                 import Dict, KeysView, Tuple # pylint: disable=unused-import
+from typing                 import Dict, KeysView, Tuple, Iterator
 from itertools              import product
 from pathlib                import Path
 import pickle
 import re
 
+from model                  import Level
 from data                   import Track as _Track, Beads, Cycles
 from data.trackio           import LegacyGRFilesIO
 from signalfilter           import PrecisionAlg, NonLinearFilter
-from control.taskcontrol    import create as _create
-from model.task             import TrackReaderTask
 from eventdetection.data    import Events
 
 from .scriptapp             import scriptapp, Tasks
@@ -75,15 +74,19 @@ def rawprecision(self, ibead):
 @_totrack
 def tasklist(self, *args, beadsonly = True):
     "creates a tasklist"
-    return ([TrackReaderTask(path = self.path, beadsonly = beadsonly)]
-            + [Tasks.get(i) for i in args])
+    return Tasks.get(self.path, *args, beadsonly = beadsonly)
 
 @_totrack
 def apply(self, *args, copy = True, beadsonly = True):
     "returns an iterator over the result of provided tasks"
-    procs = _create(self.tasklist(*args, beadsonly = beadsonly))
+    procs = Tasks.processors(self.path, *args, beadsonly = beadsonly, copy = copy)
     procs.data.setCacheDefault(0, self)
     return next(iter(procs.run(copy = copy)))
+
+@_totrack
+def apply(self, *args, copy = True, beadsonly = True):
+    "returns an iterator over the result of provided tasks"
+    return next(iter(self.processors(*args, beadsonly = beadsonly).run(copy = copy)))
 
 @_totrack # type: ignore
 @property
@@ -136,7 +139,7 @@ class TracksDict(dict):
     __SCAN_OPTS = ('cgrdir',)
     def __init__(self, tracks = None, grs = None, match = None, *tasks, **kwa):
         super().__init__()
-        self.paths = {}     # type: Dict[str, Tuple[str,...]]
+        self.paths : Dict[str, Tuple[str,...]] = {}
         self.tasks = tasks
         self.update(tracks = tracks, grs = grs, match = match, **kwa)
 
@@ -210,7 +213,14 @@ class BeadsDict(dict):
         if key in self:
             return self[key]
 
-        val = list(trk.apply(*tasks[1:])[key[1],...].values())
+        itm = trk.apply(*tasks[1:])
+        if itm.level in (Level.cycle, Level.event):
+            val = list(itm[key[1],...].values())
+        else:
+            val = itm[key[1]]
+            if isinstance(val, Iterator):
+                val = tuple(val)
+
         self.__setitem__(key, val)
         return val
 

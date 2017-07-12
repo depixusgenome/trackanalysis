@@ -42,7 +42,7 @@ def read(stream:TextIO) -> 'Iterator[Tuple[str,str]]':
         else:
             yield ("hairpin %d" % (ind+1) if title is None else title, seq)
 
-PEAKS_DTYPE = [('position', 'i4'), ('orientation', np.bool8)]
+PEAKS_DTYPE = [('position', 'i4'), ('orientation', 'bool')]
 PEAKS_TYPE  = Sequence[Tuple[int, bool]]
 
 class Translator:
@@ -119,6 +119,14 @@ class Translator:
             >>> res = peaks(seq, 'wws')
             >>> assert len(res) == 4
         """
+        ispath = False
+        try:
+            ispath = pathlib.Path(seq).exists()
+        except OSError:
+            pass
+        if ispath:
+            return ((i, cls.peaks(j, oligs)) for i, j in read(seq))
+
         if isinstance(oligs, str):
             oligs = (oligs,)
 

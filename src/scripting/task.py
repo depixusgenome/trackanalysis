@@ -3,17 +3,20 @@
 """
 Monkeypatches tasks and provides a simpler access to usual tasks
 """
+from pathlib                import Path
+
 from copy                   import deepcopy
 from enum                   import Enum
 from utils                  import update
 
 import anastore
+from control.taskcontrol        import create as _create
 from cordrift.processor         import DriftTask
 from eventdetection.processor   import ExtremumAlignmentTask, EventDetectionTask
 from peakfinding.processor      import PeakSelectorTask
 from peakcalling.processor      import FitToHairpinTask
 from model.task                 import * # pylint: disable=wildcard-import,unused-wildcard-import
-from model.task                 import __all__ as __all_tasks__, Task
+from model.task                 import __all__ as __all_tasks__, Task, TrackReaderTask
 
 RESET = type('Reset', (), {})
 class Tasks(Enum):
@@ -57,23 +60,46 @@ class Tasks(Enum):
         return self.defaults()[self.value]
 
     @classmethod
-    def create(cls, arg, **kwa):
+    def create(cls, *args, beadsonly = True, **kwa):
         "returns the task associated to the argument"
-        if isinstance(arg, (str, cls)):
-            return cls(arg)(**kwa)
+        if len(args) == 1:
+            return cls.__create(args[0], kwa, beadsonly)
+        return [cls.__create(i, kwa, beadsonly) for i in args]
 
-        elif isinstance(arg, tuple):
-            return cls(arg[0])(**arg[1], **kwa)
+    @classmethod
+    def tasklist(cls, *tasks, **kwa):
+        "Same as create except that a list may be completed as necessary"
+        lst   = cls.get(*tasks, **kwa)
+        if isinstance(lst, Task):
+            lst = [lst]
 
-        else:
-            assert isinstance(arg, Task)
-            if len(kwa):
-                return update(deepcopy(arg), **kwa)
-            return arg
+        order = FitToHairpinTask, PeakSelectorTask, EventDetectionTask,
+        for i, itm in enumerate(order[:-1]):
+            ind = next((i for i, j in enumerate(lst) if isinstance(j, itm)), None)
+            if ind is None:
+                continue
 
-    def __call__(self, *resets, current = None, **kwa):
-        cnf = self.default() if current is None else deepcopy(current)
-        cls = type(cnf)
+            if ind == 0 or not isinstance(lst[ind-1], order[i+1]):
+                name = order[ind+1].__name__.lower().replace('Task', '')
+                lst.insert(ind, cls.get(name, **kwa))
+        return lst
+
+    @classmethod
+    def processors(cls, *args, copy = True, beadsonly = True):
+        "returns an iterator over the result of provided tasks"
+        procs      = _create(cls.tasklist(*args, beadsonly = beadsonly))
+        procs.copy = copy
+        return procs
+
+    @classmethod
+    def apply(cls, *args, copy = True, beadsonly = True):
+        "returns an iterator over the result of provided tasks"
+        return next(iter(cls.processors(*args, beadsonly = beadsonly).run(copy = copy)))
+
+    def __call__(self, *resets, **kwa):
+        current = kwa.pop('current', None)
+        cnf     = self.default() if current is None else deepcopy(current)
+        cls     = type(cnf)
         if Ellipsis in resets:
             resets = tuple(i for i in resets if i is not Ellipsis)
 
@@ -88,6 +114,27 @@ class Tasks(Enum):
             return tpe.create if obj is None else obj
 
     get = _TaskGetter()
+
+    @classmethod
+    def __create(cls, arg, kwa, beadsonly):
+        if arg in cls or arg in cls.__members__:
+            return cls(arg)(**kwa)
+
+        if isinstance(arg, Task):
+            return update(deepcopy(arg), **kwa)
+
+        if (isinstance(arg, (Path, str))
+                or (isinstance(arg, (tuple, list))
+                    and isinstance(i, (Path, str)) for i in arg)):
+            info = dict(kwa)
+            info.setdefault('path', arg)
+            info.setdefault('beadsonly', beadsonly)
+            return TrackReaderTask(**info)
+
+        if isinstance(arg, (tuple, list)) and len(arg) == 2:
+            return cls(arg[0])(**arg[1], **kwa)
+
+        raise RuntimeError('arguments are unexpected')
 
 def dumps(self, **kwa):
     "returns the json configuration"
