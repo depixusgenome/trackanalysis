@@ -90,7 +90,7 @@ class Translator:
                     val = reg.search(seq, val.start()+1)
 
     @classmethod
-    def peaks(cls, seq:str, oligs:Union[Sequence[str], str],
+    def peaks(cls, seq:Union[str, pathlib.Path], oligs:Union[Sequence[str], str],
               flags = re.IGNORECASE) -> np.ndarray:
         """
         Returns the peak positions and orientation associated to a sequence.
@@ -120,10 +120,14 @@ class Translator:
             >>> assert len(res) == 4
         """
         ispath = False
+        if isinstance(oligs, pathlib.Path):
+            seq, oligs = oligs, seq
+
         try:
-            ispath = pathlib.Path(seq).exists()
+            ispath = isinstance(seq, pathlib.Path) or pathlib.Path(seq).exists()
         except OSError:
             pass
+
         if ispath:
             return ((i, cls.peaks(j, oligs)) for i, j in read(seq))
 
