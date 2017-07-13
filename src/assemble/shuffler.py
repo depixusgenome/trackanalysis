@@ -178,7 +178,7 @@ class Shuffler:
 
             # if 2 partitions differ locally (i.e. by a segment), save the segments
             # and recreate a partitions using the shared perms (domain inter) at index
-            resume_parts=self.identify_ambiguity(partitions,index)
+            resume_parts=data.Partition.reduce_partitions(partitions,index)
             if __debug__:
                 pickle.dump(resume_parts,open("debugresume_parts"+str(index)+".pickle","wb"))
 
@@ -186,38 +186,6 @@ class Shuffler:
             # implement reconstruction method
             # write the method to list the final result (i.e. all possible partitions)
         return partitions
-
-
-    # must check creation and propagation of ambi
-    @staticmethod
-    def identify_ambiguity(partitions:List[data.Partition],index:int)->List[data.Partition]:
-        '''
-        If 2 partitions differ locally, save the different segments,
-        recreate partitions using the shared perms
-        '''
-        resumep=[] # type: List[data.Partition] # used to resume the calculations
-        keyparts=sorted([(hash(tuple(prm for prm in part.perms if prm.span.intersection({index}))),
-                          part) for part in partitions],
-                        key=lambda x:x[0])
-        for grp in itertools.groupby(keyparts,key=lambda x:x[0]):
-            # if they have the same key, ambiguity
-            parts=list(i[1] for i in grp[1])
-
-            #prev_ambi=[part.ambi for part in parts] # before
-            prev_ambi=[] # type: List[List]
-            for part in parts:
-                prev_ambi+=part.ambi
-
-            ambi=data.Partition.list_ambiguities(parts)
-            perms=frozenset(parts[0].perms).intersection(*[frozenset(part.perms)
-                                                           for part in parts[1:]])
-            domain=parts[0].domain.intersection(*[frozenset(part.domain)
-                                                  for part in parts[1:]])
-            common=data.Partition(perms=list(perms),
-                                  domain=domain,
-                                  ambi=[ambi]+prev_ambi)#[[ambi]]+prev_ambi)
-            resumep.append(common)
-        return resumep
 
     def find_kperms(self,group:Tuple[int, ...])->Generator:
         u'''
@@ -274,18 +242,6 @@ class Shuffler:
             subkprms.append(tuple(kpr[:-1]))
 
         return list(set(subkprms))
-
-    @staticmethod
-    def reconstruct_partitions(partitions:List[data.Partition])->Generator:
-        '''
-        generates all partitions from possible combinations of ambiguities
-        '''
-        # something along the lines of...
-        for part in partitions:
-            # thanks itertools
-            for choice in itertools.product(*[ambi for ambi in part.ambi if ambi]):
-                yield choice # needs to combine the part with choice but that's easy
-
 
     # check if these methods could be useful here
 

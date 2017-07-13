@@ -5,7 +5,7 @@
 '''
 variables to consider:
 	  *bias (per oligo exp) (a)
-	  *non linearity (b) (+- 10 bases, rough estimate, lets make it 15)
+	  *non linearity (b) (+- 10 bases, rough estimate)
            can be used when determining if 2 oligos overlap or not
 	  *stretch (small variations of the size of the hairpin between oligo exp) (c)
 
@@ -57,10 +57,13 @@ except if we have more info from reverse_complement experiments
 '''
 
 import itertools
-from typing import List, Tuple # pylint:disable=unused-import
+from typing import List, Tuple, Dict # pylint:disable=unused-import
+#import pickle
 import numpy
 from utils import initdefaults
 import assemble.data as data
+import assemble.shuffler as shuffler
+
 
 class Bounds:
     'define upper lower limits on parameters'
@@ -74,7 +77,7 @@ class Bounds:
             return True
         return False
 
-class Scale:
+class Rescale:
     'groups stretch and bias values'
     def __init__(self,stretch,bias):
         self.stre=stretch
@@ -82,11 +85,13 @@ class Scale:
     def __call__(self,array):
         return self.stre*array+self.bias
 
+    def __str__(self):
+        return f'stretch {self.stre}, bias {self.bias}'
 
 def match_peaks(peaks1,
                 peaks2,
                 bound_stretch:Bounds,
-                bound_bias:Bounds)->List[Scale]:
+                bound_bias:Bounds)->List[Rescale]:
     '''
     NEEDS TO ACCOUNT FOR PRECISION (not yet implemented,
     missing cases where bounds would discard solutions but not bounds+precision)
@@ -102,9 +107,8 @@ def match_peaks(peaks1,
         for pe2 in peaks2:
             if bound_bias.nisin(pe1-pe2):
                 continue
-            scales.append(Scale(1,pe1-pe2))
+            scales.append(Rescale(1,pe1-pe2))
             biases.append(pe1-pe2)
-            #stretches.append(1)
 
     for bias in list(biases):
         for p11,p12 in itertools.combinations(peaks1,2):
@@ -113,9 +117,7 @@ def match_peaks(peaks1,
                 if bound_stretch.nisin(stretch):
                     continue
                 if count_matches(peaks1,stretch*peaks2+bias)>0:
-                    #stretches.append(stretch)
-                    #biases.append(bias)
-                    scales.append(Scale(stretch,bias))
+                    scales.append(Rescale(stretch,bias))
 
     return scales
 
@@ -159,7 +161,7 @@ class OPeakArray:
             return numpy.array([i.pos for i in self.arr if i.seq==seq or self.rev(i.seq)==seq])
         return numpy.array([i.pos for i in self.arr if i.seq==seq])
 
-    def match_to(self,other,bstretch,bbias,with_reverse=True)->List:
+    def find_matches(self,other,bstretch,bbias,with_reverse=True)->List[Rescale]:
         '''
         needs to take into account the seq of matching OligoPeaks
         stretches,biases are defined using self has (1,0)
@@ -176,11 +178,10 @@ class OPeakArray:
                  for str2 in oseqs
                  if len(data.Oligo.tail_overlap(str1,str2))>self.min_overl]
         print("matches=",matches)
-        scales=[] # type: List[Scale]
+        scales=[] # type: List[Rescale]
         for match in matches:
             arr1=self.matching_seq(match[0])
             arr2=other.matching_seq(match[1])
-            #stretch,bias
             scales+=match_peaks(arr1,
                                 arr2,
                                 bstretch,
@@ -243,29 +244,29 @@ class OPeakArray:
         maximum number of matches in len(self.arr)
         asymmetric function
         '''
-        return count_matches(self.arr,scaled.arr,fprecision=nlampli)
+        return count_matches([i.pos for i in self.arr],
+                             [i.pos for i in scaled.arr],
+                             fprecision=nlampli)
 
 def no_orientation(oligos:List[data.OligoPeak]):
     'each oligo has its sequence changed so that we loose the information on the orientation'
     reverse=data.Oligo.reverse_complement
-    return [data.OligoPeak(seq=min(oli.seq,reverse(oli.seq)),pos=oli.pos)
-            for oli in oligos]
-
-
-
+    return [oli.copy(seq=min(oli.seq,reverse(oli.seq))) for oli in oligos]
 
 class Scaler:
     '''
     varies stretch and bias between Oligo Experiments
     '''
+    bp2nm=1.1 # type: float
+    nl_amplitude=5*bp2nm # type: float # in nm
     oligos=[] # type: List[data.OligoPeak]
     peaks=[] # type: List[data.OPeakArray]
-    bp2nm=1.1 # type: float
-    nl_amplitude=15*bp2nm # type: float # in nm
-    min_overlap=1 # type: int
+    min_overlap=2 # type: int # need to rethink this parameter and its interaction
     with_reverse=True # type: bool
-    bstretch=Bounds()
-    bbias=Bounds()
+    bstretch=Bounds() # type: Bounds
+    bbias=Bounds() # type: Bounds
+    ref_index=0 # type: int # index of the reference OPeakArray
+    shuffler=shuffler.Shuffler()
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
         pass
@@ -276,7 +277,7 @@ class Scaler:
         and varying stretch and bias between peaks
 
         pick the first peakarray (also the largest) (peakarray1)
-        find all other arrays which may overlap
+        find all other arrays which may overlap (at least min_overlaps=1)
         for each array to add, find all stretch and bias
         for each stretch and bias, apply basewise to each cluster of peaks
         to define a cluster start with a peak in peaks1,
@@ -291,24 +292,54 @@ class Scaler:
         exp_oligos=no_orientation(self.oligos) # type: List[data.OligoPeak]
         self.peaks=OPeakArray.from_oligos(exp_oligos) # type: List[data.OPeakArray]
         self.peaks=sorted(self.peaks,key=lambda x:-len(x.arr))
-        peakarr0=self.peaks[0]
-        toscale=OPeakArray.may_overlap(peakarr0,self.peaks[1:],self.min_overlap,self.with_reverse)
-        scaleperpeak={peak:peakarr0.match_to(peak,self.bstretch,self.bbias,self.with_reverse)
-                      for peak in toscale}
-        scaleperpeak={k:v for k,v in scaleperpeak.items() if len(v)>0}
-        for peak,scales in scaleperpeak.items():
-            print("peak=",peak)
-            for scale in scales:
-                print("scale=",scale,peakarr0.count_matches(scale(peak)))
-        #[peakarr0.count_matches(scale(peak))
-        #for peak,scales in scaleperpeak.items() for scale in scales]
-        # find the combinaison of scales for each of the peaks matched peakarr0
+        refpeak=self.peaks[self.ref_index]
+        rscalesperpeak=self.find_rescales(refpeak,self.peaks[1:])
+
+        # should ooverl be 1? # should it be more flexible in Shuffler?
+        self.shuffler=shuffler.Shuffler(ooverl=2)
+        oligos=list(refpeak.arr) # type: List[data.OligoPeak]
+        for peak,scales in rscalesperpeak.items():
+            oligos+=list(scales[0][1](peak).arr)
+
+
+        self.shuffler.collection=data.BCollection.from_oligos(oligos)
+        if __debug__:
+            pass
+            #pickle.dump(oligos,open("debugoligos.pickle","wb"))
+        shuffling=self.shuffler.base_per_base()
+
+        # to find the best rescale we must run the shuffler base_per_base()
+        # we could clusterise the groups of events of rescaled peakarray close to one another
+        # can clusterize easily according using group_overlapping_normdist on OligoPeak
+        # but shuffler should handle it pretty well.
+        # run shuffler
+        # score
+
+        # then change the scalings.
+        # could use a binaryish counting system starting with the keys with fewer changes
+
+        # find the combinaison of scales for each of the peaks matched refpeak
         # per peak rank the scales according to matches
         # we can merge OligoPeaks if we can identify the overlapping
         # OligoPeaks (saves time with basewise)
 
-        return scaleperpeak
+        return rscalesperpeak, shuffling
 
+    def find_rescales(self,refpeak:OPeakArray,others:List[OPeakArray]):
+        '''
+        for each other peak, find all possible rescales (stretch and bias)
+        and ranked them by number of events in peak which are matched
+        '''
+        torescale=OPeakArray.may_overlap(refpeak,others,self.min_overlap,self.with_reverse)
+        rescaleperpeak=dict() # type: Dict[OPeakArray,List]
+        for peak in torescale:
+            scales=refpeak.find_matches(peak,self.bstretch,self.bbias,self.with_reverse)
+            if not scales:
+                continue
+            rescaleperpeak[peak]=[(refpeak.count_matches(scale(peak),self.nl_amplitude),scale)
+                                  for scale in scales]
+
+        return {key:sorted(values,key=lambda x:-x[0]) for key,values in rescaleperpeak.items()}
 
 # must take into account the 2 strands of the hairpin as soon  as possible in the program
 #oligos=pickle.load(open("oligos_sd1_os3.pickle","rb"))
