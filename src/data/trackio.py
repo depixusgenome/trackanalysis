@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=arguments-differ
 u"Loading and save tracks"
-from    typing      import (Sequence, Callable, # pylint: disable=unused-import
+from    typing      import (Sequence, Callable,
                             Any, Union, Tuple, Optional, Iterator, Dict,
                             TYPE_CHECKING)
 from    itertools   import chain
@@ -58,7 +58,7 @@ class _TrackIO:
         raise NotImplementedError()
 
     @staticmethod
-    def open(path):
+    def open(path, **_):
         u"opens a track file"
         raise NotImplementedError()
 
@@ -71,7 +71,7 @@ class PickleIO(_TrackIO):
         return path if Path(path).suffix == ".pk" else None
 
     @staticmethod
-    def open(path:PATHTYPE) -> dict:
+    def open(path:PATHTYPE, **_) -> dict:
         u"opens a track file"
         with open(str(path), 'rb') as stream:
             return pickle.load(stream)
@@ -86,9 +86,11 @@ class LegacyTrackIO(_TrackIO):
         return path if Path(path).suffix == cls.__TRKEXT else None
 
     @staticmethod
-    def open(path:PATHTYPE) -> dict:
+    def open(path:PATHTYPE, **kwa) -> dict:
         u"opens a track file"
-        return readtrack(str(path))
+        axis = kwa.pop('axis', 'Z')
+        axis = getattr(axis, 'value', axis)[0]
+        return readtrack(str(path), kwa.pop('notall', True), axis)
 
 class LegacyGRFilesIO(_TrackIO):
     u"checks and opens legacy GR files"
@@ -132,17 +134,17 @@ class LegacyGRFilesIO(_TrackIO):
             return (trk,) + grs
 
     @classmethod
-    def open(cls, paths:Tuple[PATHTYPE,PATHTYPE]) -> dict: # type: ignore
+    def open(cls, paths:Tuple[PATHTYPE,PATHTYPE], **kwa) -> dict: # type: ignore
         u"opens the directory"
-        output = readtrack(str(paths[0]))
+        output = LegacyTrackIO.open(paths[0], **kwa)
         if output is None:
             raise IOError("Could not open track. "
                           "This could be because of a *root* mounted samba path")
         remove = set(i for i in output if isinstance(i, int))
 
         if len(paths) == 2 and Path(paths[1]).is_dir():
-            itr = iter(i for i in Path(paths[1]).iterdir()
-                       if 'z(t)bd' in i.stem.lower()) # type: Iterator[Path]
+            itr : Iterator[Path] = iter(i for i in Path(paths[1]).iterdir()
+                                        if 'z(t)bd' in i.stem.lower())
         else:
             itr = (Path(i) for i in paths[1:])
 
@@ -322,7 +324,9 @@ class Handler:
         if (not isinstance(path, (str, Path))) and len(path) == 1:
             path = path[0]
 
-        kwargs = self.handler.open(path)
+        kwargs = self.handler.open(path,
+                                   notall = getattr(track, 'notall', True),
+                                   axis   = getattr(track, 'axis',   'Z'))
         res    = dict(path = path, lazy = False)
         if kwargs is None:
             res['data'] = {}

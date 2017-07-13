@@ -5,6 +5,7 @@ Base track file data.
 """
 from    typing      import Optional, Union, Dict, Tuple
 from    copy        import deepcopy
+from    enum        import Enum
 import  numpy       as     np
 
 from    utils       import initdefaults
@@ -13,6 +14,11 @@ from   .trackitems  import Beads, Cycles, BEADKEY, _m_ALL
 from   .trackio     import opentrack
 
 IDTYPE = Union[None, int, slice] # missing Ellipsys as mypy won't accept it
+class Axis(Enum):
+    "which axis to look at"
+    Xaxis = 'Xaxis'
+    Yaxis = 'Yaxis'
+    Zaxis = 'Zaxis'
 
 @levelprop(Level.project)
 class Track:
@@ -23,7 +29,8 @@ class Track:
     _path          = None # type: Union[str, Tuple[str, ...]]
     _rawprecisions = {}   # type: Dict[BEADKEY, float]
     _lazy          = True
-    @initdefaults(tuple(),
+    axis           = Axis.Zaxis
+    @initdefaults(('axis',),
                   framerate     = '_',
                   phases        = '_',
                   data          = '_',

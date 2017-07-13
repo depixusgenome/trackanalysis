@@ -36,6 +36,8 @@ namespace legacy
         void   rot   (float *)          const;
         void   pos   (float *)          const;
         void   bead  (size_t, float *)  const;
+        void   xbead (size_t, float *)  const;
+        void   ybead (size_t, float *)  const;
         void   cycles(std::vector<int>    & x) const { x.resize(nphases()*ncycles()); cycles(x.data()); }
         void   t     (std::vector<int>    & x) const { x.resize(nrecs());   t     (x.data()); }
         void   zmag  (std::vector<float>  & x) const { x.resize(nrecs());   zmag  (x.data()); }
@@ -43,12 +45,25 @@ namespace legacy
         void   pos   (std::vector<float>  & x) const { x.resize(nbeads()*2);pos   (x.data()); }
         void   bead  (size_t i, std::vector<float> & x) const
         { x.resize(nrecs()); bead(i, x.data()); }
+        void   xbead (size_t i, std::vector<float> & x) const
+        { x.resize(nrecs()); xbead(i, x.data()); }
+        void   ybead (size_t i, std::vector<float> & x) const
+        { x.resize(nrecs()); ybead(i, x.data()); }
+
 
         std::vector<int  >  t     ()         const { decltype(t   ())   x; t   (x);     return x; }
         std::vector<float>  zmag  ()         const { decltype(zmag())   x; zmag(x);     return x; }
         std::vector<float>  rot   ()         const { decltype(rot ())   x; rot (x);     return x; }
         std::vector<float>  pos   ()         const { decltype(pos ())   x; pos (x);     return x; }
         std::vector<float>  bead  (size_t i) const { decltype(bead(0))  x; bead(i, x);  return x; }
+        std::vector<float>  xbead (size_t i) const { decltype(bead(0))  x; xbead(i, x); return x; }
+        std::vector<float>  ybead (size_t i) const { decltype(bead(0))  x; ybead(i, x); return x; }
+        std::vector<float>  bead  (size_t i, int tpe) const
+        { 
+          decltype(bead(0))  x;
+          tpe == 0 ?  bead(i, x): tpe == 1 ? xbead(i, x): ybead(i, x);
+          return x; 
+        }
         std::vector<int>    cycles()         const { decltype(cycles()) x; cycles(x);   return x; }
 
         float  camerafrequency() const;

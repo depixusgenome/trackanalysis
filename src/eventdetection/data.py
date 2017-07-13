@@ -4,10 +4,11 @@ u"Finds peak positions on a bead"
 from typing           import (Iterator, Tuple, Union, Sequence,
                               Optional, TYPE_CHECKING)
 from copy             import deepcopy
-from functools        import wraps
+from functools        import wraps, partial
 import numpy          as     np
 
 from model            import PHASE
+from data             import Track
 from data.trackitems  import Items, Cycles, Level, CYCLEKEY
 from utils            import EVENTS_TYPE, EVENTS_DTYPE, asview, EventsArray
 from .                import EventDetectionConfig
@@ -69,6 +70,26 @@ class Events(Cycles, EventDetectionConfig, Items):
                     gen = EventsArray([(i, cycle[i:j])
                                        for i, j in evts(fdt, precision = val)])
             yield (key, gen)
+
+    def swap(self, data: Union[Track, Cycles] = None) -> 'Events':
+        "Returns indexes or values in data at the same key and index"
+        data = data.cycles if isinstance(data, Track) else data
+        return self.withaction(partial(self.__swap, data))
+
+    def index(self) -> 'Events':
+        "Returns indexes at the same key and positions"
+        return self.withaction(self.__index)
+
+    @staticmethod
+    def __index(info):
+        info[1]['data'] = [range(i,i+len(j)) for i, j in info[1]]
+        return info
+
+    @staticmethod
+    def __swap(data, info):
+        tmp             = data[info[0]]
+        info[1]['data'] = [tmp[i:i+len(j)] for i, j in info[1]]
+        return info
 
     if TYPE_CHECKING:
         # pylint: disable=useless-super-delegation

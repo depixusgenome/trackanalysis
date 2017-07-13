@@ -4698,6 +4698,20 @@ namespace legacy
         _get(_ptr->b_r[ibead]->z, _ptr->z_cor, 0.0f, dt);
     }
 
+    void   GenRecord::xbead  (size_t ibead, float *dt) const
+    {
+        if(_ptr == nullptr || ibead >= size_t(_ptr->n_bead))
+            return;
+        _get(_ptr->b_r[ibead]->x, 1.0f, 0.0f, dt);
+    }
+
+    void   GenRecord::ybead  (size_t ibead, float *dt) const
+    {
+        if(_ptr == nullptr || ibead >= size_t(_ptr->n_bead))
+            return;
+        _get(_ptr->b_r[ibead]->y, 1.0f, 0.0f, dt);
+    }
+
     float  GenRecord::camerafrequency() const
     { return _ptr == nullptr ? 0 : _ptr->Pico_param_record.camera_param.camera_frequency_in_Hz; }
 

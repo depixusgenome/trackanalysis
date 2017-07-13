@@ -4,7 +4,9 @@
 #include "legacy/legacygr.h"
 namespace legacy
 {
-    pybind11::object _readtrack(std::string name, bool notall = true)
+    pybind11::object _readtrack(std::string name,
+                                bool notall     = true,
+                                std::string tpe = "")
     {
         legacy::GenRecord   rec(name);
         if((notall && rec.ncycles() <= 4) || rec.ncycles() == 0)
@@ -23,9 +25,12 @@ namespace legacy
                 res[pybind11::cast(key)] = pybind11::array(sz, mem.data()+first);
             };
 
+        int axis = tpe.size() == 0 || tpe[0] == 'Z' || tpe[0] == 'z' ? 0 :
+                                      tpe[0] == 'X' || tpe[0] == 'x' ? 1 : 2;
+
         for(size_t ibead = size_t(0), ebead = rec.nbeads(); ibead < ebead; ++ibead)
             if(notall == false || !rec.islost(int(ibead)))
-                add(ibead, [&]() { return rec.bead(ibead); });
+                add(ibead, [&]() { return rec.bead(ibead, axis); });
 
         add("t",    [&]() { return rec.t(); });
         add("zmag", [&]() { return rec.zmag(); });
@@ -106,9 +111,11 @@ namespace legacy
     void pymodule(pybind11::module & mod)
     {
         using namespace pybind11::literals;
-        mod.def("readtrack", _readtrack, "path"_a, "clipcycles"_a = true,
+        mod.def("readtrack", _readtrack, "path"_a,
+                "clipcycles"_a = true, "axis"_a = 0,
                 "Reads a '.trk' file and returns a dictionnary of beads,\n"
-                "possibly removing the first 3 cycles and the last one");
+                "possibly removing the first 3 cycles and the last one.\n"
+                "axes are z(0), x(1), y(2)");
         mod.def("readtrackrotation", _readtrackrotation, "path"_a,
                 "Reads a '.trk' file's rotation");
         mod.def("readgr", _readgr, "path"_a,
