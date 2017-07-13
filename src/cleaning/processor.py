@@ -193,4 +193,4 @@ class DataCleaningProcessor(Processor):
 
     def run(self, args):
         cache = args.data.setCacheDefault(self, dict())
-        return args.apply(cache = cache, **self.config())
+        return args.apply(self.apply(cache = cache, **self.config()))

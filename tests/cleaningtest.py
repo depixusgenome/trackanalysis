@@ -42,9 +42,9 @@ def test_processor():
 
 def test_view(bokehaction):
     "test the view"
-    with bokehaction.launch('cleaning.view.CleaningPlot', 'app.BeadToolbar') as server:
+    with bokehaction.serve('cleaning.view.CleaningView', 'app.BeadToolbar') as server:
         server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
         server.load('big_legacy', andstop = False)
 
 if __name__ == '__main__':
-    test_processor()
+    test_view(bokehaction(None))

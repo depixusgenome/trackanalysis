@@ -4,7 +4,7 @@
 from typing               import Callable
 from concurrent.futures   import ThreadPoolExecutor
 
-from bokeh.document       import Document         # pylint: disable=unused-import
+from bokeh.document       import Document
 from bokeh.models.widgets import Button
 from bokeh.themes         import Theme
 from bokeh.layouts        import layout
@@ -12,9 +12,9 @@ from bokeh.layouts        import layout
 from tornado.ioloop             import IOLoop
 from tornado.platform.asyncio   import to_tornado_future
 
-from control        import Controller             # pylint: disable=unused-import
+from control        import Controller
 from control.action import ActionDescriptor, Computation, Action
-from .keypress      import KeyPressManager        # pylint: disable=unused-import
+from .keypress      import KeyPressManager
 
 SINGLE_THREAD = False
 
@@ -25,7 +25,7 @@ class View:
     ISAPP  = False
     def __init__(self, **kwargs):
         "initializes the gui"
-        self._ctrl  = kwargs['ctrl']  # type: Controller
+        self._ctrl: Controller  = kwargs['ctrl']
 
     def startup(self, path, script):
         "runs a script or opens a file on startup"
@@ -107,8 +107,8 @@ class BokehView(View):
         css.theme.basic.default = {}
         css.theme.default       = 'dark'
 
-        self._keys = kwargs['keys']  # type: KeyPressManager
-        self._doc  = None            # type: Optional[Document]
+        self._keys: KeyPressManager = kwargs['keys']
+        self._doc:  Document        = None
 
     def close(self):
         "closes the application"

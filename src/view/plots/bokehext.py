@@ -69,13 +69,13 @@ class DpxKeyedRow(Row): # pylint: disable=too-many-ancestors
     def keyedlayout(cls, plot, main, *figs, bottom = None, left = None):
         "sets up a DpxKeyedRow layout"
         figs  = (main,) + figs
-        plts  = layouts.gridplot([[*figs]],
-                                 **cls.__sizingmode(plot),
+        kwa   = plot.defaultsizingmode()
+        plts  = layouts.gridplot([[*figs]], **kwa,
                                  toolbar_location = plot.css.toolbar_location.get())
         keyed = cls(plot, main, children = [plts],
-                    toolbar  = next(i for i in plts.children if isinstance(i, ToolbarBox)))
+                    toolbar  = next(i for i in plts.children if isinstance(i, ToolbarBox)),
+                    **kwa)
 
-        kwa = cls.__sizingmode(plot)
         if left is None and bottom is None:
             return keyed
         if left is None:

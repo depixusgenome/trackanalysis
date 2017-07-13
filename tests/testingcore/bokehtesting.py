@@ -1,25 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Utils for testing views"
-from typing                import (Optional,# pylint: disable=unused-import
-                                   Union, Sequence, Any)
+from   typing    import Optional, Union, Sequence, Any
 import sys
 import tempfile
 import warnings
 import inspect
-import pytest
-
-from tornado.ioloop        import IOLoop
-import bokeh.core.properties as     props
 
 with warnings.catch_warnings():
     warnings.filterwarnings('ignore', category = DeprecationWarning)
+    import pytest
     from bokeh.model           import Model
-    from bokeh.document        import Document  # pylint: disable=unused-import
-    from bokeh.server.server   import Server    # pylint: disable=unused-import
+    from bokeh.document        import Document
+    from bokeh.server.server   import Server
+    import bokeh.core.properties as     props
+
     warnings.filterwarnings('ignore', category = FutureWarning)
     import pandas.tslib                         # pylint: disable=unused-import
 
+from tornado.ioloop        import IOLoop
 from view.keypress         import KeyPressManager
 
 class DpxTestLoaded(Model):
@@ -30,18 +29,19 @@ class DpxTestLoaded(Model):
         import *        as $    from "jquery"
         import *        as p    from "core/properties"
         import {Model}          from "model"
-        import {BokehView} from "core/bokeh_view"
+        import {DOMView}        from "core/dom_view"
 
-        export class DpxTestLoadedView extends BokehView
+        export class DpxTestLoadedView extends DOMView
+            connect_signals: () ->
+                super()
+                @connect(@model.properties.event_cnt.change, @_press)
+                @connect(@model.properties.value_cnt.change, @_change)
 
         export class DpxTestLoaded extends Model
             default_view: DpxTestLoadedView
             type: "DpxTestLoaded"
             constructor : (attributes, options) ->
                 super(attributes, options)
-                @listenTo(@, 'change:event_cnt', @_press)
-                @listenTo(@, 'change:value_cnt', @_change)
-
                 $((e) => @done = 1)
 
             _create_evt: (name) ->
@@ -165,12 +165,12 @@ class _ManagedServerLoop:
             return setattr(*args)
 
     def __init__(self, mkpatch, kwa:dict) -> None:
-        self.monkeypatch = self._Dummy() if mkpatch is None else mkpatch # type: ignore
-        self.server      = None # type: Server
-        self.view        = None # type: ignore
-        self.doc         = None # type: Document
-        self.kwa         = kwa
-        self.__warnings  = None # type: ignore
+        self.monkeypatch      = self._Dummy() if mkpatch is None else mkpatch # type: ignore
+        self.server: Server   = None
+        self.view:   Any      = None
+        self.doc:    Document = None
+        self.kwa              = kwa
+        self.__warnings: Any  = None
 
     def __buildserver(self, kwa):
         kwa['io_loop'] = IOLoop()

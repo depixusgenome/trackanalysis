@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cycles plot view for cleaning data"
-from    typing         import Dict, Tuple, TYPE_CHECKING #pylint: disable=unused-import
+from    typing         import Dict, TYPE_CHECKING
 
-from    bokeh.plotting import figure, Figure # pylint: disable=unused-import
+from    bokeh.plotting import figure
 from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 from    bokeh          import layouts
 import  bokeh.colors
@@ -27,7 +27,8 @@ class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
         super().__init__(ctrl)
         WidgetMixin.__init__(self)
         cnf = self.css
-        cnf.points      .default  = PlotAttrs('color',  'circle', 1, alpha   = .5)
+        cnf.plot.figure.height.default = self.css.plot.figure.width.get()//2
+        cnf.points.default  = PlotAttrs('color',  'circle', 1, alpha   = .5)
 
         colors = dict(good       = 'blue',
                       hfsigma    = 'red',
@@ -53,12 +54,12 @@ class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
         fig.add_layout(axis, 'above')
 
         self._addcallbacks(fig)
+        mode    = self.defaultsizingmode()
         widgets = self._createwidget(fig)
-        bottom  = layouts.widgetbox(widgets['align'])
-        left    = layouts.widgetbox(widgets['cleaning']+widgets['table'])
-        col     = layouts.column([self._keyedlayout(fig), bottom], responsive = True)
-        row     = layouts.row([left, col], responsive = True)
-        return row
+        bottom  = layouts.widgetbox(widgets['align'], **mode)
+        left    = layouts.widgetbox(widgets['cleaning']+widgets['table'], **mode)
+        col     = layouts.column([self._keyedlayout(fig), bottom], **mode)
+        return layouts.row([left, col], **mode)
 
     def _reset(self):
         if self._model.colorstore is not None:

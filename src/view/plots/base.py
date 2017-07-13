@@ -220,6 +220,19 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                  property(lambda self:    self.project.state.get(),
                           lambda self, i: self.project.state.set(PlotState(i))))
 
+    def defaultsizingmode(self, kwa = None, **kwargs):
+        "the default sizing mode"
+        if kwa is None:
+            kwa = kwargs
+        else:
+            kwa.update(kwargs)
+
+        if self.css.responsive.get():
+            kwa['sizing_mode'] = 'scale_width'
+        else:
+            kwa['sizing_mode'] = self.css.sizing_mode.get()
+        return kwa
+
     @classmethod
     def key(cls):
         "the key to this plot creator"
