@@ -32,10 +32,11 @@ class DpxTestLoaded(Model):
         import {DOMView}        from "core/dom_view"
 
         export class DpxTestLoadedView extends DOMView
-            connect_signals: () ->
-                super()
-                @connect(@model.properties.event_cnt.change, @_press)
-                @connect(@model.properties.value_cnt.change, @_change)
+            className: "dpx-test"
+            initialize: (options) ->
+                super(options)
+                @connect(@model.properties.event_cnt.change, () => @model._press())
+                @connect(@model.properties.value_cnt.change, () => @model._change())
 
         export class DpxTestLoaded extends Model
             default_view: DpxTestLoadedView
@@ -61,7 +62,6 @@ class DpxTestLoaded(Model):
 
             _change: () ->
                 if @model?
-
                     mdl = @model
                     for i in @attrs
                         mdl = mdl[i]
