@@ -6,10 +6,10 @@ Creates Classes and function to use with assemble sequence
 from typing import List, NamedTuple, Tuple, FrozenSet, Set, Dict, Generator # pylint: disable=unused-import
 import itertools
 import numpy
-import networkx as netwx
 from utils import initdefaults
 from ._types import SciDist # pylint: disable=unused-import
 from . import _utils as utils
+from . import graph as pgraph
 
 REVERSE={"a":"t","c":"g","g":"c","t":"a"}
 REVERSE.update({"A":"T","C":"G","G":"C","T":"A"})
@@ -318,7 +318,7 @@ class OligoPerm:
 # replace Partition with a DiGraph? make Partition a subclass of DiGraph
 class Partition:
     '''
-    container for indepent OligoPerm objects
+    container for independent OligoPerm objects
     includes a graph of kperms to track ambiguities
     '''
     def __init__(self,**kwa):
@@ -327,10 +327,13 @@ class Partition:
         self.noverlaps=kwa.get("noverlaps",0) # type: int
         self.pdfcost=kwa.get("pdfcost",0) # type: float
         self.domain=kwa.get("domain",None) # type: FrozenSet[int]
-        self.ambi=kwa.get("ambi",[]) # type: List # to make private after testing
-        self.graph=kwa.get("graph",netwx.DiGraph()) # type: netwx.DiGraph() # or graph.PermGraph
+        self.graph=kwa.get("graph",pgraph.PermGraph()) # type: pgraph.PermGraph
         if self.domain is None:
             self.domain=frozenset().union(*[prm.domain for prm in self.perms])
+
+        if not self.graph.nodes():
+            for perm in self.perms: # sort perms with max(prm.domain)?
+                self.graph.append(perm)
 
     def merge(self)->OligoPerm:
         'returns the merged perms'
@@ -338,16 +341,19 @@ class Partition:
 
     def add(self,perm:OligoPerm,in_place=False):
         '''
-        returns a new Partition with added perm
-        if in_place==True appends perms with perm
+        if not in_place returns a new Partition with added perm
+        else appends perms with perm
         '''
         if in_place:
             self.perms+=[perm]
             self.domain=self.domain.union(perm.domain)
-            self.graph.add_node(perm)
+            self.graph.append(perm)
         else:
+            graph=self.graph.copy()
+            graph.append(perm)
             return self.__copy__(perms=self.perms+[perm],
-                                 domain=self.domain.union(perm.domain))
+                                 domain=self.domain.union(perm.domain),
+                                 graph=graph)
 
     def __copy__(self,**kwa):
         'returns copied Partition'
@@ -359,20 +365,21 @@ class Partition:
         return self.__copy__(**kwa)
 
     # to pytest
-    @staticmethod
-    def list_ambiguities(partitions)->List:
-        '''
-        returns a list of perms for each partitions
-        the perms corresponds to the difference of a particular partition to any other
-        '''
-        ambi=[] # list of Partition
-        for idx,val in enumerate(partitions):
-            others=tuple(frozenset(part.perms) for part in partitions[:idx]+partitions[idx+1:])
-            if len(others)==0:
-                continue
-            ambi.append(Partition(perms=list(frozenset(val.perms)-frozenset.intersection(*others))))
+    #@staticmethod
+    #def list_ambiguities(partitions)->List:
+    #'''
+    #returns a list of perms for each partitions
+    #the perms corresponds to the difference of a particular partition to any other
+    #'''
+    #ambi=[] # list of Partition
+    #for idx,val in enumerate(partitions):
+    #others=tuple(frozenset(part.perms) for part in partitions[:idx]+partitions[idx+1:])
+    #if len(others)==0:
+    #continue
+    # ambi.append(Partition(perms=list(frozenset(val.perms)-frozenset.intersection(*others))))
 
-        return ambi
+    #return ambi
+
 
 
     # must check creation and propagation of ambi
@@ -386,53 +393,32 @@ class Partition:
         keyparts=sorted([(hash(tuple(prm for prm in part.perms if prm.span.intersection({index}))),
                           part) for part in partitions],
                         key=lambda x:x[0])
-        print("keyparts=",keyparts)
+
         for grp in itertools.groupby(keyparts,key=lambda x:x[0]):
             # if they have the same key, ambiguity
             parts=list(i[1] for i in grp[1])
-            print("parts=",parts)
-            
-            merging_node=frozenset.intersection(*[frozenset(prm
-                                                            for prm in part.perms
-                                                            if prm.span.intersection({index}))
-                                                  for part in parts])
-
-
-
-            prev_ambi=[] # type: List[List]
-            for part in parts:
-                print("part=",part)
-                print("ambi=",part.ambi)
-                #prev_ambi+=[ambi for ambi in part.ambi if ambi] # part.ambi
-                prev_ambi.append([ambi for ambi in part.ambi if ambi]) # part.ambi
-
-            ambiguities=Partition.list_ambiguities(parts)
+            #prev_ambi=[]
+            #for part in parts:
+            #    prev_ambi.append([ambi for ambi in part.ambi if ambi])
             perms=frozenset(parts[0].perms).intersection(*[frozenset(part.perms)
                                                            for part in parts[1:]])
             domain=parts[0].domain.intersection(*[frozenset(part.domain)
                                                   for part in parts[1:]])
+
+            graph=parts[0].graph.add(*[part.graph for part in parts[1:]])
             common=Partition(perms=list(perms),
                              domain=domain,
-                             ambi=[ambi]+prev_ambi)
-            common.graph.add_nodes_from(ambiguities)
-            print("common=",common)
+                             graph=graph)
             resumep.append(common)
-        # requires list(set(resumep))
         return resumep
 
-    @staticmethod
-    def reconstruct_partitions(partitions:List)->Generator:
+    def paths(self)->Generator:
         '''
-        generates all partitions from possible combinations of ambiguities
+        generates all list of OligoPerm from possible combinations of ambiguities
+        use networkx.all_simple_path(self.graph,self.graph.start,self.graph.end)
         '''
-        # use networkx graphs. for part in partitions all_simple_paths(part.graph,part.,part.end)
-        # something along the lines of...
-        for part in partitions:
-            # thanks itertools
-            for choice in itertools.product(*[ambi for ambi in part.ambi if ambi]):
-                # part is the common core and each alternative solution is listed in ambi
-                yield choice # needs to combine the part with choice but that's easy
-
+        for path in self.graph.paths():
+            yield path
 
 
 class OligoKPerm(OligoPerm):

@@ -12,10 +12,10 @@ import itertools
 from typing import Tuple, List, Generator, Dict # pylint: disable=unused-import
 import pickle
 import numpy
-import assemble.data as data
-import assemble.scores as scores
-import assemble.processor as processor
-import assemble._utils as utils
+from . import data
+from . import scores
+from . import processor
+from . import _utils as utils
 
 # possible optimisations:
 
@@ -48,37 +48,14 @@ class Shuffler:
         '(ordered) oligos from self.collection'
         return self.collection.oligos
 
-    @staticmethod
-    def rank_by_noverlaps(partitions:List[data.Partition],ooverl,index:int):
-        '''
-        to check that the score is computed on the correct index
-        if we construct partitions index per index discarding those that are not optimal
-        we can limit to checking that the perm[index-1:index] do overlap
-        '''
-        scored=[]
-        for part in partitions:
-            merged=part.merge()
-            if __debug__:
-                if not all(i in part.domain for i in range(index)):
-                    print("missing index values in "+str(part.domain))
-                    print("index=",index)
-                    raise ValueError
-
-            kprm=data.OligoKPerm(kperm=merged.perm[:index])
-
-            score= scores.ScoreAssembly(perm=kprm,
-                                        ooverl=ooverl)
-            scored.append((score.noverlaps(),part))
-
-        return sorted(scored,key=lambda x:x[0],reverse=True)
-
+    # to pytest
     @staticmethod
     def increment_noverlaps(partitions:List[data.Partition],
                             ooverl:int,
                             index:int):
         'increments the noverlaps value up to index'
         for partid,part in enumerate(partitions):
-            merged=part.merge()
+            merged=part.merge() # careful, merge merges only common perms in case of ambiguities
             if __debug__:
                 if not all(i in part.domain for i in range(index)):
                     print("missing index values in "+str(part.domain))
@@ -160,12 +137,10 @@ class Shuffler:
             for part in partitions:
                 # extend the part until all indices<index are in domain
                 # kpr in add_kperms which do not intersect with part
-                new_parts=self.construct_scaffold(part,add_kperms,index+1) # test should be faster
+                new_parts=self.construct_scaffold(part,add_kperms,index+1)
                 added_partitions+=new_parts
 
-            #ranked=self.rank_by_noverlaps(added_partitions,self.ooverl,index)
             self.increment_noverlaps(added_partitions,self.ooverl,index+1)
-            #max_overlap=max(i[0] for i in ranked) # before
             max_overlap=max(part.noverlaps for part in added_partitions) # pylint: disable=no-member
             partitions=[part for part in added_partitions if part.noverlaps==max_overlap] # pylint: disable=no-member
             if __debug__:
@@ -174,17 +149,13 @@ class Shuffler:
             # HERE
             # TESTING! comment the following command
             #partitions=[part for part in added_partitions if part.noverlaps>max_overlap-3] # pylint: disable=no-member
-            # can add a restriction on the stretch,bias
 
-            # if 2 partitions differ locally (i.e. by a segment), save the segments
-            # and recreate a partitions using the shared perms (domain inter) at index
             resume_parts=data.Partition.reduce_partitions(partitions,index)
             if __debug__:
                 pickle.dump(resume_parts,open("debugresume_parts"+str(index)+".pickle","wb"))
 
-            partitions=resume_parts # still testing
-            # implement reconstruction method
-            # write the method to list the final result (i.e. all possible partitions)
+            partitions=resume_parts
+
         return partitions
 
     def find_kperms(self,group:Tuple[int, ...])->Generator:

@@ -6,7 +6,6 @@ regroups functions and classes to complement assembler
 '''
 
 import itertools
-from copy import deepcopy
 from typing import Callable, List, Dict # pylint: disable=unused-import
 import scipy.stats
 import numpy
@@ -35,27 +34,6 @@ class OligoWrap:
         '''
         oligos = self.arr2oligohits(self.oligohits,*args)
         return self.to_call(oligos)
-
-def pos2oligos(olis,pos):
-    '''
-    returns a function which takes an array of pos instead of oligos
-    '''
-    assert len(olis)==len(pos)
-    oligos = [deepcopy(i) for i in olis]
-    for idx,val in enumerate(pos):
-        oligos[idx].pos=val
-
-    return oligos
-
-def bpos2oligos(olis,bpos):
-    '''
-    returns a function which takes an array of pos instead of oligos
-    '''
-    assert len(olis)==len(bpos)
-    oligos = [deepcopy(i) for i in olis]
-    for idx,val in enumerate(bpos):
-        oligos[idx].bpos=numpy.round(val)
-    return oligos
 
 def noverlaps_energy(oligos):
     '''use noverlap_bpos to compute energy
