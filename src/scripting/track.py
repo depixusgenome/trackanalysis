@@ -21,12 +21,13 @@ We add some methods and change the default behaviour:
         * a *rawprecision* method is added
         * *with...* methods return an updated copy
 """
-from typing                 import Dict, KeysView, Tuple, Iterator
+from typing                 import Dict, KeysView, Tuple, Iterator, List
 from itertools              import product
 from pathlib                import Path
 import pickle
 import re
 
+from utils                  import initdefaults
 from model                  import Level
 from data                   import Track as _Track, Beads, Cycles
 from data.trackio           import LegacyGRFilesIO
@@ -77,11 +78,12 @@ def tasklist(self, *args, beadsonly = True):
     return Tasks.get(self.path, *args, beadsonly = beadsonly)
 
 @_totrack
-def apply(self, *args, copy = True, beadsonly = True):
+def processors(self, *args, copy = True, beadsonly = True):
     "returns an iterator over the result of provided tasks"
-    procs = Tasks.processors(self.path, *args, beadsonly = beadsonly, copy = copy)
+    procs = Tasks.processors(self.path, *args, beadsonly = beadsonly)
     procs.data.setCacheDefault(0, self)
-    return next(iter(procs.run(copy = copy)))
+    procs.copy = copy
+    return procs
 
 @_totrack
 def apply(self, *args, copy = True, beadsonly = True):
@@ -190,6 +192,51 @@ class TracksDict(dict):
     def __missing__(self, olig):
         return self.__setitem__(olig, Track(path = self.paths.get(olig, olig)))
 
+class ExperimentList(dict):
+    "Provides access to keys belonging to a single experiment"
+    tracks : dict                 = TracksDict()
+    keysize: int                  = 3
+    keylist: List[Tuple[str,...]] = []
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__()
+
+    def __missing__(self, keys):
+        keys = self.convert(keys)
+        vals = None
+        for key in keys:
+            tmp  = frozenset(self.tracks[key].beadsonly.keys())
+            vals = tmp if vals is None else vals & tmp
+        self.__setitem__(keys, vals)
+        return vals
+
+    def convert(self, keys):
+        "converts keys to a list of keys"
+        if isinstance(keys, str):
+            if self.keysize is not None and len(keys) > self.keysize:
+                keys = tuple(keys[i:i+self.keysize] for i in range(len(keys)-self.keysize+1))
+            else:
+                keys = next(i for i in self.keylist if keys in i)
+        return keys
+
+    def word(self, keys):
+        "converts keys to a word"
+        keys = self.convert(keys)
+        return keys[0]+''.join(i[-1] for i in keys[1:])
+
+    def allkeys(self, oligo):
+        "returns all oligos used by a key"
+        return (next((list(i) for i in self.keylist if oligo in i), [oligo])
+                if isinstance(oligo, str) else
+                list(oligo))
+
+    def available(self, *oligos):
+        "returns available oligos"
+        beads = set(self.tracks[oligos[0]].beadsonly.keys())
+        for oligo in oligos[1:]:
+            beads &= set(self.tracks[oligo].beadsonly.keys())
+        return list(beads)
+
 class BeadsDict(dict):
     """
     A dictionnary of potentially transformed bead data.
@@ -223,5 +270,6 @@ class BeadsDict(dict):
 
         self.__setitem__(key, val)
         return val
+
 
 __all__ = ['Track', 'TracksDict', 'BeadsDict']

@@ -11,6 +11,7 @@ import holoviews            as hv
 import holoviews.operation  as hvops
 from   data.trackitems      import Beads, Cycles
 from   eventdetection.data  import Events
+from   .track               import ExperimentList
 
 if 'ipykernel_launcher' in inspect.stack()[-3].filename:
     try:
@@ -61,5 +62,22 @@ def evtcurve(self, *keys, labels = None, tpe = hv.Curve, overlay = True):
 
 Events.curve  = evtcurve
 Events.points = points
+
+def oligomap(self:ExperimentList, oligo, fcn, **kwa):
+    "returns a hv.DynamicMap with oligos and beads in the kdims"
+    oligos = self.allkeys(oligo)
+    beads  = self.available(*oligos)
+    print(oligos, beads)
+    return (hv.DynamicMap(fcn, kdims = ['oligo', 'bead'] + list(kwa))
+            .redim.values(oligo = oligos, bead = beads, **kwa))
+ExperimentList.oligomap = oligomap
+
+def keymap(self:ExperimentList, key, fcn):
+    "returns a hv.DynamicMap with keys in the kdims"
+    beads  = self.available(*self.convert(key))
+    print(key, beads)
+    return (hv.DynamicMap(fcn, kdims = ['bead'])
+            .redim.values(bead = beads))
+ExperimentList.keymap = keymap
 
 __all__ = ['hv', 'hvops']
