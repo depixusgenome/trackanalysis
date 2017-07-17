@@ -11,9 +11,12 @@ import  numpy       as     np
 from    utils       import initdefaults
 from    model       import levelprop, Level
 from   .trackitems  import Beads, Cycles, BEADKEY, _m_ALL
-from   .trackio     import opentrack
+from   .trackio     import opentrack, PATHTYPES
 
-IDTYPE = Union[None, int, slice] # missing Ellipsys as mypy won't accept it
+IDTYPE      = Union[None, int, slice] # missing Ellipsys as mypy won't accept it
+DATA        = Dict[BEADKEY, np.ndarray]
+_PRECISIONS = Dict[BEADKEY, float]
+
 class Axis(Enum):
     "which axis to look at"
     Xaxis = 'Xaxis'
@@ -23,13 +26,13 @@ class Axis(Enum):
 @levelprop(Level.project)
 class Track:
     "Model for track files. This must not contain actual data."
-    _framerate     = 0.
-    _phases        = np.empty((0,9), dtype = 'i4')
-    _data          = None # type: Optional[Dict[BEADKEY, np.ndarray]]
-    _path          = None # type: Union[str, Tuple[str, ...]]
-    _rawprecisions = {}   # type: Dict[BEADKEY, float]
-    _lazy          = True
-    axis           = Axis.Zaxis
+    _framerate                  = 0.
+    _phases                     = np.empty((0,9), dtype = 'i4')
+    _data:          DATA        = None
+    _path:          PATHTYPES   = None
+    _rawprecisions: _PRECISIONS = {}
+    _lazy                       = True
+    axis= Axis.Zaxis
     @initdefaults(('axis',),
                   framerate     = '_',
                   phases        = '_',
@@ -42,7 +45,7 @@ class Track:
 
     def __getstate__(self):
         info = self.__dict__.copy()
-        for name in ('path', 'framerate', 'rawprecisions', 'data', 'lazy'):
+        for name in ('path', 'framerate', 'rawprecisions', 'data', 'lazy', 'axis'):
             val = info.pop('_'+name)
             if val !=  getattr(type(self), '_'+name):
                 info[name] = val

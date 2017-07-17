@@ -324,10 +324,11 @@ class Handler:
         if (not isinstance(path, (str, Path))) and len(path) == 1:
             path = path[0]
 
-        kwargs = self.handler.open(path,
-                                   notall = getattr(track, 'notall', True),
-                                   axis   = getattr(track, 'axis',   'Z'))
-        res    = dict(path = path, lazy = False)
+        res    = dict(lazy   = False,
+                      notall = getattr(track, 'notall', True),
+                      axis   = getattr(track, 'axis',   'Zaxis'))
+        kwargs = self.handler.open(path, **res)
+        res['path'] = path
         if kwargs is None:
             res['data'] = {}
         else:
