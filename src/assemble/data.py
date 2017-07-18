@@ -316,6 +316,9 @@ class OligoPerm:
         del self._domain
 
 # replace Partition with a DiGraph? make Partition a subclass of DiGraph
+# a more efficient way to keep track of abiguities would be to save the edges of the graphs
+# as Tuple[data.OligoPerm,data.OligoPerm].
+# reconstruction of the tree only appears when all paths are required
 class Partition:
     '''
     container for independent OligoPerm objects

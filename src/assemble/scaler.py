@@ -140,7 +140,7 @@ class OPeakArray:
     Can even include Oligo experiments with different (not reverse_complement) sequences
     '''
     arr=numpy.empty(shape=(0,),dtype=data.OligoPeak)
-    min_overl=1 # type: int
+    min_overl=2 # type: int
     rev=data.Oligo.reverse_complement
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
@@ -176,7 +176,9 @@ class OPeakArray:
         matches=[(str1,str2)
                  for str1 in sseqs
                  for str2 in oseqs
-                 if len(data.Oligo.tail_overlap(str1,str2))>self.min_overl]
+                 if len(data.Oligo.tail_overlap(str1,str2))>=self.min_overl
+                 or len(data.Oligo.tail_overlap(str2,str1))>=self.min_overl]
+
         print("matches=",matches)
         scales=[] # type: List[Rescale]
         for match in matches:
@@ -187,6 +189,11 @@ class OPeakArray:
                                 bstretch,
                                 bbias)
         return scales
+
+    @property
+    def posarr(self):
+        'array of oligo positions'
+        return numpy.array([oli.pos for oli in self.arr])
 
     def __rmul__(self,factor):
         kwa=dict(self.__dict__)
@@ -279,7 +286,7 @@ class Scaler:
         pick the first peakarray (also the largest) (peakarray1)
         find all other arrays which may overlap (at least min_overlaps=1)
         for each array to add, find all stretch and bias
-        for each stretch and bias, apply basewise to each cluster of peaks
+        for each stretch and bias, apply shuffler.base_per_base() to each cluster of peaks
         to define a cluster start with a peak in peaks1,
         the cluster is define as all peaks matching this peak
         because all OligoPeak which may overlap (in sequence (min_overl=1?)
@@ -293,7 +300,7 @@ class Scaler:
         self.peaks=OPeakArray.from_oligos(exp_oligos) # type: List[data.OPeakArray]
         self.peaks=sorted(self.peaks,key=lambda x:-len(x.arr))
         refpeak=self.peaks[self.ref_index]
-        rscalesperpeak=self.find_rescales(refpeak,self.peaks[1:])
+        rscalesperpeak=self.find_rescales(refpeak,self.peaks[1:],matching=True)
 
         # should ooverl be 1? # should it be more flexible in Shuffler?
         self.shuffler=shuffler.Shuffler(ooverl=2)
@@ -325,12 +332,75 @@ class Scaler:
 
         return rscalesperpeak, shuffling
 
-    def find_rescales(self,refpeak:OPeakArray,others:List[OPeakArray]):
+    def run2(self):
+        '''
+        # take the 2 peaks in refpeak which are the more closely related
+        # find all possible combination of rescaled peaks which fills the gap between these peaks
+        # shuffle these peaks and keep the best order
+        # these peaks now belong the same batch (cannot switch orders)
+        # -> fewer permutations to consider
+        # restart with the next unfilled gap between peaks of refpeak
+        # we can pick (arbitrarily the seq or its reverse complement of the first peak in refpeak)
+        '''
+        exp_oligos=no_orientation(self.oligos) # type: List[data.OligoPeak]
+        self.peaks=OPeakArray.from_oligos(exp_oligos) # type: List[data.OPeakArray]
+        self.peaks=sorted(self.peaks,key=lambda x:-len(x.arr))
+        refpeak=self.peaks[self.ref_index]
+        scalesperpeak=self.find_rescales(refpeak,self.peaks[1:],matching=False)
+        # Dict[OPeakArray,Tuple[nmatches,Rescale]]
+
+        self.shuffler=shuffler.Shuffler(ooverl=self.min_overlap)
+
+        # Must take into account
+        # * the minimal distance between 2 overlapping oligos
+        # * the boundaries of the bucket are not allowed to be permutated
+        # (shuffle relative to boundaries)
+        # we can attempt to reorder events in bucket by looking at the possible sequences
+
+        gaps=sorted(((v,refpeak.posarr[i])
+                     for i,v in enumerate(refpeak.posarr[1:]-refpeak.posarr[:-1])),
+                    key=lambda x:x[0])
+        print(f"refpeak.posarr={refpeak.posarr}")
+        print(f"gaps={gaps}")
+        bucketspergap=[]
+        for gap in gaps:
+            #print(f"gap={gap[0]},{gap[1]}")
+            # shortest gap first
+            # take all events which have at least a scale such that
+            # the event is between gap[0] and gap[1]
+            bucket = []
+            for peak,scales in scalesperpeak.items():
+                for scale in scales:
+                    scaled = scale[1](peak).posarr
+                    #print(f"scaled={scaled}")
+                    boolscaled = numpy.logical_and(scaled>=gap[1],scaled<= gap[0]+gap[1])
+                    #print(f"boolscaled={boolscaled}")
+                    bucket.append((scale[0],scale[1],peak,scaled[boolscaled]))
+            bucketspergap.append(bucket)
+            print("bucket size=",sum([len(i[3]) for i in bucket]))
+            # to help the shuffler, we need to give some notion of distance between oligos
+            # use bp2nm (the minimal distance between 2 overlapping oligos is 1*bp2nm)
+
+        # the first gap is the smallest, start with this one
+        # propose possible orders based on sequence, and any other information
+        for bucket in bucketspergap:
+            for order in self.propose_order([i[3] for i in bucket]):
+                # problem this may be longuer than wanted
+
+        #self.shuffler.collection=data.BCollection.from_oligos(oligos)
+        #shuffling=self.shuffler.base_per_base()
+
+        return
+
+    def find_rescales(self,refpeak:OPeakArray,others:List[OPeakArray],matching=False):
         '''
         for each other peak, find all possible rescales (stretch and bias)
         and ranked them by number of events in peak which are matched
         '''
-        torescale=OPeakArray.may_overlap(refpeak,others,self.min_overlap,self.with_reverse)
+        torescale=others
+        if matching:
+            torescale=OPeakArray.may_overlap(refpeak,others,self.min_overlap,self.with_reverse)
+
         rescaleperpeak=dict() # type: Dict[OPeakArray,List]
         for peak in torescale:
             scales=refpeak.find_matches(peak,self.bstretch,self.bbias,self.with_reverse)
