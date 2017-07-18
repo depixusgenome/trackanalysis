@@ -2,10 +2,13 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-outer-name
 """ Tests views """
-from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
-from cleaning.processor import DataCleaning, DataCleaningProcessor
-from simulator          import randtrack, setseed
 import numpy as np
+
+from testingcore                import path as utpath
+from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
+from cleaning.processor         import DataCleaning, DataCleaningTask, DataCleaningProcessor
+from simulator                  import randtrack, setseed
+from control.taskcontrol        import create
 
 def test_cleaning_base():
     "test cleaning"
@@ -40,11 +43,21 @@ def test_processor():
     DataCleaningProcessor.apply(trk, cache)[0]
     assert tmp is cache[(None,), 0]
 
+def test_processor2():
+    "test processor"
+    proc  = create(utpath("big_all"), DataCleaningTask())
+    _     = next(iter(proc.run()))[0]
+    cache = proc.data[1].cache()
+    assert len(cache) == 1
+    cache = next(iter(cache.values()))
+    assert len(cache) == 1
+    assert 0 in cache
+
 def test_view(bokehaction):
     "test the view"
-    with bokehaction.serve('cleaning.view.CleaningView', 'app.BeadToolbar') as server:
-        server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
+    with bokehaction.launch('cleaning.view.CleaningView', 'app.BeadToolbar') as server:
         server.load('big_legacy', andstop = False)
 
 if __name__ == '__main__':
-    test_view(bokehaction(None))
+    test_processor2()
+    #test_view(bokehaction(None))

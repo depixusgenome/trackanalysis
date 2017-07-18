@@ -28,7 +28,7 @@ class DataCleaning:
     minhfsigma    = 1e-4
     maxhfsigma    = 1e-2
     minextent     = .5
-    __ZERO        = np.zeros(0)
+    __ZERO        = np.zeros(0, dtype = 'i4')
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -58,7 +58,7 @@ class DataCleaning:
 
     def extent(self, cycs: np.ndarray) -> Partial:
         "computes too short or too long cycles"
-        test = [np.nanmax(i)-np.nanmin(i) for i in cycs]
+        test = [np.nanmax(i)-np.nanmin(i) if any(np.isfinite(i)) else 0. for i in cycs]
         return self.__test('extent', test)
 
     def population(self, cycs: np.ndarray) -> Partial:
@@ -154,8 +154,7 @@ class DataCleaningProcessor(Processor):
         "returns the result of the beadselection"
         tested = False
         if cache is not None:
-            key          = (frame.parents, info[0])
-            val, discard = cache.get(key, ('', False))
+            val, discard = cache.get(frame.track, {}).get(info[0], ('', False))
             if discard:
                 return DataCleaningException(val, cnf, cls.tasktype)
             tested       = val != ''
@@ -181,7 +180,7 @@ class DataCleaningProcessor(Processor):
                 discard = False
 
         if not (tested or cache is None):
-            cache[key] = val, discard
+            cache.setdefault(frame.track, {})[info[0]] = val, discard
         return DataCleaningException(val, cnf, cls.tasktype) if discard else None
 
     @classmethod

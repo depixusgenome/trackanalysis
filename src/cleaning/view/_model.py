@@ -19,7 +19,11 @@ class DataCleaningAccess(TaskAccess):
         "returns the object cache"
         tmp = super().cache
         mem = tmp() if callable(tmp) else None
-        return None if mem is None else {i.name: i for i in mem.get(self.bead, ())}
+        if mem is None:
+            return None
+
+        cur = mem.get(self.roottask, {}).get(self.bead, ())
+        return None if cur is None else {i.name: i for i in cur}
 
     @property
     def badcycles(self):

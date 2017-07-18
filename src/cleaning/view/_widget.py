@@ -55,13 +55,13 @@ class CyclesListWidget(WidgetCreator):
 
     def reset(self, resets):
         "this widget has a source in common with the plots"
-        itm  = self.__widget if resets is None else resets[self.__widget]
+        itm  = self.__widget.source if resets is None else resets[self.__widget.source]
         data = self.__data()
         itm.update(data = data)
 
     def __data(self) -> dict:
         cache = self._model.cleaning.cache
-        if cache is None:
+        if cache is None or len(cache) == 0:
             return {i: [] for i, _1, _2 in self.__config.get()}
         info             = {i: cache[i].values for i in self.__config.get()}
         info['accepted'] = np.ones(self._model.track.ncycles, dtype = 'bool')
@@ -96,7 +96,7 @@ class CleaningFilterWidget(WidgetCreator):
         if task is None:
             task = self._model.cleaning.configtask
 
-        info = {i:j for i, j in task.config() if hasattr(self.__widget, i)}
+        info = {i:j for i, j in task.config().items() if hasattr(self.__widget, i)}
         info['framerate'] = getattr(self._model.track, 'framerate', 1./30.)
         (self.__widget if resets is None else resets[self.__widget]).update(**info)
 

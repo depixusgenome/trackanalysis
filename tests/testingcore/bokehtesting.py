@@ -7,6 +7,13 @@ import tempfile
 import warnings
 import inspect
 
+warnings.filterwarnings('ignore',
+                        category = DeprecationWarning,
+                        message  = '.*elementwise == comparison failed.*')
+warnings.filterwarnings('ignore',
+                        category = DeprecationWarning,
+                        message  = '.* deprecated in Bokeh 0.12.6 .*')
+
 with warnings.catch_warnings():
     warnings.filterwarnings('ignore', category = DeprecationWarning)
     import pytest
@@ -15,9 +22,7 @@ with warnings.catch_warnings():
     from bokeh.server.server   import Server
     import bokeh.core.properties as     props
 
-    warnings.filterwarnings('ignore', category = FutureWarning)
-    import pandas.tslib                         # pylint: disable=unused-import
-
+# pylint: disable=wrong-import-position
 from tornado.ioloop        import IOLoop
 from view.keypress         import KeyPressManager
 
