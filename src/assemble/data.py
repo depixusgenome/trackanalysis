@@ -85,6 +85,14 @@ class Oligo:
     def __rmul__(self,scale):
         return self.__mul__(scale)
 
+    def __copy__(self,**kwa):
+        mod=dict(list(self.__dict__.items())+list(kwa.items()))
+        return type(self)(**mod)
+
+    def copy(self,**kwa):
+        'calls copy'
+        return self.__copy__(**kwa)
+
 # it is bpos which needs to be updated
 # If 2 oligos are too far from one another there is a
 # unknown number of bases between the 2
@@ -141,13 +149,26 @@ class OligoPeak(Oligo):
     def __rmul__(self,scale):
         return self.__mul__(scale)
 
-    def __copy__(self,**kwa):
-        mod=dict(list(self.__dict__.items())+list(kwa.items()))
-        return OligoPeak(**mod)
+def stack_2sequences(oli1:Oligo,oli2:Oligo)->Oligo:
+    '''
+    adds sequence from oli2 to oli1 with maximal overlap
+    non symmetric
+    '''
+    cpoli=oli1.copy()
+    cpoli.seq+=oli2.seq[len(Oligo.tail_overlap(oli1.seq,oli2.seq)):]
+    return cpoli
 
-    def copy(self,**kwa):
-        'calls copy'
-        return self.__copy__(**kwa)
+def stack_sequences(*args)->Oligo:
+    '''
+    stacks sequences of oligos
+    order matters
+    '''
+    if not args:
+        return Oligo()
+    stack=args[0].copy()
+    for oli in args[1:]:
+        stack=stack_2sequences(stack,oli)
+    return stack
 
 OliBat = NamedTuple("OliBat",[("oli",OligoPeak),
                               ("idinbat",int),
