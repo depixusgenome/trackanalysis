@@ -73,11 +73,11 @@ def save(cls, task):
     "saves the task to the default config"
     cnf  = scriptapp.control.getGlobal("config").tasks
     if isinstance(task, type(cnf.driftpercycle.get())):
-        name = 'driftperbeads' if task.onbeads else 'driftpercycle'
+        name = 'driftperbead' if task.onbeads else 'driftpercycle'
     else:
         for name in cls._member_names_: # pylint: disable=protected-access
             if type(task) is type(cnf[name].get(default = None)):
-                assert name not in ('driftpercycle', 'driftperbeads')
+                assert name not in ('driftpercycle', 'driftperbead')
                 break
         else:
             raise TypeError('Unknown task: '+str(task))
