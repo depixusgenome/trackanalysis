@@ -97,6 +97,21 @@ class PeaksDict(TrackItems):
         return self.config.detailed(iter(i for _, i in self.data[ibead,...]),
                                     self.__precision(ibead, precision))
 
+    def index(self) -> 'PeaksDict':
+        "Returns indexes at the same key and positions"
+        return self.withaction(self.__index)
+
+    @classmethod
+    def __index(cls, info):
+        return info[0], ((i, cls.__array2range(j)) for i, j in info[1])
+
+    @staticmethod
+    def __array2range(arr):
+        arr['data'] = [None                        if i is None            else
+                       range(i[0], i[0]+len(i[1])) if isinstance(i, tuple) else
+                       range(i[0][0], i[-1][0]+len(i[-1][1]))
+                       for i in arr['data']]
+
     def _keys(self, sel:Sequence = None, _ = None) -> Iterator[BEADKEY]:
         if self.__keys is None:
             self.__keys = frozenset(i for i, _ in self.data.keys() if Beads.isbead(i))
@@ -120,7 +135,6 @@ class PeakSelectorProcessor(Processor):
         # pylint: disable=not-callable
         fcn = lambda frame: frame.new(PeaksDict, config = cnf)
         return fcn if toframe is None else fcn(toframe)
-
     def run(self, args):
         args.apply(self.apply(**self.config()), levels = self.levels)
 
