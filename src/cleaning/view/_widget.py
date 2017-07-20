@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cleaning beads"
-from typing         import (Optional,   # pylint: disable=unused-import
-                            List, Dict, Any, Type, TYPE_CHECKING)
+from    typing          import List
 
 import  bokeh.core.properties as props
 from    bokeh.plotting  import Figure
@@ -21,13 +20,13 @@ class CyclesListWidget(WidgetCreator):
     "Table containing stats per peaks"
     def __init__(self, model:DataCleaningModelAccess) -> None:
         super().__init__(model)
-        self.__widget     = None # type: Optional[DataTable]
-        css               = self.__config
-        css.width.default = 60
-        css.default       = [['population', u'% good',      '0.0'],
-                             ['hfsigma',    'σ[HF]',        '0.0000'],
-                             ['extent',     u'Δz',          '0.0'],
-                             ['accepted',   u'Accepted',    '']]
+        self.__widget: DataTable = None
+        css                      = self.__config
+        css.width.default        = 60
+        css.default              = [['population', u'% good',      '0.0'],
+                                    ['hfsigma',    'σ[HF]',        '0.0000'],
+                                    ['extent',     u'Δz',          '0.0'],
+                                    ['accepted',   u'Accepted',    '']]
 
     @property
     def __config(self):
@@ -73,6 +72,7 @@ class DpxCleaning(Widget):
     "This starts tests once flexx/browser window has finished loading"
     __css__            = ROUTE+"/cleaning.css"
     __implementation__ = "_widget.coffee"
+    frozen             = props.Bool(True)
     framerate          = props.Float(30.)
     figure             = props.Instance(Figure)
     maxabsvalue        = props.Float(DataCleaningTask.maxabsvalue)
@@ -86,10 +86,18 @@ class CleaningFilterWidget(WidgetCreator):
     "All inputs for cleaning"
     def __init__(self, model:DataCleaningModelAccess) -> None:
         super().__init__(model)
-        self.__widget = None # type: Optional[DpxCleaning]
+        self.__widget: DpxCleaning = None
 
-    def create(self, _) -> List[Widget]:
+    def create(self, action) -> List[Widget]:
         self.__widget = DpxCleaning()
+
+        @action
+        def _on_cb(attr, old, new):
+            self._model.cleaning.update(**{attr: new})
+
+        for name in ('maxabsvalue', 'maxderivate', 'minpopulation',
+                     'minhfsigma',  'maxhfsigma',  'minextent'):
+            self.__widget.on_change(name, _on_cb)
         return [self.__widget]
 
     def reset(self, resets):

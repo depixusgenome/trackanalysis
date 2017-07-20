@@ -3,7 +3,7 @@
 "Cycles plot view for cleaning data"
 from    typing         import Dict, TYPE_CHECKING
 
-from    bokeh.plotting import figure
+from    bokeh.plotting import figure, Figure
 from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 from    bokeh          import layouts
 import  bokeh.colors
@@ -40,14 +40,15 @@ class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
 
         self.css.figure.width.default  = 500
 
-        self.__source  = None                 # type: ColumnDataSource
+        self.__source: ColumnDataSource = None
+        self.__fig:    Figure           = None
         if TYPE_CHECKING:
             self._model = DataCleaningModelAccess(self._ctrl, '')
 
     def _create(self, doc):
         self.__source = ColumnDataSource(data = self.__data())
 
-        fig = figure(**self._figargs(y_range = Range1d, name = 'Clean:Cycles'))
+        self.__fig = fig = figure(**self._figargs(y_range = Range1d, name = 'Clean:Cycles'))
         self.css.points.addto(fig, x = 't', y = 'z', source = self.__source)
         fig.extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
         axis = LinearAxis(x_range_name = "time", axis_label = self.css.xtoplabel.get())
@@ -67,7 +68,9 @@ class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
             if not np.all_close(color, self.__source.data['color']):
                 self.__source.stream(dict(color = color), rollover = len(color))
         else:
-            self._bkmodels[self.__source]['data'] = self.__data()
+            data                                  = self.__data()
+            self._bkmodels[self.__source]['data'] = data
+            self.setbounds(self.__fig.y_range, 'y', data['z'])
         self._resetwidget()
 
     def __data(self) -> Dict[str, np.ndarray]:

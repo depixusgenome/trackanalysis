@@ -61,13 +61,19 @@ def enableOnTrack(ctrl, *aitms):
     _get(aitms)
     itms = tuple(litms)
     for ite in itms:
-        ite.disabled = True
+        if hasattr(ite, 'frozen'): # pylint: disable=simplifiable-if-statement
+            ite.frozen   = True
+        else:
+            ite.disabled = True
 
     def _onproject(items, __lst__ = itms):
         if 'track' in items:
             val = items['track'].value is items.empty
             for ite in __lst__:
-                ite.disabled = val
+                if hasattr(ite, 'frozen'):
+                    ite.frozen   = val
+                else:
+                    ite.disabled = val
     getattr(ctrl, '_ctrl', ctrl).getGlobal("project").observe(_onproject)
 
 POOL = ThreadPoolExecutor(1)

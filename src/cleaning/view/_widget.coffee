@@ -7,13 +7,21 @@ import {WidgetView, Widget} from "models/widgets/widget"
 export class DpxCleaningView extends WidgetView
     tagName: "div"
 
+    on_change_frozen: () ->
+        $(@el).find('.dpx-cl-freeze').prop('disabled', @model.frozen)
+
+    on_input: (evt) ->
+        @model[evt] = Number($(@el).find("#dpx-cl-#{evt}").val())
+
+    on_change_input: (evt) ->
+        $(@el).find("#dpx-cl-#{evt}").val("#{@model[evt]}")
+
     connect_signals: () ->
         super()
         for evt in @cl_inputs
-            @connect(@model.properties[evt].change, do (evt, me = @) ->
-                      () -> $(me.el).find("#dpx-cl-#{evt}").val("#{me.model[evt]}"))
-        @connect(@model.properties.frozen.change,
-                 () => $(@el).find('.dpx-cl-freeze').prop('disabled', @model.frozen))
+            @connect(@model.properties[evt].change, do (event = evt, me = @) ->
+                      () -> me.on_change_input(event))
+        @connect(@model.properties.frozen.change,    () => @on_change_frozen())
 
     render: () ->
         super()
@@ -31,8 +39,9 @@ export class DpxCleaningView extends WidgetView
         elem = $(@el)
         elem.html(html)
         for evt in @cl_inputs
-            el = elem.find("#dp-cl-#{evt}")
-            el.change(do (mdl = @model, el, evt) -> () -> mdl[evt] = Number(el.val()))
+            el = elem.find("#dpx-cl-#{evt}")
+            el.change(do (mdl = @model, inp = el, event = evt) ->
+                        () -> mdl[event] = Number(inp.val()))
         return @
 
     cl_inputs: ['maxabsvalue', 'maxderivate', 'minpopulation', 'minhfsigma',

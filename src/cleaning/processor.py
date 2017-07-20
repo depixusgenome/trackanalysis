@@ -49,7 +49,7 @@ class DataCleaning:
         bad = np.empty(0, dtype = 'i4')
         if stats is None:
             return bad
-        for stat in stats:
+        for stat in stats.values() if isinstance(stats, dict) else stats:
             bad = np.union1d(bad, stat.min)
             bad = np.union1d(bad, stat.max)
         return bad
