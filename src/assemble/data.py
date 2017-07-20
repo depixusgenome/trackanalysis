@@ -36,6 +36,11 @@ class Oligo:
         return ''.join(REVERSE[i] for i in reversed(seq))
 
     @classmethod
+    def rev(cls,seq)->str:
+        'shorter'
+        return cls.reverse_complement(seq)
+
+    @classmethod
     def do_overlap(cls,ol1:str,ol2:str,min_overl:int=1)->bool:
         '''
         returns true if len(tail_overlap(ol1, ol2))>=min_overl
@@ -56,6 +61,24 @@ class Oligo:
             if ol1[i:]==ol2[:len(ol1)-i]:
                 return ol1[i:]
         return ""
+
+    # to test
+    @classmethod
+    def can_tail_overlap(cls,ol1:str, ol2:str,min_overlap:int,oriented=True)->bool:
+        '''
+        returns the end sequence of ol1 matching the start of ol2
+        if oriented, orientation is supposed known
+        else, also consider reverse_complements of sequences
+        '''
+        if oriented:
+            return len(cls.tail_overlap(ol1, ol2))>min_overlap
+        else:
+            ols1=[cls.rev(ol1),ol1]
+            ols2=[cls.rev(ol2),ol2]
+            for comb in itertools.product(ols1,ols2):
+                if len(cls.tail_overlap(*comb))>min_overlap:
+                    return True
+        return False
 
     def add_to_sequence(self,seq:str)->str:
         '''
@@ -92,6 +115,15 @@ class Oligo:
     def copy(self,**kwa):
         'calls copy'
         return self.__copy__(**kwa)
+
+    def __hash__(self):
+        return hash(tuple(self.pos,self.seq))
+
+    def __eq__(self,other):
+        if isinstance(other,type(self)):
+            return hash(self)==hash(other)
+        return False
+
 
 # it is bpos which needs to be updated
 # If 2 oligos are too far from one another there is a

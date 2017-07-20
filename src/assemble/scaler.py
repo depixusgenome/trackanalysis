@@ -1,63 +1,12 @@
-#!/usr/bin/env python3
+<#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# must correct basewise module to account for any sensible type of data
 '''
-variables to consider:
-	  *bias (per oligo exp) (a)
-	  *non linearity (b) (+- 10 bases, rough estimate)
-           can be used when determining if 2 oligos overlap or not
-	  *stretch (small variations of the size of the hairpin between oligo exp) (c)
-
-
-pos in (micrometer)=(pos in base number-bias)/stretch
-
-we wish to maximize the correspondance of peaks:
-   corresponding to overlapping sequences,
-   AND given boundaries on stretch and bias:
-c_i*o_i+a_i
-where o_i is the array of position of oligo_i peaks in micrometer
-o_i=array(peakj+b_j for j in exp)
-
-
-TP: True Positive
-FP: False Positive
-FN: False Negative
-
-Notes:
-(1)we can still run the algorithm using a subset of oligos
-for example oligo i with all oligos which can overlap with i
-(2)we can push this further: select one oligo peak (detected event), i,
-and (some, the number can be discussed in (3) ) other peaks
-which corresponding to oligos with overlapping sequences
-and satisfy stretch and bias boundaries. then run the basewise algorithm
-ultimately we could create statistics on the probability of the peak being
-True positive, False Positive, False Negative
-(3)we can either consider a single cluster of overlapping peaks:
-- 2 overlapping peaks but that would be useless because we know they overlap (by sequence)
-(4)we can consider N-different clusters of P overlapping peaks
-(a priori 2 different cluster are not designed to overlap):
-- if P=2, we can easily compute the stretch-bias which
-maximises overlapping peaks without using the basewise algorithm.
-here the non-linearity is a variable which act as a valve.
-For a given oligo sequence we can test (and rank (according to
-noverlaps? no... we test 2 oligo experiments whose sequence overlap,
-we can rank by matched peak)) all possible solutions for P=2.
-if we do that for every pair of overlapping oligos, we can start
-making statistics on the probability of a peak being (TP or FP)
-for example if we have 1 peak which  never "meets" a complementary
-sequence, we can assume it is a FP
-- for P=3, we can make guesses whether we have False Negatives for the "middle" oligo
-example: ATT, TTG, TGA. If we have ATT and TGA matching but no
-detected events of TTG then there is a proba 0.25 that
-TTG is the missing peak (TAG, TCG, TGG are the other possibilities)
-- actually TAG, TCG & TGG would all have the same probability
-except if we have more info from reverse_complement experiments
-- it is more difficult to guesstimate more complex scenarios with 3-mers and P>=4
+must define non-linearity as a for each OPeakArray
 '''
 
 import itertools
-from typing import List, Tuple, Dict # pylint:disable=unused-import
+from typing import List, Tuple, Dict, FrozenSet # pylint:disable=unused-import
 #import pickle
 import numpy
 from utils import initdefaults
@@ -100,7 +49,9 @@ class Rescale:
         return hash((self.stre,self.bias))
 
     def __eq__(self,other):
-        return all(numpy.isclose(self.toarr,other.toarr,atol=self.atol))
+        if isinstance(other,type(self)):
+            return all(numpy.isclose(self.toarr,other.toarr,atol=self.atol))
+        return False
 
 def match_peaks(peaks1,
                 peaks2,
@@ -149,7 +100,6 @@ def count_matches(peaks1,peaks2,fprecision=1e-3):
 class OPeakArray:
     '''
     corresponds to an experiment with a single oligo
-    reconsider this as an array of OligoPeak
     each OligoPeak can be either sequence or reverse complement sequence
     Can even include Oligo experiments with different (not reverse_complement) sequences
     '''
@@ -192,7 +142,6 @@ class OPeakArray:
                  if len(data.Oligo.tail_overlap(str1,str2))>=self.min_overl
                  or len(data.Oligo.tail_overlap(str2,str1))>=self.min_overl]
 
-        print("matches=",matches)
         scales=[] # type: List[Rescale]
         for match in matches:
             arr1=self.matching_seq(match[0])
@@ -268,12 +217,21 @@ class OPeakArray:
                              [i.pos for i in scaled.arr],
                              fprecision=nlampli)
 
+    def __hash__(self)->int:
+        'could help to implement this'
+        return hash(self.arr.tobytes())
+
+    def __eq__(self,other)->bool:
+        if isinstance(other,type(self)):
+            return hash(self)==hash(other)
+        return False
+
 def no_orientation(oligos:List[data.OligoPeak]):
     'each oligo has its sequence changed so that we loose the information on the orientation'
     reverse=data.Oligo.reverse_complement
     return [oli.copy(seq=min(oli.seq,reverse(oli.seq))) for oli in oligos]
 
-
+# non-linearity issues should be dealt with here (and only?)
 class PeakStack:
     '''
     class to stack scaled peakarray
@@ -284,16 +242,18 @@ class PeakStack:
     def __init__(self,**kwa):
         # ordered list of scaled OPeakArray
         self.min_overlap=kwa.get("min_overlap",2) # type: int
-        self.ordered=kwa.get("ordered",[]) # type: List[OPeakArray]
-        self.stack=dict() # type: Dict[float,List[data.Oligo]]
+        self.ordered=list(kwa.get("ordered",[])) # type: List[OPeakArray]
+        self.stack=dict() # type: Dict[float,List[data.Oligo]] # make private?
         if self.ordered:
             for peakarr in self.ordered:
-                self.add2stack(peakarr)
+                self._add2stack(peakarr)
 
+    # should include non-linearity in this method
+    # could return True (instead of False) if we allow for some non-linearity
+    # some cases cannot be solved by ordering alone, needs non-linearity
+    # should cope with unknown orientation
     def can_add(self,scaled)->bool:
         'checks only tail_overlap'
-        # should it to take into account non-linearities? no.
-
         # if the stack is empty
         if not self.stack:
             return True
@@ -301,31 +261,52 @@ class PeakStack:
         tail=data.Oligo.tail_overlap
         # for each peak in scaled
         # find the corresponding peak from self.ordered
-        for peak in scaled:
+        for peak in scaled.arr:
             key=self.assign_key(peak)
-            if len(tail(self.stack[key][-1].seq,peak.seq))<self.min_overlap:
-                return False
+            if key:
+                if len(tail(self.stack[key][-1].seq,peak.seq))<self.min_overlap:
+                    return False
         return True
 
-    # to check # float precision issue?
     def assign_key(self,peak:data.Oligo)->float:
         'find which stack must be incremented by peak'
-        cmp=numpy.array(self.stack.keys())-peak.pos
-        return numpy.array(self.stack.keys())[cmp<=0][-1]
+        comp=numpy.array(sorted(self.stack.keys()))-peak.pos
+        try:
+            return numpy.array(sorted(self.stack.keys()))[comp<=0][-1]
+        except IndexError:
+            return None
 
-    def add2stack(self,scaled:OPeakArray)->None:
+    def _add2stack(self,scaled:OPeakArray)->None:
         'adds a new peakarray to the stack'
         if not self.stack:
             self.stack={peak.pos:[peak] for peak in self.ordered[0].arr}
             return
         for peak in scaled.arr:
-            self.stack[self.assign_key(peak)].append(peak)
+            key=self.assign_key(peak)
+            if key is not None:
+                self.stack[self.assign_key(peak)].append(peak)
+            else:
+                self.stack[peak.pos]=[peak]
 
-    def add(self,scaled:OPeakArray)->None:
+    def top(self)->OPeakArray:
+        '''
+        returns a PeakArray where each peak is the top of each stack
+        In the general case contains peaks with different sequences
+        '''
+        return OPeakArray(arr=numpy.array([val[-1] for val in self.stack.values()]))
+
+    # should include non-linearity in this method
+    def add(self,scaled:OPeakArray,in_place=True):
         'adds a scaled peakarray'
         # must check can_add prior to adding
-        self.ordered.append(scaled)
-        self.add2stack(scaled)
+        if in_place:
+            self.ordered.append(scaled)
+            self._add2stack(scaled)
+            return
+        cpy=self.copy()
+        cpy.ordered.append(scaled)
+        cpy._add2stack(scaled) # pylint: disable=protected-access
+        return cpy
 
     def stack_oligos(self):
         'returns private ooligos'
@@ -340,7 +321,7 @@ class PeakStack:
         pass
 
     def __copy__(self):
-        return type(self)(**self.__dict__)
+        return type(self)(ordered=self.__dict__.get("ordered",[]))
 
     def copy(self):
         'returns copy'
@@ -360,6 +341,7 @@ class Scaler:
     bbias=Bounds() # type: Bounds
     ref_index=0 # type: int # index of the reference OPeakArray
     shuffler=shuffler.Shuffler()
+    pstack=PeakStack()
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
         pass
@@ -376,6 +358,25 @@ class Scaler:
 
         return False
 
+    def build_stacks(self,
+                     stack:PeakStack,
+                     other_peaks:FrozenSet[OPeakArray])->List[PeakStack]:
+        '''
+        recursive
+        '''
+
+        if not other_peaks:
+            return []
+
+        refpeak=stack.top()
+        def cmpfilter(peak):
+            'filter'
+            return self.filterleftoverlap(refpeak,peak)
+
+        scperpeak=self.find_rescales(refpeak,other_peaks,tocmpfilter=cmpfilter)
+        toadd=[(peak,scale) for peak,scales in scperpeak.items() for scale in scales
+               if stack.can_add(scale(peak))]
+        return [stack.add(scale(peak),in_place=False) for peak,scale in toadd]
 
     def run(self):
         '''
@@ -396,23 +397,24 @@ class Scaler:
         *for each overlapping peakarray find the scale(stretch+bias)
         *for each scaled peakarray to an object (Scaffold):
         a Scaffold can only contain 1 copy of a peakarray (modulo scale)
-
-
         '''
         exp_oligos=no_orientation(self.oligos) # type: List[data.OligoPeak]
         self.peaks=OPeakArray.from_oligos(exp_oligos) # type: List[data.OPeakArray]
         self.peaks=sorted(self.peaks,key=lambda x:-len(x.arr))
         refpeak=self.peaks[self.ref_index]
 
-        def mfilter(peak):
-            'filter'
-            return self.filterleftoverlap(refpeak,peak)
-        scalesperpeak=self.find_rescales(refpeak,self.peaks[1:],matchfilter=mfilter)
+        self.pstack.add(refpeak)
 
-        # find peaks (B) which may overlap (on the right) with refpeak (A)
-        # find the scales corresponding to these peak versus refpeak
-        # if a given scale matches only peaks which do not overlap, discard it
+        # build_stacks
 
+        stacks=self.build_stacks(self.pstack,self.peaks[1:])
+
+
+        # for iteration in range(3):
+        #     print(f"iteration={iteration}")
+        # add next peak to the stack
+        # trying to reduced the numbers of possible stacks
+        # by fixing the sequences will only work when we hit a cycle
 
 
         # ref oligos is A then add Bs (B1,B2,B3) and see if there is some conflict between
@@ -420,76 +422,37 @@ class Scaler:
         # resolve conflicts if possible
         # could use shuffler at a later stage to readjust locally some events
 
-        # Dict[OPeakArray,Tuple[nmatches,Rescale]]
-
-        #self.shuffler=shuffler.Shuffler(ooverl=self.min_overlap)
-
         # Must take into account
         # * the minimal distance between 2 overlapping oligos
         # * the boundaries of the bucket are not allowed to be permutated
         # (shuffle relative to boundaries)
         # we can attempt to reorder events in bucket by looking at the possible sequences
 
-        #gaps=sorted(((v,refpeak.posarr[i])
-        #             for i,v in enumerate(refpeak.posarr[1:]-refpeak.posarr[:-1])),
-        #            key=lambda x:x[0])
-        #print(f"refpeak.posarr={refpeak.posarr}")
-        #print(f"gaps={gaps}")
-        #bucketspergap=[]
-        #for gap in gaps:
-        #    #print(f"gap={gap[0]},{gap[1]}")
-        #    # shortest gap first
-        #    # take all events which have at least a scale such that
-        #    # the event is between gap[0] and gap[1]
-        #    bucket = []
-        #    for peak,scales in scalesperpeak.items():
-        #        for scale in scales:
-        #            scaled = scale[1](peak).posarr
-                    #print(f"scaled={scaled}")
-        #            boolscaled = numpy.logical_and(scaled>=gap[1],scaled<= gap[0]+gap[1])
-        #            #print(f"boolscaled={boolscaled}")
-        #            bucket.append((scale[0],scale[1],peak,scaled[boolscaled]))
-        #    bucketspergap.append(bucket)
-        #    print("bucket size=",sum([len(i[3]) for i in bucket]))
-        #    # to help the shuffler, we need to give some notion of distance between oligos
-        #    # use bp2nm (the minimal distance between 2 overlapping oligos is 1*bp2nm)
 
-        # the first gap is the smallest, start with this one
-        # propose possible orders based on sequence, and any other information
-        #for bucket in bucketspergap:
-        #    for order in self.propose_order([i[3] for i in bucket]):
-        #        # problem this may be longuer than wanted
+        return refpeak,stacks
 
-        #self.shuffler.collection=data.BCollection.from_oligos(oligos)
-        #shuffling=self.shuffler.base_per_base()
-
-        return refpeak,scalesperpeak
-
-    def find_rescales(self,refpeak:OPeakArray,others:List[OPeakArray],matchfilter=None):
+    def find_rescales(self,refpeak:OPeakArray,others:FrozenSet[OPeakArray],tocmpfilter=None):
         '''
         for each other peak, find all possible rescales (stretch and bias)
-        and ranked them by number of events in peak which are matched
-        matching call is a function taking refpeak and others:List[OPeakArray]
+        matching filter is a function taking refpeak and others:List[OPeakArray]
         filter
         '''
         torescale=others
-        if matchfilter:
-            torescale=list(filter(matchfilter,others))
+        if tocmpfilter:
+            torescale=list(filter(tocmpfilter,others))
 
         rescaleperpeak=dict() # type: Dict[OPeakArray,List]
         for peak in torescale:
             scales=refpeak.find_matches(peak,self.bstretch,self.bbias,self.with_reverse)
             if not scales:
                 continue
-            #rescaleperpeak[peak]=[(self.score_scale(refpeak,scale(peak)),scale)
             rescaleperpeak[peak]=scales
 
-        #return {key:sorted(values,key=lambda x:-x[0]) for key,values in rescaleperpeak.items()}
         return rescaleperpeak
 
 # must take into account the 2 strands of the hairpin as soon  as possible in the program
 
-# how to deal effectiveley with reverse_complement and overlapping? for example with
+# how to deal effectively with reverse_complement and overlapping? for example with
 # aat whose reverse complement is att, aat and aat may overlap
 # in any case we can't adjust the stretch, bias in this case to match the oligo
 # consider individual peaks, each can be one sequence or its reverse complement
