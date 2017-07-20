@@ -3,11 +3,11 @@
 
 '''
 must define non-linearity as a for each OPeakArray
+use of TO FIX tags for priority commands to implement
 '''
 
 import itertools
 from typing import List, Tuple, Dict, FrozenSet # pylint:disable=unused-import
-#import pickle
 import numpy
 from utils import initdefaults
 import assemble.data as data
@@ -262,13 +262,16 @@ class PeakStack:
         if not self.stack:
             return True
 
-        tail=data.Oligo.tail_overlap
+        tail=data.Oligo.can_tail_overlap
         # for each peak in scaled
         # find the corresponding peak from self.ordered
         for peak in scaled.arr:
             key=self.assign_key(peak)
             if key is not None:
-                if len(tail(self.stack[key][-1].seq,peak.seq))<self.min_overlap:
+                if not tail(self.stack[key][-1].seq,
+                            peak.seq,
+                            self.min_overlap,
+                            oriented=False):
                     return False
         return True
 
@@ -280,6 +283,7 @@ class PeakStack:
         except IndexError:
             return None
 
+    # check implementation of reversing sequence to match top of stack
     def _add2stack(self,scaled:OPeakArray)->None:
         'adds a new peakarray to the stack'
         if not self.stack:
@@ -288,7 +292,11 @@ class PeakStack:
         for peak in scaled.arr:
             key=self.assign_key(peak)
             if key is not None:
-                self.stack[self.assign_key(peak)].append(peak)
+                last=self.stack[self.assign_key(peak)][-1]
+                if data.Oligo.tail_overlap(last.seq,peak.seq):
+                    self.stack[self.assign_key(peak)].append(peak)
+                else:
+                    self.stack[self.assign_key(peak)].append(peak.reverse(in_place=False))
             else:
                 self.stack[peak.pos]=[peak]
 

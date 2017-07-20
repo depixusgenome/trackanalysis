@@ -62,21 +62,28 @@ class Oligo:
                 return ol1[i:]
         return ""
 
+    def reverse(self,in_place=True)->None:
+        'switch the seq to its reverse complement'
+        if in_place:
+            self.seq=type(self).rev(self.seq)
+        cpy=self.copy()
+        cpy.reverse()
+        return cpy
+
     # to test
     @classmethod
     def can_tail_overlap(cls,ol1:str, ol2:str,min_overlap:int,oriented=True)->bool:
         '''
-        returns the end sequence of ol1 matching the start of ol2
         if oriented, orientation is supposed known
-        else, also consider reverse_complements of sequences
+        else, also consider reverse_complements of ol2 (NOT OL1)
         '''
         if oriented:
             return len(cls.tail_overlap(ol1, ol2))>min_overlap
         else:
-            ols1=[cls.rev(ol1),ol1]
+            ols1=[ol1]
             ols2=[cls.rev(ol2),ol2]
             for comb in itertools.product(ols1,ols2):
-                if len(cls.tail_overlap(*comb))>min_overlap:
+                if len(cls.tail_overlap(*comb))>=min_overlap:
                     return True
         return False
 
