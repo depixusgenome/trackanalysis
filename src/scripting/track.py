@@ -106,6 +106,15 @@ def events(self) -> Events:
                   first   = phase, last = phase,
                   parents = (self.path,))
 
+@_totrack # type: ignore
+@property
+def peaks(self) -> Events:
+    "returns peaks found"
+    tasks = (Tasks.eventdetection, Tasks.peakselector) # type: tuple
+    if not (isinstance(self.path, (str, Path)) or len(self.path) == 1):
+        tasks = (Tasks.alignment,) + tasks
+    return self.apply(*tasks)
+
 def _addprop(name):
     fcn = getattr(_Track, name).fget
     setattr(Track, name, property(lambda self: fcn(self).withcopy()))
