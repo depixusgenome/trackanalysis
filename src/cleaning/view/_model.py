@@ -4,6 +4,7 @@
 from   typing                   import Tuple
 import numpy as np
 
+from utils                      import NoArgs
 from eventdetection.processor   import ExtremumAlignmentTask
 from view.plots.tasks           import TaskPlotModelAccess, TaskAccess
 
@@ -25,14 +26,9 @@ class DataCleaningAccess(TaskAccess):
         cur = mem.get(self.track, {}).get(self.bead, ())
         return None if cur is None else {i.name: i for i in cur[0]}
 
-    @property
-    def badcycles(self):
+    def badcycles(self, cache = NoArgs):
         "returns bad cycles"
-        mem   = super().cache()
-        cache = None if mem is None else {i.name: i for i in mem.get(self.bead, ())}
-        if cache is None:
-            return np.ones(0, dtype = 'i4')
-        return DataCleaningTask.badcycles(cache)
+        return DataCleaningTask.badcycles(self.cache if cache is NoArgs else cache)
 
 class DataCleaningModelAccess(TaskPlotModelAccess):
     "Model for Cycles View"

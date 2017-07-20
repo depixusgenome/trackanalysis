@@ -66,7 +66,7 @@ class CyclesListWidget(WidgetCreator):
         names            = set(i[0] for i in self.__config.get()) & set(cache)
         info             = {i: cache[i].values for i in names}
         info['accepted'] = np.ones(self._model.track.ncycles, dtype = 'bool')
-        info['accepted'][self._model.cleaning.badcycles] = False
+        info['accepted'][self._model.cleaning.badcycles(cache)] = False
         return info
 
 class DpxCleaning(Widget):

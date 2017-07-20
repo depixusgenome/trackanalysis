@@ -47,6 +47,8 @@ class DataCleaning:
     def badcycles(stats):
         "returns all bad cycles"
         bad = np.empty(0, dtype = 'i4')
+        if stats is None:
+            return bad
         for stat in stats:
             bad = np.union1d(bad, stat.min)
             bad = np.union1d(bad, stat.max)
