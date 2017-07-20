@@ -63,7 +63,8 @@ class CyclesListWidget(WidgetCreator):
         cache = self._model.cleaning.cache
         if cache is None or len(cache) == 0:
             return {i: [] for i, _1, _2 in self.__config.get()}
-        info             = {i: cache[i].values for i in self.__config.get()}
+        names            = set(i[0] for i in self.__config.get()) & set(cache)
+        info             = {i: cache[i].values for i in names}
         info['accepted'] = np.ones(self._model.track.ncycles, dtype = 'bool')
         info['accepted'][self._model.cleaning.badcycles] = False
         return info

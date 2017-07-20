@@ -122,8 +122,8 @@ class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
         tmp   = np.full(len(inds), hexes['good'], dtype = '<U7')
         cache = self._model.cleaning.cache
         for name, value in () if cache is None else cache.items():
-            tmp[inds[value.low ]] = hexes[name]
-            tmp[inds[value.high]] = hexes[name]
+            tmp[inds[value.min]] = hexes[name]
+            tmp[inds[value.max]] = hexes[name]
 
         return as_strided(tmp, shape = shape, strides = (tmp.strides[0], 0))
 
