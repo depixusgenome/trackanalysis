@@ -22,10 +22,11 @@ _m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
 
 class ProcessorController:
     "data and model for tasks"
-    __slots__ = ('model', 'data')
-    def __init__(self):
-        self.model   = []         # type: List[Task]
-        self.data    = Cache()
+    __slots__ = ('model', 'data', 'copy')
+    def __init__(self, copy = False):
+        self.model: List[Task] = []
+        self.data              = Cache()
+        self.copy              = copy
 
     def task(self, task:Union[Task,int,type], noemission = False) -> Task:
         "returns a task"
@@ -73,12 +74,14 @@ class ProcessorController:
         "clears data starting at *tsk*"
         self.data.delCache()
 
-    def run(self, tsk:Optional[Task] = None, copy = False, pool = None):
+    def run(self, tsk:Optional[Task] = None, copy = None, pool = None):
         """
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
         """
-        return _runprocessors(self.data, tsk, copy = copy, pool = pool)
+        return _runprocessors(self.data, tsk,
+                              copy = self.copy if copy is None else copy,
+                              pool = pool)
 
     @classmethod
     def create(cls,
@@ -176,7 +179,7 @@ class TaskController(Controller):
         ctrl.getGlobal('project').track.observe(_clear)
 
     def task(self,
-             parent : RootTask,
+             parent : Optional[RootTask],
              task   : Union[Task,int,type],
              noemission = False) -> Task:
         "returns a task"

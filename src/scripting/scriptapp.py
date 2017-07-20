@@ -11,6 +11,7 @@ from   view.dialog import FileDialog
 from   app         import Defaults
 from   .task       import Tasks
 
+
 _frame = None
 for _frame in inspect.stack()[1:]:
     if 'importlib' not in _frame.filename:
@@ -34,15 +35,7 @@ class ScriptingView(View):
                                   multiple  = True,
                                   title     = "open a gr files")
 
-        cnf = self._ctrl.getGlobal("config").tasks
-        cnf.defaults = dict(selection      = DataSelectionTask(),
-                            alignment      = ExtremumAlignmentTask(),
-                            driftperbead   = DriftTask(onbeads = True),
-                            driftpercycle  = DriftTask(onbeads = False),
-                            cycles         = CycleCreatorTask(),
-                            eventdetection = EventDetectionTask(),
-                            peakselector   = PeakSelectorTask(),
-                            fittohairpin   = FitToHairpinTask())
+        self._ctrl.getGlobal("config").tasks.defaults = Tasks.defaults()
 
     @property
     def control(self):

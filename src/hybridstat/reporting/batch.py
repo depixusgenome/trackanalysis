@@ -163,6 +163,7 @@ class HybridstatBatchProcessor(BatchProcessor):
                                        oligos    = oligos,
                                        path      = paths.reporting,
                                        model     = [track] + list(modl))
+        return None
 
 # pylint: disable=invalid-name
 createmodels     = HybridstatBatchProcessor.models
