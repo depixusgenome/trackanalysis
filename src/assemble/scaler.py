@@ -1,4 +1,4 @@
-<#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 '''
@@ -232,6 +232,10 @@ def no_orientation(oligos:List[data.OligoPeak]):
     return [oli.copy(seq=min(oli.seq,reverse(oli.seq))) for oli in oligos]
 
 # non-linearity issues should be dealt with here (and only?)
+# if we do assume a fixde orientation for the refpeak,
+# we reduce drastically the number of possibilities
+# in this case we check if we can add a peakarray (no orientation assumed)
+# orientation is fixed (peakwise and not peakarray wise) when the peakarray is added to the stack
 class PeakStack:
     '''
     class to stack scaled peakarray
@@ -263,7 +267,7 @@ class PeakStack:
         # find the corresponding peak from self.ordered
         for peak in scaled.arr:
             key=self.assign_key(peak)
-            if key:
+            if key is not None:
                 if len(tail(self.stack[key][-1].seq,peak.seq))<self.min_overlap:
                     return False
         return True
@@ -316,9 +320,10 @@ class PeakStack:
         'returns last scaled OPeakArray'
         return self.ordered[-1]
 
-    def reverse(self,oligos:List[data.Oligo]):
-        'takes the reverse complement of oligos in self.ooligos'
-        pass
+    def reverse(self,key):
+        'takes the reverse complement of all peaks at position key'
+        for peak in self.stack[key]:
+            peak.reverse()
 
     def __copy__(self):
         return type(self)(ordered=self.__dict__.get("ordered",[]))
@@ -360,23 +365,30 @@ class Scaler:
 
     def build_stacks(self,
                      stack:PeakStack,
-                     other_peaks:FrozenSet[OPeakArray])->List[PeakStack]:
+                     peakarrs:FrozenSet[OPeakArray])->List[PeakStack]:
         '''
         recursive
         '''
 
-        if not other_peaks:
-            return []
+        if not peakarrs:
+            return [stack]
 
         refpeak=stack.top()
         def cmpfilter(peak):
             'filter'
             return self.filterleftoverlap(refpeak,peak)
 
-        scperpeak=self.find_rescales(refpeak,other_peaks,tocmpfilter=cmpfilter)
+        scperpeak=self.find_rescales(refpeak,peakarrs,tocmpfilter=cmpfilter)
         toadd=[(peak,scale) for peak,scales in scperpeak.items() for scale in scales
                if stack.can_add(scale(peak))]
-        return [stack.add(scale(peak),in_place=False) for peak,scale in toadd]
+        if not toadd:
+            return [stack]
+
+        stacks=[] # type: List[PeakStack]
+        for peak,scale in toadd:
+            stacks+=self.build_stacks(stack=stack.add(scale(peak),in_place=False),
+                                      peakarrs=peakarrs-frozenset([peak]))
+        return stacks
 
     def run(self):
         '''
@@ -407,7 +419,7 @@ class Scaler:
 
         # build_stacks
 
-        stacks=self.build_stacks(self.pstack,self.peaks[1:])
+        stacks=self.build_stacks(self.pstack,frozenset(self.peaks[1:]))
 
 
         # for iteration in range(3):
@@ -439,7 +451,7 @@ class Scaler:
         '''
         torescale=others
         if tocmpfilter:
-            torescale=list(filter(tocmpfilter,others))
+            torescale=frozenset(filter(tocmpfilter,others))
 
         rescaleperpeak=dict() # type: Dict[OPeakArray,List]
         for peak in torescale:
