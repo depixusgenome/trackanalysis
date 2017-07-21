@@ -4702,14 +4702,14 @@ namespace legacy
     {
         if(_ptr == nullptr || ibead >= size_t(_ptr->n_bead))
             return;
-        _get(_ptr->b_r[ibead]->x, 1.0f, 0.0f, dt);
+        _get(_ptr->b_r[ibead]->x, _ptr->dx, _ptr->ax, dt);
     }
 
     void   GenRecord::ybead  (size_t ibead, float *dt) const
     {
         if(_ptr == nullptr || ibead >= size_t(_ptr->n_bead))
             return;
-        _get(_ptr->b_r[ibead]->y, 1.0f, 0.0f, dt);
+        _get(_ptr->b_r[ibead]->y, _ptr->dy, _ptr->ay, dt);
     }
 
     float  GenRecord::camerafrequency() const
