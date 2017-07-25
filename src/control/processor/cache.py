@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "List of processes and cache"
-from typing         import Union, Iterable, Optional, List # pylint: disable=unused-import
+from typing         import Union, Iterable, List, Tuple, Any
 from utils          import isfunction
-from .base          import Processor # pylint: disable=unused-import
+from .base          import Processor
 
 def _version():
     i = 0
@@ -16,8 +16,8 @@ class CacheItem:
     __slots__ = ('_proc', '_cache')
     _VERSION  = _version()
     def __init__(self, proc):
-        self._proc    = proc         # type: Processor
-        self._cache   = (0, None)    # type: Tuple[int,Any]
+        self._proc:  Processor       = proc
+        self._cache: Tuple[int, Any] = (0, None)
 
     def __getstate__(self):
         return {'proc': (type(self._proc), self._proc.task)}
@@ -69,12 +69,12 @@ class CacheItem:
 class Cache:
     "Contains the track and task-created data"
     __slots__ = ('_items',)
-    def __init__(self, order: Optional[Iterable[Union[CacheItem, Processor]]] = None) -> None:
+    def __init__(self, order: Iterable[Union[CacheItem, Processor]] = None) -> None:
         if order is None:
             order = []
         else:
             order = [CacheItem(i) if isinstance(i, Processor) else i for i in order]
-        self._items = order # type: List[CacheItem]
+        self._items: List[CacheItem] = order
 
     def index(self, tsk) -> int:
         "returns the index of the provided task"
