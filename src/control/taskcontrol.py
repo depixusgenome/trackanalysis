@@ -9,7 +9,7 @@ The controller stores:
 
 It can add/delete/update tasks, emitting the corresponding events
 """
-from typing         import (Union, Iterator, Tuple, # pylint: disable=unused-import
+from typing         import (Union, Iterator, Type,
                             Optional, Any, List, Iterable, Dict)
 from pathlib        import Path
 from itertools      import chain
@@ -19,7 +19,9 @@ from model.task     import Task, RootTask, TaskIsUniqueError
 from .event         import Controller, NoEmission
 from .processor     import Cache, Processor, run as _runprocessors
 
-_m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
+_m_none    = type('_m_none', (), {}) # pylint: disable=invalid-name
+_M_PROC_T  = Type[Processor]
+_M_PROCS_T = Union[Iterable[_M_PROC_T], _M_PROC_T]
 
 class ProcessorController:
     "data and model for tasks"
@@ -29,7 +31,7 @@ class ProcessorController:
         self.data              = Cache()
         self.copy              = copy
 
-    def task(self, task:Union[Task,int,type], noemission = False) -> Task:
+    def task(self, task:Union[Type[Task],int], noemission = False) -> Task:
         "returns a task"
         tsk = None
         if isinstance(task, Task):
@@ -75,7 +77,7 @@ class ProcessorController:
         "clears data starting at *tsk*"
         self.data.delCache()
 
-    def run(self, tsk:Optional[Task] = None, copy = None, pool = None):
+    def run(self, tsk:Task = None, copy = None, pool = None):
         """
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
@@ -87,7 +89,7 @@ class ProcessorController:
     @classmethod
     def create(cls,
                *models   : Task,
-               processors: 'Union[Dict,Iterable[type],type,None]' = Processor
+               processors: Union[Dict,_M_PROCS_T,None] = Processor
               ) -> 'ProcessorController':
         "creates a task pair for this model"
         tasks = tuple(chain(*(i if isinstance(i, (tuple, list)) else (i,) for i in models)))
@@ -111,9 +113,9 @@ class ProcessorController:
 
     @classmethod
     def register(cls,
-                 processor: Union[Iterable[type], Processor, None] = None,
-                 cache:     Optional[dict]                         = None
-                ) -> 'Dict[type,Any]':
+                 processor: _M_PROCS_T = None,
+                 cache:     dict       = None
+                ) -> Dict[_M_PROC_T, Any]:
         "registers a task processor"
         if cache is None:
             cache = dict()
@@ -141,10 +143,10 @@ class TaskController(Controller):
     "Data controller class"
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.__items   = dict() # type: Dict[RootTask, ProcessorController]
-        self.__procs   = dict() # type: Dict[type,Any]
-        self.__procs   = (ProcessorController.register(kwargs['processors'])
-                          if 'processors' in kwargs else None)
+        self.__items: Dict[RootTask, ProcessorController] = dict()
+        self.__procs: Dict[_M_PROC_T, Any]                = dict()
+        self.__procs = (ProcessorController.register(kwargs['processors'])
+                        if 'processors' in kwargs else None)
 
         self.__openers = kwargs.get("openers", None)
         self.__savers  = kwargs.get("savers",  None)
@@ -181,7 +183,7 @@ class TaskController(Controller):
 
     def task(self,
              parent : Optional[RootTask],
-             task   : Union[Task,int,type],
+             task   : Union[Type[Task], int],
              noemission = False) -> Task:
         "returns a task"
         ctrl = ProcessorController() if parent is None else self.__items[parent]
@@ -197,7 +199,7 @@ class TaskController(Controller):
             track = self.__items[parent].data[0].cache()
         return track
 
-    def tasks(self, task:Optional[RootTask]) -> 'Iterator[Task]':
+    def tasks(self, task:Optional[RootTask]) -> Iterator[Task]:
         "Returns a data object in memory."
         if task is None:
             return iter(tuple())
@@ -229,8 +231,8 @@ class TaskController(Controller):
 
     @Controller.emit
     def openTrack(self,
-                  task : 'Union[None,str,RootTask]' = None,
-                  model: Iterable[Task]             = tuple()) -> dict:
+                  task : Union[str, RootTask] = None,
+                  model: Iterable[Task]       = tuple()) -> dict:
         "opens a new file"
         tasks = tuple(model)
         if task is None and len(tasks) == 0:
@@ -283,7 +285,7 @@ class TaskController(Controller):
         return dict(controller = self, parent = parent, task = tsk, old = old)
 
     @Controller.emit
-    def clearData(self, parent:'Optional[RootTask]' = _m_none) -> dict:
+    def clearData(self, parent:Optional[RootTask] = _m_none) -> dict:
         "clears all data"
         if parent is _m_none:
             self.__items.clear()
