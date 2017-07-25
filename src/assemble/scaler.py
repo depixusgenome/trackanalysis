@@ -134,7 +134,7 @@ class OPeakArray:
         '''
         needs to take into account the seq of matching OligoPeaks
         stretches,biases are defined using self has (1,0)
-        includes reverse_complement
+        includes reverse_complement of other
         '''
         sseqs=frozenset(oli.seq for oli in self.arr)
         oseqs=frozenset(oli.seq for oli in other.arr)
@@ -182,21 +182,13 @@ class OPeakArray:
         'returns sequences in peakarray'
         return frozenset(i.seq for i in self.arr)
 
-    def matching_clusters(self,scaledpeaks)->List[List]:
-        '''
-        groups the matching peaks into groups of OligoPeak for basewise algorithm
-        '''
-        if __debug__:
-            print(self,scaledpeaks)
-        return [[]]
-
     @staticmethod
     def may_overlap(peak,others:List,min_overl:int,with_reverse=True):
         '''
         compare the sequences of the 2 experiments
         returns True if the 2 sequences may overlap
         False otherwise
-        if with_reverse, also considers reverse_complement
+        if with_reverse, also considers reverse_complement of others
         '''
         to_match=frozenset(i.seq for i in peak.arr)
         match=[]
@@ -289,20 +281,34 @@ class PeakStack:
 
     # check implementation of reversing sequence to match top of stack
     def _add2stack(self,scaled:OPeakArray)->None:
-        'adds a new peakarray to the stack'
+        'adds a new scaled peakarray to the stack'
         if not self.stack:
             self.stack={peak.pos:[peak] for peak in self.ordered[0].arr}
             return
+        # check if multiple peaks are assigned to the same key
+        # if yes, add keys
+
+        assigned=[] # type: List[Tuple]
         for peak in scaled.arr:
             key=self.assign_key(peak)
-            if key is not None:
-                last=self.stack[self.assign_key(peak)][-1]
-                if data.Oligo.tail_overlap(last.seq,peak.seq):
-                    self.stack[self.assign_key(peak)].append(peak)
-                else:
-                    self.stack[self.assign_key(peak)].append(peak.reverse(in_place=False))
+            assigned+=[(str(key),peak.pos,key,peak)]
+        assigned=sorted(assigned,
+                        key=lambda x:tuple(x[:2]))
+
+        for key,group in itertools.groupby(assigned,key=lambda x:x[2]):
+            if key is None:
+                for grp in group: # not necessarily of size 0 or 1
+                    self.stack[grp[1]]=[grp[3]]
             else:
-                self.stack[peak.pos]=[peak]
+                tostack=list(group)
+                key,peak=tostack[0][2:]
+                last=self.stack[key][-1]
+                if data.Oligo.tail_overlap(last.seq,peak.seq):
+                    self.stack[key].append(peak)
+                else:
+                    self.stack[key].append(peak.reverse(in_place=False))
+                for grp in tostack[1:]:
+                    self.stack[grp[1]]=[grp[3]]
 
     def top(self)->OPeakArray:
         '''
@@ -394,19 +400,19 @@ class Scaler:
 
         stacks=[] # type: List[PeakStack]
         scperpeak=self.find_rescales(refpeak,[peakarrs[0]],tocmpfilter=cmpfilter)
-        for idx,val in scperpeak.items():
-            print(f"idx={idx}")
-            print(f"val={val}")
+        # for idx,val in scperpeak.items():
+        #     print(f"idx={idx}")
+        #     print(f"val={val}")
 
         toadd=[(peak,scale) for peak,scales in scperpeak.items()
                for scale in scales if stack.can_add(scale(peak))]
-        print(f"len(toadd)={len(toadd)}")
+        #print(f"len(toadd)={len(toadd)}")
 
         for peak,scale in toadd:
-            print(f"scale={scale}")
+            #print(f"scale={scale}")
             stacks+=self.build_stacks_fromtuple(stack=stack.add(scale(peak),in_place=False),
                                                 peakarrs=peakarrs[1:])
-            print(f"len(stacks)={len(stacks)}")
+            #print(f"len(stacks)={len(stacks)}")
 
         return stacks
 
