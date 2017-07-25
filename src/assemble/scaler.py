@@ -7,7 +7,7 @@ use of TO FIX tags for priority commands to implement
 '''
 
 import itertools
-from typing import List, Tuple, Dict, FrozenSet # pylint:disable=unused-import
+from typing import List, Tuple, Dict, FrozenSet, Iterable # pylint:disable=unused-import
 import numpy
 from utils import initdefaults
 import assemble.data as data
@@ -63,6 +63,12 @@ def match_peaks(peaks1,
     if peakcalling wan take account of precision, consider peakcalling as a better alternative
     peaks1 is supposed fixed
     returns stretches and biases
+
+    # for each index in peaks2:
+    # find indices from peaks1 that are > bound_stretch.min*peaks2
+    # and indices from peaks1 that are < bound_stretch.max*peaks2
+    # start with lowest stretch to max stretch
+
     '''
     scales=[]
     # find all biases with at least 1 match
@@ -76,15 +82,14 @@ def match_peaks(peaks1,
             biases.append(pe1-pe2)
 
     for bias in list(biases):
-        for p11,p12 in itertools.combinations(peaks1,2):
-            for p21,p22 in itertools.combinations(peaks2,2):
-                stretch=(p12-p11)/(p22-p21)
-                if bound_stretch.nisin(stretch):
-                    continue
-                if count_matches(peaks1,stretch*peaks2+bias)>0:
-                    scales.append(Rescale(stretch,bias))
+        for pe2 in peaks2:
+            upper=peaks1>=bound_stretch.lower*pe2+bias
+            lower=peaks1<=bound_stretch.upper*pe2+bias
+            tostretch=numpy.array(peaks1)[numpy.logical_and(upper,lower)]
+            for stre in tostretch:
+                scales.append(Rescale((stre-bias)/pe2,bias))
 
-    return scales
+    return list(frozenset(scales))
 
 def count_matches(peaks1,peaks2,fprecision=1e-3):
     '''
@@ -141,7 +146,6 @@ class OPeakArray:
                  for str2 in oseqs
                  if len(data.Oligo.tail_overlap(str1,str2))>=self.min_overl
                  or len(data.Oligo.tail_overlap(str2,str1))>=self.min_overl]
-
         scales=[] # type: List[Rescale]
         for match in matches:
             arr1=self.matching_seq(match[0])
@@ -258,7 +262,6 @@ class PeakStack:
     # should cope with unknown orientation
     def can_add(self,scaled)->bool:
         'checks only tail_overlap'
-        # if the stack is empty
         if not self.stack:
             return True
 
@@ -271,7 +274,8 @@ class PeakStack:
                 if not tail(self.stack[key][-1].seq,
                             peak.seq,
                             self.min_overlap,
-                            oriented=False):
+                            oriented=False,
+                            shift=1):
                     return False
         return True
 
@@ -371,6 +375,42 @@ class Scaler:
 
         return False
 
+
+    # to rename as build_stacks
+    def build_stacks_fromtuple(self,
+                               stack:PeakStack,
+                               peakarrs)->List[PeakStack]:
+        '''
+        use itertools.permutations(peaks,4) to feed tuples
+        '''
+
+        if not peakarrs:
+            return [stack]
+
+        refpeak=stack.top()
+        def cmpfilter(peak):
+            'filter'
+            return self.filterleftoverlap(refpeak,peak)
+
+        stacks=[] # type: List[PeakStack]
+        scperpeak=self.find_rescales(refpeak,[peakarrs[0]],tocmpfilter=cmpfilter)
+        for idx,val in scperpeak.items():
+            print(f"idx={idx}")
+            print(f"val={val}")
+
+        toadd=[(peak,scale) for peak,scales in scperpeak.items()
+               for scale in scales if stack.can_add(scale(peak))]
+        print(f"len(toadd)={len(toadd)}")
+
+        for peak,scale in toadd:
+            print(f"scale={scale}")
+            stacks+=self.build_stacks_fromtuple(stack=stack.add(scale(peak),in_place=False),
+                                                peakarrs=peakarrs[1:])
+            print(f"len(stacks)={len(stacks)}")
+
+        return stacks
+
+
     def build_stacks(self,
                      stack:PeakStack,
                      peakarrs:FrozenSet[OPeakArray])->List[PeakStack]:
@@ -396,6 +436,52 @@ class Scaler:
         for peak,scale in toadd:
             stacks+=self.build_stacks(stack=stack.add(scale(peak),in_place=False),
                                       peakarrs=peakarrs-frozenset([peak]))
+        return stacks
+
+
+    def _increment_stack(self,
+                         stack:PeakStack,
+                         peakarrs:FrozenSet[OPeakArray])->List[PeakStack]:
+        '''
+        recursive
+        '''
+
+        if not peakarrs:
+            return [stack]
+
+        refpeak=stack.top()
+        def cmpfilter(peak):
+            'filter'
+            return self.filterleftoverlap(refpeak,peak)
+
+        scperpeak=self.find_rescales(refpeak,peakarrs,tocmpfilter=cmpfilter)
+        toadd=[(peak,scale) for peak,scales in scperpeak.items() for scale in scales
+               if stack.can_add(scale(peak))]
+
+        if not toadd:
+            return [stack]
+
+        return [stack.add(scale(peak),in_place=False) for peak,scale in toadd]
+
+    # wrong, still infinite loop (need to tag peaks already added)
+    def new_build_stacks(self,
+                         stack:PeakStack,
+                         peakarrs:FrozenSet[OPeakArray])->List[PeakStack]:
+        '''
+        add any possible peakarrs one at a time
+        if any is not possible then we have considered the wrong combination
+        '''
+        stacks=self._increment_stack(stack,peakarrs)
+        for ite in range(3): # len(peakarrs)): # pylint: disable=unused-variable
+            print(f"ite={ite}")
+            max_size=max(len(stck.ordered) for stck in stacks)
+            print(f"max_size={max_size}")
+            print(f"len(stacks)={len(stacks)}")
+            new_stacks=[] # type: List[PeakStack]
+            for stck in stacks:
+                new_stacks+=self._increment_stack(stck,peakarrs)
+
+            stacks=new_stacks
         return stacks
 
     def run(self):
@@ -451,7 +537,7 @@ class Scaler:
 
         return refpeak,stacks
 
-    def find_rescales(self,refpeak:OPeakArray,others:FrozenSet[OPeakArray],tocmpfilter=None):
+    def find_rescales(self,refpeak:OPeakArray,others:Iterable[OPeakArray],tocmpfilter=None):
         '''
         for each other peak, find all possible rescales (stretch and bias)
         matching filter is a function taking refpeak and others:List[OPeakArray]

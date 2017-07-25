@@ -53,11 +53,13 @@ class Oligo:
         return False
 
     @staticmethod
-    def tail_overlap(ol1:str, ol2:str)->str:
+    def tail_overlap(ol1:str, ol2:str,shift=0)->str:
         '''
         returns the end sequence of ol1 matching the start of ol2
+        shift, in number of base
+        shift=0 allows for complete overlap of sequence
         '''
-        for i in range(len(ol1)):
+        for i in range(shift,len(ol1)):
             if ol1[i:]==ol2[:len(ol1)-i]:
                 return ol1[i:]
         return ""
@@ -67,23 +69,28 @@ class Oligo:
         if in_place:
             self.seq=type(self).rev(self.seq)
         cpy=self.copy()
-        cpy.reverse()
+        cpy.seq=type(self).rev(self.seq)
         return cpy
 
     # to test
     @classmethod
-    def can_tail_overlap(cls,ol1:str, ol2:str,min_overlap:int,oriented=True)->bool:
+    def can_tail_overlap(cls, # pylint: disable=too-many-arguments
+                         ol1:str,
+                         ol2:str,
+                         min_overlap:int,
+                         oriented=True,
+                         shift=0)->bool:
         '''
         if oriented, orientation is supposed known
         else, also consider reverse_complements of ol2 (NOT OL1)
         '''
         if oriented:
-            return len(cls.tail_overlap(ol1, ol2))>min_overlap
+            return len(cls.tail_overlap(ol1, ol2,shift=shift))>=min_overlap
         else:
             ols1=[ol1]
             ols2=[cls.rev(ol2),ol2]
             for comb in itertools.product(ols1,ols2):
-                if len(cls.tail_overlap(*comb))>=min_overlap:
+                if len(cls.tail_overlap(*comb,shift=shift))>=min_overlap:
                     return True
         return False
 
