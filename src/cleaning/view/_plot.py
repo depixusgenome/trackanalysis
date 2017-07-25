@@ -17,7 +17,6 @@ from    control                 import Controller
 
 from    ._model                 import DataCleaningModelAccess
 from    ._widget                import WidgetMixin
-from    ..processor             import DataCleaningException
 
 class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
     "Building the graph of cycles"
@@ -46,7 +45,7 @@ class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
             self._model = DataCleaningModelAccess(self._ctrl, '')
 
     def _create(self, doc):
-        self.__source = ColumnDataSource(data = self.__data())
+        self.__source = ColumnDataSource(data = self.__data(None))
 
         self.__fig = fig = figure(**self._figargs(y_range = Range1d, name = 'Clean:Cycles'))
         self.css.points.addto(fig, x = 't', y = 'z', source = self.__source)
@@ -63,26 +62,22 @@ class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
         return layouts.row([left, col], **mode)
 
     def _reset(self):
+        cycles = self._model.runbead(doraise = False)
+        items  = None if cycles is None else list(cycles)
+
         if self._model.colorstore is not None:
             color = self.__color()
             if not np.all_close(color, self.__source.data['color']):
-                self.__source.stream(dict(color = color), rollover = len(color))
+                self._bkmodels[self.__source] = lambda src: src.stream(dict(color = color),
+                                                                       rollover = len(color))
+            self._updatewidget()
         else:
-            data                                  = self.__data()
+            data                                  = self.__data(items)
             self._bkmodels[self.__source]['data'] = data
             self.setbounds(self.__fig.y_range, 'y', data['z'])
-        self._resetwidget()
+            self._resetwidget()
 
-    def __data(self) -> Dict[str, np.ndarray]:
-        cycles = self._model.runbead()
-        if cycles is None:
-            items = None
-        else:
-            try:
-                items = list(cycles)
-            except DataCleaningException:
-                items = None
-
+    def __data(self, items) -> Dict[str, np.ndarray]:
         if items is None or len(items) == 0 or not any(len(i) for _, i in items):
             items = [((0,0), [])]
 
@@ -90,7 +85,7 @@ class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
         res = dict(t     = self.__time(val).ravel(),
                    z     = val.ravel(),
                    cycle = self.__cycle(items, val).ravel(),
-                   color = self.__color(items, val).ravel())
+                   color = self.__color(items, val))
         assert all(len(i) == val.size for  i in res.values())
         return res
 
@@ -128,7 +123,7 @@ class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
             tmp[inds[value.min]] = hexes[name]
             tmp[inds[value.max]] = hexes[name]
 
-        return as_strided(tmp, shape = shape, strides = (tmp.strides[0], 0))
+        return as_strided(tmp, shape = shape, strides = (tmp.strides[0], 0)).ravel()
 
 class CleaningView(PlotView):
     "Peaks plot view"

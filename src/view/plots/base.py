@@ -255,7 +255,12 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         try:
             yield self
             for i, j in self._bkmodels.items():
-                i.update(**j)
+                upd = getattr(i, 'update', None)
+                if upd is None:
+                    j(i)
+                else:
+                    upd(**j)
+
         finally:
             self._bkmodels.clear()
             self.state = old

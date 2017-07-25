@@ -58,6 +58,12 @@ class CyclesListWidget(WidgetCreator):
         data = self.__data()
         itm.update(data = data)
 
+    def updatewidget(self, resets):
+        "nothing to do"
+        acc = self.__data()['accepted']
+        resets[self.__widget.source] = lambda src: src.stream(dict(accepted = acc),
+                                                              rollover = len(acc))
+
     def __data(self) -> dict:
         cache = self._model.cleaning.cache
         if cache is None or len(cache) == 0:
@@ -131,6 +137,11 @@ class WidgetMixin:
         self.__widgets['cleaning'].setfigure(fig)
         enableOnTrack(self, widgets)
         return widgets
+
+    def _updatewidget(self):
+        none = lambda _: None
+        for ite in self.__widgets.values():
+            getattr(ite, 'updatewidget', none)(self._bkmodels)
 
     def _resetwidget(self):
         for ite in self.__widgets.values():

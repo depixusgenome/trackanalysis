@@ -161,13 +161,12 @@ class DataCleaningProcessor(Processor):
                 return DataCleaningException(val, cnf, cls.tasktype)
             tested       = val != ''
 
-        if DataCleaning(**cnf).aberrant(info[1]):
-            val, discard = None, True
-        else:
-            if not tested:
-                cycs = frame.track.cycles.withdata({info[0]: info[1]})
-                val  = tuple(cls.__test(cycs, cnf))
+        discard = DataCleaning(**cnf).aberrant(info[1])
+        if not tested:
+            cycs = frame.track.cycles.withdata({info[0]: info[1]})
+            val  = tuple(cls.__test(cycs, cnf))
 
+        if not discard:
             bad = cls.tasktype.badcycles(val)
             if len(bad):
                 for _, cyc in (frame.track.cycles
@@ -188,10 +187,10 @@ class DataCleaningProcessor(Processor):
     @classmethod
     def apply(cls, toframe = None, cache = None, **cnf):
         "applies the task to a frame or returns a method that will"
-        cnf['cache'] = cache
+        cnf.update(cache = cache)
         fcn = lambda frame: frame.withaction(partial(cls.__compute, frame, **cnf))
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
-        cache = args.data.setCacheDefault(self, dict())
+        cache   = args.data.setCacheDefault(self, dict())
         return args.apply(self.apply(cache = cache, **self.config()))
