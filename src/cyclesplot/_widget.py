@@ -2,17 +2,12 @@
 # -*- coding: utf-8 -*-
 "Widgets for configuration"
 
-from    typing          import (Optional, List,    # pylint: disable=unused-import
-                                Tuple, TYPE_CHECKING)
+from    typing              import List, TYPE_CHECKING
 
-from    bokeh          import layouts
-from    bokeh.document import Document            # pylint: disable=unused-import
-from    bokeh.models   import (ColumnDataSource,  # pylint: disable=unused-import
-                               Slider, CustomJS, Paragraph, Dropdown,
-                               AutocompleteInput, DataTable, TableColumn,
-                               IntEditor, NumberEditor, ToolbarBox,
-                               RadioButtonGroup, CheckboxButtonGroup,
-                               CheckboxGroup, Widget, Button)
+from    bokeh               import layouts
+from    bokeh.models        import (ColumnDataSource, Slider, CustomJS, Paragraph,
+                                    DataTable, TableColumn, IntEditor, NumberEditor,
+                                    CheckboxButtonGroup, Widget)
 
 import  sequences
 from    view.plots          import (PlotModelAccess, GroupWidget,
@@ -23,16 +18,14 @@ from    modaldialog.view    import AdvancedWidgetMixin
 
 from    eventdetection.view import AlignmentWidget, EventDetectionWidget
 
-from    ._bokehext          import DpxHoverModel      # pylint: disable=unused-import
-
 class PeaksTableWidget(_Widget):
     "Table of peaks in z and dna units"
     def __init__(self, model:PlotModelAccess) -> None:
         super().__init__(model)
-        self.__widget = None # type: Optional[DataTable]
-        self.css.table.defaults = {'height' : 100,
-                                   'title'  : u'dna ↔ nm',
-                                   'zformat': '0.0000'}
+        self.__widget: DataTable = None
+        self.css.table.defaults  = {'height' : 100,
+                                    'title'  : u'dna ↔ nm',
+                                    'zformat': '0.0000'}
 
     def create(self, _) -> List[Widget]:
         "creates the widget"
@@ -114,9 +107,9 @@ class ConversionSlidersWidget(_Widget):
     "Sliders for managing stretch and bias factors"
     def __init__(self, model:PlotModelAccess) -> None:
         super().__init__(model)
-        self.__stretch = None # type: Optional[Slider]
-        self.__bias    = None # type: Optional[Slider]
-        self.__figdata = None # type: Optional[ColumnDataSource]
+        self.__stretch: Slider           = None
+        self.__bias:    Slider           = None
+        self.__figdata: ColumnDataSource = None
 
         base = self.css.base
         base.stretch.defaults = dict(start = 900,  step  = 5, end = 1400)
@@ -248,12 +241,13 @@ class WidgetMixin:
         self.__widgets['advanced'].callbacks(self._doc)
         self.__slave_to_hover(widgets)
 
-        return layouts.layout([[layouts.widgetbox(widgets['seq']+widgets['oligos']),
-                                layouts.widgetbox(widgets['sliders']),
-                                layouts.widgetbox(widgets['table'])],
-                               [layouts.widgetbox(widgets[i])
+        mds = self.defaultsizingmode()
+        return layouts.layout([[layouts.widgetbox(widgets['seq']+widgets['oligos'], **mds),
+                                layouts.widgetbox(widgets['sliders'], **mds),
+                                layouts.widgetbox(widgets['table'], **mds)],
+                               [layouts.widgetbox(widgets[i], **mds)
                                 for i in ('align', 'drift', 'events')],
-                               [layouts.widgetbox(widgets['advanced'])]])
+                               [layouts.widgetbox(widgets['advanced'], **mds)]], **mds)
 
     def _resetwidget(self):
         for ite in self.__widgets.values():

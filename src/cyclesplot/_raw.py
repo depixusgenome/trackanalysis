@@ -2,10 +2,9 @@
 # -*- coding: utf-8 -*-
 "Cycles plot view"
 
-from    typing         import (Optional, Tuple, # pylint: disable=unused-import
-                               TYPE_CHECKING)
+from    typing         import Tuple, TYPE_CHECKING
 
-from    bokeh.plotting import figure, Figure    # pylint: disable=unused-import
+from    bokeh.plotting import figure, Figure
 from    bokeh.models   import LinearAxis, ColumnDataSource, CustomJS, Range1d
 
 import  numpy                   as     np
@@ -25,8 +24,8 @@ class RawMixin:
                                                         palette = 'inferno'),
                              'figure.width' : 100,
                              'figure.height': 100}
-        self._rawsource = None # type: Optional[ColumnDataSource]
-        self._raw       = None # type: Optional[Figure]
+        self._rawsource: ColumnDataSource = None
+        self._raw:       Figure           = None
 
     @staticmethod
     def __normal_data(items):
@@ -55,8 +54,8 @@ class RawMixin:
     def __data(self) -> Tuple[dict, Tuple[int,int]]:
         cycles = self._model.runbead()
         if cycles is None:
-            return (dict.fromkeys(('t', 'z', 'cycle', 'color'), [0., 1.]),
-                    (1, 2))
+            return ({i: np.array([], dtype = 'f4') for i in ('t', 'z', 'cycle', 'color')},
+                    (1, 0))
 
         items = list(cycles)
         if len(items) == 0 or not any(len(i) for _, i in items):

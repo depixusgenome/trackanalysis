@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cycles plot"
-from    typing              import Optional, TYPE_CHECKING # pylint: disable=unused-import
+from    typing              import TYPE_CHECKING
 from    bokeh               import layouts
 
 from    control             import Controller
@@ -27,8 +27,8 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, WidgetMixin):
         WidgetMixin    .__init__(self)
 
         DpxHoverModel.defaultconfig(self)
-        self.config.tools.default = 'ypan,ybox_zoom,reset,save,dpxhover'
-        self._hover  = None # type: Optional[DpxHoverModel]
+        self.config.tools.default  = 'ypan,ybox_zoom,reset,save,dpxhover'
+        self._hover: DpxHoverModel = None
         if TYPE_CHECKING:
             self._model = CyclesModelAccess('', '')
 
@@ -39,13 +39,12 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, WidgetMixin):
 
         shape = self._createraw()
         self._createhist(self._rawsource.data, shape, self._raw.y_range)
-        return self._keyedlayout(self._raw, self._hist, bottom = self._createwidget())
+        return [self._keyedlayout(self._raw, self._hist), self._createwidget()]
 
     def _reset(self):
         shape = self._resetraw()
         data  = self._bkmodels[self._rawsource]['data']
         self._resethist(data, shape)
-        self.setbounds(self._hist.y_range, 'y', data['z'])
         self._resetwidget()
 
     def ismain(self, keypressmanager):

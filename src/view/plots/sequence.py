@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Create a grid displaying a sequence"
-from    typing         import List, Optional, Tuple      # pylint: disable=unused-import
+from    typing         import List, Optional, Tuple # pylint: disable=unused-import
 from    collections    import OrderedDict
 from    pathlib        import Path
 import  numpy   as np
 
 import  bokeh.core.properties as props
-from    bokeh.models    import (LinearAxis,      # pylint: disable=unused-import
-                                Model, ColumnDataSource, Range1d,
-                                BasicTicker, Ticker,
-                                Dropdown, Paragraph, AutocompleteInput,
-                                CustomJS, Widget)
+from    bokeh.models    import (LinearAxis, ColumnDataSource, Range1d, Widget,
+                                BasicTicker, Dropdown, Paragraph, AutocompleteInput)
 
 import  sequences
 
@@ -54,28 +51,30 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
 
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.__defaults = dict() # type: Any
-        self.__withbase = []     # type: Any
-        self.__axis     = None   # type: Optional[SequenceTicker]
-        self.__model    = None   # type: Any
-        self.__fig      = None   # type: Any
+        self.__standoff = None
+        self.__defaults = dict()
+        self.__withbase = []
+        self.__model    = None
+        self.__fig      = None
+        self.__axis: SequenceTicker = None
 
     @property
     def axis(self):
         u"returns the fixed axis"
         return self.__axis
 
-    def create(self, fig, mdl, cnf):
+    def create(self, fig, mdl, cnf, loc = 'right'):
         "Sets the ticks according to the configuration"
         self.__model = mdl
         self.__fig   = fig
         self.__axis  = type(self)()
+        self.__standoff = cnf.css.yrightlabel.standoff
 
         fig.extra_y_ranges        = {"bases": Range1d(start = 0., end = 1.)}
         fig.add_layout(LinearAxis(y_range_name = "bases",
                                   axis_label   = cnf.css.yrightlabel.get(),
                                   ticker       = self.__axis),
-                       'right')
+                       loc)
 
         # bokehjs will never draw minor lines unless the color is
         # is set at startup
@@ -97,6 +96,7 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
     @staticmethod
     def defaultconfig(mdl):
         "default config"
+        mdl.css.yrightlabel.standoff.default = -2
         mdl.css.plot.grid.dark.defaults  = dict(color = ('lightgray', 'lightgreen'),
                                                 width = (1,          1),
                                                 alpha = (.8,         .8),
@@ -113,6 +113,7 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
         key    = mdl.sequencekey if len(mdl.oligos) else 'NONE'
         majors = {}
         minors = {}
+        resets[fig.right[-1]].update(axis_label_standoff = self.__standoff.get())
         if key == 'NONE':
             resets[fig.ygrid[0]].update(self.__defaults)
         else:
@@ -130,10 +131,10 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
 class SequenceHoverMixin:
     "controls keypress actions"
     def __init__(self):
-        self.__source = None # type: Optional[ColumnDataSource]
-        self.__tool   = None # type: Optional[DpxHoverTool]
-        self.__size   = None # type: Any
-        self._model   = None # type: Any
+        self.__source: ColumnDataSource = None
+        self.__tool:   DpxHoverTool     = None
+        self.__size = None
+        self._model = None
 
     @staticmethod
     def impl(name, fields):
@@ -225,11 +226,11 @@ class SequencePathWidget(WidgetCreator):
     "Dropdown for choosing a fasta file"
     def __init__(self, model) -> None:
         super().__init__(model)
-        self.__widget  = None # type: Optional[Dropdown]
-        self.__list    = []   # type: List[str]
-        self.__dialog  = FileDialog(filetypes = 'fasta|*',
-                                    config    = self._ctrl,
-                                    storage   = 'sequence')
+        self.__widget: Dropdown  = None
+        self.__list:   List[str] = []
+        self.__dialog = FileDialog(filetypes = 'fasta|*',
+                                   config    = self._ctrl,
+                                   storage   = 'sequence')
         css = self.css.plot.title
         css.defaults = {'fasta'                : u'Open a fasta file',
                         'sequence'             : u'Selected DNA sequence',
@@ -317,7 +318,7 @@ class OligoListWidget(WidgetCreator):
     "Input for defining a list of oligos"
     def __init__(self, model) -> None:
         super().__init__(model)
-        self.__widget  = None # type: Optional[AutocompleteInput]
+        self.__widget: AutocompleteInput = None
         self.config.plot.oligos.defaults = {'history': [], 'history.maxlength': 10}
         self.css.plot.defaults = {'title.oligos'     : u'Oligos',
                                   'title.oligos.help': u'comma-separated list'}

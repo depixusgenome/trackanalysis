@@ -2,18 +2,15 @@
 # -*- coding: utf-8 -*-
 "Building a projection of phase 5"
 
-from    typing         import Optional, Any   # pylint: disable=unused-import
 import  warnings
 
-from    bokeh.plotting import figure, Figure    # pylint: disable=unused-import
+from    bokeh.plotting import figure, Figure
 from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 
 import  numpy        as np
 
 from    view.plots          import PlotAttrs, checksizes
 from    view.plots.sequence import SequenceTicker, estimatebias
-
-window = None # type: Any # pylint: disable=invalid-name
 
 class HistMixin:
     "Building a projection of phase 5 onto the Z axis"
@@ -32,16 +29,16 @@ class HistMixin:
                                   'xlabel'       : u'Frames'}
         SequenceTicker.defaultconfig(self)
 
-        self._histsource = None             # type: Optional[ColumnDataSource]
-        self._hist       = None             # type: Optional[Figure]
-        self._ticker     = SequenceTicker()
+        self._histsource: ColumnDataSource = None
+        self._hist:       Figure           = None
+        self._ticker                       = SequenceTicker()
 
     @checksizes
     def __data(self, data, shape):
         bins  = np.array([-1, 1])
         zeros = np.zeros((1,), dtype = 'f4')
         items = (zeros,)
-        if shape != (1, 2):
+        if shape != (1, 0):
             phase = self.config.root.phase.measure.get()
             zvals = data['z'].reshape(shape)
             if self._model.eventdetection.task is None:
@@ -79,13 +76,13 @@ class HistMixin:
     def _createhist(self, data, shape, yrng):
         self._hist       = figure(**self._figargs(self.css.hist,
                                                   y_axis_location = None,
-                                                  x_range         = Range1d,
+                                                  x_range         = Range1d(0, 5e4),
                                                   y_range         = yrng,
                                                   name            = 'Cycles:Hist'))
 
         hist             = self.__data(data, shape)
         self._histsource = ColumnDataSource(hist)
-        self._hist.extra_x_ranges = {"cycles": Range1d(start = 0., end = 0.)}
+        self._hist.extra_x_ranges = {"cycles": Range1d(start = 0., end = 100.)}
 
         attrs = self.css.cycles.get()
         axis  = LinearAxis(x_range_name          = "cycles",
@@ -125,3 +122,4 @@ class HistMixin:
         self._ticker.reset(self._bkmodels)
 
         self._bkmodels[self._histsource]['data'] = hist
+        self.setbounds(self._hist.y_range, 'y', data['z'])

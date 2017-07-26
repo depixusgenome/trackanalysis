@@ -4,12 +4,13 @@
 from itertools               import product
 import re
 
-from bokeh                   import layouts
-from bokeh.models            import (Row, Model, HoverTool, CustomJS,
-                                     NumberFormatter, ToolbarBox)
-from bokeh.plotting.figure   import Figure
+from    bokeh                   import layouts
+from    bokeh.models            import (Row, Model, HoverTool, CustomJS,
+                                        NumberFormatter, ToolbarBox)
+from    bokeh.plotting.figure   import Figure
+import  bokeh.core.properties   as     props
 
-import bokeh.core.properties   as     props
+from    ..base                  import defaultsizingmode
 
 def from_py_func(func, **kwa):
     """ Create a CustomJS instance from a Python function. The
@@ -55,16 +56,7 @@ class DpxKeyedRow(Row): # pylint: disable=too-many-ancestors
                          keys     = keys,
                          zoomrate = cnf.zoom.rate.get(),
                          panrate  = cnf.pan.rate.get(),
-                         **self.__sizingmode(plotter, kwa))
-    @staticmethod
-    def __sizingmode(plotter, kwa = None):
-        kwa = dict() if kwa is None else kwa
-        if plotter.css.responsive.get():
-            kwa['sizing_mode'] = 'scale_width'
-        else:
-            kwa['sizing_mode'] = plotter.css.sizing_mode.get()
-        return kwa
-
+                         **defaultsizingmode(plotter, kwa))
     @classmethod
     def keyedlayout(cls, plot, main, *figs, bottom = None, left = None):
         "sets up a DpxKeyedRow layout"

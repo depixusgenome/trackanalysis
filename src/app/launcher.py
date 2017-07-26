@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Updates app manager so as to deal with controllers"
-from typing     import TYPE_CHECKING, List, Callable, Tuple # pylint: disable=unused-import
+from typing     import TYPE_CHECKING, Callable, Tuple
 from pathlib    import Path
 
 import sys
@@ -26,9 +26,9 @@ import view.toolbar as toolbars
 
 from .scripting                 import INITIAL_ORDERS
 
-LOGS           = getLogger(__name__)
-DEFAULT_CONFIG = lambda x: None
-DYN_LOADS      = ('modaldialog', 'view') # type: Tuple[str,...]
+LOGS                            = getLogger(__name__)
+DEFAULT_CONFIG: Callable        = lambda x: None
+DYN_LOADS:      Tuple[str, ...] = ('modaldialog', 'view')
 
 def _serverkwargs(kwa):
     kwargs                         = dict(kwa)
@@ -322,18 +322,19 @@ class WithToolbar:
 
             def getroots(self, doc):
                 "adds items to doc"
-                tbar     = self._bar.getroots(doc)[0]
+                tbar     = self._bar.getroots(doc)
                 others   = self._mainview.getroots(doc)
-                if len(others) == 1:
-                    children = [tbar, others[0]]
+                while isinstance(others, (tuple, list)) and len(others) == 1:
+                    others = others[0]
+
+                if isinstance(others, list):
+                    children = [tbar] + others
+                elif isinstance(others, tuple):
+                    children = [tbar, layout(others, **self.defaultsizingmode())]
                 else:
-                    children = [tbar, layout(children)]
+                    children = [tbar, others]
 
-                if self._ctrl.getGlobal('css').responsive.get():
-                    return column(children, responsive = True),
-
-                mode = self._ctrl.getGlobal('css').sizing_mode.get()
-                return column(children, sizing_mode = mode),
+                return column(children, **self.defaultsizingmode())
 
         return ViewWithToolbar
 

@@ -89,6 +89,22 @@ def spawn(fcn, *args, loop = None, **kwa):
         loop = IOLoop.current()
     loop.spawn_callback(fcn, *args, **kwa)
 
+def defaultsizingmode(self, kwa:dict = None, **kwargs) -> dict:
+    "the default sizing mode"
+    if kwa is None:
+        kwa = kwargs
+    else:
+        kwa.update(kwargs)
+
+    css = getattr(self, 'css', None)
+    if css is None:
+        css = getattr(self, '_ctrl').getGlobal("css")
+    if css.responsive.get():
+        kwa['sizing_mode'] = 'scale_width'
+    else:
+        kwa['sizing_mode'] = css.sizing_mode.get()
+    return kwa
+
 class BokehView(View):
     "A view with a gui"
     def __init__(self, **kwargs):
@@ -145,13 +161,16 @@ class BokehView(View):
         self._doc = doc
         self._keys.getroots(doc)
         roots = self.getroots(doc)
-        if len(roots) == 1:
+        while isinstance(roots, (tuple, list)) and len(roots) == 1:
+            roots = roots[0]
+
+        if not isinstance(roots, (tuple, list)):
+            roots = (roots,)
+
+        if isinstance(roots, (tuple, list)) and len(roots) == 1:
             doc.add_root(roots[0])
-        elif self._ctrl.getGlobal('css').responsive.get():
-            doc.add_root(layout(roots, responsive = True))
         else:
-            mode = self._ctrl.getGlobal('css').sizing_mode.get()
-            doc.add_root(layout(roots, sizing_mode = mode))
+            doc.add_root(layout(roots, **self.defaultsizingmode()))
 
     def getroots(self, doc):
         "returns object root"
@@ -167,3 +186,7 @@ class BokehView(View):
         btn.on_click(fcn)
         self._keys.addKeyPress((prefix+'.'+title.lower(), fcn))
         return btn
+
+    def defaultsizingmode(self, kwa = None, **kwargs) -> dict:
+        "the default sizing mode"
+        return defaultsizingmode(self, kwa, **kwargs)

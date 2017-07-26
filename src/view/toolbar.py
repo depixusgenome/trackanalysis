@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Toolbar"
-from typing               import Callable, TYPE_CHECKING # pylint: disable=unused-import
+from typing               import Callable, TYPE_CHECKING
 from pathlib              import Path
 import re
 
@@ -26,9 +26,9 @@ class TrackFileDialog(FileDialog):
                          storage   = STORAGE[0],
                          config    = ctrl)
 
-        self.__store = self.config[1] # type: Callable
-        self.__ctrl  = ctrl
-        self.__doc   = None
+        self.__store: Callable = self.config[1]
+        self.__ctrl            = ctrl
+        self.__doc             = None
 
         def _defaultpath(ext, bopen):
             assert bopen
@@ -399,7 +399,8 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
             if 'track' in items:
                 self.__toolbar.frozen = items['track'].value is items.empty
         self._ctrl.getGlobal("project").observe(_onproject)
-        return (layouts.widgetbox(self.__toolbar, height = 30, responsive = True),)
+        mods = self.defaultsizingmode(height = 30)
+        return layouts.row([layouts.widgetbox(self.__toolbar, **mods)], **mods)
 
     def close(self):
         "Sets up the controller"

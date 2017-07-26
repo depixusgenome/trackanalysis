@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "The basic architecture"
-from    typing              import (Tuple, Optional,       # pylint: disable=unused-import
+from    typing              import (Tuple, Optional, Type, # pylint: disable=unused-import
                                     Iterator, Sequence, List, Union, Dict, Any, cast)
 from    collections         import OrderedDict
 from    enum                import Enum
@@ -13,15 +13,16 @@ from    time                import time
 import  numpy        as     np
 
 import  bokeh.palettes
-from    bokeh.document          import Document     # pylint: disable=unused-import
-from    bokeh.models            import (Range1d,    # pylint: disable=unused-import
-                                        RadioButtonGroup, Model,
+from    bokeh.document          import Document
+from    bokeh.models            import (Range1d, RadioButtonGroup, Model,
                                         Paragraph, Widget, GlyphRenderer)
 
 from    utils.logconfig         import getLogger
 from    control                 import Controller
 from    control.globalscontrol  import GlobalsAccess
-from    ..base                  import BokehView, threadmethod, spawn, SINGLE_THREAD
+from    ..base                  import (BokehView, threadmethod, spawn,
+                                        defaultsizingmode as _defaultsizingmode,
+                                        SINGLE_THREAD)
 from    .bokehext               import DpxHoverTool, from_py_func, DpxKeyedRow
 
 LOGS    = getLogger(__name__)
@@ -50,10 +51,10 @@ def checksizes(fcn):
 class PlotAttrs:
     "Plot Attributes for one variable"
     def __init__(self,
-                 color                  = 'blue',
-                 glyph                  = 'line',
-                 size                   = 1,
-                 palette: Optional[str] = None,
+                 color        = 'blue',
+                 glyph        = 'line',
+                 size         = 1,
+                 palette: str = None,
                  **kwa) -> None:
         self.color   = color
         self.glyph   = glyph
@@ -137,7 +138,7 @@ class GroupWidget(WidgetCreator):
     INPUT = RadioButtonGroup
     def __init__(self, model) -> None:
         super().__init__(model)
-        self._widget  = None # type: Optional[RadioButtonGroup]
+        self._widget: RadioButtonGroup = None
 
     def create(self, action) -> List[Widget]:
         "creates the widget"
@@ -210,10 +211,10 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
             ctrl.addGlobalMap(name+key)
 
         super().__init__(ctrl, key)
-        self._model                = self._MODEL(ctrl, key)
-        self._ctrl                 = ctrl
-        self._bkmodels             = self._OrderedDict() # type: Dict[Model,Dict[str,Any]]
-        self._doc                  = None                # type: Optional[Document]
+        self._model = self._MODEL(ctrl, key)
+        self._ctrl  = ctrl
+        self._bkmodels: Dict[Model,Dict[str,Any]] = self._OrderedDict()
+        self._doc:      Document                  = None
         self.project.state.default = PlotState.active
 
     state = cast(PlotState,
@@ -222,16 +223,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
 
     def defaultsizingmode(self, kwa = None, **kwargs):
         "the default sizing mode"
-        if kwa is None:
-            kwa = kwargs
-        else:
-            kwa.update(kwargs)
-
-        if self.css.responsive.get():
-            kwa['sizing_mode'] = 'scale_width'
-        else:
-            kwa['sizing_mode'] = self.css.sizing_mode.get()
-        return kwa
+        return _defaultsizingmode(self, kwa = kwa, **kwargs)
 
     @classmethod
     def key(cls):
@@ -299,9 +291,9 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         vmax += delta
 
         if axis is None:
-            curr  = None, None # type: Tuple[Optional[float], Optional[float]]
+            curr = None, None # type: Tuple[Optional[float], Optional[float]]
         else:
-            curr  = self.project[axis].get(default = (vmin, vmax))
+            curr = self.project[axis].get(default = (vmin, vmax))
 
         attrs = OrderedDict(bounds = (vmin, vmax))                  # type: Dict[str, Any]
         attrs.update(start = vmin if curr[0]  is None else curr[0], # type: ignore
@@ -516,7 +508,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                              for i in args['tools']]
         for name in ('x_range', 'y_range'):
             if args.get(name, _m_none) is Range1d:
-                args[name] = Range1d(start = 0., end = 0.)
+                args[name] = Range1d(start = 0., end = 1.)
         return args
 
     def _keyedlayout(self, main, *figs, left = None, bottom = None):
@@ -532,7 +524,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
 
 class PlotView(BokehView):
     "plot view"
-    PLOTTER = None # type: Optional[type]
+    PLOTTER: Type[PlotCreator] = None
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
@@ -594,4 +586,4 @@ class PlotView(BokehView):
         super().getroots(doc)
         ret = self._plotter.create(doc)
         self._plotter.observe()
-        return ret,
+        return ret
