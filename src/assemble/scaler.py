@@ -7,7 +7,7 @@ use of TO FIX tags for priority commands to implement
 '''
 
 import itertools
-from typing import List, Tuple, Dict, FrozenSet, Iterable # pylint:disable=unused-import
+from typing import List, Tuple, Dict, FrozenSet, Iterable, Generator # pylint:disable=unused-import
 import numpy
 import networkx
 from utils import initdefaults
@@ -15,6 +15,39 @@ import assemble.data as data
 import assemble.shuffler as shuffler
 
 BP2NM=1.1
+
+
+def cyclic_paths(graph:networkx.Graph,
+                 source=None)->Generator:
+    '''
+    yields all paths starting and ending at source
+    '''
+    if not graph:
+        return []
+
+    start=source
+    if start is None:
+        start=graph.nodes()[0]
+
+    paths=networkx.all_simple_paths(graph,
+                                    source=start,
+                                    target=start,
+                                    cutoff=len(graph))
+    for path in paths:
+        yield path
+
+
+
+# not really needed
+def hamiltonian_paths(graph:networkx.Graph,
+                      source=None)->Generator:
+    '''
+    returns all Hamiltonian paths
+    '''
+    for path in cyclic_paths(graph,source):
+        if len(path)==len(graph):
+            yield path
+
 
 class Bounds:
     'define upper lower limits on parameters'
@@ -195,7 +228,7 @@ class OPeakArray:
         return frozenset(i.seq for i in self.arr)
 
     @staticmethod
-    def may_overlap(peak,others:List,min_overl:int,with_reverse=True)->List:
+    def may_overlap(peak,others:Iterable,min_overl:int,with_reverse=True)->List:
         '''
         compare the sequences of the 2 experiments
         returns True if the 2 sequences may overlap
@@ -216,6 +249,7 @@ class OPeakArray:
 
         return match
 
+    # not used atm
     def count_matches(self,scaled,nlampli)->int:
         '''
         maximum number of matches in len(self.arr)
@@ -224,6 +258,25 @@ class OPeakArray:
         return count_matches([i.pos for i in self.arr],
                              [i.pos for i in scaled.arr],
                              fprecision=nlampli)
+
+
+
+    @staticmethod
+    def parrs2fullgraph(peaks:List[OPeakArray],min_overl=2):
+        '''
+        returns the full directed graph
+        needed for Hamiltonian path
+        '''
+        graph=networkx.DiGraph()
+        for peak in peaks:
+            toadd=OPeakArray.may_overlap(peak,
+                                         frozenset(peaks)-frozenset([peak]),
+                                         min_overl=min_overl)
+            graph.add_edges_from([(peak,other) for other in toadd])
+        return graph
+
+
+
 
     def __hash__(self)->int:
         'could help to implement this'
@@ -414,7 +467,7 @@ class Scaler:
 
         toadd=[(peak,scale) for peak,scales in scperpeak.items()
                for scale in scales if stack.can_add(scale(peak))]
-
+        print(f"len(toadd)={len(toadd)}")
         for peak,scale in toadd:
             stacks+=self.build_stacks_fromtuple(stack=stack.add(scale(peak),in_place=False),
                                                 peakarrs=peakarrs[1:])
@@ -450,6 +503,7 @@ class Scaler:
         return stacks
 
 
+    # incomplete function, not useful has is
     @staticmethod
     def peakarrays2graph(refpeak:OPeakArray,
                          others:FrozenSet[OPeakArray],
@@ -463,17 +517,20 @@ class Scaler:
         graph=networkx.DiGraph()
         last_added=frozenset([refpeak])
         for layer in range(depth):
+            if others==frozenset([]):
+                break
             print(f"layer,depth={layer},{depth}")
             others=others-last_added
             print(f"len(others)={len(others)}")
-            alladded=[]
+            alladded=[] # type: List[OPeakArray]
             for newroot in last_added:
                 toadd=OPeakArray.may_overlap(newroot,others,min_overl)
                 graph.add_edges_from([(newroot,add) for add in toadd])
                 alladded+=toadd
+
             last_added=frozenset(alladded)
 
-        return graph,list(last_added)
+        return graph,[node for node in graph.nodes() if not graph.successors(node)]
 
     def run(self):
         '''
