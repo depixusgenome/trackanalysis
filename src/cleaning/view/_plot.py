@@ -82,13 +82,17 @@ class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
     def _create(self, doc):
         self.__source = ColumnDataSource(data = self.__data(None, None))
 
-        self.__fig = fig = figure(**self._figargs(y_range = Range1d, name = 'Clean:Cycles'))
+        self.__fig = fig = figure(**self._figargs(y_range = Range1d,
+                                                  x_range = Range1d,
+                                                  name    = 'Clean:Cycles'))
         self.css.points.addto(fig, x = 't', y = 'z', source = self.__source)
         fig.extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
         axis = LinearAxis(x_range_name = "time", axis_label = self.css.xtoplabel.get())
         fig.add_layout(axis, 'above')
 
+        self.fixreset(fig.y_range)
         self._addcallbacks(fig)
+
         mode    = self.defaultsizingmode()
         widgets = self._createwidget(fig)
         bottom  = layouts.widgetbox(widgets['align'], **mode)
@@ -100,6 +104,7 @@ class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
         items, nans = GuiDataCleaningProcessor.runbead(self._model)
         data                                  = self.__data(items, nans)
         self._bkmodels[self.__source]['data'] = data
+        self.setbounds(self.__fig.x_range, 'x', data['t'])
         self.setbounds(self.__fig.y_range, 'y', data['z'])
         self._resetwidget()
 

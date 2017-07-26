@@ -293,6 +293,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         else:
             vmin  = min(arr)
             vmax  = max(arr)
+
         delta = (vmax-vmin)*over*.5
         vmin -= delta
         vmax += delta
@@ -322,8 +323,13 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         if len(arr) == 0:
             return 0., 1.
 
-        vmin  = min(arr)
-        vmax  = max(arr)
+        if isinstance(arr, np.ndarray):
+            vmin  = np.nanmin(arr)
+            vmax  = np.nanmax(arr)
+        else:
+            vmin  = min(arr)
+            vmax  = max(arr)
+
         delta = (vmax-vmin)*self.config.boundary.overshoot.get()
         vmin -= delta
         vmax += delta
