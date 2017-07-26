@@ -1,5 +1,4 @@
 import {build_views}    from "core/build_views"
-import {logger}         from "core/logging"
 import *        as $    from "jquery"
 import *        as p    from "core/properties"
 import {WidgetView, Widget} from "models/widgets/widget"
@@ -48,12 +47,11 @@ export class DpxCleaningView extends WidgetView
                 'maxhfsigma', 'minextent']
 
     mk_inp: (name, maxv = 100, dv = 0.1) ->
+        disabled = if @model.frozen then ' disabled=true' else ''
         return  "<input id='dpx-cl-#{name}'"+
                     " class='dpx-cl-freeze bk-widget-form-input'"+
                     " type='number' min=0 max=#{maxv} step=#{dv} "+
-                    " value=#{@model[name]} disabled=true>"
-
-    set_pyevent: (name) ->
+                    " value=#{@model[name]}#{disabled}>"
 
 export class DpxCleaning extends Widget
     default_view: DpxCleaningView
