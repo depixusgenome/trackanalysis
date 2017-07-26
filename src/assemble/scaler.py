@@ -16,6 +16,22 @@ import assemble.shuffler as shuffler
 
 BP2NM=1.1
 
+# to finish
+def tsp_paths(graph:networkx.Graph,
+              source=None)->Generator:
+    '''
+    returns the solution to the travelling salesman problem
+    each node visited once
+    '''
+    # traveling salesman problem
+    # generate all paths using simple paths and cutoff=len(graph)? nope. dijskstra path algorithm?
+    # use euler_circuit
+    # possible presence of duplicates nodes in path??
+    paths=networkx.eulerian_circuit(graph,source=source)
+    # check directionality
+    # for cycles, both orientation must be explored
+    print(paths)
+    yield tuple()
 
 def cyclic_paths(graph:networkx.Graph,
                  source=None)->Generator:
@@ -35,19 +51,6 @@ def cyclic_paths(graph:networkx.Graph,
                                     cutoff=len(graph))
     for path in paths:
         yield path
-
-
-
-# not really needed
-def hamiltonian_paths(graph:networkx.Graph,
-                      source=None)->Generator:
-    '''
-    returns all Hamiltonian paths
-    '''
-    for path in cyclic_paths(graph,source):
-        if len(path)==len(graph):
-            yield path
-
 
 class Bounds:
     'define upper lower limits on parameters'
@@ -110,28 +113,26 @@ def match_peaks(peaks1,
     biases=[]
     for pe1 in peaks1:
         for pe2 in peaks2:
-            print(f'pe1,pe2={pe1},{pe2}')
             if bound_bias.nisin(pe1-pe2):
                 continue
             scales.append(Rescale(1,pe1-pe2))
             biases.append(pe1-pe2)
 
-    print(f"biases={biases}")
+    if __debug__:
+        print(f"biases={biases}")
     for bias in list(biases):
         for pe2 in peaks2:
+            if numpy.isclose(pe2,0):
+                continue
             upper=peaks1>=bound_stretch.lower*pe2+bias
-
-            # print(f"upper={upper}")
-            # print(f"bound_stretch.lower={bound_stretch.lower}")
-            # print(f"pe2={pe2}")
-            # print(f"bias={bias}")
             lower=peaks1<=bound_stretch.upper*pe2+bias
-            # print(f"lower={lower}")
             tostretch=numpy.array(peaks1)[numpy.logical_and(upper,lower)]
             for stre in tostretch:
-            #     print(f"stre={stre}")
-            #     print(f"pe2={pe2}")
-            #     print(f"bias={bias}")
+                # if __debug__:
+                #     print(f"stre={stre}")
+                #     print(f"bias={bias}")
+                #     print(f"pe2={pe2}")
+
                 scales.append(Rescale((stre-bias)/pe2,bias))
 
     return list(frozenset(scales))
@@ -262,8 +263,9 @@ class OPeakArray:
 
 
     @staticmethod
-    def parrs2fullgraph(peaks:List[OPeakArray],min_overl=2):
+    def list2graph(peaks:List,min_overl=2):
         '''
+        peaks is a list of OPeakArrays
         returns the full directed graph
         needed for Hamiltonian path
         '''
@@ -345,8 +347,8 @@ class PeakStack:
             return None
 
     # check implementation of reversing sequence to match top of stack
-    def _add2stack(self,scaled:OPeakArray)->None:
-        'adds a new scaled peakarray to the stack'
+    def _add2stack(self,peakarray:OPeakArray)->None:
+        'adds a new (scaled or unscaled? scaled!) peakarray to the stack'
         if not self.stack:
             self.stack={peak.pos:[peak] for peak in self.ordered[0].arr}
             return
@@ -354,7 +356,7 @@ class PeakStack:
         # if yes, add keys
 
         assigned=[] # type: List[Tuple]
-        for peak in scaled.arr:
+        for peak in peakarray.arr:
             key=self.assign_key(peak)
             assigned+=[(str(key),peak.pos,key,peak)]
         assigned=sorted(assigned,
@@ -403,7 +405,7 @@ class PeakStack:
         'returns last scaled OPeakArray'
         return self.ordered[-1]
 
-    def reverse(self,key):
+    def reverse(self,key=None):
         'takes the reverse complement of all peaks at position key'
         for peak in self.stack[key]:
             peak.reverse()
@@ -502,35 +504,6 @@ class Scaler:
                                       peakarrs=peakarrs-frozenset([peak]))
         return stacks
 
-
-    # incomplete function, not useful has is
-    @staticmethod
-    def peakarrays2graph(refpeak:OPeakArray,
-                         others:FrozenSet[OPeakArray],
-                         min_overl=2,depth=4):
-        '''
-        use networkx to reconstruct all possible paths
-        returns the graph, and the tips of the tree (fro all_simple_paths search)
-        must add safety on the depth versus maximal depth (if depth>max_depth)
-        we loose tips
-        '''
-        graph=networkx.DiGraph()
-        last_added=frozenset([refpeak])
-        for layer in range(depth):
-            if others==frozenset([]):
-                break
-            print(f"layer,depth={layer},{depth}")
-            others=others-last_added
-            print(f"len(others)={len(others)}")
-            alladded=[] # type: List[OPeakArray]
-            for newroot in last_added:
-                toadd=OPeakArray.may_overlap(newroot,others,min_overl)
-                graph.add_edges_from([(newroot,add) for add in toadd])
-                alladded+=toadd
-
-            last_added=frozenset(alladded)
-
-        return graph,[node for node in graph.nodes() if not graph.successors(node)]
 
     def run(self):
         '''

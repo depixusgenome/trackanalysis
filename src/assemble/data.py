@@ -131,7 +131,7 @@ class Oligo:
         return self.__copy__(**kwa)
 
     def __hash__(self):
-        return hash(tuple(self.pos,self.seq))
+        return hash(tuple([self.pos,self.seq]))
 
     def __eq__(self,other):
         if isinstance(other,type(self)):
