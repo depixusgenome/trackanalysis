@@ -14,7 +14,7 @@ export class DpxToolbarView extends WidgetView
 
     on_discard_current: () ->
         ele = $(@el)
-        val = ele.find('#dpx-tb-bead').val()
+        val = Number(ele.find('#dpx-tb-bead').val())
         @model.discarded = ele.find('#dpx-tb-discard').val()+",#{val}"
 
     on_discard: () ->
@@ -28,7 +28,7 @@ export class DpxToolbarView extends WidgetView
         $(@el).find('#dpx-tb-bead').val(val)
 
     on_change_discarded: () ->
-        $('#dpx-tb-discard').val("'#{@model.discarded}'")
+        $('#dpx-tb-discard').val("#{@model.discarded}")
 
     on_change_message: () ->
         $(@el).find('#dpx-tb-message').html(@model.message)
