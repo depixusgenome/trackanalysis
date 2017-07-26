@@ -22,11 +22,12 @@ class CyclesListWidget(WidgetCreator):
         super().__init__(model)
         self.__widget: DataTable = None
         css                      = self.__config
-        css.width.default        = 60
-        css.default              = [['population', u'% good',      '0.0'],
-                                    ['hfsigma',    'σ[HF]',        '0.0000'],
-                                    ['extent',     u'Δz',          '0.0'],
-                                    ['accepted',   u'Accepted',    '']]
+        css.width.default        = 65
+        css.default              = [['cycle',       u'Cycle',   '0'],
+                                    ['population', u'% good',   '0.'],
+                                    ['hfsigma',    'σ[HF]',     '0.0000'],
+                                    ['extent',     u'Δz',       '0.0'],
+                                    ['discarded',  u'Discarded', '']]
 
     @property
     def __config(self):
@@ -47,7 +48,7 @@ class CyclesListWidget(WidgetCreator):
         self.__widget = DataTable(source      = ColumnDataSource(self.__data()),
                                   columns     = cols,
                                   editable    = False,
-                                  row_headers = True,
+                                  row_headers = False,
                                   width       = width*len(cols),
                                   name        = "Cleaning:List")
         return [self.__widget]
@@ -60,18 +61,24 @@ class CyclesListWidget(WidgetCreator):
 
     def updatewidget(self, resets):
         "nothing to do"
-        acc = self.__data()['accepted']
-        resets[self.__widget.source] = lambda src: src.stream(dict(accepted = acc),
+        acc = self.__data()['discarded']
+        resets[self.__widget.source] = lambda src: src.stream(dict(discarded = acc),
                                                               rollover = len(acc))
 
     def __data(self) -> dict:
         cache = self._model.cleaning.cache
         if cache is None or len(cache) == 0:
             return {i: [] for i, _1, _2 in self.__config.get()}
-        names            = set(i[0] for i in self.__config.get()) & set(cache)
-        info             = {i: cache[i].values for i in names}
-        info['accepted'] = np.ones(self._model.track.ncycles, dtype = 'bool')
-        info['accepted'][self._model.cleaning.badcycles(cache)] = False
+        names = set(i[0] for i in self.__config.get()) & set(cache)
+        bad   = self._model.cleaning.badcycles(cache)
+        order = np.array(sorted(range(self._model.track.ncycles),
+                                key = lambda i: (i not in bad, i)),
+                         dtype = 'i4')
+
+        info                         = {i: cache[i].values[order] for i in names}
+        info['discarded']            = np.zeros(len(order), dtype = 'U1')
+        info['discarded'][:len(bad)] = '✗'
+        info['cycle']                = order
         return info
 
 class DpxCleaning(Widget):

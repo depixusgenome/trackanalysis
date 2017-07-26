@@ -68,24 +68,41 @@ class DataCleaning:
         test = [ 0. if len(i) == 0 else np.isfinite(i).sum()/len(i)*100. for i in cycs]
         return self.__test('population', test)
 
-    def aberrant(self, bead:np.ndarray) -> bool:
+    def aberrant(self, bead:np.ndarray, clip = False) -> bool:
         """
         Removes aberrant values.
-        Returns *True* if the number of remaining values is too low
+
+        A value at position *n* is aberrant if either or both:
+
+            * |z[n] - median(z)| > maxabsvalue
+            * |(z[n+1]-z[n-1])/2-z[n]| > maxderivate
+
+        Aberrant values are replaced by:
+
+            * *NaN* if *clip* is true,
+            * *maxabsvalue ± median*, whichever is closest, if *clip* is false.
+
+        returns: *True* if the number of remaining values is too low
         """
         fin  = np.isfinite(bead)
         good = bead[fin]
         if len(good) < len(bead) * self.minpopulation * 1e-2:
             return True
 
-        der  = correlate1d(good, [.5, -1., .5], mode = 'nearest')
+        zero = np.nanmedian(good)
+        med  = good-zero
+        if clip:
+            good[med >  self.maxabsvalue] = zero+self.maxabsvalue
+            good[med < -self.maxabsvalue] = zero-self.maxabsvalue
+        else:
+            der = correlate1d(good, [.5, -1., .5], mode = 'nearest')
+            good[np.logical_or(np.abs(med) > self.maxabsvalue,
+                               np.abs(der) > self.maxderivate)] = np.NaN
 
-        good[np.logical_or(np.abs(good) > self.maxabsvalue,
-                           np.abs(der)  > self.maxderivate)] = np.NaN
+        bead[fin] = good
         if len(good)-np.isnan(good).sum() <= len(bead) * self.minpopulation * 1e-2:
             return True
 
-        bead[fin] = good
         return False
 
 class DataCleaningTask(DataCleaning, Task):

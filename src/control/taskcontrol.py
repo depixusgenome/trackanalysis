@@ -86,6 +86,14 @@ class ProcessorController:
                               copy = self.copy if copy is None else copy,
                               pool = pool)
 
+    def keepupto(self, tsk:Task = None) -> 'ProcessorController':
+        "Returns a processor for a given root and range"
+        ind         = None if tsk is None else self.data.index(tsk)
+        other       = type(self)(copy = self.copy)
+        other.model = self.model[:ind]
+        other.data  = self.data.keepupto(ind)
+        return other
+
     @classmethod
     def create(cls,
                *models   : Task,
@@ -133,7 +141,7 @@ class ProcessorController:
         elif processor.tasktype is not None:
             cache[processor.tasktype] = processor
 
-        for sclass in processor.__subclasses__():
+        for sclass in getattr(processor, '__subclasses__', lambda: ())():
             cls.register(sclass, cache)
         return cache
 
@@ -216,7 +224,14 @@ class TaskController(Controller):
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
         """
+        if parent not in self.__items:
+            return None
         return self.__items[parent].run(tsk, copy = copy, pool = pool)
+
+    def processors(self, parent:RootTask, tsk:Task) -> Optional[ProcessorController]:
+        "Returns a processor for a given root and range"
+        ctrl = self.__items.get(parent, None)
+        return None if ctrl is None else ctrl.keepupto(tsk)
 
     @Controller.emit
     def saveTrack(self, path: str) -> None:

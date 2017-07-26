@@ -23,7 +23,7 @@ class DataCleaningAccess(TaskAccess):
         if mem is None:
             return None
 
-        cur = mem.get(self.track, {}).get(self.bead, ())
+        cur = mem.get(self.track, {}).get(self.bead, None)
         return None if cur is None else {i.name: i for i in cur[0]}
 
     def badcycles(self, cache = NoArgs):

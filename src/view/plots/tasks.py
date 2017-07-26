@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Utils for dealing with the JS side of the view"
-from typing            import (Tuple, Optional, # pylint: disable =unused-import
-                               Iterator, List, Union, Any, Callable, Dict,
-                               TYPE_CHECKING)
-from functools         import wraps
+from typing                 import (Tuple, Optional, # pylint: disable =unused-import
+                                    Iterator, List, Union, Any, Callable, Dict,
+                                    TYPE_CHECKING)
+from functools              import wraps
 
-from signalfilter      import rawprecision
-from model.task        import RootTask, Task, taskorder, TASK_ORDER
-from model.globals     import (ConfigProperty, ConfigRootProperty, BeadProperty,
-                               ProjectRootProperty)
-from data.track        import Track
-from utils             import NoArgs, updatecopy, updatedeepcopy
-from control.processor import Processor
-from .base             import PlotModelAccess, PlotCreator, PlotState
+from signalfilter           import rawprecision
+from model.task             import RootTask, Task, taskorder, TASK_ORDER
+from model.globals          import (ConfigProperty, ConfigRootProperty, BeadProperty,
+                                    ProjectRootProperty)
+from data.track             import Track
+from utils                  import NoArgs, updatecopy, updatedeepcopy
+from control.processor      import Processor
+from control.taskcontrol    import ProcessorController
+from .base                  import PlotModelAccess, PlotCreator, PlotState
 
 class TaskPlotModelAccess(PlotModelAccess):
     "Contains all access to model items likely to be set by user actions"
@@ -87,21 +88,33 @@ class TaskPlotModelAccess(PlotModelAccess):
 
         return root is self.roottask
 
-    def runbead(self):
+    def processors(self, *procs) -> Optional[ProcessorController]:
         "returns a tuple (dataitem, bead) to be displayed"
         track = self.track
         if track is None:
             return None
 
         root  = self.roottask
-        ibead = self.bead
-
-        for task in tuple(self._ctrl.tasks(root))[::-1]:
+        tasks = tuple(self._ctrl.tasks(root))
+        for i, task in tuple(enumerate(tasks))[::-1]:
             if self.checktask(root, task):
-                beads = next(iter(self._ctrl.run(root, task, copy = True)))
-                return beads[ibead,...]
+                if len(procs):
+                    procs = (Processor,)+procs if Processor not in procs else procs
+                    ctrl  = ProcessorController.create(*tasks[:i+1], processors = procs)
+                    ctrl.data.setCacheDefault(0, track)
+                    return ctrl
+                return self._ctrl.processors(root, task)
+        return None
 
-        return track.cycles[ibead,...]
+    def runbead(self, *procs):
+        "returns a tuple (dataitem, bead) to be displayed"
+        ctrl  = self.processors(*procs)
+        ibead = self.bead
+        if ctrl is None:
+            track = self.track
+            return None if track is None else track.cycles[ibead,...]
+
+        return next(iter(ctrl.run(copy = True)))[ibead, ...]
 
     def observetasks(self, *args, **kwa):
         "observes the provided task"

@@ -100,3 +100,14 @@ def asview(vals:np.ndarray, view:type, **kwa) -> np.ndarray:
     for i, j in kwa.items():
         setattr(vals, i, j)
     return vals
+
+def repeat(data, count, axis = 1):
+    """
+    Repeats values along an axis.
+
+        >>> assert repeat(np.arange(3), 2, axis == 1).reshape(3,2) == [[0,0], [1,1], [2,2]]
+        >>> assert repeat(np.arange(3), 2, axis == 0).reshape(2,3) == [[0,1,2], [0,1,2]]
+    """
+    if axis == 1:
+        return np.repeat(data, count)
+    return np.repeat(np.asarray(data)[np.newaxis], count, axis = 0).ravel()
