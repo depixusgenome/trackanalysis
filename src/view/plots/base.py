@@ -381,6 +381,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
 
     if SINGLE_THREAD: # pylint: disable=using-constant-test
         # use this for single-thread debugging
+        LOGS.info("Running in single-thread mode")
         def __doreset(self):
             with self.resetting():
                 self._model.reset()
