@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "Cycles plot"
 from    typing              import Optional, TYPE_CHECKING # pylint: disable=unused-import
+from    bokeh               import layouts
 
 from    control             import Controller
 from    control.taskio      import ConfigTrackIO, GrFilesIO
@@ -35,7 +36,9 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, WidgetMixin):
         "returns the figure"
         self._hover = DpxHoverModel()
         doc.add_root(self._hover)
-        self._createhist(self._rawsource.data, self._createraw(), self._raw.y_range)
+
+        shape = self._createraw()
+        self._createhist(self._rawsource.data, shape, self._raw.y_range)
         return self._keyedlayout(self._raw, self._hist, bottom = self._createwidget())
 
     def _reset(self):

@@ -25,10 +25,11 @@ class HistMixin:
                              'cycles'    : PlotAttrs('white', 'quad',   1,
                                                      fill_color = None,
                                                      line_alpha = .5,
-                                                     line_color = 'blue')}
+                                                     line_color = 'blue'),
+                             'figure.width' : 100,
+                             'figure.height': 100}
         self.css.hist.defaults = {'xtoplabel'    : u'Cycles',
-                                  'xlabel'       : u'Frames',
-                                  'figure.width' : 400}
+                                  'xlabel'       : u'Frames'}
         SequenceTicker.defaultconfig(self)
 
         self._histsource = None             # type: Optional[ColumnDataSource]

@@ -23,7 +23,8 @@ class RawMixin:
                              'raw.basic'    : PlotAttrs('color',  'circle', 1,
                                                         alpha   = .5,
                                                         palette = 'inferno'),
-                             'figure.width' : 500}
+                             'figure.width' : 100,
+                             'figure.height': 100}
         self._rawsource = None # type: Optional[ColumnDataSource]
         self._raw       = None # type: Optional[Figure]
 
