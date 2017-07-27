@@ -7,7 +7,7 @@ from   functools    import partial
 import numpy        as np
 
 from utils                      import StreamUnion, initdefaults, updatecopy, asobjarray
-from data.trackitems            import BEADKEY, TrackItems
+from data.trackitems            import BEADKEY, TrackItems, Beads
 from peakfinding.selector       import Output as PeakFindingOutput, PeaksArray
 from peakfinding.processor      import PeaksDict
 from model                      import Task, Level
@@ -30,8 +30,24 @@ class FitToHairpinTask(Task):
     constraints = dict() # type: Constraints
     peakids     = dict() # type: PeakIds
     @initdefaults(frozenset(locals()) - {'level'})
-    def __init__(self, **_):
+    def __init__(self, **kwa):
         super().__init__()
+        if 'sequence' in kwa:
+            assert 'oligo' in kwa
+            other = self.read(kwa['sequence'], kwa['oligo'],
+                              distance   = kwa.get('distance',   None),
+                              identifier = kwa.get('identifier', None))
+            self.distances.update(other.distances)
+            self.peakids.update(other.peakids)
+
+    def __scripting__(self, kwa):
+        if 'sequence' in kwa:
+            other = self.read(kwa['sequence'], kwa['oligo'],
+                              distance   = kwa.get('distance',   None),
+                              identifier = kwa.get('identifier', None))
+            self.distances.update(other.distances)
+            self.peakids.update(other.peakids)
+            return self
 
     @classmethod
     def isslow(cls) -> bool:
@@ -69,41 +85,36 @@ FitBead = NamedTuple('FitBead',
                       ('peaks',       PEAKS_TYPE),
                       ('events',      PeakFindingOutput)])
 
-class FitToHairpinProcessor(Processor):
-    "Groups beads per hairpin"
-    @classmethod
-    def apply(cls, toframe = None, **cnf):
-        "applies the task to a frame or returns a function that does so"
-        app  = partial(cls.compute, **cnf)
-        fcn  = lambda frame: frame.withaction(app)
-        return fcn if toframe is None else fcn(toframe)
 
-    def run(self, args):
-        args.apply(self.apply(**self.config()))
+class FitToHairpinDict(TrackItems):
+    "iterator over peaks grouped by beads"
+    level = Level.bead
+    def __init__(self, *_, config = None, **kwa):
+        assert len(_) == 0
+        super().__init__(**kwa)
+        if config is None:
+            self.config = FitToHairpinTask()
+        elif isinstance(config, dict):
+            self.config = FitToHairpinTask(**config)
+        else:
+            assert isinstance(config, FitToHairpinTask), config
+            self.config = config
+        self.__keys = None
 
-    @classmethod
-    def compute(cls,
-                item        : Tuple[BEADKEY,Sequence[PeakFindingOutput]],
-                distances   : Optional[Distances]   = None,
-                constraints : Optional[Constraints] = None,
-                peakids     : Optional[PeakIds]     = None,
-                **_
-               ) -> Tuple[BEADKEY,FitBead]:
-        "Action applied to the frame"
-        if distances is None:
-            distances = {}
-        if constraints is None:
-            constraints = {}
-        if peakids is None:
-            peakids = {}
+    def _keys(self, sel:Sequence = None, _ = None) -> Iterator[BEADKEY]:
+        if self.__keys is None:
+            self.__keys = frozenset(self.data.keys())
 
-        peaks, events = cls.__topeaks(item[1])
-        dist          = cls.__distances(distances, constraints, item[0], peaks)
-        out           = cls.__beadoutput(peakids, item[0], peaks, events, dist)
-        return out.key, out
+        if sel is None:
+            yield from self.__keys
+        else:
+            yield from (i for i in self.__keys if i in sel)
 
-    @classmethod
-    def __topeaks(cls, evts:Sequence[PeakFindingOutput]) -> _PEAKS:
+    def _iter(self, sel:Sequence = None) -> Iterator[Tuple[BEADKEY, FitBead]]:
+        yield from ((bead, self.compute(bead)) for bead in self.keys(sel))
+
+    @staticmethod
+    def __topeaks(evts:Sequence[PeakFindingOutput]) -> _PEAKS:
         "Regroups the beads from a frame by hairpin"
         if isinstance(evts, Iterator):
             evts = tuple(evts)
@@ -119,11 +130,9 @@ class FitToHairpinProcessor(Processor):
                           discarded = disc)
         return np.array([i for i, _ in evts], dtype = 'f4'), evts
 
-    @staticmethod
-    def __distances(distances   : Distances,
-                    constraints : Constraints,
-                    key         : str,
-                    bead        : Sequence[float])->Dict[Optional[str], Distance]:
+    def __distances(self, key: str, bead: Sequence[float])->Dict[Optional[str], Distance]:
+        distances   = self.config.distances
+        constraints = self.config.constraints
         cstr = constraints.get(key, None)
         if cstr is not None:
             hpin = distances.get(cstr[0], None)
@@ -135,8 +144,7 @@ class FitToHairpinProcessor(Processor):
 
         return {None: next(iter(distances.values())).optimize(bead)}
 
-    @staticmethod
-    def __beadoutput(peakids : PeakIds,
+    def __beadoutput(self,
                      key     : BEADKEY,
                      peaks   : Sequence[float],
                      events  : Sequence[PeakFindingOutput],
@@ -144,9 +152,44 @@ class FitToHairpinProcessor(Processor):
                     ) -> FitBead:
         best = min(dist, key = dist.__getitem__)
         silh = HairpinDistance.silhouette(dist, best)
-        alg  = peakids.get(best, PeakIdentifier())
+        alg  = self.config.peakids.get(best, PeakIdentifier())
         ids  = alg.pair(peaks, *dist.get(best, (0., 1., 0))[1:])
         return FitBead(key, silh, dist, ids, events)
+
+    def compute(self, item: Union[BEADKEY, Tuple[BEADKEY,Sequence[PeakFindingOutput]]]) -> FitBead:
+        "Action applied to the frame"
+        if Beads.isbead(item):
+            item = item, self.data[item]
+
+        peaks, events = self.__topeaks(item[1])
+        dist          = self.__distances(item[0], peaks)
+        return self.__beadoutput(item[0], peaks, events, dist)
+
+class FitToHairpinProcessor(Processor):
+    "Groups beads per hairpin"
+    @classmethod
+    def apply(cls, toframe = None, **cnf):
+        "applies the task to a frame or returns a function that does so"
+        fcn = lambda frame: frame.new(FitToHairpinDict, config = cnf)
+        return fcn if toframe is None else fcn(toframe)
+
+    @classmethod
+    def compute(cls,
+                item        : Tuple[BEADKEY,Sequence[PeakFindingOutput]],
+                distances   : Optional[Distances]   = None,
+                constraints : Optional[Constraints] = None,
+                peakids     : Optional[PeakIds]     = None,
+                **cnf
+               ) -> Tuple[BEADKEY,FitBead]:
+        "Action applied to the frame"
+        cnf.update(distances   = {} if distances   is None else distances, # type: ignore
+                   constraints = {} if constraints is None else constraints,
+                   peakids     = {} if peakids     is None else peakids)
+        out = FitToHairpinDict(config = cnf).compute(item)
+        return out.key, out
+
+    def run(self, args):
+        args.apply(self.apply(**self.config()))
 
 ByHairpinBead  = NamedTuple('ByHairpinBead',
                             [('key',         BEADKEY),
