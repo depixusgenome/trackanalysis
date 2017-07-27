@@ -115,6 +115,28 @@ def peaks(self) -> Events:
         tasks = (Tasks.alignment,) + tasks
     return self.apply(*tasks)
 
+def _fit(self, tpe, kwa) -> Events:
+    "computes hairpin fits"
+    tasks = (Tasks.eventdetection,
+             Tasks.peakselector,
+             getattr(Tasks, tpe)(**kwa)) # type: tuple
+    if len(tasks[-1].distances) == 0:
+        raise IndexError('No distances found')
+
+    if not (isinstance(self.path, (str, Path)) or len(self.path) == 1):
+        tasks = (Tasks.alignment,) + tasks
+    return self.apply(*tasks)
+
+@_totrack # type: ignore
+def fittohairpin(self, **kwa) -> Events:
+    "computes hairpin fits"
+    return _fit(self, 'fittohairpin', kwa)
+
+@_totrack # type: ignore
+def beadsbyhairpin(self, **kwa) -> Events:
+    "computes hairpin fits"
+    return _fit(self, 'beadsbyhairpin', kwa)
+
 def _addprop(name):
     fcn = getattr(_Track, name).fget
     setattr(Track, name, property(lambda self: fcn(self).withcopy()))

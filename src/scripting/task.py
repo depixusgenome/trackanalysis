@@ -14,7 +14,7 @@ from control.taskcontrol        import create as _create
 from cordrift.processor         import DriftTask
 from eventdetection.processor   import ExtremumAlignmentTask, EventDetectionTask
 from peakfinding.processor      import PeakSelectorTask
-from peakcalling.processor      import FitToHairpinTask
+from peakcalling.processor      import FitToHairpinTask, BeadsByHairpinTask
 from model.task                 import * # pylint: disable=wildcard-import,unused-wildcard-import
 from model.task                 import __all__ as __all_tasks__, Task, TrackReaderTask
 
@@ -53,7 +53,8 @@ class Tasks(Enum):
                     cycles         = CycleCreatorTask(),
                     eventdetection = EventDetectionTask(),
                     peakselector   = PeakSelectorTask(),
-                    fittohairpin   = FitToHairpinTask())
+                    fittohairpin   = FitToHairpinTask(),
+                    beadsbyhairpin = BeadsByHairpinTask())
 
     def default(self):
         "returns default tasks"
@@ -106,6 +107,7 @@ class Tasks(Enum):
         kwa.update({i: getattr(cls, i) for i, j in kwa.items() if j is RESET})
         kwa.update({i: getattr(cls, i) for i in resets})
         task = update(deepcopy(cnf), **kwa)
+        task = getattr(task, '__scripting__', lambda x: task)(kwa)
         self.save(task)
         return task
 

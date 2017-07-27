@@ -71,6 +71,14 @@ class Task:
 
         return _dumps(self) == _dumps(obj)
 
+    def __scripting__(self, _):
+        """
+        Used in  scripting.Tasks for creating a new task
+
+        See peakcalling.FitToHairpinTask for an example.
+        """
+        return self
+
     __hash__ = object.__hash__
 
     @classmethod
