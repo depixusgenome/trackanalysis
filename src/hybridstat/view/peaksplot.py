@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
-from typing                     import (Optional,   # pylint: disable=unused-import
-                                        Tuple, List, Dict,
-                                        Union, TYPE_CHECKING)
+from typing                     import Tuple, TYPE_CHECKING
 from itertools                  import chain
 
 import bokeh.core.properties as props
 from bokeh                      import layouts
-from bokeh.plotting             import figure, Figure    # pylint: disable=unused-import
+from bokeh.plotting             import figure, Figure
 from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
                                         Model, TapTool, CustomJS)
 import bokeh.colors             as     bkcolors
@@ -120,8 +118,8 @@ class PeaksPlotCreator(TaskPlotCreator):
     def __init__(self, *args):
         super().__init__(*args)
         self.css.defaults = {'count'           : PlotAttrs('lightblue', 'line', 1),
-                             'figure.width'    : 500,
-                             'figure.height'   : 800,
+                             'figure.width'    : 100,
+                             'figure.height'   : 200,
                              'xtoplabel'       : u'Duration (s)',
                              'xlabel'          : u'Rate (%)',
                              'widgets.border'  : 10}
@@ -134,9 +132,9 @@ class PeaksPlotCreator(TaskPlotCreator):
         PeaksSequenceHover.defaultconfig(self)
         SequenceTicker.defaultconfig(self)
 
-        self._histsrc = None # type: Optional[ColumnDataSource]
-        self._peaksrc = None # type: Optional[ColumnDataSource]
-        self._fig     = None # type: Optional[Figure]
+        self._histsrc: ColumnDataSource = None
+        self._peaksrc: ColumnDataSource = None
+        self._fig:     Figure           = None
         self._widgets = dict(seq      = PeaksSequencePathWidget(self._model),
                              oligos   = OligoListWidget(self._model),
                              stats    = PeaksStatsWidget(self._model),
@@ -172,7 +170,7 @@ class PeaksPlotCreator(TaskPlotCreator):
 
     def __data(self) -> Tuple[dict, dict]:
         cycles = self._model.runbead()
-        data   = dict.fromkeys(('z', 'count'), [0., 1.])
+        data   = {i: np.empty((1,0), dtype = 'f4') for i in ('z', 'count')}
         if cycles is None:
             return data, self.__peaks(None)
 
@@ -221,10 +219,10 @@ class PeaksPlotCreator(TaskPlotCreator):
         self.setbounds(self._fig.y_range, 'y', (data['z'][0], data['z'][-1]))
 
     def __create_fig(self):
-        self._fig = figure(**self._figargs(y_range = Range1d,
+        self._fig = figure(**self._figargs(y_range = Range1d(start = 0., end = 1.),
                                            name    = 'Peaks:fig',
-                                           x_range = Range1d))
-        self._fig.extra_x_ranges = {"duration": Range1d(start = 0., end = 0.)}
+                                           x_range = Range1d(start = 0., end = 1e3)))
+        self._fig.extra_x_ranges = {"duration": Range1d(start = 0., end = 1.)}
         axis  = LinearAxis(x_range_name          = "duration",
                            axis_label            = self.css.xtoplabel.get(),
                            axis_label_text_color = self.css.peaks.colors.found.get()
