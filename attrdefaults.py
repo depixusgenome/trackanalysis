@@ -17,16 +17,13 @@ def toenum(tpe, val):
     "returns an enum object"
     if not isinstance(tpe, type):
         tpe = type(tpe)
-
     if not issubclass(tpe, Enum):
         return val
-    elif isinstance(val, str):
-        return tpe.__members__[val]
-    elif isinstance(val, int):
+    if isinstance(val, (int, str)):
         return tpe(val)
-    elif isinstance(val, tpe):
+    if isinstance(val, tpe):
         return val
-    elif val is not None:
+    if val is not None:
         raise TypeError('"level" attribute has incorrect type')
 
 class ChangeFields:
