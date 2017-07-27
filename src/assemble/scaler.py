@@ -2,8 +2,7 @@
 # -*- coding: utf-8 -*-
 
 '''
-must define non-linearity as a for each OPeakArray
-use of TO FIX tags for priority commands to implement
+non-linearity not implemented (for each OPeakArray)
 '''
 
 import itertools
@@ -17,21 +16,36 @@ import assemble.shuffler as shuffler
 BP2NM=1.1
 
 # to finish
-def tsp_paths(graph:networkx.Graph,
-              source=None)->Generator:
+def stack_paths(graph:networkx.DiGraph,
+                source=None)->Generator:
     '''
-    returns the solution to the travelling salesman problem
-    each node visited once
+    works for directed graphs
+    combine cyclic paths
     '''
-    # traveling salesman problem
-    # generate all paths using simple paths and cutoff=len(graph)? nope. dijskstra path algorithm?
-    # use euler_circuit
-    # possible presence of duplicates nodes in path??
-    paths=networkx.eulerian_circuit(graph,source=source)
-    # check directionality
-    # for cycles, both orientation must be explored
-    print(paths)
-    yield tuple()
+
+    circuit=list(networkx.eulerian_circuit(graph,source=source))
+    path=[val[0] for val in circuit]
+    spath=tuple(val for idx,val in enumerate(path)
+                if path.index(val)==idx
+                or val==source)
+    yield spath
+
+# probably not going to be used
+def hamiltonian_paths(graph:networkx.Graph,
+                      source=None)->Generator:
+    '''
+    returns paths for which each node is visited once
+    works in the special case where the graph in undirected
+    yields nothing if the (graph,source) does not allow hamiltonian path
+    brute force
+    '''
+    if source is None:
+        source=graph.nodes()[0]
+
+    paths=networkx.all_simple_paths(graph,source=source,target=source)
+    for path in paths:
+        if len(frozenset(path))==len(graph):
+            yield path
 
 def cyclic_paths(graph:networkx.Graph,
                  source=None)->Generator:
@@ -241,26 +255,17 @@ class OPeakArray:
         for seq in to_match:
             for opk in others:
                 for tocheck in opk.seqs:
-                    if data.Oligo.do_overlap(seq,tocheck,min_overl):
-                        match.append(opk)
-                        break
-                    if with_reverse and data.Oligo.do_overlap(seq,opk.rev(tocheck),min_overl):
-                        match.append(opk)
-                        break
+                    # if data.Oligo.do_overlap(seq,tocheck,min_overl):
+                    #     match.append(opk)
+                    #     break
+                    # if with_reverse and data.Oligo.do_overlap(seq,opk.rev(tocheck),min_overl):
+                    #     match.append(opk)
+                    #     break
 
+                    if data.Oligo.can_tail_overlap(seq,tocheck,min_overl,not with_reverse,shift=1):
+                        match.append(opk)
+                        break
         return match
-
-    # not used atm
-    def count_matches(self,scaled,nlampli)->int:
-        '''
-        maximum number of matches in len(self.arr)
-        asymmetric function
-        '''
-        return count_matches([i.pos for i in self.arr],
-                             [i.pos for i in scaled.arr],
-                             fprecision=nlampli)
-
-
 
     @staticmethod
     def list2graph(peaks:List,min_overl=2):
@@ -278,7 +283,32 @@ class OPeakArray:
         return graph
 
 
+    @staticmethod
+    def list2tree(refpeak,
+                  others:Iterable,
+                  min_overl=2,
+                  depth=4):
+        '''
+        use networkx to reconstruct all possible paths
+        returns the graph, and the tips of the tree (from all_simple_paths search)
+        '''
+        others=frozenset(others)
+        graph=networkx.DiGraph()
+        last_added=frozenset([refpeak])
+        for layer in range(depth):
+            print(f"layer,depth={layer},{depth}")
+            others=others-last_added
+            print(f"len(others)={len(others)}")
+            alladded=[] # type: List
+            for newroot in last_added:
+                toadd=OPeakArray.may_overlap(newroot,others,min_overl)
+                print(f"len(toadd)={len(toadd)}")
+                graph.add_edges_from([(newroot,add) for add in toadd])
+                alladded+=toadd
 
+            last_added=frozenset(alladded)
+
+        return graph,list(last_added)
 
     def __hash__(self)->int:
         'could help to implement this'
@@ -308,7 +338,7 @@ class PeakStack:
     '''
     def __init__(self,**kwa):
         # ordered list of scaled OPeakArray
-        self.min_overlap=kwa.get("min_overlap",2) # type: int
+        self.min_overl=kwa.get("min_overl",2) # type: int
         self.ordered=list(kwa.get("ordered",[])) # type: List[OPeakArray]
         self.stack=dict() # type: Dict[float,List[data.Oligo]] # make private?
         if self.ordered:
@@ -332,7 +362,7 @@ class PeakStack:
             if key is not None:
                 if not tail(self.stack[key][-1].seq,
                             peak.seq,
-                            self.min_overlap,
+                            self.min_overl,
                             oriented=False,
                             shift=1):
                     return False
@@ -425,7 +455,7 @@ class Scaler:
     nl_amplitude=5*bp2nm # type: float # in nm
     oligos=[] # type: List[data.OligoPeak]
     peaks=[] # type: List[data.OPeakArray]
-    min_overlap=2 # type: int # need to rethink this parameter and its interaction
+    min_overl=2 # type: int # need to rethink this parameter and its interaction
     with_reverse=True # type: bool
     bstretch=Bounds() # type: Bounds
     bbias=Bounds() # type: Bounds
@@ -443,17 +473,17 @@ class Scaler:
         seqs2=frozenset(i.seq for i in peaks2.arr)
         seqs2=seqs2.union(frozenset(__rev(i.seq) for i in peaks2.arr))
         for seq1,seq2 in itertools.product(seqs1,seqs2):
-            if len(data.OligoPeak.tail_overlap(seq1,seq2))>=self.min_overlap:
+            if len(data.OligoPeak.tail_overlap(seq1,seq2))>=self.min_overl:
                 return True
 
         return False
 
 
-    def build_stacks_fromtuple(self,
-                               stack:PeakStack,
-                               peakarrs)->List[PeakStack]:
+    def build_stack_fromtuple(self,
+                              stack:PeakStack,
+                              peakarrs)->List[PeakStack]:
         '''
-        use itertools.permutations(peaks,4) to feed tuples
+        peakarrs is a list of unscaled OPeakArray objects
         '''
 
         if not peakarrs:
@@ -471,15 +501,15 @@ class Scaler:
                for scale in scales if stack.can_add(scale(peak))]
         print(f"len(toadd)={len(toadd)}")
         for peak,scale in toadd:
-            stacks+=self.build_stacks_fromtuple(stack=stack.add(scale(peak),in_place=False),
-                                                peakarrs=peakarrs[1:])
+            stacks+=self.build_stack_fromtuple(stack=stack.add(scale(peak),in_place=False),
+                                               peakarrs=peakarrs[1:])
 
         return stacks
 
 
-    def build_stacks(self,
-                     stack:PeakStack,
-                     peakarrs:FrozenSet[OPeakArray])->List[PeakStack]:
+    def build_stack(self,
+                    stack:PeakStack,
+                    peakarrs:FrozenSet[OPeakArray])->List[PeakStack]:
         '''
         recursive
         '''
@@ -500,10 +530,25 @@ class Scaler:
 
         stacks=[] # type: List[PeakStack]
         for peak,scale in toadd:
-            stacks+=self.build_stacks(stack=stack.add(scale(peak),in_place=False),
-                                      peakarrs=peakarrs-frozenset([peak]))
+            stacks+=self.build_stack(stack=stack.add(scale(peak),in_place=False),
+                                     peakarrs=peakarrs-frozenset([peak]))
         return stacks
 
+    def incr_build(self,stack:PeakStack)->List[PeakStack]:
+        '''
+        build incrementally the stacks depth OPeakArrays at a time
+        returns the incremented stacks
+        '''
+        addstacks=[] # type: List[PeakStack]
+        others=frozenset(self.peaks)-frozenset(stack.ordered)
+        graph,tips=OPeakArray.list2tree(stack.top(),others,min_overl=self.min_overl,depth=1)
+        paths=[] # type: List[OPeakArray]
+        for tip in tips:
+            paths+=[path[1:]
+                    for path in networkx.all_simple_paths(graph,source=stack.top(),target=tip)]
+        for path in paths:
+            addstacks=self.build_stack_fromtuple(stack,path)
+        return addstacks
 
     def run(self):
         '''
@@ -525,38 +570,36 @@ class Scaler:
         *for each scaled peakarray to an object (Scaffold):
         a Scaffold can only contain 1 copy of a peakarray (modulo scale)
         '''
-        exp_oligos=no_orientation(self.oligos) # type: List[data.OligoPeak]
+        # exp_oligos=no_orientation(self.oligos) # type: List[data.OligoPeak] # keep for later
+        exp_oligos=list(self.oligos)
         self.peaks=OPeakArray.from_oligos(exp_oligos) # type: List[data.OPeakArray]
         self.peaks=sorted(self.peaks,key=lambda x:-len(x.arr))
         refpeak=self.peaks[self.ref_index]
+        pstack=PeakStack()
+        pstack.add(refpeak)
 
-        self.pstack.add(refpeak)
+        peakset=frozenset(self.peaks)
 
-        # build_stacks
+        pstacks=[pstack]
+        # quick and dirty solution for accounting for different starting sequences.
+        # duplicate them (any combination for arr in peaks[0])
+        # or add it when looking for overlaps
 
-        stacks=self.build_stacks(self.pstack,frozenset(self.peaks[1:]))
+        # building_stacks
+        # infinite loop to fix
+        while any(peakset-frozenset(stack.ordered) for stack in pstacks): 
+            print("in while loop")
+            new_stacks=[] # type: List[PeakStack]
+            for stack in pstacks:
+                if peakset-frozenset(stack.ordered):
+                    new_stacks+=self.incr_build(stack)
+                else:
+                    new_stacks.append(stack)
+            pstacks=new_stacks
+            if __debug__:
+                print(f"len(pstacks)={len(pstacks)}")
 
-
-        # for iteration in range(3):
-        #     print(f"iteration={iteration}")
-        # add next peak to the stack
-        # trying to reduced the numbers of possible stacks
-        # by fixing the sequences will only work when we hit a cycle
-
-
-        # ref oligos is A then add Bs (B1,B2,B3) and see if there is some conflict between
-        # events at different peaks
-        # resolve conflicts if possible (non-linearity?)
-        # could use shuffler at a later stage to readjust locally some events
-
-        # Must take into account
-        # * the minimal distance between 2 overlapping oligos
-        # * the boundaries of the bucket are not allowed to be permutated
-        # (shuffle relative to boundaries)
-        # we can attempt to reorder events in bucket by looking at the possible sequences
-
-
-        return refpeak,stacks
+        return pstacks
 
     def find_rescales(self,refpeak:OPeakArray,others:Iterable[OPeakArray],tocmpfilter=None):
         '''

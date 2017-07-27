@@ -72,7 +72,6 @@ class Oligo:
         cpy.seq=type(self).rev(self.seq)
         return cpy
 
-    # to test
     @classmethod
     def can_tail_overlap(cls, # pylint: disable=too-many-arguments
                          ol1:str,
