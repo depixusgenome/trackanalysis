@@ -22,6 +22,13 @@ class Axis(Enum):
     Xaxis = 'Xaxis'
     Yaxis = 'Yaxis'
     Zaxis = 'Zaxis'
+    @classmethod
+    def _missing_(cls, name):
+        if name in 'xyz':
+            name = name.upper()
+        if name in 'XYZ':
+            name += 'axis'
+        return cls(name)
 
 @levelprop(Level.project)
 class Track:
@@ -32,7 +39,7 @@ class Track:
     _path:          PATHTYPES   = None
     _rawprecisions: _PRECISIONS = {}
     _lazy                       = True
-    axis= Axis.Zaxis
+    axis                        = Axis.Zaxis
     @initdefaults(('axis',),
                   framerate     = '_',
                   phases        = '_',
@@ -45,11 +52,12 @@ class Track:
 
     def __getstate__(self):
         info = self.__dict__.copy()
-        for name in ('path', 'framerate', 'rawprecisions', 'data', 'lazy', 'axis'):
+        for name in ('path', 'framerate', 'rawprecisions', 'data', 'lazy'):
             val = info.pop('_'+name)
             if val !=  getattr(type(self), '_'+name):
                 info[name] = val
 
+        info['axis'] = info['axis'].value
         val = info.pop('_phases')
         if len(val) > 0:
             info['phases'] = val
