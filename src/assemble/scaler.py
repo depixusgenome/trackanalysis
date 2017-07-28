@@ -3,6 +3,8 @@
 
 '''
 non-linearity not implemented (for each OPeakArray)
+
+should deal with any orientation (keeps possible stacks depending if no conflict)
 '''
 
 import itertools
@@ -240,7 +242,7 @@ class OPeakArray:
     @property
     def seqs(self):
         'returns sequences in peakarray'
-        return frozenset(i.seq for i in self.arr)
+        return tuple(i.seq for i in self.arr)
 
     @staticmethod
     def may_overlap(peak,others:Iterable,min_overl:int,with_reverse=True)->List:
@@ -255,13 +257,6 @@ class OPeakArray:
         for seq in to_match:
             for opk in others:
                 for tocheck in opk.seqs:
-                    # if data.Oligo.do_overlap(seq,tocheck,min_overl):
-                    #     match.append(opk)
-                    #     break
-                    # if with_reverse and data.Oligo.do_overlap(seq,opk.rev(tocheck),min_overl):
-                    #     match.append(opk)
-                    #     break
-
                     if data.Oligo.can_tail_overlap(seq,tocheck,min_overl,not with_reverse,shift=1):
                         match.append(opk)
                         break
@@ -311,12 +306,25 @@ class OPeakArray:
         return graph,list(last_added)
 
     def __hash__(self)->int:
-        'could help to implement this'
-        return hash(self.arr.tobytes())
+        '''
+        simple hash considering only sequences
+        '''
+        return hash(self.seqs)
 
     def __eq__(self,other)->bool:
-        if isinstance(other,type(self)):
-            return hash(self)==hash(other)
+        '''
+        2 are equivalent if invariant under scaling (stretch,bias)
+        '''
+        if isinstance(other,type(self))\
+        and hash(self)==hash(other)\
+        and len(self.posarr)==len(other.posarr):
+            if len(self.posarr)==1:
+                return True
+            sarr=self.posarr
+            oarr=other.posarr
+            sarr=(sarr-sarr[0])/max(abs(sarr-sarr[0]))
+            oarr=(oarr-oarr[0])/max(abs(oarr-oarr[0]))
+            return all(numpy.isclose(sarr,oarr))
         return False
 
 def no_orientation(oligos:List[data.OligoPeak]):
@@ -587,8 +595,7 @@ class Scaler:
 
         # building_stacks
         # infinite loop to fix
-        while any(peakset-frozenset(stack.ordered) for stack in pstacks): 
-            print("in while loop")
+        while any(peakset-frozenset(stack.ordered) for stack in pstacks):
             new_stacks=[] # type: List[PeakStack]
             for stack in pstacks:
                 if peakset-frozenset(stack.ordered):
