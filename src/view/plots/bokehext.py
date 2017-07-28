@@ -58,23 +58,38 @@ class DpxKeyedRow(Row): # pylint: disable=too-many-ancestors
                          panrate  = cnf.pan.rate.get(),
                          **defaultsizingmode(plotter, kwa))
     @classmethod
-    def keyedlayout(cls, plot, main, *figs, bottom = None, left = None):
+    def keyedlayout(cls, plot, main, *figs, bottom = None, left = None, right = None):
         "sets up a DpxKeyedRow layout"
-        figs  = (main,) + figs
-        kwa   = plot.defaultsizingmode()
-        plts  = layouts.gridplot([[*figs]], **kwa,
-                                 toolbar_location = plot.css.toolbar_location.get())
-        keyed = cls(plot, main, children = [plts],
-                    toolbar  = next(i for i in plts.children if isinstance(i, ToolbarBox)),
-                    **kwa)
+        assert left is None or right is None
+        kwa = plot.defaultsizingmode()
+        if len(figs) == 0:
+            keyed = cls(plot, main)
+        else:
+            figs  = (main,) + figs
+            plts  = layouts.gridplot([[*figs]], **kwa,
+                                     toolbar_location = plot.css.toolbar_location.get())
 
-        if left is None and bottom is None:
+            keyed = cls(plot, main,
+                        children = [plts],
+                        toolbar  = next(i for i in plts.children if isinstance(i, ToolbarBox)),
+                        **kwa)
+
+        if {left, right, bottom} == {None}:
             return keyed
-        if left is None:
+
+        if {left, right} == {None}:
             return layouts.column([keyed, bottom], **kwa)
-        if bottom is None:
+
+        if {bottom, right} == {None}:
             return layouts.row([left, keyed], **kwa)
-        return layouts.row([left, layouts.column([keyed, bottom], **kwa)], **kwa)
+
+        if {bottom, left} == {None}:
+            return layouts.row([keyed, right], **kwa)
+
+        if left is None:
+            return layouts.column([layouts.column([keyed, bottom], **kwa), right], **kwa)
+
+        return layouts.column([left, layouts.column([keyed, bottom], **kwa)], **kwa)
 
 class DpxHoverTool(HoverTool): # pylint: disable=too-many-ancestors
     "sorts indices before displaying tooltips"

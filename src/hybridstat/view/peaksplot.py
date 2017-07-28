@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
 from typing                     import Tuple, TYPE_CHECKING
-from itertools                  import chain
 
 import bokeh.core.properties as props
 from bokeh                      import layouts
@@ -119,7 +118,7 @@ class PeaksPlotCreator(TaskPlotCreator):
         super().__init__(*args)
         self.css.defaults = {'count'           : PlotAttrs('lightblue', 'line', 1),
                              'figure.width'    : 100,
-                             'figure.height'   : 200,
+                             'figure.height'   : 150,
                              'xtoplabel'       : u'Duration (s)',
                              'xlabel'          : u'Rate (%)',
                              'widgets.border'  : 10}
@@ -196,7 +195,7 @@ class PeaksPlotCreator(TaskPlotCreator):
         self.__create_fig()
         rends = self.__add_curves()
         self.__setup_tools(doc, rends)
-        return self._keyedlayout(self._fig, left = self.__setup_widgets())
+        return self._keyedlayout(self._fig, right = self.__setup_widgets())
 
     def observe(self):
         super().observe()
@@ -272,9 +271,11 @@ class PeaksPlotCreator(TaskPlotCreator):
                                        wdg['stats'][-1],
                                        wdg['peaks'][-1])
 
-        itr = chain.from_iterable(wdg[i] for i in ('seq','oligos','cstrpath', 'advanced'))
-        lay = layouts.row(layouts.widgetbox(*itr), layouts.widgetbox(*wdg['stats']))
-        return layouts.column(lay, *wdg['peaks'])
+        mode     = self.defaultsizingmode()
+        wbox     = lambda x: layouts.widgetbox(children = x, **mode)
+        left     = sum((wdg[i] for i in ('seq','oligos','cstrpath', 'advanced')), [])
+        children = [[wbox(left), wbox(wdg['stats'])], [wbox(wdg['peaks'])]]
+        return layouts.layout(children = children, **mode)
 
     def advanced(self):
         "triggers the advanced dialog"

@@ -204,7 +204,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                                                'figure.width'       : 800,
                                                'figure.height'      : 200,
                                                'figure.sizing_mode' : 'scale_width',
-                                               'figure.responsive'  : False}
+                                               'figure.responsive'  : True}
 
         key = type(self).key()
         for name in 'config', 'project', 'css':
@@ -511,8 +511,11 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                 args[name] = Range1d(start = 0., end = 1.)
         return args
 
-    def _keyedlayout(self, main, *figs, left = None, bottom = None):
-        return DpxKeyedRow.keyedlayout(self, main, *figs, left = left, bottom = bottom)
+    def _keyedlayout(self, main, *figs, left = None, bottom = None, right = None):
+        return DpxKeyedRow.keyedlayout(self, main, *figs,
+                                       left   = left,
+                                       right  = right,
+                                       bottom = bottom,)
 
     @abstractmethod
     def _create(self, doc):
