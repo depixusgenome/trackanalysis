@@ -5,6 +5,8 @@
 non-linearity not implemented (for each OPeakArray)
 
 should deal with any orientation (keeps possible stacks depending if no conflict)
+can use boundaries on non-linearity to discard stacking or to add keys if the stacking
+requires a pile in move greater than the non-linearity
 '''
 
 import itertools
@@ -106,8 +108,8 @@ class Rescale:
             return all(numpy.isclose(self.toarr,other.toarr,atol=self.atol))
         return False
 
-def match_peaks(peaks1,
-                peaks2,
+def match_peaks(peaks1:numpy.array,
+                peaks2:numpy.array,
                 bound_stretch:Bounds,
                 bound_bias:Bounds)->List[Rescale]:
     '''
@@ -134,8 +136,6 @@ def match_peaks(peaks1,
             scales.append(Rescale(1,pe1-pe2))
             biases.append(pe1-pe2)
 
-    if __debug__:
-        print(f"biases={biases}")
     for bias in list(biases):
         for pe2 in peaks2:
             if numpy.isclose(pe2,0):
@@ -144,11 +144,6 @@ def match_peaks(peaks1,
             lower=peaks1<=bound_stretch.upper*pe2+bias
             tostretch=numpy.array(peaks1)[numpy.logical_and(upper,lower)]
             for stre in tostretch:
-                # if __debug__:
-                #     print(f"stre={stre}")
-                #     print(f"bias={bias}")
-                #     print(f"pe2={pe2}")
-
                 scales.append(Rescale((stre-bias)/pe2,bias))
 
     return list(frozenset(scales))
@@ -290,14 +285,11 @@ class OPeakArray:
         others=frozenset(others)
         graph=networkx.DiGraph()
         last_added=frozenset([refpeak])
-        for layer in range(depth):
-            print(f"layer,depth={layer},{depth}")
+        for _ in range(depth):
             others=others-last_added
-            print(f"len(others)={len(others)}")
             alladded=[] # type: List
             for newroot in last_added:
                 toadd=OPeakArray.may_overlap(newroot,others,min_overl)
-                print(f"len(toadd)={len(toadd)}")
                 graph.add_edges_from([(newroot,add) for add in toadd])
                 alladded+=toadd
 
@@ -400,17 +392,22 @@ class PeakStack:
         assigned=sorted(assigned,
                         key=lambda x:tuple(x[:2]))
 
+        print("assigned=",assigned)
         for key,group in itertools.groupby(assigned,key=lambda x:x[2]):
             if key is None:
+                print("key is None")
                 for grp in group: # not necessarily of size 0 or 1
                     self.stack[grp[1]]=[grp[3]]
             else:
                 tostack=list(group)
+                print("tostack",tostack)
                 key,peak=tostack[0][2:]
                 last=self.stack[key][-1]
-                if data.Oligo.tail_overlap(last.seq,peak.seq):
+                if len(data.Oligo.tail_overlap(last.seq,peak.seq))>=self.min_overl:
+                    print(f"{last.seq} and {peak.seq} overlap")
                     self.stack[key].append(peak)
                 else:
+                    print(f"{last.seq} and {peak.seq} do not overlap")
                     self.stack[key].append(peak.reverse(in_place=False))
                 for grp in tostack[1:]:
                     self.stack[grp[1]]=[grp[3]]
@@ -504,10 +501,10 @@ class Scaler:
 
         stacks=[] # type: List[PeakStack]
         scperpeak=self.find_rescales(refpeak,[peakarrs[0]],tocmpfilter=cmpfilter)
-
+        # if __debug__:
+        #     print(f"scperpeak={scperpeak}")
         toadd=[(peak,scale) for peak,scales in scperpeak.items()
                for scale in scales if stack.can_add(scale(peak))]
-        print(f"len(toadd)={len(toadd)}")
         for peak,scale in toadd:
             stacks+=self.build_stack_fromtuple(stack=stack.add(scale(peak),in_place=False),
                                                peakarrs=peakarrs[1:])
@@ -555,7 +552,7 @@ class Scaler:
             paths+=[path[1:]
                     for path in networkx.all_simple_paths(graph,source=stack.top(),target=tip)]
         for path in paths:
-            addstacks=self.build_stack_fromtuple(stack,path)
+            addstacks+=self.build_stack_fromtuple(stack,path)
         return addstacks
 
     def run(self):
@@ -583,7 +580,7 @@ class Scaler:
         self.peaks=OPeakArray.from_oligos(exp_oligos) # type: List[data.OPeakArray]
         self.peaks=sorted(self.peaks,key=lambda x:-len(x.arr))
         refpeak=self.peaks[self.ref_index]
-        pstack=PeakStack()
+        pstack=PeakStack(min_overl=self.min_overl)
         pstack.add(refpeak)
 
         peakset=frozenset(self.peaks)
@@ -594,17 +591,16 @@ class Scaler:
         # or add it when looking for overlaps
 
         # building_stacks
-        # infinite loop to fix
-        while any(peakset-frozenset(stack.ordered) for stack in pstacks):
+        #while any(peakset-frozenset(stack.ordered) for stack in pstacks):
+        for _ in range(2): # for debugging
             new_stacks=[] # type: List[PeakStack]
             for stack in pstacks:
                 if peakset-frozenset(stack.ordered):
                     new_stacks+=self.incr_build(stack)
                 else:
                     new_stacks.append(stack)
+            #print(f"new_stacks={new_stacks}")
             pstacks=new_stacks
-            if __debug__:
-                print(f"len(pstacks)={len(pstacks)}")
 
         return pstacks
 
@@ -620,7 +616,6 @@ class Scaler:
 
         rescaleperpeak=dict() # type: Dict[OPeakArray,List]
         for peak in torescale:
-            print(f"peak={peak.posarr}")
             scales=refpeak.find_matches(peak,self.bstretch,self.bbias,self.with_reverse)
             if not scales:
                 continue
