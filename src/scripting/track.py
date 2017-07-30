@@ -21,7 +21,7 @@ We add some methods and change the default behaviour:
         * a *rawprecision* method is added
         * *with...* methods return an updated copy
 """
-from typing                 import Dict, KeysView, Tuple, Iterator, List
+from typing                 import KeysView, Tuple, Iterator, List
 from itertools              import product
 from pathlib                import Path
 import pickle
@@ -30,7 +30,7 @@ import re
 from utils                  import initdefaults
 from model                  import Level
 from data                   import Track as _Track, Beads, Cycles
-from data.trackio           import LegacyGRFilesIO
+from data.trackio           import LegacyGRFilesIO, LegacyTrackIO
 from signalfilter           import PrecisionAlg, NonLinearFilter
 from eventdetection.data    import Events
 
@@ -90,41 +90,42 @@ def apply(self, *args, copy = True, beadsonly = True):
     "returns an iterator over the result of provided tasks"
     return next(iter(self.processors(*args, beadsonly = beadsonly).run(copy = copy)))
 
+def _tasks(paths, upto):
+    tasks = (Tasks.eventdetection, Tasks.peakselector)
+    if isinstance(paths, (str, Path)) or len(paths) == 1:
+        tasks = (Tasks.cleaning, Tasks.alignment)+tasks
+    return tasks if upto is None else tasks[:tasks.index(upto)+1]
+
+@_totrack # type: ignore
+@property
+def cleancycles(self):
+    "returns cleaned cycles"
+    return self.apply(*_tasks(self.path, Tasks.alignment))[...,...]
+
 @_totrack # type: ignore
 @property
 def measures(self):
-    "returns cycles for phase 5 only"
+    "returns cleaned cycles for phase 5 only"
     phase = scriptapp.control.getGlobal('config').phase.measure.get()
-    return self.cycles.withphases(phase)
+    return self.cleaned.withphases(phase)
 
 @_totrack # type: ignore
 @property
 def events(self) -> Events:
     "returns events in phase 5 only"
-    phase = scriptapp.control.getGlobal('config').phase.measure.get()
-    return Events(track   = self,  data = self.beadsonly,
-                  first   = phase, last = phase,
-                  parents = (self.path,))
+    return self.apply(*_tasks(self.path, Tasks.eventdetection))
 
 @_totrack # type: ignore
 @property
 def peaks(self) -> Events:
     "returns peaks found"
-    tasks = (Tasks.eventdetection, Tasks.peakselector) # type: tuple
-    if not (isinstance(self.path, (str, Path)) or len(self.path) == 1):
-        tasks = (Tasks.alignment,) + tasks
-    return self.apply(*tasks)
+    return self.apply(*_tasks(self.path, Tasks.peakselector))
 
 def _fit(self, tpe, kwa) -> Events:
     "computes hairpin fits"
-    tasks = (Tasks.eventdetection,
-             Tasks.peakselector,
-             getattr(Tasks, tpe)(**kwa)) # type: tuple
+    tasks = _tasks(self.path, None)+ (getattr(Tasks, tpe)(**kwa),) # type: tuple
     if len(tasks[-1].distances) == 0:
         raise IndexError('No distances found')
-
-    if not (isinstance(self.path, (str, Path)) or len(self.path) == 1):
-        tasks = (Tasks.alignment,) + tasks
     return self.apply(*tasks)
 
 @_totrack # type: ignore
@@ -170,26 +171,35 @@ class TracksDict(dict):
     requires defining a group which will be used as the key.
     """
     __SCAN_OPTS = ('cgrdir',)
-    def __init__(self, tracks = None, grs = None, match = None, *tasks, **kwa):
+    def __init__(self, tracks = None, grs = None, match = None, allaxes = False,
+                 *tasks, **kwa):
         super().__init__()
-        self.paths : Dict[str, Tuple[str,...]] = {}
         self.tasks = tasks
-        self.update(tracks = tracks, grs = grs, match = match, **kwa)
+        self.update(tracks = tracks, grs = grs, match = match, allaxes = allaxes, **kwa)
 
-    def __setitem__(self, key, val):
+    def __set(self, key, val, allaxes = False):
         if isinstance(val, (str, Path, tuple, list, set)):
-            self.paths[key] = val
-            return val
+            val = Track(path = val)
 
-        if isinstance(val, _Track) and not isinstance(val, Track):
-            val = _Track(**val.__dict__)
+        elif isinstance(val, _Track) and not isinstance(val, Track):
+            val = Track(**val.__getstate__())
 
         if len(self.tasks):
             val = val.apply(*self.tasks)
         super().__setitem__(key, val)
+
+        if allaxes:
+            cnf = val.__getstate__()
+            for i in 'xy':
+                cnf['axis'] = i
+                super().__setitem__('X'+key, Track(**cnf))
+
         return val
 
-    def scan(self, tracks, grs, match = None, **opts) -> KeysView[str]:
+    def __setitem__(self, key, val):
+        return self.__set(key, val)
+
+    def scan(self, tracks, grs = None, match = None, allaxes = False, **opts) -> KeysView[str]:
         "scans for trks and grs"
         if isinstance(match, str) or hasattr(match, 'match'):
             grp = True
@@ -199,14 +209,19 @@ class TracksDict(dict):
             grp = False
             fcn = lambda i: Path(str(i[0])).name if match is None else match
 
-        itr  = ((fcn(i), i) for i in LegacyGRFilesIO.scan(tracks, grs, **opts)[0])
+        if grs is None:
+            itr = ((fcn((i,)), i) for i in LegacyTrackIO.scan(tracks))
+        else:
+            itr = ((fcn(i), i) for i in LegacyGRFilesIO.scan(tracks, grs, **opts)[0])
+
         info = dict((i.group(1), j) for i, j in itr if i) if grp else dict(itr)
-        self.paths.update(info)
+        for i, j in info.items():
+            self.__set(i, j, allaxes)
         return info.keys()
 
-    def update(self, *args, tracks = None, grs = None, match = None, **kwargs):
+    def update(self, *args, tracks = None, grs = None, match = None, allaxes = False, **kwargs):
         "adds paths or tracks to self"
-        scan = {}
+        scan    = {}
         for i in self.__SCAN_OPTS:
             if i in kwargs:
                 scan[i] = kwargs.pop(i)
@@ -214,14 +229,11 @@ class TracksDict(dict):
         info = {}
         info.update(*args, **kwargs)
         for i, j in info.items():
-            self.__setitem__(i, j)
+            self.__set(i, j, allaxes)
 
         if tracks is not None:
             assert sum(i is None for i in (tracks, grs)) in (0, 2)
-            self.scan(tracks, grs, match, **scan)
-
-    def __missing__(self, olig):
-        return self.__setitem__(olig, Track(path = self.paths.get(olig, olig)))
+            self.scan(tracks, grs, match, allaxes, **scan)
 
 class ExperimentList(dict):
     "Provides access to keys belonging to a single experiment"
@@ -302,5 +314,4 @@ class BeadsDict(dict):
         self.__setitem__(key, val)
         return val
 
-
-__all__ = ['Track', 'TracksDict', 'BeadsDict']
+__all__ = ['Track', 'TracksDict', 'BeadsDict', 'Path']

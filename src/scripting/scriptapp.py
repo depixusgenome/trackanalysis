@@ -6,7 +6,6 @@ Saves stuff from session to session
 import inspect
 from   copy        import deepcopy
 
-from   view        import View
 from   view.dialog import FileDialog
 from   app         import Defaults
 from   .task       import Tasks
@@ -20,22 +19,35 @@ for _frame in inspect.stack()[1:]:
     break
 del _frame
 
-class ScriptingView(View):
+class ScriptingView:
     "Dummy view for scripting"
     APPNAME = 'Scripting'
+    ISAPP   = False
     def __init__(self, **kwa):
-        super().__init__(**kwa)
-        self.trkdlg  = FileDialog(filetypes = 'trk|*',
-                                  config    = self._ctrl,
-                                  multiple  = False,
-                                  title     = "open a track file")
+        self._ctrl  = kwa['ctrl']
+        self.trkdlg = FileDialog(filetypes = 'trk|*',
+                                 config    = self._ctrl,
+                                 multiple  = False,
+                                 title     = "open a track file")
 
-        self.grdlg   = FileDialog(filetypes = 'gr|*',
-                                  config    = self._ctrl,
-                                  multiple  = True,
-                                  title     = "open a gr files")
+        self.grdlg  = FileDialog(filetypes = 'gr|*',
+                                 config    = self._ctrl,
+                                 multiple  = True,
+                                 title     = "open a gr files")
 
         self._ctrl.getGlobal("config").tasks.defaults = Tasks.defaults()
+
+
+    def observe(self):
+        "whatever needs to be initialized"
+
+    def ismain(self):
+        "Allows setting-up stuff only when the view is the main one"
+
+    def close(self):
+        "closes the application"
+        self._ctrl.close()
+        self._ctrl = None
 
     @property
     def control(self):
