@@ -11,6 +11,7 @@ from utils                  import update
 
 import anastore
 from control.taskcontrol        import create as _create
+from cleaning.processor         import DataCleaningTask
 from cordrift.processor         import DriftTask
 from eventdetection.processor   import ExtremumAlignmentTask, EventDetectionTask
 from peakfinding.processor      import PeakSelectorTask
@@ -34,6 +35,7 @@ class Tasks(Enum):
         >>> assert Tasks.peakselector('align').align is not None  # back to true default
         >>> assert Tasks.peakselector(align = None).align is None # change default
     """
+    cleaning       = 'cleaning'
     selection      = 'selection'
     alignment      = 'alignment'
     driftperbead   = 'driftperbead'
@@ -46,7 +48,8 @@ class Tasks(Enum):
     @staticmethod
     def defaults():
         "returns default tasks"
-        return dict(selection      = DataSelectionTask(),
+        return dict(cleaning       = DataCleaningTask(),
+                    selection      = DataSelectionTask(),
                     alignment      = ExtremumAlignmentTask(),
                     driftperbead   = DriftTask(onbeads = True),
                     driftpercycle  = DriftTask(onbeads = False),
