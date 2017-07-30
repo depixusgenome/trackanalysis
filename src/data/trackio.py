@@ -92,6 +92,17 @@ class LegacyTrackIO(_TrackIO):
         axis = getattr(axis, 'value', axis)[0]
         return readtrack(str(path), kwa.pop('notall', True), axis)
 
+    @classmethod
+    def scan(cls, trkdirs) -> Iterator[Path]:
+        "scan for track files"
+        if not isinstance(trkdirs, (tuple, list, set, frozenset)):
+            trkdirs = (trkdirs,)
+        trkdirs = tuple(str(i) for i in trkdirs)
+
+        trk = cls.__TRKEXT
+        fcn = lambda i: i if i.endswith(trk) else i+'/**/*'+trk
+        yield from (i for i in chain.from_iterable(_glob(fcn(str(k))) for k in trkdirs))
+
 class LegacyGRFilesIO(_TrackIO):
     u"checks and opens legacy GR files"
     __TRKEXT = '.trk'
@@ -242,12 +253,7 @@ class LegacyGRFilesIO(_TrackIO):
     @classmethod
     def scantrk(cls, trkdirs) -> Dict[str, Path]:
         "scan for track files"
-        if not isinstance(trkdirs, (tuple, list, set, frozenset)):
-            trkdirs = (trkdirs,)
-        trkdirs = tuple(str(i) for i in trkdirs)
-
-        trk = cls.__TRKEXT
-        return cls.__scan(trkdirs, lambda i: i if i.endswith(trk) else i+'/**/*'+trk)
+        return {i.stem: i for i in LegacyTrackIO.scan(trkdirs)}
 
     @classmethod
     def scangrs(cls, grdirs, **opts) -> Dict[str, Path]:
