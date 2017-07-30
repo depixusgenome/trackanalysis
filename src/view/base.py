@@ -27,14 +27,6 @@ class View:
         "initializes the gui"
         self._ctrl: Controller  = kwargs['ctrl']
 
-    def startup(self, path, script):
-        "runs a script or opens a file on startup"
-        with self.action:
-            if path is not None:
-                self._ctrl.openTrack(path)
-            if script is not None:
-                script(self, self._ctrl)
-
     def observe(self):
         "whatever needs to be initialized"
 
