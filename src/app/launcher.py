@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Updates app manager so as to deal with controllers"
-from typing     import TYPE_CHECKING, Callable, Tuple
+from typing     import TYPE_CHECKING
 from pathlib    import Path
 
 import sys
@@ -13,22 +13,13 @@ from bokeh.server.server        import Server
 from bokeh.application          import Application
 from bokeh.application.handlers import FunctionHandler
 from bokeh.settings             import settings
-from bokeh.layouts              import layout, column
 from bokeh.resources            import DEFAULT_SERVER_PORT
 
 from utils.logconfig            import getLogger, logToFile
-from utils                      import getlocals
 from utils.gui                  import MetaMixin # pylint: disable=unused-import
-from control                    import Controller
-from view                       import View, BokehView
-from view.keypress              import KeyPressManager
-import view.toolbar as toolbars
-
-from .scripting                 import INITIAL_ORDERS
+from .scripting                 import orders
 
 LOGS                            = getLogger(__name__)
-DEFAULT_CONFIG: Callable        = lambda x: None
-DYN_LOADS:      Tuple[str, ...] = ('modaldialog', 'view')
 
 def _serverkwargs(kwa):
     kwargs                         = dict(kwa)
@@ -37,7 +28,7 @@ def _serverkwargs(kwa):
     kwargs['generate_session_ids'] = True
     kwargs['use_index']            = True
     kwargs['redirect_root']        = True
-    for mdl in DYN_LOADS:
+    for mdl in orders().dynloads():
         getattr(sys.modules.get(mdl, None), 'server', lambda x: None)(kwargs)
     return kwargs
 
@@ -65,7 +56,7 @@ class _FunctionHandler(FunctionHandler):
 
         def _start(doc):
             doc.title = _title(view)
-            INITIAL_ORDERS.run(view, doc, _onloaded)
+            orders().run(view, doc, _onloaded)
         super().__init__(_start)
 
     def on_session_created(self, session_context):
@@ -171,7 +162,7 @@ def _create(main, controls, views): # pylint: disable=unused-argument
                 ctrl = self.globalscontroller # pylint: disable=no-member
                 ctrl.readconfig(self.configpath)
                 ctrl.readconfig(self.configpath, lambda i: self.configpath(i, 'userconfig'))
-                DEFAULT_CONFIG(self)
+                orders().config(self)
 
             def writeconfig(self, name = None, saveall = False, **kwa):
                 "writes the config"
@@ -196,9 +187,8 @@ def _create(main, controls, views): # pylint: disable=unused-argument
 
         def __init__(self):
             "sets up the controller, then initializes the view"
-
             ctrl = self.MainControl(handlers = dict(), topview = self)
-            keys = KeyPressManager(ctrl = ctrl)
+            keys = getattr(self, 'KeyPressManager', lambda **_: None)(ctrl = ctrl)
             main.__init__(self, ctrl = ctrl, keys = keys)
             main.ismain(self)
 
@@ -212,58 +202,41 @@ def _create(main, controls, views): # pylint: disable=unused-argument
 
         def addtodoc(self, doc):
             "Adds one's self to doc"
-            for mdl in DYN_LOADS:
+            for mdl in orders().dynloads():
                 getattr(sys.modules.get(mdl, None), 'document', lambda x: None)(doc)
             super().addtodoc(doc)
 
     logToFile(str(Main.MainControl.apppath()/"logs.txt"))
     return Main
 
-def setup(locs            = None, # pylint: disable=too-many-arguments
+def getclass(string):
+    "returns the class indicated by the string"
+    if isinstance(string, str):
+        mod  = string[:string.rfind('.')]
+        attr = string[string.rfind('.')+1:]
+        if attr[0] != attr[0].upper():
+            __import__(string)
+            return None
+
+        return getattr(__import__(mod, fromlist = (attr,)), attr)
+    return string
+
+def setup(locs,
           mainview        = None,
           creator         = lambda _: _,
           defaultcontrols = tuple(),
           defaultviews    = tuple(),
-          decorate        = lambda x: x
          ):
     "Sets up launch and serve functions for a given app context"
-    if locs is None:
-        locs = getlocals(1)
-
-    @decorate
     def application(main     = mainview,
                     controls = defaultcontrols,
                     views    = defaultviews,
                     creator  = creator):
         "Creates a main view"
-        def _get(string):
-            if isinstance(string, str):
-                mod  = string[:string.rfind('.')]
-                attr = string[string.rfind('.')+1:]
-                if attr[0] != attr[0].upper():
-                    __import__(string)
-                    return None
-
-                return getattr(__import__(mod, fromlist = (attr,)), attr)
-            return string
-
-        classes = set(cls for cls in locs.values() if isinstance(cls, type))
-        classes.difference_update((Controller, View))
-        if controls in (all, Ellipsis):
-            controls = tuple(i for i in classes if issubclass(i, Controller))
-        else:
-            controls = tuple(_get(i) for i in controls if _get(i) is not None)
-
-        if views in (all, Ellipsis):
-            views = tuple(i for i in classes
-                          if (issubclass(i, View)
-                              and not issubclass(i, BokehView)))
-        else:
-            views = tuple(_get(i) for i in views)
-
+        controls = tuple(getclass(i) for i in controls if getclass(i) is not None)
+        views    = tuple(getclass(i) for i in views)
         return _create(creator(main), controls, views)
 
-    @decorate
     def serve(main     = mainview,
               controls = defaultcontrols,
               views    = defaultviews,
@@ -276,7 +249,6 @@ def setup(locs            = None, # pylint: disable=too-many-arguments
             return app
         return _serve(app, **kwa)
 
-    @decorate
     def launch(main     = mainview,
                controls = defaultcontrols,
                views    = defaultviews,
@@ -291,68 +263,6 @@ def setup(locs            = None, # pylint: disable=too-many-arguments
         kwa.setdefault("size",  (1200, 1000))
         return _launch(app, **kwa)
 
-    locs.setdefault('application', application)
-    locs.setdefault('serve',   serve)
-    locs.setdefault('launch',  launch)
-
-class WithToolbar:
-    "Creates an app with a toolbar"
-    def __init__(self, tbar):
-        self.tbar = tbar
-
-    def __call__(self, main):
-        tbar = self.tbar
-        class ViewWithToolbar(BokehView):
-            "A view with the toolbar on top"
-            APPNAME = getattr(main, 'APPNAME', main.__name__.lower().replace('view', ''))
-            def __init__(self, **kwa):
-                self._bar      = tbar(**kwa)
-                self._mainview = main(**kwa)
-                super().__init__(**kwa)
-
-            def ismain(self):
-                "sets-up the main view as main"
-                self._mainview.ismain()
-
-            def close(self):
-                "remove controller"
-                super().close()
-                self._bar.close()
-                self._mainview.close()
-
-            def getroots(self, doc):
-                "adds items to doc"
-                tbar     = self._bar.getroots(doc)
-                others   = self._mainview.getroots(doc)
-                while isinstance(others, (tuple, list)) and len(others) == 1:
-                    others = others[0]
-
-                if isinstance(others, list):
-                    children = [tbar] + others
-                elif isinstance(others, tuple):
-                    children = [tbar, layout(others, **self.defaultsizingmode())]
-                else:
-                    children = [tbar, others]
-
-                return column(children, **self.defaultsizingmode())
-
-        return ViewWithToolbar
-
-VIEWS       = ('undo.UndoView', 'view.globalsview.GlobalsView',)
-CONTROLS    = ('control.taskcontrol.TaskController',
-               'control.globalscontrol.GlobalsController',
-               'anastore.control',
-               'undo.UndoController')
-
-setup(locals())
-
-class Defaults:
-    "Empty app"
-    setup(locals(), defaultcontrols = CONTROLS, defaultviews = VIEWS)
-
-class BeadToolbar:
-    "App with a toolbar"
-    setup(locals(),
-          creator         = WithToolbar(toolbars.BeadToolbar),
-          defaultcontrols = CONTROLS,
-          defaultviews    = VIEWS+("view.toolbar.BeadToolbar",))
+    locs.setdefault('application',  application)
+    locs.setdefault('serve',        serve)
+    locs.setdefault('launch',       launch)

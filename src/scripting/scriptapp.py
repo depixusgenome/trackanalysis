@@ -7,7 +7,7 @@ import inspect
 from   copy        import deepcopy
 
 from   view.dialog import FileDialog
-from   app         import Defaults
+from   app         import default
 from   .task       import Tasks
 
 
@@ -100,6 +100,6 @@ def __call__(self, *resets, __old__ = Tasks.__call__, **kwa):
 Tasks.__call__ = __call__
 
 # pylint: disable=no-member,invalid-name
-scriptapp = Defaults.application(main = ScriptingView)()
+scriptapp = default.application(main = ScriptingView, creator = lambda x: x)()
 
 __all__ = ['scriptapp', 'Tasks']

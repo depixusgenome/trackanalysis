@@ -5,10 +5,8 @@ from itertools      import chain
 import numpy as np
 
 from utils                  import EVENTS_DTYPE
-from utils.logconfig        import getLogger
 import utils.warnings       #  pylint: disable=unused-import
 
-import bokeh.embed          as     embed
 from bokeh.io               import output_notebook
 from bokeh.models.widgets   import Panel, Tabs # pylint: disable=unused-import
 from bokeh.plotting         import Figure, figure
@@ -16,11 +14,6 @@ from bokeh.io               import show as _show
 from bokeh.models           import DataRange1d, LinearAxis, ColumnDataSource
 
 from data                   import TrackItems
-
-getLogger(__name__).debug('removing bokeh compiler')
-def _bundle():
-    return ''
-embed.bundle_all_models = _bundle
 
 class Multiplier:
     "basic right multiplier"

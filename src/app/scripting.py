@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Means for using the app as an API"
+from typing             import List, Callable
+import sys
 from tornado.ioloop     import IOLoop
 from bokeh.model        import Model
 
@@ -12,6 +14,11 @@ LOGS = getLogger(__name__)
 
 class Orders(list):
     "A list of orders to apply to the app"
+    def __init__(self):
+        super().__init__()
+        self.default_config: Callable  = lambda x: None
+        self.dyn_loads:      List[str] = []
+
     def __script(self, view, doc = None):
         "creates a function for running the orders"
         ctrl    = getattr(view, '_ctrl', view)
@@ -46,7 +53,22 @@ class Orders(list):
                 loaded.on_change('done', lambda attr, old, new: script())
         return view
 
+    def dynloads(self):
+        "returns dynamic loads"
+        return self.dyn_loads
+
+    def config(self, arg):
+        "returns default config"
+        return self.default_config(arg)
+
 INITIAL_ORDERS = Orders()
+def orders():
+    "returns default orders"
+    return INITIAL_ORDERS
+
+def addload(*names):
+    "adds a dyn load to the inital orders"
+    orders().dyn_loads.extend(names)
 
 class DummyDoc:
     "dummy document used for scripting"
@@ -63,7 +85,8 @@ class DummyDoc:
         "runs a command"
         fcn()
 
-class DpxLoaded(Model):
-    "This starts tests once flexx/browser window has finished loading"
-    __implementation__ = "scripting.coffee"
-    done = props.Int(0)
+if 'scripting' not in sys.modules:
+    class DpxLoaded(Model):
+        "This starts tests once flexx/browser window has finished loading"
+        __implementation__ = "scripting.coffee"
+        done = props.Int(0)

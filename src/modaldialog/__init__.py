@@ -3,9 +3,13 @@
 """
 Allows creating modals from anywhere
 """
-from  inspect       import signature
-from  tornado.web   import StaticFileHandler
-from  .modal        import DpxModal, ROUTE
+import sys
+from   inspect       import signature
+from   tornado.web   import StaticFileHandler
+from   .modal        import DpxModal, ROUTE
+
+if 'app.scripting' in sys.modules:
+    sys.modules['app.scripting'].addload(__name__)
 
 def server(kwa):
     "adds a router to the server"

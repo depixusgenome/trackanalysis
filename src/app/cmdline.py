@@ -150,12 +150,12 @@ def _debug(raiseerr, singlethread):
         _base.SINGLE_THREAD = True
 
     if raiseerr:
-        import app.launcher as app
-
         def _cnf(ctrl):
             ctrl.getGlobal('config').catcherror.default         = False
             ctrl.getGlobal('config').catcherror.toolbar.default = False
-        app.DEFAULT_CONFIG = _cnf
+
+        from app.scripting import orders
+        orders().default_config = _cnf
 
 def _files(files, bead):
     def _started(_, start = time()):
@@ -179,7 +179,7 @@ def _launch(view, app, desktop, kwa):
         app += 'app.'+app
 
     if 'toolbar' in viewcls.__name__.lower():
-        app = 'app.Defaults'
+        app = 'app.defaults'
 
     if '.' in app and 'A' <= app[app.rfind('.')+1] <= 'Z':
         mod  = app[:app.rfind('.')]
@@ -239,7 +239,7 @@ def main(view, files, bead,  # pylint: disable=too-many-arguments
         kwargs['unused_session_linger_milliseconds'] = 60000
 
     _files(files, bead)
-    server = _launch(view, 'app.BeadToolbar', gui == 'firefox', kwargs)
+    server = _launch(view, 'app.toolbar', gui == 'firefox', kwargs)
 
     if gui == 'chrome':
         server.io_loop.add_callback(lambda: _electron(server, port = kwargs['port']))

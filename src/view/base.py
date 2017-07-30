@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "basic view module"
-from typing               import Callable
+from typing               import Callable, TYPE_CHECKING
 from concurrent.futures   import ThreadPoolExecutor
 
 from bokeh.document       import Document
@@ -14,7 +14,9 @@ from tornado.platform.asyncio   import to_tornado_future
 
 from control        import Controller
 from control.action import ActionDescriptor, Computation, Action
-from .keypress      import KeyPressManager
+
+if TYPE_CHECKING:
+    from .keypress import KeyPressManager
 
 SINGLE_THREAD = False
 
@@ -121,15 +123,16 @@ class BokehView(View):
         css.theme.basic.default = {}
         css.theme.default       = 'dark'
 
-        self._keys: KeyPressManager = kwargs['keys']
+        self._keys: KeyPressManager = kwargs.get('keys', None)
         self._doc:  Document        = None
 
     def close(self):
         "closes the application"
         super().close()
         self._doc  = None
-        self._keys.close()
-        self._keys = None
+        if self._keys is not None:
+            self._keys.close()
+            self._keys = None
 
     @classmethod
     def open(cls, doc, **kwa):
@@ -151,7 +154,8 @@ class BokehView(View):
         doc.theme = Theme(json = theme)
 
         self._doc = doc
-        self._keys.getroots(doc)
+        if self._keys is not None:
+            self._keys.getroots(doc)
         roots = self.getroots(doc)
         while isinstance(roots, (tuple, list)) and len(roots) == 1:
             roots = roots[0]
@@ -176,7 +180,8 @@ class BokehView(View):
 
         btn = Button(**kwa)
         btn.on_click(fcn)
-        self._keys.addKeyPress((prefix+'.'+title.lower(), fcn))
+        if self._keys is not None:
+            self._keys.addKeyPress((prefix+'.'+title.lower(), fcn))
         return btn
 
     def defaultsizingmode(self, kwa = None, **kwargs) -> dict:
