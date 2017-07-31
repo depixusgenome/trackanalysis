@@ -150,11 +150,11 @@ def display(self, kdim = 'bead', labels = None, tpe = 'curve', overlay = True, *
 
 @_add(PeaksDict)  # type: ignore
 def display(self, # pylint: disable=function-redefined
-            kdim = 'bead', labels = None, hpins = None, oligos = None, **opts):
+            kdim = 'bead', labels = None, sequence = None, oligos = None, **opts):
     "returns a hv.DynamicMap showing the beads"
     disp = PeaksDisplay
-    if None not in (hpins, oligos):
-        return disp.hpinmap(self, hpins, oligos, labels)
+    if None not in (sequence, oligos):
+        return disp.hpinmap(self, sequence, oligos, labels)
 
     if kdim == 'bead':
         beads = list(set([i for i in self.keys() if self.isbead(i)]))
