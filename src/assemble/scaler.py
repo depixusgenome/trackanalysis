@@ -395,19 +395,15 @@ class PeakStack:
         print("assigned=",assigned)
         for key,group in itertools.groupby(assigned,key=lambda x:x[2]):
             if key is None:
-                print("key is None")
                 for grp in group: # not necessarily of size 0 or 1
                     self.stack[grp[1]]=[grp[3]]
             else:
                 tostack=list(group)
-                print("tostack",tostack)
                 key,peak=tostack[0][2:]
                 last=self.stack[key][-1]
                 if len(data.Oligo.tail_overlap(last.seq,peak.seq))>=self.min_overl:
-                    print(f"{last.seq} and {peak.seq} overlap")
                     self.stack[key].append(peak)
                 else:
-                    print(f"{last.seq} and {peak.seq} do not overlap")
                     self.stack[key].append(peak.reverse(in_place=False))
                 for grp in tostack[1:]:
                     self.stack[grp[1]]=[grp[3]]
