@@ -179,7 +179,7 @@ def _launch(view, app, desktop, kwa):
         app += 'app.'+app
 
     if 'toolbar' in viewcls.__name__.lower():
-        app = 'app.defaults'
+        app = 'app.default'
 
     if '.' in app and 'A' <= app[app.rfind('.')+1] <= 'Z':
         mod  = app[:app.rfind('.')]

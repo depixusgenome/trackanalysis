@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 u"all view aspects here"
 from bokeh.models   import Tabs, Panel
+from bokeh          import layouts
 from view.base      import BokehView
 from view.plots     import PlotState
 from view.beadplot  import BeadPlotView
@@ -50,10 +51,14 @@ class HybridStatView(BokehView):
     def getroots(self, doc):
         "returns object root"
         titles = self._ctrl.getGlobal('css').hybridstat.title
+        mode   = self.defaultsizingmode()
         def _panel(view):
-            ret   = view.getroots(doc)
-            assert len(ret) == 1
-            return Panel(title = titles[self.__key(view)].get(), child = ret[0])
+            ret = view.getroots(doc)
+            while isinstance(ret, (tuple, list)) and len(ret) == 1:
+                ret = ret[0]
+            if isinstance(ret, (tuple, list)):
+                ret = layouts.column(ret, **mode)
+            return Panel(title = titles[self.__key(view)].get(), child = ret, **mode)
 
         ind  = next((i for i, j in enumerate(self._panels)
                      if self.__state(j).get() is PlotState.active),
@@ -65,14 +70,10 @@ class HybridStatView(BokehView):
         for panel in self._panels[ind+1:]:
             self.__state(panel, PlotState.disabled)
 
-        if self._ctrl.getGlobal('css').responsive.get():
-            mod  =  {'sizing_mode': 'scale_width'}
-        else:
-            mod  =  {'sizing_mode': self._ctrl.getGlobal('css').sizing_mode.get()}
         tabs = Tabs(tabs   = [_panel(panel) for panel in self._panels],
                     active = ind,
                     name   = 'Hybridstat:Tabs',
-                    **mod)
+                    **mode)
 
         @self.action
         def _py_cb(attr, old, new):
@@ -83,13 +84,13 @@ class HybridStatView(BokehView):
                               (lambda: setattr(self._tabs, 'active', old),))
         tabs.on_change('active', _py_cb)
         self._tabs = tabs
-        return tabs,
+        return layouts.widgetbox(tabs, **mode)
 
     def observe(self):
         super().observe()
         def _make(ind):
             def _fcn(val):
-                if val.value == PlotState.active:
+                if val.value == PlotState.active and self._tabs is not None:
                     self._tabs.active = ind
             return _fcn
 

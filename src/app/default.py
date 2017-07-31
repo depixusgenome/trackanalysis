@@ -12,4 +12,5 @@ CONTROLS    = ('control.taskcontrol.TaskController',
 def _creator(main):
     from view.keypress import DpxKeyEvent
     main.KeyPressManager = DpxKeyEvent
+    return main
 setup(locals(), creator = _creator, defaultcontrols = CONTROLS, defaultviews = VIEWS)
