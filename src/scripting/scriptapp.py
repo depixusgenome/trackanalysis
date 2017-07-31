@@ -35,8 +35,7 @@ class ScriptingView:
                                  multiple  = True,
                                  title     = "open a gr files")
 
-        self._ctrl.getGlobal("config").tasks.defaults = Tasks.defaults()
-
+        Tasks.setconfig(self._ctrl)
 
     def observe(self):
         "whatever needs to be initialized"
@@ -91,11 +90,24 @@ def save(cls, task):
     scriptapp.control.writeconfig()
 Tasks.save = classmethod(save)
 
+def getconfig():
+    "returns the config accessor"
+    return scriptapp.control.getGlobal('config').tasks
+Tasks.getconfig = staticmethod(getconfig)
+
+def setconfig(cls, cnf):
+    "add default values to the config"
+    cnf = cnf.getGlobal('config').tasks
+    cnf.defaults = cls.defaults()
+    cnf.fittohairpin.range.defaults = dict(stretch = (900., 1400.),
+                                           bias    = (-.25, .25))
+Tasks.setconfig = classmethod(setconfig)
+
 def __call__(self, *resets, __old__ = Tasks.__call__, **kwa):
     if Ellipsis in resets:
         cnf = self.default()
     else:
-        cnf = scriptapp.control.getGlobal("config").tasks[self.value].get()
+        cnf = self.getconfig()[self.value].get()
     return __old__(self, *resets, current = cnf, **kwa)
 Tasks.__call__ = __call__
 
