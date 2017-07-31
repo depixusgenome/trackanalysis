@@ -18,12 +18,14 @@ class BeadPlotCreator(TaskPlotCreator):
         "sets up this plotter's info"
         super().__init__(ctrl)
         ttips = [(u'Index', '$index'), (u'(t, z, zmag)', '($~x, $data_y, @zmag)')]
-        self.css.defaults = dict(z           = PlotAttrs('lightblue', 'circle', 1),
-                                 zmag        = PlotAttrs('red',  'line',   1),
-                                 xlabel      = u"Frames",
-                                 ylabel      = u"Z",
-                                 yrightlabel = u"Zmag",
-                                 tooltips    = ttips)
+        self.css.defaults = {'z':               PlotAttrs('lightblue', 'circle', 1),
+                             'zmag':            PlotAttrs('red',  'line',   1),
+                             'xlabel':          u"Frames",
+                             'ylabel':          u"Z",
+                             'yrightlabel':     u"Zmag",
+                             'tooltips':        ttips,
+                             'figure.width' :   100,
+                             'figure.height':   60}
         self._source = None # type: Optional[ColumnDataSource]
         self._fig    = None # type: Optional[Figure]
 
@@ -31,7 +33,7 @@ class BeadPlotCreator(TaskPlotCreator):
         track = self._model.track
         bead  = self._model.bead
         if track is None:
-            return dict.fromkeys(('t', 'zmag', 'z'), [0., 1.])
+            return dict.fromkeys(('t', 'zmag', 'z'), [])
         items = track.beads
         return dict(t    = items['t'],
                     zmag = items['zmag'],

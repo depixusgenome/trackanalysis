@@ -34,7 +34,7 @@ class FitToHairpinTask(Task):
         super().__init__()
         if 'sequence' in kwa:
             assert 'oligo' in kwa
-            other = self.read(kwa['sequence'], kwa['oligo'],
+            other = self.read(kwa['sequence'], kwa['oligos'],
                               distance   = kwa.get('distance',   None),
                               identifier = kwa.get('identifier', None))
             self.distances.update(other.distances)
@@ -42,7 +42,7 @@ class FitToHairpinTask(Task):
 
     def __scripting__(self, kwa):
         if 'sequence' in kwa:
-            other = self.read(kwa['sequence'], kwa['oligo'],
+            other = self.read(kwa['sequence'], kwa['oligos'],
                               distance   = kwa.get('distance',   None),
                               identifier = kwa.get('identifier', None))
             self.distances.update(other.distances)

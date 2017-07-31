@@ -44,6 +44,7 @@ class Tasks(Enum):
     eventdetection = 'eventdetection'
     peakselector   = 'peakselector'
     fittohairpin   = 'fittohairpin'
+    beadsbyhairpin = 'beadsbyhairpin'
 
     @staticmethod
     def defaults():
