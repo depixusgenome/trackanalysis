@@ -392,7 +392,6 @@ class PeakStack:
         assigned=sorted(assigned,
                         key=lambda x:tuple(x[:2]))
 
-        print("assigned=",assigned)
         for key,group in itertools.groupby(assigned,key=lambda x:x[2]):
             if key is None:
                 for grp in group: # not necessarily of size 0 or 1
@@ -501,6 +500,10 @@ class Scaler:
         #     print(f"scperpeak={scperpeak}")
         toadd=[(peak,scale) for peak,scales in scperpeak.items()
                for scale in scales if stack.can_add(scale(peak))]
+
+        if not toadd: # check that condition is correct
+            return [stack]
+
         for peak,scale in toadd:
             stacks+=self.build_stack_fromtuple(stack=stack.add(scale(peak),in_place=False),
                                                peakarrs=peakarrs[1:])
@@ -526,7 +529,8 @@ class Scaler:
         scperpeak=self.find_rescales(refpeak,peakarrs,tocmpfilter=cmpfilter)
         toadd=[(peak,scale) for peak,scales in scperpeak.items() for scale in scales
                if stack.can_add(scale(peak))]
-        if not toadd:
+
+        if not toadd: # check that condition is correct
             return [stack]
 
         stacks=[] # type: List[PeakStack]
@@ -551,7 +555,7 @@ class Scaler:
             addstacks+=self.build_stack_fromtuple(stack,path)
         return addstacks
 
-    def run(self):
+    def run(self,iteration=None):
         '''
         ## ORIGINAL PLAN, TOO LONG TO RUN
         # take the 2 peaks in refpeak which are the more closely related
@@ -587,8 +591,8 @@ class Scaler:
         # or add it when looking for overlaps
 
         # building_stacks
-        #while any(peakset-frozenset(stack.ordered) for stack in pstacks):
-        for _ in range(2): # for debugging
+        # while any(peakset-frozenset(stack.ordered) for stack in pstacks):
+        for _ in range(iteration): # for debugging
             new_stacks=[] # type: List[PeakStack]
             for stack in pstacks:
                 if peakset-frozenset(stack.ordered):

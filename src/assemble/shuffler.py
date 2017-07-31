@@ -10,7 +10,7 @@ can be modified (1 line) # HERE to look for all suboptimal solutions
 
 import itertools
 from typing import Tuple, List, Generator, Dict # pylint: disable=unused-import
-import pickle
+import pickle # pylint: disable=unused-import
 import numpy
 from . import data
 from . import scores
@@ -33,15 +33,17 @@ from . import _utils as utils
 # OligoPeak to far from one another may not be considered as overlapping
 # must include a stretch,pos score
 
-
-
-
 class Shuffler:
     u'align oligo by maximising the overlap one index at a time'
     def __init__(self,**kwa):
-        self.collection=kwa.get("collection",data.BCollection()) # type:data.BCollection
+
+        oligos=kwa.get("oligos",[]) # type: data.OligoPeak
+        #self.collection=kwa.get("collection",data.BCollection()) # type:data.BCollection
         self.ooverl=kwa.get("ooverl",-1) # type: int
         self.nscale=kwa.get("nscale",1) # type: int
+
+        if oligos:
+            self.collection=data.BCollection.from_oligos(oligos)
 
     @property
     def oligos(self):
@@ -103,20 +105,23 @@ class Shuffler:
 
     def base_per_base(self)->List[data.Partition]:
         'constructs the sequence with maximal overlapping one base at a time'
-        if __debug__:
-            pickle.dump(self.oligos,open("debugoligos.pickle","wb"))
+        # if __debug__:
+        #     pickle.dump(self.oligos,open("debugoligos.pickle","wb"))
 
+        print("looking for permutations")
         groupedids=utils.group_overlapping_normdists([oli.dist for oli in self.oligos],
                                                      nscale=self.nscale)[1]
-        if __debug__:
-            pickle.dump(groupedids,open("debuggroupedids.pickle","wb"))
+        print(f"len(groupedids)={len(groupedids)}")
+        # if __debug__:
+        #     pickle.dump(groupedids,open("debuggroupedids.pickle","wb"))
 
         full_kperms=set([]) # can be updated sequentially
         for group in groupedids:
             full_kperms.update(set(self.find_kperms(group)))
 
-        if __debug__:
-            pickle.dump(full_kperms,open("debugfull_kperms.pickle","wb"))
+        print(f"len(full_kperms)={len(full_kperms)}")
+        # if __debug__:
+        #     pickle.dump(full_kperms,open("debugfull_kperms.pickle","wb"))
 
         add_kperms=[kpr for kpr in full_kperms if kpr.domain.intersection({0})]
 
@@ -125,14 +130,14 @@ class Shuffler:
         add_kperms=[kpr for kpr in add_kperms
                     if data.OligoPeak.tail_overlap(kpr.perm[0].seq,kpr.perm[1].seq)
                     or len(kpr.domain)==1]
+
+        print(f"len(add_kperms)={len(add_kperms)}")
         #partitions=[[kpr] for kpr in add_kperms] # before
         partitions=[data.Partition(perms=[kpr],domain=kpr.domain) for kpr in add_kperms]
 
         for index in range(len(self.oligos)):
-            print("len(partitions)=",len(partitions))
-            print("index=",index)
+            print(f"index={index}")
             add_kperms=[kpr for kpr in full_kperms if kpr.span.intersection({index})]
-            print("len(add_kperms)=",len(add_kperms))
             added_partitions=[] # type: List[data.Partition]
             for part in partitions:
                 # extend the part until all indices<index are in domain
@@ -143,19 +148,33 @@ class Shuffler:
             self.increment_noverlaps(added_partitions,self.ooverl,index+1)
             max_overlap=max(part.noverlaps for part in added_partitions) # pylint: disable=no-member
             partitions=[part for part in added_partitions if part.noverlaps==max_overlap] # pylint: disable=no-member
-            if __debug__:
-                pickle.dump(partitions,open("debugpartitions"+str(index)+".pickle","wb"))
+
+            # if __debug__:
+            #     pickle.dump(partitions,open("debugpartitions"+str(index)+".pickle","wb"))
 
             # HERE
             # TESTING! comment the following command
             #partitions=[part for part in added_partitions if part.noverlaps>max_overlap-3] # pylint: disable=no-member
 
             resume_parts=data.Partition.reduce_partitions(partitions,index)
-            if __debug__:
-                pickle.dump(resume_parts,open("debugresume_parts"+str(index)+".pickle","wb"))
+            # if __debug__:
+            #     pickle.dump(resume_parts,open("debugresume_parts"+str(index)+".pickle","wb"))
 
             partitions=resume_parts
 
+        return partitions
+
+
+    def run(self,**kwa):
+        '''
+        runs the base_per_base algorithm
+        scores partitions
+        and return the result (score+tuple of oligos)
+        '''
+        self.collection=data.BCollection.from_oligos(kwa.get("oligos",[]))
+        partitions=self.base_per_base()
+
+        # score each partition
         return partitions
 
     def find_kperms(self,group:Tuple[int, ...])->Generator:
@@ -216,41 +235,41 @@ class Shuffler:
 
     # check if these methods could be useful here
 
-    def find_groupperms(self,group:Tuple[int, ...])->Generator:
-        u'''
-        finds the permutations of oligos of a group
-        and permutations from corrections (changed indices must be in both core_groups)
-        '''
-        idsperbatch=self.collection.idsperbatch
-        batchfilter=processor.BetweenBatchFilter(idsperbatch=idsperbatch)
-        ooverlfilter=processor.RequireOverlapFilter(oligos=self.oligos,
-                                                    min_ooverl=self.ooverl)
-        # compute all possible permutations # brute force
-        kpermids=itertools.permutations(group) # generator
-        firstfiltered = filter(ooverlfilter,kpermids) # type: ignore
-        secondfiltered = filter(batchfilter,firstfiltered) # type: ignore
-        for kprid in secondfiltered:
-            yield data.OligoKPerm(oligos=self.oligos,
-                                  kperm=[self.oligos[i] for i in kprid],
-                                  kpermids=numpy.array(kprid))
+    # def find_groupperms(self,group:Tuple[int, ...])->Generator:
+    #     u'''
+    #     finds the permutations of oligos of a group
+    #     and permutations from corrections (changed indices must be in both core_groups)
+    #     '''
+    #     idsperbatch=self.collection.idsperbatch
+    #     batchfilter=processor.BetweenBatchFilter(idsperbatch=idsperbatch)
+    #     ooverlfilter=processor.RequireOverlapFilter(oligos=self.oligos,
+    #                                                 min_ooverl=self.ooverl)
+    #     # compute all possible permutations # brute force
+    #     kpermids=itertools.permutations(group) # generator
+    #     firstfiltered = filter(ooverlfilter,kpermids) # type: ignore
+    #     secondfiltered = filter(batchfilter,firstfiltered) # type: ignore
+    #     for kprid in secondfiltered:
+    #         yield data.OligoKPerm(oligos=self.oligos,
+    #                               kperm=[self.oligos[i] for i in kprid],
+    #                               kpermids=numpy.array(kprid))
 
-    # needs better implementation
-    # pylint: disable=no-self-use
-    def fix_horizon(self,
-                    partitions:List[List[data.OligoPerm]],
-                    group:Tuple[int, ...])->List[List[data.OligoPerm]]:
-        u'horizon is the ensemble of kperms which cannot modify by any subsequent combination'
-        horizon=min(group) # set(group)
-        for partid,part in enumerate(partitions):
-            if len(part)==1:
-                continue
-            #to_fix=[(idx,kpr) for idx,kpr in enumerate(part)
-            #        if not kpr.domain.intersection(horizon)]
-            to_fix=[(idx,kpr) for idx,kpr in enumerate(part)
-                    if all(i<horizon for i in  kpr.domain)]
-            if len(to_fix)==0:
-                continue
-            merged=data.OligoPerm.add(*[fix[1] for fix in to_fix])
-            fixed=[fix[0] for fix in to_fix]
-            partitions[partid]=[merged]+[part[i] for i in range(len(part)) if not i in fixed]
-        return partitions
+    # # needs better implementation
+    # # pylint: disable=no-self-use
+    # def fix_horizon(self,
+    #                 partitions:List[List[data.OligoPerm]],
+    #                 group:Tuple[int, ...])->List[List[data.OligoPerm]]:
+    #     u'horizon is the ensemble of kperms which cannot modify by any subsequent combination'
+    #     horizon=min(group) # set(group)
+    #     for partid,part in enumerate(partitions):
+    #         if len(part)==1:
+    #             continue
+    #         #to_fix=[(idx,kpr) for idx,kpr in enumerate(part)
+    #         #        if not kpr.domain.intersection(horizon)]
+    #         to_fix=[(idx,kpr) for idx,kpr in enumerate(part)
+    #                 if all(i<horizon for i in  kpr.domain)]
+    #         if len(to_fix)==0:
+    #             continue
+    #         merged=data.OligoPerm.add(*[fix[1] for fix in to_fix])
+    #         fixed=[fix[0] for fix in to_fix]
+    #         partitions[partid]=[merged]+[part[i] for i in range(len(part)) if not i in fixed]
+    #     return partitions
