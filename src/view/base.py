@@ -97,7 +97,6 @@ def defaultsizingmode(self, kwa:dict = None, **kwargs) -> dict:
         kwa['sizing_mode'] = 'scale_width'
     else:
         kwa['sizing_mode'] = css.sizing_mode.get()
-    print(kwa)
     return kwa
 
 class BokehView(View):
