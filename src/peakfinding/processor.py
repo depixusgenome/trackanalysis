@@ -4,6 +4,7 @@
 from typing             import (Iterator, Tuple, # pylint: disable=unused-import
                                 Sequence, List, Set, Optional)
 from functools          import partial
+import numpy as np
 
 from utils              import initdefaults
 from model              import Task, Level, PHASE
@@ -12,7 +13,7 @@ from data.trackitems    import BEADKEY, TrackItems, Beads
 from signalfilter       import rawprecision
 from eventdetection     import EventDetectionConfig
 from .alignment         import PeakCorrelationAlignment
-from .selector          import PeakSelector, Output as PeakOutput
+from .selector          import PeakSelector, Output as PeakOutput, PeaksArray
 from .probabilities     import Probability
 
 class PeakCorrelationAlignmentTask(PeakCorrelationAlignment, Task):
@@ -101,16 +102,50 @@ class PeaksDict(TrackItems):
         "Returns indexes at the same key and positions"
         return self.withaction(self.__index)
 
+    def withmeasure(self, singles = np.nanmean, multiples = None) -> 'PeaksDict':
+        "Returns a measure per events."
+        if multiples is None:
+            multiples = lambda x: singles(np.concatenate(x))
+        return self.withaction(partial(self.__measure, singles, multiples))
+
+    @classmethod
+    def measure(cls, itm: PeaksArray, singles = np.nanmean, multiples = None) -> PeaksArray:
+        "Returns a measure per events."
+        if len(itm) == 0:
+            return itm
+
+        if multiples is None:
+            multiples = lambda x: singles(np.concatenate(x))
+
+        if isinstance(itm[0][1], PeaksArray):
+            itm[:] = [(i, cls.__array2measure(singles, multiples, j)) for i, j in itm]
+        else :
+            itm[:] = cls.__array2measure(singles, multiples, itm)
+        return itm
+
+    @classmethod
+    def __measure(cls, singles, multiples, info):
+        return info[0], ((i, cls.__array2measure(singles, multiples, j)) for i, j in info[1])
+
     @classmethod
     def __index(cls, info):
         return info[0], ((i, cls.__array2range(j)) for i, j in info[1])
 
     @staticmethod
+    def __array2measure(singles, multiples, arr):
+        arr[:] = [None                  if i is None            else
+                  singles  (i[1])       if isinstance(i, tuple) else
+                  multiples(i['data'])
+                  for i in arr]
+        return arr
+
+    @staticmethod
     def __array2range(arr):
-        arr['data'] = [None                        if i is None            else
-                       range(i[0], i[0]+len(i[1])) if isinstance(i, tuple) else
-                       range(i[0][0], i[-1][0]+len(i[-1][1]))
-                       for i in arr['data']]
+        arr[:] = [None                        if i is None            else
+                  range(i[0], i[0]+len(i[1])) if isinstance(i, tuple) else
+                  range(i[0][0], i[-1][0]+len(i[-1][1]))
+                  for i in arr]
+        return arr
 
     def _keys(self, sel:Sequence = None, _ = None) -> Iterator[BEADKEY]:
         if self.__keys is None:
