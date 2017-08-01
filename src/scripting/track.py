@@ -121,22 +121,34 @@ def peaks(self) -> Events:
     "returns peaks found"
     return self.apply(*_tasks(self.path, Tasks.peakselector))
 
-def _fit(self, tpe, kwa) -> Events:
+def _fit(self, tpe, sequence, oligos, kwa) -> Events:
     "computes hairpin fits"
+    if None not in (sequence, oligos):
+        kwa['sequence'] = sequence
+        kwa['oligos']   = oligos
+
     tasks = _tasks(self.path, None)+ (getattr(Tasks, tpe)(**kwa),) # type: tuple
     if len(tasks[-1].distances) == 0:
         raise IndexError('No distances found')
     return self.apply(*tasks)
 
 @_totrack # type: ignore
-def fittohairpin(self, **kwa) -> Events:
-    "computes hairpin fits"
-    return _fit(self, 'fittohairpin', kwa)
+def fittohairpin(self, sequence = None, oligos = None, **kwa) -> Events:
+    """
+    Computes hairpin fits.
+
+    Arguments are for creating the FitToHairpinTask.
+    """
+    return _fit(self, 'fittohairpin', sequence, oligos, kwa)
 
 @_totrack # type: ignore
-def beadsbyhairpin(self, **kwa) -> Events:
-    "computes hairpin fits"
-    return _fit(self, 'beadsbyhairpin', kwa)
+def beadsbyhairpin(self, sequence, oligos, **kwa) -> Events:
+    """
+    Computes hairpin fits, sorted by best hairpin.
+
+    Arguments are for creating the FitToHairpinTask.
+    """
+    return _fit(self, 'beadsbyhairpin', sequence, oligos, kwa)
 
 def _addprop(name):
     fcn = getattr(_Track, name).fget
