@@ -493,7 +493,7 @@ class Partition:
 class OligoKPerm(OligoPerm):
     '''
     kpermutation of OligoPeak Object
-    As soon as 2 OligoKPerms are combine we work on OligoPerm objects
+    As soon as 2 OligoKPerms are combine we work with OligoPerm objects
     '''
     def __init__(self,**kwa)->None:
         super().__init__(**kwa)

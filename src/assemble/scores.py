@@ -190,7 +190,7 @@ class ScoreAssembly:
     '''
     perm=data.OligoPerm() # type: data.OligoPeakKPerm
     ooverl=-1 # type: int
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
         pass
 
@@ -229,7 +229,7 @@ class ScoreAssembly:
 class LScPerm:
     u'''
     lighter version of ScoredPermCollection
-    contains only pdfcost, noverlaps and perrmids
+    contains only pdfcost, noverlaps and permids
     '''
     pdfcost=0.0 # type: float
     noverlaps=-1 # type: int
@@ -389,4 +389,4 @@ class ScoreFilter:
 
 # to score a partition need to list all paths
 # each path is a list of OligoKperms
-# add all OligoKperms 
+# add all OligoKperms

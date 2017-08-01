@@ -462,6 +462,7 @@ class Scaler:
     ref_index=0 # type: int # index of the reference OPeakArray
     shuffler=shuffler.Shuffler()
     pstack=PeakStack()
+    __peakset=frozenset() # type: FrozenSet[OPeakArray]
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
         pass
@@ -545,17 +546,15 @@ class Scaler:
         returns the incremented stacks
         '''
         addstacks=[] # type: List[PeakStack]
-        others=frozenset(self.peaks)-frozenset(stack.ordered)
+        others=self.__peakset-frozenset(stack.ordered)
         graph,tips=OPeakArray.list2tree(stack.top(),others,min_overl=self.min_overl,depth=1)
-        paths=[] # type: List[OPeakArray]
+
         for tip in tips:
-            paths+=[path[1:]
-                    for path in networkx.all_simple_paths(graph,source=stack.top(),target=tip)]
-        for path in paths:
-            addstacks+=self.build_stack_fromtuple(stack,path)
+            for path in networkx.all_simple_paths(graph,source=stack.top(),target=tip):
+                addstacks+=self.build_stack_fromtuple(stack,path[1:])
         return addstacks
 
-    def run(self,iteration=None):
+    def run(self,iteration=None)->List[PeakStack]:
         '''
         ## ORIGINAL PLAN, TOO LONG TO RUN
         # take the 2 peaks in refpeak which are the more closely related
@@ -583,7 +582,7 @@ class Scaler:
         pstack=PeakStack(min_overl=self.min_overl)
         pstack.add(refpeak)
 
-        peakset=frozenset(self.peaks)
+        self.__peakset=frozenset(self.peaks)
 
         pstacks=[pstack]
         # quick and dirty solution for accounting for different starting sequences.
@@ -591,15 +590,20 @@ class Scaler:
         # or add it when looking for overlaps
 
         # building_stacks
-        # while any(peakset-frozenset(stack.ordered) for stack in pstacks):
-        for _ in range(iteration): # for debugging
+
+        return self.resume(pstacks,iteration=iteration)
+
+    def resume(self,pstacks,iteration=None)->List[PeakStack]:
+        '''
+        resume, stacking, scaling of stacks
+        '''
+        for _ in range(iteration):
             new_stacks=[] # type: List[PeakStack]
             for stack in pstacks:
-                if peakset-frozenset(stack.ordered):
+                if self.__peakset-frozenset(stack.ordered):
                     new_stacks+=self.incr_build(stack)
                 else:
                     new_stacks.append(stack)
-            #print(f"new_stacks={new_stacks}")
             pstacks=new_stacks
 
         return pstacks

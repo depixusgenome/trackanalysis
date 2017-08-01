@@ -187,6 +187,8 @@ class Shuffler:
         ooverlfilter=processor.RequireOverlapFilter(oligos=self.oligos,
                                                     min_ooverl=self.ooverl)
         # compute all possible permutations # brute force
+        # TO FIX: quick fix would use itertools.product
+        # to generate possible permutations between groups
         kpermids=itertools.permutations(group) # generator
         firstfiltered = filter(ooverlfilter,kpermids) # type: ignore
         secondfiltered = filter(batchfilter,firstfiltered) # type: ignore
