@@ -97,31 +97,36 @@ def defaultsizingmode(self, kwa:dict = None, **kwargs) -> dict:
         kwa['sizing_mode'] = 'scale_width'
     else:
         kwa['sizing_mode'] = css.sizing_mode.get()
+    print(kwa)
     return kwa
 
 class BokehView(View):
     "A view with a gui"
+    __FIRST = True
     def __init__(self, **kwargs):
         "initializes the gui"
         super().__init__(**kwargs)
         css = self._ctrl.getGlobal('css')
-        css.button.defaults = {'width': 90, 'height': 20}
-        css.input .defaults = {'width': 90, 'height': 20}
-        css.defaults = {'responsive': True, 'sizing_mode': 'scale_width'}
-        dark = { 'attrs': { 'Figure': { 'background_fill_color': '#2F2F2F',
-                                        'border_fill_color': '#2F2F2F',
-                                        'outline_line_color': '#444444' },
-                            'Axis':   { 'axis_line_color': "white",
-                                        'axis_label_text_color': "white",
-                                        'major_label_text_color': "white",
-                                        'major_tick_line_color': "white",
-                                        'minor_tick_line_color': "white"
-                                      },
-                            'Title':  { 'text_color': "white" } } }
+        if BokehView.__FIRST:
+            BokehView.__FIRST   = False
+            css.button.defaults = {'width': 90, 'height': 20}
+            css.input .defaults = {'width': 90, 'height': 20}
+            css.defaults        = {'responsive': True, 'sizing_mode': 'scale_width'}
 
-        css.theme.dark.default  = dark
-        css.theme.basic.default = {}
-        css.theme.default       = 'dark'
+            dark = { 'attrs': { 'Figure': { 'background_fill_color': '#2F2F2F',
+                                            'border_fill_color': '#2F2F2F',
+                                            'outline_line_color': '#444444' },
+                                'Axis':   { 'axis_line_color': "white",
+                                            'axis_label_text_color': "white",
+                                            'major_label_text_color': "white",
+                                            'major_tick_line_color': "white",
+                                            'minor_tick_line_color': "white"
+                                          },
+                                'Title':  { 'text_color': "white" } } }
+
+            css.theme.dark.default  = dark
+            css.theme.basic.default = {}
+            css.theme.default       = 'dark'
 
         self._keys: KeyPressManager = kwargs.get('keys', None)
         self._doc:  Document        = None

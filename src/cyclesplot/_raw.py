@@ -22,8 +22,8 @@ class RawMixin:
                              'raw.basic'    : PlotAttrs('color',  'circle', 1,
                                                         alpha   = .5,
                                                         palette = 'inferno'),
-                             'figure.width' : 100,
-                             'figure.height': 100}
+                             'figure.width' : 450,
+                             'figure.height': 450}
         self._rawsource: ColumnDataSource = None
         self._raw:       Figure           = None
 

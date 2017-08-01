@@ -19,6 +19,11 @@ class HybridStatView(BokehView):
                         CyclesPlotView(**kwa),
                         PeaksPlotView (**kwa)]
 
+        self._ctrl.getGlobal('css').defaults = dict(responsive  = False,
+                                                    sizing_mode = 'fixed')
+        self._ctrl.getGlobal('css.plot').figure.defaults = dict(responsive  = False,
+                                                                sizing_mode = 'fixed')
+        self._ctrl.getGlobal('css').hybridstat.defaults = dict(width = 300, height = 30)
         titles = self._ctrl.getGlobal('css').hybridstat.title
         for panel in self._panels:
             key                         = self.__key(panel)
@@ -70,6 +75,7 @@ class HybridStatView(BokehView):
         for panel in self._panels[ind+1:]:
             self.__state(panel, PlotState.disabled)
 
+        mode.update(self._ctrl.getGlobal('css').hybridstat.getitems('width', 'height'))
         tabs = Tabs(tabs   = [_panel(panel) for panel in self._panels],
                     active = ind,
                     name   = 'Hybridstat:Tabs',
@@ -84,7 +90,7 @@ class HybridStatView(BokehView):
                               (lambda: setattr(self._tabs, 'active', old),))
         tabs.on_change('active', _py_cb)
         self._tabs = tabs
-        return layouts.widgetbox(tabs, **mode)
+        return tabs
 
     def observe(self):
         super().observe()

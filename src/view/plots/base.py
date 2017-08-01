@@ -184,9 +184,10 @@ class PlotModelAccess(GlobalsAccess):
 
 class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     "Base plotter class"
-    _MODEL = PlotModelAccess
-    _RESET = frozenset(('bead',))
-    _CLEAR = frozenset(('track',))
+    __FIRST = True
+    _MODEL  = PlotModelAccess
+    _RESET  = frozenset(('bead',))
+    _CLEAR  = frozenset(('track',))
     class _OrderedDict(OrderedDict):
         def __missing__(self, key):
             self[key] = value = OrderedDict()
@@ -194,17 +195,20 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
 
     def __init__(self, ctrl:Controller, *_) -> None:
         "sets up this plotter's info"
-        ctrl.getGlobal("css.plot").defaults = {'ylabel'             : u'Z (nm)',
-                                               'yrightlabel'        : u'Base number',
-                                               'xtoplabel'          : u'Time (s)',
-                                               'xlabel'             : u'Frames',
-                                               'toolbar_location'   : 'right',
-                                               'toolbar_sticky'     : False,
-                                               'input.width'        : 205,
-                                               'figure.width'       : 800,
-                                               'figure.height'      : 200,
-                                               'figure.sizing_mode' : 'scale_width',
-                                               'figure.responsive'  : True}
+        if PlotCreator.__FIRST:
+            PlotCreator.__FIRST = False
+            css = ctrl.getGlobal("css.plot")
+            css.defaults = {'ylabel'             : u'Z (nm)',
+                            'yrightlabel'        : u'Base number',
+                            'xtoplabel'          : u'Time (s)',
+                            'xlabel'             : u'Frames',
+                            'toolbar_location'   : 'right',
+                            'toolbar_sticky'     : False,
+                            'input.width'        : 205,
+                            'figure.width'       : 800,
+                            'figure.height'      : 200,
+                            'figure.sizing_mode' : 'scale_width',
+                            'figure.responsive'  : True}
 
         key = type(self).key()
         for name in 'config', 'project', 'css':

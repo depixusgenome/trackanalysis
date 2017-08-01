@@ -117,8 +117,8 @@ class PeaksPlotCreator(TaskPlotCreator):
     def __init__(self, *args):
         super().__init__(*args)
         self.css.defaults = {'count'           : PlotAttrs('lightblue', 'line', 1),
-                             'figure.width'    : 100,
-                             'figure.height'   : 150,
+                             'figure.width'    : 500,
+                             'figure.height'   : 750,
                              'xtoplabel'       : u'Duration (s)',
                              'xlabel'          : u'Rate (%)',
                              'widgets.border'  : 10}

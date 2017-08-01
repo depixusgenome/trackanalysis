@@ -23,8 +23,8 @@ class HistMixin:
                                                      fill_color = None,
                                                      line_alpha = .5,
                                                      line_color = 'blue'),
-                             'figure.width' : 100,
-                             'figure.height': 100}
+                             'figure.width' : 450,
+                             'figure.height': 450}
         self.css.hist.defaults = {'xtoplabel'    : u'Cycles',
                                   'xlabel'       : u'Frames'}
         SequenceTicker.defaultconfig(self)

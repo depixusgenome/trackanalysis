@@ -24,8 +24,8 @@ class BeadPlotCreator(TaskPlotCreator):
                              'ylabel':          u"Z",
                              'yrightlabel':     u"Zmag",
                              'tooltips':        ttips,
-                             'figure.width' :   100,
-                             'figure.height':   60}
+                             'figure.width' :   900,
+                             'figure.height':   600}
         self._source = None # type: Optional[ColumnDataSource]
         self._fig    = None # type: Optional[Figure]
 
