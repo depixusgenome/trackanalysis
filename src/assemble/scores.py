@@ -141,7 +141,7 @@ class PDFCost:
     def __call__(self,xstate)->float:
         return -np.product([self.get_dists[idp].pdf(val)
                             for idp,val in enumerate(xstate)])
-
+# needed
 class ScoredPerm:
     u'''
     simple container for scores, and associated data.OligoPerm
@@ -153,10 +153,6 @@ class ScoredPerm:
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
         pass
-
-    #def intersect_with(self,other):
-    #    u'returns true if any oligo in kperm can be found in other'
-    #    return set(self.perm.perm).intersection(set(other.perm.perm))!=set()
 
     # not used, to remove
     @classmethod
@@ -170,7 +166,6 @@ class ScoredPerm:
         if len(args)==1:
             return args[0]
 
-        #res=cls.__add2(*args[:2])
         res=cls.__add2(args[0],args[1])
         for sckp in args[2:]:
             res = cls.__add2(res,sckp)
@@ -330,77 +325,6 @@ class LScPermCollection:
                 return True
         return False
 
-
-class ScoredPermCollection:
-    u'''
-    handles a list of ScoredPerm
-    '''
-    def __init__(self,scperms:List[ScoredPerm])->None:
-        self.scperms=scperms
-
-    @classmethod
-    def product(cls,*args):
-        u'''
-        returns the product of any 2 elements in 2 different ScoredPermCollection
-        '''
-        if len(args)==1:
-            return args[0]
-
-        res = cls.__product2(args[0],args[1])
-        for sckpm in args[2:]:
-            res = cls.__product2(res,sckpm)
-        return res
-
-
-    # to optimize
-    @classmethod
-    def __product2(cls,collection1,collection2):
-        u'''
-        assumes that the 2 permutation are independant
-        work on permids and changes only
-        '''
-        if collection1.intersect_with(collection2):
-            print(collection1.scperms[0].perm.domain)
-            print(collection2.scperms[0].perm.domain)
-            print("pb the 2 permutations are not independant")
-        perms1=np.matrix([i.perm.permids for i in collection1.scperms])
-        perms2=np.matrix([i.perm.permids for i in collection2.scperms])
-        merged_permids=perms1[:,perms2]
-        merged_pdfcost=-np.matrix([i.pdfcost for i in collection1.scperms]).T*np.matrix\
-            ([i.pdfcost for i in collection2.scperms])
-        merged_noverlaps=np.matrix([i.noverlaps for i in collection1.scperms]).T\
-                          +np.matrix([i.noverlaps for i in collection2.scperms])
-        scores=[ScoredPerm(pdfcost=merged_pdfcost[i1,i2],
-                           noverlaps=merged_noverlaps[i1,i2],
-                           perm=data.OligoPerm(permids=merged_permids[i1,i2,:].\
-                                               reshape((1,perms2.shape[1])).tolist()[0],
-                                               oligos=collection1.scperms[0].perm.oligos,
-                                               changes=collection1.scperms[i1].perm.changes+\
-                                               collection2.scperms[i2].perm.changes,
-                                               domain=collection1.scperms[i1].perm.\
-                                               domain.union(collection2.scperms[i2].perm.domain)))
-                for i1 in range(len(collection1.scperms))
-                for i2 in range(len(collection2.scperms))]
-        return ScoredPermCollection(scperms=scores)
-
-
-    def compute_noverlaps(self,score:ScoreAssembly)->None:
-        u'calls score on each scperm to update noverlap valuex'
-        for scpm in self.scperms:
-            score.perm=scpm.perm
-            scpm.noverlaps=score.noverlaps()
-
-    def intersect_with(self,other):
-        u'''
-        returns True if any OligoPerm in self is also in other
-        '''
-        for scpm in self.scperms:
-            if any(scpm.perm.domain.intersection(oth.perm.domain)
-                   for oth in other.scperms):
-                return True
-        return False
-
-
 class ScoreFilter:
     u'''
     filter out ScoredPerm which cannot lead to the 'best' score.
@@ -460,3 +384,9 @@ class ScoreFilter:
             grp=self._filter2(grp)
             filtered+=grp
         return filtered
+
+
+
+# to score a partition need to list all paths
+# each path is a list of OligoKperms
+# add all OligoKperms 
