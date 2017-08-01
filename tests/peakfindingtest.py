@@ -17,6 +17,7 @@ from peakfinding.histogram       import (Histogram, CWTPeakFinder,
 from peakfinding.alignment       import PeakCorrelationAlignment
 from peakfinding.reporting.batch import computereporters
 from testingcore                 import path as utfilepath
+from signalfilter                import NonLinearFilter
 
 CORR = lambda f, a, b, c, d, e, g: PeakCorrelationAlignment.run(f,
                                                                 precision     = 1.,
@@ -221,7 +222,9 @@ def test_precision():
                 nbeads    = 2,
                 ncycles   = 100)
 
-    pair  = create(TrackSimulatorTask(**sim), EventDetectionTask(), PeakSelectorTask(),
+    pair  = create(TrackSimulatorTask(**sim),
+                   EventDetectionTask(filter = NonLinearFilter()),
+                   PeakSelectorTask(),
                    PeakProbabilityTask())
     tmp   = next(pair.run())
     sim   = tmp.track.simulator[0]['sizes']
@@ -236,7 +239,7 @@ def test_precision():
 
     truth = [np.mean(i[i>=5]) for i in sim.T]
     exp   = np.array([i.averageduration for _, i in vals[1:]])
-    assert_allclose(exp, truth, rtol = 1e-3, atol = 1e-3)
+    assert_allclose(exp, truth, rtol = 1.5e-2, atol = 1e-3)
 
 if __name__ == '__main__':
     test_control()
