@@ -3,6 +3,7 @@
 """
 Monkeypatches tasks and provides a simpler access to usual tasks
 """
+import sys
 from pathlib                import Path
 
 from copy                   import deepcopy
@@ -16,9 +17,10 @@ from cordrift.processor         import DriftTask
 from eventdetection.processor   import ExtremumAlignmentTask, EventDetectionTask
 from peakfinding.processor      import PeakSelectorTask
 from peakcalling.processor      import FitToHairpinTask, BeadsByHairpinTask
-from model.task                 import * # pylint: disable=wildcard-import,unused-wildcard-import
-from model.task                 import __all__ as __all_tasks__, Task, TrackReaderTask
+from .task                      import * # pylint: disable=wildcard-import,unused-wildcard-import
+from .task                      import __all__ as __all_tasks__, Task, TrackReaderTask
 
+assert 'scripting' in sys.modules
 RESET = type('Reset', (), {})
 class Tasks(Enum):
     """

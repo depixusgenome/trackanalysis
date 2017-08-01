@@ -3,13 +3,14 @@
 """
 Saves stuff from session to session
 """
+import sys
 import inspect
 from   copy        import deepcopy
 
 from   view.dialog import FileDialog
-from   app         import default
-from   .task       import Tasks
+from   .           import default
 
+Tasks = sys.modules['model.__scripting__'].Tasks
 
 _frame = None
 for _frame in inspect.stack()[1:]:

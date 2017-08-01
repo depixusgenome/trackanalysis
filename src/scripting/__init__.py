@@ -39,19 +39,36 @@ from data                       import Beads, Cycles
 from eventdetection.processor   import ExtremumAlignmentTask, EventDetectionTask
 from peakfinding.processor      import PeakSelectorTask
 
-# pylint: disable=wildcard-import
+# pylint: disable=wildcard-import, ungrouped-imports
 from signalfilter               import *
-from .task                      import *
-from .track                     import *
-from .scriptapp                 import *
+from model.__scripting__        import *
+from app.__scripting__          import *
+from data.__scripting__         import *
+from peakcalling.__scripting__  import *
+
 try:
     from .curve                 import *
 except ImportError:
     pass
 try:
-    from .holoviewing           import *
+    import holoviews            as hv
+    import holoviews.operation  as hvops
+
 except ImportError:
     pass
+else:
+    from data.__holoviewing__               import * # pylint: disable=redefined-builtin
+    from eventdetection.__holoviewing__     import *
+    from peakcalling.__holoviewing__        import *
+    if 'ipykernel_launcher' in inspect.stack()[-3].filename:
+        try:
+            import bokeh.io as _io
+            _io.output_notebook()
+            hv.notebook_extension('bokeh')
+            from IPython import get_ipython
+            get_ipython().magic('output size=150')
+        except:                                         # pylint: disable=bare-except
+            pass
 
 if 'ipykernel_launcher' in inspect.stack()[-3].filename:
     try:

@@ -133,19 +133,26 @@ class PeaksDict(TrackItems):
 
     @staticmethod
     def __array2measure(singles, multiples, arr):
-        arr[:] = [None                  if i is None            else
-                  singles  (i[1])       if isinstance(i, tuple) else
-                  multiples(i['data'])
-                  for i in arr]
+        if arr.dtype == 'O':
+            arr[:] = [None                  if i is None            else
+                      singles  (i[1])       if isinstance(i, tuple) else
+                      multiples(i['data'])
+                      for i in arr[:]]
+        else:
+            arr['data'] = [singles(i) for i in arr['data']]
         return arr
 
     @staticmethod
     def __array2range(arr):
-        arr[:] = [None                        if i is None            else
-                  range(i[0], i[0]+len(i[1])) if isinstance(i, tuple) else
-                  range(i[0][0], i[-1][0]+len(i[-1][1]))
-                  for i in arr]
-        return arr
+        if arr.dtype == 'O':
+            return np.array([None                        if i is None            else
+                             range(i[0], i[0]+len(i[1])) if isinstance(i, tuple) else
+                             range(i[0][0], i[-1][0]+len(i[-1][1]))
+                             for i in arr])
+        return np.array([None                        if i is None            else
+                         range(i[0], i[0]+len(i[1])) if np.isscalar(i[1][0]) else
+                         range(i[0][0], i[-1][0]+len(i[-1][1]))
+                         for i in arr])
 
     def _keys(self, sel:Sequence = None, _ = None) -> Iterator[BEADKEY]:
         if self.__keys is None:

@@ -203,3 +203,10 @@ class CachedIO(Generic[T]):
 def cachedio(fcn):
     "Caches io output"
     return wraps(fcn)(CachedIO(fcn).__call__)
+
+def addto(*types):
+    "add method to a class"
+    def _wrapper(fcn):
+        for tpe in types:
+            setattr(tpe, getattr(fcn, 'fget', fcn).__name__, fcn)
+    return _wrapper

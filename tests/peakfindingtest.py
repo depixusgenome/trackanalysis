@@ -5,7 +5,6 @@ from pathlib                    import Path
 from tempfile                   import mktemp, gettempdir
 import numpy as np
 from numpy.testing               import assert_equal, assert_allclose
-from numpy.lib.stride_tricks     import as_strided
 
 from control.taskcontrol         import create
 from simulator                   import randpeaks
@@ -150,9 +149,10 @@ def test_peakselector():
                        stretch  = .05,
                        bias     = .05,
                        rates    = 1.)
-    events = np.array([as_strided(i, shape = (len(i), 5), strides = (i.strides[0], 0))
-                       for i in data],
-                      dtype = 'O')
+    events = np.array([[None for j in i] for i in data])
+    for i, j in zip(events, data):
+        for k, val in enumerate(j):
+            i[k] = np.repeat(val, 5)
     res    = tuple(PeakSelector()(events, precision = 1.))
     assert len(res) == 4
     assert all(len(i) == 5 for _, i in res)
@@ -183,6 +183,14 @@ def test_control():
         assert_allclose(tmp, (peak,)*20, atol = 0.1)
         tmp = [i.max() for i in evts['data']]
         assert_allclose(tmp, (peak,)*20, atol = 0.1)
+
+    # test that things don't crash
+    beads = tuple(next(pair.run()).index()[0])
+    beads = tuple(next(pair.run()).withmeasure()[0])
+
+    pair  = create(utfilepath('big_selected'), EventDetectionTask(), PeakSelectorTask())
+    beads = tuple(next(pair.run()).index()[0])
+    beads = tuple(next(pair.run()).withmeasure()[0])
 
 def test_reporting():
     "tests processor"
@@ -231,4 +239,4 @@ def test_precision():
     assert_allclose(exp, truth, rtol = 1e-3, atol = 1e-3)
 
 if __name__ == '__main__':
-    test_precision()
+    test_control()

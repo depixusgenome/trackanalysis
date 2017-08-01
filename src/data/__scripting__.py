@@ -21,6 +21,7 @@ We add some methods and change the default behaviour:
         * a *rawprecision* method is added
         * *with...* methods return an updated copy
 """
+import sys
 from typing                 import KeysView, Tuple, Iterator, List
 from itertools              import product
 from pathlib                import Path
@@ -28,13 +29,16 @@ import pickle
 import re
 
 from utils                  import initdefaults
+from utils.decoration       import addto
 from model                  import Level
-from data                   import Track as _Track, Beads, Cycles
-from data.trackio           import LegacyGRFilesIO, LegacyTrackIO
 from signalfilter           import PrecisionAlg, NonLinearFilter
 from eventdetection.data    import Events
 
-from .scriptapp             import scriptapp, Tasks
+from .                      import Track as _Track, Beads, Cycles
+from .trackio               import LegacyGRFilesIO, LegacyTrackIO
+
+Tasks     = sys.modules['app.__scripting__'].Tasks     # pylint: disable=invalid-name
+scriptapp = sys.modules['app.__scripting__'].scriptapp # pylint: disable=invalid-name
 
 class Track(_Track):
     "Adding helper functions for simple calls"
@@ -53,10 +57,7 @@ class Track(_Track):
             scriptapp.control.writeconfig()
         super().__init__(path = path, **kwa)
 
-def _totrack(fcn):
-    setattr(_Track, getattr(fcn, 'fget', fcn).__name__, fcn)
-
-@_totrack
+@addto(_Track)
 def grfiles(self):
     "access to gr files"
     paths = scriptapp.grdlg.open()
@@ -65,19 +66,19 @@ def grfiles(self):
     old = self.path
     self.__init__(path = ((old,) if isinstance(old, str) else old)+paths)
 
-@_totrack
+@addto(_Track)
 def rawprecision(self, ibead):
     "the raw precision for a given bead"
     if isinstance(ibead, (tuple, list)):
         ibead = next(i for i in ibead if isinstance(i, int))
     return PrecisionAlg.rawprecision(self, ibead)
 
-@_totrack
+@addto(_Track)
 def tasklist(self, *args, beadsonly = True):
     "creates a tasklist"
     return Tasks.get(self.path, *args, beadsonly = beadsonly)
 
-@_totrack
+@addto(_Track)
 def processors(self, *args, copy = True, beadsonly = True):
     "returns an iterator over the result of provided tasks"
     procs = Tasks.processors(self.path, *args, beadsonly = beadsonly)
@@ -85,7 +86,7 @@ def processors(self, *args, copy = True, beadsonly = True):
     procs.copy = copy
     return procs
 
-@_totrack
+@addto(_Track)
 def apply(self, *args, copy = True, beadsonly = True):
     "returns an iterator over the result of provided tasks"
     return next(iter(self.processors(*args, beadsonly = beadsonly).run(copy = copy)))
@@ -96,26 +97,26 @@ def _tasks(paths, upto):
         tasks = (Tasks.cleaning, Tasks.alignment)+tasks
     return tasks if upto is None else tasks[:tasks.index(upto)+1]
 
-@_totrack # type: ignore
+@addto(_Track) # type: ignore
 @property
 def cleancycles(self):
     "returns cleaned cycles"
     return self.apply(*_tasks(self.path, Tasks.alignment))[...,...]
 
-@_totrack # type: ignore
+@addto(_Track) # type: ignore
 @property
 def measures(self):
     "returns cleaned cycles for phase 5 only"
     phase = scriptapp.control.getGlobal('config').phase.measure.get()
     return self.cleaned.withphases(phase)
 
-@_totrack # type: ignore
+@addto(_Track) # type: ignore
 @property
 def events(self) -> Events:
     "returns events in phase 5 only"
     return self.apply(*_tasks(self.path, Tasks.eventdetection))
 
-@_totrack # type: ignore
+@addto(_Track) # type: ignore
 @property
 def peaks(self) -> Events:
     "returns peaks found"
@@ -132,7 +133,7 @@ def _fit(self, tpe, sequence, oligos, kwa) -> Events:
         raise IndexError('No distances found')
     return self.apply(*tasks)
 
-@_totrack # type: ignore
+@addto(_Track) # type: ignore
 def fittohairpin(self, sequence = None, oligos = None, **kwa) -> Events:
     """
     Computes hairpin fits.
@@ -141,7 +142,7 @@ def fittohairpin(self, sequence = None, oligos = None, **kwa) -> Events:
     """
     return _fit(self, 'fittohairpin', sequence, oligos, kwa)
 
-@_totrack # type: ignore
+@addto(_Track) # type: ignore
 def beadsbyhairpin(self, sequence, oligos, **kwa) -> Events:
     """
     Computes hairpin fits, sorted by best hairpin.
