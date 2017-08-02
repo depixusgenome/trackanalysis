@@ -15,7 +15,6 @@ import numpy
 import networkx
 from utils import initdefaults
 import assemble.data as data
-import assemble.shuffler as shuffler
 
 BP2NM=1.1
 
@@ -447,25 +446,25 @@ class PeakStack:
         'returns copy'
         return self.__copy__()
 
-class Scaler:
+class Scaler: # pylint: disable=too-many-instance-attributes
     '''
     varies stretch and bias between Oligo Experiments
     '''
-    bp2nm=BP2NM # type: float
-    nl_amplitude=5*bp2nm # type: float # in nm
-    oligos=[] # type: List[data.OligoPeak]
-    peaks=[] # type: List[data.OPeakArray]
-    min_overl=2 # type: int # need to rethink this parameter and its interaction
-    with_reverse=True # type: bool
-    bstretch=Bounds() # type: Bounds
-    bbias=Bounds() # type: Bounds
-    ref_index=0 # type: int # index of the reference OPeakArray
-    shuffler=shuffler.Shuffler()
-    pstack=PeakStack()
-    __peakset=frozenset() # type: FrozenSet[OPeakArray]
-    @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
-        pass
+        # self.bp2nm=BP2NM # type: float
+        # self.nl_amplitude=5*bp2nm # type: float # in nm
+        self.oligos=kwa.get("oligos",[]) # type: List[data.OligoPeak]
+        self.min_overl=kwa.get("min_overl",2) # type: int # rethink this parameter
+        self.with_reverse=kwa.get("with_reverse",True) # type: bool
+        self.bstretch=kwa.get("bstretch",Bounds()) # type: Bounds
+        self.bbias=kwa.get("bbias",Bounds()) # type: Bounds
+        self.pstack=PeakStack()
+
+        # exp_oligos=no_orientation(self.oligos) # type: List[data.OligoPeak] # keep for later
+        exp_oligos=list(self.oligos)
+        self.peaks=OPeakArray.from_oligos(exp_oligos) # type: List[data.OPeakArray]
+        self.peaks=sorted(self.peaks,key=lambda x:-len(x.arr))
+        self.__peakset=frozenset(self.peaks) # type: FrozenSet[OPeakArray]
 
     def filterleftoverlap(self,peaks1,peaks2):
         'returns True if any in (peak1,peak2) tail_overlap'
@@ -554,7 +553,7 @@ class Scaler:
                 addstacks+=self.build_stack_fromtuple(stack,path[1:])
         return addstacks
 
-    def run(self,iteration=None)->List[PeakStack]:
+    def run(self,ref_index=0,iteration=None)->List[PeakStack]:
         '''
         ## ORIGINAL PLAN, TOO LONG TO RUN
         # take the 2 peaks in refpeak which are the more closely related
@@ -574,15 +573,10 @@ class Scaler:
         *for each scaled peakarray to an object (Scaffold):
         a Scaffold can only contain 1 copy of a peakarray (modulo scale)
         '''
-        # exp_oligos=no_orientation(self.oligos) # type: List[data.OligoPeak] # keep for later
-        exp_oligos=list(self.oligos)
-        self.peaks=OPeakArray.from_oligos(exp_oligos) # type: List[data.OPeakArray]
-        self.peaks=sorted(self.peaks,key=lambda x:-len(x.arr))
-        refpeak=self.peaks[self.ref_index]
+        refpeak=self.peaks[ref_index]
         pstack=PeakStack(min_overl=self.min_overl)
         pstack.add(refpeak)
 
-        self.__peakset=frozenset(self.peaks)
 
         pstacks=[pstack]
         # quick and dirty solution for accounting for different starting sequences.
@@ -612,7 +606,7 @@ class Scaler:
         '''
         for each other peak, find all possible rescales (stretch and bias)
         matching filter is a function taking refpeak and others:List[OPeakArray]
-        filter
+        eg self.filterleftoverlap(peaks1,peaks2) filter
         '''
         torescale=others
         if tocmpfilter:
@@ -626,6 +620,55 @@ class Scaler:
             rescaleperpeak[peak]=scales
 
         return rescaleperpeak
+
+
+# needs a SubScaler class focusing on segments between two peaks
+# find the best scales for peak array between these peaks (allow for a subselection of peaks)
+# will be rewritten
+class SubScaler(Scaler):
+    '''
+    Same as Scaler but focuses on the section between to peaks (event detected)
+    to fix all the scales of oligos experiments which fall into this section
+    trying to generate the stacks on the whole sequence at once is too intensive
+    '''
+
+    # needs oligos, peaks, min_overl
+    # with_reverse bstretch, bbias, ref_index
+
+    def __init__(self,**kwa):
+        super().__init__(**kwa)
+        self.pstack=kwa.get("pstack",PeakStack()) # where peaks are considered fixed
+        self.posid=kwa.get("posid",0) # type: int # id of pstack.posarr
+
+    def find_rescales_to_key(self,others:Iterable[OPeakArray],tocmpfilter=None):
+        '''
+        for each peak in others, find the Rescale values such that the key of pstack is matched
+        '''
+        torescale=others
+        if tocmpfilter:
+            torescale=frozenset(filter(tocmpfilter,others))
+
+        # find the oligo from self.pstack.ordered[0] closest to self.pstack.keys[stack_keyid]
+        tomatch=OPeakArray.from_oligos([self.pstack.top().arr[self.posid]])[0]
+        rescaletokey=dict() # type: Dict[OPeakArray,List]
+        for peak in torescale:
+            scales=tomatch.find_matches(peak,self.bstretch,self.bbias,self.with_reverse)
+            if not scales:
+                continue
+            rescaletokey[peak]=scales
+
+        return rescaletokey
+
+    # def run(self,**kwargs)->List[PeakStack]:
+    #     '''
+    #     finding all possible stacks for the full sequence is too intensive
+    #     subdivide the problem by co
+    #     '''
+    #     iteration=kwargs.get("iteration",1) # type: int
+
+    #     pstacks=[pstack]
+    #     # building_stacks
+    #     return self.resume(pstacks,iteration=iteration)
 
 # how to deal effectively with reverse_complement and overlapping? for example with
 # aat whose reverse complement is att, aat and aat may overlap
