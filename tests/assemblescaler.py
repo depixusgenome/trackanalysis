@@ -5,6 +5,7 @@
 tests the assemble.scaler submodule
 '''
 
+import networkx
 import assemble.scaler as scaler
 import assemble.data as data
 
@@ -27,10 +28,16 @@ PEAKS=sorted(PEAKS,key=lambda x:-len(x.arr))
 
 
 STACKER=scaler.Scaler(oligos=OLIGOS,
-                      bbias=scaler.Bounds(-1.1,1.1),
+                      bbias=scaler.Bounds(-4.4,4.4),
                       bstretch=scaler.Bounds(0.95,1.05),
                       min_overlap=MIN_OVERL)
 
+
+
+GRAPH=networkx.DiGraph()
+GRAPH.add_edges_from([(0,1),(1,2),(2,3),(3,4),(4,0),(4,5)])
+for edge in GRAPH.edges():
+    GRAPH.add_edge(edge[1],edge[0])
 
 def test_cpaths():
     'checks creation of cyclic paths'
@@ -60,21 +67,17 @@ def test_cpaths():
     # eg: (1,2,3,1) and (1,3,2,1)
 
 
-# needs to
-# * stack without rescaling since stretch bias bounds are defined from original stretch
-# * allow for reverse seq for stack(key) when stacking upon
-# * must find at least 1 cpath which partially reconstructs the sequence
-# * consider any paths of incremental size?
-# * should start with cyclic paths, resolve the conflicts there
-# * then add all (iteratively) PEAKS which  have not been fixed with cyclic paths
+def test_rescales():
+    'should add test on rescales allowed within boundaries'
+    pass
+
 def test_stack():
     'test proper stacking of cpaths'
     graph=scaler.OPeakArray.list2graph(PEAKS,min_overl=MIN_OVERL)
     cpaths=list(scaler.cyclic_paths(graph,source=PEAKS[0]))
     cpaths=sorted(cpaths,key=len)
 
-    # find possible scaledpaths (fix issue with build_stacks and build_stacks_fromtuple)
+    # find possible scaledpaths
     stack=scaler.PeakStack()
     stack.add(PEAKS[0])
     # to continue from here
-    #scaledpaths=[STACKER.build_stacks_fromtuple(stack,path) for path in cpaths]
