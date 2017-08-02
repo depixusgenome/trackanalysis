@@ -242,31 +242,22 @@ class RequireOverlapFilter:
         self.oligos=oligos
         self.min_ooverl=min_ooverl
 
-    # to check: needs to check both sides of conflicted oligos
-    def __call__(self,permids:List[int]):
-        u'''
-        permids are the indices of the oligos
+        seqs=[oli.seq for oli in  self.oligos]
+        self.overlaps={(i,j):len(data.Oligo.tail_overlap(seqs[i],seqs[j]))>=self.min_ooverl
+                       for i,j in itertools.permutations(range(len(oligos)),2)}
+
+    # this call is long to execute
+    def __call__(self,permids:Tuple[int,...])->bool:
+        'if indices of oligos is permuted checks that thereis overlap'
         for idx,val in enumerate(permids[1:]):
             if permids[idx]>val:
-                if len(data.OligoPeak.tail_overlap(
-                        self.oligos[permids[idx]].seq,
-                        self.oligos[val].seq))<self.min_ooverl:
-                    return False
-        '''
-        for idx,val in enumerate(permids[1:]):
-            if permids[idx]>val:
-                if len(data.OligoPeak.tail_overlap(
-                        self.oligos[permids[idx]].seq,
-                        self.oligos[val].seq))<self.min_ooverl:
+                if not self.overlaps[(permids[idx],permids[idx+1])]:
                     if idx==0:
-                        return False # or continue?
-                    if len(data.OligoPeak.tail_overlap(
-                            self.oligos[permids[idx-1]].seq,
-                            self.oligos[permids[idx]].seq))<self.min_ooverl:
+                        return False
+                    if not self.overlaps[(permids[idx-1],permids[idx])]:
                         return False
 
         return True
-
 
 class EXAMPLEFindValidPerms:
     u'example (not finished) way to generate valid permutation'

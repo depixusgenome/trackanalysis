@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u'''
+'''
 Creates Classes and function to use with assemble sequence
 '''
-from typing import List, NamedTuple, Tuple, Set, Dict # pylint: disable=unused-import
+from typing import List, NamedTuple, Tuple, FrozenSet, Set, Dict, Generator # pylint: disable=unused-import
 import itertools
 import numpy
 from utils import initdefaults
 from ._types import SciDist # pylint: disable=unused-import
 from . import _utils as utils
+from . import graph as pgraph
 
+REVERSE={"a":"t","c":"g","g":"c","t":"a"}
+REVERSE.update({"A":"T","C":"G","G":"C","T":"A"})
 
 class Oligo:
-    u'''
+    '''
     container for an oligo sequence, a position in nanometer
     and a position in base
     '''
@@ -24,21 +27,74 @@ class Oligo:
         pass
     @property
     def size(self):
-        u'returns len(seq)'
+        'returns len(seq)'
         return len(self.seq)
 
     @staticmethod
-    def tail_overlap(ol1:str, ol2:str)->str:
-        u'''
-        returns the end sequence of ol1 matching the start of ol2
+    def reverse_complement(seq)->str:
+        'returns reverse complement of string seq'
+        return ''.join(REVERSE[i] for i in reversed(seq))
+
+    @classmethod
+    def rev(cls,seq)->str:
+        'shorter'
+        return cls.reverse_complement(seq)
+
+    @classmethod
+    def do_overlap(cls,ol1:str,ol2:str,min_overl:int=1)->bool:
         '''
-        for i in range(len(ol1)):
+        returns true if len(tail_overlap(ol1, ol2))>=min_overl
+        or len(tail_overlap(ol2, ol1))>=min_overl
+        '''
+        if len(cls.tail_overlap(ol1, ol2))>=min_overl:
+            return True
+        if len(cls.tail_overlap(ol2, ol1))>=min_overl:
+            return True
+        return False
+
+    @staticmethod
+    def tail_overlap(ol1:str, ol2:str,shift=0)->str:
+        '''
+        returns the end sequence of ol1 matching the start of ol2
+        shift, in number of base
+        shift=0 allows for complete overlap of sequence
+        '''
+        for i in range(shift,len(ol1)):
             if ol1[i:]==ol2[:len(ol1)-i]:
                 return ol1[i:]
         return ""
 
+    def reverse(self,in_place=True)->None:
+        'switch the seq to its reverse complement'
+        if in_place:
+            self.seq=type(self).rev(self.seq)
+        cpy=self.copy()
+        cpy.seq=type(self).rev(self.seq)
+        return cpy
+
+    @classmethod
+    def can_tail_overlap(cls, # pylint: disable=too-many-arguments
+                         ol1:str,
+                         ol2:str,
+                         min_overlap:int,
+                         oriented=True,
+                         shift=0)->bool:
+        '''
+        if oriented, orientation is supposed known
+        else, also consider reverse_complements of ol2 (NOT OL1)
+        '''
+        if oriented:
+            return len(cls.tail_overlap(ol1, ol2,shift=shift))>=min_overlap
+        else:
+            ols1=[ol1]
+            ols2=[cls.rev(ol2),ol2]
+            for comb in itertools.product(ols1,ols2):
+                if len(cls.tail_overlap(*comb,shift=shift))>=min_overlap:
+                    return True
+        return False
+
     def add_to_sequence(self,seq:str)->str:
-        u'''
+        '''
         returns the sequence such that overlap of seq and oseq is maximised
         '''
         if self.seq=="":
@@ -49,6 +105,39 @@ class Oligo:
                 return seq[:i]+self.seq
         return seq+self.seq
 
+    def __add__(self,bias):
+        kwa=dict(self.__dict__)
+        kwa["pos"]=kwa["pos"]+bias
+        return Oligo(**kwa)
+
+    def __radd__(self,bias):
+        return self.__add__(bias)
+
+    def __mul__(self,scale):
+        kwa=dict(self.__dict__)
+        kwa["pos"]=kwa["pos"]*scale
+        return Oligo(**kwa)
+
+    def __rmul__(self,scale):
+        return self.__mul__(scale)
+
+    def __copy__(self,**kwa):
+        mod=dict(list(self.__dict__.items())+list(kwa.items()))
+        return type(self)(**mod)
+
+    def copy(self,**kwa):
+        'calls copy'
+        return self.__copy__(**kwa)
+
+    def __hash__(self):
+        return hash(tuple([self.pos,self.seq]))
+
+    def __eq__(self,other):
+        if isinstance(other,type(self)):
+            return hash(self)==hash(other)
+        return False
+
+
 # it is bpos which needs to be updated
 # If 2 oligos are too far from one another there is a
 # unknown number of bases between the 2
@@ -58,7 +147,7 @@ class Oligo:
 # we can reestimate the stretch bias
 # Should we modify the bias?
 class OligoPeak(Oligo):
-    u'represents peaks obtained from sequencing experiment'
+    'represents peaks obtained from sequencing experiment'
     batch_id = -1 # type: int
     dist = None # type: SciDist
     poserr = -1. # type: float
@@ -75,12 +164,12 @@ class OligoPeak(Oligo):
 
     @property
     def bias(self):
-        u'returns bias'
+        'returns bias'
         return self.appliedbias
 
     @property
     def stretch(self):
-        u'''
+        '''
         recomputes stretch from current position
         takes into account modifications due to permutations
         '''
@@ -89,13 +178,49 @@ class OligoPeak(Oligo):
         except ZeroDivisionError:
             return 0
 
+    def __add__(self,bias):
+        kwa=dict(self.__dict__)
+        kwa["pos"]=kwa["pos"]+bias
+        return OligoPeak(**kwa)
+
+    def __radd__(self,bias):
+        return self.__add__(bias)
+
+    def __mul__(self,scale):
+        kwa=dict(self.__dict__)
+        kwa["pos"]=kwa["pos"]*scale
+        return OligoPeak(**kwa)
+
+    def __rmul__(self,scale):
+        return self.__mul__(scale)
+
+def stack_2sequences(oli1:Oligo,oli2:Oligo)->Oligo:
+    '''
+    adds sequence from oli2 to oli1 with maximal overlap
+    non symmetric
+    '''
+    cpoli=oli1.copy()
+    cpoli.seq+=oli2.seq[len(Oligo.tail_overlap(oli1.seq,oli2.seq)):]
+    return cpoli
+
+def stack_sequences(*args)->Oligo:
+    '''
+    stacks sequences of oligos
+    order matters
+    '''
+    if not args:
+        return Oligo()
+    stack=args[0].copy()
+    for oli in args[1:]:
+        stack=stack_2sequences(stack,oli)
+    return stack
 
 OliBat = NamedTuple("OliBat",[("oli",OligoPeak),
                               ("idinbat",int),
                               ("batid",int)])
 
 class Batch:
-    u'''
+    '''
     Container for Oligo
     could setattr BCollection id to each oligo
     '''
@@ -106,12 +231,12 @@ class Batch:
         pass
 
     def fill_with(self,other)->None:
-        u'adds oligos from other into self and empties other'
+        'adds oligos from other into self and empties other'
         self.oligos.extend(other.oligos)
         del other.oligos
 
     def oligo_overlap(self,other,min_overl:int=1)->bool:
-        u'''
+        '''
         compare the sequences of oligos in the two batch
         if any can tail_overlap
         return True
@@ -128,7 +253,7 @@ class Batch:
         return False
 
 class BCollection:
-    u'''
+    '''
     Collection of batches
     '''
     oligos = [] # type: List[OligoPeak]
@@ -140,7 +265,7 @@ class BCollection:
 
     @classmethod
     def from_oligos(cls,oligos:List[OligoPeak],attr="seq"):
-        u'from a list of OligoPeaks, creates BCollection'
+        'from a list of OligoPeaks, creates BCollection'
         grps= {getattr(oli,attr) for oli in oligos}
         batches=[Batch(oligos=[oli for oli in oligos if getattr(oli,attr)==grp],index=idx)
                  for idx,grp in enumerate(grps)]
@@ -151,13 +276,13 @@ class BCollection:
                    idsperbatch=idsperbatch)
 
     def group_overlapping_oligos(self,nscale)->List[List[OligoPeak]]:
-        u'returns groups of overlapping oligos'
+        'returns groups of overlapping oligos'
         groups = utils.group_overlapping_normdists([oli.dist for oli in self.oligos],
                                                    nscale=nscale)[1]
         return [[self.oligos[idx] for idx in grp] for grp in groups]
 
     def group_overlapping_batches(self,nscale)->List[List[OligoPeak]]:
-        u'same as group_overlapping_oligos except that only oligos in batches are considered'
+        'same as group_overlapping_oligos except that only oligos in batches are considered'
         olis=[] # type: List[OligoPeak]
         print("nscale=",nscale)
         for bat in self.batches:
@@ -166,50 +291,46 @@ class BCollection:
                                                    nscale=nscale)[1]
         return [[olis[idx] for idx in grp] for grp in groups]
 
-
     def oli2index(self,oli:OligoPeak)->int:
-        u'returns index of oli in oligos'
+        'returns index of oli in oligos'
         return self.oligos.index(oli)
 
-# to implement
-class Partition:
-    u'container for indepent OligoPerm objects'
-    pass
 
 class OligoPerm:
-    u'base class. full n-permutation'
+    'base class. full n-permutation'
     def __init__(self,**kwa):
         self.oligos=kwa.get("oligos",[]) # type: List[OligoPeak]
-        self._changes = kwa.get("changes",tuple()) # type: Tuple[int, ...]
+        #self._changes = kwa.get("changes",tuple()) # type: Tuple[int, ...]
         self._perm = kwa.get("perm",[]) # type: List[OligoPeak]
-        self._permids = kwa.get("permids",numpy.array([],dtype=int)) # type: List[int]
-        self._domain =  kwa.get("domain",set()) # type: Set[int]
+        self._permids = kwa.get("permids",numpy.empty(0,dtype='i4')) # type: List[int]
+        self._domain = kwa.get("domain",frozenset()) # type: FrozenSet[int]
+        self.__span = kwa.get("__span",frozenset()) # type: FrozenSet[int]
 
     @property
     def permids(self):
-        u'returns value'
+        'returns value'
         return self._permids
 
     @property
     def perm(self):
-        u'perm may not be needed, compute iff necessary'
-        if self._perm==[]:
+        'perm may not be needed, compute iff necessary'
+        if len(self._perm)==0:
             self._perm=numpy.array(self.oligos)[self.permids].tolist()
         return self._perm
 
     @property
-    def changes(self):
-        u'returns value'
-        return self._changes
+    def span(self)->FrozenSet[int]:
+        'to detect when ambiguity converge'
+        return self.__span
 
     @property
     def domain(self):
-        u'returns value'
+        'returns value'
         return self._domain
 
     @classmethod
     def add(cls,*args):
-        u'''
+        '''
         add all perms in args
         perm args[0] applied first,
         then args[1], args[2], ...
@@ -219,7 +340,6 @@ class OligoPerm:
         if len(args)==1:
             return args[0]
 
-        #res = cls.__add2(*args[:2])
         res = cls.__add2(args[0],args[1])
         for perm in args[2:]:
             res = cls.__add2(res,perm)
@@ -227,25 +347,25 @@ class OligoPerm:
 
     @classmethod
     def __add2(cls,perm1, perm2):
-        u'''
+        '''
         combine 2 OligoPerms
         assumes that the 2 perms have the same oligos
         '''
         if __debug__:
-            if len(set(perm1.domain).intersection(set(perm2.domain)))>0:
+            if len(frozenset(perm1.domain).intersection(frozenset(perm2.domain)))>0:
                 print("perm1.domain",perm1.domain)
                 print("perm2.domain",perm2.domain)
                 raise ValueError("perm1 and perm2 are not independant")
-        changes = perm1.changes+perm2.changes
+        #changes = perm1.changes+perm2.changes
         permids = perm1.permids[perm2.permids]
         perm=[]
-        if not perm1.oligos==[]:
+        if not len(perm1.oligos)==0:
             perm=[perm1.oligos[i] for i in permids]
         return OligoPerm(oligos=perm1.oligos,
-                         changes=changes,
                          perm=perm,
                          permids=permids,
-                         domain=perm1.domain.union(perm2.domain))
+                         domain=perm1.domain.union(perm2.domain),
+                         __span=perm1.span.union(perm2.span))
 
     def __hash__(self)->int:
         return hash((tuple(sorted(self.domain)),tuple(self.permids)))
@@ -255,64 +375,148 @@ class OligoPerm:
             return True
         return False
 
-    def outer_seqs(self,ooverl:int)->Tuple[str, ...]:
-        u'''
-        returns the overlapping oligo seq of left most oligo and right most
-        as a tuple(left,right)
-        '''
-        changed=[val in self.changes for idx,val in enumerate(self.permids)]
-        # "l" for left, take the first ooverl chars in sequence
-        # "r" for right
-        sides=[("l",0)] if changed[0] else []
-        for idx,val in enumerate(changed[1:]):
-            if changed[idx]!=val:
-                if changed[idx]:
-                    sides.append(("r",idx))
-                else:
-                    sides.append(("l",idx+1))
-        if changed[-1]:
-            sides.append(('r',len(changed)-1))
-
-        return tuple(self.perm[val].seq[:ooverl]
-                     if lorr=="l"
-                     else self.perm[val].seq[-ooverl:]
-                     for lorr,val in sides)
-
     def __del__(self):
         del self.oligos
-        del self._changes
         del self._perm
         del self._permids
         del self._domain
 
+# replace Partition with a DiGraph? make Partition a subclass of DiGraph
+# a more efficient way to keep track of abiguities would be to save the edges of the graphs
+# as Tuple[data.OligoPerm,data.OligoPerm].
+# reconstruction of the tree only appears when all paths are required
+class Partition:
+    '''
+    container for independent OligoPerm objects
+    includes a graph of kperms to track ambiguities
+    '''
+    def __init__(self,**kwa):
+        self.perms=kwa.get("perms",[])  # type: List[OligoPerm]
+        self.scores=kwa.get("scores",tuple()) # type: Tuple[float, ...]
+        self.noverlaps=kwa.get("noverlaps",0) # type: int
+        self.pdfcost=kwa.get("pdfcost",0) # type: float
+        self.domain=kwa.get("domain",None) # type: FrozenSet[int]
+        self.graph=kwa.get("graph",pgraph.PermGraph()) # type: pgraph.PermGraph
+        if self.domain is None:
+            self.domain=frozenset().union(*[prm.domain for prm in self.perms])
+
+        if not self.graph.nodes():
+            for perm in self.perms: # sort perms with max(prm.domain)?
+                self.graph.append(perm)
+
+    def merge(self)->OligoPerm:
+        'returns the merged perms'
+        return OligoPerm.add(*self.perms)
+
+    def add(self,perm:OligoPerm,in_place=False):
+        '''
+        if not in_place returns a new Partition with added perm
+        else appends perms with perm
+        '''
+        if in_place:
+            self.perms+=[perm]
+            self.domain=self.domain.union(perm.domain)
+            self.graph.append(perm)
+        else:
+            graph=self.graph.copy()
+            graph.append(perm)
+            return self.__copy__(perms=self.perms+[perm],
+                                 domain=self.domain.union(perm.domain),
+                                 graph=graph)
+
+    def __copy__(self,**kwa):
+        'returns copied Partition'
+        mod=dict(list(self.__dict__.items())+list(kwa.items()))
+        return Partition(**mod)
+
+    def copy(self,**kwa):
+        'copy call'
+        return self.__copy__(**kwa)
+
+    # to pytest
+    #@staticmethod
+    #def list_ambiguities(partitions)->List:
+    #'''
+    #returns a list of perms for each partitions
+    #the perms corresponds to the difference of a particular partition to any other
+    #'''
+    #ambi=[] # list of Partition
+    #for idx,val in enumerate(partitions):
+    #others=tuple(frozenset(part.perms) for part in partitions[:idx]+partitions[idx+1:])
+    #if len(others)==0:
+    #continue
+    # ambi.append(Partition(perms=list(frozenset(val.perms)-frozenset.intersection(*others))))
+
+    #return ambi
+
+
+
+    # must check creation and propagation of ambi
+    @staticmethod
+    def reduce_partitions(partitions:List,index:int)->List:
+        '''
+        If 2 partitions differ locally, save the different segments,
+        recreate partitions using the shared perms
+        '''
+        resumep=[] # type: List # list of partitions used to resume the calculations
+        keyparts=sorted([(hash(tuple(prm for prm in part.perms if prm.span.intersection({index}))),
+                          part) for part in partitions],
+                        key=lambda x:x[0])
+
+        for grp in itertools.groupby(keyparts,key=lambda x:x[0]):
+            # if they have the same key, ambiguity
+            parts=list(i[1] for i in grp[1])
+            #prev_ambi=[]
+            #for part in parts:
+            #    prev_ambi.append([ambi for ambi in part.ambi if ambi])
+            perms=frozenset(parts[0].perms).intersection(*[frozenset(part.perms)
+                                                           for part in parts[1:]])
+            domain=parts[0].domain.intersection(*[frozenset(part.domain)
+                                                  for part in parts[1:]])
+
+            graph=parts[0].graph.add(*[part.graph for part in parts[1:]])
+            common=Partition(perms=list(perms),
+                             domain=domain,
+                             graph=graph)
+            resumep.append(common)
+        return resumep
+
+    def paths(self)->Generator:
+        '''
+        generates all list of OligoPerm from possible combinations of ambiguities
+        use networkx.all_simple_path(self.graph,self.graph.start,self.graph.end)
+        '''
+        for path in self.graph.paths():
+            yield path
+
 
 class OligoKPerm(OligoPerm):
-    u'''
+    '''
     kpermutation of OligoPeak Object
-    As soon as 2 OligoKPerms are combine we work on OligoPerm objects
+    As soon as 2 OligoKPerms are combine we work with OligoPerm objects
     '''
     def __init__(self,**kwa)->None:
         super().__init__(**kwa)
         self.kperm=kwa.get("kperm",[]) # type: List[OligoPeak]
-        self._kpermids = kwa.get("kpermids",numpy.array([],dtype=int)) # type: numpy.array
+        self._kpermids = kwa.get("kpermids",numpy.empty(0, dtype='i4')) # type: numpy.array
 
     @property
     def kpermids(self)->List[int]:
-        u'returns the indices of the kperm'
+        'returns the indices of the kperm'
         if len(self._kpermids)==0:
             self._kpermids=[self.oligos.index(oli) for oli in self.kperm]
         return self._kpermids
 
     @property
     def perm(self):
-        u'returns full permutation of oligos'
+        'returns full permutation of oligos'
         if len(self._perm)==0:
             self._perm=numpy.array(self.oligos)[self.permids].tolist()
         return self._perm
 
     @property
     def permids(self):
-        u'returns the full permutation of oligo indices'
+        'returns the full permutation of oligo indices'
         if len(self._permids)==0:
             toperm={val:self.kpermids[idx] for idx,val in enumerate(sorted(self.kpermids))}
             self._permids=numpy.array(range(len(self.oligos)))
@@ -320,9 +524,15 @@ class OligoKPerm(OligoPerm):
                 self._permids[key]=val
         return self._permids
 
+    @property
+    def span(self)->FrozenSet[int]:
+        'to detect when ambiguity converge'
+        return frozenset(range(min(self.domain),max(self.domain)+1))
+
+    # not used anymore
     @classmethod
-    def get_changes(cls,kperm,sort_by="pos")->Tuple[int, ...]:
-        u'''
+    def get_changes(cls,kperm,sort_by="pos")->FrozenSet[int]:
+        '''
         returns the smallest (contiguous) permutations of kperm
         will not work for a combination of kperms
         '''
@@ -331,31 +541,32 @@ class OligoKPerm(OligoPerm):
         except AttributeError:
             sortedp=sorted(kperm)
         issame=[sortedp[idx]==kperm[idx] for idx in range(len(kperm))]
-
         try:
             if issame[-1] is False:
-                return tuple(kperm[issame.index(False):])
-            return tuple(kperm[issame.index(False):-list(reversed(issame)).index(False)])
+                return frozenset(kperm[issame.index(False):])
+            return frozenset(kperm[issame.index(False):-list(reversed(issame)).index(False)])
         except ValueError:
-            return tuple()
+            return frozenset()
+
+    @classmethod
+    def get_domain(cls,kperm,sort_by="pos")->FrozenSet[int]:
+        '''
+        return the elements of kperm which are changed by application of the kpermutation
+        '''
+        try:
+            sortedp=sorted(kperm,key=lambda x:getattr(x,sort_by))
+        except AttributeError:
+            sortedp=sorted(kperm)
+        issame=[sortedp[idx]==kperm[idx] for idx in range(len(kperm))]
+        return frozenset(val for idx,val in enumerate(kperm) if not issame[idx])
 
     @property
     def domain(self):
-        u'returns the set of indices onto which the k-permutation applies'
+        'returns the set of indices onto which the k-permutation applies'
         if len(self._domain)==0:
-            #self._domain=set(self.kpermids) # not restrictive enough
-            self._domain=set(self.changes)
+            self._domain=self.get_domain(self.kpermids)
         return self._domain
 
-    @property
-    def changes(self)->Tuple[int, ...]:
-        u'''
-        returns the tuple of indices which will be changed by application of perm
-        should return [] if all sorted(perm)[i]==perm[i], ie: identity operator
-        '''
-        if len(self._changes)==0:
-            self._changes=self.get_changes(self.kpermids)
-        return self._changes
 
     def __hash__(self)->int:
         return hash((tuple(sorted(self.domain)),tuple(self.kpermids)))
@@ -367,7 +578,7 @@ class OligoKPerm(OligoPerm):
 
     # to check
     def identity_perm(self):
-        u'''
+        '''
         returns an OligoKPerm with identity permutation
         but with same domain
         '''
@@ -381,29 +592,10 @@ class OligoKPerm(OligoPerm):
         del self.kperm
         del self._kpermids
 
-# no longer used, to remove
-class Permids2OligoPerm:
-    u'Convertion class'
-    oligos=[] # type: List[OligoPeak]
-    @initdefaults(frozenset(locals()))
-    def __init__(self,**kwa):
-        u'initialize before call'
-        pass
-    def __call__(self,
-                 permids:List[int],
-                 changes:Tuple[int, ...],
-                 domain:Set[int])->OligoPerm:
-        u'convert using permids'
-        # leaves perms list iff necessary
-        return OligoPerm(oligos=self.oligos,
-                         permids=permids,
-                         changes=changes,
-                         domain=domain)
 
-
-# replace with OligoPerm
+# replaced by OligoPerm
 class KPermCollection:
-    u'''
+    '''
     Container for a list of OligoKPerm
     '''
     kperms=[] # type: List[OligoKPerm]
@@ -414,7 +606,7 @@ class KPermCollection:
 
     @classmethod
     def product(cls,*args):
-        u'''
+        '''
         returns a KPermCollection with the product of kperms in first
         and kperms in second
         '''
@@ -429,7 +621,7 @@ class KPermCollection:
 
     @classmethod
     def __product2(cls,first,second):
-        u'''
+        '''
         takes the product of 2 elements at a time
         '''
         kperms = list(OligoKPerm.add(*prd)
@@ -438,7 +630,7 @@ class KPermCollection:
 
 
     def intersect_with(self,other):
-        u'''
+        '''
         returns True if any OligoKPerm is shared by the 2 collections
         REMINDER: 2 groups intersecting (i.e. which share the same oligos)
         both contain the kperm related to the intersecting oligos.
