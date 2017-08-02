@@ -92,7 +92,7 @@ class Rescale:
         return self.stre*array+self.bias
 
     def __str__(self):
-        return f'stretch {self.stre}, bias {self.bias}'
+        return f'({self.stre},{self.bias})'
 
     @property
     def toarr(self):
@@ -339,7 +339,7 @@ class PeakStack:
         # ordered list of scaled OPeakArray
         self.min_overl=kwa.get("min_overl",2) # type: int
         self.ordered=list(kwa.get("ordered",[])) # type: List[OPeakArray]
-        self.stack=dict() # type: Dict[float,List[data.Oligo]] # make private?
+        self.stack=dict() # type: Dict[float,List[data.Oligo]]
         if self.ordered:
             for peakarr in self.ordered:
                 self._add2stack(peakarr)
@@ -446,6 +446,12 @@ class PeakStack:
         'returns copy'
         return self.__copy__()
 
+    def __str__(self):
+        to_str=""
+        for key,values in self.stack.items():
+            to_str+=f"{key} "+" ,".join(val.seq for val in values)+" "
+        return to_str
+
 class Scaler: # pylint: disable=too-many-instance-attributes
     '''
     varies stretch and bias between Oligo Experiments
@@ -501,7 +507,7 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         toadd=[(peak,scale) for peak,scales in scperpeak.items()
                for scale in scales if stack.can_add(scale(peak))]
 
-        if not toadd: # check that condition is correct
+        if not toadd: # check that this condition is correct
             return [stack]
 
         for peak,scale in toadd:
@@ -530,7 +536,7 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         toadd=[(peak,scale) for peak,scales in scperpeak.items() for scale in scales
                if stack.can_add(scale(peak))]
 
-        if not toadd: # check that condition is correct
+        if not toadd: # check that this condition is correct
             return [stack]
 
         stacks=[] # type: List[PeakStack]
@@ -539,6 +545,7 @@ class Scaler: # pylint: disable=too-many-instance-attributes
                                      peakarrs=peakarrs-frozenset([peak]))
         return stacks
 
+    # overkill to use networkx if we have trees of depth=2 (source+tip)
     def incr_build(self,stack:PeakStack)->List[PeakStack]:
         '''
         build incrementally the stacks depth OPeakArrays at a time
@@ -587,11 +594,13 @@ class Scaler: # pylint: disable=too-many-instance-attributes
 
         return self.resume(pstacks,iteration=iteration)
 
-    def resume(self,pstacks,iteration=None)->List[PeakStack]:
+    def resume(self,pstacks,iteration=1)->List[PeakStack]:
         '''
         resume, stacking, scaling of stacks
         '''
         for _ in range(iteration):
+            if __debug__:
+                print(f"iteration, {_}")
             new_stacks=[] # type: List[PeakStack]
             for stack in pstacks:
                 if self.__peakset-frozenset(stack.ordered):
@@ -639,36 +648,50 @@ class SubScaler(Scaler):
         super().__init__(**kwa)
         self.pstack=kwa.get("pstack",PeakStack()) # where peaks are considered fixed
         self.posid=kwa.get("posid",0) # type: int # id of pstack.posarr
+        self.key2fit=list(self.pstack.stack.keys())[self.posid] # type: float
+        # resume is inherited from Scaler
+        # incr_build is inherited from Scaler
+        # build_stack_fromtuple changes since the rescaling func called uses only
+        # a refpeak consisting of a single Oligo event
 
-    def find_rescales_to_key(self,others:Iterable[OPeakArray],tocmpfilter=None):
+    def extract_key(self,stack:PeakStack)->OPeakArray:
         '''
-        for each peak in others, find the Rescale values such that the key of pstack is matched
+        creates a OPeakArray consisting only of the Oligo event to match
         '''
-        torescale=others
-        if tocmpfilter:
-            torescale=frozenset(filter(tocmpfilter,others))
+        tomatch=stack.top().arr[numpy.abs(stack.top().posarr-self.key2fit).argmin()]
+        return OPeakArray.from_oligos([tomatch])[0]
 
-        # find the oligo from self.pstack.ordered[0] closest to self.pstack.keys[stack_keyid]
-        tomatch=OPeakArray.from_oligos([self.pstack.top().arr[self.posid]])[0]
-        rescaletokey=dict() # type: Dict[OPeakArray,List]
-        for peak in torescale:
-            scales=tomatch.find_matches(peak,self.bstretch,self.bbias,self.with_reverse)
-            if not scales:
-                continue
-            rescaletokey[peak]=scales
+    def build_stack_fromtuple(self,
+                              stack:PeakStack,
+                              peakarrs)->List[PeakStack]:
+        '''
+        peakarrs is a list of unscaled OPeakArray objects
+        similar to Scaler.build_stack_fromtuple but refpeak consist of a single Oligo event
+        '''
 
-        return rescaletokey
+        if not peakarrs:
+            return [stack]
 
-    # def run(self,**kwargs)->List[PeakStack]:
-    #     '''
-    #     finding all possible stacks for the full sequence is too intensive
-    #     subdivide the problem by co
-    #     '''
-    #     iteration=kwargs.get("iteration",1) # type: int
+        refpeak=self.extract_key(stack)
+        def cmpfilter(peak):
+            'filter'
+            return self.filterleftoverlap(refpeak,peak)
 
-    #     pstacks=[pstack]
-    #     # building_stacks
-    #     return self.resume(pstacks,iteration=iteration)
+        stacks=[] # type: List[PeakStack]
+        scperpeak=self.find_rescales(refpeak,[peakarrs[0]],tocmpfilter=cmpfilter)
+
+        toadd=[(peak,scale) for peak,scales in scperpeak.items()
+               for scale in scales if stack.can_add(scale(peak))]
+
+        if not toadd: # check that this condition is correct
+            return [stack]
+
+        for peak,scale in toadd:
+            stacks+=self.build_stack_fromtuple(stack=stack.add(scale(peak),in_place=False),
+                                               peakarrs=peakarrs[1:])
+
+        return stacks
+
 
 # how to deal effectively with reverse_complement and overlapping? for example with
 # aat whose reverse complement is att, aat and aat may overlap
