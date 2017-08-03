@@ -271,7 +271,11 @@ class OPeakArray:
             graph.add_edges_from([(peak,other) for other in toadd])
         return graph
 
-
+    # to improve
+    # creates duplicates because it allows tips to be added
+    # for each of those added tips, if they don't really do overlap
+    # then they create duplicates since build_stack_fromtuple returns stack
+    # if no peak array are added to the stack
     @staticmethod
     def list2tree(refpeak,
                   others:Iterable,
@@ -439,6 +443,11 @@ class PeakStack:
         for peak in self.stack[key]:
             peak.reverse()
 
+    def __keyseqs(self)->Tuple:
+        'returns the keys and seqs of the values of self.stack'
+        return tuple(sorted([(key,)+tuple([val.seq for val in values])
+                             for key,values in self.stack.items()]))
+
     def __copy__(self):
         return type(self)(ordered=self.__dict__.get("ordered",[]))
 
@@ -451,6 +460,15 @@ class PeakStack:
         for key,values in self.stack.items():
             to_str+=f"{key} "+" ,".join(val.seq for val in values)+" "
         return to_str
+
+    # rather long for an hash...
+    def __hash__(self):
+        return hash(tuple(self.ordered)+self.__keyseqs())
+
+    def __eq__(self,other):
+        if isinstance(other,type(self)) and hash(self)==hash(other):
+            return True
+        return False
 
 class Scaler: # pylint: disable=too-many-instance-attributes
     '''
@@ -594,7 +612,7 @@ class Scaler: # pylint: disable=too-many-instance-attributes
 
         return self.resume(pstacks,iteration=iteration)
 
-    def resume(self,pstacks,iteration=1)->List[PeakStack]:
+    def old_resume(self,pstacks,iteration=1)->List[PeakStack]:
         '''
         resume, stacking, scaling of stacks
         '''
@@ -607,9 +625,37 @@ class Scaler: # pylint: disable=too-many-instance-attributes
                     new_stacks+=self.incr_build(stack)
                 else:
                     new_stacks.append(stack)
-            pstacks=new_stacks
+            pstacks=set(new_stacks)
 
-        return pstacks
+        return list(pstacks)
+
+    def resume(self,pstacks,iteration=1)->List[PeakStack]:
+        '''
+        resume, stacking (scaling) of stacks
+        if self.incr_build(stack)==stack, stack is placed in a list of fixed stacks
+        minor improvements on previous version
+        '''
+        fixed=frozenset([]) # type: FrozenSet[PeakStack]
+        for _ in range(iteration):
+            if __debug__:
+                print(f"iteration, {_}")
+            new_stacks=[] # type: List[PeakStack]
+            for stack in pstacks:
+                if self.__peakset-frozenset(stack.ordered):
+                    toadd=frozenset(self.incr_build(stack))
+                    # if __debug__:
+                    #     print(f"diff={toadd.symmetric_difference(frozenset([stack]))}")
+                    if not toadd.symmetric_difference(frozenset([stack])):
+                        fixed=fixed.union(toadd) # frozenset does not have union
+                    else:
+                        new_stacks+=toadd
+                else:
+                    fixed=fixed.union(stack)
+            # if __debug__:
+            #     print(f"len(fixed)={len(fixed)}")
+            pstacks=frozenset(new_stacks)
+
+        return list(pstacks.union(fixed))
 
     def find_rescales(self,refpeak:OPeakArray,others:Iterable[OPeakArray],tocmpfilter=None):
         '''
