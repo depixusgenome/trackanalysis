@@ -650,6 +650,8 @@ class Scaler: # pylint: disable=too-many-instance-attributes
 
         return list(pstacks.union(fixed))
 
+
+
     def find_rescales(self,refpeak:OPeakArray,others:Iterable[OPeakArray],tocmpfilter=None):
         '''
         for each other peak, find all possible rescales (stretch and bias)
@@ -676,7 +678,7 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         with next keystack
         otherwise returns []
         '''
-        nextkey = stack.keys[numpy.argmax(stack.keys>key)]
+        nextkey = stack.keys[numpy.argmax(numpy.array(stack.keys)>key)]
         first = stack.stack[nextkey][-1].seq
         second = stack.stack[nextkey][0].seq
         if data.Oligo.can_tail_overlap(first,second,min_overl,oriented=False,shift=1):
@@ -698,13 +700,11 @@ class SubScaler(Scaler):
 
     def __init__(self,**kwa):
         super().__init__(**kwa)
-        self.pstack=kwa.get("pstack",PeakStack()) # where peaks are considered fixed
+        #self.pstack=kwa.get("pstack",PeakStack()) # where peaks are considered fixed
+        self.pstack=PeakStack()
+        self.pstack.add(self.peaks[0])
         self.__posid=kwa.get("posid",0) # type: int # id of pstack.posarr
         self._key2fit=self.pstack.keys[self.__posid] # type: float
-        # resume is inherited from Scaler
-        # incr_build is inherited from Scaler
-        # build_stack_fromtuple changes since the rescaling func called uses only
-        # a refpeak consisting of a single Oligo event
 
     @property
     def posid(self):
@@ -725,7 +725,7 @@ class SubScaler(Scaler):
         '''
         creates a OPeakArray consisting only of the Oligo event to match
         '''
-        tomatch=stack.top().arr[numpy.abs(stack.top().posarr-self.key2fit).argmin()]
+        tomatch=stack.top().arr[numpy.abs(stack.top().posarr-self._key2fit).argmin()]
         return OPeakArray.from_oligos([tomatch])[0]
 
     def build_stack_fromtuple(self,
@@ -759,6 +759,17 @@ class SubScaler(Scaler):
 
         return stacks
 
+    def test(self,try_concatenate=True)->List[PeakStack]:
+        '''
+        this requires implementation and testing
+        max number of peaks is 32
+        must include only the add to stack only to the specified key.
+        '''
+        pstacks=[self.pstack]
+        for _ in range(len(self.pstack.keys)):
+            print(f"posid={_}")
+            pstacks=self.resume(pstacks,iteration=32,try_concatenate=try_concatenate)
+        return pstacks
 
 # how to deal effectively with reverse_complement and overlapping? for example with
 # aat whose reverse complement is att, aat and aat may overlap
