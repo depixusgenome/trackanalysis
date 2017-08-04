@@ -443,6 +443,11 @@ class PeakStack:
         for peak in self.stack[key]:
             peak.reverse()
 
+    @property
+    def keys(self):
+        'returns sorted keys'
+        return sorted(self.stack.keys())
+
     def __keyseqs(self)->Tuple:
         'returns the keys and seqs of the values of self.stack'
         return tuple(sorted([(key,)+tuple([val.seq for val in values])
@@ -484,8 +489,8 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         self.bbias=kwa.get("bbias",Bounds()) # type: Bounds
         self.pstack=PeakStack()
 
-        # exp_oligos=no_orientation(self.oligos) # type: List[data.OligoPeak] # keep for later
-        exp_oligos=list(self.oligos)
+        exp_oligos=no_orientation(self.oligos) # type: List[data.OligoPeak]
+        #exp_oligos=list(self.oligos) # type: List[data.OligoPeak] # keep for later
         self.peaks=OPeakArray.from_oligos(exp_oligos) # type: List[data.OPeakArray]
         self.peaks=sorted(self.peaks,key=lambda x:-len(x.arr))
         self.__peakset=frozenset(self.peaks) # type: FrozenSet[OPeakArray]
@@ -578,7 +583,7 @@ class Scaler: # pylint: disable=too-many-instance-attributes
                 addstacks+=self.build_stack_fromtuple(stack,path[1:])
         return addstacks
 
-    def run(self,ref_index=0,iteration=None)->List[PeakStack]:
+    def run(self,ref_index=0,iteration=1)->List[PeakStack]:
         '''
         ## ORIGINAL PLAN, TOO LONG TO RUN
         # take the 2 peaks in refpeak which are the more closely related
@@ -612,24 +617,7 @@ class Scaler: # pylint: disable=too-many-instance-attributes
 
         return self.resume(pstacks,iteration=iteration)
 
-    def old_resume(self,pstacks,iteration=1)->List[PeakStack]:
-        '''
-        resume, stacking, scaling of stacks
-        '''
-        for _ in range(iteration):
-            if __debug__:
-                print(f"iteration, {_}")
-            new_stacks=[] # type: List[PeakStack]
-            for stack in pstacks:
-                if self.__peakset-frozenset(stack.ordered):
-                    new_stacks+=self.incr_build(stack)
-                else:
-                    new_stacks.append(stack)
-            pstacks=set(new_stacks)
-
-        return list(pstacks)
-
-    def resume(self,pstacks,iteration=1)->List[PeakStack]:
+    def resume(self,pstacks,iteration=1,try_concatenate=False)->List[PeakStack]:
         '''
         resume, stacking (scaling) of stacks
         if self.incr_build(stack)==stack, stack is placed in a list of fixed stacks
@@ -655,6 +643,11 @@ class Scaler: # pylint: disable=too-many-instance-attributes
             #     print(f"len(fixed)={len(fixed)}")
             pstacks=frozenset(new_stacks)
 
+            key2fit=getattr(self,"key2fit",None)
+            if try_concatenate and key2fit:
+                fixed=fixed.union([self.can_concatenate(stk,key2fit,self.min_overl)
+                                   for stk in new_stacks])
+
         return list(pstacks.union(fixed))
 
     def find_rescales(self,refpeak:OPeakArray,others:Iterable[OPeakArray],tocmpfilter=None):
@@ -676,6 +669,19 @@ class Scaler: # pylint: disable=too-many-instance-attributes
 
         return rescaleperpeak
 
+    @staticmethod
+    def can_concatenate(stack:PeakStack,key:float,min_overl:int)->PeakStack:
+        '''
+        returns stack if keystack and next can overlap (with_reverse)
+        with next keystack
+        otherwise returns []
+        '''
+        nextkey = stack.keys[numpy.argmax(stack.keys>key)]
+        first = stack.stack[nextkey][-1].seq
+        second = stack.stack[nextkey][0].seq
+        if data.Oligo.can_tail_overlap(first,second,min_overl,oriented=False,shift=1):
+            return stack
+        return None
 
 # needs a SubScaler class focusing on segments between two peaks
 # find the best scales for peak array between these peaks (allow for a subselection of peaks)
@@ -693,12 +699,27 @@ class SubScaler(Scaler):
     def __init__(self,**kwa):
         super().__init__(**kwa)
         self.pstack=kwa.get("pstack",PeakStack()) # where peaks are considered fixed
-        self.posid=kwa.get("posid",0) # type: int # id of pstack.posarr
-        self.key2fit=list(self.pstack.stack.keys())[self.posid] # type: float
+        self.__posid=kwa.get("posid",0) # type: int # id of pstack.posarr
+        self._key2fit=self.pstack.keys[self.__posid] # type: float
         # resume is inherited from Scaler
         # incr_build is inherited from Scaler
         # build_stack_fromtuple changes since the rescaling func called uses only
         # a refpeak consisting of a single Oligo event
+
+    @property
+    def posid(self):
+        'posid attribute'
+        return self.__posid
+
+    @posid.setter
+    def posid(self,value):
+        self.__posid=value
+        self._key2fit=self.pstack.keys[self.__posid]
+
+    @posid.getter
+    def posid(self):
+        'getter'
+        return self.__posid
 
     def extract_key(self,stack:PeakStack)->OPeakArray:
         '''
