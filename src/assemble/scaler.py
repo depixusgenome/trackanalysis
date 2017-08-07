@@ -8,7 +8,7 @@ should deal with any orientation (keeps possible stacks depending if no conflict
 can use boundaries on non-linearity to discard stacking or to add keys if the stacking
 requires a pile in move greater than the non-linearity
 '''
-
+import abc
 import itertools
 from typing import List, Tuple, Dict, FrozenSet, Iterable, Generator # pylint:disable=unused-import
 import numpy
@@ -274,7 +274,7 @@ class OPeakArray:
     # to improve
     # creates duplicates because it allows tips to be added
     # for each of those added tips, if they don't really do overlap
-    # then they create duplicates since build_stack_fromtuple returns stack
+    # then they create duplicates since stack_fromtuple returns stack
     # if no peak array are added to the stack
     @staticmethod
     def list2tree(refpeak,
@@ -430,6 +430,54 @@ class PeakStack:
         cpy._add2stack(scaled) # pylint: disable=protected-access
         return cpy
 
+    def _add2keyonly(self,
+                     key2add:float,
+                     scaled:OPeakArray)->None:
+        '''
+        same as _add2stack must stack only to key
+        other keys from scaled are added to self.stack
+        '''
+        if not self.stack:
+            self.stack={peak.pos:[peak] for peak in self.ordered[0].arr}
+            return
+
+        assigned=[] # type: List[Tuple]
+        for peak in scaled.arr:
+            key=self.assign_key(peak)
+            assigned+=[(str(key),peak.pos,key,peak)]
+        assigned=sorted(assigned,
+                        key=lambda x:tuple(x[:2]))
+
+        for key,group in itertools.groupby(assigned,key=lambda x:x[2]):
+            if key!=key2add:
+                for grp in group:
+                    self.stack[grp[1]]=[grp[3]]
+            else:
+                tostack=list(group)
+                key,peak=tostack[0][2:]
+                last=self.stack[key][-1]
+                if len(data.Oligo.tail_overlap(last.seq,peak.seq))>=self.min_overl:
+                    self.stack[key].append(peak)
+                else:
+                    self.stack[key].append(peak.reverse(in_place=False))
+                for grp in tostack[1:]:
+                    self.stack[grp[1]]=[grp[3]]
+
+    def add2keyonly(self,
+                    key:float,
+                    scaled:OPeakArray,
+                    in_place=True):
+        'adds a scaled peakarray'
+        # must check can_add prior to adding
+        if in_place:
+            self.ordered.append(scaled)
+            self._add2keyonly(key,scaled) # to change
+            return
+        cpy=self.copy()
+        cpy.ordered.append(scaled)
+        cpy._add2keyonly(key,scaled) # pylint: disable=protected-access
+        return cpy
+
     def stack_oligos(self):
         'returns private ooligos'
         return [data.stack_sequences(*val) for key,val in self.stack.items()]
@@ -507,69 +555,84 @@ class Scaler: # pylint: disable=too-many-instance-attributes
 
         return False
 
+    @abc.abstractmethod
+    def stack_fromtuple(self,
+                        stack:PeakStack,
+                        peakarrs)->List[PeakStack]:
+        'abstract method'
 
-    def build_stack_fromtuple(self,
-                              stack:PeakStack,
-                              peakarrs)->List[PeakStack]:
-        '''
-        peakarrs is a list of unscaled OPeakArray objects
-        '''
+    @abc.abstractmethod
+    def stack_key_fromtuple(self,
+                            key2add:float,
+                            stack:PeakStack,
+                            peakarrs)->List[PeakStack]:
+        'abstract'
 
-        if not peakarrs:
-            return [stack]
+    # not used as is anymore. Keeping it could be confusing
+    # def stack_fromtuple(self,
+    #                           stack:PeakStack,
+    #                           peakarrs)->List[PeakStack]:
+    #     '''
+    #     peakarrs is a list of unscaled OPeakArray objects
+    #     '''
 
-        refpeak=stack.top()
-        def cmpfilter(peak):
-            'filter'
-            return self.filterleftoverlap(refpeak,peak)
+    #     if not peakarrs:
+    #         return [stack]
 
-        stacks=[] # type: List[PeakStack]
-        scperpeak=self.find_rescales(refpeak,[peakarrs[0]],tocmpfilter=cmpfilter)
-        # if __debug__:
-        #     print(f"scperpeak={scperpeak}")
-        toadd=[(peak,scale) for peak,scales in scperpeak.items()
-               for scale in scales if stack.can_add(scale(peak))]
+    #     refpeak=stack.top()
+    #     def cmpfilter(peak):
+    #         'filter'
+    #         return self.filterleftoverlap(refpeak,peak)
 
-        if not toadd: # check that this condition is correct
-            return [stack]
+    #     stacks=[] # type: List[PeakStack]
+    #     scperpeak=self.find_rescales(refpeak,[peakarrs[0]],tocmpfilter=cmpfilter)
+    #     # if __debug__:
+    #     #     print(f"scperpeak={scperpeak}")
+    #     toadd=[(peak,scale) for peak,scales in scperpeak.items()
+    #            for scale in scales if stack.can_add(scale(peak))]
 
-        for peak,scale in toadd:
-            stacks+=self.build_stack_fromtuple(stack=stack.add(scale(peak),in_place=False),
-                                               peakarrs=peakarrs[1:])
+    #     if not toadd: # check that this condition is correct
+    #         return [stack]
 
-        return stacks
+    #     for peak,scale in toadd:
+    #         stacks+=self.stack_fromtuple(stack=stack.add(scale(peak),in_place=False),
+    #                                            peakarrs=peakarrs[1:])
 
+    #     return stacks
 
-    def build_stack(self,
-                    stack:PeakStack,
-                    peakarrs:FrozenSet[OPeakArray])->List[PeakStack]:
-        '''
-        recursive
-        '''
+    # not  used anymore
+    # def build_stack(self,
+    #                 stack:PeakStack,
+    #                 peakarrs:FrozenSet[OPeakArray])->List[PeakStack]:
+    #     '''
+    #     recursive
+    #     '''
 
-        if not peakarrs:
-            return [stack]
+    #     if not peakarrs:
+    #         return [stack]
 
-        refpeak=stack.top()
-        def cmpfilter(peak):
-            'filter'
-            return self.filterleftoverlap(refpeak,peak)
+    #     refpeak=stack.top()
+    #     def cmpfilter(peak):
+    #         'filter'
+    #         return self.filterleftoverlap(refpeak,peak)
 
-        scperpeak=self.find_rescales(refpeak,peakarrs,tocmpfilter=cmpfilter)
-        toadd=[(peak,scale) for peak,scales in scperpeak.items() for scale in scales
-               if stack.can_add(scale(peak))]
+    #     scperpeak=self.find_rescales(refpeak,peakarrs,tocmpfilter=cmpfilter)
+    #     toadd=[(peak,scale) for peak,scales in scperpeak.items() for scale in scales
+    #            if stack.can_add(scale(peak))]
 
-        if not toadd: # check that this condition is correct
-            return [stack]
+    #     if not toadd: # check that this condition is correct
+    #         return [stack]
 
-        stacks=[] # type: List[PeakStack]
-        for peak,scale in toadd:
-            stacks+=self.build_stack(stack=stack.add(scale(peak),in_place=False),
-                                     peakarrs=peakarrs-frozenset([peak]))
-        return stacks
+    #     stacks=[] # type: List[PeakStack]
+    #     for peak,scale in toadd:
+    #         stacks+=self.build_stack(stack=stack.add(scale(peak),in_place=False),
+    #                                  peakarrs=peakarrs-frozenset([peak]))
+    #     return stacks
 
     # overkill to use networkx if we have trees of depth=2 (source+tip)
-    def incr_build(self,stack:PeakStack)->List[PeakStack]:
+    def incr_build(self,
+                   stack:PeakStack,
+                   key2fit=None)->List[PeakStack]:
         '''
         build incrementally the stacks depth OPeakArrays at a time
         returns the incremented stacks
@@ -580,7 +643,10 @@ class Scaler: # pylint: disable=too-many-instance-attributes
 
         for tip in tips:
             for path in networkx.all_simple_paths(graph,source=stack.top(),target=tip):
-                addstacks+=self.build_stack_fromtuple(stack,path[1:])
+                if key2fit is None:
+                    addstacks+=self.stack_fromtuple(stack,path[1:])
+                else:
+                    addstacks+=self.stack_key_fromtuple(key2fit,stack,path[1:])
         return addstacks
 
     def run(self,ref_index=0,iteration=1)->List[PeakStack]:
@@ -624,13 +690,14 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         minor improvements on previous version
         '''
         fixed=frozenset([]) # type: FrozenSet[PeakStack]
+        key2fit=getattr(self,"key2fit",None)
         for _ in range(iteration):
             if __debug__:
                 print(f"iteration, {_}")
             new_stacks=[] # type: List[PeakStack]
             for stack in pstacks:
                 if self.__peakset-frozenset(stack.ordered):
-                    toadd=frozenset(self.incr_build(stack))
+                    toadd=frozenset(self.incr_build(stack,key2fit=key2fit))
                     # if __debug__:
                     #     print(f"diff={toadd.symmetric_difference(frozenset([stack]))}")
                     if not toadd.symmetric_difference(frozenset([stack])):
@@ -643,14 +710,11 @@ class Scaler: # pylint: disable=too-many-instance-attributes
             #     print(f"len(fixed)={len(fixed)}")
             pstacks=frozenset(new_stacks)
 
-            key2fit=getattr(self,"key2fit",None)
             if try_concatenate and key2fit:
                 fixed=fixed.union([self.can_concatenate(stk,key2fit,self.min_overl)
                                    for stk in new_stacks])
 
         return list(pstacks.union(fixed))
-
-
 
     def find_rescales(self,refpeak:OPeakArray,others:Iterable[OPeakArray],tocmpfilter=None):
         '''
@@ -700,7 +764,6 @@ class SubScaler(Scaler):
 
     def __init__(self,**kwa):
         super().__init__(**kwa)
-        #self.pstack=kwa.get("pstack",PeakStack()) # where peaks are considered fixed
         self.pstack=PeakStack()
         self.pstack.add(self.peaks[0])
         self.__posid=kwa.get("posid",0) # type: int # id of pstack.posarr
@@ -728,12 +791,12 @@ class SubScaler(Scaler):
         tomatch=stack.top().arr[numpy.abs(stack.top().posarr-self._key2fit).argmin()]
         return OPeakArray.from_oligos([tomatch])[0]
 
-    def build_stack_fromtuple(self,
-                              stack:PeakStack,
-                              peakarrs)->List[PeakStack]:
+    def stack_fromtuple(self,
+                        stack:PeakStack,
+                        peakarrs)->List[PeakStack]:
         '''
         peakarrs is a list of unscaled OPeakArray objects
-        similar to Scaler.build_stack_fromtuple but refpeak consist of a single Oligo event
+        similar to Scaler.stack_fromtuple but refpeak consist of a single Oligo event
         '''
 
         if not peakarrs:
@@ -754,10 +817,48 @@ class SubScaler(Scaler):
             return [stack]
 
         for peak,scale in toadd:
-            stacks+=self.build_stack_fromtuple(stack=stack.add(scale(peak),in_place=False),
-                                               peakarrs=peakarrs[1:])
+            stacks+=self.stack_fromtuple(stack=stack.add(scale(peak),in_place=False),
+                                         peakarrs=peakarrs[1:])
 
         return stacks
+
+    def stack_key_fromtuple(self,
+                            key2add:float,
+                            stack:PeakStack,
+                            peakarrs)->List[PeakStack]:
+        '''
+        similar to stack_fromtuple except that a single key is stacked
+        when adding a peakarray, one key is stacked to stack,
+        the others are added to the stack
+        '''
+        if not peakarrs:
+            return [stack]
+
+        refpeak=self.extract_key(stack)
+        def cmpfilter(peak):
+            'filter'
+            return self.filterleftoverlap(refpeak,peak)
+
+        stacks=[] # type: List[PeakStack]
+        scperpeak=self.find_rescales(refpeak,[peakarrs[0]],tocmpfilter=cmpfilter)
+
+        toadd=[(peak,scale) for peak,scales in scperpeak.items()
+               for scale in scales if stack.can_add(scale(peak))
+               and stack.assign_key(scale(peak))==key2add]
+
+        if not toadd:
+            return [stack]
+
+        for peak,scale in toadd:
+            stacks+=self.stack_key_fromtuple(key2add,
+                                             stack=stack.add2keyonly(key2add,
+                                                                     scale(peak),
+                                                                     in_place=False),
+                                             peakarrs=peakarrs[1:])
+
+        return stacks
+
+
 
     def test(self,try_concatenate=True)->List[PeakStack]:
         '''
