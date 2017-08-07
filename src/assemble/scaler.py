@@ -158,6 +158,7 @@ def count_matches(peaks1,peaks2,fprecision=1e-3):
             count+=1
     return count
 
+# move to data.py
 class OPeakArray:
     '''
     corresponds to an experiment with a single oligo
@@ -180,13 +181,13 @@ class OPeakArray:
             exp.append(OPeakArray(arr=numpy.array([oli[2] for oli in values[1]])))
         return exp
 
-    def matching_seq(self,seq,with_reverse=True):
+    def matching_seq(self,seq,unsigned=True):
         '''returns the array of position which match seq'''
-        if with_reverse:
+        if unsigned:
             return numpy.array([i.pos for i in self.arr if i.seq==seq or self.rev(i.seq)==seq])
         return numpy.array([i.pos for i in self.arr if i.seq==seq])
 
-    def find_matches(self,other,bstretch,bbias,with_reverse=True)->List[Rescale]:
+    def find_matches(self,other,bstretch,bbias,unsigned=True)->List[Rescale]:
         '''
         needs to take into account the seq of matching OligoPeaks
         stretches,biases are defined using self has (1,0)
@@ -194,7 +195,7 @@ class OPeakArray:
         '''
         sseqs=frozenset(oli.seq for oli in self.arr)
         oseqs=frozenset(oli.seq for oli in other.arr)
-        if with_reverse:
+        if unsigned:
             oseqs=oseqs.union(frozenset(other.rev(oli.seq) for oli in other.arr))
 
         matches=[(str1,str2)
@@ -239,19 +240,19 @@ class OPeakArray:
         return tuple(i.seq for i in self.arr)
 
     @staticmethod
-    def may_overlap(peak,others:Iterable,min_overl:int,with_reverse=True)->List:
+    def may_overlap(peak,others:Iterable,min_overl:int,unsigned=True)->List:
         '''
         compare the sequences of the 2 experiments
         returns True if the 2 sequences may overlap
         False otherwise
-        if with_reverse, also considers reverse_complement of others
+        if unsigned, also considers reverse_complement of others
         '''
         to_match=frozenset(i.seq for i in peak.arr)
         match=[]
         for seq in to_match:
             for opk in others:
                 for tocheck in opk.seqs:
-                    if data.Oligo.can_tail_overlap(seq,tocheck,min_overl,not with_reverse,shift=1):
+                    if data.Oligo.can_tail_overlap(seq,tocheck,min_overl,not unsigned,shift=1):
                         match.append(opk)
                         break
         return match
@@ -322,6 +323,26 @@ class OPeakArray:
             return all(numpy.isclose(sarr,oarr))
         return False
 
+
+    def __copy__(self):
+        'creates a copy'
+        return type(self)(arr=self.arr.copy(),
+                          min_overl=self.min_overl,
+                          rev=self.rev)
+    def copy(self):
+        'calls __copy__'
+        return self.__copy__()
+
+    def reverse(self,in_place=True):
+        'takes the reverse compelemnt of each oligos in the array'
+        if in_place:
+            for oli in self.arr:
+                oli.reverse()
+            return
+        cpy=self.copy()
+        cpy.reverse()
+        return cpy
+
 def no_orientation(oligos:List[data.OligoPeak]):
     'each oligo has its sequence changed so that we loose the information on the orientation'
     reverse=data.Oligo.reverse_complement
@@ -373,9 +394,9 @@ class PeakStack:
 
     def assign_key(self,peak:data.Oligo)->float:
         'find which stack must be incremented by peak'
-        comp=numpy.array(sorted(self.stack.keys()))-peak.pos
+        comp=numpy.array(self.keys)-peak.pos
         try:
-            return numpy.array(sorted(self.stack.keys()))[comp<=0][-1]
+            return numpy.array(self.keys)[comp<=0][-1]
         except IndexError:
             return None
 
@@ -488,6 +509,11 @@ class PeakStack:
 
     def reverse(self,key=None):
         'takes the reverse complement of all peaks at position key'
+        if key is None:
+            for values in self.stack.values():
+                for val in values:
+                    val.reverse()
+            return
         for peak in self.stack[key]:
             peak.reverse()
 
@@ -532,7 +558,9 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         # self.nl_amplitude=5*bp2nm # type: float # in nm
         self.oligos=kwa.get("oligos",[]) # type: List[data.OligoPeak]
         self.min_overl=kwa.get("min_overl",2) # type: int # rethink this parameter
-        self.with_reverse=kwa.get("with_reverse",True) # type: bool
+        # replace with_reverse by oriented (signed)
+        #self.with_reverse=kwa.get("with_reverse",True) # type: bool
+        self.unsigned=True # type: bool
         self.bstretch=kwa.get("bstretch",Bounds()) # type: Bounds
         self.bbias=kwa.get("bbias",Bounds()) # type: Bounds
         self.pstack=PeakStack()
@@ -568,67 +596,6 @@ class Scaler: # pylint: disable=too-many-instance-attributes
                             peakarrs)->List[PeakStack]:
         'abstract'
 
-    # not used as is anymore. Keeping it could be confusing
-    # def stack_fromtuple(self,
-    #                           stack:PeakStack,
-    #                           peakarrs)->List[PeakStack]:
-    #     '''
-    #     peakarrs is a list of unscaled OPeakArray objects
-    #     '''
-
-    #     if not peakarrs:
-    #         return [stack]
-
-    #     refpeak=stack.top()
-    #     def cmpfilter(peak):
-    #         'filter'
-    #         return self.filterleftoverlap(refpeak,peak)
-
-    #     stacks=[] # type: List[PeakStack]
-    #     scperpeak=self.find_rescales(refpeak,[peakarrs[0]],tocmpfilter=cmpfilter)
-    #     # if __debug__:
-    #     #     print(f"scperpeak={scperpeak}")
-    #     toadd=[(peak,scale) for peak,scales in scperpeak.items()
-    #            for scale in scales if stack.can_add(scale(peak))]
-
-    #     if not toadd: # check that this condition is correct
-    #         return [stack]
-
-    #     for peak,scale in toadd:
-    #         stacks+=self.stack_fromtuple(stack=stack.add(scale(peak),in_place=False),
-    #                                            peakarrs=peakarrs[1:])
-
-    #     return stacks
-
-    # not  used anymore
-    # def build_stack(self,
-    #                 stack:PeakStack,
-    #                 peakarrs:FrozenSet[OPeakArray])->List[PeakStack]:
-    #     '''
-    #     recursive
-    #     '''
-
-    #     if not peakarrs:
-    #         return [stack]
-
-    #     refpeak=stack.top()
-    #     def cmpfilter(peak):
-    #         'filter'
-    #         return self.filterleftoverlap(refpeak,peak)
-
-    #     scperpeak=self.find_rescales(refpeak,peakarrs,tocmpfilter=cmpfilter)
-    #     toadd=[(peak,scale) for peak,scales in scperpeak.items() for scale in scales
-    #            if stack.can_add(scale(peak))]
-
-    #     if not toadd: # check that this condition is correct
-    #         return [stack]
-
-    #     stacks=[] # type: List[PeakStack]
-    #     for peak,scale in toadd:
-    #         stacks+=self.build_stack(stack=stack.add(scale(peak),in_place=False),
-    #                                  peakarrs=peakarrs-frozenset([peak]))
-    #     return stacks
-
     # overkill to use networkx if we have trees of depth=2 (source+tip)
     def incr_build(self,
                    stack:PeakStack,
@@ -638,7 +605,12 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         returns the incremented stacks
         '''
         addstacks=[] # type: List[PeakStack]
-        others=self.__peakset-frozenset(stack.ordered)
+        # need to compare the reverse too
+        #others=self.__peakset-frozenset(stack.ordered)
+        others=self.notin_stack(stack) # to check
+        if __debug__:
+            for other in others:
+                print(f"other={other.seqs}")
         graph,tips=OPeakArray.list2tree(stack.top(),others,min_overl=self.min_overl,depth=1)
 
         for tip in tips:
@@ -683,7 +655,7 @@ class Scaler: # pylint: disable=too-many-instance-attributes
 
         return self.resume(pstacks,iteration=iteration)
 
-    def resume(self,pstacks,iteration=1,try_concatenate=False)->List[PeakStack]:
+    def resume(self,pstacks,iteration=1,try_concatenate:bool=False)->List[PeakStack]:
         '''
         resume, stacking (scaling) of stacks
         if self.incr_build(stack)==stack, stack is placed in a list of fixed stacks
@@ -692,11 +664,12 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         fixed=frozenset([]) # type: FrozenSet[PeakStack]
         key2fit=getattr(self,"key2fit",None)
         for _ in range(iteration):
-            if __debug__:
-                print(f"iteration, {_}")
+            # if __debug__:
+            #     print(f"iteration, {_}")
             new_stacks=[] # type: List[PeakStack]
             for stack in pstacks:
-                if self.__peakset-frozenset(stack.ordered):
+                #if self.__peakset-frozenset(stack.ordered):
+                if self.notin_stack(stack): # to check
                     toadd=frozenset(self.incr_build(stack,key2fit=key2fit))
                     # if __debug__:
                     #     print(f"diff={toadd.symmetric_difference(frozenset([stack]))}")
@@ -716,6 +689,18 @@ class Scaler: # pylint: disable=too-many-instance-attributes
 
         return list(pstacks.union(fixed))
 
+    def notin_stack(self,
+                    stack:PeakStack)->FrozenSet[OPeakArray]:
+        '''
+        returns the set of OPeakArray which are in self.peaks
+        but not in stack.ordered
+        accounts for sign
+        '''
+        others=self.__peakset-frozenset(stack.ordered)
+
+        #if self.unsigned:
+        # take min sequence for each Oligo in each peak sets
+        return others
     def find_rescales(self,refpeak:OPeakArray,others:Iterable[OPeakArray],tocmpfilter=None):
         '''
         for each other peak, find all possible rescales (stretch and bias)
@@ -728,7 +713,7 @@ class Scaler: # pylint: disable=too-many-instance-attributes
 
         rescaleperpeak=dict() # type: Dict[OPeakArray,List]
         for peak in torescale:
-            scales=refpeak.find_matches(peak,self.bstretch,self.bbias,self.with_reverse)
+            scales=refpeak.find_matches(peak,self.bstretch,self.bbias,self.unsigned)
             if not scales:
                 continue
             rescaleperpeak[peak]=scales
@@ -738,7 +723,7 @@ class Scaler: # pylint: disable=too-many-instance-attributes
     @staticmethod
     def can_concatenate(stack:PeakStack,key:float,min_overl:int)->PeakStack:
         '''
-        returns stack if keystack and next can overlap (with_reverse)
+        returns stack if keystack and next can overlap (unsigned)
         with next keystack
         otherwise returns []
         '''
@@ -760,7 +745,7 @@ class SubScaler(Scaler):
     '''
 
     # needs oligos, peaks, min_overl
-    # with_reverse bstretch, bbias, ref_index
+    # unsigned bstretch, bbias, ref_index
 
     def __init__(self,**kwa):
         super().__init__(**kwa)
@@ -819,7 +804,6 @@ class SubScaler(Scaler):
         for peak,scale in toadd:
             stacks+=self.stack_fromtuple(stack=stack.add(scale(peak),in_place=False),
                                          peakarrs=peakarrs[1:])
-
         return stacks
 
     def stack_key_fromtuple(self,
@@ -841,11 +825,11 @@ class SubScaler(Scaler):
 
         stacks=[] # type: List[PeakStack]
         scperpeak=self.find_rescales(refpeak,[peakarrs[0]],tocmpfilter=cmpfilter)
-
         toadd=[(peak,scale) for peak,scales in scperpeak.items()
-               for scale in scales if stack.can_add(scale(peak))
-               and stack.assign_key(scale(peak))==key2add]
-
+               for scale in scales if stack.can_add(scale(peak))]
+        if __debug__:
+            print(f"toadd={toadd}")
+            print(f"scperpeak={scperpeak}")
         if not toadd:
             return [stack]
 
@@ -860,16 +844,26 @@ class SubScaler(Scaler):
 
 
 
-    def test(self,try_concatenate=True)->List[PeakStack]:
+    def test(self,try_concatenate:bool=True)->List[PeakStack]:
         '''
         this requires implementation and testing
         max number of peaks is 32
         must include only the add to stack only to the specified key.
+        need to allow for reverse of keys
+        how can we make so that it is an efficient search.
+        We don't want to do the 2**40 combination for 40 peaks...
+        * we need to start with the first orientation of the first peak.
+        and reconstruct the sequences from there.
+        * then consider the reverse of first peak
+        and construct the other sequences from there
+        * can need a score
         '''
         pstacks=[self.pstack]
-        for _ in range(len(self.pstack.keys)):
-            print(f"posid={_}")
-            pstacks=self.resume(pstacks,iteration=32,try_concatenate=try_concatenate)
+        #for _ in range(len(self.pstack.keys)):
+        #    print(f"posid={_}")
+        #    self.posid=_
+        self.posid=0
+        pstacks=self.resume(pstacks,iteration=32,try_concatenate=try_concatenate)
         return pstacks
 
 # how to deal effectively with reverse_complement and overlapping? for example with

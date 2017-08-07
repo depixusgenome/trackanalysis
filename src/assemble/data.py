@@ -77,13 +77,13 @@ class Oligo:
                          ol1:str,
                          ol2:str,
                          min_overlap:int,
-                         oriented=True,
+                         signed=True,
                          shift=0)->bool:
         '''
-        if oriented, orientation is supposed known
+        if signed, orientation is supposed known
         else, also consider reverse_complements of ol2 (NOT OL1)
         '''
-        if oriented:
+        if signed:
             return len(cls.tail_overlap(ol1, ol2,shift=shift))>=min_overlap
         else:
             ols1=[ol1]
