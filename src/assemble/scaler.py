@@ -326,15 +326,26 @@ class OPeakArray:
 
     def __copy__(self):
         'creates a copy'
-        return type(self)(arr=self.arr.copy(),
+        return type(self)(arr=numpy.array([oli.copy() for oli in self.arr]),
                           min_overl=self.min_overl,
                           rev=self.rev)
     def copy(self):
         'calls __copy__'
         return self.__copy__()
 
+    def minseq(self,in_place=True):
+        'sets the seq to the min sequence'
+        if in_place:
+            for oli in self.arr:
+                if oli.seq!=min(oli.seq,data.Oligo.rev(oli.seq)):
+                    oli.reverse()
+            return
+        cpy=self.copy()
+        cpy.minseq()
+        return cpy
+
     def reverse(self,in_place=True):
-        'takes the reverse compelemnt of each oligos in the array'
+        'takes the reverse compelement of each oligos in the array'
         if in_place:
             for oli in self.arr:
                 oli.reverse()
@@ -387,7 +398,7 @@ class PeakStack:
                 if not tail(self.stack[key][-1].seq,
                             peak.seq,
                             self.min_overl,
-                            oriented=False,
+                            signed=False,
                             shift=1):
                     return False
         return True
@@ -608,9 +619,9 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         # need to compare the reverse too
         #others=self.__peakset-frozenset(stack.ordered)
         others=self.notin_stack(stack) # to check
-        if __debug__:
-            for other in others:
-                print(f"other={other.seqs}")
+        # if __debug__:
+        #     for other in others:
+        #         print(f"other={other.seqs}")
         graph,tips=OPeakArray.list2tree(stack.top(),others,min_overl=self.min_overl,depth=1)
 
         for tip in tips:
@@ -619,6 +630,8 @@ class Scaler: # pylint: disable=too-many-instance-attributes
                     addstacks+=self.stack_fromtuple(stack,path[1:])
                 else:
                     addstacks+=self.stack_key_fromtuple(key2fit,stack,path[1:])
+        # if __debug__:
+        #     print(f"len(addstacks)={len(addstacks)}")
         return addstacks
 
     def run(self,ref_index=0,iteration=1)->List[PeakStack]:
@@ -669,16 +682,19 @@ class Scaler: # pylint: disable=too-many-instance-attributes
             new_stacks=[] # type: List[PeakStack]
             for stack in pstacks:
                 #if self.__peakset-frozenset(stack.ordered):
+                # if __debug__:
+                #     print(f"stack={stack}")
+                #     print(f"notinstack={self.notin_stack(stack)}")
                 if self.notin_stack(stack): # to check
                     toadd=frozenset(self.incr_build(stack,key2fit=key2fit))
                     # if __debug__:
                     #     print(f"diff={toadd.symmetric_difference(frozenset([stack]))}")
                     if not toadd.symmetric_difference(frozenset([stack])):
-                        fixed=fixed.union(toadd) # frozenset does not have union
+                        fixed=fixed.union(toadd)
                     else:
                         new_stacks+=toadd
                 else:
-                    fixed=fixed.union(stack)
+                    fixed=fixed.union([stack])
             # if __debug__:
             #     print(f"len(fixed)={len(fixed)}")
             pstacks=frozenset(new_stacks)
@@ -696,11 +712,12 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         but not in stack.ordered
         accounts for sign
         '''
-        others=self.__peakset-frozenset(stack.ordered)
+        if self.unsigned:
+            upeaks=frozenset([peak.minseq(in_place=False) for peak in stack.ordered])
+            return frozenset([peak for peak in self.__peakset
+                              if peak.minseq(in_place=False) not in upeaks])
+        return self.__peakset-frozenset(stack.ordered)
 
-        #if self.unsigned:
-        # take min sequence for each Oligo in each peak sets
-        return others
     def find_rescales(self,refpeak:OPeakArray,others:Iterable[OPeakArray],tocmpfilter=None):
         '''
         for each other peak, find all possible rescales (stretch and bias)
@@ -730,7 +747,7 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         nextkey = stack.keys[numpy.argmax(numpy.array(stack.keys)>key)]
         first = stack.stack[nextkey][-1].seq
         second = stack.stack[nextkey][0].seq
-        if data.Oligo.can_tail_overlap(first,second,min_overl,oriented=False,shift=1):
+        if data.Oligo.can_tail_overlap(first,second,min_overl,signed=False,shift=1):
             return stack
         return None
 
@@ -827,9 +844,9 @@ class SubScaler(Scaler):
         scperpeak=self.find_rescales(refpeak,[peakarrs[0]],tocmpfilter=cmpfilter)
         toadd=[(peak,scale) for peak,scales in scperpeak.items()
                for scale in scales if stack.can_add(scale(peak))]
-        if __debug__:
-            print(f"toadd={toadd}")
-            print(f"scperpeak={scperpeak}")
+        # if __debug__:
+        #     print(f"toadd={toadd}")
+        #     print(f"scperpeak={scperpeak}")
         if not toadd:
             return [stack]
 

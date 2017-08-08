@@ -68,6 +68,7 @@ class Oligo:
         'switch the seq to its reverse complement'
         if in_place:
             self.seq=type(self).rev(self.seq)
+            return
         cpy=self.copy()
         cpy.seq=type(self).rev(self.seq)
         return cpy
@@ -404,6 +405,8 @@ class Partition:
             for perm in self.perms: # sort perms with max(prm.domain)?
                 self.graph.append(perm)
 
+    # confusing, merges only the perms in self.
+    # not those that are ambiguous
     def merge(self)->OligoPerm:
         'returns the merged perms'
         return OligoPerm.add(*self.perms)

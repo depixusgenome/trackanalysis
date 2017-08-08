@@ -57,6 +57,7 @@ class Shuffler:
                             index:int):
         'increments the noverlaps value up to index'
         for partid,part in enumerate(partitions):
+            # should be ok but needs checking
             merged=part.merge() # careful, merge merges only common perms in case of ambiguities
             if __debug__:
                 if not all(i in part.domain for i in range(index)):
@@ -73,6 +74,7 @@ class Shuffler:
 
         return
 
+    # still long
     @classmethod
     def construct_scaffold(cls,
                            base:data.Partition,
@@ -139,6 +141,11 @@ class Shuffler:
             print(f"index={index}")
             add_kperms=[kpr for kpr in full_kperms if kpr.span.intersection({index})]
             added_partitions=[] # type: List[data.Partition]
+            # if __debug__:
+            #     print(f"index={index}")
+            #     pickle.dump(partitions,open("partitions"+str(index)+".pickle","wb"))
+            #     pickle.dump(add_kperms,open("add_kperms"+str(index)+".pickle","wb"))
+
             for part in partitions:
                 # extend the part until all indices<index are in domain
                 # kpr in add_kperms which do not intersect with part
