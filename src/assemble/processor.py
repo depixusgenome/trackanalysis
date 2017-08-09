@@ -248,7 +248,7 @@ class RequireOverlapFilter:
 
     # this call is long to execute
     def __call__(self,permids:Tuple[int,...])->bool:
-        'if indices of oligos is permuted checks that thereis overlap'
+        'if indices of oligos is permuted checks that there is overlap'
         for idx,val in enumerate(permids[1:]):
             if permids[idx]>val:
                 if not self.overlaps[(permids[idx],permids[idx+1])]:
