@@ -401,7 +401,7 @@ class Partition:
         if self.domain is None:
             self.domain=frozenset().union(*[prm.domain for prm in self.perms])
 
-        if not self.graph.nodes():
+        if not self.graph.starts:
             for perm in self.perms: # sort perms with max(prm.domain)?
                 self.graph.append(perm)
 
