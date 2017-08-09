@@ -12,6 +12,7 @@ import itertools
 from typing import Tuple, List, Generator, Dict # pylint: disable=unused-import
 import pickle # pylint: disable=unused-import
 import numpy
+import networkx
 from . import data
 from . import scores
 from . import processor
@@ -34,14 +35,59 @@ from . import _utils as utils
 # must include a stretch,pos score
 
 class PermGenerator:
-    'generates eligible permutation'
-    def __init__(self,):
+    '''
+    generates eligible permutation
+    will need to filter out on permutations within batch
+    A couple things to check:
+    * the kperms are not the same but the ones in here seems more correct
+    due in part to the fact that shift  was not  set to 1 in tail_overlaps
+    leading to additional but unecessary kperms
+    * need to check whether we still need sub (cyclic) permutations. Probably not.
+    '''
+
+    def __init__(self,**kwa):
         'creates the full graph from oligos'
-        pass
+        self.ooverl=kwa.get("ooverl",-1)
+        self.graph=networkx.DiGraph()
+        self.__oligos=kwa.get("oligos",[]) # type: List[data.Oligo]
+        self.__gengraph()
+
+    @property
+    def oligos(self):
+        'oligos'
+        return self.__oligos
+
+    @oligos.setter
+    def oligos(self,values):
+        'setter'
+        self.__oligos=values
+        self.graph.clear()
+        self.__gengraph()
+
+    def __gengraph(self)->None:
+        'creates the graph corresponding to the sorted group of oligos'
+        tail=data.Oligo.tail_overlap
+        edges=[(idx,idx+1) for idx in range(len(self.oligos))]
+        if self.ooverl>0:
+            for idx1,idx2 in itertools.permutations(range(len(self.oligos)),2):
+                if len(tail(self.oligos[idx1].seq,self.oligos[idx2].seq,shift=1))==self.ooverl:
+                    edges+=[(idx1,idx2)]
+
+        self.graph.add_edges_from(frozenset(edges))
+
+    def find_kpermids(self,group:Tuple[int, ...])->Generator:
+        'find eligible permutation within the subgraph group'
+        subgraph=self.graph.subgraph(group)
+        for oli1,oli2 in itertools.permutations(subgraph.nodes(),2):
+            for perm in networkx.all_simple_paths(subgraph,source=oli1,target=oli2):
+                yield tuple(perm)
 
     def find_kperms(self,group:Tuple[int, ...])->Generator:
-        'find eligible permutation within the subgraph group'
-        pass
+        'generates '
+        for prmid in self.find_kpermids(group):
+            yield data.OligoKPerm(oligos=self.oligos,
+                                  kperm=[self.oligos[i] for i in prmid],
+                                  kpermids=numpy.array(prmid))
 
 class Shuffler:
     'align oligo by maximising the overlap one index at a time'
@@ -51,14 +97,22 @@ class Shuffler:
         #self.collection=kwa.get("collection",data.BCollection()) # type:data.BCollection
         self.ooverl=kwa.get("ooverl",-1) # type: int
         self.nscale=kwa.get("nscale",1) # type: int
+        self.permgen=PermGenerator(ooverl=self.ooverl)
 
         if oligos:
             self.collection=data.BCollection.from_oligos(oligos)
+            self.permgen.oligos=self.collection.oligos
+
 
     @property
     def oligos(self):
         '(ordered) oligos from self.collection'
         return self.collection.oligos
+
+    @oligos.setter
+    def oligos(self,values):
+        self.collection=data.BCollection.from_oligos(values)
+        self.permgen.oligos=self.collection.oligos
 
     # to pytest
     @staticmethod
@@ -194,12 +248,16 @@ class Shuffler:
         # score each partition
         return partitions
 
-    def new_find_kperms(self,group:Tuple[int, ...])->Generator:
-        '''
-        generates eligible permutations using networkx 
-        '''
-        pass
+    # method to test!
     def find_kperms(self,group:Tuple[int, ...])->Generator:
+        '''
+        generates eligible permutations using networkx
+        '''
+        for kprm in self.permgen.find_kperms(group):
+            yield kprm
+
+    # works but slow
+    def old_find_kperms(self,group:Tuple[int, ...])->Generator:
         '''
         finds the permutations of oligos in cores
         and permutations from corrections (changed indices must be in both core_groups)
@@ -256,4 +314,3 @@ class Shuffler:
             subkprms.append(tuple(kpr[:-1]))
 
         return list(set(subkprms))
-
