@@ -33,8 +33,18 @@ from . import _utils as utils
 # OligoPeak to far from one another may not be considered as overlapping
 # must include a stretch,pos score
 
+class PermGenerator:
+    'generates eligible permutation'
+    def __init__(self,):
+        'creates the full graph from oligos'
+        pass
+
+    def find_kperms(self,group:Tuple[int, ...])->Generator:
+        'find eligible permutation within the subgraph group'
+        pass
+
 class Shuffler:
-    u'align oligo by maximising the overlap one index at a time'
+    'align oligo by maximising the overlap one index at a time'
     def __init__(self,**kwa):
 
         oligos=kwa.get("oligos",[]) # type: data.OligoPeak
@@ -184,8 +194,13 @@ class Shuffler:
         # score each partition
         return partitions
 
+    def new_find_kperms(self,group:Tuple[int, ...])->Generator:
+        '''
+        generates eligible permutations using networkx 
+        '''
+        pass
     def find_kperms(self,group:Tuple[int, ...])->Generator:
-        u'''
+        '''
         finds the permutations of oligos in cores
         and permutations from corrections (changed indices must be in both core_groups)
         '''
@@ -204,7 +219,7 @@ class Shuffler:
                 yield kpr
 
     def find_subkperms_from_permids(self,kpermids:Tuple[int, ...])->List[data.OligoKPerm]:
-        u'''finds all sub kperms within a permids
+        '''finds all sub kperms within a permids
         eg : (0,2,1,3,6,4,5) will return kperms conrresponding to [(0,),(1,2),(4,6,5)]
         '''
         cyclicsubs=self.find_cyclicsubs(kpermids)
@@ -213,7 +228,7 @@ class Shuffler:
 
     @staticmethod
     def cperm2kperm(oligos,cpermids:Tuple[int,...])->data.OligoKPerm:
-        u'translates cyclic permutation to kperm'
+        'translates cyclic permutation to kperm'
         toprm={cpermids[k]:v for k,v in enumerate(cpermids[1:])}
         toprm.update({cpermids[-1]:cpermids[0]})
         kpermids=tuple(toprm[i] if i in toprm else i for i in range(min(cpermids),max(cpermids)+1))
@@ -225,7 +240,7 @@ class Shuffler:
     # ok but k-cycles are k duplicated
     @staticmethod
     def find_cyclicsubs(perm:Tuple[int, ...]):
-        u'find sub-kpermutations within the permutation'
+        'find sub-kpermutations within the permutation'
         # compute the new positions for each sub-kperm
         srtprm=sorted(perm)
         subkprms=[]
@@ -242,43 +257,3 @@ class Shuffler:
 
         return list(set(subkprms))
 
-    # check if these methods could be useful here
-
-    # def find_groupperms(self,group:Tuple[int, ...])->Generator:
-    #     u'''
-    #     finds the permutations of oligos of a group
-    #     and permutations from corrections (changed indices must be in both core_groups)
-    #     '''
-    #     idsperbatch=self.collection.idsperbatch
-    #     batchfilter=processor.BetweenBatchFilter(idsperbatch=idsperbatch)
-    #     ooverlfilter=processor.RequireOverlapFilter(oligos=self.oligos,
-    #                                                 min_ooverl=self.ooverl)
-    #     # compute all possible permutations # brute force
-    #     kpermids=itertools.permutations(group) # generator
-    #     firstfiltered = filter(ooverlfilter,kpermids) # type: ignore
-    #     secondfiltered = filter(batchfilter,firstfiltered) # type: ignore
-    #     for kprid in secondfiltered:
-    #         yield data.OligoKPerm(oligos=self.oligos,
-    #                               kperm=[self.oligos[i] for i in kprid],
-    #                               kpermids=numpy.array(kprid))
-
-    # # needs better implementation
-    # # pylint: disable=no-self-use
-    # def fix_horizon(self,
-    #                 partitions:List[List[data.OligoPerm]],
-    #                 group:Tuple[int, ...])->List[List[data.OligoPerm]]:
-    #     u'horizon is the ensemble of kperms which cannot modify by any subsequent combination'
-    #     horizon=min(group) # set(group)
-    #     for partid,part in enumerate(partitions):
-    #         if len(part)==1:
-    #             continue
-    #         #to_fix=[(idx,kpr) for idx,kpr in enumerate(part)
-    #         #        if not kpr.domain.intersection(horizon)]
-    #         to_fix=[(idx,kpr) for idx,kpr in enumerate(part)
-    #                 if all(i<horizon for i in  kpr.domain)]
-    #         if len(to_fix)==0:
-    #             continue
-    #         merged=data.OligoPerm.add(*[fix[1] for fix in to_fix])
-    #         fixed=[fix[0] for fix in to_fix]
-    #         partitions[partid]=[merged]+[part[i] for i in range(len(part)) if not i in fixed]
-    #     return partitions
