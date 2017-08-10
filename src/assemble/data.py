@@ -469,9 +469,6 @@ class Partition:
         for grp in itertools.groupby(keyparts,key=lambda x:x[0]):
             # if they have the same key, ambiguity
             parts=list(i[1] for i in grp[1])
-            #prev_ambi=[]
-            #for part in parts:
-            #    prev_ambi.append([ambi for ambi in part.ambi if ambi])
             perms=frozenset(parts[0].perms).intersection(*[frozenset(part.perms)
                                                            for part in parts[1:]])
             domain=parts[0].domain.intersection(*[frozenset(part.domain)

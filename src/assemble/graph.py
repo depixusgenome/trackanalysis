@@ -6,6 +6,8 @@
 from typing import Generator
 import networkx
 
+# Suspected bug in the construction (or the reconstruction)
+# for the graph
 class PermGraph:
     '''
     subclassing for assembling
@@ -45,6 +47,10 @@ class PermGraph:
 
         return pgraph
 
+    # known issue with this method
+    # generates many equivalent paths
+    # some paths include intersecting perms (not allowed)
+    # until better implementation, discard impossible paths
     def paths(self)->Generator:
         'generates all list of perms from start to last'
         graph=networkx.DiGraph()

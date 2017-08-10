@@ -243,7 +243,10 @@ class RequireOverlapFilter:
         self.min_ooverl=min_ooverl
 
         seqs=[oli.seq for oli in  self.oligos]
-        self.overlaps={(i,j):len(data.Oligo.tail_overlap(seqs[i],seqs[j]))>=self.min_ooverl
+        #self.overlaps={(i,j):len(data.Oligo.tail_overlap(seqs[i],seqs[j]))>=self.min_ooverl
+        #               for i,j in itertools.permutations(range(len(oligos)),2)}
+        # test
+        self.overlaps={(i,j):len(data.Oligo.tail_overlap(seqs[i],seqs[j],shift=1))>=self.min_ooverl
                        for i,j in itertools.permutations(range(len(oligos)),2)}
 
     # this call is long to execute

@@ -43,6 +43,7 @@ class PermGenerator:
     due in part to the fact that shift  was not  set to 1 in tail_overlaps
     leading to additional but unecessary kperms
     * need to check whether we still need sub (cyclic) permutations. Probably not.
+    * need to generate single kperm [1],[2],[3] for (1,2,3)
     '''
 
     def __init__(self,**kwa):
@@ -205,10 +206,6 @@ class Shuffler:
             print(f"index={index}")
             add_kperms=[kpr for kpr in full_kperms if kpr.span.intersection({index})]
             added_partitions=[] # type: List[data.Partition]
-            # if __debug__:
-            #     print(f"index={index}")
-            #     pickle.dump(partitions,open("partitions"+str(index)+".pickle","wb"))
-            #     pickle.dump(add_kperms,open("add_kperms"+str(index)+".pickle","wb"))
 
             for part in partitions:
                 # extend the part until all indices<index are in domain
@@ -219,18 +216,13 @@ class Shuffler:
             self.increment_noverlaps(added_partitions,self.ooverl,index+1)
             max_overlap=max(part.noverlaps for part in added_partitions) # pylint: disable=no-member
             partitions=[part for part in added_partitions if part.noverlaps==max_overlap] # pylint: disable=no-member
-
             # if __debug__:
-            #     pickle.dump(partitions,open("debugpartitions"+str(index)+".pickle","wb"))
-
-            # HERE
-            # TESTING! comment the following command
-            #partitions=[part for part in added_partitions if part.noverlaps>max_overlap-3] # pylint: disable=no-member
+            #     for testid,testpart in enumerate(partitions):
+            #         print(f"testid={testid}")
+            #         testmerged=data.OligoPerm.add(*testpart.perms) # pylint: disable=unused-variable
+            #         print("ok")
 
             resume_parts=data.Partition.reduce_partitions(partitions,index)
-            # if __debug__:
-            #     pickle.dump(resume_parts,open("debugresume_parts"+str(index)+".pickle","wb"))
-
             partitions=resume_parts
 
         return partitions
@@ -253,8 +245,9 @@ class Shuffler:
         '''
         generates eligible permutations using networkx
         '''
-        for kprm in self.permgen.find_kperms(group):
-            yield kprm
+        for kprid in self.permgen.find_kpermids(group):
+            for kpr in self.find_subkperms_from_permids(kprid):
+                yield kpr
 
     # works but slow
     def old_find_kperms(self,group:Tuple[int, ...])->Generator:
