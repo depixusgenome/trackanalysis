@@ -481,7 +481,7 @@ class Partition:
             resumep.append(common)
         return resumep
 
-    def paths(self)->Generator:
+    def __paths(self)->Generator:
         '''
         generates all list of OligoPerm from possible combinations of ambiguities
         use networkx.all_simple_path(self.graph,self.graph.start,self.graph.end)
@@ -489,6 +489,16 @@ class Partition:
         for path in self.graph.paths():
             yield path
 
+    # to test # could take the frozenset of sequences generated
+    def paths(self)->Generator:
+        '''
+        calls paths, yields only paths with no conflicting perms
+        '''
+        for path in self.__paths():
+            if any([prm1.domain.intersection(prm2.domain)
+                    for prm1,prm2 in itertools.combinations(path,2)]):
+                pass
+            yield path
 
 class OligoKPerm(OligoPerm):
     '''
