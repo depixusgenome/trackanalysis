@@ -90,7 +90,7 @@ class HybridStatView(BokehView):
                               (lambda: setattr(self._tabs, 'active', old),))
         tabs.on_change('active', _py_cb)
         self._tabs = tabs
-        return tabs
+        return layouts.row(layouts.widgetbox(tabs, **mode), **mode)
 
     def observe(self):
         super().observe()
