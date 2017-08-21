@@ -168,6 +168,7 @@ class OPeakArray:
     arr=numpy.empty(shape=(0,),dtype=data.OligoPeak)
     min_overl=2 # type: int
     rev=data.Oligo.reverse_complement
+    uniqueid=-1 # type: int # allows to differentiate single peaks
     @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
         pass
@@ -311,11 +312,14 @@ class OPeakArray:
         '''
         2 are equivalent if invariant under scaling (stretch,bias)
         '''
-        if isinstance(other,type(self))\
-        and hash(self)==hash(other)\
-        and len(self.posarr)==len(other.posarr):
+
+        if isinstance(other,type(self)):
+            return False
+
+        if hash(self)==hash(other)\
+           and len(self.posarr)==len(other.posarr):
             if len(self.posarr)==1:
-                return True
+                return self.uniqueid==other.uniqueid # to change probably
             sarr=self.posarr
             oarr=other.posarr
             sarr=(sarr-sarr[0])/max(abs(sarr-sarr[0]))
@@ -548,7 +552,7 @@ class PeakStack:
     def __str__(self):
         to_str=""
         for key,values in self.stack.items():
-            to_str+=f"{key} "+" ,".join(val.seq for val in values)+" "
+            to_str+=f"{key} "+" ,".join(val.seq for val in values)+" \n"
         return to_str
 
     # rather long for an hash...
@@ -577,7 +581,7 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         self.pstack=PeakStack()
 
         exp_oligos=no_orientation(self.oligos) # type: List[data.OligoPeak]
-        #exp_oligos=list(self.oligos) # type: List[data.OligoPeak] # keep for later
+        #exp_oligos=list(self.oligos) # type: List[data.OligoPeak] # keep for testing
         self.peaks=OPeakArray.from_oligos(exp_oligos) # type: List[data.OPeakArray]
         self.peaks=sorted(self.peaks,key=lambda x:-len(x.arr))
         self.__peakset=frozenset(self.peaks) # type: FrozenSet[OPeakArray]
@@ -619,9 +623,6 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         # need to compare the reverse too
         #others=self.__peakset-frozenset(stack.ordered)
         others=self.notin_stack(stack) # to check
-        # if __debug__:
-        #     for other in others:
-        #         print(f"other={other.seqs}")
         graph,tips=OPeakArray.list2tree(stack.top(),others,min_overl=self.min_overl,depth=1)
 
         for tip in tips:
@@ -677,18 +678,11 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         fixed=frozenset([]) # type: FrozenSet[PeakStack]
         key2fit=getattr(self,"key2fit",None)
         for _ in range(iteration):
-            # if __debug__:
-            #     print(f"iteration, {_}")
             new_stacks=[] # type: List[PeakStack]
             for stack in pstacks:
                 #if self.__peakset-frozenset(stack.ordered):
-                # if __debug__:
-                #     print(f"stack={stack}")
-                #     print(f"notinstack={self.notin_stack(stack)}")
                 if self.notin_stack(stack): # to check
                     toadd=frozenset(self.incr_build(stack,key2fit=key2fit))
-                    # if __debug__:
-                    #     print(f"diff={toadd.symmetric_difference(frozenset([stack]))}")
                     if not toadd.symmetric_difference(frozenset([stack])):
                         fixed=fixed.union(toadd)
                     else:
@@ -767,7 +761,7 @@ class SubScaler(Scaler):
     def __init__(self,**kwa):
         super().__init__(**kwa)
         self.pstack=PeakStack()
-        self.pstack.add(self.peaks[0])
+        self.pstack.add(self.peaks[kwa.get("ref_index",0)])
         self.__posid=kwa.get("posid",0) # type: int # id of pstack.posarr
         self._key2fit=self.pstack.keys[self.__posid] # type: float
 
