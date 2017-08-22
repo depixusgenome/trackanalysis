@@ -39,7 +39,7 @@ class TaskTypeDescriptor:
 
 class MetaProcessor(ABCMeta):
     "Protects attribute tasktype"
-    def __new__(mcs, name, bases, nspace):
+    def __new__(mcs, name, bases, nspace): #pylint: disable=arguments-differ
         if name != 'Processor' and 'tasktype' not in nspace:
             tskname = name.replace('Processor', 'Task')
             tsk     = getattr(_tasks, tskname, None)
