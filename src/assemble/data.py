@@ -41,14 +41,18 @@ class Oligo:
         return cls.reverse_complement(seq)
 
     @classmethod
-    def do_overlap(cls,ol1:str,ol2:str,min_overl:int=1)->bool:
+    def do_overlap(cls,
+                   ol1:str,
+                   ol2:str,
+                   min_overl:int=1,
+                   shift=0)->bool:
         '''
         returns true if len(tail_overlap(ol1, ol2))>=min_overl
         or len(tail_overlap(ol2, ol1))>=min_overl
         '''
-        if len(cls.tail_overlap(ol1, ol2))>=min_overl:
+        if len(cls.tail_overlap(ol1, ol2,shift=shift))>=min_overl:
             return True
-        if len(cls.tail_overlap(ol2, ol1))>=min_overl:
+        if len(cls.tail_overlap(ol2, ol1,shift=shift))>=min_overl:
             return True
         return False
 
@@ -73,6 +77,7 @@ class Oligo:
         cpy.seq=type(self).rev(self.seq)
         return cpy
 
+    # can be replaced by overlap(cls,ol1,ol2,min_overl=min_overlap,signs=(1,0),shift=0)
     @classmethod
     def can_tail_overlap(cls, # pylint: disable=too-many-arguments
                          ol1:str,
@@ -92,6 +97,24 @@ class Oligo:
             for comb in itertools.product(ols1,ols2):
                 if len(cls.tail_overlap(*comb,shift=shift))>=min_overlap:
                     return True
+        return False
+
+    @classmethod
+    def overlap(cls, # pylint: disable=too-many-arguments
+                ol1:str,
+                ol2:str,
+                min_overl:int,
+                signs:Tuple[int,int],
+                shift=0)->bool:
+        '''
+        most general form of tail overlap
+        signs is 1 if the associated seq is signed otherwise 0
+        '''
+        ols1=[ol1] if signs[0] else [cls.rev(ol1),ol1]
+        ols2=[ol2] if signs[1] else [cls.rev(ol2),ol2]
+        for comb in itertools.product(ols1,ols2):
+            if len(cls.tail_overlap(*comb,shift=shift))>=min_overl:
+                return True
         return False
 
     def add_to_sequence(self,seq:str)->str:
