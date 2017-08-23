@@ -122,12 +122,15 @@ class PeaksPlotCreator(TaskPlotCreator):
                              'xtoplabel'       : u'Duration (s)',
                              'xlabel'          : u'Rate (%)',
                              'widgets.border'  : 10}
-        self.css.peaks.defaults = {'duration'  : PlotAttrs('gray',     'diamond', 10),
-                                   'count'     : PlotAttrs('lightblue', 'square',  10)}
 
-        found = 'black' if self.css.root.theme.get() != 'dark' else 'white'
-        self.css.peaks.colors.defaults = {'found': found, 'missing': 'red'}
-        self.config.defaults = {'tools'      : 'ypan,ybox_zoom,reset,save,dpxhover,tap'}
+        css = self.css.peaks
+        css.defaults = {'duration'  : PlotAttrs('gray',     'diamond', 10),
+                        'count'     : PlotAttrs('lightblue', 'square',  10)}
+        css.colors.missing.default = 'red'
+        css.colors.found.defaults  = {'dark': 'black', 'default': 'white'}
+
+        self.config.defaults = {'tools': 'ypan,ybox_zoom,reset,save,dpxhover,tap'}
+
         PeaksSequenceHover.defaultconfig(self)
         SequenceTicker.defaultconfig(self)
 
@@ -150,11 +153,15 @@ class PeaksPlotCreator(TaskPlotCreator):
         "returns the model"
         return self._model
 
-    def __peaks(self, vals = None):
-        peaks  = dict(self._model.setpeaks(vals))
-        colors = [getattr(bkcolors, j).to_hex()
-                  for j in self.css.peaks.colors.get('found', 'missing')]
+    @property
+    def __foundcolor(self):
+        return self.css.peaks.colors.found[self.css.root.theme.get()]
 
+    def __peaks(self, vals = None):
+        tohex  = lambda x: getattr(bkcolors, x.get()).to_hex()
+        colors = [tohex(self.__foundcolor), tohex(self.css.peaks.colors.missing)]
+
+        peaks  = dict(self._model.setpeaks(vals))
         if vals is None or self._model.identification.task is None:
             peaks['color'] = [colors[0]]*len(peaks['id'])
         else:
@@ -224,7 +231,7 @@ class PeaksPlotCreator(TaskPlotCreator):
         self._fig.extra_x_ranges = {"duration": Range1d(start = 0., end = 1.)}
         axis  = LinearAxis(x_range_name          = "duration",
                            axis_label            = self.css.xtoplabel.get(),
-                           axis_label_text_color = self.css.peaks.colors.found.get()
+                           axis_label_text_color = self.__foundcolor.get()
                           )
         self._fig.xaxis[0].axis_label_text_color = self.css.count.get().color
         self._fig.add_layout(axis, 'above')

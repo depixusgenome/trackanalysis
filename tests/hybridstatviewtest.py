@@ -87,8 +87,8 @@ def test_peaksplot(bokehaction):
     def _printrng(evts):
         if 'y' in evts:
             vals[:2] = [0. if i is None else i for i in evts['y'].value]
-    with bokehaction.launch('hybridstat.view.peaksplot.PeaksPlotView',
-                            'app.BeadToolbar') as server:
+    with bokehaction.serve('hybridstat.view.peaksplot.PeaksPlotView',
+                           'app.toolbar') as server:
         server.ctrl.observe("globals.project.plot.peaks", _printrng)
         server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
         server.load('big_legacy', andstop = False)
@@ -121,17 +121,19 @@ def test_peaksplot(bokehaction):
         assert all(i.strip() == '' for i in src.data['orient'])
 
         server.change('Cycles:Oligos', 'value', 'ctgt')
+        server.wait()
         assert server.widget['Cycles:Oligos'].value == 'ctgt'
         assert not all(np.isnan(src.data['distance']))
         assert not all(i.strip() == '' for i in src.data['orient'])
 
         menu = server.widget['Cycles:Sequence'].menu
         lst  = tuple(i if i is None else i[0] for i in list(menu))
-        assert lst == ('GF4', 'GF2', 'GF1', 'GF3', '015', None, 'Select sequence')
+        assert lst == ('GF2', 'GF4', 'GF1', 'GF3', '015', None, 'Select sequence')
 
         out = mktemp()+"_hybridstattest100.xlsx"
         writeparams(out, [('GF3', (0,))])
         server.click('Peaks:IDPath', withpath = out)
+        server.wait()
 
         menu = server.widget['Cycles:Sequence'].menu
         lst  = tuple(i if i is None else i[0] for i in list(menu))
@@ -139,7 +141,7 @@ def test_peaksplot(bokehaction):
 
 def test_hybridstat(bokehaction):
     "test hybridstat"
-    with bokehaction.launch('hybridstat.view', 'app.BeadToolbar') as server:
+    with bokehaction.launch('hybridstat.view', 'app.toolbar') as server:
         server.change('Hybridstat:Tabs', 'active', 0)
         server.change('Hybridstat:Tabs', 'active', 1)
         server.change('Hybridstat:Tabs', 'active', 2)
@@ -155,4 +157,4 @@ def test_hybridstat(bokehaction):
         server.change('Hybridstat:Tabs', 'active', 2)
 
 if __name__ == '__main__':
-    test_peaks_xlsxio()
+    test_peaksplot(bokehaction(None))

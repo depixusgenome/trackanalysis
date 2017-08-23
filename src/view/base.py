@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "basic view module"
-from typing               import Callable, TYPE_CHECKING
+from typing               import Callable, Set, TYPE_CHECKING # pylint: disable=unused-import
 from concurrent.futures   import ThreadPoolExecutor
 
 from bokeh.document       import Document
@@ -101,13 +101,13 @@ def defaultsizingmode(self, kwa:dict = None, **kwargs) -> dict:
 
 class BokehView(View):
     "A view with a gui"
-    __FIRST = True
+    __CTRL = set() # type: Set[int]
     def __init__(self, **kwargs):
         "initializes the gui"
         super().__init__(**kwargs)
         css = self._ctrl.getGlobal('css')
-        if BokehView.__FIRST:
-            BokehView.__FIRST   = False
+        if id(self._ctrl) not in BokehView.__CTRL:
+            BokehView.__CTRL.add(id(self._ctrl))
             css.button.defaults = {'width': 90, 'height': 20}
             css.input .defaults = {'width': 90, 'height': 20}
             css.defaults        = {'responsive': True, 'sizing_mode': 'scale_width'}
@@ -152,10 +152,11 @@ class BokehView(View):
 
     def addtodoc(self, doc):
         "Adds one's self to doc"
-        theme     = self._ctrl.getGlobal('css').theme.get(default = None)
+        theme = self._ctrl.getGlobal('css').theme.get(default = None)
         if isinstance(theme, str):
             theme = self._ctrl.getGlobal('css').theme[theme].get(default = None)
-        doc.theme = Theme(json = theme)
+        if theme is not None:
+            doc.theme = Theme(json = theme)
 
         self._doc = doc
         if self._keys is not None:

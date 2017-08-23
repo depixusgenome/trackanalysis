@@ -184,7 +184,6 @@ class PlotModelAccess(GlobalsAccess):
 
 class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     "Base plotter class"
-    __FIRST = True
     _MODEL  = PlotModelAccess
     _RESET  = frozenset(('bead',))
     _CLEAR  = frozenset(('track',))
@@ -195,9 +194,8 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
 
     def __init__(self, ctrl:Controller, *_) -> None:
         "sets up this plotter's info"
-        if PlotCreator.__FIRST:
-            PlotCreator.__FIRST = False
-            css = ctrl.getGlobal("css.plot")
+        css = ctrl.getGlobal("css.plot")
+        if css.ylabel.get(default = None) is None:
             css.defaults = {'ylabel'             : u'Z (nm)',
                             'yrightlabel'        : u'Base number',
                             'xtoplabel'          : u'Time (s)',
