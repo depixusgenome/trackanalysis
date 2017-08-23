@@ -9,6 +9,7 @@ from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-imp
 from cleaning.processor         import DataCleaning, DataCleaningTask, DataCleaningProcessor
 from simulator                  import randtrack, setseed
 from control.taskcontrol        import create
+from data.track                 import Track
 
 def test_cleaning_base():
     "test cleaning"
@@ -20,7 +21,7 @@ def test_cleaning_base():
     cycs[2,:]      = np.random.normal(.0, 3e-3, 100)
     cycs[3,:22]    = np.NaN
     cycs[4,3:69:3] += 2.5
-    cycs[5,:22]    += 5.2
+    cycs[5,:22]    += 5.7
 
     tsk = DataCleaning()
     assert set(tsk.hfsigma(cycs).min) == set([1])
@@ -38,10 +39,14 @@ def test_processor():
     cache = {}
     trk   = randtrack().beads
     DataCleaningProcessor.apply(trk, cache)[0]
-    assert list(cache.keys()) == [((None,), 0)]
-    tmp = cache[(None,), 0]
+    assert len(list(cache.keys())) == 1
+    assert isinstance(next(iter(cache.keys())), Track)
+
+    trkcache = next(iter(cache.values()))
+    assert list(trkcache) == [0]
+    tmp = trkcache[0]
     DataCleaningProcessor.apply(trk, cache)[0]
-    assert tmp is cache[(None,), 0]
+    assert tmp is next(iter(cache.values()))[0]
 
 def test_processor2():
     "test processor"
@@ -55,9 +60,8 @@ def test_processor2():
 
 def test_view(bokehaction):
     "test the view"
-    with bokehaction.launch('cleaning.view.CleaningView', 'app.BeadToolbar') as server:
+    with bokehaction.launch('cleaning.view.CleaningView', 'app.toolbar') as server:
         server.load('big_legacy', andstop = False)
 
 if __name__ == '__main__':
-    test_processor2()
-    #test_view(bokehaction(None))
+    test_view(bokehaction(None))

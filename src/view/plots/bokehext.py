@@ -87,9 +87,9 @@ class DpxKeyedRow(Row): # pylint: disable=too-many-ancestors
             return layouts.row([keyed, right], **kwa)
 
         if left is None:
-            return layouts.column([layouts.column([keyed, bottom], **kwa), right], **kwa)
+            return layouts.row([layouts.column([keyed, bottom], **kwa), right], **kwa)
 
-        return layouts.column([left, layouts.column([keyed, bottom], **kwa)], **kwa)
+        return layouts.row([left, layouts.column([keyed, bottom], **kwa)], **kwa)
 
 class DpxHoverTool(HoverTool): # pylint: disable=too-many-ancestors
     "sorts indices before displaying tooltips"

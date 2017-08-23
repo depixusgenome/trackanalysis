@@ -28,11 +28,11 @@ export class DpxCleaningView extends WidgetView
                    "<div><p>|z| ≤</p><p>Δz  ≥</p><p/></div>"+
                    "<div>#{@mk_inp("maxabsvalue")}"+
                         "#{@mk_inp("minextent")}"+
-                        "#{@mk_inp("minhfsigma", step = 0.0001, maxv = 0.01)}</div>"+
+                        "#{@mk_inp("minhfsigma", 0.01, 0.0001)}</div>"+
                    "<div><p>|dz/dt| ≤</p><p>% good  ≥</p><p>≤ σ[HF] ≤</p></div>"+
                    "<div>#{@mk_inp("maxderivate")}"+
-                        "#{@mk_inp("minpopulation", step = 0.1)}"+
-                        "#{@mk_inp("maxhfsigma", step = 0.0001, maxv = 0.01)}</diV>"+
+                        "#{@mk_inp("minpopulation", 100, 0.1)}"+
+                        "#{@mk_inp("maxhfsigma", 0.01,  0.0001)}</diV>"+
                "</div>"
 
         elem = $(@el)

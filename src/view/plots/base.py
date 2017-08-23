@@ -200,7 +200,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                             'yrightlabel'        : u'Base number',
                             'xtoplabel'          : u'Time (s)',
                             'xlabel'             : u'Frames',
-                            'toolbar_location'   : 'right',
+                            'toolbar_location'   : 'left',
                             'toolbar_sticky'     : False,
                             'input.width'        : 205,
                             'figure.width'       : 800,
