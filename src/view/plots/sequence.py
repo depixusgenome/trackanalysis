@@ -110,7 +110,7 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
         "Updates the ticks according to the configuration"
         mdl    = self.__model
         fig    = self.__fig
-        key    = mdl.sequencekey if len(mdl.oligos) else 'NONE'
+        key    = mdl.sequencekey if mdl.sequencekey is not None and len(mdl.oligos) else 'NONE'
         majors = {}
         minors = {}
         resets[fig.right[-1]].update(axis_label_standoff = self.__standoff.get())
