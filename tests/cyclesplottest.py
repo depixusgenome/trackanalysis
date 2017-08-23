@@ -84,25 +84,25 @@ def test_cyclesplot2(bokehaction):
         server.load('big_legacy', andstop = False)
 
         fig  = server.widget['Cycles:Hist']()
-        assert fig.extra_x_ranges['cycles'].end < 50
+        assert fig.extra_x_ranges['cycles'].end < 40
         server.change('Cycles:Alignment', 'active', 1)
 
         for _ in range(5):
             val = fig.extra_x_ranges['cycles'].end
-            if val is not None and val > 80:
+            if val is not None and val > 70:
                 break
             server.wait()
         assert server.widget['Cycles:Alignment'].active == 1
-        assert fig.extra_x_ranges['cycles'].end > 80
+        assert fig.extra_x_ranges['cycles'].end > 70
 
         server.press('Control-z')
         for _ in range(5):
             val = fig.extra_x_ranges['cycles'].end
-            if val is not None and val < 80:
+            if val is not None and val < 40:
                 break
             server.wait()
         assert server.widget['Cycles:Alignment'].active == 0
-        assert fig.extra_x_ranges['cycles'].end < 50
+        assert fig.extra_x_ranges['cycles'].end < 40
 
         rng  = server.widget['Cycles:Raw']().x_range
         vals = rng.start, rng.end
@@ -117,7 +117,7 @@ def test_cyclesplot2(bokehaction):
         assert rng.end   < vals[1]
         assert rng.end   < 350
 
-        server.change('Beads:Rejected', 'value', '0')
+        server.press('Shift-Delete')
         server.wait()
         server.change('Cycles:Drift', 'value', [0])
         server.wait()
