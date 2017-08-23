@@ -177,7 +177,7 @@ class PeaksPlotModelAccess(IdentificationModelAccess):
         self.__set_probas(peaks)
         return self.peaks
 
-    def runbead(self):
+    def runbead(self, *_):
         "returns a tuple (dataitem, bead) to be displayed"
         if self.track is None or self.checkbead(False):
             return None

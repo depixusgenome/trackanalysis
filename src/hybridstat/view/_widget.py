@@ -182,10 +182,9 @@ class PeaksStatsWidget(WidgetCreator):
 
         if self._model.identification.task is not None:
             dist = self._model.distances
-            for key in self._model.sequences:
-                if key in dist:
-                    tab.sequencedependant(self._model, dist, key)
-                    ret[key] = tab()
+            for key in dist:
+                tab.sequencedependant(self._model, dist, key)
+                ret[key] = tab()
         return ret
 
 class PeakListWidget(WidgetCreator):

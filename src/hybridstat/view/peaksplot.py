@@ -171,6 +171,9 @@ class PeaksPlotCreator(TaskPlotCreator):
                     continue
                 peaks[key+'color'] = np.where(np.isfinite(peaks[key+'id']), *colors)
 
+            if self._model.sequencekey not in alldist:
+                self._model.sequencekey = max(tuple(alldist),
+                                              key = lambda x: alldist[x].value)
             peaks['color'] = peaks[self._model.sequencekey+'color']
         return peaks
 
