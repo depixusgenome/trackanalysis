@@ -104,8 +104,8 @@ class Oligo:
                 ol1:str,
                 ol2:str,
                 min_overl:int,
-                signs:Tuple[int,int],
-                shift=0)->bool:
+                signs:Tuple[int,int]=(0,0),
+                shift:int=0)->bool:
         '''
         most general form of tail overlap
         signs is 1 if the associated seq is signed otherwise 0
