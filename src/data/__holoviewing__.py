@@ -67,19 +67,19 @@ class Display:
         """
         disp = cls.run
         if kdim == 'cycle':
-            itms = list(set([i for _, i in itms.keys() if Beads.isbead(i)]))
+            keys = list(set([i for _, i in itms.keys() if Beads.isbead(_)]))
             def _percycle(cyc):
                 return disp(itms[...,cyc], labels, tpe, overlay, opts)
             fcn  = _percycle
         elif kdim == 'bead':
-            itms = list(set([i for i, _ in itms.keys() if Beads.isbead(i)]))
+            keys = list(set([i for i, _ in itms.keys() if Beads.isbead(i)]))
             def _perbead(bead):
                 return disp(itms[bead,...], labels, tpe, overlay, opts)
             fcn  = _perbead
         else:
             return disp(itms, labels, tpe, overlay, opts)
 
-        return hv.DynamicMap(fcn, kdims = [kdim]).redim.values(**{kdim: itms})
+        return hv.DynamicMap(fcn, kdims = [kdim]).redim.values(**{kdim: keys})
 
     @classmethod
     def beads(cls, itms, # pylint: disable=too-many-arguments
