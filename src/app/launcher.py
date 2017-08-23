@@ -19,7 +19,8 @@ from utils.logconfig            import getLogger, logToFile
 from utils.gui                  import MetaMixin # pylint: disable=unused-import
 from .scripting                 import orders
 
-LOGS                            = getLogger(__name__)
+LOGS        = getLogger(__name__)
+CAN_LOAD_JS = True
 
 def _serverkwargs(kwa):
     kwargs                         = dict(kwa)
@@ -75,7 +76,7 @@ class _FunctionHandler(FunctionHandler):
 
 def _monkeypatch(view):
     output = view.MainControl.APPNAME.lower() + '.js'
-    if Path(output).exists():
+    if Path(output).exists() and CAN_LOAD_JS:
         LOGS.debug('monkeypatching bokeh compiler with '+output)
         def _bundle():
             return ''.join(open(output))

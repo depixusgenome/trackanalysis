@@ -15,7 +15,7 @@ def test_cyclesplot(bokehaction):
         if 'y' in evts:
             vals[:2] = [0. if i is None else i for i in evts['y'].value]
 
-    with bokehaction.launch('cyclesplot.CyclesPlotView', 'app.BeadToolbar') as server:
+    with bokehaction.launch('cyclesplot.CyclesPlotView', 'app.toolbar') as server:
         server.ctrl.getGlobal('config').tasks.default = []
         server.ctrl.observe("globals.project.plot.cycles", _printrng)
         server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
@@ -78,7 +78,7 @@ def test_cyclesplot(bokehaction):
 def test_cyclesplot2(bokehaction):
     "test cyclesplot data actions"
 
-    with bokehaction.launch('cyclesplot.CyclesPlotView', 'app.BeadToolbar') as server:
+    with bokehaction.launch('cyclesplot.CyclesPlotView', 'app.toolbar') as server:
         server.ctrl.getGlobal('config').tasks.default = []
         server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
         server.load('big_legacy', andstop = False)

@@ -72,7 +72,10 @@ class DpxTestLoaded(Model):
                         mdl = mdl[i]
 
                     mdl[@attr] = @value
-                    @model.trigger('change:'+@attrs[0])
+                    if @attrs.length == 0
+                        @model.properties[@attr].change.emit()
+                    else
+                        @model.properties[@attrs[0]].change.emit()
 
             @define {
                 done:  [p.Number, 0]
@@ -177,42 +180,24 @@ class _ManagedServerLoop:
         self.kwa              = kwa
         self.__warnings: Any  = None
 
-    def __buildserver(self, kwa):
-        kwa['io_loop'] = IOLoop()
-        kwa['io_loop'].make_current()
+    @staticmethod
+    def __import(amod):
+        if not isinstance(amod, str):
+            return amod
 
-        def _import(amod):
-            if not isinstance(amod, str):
-                return amod
+        if '.' in amod and 'A' <= amod[amod.rfind('.')+1] <= 'Z':
+            modname = amod[:amod.rfind('.')]
+            attr    = (amod[amod.rfind('.')+1:],)
+        else:
+            modname = amod
+            attr    = tuple()
 
-            if '.' in amod and 'A' <= amod[amod.rfind('.')+1] <= 'Z':
-                modname = amod[:amod.rfind('.')]
-                attr    = (amod[amod.rfind('.')+1:],)
-            else:
-                modname = amod
-                attr    = tuple()
+        mod = __import__(modname)
+        for i in tuple(modname.split('.')[1:]) + attr:
+            mod = getattr(mod, i)
+        return mod
 
-            mod = __import__(modname)
-            for i in tuple(modname.split('.')[1:]) + attr:
-                mod = getattr(mod, i)
-            return mod
-
-        tmpapp, mod, fcn = self.kwa.pop('_args_')
-        app              = _import(tmpapp)
-        if not isinstance(app, type):
-            from view.base import BokehView
-            pred = lambda i: (isinstance(i, type)
-                              and i.__module__ == app.__name__
-                              and issubclass(i, BokehView))
-            pot  = tuple(i for _, i in inspect.getmembers(app, pred))
-            assert len(pot) == 1
-            app  = pot[0]
-
-        launch = getattr(_import(mod), fcn)
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', '.*inspect.getargspec().*')
-            server = launch(app, server = kwa)
-
+    def __patchserver(self, server):
         @classmethod
         def _open(_, doc, _func_ = server.MainView.open):
             self.doc = doc
@@ -227,6 +212,36 @@ class _ManagedServerLoop:
             return ret
 
         server.MainView.close = _close
+
+    def __getlauncher(self):
+        tmpapp, mod, fcn = self.kwa.pop('_args_')
+        app              = self.__import(tmpapp)
+        if not isinstance(app, type):
+            from view.base import BokehView
+            pred = lambda i: (isinstance(i, type)
+                              and i.__module__ == app.__name__
+                              and issubclass(i, BokehView))
+            pot  = tuple(i for _, i in inspect.getmembers(app, pred))
+            assert len(pot) == 1
+            app  = pot[0]
+
+        return app, getattr(self.__import(mod), fcn)
+
+    def __buildserver(self, kwa):
+        kwa['io_loop'] = IOLoop()
+        kwa['io_loop'].make_current()
+
+        app, launch = self.__getlauncher()
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', '.*inspect.getargspec().*')
+            import app.launcher as _launcher
+            old, _launcher.CAN_LOAD_JS = _launcher.CAN_LOAD_JS, False
+            try:
+                server = launch(app, server = kwa)
+            finally:
+                _launcher.CAN_LOAD_JS = old
+
+        self.__patchserver(server)
         return server
 
     def __enter__(self):
