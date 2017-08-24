@@ -20,21 +20,22 @@ class CyclesListWidget(WidgetCreator):
     "Table containing stats per peaks"
     def __init__(self, model:DataCleaningModelAccess) -> None:
         super().__init__(model)
-        self.__widget: DataTable = None
-        css                      = self.__config
-        css.width.default        = 65
-        css.default              = [['cycle',       u'Cycle',   '0'],
-                                    ['population', u'% good',   '0.'],
-                                    ['hfsigma',    'σ[HF]',     '0.0000'],
-                                    ['extent',     u'Δz',       '0.0'],
-                                    ['discarded',  u'Discarded', '']]
+        self.__widget: DataTable  = None
+        css                       = self.__config
+        css.lines.order.default   = ('extent', 'hfsigma', 'population', 'aberrant', 'good')
+        css.columns.width.default = 65
+        css.columns.default       = [['cycle',       u'Cycle',   '0'],
+                                     ['population', u'% good',   '0.'],
+                                     ['hfsigma',    'σ[HF]',     '0.0000'],
+                                     ['extent',     u'Δz',       '0.0'],
+                                     ['discarded',  u'Discarded', '']]
 
     @property
     def __config(self):
-        return self.css.table.columns
+        return self.css.table
 
     def create(self, _) -> List[Widget]:
-        cnf   = self.__config
+        cnf   = self.__config.columns
         width = cnf.width.get()
         get   = lambda i: self.css[i[4:]].get() if i.startswith('css:') else i
         fmt   = lambda i: (StringFormatter(text_align = 'center',
@@ -68,17 +69,14 @@ class CyclesListWidget(WidgetCreator):
     def __data(self) -> dict:
         cache = self._model.cleaning.cache
         if cache is None or len(cache) == 0:
-            return {i: [] for i, _1, _2 in self.__config.get()}
-        names = set(i[0] for i in self.__config.get()) & set(cache)
-        bad   = self._model.cleaning.badcycles(cache)
-        order = np.array(sorted(range(self._model.track.ncycles),
-                                key = lambda i: (i not in bad, i)),
-                         dtype = 'i4')
-
-        info                         = {i: cache[i].values[order] for i in names}
-        info['discarded']            = np.zeros(len(order), dtype = 'U1')
-        info['discarded'][:len(bad)] = '✗'
-        info['cycle']                = order
+            return {i: [] for i, _1, _2 in self.__config.columns.get()}
+        names = set(i[0] for i in self.__config.columns.get()) & set(cache)
+        bad   = self._model.cleaning.nbadcycles(cache)
+        order = self._model.cleaning.sorted(self.__config.lines.order.get(), cache)
+        info                    = {i: cache[i].values[order] for i in names}
+        info['discarded']       = np.zeros(len(order), dtype = 'U1')
+        info['discarded'][:bad] = '✗'
+        info['cycle']           = order
         return info
 
 class DpxCleaning(Widget):

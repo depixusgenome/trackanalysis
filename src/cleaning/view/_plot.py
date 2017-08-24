@@ -6,7 +6,7 @@ from    typing         import Dict, TYPE_CHECKING
 from    bokeh.plotting import figure, Figure
 from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 from    bokeh          import layouts
-import  bokeh.colors
+import  bokeh.colors   as     _bkclr
 
 import  numpy                   as     np
 
@@ -25,10 +25,9 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
     @classmethod
     def compute(cls, frame, info, cache = None, **cnf):
         "returns the result of the beadselection"
-        cpy = np.copy(info[1])
-        super().compute(frame, (info[0], cpy), cache = cache, **cnf)
+        super().compute(frame, (info[0], np.copy(info[1])), cache = cache, **cnf)
         DataCleaning(**cnf).aberrant(info[1], clip = True)
-        cache['gui'] = np.isnan(cpy)
+        cache['gui'] = np.isnan(info[1])
         return None
 
     @staticmethod
@@ -63,16 +62,15 @@ class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
         cnf.plot.figure.height.default = self.css.plot.figure.width.get()//2
         cnf.points.default  = PlotAttrs('color',  'circle', 1, alpha   = .5)
 
-        colors = dict(good       = 'blue',
-                      hfsigma    = 'red',
+        colors = dict(good       = '#6baed6', # blue
+                      hfsigma    = 'gold',
                       extent     = 'orange',
                       population = 'hotpink',
-                      aberrant   = 'gold')
+                      aberrant   = 'red')
         cnf.colors.basic.defaults = colors
         cnf.colors.dark .defaults = colors
-        cnf.colors.order.default  = ('good', 'hfsigma', 'extent', 'population', 'aberrant')
-
-        self.css.figure.width.default  = 500
+        cnf.colors.order.default  = ('aberrant', 'hfsigma', 'extent', 'population', 'good')
+        self.css.figure.defaults  = dict(width = 500, height = 800)
 
         self.__source: ColumnDataSource = None
         self.__fig:    Figure           = None
@@ -101,7 +99,7 @@ class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
 
     def _reset(self):
         items, nans = GuiDataCleaningProcessor.runbead(self._model)
-        data                                  = self.__data(items, nans)
+        data        = self.__data(items, nans)
         self._bkmodels[self.__source]['data'] = data
         self.setbounds(self.__fig.x_range, 'x', data['t'])
         self.setbounds(self.__fig.y_range, 'y', data['z'])
@@ -111,10 +109,7 @@ class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
         if items is None or len(items) == 0 or not any(len(i) for _, i in items):
             items = [((0,0), [])]
 
-        bad   = self._model.cleaning.badcycles()
-        order = np.array(sorted(range(len(items)), key = lambda i: (i not in bad, i)),
-                         dtype = 'i4')
-
+        order = self._model.cleaning.sorted(self.css.colors.order.get())
         size  = max(len(i) for _, i in items)
         val   = np.full((len(items), size), np.NaN, dtype = 'f4')
         for (_, i), j in items:
@@ -127,18 +122,20 @@ class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
         assert all(len(i) == val.size for  i in res.values())
         return res
 
+
     def __color(self, order, nancache, items) -> np.ndarray:
         colors = self.css.colors[self.css.theme.get()].getitems(...)
-        hexes  = {i: getattr(bokeh.colors, j).to_hex() for i, j in colors.items()}
+        tohex  = lambda clr: clr if clr[0] == '#' else getattr(_bkclr, clr).to_hex()
+        hexes  = {i: tohex(j) for i, j in colors.items()}
 
         tmp    = np.full(items.shape, hexes['good'], dtype = '<U7')
         cache  = self._model.cleaning.cache
         for name in self.css.colors.order.get():
             if name == 'aberrant' and nancache is not None:
                 color   = hexes[name]
-                cycnans = GuiDataCleaningProcessor.nans(self._model, nancache)[order]
+                cycnans = GuiDataCleaningProcessor.nans(self._model, nancache)
                 for cyc, nans in enumerate(cycnans):
-                    tmp[cyc,:len(nans)][nans] = color
+                    tmp[order[cyc],:len(nans)][nans] = color
 
             elif cache is not None:
                 value, color = cache.get(name, None), hexes[name]

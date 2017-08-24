@@ -26,6 +26,29 @@ class DataCleaningAccess(TaskAccess):
         cur = mem.get(self.track, {}).get(self.bead, None)
         return None if cur is None else {i.name: i for i in cur[0]}
 
+    def nbadcycles(self, cache = NoArgs) -> int:
+        "returns the number of bad cycles"
+        return len(self.badcycles(cache))
+
+    def sorted(self, order, cache = NoArgs):
+        "returns cycles ordered by category"
+        astats = self.cache if cache is NoArgs else cache
+        if astats is None:
+            return (np.zeros(1, dtype = 'i4') if self.track is None     else
+                    np.arange(self.track.ncycles, dtype = 'i4'))
+
+        stats = astats if isinstance(astats, dict) else dict(astats)
+        res   = np.full(len(next(iter(stats.values())).values), -1, dtype = 'i4')
+        for i, name in enumerate(order):
+            stat = stats.get(name, None)
+            if stat is not None:
+                cur      = np.union1d(stat.min, stat.max)
+                res[cur] = cur+i*len(res)
+
+        cur      = np.arange(len(res), dtype = 'i4')[res == -1]
+        res[cur] = cur+order.index('good')*len(res)
+        return np.argsort(res)
+
     def badcycles(self, cache = NoArgs):
         "returns bad cycles"
         return DataCleaningTask.badcycles(self.cache if cache is NoArgs else cache)
