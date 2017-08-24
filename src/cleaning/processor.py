@@ -44,7 +44,7 @@ class DataCleaning:
         return Partial(name, low, high, test)
 
     @staticmethod
-    def badcycles(stats):
+    def badcycles(stats) -> np.ndarray:
         "returns all bad cycles"
         bad = np.empty(0, dtype = 'i4')
         if stats is None:
@@ -60,7 +60,8 @@ class DataCleaning:
 
     def extent(self, cycs: np.ndarray) -> Partial:
         "computes too short or too long cycles"
-        test = [np.nanmax(i)-np.nanmin(i) if any(np.isfinite(i)) else 0. for i in cycs]
+        maxv = np.finfo('f4').max
+        test = [np.nanmax(i)-np.nanmin(i) if any(np.isfinite(i)) else maxv for i in cycs]
         return self.__test('extent', test)
 
     def population(self, cycs: np.ndarray) -> Partial:
