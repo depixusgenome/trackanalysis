@@ -5,8 +5,8 @@ u"gui related utils"
 import re
 import sys
 import os
-import pathlib
 import subprocess
+from   pathlib     import Path
 from   functools   import wraps
 from   inspect     import ismethod as _ismeth, isfunction as _isfunc, getmembers
 from   enum        import Enum
@@ -16,16 +16,35 @@ from   .logconfig  import getLogger
 
 LOGS = getLogger(__name__)
 
-def coffee(apath:'Union[str,pathlib.Path]', name:'Optional[str]' = None, **kwa) -> str:
+def coffee(apath:'Union[str,Path]', name:'Optional[str]' = None, **kwa) -> str:
     u"returns the javascript implementation code"
-    path = pathlib.Path(apath)
+    path = Path(apath)
     if name is not None:
         path = path.parent / name # type: ignore
 
-    src = pathlib.Path(path.with_suffix(".coffee")).read_text()
+    src = Path(path.with_suffix(".coffee")).read_text()
     for title, val in kwa.items():
         src = src.replace("$$"+title, val)
     return src.replace('$$', '')
+
+def implementation(apath, *args, extra = None, **kwa):
+    "returns the coffeescript implementation"
+    path = Path(apath).with_suffix('.coffee')
+    if not path.exists():
+        # Should only happen with the JS compiler hack
+        LOGS.debug(str(path) + ' was not implemented')
+        return ""
+
+    code = ''.join(open(path))
+    for title, val in kwa.items():
+        code = code.replace(title, val)
+    for title, val in args:
+        code = code.replace(title, val)
+    code += "\n"
+
+    if extra:
+        code += '\n'+''.join(open(Path(extra).with_suffix('.coffee')))
+    return code
 
 class MetaMixin(type):
     u"""
