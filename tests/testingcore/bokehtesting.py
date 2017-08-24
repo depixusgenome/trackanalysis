@@ -25,6 +25,9 @@ with warnings.catch_warnings():
 # pylint: disable=wrong-import-position
 from tornado.ioloop        import IOLoop
 from view.keypress         import KeyPressManager
+from utils.logconfig       import getLogger
+
+LOGS = getLogger()
 
 class DpxTestLoaded(Model):
     """
@@ -49,6 +52,26 @@ class DpxTestLoaded(Model):
             constructor : (attributes, options) ->
                 super(attributes, options)
                 $((e) => @done = 1)
+
+                self = @
+
+                oldlog       = console.log
+                console.log  = () -> self._tostr(oldlog, 'debug', arguments)
+
+                oldinfo      = console.info
+                console.info = () -> self._tostr(oldinfo, 'info', arguments)
+
+                oldwarn      = console.warn
+                console.warn = () -> self._tostr(oldwarn, 'warn', arguments)
+
+            _tostr: (old, name, args) ->
+                str = ""
+                for i in args
+                    str = str + " " + i
+                @[name] = ""
+                @[name] = str
+
+                old.apply(console, args)
 
             _create_evt: (name) ->
                 evt = $.Event(name)
@@ -86,6 +109,9 @@ class DpxTestLoaded(Model):
                 attr : [p.String, '']
                 value: [p.Any,   {}]
                 value_cnt: [p.Int, 0]
+                debug: [p.String, '']
+                warn: [p.String, '']
+                info: [p.String, '']
             }
                          """
     done        = props.Int(0)
@@ -96,6 +122,19 @@ class DpxTestLoaded(Model):
     attr        = props.String()
     value       = props.Any()
     value_cnt   = props.Int(0)
+    debug       = props.String()
+    warn        = props.String()
+    info        = props.String()
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+        self.on_change("debug", self.__log_cb)
+        self.on_change("warn",  self.__log_cb)
+        self.on_change("info",  self.__log_cb)
+
+    @staticmethod
+    def __log_cb(attr, old, new):
+        if new != '':
+            getattr(LOGS, attr)('JS <- '+new)
 
     def press(self, key, model):
         "Sets-up a new keyevent in JS"
@@ -158,8 +197,13 @@ class _ManagedServerLoop:
     lets us use a current IOLoop with "with"
     and ensures the server unlistens
     """
-    loop = property(lambda self: self.server.io_loop)
-    ctrl = property(lambda self: getattr(self.view, '_ctrl'))
+    loop     = property(lambda self: self.server.io_loop)
+    ctrl     = property(lambda self: getattr(self.view, '_ctrl'))
+    roottask = property(lambda self: self.ctrl.getGlobal('project').track.get())
+    track    = property(lambda self: self.ctrl.track(self.roottask))
+    def task(self, task):
+        "returns a task"
+        return self.ctrl.task(self.roottask, task)
 
     @property
     def loading(self) -> Optional[DpxTestLoaded]:
