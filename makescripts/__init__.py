@@ -13,10 +13,8 @@ _utils.ROOT      = str(Path(__file__).parent.parent)
 _utils.DEFAULT   = str(Path(__file__).parent.parent/"wscript")
 
 # pylint: disable=wildcard-import,wrong-import-position
-from ._requirements import *
-from ._base         import *
-from ._conda        import *
-from ._tests        import *
-from ._utils        import *
-from ._gui          import *
+from ._base  import *
+from ._conda import *
+from ._gui   import *
+
 __builtins__['guimake'] = guimake # type: ignore

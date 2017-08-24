@@ -8,11 +8,12 @@ from zipfile    import ZipFile
 from shutil     import rmtree
 import py_compile
 
-from waflib             import Logs
+from waflib         import Logs
+from waflib.Build   import BuildContext
 
 import wafbuilder
-from   ._utils          import BaseContext, BuildContext, MODULES
-from   ._base           import build as _basebuild
+from   ._utils      import BaseContext, MODULES
+from   ._base       import build as _basebuild
 
 class _CondaEnv(BuildContext):
     fun = cmd = 'condaenv'
