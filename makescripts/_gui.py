@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Compiles the JS code once and for all"
+from pathlib    import Path
 from wafbuilder import copyroot, make
 
 def build_bokehjs(bld, *modules):
@@ -38,7 +39,12 @@ def guimake(viewname, locs):
                     break
                 modules.append(modules[-1]+'.'+i)
 
-        build_bokehjs(bld, *modules, 'app.launcher', 'undo')
+        for i in (bld.path.parent.ant_glob('view/**/*.py')
+                  +bld.path.parent.ant_glob('app/**/*.py')):
+            i = i.srcpath()
+            if Path(str(i)).name[:2] != '__':
+                modules.append(str(i)[4:-3].replace("/", ".").replace("\\", "."))
+        build_bokehjs(bld, *(i for i in modules if i[:2] != '__'), 'undo')
 
     locs['build'] = build
 

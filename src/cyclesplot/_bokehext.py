@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 "Cycles plot view"
 from typing         import Optional, Tuple      # pylint: disable=unused-import
-from pathlib        import Path
 
 import  bokeh.core.properties as props
 from    bokeh.model    import Model
@@ -23,9 +22,10 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
     updating  = props.String('')
 
     impl      = SequenceHoverMixin.impl
-    __implementation__ = (impl('DpxHoverModel',
-                               'shape: [p.Array, [2,1]], cycle: [p.Int, -1],')
-                          + '\n'+''.join(open(str(Path(__file__).with_suffix('.coffee')))))
+    __implementation__ = impl('DpxHoverModel',
+                              ('shape: [p.Array, [2,1]],'
+                               'cycle: [p.Int, -1],'),
+                              __file__)
 
     def __init__(self, **kwa):
         super().__init__(**kwa)

@@ -13,6 +13,7 @@ from    bokeh.models    import (LinearAxis, ColumnDataSource, Range1d, Widget,
 import  sequences
 
 from    utils           import CachedIO
+from    utils.gui       import implementation
 
 from   model.globals    import BeadProperty
 from   ..dialog         import FileDialog
@@ -137,12 +138,11 @@ class SequenceHoverMixin:
         self._model = None
 
     @staticmethod
-    def impl(name, fields):
+    def impl(name, fields, extra = None):
         "returns the coffeescript implementation"
-        code = ''.join(open(str(Path(__file__).with_suffix('.coffee'))))
-        code = code.replace('NAME', name)
-        code = code.replace('@define {', '@define {\n        '+fields)
-        return code+"\n"
+        args = ('@define {', '@define {\n        '+fields)
+        code = implementation(__file__, args, NAME  = name, extra = extra)
+        return code
 
     @staticmethod
     def defaultconfig(mdl):

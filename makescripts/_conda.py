@@ -58,7 +58,7 @@ class _CondaApp(BuildContext):
         for optext, opts in (('', ''), ('_chrome', ' --electron')):
             fname = str(self.options.STARTSCRIPT_PATH.make_node(name+optext+ext))
             with open(fname, 'w', encoding = 'utf-8') as stream:
-                print(cmd + r"app/cmdline.pyc " + val + opts + ' --port random',
+                print(cmd + r"bin/python app/cmdline.pyc " + val + opts + ' --port random',
                       file = stream)
 
     def __startscripts(self, mods):
@@ -91,8 +91,7 @@ class _CondaApp(BuildContext):
         mods = [path/Path(mod).name for mod in mods]
         zips = [mod for mod in mods
                 if (mod.exists() and mod.name != 'app'
-                    and next(mod.glob("_core"+dll), None) is None
-                    and next(mod.glob("**/*.coffee"), None) is None)]
+                    and next(mod.glob("_core"+dll), None) is None)]
 
         def _compile(inp, outp):
             with open(str(inp), encoding = 'utf-8') as stream:
@@ -138,6 +137,9 @@ class _CondaApp(BuildContext):
 
         if (path/'static').exists():
             (path/'static').rename(out/'static')
+
+        for itm in path.glob("*.js"):
+            itm.rename(out/itm.relative_to(path))
 
         final = Path(".")/wafbuilder.git.version()
         if final.exists():
