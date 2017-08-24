@@ -61,7 +61,14 @@ def test_processor2():
 def test_view(bokehaction):
     "test the view"
     with bokehaction.launch('cleaning.view.CleaningView', 'app.toolbar') as server:
+        server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
         server.load('big_legacy', andstop = False)
+
+        assert server.task(DataCleaningTask).maxhfsigma != 0.002
+        server.change('Cleaning:Filter', 'maxhfsigma', 0.002)
+        server.wait()
+        assert server.widget['Cleaning:Filter'].maxhfsigma == 0.002
+        assert server.task(DataCleaningTask).maxhfsigma == 0.002
 
 if __name__ == '__main__':
     test_view(bokehaction(None))

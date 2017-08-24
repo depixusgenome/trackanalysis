@@ -100,7 +100,7 @@ class CleaningFilterWidget(WidgetCreator):
         self.__widget: DpxCleaning = None
 
     def create(self, action) -> List[Widget]:
-        self.__widget = DpxCleaning()
+        self.__widget = DpxCleaning(name = "Cleaning:Filter")
 
         @action
         def _on_cb(attr, old, new):
