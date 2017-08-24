@@ -95,7 +95,9 @@ def _tasks(paths, upto):
     tasks = (Tasks.eventdetection, Tasks.peakselector)
     if isinstance(paths, (str, Path)) or len(paths) == 1:
         tasks = (Tasks.cleaning, Tasks.alignment)+tasks
-    return tasks if upto is None else tasks[:tasks.index(upto)+1]
+    return (tasks if upto is None       else
+            ()    if upto not in tasks  else
+            tasks[:tasks.index(upto)+1])
 
 @addto(_Track) # type: ignore
 @property
