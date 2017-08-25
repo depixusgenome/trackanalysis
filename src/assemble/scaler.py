@@ -275,6 +275,20 @@ class OPeakArray:
                         break
         return match
 
+    @classmethod
+    def list2edgeids(cls,
+                     peaks:List,
+                     min_overl:int=2,
+                     unsigned=True):
+        '''
+        returns the edges of peak indices which overlap
+        '''
+        edges=[(idx1,idx2) for idx1,idx2 in itertools.permutations(range(len(peaks)),2)
+               if cls.may_overlap(peaks[idx1],
+                                  [peaks[idx2]],
+                                  min_overl=min_overl,unsigned=unsigned)]
+        return sorted(edges)
+
     @staticmethod
     def list2graph(peaks:List,min_overl=2):
         '''
