@@ -9,11 +9,12 @@ how to fix the temperature?
 need more efficient sampling of (stretch,bias)
 '''
 
-from typing import List, Tuple # pylint: disable=unused-import
+from typing import List, Tuple, Callable # pylint: disable=unused-import
 import pickle
 import itertools
+import random
 import networkx
-import numpy
+import numpy as np
 import scipy.stats
 from scipy.optimize import basinhopping, OptimizeResult
 import assemble.data as data
@@ -46,7 +47,7 @@ class PeakSetting:
     regroups information regarding oligo experiments
     '''
     def __init__(self,**kwa):
-        self._pos=[] # type: List[numpy.array]
+        self._pos=[] # type: List[np.array]
         self._seqs=[] # type: List[Tuple[str, ...]]
         self._fseqs=[] # type: List[str] # flat
         self._peaks=[] # type: List[scaler.OPeakArray]
@@ -90,7 +91,7 @@ class Score(PeakSetting):
                                                    signs=(0,0),
                                                    shift=1)])
         # change the set of ids to consider for adjusting the mcmc
-        self.sub_ids=kwa.get("sub_ids",set(range(len(self.peaks))))
+        self.ids=kwa.get("ids",list(range(len(self.peaks))))
     def callpass(self,*arg,**kwa):
         'pass'
         pass
@@ -100,20 +101,28 @@ class Score(PeakSetting):
         'min_overl'
         return self._min_overl
 
+    @min_overl.setter
+    def min_overl(self,value):
+        'min_overl'
+        self._min_overl=value
+
     def __call__(self,state):
         return self.score_state(state)
 
-    def score_state(self,state:numpy.array)->float:
+    # adjust using ids
+    def score_state(self,state:np.array)->float:
         '''
         scales self.__pos instead of using Rescale.__call__
         '''
         # rescale positions
-        npos=[state[2*idx]*pos+state[2*idx+1]
-              for idx,pos in enumerate(self._pos)]
+        # npos=[state[2*idx]*pos+state[2*idx+1]
+        #       for idx,pos in enumerate(self._pos)]
+
+        npos=[state[2*idx]*self._pos[idx]+state[2*idx+1] for idx in self.ids]
         fpos=[pos for ppos in npos for pos in ppos] # flat
 
         # sort seq according to npos
-        seqs=[pseq[1] for pseq in sorted(zip(fpos,self._fseqs))]
+        seqs=[pseq[1] for pseq in sorted(zip(fpos,np.array(self._fseqs)[self.ids]))]
         return -sum([1 for idx,val in enumerate(seqs[1:]) if (seqs[idx],val) in self.seqs])
 
 class StreBiasStep: # pylint: disable=too-many-instance-attributes
@@ -121,7 +130,7 @@ class StreBiasStep: # pylint: disable=too-many-instance-attributes
     def __init__(self,**kwa):
         self.bstretch=kwa.get("bstretch",scaler.Bounds())
         self.bbias=kwa.get("bbias",scaler.Bounds())
-        self.cov=numpy.array([1]) # type: numpy.array
+        self.cov=np.array([1]) # type: np.array
         self.__size=1
         self.size=kwa.get("size",1) # type: int
         self.__sample="" # type: str
@@ -140,10 +149,9 @@ class StreBiasStep: # pylint: disable=too-many-instance-attributes
     @size.setter
     def size(self,value):
         self.__size=value
-        self.cov=numpy.array([1
-                              if idx%2
-                              else 0.1
-                              for idx in range(2*self.__size)])
+        self.cov=np.array([1 if idx%2
+                           else 0.1
+                           for idx in range(2*self.__size)])
     @property
     def sample(self):
         'property'
@@ -169,15 +177,148 @@ class StreBiasStep: # pylint: disable=too-many-instance-attributes
             self.__sample=stype
             raise NotImplementedError
 
-    def __call__(self,*args,**kwa)->numpy.array:
+    def __call__(self,*args,**kwa)->np.array:
         if self.sample=="uniform":
             bias=self.biasdist.rvs(size=self.size)
             stre=self.stredist.rvs(size=self.size)
-            return numpy.array([val for pair in zip(stre,bias) for val in pair])
+            return np.array([val for pair in zip(stre,bias) for val in pair])
         if self.sample=="normal":
             dist=scipy.stats.multivariate_normal(mean=args[0],cov=self.cov)
             return dist.rvs()
-        return numpy.array([])
+        return np.array([])
+
+
+
+# will not work if any peaks[1:] can't match peaks[0]
+# class StreBiasGenerator(PeakSetting):
+#     '''
+#     sample more efficiently (stretch,bias) for mcmc
+#     '''
+#     def __init__(self,**kwa):
+#         super().__init__(**kwa)
+#         self.bstretch=kwa.get("bstretch",scaler.Bounds())
+#         self.bbias=kwa.get("bbias",scaler.Bounds())
+#         self.noise=scipy.stats.norm(loc=0,scale=0.1).rvs
+#         self.matches=[[scale.toarr
+#                        for scale in scaler.scale_peaks(self.peaks[0].posarr,
+#                                                        peak.posarr,
+#                                                        self.bstretch,
+#                                                        self.bbias)] for peak in self.peaks[1:]]
+#         self.lengths=[len(val) for val in self.matches]
+
+
+
+#     def __call__(self,*args,**kwargs):
+#         # naive version:
+#         # for each peak pick a scale and apply a small random noise on the bias
+#         noise=self.noise(size=len(self.peaks[1:]))
+#         scales=[match[np.random.randint(self.lengths[idx])]+np.array([0,noise[idx]])
+#                 for idx,match in enumerate(self.matches)]
+#         return np.array([1,0]+[val for scl in scales for val in scl])
+
+
+class SeqUpdate(PeakSetting):
+    '''
+    sample more efficiently (stretch,bias) for mcmc
+    creates a graph: try to fit peaks starting from peaks[0] and adding more and more neighbors
+    # make a graph with indices as nodes (do not use make_graph)
+    # use find matches
+    # pick at random a peak (except 0)
+    # move the oligos of that peak (the move can then be optimised with regard to neighbors)
+    Need to find the sets of scales for each peaks which gives a different sequence of peaks
+    '''
+    def __init__(self,**kwa):
+        super().__init__(**kwa)
+        self.bstretch=kwa.get("bstretch",scaler.Bounds())
+        self.bbias=kwa.get("bbias",scaler.Bounds())
+        self.cycle=itertools.cycle(list(range(1,len(self.peaks)-1)))
+        self.index=kwa.get("index",1) # type: int
+
+    def next_move(self,npos:List[np.array],tomove:int):
+        'defines a new stre,bias for a single peak'
+        others=np.sort(np.hstack(npos[:tomove]+npos[tomove+1:]))
+        moves=scaler.match_peaks(others,self._pos[tomove],self.bstretch,self.bbias)
+        return random.choice(moves)
+
+    def __call__(self,*args,**kwargs):
+        tomove=self.index
+        state=args[0]
+        # scale all peaks
+        npos=[state[2*idx]*arr+state[2*idx+1] for idx,arr in enumerate(self._pos)]
+        # find where to move
+        try:
+            nstre,nbias=self.next_move(npos,tomove)
+        except IndexError:
+            return state
+        return np.hstack([state[:2*tomove],[nstre,nbias],state[2*(tomove+1):]])
+
+
+
+class HopperStatus:
+    'basinhopping container'
+    def __init__(self,**kwa):
+        self.state=kwa.get("state",np.array)
+        self.scores=[] # type: List[float]
+
+class SeqHoppScaler(PeakSetting):
+    '''
+    adjust the scales of experiments to minimize scoring function
+    Could be better with a full-fledged MCTS implementation
+    Controls the SeqUpdate instance together with the Score
+    decides which indices must be used to compute the score
+    and which index must be updated
+    '''
+    def __init__(self,**kwa):
+        super().__init__(**kwa)
+        self.scoring=Score(**kwa)
+        self.sampler=SeqUpdate(**kwa)
+        self.min_overl=kwa.get("min_overl",2) # type: int
+        self.edges=scaler.OPeakArray.list2edgeids(self._peaks,
+                                                  min_overl=self.min_overl,
+                                                  unsigned=self.scoring.unsigned)
+        self.edges=[edge for edge in self.edges if edge[0]<edge[1]]
+        self.basinkwa={"func":self.scoring,
+                       "niter":100,
+                       "minimizer_kwargs":dict(method=no_minimizer),
+                       "take_step":self.sampler}
+        self.res=[] # type: List[scipy.optimize.optimize.OptimizeResult]
+
+    @property
+    def bstretch(self):
+        'bstretch'
+        return self.sampler.bstretch
+
+    @property
+    def bbias(self):
+        'bbias'
+        return self.sampler.bbias
+
+    def run(self):
+        '''
+        simple and naive approach first
+        Consider peaks[0] fixed and only the peaks (1 by 1?) which can overlap with peaks[0]
+        then add others
+        '''
+        biasdist=scipy.stats.uniform(loc=self.bbias.lower,
+                                     scale=self.bbias.upper-self.bbias.lower)
+        stredist=scipy.stats.uniform(loc=self.bstretch.lower,
+                                     scale=self.bstretch.upper-self.bstretch.lower)
+        bias=biasdist.rvs(size=len(self._peaks)-1)
+        stre=stredist.rvs(size=len(self._peaks)-1)
+        state=np.array([1,0]+[val for pair in zip(stre,bias) for val in pair])
+
+        toscore=[0]
+        for edge in self.edges:
+            toscore=sorted(frozenset(toscore).union(edge))
+            print("the scoring does not work correctly")
+            print(f"toscore={toscore}")
+            self.scoring.ids=toscore
+            # I cannot change only edge[1] but edge[1] and all neighbors
+            self.sampler.index=edge[1]
+            curr_res=basinhopping(x0=state,**self.basinkwa)
+            print(f"fun={curr_res.fun}")
+            self.res.append(curr_res)
+            state=curr_res.x
 
 if __name__=='__main__':
     UNSIGNED= True
