@@ -3,10 +3,6 @@
 
 '''
 non-linearity not implemented (for each OPeakArray)
-
-should deal with any orientation (keeps possible stacks depending if no conflict)
-can use boundaries on non-linearity to discard stacking or to add keys if the stacking
-requires a pile in move greater than the non-linearity
 '''
 import abc
 import itertools
@@ -88,6 +84,7 @@ class Rescale:
         self.stre=stretch
         self.bias=bias
 
+    # too long. create peakarray?
     def __call__(self,array):
         return self.stre*array+self.bias
 
@@ -97,7 +94,7 @@ class Rescale:
     @property
     def toarr(self):
         'array of stre,bias'
-        return numpy.array(self.stre,self.bias)
+        return numpy.array([self.stre,self.bias])
 
     def __hash__(self):
         return hash((self.stre,self.bias))
@@ -313,7 +310,7 @@ class OPeakArray:
         2 are equivalent if invariant under scaling (stretch,bias)
         '''
 
-        if isinstance(other,type(self)):
+        if not isinstance(other,type(self)):
             return False
 
         if hash(self)==hash(other)\
@@ -578,13 +575,14 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         self.unsigned=True # type: bool
         self.bstretch=kwa.get("bstretch",Bounds()) # type: Bounds
         self.bbias=kwa.get("bbias",Bounds()) # type: Bounds
-        self.pstack=PeakStack()
 
         exp_oligos=no_orientation(self.oligos) # type: List[data.OligoPeak]
         #exp_oligos=list(self.oligos) # type: List[data.OligoPeak] # keep for testing
         self.peaks=OPeakArray.from_oligos(exp_oligos) # type: List[data.OPeakArray]
         self.peaks=sorted(self.peaks,key=lambda x:-len(x.arr))
         self.__peakset=frozenset(self.peaks) # type: FrozenSet[OPeakArray]
+        self.pstack=PeakStack(min_overl=self.min_overl)
+        self.pstack.add(self.peaks[kwa.get("ref_index",0)])
 
     def filterleftoverlap(self,peaks1,peaks2):
         'returns True if any in (peak1,peak2) tail_overlap'
@@ -598,11 +596,35 @@ class Scaler: # pylint: disable=too-many-instance-attributes
 
         return False
 
-    @abc.abstractmethod
     def stack_fromtuple(self,
                         stack:PeakStack,
                         peakarrs)->List[PeakStack]:
-        'abstract method'
+        '''
+        peakarrs is a list of unscaled OPeakArray objects
+        similar to Scaler.stack_fromtuple but refpeak consist of a single Oligo event
+        '''
+
+        if not peakarrs:
+            return [stack]
+
+        refpeak=stack.top()
+        def cmpfilter(peak):
+            'filter'
+            return self.filterleftoverlap(refpeak,peak)
+
+        stacks=[] # type: List[PeakStack]
+        scperpeak=self.find_rescales(refpeak,[peakarrs[0]],tocmpfilter=cmpfilter)
+
+        toadd=[(peak,scale) for peak,scales in scperpeak.items()
+               for scale in scales if stack.can_add(scale(peak))]
+
+        if not toadd: # check that this condition is correct
+            return [stack]
+
+        for peak,scale in toadd:
+            stacks+=self.stack_fromtuple(stack=stack.add(scale(peak),in_place=False),
+                                         peakarrs=peakarrs[1:])
+        return stacks
 
     @abc.abstractmethod
     def stack_key_fromtuple(self,
@@ -612,6 +634,7 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         'abstract'
 
     # overkill to use networkx if we have trees of depth=2 (source+tip)
+    # and time consuming to recreate trees...
     def incr_build(self,
                    stack:PeakStack,
                    key2fit=None)->List[PeakStack]:
@@ -623,19 +646,27 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         # need to compare the reverse too
         #others=self.__peakset-frozenset(stack.ordered)
         others=self.notin_stack(stack) # to check
-        graph,tips=OPeakArray.list2tree(stack.top(),others,min_overl=self.min_overl,depth=1)
+        tips=OPeakArray.may_overlap(stack.top(),others,min_overl=self.min_overl) # to check
 
-        for tip in tips:
-            for path in networkx.all_simple_paths(graph,source=stack.top(),target=tip):
-                if key2fit is None:
-                    addstacks+=self.stack_fromtuple(stack,path[1:])
-                else:
-                    addstacks+=self.stack_key_fromtuple(key2fit,stack,path[1:])
+        if key2fit is None:
+            for tip in tips:
+                addstacks+=self.stack_fromtuple(stack,(tip,))
+        else:
+            for tip in tips:
+                addstacks+=self.stack_key_fromtuple(key2fit,stack,(tip,))
+
+        # graph,tips=OPeakArray.list2tree(stack.top(),others,min_overl=self.min_overl,depth=1)
+        # for tip in tips:
+        #     for path in networkx.all_simple_paths(graph,source=stack.top(),target=tip):
+        #         if key2fit is None:
+        #             addstacks+=self.stack_fromtuple(stack,path[1:])
+        #         else:
+        #             addstacks+=self.stack_key_fromtuple(key2fit,stack,path[1:])
         # if __debug__:
         #     print(f"len(addstacks)={len(addstacks)}")
         return addstacks
 
-    def run(self,ref_index=0,iteration=1)->List[PeakStack]:
+    def run(self,iteration=1)->List[PeakStack]:
         '''
         ## ORIGINAL PLAN, TOO LONG TO RUN
         # take the 2 peaks in refpeak which are the more closely related
@@ -655,12 +686,12 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         *for each scaled peakarray to an object (Scaffold):
         a Scaffold can only contain 1 copy of a peakarray (modulo scale)
         '''
-        refpeak=self.peaks[ref_index]
-        pstack=PeakStack(min_overl=self.min_overl)
-        pstack.add(refpeak)
+        # refpeak=self.peaks[self.ref_index]
+        # pstack=PeakStack(min_overl=self.min_overl)
+        # pstack.add(refpeak)
 
 
-        pstacks=[pstack]
+        pstacks=[self.pstack]
         # quick and dirty solution for accounting for different starting sequences.
         # duplicate them (any combination for arr in peaks[0])
         # or add it when looking for overlaps
@@ -678,17 +709,18 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         fixed=frozenset([]) # type: FrozenSet[PeakStack]
         key2fit=getattr(self,"key2fit",None)
         for _ in range(iteration):
+            if __debug__:
+                print(f"iteration={_}")
+                print(f'len(pstacks)={len(pstacks)}')
+                print(f'fixed,pstacks={len(fixed),len(pstacks)}')
             new_stacks=[] # type: List[PeakStack]
             for stack in pstacks:
-                #if self.__peakset-frozenset(stack.ordered):
-                if self.notin_stack(stack): # to check
-                    toadd=frozenset(self.incr_build(stack,key2fit=key2fit))
-                    if not toadd.symmetric_difference(frozenset([stack])):
-                        fixed=fixed.union(toadd)
-                    else:
-                        new_stacks+=toadd
-                else:
+                toadd=frozenset(self.incr_build(stack,key2fit=key2fit))
+                if stack in toadd:
+                    new_stacks+=list(toadd - frozenset([stack]))
                     fixed=fixed.union([stack])
+                else:
+                    new_stacks+=toadd
             # if __debug__:
             #     print(f"len(fixed)={len(fixed)}")
             pstacks=frozenset(new_stacks)
@@ -699,6 +731,7 @@ class Scaler: # pylint: disable=too-many-instance-attributes
 
         return list(pstacks.union(fixed))
 
+    # long
     def notin_stack(self,
                     stack:PeakStack)->FrozenSet[OPeakArray]:
         '''
@@ -760,8 +793,6 @@ class SubScaler(Scaler):
 
     def __init__(self,**kwa):
         super().__init__(**kwa)
-        self.pstack=PeakStack()
-        self.pstack.add(self.peaks[kwa.get("ref_index",0)])
         self.__posid=kwa.get("posid",0) # type: int # id of pstack.posarr
         self._key2fit=self.pstack.keys[self.__posid] # type: float
 

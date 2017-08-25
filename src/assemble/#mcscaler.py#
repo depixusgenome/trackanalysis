@@ -113,7 +113,7 @@ class Score(PeakSetting):
                                       signs=(0,0),
                                       shift=1)
         self.__func=func
-
+<
     def __call__(self,state):
         return self.score_state(state)
 

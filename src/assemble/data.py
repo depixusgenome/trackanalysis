@@ -22,6 +22,7 @@ class Oligo:
     seq="" # type: str
     pos=-1 # type: int
     bpos=-1 # type: int # base position
+    signed=1 # type: int # True, False
     @initdefaults
     def __init__(self,**kwa):
         pass

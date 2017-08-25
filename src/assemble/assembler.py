@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-u'''
+'''
 regroups functions and classes to initialise assemblers
 '''
 
@@ -26,22 +26,22 @@ from . import stepper
 LOGS = getLogger(__name__)
 
 def print_state(xstate, func, accepted): # pylint: disable=unused-argument
-    u'''use this to print the state at each Monte Carlo step
+    '''use this to print the state at each Monte Carlo step
     '''
     LOGS.info("at minimum %.4f accepted %d", func, int(accepted))
 
 def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argument
-    u'''use this minimizer to avoid minimization step in basinhopping
+    '''use this minimizer to avoid minimization step in basinhopping
     '''
     return OptimizeResult(x=xinit, fun=fun(xinit), success=True, nfev=1)
 
 class NestedAsmrs:
-    u'''
+    '''
     nested Monte Carlo running different random seeds in parallel
     should update the temperature based on each asmrs
     '''
     def __init__(self,**kwargs):
-        u'''
+        '''
         duplicate an Assembler object for different seeds value
         '''
         self.nprocs = kwargs.get("nprocs",1) # type: int
@@ -59,12 +59,12 @@ class NestedAsmrs:
                 self._pool = None
 
     def __del__(self,):
-        u'closes pool'
+        'closes pool'
         if not self._pool is None:
             self._pool.close()
 
     def run(self,niter:int=1):
-        u'''run in parallel each asmrs
+        '''run in parallel each asmrs
         '''
         if self._pool is None:
             for asmr in self.asmrs:
@@ -75,17 +75,17 @@ class NestedAsmrs:
 
     @property
     def result(self):
-        u'''results for each of the assemblers'''
+        '''results for each of the assemblers'''
         return [asmr.result for asmr in self.asmrs]
 
     def __getstate__(self):
-        u'for pickling'
+        'for pickling'
         self_dict = self.__dict__.copy()
         del self_dict["_pool"]
         return self_dict
 
     def __setstate__(self,state):
-        u'reassign nprocs worker to the _pool'
+        'reassign nprocs worker to the _pool'
         try:
             _pool = Pool(processes=state["nprocs"])
         except OSError:
@@ -99,17 +99,15 @@ def _run_asmr(*args):
     asmr.run(**args[0][1])
     return asmr
 
-
-
 def adjust_T(nested:NestedAsmrs):
-    u'modifies the temperature of the NestedAsmrs to increase mixing'
+    'modifies the temperature of the NestedAsmrs to increase mixing'
     # read fun values
     all_fun = [i.fun for i in nested.result]
     all_fun.sort()
     nested.T = all_fun[-1]-all_fun[0]
 
 class Assembler:
-    u'''
+    '''
     parent class for assemblers
     '''
     def __init__(self,**kwargs):
@@ -123,11 +121,11 @@ class Assembler:
             self.npstate = numpy.random.RandomState(seed)
 
     def run(self,*args,**kwargs):
-        u'runs the assembler'
+        'runs the assembler'
         pass
 
 class MCAssembler(Assembler):
-    u'''
+    '''
     Monte Carlo for assembling sequences from oligohits
     '''
 
@@ -140,7 +138,7 @@ class MCAssembler(Assembler):
         self.step = kwargs.get("step",stepper.HoppingSteps())
 
     def run(self,*args,**kwargs)->None: # pylint:disable = unused-argument
-        u'''runs a specified number of steps
+        '''runs a specified number of steps
         '''
         if "niter" not in kwargs.keys():
             kwargs["niter"]=1
@@ -161,13 +159,13 @@ class MCAssembler(Assembler):
         self._update(self.result)
 
     def _update(self,result:OptimizeResult):
-        u'''
+        '''
         update the simulator from result
         '''
         self.state = result.x
 
 def acceptance(): # could implement
-    u'''
+    '''
     provides arg for accept_test
     complements MH-acceptance ratio
     can return "force accept" to escape local minima
@@ -177,5 +175,5 @@ def acceptance(): # could implement
 
 
 def force_accept(*args,**kwargs):# pylint: disable=unused-argument
-    u'for testing purposes'
+    'for testing purposes'
     return "force accept"

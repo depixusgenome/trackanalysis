@@ -222,8 +222,6 @@ class Shuffler:
             #         testmerged=data.OligoPerm.add(*testpart.perms) # pylint: disable=unused-variable
             #         print("ok")
 
-            if __debug__:
-                pickle.dump(partitions,open(f"parts_index{index}.pickle","wb"))
             resume_parts=data.Partition.reduce_partitions(partitions,index)
             partitions=resume_parts
 
