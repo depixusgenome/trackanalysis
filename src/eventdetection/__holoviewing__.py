@@ -46,7 +46,7 @@ def display(self,       # pylint: disable=function-redefined
         * *tpe*: can be scatter or curve.
         * *overlay*: if *False*, all data is concatenated into one array.
     """
-    return Display.cycles(self, kdim, labels, tpe, overlay, **opts)
+    return EventDisplay.cycles(self, kdim, labels, tpe, overlay, **opts)
 
 @addto(Events)  # type: ignore
 def map(self, fcn, kdim = None, **kwa): # pylint: disable=redefined-builtin,function-redefined
