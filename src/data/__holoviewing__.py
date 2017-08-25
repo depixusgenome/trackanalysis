@@ -10,6 +10,7 @@ from   itertools                import chain, repeat
 import numpy                    as np
 import holoviews                as hv
 from   utils.decoration         import addto
+from   .track                   import FOV
 from   .trackitems              import Beads, Cycles
 
 from   .__scripting__           import ExperimentList, Track
@@ -129,8 +130,8 @@ def display(self,
     """
     return Display.beads(self, kdim, labels, tpe, overlay, **opts)
 
-@addto(Cycles)   # type: ignore
-def display(self,       # pylint: disable=function-redefined
+@addto(Cycles)                          # type: ignore
+def display(self,                       # pylint: disable=function-redefined
             kdim    = 'bead',
             labels  = None,
             tpe     = 'curve',
@@ -152,12 +153,12 @@ def display(self,       # pylint: disable=function-redefined
     return Display.cycles(self, kdim, labels, tpe, overlay, **opts)
 
 @addto(Track, Beads)
-def map(self, fcn, **kwa): # pylint: disable=redefined-builtin
+def map(self, fcn, **kwa):              # pylint: disable=redefined-builtin
     "returns a hv.DynamicMap with beads and kwargs in the kdims"
     kwa.setdefault('bead', list(i for i in self.keys()))
     return hv.DynamicMap(partial(fcn, self), kdims = list(kwa)).redim.values(**kwa)
 
-@addto(Cycles)  # type: ignore
+@addto(Cycles)                          # type: ignore
 def map(self, fcn, kdim = None, **kwa): # pylint: disable=redefined-builtin,function-redefined
     "returns a hv.DynamicMap with beads or cycles, as well as kwargs in the kdims"
     if kdim is None:
@@ -185,5 +186,29 @@ def keymap(self:ExperimentList, key, fcn, **kwa):
     print(key, beads)
     return (hv.DynamicMap(fcn, kdims = ['bead']+list(kwa))
             .redim.values(bead = beads, **kwa))
+
+@addto(FOV)        # type: ignore
+def display(self,  # pylint: disable=function-redefined
+            beads    = None,
+            colorbar = True,
+            ptcolor  = 'lightblue',
+            txtcolor = 'blue'):
+    "displays the FOV with bead positions"
+    (xslope, xbias), (yslope, ybias) = self.dim
+    raw = self.image
+    bnd = (xbias, ybias, xbias+raw.shape[0]*xslope, ybias+raw.shape[1]*yslope)
+
+    if beads is None:
+        beads = self.beads.keys()
+
+    good  = {i: j[:2] for i, j in self.beads.items() if i in beads}
+    xvals = [i         for i, _ in good.values()]
+    yvals = [bnd[-1]-i for _, i in good.values()]
+    txt   = [f'{i}'    for i    in good.keys()]
+
+    return hv.Overlay([hv.Image(self.image, bnd)(plot = dict(colorbar = colorbar)),
+                       hv.Points((xvals, yvals))(style = dict(color = ptcolor))]
+                      + [hv.Text(*i)(style = dict(color = txtcolor))
+                         for i in zip(xvals, yvals, txt)])
 
 __all__: List[str] = []

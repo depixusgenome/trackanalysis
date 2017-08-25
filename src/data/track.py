@@ -15,7 +15,10 @@ from   .trackio     import opentrack, PATHTYPES
 
 IDTYPE      = Union[None, int, slice] # missing Ellipsys as mypy won't accept it
 DATA        = Dict[BEADKEY, np.ndarray]
+POSITIONS   = Dict[BEADKEY, Tuple[float, float, float]]
+DIMENSIONS  = Tuple[Tuple[float, float], Tuple[float, float]]
 _PRECISIONS = Dict[BEADKEY, float]
+_LAZIES     = ('fov',  'framerate', 'data', 'path', 'lazy', 'rawprecisions')
 
 class Axis(Enum):
     "which axis to look at"
@@ -30,29 +33,44 @@ class Axis(Enum):
             name += 'axis'
         return cls(name)
 
+class FOV:
+    """
+    Data concerning the FOV
+
+    Dimensions are provided as : (X slope, X bias), (Y slope, Y bias)
+    """
+    image              = np.empty((0,0), dtype = np.uint8)
+    beads:  POSITIONS  = {}
+    dim:    DIMENSIONS = ((1., 0.), (1., 0.))
+    @initdefaults(locals())
+    def __init__(self, **kwa):
+        pass
+
+    @property
+    def scale(self):
+        "The pixel scale: error occurs if the pixel is not square"
+        if abs(self.dim[0][0]-self.dim[1][0]) > 1e-6:
+            raise ValueError("Pixel is not square")
+        return self.dim[0][0]
+
 @levelprop(Level.project)
 class Track:
     "Model for track files. This must not contain actual data."
     _framerate                  = 0.
+    _fov: FOV                   = None
     _phases                     = np.empty((0,9), dtype = 'i4')
     _data:          DATA        = None
     _path:          PATHTYPES   = None
     _rawprecisions: _PRECISIONS = {}
     _lazy                       = True
     axis                        = Axis.Zaxis
-    @initdefaults(('axis',),
-                  framerate     = '_',
-                  phases        = '_',
-                  data          = '_',
-                  path          = '_',
-                  lazy          = '_',
-                  rawprecisions = '_')
+    @initdefaults(('axis',), **{i: '_' for i in _LAZIES + ('phases',)})
     def __init__(self, **_) -> None:
         pass
 
     def __getstate__(self):
         info = self.__dict__.copy()
-        for name in ('path', 'framerate', 'rawprecisions', 'data', 'lazy'):
+        for name in _LAZIES:
             val = info.pop('_'+name)
             if val !=  getattr(type(self), '_'+name):
                 info[name] = val
@@ -69,67 +87,74 @@ class Track:
     def __setstate__(self, values):
         self.__init__(**values)
 
-    def __unlazyfy(self):
+    def __getter(self, name):
         if self._lazy:
             self._lazy = False
             getattr(self, 'data') # call property: opens the file
+        return getattr(self, name)
+
+    def __setter(self, name, val):
+        if self._lazy:
+            self._lazy = False
+            getattr(self, 'data') # call property: opens the file
+        setattr(self, name, val)
+        return getattr(self, name)
 
     @property
     def phases(self) -> np.ndarray:
         "returns the number of cycles in the track file"
-        self.__unlazyfy()
-        return self._phases
+        return self.__getter('_phases')
 
     @phases.setter
-    def phases(self, vals) -> np.ndarray:
+    def phases(self, val) -> np.ndarray:
         "returns the number of cycles in the track file"
-        self.__unlazyfy()
-        self._phases = vals
-        return self._phases
+        return self.__setter('_phases', val)
 
     @property
     def framerate(self) -> float:
         "returns the frame rate"
-        self.__unlazyfy()
-        return self._framerate
+        return self.__getter('_framerate')
 
     @framerate.setter
     def framerate(self, val) -> float:
         "returns the frame rate"
-        self.__unlazyfy()
-        self._framerate = val
-        return self._framerate
+        return self.__setter('_framerate', val)
+
+    @property
+    def fov(self) -> np.ndarray:
+        "returns the FOV"
+        return self.__getter('_fov')
+
+    @fov.setter
+    def fov(self, val) -> np.ndarray:
+        "returns the FOV"
+        return self.__setter('_fov', val)
 
     @property
     def ncycles(self) -> int:
         "returns the number of cycles in the track file"
-        self.__unlazyfy()
-        return len(self._phases)
+        return len(self.__getter('_phases'))
 
     @property
     def nphases(self) -> Optional[int]:
         "returns the number of phases in the track"
-        self.__unlazyfy()
-        return self._phases.shape[1]
+        return self.__getter('_phases').shape[1]
 
     def phaseduration(self, cid:IDTYPE, pid:IDTYPE) -> Union[int, np.ndarray]:
         "returns the duration of the cycle and phase"
-        self.__unlazyfy()
-
+        phases = self.__getter('_phases')
         if pid in _m_ALL:
             ix1, ix2 = 0, -1
         elif isinstance(pid, int):
-            if pid in (-1, self._phases.shape[1]):
-                return np.insert(self._phases[0,1:]-self._phases[-1,:-1],
-                                 len(self._phases), np.iinfo('i4').max)
+            if pid in (-1, phases.shape[1]):
+                return np.insert(phases[0,1:]-phases[-1,:-1], len(phases), np.iinfo('i4').max)
             else:
                 ix1, ix2 = pid, pid+1
-        return self._phases[cid,ix2]-self._phases[cid,ix1]
+        return phases[cid,ix2]-phases[cid,ix1]
 
     def phase(self, cid:IDTYPE = None, pid:IDTYPE = None) -> Union[np.ndarray, int]:
         "returns the starttime of the cycle and phase"
-        self.__unlazyfy()
-        vect = self._phases
+        vect = self.__getter('_phases')
         orig = vect[0,0]
         if {cid, pid}.issubset(_m_ALL):
             pass
@@ -152,7 +177,7 @@ class Track:
         self._lazy = False
         self._path = val
 
-        for name in ('_framerate', '_phases'):
+        for name in ('_framerate', '_phases', '_fov'):
             setattr(self, name, deepcopy(getattr((type(self)), name)))
 
         self._data = None

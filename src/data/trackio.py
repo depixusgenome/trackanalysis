@@ -338,8 +338,11 @@ class Handler:
         if kwargs is None:
             res['data'] = {}
         else:
-            res.update(phases    = kwargs.pop('phases'), # type: ignore
-                       framerate = kwargs.pop('framerate'))
+            from .track import FOV
+            res['fov']    = FOV(image = kwargs.pop('fov'),
+                                dim   = kwargs.pop('dimensions'),
+                                beads = kwargs.pop('positions'))
+            res['phases'] = kwargs.pop('phases')
 
             if beadsonly:
                 data = {i: j for i, j in kwargs.items()

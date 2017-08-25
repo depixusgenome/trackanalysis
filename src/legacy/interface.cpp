@@ -4,6 +4,45 @@
 #include "legacy/legacygr.h"
 namespace legacy
 {
+    namespace
+    {
+        template <typename T>
+        pybind11::object _toimage(auto & shape, void *ptr)
+        {
+            std::vector<size_t> strides(2);
+            strides = { shape[1]*sizeof(T), sizeof(T) };
+            std::vector<T> dt(shape[1]*shape[2]);
+            return pybind11::array(shape, strides, (T*) ptr);
+        }
+    }
+
+    pybind11::object _readrecfov(legacy::GenRecord &rec)
+    {
+        int nx, ny, dt;
+        void *ptr = nullptr;
+        pybind11::object res = pybind11::none();
+        try
+        {
+            rec.readfov(nx, ny, dt, ptr);
+
+            std::vector<size_t> shape = {(size_t) ny, (size_t) nx};
+
+            if(dt == 512)
+                res = _toimage<float>(shape, ptr);
+            else if(dt == 256)
+                res = _toimage<unsigned char>(shape, ptr);
+        } catch(...) {};
+
+        rec.destroyfov(dt, ptr);
+        return res;
+    }
+
+    pybind11::object _readfov(std::string name)
+    {
+        legacy::GenRecord rec(name);
+        return rec.ncycles() == 0 ? pybind11::none() : _readrecfov(rec);
+    }
+
     pybind11::object _readtrack(std::string name,
                                 bool notall     = true,
                                 std::string tpe = "")
@@ -40,6 +79,20 @@ namespace legacy
         res["ncycles"]   = pybind11::cast((notall ? -4 : 0) + rec.ncycles());
         res["nphases"]   = pybind11::cast(rec.nphases());
         res["framerate"] = pybind11::cast(rec.camerafrequency());
+        res["fov"]       = _readrecfov(rec);
+
+        pybind11::dict pos;
+        for(auto const & val: rec.pos())
+            pos[pybind11::int_(val.first)] = pybind11::make_tuple(std::get<0>(val.second),
+                                                                  std::get<1>(val.second),
+                                                                  std::get<2>(val.second));
+        res["positions"] = pos;
+
+        auto dim = rec.dimensions();
+        res["dimensions"] = pybind11::make_tuple(pybind11::make_tuple(std::get<0>(dim),
+                                                                      std::get<1>(dim)),
+                                                 pybind11::make_tuple(std::get<2>(dim),
+                                                                      std::get<3>(dim)));
 
         std::vector<size_t> shape   = {rec.ncycles()-(notall ? 4: 0), rec.nphases()};
         std::vector<size_t> strides = {rec.nphases()*sizeof(decltype(cycles)::value_type),
@@ -122,5 +175,7 @@ namespace legacy
                 "Reads a '.gr' file and returns a dictionnary of datasets");
         mod.def("readim", _readim, "path"_a,
                 "Reads a '.gr' file and returns an image");
+        mod.def("fov",    _readfov, "path"_a,
+                "Reads a '.trk' file and returns the FOV image");
     }
 }

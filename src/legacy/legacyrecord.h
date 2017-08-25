@@ -4,6 +4,7 @@
 #include <string>
 #include <exception>
 #include <vector>
+#include <map>
 
 namespace legacy
 {
@@ -29,12 +30,13 @@ namespace legacy
         int    cyclemax () const;
         size_t ncycles  () const;
         size_t nphases  () const;
+        std::tuple<float, float, float, float> dimensions() const;
+
         bool   islost(int i) const;
         void   cycles(int *)            const;
         void   t     (int *)            const;
         void   zmag  (float *)          const;
         void   rot   (float *)          const;
-        void   pos   (float *)          const;
         void   bead  (size_t, float *)  const;
         void   xbead (size_t, float *)  const;
         void   ybead (size_t, float *)  const;
@@ -42,7 +44,6 @@ namespace legacy
         void   t     (std::vector<int>    & x) const { x.resize(nrecs());   t     (x.data()); }
         void   zmag  (std::vector<float>  & x) const { x.resize(nrecs());   zmag  (x.data()); }
         void   rot   (std::vector<float>  & x) const { x.resize(nrecs());   rot   (x.data()); }
-        void   pos   (std::vector<float>  & x) const { x.resize(nbeads()*2);pos   (x.data()); }
         void   bead  (size_t i, std::vector<float> & x) const
         { x.resize(nrecs()); bead(i, x.data()); }
         void   xbead (size_t i, std::vector<float> & x) const
@@ -50,11 +51,13 @@ namespace legacy
         void   ybead (size_t i, std::vector<float> & x) const
         { x.resize(nrecs()); ybead(i, x.data()); }
 
+        bool   readfov(int &nx, int &ny, int &dt, void *& ptr);
+        void   destroyfov(int dt, void *& ptr);
+        std::map<int, std::tuple<float, float, float>> pos()  const;
 
         std::vector<int  >  t     ()         const { decltype(t   ())   x; t   (x);     return x; }
         std::vector<float>  zmag  ()         const { decltype(zmag())   x; zmag(x);     return x; }
         std::vector<float>  rot   ()         const { decltype(rot ())   x; rot (x);     return x; }
-        std::vector<float>  pos   ()         const { decltype(pos ())   x; pos (x);     return x; }
         std::vector<float>  bead  (size_t i) const { decltype(bead(0))  x; bead(i, x);  return x; }
         std::vector<float>  xbead (size_t i) const { decltype(bead(0))  x; xbead(i, x); return x; }
         std::vector<float>  ybead (size_t i) const { decltype(bead(0))  x; ybead(i, x); return x; }

@@ -110,7 +110,7 @@ def cleancycles(self):
 def measures(self):
     "returns cleaned cycles for phase 5 only"
     phase = scriptapp.control.getGlobal('config').phase.measure.get()
-    return self.cleaned.withphases(phase)
+    return self.cleancycles.withphases(phase)
 
 @addto(_Track) # type: ignore
 @property

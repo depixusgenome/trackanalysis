@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <cmath>
 #include <limits>
+#include <assert.h>
 
 // structures : record.h ...
 namespace legacy
@@ -512,18 +513,29 @@ namespace legacy
 {
     namespace
     {
-        constexpr static int const PAGE_BUFFER_SIZE = 4096;
-        constexpr static int const F_EVA_DECAY  = 62;
-        constexpr static int const F_EVA_OFFSET = 61;
-        constexpr static int const I_EVANESCENT_MODE = 62;
-        constexpr static int const I_SDI_MODE = 61;
+        constexpr static int const PAGE_BUFFER_SIZE              = 4096;
+        constexpr static int const F_EVA_DECAY                   = 62;
+        constexpr static int const F_EVA_OFFSET                  = 61;
+        constexpr static int const I_EVANESCENT_MODE             = 62;
+        constexpr static int const I_SDI_MODE                    = 61;
         constexpr static int const XY_TRACKING_TYPE_DIFFERENTIAL = 0x01;
         constexpr static int const XY_BEAD_PROFILE_RECORDED      = 0x04;
         constexpr static int const XY_BEAD_DIFF_PROFILE_RECORDED = 0x08;
         constexpr static int const XYZ_ERROR_RECORDED            = 0x10;
         constexpr static int const RECORD_BEAD_IMAGE             = 0x20;
+        constexpr static int const IS_INT_IMAGE                  = 128;
         constexpr static int const IS_CHAR_IMAGE                 = 256;
-        constexpr static int const IS_UINT_IMAGE                 = 131072;
+        constexpr static int const IS_FLOAT_IMAGE                = 512;
+        constexpr static int const IS_COMPLEX_IMAGE              = 64;
+        constexpr static int const IS_RGB_PICTURE                = 16384;   // 0x4000
+        constexpr static int const IS_BW_PICTURE                 = 32768;  // 0x8000
+        constexpr static int const IS_UINT_IMAGE                 = 131072;  // 0x20000
+        constexpr static int const IS_LINT_IMAGE                 = 262144;  // 0x40000
+        constexpr static int const IS_RGBA_PICTURE               = 524288;  // 0x80000
+        constexpr static int const IS_DOUBLE_IMAGE               = 0x200000;
+        constexpr static int const IS_COMPLEX_DOUBLE_IMAGE       = 0x400000;
+        constexpr static int const IS_RGB16_PICTURE              = 0x800000;
+        constexpr static int const IS_RGBA16_PICTURE             = 0x100000;
 
 #   ifdef _WIN32
         long long my_ulclocks_per_sec = 0;
@@ -4575,6 +4587,98 @@ namespace legacy
         }
         return g_r;
     }
+
+    int _get_image_stats(gen_record *g_r, int & nx, int & ny, int & data_type)
+    {
+        FILE *fp = NULL;
+        int file_error = 0;
+        long pos = 0;
+
+        fp = fopen(g_r->fullname, "rb+");
+        if (fp == NULL)
+            return {};
+
+        pos = 9 * sizeof(int) + g_r->in_bead * (3 * sizeof(int)) + sizeof(unsigned int); //todo : fix time_t system
+        pos += sizeof(long long) + 512 * sizeof(char) + 64 * sizeof(int) + 64 * sizeof(float);
+        pos += 4 * sizeof(float);
+        fseek(fp, pos, SEEK_SET);      // we go to file end
+
+        if (fread(&nx, sizeof(int), 1, fp) != 1)
+            file_error++;
+
+        if (fread(&ny, sizeof(int), 1, fp) != 1)
+            file_error++;
+
+        if (fread(&data_type, sizeof(int), 1, fp) != 1)
+            file_error++;
+
+        fclose(fp);
+        return file_error;
+    }
+
+    template <typename T>
+    void * _read(int nx, int ny, FILE * fp)
+    { 
+        auto table = new T[nx*ny];
+        auto sz = fread(table, sizeof(T), nx*ny, fp); 
+        sz += 1;
+        return (void*) table;
+    }
+
+    int _read_mic_image(gen_record *g_r,
+                        int & nx, int & ny, int & data_type, void *&ptr)
+    {
+        FILE *fp = NULL;
+        int file_error = 0;
+        long pos = 0;
+
+        fp = fopen(g_r->fullname, "rb+");
+        if (fp == NULL)
+            return {};
+
+        pos = 9 * sizeof(int) + g_r->in_bead * (3 * sizeof(int)) + sizeof(unsigned int); //todo : fix time_t system
+        pos += sizeof(long long) + 512 * sizeof(char) + 64 * sizeof(int) + 64 * sizeof(float);
+        pos += 4 * sizeof(float);
+        fseek(fp, pos, SEEK_SET);      // we go to file end
+
+        if (fread(&nx, sizeof(int), 1, fp) != 1)
+            file_error++;
+
+        if (fread(&ny, sizeof(int), 1, fp) != 1)
+            file_error++;
+
+        if (fread(&data_type, sizeof(int), 1, fp) != 1)
+            file_error++;
+
+        if (data_type == IS_CHAR_IMAGE)
+            ptr = _read<char>(nx, ny, fp);
+        else if (data_type == IS_RGB_PICTURE)
+            assert(false);
+        else if (data_type == IS_RGBA_PICTURE)
+            assert(false);
+        else if (data_type == IS_RGB16_PICTURE)
+            assert(false);
+        else if (data_type == IS_RGBA16_PICTURE)
+            assert(false);
+        else if (data_type == IS_INT_IMAGE)
+            ptr = _read<short int>(nx, ny, fp);
+        else if (data_type == IS_UINT_IMAGE)
+            ptr = _read<unsigned short int>(nx, ny, fp);
+        else if (data_type == IS_LINT_IMAGE)
+            ptr = _read<int>(nx, ny, fp);
+        else if (data_type == IS_FLOAT_IMAGE)
+            ptr = _read<float>(nx, ny, fp);
+        else if (data_type == IS_COMPLEX_IMAGE)
+            assert(false);
+        else if (data_type == IS_DOUBLE_IMAGE)
+            ptr = _read<double>(nx, ny, fp);
+        else if (data_type == IS_COMPLEX_DOUBLE_IMAGE)
+            assert(false);
+        else
+            file_error++;
+        fclose(fp);
+        return file_error;
+    }
 }
 
 // getters
@@ -4669,26 +4773,25 @@ namespace legacy
     void   GenRecord::rot   (float *dt)  const
     { _get(_ptr->rot_mag, 1.0f, 0.0f, dt); }
 
-    void   GenRecord::pos(float *dt)  const
+    std::map<int, std::tuple<float, float, float>> GenRecord::pos()  const
     {
-        for(size_t i = 0; i < nbeads(); ++i)
-            dt[2*i] = dt[2*i+1] = -1;
-
         std::smatch val;
-        std::string flt = "[-+]?(?:\\d+(?:[.,]\\d*)?|[.,]\\d+)(?:[eE][-+]?\\d+)?'\n";
+        std::string flt = "[-+]?(?:\\d+(?:[.,]\\d*)?|[.,]\\d+)(?:[eE][-+]?\\d+)?";
         std::string tmp = "^Bead(\\d+) xcb ("+flt+") ycb ("+flt+") zcb ("+flt+") .*";
         std::regex  patt(tmp.c_str());
 
-        std::string line;
         std::ifstream stream(_name.c_str(), std::ios_base::in | std::ios_base::binary);
+
+        decltype(this->pos()) res;
+        std::string           line;
         while(std::getline(stream, line))
             if(std::regex_match(line, val, patt) && val.size() == 5)
-            {
-                int   bid = 2*std::stoi(val[1]);
-                dt[bid]   = std::stof(val[2]);
-                dt[bid+1] = std::stof(val[3]);
-            }
+                res[std::stoi(val[1])] = {  std::stof(val[2]),
+                                            std::stof(val[3]),
+                                            std::stof(val[4]),
+                                         };
         stream.close();
+        return res;
     }
 
     void   GenRecord::bead  (size_t ibead, float *dt) const
@@ -4722,6 +4825,45 @@ namespace legacy
         return _ptr->b_r[i]->completely_losted;
             //|| _ptr->b_r[i]->calib_im == NULL && _ptr->SDI_mode == 0;
     }
+
+    bool GenRecord::readfov(int &nx, int &ny, int &dt, void *& ptr)
+    {
+        if(_ptr == nullptr)
+            return true;
+        return _read_mic_image(_ptr, nx, ny, dt, ptr) == 0;
+    }
+
+    void GenRecord::destroyfov(int data_type, void *& ptr)
+    {
+        if (data_type == IS_CHAR_IMAGE)
+            delete [] ((char*) ptr);
+        else if (data_type == IS_RGB_PICTURE)
+            assert(false);
+        else if (data_type == IS_RGBA_PICTURE)
+            assert(false);
+        else if (data_type == IS_RGB16_PICTURE)
+            assert(false);
+        else if (data_type == IS_RGBA16_PICTURE)
+            assert(false);
+        else if (data_type == IS_INT_IMAGE)
+            delete [] ((short int*) ptr);
+        else if (data_type == IS_UINT_IMAGE)
+            delete [] ((unsigned short int*) ptr);
+        else if (data_type == IS_LINT_IMAGE)
+            delete [] ((int*) ptr);
+        else if (data_type == IS_FLOAT_IMAGE)
+            delete [] ((float*) ptr);
+        else if (data_type == IS_COMPLEX_IMAGE)
+            assert(false);
+        else if (data_type == IS_DOUBLE_IMAGE)
+            delete [] ((double*) ptr);
+        else if (data_type == IS_COMPLEX_DOUBLE_IMAGE)
+            assert(false);
+        ptr = nullptr;
+    }
+
+    std::tuple<float, float, float, float> GenRecord::dimensions() const
+    { return std::make_tuple(_ptr->dx, _ptr->ax, _ptr->dy, _ptr->ay); }
 
     void GenRecord::open(std::string x)
     {
