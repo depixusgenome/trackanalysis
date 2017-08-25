@@ -7,7 +7,7 @@ non-linearity not implemented (for each OPeakArray)
 import abc
 import itertools
 from typing import List, Tuple, Dict, FrozenSet, Iterable, Generator # pylint:disable=unused-import
-import numpy
+import numpy as np
 import networkx
 from utils import initdefaults
 import assemble.data as data
@@ -94,20 +94,31 @@ class Rescale:
     @property
     def toarr(self):
         'array of stre,bias'
-        return numpy.array([self.stre,self.bias])
+        return np.array([self.stre,self.bias])
 
     def __hash__(self):
         return hash((self.stre,self.bias))
 
     def __eq__(self,other):
         if isinstance(other,type(self)):
-            return all(numpy.isclose(self.toarr,other.toarr,atol=self.atol))
+            return all(np.isclose(self.toarr,other.toarr,atol=self.atol))
         return False
 
-def match_peaks(peaks1:numpy.array,
-                peaks2:numpy.array,
-                bound_stretch:Bounds,
-                bound_bias:Bounds)->List[Rescale]:
+def scale_peaks(peaks1:np.array,
+                peaks2:np.array,
+                bstretch:Bounds,
+                bbias:Bounds)->List[Rescale]:
+    'uses macth_peaks but return Rescale objects'
+    return [Rescale(stre,bias)
+            for stre, bias in match_peaks(peaks1,
+                                          peaks2,
+                                          bstretch,
+                                          bbias)]
+
+def match_peaks(peaks1:np.array,
+                peaks2:np.array,
+                bstretch:Bounds,
+                bbias:Bounds)->List[Tuple[float,float]]:
     '''
     NEEDS TO ACCOUNT FOR PRECISION (not yet implemented,
     missing cases where bounds would discard solutions but not bounds+precision)
@@ -116,8 +127,8 @@ def match_peaks(peaks1:numpy.array,
     returns stretches and biases
 
     # for each index in peaks2:
-    # find indices from peaks1 that are > bound_stretch.min*peaks2
-    # and indices from peaks1 that are < bound_stretch.max*peaks2
+    # find indices from peaks1 that are > bstretch.min*peaks2
+    # and indices from peaks1 that are < bstretch.max*peaks2
     # start with lowest stretch to max stretch
 
     '''
@@ -127,20 +138,23 @@ def match_peaks(peaks1:numpy.array,
     biases=[]
     for pe1 in peaks1:
         for pe2 in peaks2:
-            if bound_bias.nisin(pe1-pe2):
+            if bbias.nisin(pe1-pe2):
                 continue
-            scales.append(Rescale(1,pe1-pe2))
+            scales.append((1,pe1-pe2))
             biases.append(pe1-pe2)
 
-    for bias in list(biases):
+    # for bias in list(biases):
+    for bias in biases:
         for pe2 in peaks2:
-            if numpy.isclose(pe2,0):
+            # if np.isclose(pe2,0):
+            #     continue
+            if not pe2:
                 continue
-            upper=peaks1>=bound_stretch.lower*pe2+bias
-            lower=peaks1<=bound_stretch.upper*pe2+bias
-            tostretch=numpy.array(peaks1)[numpy.logical_and(upper,lower)]
-            for stre in tostretch:
-                scales.append(Rescale((stre-bias)/pe2,bias))
+            upper=peaks1>=bstretch.lower*pe2+bias
+            lower=peaks1<=bstretch.upper*pe2+bias
+            # apply -bias/pe2 to tostretch
+            tostre=(np.array(peaks1)[np.logical_and(upper,lower)]-bias)/pe2
+            scales.extend([(stre,bias) for stre in tostre])
 
     return list(frozenset(scales))
 
@@ -151,7 +165,7 @@ def count_matches(peaks1,peaks2,fprecision=1e-3):
     '''
     count=0
     for peak in peaks1:
-        if numpy.isclose(peak,peaks2,atol=fprecision).any():
+        if np.isclose(peak,peaks2,atol=fprecision).any():
             count+=1
     return count
 
@@ -162,7 +176,7 @@ class OPeakArray:
     each OligoPeak can be either sequence or reverse complement sequence
     Can even include Oligo experiments with different (not reverse_complement) sequences
     '''
-    arr=numpy.empty(shape=(0,),dtype=data.OligoPeak)
+    arr=np.empty(shape=(0,),dtype=data.OligoPeak)
     min_overl=2 # type: int
     rev=data.Oligo.reverse_complement
     uniqueid=-1 # type: int # allows to differentiate single peaks
@@ -176,14 +190,14 @@ class OPeakArray:
         solis=sorted([(oli.seq,oli.pos,oli) for oli in oligos])
         exp=[]
         for values in itertools.groupby(solis,key=lambda x:x[0]):
-            exp.append(OPeakArray(arr=numpy.array([oli[2] for oli in values[1]])))
+            exp.append(OPeakArray(arr=np.array([oli[2] for oli in values[1]])))
         return exp
 
     def matching_seq(self,seq,unsigned=True):
         '''returns the array of position which match seq'''
         if unsigned:
-            return numpy.array([i.pos for i in self.arr if i.seq==seq or self.rev(i.seq)==seq])
-        return numpy.array([i.pos for i in self.arr if i.seq==seq])
+            return np.array([i.pos for i in self.arr if i.seq==seq or self.rev(i.seq)==seq])
+        return np.array([i.pos for i in self.arr if i.seq==seq])
 
     def find_matches(self,other,bstretch,bbias,unsigned=True)->List[Rescale]:
         '''
@@ -205,7 +219,7 @@ class OPeakArray:
         for match in matches:
             arr1=self.matching_seq(match[0])
             arr2=other.matching_seq(match[1])
-            scales+=match_peaks(arr1,
+            scales+=scale_peaks(arr1,
                                 arr2,
                                 bstretch,
                                 bbias)
@@ -214,7 +228,13 @@ class OPeakArray:
     @property
     def posarr(self):
         'array of oligo positions'
-        return numpy.array([oli.pos for oli in self.arr])
+        return np.array([oli.pos for oli in self.arr])
+
+    @posarr.setter
+    def posarr(self,values:np.array):
+        'changes the pos of oligos within the peakarr'
+        for idx,val in enumerate(values):
+            self.arr[idx].pos=val
 
     def __rmul__(self,factor):
         kwa=dict(self.__dict__)
@@ -321,13 +341,13 @@ class OPeakArray:
             oarr=other.posarr
             sarr=(sarr-sarr[0])/max(abs(sarr-sarr[0]))
             oarr=(oarr-oarr[0])/max(abs(oarr-oarr[0]))
-            return all(numpy.isclose(sarr,oarr))
+            return all(np.isclose(sarr,oarr))
         return False
 
 
     def __copy__(self):
         'creates a copy'
-        return type(self)(arr=numpy.array([oli.copy() for oli in self.arr]),
+        return type(self)(arr=np.array([oli.copy() for oli in self.arr]),
                           min_overl=self.min_overl,
                           rev=self.rev)
     def copy(self):
@@ -406,9 +426,9 @@ class PeakStack:
 
     def assign_key(self,peak:data.Oligo)->float:
         'find which stack must be incremented by peak'
-        comp=numpy.array(self.keys)-peak.pos
+        comp=np.array(self.keys)-peak.pos
         try:
-            return numpy.array(self.keys)[comp<=0][-1]
+            return np.array(self.keys)[comp<=0][-1]
         except IndexError:
             return None
 
@@ -448,7 +468,7 @@ class PeakStack:
         returns a PeakArray where each peak is the top of each stack
         In the general case contains peaks with different sequences
         '''
-        return OPeakArray(arr=numpy.array([val[-1] for val in self.stack.values()]))
+        return OPeakArray(arr=np.array([val[-1] for val in self.stack.values()]))
 
     # should include non-linearity in this method
     def add(self,scaled:OPeakArray,in_place=True):
@@ -771,7 +791,7 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         with next keystack
         otherwise returns []
         '''
-        nextkey = stack.keys[numpy.argmax(numpy.array(stack.keys)>key)]
+        nextkey = stack.keys[np.argmax(np.array(stack.keys)>key)]
         first = stack.stack[nextkey][-1].seq
         second = stack.stack[nextkey][0].seq
         if data.Oligo.can_tail_overlap(first,second,min_overl,signed=False,shift=1):
@@ -815,7 +835,7 @@ class SubScaler(Scaler):
         '''
         creates a OPeakArray consisting only of the Oligo event to match
         '''
-        tomatch=stack.top().arr[numpy.abs(stack.top().posarr-self._key2fit).argmin()]
+        tomatch=stack.top().arr[np.abs(stack.top().posarr-self._key2fit).argmin()]
         return OPeakArray.from_oligos([tomatch])[0]
 
     def stack_fromtuple(self,

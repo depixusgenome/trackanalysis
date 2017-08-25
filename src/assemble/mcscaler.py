@@ -67,11 +67,6 @@ class PeakSetting:
         self._seqs=[peak.seqs for peak in value]
         self._fseqs=[seq for seqs in self._seqs for seq in seqs]
 
-    # @property
-    # def pos(self):
-    #     'pos'
-    #     return self.__pos
-
 def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argument
     '''
     use this minimizer to avoid minimization step in basinhopping
@@ -82,16 +77,20 @@ def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argumen
 class Score(PeakSetting):
     'defines a callable with desired params'
     def __init__(self,**kwa):
-        # self.__pos=[] # type: List[numpy.array]
-        # self.__seqs=[] # type: List[Tuple[str, ...]]
-        # self.__fseqs=[] # type: List[str] # flat
-        # self.__peaks=[] # type: List[scaler.OPeakArray]
-        # self.peaks=kwa.get("peaks",[]) # type: List[scaler.OPeakArray]
         super().__init__(**kwa)
         self.__func=self.callpass # type: Callable
         self.min_overl=kwa.get("min_overl",2)
         self.unsigned=kwa.get("unsigned",True)
-
+        seqs=frozenset().union(*[frozenset(pk.seqs) for pk in self.peaks])
+        self.seqs=frozenset([(sq1,sq2)
+                             for sq1,sq2 in itertools.permutations(seqs,2)
+                             if data.Oligo.overlap(sq1,
+                                                   sq2,
+                                                   min_overl=self._min_overl,
+                                                   signs=(0,0),
+                                                   shift=1)])
+        # change the set of ids to consider for adjusting the mcmc
+        self.sub_ids=kwa.get("sub_ids",set(range(len(self.peaks))))
     def callpass(self,*arg,**kwa):
         'pass'
         pass
@@ -100,19 +99,6 @@ class Score(PeakSetting):
     def min_overl(self):
         'min_overl'
         return self._min_overl
-
-
-    @min_overl.setter
-    def min_overl(self,value):
-        self._min_overl=value
-        def func(sq1,sq2):
-            'score'
-            return data.Oligo.overlap(sq1,
-                                      sq2,
-                                      min_overl=self._min_overl,
-                                      signs=(0,0),
-                                      shift=1)
-        self.__func=func
 
     def __call__(self,state):
         return self.score_state(state)
@@ -128,7 +114,7 @@ class Score(PeakSetting):
 
         # sort seq according to npos
         seqs=[pseq[1] for pseq in sorted(zip(fpos,self._fseqs))]
-        return -sum(self.__func(seqs[idx],val) for idx,val in enumerate(seqs[1:]))
+        return -sum([1 for idx,val in enumerate(seqs[1:]) if (seqs[idx],val) in self.seqs])
 
 class StreBiasStep: # pylint: disable=too-many-instance-attributes
     'defines the take_step callable'
