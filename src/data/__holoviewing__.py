@@ -39,11 +39,10 @@ class Display:
     @classmethod
     def run(cls, itms, labels, tpe, overlay, opts): # pylint: disable=too-many-arguments
         "shows overlayed Curve items"
-        good = ((i, j) for i, j in itms if np.any(np.isfinite(j)))
-        if overlay:
-            good = tuple(good)
-        else:
-            good = (('', cls.concat(i for _, i in good)),)
+        good = tuple((i, j) for i, j in itms if np.any(np.isfinite(j)))
+        if not overlay:
+            good = (('', (cls.concat(np.arange(len(i), dtype = 'f4') for _, i in good),
+                          cls.concat(i for _, i in good))),)
         return cls._create(labels, tpe, overlay, opts, good)
 
     @classmethod
