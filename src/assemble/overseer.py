@@ -18,9 +18,7 @@ more difficult to implement but simpler algorithm as a whole
 '''
 
 from typing import List, Generator # pylint: disable=unused-import
-import assemble.scaler as ascaler
-import assemble.shuffler as ashuffler
-import assemble.data as adata  # pylint: disable=unused-import
+from assemble import data,mcscaler, shuffler
 import assemble.scores as scores
 
 class ScorePartition:
@@ -32,36 +30,35 @@ class ScorePartition:
 
     def __call__(self,partition)->Generator:
         for path in partition.paths():
-            perm=adata.OligoPerm.add(*path)
-            kperm=adata.OligoKPerm(oligos=perm.oligos,
-                                   kperm=perm.perm,
-                                   kpermids=perm.permids)
+            perm=data.OligoPerm.add(*path)
+            kperm=data.OligoKPerm(oligos=perm.oligos,
+                                  kperm=perm.perm,
+                                  kpermids=perm.permids)
             yield self.scoring(kperm)
 
-class BaseOverseer:
-    'Overseer Parent Class'
-    def __init__(self,**kwa):
-        self.min_overl=kwa.get("min_overl",2) # type: int
-        self.bbias=kwa.get("bbias",ascaler.Bounds())
-        self.bstretch=kwa.get("bstretch",ascaler.Bounds())
-        self.maxstack=kwa.get("maxstack",4) # type: int
 
-class Overseer(BaseOverseer):
+
+class Overseer(mcscaler.PeakSetting):
     '''
     manages scaler and shuffler
     defines a good sequence alignmenent
     '''
     def __init__(self,**kwa):
         super().__init__(**kwa)
-        self.oligos=kwa.get("oligos",[]) # type: List[adata.OligoPeaks]
-        self.scaler=ascaler.Scaler(oligos=self.oligos,
-                                   bbias=self.bbias,
-                                   bstretch=self.bstretch,
-                                   min_overl=self.min_overl)
-        self.shuffler=ashuffler.Shuffler(oligos=self.oligos,
-                                         ooverl=self.min_overl)
+        # self.oligos=kwa.get("oligos",[]) # type: List[data.OligoPeaks]
+        # self.scaler=scaler.Scaler(oligos=self.oligos,
+        #                            bbias=self.bbias,
+        #                            bstretch=self.bstretch,
+        #                            min_overl=self.min_overl)
 
-        self.score=ScorePartition(ooverl=self.min_overl)
+        self.scaler=mcscaler.SeqHoppScaler()
+        # shift to  mcscaler.SeqHoppScaler(**self.__dict__)
+
+        self.shuffler=shuffler.Shuffler() # not really necessary except for debugging
+        # self.shuffler=shuffler.Shuffler(oligos=self.oligos,
+        #                                 ooverl=self.min_overl)
+
+        #self.score=ScorePartition(ooverl=self.min_overl)
 
     def run(self):
         '''
@@ -72,8 +69,22 @@ class Overseer(BaseOverseer):
         discard worse solution
         resume
         '''
-        stacks=self.scaler.run(iteration=self.maxstack)
-        print(f"len(stacks)={len(stacks)}")
+
+        for it in range(5):
+            print(f"it={it}")
+            scales=self.scaler.run()
+            # translate scales to peaks and to oligos
+            scaled=[val[0]*self.peaks[idx]+val[1] for idx,val in enumerate(scales)]
+            oligos=sorted([oli for peak in scaled for oli in peak],
+                          key=lambda x:x.pos)
+            # each oligos is then separated by 1.1 nm
+            
+            # problem, havent considered signs of oligos...
+            self.shuffler=shuffler.Shuffler(oligos=oligos,
+                                            min_overl=self.min_overl)
+            
+        # stacks=self.scaler.run(iteration=self.maxstack)
+        # print(f"len(stacks)={len(stacks)}")
         # toshuffle=list(frozenset(tuple (val) for stack in stacks for val in stack.stack.values()))
         # pathscores=[] # type: List[scores.ScoredPerm]
         # for elmt in toshuffle:
@@ -96,4 +107,4 @@ class Overseer(BaseOverseer):
         #     print(f"iterating scaler resume {_}")
         #     stacks=self.scaler.resume(pstacks=stacks,iteration=self.maxstack)
         #     print(f"len(stacks)={len(stacks)}")
-        return stacks
+        pass
