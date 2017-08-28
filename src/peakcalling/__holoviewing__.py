@@ -16,6 +16,39 @@ Tasks:   type = sys.modules['model.__scripting__'].Tasks
 class PeaksDisplay(Display): # type: ignore
     "displays the events"
     # pylint: disable=too-many-arguments,arguments-differ
+    @staticmethod
+    def __histogram(det, params, opts, estyle):
+        xvals = np.arange(len(det.histogram))*det.binwidth+det.minvalue
+        xvals = (xvals-params[1])*params[0]
+        return hv.Curve((xvals, det.histogram), **opts)(style = estyle)
+
+    @staticmethod
+    def __events(det, params, opts, estyle, hist):
+        peaks = (np.concatenate(det.positions)-params[1])*params[0]
+        yvals = [hist[i] for i in peaks]
+        return hv.Scatter((peaks, yvals), **opts)(style = estyle)
+
+    @staticmethod
+    def __errors(arr):
+        good = [np.nanmean(i[1] if isinstance(i, tuple) else np.concatenate(i['data']))
+                for i in arr if i is not None]
+        return 0. if len(good) == 1 else np.std(good)
+
+    @classmethod
+    def __errorbars(cls, evts, det, params, opts, pstyle, hist):
+        means = [((i-params[1])*params[0], cls.__errors(j))
+                 for i, j in evts.config.details2output(det)]
+        vals  = [(i, hist[i], j) for i, j in means]
+        opts  = dict(opts)
+        otps['vdims'] = ['events', 'zerror']
+        return hv.ErrorBars(vals, **opts)(style = pstyle)
+
+    @staticmethod
+    def __peaks(evts, det, params, opts, pstyle, hist):
+        means = [(i-params[1])*params[0] for i, _ in evts.config.details2output(det)]
+        yvals = [hist[i] for i in means]
+        return hv.Scatter((means, yvals), **opts)(style = pstyle)
+
     @classmethod
     def elements(cls, evts, labels, **opts):
         "shows overlayed Curve items"
@@ -24,27 +57,20 @@ class PeaksDisplay(Display): # type: ignore
         estyle = opts.pop('eventstyle', dict(size = 3))
         opts.setdefault('kdims', ['z'])
         opts.setdefault('vdims', ['events'])
-        stretch = opts.pop('stretch', 1.)
-        bias    = opts.pop('bias', 0.)
-
-        itms    = []
+        params = opts.pop('stretch', 1.), opts.pop('bias', 0.)
+        itms   = []
         for bead in evts.keys():
             det   = evts.detailed(bead, prec)
-            xvals = np.arange(len(det.histogram))*det.binwidth+det.minvalue
-            xvals = (xvals-bias)*stretch
+
             if labels is not False:
                 opts['label'] = 'histogram'
-            itms.append(hv.Curve((xvals, det.histogram), **opts)(style = estyle))
+            itms.append(cls.__histogram(det, params, opts, estyle))
+            itms.append(cls.__events   (det, params, opts, estyle, itms[-1]))
 
-            xvals = (np.concatenate(det.positions)-bias)*stretch
-            yvals = [itms[-1][i] for i in xvals]
-            itms.append(hv.Scatter((xvals, yvals), **opts)(style = estyle))
-
-            xvals = [(i-bias)*stretch for i, _ in evts.config.details2output(det)]
-            yvals = [itms[-2][i] for i in xvals]
             if labels is not False:
                 opts['label'] = 'peaks'
-            itms.append(hv.Scatter((xvals, yvals), **opts)(style = pstyle))
+            itms.append(cls.__peaks    (evts, det, params, opts, pstyle, itms[-2]))
+            itms.append(cls.__errorbars(evts, det, params, opts, pstyle, itms[-3]))
         return itms
 
     @classmethod
