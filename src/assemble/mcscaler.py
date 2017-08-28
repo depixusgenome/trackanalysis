@@ -10,7 +10,6 @@ need more efficient sampling of (stretch,bias)
 '''
 
 from typing import List, Tuple, Callable # pylint: disable=unused-import
-import pickle
 import itertools
 import random
 import networkx
@@ -104,6 +103,9 @@ class Score(PeakSetting):
     def __call__(self,state:np.array)->float:
         '''
         scales self.__pos instead of using Rescale.__call__
+        does not consider the signs of oligos nor the constraints
+        (i.e. over estimate the score)
+        check ergodicity
         '''
         npos=[state[2*idx]*self._pos[idx]+state[2*idx+1] for idx in self.ids]
         fpos=[pos for ppos in npos for pos in ppos] # flat
@@ -111,6 +113,14 @@ class Score(PeakSetting):
         # sort seq according to npos
         seqs=[pseq[1] for pseq in sorted(zip(fpos,fseqs))]
         return -sum([1 for idx,val in enumerate(seqs[1:]) if (seqs[idx],val) in self.pairseqs])
+
+
+    def sign_oligos(self,state:np.array):
+        '''
+        given a state, returns the signs for each oligos which minimises the score
+        can't use networkx to find minimal path, in most cases, no paths
+        '''
+        pass
 
 class StreBiasStep: # pylint: disable=too-many-instance-attributes
     'defines the take_step callable'
@@ -173,36 +183,6 @@ class StreBiasStep: # pylint: disable=too-many-instance-attributes
             dist=scipy.stats.multivariate_normal(mean=args[0],cov=self.cov)
             return dist.rvs()
         return np.array([])
-
-
-
-# will not work if any peaks[1:] can't match peaks[0]
-# class StreBiasGenerator(PeakSetting):
-#     '''
-#     sample more efficiently (stretch,bias) for mcmc
-#     '''
-#     def __init__(self,**kwa):
-#         super().__init__(**kwa)
-#         self.bstretch=kwa.get("bstretch",scaler.Bounds())
-#         self.bbias=kwa.get("bbias",scaler.Bounds())
-#         self.noise=scipy.stats.norm(loc=0,scale=0.1).rvs
-#         self.matches=[[scale.toarr
-#                        for scale in scaler.scale_peaks(self.peaks[0].posarr,
-#                                                        peak.posarr,
-#                                                        self.bstretch,
-#                                                        self.bbias)] for peak in self.peaks[1:]]
-#         self.lengths=[len(val) for val in self.matches]
-
-
-
-#     def __call__(self,*args,**kwargs):
-#         # naive version:
-#         # for each peak pick a scale and apply a small random noise on the bias
-#         noise=self.noise(size=len(self.peaks[1:]))
-#         scales=[match[np.random.randint(self.lengths[idx])]+np.array([0,noise[idx]])
-#                 for idx,match in enumerate(self.matches)]
-#         return np.array([1,0]+[val for scl in scales for val in scl])
-
 
 class SeqUpdate(PeakSetting):
     '''
@@ -306,41 +286,3 @@ class SeqHoppScaler(PeakSetting):
             state=curr_res.x
 
         return state
-if __name__=='__main__':
-    UNSIGNED= True
-    MIN_OVERL=2
-    BBIAS=scaler.Bounds(-6,6)
-    BSTRETCH=scaler.Bounds(0.95,1.05)
-
-    OLIGOS=pickle.load(open("oligos_sd1_os3.pickle","rb"))
-
-    SCA=scaler.SubScaler(oligos=OLIGOS,
-                         min_overl=MIN_OVERL,
-                         bstretch=BSTRETCH,
-                         bbias=BBIAS,
-                         posid=0)
-    PEAKS=SCA.peaks
-
-
-    # compute all (strech,bias) that any exp can take when fitting to any other
-    # make a graph
-    GRAPH=make_graph(PEAKS,BSTRETCH,BBIAS,MIN_OVERL,UNSIGNED)
-    # we fix the experiment with maximal number of peaks
-    # for each node in graph compute (stretch,bias) possible
-    SCALES={(p1,p2):p1.find_matches(p2,BSTRETCH,BBIAS,unsigned=UNSIGNED)
-            for p1 in GRAPH.nodes()
-            for p2 in networkx.neighbors(GRAPH,p1)
-            if p2!=PEAKS[0]}
-
-
-
-
-    SCORING=Score(peaks=PEAKS,min_overl=MIN_OVERL,unsigned=UNSIGNED)
-    print("score set")
-    STEP=StreBiasStep(bstretch=BSTRETCH,bbias=BBIAS,size=len(PEAKS),sample="uniform")
-    STATE_INIT=STEP()
-    RESULT=basinhopping(func=SCORING,
-                        x0=STATE_INIT,
-                        niter=1000,
-                        minimizer_kwargs=dict(method=no_minimizer),
-                        take_step=STEP)
