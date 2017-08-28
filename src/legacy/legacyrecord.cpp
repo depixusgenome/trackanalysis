@@ -4786,10 +4786,10 @@ namespace legacy
         std::string           line;
         while(std::getline(stream, line))
             if(std::regex_match(line, val, patt) && val.size() == 5)
-                res[std::stoi(val[1])] = {  std::stof(val[2]),
-                                            std::stof(val[3]),
-                                            std::stof(val[4]),
-                                         };
+	      res[std::stoi(val[1])] = std::make_tuple(std::stof(val[2]),
+						       std::stof(val[3]),
+						       std::stof(val[4])
+						       );
         stream.close();
         return res;
     }
