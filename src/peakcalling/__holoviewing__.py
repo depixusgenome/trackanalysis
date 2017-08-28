@@ -17,10 +17,16 @@ class PeaksDisplay(Display): # type: ignore
     "displays the events"
     # pylint: disable=too-many-arguments,arguments-differ
     @staticmethod
-    def __histogram(det, params, opts, estyle):
+    def __histogram(evts, det, params, norm, opts, estyle):
         xvals = np.arange(len(det.histogram))*det.binwidth+det.minvalue
         xvals = (xvals-params[1])*params[0]
-        return hv.Curve((xvals, det.histogram), **opts)(style = estyle)
+        if norm == 'events':
+            norm = 1./evts.config.histogram.kernelarray().max()
+        elif norm in (1., 'probability'):
+            norm = 1./det.histogram.sum()
+        else:
+            norm = 1.
+        return hv.Curve((xvals, det.histogram*norm), **opts)(style = estyle)
 
     @staticmethod
     def __events(det, params, opts, estyle, hist):
@@ -38,10 +44,9 @@ class PeaksDisplay(Display): # type: ignore
     def __errorbars(cls, evts, det, params, opts, pstyle, hist):
         means = [((i-params[1])*params[0], cls.__errors(j))
                  for i, j in evts.config.details2output(det)]
-        vals  = [(i, hist[i], j) for i, j in means]
-        opts  = dict(opts)
-        otps['vdims'] = ['events', 'zerror']
-        return hv.ErrorBars(vals, **opts)(style = pstyle)
+        xvals = sum(([i-j, i+j, np.NaN] for i, j in means), [])
+        yvals = sum(([hist[i], hist[i], np.NaN] for i, j in means), [])
+        return hv.Curve((xvals, yvals), **opts)(style = pstyle)
 
     @staticmethod
     def __peaks(evts, det, params, opts, pstyle, hist):
@@ -52,25 +57,32 @@ class PeaksDisplay(Display): # type: ignore
     @classmethod
     def elements(cls, evts, labels, **opts):
         "shows overlayed Curve items"
+        opts.pop('sequencestyle', None)
         prec   = opts.pop('precision', None)
-        pstyle = opts.pop('peakstyle',  dict(size = 5, color = 'green'))
-        estyle = opts.pop('eventstyle', dict(size = 3))
+        pstyle = dict(opts.pop('peakstyle',  dict(size = 5, color = 'green')))
+        estyle = dict(opts.pop('eventstyle', dict(size = 3)))
         opts.setdefault('kdims', ['z'])
         opts.setdefault('vdims', ['events'])
         params = opts.pop('stretch', 1.), opts.pop('bias', 0.)
+        zero   = opts.pop('zero', True)
+        norm   = opts.pop('norm', 'events')
         itms   = []
         for bead in evts.keys():
             det   = evts.detailed(bead, prec)
+            if zero:
+                cparams = params[0], params[1]+det.peaks[0]
+            else:
+                cparams = params
 
             if labels is not False:
                 opts['label'] = 'histogram'
-            itms.append(cls.__histogram(det, params, opts, estyle))
-            itms.append(cls.__events   (det, params, opts, estyle, itms[-1]))
+            itms.append(cls.__histogram(evts, det, cparams, norm, opts, estyle))
+            itms.append(cls.__events   (det, cparams, opts, estyle, itms[-1]))
 
             if labels is not False:
                 opts['label'] = 'peaks'
-            itms.append(cls.__peaks    (evts, det, params, opts, pstyle, itms[-2]))
-            itms.append(cls.__errorbars(evts, det, params, opts, pstyle, itms[-3]))
+            itms.append(cls.__peaks    (evts, det, cparams, opts, pstyle, itms[-2]))
+            itms.append(cls.__errorbars(evts, det, cparams, opts, pstyle, itms[-3]))
         return itms
 
     @classmethod
@@ -159,6 +171,8 @@ def display(self, # pylint: disable=function-redefined,too-many-arguments
         * *sequence* and *oligo*: can be used to display dna positions. If
         *fit* is *False*, then the returned dynamic map will have *sequence*,
         *stretch* and *bias* widgets as well as *bead*.
+        * *stretch* and *bias* values can be provided manually
+        * *zero* set to *True* will set the x-axis zero to the first peak position.
         * *fit*: if used in conjunction with *sequence* and *oligo*, each bead
         will be displayed with the best fit sequence.
 
