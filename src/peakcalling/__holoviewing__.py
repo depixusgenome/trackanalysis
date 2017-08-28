@@ -40,7 +40,7 @@ class PeaksDisplay(Display): # type: ignore
                  for i, j in evts.config.details2output(det)]
         vals  = [(i, hist[i], j) for i, j in means]
         opts  = dict(opts)
-        otps['vdims'] = ['events', 'zerror']
+        opts['vdims'] = ['events', 'zerror']
         return hv.ErrorBars(vals, **opts)(style = pstyle)
 
     @staticmethod
