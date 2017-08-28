@@ -22,6 +22,7 @@ class Oligo:
     seq="" # type: str
     pos=-1 # type: int
     bpos=-1 # type: int # base position
+    signed=1 # type: int # True, False
     @initdefaults
     def __init__(self,**kwa):
         pass
@@ -41,14 +42,18 @@ class Oligo:
         return cls.reverse_complement(seq)
 
     @classmethod
-    def do_overlap(cls,ol1:str,ol2:str,min_overl:int=1)->bool:
+    def do_overlap(cls,
+                   ol1:str,
+                   ol2:str,
+                   min_overl:int=1,
+                   shift=0)->bool:
         '''
         returns true if len(tail_overlap(ol1, ol2))>=min_overl
         or len(tail_overlap(ol2, ol1))>=min_overl
         '''
-        if len(cls.tail_overlap(ol1, ol2))>=min_overl:
+        if len(cls.tail_overlap(ol1, ol2,shift=shift))>=min_overl:
             return True
-        if len(cls.tail_overlap(ol2, ol1))>=min_overl:
+        if len(cls.tail_overlap(ol2, ol1,shift=shift))>=min_overl:
             return True
         return False
 
@@ -68,22 +73,24 @@ class Oligo:
         'switch the seq to its reverse complement'
         if in_place:
             self.seq=type(self).rev(self.seq)
+            return
         cpy=self.copy()
         cpy.seq=type(self).rev(self.seq)
         return cpy
 
+    # can be replaced by overlap(cls,ol1,ol2,min_overl=min_overlap,signs=(1,0),shift=0)
     @classmethod
     def can_tail_overlap(cls, # pylint: disable=too-many-arguments
                          ol1:str,
                          ol2:str,
                          min_overlap:int,
-                         oriented=True,
+                         signed=True,
                          shift=0)->bool:
         '''
-        if oriented, orientation is supposed known
+        if signed, orientation is supposed known
         else, also consider reverse_complements of ol2 (NOT OL1)
         '''
-        if oriented:
+        if signed:
             return len(cls.tail_overlap(ol1, ol2,shift=shift))>=min_overlap
         else:
             ols1=[ol1]
@@ -91,6 +98,24 @@ class Oligo:
             for comb in itertools.product(ols1,ols2):
                 if len(cls.tail_overlap(*comb,shift=shift))>=min_overlap:
                     return True
+        return False
+
+    @classmethod
+    def overlap(cls, # pylint: disable=too-many-arguments
+                ol1:str,
+                ol2:str,
+                min_overl:int,
+                signs:Tuple[int,int]=(0,0),
+                shift:int=0)->bool:
+        '''
+        most general form of tail overlap
+        signs is 1 if the associated seq is signed otherwise 0
+        '''
+        ols1=[ol1] if signs[0] else [cls.rev(ol1),ol1]
+        ols2=[ol2] if signs[1] else [cls.rev(ol2),ol2]
+        for comb in itertools.product(ols1,ols2):
+            if len(cls.tail_overlap(*comb,shift=shift))>=min_overl:
+                return True
         return False
 
     def add_to_sequence(self,seq:str)->str:
@@ -160,7 +185,7 @@ class OligoPeak(Oligo):
     appliedbias = 0 # type: float
     @initdefaults
     def __init__(self,**kwa):
-        super().__init__(**kwa)
+        super().__init__()
 
     @property
     def bias(self):
@@ -400,10 +425,12 @@ class Partition:
         if self.domain is None:
             self.domain=frozenset().union(*[prm.domain for prm in self.perms])
 
-        if not self.graph.nodes():
+        if not self.graph.starts:
             for perm in self.perms: # sort perms with max(prm.domain)?
                 self.graph.append(perm)
 
+    # confusing, merges only the perms in self.
+    # not those that are ambiguous
     def merge(self)->OligoPerm:
         'returns the merged perms'
         return OligoPerm.add(*self.perms)
@@ -466,9 +493,6 @@ class Partition:
         for grp in itertools.groupby(keyparts,key=lambda x:x[0]):
             # if they have the same key, ambiguity
             parts=list(i[1] for i in grp[1])
-            #prev_ambi=[]
-            #for part in parts:
-            #    prev_ambi.append([ambi for ambi in part.ambi if ambi])
             perms=frozenset(parts[0].perms).intersection(*[frozenset(part.perms)
                                                            for part in parts[1:]])
             domain=parts[0].domain.intersection(*[frozenset(part.domain)
@@ -481,7 +505,7 @@ class Partition:
             resumep.append(common)
         return resumep
 
-    def paths(self)->Generator:
+    def __paths(self)->Generator:
         '''
         generates all list of OligoPerm from possible combinations of ambiguities
         use networkx.all_simple_path(self.graph,self.graph.start,self.graph.end)
@@ -489,6 +513,16 @@ class Partition:
         for path in self.graph.paths():
             yield path
 
+    # to test # could take the frozenset of sequences generated
+    def paths(self)->Generator:
+        '''
+        calls paths, yields only paths with no conflicting perms
+        '''
+        for path in self.__paths():
+            if any([prm1.domain.intersection(prm2.domain)
+                    for prm1,prm2 in itertools.combinations(path,2)]):
+                pass
+            yield path
 
 class OligoKPerm(OligoPerm):
     '''

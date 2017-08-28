@@ -12,6 +12,7 @@ import itertools
 from typing import Tuple, List, Generator, Dict # pylint: disable=unused-import
 import pickle # pylint: disable=unused-import
 import numpy
+import networkx
 from . import data
 from . import scores
 from . import processor
@@ -33,22 +34,86 @@ from . import _utils as utils
 # OligoPeak to far from one another may not be considered as overlapping
 # must include a stretch,pos score
 
+class PermGenerator:
+    '''
+    generates eligible permutation
+    will need to filter out on permutations within batch
+    A couple things to check:
+    * the kperms are not the same but the ones in here seems more correct
+    due in part to the fact that shift  was not  set to 1 in tail_overlaps
+    leading to additional but unecessary kperms
+    * need to check whether we still need sub (cyclic) permutations. Probably not.
+    * need to generate single kperm [1],[2],[3] for (1,2,3)
+    '''
+
+    def __init__(self,**kwa):
+        'creates the full graph from oligos'
+        self.ooverl=kwa.get("ooverl",-1)
+        self.graph=networkx.DiGraph()
+        self.__oligos=kwa.get("oligos",[]) # type: List[data.Oligo]
+        self.__gengraph()
+
+    @property
+    def oligos(self):
+        'oligos'
+        return self.__oligos
+
+    @oligos.setter
+    def oligos(self,values):
+        'setter'
+        self.__oligos=values
+        self.graph.clear()
+        self.__gengraph()
+
+    def __gengraph(self)->None:
+        'creates the graph corresponding to the sorted group of oligos'
+        tail=data.Oligo.tail_overlap
+        edges=[(idx,idx+1) for idx in range(len(self.oligos))]
+        if self.ooverl>0:
+            for idx1,idx2 in itertools.permutations(range(len(self.oligos)),2):
+                if len(tail(self.oligos[idx1].seq,self.oligos[idx2].seq,shift=1))==self.ooverl:
+                    edges+=[(idx1,idx2)]
+
+        self.graph.add_edges_from(frozenset(edges))
+
+    def find_kpermids(self,group:Tuple[int, ...])->Generator:
+        'find eligible permutation within the subgraph group'
+        subgraph=self.graph.subgraph(group)
+        for oli1,oli2 in itertools.permutations(subgraph.nodes(),2):
+            for perm in networkx.all_simple_paths(subgraph,source=oli1,target=oli2):
+                yield tuple(perm)
+
+    def find_kperms(self,group:Tuple[int, ...])->Generator:
+        'generates '
+        for prmid in self.find_kpermids(group):
+            yield data.OligoKPerm(oligos=self.oligos,
+                                  kperm=[self.oligos[i] for i in prmid],
+                                  kpermids=numpy.array(prmid))
+
 class Shuffler:
-    u'align oligo by maximising the overlap one index at a time'
+    'align oligo by maximising the overlap one index at a time'
     def __init__(self,**kwa):
 
         oligos=kwa.get("oligos",[]) # type: data.OligoPeak
         #self.collection=kwa.get("collection",data.BCollection()) # type:data.BCollection
         self.ooverl=kwa.get("ooverl",-1) # type: int
         self.nscale=kwa.get("nscale",1) # type: int
+        self.permgen=PermGenerator(ooverl=self.ooverl)
 
         if oligos:
             self.collection=data.BCollection.from_oligos(oligos)
+            self.permgen.oligos=self.collection.oligos
+
 
     @property
     def oligos(self):
         '(ordered) oligos from self.collection'
         return self.collection.oligos
+
+    @oligos.setter
+    def oligos(self,values):
+        self.collection=data.BCollection.from_oligos(values)
+        self.permgen.oligos=self.collection.oligos
 
     # to pytest
     @staticmethod
@@ -57,6 +122,7 @@ class Shuffler:
                             index:int):
         'increments the noverlaps value up to index'
         for partid,part in enumerate(partitions):
+            # should be ok but needs checking
             merged=part.merge() # careful, merge merges only common perms in case of ambiguities
             if __debug__:
                 if not all(i in part.domain for i in range(index)):
@@ -73,6 +139,7 @@ class Shuffler:
 
         return
 
+    # still long
     @classmethod
     def construct_scaffold(cls,
                            base:data.Partition,
@@ -139,6 +206,7 @@ class Shuffler:
             print(f"index={index}")
             add_kperms=[kpr for kpr in full_kperms if kpr.span.intersection({index})]
             added_partitions=[] # type: List[data.Partition]
+
             for part in partitions:
                 # extend the part until all indices<index are in domain
                 # kpr in add_kperms which do not intersect with part
@@ -148,18 +216,13 @@ class Shuffler:
             self.increment_noverlaps(added_partitions,self.ooverl,index+1)
             max_overlap=max(part.noverlaps for part in added_partitions) # pylint: disable=no-member
             partitions=[part for part in added_partitions if part.noverlaps==max_overlap] # pylint: disable=no-member
-
             # if __debug__:
-            #     pickle.dump(partitions,open("debugpartitions"+str(index)+".pickle","wb"))
-
-            # HERE
-            # TESTING! comment the following command
-            #partitions=[part for part in added_partitions if part.noverlaps>max_overlap-3] # pylint: disable=no-member
+            #     for testid,testpart in enumerate(partitions):
+            #         print(f"testid={testid}")
+            #         testmerged=data.OligoPerm.add(*testpart.perms) # pylint: disable=unused-variable
+            #         print("ok")
 
             resume_parts=data.Partition.reduce_partitions(partitions,index)
-            # if __debug__:
-            #     pickle.dump(resume_parts,open("debugresume_parts"+str(index)+".pickle","wb"))
-
             partitions=resume_parts
 
         return partitions
@@ -177,8 +240,18 @@ class Shuffler:
         # score each partition
         return partitions
 
+    # method to test!
     def find_kperms(self,group:Tuple[int, ...])->Generator:
-        u'''
+        '''
+        generates eligible permutations using networkx
+        '''
+        for kprid in self.permgen.find_kpermids(group):
+            for kpr in self.find_subkperms_from_permids(kprid):
+                yield kpr
+
+    # works but slow
+    def old_find_kperms(self,group:Tuple[int, ...])->Generator:
+        '''
         finds the permutations of oligos in cores
         and permutations from corrections (changed indices must be in both core_groups)
         '''
@@ -197,7 +270,7 @@ class Shuffler:
                 yield kpr
 
     def find_subkperms_from_permids(self,kpermids:Tuple[int, ...])->List[data.OligoKPerm]:
-        u'''finds all sub kperms within a permids
+        '''finds all sub kperms within a permids
         eg : (0,2,1,3,6,4,5) will return kperms conrresponding to [(0,),(1,2),(4,6,5)]
         '''
         cyclicsubs=self.find_cyclicsubs(kpermids)
@@ -206,7 +279,7 @@ class Shuffler:
 
     @staticmethod
     def cperm2kperm(oligos,cpermids:Tuple[int,...])->data.OligoKPerm:
-        u'translates cyclic permutation to kperm'
+        'translates cyclic permutation to kperm'
         toprm={cpermids[k]:v for k,v in enumerate(cpermids[1:])}
         toprm.update({cpermids[-1]:cpermids[0]})
         kpermids=tuple(toprm[i] if i in toprm else i for i in range(min(cpermids),max(cpermids)+1))
@@ -218,7 +291,7 @@ class Shuffler:
     # ok but k-cycles are k duplicated
     @staticmethod
     def find_cyclicsubs(perm:Tuple[int, ...]):
-        u'find sub-kpermutations within the permutation'
+        'find sub-kpermutations within the permutation'
         # compute the new positions for each sub-kperm
         srtprm=sorted(perm)
         subkprms=[]
@@ -234,44 +307,3 @@ class Shuffler:
             subkprms.append(tuple(kpr[:-1]))
 
         return list(set(subkprms))
-
-    # check if these methods could be useful here
-
-    # def find_groupperms(self,group:Tuple[int, ...])->Generator:
-    #     u'''
-    #     finds the permutations of oligos of a group
-    #     and permutations from corrections (changed indices must be in both core_groups)
-    #     '''
-    #     idsperbatch=self.collection.idsperbatch
-    #     batchfilter=processor.BetweenBatchFilter(idsperbatch=idsperbatch)
-    #     ooverlfilter=processor.RequireOverlapFilter(oligos=self.oligos,
-    #                                                 min_ooverl=self.ooverl)
-    #     # compute all possible permutations # brute force
-    #     kpermids=itertools.permutations(group) # generator
-    #     firstfiltered = filter(ooverlfilter,kpermids) # type: ignore
-    #     secondfiltered = filter(batchfilter,firstfiltered) # type: ignore
-    #     for kprid in secondfiltered:
-    #         yield data.OligoKPerm(oligos=self.oligos,
-    #                               kperm=[self.oligos[i] for i in kprid],
-    #                               kpermids=numpy.array(kprid))
-
-    # # needs better implementation
-    # # pylint: disable=no-self-use
-    # def fix_horizon(self,
-    #                 partitions:List[List[data.OligoPerm]],
-    #                 group:Tuple[int, ...])->List[List[data.OligoPerm]]:
-    #     u'horizon is the ensemble of kperms which cannot modify by any subsequent combination'
-    #     horizon=min(group) # set(group)
-    #     for partid,part in enumerate(partitions):
-    #         if len(part)==1:
-    #             continue
-    #         #to_fix=[(idx,kpr) for idx,kpr in enumerate(part)
-    #         #        if not kpr.domain.intersection(horizon)]
-    #         to_fix=[(idx,kpr) for idx,kpr in enumerate(part)
-    #                 if all(i<horizon for i in  kpr.domain)]
-    #         if len(to_fix)==0:
-    #             continue
-    #         merged=data.OligoPerm.add(*[fix[1] for fix in to_fix])
-    #         fixed=[fix[0] for fix in to_fix]
-    #         partitions[partid]=[merged]+[part[i] for i in range(len(part)) if not i in fixed]
-    #     return partitions

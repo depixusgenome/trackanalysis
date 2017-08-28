@@ -15,12 +15,12 @@ class Recorder:
     u'''
     keeps the results the assembler at each time step
     '''
-    def __init__(self,**kwargs): # ok
+    def __init__(self,**kwargs):
         self.assembler = kwargs.get("assembler",None)
         self.rec = kwargs.get("rec",[]) # list of results
         self.filename = kwargs.get("filename","")
 
-    def run(self,*args,**kwargs): # ok
+    def run(self,*args,**kwargs):
         u'calls assembler and save the result'
         self.assembler.run(*args,**kwargs)
         self.rec.append(self.assembler.result)

@@ -18,9 +18,7 @@ more difficult to implement but simpler algorithm as a whole
 '''
 
 from typing import List, Generator # pylint: disable=unused-import
-import assemble.scaler as ascaler
-import assemble.shuffler as ashuffler
-import assemble.data as adata  # pylint: disable=unused-import
+from assemble import data,mcscaler, shuffler
 import assemble.scores as scores
 
 class ScorePartition:
@@ -32,36 +30,35 @@ class ScorePartition:
 
     def __call__(self,partition)->Generator:
         for path in partition.paths():
-            perm=adata.OligoPerm.add(*path)
-            kperm=adata.OligoKPerm(oligos=perm.oligos,
-                                   kperm=perm.perm,
-                                   kpermids=perm.permids)
+            perm=data.OligoPerm.add(*path)
+            kperm=data.OligoKPerm(oligos=perm.oligos,
+                                  kperm=perm.perm,
+                                  kpermids=perm.permids)
             yield self.scoring(kperm)
 
-class BaseOverseer:
-    'Overseer Parent Class'
-    def __init__(self,**kwa):
-        self.min_overl=kwa.get("min_overl",2) # type: int
-        self.bbias=kwa.get("bbias",ascaler.Bounds())
-        self.bstretch=kwa.get("bstretch",ascaler.Bounds())
-        self.maxstack=kwa.get("maxstack",4) # type: int
 
-class Overseer(BaseOverseer):
+
+class Overseer(mcscaler.PeakSetting):
     '''
     manages scaler and shuffler
-    defines a good sequence alignmenent
+    defines a good sequence alignment
     '''
     def __init__(self,**kwa):
         super().__init__(**kwa)
-        self.oligos=kwa.get("oligos",[]) # type: List[adata.OligoPeaks]
-        self.scaler=ascaler.Scaler(oligos=self.oligos,
-                                   bbias=self.bbias,
-                                   bstretch=self.bstretch,
-                                   min_overl=self.min_overl)
-        self.shuffler=ashuffler.Shuffler(oligos=self.oligos,
-                                         ooverl=self.min_overl)
+        # self.oligos=kwa.get("oligos",[]) # type: List[data.OligoPeaks]
+        # self.scaler=scaler.Scaler(oligos=self.oligos,
+        #                            bbias=self.bbias,
+        #                            bstretch=self.bstretch,
+        #                            min_overl=self.min_overl)
 
-        self.score=ScorePartition(ooverl=self.min_overl)
+        self.scaler=mcscaler.SeqHoppScaler(**kwa)
+        # shift to  mcscaler.SeqHoppScaler(**self.__dict__)
+
+        self.shuffler=shuffler.Shuffler() # not really necessary except for debugging
+        # self.shuffler=shuffler.Shuffler(oligos=self.oligos,
+        #                                 ooverl=self.min_overl)
+
+        #self.score=ScorePartition(ooverl=self.min_overl)
 
     def run(self):
         '''
@@ -72,28 +69,19 @@ class Overseer(BaseOverseer):
         discard worse solution
         resume
         '''
-        stacks=self.scaler.run(iteration=self.maxstack)
-        print(f"len(stacks)={len(stacks)}")
-        # toshuffle=list(frozenset(tuple (val) for stack in stacks for val in stack.stack.values()))
-        # pathscores=[] # type: List[scores.ScoredPerm]
-        # for elmt in toshuffle:
-        #     if len(elmt)>1:
-        #         partitions=self.shuffler.run(oligos=elmt)
-        #         for partition in partitions:
-        #             pathscores+=list(self.score(partition))
+        partitions=[]
 
-        #         # do not score partitions, but stacks of oligos
-        #         # score stacks ... or only tuple of oligos
-        #         # score tuple and discard all tuple who have a score
-        #         # overlapping is already considered.  for each stack.
-        #         # careful.
-        #         # overlapping may not be maximal if non-linearity is implemented in stacking!
-        #         # need to score each partitions and the ambiguities (overlap + pdfcost)
+        for ite in range(5):
+            print(f"ite={ite}")
+            scales=self.scaler.run()
+            # translate scales to peaks and to oligos
+            scaled=[scales[2*idx]*self.peaks[idx]+scales[2*idx+1] for idx in range(len(self.peaks))]
+            oligos=sorted([oli for peak in scaled for oli in peak.arr],
+                          key=lambda x:x.pos)
+            # each oligos is then separated by 1.1 nm
 
-
-        # discard unwanted partitions
-        # for _ in range(5):
-        #     print(f"iterating scaler resume {_}")
-        #     stacks=self.scaler.resume(pstacks=stacks,iteration=self.maxstack)
-        #     print(f"len(stacks)={len(stacks)}")
-        return stacks
+            # problem, havent considered signs of oligos...
+            self.shuffler=shuffler.Shuffler(oligos=oligos,
+                                            min_overl=self.min_overl)
+            partitions.append(self.shuffler.run())
+        return partitions
