@@ -185,7 +185,7 @@ class OligoPeak(Oligo):
     appliedbias = 0 # type: float
     @initdefaults
     def __init__(self,**kwa):
-        super().__init__(**kwa)
+        super().__init__()
 
     @property
     def bias(self):

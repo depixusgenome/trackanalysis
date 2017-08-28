@@ -185,12 +185,14 @@ class OPeakArray:
         pass
 
     @staticmethod
-    def from_oligos(oligos:List[data.OligoPeak])->List:
+    def from_oligos(oligos:List[data.OligoPeak],**kwa)->List:
         'return Peaks from oligos'
         solis=sorted([(oli.seq,oli.pos,oli) for oli in oligos])
         exp=[]
         for values in itertools.groupby(solis,key=lambda x:x[0]):
             exp.append(OPeakArray(arr=np.array([oli[2] for oli in values[1]])))
+        if kwa.get("sorted",True):
+            return sorted(exp,key=lambda val: -len(val))
         return exp
 
     def matching_seq(self,seq,unsigned=True):

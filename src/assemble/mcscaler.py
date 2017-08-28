@@ -52,7 +52,7 @@ class PeakSetting:
         self._fseqs=[] # type: List[str] # flat
         self._peaks=[] # type: List[scaler.OPeakArray]
         self.peaks=kwa.get("peaks",[]) # type: List[scaler.OPeakArray]
-        self._min_overl=kwa.get("min_overl",2)
+        self.min_overl=kwa.get("min_overl",2)
         self.unsigned=kwa.get("unsigned",True)
 
     @property
@@ -76,54 +76,41 @@ def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argumen
 
 
 class Score(PeakSetting):
-    'defines a callable with desired params'
+    '''
+    defines a callable with desired params
+    will have to find maximal score according to relative sign
+    assumes the first oligo has the correct sequence...
+    '''
     def __init__(self,**kwa):
         super().__init__(**kwa)
         self.__func=self.callpass # type: Callable
         self.min_overl=kwa.get("min_overl",2)
         self.unsigned=kwa.get("unsigned",True)
         seqs=frozenset().union(*[frozenset(pk.seqs) for pk in self.peaks])
-        self.seqs=frozenset([(sq1,sq2)
-                             for sq1,sq2 in itertools.permutations(seqs,2)
-                             if data.Oligo.overlap(sq1,
-                                                   sq2,
-                                                   min_overl=self._min_overl,
-                                                   signs=(0,0),
-                                                   shift=1)])
+        self.pairseqs=frozenset([(sq1,sq2)
+                                 for sq1,sq2 in itertools.permutations(seqs,2)
+                                 if data.Oligo.overlap(sq1,
+                                                       sq2,
+                                                       min_overl=self.min_overl,
+                                                       signs=(0,0),
+                                                       shift=1)])
         # change the set of ids to consider for adjusting the mcmc
         self.ids=kwa.get("ids",list(range(len(self.peaks))))
+
     def callpass(self,*arg,**kwa):
         'pass'
         pass
 
-    @property
-    def min_overl(self):
-        'min_overl'
-        return self._min_overl
-
-    @min_overl.setter
-    def min_overl(self,value):
-        'min_overl'
-        self._min_overl=value
-
-    def __call__(self,state):
-        return self.score_state(state)
-
-    # adjust using ids
-    def score_state(self,state:np.array)->float:
+    def __call__(self,state:np.array)->float:
         '''
         scales self.__pos instead of using Rescale.__call__
         '''
-        # rescale positions
-        # npos=[state[2*idx]*pos+state[2*idx+1]
-        #       for idx,pos in enumerate(self._pos)]
-
         npos=[state[2*idx]*self._pos[idx]+state[2*idx+1] for idx in self.ids]
         fpos=[pos for ppos in npos for pos in ppos] # flat
-
+        fseqs=[seq for idx in self.ids for seq in self._seqs[idx]]
         # sort seq according to npos
-        seqs=[pseq[1] for pseq in sorted(zip(fpos,np.array(self._fseqs)[self.ids]))]
-        return -sum([1 for idx,val in enumerate(seqs[1:]) if (seqs[idx],val) in self.seqs])
+        seqs=[pseq[1] for pseq in sorted(zip(fpos,fseqs))]
+        return -sum([1 for idx,val in enumerate(seqs[1:]) if (seqs[idx],val) in self.pairseqs])
 
 class StreBiasStep: # pylint: disable=too-many-instance-attributes
     'defines the take_step callable'
@@ -238,7 +225,7 @@ class SeqUpdate(PeakSetting):
         'defines a new stre,bias for a single peak'
         others=np.sort(np.hstack(npos[:tomove]+npos[tomove+1:]))
         moves=scaler.match_peaks(others,self._pos[tomove],self.bstretch,self.bbias)
-        return random.choice(moves)
+        return random.choice(moves) # type: ignore
 
     def __call__(self,*args,**kwargs):
         tomove=self.index
@@ -310,8 +297,6 @@ class SeqHoppScaler(PeakSetting):
         toscore=[0]
         for edge in self.edges:
             toscore=sorted(frozenset(toscore).union(edge))
-            print("the scoring does not work correctly")
-            print(f"toscore={toscore}")
             self.scoring.ids=toscore
             # I cannot change only edge[1] but edge[1] and all neighbors
             self.sampler.index=edge[1]
@@ -320,6 +305,7 @@ class SeqHoppScaler(PeakSetting):
             self.res.append(curr_res)
             state=curr_res.x
 
+        return state
 if __name__=='__main__':
     UNSIGNED= True
     MIN_OVERL=2
