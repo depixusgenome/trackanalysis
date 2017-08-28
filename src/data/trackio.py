@@ -342,7 +342,7 @@ class Handler:
             res['fov']    = FOV(image = kwargs.pop('fov'),
                                 dim   = kwargs.pop('dimensions'),
                                 beads = kwargs.pop('positions'))
-            res['phases'] = kwargs.pop('phases')
+            res.update({i: kwargs.pop(i) for i in ('phases', 'framerate')})
 
             if beadsonly:
                 data = {i: j for i, j in kwargs.items()
