@@ -6,6 +6,7 @@ from bokeh          import layouts
 from view.base      import BokehView
 from view.plots     import PlotState
 from view.beadplot  import BeadPlotView
+from cleaning.view  import CleaningView
 from cyclesplot     import CyclesPlotView
 from .peaksplot     import PeaksPlotView
 
@@ -16,6 +17,7 @@ class HybridStatView(BokehView):
         super().__init__(**kwa)
         self._tabs   = None
         self._panels = [BeadPlotView  (**kwa),
+                        CleaningView  (**kwa),
                         CyclesPlotView(**kwa),
                         PeaksPlotView (**kwa)]
 
@@ -46,6 +48,7 @@ class HybridStatView(BokehView):
     def ismain(self):
         "Allows setting-up stuff only when the view is the main one"
         self._panels[-1].ismain()
+        self._panels[1].ismain()
         def _advanced():
             for panel in self._panels:
                 if self.__state(panel).get() is PlotState.active:
