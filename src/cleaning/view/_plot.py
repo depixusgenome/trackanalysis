@@ -46,6 +46,9 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
         items  = None if cycles is None else list(cycles)
 
         tsk    = mdl.cleaning.task
+        if tsk is None:
+            return items, None
+
         cache  = ctrl.data.getCache(tsk)()
         nans   = cache.pop('gui')
         mdl.processors().data.setCacheDefault(tsk, {}).update(cache)
