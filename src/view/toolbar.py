@@ -185,10 +185,14 @@ class MessagesInput(BokehView):
             else:
                 val = templ[text.value[1]].format(text.value[0])
             if curdoc() is doc:
-                toolbar.message = val
-            else:
-                fcn = lambda: setattr(toolbar, 'message', val)
-                doc.add_next_tick_callback(fcn)
+                try:
+                    toolbar.message = val
+                    return
+                except RuntimeError:
+                    pass
+
+            fcn = lambda: setattr(toolbar, 'message', val)
+            doc.add_next_tick_callback(fcn)
 
         ctrl.getGlobal('project').message.observe(_settext)
 
