@@ -9,7 +9,7 @@ how to fix the temperature?
 need more efficient sampling of (stretch,bias)
 '''
 
-from typing import List, Tuple, Callable # pylint: disable=unused-import
+from typing import List, Dict, Tuple, Callable, Iterable # pylint: disable=unused-import
 import itertools
 import random
 import networkx
@@ -46,13 +46,13 @@ class PeakSetting:
     regroups information regarding oligo experiments
     '''
     def __init__(self,**kwa):
-        self._pos=[] # type: List[np.array]
-        self._seqs=[] # type: List[Tuple[str, ...]]
-        self._fseqs=[] # type: List[str] # flat
-        self._peaks=[] # type: List[scaler.OPeakArray]
-        self.peaks=kwa.get("peaks",[]) # type: List[scaler.OPeakArray]
-        self.min_overl=kwa.get("min_overl",2)
-        self.unsigned=kwa.get("unsigned",True)
+        self._pos:List[np.array]=[]
+        self._seqs:List[Tuple[str, ...]]=[]
+        self._fseqs:List[str]=[] # flat
+        self._peaks:List[scaler.OPeakArray]=[]
+        self.peaks:List[scaler.OPeakArray]=kwa.get("peaks",[])
+        self.min_overl:int=kwa.get("min_overl",2)
+        self.unsigned:bool=kwa.get("unsigned",True)
 
     @property
     def peaks(self):
@@ -82,9 +82,9 @@ class Score(PeakSetting):
     '''
     def __init__(self,**kwa):
         super().__init__(**kwa)
-        self.__func=self.callpass # type: Callable
-        self.min_overl=kwa.get("min_overl",2)
-        self.unsigned=kwa.get("unsigned",True)
+        self.__func:callable=self.callpass
+        self.min_overl:int=kwa.get("min_overl",2)
+        self.unsigned:bool=kwa.get("unsigned",True)
         seqs=frozenset().union(*[frozenset(pk.seqs) for pk in self.peaks])
         self.pairseqs=frozenset([(sq1,sq2)
                                  for sq1,sq2 in itertools.permutations(seqs,2)
@@ -93,8 +93,8 @@ class Score(PeakSetting):
                                                        min_overl=self.min_overl,
                                                        signs=(0,0),
                                                        shift=1)])
-        # change the set of ids to consider for adjusting the mcmc
-        self.ids=kwa.get("ids",list(range(len(self.peaks))))
+        # the sequential update without considering all peaks leads to the wrong minima
+        self.__ids:Tuple[int]=kwa.get("ids",tuple(range(len(self.peaks))))
 
     def callpass(self,*arg,**kwa):
         'pass'
@@ -107,9 +107,9 @@ class Score(PeakSetting):
         (i.e. over estimate the score)
         check ergodicity
         '''
-        npos=[state[2*idx]*self._pos[idx]+state[2*idx+1] for idx in self.ids]
+        npos=[state[2*idx]*self._pos[idx]+state[2*idx+1] for idx in self.__ids]
         fpos=[pos for ppos in npos for pos in ppos] # flat
-        fseqs=[seq for idx in self.ids for seq in self._seqs[idx]]
+        fseqs=[seq for idx in self.__ids for seq in self._seqs[idx]]
         # sort seq according to npos
         seqs=[pseq[1] for pseq in sorted(zip(fpos,fseqs))]
         return -sum([1 for idx,val in enumerate(seqs[1:]) if (seqs[idx],val) in self.pairseqs])
@@ -125,15 +125,15 @@ class Score(PeakSetting):
 class StreBiasStep: # pylint: disable=too-many-instance-attributes
     'defines the take_step callable'
     def __init__(self,**kwa):
-        self.bstretch=kwa.get("bstretch",scaler.Bounds())
-        self.bbias=kwa.get("bbias",scaler.Bounds())
-        self.cov=np.array([1]) # type: np.array
-        self.__size=1
-        self.size=kwa.get("size",1) # type: int
-        self.__sample="" # type: str
+        self.bstretch:scaler.Bounds=kwa.get("bstretch",scaler.Bounds())
+        self.bbias:scaler.Bounds=kwa.get("bbias",scaler.Bounds())
+        self.cov:np.array=np.array([1])
+        self.__size:int=1
+        self.size:int=kwa.get("size",1)
+        self.__sample:str=""
         self.biasdist=self.callpass # type: ignore
         self.stredist=self.callpass # type: ignore
-        self.sample=kwa.get("sample","uniform") # type: str
+        self.sample:str=kwa.get("sample","uniform")
 
     def callpass(self,*args,**kwa):
         'pass'
@@ -193,39 +193,65 @@ class SeqUpdate(PeakSetting):
     # pick at random a peak (except 0)
     # move the oligos of that peak (the move can then be optimised with regard to neighbors)
     Need to find the sets of scales for each peaks which gives a different sequence of peaks
+    cyclic iteration didn't work too well. when fitting only 1 peak at a time
+    could go back to cyclic when neighbors are considered
     '''
     def __init__(self,**kwa):
         super().__init__(**kwa)
         self.bstretch=kwa.get("bstretch",scaler.Bounds())
         self.bbias=kwa.get("bbias",scaler.Bounds())
         self.cycle=itertools.cycle(list(range(1,len(self.peaks)-1)))
-        self.index=kwa.get("index",1) # type: int
+        self.index=kwa.get("index",0) # type: int
+        self.indices:List[int]=kwa.get("indices",list(range(len(self.peaks))))
+        self.call:Callable=self.multi_update
 
-    def next_move(self,npos:List[np.array],tomove:int):
+    # need to consider only the peaks that can be matched
+    # no need to recompute the bstretch,bbias function of state if using self._pos[tomove]
+    def move_one(self,npos:List[np.array],tomove:int):
         'defines a new stre,bias for a single peak'
-        others=np.sort(np.hstack(npos[:tomove]+npos[tomove+1:]))
+        others=np.sort(np.hstack(npos))
         moves=scaler.match_peaks(others,self._pos[tomove],self.bstretch,self.bbias)
         return random.choice(moves) # type: ignore
 
-    def __call__(self,*args,**kwargs):
+    def single_update(self,*args,**kwa): # pylint: disable=unused-argument
+        '1 peak has its state updated'
         tomove=self.index
+        neigh=sorted(frozenset(self.indices)-frozenset([self.index]))
         state=args[0]
         # scale all peaks
-        npos=[state[2*idx]*arr+state[2*idx+1] for idx,arr in enumerate(self._pos)]
+        #npos=[state[2*idx]*arr+state[2*idx+1] for idx,arr in enumerate(self._pos)]
+        # consider only those which may overlap
+        # must remove self.index from
+        npos=[state[2*idx]*self._pos[idx]+state[2*idx+1] for idx in neigh]
         # find where to move
         try:
-            nstre,nbias=self.next_move(npos,tomove)
+            nstre,nbias=self.move_one(npos,tomove)
         except IndexError:
             return state
         return np.hstack([state[:2*tomove],[nstre,nbias],state[2*(tomove+1):]])
 
+    def __call__(self,*args,**kwa):
+        return self.call(*args,**kwa)
 
+    def multi_update(self,*args,**kwa)->np.array: # pylint: disable=unused-argument
+        '''
+        multiple peaks are updated simultaneously
+        a peak and overlapping ones
+        '''
+        indices=np.random.permutation(self.indices)
+        state=args[0]
+        for index in indices:
+            self.index=index
+            #print(f"index={index},state={state}")
+            if self.index!=0:
+                state=self.single_update(state)
+        return state
 
 class HopperStatus:
     'basinhopping container'
     def __init__(self,**kwa):
         self.state=kwa.get("state",np.array)
-        self.scores=[] # type: List[float]
+        self.scores:List[float]=[]
 
 class SeqHoppScaler(PeakSetting):
     '''
@@ -239,16 +265,21 @@ class SeqHoppScaler(PeakSetting):
         super().__init__(**kwa)
         self.scoring=Score(**kwa)
         self.sampler=SeqUpdate(**kwa)
-        self.min_overl=kwa.get("min_overl",2) # type: int
+        self.min_overl:int=kwa.get("min_overl",2)
         self.edges=scaler.OPeakArray.list2edgeids(self._peaks,
                                                   min_overl=self.min_overl,
                                                   unsigned=self.scoring.unsigned)
-        self.edges=[edge for edge in self.edges if edge[0]<edge[1]]
+        self.neigh:Dict[int,List[int]]={idx:frozenset(edg
+                                                      for edge in self.edges
+                                                      for edg in edge
+                                                      if idx in edge)
+                                        for idx in range(len(self.peaks))}
+        #self.edges=[edge for edge in self.edges if edge[0]<edge[1]]
         self.basinkwa={"func":self.scoring,
                        "niter":100,
                        "minimizer_kwargs":dict(method=no_minimizer),
                        "take_step":self.sampler}
-        self.res=[] # type: List[scipy.optimize.optimize.OptimizeResult]
+        self.res:List[OptimizeResult]=[]
 
     @property
     def bstretch(self):
@@ -273,16 +304,21 @@ class SeqHoppScaler(PeakSetting):
         bias=biasdist.rvs(size=len(self._peaks)-1)
         stre=stredist.rvs(size=len(self._peaks)-1)
         state=np.array([1,0]+[val for pair in zip(stre,bias) for val in pair])
+        #print(f"state={state}")
+        #for edge in self.edges:
+            # changing only edge[1]
+            #self.sampler.index=edge[1]
+            # changing edge[1] and all neighbors
+            #print(f"edge={edge}")
+            #self.sampler.indices=list(self.neigh[edge[1]])
 
-        toscore=[0]
-        for edge in self.edges:
-            toscore=sorted(frozenset(toscore).union(edge))
-            self.scoring.ids=toscore
-            # I cannot change only edge[1] but edge[1] and all neighbors
-            self.sampler.index=edge[1]
-            curr_res=basinhopping(x0=state,**self.basinkwa)
-            print(f"fun={curr_res.fun}")
-            self.res.append(curr_res)
-            state=curr_res.x
+        for loop in itertools.repeat(range(1,len(self.peaks)),5):
+            for lidx in loop:
+                print(f"lidx={lidx}")
+                self.sampler.indices=list(self.neigh[lidx])
+                curr_res=basinhopping(x0=state,**self.basinkwa)
+                print(f"fun={curr_res.fun}")
+                self.res.append(curr_res)
+                state=curr_res.x
 
         return state

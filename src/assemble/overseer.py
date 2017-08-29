@@ -17,7 +17,9 @@ Or non-linearities is included in the gaussian noise
 more difficult to implement but simpler algorithm as a whole
 '''
 
-from typing import List, Generator # pylint: disable=unused-import
+from typing import List, Generator, Tuple # pylint: disable=unused-import
+import itertools
+import networkx
 from assemble import data,mcscaler, shuffler
 import assemble.scores as scores
 
@@ -36,8 +38,6 @@ class ScorePartition:
                                   kpermids=perm.permids)
             yield self.scoring(kperm)
 
-
-
 class Overseer(mcscaler.PeakSetting):
     '''
     manages scaler and shuffler
@@ -45,20 +45,54 @@ class Overseer(mcscaler.PeakSetting):
     '''
     def __init__(self,**kwa):
         super().__init__(**kwa)
-        # self.oligos=kwa.get("oligos",[]) # type: List[data.OligoPeaks]
-        # self.scaler=scaler.Scaler(oligos=self.oligos,
-        #                            bbias=self.bbias,
-        #                            bstretch=self.bstretch,
-        #                            min_overl=self.min_overl)
-
         self.scaler=mcscaler.SeqHoppScaler(**kwa)
-        # shift to  mcscaler.SeqHoppScaler(**self.__dict__)
-
         self.shuffler=shuffler.Shuffler() # not really necessary except for debugging
-        # self.shuffler=shuffler.Shuffler(oligos=self.oligos,
-        #                                 ooverl=self.min_overl)
 
-        #self.score=ScorePartition(ooverl=self.min_overl)
+    @staticmethod
+    def fix_signs(oligos:List[data.OligoPeak],min_overl:int=2): # ->List[data.OligoPeak]:
+        '''
+        fix signs of ordered oligos such that
+        the # of overlaps is maximize
+
+        Listing all_shortest_paths might not be necessary in the present
+        case and could be replaced by shortest_path, to convince
+
+        actually no need to use networkx
+        (from the source always take the best neighbor?)
+        will have to rewrite it without networkx to run in scoring
+
+        '''
+        def func(seq1,seq2):
+            "local call to overlap"
+            return data.Oligo.overlap(seq1,seq2,min_overl=min_overl,signs=(1,1),shift=1)
+        graph=networkx.DiGraph()
+        #oligos=sorted(oligos,key:lambda x:x.pos)
+        edges=[(oligos[idx],val) for idx,val in enumerate(oligos[1:])]
+        edges+=[(oligos[idx].reverse(in_place=False),val) for idx,val in enumerate(oligos[1:])]
+        sources=[edges[0][0],edges[len(oligos)-1][0]]
+        edges+=[(oligos[idx],val.reverse(in_place=False)) for idx,val in enumerate(oligos[1:])]
+        targets=[oligos[-1],edges[-1][1]]
+        edges+=[(oligos[idx].reverse(in_place=False),val.reverse(in_place=False))
+                for idx,val in enumerate(oligos[1:])]
+        # weight is 1 if no overlap, 0 otherwise, shortest path problem
+        weights=[0 if func(ed1.seq,ed2.seq) else 1 for ed1,ed2 in edges]
+        graph.add_edges_from([edges[idx]+({"weight":weights[idx]},) for idx in range(len(edges))])
+        paths:List[Tuple[float,List[data.OligoPeak]]]=[]
+
+        for src,tgt in itertools.product(sources,targets):
+            print(src,tgt)
+            paths+=[(networkx.shortest_path_length(graph,src,tgt,weight="weight"),
+                     list(networkx.shortest_path(graph,source=src,target=tgt,weight="weight")))]
+            # paths+=[(networkx.shortest_path_length(graph,
+            #                                        src,
+            #                                        tgt,
+            #                                        weight="weight"),
+            #          list(networkx.all_shortest_paths(graph,
+            #                                           source=src,
+            #                                           target=tgt,
+            #                                           weight="weight")))]
+
+        return paths
 
     def run(self):
         '''

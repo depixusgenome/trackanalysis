@@ -192,7 +192,7 @@ class OPeakArray:
         for values in itertools.groupby(solis,key=lambda x:x[0]):
             exp.append(OPeakArray(arr=np.array([oli[2] for oli in values[1]])))
         if kwa.get("sorted",True):
-            return sorted(exp,key=lambda val: -len(val))
+            return sorted(exp,key=lambda val: -len(val.posarr))
         return exp
 
     def matching_seq(self,seq,unsigned=True):

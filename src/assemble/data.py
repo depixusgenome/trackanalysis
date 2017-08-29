@@ -19,11 +19,11 @@ class Oligo:
     container for an oligo sequence, a position in nanometer
     and a position in base
     '''
-    seq="" # type: str
-    pos=-1 # type: int
-    bpos=-1 # type: int # base position
-    signed=1 # type: int # True, False
-    @initdefaults
+    seq:str=""
+    pos:int=-1
+    bpos:int=-1 # base position
+    signed:int=1 # True, False
+    @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
         pass
     @property
@@ -183,9 +183,9 @@ class OligoPeak(Oligo):
     bpos = 0 # type: int
     appliedstretch = 1 # type: float
     appliedbias = 0 # type: float
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
-        super().__init__()
+        super().__init__(**kwa)
 
     @property
     def bias(self):
@@ -251,7 +251,7 @@ class Batch:
     '''
     oligos=[] # type: List[OligoPeak]
     index=-1 # type: int
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
         pass
 
@@ -284,7 +284,7 @@ class BCollection:
     oligos = [] # type: List[OligoPeak]
     batches = [] # type: List[Batch]
     idsperbatch = dict() # type: Dict[int,List[int]]
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self,**kwa):
         pass
 
