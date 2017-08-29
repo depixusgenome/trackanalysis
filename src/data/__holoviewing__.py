@@ -195,7 +195,7 @@ def display(self,  # pylint: disable=function-redefined
     "displays the FOV with bead positions"
     (xslope, xbias), (yslope, ybias) = self.dim
     raw = self.image
-    bnd = (xbias, ybias, xbias+raw.shape[0]*xslope, ybias+raw.shape[1]*yslope)
+    bnd = self.bounds()
 
     if beads is None:
         beads = self.beads.keys()
