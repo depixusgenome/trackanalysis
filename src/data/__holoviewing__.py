@@ -193,19 +193,16 @@ def display(self,  # pylint: disable=function-redefined
             ptcolor  = 'lightblue',
             txtcolor = 'blue'):
     "displays the FOV with bead positions"
-    (xslope, xbias), (yslope, ybias) = self.dim
-    raw = self.image
     bnd = self.bounds()
-
     if beads is None:
         beads = self.beads.keys()
 
     good  = {i: j[:2] for i, j in self.beads.items() if i in beads}
-    xvals = [i         for i, _ in good.values()]
-    yvals = [bnd[-1]-i for _, i in good.values()]
-    txt   = [f'{i}'    for i    in good.keys()]
+    xvals = [i        for i, _ in good.values()]
+    yvals = [i        for _, i in good.values()]
+    txt   = [f'{i}'   for i    in good.keys()]
 
-    return hv.Overlay([hv.Image(self.image, bnd)(plot = dict(colorbar = colorbar)),
+    return hv.Overlay([hv.Image(self.image[::-1], bnd)(plot = dict(colorbar = colorbar)),
                        hv.Points((xvals, yvals))(style = dict(color = ptcolor))]
                       + [hv.Text(*i)(style = dict(color = txtcolor))
                          for i in zip(xvals, yvals, txt)])
