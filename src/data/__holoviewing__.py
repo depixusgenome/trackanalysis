@@ -187,25 +187,34 @@ def keymap(self:ExperimentList, key, fcn, **kwa):
             .redim.values(bead = beads, **kwa))
 
 @addto(FOV)        # type: ignore
-def display(self,  # pylint: disable=function-redefined
+def display(self,  # pylint: disable=function-redefined,too-many-arguments
             beads    = None,
+            calib    = True,
             colorbar = True,
             ptcolor  = 'lightblue',
             txtcolor = 'blue'):
-    "displays the FOV with bead positions"
+    """
+    displays the FOV with bead positions as well as calibration images.
+    """
     bnd = self.bounds()
-    if beads is None:
-        beads = self.beads.keys()
+    beads = list(self.beads.keys()) if beads is None else list(beads)
 
     good  = {i: j.position[:2] for i, j in self.beads.items() if i in beads}
     xvals = [i                 for i, _ in good.values()]
     yvals = [i                 for _, i in good.values()]
     txt   = [f'{i}'            for i    in good.keys()]
 
-    return hv.Overlay([hv.Image(self.image[::-1], bnd)(plot = dict(colorbar = colorbar)),
-                       hv.Points((xvals, yvals))(style = dict(color = ptcolor))]
-                      + [hv.Text(*i)(style = dict(color = txtcolor))
-                         for i in zip(xvals, yvals, txt)])
+    top   = (hv.Overlay([hv.Image(self.image[::-1], bnd)(plot = dict(colorbar = colorbar)),
+                         hv.Points((xvals, yvals))(style = dict(color = ptcolor))]
+                        +[hv.Text(*i)(style = dict(color = txtcolor))
+                          for i in zip(xvals, yvals, txt)])
+             .redim(x = 'x (nm)', y = 'y (nm)'))
+    if not calib:
+        return top
+    bottom = hv.DynamicMap(lambda bead: self.beads[bead].display(colorbar = colorbar),
+                           kdims = ['bead']).redim.values(bead = beads)
+    return (top+bottom).cols(1)
+
 
 @addto(Bead)       # type: ignore
 def display(self,  # pylint: disable=function-redefined
@@ -215,6 +224,7 @@ def display(self,  # pylint: disable=function-redefined
         return
 
     bnd = [0, 0] + list(self.image.shape)
-    return hv.Image(self.image[::-1], bnd)(plot = dict(colorbar = colorbar))
+    return (hv.Image(self.image[::-1], bnd, kdims = ['z focus (pixel)', 'profile'])
+            (plot = dict(colorbar = colorbar)))
 
 __all__: List[str] = []
