@@ -15,13 +15,13 @@ class FOVPlotCreator(TaskPlotCreator):
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
-        self.css.defaults = {'beads':   PlotAttrs('lightblue', 'circle', alpha = .5),
-                             'text':    PlotAttrs('lightblue', 'text'),
+        self.css.defaults = {'beads':   PlotAttrs('goldenrod', 'circle', alpha = .5),
+                             'text':    PlotAttrs('gold', 'text'),
                              'image':   PlotAttrs('Greys256', 'image', x = 0, y = 0),
-                             'current': PlotAttrs('green', 'circle', 16),
+                             'current': PlotAttrs('red', 'circle', 16),
                              'radius'       : 1.,
-                             'figure.width' : 450,
-                             'figure.height': 450,
+                             'figure.width' : 800,
+                             'figure.height': 800,
                              'ylabel'       : u'Y (nm)',
                              'xlabel'       : u'X (nm)',
                             }
