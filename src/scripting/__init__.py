@@ -44,6 +44,7 @@ from signalfilter               import *
 from model.__scripting__        import *
 from app.__scripting__          import *
 from data.__scripting__         import *
+from peakfinding.__scripting__  import *
 from peakcalling.__scripting__  import *
 
 try:
@@ -53,12 +54,12 @@ except ImportError:
 try:
     import holoviews            as hv
     import holoviews.operation  as hvops
-
 except ImportError:
     pass
 else:
     from data.__holoviewing__               import * # pylint: disable=redefined-builtin
     from eventdetection.__holoviewing__     import *
+    from peakfinding.__holoviewing__        import *
     from peakcalling.__holoviewing__        import *
     if 'ipykernel_launcher' in inspect.stack()[-3].filename:
         try:

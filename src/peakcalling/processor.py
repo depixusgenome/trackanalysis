@@ -133,7 +133,7 @@ class FitToHairpinDict(TrackItems):
     def __distances(self, key: str, bead: Sequence[float])->Dict[Optional[str], Distance]:
         distances   = self.config.distances
         constraints = self.config.constraints
-        cstr = constraints.get(key, None)
+        cstr        = constraints.get(key, None)
         if cstr is not None:
             hpin = distances.get(cstr[0], None)
             if hpin is not None:

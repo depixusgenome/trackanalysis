@@ -1,97 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"Updating PeaksDict for scripting purposes"
+"Updating PeaksDict for oligo mapping purposes"
 import sys
 from   typing           import List
-from   functools        import partial
 import numpy            as np
 import holoviews        as hv
 from   utils.decoration import addto
 import sequences
 from   .processor       import PeaksDict, BeadsByHairpinProcessor
 
-Display: type = sys.modules['data.__holoviewing__'].Display
-Tasks:   type = sys.modules['model.__scripting__'].Tasks
+Detailed:     type = sys.modules['peakfinding.__scripting__'].Detailed
+PeaksDisplay: type = sys.modules['peakfinding.__holoviewing__'].PeaksDisplay
+Display:      type = sys.modules['data.__holoviewing__'].Display
+Tasks:        type = sys.modules['model.__scripting__'].Tasks
 
-class PeaksDisplay(Display): # type: ignore
-    "displays the events"
-    # pylint: disable=too-many-arguments,arguments-differ
+class OligoMappingDisplay(PeaksDisplay): # type: ignore
+    "displays peaks & oligos"
     @staticmethod
-    def __histogram(evts, det, params, norm, opts, estyle):
-        xvals = np.arange(len(det.histogram))*det.binwidth+det.minvalue
-        xvals = (xvals-params[1])*params[0]
-        if norm == 'events':
-            norm = 1./evts.config.histogram.kernelarray().max()
-        elif norm in (1., 'probability'):
-            norm = 1./det.histogram.sum()
-        else:
-            norm = 1.
-        return hv.Curve((xvals, det.histogram*norm), **opts)(style = estyle)
-
-    @staticmethod
-    def __events(det, params, opts, estyle, hist):
-        peaks = (np.concatenate(det.positions)-params[1])*params[0]
-        yvals = [hist[i] for i in peaks]
-        return hv.Scatter((peaks, yvals), **opts)(style = estyle)
-
-    @staticmethod
-    def __errors(arr):
-        good = [np.nanmean(i[1] if isinstance(i, tuple) else np.concatenate(i['data']))
-                for i in arr if i is not None]
-        return 0. if len(good) == 1 else np.std(good)
-
-    @classmethod
-    def __errorbars(cls, evts, det, params, opts, pstyle, hist):
-        means = [((i-params[1])*params[0], cls.__errors(j))
-                 for i, j in evts.config.details2output(det)]
-        xvals = sum(([i-j, i+j, np.NaN] for i, j in means), [])
-        yvals = sum(([hist[i], hist[i], np.NaN] for i, j in means), [])
-        return hv.Curve((xvals, yvals), **opts)(style = pstyle)
-
-    @staticmethod
-    def __peaks(evts, det, params, opts, pstyle, hist):
-        means = [(i-params[1])*params[0] for i, _ in evts.config.details2output(det)]
-        yvals = [hist[i] for i in means]
-        return hv.Scatter((means, yvals), **opts)(style = pstyle)
-
-    @classmethod
-    def elements(cls, evts, labels, **opts):
-        "shows overlayed Curve items"
-        opts.pop('sequencestyle', None)
-        prec   = opts.pop('precision', None)
-        pstyle = dict(opts.pop('peakstyle',  dict(size = 5, color = 'green')))
-        estyle = dict(opts.pop('eventstyle', dict(size = 3)))
-        opts.setdefault('kdims', ['z'])
-        opts.setdefault('vdims', ['events'])
-        params = opts.pop('stretch', 1.), opts.pop('bias', 0.)
-        zero   = opts.pop('zero', True)
-        norm   = opts.pop('norm', 'events')
-        itms   = []
-        for bead in evts.keys():
-            det   = evts.detailed(bead, prec)
-            if zero:
-                cparams = params[0], params[1]+det.peaks[0]
-            else:
-                cparams = params
-
-            if labels is not False:
-                opts['label'] = 'histogram'
-            itms.append(cls.__histogram(evts, det, cparams, norm, opts, estyle))
-            itms.append(cls.__events   (det, cparams, opts, estyle, itms[-1]))
-
-            if labels is not False:
-                opts['label'] = 'peaks'
-            itms.append(cls.__peaks    (evts, det, cparams, opts, pstyle, itms[-2]))
-            itms.append(cls.__errorbars(evts, det, cparams, opts, pstyle, itms[-3]))
-        return itms
-
-    @classmethod
-    def run(cls, evts, labels, **opts):
-        "shows overlayed Curve items"
-        return hv.Overlay(cls.elements(evts, labels, **opts))
-
-    @classmethod
-    def hpins(cls, seq, oligos, labels, **opts):
+    def hpins(seq, oligos, labels, **opts):
         "returns haipin positions"
         opts.setdefault('kdims', ['z'])
         opts.setdefault('vdims', ['events'])
@@ -109,10 +35,10 @@ class PeaksDisplay(Display): # type: ignore
     @classmethod
     def fitmap(cls, itms, seq, oligos, labels = None, **opts):
         "creates a DynamicMap with fitted oligos"
-        hpins = cls.hpins(seq, oligos, opts)
-        task  = Tasks.beadsbyhairpin.get(sequence = seq, oligos = oligos)
-        info  = {i: [(k.key, k.distance) for k in j.beads]
-                 for i, j in BeadsByHairpinProcessor.apply(itms, **task.config())}
+        pins = cls.hpins(seq, oligos, opts)
+        task = Tasks.beadsbyhairpin.get(sequence = seq, oligos = oligos)
+        info = {i: [(k.key, k.distance) for k in j.beads]
+                for i, j in BeadsByHairpinProcessor.apply(itms, **task.config())}
 
         def _fcn(bead):
             for key, other in info.items():
@@ -124,7 +50,7 @@ class PeaksDisplay(Display): # type: ignore
                                    stretch = dist.stretch,
                                    bias    = dist.bias,
                                    group   = key)
-                return hv.Overlay(crv+[hpins[key]], group = key)
+                return hv.Overlay(crv+[pins[key]], group = key)
 
         beads = list(set([i for i in itms.keys() if itms.isbead(i)]))
         return hv.DynamicMap(_fcn, kdims = ['bead']).redim.values(bead = beads)
@@ -132,7 +58,7 @@ class PeaksDisplay(Display): # type: ignore
     @classmethod
     def hpinmap(cls, itms, seq, oligos, labels = None, **opts):
         "creates a DynamicMap with oligos to fit"
-        hpins = cls.hpins(seq, oligos, opts)
+        pins = cls.hpins(seq, oligos, opts)
         def _clone(itm, stretch, bias):
             data = np.copy(itm.data)
             data[:,0] = (data[:,0]-bias)*stretch
@@ -144,12 +70,12 @@ class PeaksDisplay(Display): # type: ignore
                 cache[0] = bead
                 cache[1] = cls.elements(itms[[bead]], labels, **opts)
             clones = [_clone(i, stretch, bias) for i in cache[1]]
-            return hv.Overlay(clones+[hpins[sequence]])
+            return hv.Overlay(clones+[pins[sequence]])
 
         beads = list(set([i for i in itms.keys() if itms.isbead(i)]))
         rngs  = Tasks.getconfig().fittohairpin.getitems(...)
         return (hv.DynamicMap(_over, kdims = ['sequence', 'bead', 'stretch', 'bias'])
-                .redim.values(bead    = beads, sequence = list(hpins.keys()))
+                .redim.values(bead    = beads, sequence = list(pins.keys()))
                 .redim.range(**rngs))
 
 @addto(PeaksDict)  # type: ignore
@@ -166,6 +92,7 @@ def display(self, # pylint: disable=function-redefined,too-many-arguments
 
         * *kdim*: if 'bead', then a *holoviews.DynamicMap* is returned, displaying
         beads independently.
+        * *precision* is the noise level used to find peaks
         * *labels*: if *False*, no labels are added. If *None*, labels are added
         if 3 or less beads are shown.
         * *sequence* and *oligo*: can be used to display dna positions. If
@@ -175,14 +102,10 @@ def display(self, # pylint: disable=function-redefined,too-many-arguments
         * *zero* set to *True* will set the x-axis zero to the first peak position.
         * *fit*: if used in conjunction with *sequence* and *oligo*, each bead
         will be displayed with the best fit sequence.
-
-    Other options are:
-
         * *sequencestyle*, *eventstyle*, *peakstyle* can be used to set the style
         of corresponding graph elements.
-        * *stretch* and *bias* can be used to set the *z* axis range.
     """
-    disp = PeaksDisplay
+    disp = OligoMappingDisplay
     if None not in (sequence, oligos):
         if fit:
             return disp.fitmap(self, sequence, oligos, labels, **opts)
@@ -197,11 +120,5 @@ def display(self, # pylint: disable=function-redefined,too-many-arguments
             return disp.run(self[[bead]], labels, **opts)
         return hv.DynamicMap(_fcn, kdims = ['bead']).redim.values(bead = beads)
     return disp.run(self, labels, **opts)
-
-@addto(PeaksDict)
-def map(self, fcn, **kwa): # pylint: disable=redefined-builtin
-    "returns a hv.DynamicMap with beads and kwargs in the kdims"
-    kwa.setdefault('bead', list(i for i in self.keys()))
-    return hv.DynamicMap(partial(fcn, self), kdims = list(kwa)).redim.values(**kwa)
 
 __all__: List[str] = []

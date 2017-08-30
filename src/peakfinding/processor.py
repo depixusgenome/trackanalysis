@@ -91,12 +91,7 @@ class PeaksDict(TrackItems):
     def compute(self, ibead, precision: float = None) -> Iterator[PeakOutput]:
         "Computes values for one bead"
         vals = iter(i for _, i in self.data[ibead,...])
-        yield from self.config(vals, self.__precision(ibead, precision))
-
-    def detailed(self, ibead, precision: float = None):
-        "detailed output from config"
-        return self.config.detailed(iter(i for _, i in self.data[ibead,...]),
-                                    self.__precision(ibead, precision))
+        yield from self.config(vals, self._precision(ibead, precision))
 
     def index(self) -> 'PeaksDict':
         "Returns indexes at the same key and positions"
@@ -166,7 +161,7 @@ class PeaksDict(TrackItems):
     def _iter(self, sel:Sequence = None) -> Iterator[Output]:
         yield from ((bead, self.compute(bead)) for bead in self.keys(sel))
 
-    def __precision(self, ibead: int, precision: Optional[float]):
+    def _precision(self, ibead: int, precision: Optional[float]):
         return self.config.getprecision(precision, self.data.track, ibead)
 
 class PeakSelectorProcessor(Processor):
