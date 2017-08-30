@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include "legacy/legacyrecord.h"
@@ -15,6 +16,7 @@ namespace legacy
             return pybind11::array(shape, strides, (T*) ptr);
         }
     }
+    pybind11::object _readim(std::string name, bool all = true);
 
     pybind11::object _readrecfov(legacy::GenRecord &rec)
     {
@@ -81,11 +83,20 @@ namespace legacy
         res["framerate"] = pybind11::cast(rec.camerafrequency());
         res["fov"]       = _readrecfov(rec);
 
+        pybind11::dict calib;
         pybind11::dict pos;
+        char tmpname[L_tmpnam];
+        std::string fname = std::tmpnam(tmpname);
         for(auto const & val: rec.pos())
+        {
             pos[pybind11::int_(val.first)] = pybind11::make_tuple(std::get<0>(val.second),
                                                                   std::get<1>(val.second),
                                                                   std::get<2>(val.second));
+            rec.readcalib(val.first, fname);
+            calib[pybind11::int_(val.first)] = _readim(fname, false);
+        }
+
+        res["calibrations"] = calib;
         res["positions"] = pos;
 
         auto dim = rec.dimensions();
@@ -132,7 +143,7 @@ namespace legacy
         return res;
     }
 
-    pybind11::object _readim(std::string name)
+    pybind11::object _readim(std::string name, bool all)
     {
         ImData gr(name);
         if(gr.isnone())
@@ -149,6 +160,8 @@ namespace legacy
             strides = { dims.first*sizeof(float), sizeof(float) };
             std::vector<float> dt(dims.first*dims.second);
             gr.data((void*)dt.data());
+            if(!all)
+                return pybind11::array(shape, strides, dt.data());
             res["image"] = pybind11::array(shape, strides, dt.data());
         }
         else if(gr.ischar())
@@ -156,8 +169,12 @@ namespace legacy
             strides = { dims.first*sizeof(char), sizeof(char) };
             std::vector<unsigned char> dt(dims.first*dims.second);
             gr.data((void*)dt.data());
+            if(!all)
+                return pybind11::array(shape, strides, dt.data());
             res["image"] = pybind11::array(shape, strides, dt.data());
         }
+        if(!all)
+            return pybind11::none();
         return res;
     }
 
@@ -173,7 +190,7 @@ namespace legacy
                 "Reads a '.trk' file's rotation");
         mod.def("readgr", _readgr, "path"_a,
                 "Reads a '.gr' file and returns a dictionnary of datasets");
-        mod.def("readim", _readim, "path"_a,
+        mod.def("readim", _readim, "path"_a, "readall"_a = true,
                 "Reads a '.gr' file and returns an image");
         mod.def("fov",    _readfov, "path"_a,
                 "Reads a '.trk' file and returns the FOV image");

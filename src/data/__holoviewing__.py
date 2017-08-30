@@ -10,7 +10,7 @@ from   itertools                import chain, repeat
 import numpy                    as np
 import holoviews                as hv
 from   utils.decoration         import addto
-from   .track                   import FOV
+from   .track                   import FOV, Bead
 from   .trackitems              import Beads, Cycles
 
 from   .__scripting__           import ExperimentList, Track
@@ -197,14 +197,24 @@ def display(self,  # pylint: disable=function-redefined
     if beads is None:
         beads = self.beads.keys()
 
-    good  = {i: j[:2] for i, j in self.beads.items() if i in beads}
-    xvals = [i        for i, _ in good.values()]
-    yvals = [i        for _, i in good.values()]
-    txt   = [f'{i}'   for i    in good.keys()]
+    good  = {i: j.position[:2] for i, j in self.beads.items() if i in beads}
+    xvals = [i                 for i, _ in good.values()]
+    yvals = [i                 for _, i in good.values()]
+    txt   = [f'{i}'            for i    in good.keys()]
 
     return hv.Overlay([hv.Image(self.image[::-1], bnd)(plot = dict(colorbar = colorbar)),
                        hv.Points((xvals, yvals))(style = dict(color = ptcolor))]
                       + [hv.Text(*i)(style = dict(color = txtcolor))
                          for i in zip(xvals, yvals, txt)])
+
+@addto(Bead)       # type: ignore
+def display(self,  # pylint: disable=function-redefined
+            colorbar = True):
+    "displays the bead calibration"
+    if self.image is None:
+        return
+
+    bnd = [0, 0] + list(self.image.shape)
+    return hv.Image(self.image[::-1], bnd)(plot = dict(colorbar = colorbar))
 
 __all__: List[str] = []

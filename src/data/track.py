@@ -13,12 +13,12 @@ from    model       import levelprop, Level
 from   .trackitems  import Beads, Cycles, BEADKEY, _m_ALL
 from   .trackio     import opentrack, PATHTYPES
 
-IDTYPE      = Union[None, int, slice] # missing Ellipsys as mypy won't accept it
-DATA        = Dict[BEADKEY, np.ndarray]
-POSITIONS   = Dict[BEADKEY, Tuple[float, float, float]]
-DIMENSIONS  = Tuple[Tuple[float, float], Tuple[float, float]]
-_PRECISIONS = Dict[BEADKEY, float]
-_LAZIES     = ('fov',  'framerate', 'data', 'path', 'lazy', 'rawprecisions')
+IDTYPE       = Union[None, int, slice] # missing Ellipsys as mypy won't accept it
+DATA         = Dict[BEADKEY, np.ndarray]
+BEADS        = Dict[BEADKEY, 'Bead']
+DIMENSIONS   = Tuple[Tuple[float, float], Tuple[float, float]]
+_PRECISIONS  = Dict[BEADKEY, float]
+_LAZIES      = ('fov',  'framerate', 'data', 'path', 'lazy', 'rawprecisions')
 
 class Axis(Enum):
     "which axis to look at"
@@ -33,15 +33,23 @@ class Axis(Enum):
             name += 'axis'
         return cls(name)
 
+class Bead:
+    "characteristics of a bead"
+    position: Tuple[float, float, float] = (0., 0., 0.)
+    image:    np.ndarray                 = np.zeros(0, dtype = np.uint8)
+    @initdefaults(locals())
+    def __init__(self, **_):
+        pass
+
 class FOV:
     """
     Data concerning the FOV
 
     Dimensions are provided as : (X slope, X bias), (Y slope, Y bias)
     """
-    image              = np.empty((0,0), dtype = np.uint8)
-    beads:  POSITIONS  = {}
-    dim:    DIMENSIONS = ((1., 0.), (1., 0.))
+    image                       = np.empty((0,0), dtype = np.uint8)
+    beads:         BEADS        = {}
+    dim:           DIMENSIONS   = ((1., 0.), (1., 0.))
     @initdefaults(locals())
     def __init__(self, **kwa):
         pass

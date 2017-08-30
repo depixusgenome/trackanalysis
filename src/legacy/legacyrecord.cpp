@@ -4679,7 +4679,84 @@ namespace legacy
         fclose(fp);
         return file_error;
     }
+
+    bool _load_calib_im_file_from_record(gen_record *g_r, int im, std::string fname)
+    {
+        long int start, end;
+        char test[32], *st = NULL;
+        FILE *fp = NULL, *fpo = NULL;
+        unsigned char uch;
+        int read_error = 0, write_error = 0,  i;
+        size_t result;
+
+        if (g_r == NULL || im < 0 || im >= g_r->n_bead)
+            return false;
+
+        fpo = fopen(fname.data(), "wb");
+        if (fpo == NULL)
+        {
+            fclose(fp);
+            return false;
+        }
+
+        fp = fopen(g_r->fullname, "rb+");
+        if (fp == NULL)
+            return false;
+
+
+        start = g_r->b_r[im]->cal_im_start;
+        end = (im == g_r->n_bead - 1) ? g_r->config_file_position : g_r->b_r[im + 1]->cal_im_start;
+        if (end - start < 1024)
+            return false;
+
+        fseek(fp, start, SEEK_SET);      // we go to file end
+        result = fread(test, sizeof(char), 32, fp);
+        if (result != 32)
+        {
+            fclose(fp);
+            fclose(fpo);
+            return NULL;
+        }
+
+        st = strstr(test, "image data");
+        if (st == NULL)
+        {
+            start += 1024;
+
+            fseek(fp, start, SEEK_SET);
+
+            result = fread(test, sizeof(char), 32, fp);
+            st = strstr(test, "image data");
+
+            if (st == NULL)
+            {
+                fclose(fp);
+                fclose(fpo);
+                return NULL;
+            }
+        }
+
+        fseek(fp, start, SEEK_SET);      // we go to file end
+        for (i = start; i < end; i++)
+        {
+            // we put data on 1k boundary
+            if (fread(&uch, sizeof(unsigned char), 1, fp) != 1)
+            {
+                read_error++;
+            }
+
+            if (fwrite(&uch, sizeof(unsigned char), 1, fpo) != 1)
+            {
+                write_error++;
+            }
+        }
+
+        fclose(fp);
+        fclose(fpo);
+        return true;
+    }
 }
+
 
 // getters
 namespace legacy
@@ -4695,6 +4772,13 @@ namespace legacy
         int lmin = 0, lmax = 0, lphase = 0;
         _retrieve_min_max_event_and_phases(_ptr, &lmin, &lmax, &lphase);
         return lmax-lmin+1;
+    }
+
+    bool GenRecord::readcalib(int im, std::string fname) const
+    {
+        if(_ptr == nullptr || _ptr->abs_pos < 0)
+            return false;
+        return _load_calib_im_file_from_record(_ptr, im, fname);
     }
 
     int GenRecord::cyclemin  () const
