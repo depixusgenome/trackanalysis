@@ -5,7 +5,6 @@ permutes oligos to find maximal overlapping
 checks base per base that the constructed sequence is optimal
 allows for multiple possibilities
 can be optimised
-can be modified (1 line) # HERE to look for all suboptimal solutions
 '''
 
 import itertools
@@ -90,8 +89,11 @@ class PermGenerator:
                                   kperm=[self.oligos[i] for i in prmid],
                                   kpermids=numpy.array(prmid))
 
+
+
+
 class Shuffler:
-    'align oligo by maximising the overlap one index at a time'
+    '''align oligo by maximising the overlap one index at a time'''
     def __init__(self,**kwa):
 
         oligos=kwa.get("oligos",[]) # type: data.OligoPeak
@@ -224,6 +226,8 @@ class Shuffler:
 
             resume_parts=data.Partition.reduce_partitions(partitions,index)
             partitions=resume_parts
+            if __debug__:
+                pickle.dump(partitions,open(f"parts{index}.pickle","wb"))
 
         return partitions
 

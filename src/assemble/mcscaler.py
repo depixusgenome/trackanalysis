@@ -87,7 +87,7 @@ class Score(PeakSetting):
         self.unsigned:bool=kwa.get("unsigned",True)
         seqs=frozenset().union(*[frozenset(pk.seqs) for pk in self.peaks])
         self.pairseqs=frozenset([(sq1,sq2)
-                                 for sq1,sq2 in itertools.permutations(seqs,2)
+                                 for sq1,sq2 in itertools.product(seqs,seqs)
                                  if data.Oligo.overlap(sq1,
                                                        sq2,
                                                        min_overl=self.min_overl,
@@ -113,14 +113,6 @@ class Score(PeakSetting):
         # sort seq according to npos
         seqs=[pseq[1] for pseq in sorted(zip(fpos,fseqs))]
         return -sum([1 for idx,val in enumerate(seqs[1:]) if (seqs[idx],val) in self.pairseqs])
-
-
-    def sign_oligos(self,state:np.array):
-        '''
-        given a state, returns the signs for each oligos which minimises the score
-        can't use networkx to find minimal path, in most cases, no paths
-        '''
-        pass
 
 class StreBiasStep: # pylint: disable=too-many-instance-attributes
     'defines the take_step callable'
@@ -203,7 +195,7 @@ class SeqUpdate(PeakSetting):
         self.cycle=itertools.cycle(list(range(1,len(self.peaks)-1)))
         self.index=kwa.get("index",0) # type: int
         self.indices:List[int]=kwa.get("indices",list(range(len(self.peaks))))
-        self.call:Callable=self.multi_update
+        self.call:Callable=self.multi_update # self.single_update
 
     # need to consider only the peaks that can be matched
     # no need to recompute the bstretch,bbias function of state if using self._pos[tomove]
@@ -233,18 +225,17 @@ class SeqUpdate(PeakSetting):
     def __call__(self,*args,**kwa):
         return self.call(*args,**kwa)
 
+    # # fix this: returns only a single update and not all
+    # still performs better than single update...
     def multi_update(self,*args,**kwa)->np.array: # pylint: disable=unused-argument
         '''
         multiple peaks are updated simultaneously
         a peak and overlapping ones
         '''
-        indices=np.random.permutation(self.indices)
+        self.index=random.choice(self.indices) # type: ignore
         state=args[0]
-        for index in indices:
-            self.index=index
-            #print(f"index={index},state={state}")
-            if self.index!=0:
-                state=self.single_update(state)
+        if self.index!=0:
+            state=self.single_update(state)
         return state
 
 class HopperStatus:
@@ -314,7 +305,6 @@ class SeqHoppScaler(PeakSetting):
 
         for loop in itertools.repeat(range(1,len(self.peaks)),5):
             for lidx in loop:
-                print(f"lidx={lidx}")
                 self.sampler.indices=list(self.neigh[lidx])
                 curr_res=basinhopping(x0=state,**self.basinkwa)
                 print(f"fun={curr_res.fun}")

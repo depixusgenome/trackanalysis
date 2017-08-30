@@ -83,16 +83,7 @@ class Overseer(mcscaler.PeakSetting):
             print(src,tgt)
             paths+=[(networkx.shortest_path_length(graph,src,tgt,weight="weight"),
                      list(networkx.shortest_path(graph,source=src,target=tgt,weight="weight")))]
-            # paths+=[(networkx.shortest_path_length(graph,
-            #                                        src,
-            #                                        tgt,
-            #                                        weight="weight"),
-            #          list(networkx.all_shortest_paths(graph,
-            #                                           source=src,
-            #                                           target=tgt,
-            #                                           weight="weight")))]
-
-        return paths
+        return sorted(paths,key=lambda x:x[0])[0][1]
 
     def run(self):
         '''
