@@ -1,16 +1,17 @@
 #include "peakcalling/optimize.hpp"
 #include "peakcalling/costfunction.h"
 
+
 namespace peakcalling { namespace cost
 {
     namespace
     {
-        Output _computecf  (Parameters const & cf, double stretch, double bias,
-                            float const * bead1, size_t size1,
-                            float const * bead2, size_t size2)
+        Output _computecf(Parameters const & cf, double stretch, double bias,
+                          float const * bead1, float const * yvals1, size_t size1,
+                          float const * bead2, float const * yvals2, size_t size2)
         {
-            auto cost = [](float const * pos1, size_t size1,
-                           float const * pos2, size_t size2,
+            auto cost = [](float const * pos1, float const * aweight1, size_t size1,
+                           float const * pos2, float const * aweight2, size_t size2,
                            double alpha, double beta, double sig)
                         -> std::tuple<float, float, float>
                 {
@@ -21,12 +22,24 @@ namespace peakcalling { namespace cost
                     double norm1     = 0.;
                     double grsum [2] = {0., 0.};
                     double grnorm    = 0.;
+
+                    auto   weights = [](auto const & aweight, auto size)
+                    {
+                        if(aweight == nullptr)
+                            return std::vector<float>(size, 1.);
+                        return std::vector<float>(aweight, aweight+size);
+                    };
+
+                    auto weights1 = weights(aweight1, size1),
+                         weights2 = weights(aweight2, size2);
+
                     for(size_t i2 = 0; i2 < size2; ++i2)
                     {
                         for(size_t i1 = 0; i1 < size1; ++i1)
                         {
                             double d = (pos1[i1]-alpha*pos2[i2]-beta)/sig;
-                            double e = std::exp(-.5*d*d);
+                            double w = weights1[i1]*weights2[i2];
+                            double e = w*std::exp(-.5*d*d);
                             double c = e*d/sig;
 
                             sum      += e;
@@ -37,7 +50,8 @@ namespace peakcalling { namespace cost
                         for(size_t i1 = 0; i1 < size2; ++i1)
                         {
                             double d = (pos2[i1]-pos2[i2])*alpha/sig;
-                            double e = std::exp(-.5*d*d);
+                            double w = weights2[i1]*weights2[i2];
+                            double e = w*std::exp(-.5*d*d);
 
                             norm1  += e;
                             grnorm += e*d/sig*(pos2[i2]-pos2[i1]);
@@ -49,7 +63,8 @@ namespace peakcalling { namespace cost
                         for(size_t i2 = 0; i2 < size1; ++i2)
                         {
                             double d = (pos1[i1]-pos1[i2])/sig;
-                            norm2 += std::exp(-.5*d*d);
+                            double w = weights1[i1]*weights1[i2];
+                            norm2   += w*std::exp(-.5*d*d);
                         }
 
                     double c = std::sqrt(norm1*norm2);
@@ -59,11 +74,13 @@ namespace peakcalling { namespace cost
                                            float(-grsum[1]/c));
                 };
 
-            auto r1 = cost(bead1, size1, bead2, size2, stretch, bias, cf.sigma);
+            auto r1 = cost(bead1, yvals1, size1,
+                           bead2, yvals2, size2,
+                           stretch, bias, cf.sigma);
             if(!cf.symmetric)
                 return r1;
 
-            auto r2 = cost(bead2, size2, bead1, size1, 1./stretch, -bias/stretch,
+            auto r2 = cost(bead2, yvals2, size2, bead1, yvals1, size1, 1./stretch, -bias/stretch,
                            cf.sigma);
             return std::make_tuple(float(std::get<0>(r1) +std::get<0>(r2)),
                                    float(std::get<1>(r1)-(std::get<1>(r2)-std::get<2>(r2)*bias)
@@ -75,8 +92,8 @@ namespace peakcalling { namespace cost
         {
             auto const & cf = *((optimizer::NLOptCall<Parameters> const *) d);
             auto res = _computecf(*cf.params, x[0], x[1],
-                                  cf.beads[0], cf.sizes[0],
-                                  cf.beads[1], cf.sizes[1]);
+                                  cf.beads[0], cf.weights[0], cf.sizes[0],
+                                  cf.beads[1], cf.weights[1], cf.sizes[1]);
             g[0] = std::get<1>(res);
             g[1] = std::get<2>(res);
             return std::get<0>(res);
@@ -84,12 +101,19 @@ namespace peakcalling { namespace cost
     }
 
     Output compute  (Parameters const & cf,
-                     float const * bead1, size_t size1,
-                     float const * bead2, size_t size2)
-    { return _computecf(cf, cf.current[0], cf.current[1], bead1, size1, bead2, size2); }
+                     float const * bead1, float const * weights1,  size_t size1,
+                     float const * bead2, float const * weights2,  size_t size2)
+    {
+        return _computecf(cf, cf.current[0], cf.current[1],
+                          bead1, weights1, size1,
+                          bead2, weights2, size2);
+    }
 
     Output optimize (Parameters const & cf,
-                     float const * bead1, size_t size1,
-                     float const * bead2, size_t size2)
-    { return optimizer::optimize(cf, bead1, size1, bead2, size2, _compute); }
+                     float const * bead1, float const * weights1,  size_t size1,
+                     float const * bead2, float const * weights2,  size_t size2)
+    {
+        return optimizer::optimize(cf, bead1, weights1, size1, bead2, weights2, size2,
+                                   _compute);
+    }
 }}

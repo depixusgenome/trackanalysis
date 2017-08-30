@@ -17,10 +17,33 @@ namespace peakcalling
                     {
                         Parameters cf; cf.symmetric = a; cf.sigma = b; cf.current = {c, d};
                         return compute(cf,
-                                       bead1.data(), bead1.size(),
-                                       bead2.data(), bead2.size());
+                                       bead1.data(), nullptr, bead1.size(),
+                                       bead2.data(), nullptr, bead2.size());
                     },
                     "input1"_a,          "input2"_a,
+                    "symmetry"_a = true, "noise"_a = 0.003f,
+                    "stretch"_a  = 1.f,  "bias"_a  = 0.f,
+                    "Computes the cost for given parameters.\n"
+                    "Returns a tuple (value, stretch gradient, bias gradient)"
+                    );
+
+            ht.def("compute", [](pybind11::array_t<float> const & bead1,
+                                 pybind11::array_t<float> const & weight1,
+                                 pybind11::array_t<float> const & bead2,
+                                 pybind11::array_t<float> const & weight2,
+                                 bool a, float b, float c, float d)
+                    {
+                        if(bead1.size() != weight1.size())
+                            throw pybind11::index_error("bead1.size != weight1.size");
+                        if(bead2.size() != weight2.size())
+                            throw pybind11::index_error("bead2.size != weight2.size");
+                        Parameters cf; cf.symmetric = a; cf.sigma = b; cf.current = {c, d};
+                        return compute(cf,
+                                       bead1.data(), weight1.data(), bead1.size(),
+                                       bead2.data(), weight2.data(), bead2.size());
+                    },
+                    "input1"_a,          "input2"_a,
+                    "weight1"_a,         "weight2"_a,
                     "symmetry"_a = true, "noise"_a = 0.003f,
                     "stretch"_a  = 1.f,  "bias"_a  = 0.f,
                     "Computes the cost for given parameters.\n"
@@ -40,10 +63,45 @@ namespace peakcalling
                         cf.lower = {ls, lb}; cf.upper = {us, ub}; cf.xrel = rpar; cf.frel = rfcn;
                         cf.xabs  = apar; cf.stopval = stop; cf.maxeval = maxe;
                         return optimize(cf,
-                                        bead1.data(), bead1.size(),
-                                        bead2.data(), bead2.size());
+                                        bead1.data(), nullptr, bead1.size(),
+                                        bead2.data(), nullptr, bead2.size());
                     },
                     "input1"_a,                "input2"_a,
+                    "symmetry"_a    = true,    "noise"_a   = 0.003f,
+                    "min_stretch"_a = 0.8f,    "stretch"_a = 1.f, "max_stretch"_a = 1.2f,
+                    "min_bias"_a    = -0.005f, "bias"_a    = 0.f, "max_bias"_a    = .005f,
+                    "threshold_param_rel"_a = 1e-4,
+                    "threshold_param_abs"_a = 1e-8,
+                    "threshold_func_rel"_a  = 1e-4,
+                    "stopval"_a             = 1e-8,
+                    "maxeval"_a             = size_t(100),
+                    "Optimizes the cost for given parameters."
+                    "Returns a tuple (min cost, best stretch, best bias)");
+
+            ht.def("optimize", [](pybind11::array_t<float> const & bead1,
+                                  pybind11::array_t<float> const & weight1,
+                                  pybind11::array_t<float> const & bead2,
+                                  pybind11::array_t<float> const & weight2,
+                                  bool   sym,  float sig,
+                                  float  ls,   float cs, float us,
+                                  float  lb,   float cb, float ub,
+                                  double rpar, double apar, double rfcn, double stop,
+                                  size_t maxe
+                                 )
+                    {
+                        if(bead1.size() != weight1.size())
+                            throw pybind11::index_error("bead1.size != weight1.size");
+                        if(bead2.size() != weight2.size())
+                            throw pybind11::index_error("bead2.size != weight2.size");
+                        Parameters cf; cf.symmetric = sym; cf.sigma = sig; cf.current = {cs, cb};
+                        cf.lower = {ls, lb}; cf.upper = {us, ub}; cf.xrel = rpar; cf.frel = rfcn;
+                        cf.xabs  = apar; cf.stopval = stop; cf.maxeval = maxe;
+                        return optimize(cf,
+                                        bead1.data(), weight1.data(), bead1.size(),
+                                        bead2.data(), weight2.data(), bead2.size());
+                    },
+                    "input1"_a,                "input2"_a,
+                    "weight1"_a,               "weight2"_a,
                     "symmetry"_a    = true,    "noise"_a   = 0.003f,
                     "min_stretch"_a = 0.8f,    "stretch"_a = 1.f, "max_stretch"_a = 1.2f,
                     "min_bias"_a    = -0.005f, "bias"_a    = 0.f, "max_bias"_a    = .005f,

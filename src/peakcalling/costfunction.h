@@ -10,6 +10,10 @@ namespace peakcalling { namespace cost
 
     using Output = optimizer::Output;
 
-    Output compute (Parameters const &, float const *, size_t, float const *, size_t);
-    Output optimize(Parameters const &, float const *, size_t, float const *, size_t);
+    Output compute (Parameters const &,
+                    float const *, float const *, size_t,
+                    float const *, float const *, size_t);
+    Output optimize(Parameters const &,
+                    float const *, float const *, size_t,
+                    float const *, float const *, size_t);
 }}

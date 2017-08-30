@@ -218,5 +218,5 @@ namespace peakcalling { namespace match
     optimizer::Output optimize (Parameters const & cf,
                                 float const * bead1, size_t size1,
                                 float const * bead2, size_t size2)
-    { return optimizer::optimize(cf, bead1, size1, bead2, size2, _compute); }
+    { return optimizer::optimize(cf, bead1, nullptr, size1, bead2, nullptr, size2, _compute); }
 }}
