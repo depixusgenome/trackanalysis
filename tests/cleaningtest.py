@@ -3,6 +3,7 @@
 # pylint: disable=redefined-outer-name
 """ Tests views """
 import numpy as np
+from   numpy.testing            import assert_equal
 
 from testingcore                import path as utpath
 from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
@@ -10,6 +11,35 @@ from cleaning.processor         import DataCleaning, DataCleaningTask, DataClean
 from simulator                  import randtrack, setseed
 from control.taskcontrol        import create
 from data.track                 import Track
+
+def test_constantvalues():
+    "test constant values"
+    setseed(0)
+    bead = np.random.normal(.1, 3e-3, 50)
+
+    bead[:3]    = 100.
+    bead[10:13] = 100.
+    bead[20:30] = 100.
+    bead[40:42] = 100.
+    bead[-3:]   = 100.
+
+    fin                  =  np.abs(bead-100.) < 1e-5
+    fin[[0,10,20,40,41,-3]] = False
+
+    DataCleaning().constant(bead)
+
+    assert_equal(np.isnan(bead), fin)
+
+    bead[:3]    = 100.
+    bead[10:13] = 100.
+    bead[20:30] = 100.
+    bead[40:42] = 100.
+    bead[-3:]   = 100.
+
+    DataCleaning(mindeltarange=5).constant(bead)
+    fin[:] = False
+    fin[21:30] = True
+    assert_equal(np.isnan(bead), fin)
 
 def test_cleaning_base():
     "test cleaning"
@@ -71,4 +101,4 @@ def test_view(bokehaction):
         assert server.task(DataCleaningTask).maxhfsigma == 0.002
 
 if __name__ == '__main__':
-    test_view(bokehaction(None))
+    test_cleaning_base()

@@ -22,6 +22,8 @@ Partial = NamedTuple('Partial',
 
 class DataCleaning:
     "bead selection"
+    mindeltavalue = 1e-6
+    mindeltarange = 3
     maxabsvalue   = 5.
     maxderivate   = 2.
     minpopulation = 80.
@@ -29,6 +31,8 @@ class DataCleaning:
     maxhfsigma    = 1e-2
     minextent     = .5
     __ZERO        = np.zeros(0, dtype = 'i4')
+
+    CYCLES        = 'hfsigma', 'extent', 'population'
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -69,6 +73,37 @@ class DataCleaning:
         test = [ 0. if len(i) == 0 else np.isfinite(i).sum()/len(i)*100. for i in cycs]
         return self.__test('population', test)
 
+    def constant(self, bead:np.ndarray):
+        """
+        Removes constant values.
+
+            * |z[I-mindeltarange+1] - z[I-mindeltarange+2] | < mindeltavalue
+            *  & ...
+            *  & |z[I-mindeltarange+1] - z[I]|              < mindeltavalue
+            *  & n ∈ [I-mindeltarange+2, I]
+        """
+        mind  = self.mindeltavalue
+        rng   = self.mindeltarange-1
+
+        bead[np.isnan(bead)] = np.finfo('f4').max
+
+        inds  = np.abs(bead[:-rng]-bead[1:1-rng]) < mind
+        inds &= np.abs(bead[:-rng]-bead[2:2-rng if rng > 2 else None]) < mind
+        inds  = np.nonzero(inds)[0]
+
+        for i in range(2, rng):
+            inds = inds[np.abs(bead[inds]-bead[inds+i]) < mind]
+
+        while len(inds):
+            i     = inds[0]
+            start = bead[i]
+            j     = next((j for j, v in enumerate(bead[i+3:]) if abs(start-v) > mind), 0)
+            bead[i+1:i+j+3] = np.NaN
+
+            inds  = inds[np.searchsorted(inds, i+j+2):]
+
+        bead[bead == np.finfo('f4').max] = np.NaN
+
     def aberrant(self, bead:np.ndarray, clip = False) -> bool:
         """
         Removes aberrant values.
@@ -77,6 +112,10 @@ class DataCleaning:
 
             * |z[n] - median(z)| > maxabsvalue
             * |(z[n+1]-z[n-1])/2-z[n]| > maxderivate
+            * |z[I-mindeltarange+1] - z[I-mindeltarange+2] | < mindeltavalue
+              && ...
+              && |z[I-mindeltarange+1] - z[I]|               < mindeltavalue
+              && n ∈ [I-mindeltarange+2, I]
 
         Aberrant values are replaced by:
 
@@ -95,12 +134,15 @@ class DataCleaning:
         if clip:
             good[med >  self.maxabsvalue] = zero+self.maxabsvalue
             good[med < -self.maxabsvalue] = zero-self.maxabsvalue
+            bead[fin] = good
         else:
             der = correlate1d(good, [.5, -1., .5], mode = 'nearest')
             good[np.logical_or(np.abs(med) > self.maxabsvalue,
                                np.abs(der) > self.maxderivate)] = np.NaN
 
-        bead[fin] = good
+            bead[fin] = good
+            self.constant(bead)
+
         if len(good)-np.isnan(good).sum() <= len(bead) * self.minpopulation * 1e-2:
             return True
 
@@ -142,7 +184,7 @@ class DataCleaningException(Exception):
             msg   = ('%d cycles: valid < %.0f%%' % get('population', 'min'),
                      '%d cycles: σ[HF] < %.4f'   % get('hfsigma',    'min'),
                      '%d cycles: σ[HF] > %.4f'   % get('hfsigma',    'max'),
-                     '%d cycles: z range > %.2f' % get('extent',     'max'))
+                     '%d cycles: max(z)-min(z) < %.2f' % get('extent',     'max'))
 
             return '\n'.join(i for i in msg if i[0] != '0')
 
@@ -158,7 +200,7 @@ class DataCleaningProcessor(Processor):
     @classmethod
     def __test(cls, frame, cnf):
         sel = DataCleaningTask(**cnf)
-        for name in ('population', 'hfsigma', 'extent'):
+        for name in sel.CYCLES:
             cycs = tuple(frame.withphases(*cls.__get(name+'phases', cnf)).values())
             yield getattr(sel, name)(cycs)
 
