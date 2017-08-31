@@ -49,7 +49,7 @@ export class DpxToolbarView extends WidgetView
         super()
         mdl  = @model
         if @model.hasquit
-            quit = "<div class='dpx-col-12'>#{@make_btn('quit', 'Quit')}</div>"
+            quit = "<div class='dpx-col-12'>#{@make_btn('quit', 'Quit', '')}</div>"
         else
             quit =''
 
