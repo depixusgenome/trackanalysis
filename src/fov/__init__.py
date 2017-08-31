@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"all FOV view aspects here"
+u"all FoV view aspects here"
 from typing           import Dict, Any
 import numpy as np
 from bokeh.models     import ColumnDataSource, Range1d, TapTool
@@ -10,8 +10,8 @@ from control.action   import Action
 from view.plots.tasks import TaskPlotCreator
 from view.plots       import PlotAttrs, PlotView
 
-class FOVPlotCreator(TaskPlotCreator):
-    "Plots a default bead and its FOV"
+class FoVPlotCreator(TaskPlotCreator):
+    "Plots a default bead and its FoV"
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
@@ -38,7 +38,7 @@ class FOVPlotCreator(TaskPlotCreator):
         self.__fov:        int              = None
 
     def _create(self, _):
-        self._fig = figure(**self._figargs(name    = 'FOV:Fig',
+        self._fig = figure(**self._figargs(name    = 'FoV:Fig',
                                            x_range = Range1d(0, 1),
                                            y_range = Range1d(0, 1),
                                            tools   = self.config.plot.fov.tools.get()))
@@ -158,6 +158,6 @@ class FOVPlotCreator(TaskPlotCreator):
                      text = [f'{i}'        for i in items.keys()])
         return dict(data = data)
 
-class FOVPlotView(PlotView):
-    "FOV plot view"
-    PLOTTER = FOVPlotCreator
+class FoVPlotView(PlotView):
+    "FoV plot view"
+    PLOTTER = FoVPlotCreator

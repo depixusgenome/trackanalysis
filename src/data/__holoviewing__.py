@@ -10,7 +10,7 @@ from   itertools                import chain, repeat
 import numpy                    as np
 import holoviews                as hv
 from   utils.decoration         import addto
-from   .track                   import FOV, Bead
+from   .track                   import FoV, Bead
 from   .trackitems              import Beads, Cycles
 
 from   .__scripting__           import ExperimentList, Track
@@ -186,7 +186,7 @@ def keymap(self:ExperimentList, key, fcn, **kwa):
     return (hv.DynamicMap(fcn, kdims = ['bead']+list(kwa))
             .redim.values(bead = beads, **kwa))
 
-@addto(FOV)        # type: ignore
+@addto(FoV)        # type: ignore
 def display(self,  # pylint: disable=function-redefined,too-many-arguments
             beads    = None,
             calib    = True,
@@ -194,7 +194,7 @@ def display(self,  # pylint: disable=function-redefined,too-many-arguments
             ptcolor  = 'lightblue',
             txtcolor = 'blue'):
     """
-    displays the FOV with bead positions as well as calibration images.
+    displays the FoV with bead positions as well as calibration images.
     """
     bnd = self.bounds()
     beads = list(self.beads.keys()) if beads is None else list(beads)

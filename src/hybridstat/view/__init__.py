@@ -5,9 +5,8 @@ from bokeh.models   import Tabs, Panel
 from bokeh          import layouts
 from view.base      import BokehView
 from view.plots     import PlotState
-from view.beadplot  import BeadPlotView
 from cleaning.view  import CleaningView
-from fov            import FOVPlotView
+from fov            import FoVPlotView
 from cyclesplot     import CyclesPlotView
 from .peaksplot     import PeaksPlotView
 
@@ -17,8 +16,7 @@ class HybridStatView(BokehView):
         "Sets up the controller"
         super().__init__(**kwa)
         self._tabs   = None
-        self._panels = [FOVPlotView   (**kwa),
-                        BeadPlotView  (**kwa),
+        self._panels = [FoVPlotView   (**kwa),
                         CleaningView  (**kwa),
                         CyclesPlotView(**kwa),
                         PeaksPlotView (**kwa)]
@@ -33,6 +31,7 @@ class HybridStatView(BokehView):
             key                         = self.__key(panel)
             titles[key].default         = key.capitalize()
             self.__state(panel).default = PlotState.disabled
+        titles['fov'].default           = 'FoV'
 
         self.__state(self.__select(CleaningView)).default = PlotState.active
 

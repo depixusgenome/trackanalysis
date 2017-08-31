@@ -193,6 +193,6 @@ namespace legacy
         mod.def("readim", _readim, "path"_a, "readall"_a = true,
                 "Reads a '.gr' file and returns an image");
         mod.def("fov",    _readfov, "path"_a,
-                "Reads a '.trk' file and returns the FOV image");
+                "Reads a '.trk' file and returns the FoV image");
     }
 }

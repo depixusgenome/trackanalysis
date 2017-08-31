@@ -338,9 +338,9 @@ class Handler:
         if kwargs is None:
             res['data'] = {}
         else:
-            from .track import FOV, Bead
+            from .track import FoV, Bead
             calib = kwargs.pop('calibrations')
-            res['fov'] = FOV(image = kwargs.pop('fov'),
+            res['fov'] = FoV(image = kwargs.pop('fov'),
                              dim   = kwargs.pop('dimensions'),
                              beads = {i: Bead(position = j,
                                               image    = calib.get(i, Bead.image))

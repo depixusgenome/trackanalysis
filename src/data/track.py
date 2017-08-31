@@ -41,9 +41,9 @@ class Bead:
     def __init__(self, **_):
         pass
 
-class FOV:
+class FoV:
     """
-    Data concerning the FOV
+    Data concerning the FoV
 
     Dimensions are provided as : (X slope, X bias), (Y slope, Y bias)
     """
@@ -98,7 +98,7 @@ class FOV:
 class Track:
     "Model for track files. This must not contain actual data."
     _framerate                  = 0.
-    _fov: FOV                   = None
+    _fov: FoV                   = None
     _phases                     = np.empty((0,9), dtype = 'i4')
     _data:          DATA        = None
     _path:          PATHTYPES   = None
@@ -163,12 +163,12 @@ class Track:
 
     @property
     def fov(self) -> np.ndarray:
-        "returns the FOV"
+        "returns the FoV"
         return self.__getter('_fov')
 
     @fov.setter
     def fov(self, val) -> np.ndarray:
-        "returns the FOV"
+        "returns the FoV"
         return self.__setter('_fov', val)
 
     @property
