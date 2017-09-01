@@ -18,6 +18,7 @@ more difficult to implement but simpler algorithm as a whole
 '''
 
 from typing import List, Generator, Tuple # pylint: disable=unused-import
+import pickle
 import itertools
 import networkx
 from assemble import data,mcscaler, shuffler
@@ -46,7 +47,8 @@ class Overseer(mcscaler.PeakSetting):
     def __init__(self,**kwa):
         super().__init__(**kwa)
         self.scaler=mcscaler.SeqHoppScaler(**kwa)
-        self.shuffler=shuffler.Shuffler() # not really necessary except for debugging
+        self.shuffler=shuffler.Shuffler()
+        self.signed:List[data.OligoPeak]
 
     @staticmethod
     def fix_signs(oligos:List[data.OligoPeak],min_overl:int=2): # ->List[data.OligoPeak]:
@@ -80,9 +82,22 @@ class Overseer(mcscaler.PeakSetting):
         paths:List[Tuple[float,List[data.OligoPeak]]]=[]
 
         for src,tgt in itertools.product(sources,targets):
-            print(src,tgt)
             paths+=[(networkx.shortest_path_length(graph,src,tgt,weight="weight"),
                      list(networkx.shortest_path(graph,source=src,target=tgt,weight="weight")))]
+
+            # all shortest paths is not a solution
+            # paths+=[(networkx.shortest_path_length(graph,
+            #                                        src,
+            #                                        tgt,
+            #                                        weight="weight"),
+            #          list(networkx.all_shortest_paths(graph,
+            #                                           source=src,
+            #                                           target=tgt,
+            #                                           weight="weight")))]
+
+        # consider this also
+        # min_len=min([path[0] for path in paths])
+        # return [pth for path in paths for pth in path[1] if path[0]==min_len]
         return sorted(paths,key=lambda x:x[0])[0][1]
 
     def run(self):
@@ -104,9 +119,12 @@ class Overseer(mcscaler.PeakSetting):
             oligos=sorted([oli for peak in scaled for oli in peak.arr],
                           key=lambda x:x.pos)
             # each oligos is then separated by 1.1 nm
+            self.signed=self.fix_signs(oligos,self.min_overl)
 
-            # problem, havent considered signs of oligos...
-            self.shuffler=shuffler.Shuffler(oligos=oligos,
+            if __debug__:
+                # to debug error in line 219 of shuffler
+                pickle.dump(self.signed,open(f"dbgsigned{ite}.pickle","wb"))
+            self.shuffler=shuffler.Shuffler(oligos=self.signed,
                                             min_overl=self.min_overl)
             partitions.append(self.shuffler.run())
         return partitions

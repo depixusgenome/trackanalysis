@@ -435,6 +435,15 @@ class Partition:
         'returns the merged perms'
         return OligoPerm.add(*self.perms)
 
+    def ordered(self)->List[List[Oligo]]:
+        '''
+        returns the list of ordered oligos (after permutation) for each path
+        '''
+        paths=list(self.paths())
+        # merge permutations
+        merged=[OligoPerm.add(*path) for path in paths]
+        return [merg.perm for merg in merged]
+
     def add(self,perm:OligoPerm,in_place=False):
         '''
         if not in_place returns a new Partition with added perm

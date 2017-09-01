@@ -199,10 +199,17 @@ class SeqUpdate(PeakSetting):
 
     # need to consider only the peaks that can be matched
     # no need to recompute the bstretch,bbias function of state if using self._pos[tomove]
-    def move_one(self,npos:List[np.array],tomove:int):
-        'defines a new stre,bias for a single peak'
-        others=np.sort(np.hstack(npos))
-        moves=scaler.match_peaks(others,self._pos[tomove],self.bstretch,self.bbias)
+    def move_one(self,others:np.array,tomove:int):
+        '''
+        defines a new stre,bias for a single peak
+        position to match are located between others positions
+        '''
+        shifted=0.5*(others[1:]+others[:-1]) # to avoid multiple overlaps
+        moves=scaler.match_peaks(shifted,self._pos[tomove],self.bstretch,self.bbias)
+        if len(moves)==0:
+            print(f"cant move index={tomove}")
+        else:
+            print(f'can move')
         return random.choice(moves) # type: ignore
 
     def single_update(self,*args,**kwa): # pylint: disable=unused-argument
@@ -211,13 +218,17 @@ class SeqUpdate(PeakSetting):
         neigh=sorted(frozenset(self.indices)-frozenset([self.index]))
         state=args[0]
         # scale all peaks
-        #npos=[state[2*idx]*arr+state[2*idx+1] for idx,arr in enumerate(self._pos)]
-        # consider only those which may overlap
-        # must remove self.index from
-        npos=[state[2*idx]*self._pos[idx]+state[2*idx+1] for idx in neigh]
+        all_scaled=[state[2*idx]*pos+state[2*idx+1] for idx,pos in enumerate(self._pos)]
+        match=np.sort(np.hstack([all_scaled[idx] for idx in neigh]))
+        apos=np.sort(np.hstack(all_scaled)) # all positions
+        lower=max(apos[apos<min(match)]) if any(apos<min(match)) else min(match)-2.2
+        upper=min(apos[apos>max(match)]) if any(apos>max(match)) else max(match)+2.2
+
         # find where to move
         try:
-            nstre,nbias=self.move_one(npos,tomove)
+            #nstre,nbias=self.move_one(match,tomove)
+            nstre,nbias=self.move_one(np.hstack([lower,match,upper]),tomove)
+
         except IndexError:
             return state
         return np.hstack([state[:2*tomove],[nstre,nbias],state[2*(tomove+1):]])
@@ -226,7 +237,6 @@ class SeqUpdate(PeakSetting):
         return self.call(*args,**kwa)
 
     # # fix this: returns only a single update and not all
-    # still performs better than single update...
     def multi_update(self,*args,**kwa)->np.array: # pylint: disable=unused-argument
         '''
         multiple peaks are updated simultaneously
@@ -234,8 +244,9 @@ class SeqUpdate(PeakSetting):
         '''
         self.index=random.choice(self.indices) # type: ignore
         state=args[0]
-        if self.index!=0:
-            state=self.single_update(state)
+        # if self.index!=0:
+        #    state=self.single_update(state)
+        state=self.single_update(state) # trying wth peaks 0 moving
         return state
 
 class HopperStatus:
@@ -244,8 +255,81 @@ class HopperStatus:
         self.state=kwa.get("state",np.array)
         self.scores:List[float]=[]
 
-class SeqHoppScaler(PeakSetting):
+# class SeqHoppScaler(PeakSetting):
+#     '''
+#     Cannot  converge towards the correct solution because it needs to
+#     take into account the noise on each position
+
+#     adjust the scales of experiments to minimize scoring function
+#     Could be better with a full-fledged MCTS implementation
+#     Controls the SeqUpdate instance together with the Score
+#     decides which indices must be used to compute the score
+#     and which index must be updated
+#     '''
+#     def __init__(self,**kwa):
+#         super().__init__(**kwa)
+#         self.scoring=Score(**kwa)
+#         self.sampler=SeqUpdate(**kwa)
+#         self.min_overl:int=kwa.get("min_overl",2)
+#         self.edges=scaler.OPeakArray.list2edgeids(self._peaks,
+#                                                   min_overl=self.min_overl,
+#                                                   unsigned=self.scoring.unsigned)
+#         self.neigh:Dict[int,List[int]]={idx:frozenset(edg
+#                                                       for edge in self.edges
+#                                                       for edg in edge
+#                                                       if idx in edge)
+#                                         for idx in range(len(self.peaks))}
+#         #self.edges=[edge for edge in self.edges if edge[0]<edge[1]]
+#         self.basinkwa={"func":self.scoring,
+#                        "niter":100,
+#                        "minimizer_kwargs":dict(method=no_minimizer),
+#                        "take_step":self.sampler}
+#         self.res:List[OptimizeResult]=[]
+
+#     @property
+#     def bstretch(self):
+#         'bstretch'
+#         return self.sampler.bstretch
+
+#     @property
+#     def bbias(self):
+#         'bbias'
+#         return self.sampler.bbias
+
+#     def run(self):
+#         '''
+#         simple and naive approach first
+#         Consider peaks[0] fixed and only the peaks (1 by 1?) which can overlap with peaks[0]
+#         then add others
+#         '''
+#         biasdist=scipy.stats.uniform(loc=self.bbias.lower,
+#                                      scale=self.bbias.upper-self.bbias.lower)
+#         stredist=scipy.stats.uniform(loc=self.bstretch.lower,
+#                                      scale=self.bstretch.upper-self.bstretch.lower)
+#         bias=biasdist.rvs(size=len(self._peaks)-1)
+#         stre=stredist.rvs(size=len(self._peaks)-1)
+#         state=np.array([1,0]+[val for pair in zip(stre,bias) for val in pair])
+
+#         for loop in itertools.repeat(range(len(self.peaks)),5): # trying to move peaks[0]
+#             for lidx in loop:
+#         # for _ in range(5):
+#         #     loop=np.random.permutation(range(len(self.peaks))) # trying to move peaks[0]
+#             # for lidx in loop:
+#                 self.sampler.indices=list(self.neigh[lidx])
+#                 curr_res=basinhopping(x0=state,**self.basinkwa)
+#                 print(f"fun={curr_res.fun}")
+#                 self.res.append(curr_res)
+#                 state=curr_res.x
+
+#         return state
+
+
+
+class SpringScaler(PeakSetting):
     '''
+    Cannot  converge towards the correct solution because it needs to
+    take into account the noise on each position
+
     adjust the scales of experiments to minimize scoring function
     Could be better with a full-fledged MCTS implementation
     Controls the SeqUpdate instance together with the Score
@@ -295,16 +379,12 @@ class SeqHoppScaler(PeakSetting):
         bias=biasdist.rvs(size=len(self._peaks)-1)
         stre=stredist.rvs(size=len(self._peaks)-1)
         state=np.array([1,0]+[val for pair in zip(stre,bias) for val in pair])
-        #print(f"state={state}")
-        #for edge in self.edges:
-            # changing only edge[1]
-            #self.sampler.index=edge[1]
-            # changing edge[1] and all neighbors
-            #print(f"edge={edge}")
-            #self.sampler.indices=list(self.neigh[edge[1]])
 
-        for loop in itertools.repeat(range(1,len(self.peaks)),5):
+        for loop in itertools.repeat(range(len(self.peaks)),5): # trying to move peaks[0]
             for lidx in loop:
+        # for _ in range(5):
+        #     loop=np.random.permutation(range(len(self.peaks))) # trying to move peaks[0]
+            # for lidx in loop:
                 self.sampler.indices=list(self.neigh[lidx])
                 curr_res=basinhopping(x0=state,**self.basinkwa)
                 print(f"fun={curr_res.fun}")

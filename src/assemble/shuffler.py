@@ -216,6 +216,8 @@ class Shuffler:
                 added_partitions+=new_parts
 
             self.increment_noverlaps(added_partitions,self.ooverl,index+1)
+            # the following line may be wrong if we have ambiguities in sequence,
+            # CHECK when reducing.. ?
             max_overlap=max(part.noverlaps for part in added_partitions) # pylint: disable=no-member
             partitions=[part for part in added_partitions if part.noverlaps==max_overlap] # pylint: disable=no-member
             # if __debug__:
@@ -238,7 +240,7 @@ class Shuffler:
         scores partitions
         and return the result (score+tuple of oligos)
         '''
-        self.collection=data.BCollection.from_oligos(kwa.get("oligos",[]))
+        self.collection=data.BCollection.from_oligos(kwa.get("oligos",self.oligos))
         partitions=self.base_per_base()
 
         # score each partition
