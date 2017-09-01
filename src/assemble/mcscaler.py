@@ -9,7 +9,7 @@ how to fix the temperature?
 need more efficient sampling of (stretch,bias)
 '''
 
-from typing import List, Dict, Tuple, Callable, Iterable # pylint: disable=unused-import
+from typing import List, Dict, Tuple, Callable, Iterable, NamedTuple, FrozenSet # pylint: disable=unused-import
 import itertools
 import random
 import networkx
@@ -40,33 +40,126 @@ def make_graph(peaks,bstretch,bbias,min_overl=2,unsigned=True):
     graph.add_edges_from(edges2)
     return graph
 
-
-class PeakSetting:
+class BasePeakSetting:
     '''
     regroups information regarding oligo experiments
     '''
     def __init__(self,**kwa):
         self._pos:List[np.array]=[]
+        self._fpos:List[np.array]=[] # flat
         self._seqs:List[Tuple[str, ...]]=[]
         self._fseqs:List[str]=[] # flat
         self._peaks:List[scaler.OPeakArray]=[]
-        self.peaks:List[scaler.OPeakArray]=kwa.get("peaks",[])
         self.min_overl:int=kwa.get("min_overl",2)
         self.unsigned:bool=kwa.get("unsigned",True)
+
+    def set_peaks(self,value:scaler.OPeakArray):
+        'update peaks and inner attr'
+        self._peaks=value
+        self._pos=[peak.posarr for peak in value]
+        self._fpos=[pos for peak in value for pos in peak.posarr]
+        self._seqs=[peak.seqs for peak in value]
+        self._fseqs=[seq for seqs in self._seqs for seq in seqs]
+
+
+    def get_peaks(self):
+        'prop'
+        return self._peaks
+
+class PeakSetting(BasePeakSetting):
+    '''
+    regroups information regarding oligo experiments
+    '''
+    def __init__(self,**kwa):
+        super().__init__(**kwa)
+        self.peaks:List[scaler.OPeakArray]=kwa.get("peaks",[])
 
     @property
     def peaks(self):
         'prop'
-        return self._peaks
+        return self.get_peaks
 
     @peaks.setter
     def peaks(self,value:scaler.OPeakArray):
-        'update peaks and inner attr'
-        self._peaks=value
-        self._pos=[peak.posarr for peak in value]
-        self._seqs=[peak.seqs for peak in value]
-        self._fseqs=[seq for seqs in self._seqs for seq in seqs]
+        self.set_peaks(value)
 
+
+
+
+class Spring:
+    'models a spring'
+    def __init__(self,**kwa):
+        self.type:str=kwa.get("type","")
+        self.force:float=kwa.get("force",0)
+        self.xeq:float=kwa.get("xeq",0)
+        self.id1:int=kwa.get("id1",0)
+        self.id2:int=kwa.get("id2",0)
+        self.direct:bool=kwa.get("direct",False)
+
+    def energy(self,xpos1,xpos2):
+        'returns energy on the spring'
+        if self.direct:
+            return self.force*(xpos2-xpos1-self.xeq)**2
+        return self.force*(abs(xpos2-xpos1)-self.xeq)**2
+
+class ScaleSetting(PeakSetting):
+    'adds boundaries information on stretch and bias to PeakSetting'
+    def __init__(self,**kwa):
+        super().__init__(**kwa)
+        self.bstretch:scaler.Bounds=kwa.get("bstretch",scaler.Bounds())
+        self.bbias:scaler.Bounds=kwa.get("bbias",scaler.Bounds())
+
+class SpringSetting(ScaleSetting):
+    '''
+    adds Springs to the peaks
+    if the noise is small and we rescale peaks kinter>kintra
+    should the inter springs be directed? It should help
+    '''
+    def __init__(self,**kwa):
+        super().__init__(**kwa)
+        self.kintra:float=kwa.get("kintra",1)
+        self.kinter:float=kwa.get("kinter",2)
+        self._olis:List[data.OligoPeak]=[]
+        self.springs:List[Spring]=[]
+        self._peakids:List[List[int]]=[]
+        self.peaks:List[scaler.OPeakArray]=kwa.get("peaks",[])
+
+    @property
+    def peaks(self)->List[scaler.OPeakArray]:
+        'prop'
+        return self.get_peaks()
+
+    @peaks.setter
+    def peaks(self,peaks:List[scaler.OPeakArray]):
+        'peaks setter'
+        self.set_peaks(peaks)
+        self._olis=[oli for peak in self.peaks for oli in peak.arr] # arbitrary order
+        self._peakids=[[self._olis.index(oli) for oli in peak.arr]
+                       for peak in self.peaks] # not great imp.
+        self.springs=[]
+        for pkids in self._peakids:
+            self.springs.extend([Spring(type="intra",
+                                        force=self.kintra,
+                                        xeq=abs(self._fpos[id1]-self._fpos[id2]),
+                                        id1=id1,id2=id2)
+                                 for id1,id2 in zip(pkids[:-1],pkids[1:])])
+        self.add_inter()
+
+    def add_inter(self)->None:
+        'add springs between peaks'
+        signs=(0,0) if self.unsigned else (1,1)
+        for id1,id2 in itertools.permutations(range(len(self._olis)),2):
+            if data.Oligo.overlap(self._olis[id1].seq,
+                                  self._olis[id2].seq,
+                                  min_overl=self.min_overl,
+                                  signs=signs,
+                                  shift=1):
+                self.springs.append(Spring(type="inter",
+                                           force=self.kinter,
+                                           xeq=1.1,
+                                           id1=id1,id2=id2,
+                                           direct=True))
+        
 def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argument
     '''
     use this minimizer to avoid minimization step in basinhopping
@@ -74,107 +167,107 @@ def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argumen
     return OptimizeResult(x=xinit, fun=fun(xinit), success=True, nfev=1)
 
 
-class Score(PeakSetting):
-    '''
-    defines a callable with desired params
-    will have to find maximal score according to relative sign
-    assumes the first oligo has the correct sequence...
-    '''
-    def __init__(self,**kwa):
-        super().__init__(**kwa)
-        self.__func:callable=self.callpass
-        self.min_overl:int=kwa.get("min_overl",2)
-        self.unsigned:bool=kwa.get("unsigned",True)
-        seqs=frozenset().union(*[frozenset(pk.seqs) for pk in self.peaks])
-        self.pairseqs=frozenset([(sq1,sq2)
-                                 for sq1,sq2 in itertools.product(seqs,seqs)
-                                 if data.Oligo.overlap(sq1,
-                                                       sq2,
-                                                       min_overl=self.min_overl,
-                                                       signs=(0,0),
-                                                       shift=1)])
-        # the sequential update without considering all peaks leads to the wrong minima
-        self.__ids:Tuple[int]=kwa.get("ids",tuple(range(len(self.peaks))))
+# class Score(PeakSetting):
+#     '''
+#     defines a callable with desired params
+#     will have to find maximal score according to relative sign
+#     assumes the first oligo has the correct sequence...
+#     '''
+#     def __init__(self,**kwa):
+#         super().__init__(**kwa)
+#         self.__func:callable=self.callpass
+#         self.min_overl:int=kwa.get("min_overl",2)
+#         self.unsigned:bool=kwa.get("unsigned",True)
+#         seqs=frozenset().union(*[frozenset(pk.seqs) for pk in self.peaks])
+#         self.pairseqs=frozenset([(sq1,sq2)
+#                                  for sq1,sq2 in itertools.product(seqs,seqs)
+#                                  if data.Oligo.overlap(sq1,
+#                                                        sq2,
+#                                                        min_overl=self.min_overl,
+#                                                        signs=(0,0),
+#                                                        shift=1)])
+#         # the sequential update without considering all peaks leads to the wrong minima
+#         self.__ids:Tuple[int]=kwa.get("ids",tuple(range(len(self.peaks))))
 
-    def callpass(self,*arg,**kwa):
-        'pass'
-        pass
+#     def callpass(self,*arg,**kwa):
+#         'pass'
+#         pass
 
-    def __call__(self,state:np.array)->float:
-        '''
-        scales self.__pos instead of using Rescale.__call__
-        does not consider the signs of oligos nor the constraints
-        (i.e. over estimate the score)
-        check ergodicity
-        '''
-        npos=[state[2*idx]*self._pos[idx]+state[2*idx+1] for idx in self.__ids]
-        fpos=[pos for ppos in npos for pos in ppos] # flat
-        fseqs=[seq for idx in self.__ids for seq in self._seqs[idx]]
-        # sort seq according to npos
-        seqs=[pseq[1] for pseq in sorted(zip(fpos,fseqs))]
-        return -sum([1 for idx,val in enumerate(seqs[1:]) if (seqs[idx],val) in self.pairseqs])
+#     def __call__(self,state:np.array)->float:
+#         '''
+#         scales self.__pos instead of using Rescale.__call__
+#         does not consider the signs of oligos nor the constraints
+#         (i.e. over estimate the score)
+#         check ergodicity
+#         '''
+#         npos=[state[2*idx]*self._pos[idx]+state[2*idx+1] for idx in self.__ids]
+#         fpos=[pos for ppos in npos for pos in ppos] # flat
+#         fseqs=[seq for idx in self.__ids for seq in self._seqs[idx]]
+#         # sort seq according to npos
+#         seqs=[pseq[1] for pseq in sorted(zip(fpos,fseqs))]
+#         return -sum([1 for idx,val in enumerate(seqs[1:]) if (seqs[idx],val) in self.pairseqs])
 
-class StreBiasStep: # pylint: disable=too-many-instance-attributes
-    'defines the take_step callable'
-    def __init__(self,**kwa):
-        self.bstretch:scaler.Bounds=kwa.get("bstretch",scaler.Bounds())
-        self.bbias:scaler.Bounds=kwa.get("bbias",scaler.Bounds())
-        self.cov:np.array=np.array([1])
-        self.__size:int=1
-        self.size:int=kwa.get("size",1)
-        self.__sample:str=""
-        self.biasdist=self.callpass # type: ignore
-        self.stredist=self.callpass # type: ignore
-        self.sample:str=kwa.get("sample","uniform")
+# class StreBiasStep: # pylint: disable=too-many-instance-attributes
+#     'defines the take_step callable'
+#     def __init__(self,**kwa):
+#         self.bstretch:scaler.Bounds=kwa.get("bstretch",scaler.Bounds())
+#         self.bbias:scaler.Bounds=kwa.get("bbias",scaler.Bounds())
+#         self.cov:np.array=np.array([1])
+#         self.__size:int=1
+#         self.size:int=kwa.get("size",1)
+#         self.__sample:str=""
+#         self.biasdist=self.callpass # type: ignore
+#         self.stredist=self.callpass # type: ignore
+#         self.sample:str=kwa.get("sample","uniform")
 
-    def callpass(self,*args,**kwa):
-        'pass'
-        pass
+#     def callpass(self,*args,**kwa):
+#         'pass'
+#         pass
 
-    @property
-    def size(self):
-        'size'
-        return self.__size
-    @size.setter
-    def size(self,value):
-        self.__size=value
-        self.cov=np.array([1 if idx%2
-                           else 0.1
-                           for idx in range(2*self.__size)])
-    @property
-    def sample(self):
-        'property'
-        return self.__sample
+#     @property
+#     def size(self):
+#         'size'
+#         return self.__size
+#     @size.setter
+#     def size(self,value):
+#         self.__size=value
+#         self.cov=np.array([1 if idx%2
+#                            else 0.1
+#                            for idx in range(2*self.__size)])
+#     @property
+#     def sample(self):
+#         'property'
+#         return self.__sample
 
-    @sample.setter
-    def sample(self,stype:str):
-        if stype=="uniform": # read stype from enum instead
-            self.__sample=stype
-            self.biasdist=scipy.stats.uniform(loc=self.bbias.lower,
-                                              scale=self.bbias.upper-self.bbias.lower)
-            self.stredist=scipy.stats.uniform(loc=self.bstretch.lower,
-                                              scale=self.bstretch.upper-self.bstretch.lower)
-        # not bounded..
-        if stype=="normal":
-            self.__sample=stype
+#     @sample.setter
+#     def sample(self,stype:str):
+#         if stype=="uniform": # read stype from enum instead
+#             self.__sample=stype
+#             self.biasdist=scipy.stats.uniform(loc=self.bbias.lower,
+#                                               scale=self.bbias.upper-self.bbias.lower)
+#             self.stredist=scipy.stats.uniform(loc=self.bstretch.lower,
+#                                               scale=self.bstretch.upper-self.bstretch.lower)
+#         # not bounded..
+#         if stype=="normal":
+#             self.__sample=stype
 
-        if stype=="discrete":
-            self.__sample=stype
-            raise NotImplementedError
+#         if stype=="discrete":
+#             self.__sample=stype
+#             raise NotImplementedError
 
-        if stype=="sequential":
-            self.__sample=stype
-            raise NotImplementedError
+#         if stype=="sequential":
+#             self.__sample=stype
+#             raise NotImplementedError
 
-    def __call__(self,*args,**kwa)->np.array:
-        if self.sample=="uniform":
-            bias=self.biasdist.rvs(size=self.size)
-            stre=self.stredist.rvs(size=self.size)
-            return np.array([val for pair in zip(stre,bias) for val in pair])
-        if self.sample=="normal":
-            dist=scipy.stats.multivariate_normal(mean=args[0],cov=self.cov)
-            return dist.rvs()
-        return np.array([])
+#     def __call__(self,*args,**kwa)->np.array:
+#         if self.sample=="uniform":
+#             bias=self.biasdist.rvs(size=self.size)
+#             stre=self.stredist.rvs(size=self.size)
+#             return np.array([val for pair in zip(stre,bias) for val in pair])
+#         if self.sample=="normal":
+#             dist=scipy.stats.multivariate_normal(mean=args[0],cov=self.cov)
+#             return dist.rvs()
+#         return np.array([])
 
 class SeqUpdate(PeakSetting):
     '''
@@ -248,107 +341,53 @@ class SeqUpdate(PeakSetting):
         #    state=self.single_update(state)
         state=self.single_update(state) # trying wth peaks 0 moving
         return state
+        
+class SpringStep(SpringSetting):
+    '''
+    each moves consists of two steps for each experiment
+    a move of all oligos within a peak
+    a move for each oligos
+    '''
+    pass
 
-class HopperStatus:
-    'basinhopping container'
+class SpringScore(SpringSetting):
+
     def __init__(self,**kwa):
-        self.state=kwa.get("state",np.array)
-        self.scores:List[float]=[]
-
-# class SeqHoppScaler(PeakSetting):
-#     '''
-#     Cannot  converge towards the correct solution because it needs to
-#     take into account the noise on each position
-
-#     adjust the scales of experiments to minimize scoring function
-#     Could be better with a full-fledged MCTS implementation
-#     Controls the SeqUpdate instance together with the Score
-#     decides which indices must be used to compute the score
-#     and which index must be updated
-#     '''
-#     def __init__(self,**kwa):
-#         super().__init__(**kwa)
-#         self.scoring=Score(**kwa)
-#         self.sampler=SeqUpdate(**kwa)
-#         self.min_overl:int=kwa.get("min_overl",2)
-#         self.edges=scaler.OPeakArray.list2edgeids(self._peaks,
-#                                                   min_overl=self.min_overl,
-#                                                   unsigned=self.scoring.unsigned)
-#         self.neigh:Dict[int,List[int]]={idx:frozenset(edg
-#                                                       for edge in self.edges
-#                                                       for edg in edge
-#                                                       if idx in edge)
-#                                         for idx in range(len(self.peaks))}
-#         #self.edges=[edge for edge in self.edges if edge[0]<edge[1]]
-#         self.basinkwa={"func":self.scoring,
-#                        "niter":100,
-#                        "minimizer_kwargs":dict(method=no_minimizer),
-#                        "take_step":self.sampler}
-#         self.res:List[OptimizeResult]=[]
-
-#     @property
-#     def bstretch(self):
-#         'bstretch'
-#         return self.sampler.bstretch
-
-#     @property
-#     def bbias(self):
-#         'bbias'
-#         return self.sampler.bbias
-
-#     def run(self):
-#         '''
-#         simple and naive approach first
-#         Consider peaks[0] fixed and only the peaks (1 by 1?) which can overlap with peaks[0]
-#         then add others
-#         '''
-#         biasdist=scipy.stats.uniform(loc=self.bbias.lower,
-#                                      scale=self.bbias.upper-self.bbias.lower)
-#         stredist=scipy.stats.uniform(loc=self.bstretch.lower,
-#                                      scale=self.bstretch.upper-self.bstretch.lower)
-#         bias=biasdist.rvs(size=len(self._peaks)-1)
-#         stre=stredist.rvs(size=len(self._peaks)-1)
-#         state=np.array([1,0]+[val for pair in zip(stre,bias) for val in pair])
-
-#         for loop in itertools.repeat(range(len(self.peaks)),5): # trying to move peaks[0]
-#             for lidx in loop:
-#         # for _ in range(5):
-#         #     loop=np.random.permutation(range(len(self.peaks))) # trying to move peaks[0]
-#             # for lidx in loop:
-#                 self.sampler.indices=list(self.neigh[lidx])
-#                 curr_res=basinhopping(x0=state,**self.basinkwa)
-#                 print(f"fun={curr_res.fun}")
-#                 self.res.append(curr_res)
-#                 state=curr_res.x
-
-#         return state
-
+        super().__init__(**kwa)
+        self.edges=scaler.OPeakArray.list2edgeids(self._peaks,
+                                                  min_overl=self.min_overl,
+                                                  unsigned=self.unsigned)
+        self.neigh:Dict[int,List[int]]={idx:frozenset(edg
+                                                      for edge in self.edges
+                                                      for edg in edge
+                                                      if idx in edge)
+                                        for idx in range(len(self.peaks))}
+        self.springs:Dict[int,Spring]=dict()
 
 
 class SpringScaler(PeakSetting):
     '''
-    Cannot  converge towards the correct solution because it needs to
-    take into account the noise on each position
+    k_intra, a tension between oligos in the same peak
+    k_extra, a directed tension between oligos which may overlap
 
-    adjust the scales of experiments to minimize scoring function
-    Could be better with a full-fledged MCTS implementation
-    Controls the SeqUpdate instance together with the Score
-    decides which indices must be used to compute the score
-    and which index must be updated
+    k_intra allows for gaussian noise around each oligo
+    k_extra necessary to rescale peaks
     '''
     def __init__(self,**kwa):
         super().__init__(**kwa)
         self.scoring=Score(**kwa)
         self.sampler=SeqUpdate(**kwa)
         self.min_overl:int=kwa.get("min_overl",2)
-        self.edges=scaler.OPeakArray.list2edgeids(self._peaks,
-                                                  min_overl=self.min_overl,
-                                                  unsigned=self.scoring.unsigned)
-        self.neigh:Dict[int,List[int]]={idx:frozenset(edg
-                                                      for edge in self.edges
-                                                      for edg in edge
-                                                      if idx in edge)
-                                        for idx in range(len(self.peaks))}
+
+
+        # self.edges=scaler.OPeakArray.list2edgeids(self._peaks,
+        #                                           min_overl=self.min_overl,
+        #                                           unsigned=self.scoring.unsigned)
+        # self.neigh:Dict[int,List[int]]={idx:frozenset(edg
+        #                                               for edge in self.edges
+        #                                               for edg in edge
+        #                                               if idx in edge)
+        #                                 for idx in range(len(self.peaks))}
         #self.edges=[edge for edge in self.edges if edge[0]<edge[1]]
         self.basinkwa={"func":self.scoring,
                        "niter":100,
