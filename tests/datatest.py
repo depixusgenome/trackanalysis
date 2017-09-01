@@ -36,6 +36,9 @@ def test_beaditerkeys():
     assert set(beads().withbeadsonly().keys()) == (vals-{'zmag', 't'})
     assert set(beads().selecting(all).keys())  == vals
     assert set(beads().selecting(None).keys()) == vals
+    assert set(beads()[:].keys()) == vals
+    assert set(beads()[:2].keys()) == {0, 1}
+    assert set(beads()[:2][1:5].keys()) == {1} # pylint: disable=unsubscriptable-object
     assert isinstance(beads()['t'], np.ndarray)
     assert isinstance(beads()[0],   np.ndarray)
 
@@ -60,8 +63,13 @@ def test_cycles_iterkeys():
     bids  = lambda _: set((_,i) for i in range(102))
     assert set  (cycs().selecting(0).keys())         == cids(0)
     assert tuple(cycs().selecting((0,0)).keys())     == ((0,0),)
+    assert set  (cycs()[:,0].keys())                 == cids(0)
     assert set  (cycs()[...,0].keys())               == cids(0)
+    assert set  (cycs()[...,0][1,...].keys())        == {(1,0)}
+    assert set  (cycs()[:1,0].keys())                == {i for i in cids(0) if i[0] == 0}
     assert set  (cycs()[0,...].keys())               == bids(0)
+    assert set  (cycs()[0,:].keys())                 == bids(0)
+    assert set  (cycs()[0,2:5].keys())               == {i for i in bids(0) if 2<= i[1] < 5}
     assert set  (cycs()['zmag',...].keys())          == bids('zmag')
     assert set(i[0] for i in (cycs()
                               .selecting([('t',...), (0,...)])

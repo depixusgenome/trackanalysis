@@ -197,7 +197,7 @@ class Track:
         "returns the starttime of the cycle and phase"
         vect = self.__getter('_phases')
         orig = vect[0,0]
-        if {cid, pid}.issubset(_m_ALL):
+        if cid in _m_ALL and pid in _m_ALL:
             pass
         elif cid in _m_ALL:
             vect = vect[:,pid]

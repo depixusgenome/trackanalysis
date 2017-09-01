@@ -182,10 +182,10 @@ namespace legacy
     {
         using namespace pybind11::literals;
         mod.def("readtrack", _readtrack, "path"_a,
-                "clipcycles"_a = true, "axis"_a = 0,
+                "clipcycles"_a = true, "axis"_a = "z",
                 "Reads a '.trk' file and returns a dictionnary of beads,\n"
                 "possibly removing the first 3 cycles and the last one.\n"
-                "axes are z(0), x(1), y(2)");
+                "axes are x, y or z");
         mod.def("readtrackrotation", _readtrackrotation, "path"_a,
                 "Reads a '.trk' file's rotation");
         mod.def("readgr", _readgr, "path"_a,

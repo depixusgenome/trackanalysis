@@ -344,7 +344,8 @@ class Handler:
                              dim   = kwargs.pop('dimensions'),
                              beads = {i: Bead(position = j,
                                               image    = calib.get(i, Bead.image))
-                                      for i, j in kwargs.pop('positions').items()})
+                                      for i, j in kwargs.pop('positions').items()
+                                      if i in kwargs})
 
             res.update({i: kwargs.pop(i) for i in ('phases', 'framerate')})
 

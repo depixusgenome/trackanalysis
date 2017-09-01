@@ -15,7 +15,7 @@ import  numpy as np
 from    utils       import isfunction, initdefaults
 from    model       import Level
 
-_m_ALL   = None, all, Ellipsis          # type: tuple
+_m_ALL   = None, all, Ellipsis, slice(None) # type: tuple
 _m_INTS  = int, cast(type, np.integer)
 _m_KEYS  = int, cast(type, np.integer), str
 _m_INDEX = int, cast(type, np.integer), str, tuple
@@ -26,6 +26,11 @@ CYCLEKEY = Tuple[BEADKEY,int]
 Self     = TypeVar('Self',  bound = '_m_ConfigMixin')
 TSelf    = TypeVar('TSelf', bound = 'TrackItems')
 
+def _m_torange(sli):
+    start, stop, step = sli.start, sli.stop, sli.step
+    if stop is None:
+        raise IndexError("An exact number must be provided for stop")
+    return range(0 if start is None else start, stop, 1 if step is None else step)
 
 def _m_ellipsis(vals):
     return (not isinstance(vals, np.ndarray)) and vals in _m_ALL
@@ -54,13 +59,16 @@ def _m_selection(self:Self, attr, cyc, clear) -> Self:
         if all(isinstance(i, _m_INDEX) or _m_ellipsis(i) for i in cyc):
             getattr(self, attr).append(cyc)
         else:
-            vals = ((i,) if (isinstance(i, _m_INDEX) or _m_ellipsis(i)) else i
-                    for i in cyc)
+            vals = ((i,)          if (isinstance(i, _m_INDEX) or _m_ellipsis(i)) else
+                    _m_torange(i) if isinstance(i, slice)                        else
+                    i   for i in cyc)
             getattr(self, attr).extend(product(*vals))
 
     elif isinstance(cyc, _m_INDEX) or isfunction(cyc):
         getattr(self, attr).append(cyc)
 
+    elif isinstance(cyc, slice):
+        getattr(self, attr).extend(_m_torange(cyc))
     else:
         getattr(self, attr).extend(cyc)
 
@@ -316,24 +324,19 @@ class TrackItems(_m_ConfigMixin, Items):
             yield from (act(col) for col in self._iter())
 
     def __getitem__(self:TSelf, keys) -> Union[TSelf, np.ndarray]:
-        if isinstance(keys, slice):
-            # could be a slice of beads or a slice of bead data ...
-            raise NotImplementedError()
-
-        elif (_m_ellipsis(keys)
-              or (isinstance(keys, tuple) and all(_m_ellipsis(i) for i in keys))):
+        if (_m_ellipsis(keys)
+                or (isinstance(keys, tuple) and all(_m_ellipsis(i) for i in keys))):
             return shallowcopy(self)
 
-        elif (isinstance(keys, _m_KEYS)
-              or (isinstance(keys, tuple)
-                  and all(isinstance(i, _m_KEYS) for i in keys))):
+        if (isinstance(keys, _m_KEYS)
+                or (isinstance(keys, tuple)
+                    and all(isinstance(i, _m_KEYS) for i in keys))):
             # this is NOT a slice
             return self.get(keys)
 
-        else:
-            # consider this a slice
-            cpy = shallowcopy(self)
-            return cpy.selecting(keys, clear = True)
+        # consider this a slice
+        cpy = shallowcopy(self)
+        return cpy.new().selecting(keys)
 
     def freeze(self):
         "returns data with all treatments applied"
@@ -403,10 +406,12 @@ class Beads(TrackItems, Items):
         self.__withcycles(kwa.get('cycles', ...))
 
     def _keys(self, sel:Optional[Sequence], beadsonly: bool) -> Iterator[BEADKEY]:
-        if (sel is not None or beadsonly) and isinstance(self.data, Beads):
-            yield from iter(cast(Beads, self.data).keys(sel, beadsonly))
-        else:
-            yield from super()._keys(sel, beadsonly)
+        if isinstance(self.data, Beads):
+            if sel is None:
+                yield from self.data.keys(None, beadsonly)
+            else:
+                yield from (i for i in self.data.keys(None, beadsonly) if i in sel)
+        yield from super()._keys(sel, beadsonly)
 
     def _iter(self, sel = None) -> Iterator[Tuple[BEADKEY, np.ndarray]]:
         if isinstance(self.data, Beads) and self.cycles is None:
@@ -555,11 +560,16 @@ class Cycles(TrackItems, Items):
             else:
                 yield from ((col, thisid) for col in beads)
 
-    def __keysdirect(self, sel):
+    def __keysdirect(self, sel, beadsonly):
+        if beadsonly:
+            isbead = self.isbead
+            yield from (i for i in self.__keysdirect(sel, False) if isbead(i))
+
         if sel is None:
             yield from self.data.keys()
             return
 
+        keys = list(self.data.keys())
         for thisid in sel:
             if isinstance(thisid, (tuple, list)):
                 bid, tmp = thisid[0], thisid[1] # type: BEADKEY, Any
@@ -568,28 +578,28 @@ class Cycles(TrackItems, Items):
                 elif bid in _m_ALL:
                     thisid = tmp
                 elif tmp in _m_ALL:
-                    yield from (i for i in self.data.keys() if i[0] == bid)
+                    yield from (i for i in keys if i[0] == bid)
                     continue
                 else:
                     yield (bid, tmp)
                     continue
 
             if thisid in _m_ALL:
-                yield from self.data.keys()
+                yield from keys
 
             else:
-                yield from (i for i in self.data.keys() if i[1] == thisid)
+                yield from (i for i in keys if i[1] == thisid)
 
     def _keys(self, sel, beadsonly) -> Iterable[CYCLEKEY]:
         if isinstance(self.data, Cycles):
-            yield from cast(Cycles, self.data).keys(sel, beadsonly)
+            data = cast(Cycles, self.data)
+            if sel is None:
+                yield from data.keys(None, beadsonly)
+            else:
+                yield from self.__keysdirect(sel, beadsonly)
 
         elif self.direct:
-            if beadsonly:
-                isbead = self.isbead
-                yield from (i for i in self.__keysdirect(sel) if isbead(i))
-            else:
-                yield from self.__keysdirect(sel)
+            yield from self.__keysdirect(sel, beadsonly)
         else:
             yield from self.__keysfrombeads(sel, beadsonly)
 
