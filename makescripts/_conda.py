@@ -54,11 +54,11 @@ class _CondaApp(BuildContext):
         "creates the startup script"
         iswin = sys.platform.startswith("win")
         ext   = ".bat"                         if iswin else ".sh"
-        cmd   = r"start /min %~dp0pythonw -I " if iswin else "./"
+        cmd   = r"start /min %~dp0pythonw -I " if iswin else r"./bin/python"
         for optext, opts in (('', ''), ('_chrome', ' --electron')):
             fname = str(self.options.STARTSCRIPT_PATH.make_node(name+optext+ext))
             with open(fname, 'w', encoding = 'utf-8') as stream:
-                print(cmd + r"bin/python app/cmdline.pyc " + val + opts + ' --port random',
+                print(cmd + r" app/cmdline.pyc " + val + opts + r' --port random',
                       file = stream)
 
     def __startscripts(self, mods):

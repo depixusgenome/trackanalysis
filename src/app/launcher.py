@@ -79,7 +79,7 @@ def _monkeypatch(view):
     if Path(output).exists() and CAN_LOAD_JS:
         LOGS.debug('monkeypatching bokeh compiler with '+output)
         def _bundle():
-            return ''.join(open(output))
+            return ''.join(open(output, encoding = 'utf-8'))
         import bokeh.embed      as embed
         embed.bundle_all_models = _bundle
 
