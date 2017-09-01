@@ -62,16 +62,16 @@ def test_subtract():
 
     tmp = Beads(data = {0: np.arange(5), 1: np.ones(5),
                         2: np.zeros(5),  3: np.arange(5)*1.})
-    cache = []
+    cache = {}
     frame = BeadSubtractionProcessor.apply(tmp, cache, beads = [0, 1])
     assert set(frame.keys()) == {2, 3}
     assert_allclose(frame[2], -.5*np.arange(5)-.5)
-    assert_allclose(cache[0],  .5*np.arange(5)+.5)
+    assert_allclose(cache[None],  .5*np.arange(5)+.5)
 
-    ca0 = cache[0]
+    ca0 = cache[None]
     res = frame[3]
     assert res is frame.data[3] # pylint: disable=unsubscriptable-object
-    assert ca0 is cache[0]
+    assert ca0 is cache[None]
 
 if __name__ == '__main__':
     test_subtract()

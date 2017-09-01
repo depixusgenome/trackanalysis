@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "access to the model"
-from   typing                   import Tuple
+from   typing                       import Tuple
 import numpy as np
 
-from utils                      import NoArgs
-from eventdetection.processor   import ExtremumAlignmentTask
-from view.plots.tasks           import TaskPlotModelAccess, TaskAccess
+from utils                          import NoArgs
+from eventdetection.processor       import ExtremumAlignmentTask
+from view.plots.tasks               import TaskPlotModelAccess, TaskAccess
 
-from ..processor                import DataCleaningTask
+from signalfilter.beadsubtraction   import BeadSubtractionTask
+from ..processor                    import DataCleaningTask
 
 class DataCleaningAccess(TaskAccess):
     "access to data cleaning"
@@ -53,12 +54,39 @@ class DataCleaningAccess(TaskAccess):
         "returns bad cycles"
         return DataCleaningTask.badcycles(self.cache if cache is NoArgs else cache)
 
+class BeadSubtractionAccess(TaskAccess):
+    "access to bead subtraction"
+    def __init__(self, mdl):
+        super().__init__(mdl, BeadSubtractionTask)
+
+    @property
+    def beads(self):
+        "returns beads to subtract"
+        return getattr(self.task, 'beads', [])
+
+    @beads.setter
+    def beads(self, vals):
+        "returns beads to subtract"
+        if len(vals) == 0:
+            self.remove()
+        else:
+            self.update(beads = sorted(vals))
+
+    def switch(self, bead):
+        "adds or removes the bead"
+        self.beads = set(self.beads).symmetric_difference({bead})
+
+    @staticmethod
+    def _configattributes(kwa):
+        return {}
+
 class DataCleaningModelAccess(TaskPlotModelAccess):
     "Model for Cycles View"
     def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
-        self.alignment = TaskAccess(self, ExtremumAlignmentTask)
-        self.cleaning  = DataCleaningAccess(self)
+        self.alignment  = TaskAccess(self, ExtremumAlignmentTask)
+        self.cleaning   = DataCleaningAccess(self)
+        self.subtracted = BeadSubtractionAccess(self)
         self.__bead: int                                          = None
         self.__colorstore: Tuple[int, np.ndarray, Tuple[int,...]] = None
 

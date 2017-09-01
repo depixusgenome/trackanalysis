@@ -10,7 +10,7 @@ from   pathlib     import Path
 from   functools   import wraps
 from   inspect     import ismethod as _ismeth, isfunction as _isfunc, getmembers
 from   enum        import Enum
-from   typing      import Union, Optional  # pylint: disable=unused-import
+from   typing      import Set, Union, Optional  # pylint: disable=unused-import
 from   .inspection import ismethod
 from   .logconfig  import getLogger
 
@@ -167,3 +167,13 @@ def startfile(filepath:str):
         subprocess.Popen(('xdg-open', filepath),
                          stdout = subprocess.DEVNULL,
                          stderr = subprocess.DEVNULL)
+
+def parseints(new:str) -> Set[int]:
+    "returns a set of ints"
+    vals = set()
+    for i in re.split('[:;,]', new):
+        try:
+            vals.add(int(i))
+        except ValueError:
+            continue
+    return vals

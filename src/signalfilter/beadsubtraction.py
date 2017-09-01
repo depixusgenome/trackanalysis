@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Task & Processor for subtracting beads from other beads"
-from    typing              import (List,   # pylint: disable=unused-import
-                                    Optional)
+from    typing              import List
 from    functools           import partial
 
 import  numpy               as     np
 from    utils               import initdefaults
 from    model               import Task, Level
 from    control.processor   import Processor
-from   .noisereduction      import Filter   # pylint: disable=unused-import
+from   .noisereduction      import Filter
 
 class SignalAverage:
     "creates an average of signals"
-    filter = None # type: Optional[Filter]
+    filter: Filter = None
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
@@ -40,8 +39,8 @@ class SignalAverage:
 
 class BeadSubtractionTask(SignalAverage, Task):
     "Task for subtracting beads"
-    level = Level.bead
-    beads = [] # type: List[int]
+    level                = Level.none
+    beads: List[int] = []
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -49,21 +48,34 @@ class BeadSubtractionTask(SignalAverage, Task):
 
 class BeadSubtractionProcessor(Processor):
     "Processor for subtracting beads"
-    @classmethod
-    def apply(cls, frame, cache = None, **kwa):
-        "applies the subtraction to the frame"
-        if cache is None:
-            cache = [None]
-        elif len(cache) == 0:
-            cache.append(None)
+    @staticmethod
+    def __action(task, cache, frame, info):
+        key = info[1] if isinstance(info[0], tuple) else None
+        sub = None if cache is None else cache.get(key, None)
+        if sub is None:
+            print(key, id(frame), type(frame), type(frame.data))
+            if key is None:
+                sub = task([frame.data[i] for i in task.beads])
+            else:
+                sub = task([frame.data[i, key] for i in task.beads])
+            cache[key] = sub
 
+        info[1][:len(sub)] -= sub[:len(info[1])]
+        return info
+
+    @classmethod
+    def __run(cls, task, cache, frame):
+        frame = frame.new().discarding(task.beads)
+        print('**', id(frame), type(frame.data), type(frame.data.data))
+        return frame.withaction(partial(cls.__action, task, cache, frame))
+
+    @classmethod
+    def apply(cls, toframe = None, cache = None, **kwa):
+        "applies the subtraction to the frame"
         task = cls.tasktype(**kwa) # pylint: disable=not-callable
-        def _beadaction(info, cache = cache):
-            if cache[0] is None:
-                cache[0] = task([frame[i] for i in task.beads])
-            info[1][:len(cache[0])] -= cache[0][:len(info[1])]
-            return info
-        return frame.new().withaction(_beadaction).discarding(task.beads)
+        fcn  = partial(cls.__run, task, cache)
+        return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
-        args.apply(partial(self.apply, **self.config()))
+        cache = args.data.setCacheDefault(self, {})
+        args.apply(self.apply(cache =  cache, **self.config()))

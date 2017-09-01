@@ -10,6 +10,7 @@ from    bokeh.models    import (ColumnDataSource, DataTable, TableColumn,
 
 import  numpy       as     np
 
+from    utils.gui           import parseints
 from    view.base           import enableOnTrack
 from    view.static         import ROUTE
 from    view.plots          import DpxNumberFormatter, WidgetCreator
@@ -60,12 +61,6 @@ class CyclesListWidget(WidgetCreator):
         data = self.__data()
         itm.update(data = data)
 
-    def updatewidget(self, resets):
-        "nothing to do"
-        acc = self.__data()['discarded']
-        resets[self.__widget.source] = lambda src: src.stream(dict(discarded = acc),
-                                                              rollover = len(acc))
-
     def __data(self) -> dict:
         cache = self._model.cleaning.cache
         if cache is None or len(cache) == 0:
@@ -86,6 +81,8 @@ class DpxCleaning(Widget):
     frozen             = props.Bool(True)
     framerate          = props.Float(30.)
     figure             = props.Instance(Figure)
+    subtracted         = props.String("")
+    subtractcurrent    = props.Int(0)
     maxabsvalue        = props.Float(DataCleaningTask.maxabsvalue)
     maxderivate        = props.Float(DataCleaningTask.maxderivate)
     minpopulation      = props.Float(DataCleaningTask.minpopulation)
@@ -109,6 +106,17 @@ class CleaningFilterWidget(WidgetCreator):
         for name in ('maxabsvalue', 'maxderivate', 'minpopulation',
                      'minhfsigma',  'maxhfsigma',  'minextent'):
             self.__widget.on_change(name, _on_cb)
+
+        @action
+        def _on_subtract_cb(attr, old, new):
+            self._model.subtracted.beads = parseints(new)
+        self.__widget.on_change('subtracted', _on_subtract_cb)
+
+        @action
+        def _on_subtract_cur_cb(attr, old, new):
+            self._model.subtracted.switch(self._model.bead)
+        self.__widget.on_change('subtractcurrent', _on_subtract_cur_cb)
+
         return [self.__widget]
 
     def reset(self, resets):
@@ -117,7 +125,10 @@ class CleaningFilterWidget(WidgetCreator):
             task = self._model.cleaning.configtask
 
         info = {i:j for i, j in task.config().items() if hasattr(self.__widget, i)}
+
         info['framerate'] = getattr(self._model.track, 'framerate', 1./30.)
+        info['subtracted']= ', '.join(str(i) for i in sorted(self._model.subtracted.beads))
+
         (self.__widget if resets is None else resets[self.__widget]).update(**info)
 
     def setfigure(self, fig):
@@ -142,11 +153,6 @@ class WidgetMixin:
         self.__widgets['cleaning'].setfigure(fig)
         enableOnTrack(self, widgets)
         return widgets
-
-    def _updatewidget(self):
-        none = lambda _: None
-        for ite in self.__widgets.values():
-            getattr(ite, 'updatewidget', none)(self._bkmodels)
 
     def _resetwidget(self):
         for ite in self.__widgets.values():

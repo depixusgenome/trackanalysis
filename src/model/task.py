@@ -210,6 +210,7 @@ class DataFunctorTask(Task):
 
 TASK_ORDER = ('model.task.RootTask',
               'model.task.DataSelectionTask',
+              'signalfilter.beadsubtraction.BeadSubtractionTask',
               'cleaning.processor.DataCleaningTask',
               'eventdetection.processor.ExtremumAlignmentTask',
               'cordrift.processor.DriftTask',

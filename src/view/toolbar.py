@@ -3,9 +3,7 @@
 "Toolbar"
 from typing               import Callable, TYPE_CHECKING
 from pathlib              import Path
-import re
 
-import numpy                   as np
 import bokeh.core.properties   as props
 
 from bokeh                import layouts
@@ -13,7 +11,8 @@ from bokeh.models         import Widget
 from bokeh.io             import curdoc
 
 from control.taskio       import TaskIO
-from model.task           import DataSelectionTask
+from control.beadscontrol import BeadController
+from utils.gui            import parseints
 from .dialog              import FileDialog
 from .base                import BokehView, threadmethod, spawn, Action
 from .static              import ROUTE
@@ -198,20 +197,9 @@ class MessagesInput(BokehView):
 
 class BeadView(BokehView):
     "Widget for controlling the current beads"
-    @property
-    def _root(self):
-        return self._ctrl.getGlobal("project").track.get()
-
-    @property
-    def _bead(self):
-        return self._ctrl.getGlobal("project").bead.get()
-
-    @_bead.setter
-    def _bead(self, val):
-        return self._ctrl.getGlobal("project").bead.set(val)
-
-    def _isdiscardedbeads(self, parent, task):
-        return isinstance(task, DataSelectionTask) and parent is self._root
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+        self._bdctrl = BeadController(self._ctrl)
 
     if TYPE_CHECKING:
         def getroots(self, doc):
@@ -225,63 +213,30 @@ class BeadInput(BeadView):
         cnf = self._ctrl.getGlobal('config')
         cnf.keypress.defaults = {'beadup'   : 'PageUp',
                                  'beaddown' : 'PageDown'}
-
-        self.__beads   = np.empty((0,), dtype = 'i4')
         self.__toolbar = None
 
     def setup(self, toolbar):
         "adds items to doc"
         self.__toolbar  = toolbar
-        toolbar.on_change('bead', self.__onchange_cb)
-        self._ctrl.getGlobal('project').observe('track', 'bead', self.__onproject)
-        self._ctrl.observe("updatetask", "addtask", "removetask", self.__onupdatetask)
+
+        def _onchange_cb(attr, old, new):
+            with self.action:
+                self._bdctrl.bead = new
+
+        def _onproject(_):
+            self._bdctrl.bead = self._bdctrl.bead
+
+        def _onupdatetask(**_):
+            self._bdctrl.bead = self._bdctrl.bead
+
+        toolbar.on_change('bead', _onchange_cb)
+        self._ctrl.getGlobal('project').observe('track', 'bead', _onproject)
+        self._ctrl.observe("updatetask", "addtask", "removetask", _onupdatetask)
 
         self._keys.addKeyPress(('keypress.beadup',
-                                lambda: self.__onchange_cb('', '', toolbar.bead+1)))
+                                lambda: _onchange_cb('', '', toolbar.bead+1)))
         self._keys.addKeyPress(('keypress.beaddown',
-                                lambda: self.__onchange_cb('', '', toolbar.bead-1)))
-
-    def __setbeads(self):
-        "returns the active beads"
-        root  = self._root
-        track = self._ctrl.track(root)
-        if track is None:
-            return []
-
-        task  = self._ctrl.task(root, DataSelectionTask)
-        beads = set(track.beadsonly.keys()) - set(getattr(task, 'discarded', []))
-        self.__beads = np.sort(tuple(beads)) if len(beads) else np.empty((0,), dtype = 'i4')
-        if self.__toolbar.bead not in self.__beads:
-            self.__setvalue(self.__beads[0])
-
-    def __setvalue(self, bead):
-        if len(self.__beads) == 0:
-            return
-
-        if bead is None:
-            bead = self.__beads[0]
-        elif bead not in self.__beads:
-            bead = self.__beads[min(len(self.__beads)-1,
-                                    np.searchsorted(self.__beads, bead))]
-
-        if bead == self._bead:
-            self.__toolbar.bead = bead
-        else:
-            with self.action:
-                self._bead = bead
-
-    def __onchange_cb(self, attr, old, new):
-        self.__setvalue(new)
-
-    def __onproject(self, items):
-        if 'track' in items:
-            self.__setbeads()
-        self.__setvalue(self._bead)
-
-    def __onupdatetask(self, parent = None, task = None, **_):
-        if self._isdiscardedbeads(parent, task):
-            self.__setbeads()
-            self.__setvalue(self._bead)
+                                lambda: _onchange_cb('', '', toolbar.bead-1)))
 
 class RejectedBeadsInput(BeadView):
     "Text dealing with rejected beads"
@@ -292,57 +247,30 @@ class RejectedBeadsInput(BeadView):
 
     def setup(self, toolbar):
         "sets-up the gui"
-        self._keys.addKeyPress(('keypress.delbead', self.__ondiscard_current))
-        toolbar.on_change('discarded',              self.__ondiscarded_cb)
-        self._ctrl.observe("updatetask", "addtask", self.__onupdatetask)
-        self._ctrl.observe("removetask",            self.__onremovetask)
-        self._ctrl.getGlobal('project').track.observe(self.__onproject)
+        def _ondiscard_current(*_):
+            if self._bdctrl.bead is not None:
+                with self.action:
+                    self._bdctrl.discarded = self._bdctrl.discarded | {self._bdctrl.bead}
+
+        def _ondiscarded_cb(attr, old, new):
+            with self.action:
+                self._bdctrl.discarded = parseints(new)
+
+        def _onupdatetask(**_):
+            self.__toolbar.discarded = ','.join(self._bdctrl.discarded)
+
+        def _onremovetask(**_):
+            self.__toolbar.discarded = ','.join(self._bdctrl.discarded)
+
+        def _onproject():
+            self.__toolbar.discarded = ', '.join(str(i) for i in sorted(self._bdctrl.discarded))
+
+        self._keys.addKeyPress(('keypress.delbead', _ondiscard_current))
+        toolbar.on_change('discarded',              _ondiscarded_cb)
+        self._ctrl.observe("updatetask", "addtask", _onupdatetask)
+        self._ctrl.observe("removetask",            _onremovetask)
+        self._ctrl.getGlobal('project').track.observe(_onproject)
         self.__toolbar = toolbar
-
-    def __current(self):
-        task = self._ctrl.task(self._root, DataSelectionTask)
-        return set(getattr(task, 'discarded', []))
-
-    def __ondiscard_current(self, *_):
-        beads = self.__current()
-        beads.add(self._bead)
-        self.__ondiscard(beads)
-
-    def __ondiscarded_cb(self, attr, old, new):
-        vals = set()
-        for i in re.split('[:;,]', new):
-            try:
-                vals.add(int(i))
-            except ValueError:
-                continue
-        self.__ondiscard(vals)
-
-    def __ondiscard(self, vals:set):
-        if vals == self.__current():
-            return
-
-        root = self._root
-        task = self._ctrl.task(root, DataSelectionTask)
-        with self.action:
-            if task is None:
-                self._ctrl.addTask(root, DataSelectionTask(discarded = list(vals)), index = 1)
-            elif len(vals) == 0:
-                self._ctrl.removeTask(root, task)
-            else:
-                self._ctrl.updateTask(root, task, discarded = list(vals))
-
-    def __onupdatetask(self, parent = None, task = None, **_):
-        if self._isdiscardedbeads(parent, task):
-            self.__toolbar.discarded = ','.join(str(i) for i in sorted(task.discarded))
-
-    def __onremovetask(self, parent = None, task = None, **_):
-        if self._isdiscardedbeads(parent, task):
-            self.__toolbar.discarded = ''
-
-    def __onproject(self):
-        task  = self._ctrl.task(self._root, DataSelectionTask)
-        beads = getattr(task, 'discarded', ())
-        self.__toolbar.discarded = ', '.join(str(i) for i in sorted(beads))
 
 class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
     "Toolbar"

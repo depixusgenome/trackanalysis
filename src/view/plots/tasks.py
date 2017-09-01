@@ -25,6 +25,7 @@ class TaskPlotModelAccess(PlotModelAccess):
                         'max': 1e-2,
                         'title': ("Bead {bead} has "
                                   +"{min:.4f} ≮ σ[HF] = {val:.4f} ≮ {max:.4f}")}
+
     @property
     def bead(self) -> Optional[int]:
         "returns the current bead number"
