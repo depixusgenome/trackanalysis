@@ -39,7 +39,7 @@ def monkeypatch(output):
     if Path(output).exists():
         @wraps(_compiler.bundle_all_models)
         def _bundle():
-            return ''.join(open(output))
+            return ''.join(open(output, encoding = 'utf-8'))
         _compiler.bundle_all_models = _bundle
 
 if __name__ == '__main__':
@@ -58,6 +58,6 @@ if __name__ == '__main__':
         if output is None:
             print(string)
         else:
-            print(string, file = open(output, 'w'))
+            print(string, file = open(output, 'w', encoding='utf-8'))
 
     _main()

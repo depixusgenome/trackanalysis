@@ -7,8 +7,8 @@ namespace legacy
 {
     namespace
     {
-        template <typename T>
-        pybind11::object _toimage(auto & shape, void *ptr)
+        template <typename T, typename K>
+        pybind11::object _toimage(K & shape, void *ptr)
         {
             std::vector<size_t> strides(2);
             strides = { shape[1]*sizeof(T), sizeof(T) };
