@@ -102,6 +102,9 @@ class Spring:
             return self.force*(xpos2-xpos1-self.xeq)**2
         return self.force*(abs(xpos2-xpos1)-self.xeq)**2
 
+    # def energy_from_array(self,arr:np.array):
+    #     return self.energy(arr[self.id1],arr[self.id2])
+
 class ScaleSetting(PeakSetting):
     'adds boundaries information on stretch and bias to PeakSetting'
     def __init__(self,**kwa):
@@ -269,78 +272,78 @@ def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argumen
 #             return dist.rvs()
 #         return np.array([])
 
-class SeqUpdate(PeakSetting):
-    '''
-    sample more efficiently (stretch,bias) for mcmc
-    creates a graph: try to fit peaks starting from peaks[0] and adding more and more neighbors
-    # make a graph with indices as nodes (do not use make_graph)
-    # use find matches
-    # pick at random a peak (except 0)
-    # move the oligos of that peak (the move can then be optimised with regard to neighbors)
-    Need to find the sets of scales for each peaks which gives a different sequence of peaks
-    cyclic iteration didn't work too well. when fitting only 1 peak at a time
-    could go back to cyclic when neighbors are considered
-    '''
-    def __init__(self,**kwa):
-        super().__init__(**kwa)
-        self.bstretch=kwa.get("bstretch",scaler.Bounds())
-        self.bbias=kwa.get("bbias",scaler.Bounds())
-        self.cycle=itertools.cycle(list(range(1,len(self.peaks)-1)))
-        self.index=kwa.get("index",0) # type: int
-        self.indices:List[int]=kwa.get("indices",list(range(len(self.peaks))))
-        self.call:Callable=self.multi_update # self.single_update
+# class SeqUpdate(PeakSetting):
+#     '''
+#     sample more efficiently (stretch,bias) for mcmc
+#     creates a graph: try to fit peaks starting from peaks[0] and adding more and more neighbors
+#     # make a graph with indices as nodes (do not use make_graph)
+#     # use find matches
+#     # pick at random a peak (except 0)
+#     # move the oligos of that peak (the move can then be optimised with regard to neighbors)
+#     Need to find the sets of scales for each peaks which gives a different sequence of peaks
+#     cyclic iteration didn't work too well. when fitting only 1 peak at a time
+#     could go back to cyclic when neighbors are considered
+#     '''
+#     def __init__(self,**kwa):
+#         super().__init__(**kwa)
+#         self.bstretch=kwa.get("bstretch",scaler.Bounds())
+#         self.bbias=kwa.get("bbias",scaler.Bounds())
+#         self.cycle=itertools.cycle(list(range(1,len(self.peaks)-1)))
+#         self.index=kwa.get("index",0) # type: int
+#         self.indices:List[int]=kwa.get("indices",list(range(len(self.peaks))))
+#         self.call:Callable=self.multi_update # self.single_update
 
-    # need to consider only the peaks that can be matched
-    # no need to recompute the bstretch,bbias function of state if using self._pos[tomove]
-    def move_one(self,others:np.array,tomove:int):
-        '''
-        defines a new stre,bias for a single peak
-        position to match are located between others positions
-        '''
-        shifted=0.5*(others[1:]+others[:-1]) # to avoid multiple overlaps
-        moves=scaler.match_peaks(shifted,self._pos[tomove],self.bstretch,self.bbias)
-        if len(moves)==0:
-            print(f"cant move index={tomove}")
-        else:
-            print(f'can move')
-        return random.choice(moves) # type: ignore
+#     # need to consider only the peaks that can be matched
+#     # no need to recompute the bstretch,bbias function of state if using self._pos[tomove]
+#     def move_one(self,others:np.array,tomove:int):
+#         '''
+#         defines a new stre,bias for a single peak
+#         position to match are located between others positions
+#         '''
+#         shifted=0.5*(others[1:]+others[:-1]) # to avoid multiple overlaps
+#         moves=scaler.match_peaks(shifted,self._pos[tomove],self.bstretch,self.bbias)
+#         if len(moves)==0:
+#             print(f"cant move index={tomove}")
+#         else:
+#             print(f'can move')
+#         return random.choice(moves) # type: ignore
 
-    def single_update(self,*args,**kwa): # pylint: disable=unused-argument
-        '1 peak has its state updated'
-        tomove=self.index
-        neigh=sorted(frozenset(self.indices)-frozenset([self.index]))
-        state=args[0]
-        # scale all peaks
-        all_scaled=[state[2*idx]*pos+state[2*idx+1] for idx,pos in enumerate(self._pos)]
-        match=np.sort(np.hstack([all_scaled[idx] for idx in neigh]))
-        apos=np.sort(np.hstack(all_scaled)) # all positions
-        lower=max(apos[apos<min(match)]) if any(apos<min(match)) else min(match)-2.2
-        upper=min(apos[apos>max(match)]) if any(apos>max(match)) else max(match)+2.2
+#     def single_update(self,*args,**kwa): # pylint: disable=unused-argument
+#         '1 peak has its state updated'
+#         tomove=self.index
+#         neigh=sorted(frozenset(self.indices)-frozenset([self.index]))
+#         state=args[0]
+#         # scale all peaks
+#         all_scaled=[state[2*idx]*pos+state[2*idx+1] for idx,pos in enumerate(self._pos)]
+#         match=np.sort(np.hstack([all_scaled[idx] for idx in neigh]))
+#         apos=np.sort(np.hstack(all_scaled)) # all positions
+#         lower=max(apos[apos<min(match)]) if any(apos<min(match)) else min(match)-2.2
+#         upper=min(apos[apos>max(match)]) if any(apos>max(match)) else max(match)+2.2
 
-        # find where to move
-        try:
-            #nstre,nbias=self.move_one(match,tomove)
-            nstre,nbias=self.move_one(np.hstack([lower,match,upper]),tomove)
+#         # find where to move
+#         try:
+#             #nstre,nbias=self.move_one(match,tomove)
+#             nstre,nbias=self.move_one(np.hstack([lower,match,upper]),tomove)
 
-        except IndexError:
-            return state
-        return np.hstack([state[:2*tomove],[nstre,nbias],state[2*(tomove+1):]])
+#         except IndexError:
+#             return state
+#         return np.hstack([state[:2*tomove],[nstre,nbias],state[2*(tomove+1):]])
 
-    def __call__(self,*args,**kwa):
-        return self.call(*args,**kwa)
+#     def __call__(self,*args,**kwa):
+#         return self.call(*args,**kwa)
 
-    # # fix this: returns only a single update and not all
-    def multi_update(self,*args,**kwa)->np.array: # pylint: disable=unused-argument
-        '''
-        multiple peaks are updated simultaneously
-        a peak and overlapping ones
-        '''
-        self.index=random.choice(self.indices) # type: ignore
-        state=args[0]
-        # if self.index!=0:
-        #    state=self.single_update(state)
-        state=self.single_update(state) # trying wth peaks 0 moving
-        return state
+#     # # fix this: returns only a single update and not all
+#     def multi_update(self,*args,**kwa)->np.array: # pylint: disable=unused-argument
+#         '''
+#         multiple peaks are updated simultaneously
+#         a peak and overlapping ones
+#         '''
+#         self.index=random.choice(self.indices) # type: ignore
+#         state=args[0]
+#         # if self.index!=0:
+#         #    state=self.single_update(state)
+#         state=self.single_update(state) # trying wth peaks 0 moving
+#         return state
         
 class SpringStep(SpringSetting):
     '''
@@ -378,17 +381,6 @@ class SpringScaler(PeakSetting):
         self.scoring=Score(**kwa)
         self.sampler=SeqUpdate(**kwa)
         self.min_overl:int=kwa.get("min_overl",2)
-
-
-        # self.edges=scaler.OPeakArray.list2edgeids(self._peaks,
-        #                                           min_overl=self.min_overl,
-        #                                           unsigned=self.scoring.unsigned)
-        # self.neigh:Dict[int,List[int]]={idx:frozenset(edg
-        #                                               for edge in self.edges
-        #                                               for edg in edge
-        #                                               if idx in edge)
-        #                                 for idx in range(len(self.peaks))}
-        #self.edges=[edge for edge in self.edges if edge[0]<edge[1]]
         self.basinkwa={"func":self.scoring,
                        "niter":100,
                        "minimizer_kwargs":dict(method=no_minimizer),
