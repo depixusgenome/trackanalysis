@@ -6,6 +6,67 @@ namespace peakcalling { namespace cost
 {
     namespace
     {
+        Output _cross(float const * bead1, float const * weights1, size_t size1,
+                      float const * bead2, float const * weights2, size_t size2,
+                      double alpha, double beta, double sig)
+        {
+            double sum       = 0.;
+            double grsum [2] = {0., 0.};
+
+            bool   wgood     = weights1 != nullptr || weights2 != nullptr;
+            for(size_t i2 = 0; i2 < size2; ++i2)
+                for(size_t i1 = 0; i1 < size1; ++i1)
+                {
+                    double d = (bead1[i1]-alpha*bead2[i2]-beta)/sig;
+                    double w = wgood ? weights1[i1]*weights2[i2] : 1.0;
+                    double e = w*std::exp(-.5*d*d);
+                    double c = e*d/sig;
+
+                    sum      += e;
+                    grsum[0] += c*bead2[i2];
+                    grsum[1] += c;
+                }
+
+            return std::make_tuple(float(sum), float(grsum[0]), float(grsum[1]));
+        }
+
+        Output _norm2(float const * bead2, float const * weights2, size_t size2,
+                      double alpha, double sig)
+        {
+            double norm2  = 0.;
+            double grnorm = 0.;
+
+            bool   wgood  = weights2 != nullptr;
+            for(size_t i2 = 0; i2 < size2; ++i2)
+                for(size_t i1 = 0; i1 < size2; ++i1)
+                {
+                    double d = (bead2[i1]-bead2[i2])*alpha/sig;
+                    double w = wgood ? weights2[i1]*weights2[i2] : 1.0;
+                    double e = w*std::exp(-.5*d*d);
+
+                    norm2  += e;
+                    grnorm += e*d/sig*(bead2[i2]-bead2[i1]);
+                }
+
+            return std::make_tuple(float(norm2), float(grnorm), 0.f);
+        }
+
+        float _norm1(float const * bead1, float const * weights1, size_t size1,
+                     double sig)
+        {
+            double norm1 = 0.0;
+            bool   wgood  = weights1 != nullptr;
+            for(size_t i1 = 0; i1 < size1; ++i1)
+                for(size_t i2 = 0; i2 < size1; ++i2)
+                {
+                    double d = (bead1[i1]-bead1[i2])/sig;
+                    double w = wgood ? weights1[i1]*weights1[i2] : 1.0;
+                    norm1   += w*std::exp(-.5*d*d);
+                }
+
+            return float(norm1);
+        }
+
         Output _computecf(Parameters const & cf, double stretch, double bias,
                           float const * bead1, float const * yvals1, size_t size1,
                           float const * bead2, float const * yvals2, size_t size2)
@@ -18,60 +79,20 @@ namespace peakcalling { namespace cost
                     if(size1 == 0 || size2 == 0)
                         return std::make_tuple(1.0f, 0.0f, 0.0f);
 
-                    double sum       = 0.;
-                    double norm1     = 0.;
-                    double grsum [2] = {0., 0.};
-                    double grnorm    = 0.;
+                    auto cross = _cross(pos1, aweight1, size1,
+                                        pos2, aweight2, size2,
+                                        alpha, beta, sig);
+                    auto n2 = _norm2(pos2, aweight2, size2, alpha, sig);
+                    auto n1 = _norm1(pos1, aweight1, size1, sig);
 
-                    auto   weights = [](auto const & aweight, auto size)
-                    {
-                        if(aweight == nullptr)
-                            return std::vector<float>(size, 1.);
-                        return std::vector<float>(aweight, aweight+size);
-                    };
-
-                    auto weights1 = weights(aweight1, size1),
-                         weights2 = weights(aweight2, size2);
-
-                    for(size_t i2 = 0; i2 < size2; ++i2)
-                    {
-                        for(size_t i1 = 0; i1 < size1; ++i1)
-                        {
-                            double d = (pos1[i1]-alpha*pos2[i2]-beta)/sig;
-                            double w = weights1[i1]*weights2[i2];
-                            double e = w*std::exp(-.5*d*d);
-                            double c = e*d/sig;
-
-                            sum      += e;
-                            grsum[0] += c*pos2[i2];
-                            grsum[1] += c;
-                        }
-
-                        for(size_t i1 = 0; i1 < size2; ++i1)
-                        {
-                            double d = (pos2[i1]-pos2[i2])*alpha/sig;
-                            double w = weights2[i1]*weights2[i2];
-                            double e = w*std::exp(-.5*d*d);
-
-                            norm1  += e;
-                            grnorm += e*d/sig*(pos2[i2]-pos2[i1]);
-                        }
-                    }
-
-                    double norm2 = 0.0;
-                    for(size_t i1 = 0; i1 < size1; ++i1)
-                        for(size_t i2 = 0; i2 < size1; ++i2)
-                        {
-                            double d = (pos1[i1]-pos1[i2])/sig;
-                            double w = weights1[i1]*weights1[i2];
-                            norm2   += w*std::exp(-.5*d*d);
-                        }
-
-                    double c = std::sqrt(norm1*norm2);
-                    double x = sum/c;
-                    return std::make_tuple(float(1.-x),
-                                           float((.5*grnorm*sum/norm1-grsum[0])/c),
-                                           float(-grsum[1]/c));
+                    float sum =  std::get<0>(cross);
+                    float c   = std::sqrt(std::get<0>(n2)*n1);
+                    float x   = sum/c;
+                    return std::make_tuple(1.-x,
+                                           (.5*std::get<1>(n2)*sum/std::get<0>(n2)
+                                            -std::get<1>(cross)
+                                           )/c,
+                                           -std::get<2>(cross)/c);
                 };
 
             auto r1 = cost(bead1, yvals1, size1,
@@ -98,6 +119,18 @@ namespace peakcalling { namespace cost
             g[1] = std::get<2>(res);
             return std::get<0>(res);
         }
+    }
+
+    Terms terms(float alpha, float beta, float sig,
+                float const * bead1, float const * weight1,  size_t size1,
+                float const * bead2, float const * weight2,  size_t size2)
+    {
+        auto n1    = std::make_tuple(_norm1(bead1, weight1, size1, sig), 0.f, 0.f);
+        auto n2    = _norm2(bead2, weight2, size2, alpha, sig);
+        auto cross = _cross(bead1, weight1, size1,
+                            bead2, weight2, size2,
+                            alpha, beta, sig);
+        return std::make_tuple(n1, n2, cross);
     }
 
     Output compute  (Parameters const & cf,

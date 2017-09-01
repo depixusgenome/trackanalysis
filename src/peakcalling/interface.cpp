@@ -6,6 +6,30 @@ namespace peakcalling
 {
     namespace cost
     {
+        namespace 
+        {
+            pybind11::object _terms(float a, float b, float c,
+                                    float const * bead1, float const * weight1, size_t size1,
+                                    float const * bead2, float const * weight2, size_t size2)
+            {
+                auto res = terms(a, b, c,
+                                 bead1, weight1, size1,
+                                 bead2, weight2, size2);
+
+                std::vector<size_t> shape   = {3, 3};
+                std::vector<size_t> strides = {3*sizeof(float), sizeof(float)};
+
+                float dt[9] = 
+                    { std::get<0>(std::get<0>(res)), std::get<0>(std::get<1>(res)), 0.,
+                      std::get<1>(std::get<0>(res)), 0., 0.,
+                      std::get<2>(std::get<0>(res)),
+                      std::get<2>(std::get<1>(res)),
+                      std::get<2>(std::get<2>(res)),
+                    };
+                return pybind11::array(shape, strides, dt);
+            }
+        }
+
         void pymodule(pybind11::module & mod)
         {
             using namespace pybind11::literals;
@@ -49,6 +73,42 @@ namespace peakcalling
                     "Computes the cost for given parameters.\n"
                     "Returns a tuple (value, stretch gradient, bias gradient)"
                     );
+
+            ht.def("terms", [](pybind11::array_t<float> const & bead1,
+                               pybind11::array_t<float> const & bead2,
+                               float a, float b, float c)
+                    {
+                        return _terms(a, b, c,
+                                      bead1.data(), nullptr, bead1.size(),
+                                      bead2.data(), nullptr, bead2.size());
+                    },
+                    "input1"_a,          "input2"_a,
+                    "stretch"_a  = 1.f,  "bias"_a  = 0.f,
+                    "noise"_a = 0.003f,
+                    "Computes the cost terms for given parameters.\n"
+                    );
+
+            ht.def("terms", [](pybind11::array_t<float> const & bead1,
+                               pybind11::array_t<float> const & weight1,
+                               pybind11::array_t<float> const & bead2,
+                               pybind11::array_t<float> const & weight2,
+                               float a, float b, float c)
+                    {
+                        if(bead1.size() != weight1.size())
+                            throw pybind11::index_error("bead1.size != weight1.size");
+                        if(bead2.size() != weight2.size())
+                            throw pybind11::index_error("bead2.size != weight2.size");
+                        return _terms(a, b, c,
+                                      bead1.data(), weight1.data(), bead1.size(),
+                                      bead2.data(), weight2.data(), bead2.size());
+                    },
+                    "input1"_a,          "input2"_a,
+                    "weight1"_a,          "weight2"_a,
+                    "stretch"_a  = 1.f,  "bias"_a  = 0.f,
+                    "noise"_a = 0.003f,
+                    "Computes the cost terms for given parameters.\n"
+                    );
+
 
             ht.def("optimize", [](pybind11::array_t<float> const & bead1,
                                   pybind11::array_t<float> const & bead2,

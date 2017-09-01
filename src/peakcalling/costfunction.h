@@ -9,7 +9,11 @@ namespace peakcalling { namespace cost
     };
 
     using Output = optimizer::Output;
+    using Terms  = std::tuple<Output, Output, Output>;
 
+    Terms terms(float alpha, float beta, float sig,
+                float const * bead1, float const * weight1,  size_t size1,
+                float const * bead2, float const * weight2,  size_t size2);
     Output compute (Parameters const &,
                     float const *, float const *, size_t,
                     float const *, float const *, size_t);
