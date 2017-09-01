@@ -4,11 +4,11 @@
 import sys
 from   typing           import List
 import numpy            as np
-import holoviews        as hv
 from   utils.decoration import addto
 import sequences
 from   .processor       import PeaksDict, BeadsByHairpinProcessor
 
+hv                 = sys.modules['holoviews']  # pylint: disable=invalid-name
 Detailed:     type = sys.modules['peakfinding.__scripting__'].Detailed
 PeaksDisplay: type = sys.modules['peakfinding.__holoviewing__'].PeaksDisplay
 Display:      type = sys.modules['data.__holoviewing__'].Display

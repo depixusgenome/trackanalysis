@@ -8,13 +8,13 @@ from   typing                   import List
 from   functools                import partial
 from   itertools                import chain, repeat
 import numpy                    as np
-import holoviews                as hv
 from   utils.decoration         import addto
 from   .track                   import FoV, Bead
 from   .trackitems              import Beads, Cycles
 
 from   .__scripting__           import ExperimentList, Track
 
+hv    = sys.modules['holoviews']  # pylint: disable=invalid-name
 Tasks = sys.modules['model.__scripting__'].Tasks
 
 class Display:

@@ -4,12 +4,12 @@
 from   typing           import List, Iterator
 from   functools        import partial
 import sys
-import holoviews        as hv
 import numpy            as np
 from   utils.decoration import addto
 from   .processor       import PeaksDict
 from   .__scripting__   import Detailed
 
+hv             = sys.modules['holoviews']  # pylint: disable=invalid-name
 Display:  type = sys.modules['data.__holoviewing__'].Display
 Tasks:    type = sys.modules['model.__scripting__'].Tasks
 

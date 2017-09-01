@@ -206,7 +206,7 @@ namespace peakcalling { namespace match
         double  _compute(unsigned, double const * x, double * g, void * d)
         {
             auto const & cf = *((optimizer::NLOptCall<> const *) d);
-            auto res = distance(cf.params->sigma, x[0], x[1],
+            auto res = distance(cf.params->sigma, float(x[0]), float(x[1]),
                                 cf.beads[0], cf.sizes[0],
                                 cf.beads[1], cf.sizes[1]);
             g[0] = std::get<1>(res);

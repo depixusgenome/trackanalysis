@@ -52,8 +52,8 @@ try:
 except ImportError:
     pass
 try:
-    import holoviews            as hv
-    import holoviews.operation  as hvops
+    import holoviews            as hv       # pylint: disable=import-error
+    import holoviews.operation  as hvops    # pylint: disable=import-error
 except ImportError:
     pass
 else:
@@ -66,18 +66,18 @@ else:
             import bokeh.io as _io
             _io.output_notebook()
             hv.notebook_extension('bokeh')
-            from IPython import get_ipython
+            from IPython import get_ipython  # pylint: disable=import-error
             get_ipython().magic('output size=150')
-        except:                                         # pylint: disable=bare-except
+        except:                              # pylint: disable=bare-except
             pass
 
 if 'ipykernel_launcher' in inspect.stack()[-3].filename:
     try:
-        from IPython import get_ipython
+        from IPython import get_ipython  # pylint: disable=import-error
         get_ipython().magic('load_ext autoreload')
         get_ipython().magic('autoreload 2')
         get_ipython().magic('matplotlib inline')
-    except:                                         # pylint: disable=bare-except
+    except:                              # pylint: disable=bare-except
         pass
 
 _frame = None

@@ -7,10 +7,10 @@ import sys
 from   typing           import List
 from   functools        import partial
 import numpy            as np
-import holoviews        as hv
 from   utils.decoration import addto
 from   .data            import Events
 
+hv            = sys.modules['holoviews']  # pylint: disable=invalid-name
 Display: type = sys.modules['data.__holoviewing__'].Display
 
 class EventDisplay(Display): # type: ignore
