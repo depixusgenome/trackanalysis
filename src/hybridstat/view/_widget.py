@@ -126,8 +126,6 @@ class PeaksStatsWidget(WidgetCreator):
             if mdl.track is None:
                 return
 
-            self.values[0] = mdl.stretch
-            self.values[1] = mdl.bias
             self.values[2] = rawprecision(mdl.track, mdl.bead)
             if len(mdl.peaks['z']):
                 self.values[3] = mdl.peaks['sigma']
@@ -138,6 +136,9 @@ class PeaksStatsWidget(WidgetCreator):
 
         def sequencedependant(self, mdl, dist, key):
             "all sequence dependant stats"
+            self.values[0] = dist[key].stretch
+            self.values[1] = dist[key].bias
+
             task      = mdl.identification.task
             remove    = task.peakids[key].peaks[[0,-1]]
             nrem      = sum(i in remove for i in mdl.peaks[key+'id'])
