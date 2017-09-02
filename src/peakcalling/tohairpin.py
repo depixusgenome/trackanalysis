@@ -157,9 +157,12 @@ class HairpinDistance(Hairpin):
             return product(self.__arange('stretch'), self.__arange('bias'))
 
         val = getattr(self, attr)
+        cnt = max(1, (int(2.*val.size/val.step+0.5)//2)*2+1)
+        if cnt == 1:
+            return np.array([0. if val.center is None else val.center], dtype = 'f4')
         if val.center is None:
-            return np.arange(-val.size, val.size+val.step*.1, val.step)
-        return np.arange(val.center-val.size, val.center+val.size+val.step*.1, val.step)
+            return np.linspace(-val.size, val.size, cnt)
+        return np.linspace(val.center-val.size, val.center+val.size, cnt)
 
 PEAKS_DTYPE = np.dtype([('zvalue', 'f4'), ('key', 'i4')])
 PEAKS_TYPE  = Union[Sequence[Tuple[float,int]],np.ndarray]

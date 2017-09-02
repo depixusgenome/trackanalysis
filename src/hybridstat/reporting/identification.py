@@ -51,7 +51,7 @@ def _add(info, row, ibead, ref):
 
     info.setdefault(ref, []).append(beadid)
 
-def _read_summary(rows) -> List[Tuple[int, str, float, float]]:
+def _read_summary(rows) -> List[Tuple[int, str, Optional[float], Optional[float]]]:
     ids   = [None, None, None, None] # type: List[Optional[int]]
     names = ('bead', 'reference', 'stretch', 'bias')
     for row in rows:
@@ -68,9 +68,8 @@ def _read_summary(rows) -> List[Tuple[int, str, float, float]]:
         cnv = (_id, lambda r, i: str(r[i].value), _tofloat, _tofloat) # type: Sequence[Callable]
         for row in rows:
             vals = tuple(fcn(row, idx) for fcn, idx in zip(cnv, ids))
-            if None not in vals:
-                info.append(cast(Tuple[int,str,float,float], vals))
-
+            if None not in vals[:2]:
+                info.append(cast(Tuple[int, str, Optional[float], Optional[float]], vals))
     return info
 
 def _read_identifications(rows) -> List[Tuple[int,str]]:
@@ -93,7 +92,7 @@ def _read_identifications(rows) -> List[Tuple[int,str]]:
         res.extend((i,hpin) for i in beads)
     return res
 
-def readparams(fname:str) -> Union[List[Tuple[int,str,float,float]],
+def readparams(fname:str) -> Union[List[Tuple[int,str,Optional[float],Optional[float]]],
                                    List[Tuple[int,str]]]:
     "extracts bead ids and their reference from a report"
     wbook = load_workbook(filename=fname, read_only=True)

@@ -15,7 +15,7 @@ from control.processor.batch        import BatchTask, BatchProcessor, PathIO
 from peakfinding.reporting.batch    import PeakFindingBatchTemplate
 from peakcalling.processor          import (BeadsByHairpinTask, # pylint: disable=unused-import
                                             FitToHairpinTask, DistanceConstraint,
-                                            Constraints)
+                                            Constraints, HairpinDistance)
 from peakcalling.tohairpin          import Range
 from .processor                     import HybridstatExcelTask
 from .identification                import readparams
@@ -34,14 +34,14 @@ def readconstraints(idtask   : FitToHairpinTask,
         if len(item) == 2 or not useparams:
             continue
 
-        rngs    = idtask.distances[item[0]]
+        rngs = idtask.distances.get(item[1], HairpinDistance())
         if item[2] is not None:
             stretch = Range(item[2], rngs.stretch[-1]*.1, rngs.stretch[-1])
-            cstrs[item[0]]['stretch'] = stretch
+            cstrs[item[0]].constraints['stretch'] = stretch
 
         if item[3] is not None:
-            bias    = Range(item[3], rngs.bias   [-1]*.1, rngs.bias[-1])
-            cstrs[item[0]]['bias']    = bias
+            bias = Range(item[3], rngs.bias   [-1]*.1, rngs.bias[-1])
+            cstrs[item[0]].constraints['bias'] = bias
     return idtask
 
 def fittohairpintask(seqpath    : Union[Path, str],
