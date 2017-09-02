@@ -109,6 +109,11 @@ class Processor(metaclass=MetaProcessor):
         return self.task.isslow()
 
     @staticmethod
+    def beads(_, selected: Iterable[int]) -> Iterable[int]:
+        "Beads selected/discarded by the task"
+        return selected
+
+    @staticmethod
     def canpool():
         "returns whether this is pooled"
         return False
@@ -215,6 +220,11 @@ class TrackReaderProcessor(Processor):
         attr += 'only'   if self.task.beadsonly else ''
         args.apply((getattr(res, attr).withcopy(self.task.copy),), levels = self.levels)
 
+    @staticmethod
+    def beads(cache, _) -> Iterable[int]:
+        "Beads selected/discarded by the task"
+        return cache.beadsonly.keys()
+
 class CycleCreatorProcessor(Processor):
     "Generates output from a _tasks.CycleCreatorTask"
     @classmethod
@@ -247,6 +257,19 @@ class DataSelectionProcessor(Processor):
 
     def run(self, args):
         args.apply(self.apply(**self.config()))
+
+    def beads(self, _, selected: Iterable[int]) -> Iterable[int]: # type: ignore
+        "Beads selected/discarded by the task"
+        if self.task.selected and self.task.discarded:
+            acc       = frozenset(self.task.selected) - frozenset(self.task.discarded)
+            selected  = iter(i for i in selected if i in acc)
+        elif self.task.selected:
+            acc       = frozenset(self.task.selected)
+            selected  = iter(i for i in selected if i in acc)
+        elif self.task.discarded:
+            disc      = frozenset(self.task.discarded)
+            selected  = iter(i for i in selected if i not in disc)
+        return selected
 
 class TaggingProcessor(Processor):
     "Generates output from a TaggingTask"

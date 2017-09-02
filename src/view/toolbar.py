@@ -11,7 +11,7 @@ from bokeh.models         import Widget
 from bokeh.io             import curdoc
 
 from control.taskio       import TaskIO
-from control.beadscontrol import BeadController
+from control.beadscontrol import DataSelectionBeadController
 from utils.gui            import parseints
 from .dialog              import FileDialog
 from .base                import BokehView, threadmethod, spawn, Action
@@ -199,7 +199,7 @@ class BeadView(BokehView):
     "Widget for controlling the current beads"
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self._bdctrl = BeadController(self._ctrl)
+        self._bdctrl = DataSelectionBeadController(self._ctrl)
 
     if TYPE_CHECKING:
         def getroots(self, doc):
@@ -222,21 +222,25 @@ class BeadInput(BeadView):
         def _onchange_cb(attr, old, new):
             with self.action:
                 self._bdctrl.bead = new
+            self.__toolbar.bead = self._bdctrl.bead
 
-        def _onproject(_):
-            self._bdctrl.bead = self._bdctrl.bead
-
-        def _onupdatetask(**_):
-            self._bdctrl.bead = self._bdctrl.bead
+        def _onproject(_ = None):
+            bead = self._bdctrl.bead
+            if bead not in self._bdctrl.availablebeads:
+                self._bdctrl.bead = bead+1
+                if self._bdctrl.bead == bead:
+                    self._bdctrl.bead = bead-1
+            else:
+                self.__toolbar.bead = bead
 
         toolbar.on_change('bead', _onchange_cb)
         self._ctrl.getGlobal('project').observe('track', 'bead', _onproject)
-        self._ctrl.observe("updatetask", "addtask", "removetask", _onupdatetask)
+        self._ctrl.observe("updatetask", "addtask", "removetask", lambda **_: _onproject())
 
         self._keys.addKeyPress(('keypress.beadup',
-                                lambda: _onchange_cb('', '', toolbar.bead+1)))
-        self._keys.addKeyPress(('keypress.beaddown',
-                                lambda: _onchange_cb('', '', toolbar.bead-1)))
+                                lambda: _onchange_cb('', '', self._bdctrl.bead+1)),
+                               ('keypress.beaddown',
+                                lambda: _onchange_cb('', '', self._bdctrl.bead-1)))
 
 class RejectedBeadsInput(BeadView):
     "Text dealing with rejected beads"
@@ -248,27 +252,22 @@ class RejectedBeadsInput(BeadView):
     def setup(self, toolbar):
         "sets-up the gui"
         def _ondiscard_current(*_):
-            if self._bdctrl.bead is not None:
-                with self.action:
-                    self._bdctrl.discarded = self._bdctrl.discarded | {self._bdctrl.bead}
+            bead = self._bdctrl.bead
+            if bead is None:
+                return
+            with self.action:
+                self._bdctrl.discarded = set(self._bdctrl.discarded) | {bead}
 
         def _ondiscarded_cb(attr, old, new):
             with self.action:
                 self._bdctrl.discarded = parseints(new)
-
-        def _onupdatetask(**_):
-            self.__toolbar.discarded = ','.join(self._bdctrl.discarded)
-
-        def _onremovetask(**_):
-            self.__toolbar.discarded = ','.join(self._bdctrl.discarded)
 
         def _onproject():
             self.__toolbar.discarded = ', '.join(str(i) for i in sorted(self._bdctrl.discarded))
 
         self._keys.addKeyPress(('keypress.delbead', _ondiscard_current))
         toolbar.on_change('discarded',              _ondiscarded_cb)
-        self._ctrl.observe("updatetask", "addtask", _onupdatetask)
-        self._ctrl.observe("removetask",            _onremovetask)
+        self._ctrl.observe("updatetask", "addtask", "removetask", lambda **_: _onproject())
         self._ctrl.getGlobal('project').track.observe(_onproject)
         self.__toolbar = toolbar
 

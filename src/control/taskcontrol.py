@@ -228,7 +228,7 @@ class TaskController(Controller):
             return None
         return self.__items[parent].run(tsk, copy = copy, pool = pool)
 
-    def processors(self, parent:RootTask, tsk:Task) -> Optional[ProcessorController]:
+    def processors(self, parent:RootTask, tsk:Task = None) -> Optional[ProcessorController]:
         "Returns a processor for a given root and range"
         ctrl = self.__items.get(parent, None)
         return None if ctrl is None else ctrl.keepupto(tsk)

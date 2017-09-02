@@ -33,6 +33,8 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
     @staticmethod
     def nans(mdl, nans):
         "returns an array with nan positions per cycle"
+        if nans is None:
+            return ()
         return np.array(list(mdl.track.cycles.withdata({0:nans}).values()), dtype = 'O')
 
     @staticmethod
@@ -50,7 +52,7 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
             return items, None
 
         cache  = ctrl.data.getCache(tsk)()
-        nans   = cache.pop('gui')
+        nans   = cache.pop('gui', None)
         mdl.processors().data.setCacheDefault(tsk, {}).update(cache)
         return items, nans
 
