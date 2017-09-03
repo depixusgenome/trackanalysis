@@ -102,7 +102,7 @@ class HairpinDistance(Hairpin):
     symmetry  = False
     precision = 15.
     stretch   = Range(1./8.8e-4, 200., 100.)
-    bias      = Range(None,       20.*8.8e-4, 20.*8.8e-4)
+    bias      = Range(None,       60.*8.8e-4, 60.*8.8e-4)
     optim     = OptimisationParams(1e-4, 1e-8, 1e-4, 1e-8, 100)
     __KEYS    = frozenset(locals())
     @initdefaults(__KEYS)
