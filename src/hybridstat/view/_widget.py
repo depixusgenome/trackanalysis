@@ -170,7 +170,7 @@ class PeaksStatsWidget(WidgetCreator):
             if np.isscalar(val):
                 return ('{:'+fmt+'}').format(val)
 
-            if isinstance(val, np.ndarray):
+            if isinstance(val, (list, np.ndarray)):
                 if len(val) == 0:
                     return '0 ± ∞'
                 val = np.mean(val), np.std(val)

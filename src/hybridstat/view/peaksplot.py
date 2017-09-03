@@ -179,7 +179,7 @@ class PeaksPlotCreator(TaskPlotCreator):
 
     def __data(self) -> Tuple[dict, dict]:
         cycles = self._model.runbead()
-        data   = {i: np.empty((1,0), dtype = 'f4') for i in ('z', 'count')}
+        data   = {i: np.empty(0, dtype = 'f4') for i in ('z', 'count')}
         if cycles is None:
             return data, self.__peaks(None)
 
@@ -225,7 +225,10 @@ class PeaksPlotCreator(TaskPlotCreator):
         for widget in self._widgets.values():
             widget.reset(self._bkmodels)
 
-        self.setbounds(self._fig.y_range, 'y', (data['z'][0], data['z'][-1]))
+        if len(data['z']) > 2:
+            self.setbounds(self._fig.y_range, 'y', (data['z'][0], data['z'][-1]))
+        else:
+            self.setbounds(self._fig.y_range, 'y', (0., 1.))
 
     def __create_fig(self):
         self._fig = figure(**self._figargs(y_range = Range1d(start = 0., end = 1.),
