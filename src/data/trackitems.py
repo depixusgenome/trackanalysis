@@ -336,7 +336,7 @@ class TrackItems(_m_ConfigMixin, Items):
 
         # consider this a slice
         cpy = shallowcopy(self)
-        return cpy.new().selecting(keys)
+        return (cpy.new() if cpy.selected else cpy).selecting(keys)
 
     def freeze(self):
         "returns data with all treatments applied"
@@ -411,7 +411,8 @@ class Beads(TrackItems, Items):
                 yield from self.data.keys(None, beadsonly)
             else:
                 yield from (i for i in self.data.keys(None, beadsonly) if i in sel)
-        yield from super()._keys(sel, beadsonly)
+        else:
+            yield from super()._keys(sel, beadsonly)
 
     def _iter(self, sel = None) -> Iterator[Tuple[BEADKEY, np.ndarray]]:
         if isinstance(self.data, Beads) and self.cycles is None:
@@ -421,8 +422,12 @@ class Beads(TrackItems, Items):
 
             if sel is None:
                 yield from beads.__iter__() # pylint: disable=no-member
-            else:
-                yield from shallowcopy(beads).selecting(sel).__iter__()
+
+            elif beads.selected:
+                parent = frozenset(beads.keys())
+                sel    = [i for i in shallowcopy(beads).selecting(sel, True).keys()
+                          if i in parent]
+            yield from shallowcopy(beads).selecting(sel, clear = True).__iter__()
             return
 
         itr = ((bead, self.data[bead]) for bead in self.keys(sel))
@@ -633,8 +638,11 @@ class Cycles(TrackItems, Items):
 
             if sel is None:
                 yield from cycles.__iter__() # pylint: disable=no-member
-            else:
-                yield from shallowcopy(cycles).selecting(sel).__iter__()
+            elif cycles.selected:
+                parent = frozenset(cycles.keys())
+                sel    = [i for i in shallowcopy(cycles).selecting(sel, True).keys()
+                          if i in parent]
+            yield from shallowcopy(cycles).selecting(sel, clear = True).__iter__()
 
         elif self.direct:
             yield from ((key, self.data[key]) for key in self.keys(sel))
