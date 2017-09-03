@@ -70,7 +70,6 @@ def test_beadplot(bokehaction):
     "test plot"
     vals = [0.]*4
     def _printrng(evts):
-        print(evts)
         if 'x' in evts:
             vals[:2] = [0. if i is None else i for i in evts['x'].value]
         if 'y' in evts:

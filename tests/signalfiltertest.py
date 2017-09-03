@@ -5,9 +5,7 @@ u"all view aspects here"
 import numpy as np
 from numpy.testing import assert_allclose
 
-from data          import Beads
 from signalfilter  import ForwardBackwardFilter, NonLinearFilter, hfsigma, nanhfsigma
-from signalfilter.beadsubtraction import BeadSubtractionTask, BeadSubtractionProcessor
 
 def test_nl_bf_filters():
     u"Tests ForwardBackwardFilter, NonLinearFilter"
@@ -50,28 +48,5 @@ def test_hfsigma():
     arr = np.insert(arr, range(0, 20, 2), np.nan)
     assert nanhfsigma(arr) == np.median(np.diff(arr[np.isfinite(arr)]))
 
-def test_subtract():
-    "tests subtractions"
-    assert_allclose(BeadSubtractionTask()([np.arange(5)]),   np.arange(5))
-    assert_allclose(BeadSubtractionTask()([np.arange(5)]*5), np.arange(5))
-    assert_allclose(BeadSubtractionTask()([np.arange(5), np.ones(5)]),
-                    np.arange(5)*.5+.5)
-
-    assert_allclose(BeadSubtractionTask()([np.arange(6), np.ones(5)]),
-                    list(np.arange(5)*.5+.5)+[5])
-
-    tmp = Beads(data = {0: np.arange(5), 1: np.ones(5),
-                        2: np.zeros(5),  3: np.arange(5)*1.})
-    cache = {}
-    frame = BeadSubtractionProcessor.apply(tmp, cache, beads = [0, 1])
-    assert set(frame.keys()) == {2, 3}
-    assert_allclose(frame[2], -.5*np.arange(5)-.5)
-    assert_allclose(cache[None],  .5*np.arange(5)+.5)
-
-    ca0 = cache[None]
-    res = frame[3]
-    assert res is frame.data[3] # pylint: disable=unsubscriptable-object
-    assert ca0 is cache[None]
-
 if __name__ == '__main__':
-    test_subtract()
+    test_hfsigma()

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Task & Processor for subtracting beads from other beads"
-from    typing              import List
-from    functools           import partial
+from    typing                      import List, Iterable
+from    functools                   import partial
 
-import  numpy               as     np
-from    utils               import initdefaults
-from    model               import Task, Level
-from    control.processor   import Processor
-from   .noisereduction      import Filter
+import  numpy                       as     np
+from    utils                       import initdefaults
+from    model                       import Task, Level
+from    control.processor           import Processor
+from    signalfilter.noisereduction import Filter
 
 class SignalAverage:
     "creates an average of signals"
@@ -53,7 +53,6 @@ class BeadSubtractionProcessor(Processor):
         key = info[1] if isinstance(info[0], tuple) else None
         sub = None if cache is None else cache.get(key, None)
         if sub is None:
-            print(key, id(frame), type(frame), type(frame.data))
             if key is None:
                 sub = task([frame.data[i] for i in task.beads])
             else:
@@ -66,7 +65,6 @@ class BeadSubtractionProcessor(Processor):
     @classmethod
     def __run(cls, task, cache, frame):
         frame = frame.new().discarding(task.beads)
-        print('**', id(frame), type(frame.data), type(frame.data.data))
         return frame.withaction(partial(cls.__action, task, cache, frame))
 
     @classmethod
@@ -79,3 +77,8 @@ class BeadSubtractionProcessor(Processor):
     def run(self, args):
         cache = args.data.setCacheDefault(self, {})
         args.apply(self.apply(cache =  cache, **self.config()))
+
+    def beads(self, _, selected: Iterable[int]) -> Iterable[int]:
+        "Beads selected/discarded by the task"
+        sub = self.task.beads
+        return (i for i in selected if i not in sub)

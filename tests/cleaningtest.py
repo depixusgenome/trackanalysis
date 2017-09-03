@@ -3,14 +3,15 @@
 # pylint: disable=redefined-outer-name
 """ Tests views """
 import numpy as np
-from   numpy.testing            import assert_equal
+from   numpy.testing            import assert_equal, assert_allclose
 
 from testingcore                import path as utpath
 from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 from cleaning.processor         import DataCleaning, DataCleaningTask, DataCleaningProcessor
+from cleaning.beadsubtraction   import BeadSubtractionTask, BeadSubtractionProcessor
 from simulator                  import randtrack, setseed
 from control.taskcontrol        import create
-from data.track                 import Track
+from data                       import Beads, Track
 
 def test_constantvalues():
     "test constant values"
@@ -62,6 +63,29 @@ def test_cleaning_base():
     tsk.aberrant(cycs.ravel())
     assert set(tsk.population(cycs).min) == set([3,4,5])
     assert set(tsk.population(cycs).max) == set([])
+
+def test_subtract():
+    "tests subtractions"
+    assert_allclose(BeadSubtractionTask()([np.arange(5)]),   np.arange(5))
+    assert_allclose(BeadSubtractionTask()([np.arange(5)]*5), np.arange(5))
+    assert_allclose(BeadSubtractionTask()([np.arange(5), np.ones(5)]),
+                    np.arange(5)*.5+.5)
+
+    assert_allclose(BeadSubtractionTask()([np.arange(6), np.ones(5)]),
+                    list(np.arange(5)*.5+.5)+[5])
+
+    tmp = Beads(data = {0: np.arange(5), 1: np.ones(5),
+                        2: np.zeros(5),  3: np.arange(5)*1.})
+    cache = {}
+    frame = BeadSubtractionProcessor.apply(tmp, cache, beads = [0, 1])
+    assert set(frame.keys()) == {2, 3}
+    assert_allclose(frame[2], -.5*np.arange(5)-.5)
+    assert_allclose(cache[None],  .5*np.arange(5)+.5)
+
+    ca0 = cache[None]
+    res = frame[3]
+    assert res is frame.data[3] # pylint: disable=unsubscriptable-object
+    assert ca0 is cache[None]
 
 def test_processor():
     "test processor"

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "access to the model"
-from   typing                       import Tuple
+from   typing                   import Tuple
 import numpy as np
 
-from utils                          import NoArgs
-from eventdetection.processor       import ExtremumAlignmentTask
-from view.plots.tasks               import TaskPlotModelAccess, TaskAccess
+from utils                      import NoArgs
+from eventdetection.processor   import ExtremumAlignmentTask
+from view.plots.tasks           import TaskPlotModelAccess, TaskAccess
 
-from signalfilter.beadsubtraction   import BeadSubtractionTask
-from ..processor                    import DataCleaningTask
+from ..beadsubtraction          import BeadSubtractionTask
+from ..processor                import DataCleaningTask
 
 class DataCleaningAccess(TaskAccess):
     "access to data cleaning"
