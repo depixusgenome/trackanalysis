@@ -15,7 +15,7 @@ from pathlib        import Path
 from itertools      import chain
 from functools      import partial
 
-from model.task     import Task, RootTask, TaskIsUniqueError
+from model.task     import Task, RootTask, TaskIsUniqueError, taskorder
 from .event         import Controller, NoEmission
 from .processor     import Cache, Processor, run as _runprocessors
 
@@ -147,7 +147,7 @@ class ProcessorController:
 
 create = ProcessorController.create # pylint: disable=invalid-name
 
-class TaskController(Controller):
+class BaseTaskController(Controller):
     "Data controller class"
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -164,30 +164,6 @@ class TaskController(Controller):
         if self.__procs is None:
             self.__procs = ProcessorController.register(Processor)
         return self.__procs
-
-    def setup(self, ctrl):
-        "sets up the missing info"
-        def _import(name):
-            if not isinstance(name, str):
-                return name
-            modname, clsname = name[:name.rfind('.')], name[name.rfind('.')+1:]
-            return getattr(__import__(modname, fromlist = (clsname,)), clsname)
-
-        cnf = ctrl.getGlobal('config').tasks
-        if self.__procs is None:
-            proc         = _import(cnf.processors.get())
-            self.__procs = ProcessorController.register(proc)
-
-        if self.__openers is None:
-            self.__openers = [_import(itm)(ctrl) for itm in cnf.io.open.get()]
-
-        if self.__savers is None:
-            self.__savers  = [_import(itm)(ctrl) for itm in cnf.io.save.get()]
-
-        def _clear(itm):
-            if ctrl.getGlobal('config').tasks.clear.get(default = True):
-                ctrl.clearData(itm.old)
-        ctrl.getGlobal('project').track.observe(_clear)
 
     def task(self,
              parent : Optional[RootTask],
@@ -331,6 +307,81 @@ class TaskController(Controller):
 
         for elem in models:
             self.openTrack(elem[0], elem)
+
+    @staticmethod
+    def __undos__():
+        "yields all undoable user actions"
+        # pylint: disable=unused-variable
+        def _onOpenTrack (controller = None, model = None, **_2):
+            return partial(controller.closeTrack, model[0])
+
+        def _onCloseTrack(controller = None, model = None, **_2):
+            return partial(controller.openTrack, model[0], model)
+
+        def _onAddTask   (controller = None, parent = None, task = None, **_2):
+            return partial(controller.removeTask, parent, task)
+
+        def _onUpdateTask(controller = None, parent = None, task = None, old = None, **_):
+            return partial(controller.updateTask, parent, task, **old)
+
+        def _onRemoveTask(controller = None, parent = None, task = None, old = None, **_):
+            return partial(controller.addTask, parent, task, old.index(task))
+
+        yield from (fcn for name, fcn in locals().items() if name[:3] == '_on')
+
+class TaskController(BaseTaskController):
+    "Task controller class which knows about globals"
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+        self.__order = None
+
+    def setup(self, ctrl):
+        "sets up the missing info"
+        def _import(name):
+            if not isinstance(name, str):
+                return name
+            modname, clsname = name[:name.rfind('.')], name[name.rfind('.')+1:]
+            return getattr(__import__(modname, fromlist = (clsname,)), clsname)
+
+        getter = lambda x:    getattr(self, '_BaseTaskController__'+x)
+        setter = lambda x, y: setattr(self, '_BaseTaskController__'+x, y)
+        cnf    = ctrl.getGlobal('config').tasks
+        if getter('procs') is None:
+            proc                            = _import(cnf.processors.get())
+            setter('procs', ProcessorController.register(proc))
+
+        if getter('openers') is None:
+            setter('openers', [_import(itm)(ctrl) for itm in cnf.io.open.get()])
+
+        if getter('savers') is None:
+            setter('savers', [_import(itm)(ctrl) for itm in cnf.io.save.get()])
+
+        self.__order = ctrl.getGlobal("config").tasks.order
+
+        def _clear(itm):
+            if ctrl.getGlobal('config').tasks.clear.get(default = True):
+                ctrl.clearData(itm.old)
+        ctrl.getGlobal('project').track.observe(_clear)
+
+    def defaulttaskindex(self, parent:RootTask, task:Task, side = 0) -> int:
+        "returns the default task index"
+        if not isinstance(task, type):
+            task = type(task)
+        order    = tuple(taskorder(self.__order.get()))
+        previous = order[:order.index(task)+side]
+
+        curr     = tuple(self.tasks(parent))
+        for i, tsk in enumerate(curr[1:]):
+            if not isinstance(tsk, previous):
+                return i+1
+        return len(curr)
+
+    def addTask(self, parent:RootTask, task:Task, # pylint: disable=arguments-differ
+                index = _m_none, side = 0):
+        "opens a new file"
+        if index == 'auto':
+            index = self.defaulttaskindex(parent, task, side)
+        return super().addTask(parent, task, index)
 
     @staticmethod
     def __undos__():

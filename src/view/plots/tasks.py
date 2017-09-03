@@ -262,15 +262,7 @@ class TaskAccess(TaskPlotModelAccess):
     @property
     def index(self) -> Optional[Task]:
         "returns the index the new task should have"
-        order    = tuple(taskorder(self.config.tasks.order.get()))
-        ind      = order.index(self.tasktype) + self.side
-        previous = order[:ind]
-
-        tasks    = tuple(self._ctrl.tasks(self.roottask))
-        for i, tsk in enumerate(tasks[1:]):
-            if not isinstance(tsk, previous):
-                return i+1
-        return len(tasks)
+        return self._ctrl.defaulttaskindex(self.roottask, self.tasktype, self.side)
 
     def observe(self, *args, **kwa):
         "observes the provided task"

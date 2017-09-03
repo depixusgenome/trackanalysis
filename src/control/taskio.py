@@ -26,7 +26,7 @@ class TaskIO:
     @classmethod
     def __get(cls, ctrl, attr:str):
         ctrl = getattr(ctrl, 'taskcontroller', ctrl)
-        return getattr(ctrl, '_TaskController__'+attr)
+        return getattr(ctrl, '_BaseTaskController__'+attr)
 
     @classmethod
     def extensions(cls, ctrl, attr:str):

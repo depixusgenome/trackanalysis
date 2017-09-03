@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Deals with bead selection"
 from typing             import Optional, Iterator, Iterable
-from model.task         import RootTask, DataSelectionTask, taskorder
+from model.task         import RootTask, DataSelectionTask
 
 class BeadController:
     "Deals with bead selection"
@@ -106,9 +106,9 @@ class DataSelectionBeadController(BeadController):
             return
 
         if tsk is None:
-            order = tuple(taskorder(self._ctrl.getGlobal('config').tasks.order.get()))
-            tsk   = DataSelectionTask(discarded = list(vals))
-            self._ctrl.addTask(root, tsk, index = order.index(DataSelectionTask))
+            tsk = DataSelectionTask(discarded = list(vals))
+            self._ctrl.addTask(root, tsk, index = 'auto')
+
         elif len(vals) == 0:
             self._ctrl.removeTask(root, tsk)
         else:
