@@ -23,9 +23,15 @@ class BeadController:
     @property
     def availablebeads(self) -> Iterable[int]:
         "returns available beads"
+        if self._ctrl.track(self.roottask) is None:
+            return iter(tuple())
+
         selected = None
-        self._ctrl.track(self.roottask)
-        for itm in self._ctrl.processors(self.roottask).data.items():
+        procs    = self._ctrl.processors(self.roottask)
+        if procs is None:
+            return iter(tuple())
+
+        for itm in procs.data.items():
             selected = itm.proc.beads(itm.cache(), selected)
         return selected
 

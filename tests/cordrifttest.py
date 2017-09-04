@@ -342,7 +342,7 @@ def test_cycleprocess_emptycycles():
     tasks = (utpath("big_all"),
              ExtremumAlignmentTask(phase = 'pull'),
              DriftTask(onbeads = False))
-    ret = dict(next(i for i in create(tasks).run())[0,...].withphases(5))
+    ret = dict(next(i for i in create(tasks).run())[0,:5].withphases(5))
     assert ret is not None # check that computations don't crash
 
 if __name__ == '__main__':
