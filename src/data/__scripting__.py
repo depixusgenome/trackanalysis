@@ -43,7 +43,7 @@ scriptapp = sys.modules['app.__scripting__'].scriptapp # pylint: disable=invalid
 class Track(_Track):
     "Adding helper functions for simple calls"
     def __init__(self, path = None, **kwa):
-        cnf = scriptapp.control.getGlobal('config').last.path.trk
+        cnf = scriptapp.control.getGlobal('css').last.path.trk
         if path in (Ellipsis, 'prev', ''):
             path = cnf.get()
 

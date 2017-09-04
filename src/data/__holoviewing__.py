@@ -9,11 +9,13 @@ from   functools                import partial
 from   itertools                import chain, repeat
 import numpy                    as np
 from   utils.decoration         import addto
+from   utils.logconfig          import getLogger
 from   .track                   import FoV, Bead
 from   .trackitems              import Beads, Cycles
 
 from   .__scripting__           import ExperimentList, Track
 
+LOGS  = getLogger(__name__)
 hv    = sys.modules['holoviews']  # pylint: disable=invalid-name
 Tasks = sys.modules['model.__scripting__'].Tasks
 
@@ -174,7 +176,7 @@ def oligomap(self:ExperimentList, oligo, fcn, **kwa):
     "returns a hv.DynamicMap with oligos and beads in the kdims"
     oligos = self.allkeys(oligo)
     beads  = self.available(*oligos)
-    print(oligos, beads)
+    LOGS.info(f"{oligos}, {beads}")
     return (hv.DynamicMap(fcn, kdims = ['oligo', 'bead'] + list(kwa))
             .redim.values(oligo = oligos, bead = beads, **kwa))
 
@@ -182,7 +184,7 @@ def oligomap(self:ExperimentList, oligo, fcn, **kwa):
 def keymap(self:ExperimentList, key, fcn, **kwa):
     "returns a hv.DynamicMap with keys in the kdims"
     beads  = self.available(*self.convert(key))
-    print(key, beads)
+    LOGS.info(f"{key}, {beads}")
     return (hv.DynamicMap(fcn, kdims = ['bead']+list(kwa))
             .redim.values(bead = beads, **kwa))
 

@@ -85,6 +85,7 @@ class ConfigXlsxIO(TaskIO):
             self.__msg.set(exc)
 
         try:
+            LOGS.info('%s saving %s', type(self).__name__, path)
             ret = self._run(dict(path      = path,
                                  oligos    = self.__model.oligos,
                                  sequences = self.__model.sequences),
