@@ -108,7 +108,7 @@ class FoVPlotCreator(TaskPlotCreator):
             bead  = track.fov.beads[self._model.bead]
             img   = bead.image
             pos   = bead.position
-            rng   = track.fov.size()
+            rng   = (max(track.fov.size()),)*2
             start = self.css.calib.start.get()
             size  = self.css.calib.size.get()
             dist  = [rng[0] * (start+ (0.5 if pos[0] < rng[0]*.5 else 0.)),
@@ -135,8 +135,8 @@ class FoVPlotCreator(TaskPlotCreator):
                                                            dw    = [dist[0]],
                                                            dh    = [dist[1]]))
 
-        self.setbounds(self._fig.x_range, 'x', [0, dist[0]])
-        self.setbounds(self._fig.y_range, 'y', [0, dist[1]])
+        self.setbounds(self._fig.x_range, 'x', [0, max(dist[:2])])
+        self.setbounds(self._fig.y_range, 'y', [0, max(dist[:2])])
 
     def __curdata(self):
         bead  = self._model.bead
