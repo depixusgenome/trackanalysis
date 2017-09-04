@@ -23,7 +23,7 @@ def test_toolbar(bokehaction):
             assert not tbar.frozen
             assert track.path  == server.path('small_legacy')
             assert track       is curr.task.get()
-            assert ctrl.getGlobal('config').last.path.trk.get() == track.path
+            assert ctrl.getGlobal('css').last.path.trk.get() == track.path
 
         _checknone()
         server.load('small_legacy')

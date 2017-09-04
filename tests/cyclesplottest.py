@@ -50,13 +50,13 @@ def test_cyclesplot(bokehaction):
         assert server.widget['Cycles:Oligos'].value == 'aatt, tggc'
         cnf = anastore.load(server.ctrl.configpath(next(anastore.iterversions('config'))))
         assert cnf['config']['oligos'] == ['aatt', 'tggc']
-        assert cnf['config.plot']['oligos.history'] == [['aatt', 'tggc']]
+        assert cnf['css.plot']['oligos.history'] == [['aatt', 'tggc']]
 
         server.change('Cycles:Oligos', 'value', '')
         assert server.widget['Cycles:Oligos'].value == ''
         cnf = anastore.load(server.ctrl.configpath(next(anastore.iterversions('config'))))
         assert 'oligos' not in cnf.get('config', {})
-        assert cnf['config.plot']['oligos.history'] == [['aatt', 'tggc']]
+        assert cnf['css.plot']['oligos.history'] == [['aatt', 'tggc']]
 
         server.load('hairpins.fasta', andpress = False)
         server.change('Cycles:Sequence', 'value', '←')

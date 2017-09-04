@@ -54,12 +54,12 @@ class FileDialog:
     @staticmethod
     def globals(ctrl):
         "returns access to globals"
-        return ctrl.getGlobal('config').last.path
+        return ctrl.getGlobal('css').last.path
 
     @staticmethod
     def storedpaths(ctrl, name, exts) -> List[Path]:
         "returns a stored path"
-        cnf = ctrl.getGlobal('config').last.path
+        cnf = ctrl.getGlobal('css').last.path
         fcn = lambda i: cnf[i].get(default = None)
 
         pot = [fcn(i.replace('.', '')) for _, i in exts]
