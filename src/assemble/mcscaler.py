@@ -18,7 +18,7 @@ this will also forbid the the overlap of 2 or more peak
 
 from typing import List, Dict, Tuple, Callable, Iterable, NamedTuple, FrozenSet # pylint: disable=unused-import
 import itertools
-#import random
+import random
 import networkx
 import numpy as np
 import scipy.stats
@@ -170,36 +170,36 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
         self.noise=scipy.stats.norm(loc=0.,
                                     scale=self.poserr).rvs
         self.peakid:int=kwa.get("peakid",0) # index of peakid to update
-        # self.rneighs:Dict[int,Tuple[int]]=self.find_neighbors(side="right")
-        # self.lneighs:Dict[int,Tuple[int]]=self.find_neighbors(side="left")
+        self.rneighs:Dict[int,Tuple[int]]=self.find_neighbors(side="right")
+        self.lneighs:Dict[int,Tuple[int]]=self.find_neighbors(side="left")
 
     # must not include bstretch, bbias to limit calculations
-    # def find_neighbors(self,side)->Dict[int,Tuple[int, ...]]:
-    #     '''
-    #     returns the indices of self._olis which overlap on the right of given key
-    #     '''
-    #     overlap=data.Oligo.overlap
-    #     signs=(0,0) if self.unsigned else (1,1)
-    #     neighs={}
-    #     if side=="right":
-    #         for idx, oli in enumerate(self._olis):
-    #             neighs[idx]=tuple(frozenset([idy
-    #                                          for idy in range(len(self._olis))
-    #                                          if overlap(oli.seq,
-    #                                                     self._olis[idy].seq,
-    #                                                     signs=signs,
-    #                                                     min_overl=self.min_overl,
-    #                                                     shift=1)]))
-    #     else:
-    #         for idx, oli in enumerate(self._olis):
-    #             neighs[idx]=tuple(frozenset([idy
-    #                                          for idy in range(len(self._olis))
-    #                                          if overlap(self._olis[idy].seq,
-    #                                                     oli.seq,
-    #                                                     signs=signs,
-    #                                                     min_overl=self.min_overl,
-    #                                                     shift=1)]))
-    #     return neighs
+    def find_neighbors(self,side)->Dict[int,Tuple[int, ...]]:
+        '''
+        returns the indices of self._olis which overlap on the right of given key
+        '''
+        overlap=data.Oligo.overlap
+        signs=(0,0) if self.unsigned else (1,1)
+        neighs={}
+        if side=="right":
+            for idx, oli in enumerate(self._olis):
+                neighs[idx]=tuple(frozenset([idy
+                                             for idy in range(len(self._olis))
+                                             if overlap(oli.seq,
+                                                        self._olis[idy].seq,
+                                                        signs=signs,
+                                                        min_overl=self.min_overl,
+                                                        shift=1)]))
+        else:
+            for idx, oli in enumerate(self._olis):
+                neighs[idx]=tuple(frozenset([idy
+                                             for idy in range(len(self._olis))
+                                             if overlap(self._olis[idy].seq,
+                                                        oli.seq,
+                                                        signs=signs,
+                                                        min_overl=self.min_overl,
+                                                        shift=1)]))
+        return neighs
 
     # too long! use matrix notation?
     # def __call__(self,*args):
@@ -223,8 +223,9 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
         '''
         state=args[0]
         # the following 3 lines will be replaced by random choice amongst possible scalings
-        stre=self.stredist()
-        bias=self.biasdist()
+        # stre=self.stredist()
+        # bias=self.biasdist()
+        stre,bias=self.proposal(state)
         noise=self.noise(size=len(self.peakids[self.peakid]))
         # apply stretch, bias and noise to peakid
         # tomatch=stre*self._pos[self.peakid]+bias+noise
@@ -239,6 +240,24 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
         nstate[self.peakids[self.peakid]]=stre*self._pos[self.peakid]+bias+noise
         return nstate
 
+
+    def proposal(self,state:np.array):
+        '''
+        given the current position of oligos,
+        try to propose a new position for oligos in self.peakid
+        '''
+        left=list(frozenset([idx for pkid in self.peakids[self.peakid]
+                             for idx in self.lneighs[pkid]]))
+        right=list(frozenset([idx for pkid in self.peakids[self.peakid]
+                              for idx in self.rneighs[pkid]]))
+
+        tomatch=np.sort(np.hstack([np.array(state[left])-1.1,np.array(state[right])+1.1]))
+
+        matches=scaler.match_peaks(tomatch,
+                                   self._pos[self.peakid],
+                                   self.bstretch,
+                                   self.bbias)
+        return random.choice(matches) # type: ignore
 
     # def find_optim(self,stretch,intra,inter)->np.array:
     #     '''
@@ -488,14 +507,15 @@ class SpringScaler(SpringSetting):
 
 
 
-    def run(self):
+    def run(self,repeats:int=1):
         '''
         runs mcmc steps on a single peak at a time
         '''
         # I do need to update the first peak to allow for more flexibility
         # to others
         state=self._fpos
-        for peakid in range(len(self.peaks)):
+        chains=itertools.chain.from_iterable(itertools.repeat(range(len(self.peaks)),repeats))
+        for peakid in chains:
             # neighs=frozenset().union([self.neighs[idx] for idx in self.peakids[peakid]])
             # neighs=neighs-frozenset(self.peakids[peakid])
             self.stepper.peakid=peakid

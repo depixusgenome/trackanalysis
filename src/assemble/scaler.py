@@ -829,7 +829,7 @@ class SubScaler(Scaler):
 
     def __init__(self,**kwa):
         super().__init__(**kwa)
-        self.__posid=kwa.get("posid",0) # type: int # id of pstack.posarr
+        self.__posid=kwa.get("posid",0) # type: int
         self._key2fit=self.pstack.keys[self.__posid] # type: float
 
     @property
