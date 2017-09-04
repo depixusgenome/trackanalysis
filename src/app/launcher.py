@@ -155,7 +155,7 @@ def _create(main, controls, views): # pylint: disable=unused-argument
                 fname = ('autosave' if stem is None else stem)+'.txt'
                 return cls.apppath()/str(version)/fname
 
-            def readconfig(self):
+            def readuserconfig(self):
                 """
                 reads the config: first the stuff saved automatically, then
                 anything the user wishes to impose.
@@ -165,7 +165,7 @@ def _create(main, controls, views): # pylint: disable=unused-argument
                 ctrl.readconfig(self.configpath, lambda i: self.configpath(i, 'userconfig'))
                 orders().config(self)
 
-            def writeconfig(self, name = None, saveall = False, **kwa):
+            def writeuserconfig(self, name = None, saveall = False, **kwa):
                 "writes the config"
                 kwa['saveall'] = saveall
                 ctrl = self.globalscontroller # pylint: disable=no-member
@@ -177,7 +177,7 @@ def _create(main, controls, views): # pylint: disable=unused-argument
 
             def close(self):
                 "remove controller"
-                self.writeconfig()
+                self.writeuserconfig()
                 self._callmixins("close")
 
             @classmethod
@@ -193,9 +193,9 @@ def _create(main, controls, views): # pylint: disable=unused-argument
             main.__init__(self, ctrl = ctrl, keys = keys)
             main.ismain(self)
 
-            ctrl.writeconfig('defaults',   index = 1, saveall   = True)
-            ctrl.writeconfig('userconfig', index = 0, overwrite = False)
-            ctrl.readconfig()
+            ctrl.writeuserconfig('defaults',   index = 1, saveall   = True)
+            ctrl.writeuserconfig('userconfig', index = 0, overwrite = False)
+            ctrl.readuserconfig()
             ctrl.setup()
             main.observe(self)
             for cls in views:

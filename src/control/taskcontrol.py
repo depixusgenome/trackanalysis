@@ -306,7 +306,7 @@ class BaseTaskController(Controller):
             raise IOError(msg, 'warning')
 
         for elem in models:
-            self.openTrack(elem[0], elem)
+            self.openTrack(model = elem)
 
     @staticmethod
     def __undos__():
@@ -333,7 +333,8 @@ class TaskController(BaseTaskController):
     "Task controller class which knows about globals"
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.__order = None
+        self.__order      = None
+        self.__readconfig = None
 
     def setup(self, ctrl):
         "sets up the missing info"
@@ -347,7 +348,7 @@ class TaskController(BaseTaskController):
         setter = lambda x, y: setattr(self, '_BaseTaskController__'+x, y)
         cnf    = ctrl.getGlobal('config').tasks
         if getter('procs') is None:
-            proc                            = _import(cnf.processors.get())
+            proc = _import(cnf.processors.get())
             setter('procs', ProcessorController.register(proc))
 
         if getter('openers') is None:
@@ -363,6 +364,8 @@ class TaskController(BaseTaskController):
                 ctrl.clearData(itm.old)
         ctrl.getGlobal('project').track.observe(_clear)
 
+        self.__readconfig = ctrl.readconfig
+
     def defaulttaskindex(self, parent:RootTask, task:Task, side = 0) -> int:
         "returns the default task index"
         if not isinstance(task, type):
@@ -375,6 +378,16 @@ class TaskController(BaseTaskController):
             if not isinstance(tsk, previous):
                 return i+1
         return len(curr)
+
+    def openTrack(self,
+                  task : Union[str, RootTask] = None,
+                  model: Iterable[Task]       = tuple()):
+        if task is None and isinstance(model, dict):
+            if len(model.get('tasks', (()))[0]):
+                super().openTrack(model = model.pop("tasks")[0])
+                self.__readconfig( model, dict)
+        else:
+            super().openTrack(task, model)
 
     def addTask(self, parent:RootTask, task:Task, # pylint: disable=arguments-differ
                 index = _m_none, side = 0):

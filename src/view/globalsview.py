@@ -57,9 +57,10 @@ class GlobalsView(View):
         def _onconfig(*_):
             counts[0] = True
 
-        @self._ctrl.observe
-        def _onstopaction(recursive = None, **_):
-            if recursive is False:
-                if counts[0]:
-                    counts[0] = False
-                    self._ctrl.writeconfig()
+        if hasattr(self._ctrl, 'writeuserconfig'):
+            @self._ctrl.observe
+            def _onstopaction(recursive = None, **_):
+                if recursive is False:
+                    if counts[0]:
+                        counts[0] = False
+                        self._ctrl.writeuserconfig()
