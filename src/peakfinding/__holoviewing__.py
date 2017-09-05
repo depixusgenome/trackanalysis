@@ -70,6 +70,7 @@ class PeaksDisplay(Display): # type: ignore
         if not isinstance(dets, Iterator):
             dets = (dets,)
 
+
         itms   = []
         for det in dets:
             if opts.pop('zero', True):
@@ -77,13 +78,18 @@ class PeaksDisplay(Display): # type: ignore
             else:
                 cparams = params
 
-            if labels is not False:
+            if isinstance(labels, str):
+                opts['label'] = labels
+            elif labels is True:
                 opts['label'] = 'histogram'
             itms.append(cls.__histogram(det, cparams, norm, opts, estyle))
             itms.append(cls.__events   (det, cparams, opts, estyle, itms[-1]))
 
-            if labels is not False:
+            if isinstance(labels, str):
+                opts.pop('label')
+            elif labels is True:
                 opts['label'] = 'peaks'
+
             itms.append(cls.__peaks    (det, cparams, opts, pstyle, itms[-2]))
             itms.append(cls.__errorbars(det, cparams, opts, pstyle, itms[-3]))
         return itms
