@@ -28,6 +28,12 @@ which data points or cycles are missing. The criteria are:
 
 These values can be updated throught the gui
 
+### Fixed Beads
+
+Fixed beads can be removed by going to the *Cleaning* tab and adding the number
+to the *subtracted beads* input. Pressing the button on its right will add the
+current bead to subtracted beads.
+
 ### Reporting
 
 Header in summary is now in multiple columns with the most irrelevant information
