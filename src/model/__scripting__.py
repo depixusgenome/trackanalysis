@@ -125,11 +125,14 @@ class Tasks(Enum):
 
     @classmethod
     def __create(cls, arg, kwa, beadsonly):
-        if arg in cls or arg in cls.__members__:
-            return cls(arg)(**kwa)
+        if isinstance(arg, cls):
+            return arg(**kwa)
 
         if isinstance(arg, Task):
             return update(deepcopy(arg), **kwa)
+
+        if isinstance(arg, str) and arg in cls.__members__:
+            return cls(arg)(**kwa)
 
         if (isinstance(arg, (Path, str))
                 or (isinstance(arg, (tuple, list))

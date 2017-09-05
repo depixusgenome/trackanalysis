@@ -54,7 +54,7 @@ class Track(_Track):
 
         if isinstance(path, (tuple, str)):
             cnf.set(path)
-            scriptapp.control.writeconfig()
+            scriptapp.control.writeuserconfig()
         super().__init__(path = path, **kwa)
 
 @addto(_Track)
