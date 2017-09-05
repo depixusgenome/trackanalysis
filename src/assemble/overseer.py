@@ -22,6 +22,7 @@ import pickle
 import itertools
 import networkx
 from assemble import data,mcscaler, shuffler
+from assemble.settings import PeakSetting
 import assemble.scores as scores
 
 class ScorePartition:
@@ -39,14 +40,14 @@ class ScorePartition:
                                   kpermids=perm.permids)
             yield self.scoring(kperm)
 
-class Overseer(mcscaler.PeakSetting):
+class Overseer(PeakSetting):
     '''
     manages scaler and shuffler
     defines a good sequence alignment
     '''
     def __init__(self,**kwa):
         super().__init__(**kwa)
-        self.scaler=mcscaler.SeqHoppScaler(**kwa)
+        self.scaler=mcscaler.SpringScaler(**kwa)# mcscaler.SeqHoppScaler(**kwa)
         self.shuffler=shuffler.Shuffler()
         self.signed:List[data.OligoPeak]
 

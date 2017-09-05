@@ -4,16 +4,20 @@
 
 '''
 use mcmc to try to converge to a good set of scales
-a score can be the number of overlap between consecutives oligos
 The score is the energy of the spring
 
 to do:
-*need an update peak per peak
-*must list all possible scalings that a peak may take a given set of others
-this will take into account the optimal position
-this will also forbid the the overlap of 2 or more peak
-*how to fix the temperature?
-*consider the best relative
+optimal position -> L-BFGS-B
+also forbid the the overlap of 2 or more peak
+ -> L-BFGS-B
+*how to fix the temperature? ...
+* consider the best relative of kintra, kinter
+* consider Pol's suggestion to put a max penalty score on peaks which do not match any other
+* could also set energy of intra springs to zero if the x2-x1-xeq<pos_err
+* issue with vertices located at the same position
+-> adding LJ potential energy (on top of everything else) is a bit too much for mcmc+L-BFGS-B
+-> solution: we know thanks to scl.inter which are the bonded oligos... tree?
+-> solution: we could write a optimal solution if we know the springs (we do) to bypass L-BFGS-B
 '''
 
 from typing import List, Dict, Tuple, Callable, Iterable, NamedTuple, FrozenSet # pylint: disable=unused-import
@@ -23,8 +27,12 @@ import networkx
 import numpy as np
 import scipy.stats
 from scipy.optimize import OptimizeResult, basinhopping
+from utils.logconfig import getLogger
+from assemble.settings import SpringSetting
 import assemble.data as data
 import assemble.scaler as scaler
+
+LOGS=getLogger(__name__)
 
 def make_graph(peaks,bstretch,bbias,min_overl=2,unsigned=True):
     '''
@@ -47,53 +55,6 @@ def make_graph(peaks,bstretch,bbias,min_overl=2,unsigned=True):
     graph.add_edges_from(edges2)
     return graph
 
-class BasePeakSetting: # pylint: disable=too-many-instance-attributes
-    '''
-    regroups information regarding oligo experiments
-    '''
-    def __init__(self,**kwa):
-        self._pos:List[np.array]=[]
-        self._fpos:np.array=np.empty(shape=(0,),dtype='f4') # flat
-        self._seqs:List[Tuple[str, ...]]=[]
-        self._fseqs:List[str]=[] # flat
-        self._peaks:List[scaler.OPeakArray]=[]
-        self._olis:List[data.OligoPeak]=[]
-        self.min_overl:int=kwa.get("min_overl",2)
-        self.unsigned:bool=kwa.get("unsigned",True)
-        self.peakids:List[List[int]]=[]
-
-    def set_peaks(self,value:scaler.OPeakArray):
-        'update peaks and inner attr'
-        self._peaks=value
-        self._pos=[peak.posarr for peak in value]
-        self._olis=[oli for peak in self._peaks for oli in peak.arr] # arbitrary order
-        self._fpos=np.array([pos for peak in value for pos in peak.posarr])
-        self._seqs=[peak.seqs for peak in value]
-        self._fseqs=[seq for seqs in self._seqs for seq in seqs]
-        self.peakids=[[self._olis.index(oli) for oli in peak.arr]
-                      for peak in self._peaks] # not great imp.
-
-
-    def get_peaks(self):
-        'prop'
-        return self._peaks
-
-class PeakSetting(BasePeakSetting):
-    '''
-    regroups information regarding oligo experiments
-    '''
-    def __init__(self,**kwa):
-        super().__init__(**kwa)
-        self.peaks:List[scaler.OPeakArray]=kwa.get("peaks",[])
-
-    @property
-    def peaks(self):
-        'prop'
-        return self.get_peaks
-
-    @peaks.setter
-    def peaks(self,value:scaler.OPeakArray):
-        self.set_peaks(value)
 
 class Spring:
     'models a spring'
@@ -111,38 +72,13 @@ class Spring:
             return self.force*(xpos2-xpos1-self.xeq)**2
         return self.force*(abs(xpos2-xpos1)-self.xeq)**2
 
+    @property
+    def ids(self)->Tuple[int,int]:
+        "ids"
+        return tuple(self.id1,self.id2)
+    
     # def energy_from_array(self,arr:np.array):
     #     return self.energy(arr[self.id1],arr[self.id2])
-
-class ScaleSetting(PeakSetting):
-    'adds boundaries information on stretch and bias to PeakSetting'
-    def __init__(self,**kwa):
-        super().__init__(**kwa)
-        self.bstretch:scaler.Bounds=kwa.get("bstretch",scaler.Bounds())
-        self.bbias:scaler.Bounds=kwa.get("bbias",scaler.Bounds())
-        self.peaks:List[scaler.OPeakArray]=kwa.get("peaks",[])
-
-class SpringSetting(ScaleSetting):
-    '''
-    adds Springs to the peaks
-    if the noise is small and we rescale peaks kinter>kintra
-    should the inter springs be directed? It should help
-    '''
-    def __init__(self,**kwa):
-        super().__init__(**kwa)
-        self.kintra:float=kwa.get("kintra",1)
-        self.kinter:float=kwa.get("kinter",2)
-        self.peaks:List[scaler.OPeakArray]=kwa.get("peaks",[])
-
-    @property
-    def peaks(self)->List[scaler.OPeakArray]:
-        'prop'
-        return self.get_peaks()
-
-    @peaks.setter
-    def peaks(self,peaks:List[scaler.OPeakArray]):
-        'peaks setter'
-        self.set_peaks(peaks)
 
 def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argument
     '''
@@ -229,9 +165,9 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
         prop=self.proposal(state)
 
         if prop is None:
-            return state+self.noise(size=len(state))
+            return state #+self.noise(size=len(state))
 
-        noise=self.noise(size=len(self.peakids[self.peakid]))
+        #noise=self.noise(size=len(self.peakids[self.peakid]))
         stre,bias=prop
         # apply stretch, bias and noise to peakid
         # tomatch=stre*self._pos[self.peakid]+bias+noise
@@ -243,7 +179,7 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
         # optimpos=self.find_optim(stre,intramatches,intermatches)
         #nstate[self.peakid]=optimpos
         nstate=state.copy()
-        nstate[self.peakids[self.peakid]]=stre*self._pos[self.peakid]+bias+noise
+        nstate[self.peakids[self.peakid]]=stre*self._pos[self.peakid]+bias #+noise
         return nstate
 
 
@@ -262,13 +198,8 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
                                    self._pos[self.peakid],
                                    self.bstretch,
                                    self.bbias)
-        if __debug__ and not matches:
-            print(f"left={left}")
-            print(f"right={right}")
-            print(f"self.peakid={self.peakid}")
-            print(f"tomatch={tomatch}")
-            print(f"self._pos[self.peakid]={self._pos[self.peakid]}")
-            print(f"matches={matches}")
+        if not matches:
+            LOGS.debug(f"no proposal for peak id {self.peakid}")
 
         if matches:
             return random.choice(matches) # type: ignore
@@ -409,6 +340,26 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
 #         return self.call(*args,**kwa)
 
 
+def find_equilibrium(springs:List):
+    'solve the SpringSystem'
+    # build the connectivity matrix
+    # build the K matrix (force)
+    # K=np.diag([kinter,kintra])
+    # assumes x_init=0.0 # general
+    lengths=np.matrix([spr.eq for spr in springs]).T
+    nverts=len(set([idx for spr in springs for idx in spr.ids])) # careful with definition
+    adjacency=np.zeros(shape=(len(springs),nverts)) # careful with definition
+    for idx,spr in enumerate(springs):
+        adjacency[idx][spr.id2]=1
+        adjacency[idx][spr.id1]=-1
+
+    forces=np.diag([spr.force for spr in springs])
+    right_term=adjacency.T*lengths
+    left_term=adjacency.T*forces*adjacency
+    left_term=left_term[1:,1:]
+    right_term=right_term[1:,:]
+    equil=(np.linalg.inv(left_term)*right_term).T[0,:].tolist()[0]
+    return equil # returns x2,x3,...
 
 class SpringScore(SpringSetting):
     '''
@@ -442,7 +393,18 @@ class SpringScore(SpringSetting):
                     # for small number of oligos it is possible that
                     # one does not overlap with any other
                     pass
-        return sum(scores)
+
+        # adding a penalty score (Lennard-Jones potential)
+        # is a bit too difficult for L-BFGS-B
+        # sstate=np.sort(state)
+        # radii=sstate[1:]-sstate[:-1]
+
+        return sum(scores)#+self.potential(radii)
+
+    # @staticmethod
+    # def potential(rad:np.array)->float:
+    #     'Lennard-Jones potential'
+    #     return sum((1.1/rad)**12-2*(1.1/rad)**6)
 
 class SpringScaler(SpringSetting):
     '''
@@ -543,7 +505,7 @@ class SpringScaler(SpringSetting):
             self.stepper.peakid=peakid
             # self.stepper.neighs=neighs
             curr_res=basinhopping(x0=state,**self.basinkwa)
-            print(f"job fun={curr_res.fun}")
+            LOGS.debug(f"job fun={curr_res.fun}")
             self.res.append(curr_res)
             state=curr_res.x
 
