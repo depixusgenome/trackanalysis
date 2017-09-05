@@ -150,6 +150,7 @@ def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argumen
     '''
     return OptimizeResult(x=xinit, fun=fun(xinit), success=True, nfev=1)
 
+# noise is probably not useful anymore
 class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
     '''
     each moves consists of two steps for each experiment
@@ -225,8 +226,13 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
         # the following 3 lines will be replaced by random choice amongst possible scalings
         # stre=self.stredist()
         # bias=self.biasdist()
-        stre,bias=self.proposal(state)
+        prop=self.proposal(state)
+
+        if prop is None:
+            return state+self.noise(size=len(state))
+
         noise=self.noise(size=len(self.peakids[self.peakid]))
+        stre,bias=prop
         # apply stretch, bias and noise to peakid
         # tomatch=stre*self._pos[self.peakid]+bias+noise
         # # find closest in neighs to match
@@ -252,12 +258,21 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
                               for idx in self.rneighs[pkid]]))
 
         tomatch=np.sort(np.hstack([np.array(state[left])-1.1,np.array(state[right])+1.1]))
-
         matches=scaler.match_peaks(tomatch,
                                    self._pos[self.peakid],
                                    self.bstretch,
                                    self.bbias)
-        return random.choice(matches) # type: ignore
+        if __debug__ and not matches:
+            print(f"left={left}")
+            print(f"right={right}")
+            print(f"self.peakid={self.peakid}")
+            print(f"tomatch={tomatch}")
+            print(f"self._pos[self.peakid]={self._pos[self.peakid]}")
+            print(f"matches={matches}")
+
+        if matches:
+            return random.choice(matches) # type: ignore
+        return None
 
     # def find_optim(self,stretch,intra,inter)->np.array:
     #     '''
@@ -411,16 +426,21 @@ class SpringScore(SpringSetting):
     def __call__(self,*args,**kwa):
         state=args[0]
         scores=[spr.energy(state[spr.id1],state[spr.id2]) for spr in self.intra]
-        argmin=np.argmin(state)
+        argmax=np.argmax(state)
 
+        # there could be a mistake in the calculus of the score
+        # or in the number of springs in inter
         for id1 in self.inter.keys():
-            if id1!=argmin:
+            if id1!=argmax:
                 try:
                     scores.append(min([spr.energy(state[id1],state[spr.id2])
                                        for spr in self.inter[id1]]))
+                    # test=min([spr.energy(state[id1],state[spr.id2])
+                    #           for spr in self.inter[id1]])
+                    # print(f"id1,scr={id1,test}")
                 except ValueError:
                     # for small number of oligos it is possible that
-                    # on does not overlap with any other
+                    # one does not overlap with any other
                     pass
         return sum(scores)
 
@@ -446,12 +466,14 @@ class SpringScaler(SpringSetting):
 
         self.res:List[OptimizeResult]=[]
         self.peakid:int=kwa.get("peakid",0) # id of peak to update
+        # minimization using L-BFGS-B also allows for minimization of vertices
+        # allows to readjust locally all experiments
         self.basinkwa={"func":self.scoring,
                        "niter":100,
-                       "minimizer_kwargs":dict(method=no_minimizer),
+                       "minimizer_kwargs":dict(method="L-BFGS-B"),
                        "take_step":self.stepper}
 
-
+        # self.basinkwa["minimizer_kwargs"]=dict(method=no_minimizer)
 
 
     def find_intra(self)->List[Spring]:
@@ -467,7 +489,7 @@ class SpringScaler(SpringSetting):
 
 
     def find_inter(self)->Dict[int,List[Spring]]:
-        'add springs between peaks'
+        'add springs between oligos of different experiments'
         signs=(0,0) if self.unsigned else (1,1)
         inter:Dict[int,List[Spring]]={idx:[] for idx in range(len(self._olis))}
         for id1,id2 in itertools.permutations(range(len(self._olis)),2):
