@@ -35,20 +35,21 @@ try:
 except ImportError:
     pass
 
-from data                       import Beads, Cycles
-from eventdetection.processor   import ExtremumAlignmentTask, EventDetectionTask
-from peakfinding.processor      import PeakSelectorTask
+from data                         import Beads, Cycles
+from eventdetection.processor     import ExtremumAlignmentTask, EventDetectionTask
+from peakfinding.processor        import PeakSelectorTask
 
 # pylint: disable=wildcard-import, ungrouped-imports
-from signalfilter               import *
-from model.__scripting__        import *
-from app.__scripting__          import *
-from data.__scripting__         import *
-from peakfinding.__scripting__  import *
-from peakcalling.__scripting__  import *
+from signalfilter                 import *
+from model.__scripting__          import *
+from app.__scripting__            import *
+from data.__scripting__           import *
+from eventdetection.__scripting__ import *
+from peakfinding.__scripting__    import *
+from peakcalling.__scripting__    import *
 
 try:
-    from .curve                 import *
+    from .curve                   import *
 except ImportError:
     pass
 try:
