@@ -74,10 +74,13 @@ else:
 
 if 'ipykernel_launcher' in inspect.stack()[-3].filename:
     try:
-        from IPython import get_ipython  # pylint: disable=import-error
+        from IPython              import get_ipython   # pylint: disable=import-error
         get_ipython().magic('load_ext autoreload')
         get_ipython().magic('autoreload 2')
         get_ipython().magic('matplotlib inline')
+
+        from IPython.core.display import display, HTML # pylint: disable=import-error
+        display(HTML("<style>.container { width:100% !important; }</style>"))
     except:                              # pylint: disable=bare-except
         pass
 
@@ -85,6 +88,10 @@ def _test():
     stack = [i.filename for i in inspect.stack()[1:]
              if 'importlib' not in i.filename and i.filename != '<stdin>']
     if any(i.endswith("IPython/core/magics/execution.py")
+           for i in stack):
+        return
+
+    if any(i.endswith("ipykernel/zmqshell.py")
            for i in stack):
         return
 
