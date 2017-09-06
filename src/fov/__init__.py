@@ -35,7 +35,12 @@ class FoVPlotCreator(TaskPlotCreator):
         self._cursource:   ColumnDataSource = None
         self._imgsource:   ColumnDataSource = None
         self._calibsource: ColumnDataSource = None
-        self.__fov:        int              = None
+        self.__idfov:      int              = None
+
+    @property
+    def __fov(self):
+        trk = self._model.track
+        return None if trk is None else trk.fov
 
     def _create(self, _):
         self._fig = figure(**self._figargs(name    = 'FoV:Fig',
@@ -89,9 +94,9 @@ class FoVPlotCreator(TaskPlotCreator):
                                              '1d': {'indices': []},
                                              '2d': {'indices': []}}
     def _reset(self):
-        track = self._model.track
-        if track is not None and self.__fov != id(track.fov):
-            self.__fov = id(track.fov)
+        fov = self.__fov
+        if fov is not None and self.__idfov != id(fov):
+            self.__idfov = id(fov)
             self.__imagedata()
             self._bkmodels[self._beadssource].update(self.__beadsdata())
 
@@ -101,14 +106,17 @@ class FoVPlotCreator(TaskPlotCreator):
         self.__calibdata()
 
     def __calibdata(self):
-        track = self._model.track
+        fov   = self.__fov
+        bead  = self._model.bead
         img   = np.zeros((10, 10))
-        dist  = (0, 0), (1, 1)
-        if track is not None and track.fov.beads[self._model.bead].image.size:
-            bead  = track.fov.beads[self._model.bead]
+        dist  = (0, 0, 0, 0)
+        if (fov is not None
+                and bead in fov.beads
+                and fov.beads[bead].image.size):
+            bead  = fov.beads[bead]
             img   = bead.image
             pos   = bead.position
-            rng   = (max(track.fov.size()),)*2
+            rng   = (max(fov.size()),)*2
             start = self.css.calib.start.get()
             size  = self.css.calib.size.get()
             dist  = [rng[0] * (start+ (0.5 if pos[0] < rng[0]*.5 else 0.)),
@@ -123,13 +131,13 @@ class FoVPlotCreator(TaskPlotCreator):
                                                              dh    = [dist[3]]))
 
     def __imagedata(self):
-        track = self._model.track
-        if track is None:
-            img  = np.zeros((10, 10))+256
+        fov = self.__fov
+        if fov is None:
+            img  = np.zeros((10, 10))
             dist = 1, 1
         else:
-            img  = track.fov.image
-            dist = track.fov.size()
+            img  = fov.image
+            dist = fov.size()
 
         self._bkmodels[self._imgsource].update(data = dict(image = [img],
                                                            dw    = [dist[0]],
@@ -139,20 +147,20 @@ class FoVPlotCreator(TaskPlotCreator):
         self.setbounds(self._fig.y_range, 'y', [0, max(dist[:2])])
 
     def __curdata(self):
-        bead  = self._model.bead
-        track = self._model.track
-        if track is None or bead is None:
+        bead = self._model.bead
+        fov  = self.__fov
+        if fov is None or bead not in fov.beads:
             return dict(data = dict.fromkeys(('x', 'y'), []))
 
-        pos = track.fov.beads[bead].position
+        pos = fov.beads[bead].position
         return dict(data = dict(x = [pos[0]], y = [pos[1]]))
 
     def __beadsdata(self):
-        track = self._model.track
-        if track is None:
+        fov = self.__fov
+        if fov is None:
             return dict(data = dict.fromkeys(('x', 'y', 'text'), []))
 
-        items = track.fov.beads
+        items = fov.beads
         data  = dict(x    = [i.position[0] for i in items.values()],
                      y    = [i.position[1] for i in items.values()],
                      text = [f'{i}'        for i in items.keys()])
