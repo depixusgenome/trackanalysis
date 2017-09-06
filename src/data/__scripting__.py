@@ -178,7 +178,7 @@ class TracksDict(dict):
 
         >>> tracks = "/path/to/my/trackfiles/**/with/recursive/search/*.trk"
         >>> grs    = ("/more/than/a/single/path/**", "/is/possible/**")
-        >>> match  = r".*test045_(?\\w\\w\\w)_BNA.*" # select only test 045 and define the key
+        >>> match  = r".*test045_(\\w\\w\\w)_BNA.*" # select only test 045 and define the key
         >>> TRACKS = TracksDict(tracks, grs, match)
         >>> TRACKS['AAA'].cycles                  # access the track
 
@@ -249,6 +249,17 @@ class TracksDict(dict):
         if tracks is not None:
             assert sum(i is None for i in (tracks, grs)) in (0, 2)
             self.scan(tracks, grs, match, allaxes, **scan)
+
+    def beads(self, *keys) -> List[int]:
+        "returns the intersection of all beads in requested tracks"
+        if len(keys) == 0:
+            keys = tuple(self.keys())
+
+        beads = set(self[keys[0]].beadsonly.keys())
+        for key in keys[1:]:
+            beads &= set(self[key].beadsonly.keys())
+
+        return sorted(beads)
 
 class ExperimentList(dict):
     "Provides access to keys belonging to a single experiment"

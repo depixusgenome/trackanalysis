@@ -13,7 +13,7 @@ from   utils.logconfig          import getLogger
 from   .track                   import FoV, Bead
 from   .trackitems              import Beads, Cycles
 
-from   .__scripting__           import ExperimentList, Track
+from   .__scripting__           import ExperimentList, Track, TracksDict
 
 LOGS  = getLogger(__name__)
 hv    = sys.modules['holoviews']  # pylint: disable=invalid-name
@@ -25,6 +25,19 @@ class Display:
     def concat(itr):
         "concatenates arrays, appending a NaN"
         return np.concatenate(list(chain.from_iterable(zip(itr, repeat([np.NaN])))))
+
+    @staticmethod
+    def errormessage(exc, **dims):
+        "displays error message"
+        args = getattr(exc, 'args', tuple())
+        if isinstance(args, (list, tuple)) and len(args) in (1, 2):
+            txt = str(exc.args[0]).split('\n')
+        else:
+            txt = str(args).split('\n')
+
+        ovr = hv.Overlay([hv.Text(0.4, len(txt)*.1+.5-i*.1, j)
+                          for i, j in enumerate(txt)])
+        return ovr.redim(**dims) if len(dims) else ovr
 
     @staticmethod
     def _create(labels, tpe, overlay, opts, good):
@@ -41,7 +54,13 @@ class Display:
     @classmethod
     def run(cls, itms, labels, tpe, overlay, opts): # pylint: disable=too-many-arguments
         "shows overlayed Curve items"
-        good = tuple((i, j) for i, j in itms if np.any(np.isfinite(j)))
+        try:
+            good = tuple((i, j) for i, j in itms if np.any(np.isfinite(j)))
+        except Exception as exc: # pylint: disable=broad-except
+            return cls.errormessage(exc,
+                                    x = opts.get('kdims', ['frames'])[0],
+                                    y = opts.get('vdims', ['z'])[0])
+
         if not overlay:
             good = (('', (cls.concat(np.arange(len(i), dtype = 'f4') for _, i in good),
                           cls.concat(i for _, i in good))),)
@@ -170,6 +189,65 @@ def map(self, fcn, kdim = None, **kwa): # pylint: disable=redefined-builtin,func
     elif kdim == 'cycle':
         kwa.setdefault(kdim, list(set(i for i, _ in self.keys())))
     return hv.DynamicMap(partial(fcn, self), kdims = list(kwa)).redim.values(**kwa)
+
+@addto(TracksDict)         # type: ignore
+def map(self, fcn, kdim = 'oligo', *extra, **kwa): # pylint: disable=redefined-builtin,function-redefined
+    "returns a hv.DynamicMap"
+    if kdim is not None and kdim not in kwa:
+        kwa[kdim] = list(self.keys())
+
+    if 'bead' not in kwa:
+        kwa['bead'] = self.keys(*kwa.get(kdim, ()))
+
+    return hv.DynamicMap(fcn, kdims = list(kwa)+list(extra)).redim.values(**kwa)
+
+def _display(self, name, overlay, kwa): # pylint: disable=redefined-builtin,function-redefined
+    "returns a hv.DynamicMap showing cycles"
+    kdims = dict()
+    kdims['key']  = kwa.pop('key')  if 'key'  in kwa else list(self.keys())
+    kdims['bead'] = kwa.pop('bead') if 'bead' in kwa else list(self.beads(*kdims['key']))
+
+    fcn = lambda key, bead: getattr(self[key], name).display(**kwa)[bead]
+    if overlay == 'bead':
+        if 'labels' not in kwa:
+            fcn = lambda key, bead: (getattr(self[key], name)
+                                     .display(labels = f'{key}', **kwa)
+                                     [bead])
+        def _allbeads(key):
+            return hv.Overlay([fcn(key, i) for i in kdims['bead']])
+        return hv.DynamicMap(_allbeads, kdims = ['key']).redim.values(key = kdims['key'])
+
+    if overlay == 'key':
+        if 'labels' not in kwa:
+            fcn = lambda key, bead: (getattr(self[key], name)
+                                     .display(labels = f'{key}', **kwa)
+                                     [bead])
+        def _allkeys(bead):
+            return hv.Overlay([fcn(i, bead) for i in kdims['key']])
+        return hv.DynamicMap(_allkeys, kdims = ['bead']).redim.values(bead = kdims['bead'])
+
+    fcn = lambda key, bead: getattr(self[key], name).display(**kwa)[bead]
+    return hv.DynamicMap(fcn, kdims = ['bead', 'key']).redim.values(**kdims)
+
+@addto(TracksDict)                              # type: ignore
+def cycles(self, overlay = None, **kwa): # pylint: disable=redefined-builtin,function-redefined
+    "returns a hv.DynamicMap showing cycles"
+    return _display(self, 'cycles', overlay, kwa)
+
+@addto(TracksDict)                                # type: ignore
+def measures(self, overlay = None, **kwa): # pylint: disable=redefined-builtin,function-redefined
+    "returns a hv.DynamicMap showing measures"
+    return _display(self, 'measures', overlay, kwa)
+
+@addto(TracksDict)                              # type: ignore
+def events(self, overlay = None, **kwa): # pylint: disable=redefined-builtin,function-redefined
+    "returns a hv.DynamicMap showing events"
+    return _display(self, 'events', overlay, kwa)
+
+@addto(TracksDict)                             # type: ignore
+def peaks(self, overlay = None, **kwa): # pylint: disable=redefined-builtin,function-redefined
+    "returns a hv.DynamicMap showing peaks"
+    return _display(self, 'peaks', overlay, kwa)
 
 @addto(ExperimentList)
 def oligomap(self:ExperimentList, oligo, fcn, **kwa):

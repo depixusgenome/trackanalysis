@@ -51,7 +51,12 @@ class PeaksDisplay(Display): # type: ignore
     def elements(cls, evts, labels, **opts):
         "shows overlayed Curve items"
         prec = opts.pop('precision', None)
-        return cls.detailed(evts.detailed(..., prec), labels, **opts)
+        try:
+            return cls.detailed(evts.detailed(..., prec), labels, **opts)
+        except Exception as exc: # pylint: disable=broad-except
+            return cls.errormessage(exc,
+                                    x = opts.get('kdims', ['z'])[0],
+                                    y = opts.get('vdims', ['events'])[0])
 
     @classmethod
     def detailed(cls, dets, labels, **opts):
@@ -74,7 +79,7 @@ class PeaksDisplay(Display): # type: ignore
         itms   = []
         for det in dets:
             if opts.pop('zero', True):
-                cparams = params[0], params[1]+det.peaks[0]
+                cparams = params[0], params[1]+det.zero
             else:
                 cparams = params
 
