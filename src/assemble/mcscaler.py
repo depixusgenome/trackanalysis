@@ -10,6 +10,7 @@ to do:
 optimal position -> L-BFGS-B
 also forbid the the overlap of 2 or more peak
  -> L-BFGS-B
+* still need to apply correction of stre to xeq for different springs
 *how to fix the temperature? ...
 * consider the best relative of kintra, kinter
 * consider Pol's suggestion to put a max penalty score on peaks which do not match any other
@@ -18,6 +19,12 @@ also forbid the the overlap of 2 or more peak
 -> adding LJ potential energy (on top of everything else) is a bit too much for mcmc+L-BFGS-B
 -> solution: we know thanks to scl.inter which are the bonded oligos... tree?
 -> solution: we could write a optimal solution if we know the springs (we do) to bypass L-BFGS-B
+
+# options with regard to minimizations:
+1) add expression of Jacobian and Hessian Matrix to BFGS,
+quick to impl. not sure about time efficiency
+2) use the find_equilibirum of forces to find a local minima.
+Faster, need to solve singular matrix (dirty but easy way)
 '''
 
 from typing import List, Dict, Tuple, Callable, Iterable, NamedTuple, FrozenSet # pylint: disable=unused-import
@@ -64,21 +71,34 @@ class Spring:
         self.xeq:float=kwa.get("xeq",0)
         self.id1:int=kwa.get("id1",0)
         self.id2:int=kwa.get("id2",0)
-        self.direct:bool=kwa.get("direct",False)
 
     def energy(self,xpos1,xpos2):
         'returns energy on the spring'
-        if self.direct:
-            return self.force*(xpos2-xpos1-self.xeq)**2
-        return self.force*(abs(xpos2-xpos1)-self.xeq)**2
+        return self.force*(xpos2-xpos1-self.xeq)**2
+
+    def tension(self,xpos1,xpos2):
+        'returns the tension applied on the spring'
+        return 2*self.force*(xpos2-xpos1-self.xeq)
 
     @property
-    def ids(self)->Tuple[int,int]:
+    def ids(self)->Tuple[int, ...]:
         "ids"
-        return tuple(self.id1,self.id2)
-    
-    # def energy_from_array(self,arr:np.array):
-    #     return self.energy(arr[self.id1],arr[self.id2])
+        return tuple([self.id1,self.id2])
+
+
+def get_Jacobian(intra,inter,state):
+    'returns Jacobian'
+    springs=list(intra)+SpringScore.used_springs(inter,state)
+    jac=np.array([0]*len(state))
+    for idx,_ in enumerate(jac):
+        force=sum([spr.tension(state[spr.id1],state[spr.id2]) for spr in springs if idx==spr.id1])
+        force+=sum([-spr.tension(state[spr.id1],state[spr.id2]) for spr in springs if idx==spr.id2])
+        jac[idx]=force
+    return jac
+
+def get_Hessian():
+    'to implement'
+    pass
 
 def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argument
     '''
@@ -86,7 +106,6 @@ def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argumen
     '''
     return OptimizeResult(x=xinit, fun=fun(xinit), success=True, nfev=1)
 
-# noise is probably not useful anymore
 class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
     '''
     each moves consists of two steps for each experiment
@@ -104,8 +123,10 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
                                             loc=loc,scale=scale).rvs
         self.biasdist=scipy.stats.uniform(loc=self.bbias.lower,
                                           scale=self.bbias.upper-self.bbias.lower).rvs
-        self.noise=scipy.stats.norm(loc=0.,
-                                    scale=self.poserr).rvs
+        # self.noise=scipy.stats.norm(loc=0.,
+        #                             scale=self.poserr).rvs
+        self.intra:List[Spring]=kwa.get("intra",[])
+        self.inter:Dict[int,List[Spring]]=kwa.get("inter",{})
         self.peakid:int=kwa.get("peakid",0) # index of peakid to update
         self.rneighs:Dict[int,Tuple[int]]=self.find_neighbors(side="right")
         self.lneighs:Dict[int,Tuple[int]]=self.find_neighbors(side="left")
@@ -180,8 +201,15 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
         #nstate[self.peakid]=optimpos
         nstate=state.copy()
         nstate[self.peakids[self.peakid]]=stre*self._pos[self.peakid]+bias #+noise
-        return nstate
 
+        return nstate
+        # testing :
+        # springs=SpringScore.used_springs(self.intra,self.inter,nstate)
+
+        # equil=find_equilibrium(springs)
+        # if equil is None:
+        #     return nstate
+        # return nstate[0]+np.array([0.0]+equil)
 
     def proposal(self,state:np.array):
         '''
@@ -339,26 +367,32 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
 #     def __call__(self,*args,**kwa):
 #         return self.call(*args,**kwa)
 
-
-def find_equilibrium(springs:List):
-    'solve the SpringSystem'
+def find_equilibrium(springs:List[Spring]):
+    '''
+    solve the SpringSystem
+    this function computes the equilibrium, not the minimisation of energy
+    '''
     # build the connectivity matrix
     # build the K matrix (force)
     # K=np.diag([kinter,kintra])
     # assumes x_init=0.0 # general
-    lengths=np.matrix([spr.eq for spr in springs]).T
-    nverts=len(set([idx for spr in springs for idx in spr.ids])) # careful with definition
-    adjacency=np.zeros(shape=(len(springs),nverts)) # careful with definition
+    lengths=np.matrix([spr.xeq for spr in springs]).T
+    verts=set([idx for spr in springs for idx in spr.ids]) # careful with definition
+    adjacency=np.matrix(np.zeros(shape=(len(springs),max(verts)+1))) # careful with definition
     for idx,spr in enumerate(springs):
-        adjacency[idx][spr.id2]=1
-        adjacency[idx][spr.id1]=-1
+        adjacency[idx,spr.id2]=1
+        adjacency[idx,spr.id1]=-1
 
-    forces=np.diag([spr.force for spr in springs])
+    forces=np.matrix(np.diag([spr.force for spr in springs]))
     right_term=adjacency.T*lengths
     left_term=adjacency.T*forces*adjacency
     left_term=left_term[1:,1:]
     right_term=right_term[1:,:]
-    equil=(np.linalg.inv(left_term)*right_term).T[0,:].tolist()[0]
+    try:
+        equil=(np.linalg.inv(left_term)*right_term).T[0,:].tolist()[0] # type: ignore
+    except np.linalg.linalg.LinAlgError: # type: ignore
+        print("raised")
+        return None
     return equil # returns x2,x3,...
 
 class SpringScore(SpringSetting):
@@ -401,11 +435,33 @@ class SpringScore(SpringSetting):
 
         return sum(scores)#+self.potential(radii)
 
+    @staticmethod
+    def used_springs(inter,state)->List[Spring]:
+        'returns the spring used for a particular state'
+        springs:List[Spring]=[]
+        argmax=np.argmax(state)
+
+        # there could be a mistake in the calculus of the score
+        # or in the number of springs in inter
+        for id1 in inter.keys():
+            if id1!=argmax:
+                try:
+                    scores=sorted([(spr.energy(state[id1],state[spr.id2]),spr)
+                                   for spr in inter[id1]],key=lambda x:x[0])
+                    springs.append(scores[0][1])
+                except ValueError:
+                    # for small number of oligos it is possible that
+                    # one does not overlap with any other
+                    pass
+
+        return springs
+
     # @staticmethod
     # def potential(rad:np.array)->float:
     #     'Lennard-Jones potential'
     #     return sum((1.1/rad)**12-2*(1.1/rad)**6)
 
+# replace intra and inter by springs
 class SpringScaler(SpringSetting):
     '''
     kintra, a tension between oligos in the same peak
@@ -418,10 +474,12 @@ class SpringScaler(SpringSetting):
     def __init__(self,**kwa):
         super().__init__(**kwa)
         # scoring and stepper must not be springsettings but inherit springs from scaler
-        self.stepper=SpringStep(**kwa)
         self.intra:List[Spring]=self.find_intra()
         self.inter:Dict[int,List[Spring]]=self.find_inter()
 
+        self.stepper=SpringStep(intra=self.intra,
+                                inter=self.inter,
+                                **kwa)
         self.scoring=SpringScore(intra=self.intra,
                                  inter=self.inter,
                                  **kwa)
@@ -463,8 +521,8 @@ class SpringScaler(SpringSetting):
                 inter[id1].append(Spring(type="inter",
                                          force=self.kinter,
                                          xeq=1.1,
-                                         id1=id1,id2=id2,
-                                         direct=True))
+                                         id1=id1,
+                                         id2=id2))
 
         return inter
 
@@ -505,6 +563,7 @@ class SpringScaler(SpringSetting):
             self.stepper.peakid=peakid
             # self.stepper.neighs=neighs
             curr_res=basinhopping(x0=state,**self.basinkwa)
+            print(f"job fun={curr_res.fun}")
             LOGS.debug(f"job fun={curr_res.fun}")
             self.res.append(curr_res)
             state=curr_res.x
