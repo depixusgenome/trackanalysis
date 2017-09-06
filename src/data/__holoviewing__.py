@@ -30,10 +30,10 @@ class Display:
     def errormessage(exc, **dims):
         "displays error message"
         args = getattr(exc, 'args', tuple())
-        if isinstance(args, (list, tuple)) and len(args) in (1, 2):
+        if isinstance(args, (list, tuple)) and len(args) == 2:
             txt = str(exc.args[0]).split('\n')
         else:
-            txt = str(args).split('\n')
+            raise RuntimeError("error") from exc
 
         ovr = hv.Overlay([hv.Text(0.4, len(txt)*.1+.5-i*.1, j)
                           for i, j in enumerate(txt)])

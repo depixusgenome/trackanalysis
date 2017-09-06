@@ -85,23 +85,18 @@ if 'ipykernel_launcher' in inspect.stack()[-3].filename:
         pass
 
 def _test():
-    stack = [i.filename for i in inspect.stack()[1:]
-             if 'importlib' not in i.filename and i.filename != '<stdin>']
-    if any(i.endswith("IPython/core/magics/execution.py")
+    stack  = [i.filename for i in inspect.stack()[1:]
+              if 'importlib' not in i.filename and i.filename != '<stdin>']
+    ends   = ("IPython/core/magics/execution.py",
+              "ipykernel/zmqshell.py",
+              "/trackanalysis.py")
+    starts = ("<ipython-input",)
+    if any(any(i.endswith(j) for j in ends) or any(i.startswith(j) for j in starts)
            for i in stack):
         return
 
-    if any(i.endswith("ipykernel/zmqshell.py")
-           for i in stack):
-        return
-
-    last = next((i for i in stack
-                 if not (i.startswith('<ipython')
-                         or i.endswith('/trackanalysis.py')
-                         or 'ipython/extensions' in i)), None)
-    if last is not None:
-        import traceback
-        traceback.print_stack()
-        assert False, last
+    import traceback
+    traceback.print_stack()
+    assert False, stack[-1]
 _test()
 del _test

@@ -151,7 +151,10 @@ class PeaksDict(TrackItems):
 
     def _keys(self, sel:Sequence = None, _ = None) -> Iterator[BEADKEY]:
         if self.__keys is None:
-            self.__keys = frozenset(i for i, _ in self.data.keys() if Beads.isbead(i))
+            if isinstance(self.data, PeaksDict):
+                self.__keys = frozenset(i for i in self.data.keys() if Beads.isbead(i))
+            else:
+                self.__keys = frozenset(i for i, _ in self.data.keys() if Beads.isbead(i))
 
         if sel is None:
             yield from self.__keys
