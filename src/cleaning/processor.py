@@ -2,8 +2,7 @@
 # -*- coding: utf-8 -*-
 "Selecting beads"
 
-from    typing                import (Optional, # pylint: disable=unused-import
-                                      NamedTuple, Tuple, Union)
+from    typing                import Optional, NamedTuple, Dict, Any
 from    itertools             import repeat
 from    functools             import partial
 import  numpy                 as     np
@@ -163,7 +162,7 @@ class DataCleaningException(Exception):
     "Exception thrown when a bead is not selected"
     class ErrorMessage:
         "creates the error message upon request"
-        def __init__(self, stats, cnf, tasktype):
+        def __init__(self, stats, cnf:Dict[str,Any], tasktype:type) -> None:
             self.stats    = stats
             self.config   = cnf
             self.tasktype = tasktype
@@ -181,15 +180,15 @@ class DataCleaningException(Exception):
             stats = {i.name: i  for i in stats}
             get   = lambda i, j: (len(getattr(stats[i], j)),
                                   cnf.get(j+i, getattr(tasktype, j+i)))
-            msg   = ('%d cycles: valid < %.0f%%' % get('population', 'min'),
-                     '%d cycles: σ[HF] < %.4f'   % get('hfsigma',    'min'),
-                     '%d cycles: σ[HF] > %.4f'   % get('hfsigma',    'max'),
-                     '%d cycles: max(z)-min(z) < %.2f' % get('extent',     'max'))
+            msg   = ('%d cycles: population < %.0f%%'  % get('population', 'min'),
+                     '%d cycles: σ[HF] < %.4f'         % get('hfsigma',    'min'),
+                     '%d cycles: σ[HF] > %.4f'         % get('hfsigma',    'max'),
+                     '%d cycles: max(z)-min(z) < %.2f' % get('extent',     'min'))
 
             return '\n'.join(i for i in msg if i[0] != '0')
 
     def __init__(self, stats, cnf, tasktype):
-        super().__init__(self.ErrorMessage(tasktype, stats, cnf), 'warning')
+        super().__init__(self.ErrorMessage(stats, cnf, tasktype), 'warning')
 
 class DataCleaningProcessor(Processor):
     "Processor for bead selection"
