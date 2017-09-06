@@ -71,6 +71,7 @@ namespace legacy
         std::vector<int>    cycles()         const { decltype(cycles()) x; cycles(x);   return x; }
 
         float  camerafrequency() const;
+        bool   sdi() const;
 
         private:
             template <typename T>

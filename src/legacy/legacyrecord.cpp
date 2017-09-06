@@ -4949,6 +4949,9 @@ namespace legacy
     std::tuple<float, float, float, float> GenRecord::dimensions() const
     { return std::make_tuple(_ptr->dx, _ptr->ax, _ptr->dy, _ptr->ay); }
 
+    bool GenRecord::sdi() const
+    { return _ptr != nullptr && _ptr->SDI_mode != 0; }
+
     void GenRecord::open(std::string x)
     {
         close();
