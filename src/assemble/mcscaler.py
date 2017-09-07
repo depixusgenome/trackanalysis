@@ -23,6 +23,7 @@ also forbid the the overlap of 2 or more peak
 * !! different stretch and bias are considered but
   we also need different noise on beads (changes of springs)
 * !! must include the correct the force of a spring by the stretch applied to it stretch
+* ! move call find_equilibrium to minimization method (cleaner code)
 # options with regard to minimizations:
 1) add expression of Jacobian and Hessian Matrix to BFGS,
 quick to impl. not sure about time efficiency
@@ -88,26 +89,24 @@ class Spring:
         "ids"
         return tuple([self.id1,self.id2])
 
+# # probably no longer useful
+# def get_Jacobian(intra,inter,state):
+#     'returns Jacobian'
+#     springs=list(intra)+SpringScore.used_springs(inter,state)
+#     jac=np.array([0]*len(state))
+#     for idx,_ in enumerate(jac):
+#         force=sum([spr.tension(state[spr.id1],state[spr.id2]) for spr in springs if idx==spr.id1])
+#         force+=sum([-spr.tension(state[spr.id1],state[spr.id2])
+#                     for spr in springs if idx==spr.id2])
+#         jac[idx]=force
+#     return jac
 
-def get_Jacobian(intra,inter,state):
-    'returns Jacobian'
-    springs=list(intra)+SpringScore.used_springs(inter,state)
-    jac=np.array([0]*len(state))
-    for idx,_ in enumerate(jac):
-        force=sum([spr.tension(state[spr.id1],state[spr.id2]) for spr in springs if idx==spr.id1])
-        force+=sum([-spr.tension(state[spr.id1],state[spr.id2]) for spr in springs if idx==spr.id2])
-        jac[idx]=force
-    return jac
-
-def get_Hessian():
-    'to implement'
-    pass
-
-def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argument
-    '''
-    use this minimizer to avoid minimization step in basinhopping
-    '''
-    return OptimizeResult(x=xinit, fun=fun(xinit), success=True, nfev=1)
+# # moved to SpringMinimizer
+# def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argument
+#     '''
+#     use this minimizer to avoid minimization step in basinhopping
+#     '''
+#     return OptimizeResult(x=xinit, fun=fun(xinit), success=True, nfev=1)
 
 class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
     '''
@@ -202,11 +201,15 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
         # # find optimal solution, optim
         # optimpos=self.find_optim(stre,intramatches,intermatches)
         #nstate[self.peakid]=optimpos
+
         nstate=state.copy()
         nstate[self.peakids[self.peakid]]=stre*self._pos[self.peakid]+bias #+noise
-
         return nstate
-        # testing :
+
+        # # moving to minimization method
+        # nstate=state.copy()
+        # nstate[self.peakids[self.peakid]]=stre*self._pos[self.peakid]+bias
+        # # change factor here of springs in self.peakids[self.peakid]
         # springs=list(self.intra)+SpringScore.used_springs(self.inter,nstate)
         # equil=find_equilibrium(springs)
         # if equil is None:
@@ -372,6 +375,42 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
 # there is a problem with the force!
 # if the force on the springs are different
 # the minimization and the equilibrium are different
+
+class SpringMinimizer:
+    'regroups the different ways to minimize the spring network'
+    def __init__(self,**kwa):
+        self.intra:List[Spring]=kwa.get("intra",[])
+        self.inter:Dict[int,List[Spring]]=kwa.get("inter",{})
+        self.call:Callable=kwa.get("method",self.no_noise)
+
+    def __call__(self,*args,**kwa):
+        return self.call(self,*args,**kwa)
+
+    def no_noise(self,fun, xinit, *args, **kwa): # pylint: disable=unused-argument
+        'finds equilibrium of a system of springs'
+        springs=list(self.intra)+SpringScore.used_springs(self.inter,xinit)
+        equil=find_equilibrium(springs)
+        if equil is None:
+            return xinit
+        return xinit[0]+np.array([0.0]+equil)
+
+    def with_noise(self,fun, xinit, *args, **kwa): # pylint: disable=unused-argument
+        '''
+        allows vertices to be moved up to a given value
+        which will result in different spring networks
+        returns the one with minimal energy
+        '''
+        pass
+
+    @staticmethod
+    def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argument
+        '''
+        use this minimizer to avoid minimization step in basinhopping
+        '''
+        return OptimizeResult(x=xinit, fun=fun(xinit), success=True, nfev=1)
+
+
+# to move to static method of SpringMinimizer
 def find_equilibrium(springs:List[Spring]):
     '''
     solve the SpringSystem
