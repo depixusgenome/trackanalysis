@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Updating PeaksDict for scripting purposes"
-from   typing           import List, Iterator, Callable, Type
+from   typing           import List, Iterator, Type
 from   functools        import partial
 import sys
 import numpy            as np
@@ -14,10 +14,11 @@ def _get(name, attr = None):
     return mod if attr is None else getattr(mod, attr)
 
 # pylint: disable=invalid-name
-hv                   = _get('holoviews')
-TracksDict: Type     = _get('data.__scripting__', 'TracksDict')
-Display:    Type     = _get('data.__scripting__.holoviewing', 'Display')
-_display:   Callable = _get('data.__scripting__.holoviewing.tracksdict', '_display')
+hv               = _get('holoviews')
+TracksDict: Type = _get('data.__scripting__', 'TracksDict')
+Display:    Type = _get('data.__scripting__.holoviewing', 'Display')
+TracksDictDisplay: Type = _get('data.__scripting__.holoviewing.tracksdict',
+                               'TracksDictDisplay')
 
 class PeaksDisplay(Display): # type: ignore
     "displays peaks"
@@ -166,6 +167,17 @@ def map(self, fcn, **kwa): # pylint: disable=redefined-builtin
     kwa.setdefault('bead', list(i for i in self.keys()))
     return hv.DynamicMap(partial(fcn, self), kdims = list(kwa)).redim.values(**kwa)
 
+class PeaksTracksDictDisplay(TracksDictDisplay): # type: ignore
+    "tracksdict display for peaks"
+    @classmethod
+    def _all(cls, reference, name, fcn, kdims, key): # pylint: disable=too-many-arguments
+        ovrs = super()._all(reference, name, fcn, kdims, key)
+        if reference is not None:
+            ind  = kdims[name].index(reference)
+            area = next(iter(ovrs[ind].data.values())).to(hv.Area)
+            ovrs[ind] = area(style = dict(alpha = 0.5))*ovrs[ind]
+        return ovrs
+
 @addto(TracksDict) # type: ignore
 def peaks(self, overlay = 'key', reference = None, **kwa):
     """
@@ -185,7 +197,7 @@ def peaks(self, overlay = 'key', reference = None, **kwa):
             Thus zooming and spanning is independant.
             * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
     """
-    kwa.setdefault('reflayout', 'top')
-    return _display(self, 'peaks', overlay, reference, kwa)
+    kwa.setdefault('reflayout', 'bottom')
+    return PeaksTracksDictDisplay.run(self, 'peaks', overlay, reference, kwa)
 
 __all__: List[str] = []

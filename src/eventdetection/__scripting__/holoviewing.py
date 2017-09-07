@@ -4,7 +4,7 @@
 Adds shortcuts for using holoview
 """
 import sys
-from   typing           import List, Type, Callable
+from   typing           import List, Type
 from   functools        import partial
 import numpy            as np
 from   utils.decoration import addto
@@ -18,7 +18,8 @@ def _get(name, attr = None):
 hv                   = _get('holoviews')
 TracksDict: Type     = _get('data.__scripting__', 'TracksDict')
 Display:    Type     = _get('data.__scripting__.holoviewing', 'Display')
-_display:   Callable = _get('data.__scripting__.holoviewing.tracksdict', '_display')
+TracksDictDisplay: Type = _get('data.__scripting__.holoviewing.tracksdict',
+                               'TracksDictDisplay')
 
 class EventDisplay(Display): # type: ignore
     "displays the events"
@@ -93,6 +94,6 @@ def events(self, overlay = None, reference = None, **kwa):
             Thus zooming and spanning is independant.
             * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
     """
-    return _display(self, 'events', overlay, reference, kwa)
+    return TracksDictDisplay.run(self, 'events', overlay, reference, kwa)
 
 __all__: List[str] = []
