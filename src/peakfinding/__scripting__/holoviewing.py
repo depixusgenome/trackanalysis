@@ -167,8 +167,25 @@ def map(self, fcn, **kwa): # pylint: disable=redefined-builtin
     return hv.DynamicMap(partial(fcn, self), kdims = list(kwa)).redim.values(**kwa)
 
 @addto(TracksDict) # type: ignore
-def peaks(self, overlay = None, **kwa):
-    "returns a hv.DynamicMap showing peaks"
-    return _display(self, 'peaks', overlay, kwa)
+def peaks(self, overlay = 'key', reference = None, **kwa):
+    """
+    A hv.DynamicMap showing peaks
+
+    Options are:
+
+        * *overlay* == 'key': for a given bead, all tracks are overlayed
+        The *reference* option can be used to indicate the top-most track.
+        * *overlay* == 'bead': for a given track, all beads are overlayed
+        The *reference* option can be used to indicate the top-most bead.
+        * *overlay* == None:
+
+            * *reference*: the reference is removed from the *key* widget and
+            allways displayed to the left independently.
+            * *refdims*: if set to *True*, the reference gets its own dimensions.
+            Thus zooming and spanning is independant.
+            * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
+    """
+    kwa.setdefault('reflayout', 'top')
+    return _display(self, 'peaks', overlay, reference, kwa)
 
 __all__: List[str] = []
