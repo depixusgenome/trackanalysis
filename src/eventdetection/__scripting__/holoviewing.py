@@ -17,8 +17,8 @@ def _get(name, attr = None):
 # pylint: disable=invalid-name
 hv                   = _get('holoviews')
 TracksDict: Type     = _get('data.__scripting__', 'TracksDict')
-_display:   Callable = _get('data.__scripting__', '_display')
 Display:    Type     = _get('data.__scripting__.holoviewing', 'Display')
+_display:   Callable = _get('data.__scripting__.holoviewing.tracksdict', '_display')
 
 class EventDisplay(Display): # type: ignore
     "displays the events"

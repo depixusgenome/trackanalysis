@@ -8,7 +8,7 @@ import sys
 from   typing                   import List
 from   utils.decoration         import addto
 from   utils.logconfig          import getLogger
-from   ..trackdict              import ExperimentList, TracksDict
+from   ..tracksdict             import ExperimentList, TracksDict
 
 LOGS  = getLogger(__name__)
 hv    = sys.modules['holoviews']  # pylint: disable=invalid-name
@@ -61,6 +61,18 @@ def cycles(self, overlay = None, **kwa):
 def measures(self, overlay = None, **kwa):
     "returns a hv.DynamicMap showing measures"
     return _display(self, 'measures', overlay, kwa)
+
+@addto(TracksDict)
+def fov(self, *keys, calib = False, layout = True, cols = 2, **opts):
+    "displays all fovs"
+    if len(keys) == 0:
+        keys = self.keys()
+
+    opts['calib'] = calib
+    fcn           = lambda key: self[key].fov.display(**opts).relabel(f'{key}')
+    if layout:
+        return hv.Layout([fcn(i) for i in keys]).cols(cols)
+    return hv.DynamicMap(fcn, kdims = ['key']).redim.values(key = list(keys))
 
 @addto(ExperimentList)
 def oligomap(self:ExperimentList, oligo, fcn, **kwa):
