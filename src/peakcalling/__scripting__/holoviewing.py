@@ -6,12 +6,12 @@ from   typing           import List
 import numpy            as np
 from   utils.decoration import addto
 import sequences
-from   .processor       import PeaksDict, BeadsByHairpinProcessor
+from   ..processor      import PeaksDict, BeadsByHairpinProcessor
 
 hv                 = sys.modules['holoviews']  # pylint: disable=invalid-name
 Detailed:     type = sys.modules['peakfinding.__scripting__'].Detailed
-PeaksDisplay: type = sys.modules['peakfinding.__holoviewing__'].PeaksDisplay
-Display:      type = sys.modules['data.__holoviewing__'].Display
+PeaksDisplay: type = sys.modules['peakfinding.__scripting__.holoviewing'].PeaksDisplay
+Display:      type = sys.modules['data.__scripting__.holoviewing'].Display
 Tasks:        type = sys.modules['model.__scripting__'].Tasks
 
 class OligoMappingDisplay(PeaksDisplay): # type: ignore

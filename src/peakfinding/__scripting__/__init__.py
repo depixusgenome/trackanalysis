@@ -1,14 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Simpler PeaksDict detection: merging and selecting the sections in the signal detected as flat"
-from typing             import Iterator, Iterable
+import sys
+from   typing           import Iterator, Iterable, Type, Callable
 import numpy as np
 
 from utils.decoration   import addto
 from eventdetection     import EventDetectionConfig
 from model              import PHASE
-from .selector          import PeakSelectorDetails
-from .processor         import PeaksDict, Probability, Output
+from data               import Track
+from ..selector         import PeakSelectorDetails
+from ..processor        import PeaksDict, Probability, Output
+
+Tasks:           Type     = sys.modules['model.__scripting__'].Tasks
+defaulttasklist: Callable = sys.modules['data.__scripting__'].defaulttasklist
+
+@addto(Track) # type: ignore
+@property
+def peaks(self) -> PeaksDict:
+    "returns peaks found"
+    return self.apply(*defaulttasklist(self.path, Tasks.peakselector))
 
 class Detailed:
     "Deals with easy acccess to peaks data"

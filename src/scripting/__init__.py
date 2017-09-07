@@ -24,6 +24,7 @@ We add some methods and change the default behaviour:
 # pylint: disable=unused-import
 from   itertools import chain, product, repeat
 from   functools import wraps, partial
+from   pathlib   import Path
 
 import inspect
 import re
@@ -38,6 +39,8 @@ except ImportError:
 from data                         import Beads, Cycles
 from eventdetection.processor     import ExtremumAlignmentTask, EventDetectionTask
 from peakfinding.processor        import PeakSelectorTask
+from utils.logconfig              import getLogger
+import version
 
 # pylint: disable=wildcard-import, ungrouped-imports
 from signalfilter                 import *
@@ -48,48 +51,70 @@ from eventdetection.__scripting__ import *
 from peakfinding.__scripting__    import *
 from peakcalling.__scripting__    import *
 
+LOGS = getLogger(__name__)
+LOGS.info(f'version is {version.version()}')
+
 try:
     from .curve                   import *
 except ImportError:
     pass
+
+def _is_jupyter():
+    return any(i.filename.endswith("ipykernel/zmqshell.py") for i in inspect.stack())
+
 try:
-    import holoviews            as hv       # pylint: disable=import-error
-    import holoviews.operation  as hvops    # pylint: disable=import-error
+    # pylint: disable=import-error
+    import holoviews            as hv
+    import holoviews.operation  as hvops
 except ImportError:
     pass
 else:
-    from data.__holoviewing__               import * # pylint: disable=redefined-builtin
-    from eventdetection.__holoviewing__     import *
-    from peakfinding.__holoviewing__        import *
-    from peakcalling.__holoviewing__        import *
-    if 'ipykernel_launcher' in inspect.stack()[-3].filename:
+    from data.__scripting__.holoviewing           import * # pylint: disable=redefined-builtin
+    from eventdetection.__scripting__.holoviewing import *
+    from peakfinding.__scripting__.holoviewing    import *
+    from peakcalling.__scripting__.holoviewing    import *
+    def _configure_hv():
+        if not _is_jupyter():
+            return
+
+        # pylint: disable=import-error,bare-except
         try:
             import bokeh.io as _io
             _io.output_notebook()
             hv.notebook_extension('bokeh')
-            from IPython import get_ipython  # pylint: disable=import-error
+
+            from IPython import get_ipython
             get_ipython().magic('output size=150')
-        except:                              # pylint: disable=bare-except
+        except:
             pass
 
-if 'ipykernel_launcher' in inspect.stack()[-3].filename:
+    _configure_hv()
+    del _configure_hv
+
+def _configure_jupyter():
+    if not _is_jupyter():
+        return
+
+    # pylint: disable=import-error,bare-except
     try:
-        from IPython              import get_ipython   # pylint: disable=import-error
+        from IPython              import get_ipython
+        from IPython.core.display import display as _display, HTML
         get_ipython().magic('load_ext autoreload')
         get_ipython().magic('autoreload 2')
         get_ipython().magic('matplotlib inline')
-
-        from IPython.core.display import display, HTML # pylint: disable=import-error
-        display(HTML("<style>.container { width:100% !important; }</style>"))
-    except:                              # pylint: disable=bare-except
+        _display(HTML("<style>.container { width:100% !important; }</style>"))
+    except:
         pass
 
+_configure_jupyter()
+del _configure_jupyter
+
 def _test():
+    if _is_jupyter():
+        return
     stack  = [i.filename for i in inspect.stack()[1:]
               if 'importlib' not in i.filename and i.filename != '<stdin>']
-    ends   = ("IPython/core/magics/execution.py",
-              "ipykernel/zmqshell.py",
-              "/trackanalysis.py")
+    ends   = "IPython/core/magics/execution.py", "/trackanalysis.py"
     starts = ("<ipython-input",)
     if any(any(i.endswith(j) for j in ends) or any(i.startswith(j) for j in starts)
            for i in stack):
@@ -100,3 +125,4 @@ def _test():
     assert False, stack[-1]
 _test()
 del _test
+del _is_jupyter

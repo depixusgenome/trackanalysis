@@ -6,11 +6,11 @@ from   functools        import partial
 import sys
 import numpy            as np
 from   utils.decoration import addto
-from   .processor       import PeaksDict
-from   .__scripting__   import Detailed
+from   ..processor      import PeaksDict
+from   .                import Detailed
 
 hv             = sys.modules['holoviews']  # pylint: disable=invalid-name
-Display:  type = sys.modules['data.__holoviewing__'].Display
+Display:  type = sys.modules['data.__scripting__.holoviewing'].Display
 Tasks:    type = sys.modules['model.__scripting__'].Tasks
 
 class PeaksDisplay(Display): # type: ignore

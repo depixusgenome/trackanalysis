@@ -8,10 +8,10 @@ from   typing           import List
 from   functools        import partial
 import numpy            as np
 from   utils.decoration import addto
-from   .data            import Events
+from   ..data           import Events
 
 hv            = sys.modules['holoviews']  # pylint: disable=invalid-name
-Display: type = sys.modules['data.__holoviewing__'].Display
+Display: type = sys.modules['data.__scripting__.holoviewing'].Display
 
 class EventDisplay(Display): # type: ignore
     "displays the events"

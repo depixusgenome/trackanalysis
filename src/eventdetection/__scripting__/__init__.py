@@ -3,9 +3,21 @@
 """
 Adds shortcuts for using Events
 """
-from   typing           import Tuple, Callable, FrozenSet
+import sys
+from   typing           import Tuple, Callable, FrozenSet, Type
 import numpy            as np
-from   .data            import Events
+from   utils.decoration import addto
+from   data             import Track
+from   ..data           import Events
+
+Tasks:           Type     = sys.modules['model.__scripting__'].Tasks
+defaulttasklist: Callable = sys.modules['data.__scripting__'].defaulttasklist
+
+@addto(Track) # type: ignore
+@property
+def events(self) -> Events:
+    "returns events in phase 5 only"
+    return self.apply(*defaulttasklist(self.path, Tasks.eventdetection))
 
 _RETURN_TYPE = FrozenSet[Tuple[int, int]]
 class Comparator:

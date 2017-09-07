@@ -1,174 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Monkey patches the Track class.
-
-We add some methods and change the default behaviour:
-
-    * Track:
-
-        * *__init__* takes *path* as it's first positional argument
-        * an *events* property is added
-        * a *rawprecision* method is added
-
-    * Beads, Cycles:
-
-        * can filter their output using *withfilter*
-
-    * Beads, Cycles, Events:
-
-        * *withcopy(True)* is called in the *__init__* by default
-        * a *rawprecision* method is added
-        * *with...* methods return an updated copy
+Adds a dictionnaries to access tracks, experiments, ...
 """
-import sys
 from typing                 import KeysView, Tuple, Iterator, List
-from itertools              import product
 from pathlib                import Path
 import pickle
 import re
 
 from utils                  import initdefaults
-from utils.decoration       import addto
 from model                  import Level
-from signalfilter           import PrecisionAlg, NonLinearFilter
-from eventdetection.data    import Events
 
-from .                      import Track as _Track, Beads, Cycles
-from .trackio               import LegacyGRFilesIO, LegacyTrackIO
-
-Tasks     = sys.modules['app.__scripting__'].Tasks     # pylint: disable=invalid-name
-scriptapp = sys.modules['app.__scripting__'].scriptapp # pylint: disable=invalid-name
-
-class Track(_Track):
-    "Adding helper functions for simple calls"
-    def __init__(self, path = None, **kwa):
-        cnf = scriptapp.control.getGlobal('css').last.path.trk
-        if path in (Ellipsis, 'prev', ''):
-            path = cnf.get()
-
-        if path is None:
-            path = scriptapp.trkdlg.open()
-            if path is None:
-                path = ''
-
-        if isinstance(path, (tuple, str)):
-            cnf.set(path)
-            scriptapp.control.writeuserconfig()
-        super().__init__(path = path, **kwa)
-
-@addto(_Track)
-def grfiles(self):
-    "access to gr files"
-    paths = scriptapp.grdlg.open()
-    if paths is None or len(paths) == 0:
-        return
-    old = self.path
-    self.__init__(path = ((old,) if isinstance(old, str) else old)+paths)
-
-@addto(_Track)
-def rawprecision(self, ibead):
-    "the raw precision for a given bead"
-    if isinstance(ibead, (tuple, list)):
-        ibead = next(i for i in ibead if isinstance(i, int))
-    return PrecisionAlg.rawprecision(self, ibead)
-
-@addto(_Track)
-def tasklist(self, *args, beadsonly = True):
-    "creates a tasklist"
-    return Tasks.get(self.path, *args, beadsonly = beadsonly)
-
-@addto(_Track)
-def processors(self, *args, copy = True, beadsonly = True):
-    "returns an iterator over the result of provided tasks"
-    procs = Tasks.processors(self.path, *args, beadsonly = beadsonly)
-    procs.data.setCacheDefault(0, self)
-    procs.copy = copy
-    return procs
-
-@addto(_Track)
-def apply(self, *args, copy = True, beadsonly = True):
-    "returns an iterator over the result of provided tasks"
-    return next(iter(self.processors(*args, beadsonly = beadsonly).run(copy = copy)))
-
-def _tasks(paths, upto):
-    tasks = (Tasks.eventdetection, Tasks.peakselector)
-    if isinstance(paths, (str, Path)) or len(paths) == 1:
-        tasks = (Tasks.cleaning, Tasks.alignment)+tasks
-    return (tasks if upto is None       else
-            ()    if upto not in tasks  else
-            tasks[:tasks.index(upto)+1])
-
-@addto(_Track) # type: ignore
-@property
-def cleancycles(self):
-    "returns cleaned cycles"
-    return self.apply(*_tasks(self.path, Tasks.alignment))[...,...]
-
-@addto(_Track) # type: ignore
-@property
-def measures(self):
-    "returns cleaned cycles for phase 5 only"
-    phase = scriptapp.control.getGlobal('config').phase.measure.get()
-    return self.cleancycles.withphases(phase)
-
-@addto(_Track) # type: ignore
-@property
-def events(self) -> Events:
-    "returns events in phase 5 only"
-    return self.apply(*_tasks(self.path, Tasks.eventdetection))
-
-@addto(_Track) # type: ignore
-@property
-def peaks(self) -> Events:
-    "returns peaks found"
-    return self.apply(*_tasks(self.path, Tasks.peakselector))
-
-def _fit(self, tpe, sequence, oligos, kwa) -> Events:
-    "computes hairpin fits"
-    if None not in (sequence, oligos):
-        kwa['sequence'] = sequence
-        kwa['oligos']   = oligos
-
-    tasks = _tasks(self.path, None)+ (getattr(Tasks, tpe)(**kwa),) # type: tuple
-    if len(tasks[-1].distances) == 0:
-        raise IndexError('No distances found')
-    return self.apply(*tasks)
-
-@addto(_Track) # type: ignore
-def fittohairpin(self, sequence = None, oligos = None, **kwa) -> Events:
-    """
-    Computes hairpin fits.
-
-    Arguments are for creating the FitToHairpinTask.
-    """
-    return _fit(self, 'fittohairpin', sequence, oligos, kwa)
-
-@addto(_Track) # type: ignore
-def beadsbyhairpin(self, sequence, oligos, **kwa) -> Events:
-    """
-    Computes hairpin fits, sorted by best hairpin.
-
-    Arguments are for creating the FitToHairpinTask.
-    """
-    return _fit(self, 'beadsbyhairpin', sequence, oligos, kwa)
-
-def _addprop(name):
-    fcn = getattr(_Track, name).fget
-    setattr(Track, name, property(lambda self: fcn(self).withcopy()))
-
-for tname in product(('beads', 'cycles'), ('only', '')):
-    _addprop(''.join(tname))
-
-def _withfilter(self, tpe = NonLinearFilter, **kwa):
-    "applies the filter to the data"
-    filt = tpe(**kwa)
-    fcn  = lambda info: (info[0],
-                         filt(info[1], precision = self.track.rawprecision(info[0])))
-    return self.withaction(fcn)
-
-for _cls in (Beads, Cycles, Events):
-    _cls.withfilter = _withfilter
+from ..                     import Track as _Track
+from .track                 import Track
+from ..trackio              import LegacyGRFilesIO, LegacyTrackIO
 
 class TracksDict(dict):
     """
@@ -340,4 +185,4 @@ class BeadsDict(dict):
         self.__setitem__(key, val)
         return val
 
-__all__ = ['Track', 'TracksDict', 'BeadsDict', 'Path']
+__all__ = ['TracksDict', 'BeadsDict', 'ExperimentList']
