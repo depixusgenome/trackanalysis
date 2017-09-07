@@ -23,12 +23,7 @@ also forbid the the overlap of 2 or more peak
 * !! different stretch and bias are considered but
   we also need different noise on beads (changes of springs)
 * !! must include the correct the force of a spring by the stretch applied to it stretch
-* ! move call find_equilibrium to minimization method (cleaner code)
-# options with regard to minimizations:
-1) add expression of Jacobian and Hessian Matrix to BFGS,
-quick to impl. not sure about time efficiency
-2) use the find_equilibirum of forces to find a local minima.
-Faster, need to solve singular matrix (dirty but easy way)
+-> this could easily be tougher than expected
 '''
 
 from typing import List, Dict, Tuple, Callable, Iterable, NamedTuple, FrozenSet # pylint: disable=unused-import
@@ -380,19 +375,28 @@ class SpringMinimizer:
     'regroups the different ways to minimize the spring network'
     def __init__(self,**kwa):
         self.intra:List[Spring]=kwa.get("intra",[])
-        self.inter:Dict[int,List[Spring]]=kwa.get("inter",{})
+        self.inter:Dict[int,List[Spring]]=kwa.get("inter",dict())
         self.call:Callable=kwa.get("method",self.no_noise)
 
     def __call__(self,*args,**kwa):
         return self.call(self,*args,**kwa)
 
-    def no_noise(self,fun, xinit, *args, **kwa): # pylint: disable=unused-argument
+    def no_noise(self,_,_2,*args, **kwa): # pylint: disable=unused-argument
         'finds equilibrium of a system of springs'
+        xinit=args[0]
         springs=list(self.intra)+SpringScore.used_springs(self.inter,xinit)
-        equil=find_equilibrium(springs)
+        equil=self.find_equilibrium(springs)
+
         if equil is None:
-            return xinit
-        return xinit[0]+np.array([0.0]+equil)
+            return OptimizeResult(x=xinit,
+                                  fun=SpringScore.score_springs(springs,xinit),
+                                  success=True,
+                                  nfev=1)
+        equil=xinit[0]+np.array([0.0]+equil)
+        return OptimizeResult(x=equil,
+                              fun=SpringScore.score_springs(springs,equil),
+                              success=True,
+                              nfev=1)
 
     def with_noise(self,fun, xinit, *args, **kwa): # pylint: disable=unused-argument
         '''
@@ -400,6 +404,10 @@ class SpringMinimizer:
         which will result in different spring networks
         returns the one with minimal energy
         '''
+        # compute the set of springs for each possible moved vertex
+        # does not necessarily require __hash__ and __eq__ of Spring
+        # for each springs compute the equilibrium
+        # energy(*(springs,equil)) for (springs,equil) in sprequilibria
         pass
 
     @staticmethod
@@ -409,36 +417,34 @@ class SpringMinimizer:
         '''
         return OptimizeResult(x=xinit, fun=fun(xinit), success=True, nfev=1)
 
+    @staticmethod
+    def find_equilibrium(springs:List[Spring]):
+        '''
+        solves the SpringSystem
+        this function computes the equilibrium, not the minimisation of energy
+        '''
+        # build the connectivity matrix
+        # build the K matrix (force)
+        # K=np.diag([kinter,kintra])
+        # assumes x_init=0.0 # general
+        lengths=np.matrix([spr.xeq for spr in springs]).T
+        verts=set([idx for spr in springs for idx in spr.ids]) # careful with definition
+        adjacency=np.matrix(np.zeros(shape=(len(springs),max(verts)+1))) # careful with definition
+        for idx,spr in enumerate(springs):
+            adjacency[idx,spr.id2]=1
+            adjacency[idx,spr.id1]=-1
 
-# to move to static method of SpringMinimizer
-def find_equilibrium(springs:List[Spring]):
-    '''
-    solve the SpringSystem
-    this function computes the equilibrium, not the minimisation of energy
-    '''
-    # build the connectivity matrix
-    # build the K matrix (force)
-    # K=np.diag([kinter,kintra])
-    # assumes x_init=0.0 # general
-    lengths=np.matrix([spr.xeq for spr in springs]).T
-    verts=set([idx for spr in springs for idx in spr.ids]) # careful with definition
-    adjacency=np.matrix(np.zeros(shape=(len(springs),max(verts)+1))) # careful with definition
-    for idx,spr in enumerate(springs):
-        adjacency[idx,spr.id2]=1
-        adjacency[idx,spr.id1]=-1
-
-    forces=np.matrix(np.diag([spr.force for spr in springs]))
-    print(f"forces={forces}")
-    right_term=adjacency.T*forces*lengths
-    left_term=adjacency.T*forces*adjacency
-    left_term=left_term[1:,1:]
-    right_term=right_term[1:,:]
-    try:
-        equil=(np.linalg.inv(left_term)*right_term).T[0,:].tolist()[0] # type: ignore
-    except np.linalg.linalg.LinAlgError: # type: ignore
-        print("raised")
-        return None
-    return equil # returns x2,x3,...
+        forces=np.matrix(np.diag([spr.force for spr in springs]))
+        right_term=adjacency.T*forces*lengths
+        left_term=adjacency.T*forces*adjacency
+        left_term=left_term[1:,1:]
+        right_term=right_term[1:,:]
+        try:
+            equil=(np.linalg.inv(left_term)*right_term).T[0,:].tolist()[0] # type: ignore
+        except np.linalg.linalg.LinAlgError: # type: ignore
+            print("raised")
+            return None
+        return equil # returns x2,x3,...
 
 class SpringScore(SpringSetting):
     '''
@@ -454,38 +460,23 @@ class SpringScore(SpringSetting):
         self.inter:Dict[int,List[Spring]]=kwa.get("inter",{})
 
     def __call__(self,*args,**kwa):
+        'testing a cleaner __call__'
         state=args[0]
-        scores=[spr.energy(state[spr.id1],state[spr.id2]) for spr in self.intra]
-        argmax=np.argmax(state)
+        springs=list(self.intra)+self.used_springs(self.inter,state)
+        return self.score_springs(springs,state)
 
-        # there could be a mistake in the calculus of the score
-        # or in the number of springs in inter
-        for id1 in self.inter.keys():
-            if id1!=argmax:
-                try:
-                    scores.append(min([spr.energy(state[id1],state[spr.id2])
-                                       for spr in self.inter[id1]]))
-                    # test=min([spr.energy(state[id1],state[spr.id2])
-                    #           for spr in self.inter[id1]])
-                    # print(f"id1,scr={id1,test}")
-                except ValueError:
-                    # for small number of oligos it is possible that
-                    # one does not overlap with any other
-                    pass
+    @staticmethod
+    def score_springs(springs,state):
+        'adds the energy of all springs'
+        scores=[spr.energy(state[spr.id1],state[spr.id2]) for spr in springs]
+        return sum(scores)
 
-        # adding a penalty score (Lennard-Jones potential)
-        # is a bit too difficult for L-BFGS-B
-        # sstate=np.sort(state)
-        # radii=sstate[1:]-sstate[:-1]
-
-        return sum(scores)#+self.potential(radii)
 
     @staticmethod
     def used_springs(inter,state)->List[Spring]:
         'returns the spring used for a particular state'
         springs:List[Spring]=[]
         argmax=np.argmax(state)
-
         # there could be a mistake in the calculus of the score
         # or in the number of springs in inter
         for id1 in inter.keys():
@@ -507,7 +498,7 @@ class SpringScore(SpringSetting):
     #     return sum((1.1/rad)**12-2*(1.1/rad)**6)
 
 # replace intra and inter by springs
-class SpringScaler(SpringSetting):
+class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
     '''
     kintra, a tension between oligos in the same peak
     kextra, a directed tension between oligos which may overlap
@@ -528,17 +519,18 @@ class SpringScaler(SpringSetting):
         self.scoring=SpringScore(intra=self.intra,
                                  inter=self.inter,
                                  **kwa)
-
+        self.minimizer=SpringMinimizer(intra=self.intra,inter=self.inter)
         self.res:List[OptimizeResult]=[]
         self.peakid:int=kwa.get("peakid",0) # id of peak to update
         # minimization using L-BFGS-B also allows for minimization of vertices
         # allows to readjust locally all experiments
         self.basinkwa={"func":self.scoring,
                        "niter":100,
-                       "minimizer_kwargs":dict(method="L-BFGS-B"),
+                       "minimizer_kwargs":dict(method=self.minimizer),
                        "take_step":self.stepper}
 
         # self.basinkwa["minimizer_kwargs"]=dict(method=no_minimizer)
+        # self.basinkwa["minimizer_kwargs"]=dict(method="L-BFGS-B")
 
 
     def find_intra(self)->List[Spring]:
