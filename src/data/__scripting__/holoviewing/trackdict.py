@@ -62,16 +62,6 @@ def measures(self, overlay = None, **kwa):
     "returns a hv.DynamicMap showing measures"
     return _display(self, 'measures', overlay, kwa)
 
-@addto(TracksDict) # type: ignore
-def events(self, overlay = None, **kwa):
-    "returns a hv.DynamicMap showing events"
-    return _display(self, 'events', overlay, kwa)
-
-@addto(TracksDict) # type: ignore
-def peaks(self, overlay = None, **kwa):
-    "returns a hv.DynamicMap showing peaks"
-    return _display(self, 'peaks', overlay, kwa)
-
 @addto(ExperimentList)
 def oligomap(self:ExperimentList, oligo, fcn, **kwa):
     "returns a hv.DynamicMap with oligos and beads in the kdims"

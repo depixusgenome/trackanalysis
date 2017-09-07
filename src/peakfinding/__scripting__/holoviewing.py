@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Updating PeaksDict for scripting purposes"
-from   typing           import List, Iterator
+from   typing           import List, Iterator, Callable, Type
 from   functools        import partial
 import sys
 import numpy            as np
@@ -9,9 +9,15 @@ from   utils.decoration import addto
 from   ..processor      import PeaksDict
 from   .                import Detailed
 
-hv             = sys.modules['holoviews']  # pylint: disable=invalid-name
-Display:  type = sys.modules['data.__scripting__.holoviewing'].Display
-Tasks:    type = sys.modules['model.__scripting__'].Tasks
+def _get(name, attr = None):
+    mod = sys.modules[name]
+    return mod if attr is None else getattr(mod, attr)
+
+# pylint: disable=invalid-name
+hv                   = _get('holoviews')
+TracksDict: Type     = _get('data.__scripting__', 'TracksDict')
+_display:   Callable = _get('data.__scripting__', '_display')
+Display:    Type     = _get('data.__scripting__.holoviewing', 'Display')
 
 class PeaksDisplay(Display): # type: ignore
     "displays peaks"
@@ -24,9 +30,9 @@ class PeaksDisplay(Display): # type: ignore
 
     @staticmethod
     def __events(det, params, opts, estyle, hist):
-        peaks = (np.concatenate(det.positions)-params[1])*params[0]
-        yvals = [hist[i] for i in peaks]
-        return hv.Scatter((peaks, yvals), **opts)(style = estyle)
+        pks   = (np.concatenate(det.positions)-params[1])*params[0]
+        yvals = [hist[i] for i in pks]
+        return hv.Scatter((pks, yvals), **opts)(style = estyle)
 
     @staticmethod
     def __errors(arr):
@@ -159,5 +165,10 @@ def map(self, fcn, **kwa): # pylint: disable=redefined-builtin
     "returns a hv.DynamicMap with beads and kwargs in the kdims"
     kwa.setdefault('bead', list(i for i in self.keys()))
     return hv.DynamicMap(partial(fcn, self), kdims = list(kwa)).redim.values(**kwa)
+
+@addto(TracksDict) # type: ignore
+def peaks(self, overlay = None, **kwa):
+    "returns a hv.DynamicMap showing peaks"
+    return _display(self, 'peaks', overlay, kwa)
 
 __all__: List[str] = []

@@ -4,14 +4,21 @@
 Adds shortcuts for using holoview
 """
 import sys
-from   typing           import List
+from   typing           import List, Type, Callable
 from   functools        import partial
 import numpy            as np
 from   utils.decoration import addto
 from   ..data           import Events
 
-hv            = sys.modules['holoviews']  # pylint: disable=invalid-name
-Display: type = sys.modules['data.__scripting__.holoviewing'].Display
+def _get(name, attr = None):
+    mod = sys.modules[name]
+    return mod if attr is None else getattr(mod, attr)
+
+# pylint: disable=invalid-name
+hv                   = _get('holoviews')
+TracksDict: Type     = _get('data.__scripting__', 'TracksDict')
+_display:   Callable = _get('data.__scripting__', '_display')
+Display:    Type     = _get('data.__scripting__.holoviewing', 'Display')
 
 class EventDisplay(Display): # type: ignore
     "displays the events"
@@ -66,5 +73,10 @@ def map(self, fcn, kdim = None, **kwa): # pylint: disable=redefined-builtin,func
     elif kdim == 'cycle':
         kwa.setdefault(kdim, list(set(i for i, _ in self.keys())))
     return hv.DynamicMap(partial(fcn, self), kdims = list(kwa)).redim.values(**kwa)
+
+@addto(TracksDict) # type: ignore
+def events(self, overlay = None, **kwa):
+    "returns a hv.DynamicMap showing events"
+    return _display(self, 'events', overlay, kwa)
 
 __all__: List[str] = []
