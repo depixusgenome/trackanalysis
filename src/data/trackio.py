@@ -159,12 +159,17 @@ class LegacyGRFilesIO(_TrackIO):
         else:
             itr = (Path(i) for i in paths[1:])
 
+        # in case of axis != 'Z: we keep a backup,
+        # find which beads are valid and recover only these
+        axis   = kwa.pop('axis', 'Z')
+        axis   = getattr(axis, 'value', axis)[0]
+        backup = dict(output) if axis != 'Z' else output
+
         for grpath in itr:
-            if grpath.suffix != ".gr":
-                continue
+            if grpath.suffix == ".gr":
+                remove.discard(cls.__update(str(grpath), output))
 
-            remove.discard(cls.__update(str(grpath), output))
-
+        output = backup # this only affects axis != 'Z'
         for key in remove:
             output.pop(key)
         return output

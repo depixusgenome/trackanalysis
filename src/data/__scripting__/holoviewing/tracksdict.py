@@ -20,7 +20,7 @@ def map(self, fcn, kdim = 'oligo', *extra, **kwa):
         kwa[kdim] = list(self.keys())
 
     if 'bead' not in kwa:
-        kwa['bead'] = self.keys(*kwa.get(kdim, ()))
+        kwa['bead'] = self.beads(*kwa.get(kdim, ()))
 
     return hv.DynamicMap(fcn, kdims = list(kwa)+list(extra)).redim.values(**kwa)
 
