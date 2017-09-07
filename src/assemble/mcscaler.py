@@ -96,13 +96,6 @@ class Spring:
 #         jac[idx]=force
 #     return jac
 
-# # moved to SpringMinimizer
-# def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argument
-#     '''
-#     use this minimizer to avoid minimization step in basinhopping
-#     '''
-#     return OptimizeResult(x=xinit, fun=fun(xinit), success=True, nfev=1)
-
 class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
     '''
     each moves consists of two steps for each experiment
@@ -156,60 +149,21 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
                                                         shift=1)]))
         return neighs
 
-    # too long! use matrix notation?
-    # def __call__(self,*args):
-    #     '''
-    #     draw from self.stredist and self.biasdista
-    #     then apply to original position
-    #     '''
-    #     arrs:List=[]
-    #     for pkid in self.peakids:
-    #         ones=np.ones(shape=(len(pkid),))
-    #         stre=self.stredist()
-    #         bias=self.biasdist()
-    #         # next command is wrong
-    #         #arrs.append(stre*ones+bias) # problem this affects negatively the force of kintra
-    #     noise=self.noise(size=len(self._fpos))
-    #     return noise+np.hstack(arrs)
-
     def __call__(self,*args):
         '''
         updates a single peak and returns the position which minimizes the energy due to that peak
         '''
         state=args[0]
-        # the following 3 lines will be replaced by random choice amongst possible scalings
-        # stre=self.stredist()
-        # bias=self.biasdist()
         prop=self.proposal(state)
 
         if prop is None:
-            return state #+self.noise(size=len(state))
+            return state
 
-        #noise=self.noise(size=len(self.peakids[self.peakid]))
-        stre,bias=prop
         # apply stretch, bias and noise to peakid
-        # tomatch=stre*self._pos[self.peakid]+bias+noise
-        # # find closest in neighs to match
-        # intermatches=self.closest_match(state,tomatch,self.peakids[self.peakid])
-        # # list of springs
-        # intramatches=[spr for spr in self.intra if spr.id1==pid for pid in self.peakid]
-        # # find optimal solution, optim
-        # optimpos=self.find_optim(stre,intramatches,intermatches)
-        #nstate[self.peakid]=optimpos
-
+        stre,bias=prop
         nstate=state.copy()
         nstate[self.peakids[self.peakid]]=stre*self._pos[self.peakid]+bias #+noise
         return nstate
-
-        # # moving to minimization method
-        # nstate=state.copy()
-        # nstate[self.peakids[self.peakid]]=stre*self._pos[self.peakid]+bias
-        # # change factor here of springs in self.peakids[self.peakid]
-        # springs=list(self.intra)+SpringScore.used_springs(self.inter,nstate)
-        # equil=find_equilibrium(springs)
-        # if equil is None:
-        #     return nstate
-        # return nstate[0]+np.array([0.0]+equil)
 
     def proposal(self,state:np.array):
         '''
@@ -232,144 +186,6 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
         if matches:
             return random.choice(matches) # type: ignore
         return None
-
-    # def find_optim(self,stretch,intra,inter)->np.array:
-    #     '''
-    #     find optimal position to reduce
-    #     needs stretch value to correct intra force springs
-    #     '''
-
-
-    #     return arr
-
-    # def closest_match(self,
-    #                   state:np.array,
-    #                   arr:np.array,
-    #                   peakids:List[int])->Dict[int,Tuple[float,float]]:
-    #     '''
-    #     find to which indices the vertices in arr are matched to
-    #     to minimize inter springs
-    #     '''
-    #     # if min(arr)<min(state) # no binding on the left
-    #     # if max(arr)>max(state) # no binding on the right
-    #     toout:Dict[int,Tuple[float,float]]={}
-    #     for idx,pos in arr:
-    #         lneigh=self.lneighs[peakids[idx]]
-    #         rneigh=self.rneighs[peakids[idx]]
-    #         left=np.array([(state[idy]-pos)**2 for idy in lneigh])
-    #         right=np.array([(state[idy]-pos)**2 for idy in rneigh])
-    #         lid,rid=(lneigh[np.argmin(left)],rneigh[np.argmin(right)])
-    #         toout[idx]=(state[lid],state[rid])
-
-    #     return toout
-
-    # def move_one(self,others:np.array,tomove:int):
-    #     '''
-    #     defines a new stre,bias for a single peak
-    #     position to match are located between others positions
-    #     '''
-    #     shifted=0.5*(others[1:]+others[:-1]) # to avoid multiple overlaps
-    #     moves=scaler.match_peaks(shifted,self._pos[tomove],self.bstretch,self.bbias)
-    #     if len(moves)==0:
-    #         print(f"cant move index={tomove}")
-    #     else:
-    #         print(f'can move')
-    #     return random.choice(moves) # type: ignore
-
-    # def single_update(self,*args,**kwa): # pylint: disable=unused-argument
-    #     '1 peak has its state updated'
-    #     tomove=self.index
-    #     neigh=sorted(frozenset(self.indices)-frozenset([self.index]))
-    #     state=args[0]
-    #     # scale all peaks
-    #     all_scaled=[state[2*idx]*pos+state[2*idx+1] for idx,pos in enumerate(self._pos)]
-    #     match=np.sort(np.hstack([all_scaled[idx] for idx in neigh]))
-    #     apos=np.sort(np.hstack(all_scaled)) # all positions
-    #     lower=max(apos[apos<min(match)]) if any(apos<min(match)) else min(match)-2.2
-    #     upper=min(apos[apos>max(match)]) if any(apos>max(match)) else max(match)+2.2
-    #     # find where to move
-    #     try:
-    #         #nstre,nbias=self.move_one(match,tomove)
-    #         nstre,nbias=self.move_one(np.hstack([lower,match,upper]),tomove)
-    #     except IndexError:
-    #         return state
-    #     return np.hstack([state[:2*tomove],[nstre,nbias],state[2*(tomove+1):]])
-
-    # # # fix this: returns only a single update and not all
-    # def multi_update(self,*args,**kwa)->np.array: # pylint: disable=unused-argument
-    #     '''
-    #     multiple peaks are updated simultaneously
-    #     a peak and overlapping ones
-    #     '''
-    #     self.index=random.choice(self.indices) # type: ignore
-    #     state=args[0]
-    #     # if self.index!=0:
-    #     #    state=self.single_update(state)
-    #     state=self.single_update(state) # trying wth peaks 0 moving
-    #     return state
-
-
-# class SeqUpdate(PeakSetting):
-#     '''
-#     sample more efficiently (stretch,bias) for mcmc
-#     creates a graph: try to fit peaks starting from peaks[0] and adding more and more neighbors
-#     # make a graph with indices as nodes (do not use make_graph)
-#     # use find matches
-#     # pick at random a peak (except 0)
-#     # move the oligos of that peak (the move can then be optimised with regard to neighbors)
-#     Need to find the sets of scales for each peaks which gives a different sequence of peaks
-#     cyclic iteration didn't work too well. when fitting only 1 peak at a time
-#     could go back to cyclic when neighbors are considered
-#     '''
-#     def __init__(self,**kwa):
-#         super().__init__(**kwa)
-#         self.bstretch=kwa.get("bstretch",scaler.Bounds())
-#         self.bbias=kwa.get("bbias",scaler.Bounds())
-#         self.cycle=itertools.cycle(list(range(1,len(self.peaks)-1)))
-#         self.index=kwa.get("index",0) # type: int
-#         self.indices:List[int]=kwa.get("indices",list(range(len(self.peaks))))
-#         self.call:Callable=self.multi_update # self.single_update
-
-#         # need to consider only the peaks that can be matched
-#         # no need to recompute the bstretch,bbias function of state if using self._pos[tomove]
-#     def move_one(self,others:np.array,tomove:int):
-#         '''
-#         defines a new stre,bias for a single peak
-#         position to match are located between others positions
-#         '''
-#         shifted=0.5*(others[1:]+others[:-1]) # to avoid multiple overlaps
-#         moves=scaler.match_peaks(shifted,self._pos[tomove],self.bstretch,self.bbias)
-#         if len(moves)==0:
-#             print(f"cant move index={tomove}")
-#         else:
-#             print(f'can move')
-#         return random.choice(moves) # type: ignore
-
-#     def single_update(self,*args,**kwa): # pylint: disable=unused-argument
-#         '1 peak has its state updated'
-#         tomove=self.index
-#         neigh=sorted(frozenset(self.indices)-frozenset([self.index]))
-#         state=args[0]
-#         # scale all peaks
-#         all_scaled=[state[2*idx]*pos+state[2*idx+1] for idx,pos in enumerate(self._pos)]
-#         match=np.sort(np.hstack([all_scaled[idx] for idx in neigh]))
-#         apos=np.sort(np.hstack(all_scaled)) # all positions
-#         lower=max(apos[apos<min(match)]) if any(apos<min(match)) else min(match)-2.2
-#         upper=min(apos[apos>max(match)]) if any(apos>max(match)) else max(match)+2.2
-#         # find where to move
-#         try:
-#             #nstre,nbias=self.move_one(match,tomove)
-#             nstre,nbias=self.move_one(np.hstack([lower,match,upper]),tomove)
-#         except IndexError:
-#             return state
-#         return np.hstack([state[:2*tomove],[nstre,nbias],state[2*(tomove+1):]])
-
-#     def __call__(self,*args,**kwa):
-#         return self.call(*args,**kwa)
-
-# there is a problem with the force!
-# if the force on the springs are different
-# the minimization and the equilibrium are different
 
 class SpringMinimizer:
     'regroups the different ways to minimize the spring network'
@@ -497,7 +313,6 @@ class SpringScore(SpringSetting):
     #     'Lennard-Jones potential'
     #     return sum((1.1/rad)**12-2*(1.1/rad)**6)
 
-# replace intra and inter by springs
 class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
     '''
     kintra, a tension between oligos in the same peak
@@ -519,11 +334,10 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
         self.scoring=SpringScore(intra=self.intra,
                                  inter=self.inter,
                                  **kwa)
-        self.minimizer=SpringMinimizer(intra=self.intra,inter=self.inter)
+        self.minimizer=SpringMinimizer(intra=self.intra,
+                                       inter=self.inter)
         self.res:List[OptimizeResult]=[]
         self.peakid:int=kwa.get("peakid",0) # id of peak to update
-        # minimization using L-BFGS-B also allows for minimization of vertices
-        # allows to readjust locally all experiments
         self.basinkwa={"func":self.scoring,
                        "niter":100,
                        "minimizer_kwargs":dict(method=self.minimizer),
@@ -531,6 +345,7 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
 
         # self.basinkwa["minimizer_kwargs"]=dict(method=no_minimizer)
         # self.basinkwa["minimizer_kwargs"]=dict(method="L-BFGS-B")
+        # minimization using L-BFGS-B also allows for minimization of vertices
 
 
     def find_intra(self)->List[Spring]:
@@ -563,42 +378,14 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
 
         return inter
 
-
-        # indices of self._olis which overlap on the right of idx
-        # self.neigh={idx:frozenset(idy
-        # for idy in range(len(self._olis)) if data.Oligo.overlap(self._olis[idx].seq,
-        # self._olis[idy].seq,
-        # signs=signs,
-        # min_overl=self.min_overl,
-        # shift=1) for idx,oli in enumerate(self._olis)}
-        # need to find which xid overlap with which
-
-
-        # self.edges=scaler.OPeakArray.list2edgeids(self.peaks,
-        #                                           min_overl=self.min_overl,
-        #                                           unsigned=self.unsigned)
-        # self.neigh:Dict[int,List[int]]={idx:frozenset(edg
-        #                                               for edge in self.edges
-        #                                               for edg in edge
-        #                                               if idx in edge)
-        #                                 for idx in range(len(self.peaks))}
-        #self.edges=[edge for edge in self.edges if edge[0]<edge[1]]
-
-
-
     def run(self,repeats:int=1):
         '''
         runs mcmc steps on a single peak at a time
         '''
-        # I do need to update the first peak to allow for more flexibility
-        # to others
         state=self._fpos
         chains=itertools.chain.from_iterable(itertools.repeat(range(len(self.peaks)),repeats))
         for peakid in chains:
-            # neighs=frozenset().union([self.neighs[idx] for idx in self.peakids[peakid]])
-            # neighs=neighs-frozenset(self.peakids[peakid])
             self.stepper.peakid=peakid
-            # self.stepper.neighs=neighs
             curr_res=basinhopping(x0=state,**self.basinkwa)
             print(f"job fun={curr_res.fun}")
             LOGS.debug(f"job fun={curr_res.fun}")
@@ -607,31 +394,8 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
 
         return state
 
-
     def order(self,state)->List[data.Oligo]:
         'returns the ordered list of oligos according to state'
         order=sorted([(state[idx],self._olis[idx]) for idx in range(len(self._olis))],
                      key=lambda x:x[0])
         return [oli[1] for oli in order]
-
-    # def run(self):
-    #     '''
-    #     simple and naive approach first
-    #     Consider peaks[0] fixed and only the peaks (1 by 1?) which can overlap with peaks[0]
-    #     then add others
-    #     '''
-    #     # biasdist=scipy.stats.uniform(loc=self.bbias.lower,
-    #     #                              scale=self.bbias.upper-self.bbias.lower)
-    #     # stredist=scipy.stats.uniform(loc=self.bstretch.lower,
-    #     #                              scale=self.bstretch.upper-self.bstretch.lower)
-    #     # bias=biasdist.rvs(size=len(self._peaks)-1)
-    #     # stre=stredist.rvs(size=len(self._peaks)-1)
-    #     state=self._fpos
-    #     for iteration in range(50):
-    #         print(f"iteration={iteration}")
-    #         curr_res=basinhopping(x0=state,**self.basinkwa)
-    #         print(f"job fun={curr_res.fun}")
-    #         self.res.append(curr_res)
-    #         state=curr_res.x
-
-    #     return state
