@@ -20,6 +20,9 @@ also forbid the the overlap of 2 or more peak
 -> solution: we know thanks to scl.inter which are the bonded oligos... tree?
 -> solution: we could write a optimal solution if we know the springs (we do) to bypass L-BFGS-B
 
+* !! different stretch and bias are considered but
+  we also need different noise on beads (changes of springs)
+* !! must include the correct the force of a spring by the stretch applied to it stretch
 # options with regard to minimizations:
 1) add expression of Jacobian and Hessian Matrix to BFGS,
 quick to impl. not sure about time efficiency
@@ -204,8 +207,7 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
 
         return nstate
         # testing :
-        # springs=SpringScore.used_springs(self.intra,self.inter,nstate)
-
+        # springs=list(self.intra)+SpringScore.used_springs(self.inter,nstate)
         # equil=find_equilibrium(springs)
         # if equil is None:
         #     return nstate
@@ -367,6 +369,9 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
 #     def __call__(self,*args,**kwa):
 #         return self.call(*args,**kwa)
 
+# there is a problem with the force!
+# if the force on the springs are different
+# the minimization and the equilibrium are different
 def find_equilibrium(springs:List[Spring]):
     '''
     solve the SpringSystem
@@ -384,7 +389,8 @@ def find_equilibrium(springs:List[Spring]):
         adjacency[idx,spr.id1]=-1
 
     forces=np.matrix(np.diag([spr.force for spr in springs]))
-    right_term=adjacency.T*lengths
+    print(f"forces={forces}")
+    right_term=adjacency.T*forces*lengths
     left_term=adjacency.T*forces*adjacency
     left_term=left_term[1:,1:]
     right_term=right_term[1:,:]
@@ -449,7 +455,7 @@ class SpringScore(SpringSetting):
                     scores=sorted([(spr.energy(state[id1],state[spr.id2]),spr)
                                    for spr in inter[id1]],key=lambda x:x[0])
                     springs.append(scores[0][1])
-                except ValueError:
+                except IndexError:
                     # for small number of oligos it is possible that
                     # one does not overlap with any other
                     pass
