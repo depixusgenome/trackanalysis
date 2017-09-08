@@ -3,17 +3,20 @@
 """
 Adds a dictionnaries to access tracks, experiments, ...
 """
-from typing                 import KeysView, Tuple, Iterator, List
+from typing                 import KeysView, Tuple, Iterator, List, Type
 from pathlib                import Path
+import sys
 import pickle
 import re
 
 from utils                  import initdefaults
-from model                  import Level
+from model                  import Level, Task
 
 from ..                     import Track as _Track
 from .track                 import Track
 from ..trackio              import LegacyGRFilesIO, LegacyTrackIO
+
+Tasks: Type = sys.modules['model.__scripting__'].Tasks
 
 class TracksDict(dict):
     """
@@ -31,10 +34,15 @@ class TracksDict(dict):
     requires defining a group which will be used as the key.
     """
     __SCAN_OPTS = ('cgrdir',)
-    def __init__(self, tracks = None, grs = None, match = None, allaxes = False,
-                 *tasks, **kwa):
+    def __init__(self,          # pylint: disable=too-many-arguments
+                 tracks  = None,
+                 grs     = None,
+                 match   = None,
+                 allaxes = False,
+                 tasks   = None,
+                 **kwa):
         super().__init__()
-        self.tasks = tasks
+        self.tasks  = tasks
         self.update(tracks = tracks, grs = grs, match = match, allaxes = allaxes, **kwa)
 
     def __set(self, key, val, allaxes = False):
@@ -44,8 +52,6 @@ class TracksDict(dict):
         elif isinstance(val, _Track) and not isinstance(val, Track):
             val = Track(**val.__getstate__())
 
-        if len(self.tasks):
-            val = val.apply(*self.tasks)
         super().__setitem__(key, val)
 
         if allaxes:
@@ -55,6 +61,15 @@ class TracksDict(dict):
                 super().__setitem__('X'+key, Track(**cnf))
 
         return val
+
+    def __getitem__(self, key):
+        if isinstance(key, (Task, Tasks)):
+            return self.apply(key)
+        if isinstance(key, tuple) and all(isinstance(i, (Task, Tasks)) for i in key):
+            return self.apply(*key)
+
+        trk = super().__getitem__(key)
+        return trk.apply(*self.tasks) if self.tasks else trk
 
     def __setitem__(self, key, val):
         return self.__set(key, val)
@@ -79,14 +94,19 @@ class TracksDict(dict):
             self.__set(i, j, allaxes)
         return info.keys()
 
-    def update(self, *args, tracks = None, grs = None, match = None, allaxes = False, **kwargs):
+    def update(self, *args,
+               tracks  = None,
+               grs     = None,
+               match   = None,
+               allaxes = False,
+               **kwargs):
         "adds paths or tracks to self"
         scan    = {}
         for i in self.__SCAN_OPTS:
             if i in kwargs:
                 scan[i] = kwargs.pop(i)
 
-        info = {}
+        info = {} # type: ignore
         info.update(*args, **kwargs)
         for i, j in info.items():
             self.__set(i, j, allaxes)
@@ -105,6 +125,12 @@ class TracksDict(dict):
             beads &= set(self[key].beadsonly.keys())
 
         return sorted(beads)
+
+    def apply(self, *tasks) -> 'TracksDict':
+        "returns a new tracksdict with default tasks"
+        other = type(self)(tasks = tasks)
+        other.update(self)
+        return other
 
 class ExperimentList(dict):
     "Provides access to keys belonging to a single experiment"
