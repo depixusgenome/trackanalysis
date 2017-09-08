@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Creates a histogram from available events"
-from    typing import (Optional, Iterator, # pylint: disable=unused-import
+from    typing import (NamedTuple, Optional, Iterator,
                        Iterable, Union, Sequence, Callable, Tuple, cast)
 from    enum   import Enum
 import  itertools
@@ -12,10 +12,16 @@ from    scipy.signal            import find_peaks_cwt
 from    utils                   import (kwargsdefaults, initdefaults,
                                         NoArgs, asdataarrays, EVENTS_DTYPE)
 from    signalfilter            import PrecisionAlg
-from    signalfilter.convolve   import KernelConvolution # pylint: disable=unused-import
+from    signalfilter.convolve   import KernelConvolution
 
 HistInputs = Union[Iterable[Iterable[float]], Iterable[Iterable[np.ndarray]]]
 BiasType   = Union[None, float, np.ndarray]
+
+class HistogramData(NamedTuple): # pylint: disable=missing-docstring
+    table:      np.ndarray
+    minvalue:   float
+    binwidth:   float
+
 class Histogram(PrecisionAlg):
     """
     Creates a gaussian smeared histogram of events.
@@ -43,11 +49,11 @@ class Histogram(PrecisionAlg):
     2. the histogram's origin
     3. the histogram's bin width
     """
-    edge         = 0
-    oversampling = 5
-    zmeasure     = 'nanmean'            # type: Union[str, Callable, None]
-    weight       = None                 # type: Optional[Callable]
-    kernel       = KernelConvolution()  # type: Optional[KernelConvolution]
+    edge                                  = 0
+    oversampling                          = 5
+    zmeasure: Union[str, Callable, None]  = 'nanmean'
+    weight:   Union[str, Callable, None]  = None
+    kernel:   Optional[KernelConvolution] = KernelConvolution()
 
     @initdefaults(frozenset(locals()), kernel = 'update')
     def __init__(self, **kwa):
@@ -74,7 +80,7 @@ class Histogram(PrecisionAlg):
     def projection(self, aevents : HistInputs, bias: BiasType = None, **kwa):
         "Calls itself and returns the sum of histograms + min value and bin size"
         tmp, minv, bwidth = self(aevents, bias, separate = False, **kwa)
-        return next(tmp), minv, bwidth
+        return HistogramData(next(tmp), minv, bwidth)
 
     def apply(self, minv, bwidth, lenv, arr):
         "Applies to one array"
@@ -186,7 +192,7 @@ class Histogram(PrecisionAlg):
 
         zmeas  -= minv
         zmeas  /= bwidth
-        items   = (np.int32(np.rint(i)) for i in zmeas)      # type: ignore
+        items   = (np.int32(np.rint(i)) for i in zmeas)  # type: ignore
         weight  = self.__weights(self.weight,   events)
 
         if not separate:
@@ -206,9 +212,9 @@ class SubPixelPeakPosition:
     """
     Refines the peak position using a quadratic fit
     """
-    fitwidth = 1 # type: Optional[int]
-    fitcount = 2
-    fitmode  = FitMode.quadratic
+    fitwidth: Optional[int] = 1
+    fitcount                = 2
+    fitmode                 = FitMode.quadratic
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -242,19 +248,19 @@ class SubPixelPeakPosition:
                      i) for i in cast(Iterable, inds))
 
             vals = np.array([fitfcn(*i) for i in rngs], dtype = 'f4')
-            inds = np.int32(np.rint(vals)) # type: ignore
+            inds = np.int32(np.rint(vals))      # type: ignore
         return (vals[0] if np.isscalar(ainds) else vals) * rho + bias
 
 class CWTPeakFinder:
     "Finds peaks using scipy's find_peaks_cwt. See the latter's documentation"
-    subpixel      = SubPixelPeakPosition()
-    widths        = np.arange(5, 11) # type: Sequence[int]
-    wavelet       = None             # type: Optional[Callable]
-    max_distances = None             # type: Optional[Sequence[int]]
-    gap_tresh     = None             # type: Optional[float]
-    min_length    = None             # type: Optional[int]
-    min_snr       = 1.
-    noise_perc    = 10.
+    subpixel                               = SubPixelPeakPosition()
+    widths:        Sequence[int]           = np.arange(5, 11)
+    wavelet:       Optional[Callable]      = None
+    max_distances: Optional[Sequence[int]] = None
+    gap_tresh:     Optional[float]         = None
+    min_length:    Optional[int]           = None
+    min_snr                                = 1.
+    noise_perc                             = 10.
     @initdefaults(frozenset(locals()), subpixel = 'update')
     def __init__(self, **_):
         pass
@@ -272,9 +278,9 @@ class ZeroCrossingPeakFinder:
     """
     Finds peaks with a minimum *half*width and threshold
     """
-    subpixel  = SubPixelPeakPosition()
-    peakwidth = 1
-    threshold = getattr(np.finfo('f4'), 'resolution') # type: float
+    subpixel         = SubPixelPeakPosition()
+    peakwidth        = 1
+    threshold: float = getattr(np.finfo('f4'), 'resolution')
     @initdefaults(frozenset(locals()), subpixel = 'update')
     def __init__(self, **_):
         pass
@@ -363,7 +369,6 @@ class GroupByPeakAndBase(GroupByPeak):
         * *baserange:* the range starting from the very left where the baseline
         peak should be, in µm.
     """
-
     baserange = .1
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):

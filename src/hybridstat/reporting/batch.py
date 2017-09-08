@@ -16,7 +16,7 @@ from peakfinding.reporting.batch    import PeakFindingBatchTemplate
 from peakcalling.processor          import (BeadsByHairpinTask, # pylint: disable=unused-import
                                             FitToHairpinTask, DistanceConstraint,
                                             Constraints, HairpinDistance)
-from peakcalling.tohairpin          import Range
+from peakcalling                    import Range
 from .processor                     import HybridstatExcelTask
 from .identification                import readparams
 
