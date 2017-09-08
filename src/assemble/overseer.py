@@ -7,7 +7,7 @@ calls scaler (which does not yet alloow for non-linearity)
 then calls shuffler (which also scores the builded stack)
 need to compute only tuple(oligos) for each key (many duplicate possible)
 
-What could be done frfom here:
+What could be done from here:
 
 Either scaler is general and takes into account non-linearities
 in which cases we can score easily the partitions
@@ -49,7 +49,7 @@ class Overseer(PeakSetting):
         super().__init__(**kwa)
         self.scaler=mcscaler.SpringScaler(**kwa)# mcscaler.SeqHoppScaler(**kwa)
         self.shuffler=shuffler.Shuffler()
-        self.signed:List[data.OligoPeak]
+        self.signed_oligos:List[data.OligoPeak]
 
     @staticmethod
     def fix_signs(oligos:List[data.OligoPeak],min_overl:int=2): # ->List[data.OligoPeak]:
@@ -86,19 +86,7 @@ class Overseer(PeakSetting):
             paths+=[(networkx.shortest_path_length(graph,src,tgt,weight="weight"),
                      list(networkx.shortest_path(graph,source=src,target=tgt,weight="weight")))]
 
-            # all shortest paths is not a solution
-            # paths+=[(networkx.shortest_path_length(graph,
-            #                                        src,
-            #                                        tgt,
-            #                                        weight="weight"),
-            #          list(networkx.all_shortest_paths(graph,
-            #                                           source=src,
-            #                                           target=tgt,
-            #                                           weight="weight")))]
-
-        # consider this also
-        # min_len=min([path[0] for path in paths])
-        # return [pth for path in paths for pth in path[1] if path[0]==min_len]
+            # all shortest paths is not a solution, too long!
         return sorted(paths,key=lambda x:x[0])[0][1]
 
     def run(self):
@@ -114,18 +102,24 @@ class Overseer(PeakSetting):
 
         for ite in range(5):
             print(f"ite={ite}")
-            scales=self.scaler.run()
+            scaled=self.scaler.run()
             # translate scales to peaks and to oligos
-            scaled=[scales[2*idx]*self.peaks[idx]+scales[2*idx+1] for idx in range(len(self.peaks))]
-            oligos=sorted([oli for peak in scaled for oli in peak.arr],
-                          key=lambda x:x.pos)
+            # scaled=[scales[2*idx]*self.peaks[idx]+scales[2*idx+1]
+            # for idx in range(len(self.peaks))]
+            # oligos=sorted([oli for peak in scaled for oli in peak.arr],
+            #               key=lambda x:x.pos)
             # each oligos is then separated by 1.1 nm
-            self.signed=self.fix_signs(oligos,self.min_overl)
+
+            oligos=self.scaler.ordered_oligos(scaled)
+            if self.unsigned:
+                self.signed_oligos=self.fix_signs(oligos,self.min_overl)
+            else:
+                self.signed_oligos=oligos
 
             if __debug__:
                 # to debug error in line 219 of shuffler
-                pickle.dump(self.signed,open(f"dbgsigned{ite}.pickle","wb"))
-            self.shuffler=shuffler.Shuffler(oligos=self.signed,
-                                            min_overl=self.min_overl)
+                pickle.dump(self.signed_oligos,open(f"dbgsigned{ite}.pickle","wb"))
+            self.shuffler=shuffler.Shuffler(oligos=self.signed_oligos,
+                                            ooverl=self.min_overl)
             partitions.append(self.shuffler.run())
         return partitions

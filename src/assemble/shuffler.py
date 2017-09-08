@@ -196,8 +196,14 @@ class Shuffler:
 
         # for the first iteration,
         # we can keep only kpr if the 2 first oligos overlap kpr.perm[:2] or consist only of {0}
+        # before
+        # add_kperms=[kpr for kpr in add_kperms
+        #             if data.OligoPeak.tail_overlap(kpr.perm[0].seq,kpr.perm[1].seq)
+        #             or len(kpr.domain)==1]
         add_kperms=[kpr for kpr in add_kperms
-                    if data.OligoPeak.tail_overlap(kpr.perm[0].seq,kpr.perm[1].seq)
+                    if data.OligoPeak.tail_overlap(kpr.perm[0].seq,
+                                                   kpr.perm[1].seq,
+                                                   shift=1)==self.ooverl
                     or len(kpr.domain)==1]
 
         print(f"len(add_kperms)={len(add_kperms)}")

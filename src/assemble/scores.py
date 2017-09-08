@@ -212,9 +212,11 @@ class ScoreAssembly:
         returns the number of consecutive overlaps between oligos in kpermids
         '''
         kperm=getattr(self.perm,attr)
+        # added shift=1
         return len([idx for idx,val in enumerate(kperm[1:])
                     if len(data.Oligo.tail_overlap(kperm[idx].seq,
-                                                   val.seq))==self.ooverl])
+                                                   val.seq,
+                                                   shift=1))==self.ooverl])
 
     def __call__(self,kperm:data.OligoKPerm)->ScoredPerm:
         u'kperm is a k-permutation (not a more general OligoPerm)'

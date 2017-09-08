@@ -522,7 +522,6 @@ class Partition:
         for path in self.graph.paths():
             yield path
 
-    # to test # could take the frozenset of sequences generated
     def paths(self)->Generator:
         '''
         calls paths, yields only paths with no conflicting perms
@@ -530,7 +529,7 @@ class Partition:
         for path in self.__paths():
             if any([prm1.domain.intersection(prm2.domain)
                     for prm1,prm2 in itertools.combinations(path,2)]):
-                pass
+                continue
             yield path
 
 class OligoKPerm(OligoPerm):

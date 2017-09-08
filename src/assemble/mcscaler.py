@@ -20,16 +20,20 @@ also forbid the the overlap of 2 or more peak
 -> solution: we know thanks to scl.inter which are the bonded oligos... tree?
 -> solution: we could write a optimal solution if we know the springs (we do) to bypass L-BFGS-B
 
-* !! different stretch and bias are considered but
-  we also need different noise on beads (changes of springs)
+* !! different stretch and bias are considered but no noise on beads (changes of springs)
+-> it is probably not useful if kintra is low enough
 * !! must include the correct the force of a spring by the stretch applied to it stretch
 -> this could easily be tougher than expected
+* !! At the moment, the score is based on inter springs which right overlap, but there is some cases
+where a vertex is not linked by an intra and is located at the tail of the sequence. This vertex
+is unconstrained.
+* will be necessary to replace 1.1 (distance between two consecutive oligos) by a named variable
 '''
 
 from typing import List, Dict, Tuple, Callable, Iterable, NamedTuple, FrozenSet # pylint: disable=unused-import
 import itertools
 import random
-import networkx
+#import networkx
 import numpy as np
 import scipy.stats
 from scipy.optimize import OptimizeResult, basinhopping
@@ -40,26 +44,26 @@ import assemble.scaler as scaler
 
 LOGS=getLogger(__name__)
 
-def make_graph(peaks,bstretch,bbias,min_overl=2,unsigned=True):
-    '''
-    creates a graph where each oligo expirement is a node
-    '''
-    # the first (larger) tree (DiGraph) checks if there is overlapping (unsigned==True)
-    # between peaks seqs
-    edges1=[(p1,p2)
-            for p1,p2 in itertools.permutations(peaks,2)
-            if scaler.OPeakArray.may_overlap(p1,[p2],min_overl=min_overl,unsigned=unsigned)]
+# def make_graph(peaks,bstretch,bbias,min_overl=2,unsigned=True):
+#     '''
+#     creates a graph where each oligo expirement is a node
+#     '''
+#     # the first (larger) tree (DiGraph) checks if there is overlapping (unsigned==True)
+#     # between peaks seqs
+#     edges1=[(p1,p2)
+#             for p1,p2 in itertools.permutations(peaks,2)
+#             if scaler.OPeakArray.may_overlap(p1,[p2],min_overl=min_overl,unsigned=unsigned)]
 
-    # the second (sub-tree) contains only edges between peaks which can be matched by stretch,bias
-    edges2=[edge for edge in edges1 if scaler.match_peaks(edge[0].posarr,
-                                                          edge[1].posarr,
-                                                          bstretch,
-                                                          bbias)]
+#     # the second (sub-tree) contains only edges between peaks which can be matched by stretch,bias
+#     edges2=[edge for edge in edges1 if scaler.match_peaks(edge[0].posarr,
+#                                                           edge[1].posarr,
+#                                                           bstretch,
+#                                                           bbias)]
 
-    # find all paths starting with a given peakid
-    graph=networkx.DiGraph()
-    graph.add_edges_from(edges2)
-    return graph
+#     # find all paths starting with a given peakid
+#     graph=networkx.DiGraph()
+#     graph.add_edges_from(edges2)
+#     return graph
 
 
 class Spring:
@@ -162,7 +166,7 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
         # apply stretch, bias and noise to peakid
         stre,bias=prop
         nstate=state.copy()
-        nstate[self.peakids[self.peakid]]=stre*self._pos[self.peakid]+bias #+noise
+        nstate[self.peakids[self.peakid]]=stre*self._pos[self.peakid]+bias
         return nstate
 
     def proposal(self,state:np.array):
@@ -187,27 +191,98 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
             return random.choice(matches) # type: ignore
         return None
 
+
+    def find_crystal(self,state:np.array)->List[Tuple[int, ...]]:
+        '''
+        there is crystallisation of two or more experiments if
+        their oligos overlap and that 2 oligos from different peaks
+        are located at 1.1 from one another
+        needs more complexity eg:
+        if (tgt) and (gtg,gtg) when (gtg,tgt,gtg) is the correct solution
+        '''
+        esp=0.25
+        signs=(0,0) if self.unsigned else (1,1)
+        overlap=lambda seq1,seq2:data.Oligo.overlap(seq1,
+                                                    seq2,
+                                                    signs=signs,
+                                                    min_overl=self.min_overl,
+                                                    shift=1)
+        oneway=lambda seq1,seq2:overlap(seq1,seq2) and not overlap(seq2,seq1)
+        groups:List[Tuple[int, ...]]=[]
+        for idx1,idx2 in itertools.permutations(range(len(state)),2):
+            if (state[idx2]-state[idx1]-1.1)**2<esp:
+                if oneway(self._olis[idx2].seq,self._olis[idx1].seq):
+                    groups.append((idx1,idx2))
+
+        return groups
+
+    # not great implementation, will  be rewritten
+    def alt_proposal(self,state:np.array):
+        '''
+        When looking at sequence reconstructed by proposal
+        we see that after some random proposal, some peaks have 'crystalised'
+        In fact, groups of peaks have crystalised together (clumps)
+        once these are fixed after some time, what we want to do is move these
+        clumps relative to one another
+        '''
+        # find the clumps of peaks
+        # crystals=self.find_crystal(state)
+        # find the stre and bias which are compatible with all peaks in the clumps
+        # find a new stre, bias for each of the clumps
+        pass
+
 class SpringMinimizer:
     'regroups the different ways to minimize the spring network'
     def __init__(self,**kwa):
         self.intra:List[Spring]=kwa.get("intra",[])
         self.inter:Dict[int,List[Spring]]=kwa.get("inter",dict())
-        self.call:Callable=kwa.get("method",self.no_noise)
+        self.call:Callable=kwa.get("method",self.bare)
 
     def __call__(self,*args,**kwa):
         return self.call(self,*args,**kwa)
 
-    def no_noise(self,_,_2,*args, **kwa): # pylint: disable=unused-argument
-        'finds equilibrium of a system of springs'
+    # problem with basinhopping with variable number of springs
+    def with_repulsion(self,_,_2,*args, **kwa): # pylint: disable=unused-argument
+        '''
+        compared to bare, adds springs between consecutive vertices
+        to force them appart'''
         xinit=args[0]
         springs=list(self.intra)+SpringScore.used_springs(self.inter,xinit)
-        equil=self.find_equilibrium(springs)
+        repkwa={"force":30,"xeq":1.1} # force of spring same as kinter
+        # add springs with repulsion
+        springs+=[Spring(id1=id1 if xinit[id1]<xinit[id2] else id2,
+                         id2=id2 if xinit[id1]<xinit[id2] else id1,
+                         **repkwa)
+                  for id1,id2 in itertools.permutations(range(len(xinit)),2)
+                  if (xinit[id1]-xinit[id2])**2<1.1]
+        return self.equilibrium(springs,xinit)
+
+    def bare(self,_,_2,*args, **kwa): # pylint: disable=unused-argument
+        'finds equilibrium of a system of springs'
+        springs=list(self.intra)+SpringScore.used_springs(self.inter,args[0])
+        return self.equilibrium(springs,args[0])
+
+    # TO FIX! when no intra connect to a vertex
+    # and that vertex is the last argument then is not connected though inter
+    # then we have an unconstrained vertex.
+    @staticmethod
+    def equilibrium(springs,xinit)->OptimizeResult:
+        'find the equilibrium for a given list of springs and xinit'
+        equil=SpringMinimizer.find_equilibrium(springs)
 
         if equil is None:
             return OptimizeResult(x=xinit,
                                   fun=SpringScore.score_springs(springs,xinit),
                                   success=True,
                                   nfev=1)
+
+        if len(equil)!=len(xinit)-1:
+            # unconstrained vertex by set of springs
+            return OptimizeResult(x=xinit,
+                                  fun=SpringScore.score_springs(springs,xinit),
+                                  success=True,
+                                  nfev=1)
+
         equil=xinit[0]+np.array([0.0]+equil)
         return OptimizeResult(x=equil,
                               fun=SpringScore.score_springs(springs,equil),
@@ -236,6 +311,7 @@ class SpringMinimizer:
     @staticmethod
     def find_equilibrium(springs:List[Spring]):
         '''
+        problem when the set of springs does not include all vertices in the system
         solves the SpringSystem
         this function computes the equilibrium, not the minimisation of energy
         '''
@@ -341,7 +417,8 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
         self.basinkwa={"func":self.scoring,
                        "niter":100,
                        "minimizer_kwargs":dict(method=self.minimizer),
-                       "take_step":self.stepper}
+                       "take_step":self.stepper,
+                       "T":10} # guesstimate from simulations
 
         # self.basinkwa["minimizer_kwargs"]=dict(method=no_minimizer)
         # self.basinkwa["minimizer_kwargs"]=dict(method="L-BFGS-B")
@@ -394,8 +471,13 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
 
         return state
 
-    def order(self,state)->List[data.Oligo]:
+    def ordered_oligos(self,state)->List[data.Oligo]:
         'returns the ordered list of oligos according to state'
-        order=sorted([(state[idx],self._olis[idx]) for idx in range(len(self._olis))],
-                     key=lambda x:x[0])
-        return [oli[1] for oli in order]
+        # order=sorted([(state[idx],self._olis[idx]) for idx in range(len(self._olis))],
+        #              key=lambda x:x[0])
+        # return [oli[1] for oli in order]
+        oligos=[self._olis[idx].copy(pos=state[idx],
+                                     dist=scipy.stats.norm(loc=state[idx],
+                                                           scale=self._olis[idx].poserr))
+                for idx in range(len(self._olis))]
+        return sorted(oligos,key=lambda x:x.pos)
