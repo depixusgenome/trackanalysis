@@ -30,7 +30,8 @@ def compileapp(*modules) -> str:
         __import__(mod)
     __import__('app.launcher')
     string = _compiler.bundle_all_models()
-    string = re.sub(r'\s\s+', ' ',  string)
+    string = re.sub(r'//\s[^\n]*?\n', '',  string)
+    string = re.sub(r'\s\s+',         ' ', string)
     string = re.sub(r'\s*([,;={}()])\s*', lambda x: x.group(1), string)
     return string
 

@@ -6,7 +6,8 @@ from wafbuilder import copyroot, make
 
 def build_bokehjs(bld, *modules):
     "compiles the bokeh js code"
-    srcs = sum((bld.path.ant_glob(i+'/**/*.coffee')
+    root = bld.path.ctx.bldnode
+    srcs = sum((root.ant_glob(i.replace('.', '/')+'/**/*.coffee')
                 for i in {j.split('.')[0] for j in modules}), [])
     tgt  = copyroot(bld, modules[0]+'.js')
 
