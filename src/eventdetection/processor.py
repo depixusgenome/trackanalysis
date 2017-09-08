@@ -251,6 +251,46 @@ class ExtremumAlignmentProcessor(Processor):
     def run(self, args):
         args.apply(self.apply(**self.config()))
 
+class BiasRemovalTask(Task):
+    "removes the bias from the whole bead"
+    level       = Level.bead
+    phase       = PHASE.measure
+    length      = 10
+    zeropos     = 5.
+    zerodelta   = 1e-2
+    binsize     = 1e-3
+
+class BiasRemovalProcessor(Processor):
+    "removes the bias from the whole bead"
+    @staticmethod
+    def beadaction(frame, task, info):
+        "removes the bias"
+        cycles = (frame.new(data = dict((info,)))
+                  [info[0],...]
+                  .withphases(task.phase))
+        vals   = np.concatenate([i[-task.length:] for i in cycles.values()])
+        vals   = vals[np.isfinite(vals)]
+        zero   = np.percentile(vals, task.zeropos)
+        vals   = vals[np.abs(vals-zero) < task.zerodelta]
+
+        hist, bins  = np.histogram(vals,
+                                   int(task.zerodelta/task.binsize+0.5),
+                                   (zero-task.zerodelta, zero+task.zerodelta))
+        bias        = bins[np.argmax(hist):][:2].mean()
+        info[1][:] -= bias
+        return info
+
+    @classmethod
+    def apply(cls, toframe = None, **cnf):
+        "applies the task to a frame or returns a function that does so"
+        if toframe is None:
+            return cls.apply
+        task = cls.tasktype(**cnf) # pylint: disable=not-callable
+        return toframe.withaction(partial(cls.beadaction, toframe, task))
+
+    def run(self, args):
+        args.apply(self.apply(**self.config()))
+
 class EventDetectionTask(EventDetectionConfig, Task):
     "Config for an event detection"
     levelin = Level.bead
