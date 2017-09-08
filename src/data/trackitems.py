@@ -6,7 +6,7 @@ from    copy        import copy as shallowcopy
 from    abc         import ABCMeta, abstractmethod
 from    itertools   import product
 from    functools   import wraps
-from    typing      import (Optional, Tuple, Union, # pylint: disable=unused-import
+from    typing      import (Optional, Tuple, Union,
                             Any, List, Sequence, Iterable, Iterator,
                             TypeVar, Hashable, TYPE_CHECKING, Dict, Generator,
                             cast)
@@ -154,13 +154,13 @@ class TransformedItems:
             self._parent.data = fcn(self._data)
 
 class _m_ConfigMixin: # pylint: disable=invalid-name
-    data      = None    # type: Union[Items,TrackItems,TransformedItems,Dict,None]
-    selected  = None    # type: Optional[List]
-    discarded = None    # type: Optional[List]
-    beadsonly = False
-    actions   = []      # type: List
-    parents   = tuple() # type: Union[Tuple,Hashable]
-    _COPY     = None    # type: Optional[bool]
+    data:      Union[Items, 'TrackItems', TransformedItems, Dict] = None
+    selected:  List                                               = None
+    discarded: List                                               = None
+    beadsonly                                                     = False
+    actions:   List                                               = []
+    parents:   Union[Tuple, Hashable]                             = tuple()
+    _COPY:     bool                                               = None
     def __init__(self, **kw) -> None:
         get = lambda x: kw.get(x, shallowcopy(getattr(self.__class__, x)))
         self.data      = get('data')
@@ -281,8 +281,8 @@ class _m_ConfigMixin: # pylint: disable=invalid-name
 
 class TrackItems(_m_ConfigMixin, Items):
     "Class for iterating over beads or creating a new list of data"
-    level     = Level.none
-    track     = None  # type: Any
+    level      = Level.none
+    track: Any = None
     @initdefaults(frozenset(locals()))
     def __init__(self, **kw) -> None:
         super().__init__(**kw)
@@ -399,8 +399,8 @@ class Beads(TrackItems, Items):
 
     * providing names or ids: selects only those columns
     """
-    level  = Level.bead
-    cycles = None # type: Optional[slice]
+    level         = Level.bead
+    cycles: slice = None
     def __init__(self, **kwa):
         super().__init__(self, **kwa)
         self.__withcycles(kwa.get('cycles', ...))
@@ -513,10 +513,10 @@ class Cycles(TrackItems, Items):
 
     * providing with a unique cycle id will extract all columns for that cycle
     """
-    level   = Level.cycle
-    first   = None   # type: Optional[int]
-    last    = None   # type: Optional[int]
-    _direct = False  # type: bool
+    level      = Level.cycle
+    first: int = None
+    last:  int = None
+    _direct    = False  # type: bool
 
     @initdefaults(frozenset(locals()),
                   direct = lambda i, j: setattr(i, '_direct', j))

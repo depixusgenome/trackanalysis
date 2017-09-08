@@ -6,8 +6,7 @@ Classes defining a type of data treatment.
 **Warning** Those definitions must remain data-independant.
 """
 from copy           import deepcopy
-from typing         import (Optional, Sequence,  # pylint: disable=unused-import
-                            Dict, Callable, Set, Tuple, Union, List)
+from typing         import Sequence, Dict, Set, Tuple, Union, List
 from pickle         import dumps as _dumps
 from enum           import Enum, unique
 import numpy        as     np
@@ -118,9 +117,9 @@ class RootTask(Task):
 class TrackReaderTask(RootTask):
     "Class indicating that a track file should be added to memory"
     def __init__(self,
-                 path:     Union[str, Tuple[str,...], None] = None,
-                 beadsonly:bool          = False,
-                 copy:     bool          = False, **kwa) -> None:
+                 path:      Union[str, Tuple[str,...]] = None,
+                 beadsonly: bool                       = False,
+                 copy:      bool                       = False, **kwa) -> None:
         super().__init__(**kwa)
         self.path      = path
         self.beadsonly = beadsonly
@@ -128,13 +127,13 @@ class TrackReaderTask(RootTask):
 
 class DataSelectionTask(Task):
     "selects some part of the data"
-    level     = Level.none
-    beadsonly = None    # type: Optional[bool]
-    samples   = None    # type: Union[Sequence[int], slice, None]
-    phases    = None    # type: Union[Tuple[int,...], int, None]
-    selected  = None    # type: Optional[List]
-    discarded = None    # type: Optional[List]
-    cycles    = None    # type: Optional[slice]
+    level                                  = Level.none
+    beadsonly: bool                        = None
+    samples:   Union[Sequence[int], slice] = None
+    phases:    Union[Tuple[int,...], int]  = None
+    selected:  List                        = None
+    discarded: List                        = None
+    cycles:    slice                       = None
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_) -> None:
         super().__init__()
@@ -154,9 +153,9 @@ class TaggingTask(Task):
 
     def __init__(self, level:Level, **kw) -> None:
         super().__init__(level = level)
-        self.tags      = dict(kw.get('tags', []))  # type: Dict[str,Set[int]]
-        self.selection = set (kw.get('tags', []))  # type: Set
-        self.action    = toenum(TagAction, kw.get('action', 'none')) # type: TagAction
+        self.tags:      Dict[str,Set[int]] = dict(kw.get('tags', []))
+        self.selection: Set                = set (kw.get('tags', []))
+        self.action:    TagAction          = toenum(TagAction, kw.get('action', 'none'))
 
     def selected(self, item) -> bool:
         "Returns whether an item is selected"
@@ -178,9 +177,10 @@ class TaggingTask(Task):
 
 class CycleCreatorTask(Task):
     "Task for dividing a bead's data into cycles"
-    levelin = Level.bead
-    levelou = Level.cycle
-
+    levelin    = Level.bead
+    levelou    = Level.cycle
+    first: int = None
+    last:  int = None
     @classmethod
     def unique(cls):
         "returns class or parent task if must remain unique"
@@ -225,5 +225,5 @@ def taskorder(lst):
         modname, clsname = itm[:itm.rfind('.')], itm[itm.rfind('.')+1:]
         yield getattr(__import__(modname, fromlist = (clsname,)), clsname)
 
-__all__  = tuple(i for i in locals() if i.endswith('Task') and len(i) >= len('Task'))
-__all__ += 'TagAction', 'TASK_ORDER' # type: ignore
+__all__ = (tuple(i for i in locals() if i.endswith('Task') and len(i) >= len('Task'))
+           + ('TagAction', 'TASK_ORDER'))
