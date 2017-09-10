@@ -14,11 +14,13 @@ from    utils                   import (kwargsdefaults, initdefaults,
 from    signalfilter            import PrecisionAlg
 from    signalfilter.convolve   import KernelConvolution
 
-HistInputs = Union[Iterable[Iterable[float]], Iterable[Iterable[np.ndarray]]]
+HistInputs = Union[Iterable[Iterable[float]],
+                   Iterable[Iterable[np.ndarray]],
+                   Iterable[float]]
 BiasType   = Union[None, float, np.ndarray]
 
 class HistogramData(NamedTuple): # pylint: disable=missing-docstring
-    table:      np.ndarray
+    histogram:  np.ndarray
     minvalue:   float
     binwidth:   float
 
@@ -65,13 +67,20 @@ class Histogram(PrecisionAlg):
                  bias     : BiasType = None,
                  separate : bool     = False,
                 ) -> Tuple[Iterator[np.ndarray], float, float]:
-        events = asdataarrays(aevents)
-        if events is None:
-            return np.empty((0,), dtype = 'f4'), np.inf, 0.
+        if isinstance(aevents, Iterable) and all(np.isscalar(i) for i in aevents):
+            events = np.array(aevents, dtype = 'f4')[None].T[None]
+        elif (isinstance(aevents, np.ndarray)
+              and len(aevents.shape) == 1           # type: ignore
+              and str(aevents.dtype[0]) == 'f'):    # type: ignore
+            events = np.array(aevents, dtype = 'f4')[None].T[None]
+        else:
+            events = asdataarrays(aevents)
+            if events is None:
+                return np.empty((0,), dtype = 'f4'), np.inf, 0.
 
-        if (self.zmeasure is not None
-                and np.isscalar(next(i[0] for i in events if len(i)))):
-            events = (events,)
+            if (self.zmeasure is not None
+                    and np.isscalar(next(i[0] for i in events if len(i)))):
+                events = (events,)
 
         gen          = self.__compute(events, bias, separate)
         minv, bwidth = next(gen)
