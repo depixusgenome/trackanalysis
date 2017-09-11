@@ -34,6 +34,7 @@ from typing import List, Dict, Tuple, Callable, Iterable, NamedTuple, FrozenSet 
 import itertools
 import random
 #import networkx
+#import pickle
 import numpy as np
 import scipy.stats
 from scipy.optimize import OptimizeResult, basinhopping
@@ -75,13 +76,18 @@ class Spring:
         self.xeq:float=kwa.get("xeq",0)
         self.id1:int=kwa.get("id1",0)
         self.id2:int=kwa.get("id2",0)
+        self.thres:float=kwa.get("thres",-1)
 
     def energy(self,xpos1,xpos2):
         'returns energy on the spring'
+        if self.thres>0 and abs(xpos2-xpos1-self.xeq)>self.thres:
+            return 0
         return self.force*(xpos2-xpos1-self.xeq)**2
 
     def tension(self,xpos1,xpos2):
         'returns the tension applied on the spring'
+        if self.thres>0 and abs(xpos2-xpos1-self.xeq)>self.thres:
+            return 0
         return 2*self.force*(xpos2-xpos1-self.xeq)
 
     @property
@@ -170,16 +176,55 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
         nstate[self.peakids[self.peakid]]=stre*self._pos[self.peakid]+bias
         return nstate
 
+    # before
+    # def proposal(self,state:np.array):
+    #     '''
+    #     given the current position of oligos,
+    #     try to propose a new position for oligos in self.peakid
+    #     '''
+    #     left=list(frozenset([idx for pkid in self.peakids[self.peakid]
+    #                          for idx in self.lneighs[pkid]]))
+    #     right=list(frozenset([idx for pkid in self.peakids[self.peakid]
+    #                           for idx in self.rneighs[pkid]]))
+
+    #     tomatch=np.sort(np.hstack([np.array(state[left])-1.1,np.array(state[right])+1.1]))
+    #     matches=match_peaks(tomatch,
+    #                         self._pos[self.peakid],
+    #                         self.bstretch,
+    #                         self.bbias)
+    #     if not matches:
+    #         LOGS.debug(f"no proposal for peak id {self.peakid}")
+
+    #     if matches:
+    #         return random.choice(matches) # type: ignore
+    #     return None
+
+    # testing, not fully tested
     def proposal(self,state:np.array):
         '''
-        given the current position of oligos,
-        try to propose a new position for oligos in self.peakid
+        testing,
+        a scale is not proposed if the matched vertex is already overlapping
+        with another
         '''
-        left=list(frozenset([idx for pkid in self.peakids[self.peakid]
-                             for idx in self.lneighs[pkid]]))
-        right=list(frozenset([idx for pkid in self.peakids[self.peakid]
-                              for idx in self.rneighs[pkid]]))
-
+        all_left=frozenset([idx for pkid in self.peakids[self.peakid]
+                            for idx in self.lneighs[pkid]])
+        # removing indices of left if they overlap on their right
+        rmleft=frozenset([idx for idx in all_left
+                          if any([abs(state[idx]-state[idy])<1.5
+                                  for idy in self.rneighs[idx]])])
+        # if rmleft:
+        #     for idx in all_left:
+        #         print(f"idx={idx}")
+        #         print(f"state={state}")
+        #         print([abs(state[idx]-state[idy])<1.5
+        #                for idy in self.rneighs[idx]])
+        all_right=frozenset([idx for pkid in self.peakids[self.peakid]
+                             for idx in self.rneighs[pkid]])
+        rmright=frozenset([idx for idx in all_right
+                           if any([abs(state[idx]-state[idy])<1.5
+                                   for idy in self.lneighs[idx]])])
+        left=list(all_left-rmleft)
+        right=list(all_right-rmright)
         tomatch=np.sort(np.hstack([np.array(state[left])-1.1,np.array(state[right])+1.1]))
         matches=match_peaks(tomatch,
                             self._pos[self.peakid],
@@ -191,7 +236,6 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
         if matches:
             return random.choice(matches) # type: ignore
         return None
-
 
     # def find_crystal(self,state:np.array)->List[Tuple[int, ...]]:
     #     '''
@@ -234,13 +278,10 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
 
     def new_proposal(self,state:np.array):
         '''
-        consider only a subset of peaks (how to model this score-wise will be tricky)
-        create a score object from self.__dict__ with only  a subset of peaks
-        consider the first (more number of peaks together)
-        find the best grouping of peaks
-        same idea as a subscaler actually...
+        given the current position of oligos,
+        try to propose a new position for oligos in self.peakid
+        where 2 vertices do not occuppy the same sphere
         '''
-
         pass
 
 class SpringMinimizer:
@@ -301,17 +342,6 @@ class SpringMinimizer:
                               success=True,
                               nfev=1)
 
-    def with_noise(self,fun, xinit, *args, **kwa): # pylint: disable=unused-argument
-        '''
-        allows vertices to be moved up to a given value
-        which will result in different spring networks
-        returns the one with minimal energy
-        '''
-        # compute the set of springs for each possible moved vertex
-        # does not necessarily require __hash__ and __eq__ of Spring
-        # for each springs compute the equilibrium
-        # energy(*(springs,equil)) for (springs,equil) in sprequilibria
-        pass
 
     @staticmethod
     def no_minimizer(fun, xinit, *args, **options): # pylint: disable=unused-argument
@@ -350,6 +380,7 @@ class SpringMinimizer:
             return None
         return equil # returns x2,x3,...
 
+# testing in progress
 class SpringScore(SpringSetting):
     '''
     uses springs to scale experiments
@@ -373,7 +404,8 @@ class SpringScore(SpringSetting):
     def score_springs(springs,state):
         'adds the energy of all springs'
         scores=[spr.energy(state[spr.id1],state[spr.id2]) for spr in springs]
-        return sum(scores)
+        #penalty=np.sum((np.sort(state)[1:]-np.sort(state)[:-1])<1.1)
+        return sum(scores)#+100*penalty
 
 
     @staticmethod
@@ -414,7 +446,7 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
         super().__init__(**kwa)
         # scoring and stepper must not be springsettings but inherit springs from scaler
         self.intra:List[Spring]=self.find_intra()
-        self.inter:Dict[int,List[Spring]]=self.find_inter()
+        self.inter:Dict[int,List[Spring]]=self.find_inter(thres=kwa.get("thres",-1))
 
         self.stepper=SpringStep(intra=self.intra,
                                 inter=self.inter,
@@ -448,8 +480,9 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
                           for id1,id2 in zip(pkids[:-1],pkids[1:])])
         return intra
 
-
-    def find_inter(self)->Dict[int,List[Spring]]:
+    # TO CORRECT: 2 vertices from the same exp can will have an
+    # additional spring if they can overlap between them
+    def find_inter(self,thres=-1)->Dict[int,List[Spring]]:
         'add springs between oligos of different experiments'
         signs=(0,0) if self.unsigned else (1,1)
         inter:Dict[int,List[Spring]]={idx:[] for idx in range(len(self._olis))}
@@ -463,7 +496,8 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
                                          force=self.kinter,
                                          xeq=1.1,
                                          id1=id1,
-                                         id2=id2))
+                                         id2=id2,
+                                         thres=thres))
 
         return inter
 
@@ -476,8 +510,8 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
         for peakid in chains:
             self.stepper.peakid=peakid
             curr_res=basinhopping(x0=state,**self.basinkwa)
-            print(f"job fun={curr_res.fun}")
-            LOGS.debug(f"job fun={curr_res.fun}")
+            print(f"fun={curr_res.fun}")
+            LOGS.debug(f"fun={curr_res.fun}")
             self.res.append(curr_res)
             state=curr_res.x
 
@@ -496,6 +530,9 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
 
 Match2Peaks=NamedTuple("Match2Peaks",[("score",float),("nmatches",int),("peak",OPeakArray)])
 
+
+# bugged in the position of the oligos after cluster.
+# stretch, bias boundaries are not respected!
 class SpringCluster(SpringScaler): # inherit from SpringScaler instead
     '''
     The idea is to focus on a very small subset (2, max 3) set of peaks
@@ -508,7 +545,7 @@ class SpringCluster(SpringScaler): # inherit from SpringScaler instead
         self.kwargs=kwa
         self.scaler:SpringScaler
 
-    # finish improving
+    # needs improvements
     def cluster2peaks(self,
                       exp1:OPeakArray,
                       exp2:OPeakArray)->Match2Peaks:
@@ -532,6 +569,7 @@ class SpringCluster(SpringScaler): # inherit from SpringScaler instead
         # faster implementation and testing
         # the mcmc scoring defines which is best in terms of k1, k2
         self.scaler=SpringScaler(**dict(list(self.kwargs.items())+[("peaks",[exp1,exp2])]))
+        self.scaler.basinkwa["niter"]=500
         state=self.scaler.run(repeats=1)
         # can rescale state such that one point is fixed (conserves stretch and bias boundaries)
         # can compute the number of springs involved for normalisation
@@ -544,44 +582,44 @@ class SpringCluster(SpringScaler): # inherit from SpringScaler instead
                            nmatches=nmatches,
                            peak=peak)
 
+    # should consider only those who have more than 1 event
     def cluster(self):
         '''
         main clustering process which tries to add to peaks[0]
         a peak at a time
+        probably better to leave off clustering of peaks with single event
         '''
+        signs=(0,0) if self.unsigned else (1,1)
+        overlap=lambda peak1,peak2: peak1.overlap_with(peak2,
+                                                       min_overl=self.min_overl,
+                                                       signs=signs,
+                                                       shift=1)
 
         assigned=[False]*len(self.peakids)
         assigned[0]=True
         cluster=self.peaks[0].copy()
-        # while not all(assigned):
+        # all_matches:List[Match2Peaks]=[]
+        while not all(assigned):
+            print(f"unassigned={assigned.count(False)}")
             # assign=assigned.index(False)
             # matches:List[Match2Peaks]=[] # scores and clusters
+            neighs=[pkid for pkid,peak in enumerate(self.peaks)
+                    if not assigned[pkid] and overlap(cluster,peak)]
+            neighs+=[pkid for pkid,peak in enumerate(self.peaks)
+                     if not assigned[pkid] and overlap(peak,cluster)]
+            neighs=list(frozenset(neighs))
+            print(f'len(neighs)={len(neighs)}')
+            print(f'neighs={neighs}')
+            # scores and clusters
+            matches=[(self.cluster2peaks(cluster,self.peaks[neigh]),neigh) for neigh in neighs]
+            matches=sorted(matches,key=lambda x:x[0].score/x[0].nmatches)
+            cluster=matches[0][0].peak
+            assigned[matches[0][1]]=True
+        return cluster
 
-        signs=(0,0) if self.unsigned else (1,1)
-        overlap=lambda seq1,seq2: data.Oligo.overlap(seq1,
-                                                     seq2,
-                                                     min_overl=self.min_overl,
-                                                     signs=signs,
-                                                     shift=1)
-
-        neighs=cluster.may_overlap(cluster,
-                                   [],
-                                   min_overl=self.min_overl,
-                                   unsigned=self.unsigned)
-
-        print(f'len(neighs)={len(neighs)}')
-
-        # scores and clusters
-        matches=[self.cluster2peaks(cluster,self.peaks[neigh]) for neigh in neighs]
-        return matches
-
-            # for neigh in self.rneigh[assign]:
-            #     matches.append(self.cluster2(cluster,neigh))
-
-            # # compare the clusters together
-            # # spring system energy?
-            # # normalisation by the number of springs used??
-            # # I like the normalisation one but needs to be weighted by k1 and k2
-
-            # for neigh in self.lneigh[assign]:
-            #     matches.append(self.cluster2(cluster,neigh))
+# Notes :
+# (1) when computing the equilibirium of the spring system,
+# we do not take into account the stretch and bias
+# (2) CLUSTERING: non-paired vertices are penalising clustering
+# score (must include a threshold poserr)
+# (3) CLUSTERING: there is not penalty score for vertices occupying the same space
