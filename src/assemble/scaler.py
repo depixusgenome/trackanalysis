@@ -259,81 +259,96 @@ class OPeakArray:
         'returns sequences in peakarray'
         return tuple(i.seq for i in self.arr)
 
+    # @staticmethod
+    # def may_overlap(peak,others:Iterable,min_overl:int,unsigned=True)->List:
+    #     '''
+    #     compare the sequences of the 2 experiments
+    #     returns True if the 2 sequences may overlap
+    #     False otherwise
+    #     if unsigned, also considers reverse_complement of others
+    #     '''
+    #     to_match=frozenset(i.seq for i in peak.arr)
+    #     match=[]
+    #     for seq in to_match:
+    #         for opk in others:
+    #             for tocheck in opk.seqs:
+    #                 if data.Oligo.can_tail_overlap(seq,tocheck,min_overl,not unsigned,shift=1):
+    #                     match.append(opk)
+    #                     break
+    #     return match
+
     @staticmethod
-    def may_overlap(peak,others:Iterable,min_overl:int,unsigned=True)->List:
+    def which_overlap(peak,others:Iterable,min_overl:int,unsigned=True)->List:
         '''
-        compare the sequences of the 2 experiments
-        returns True if the 2 sequences may overlap
-        False otherwise
-        if unsigned, also considers reverse_complement of others
+        if unsigned, also considers reverse_complement of peak and others
         '''
         to_match=frozenset(i.seq for i in peak.arr)
         match=[]
         for seq in to_match:
             for opk in others:
                 for tocheck in opk.seqs:
-                    if data.Oligo.can_tail_overlap(seq,tocheck,min_overl,not unsigned,shift=1):
+                    if #data.Oligo.can_tail_overlap(seq,tocheck,min_overl,not unsigned,shift=1):
                         match.append(opk)
                         break
         return match
 
-    @classmethod
-    def list2edgeids(cls,
-                     peaks:List,
-                     min_overl:int=2,
-                     unsigned=True):
-        '''
-        returns the edges of peak indices which overlap
-        '''
-        edges=[(idx1,idx2) for idx1,idx2 in itertools.permutations(range(len(peaks)),2)
-               if cls.may_overlap(peaks[idx1],
-                                  [peaks[idx2]],
-                                  min_overl=min_overl,unsigned=unsigned)]
-        return sorted(edges)
+    # @classmethod
+    # def list2edgeids(cls,
+    #                  peaks:List,
+    #                  min_overl:int=2,
+    #                  unsigned=True):
+    #     '''
+    #     returns the edges of peak indices which overlap
+    #     '''
+    #     edges=[(idx1,idx2) for idx1,idx2 in itertools.permutations(range(len(peaks)),2)
+    #            if cls.may_overlap(peaks[idx1],
+    #                               [peaks[idx2]],
+    #                               min_overl=min_overl,unsigned=unsigned)]
+    #     return sorted(edges)
 
-    @staticmethod
-    def list2graph(peaks:List,min_overl=2):
-        '''
-        peaks is a list of OPeakArrays
-        returns the full directed graph
-        needed for Hamiltonian path
-        '''
-        graph=networkx.DiGraph()
-        for peak in peaks:
-            toadd=OPeakArray.may_overlap(peak,
-                                         frozenset(peaks)-frozenset([peak]),
-                                         min_overl=min_overl)
-            graph.add_edges_from([(peak,other) for other in toadd])
-        return graph
+    # @staticmethod
+    # def list2graph(peaks:List,min_overl=2):
+    #     '''
+    #     peaks is a list of OPeakArrays
+    #     returns the full directed graph
+    #     needed for Hamiltonian path
+    #     '''
+    #     graph=networkx.DiGraph()
+    #     for peak in peaks:
+    #         toadd=OPeakArray.may_overlap(peak,
+    #                                      frozenset(peaks)-frozenset([peak]),
+    #                                      min_overl=min_overl)
+    #         graph.add_edges_from([(peak,other) for other in toadd])
+    #     return graph
 
     # to improve
     # creates duplicates because it allows tips to be added
     # for each of those added tips, if they don't really do overlap
     # then they create duplicates since stack_fromtuple returns stack
     # if no peak array are added to the stack
-    @staticmethod
-    def list2tree(refpeak,
-                  others:Iterable,
-                  min_overl=2,
-                  depth=4):
-        '''
-        use networkx to reconstruct all possible paths
-        returns the graph, and the tips of the tree (from all_simple_paths search)
-        '''
-        others=frozenset(others)
-        graph=networkx.DiGraph()
-        last_added=frozenset([refpeak])
-        for _ in range(depth):
-            others=others-last_added
-            alladded=[] # type: List
-            for newroot in last_added:
-                toadd=OPeakArray.may_overlap(newroot,others,min_overl)
-                graph.add_edges_from([(newroot,add) for add in toadd])
-                alladded+=toadd
+    # @staticmethod
+    # def list2tree(refpeak,
+    #               others:Iterable,
+    #               min_overl=2,
+    #               depth=4):
+    #     '''
+    #     use networkx to reconstruct all possible paths
+    #     returns the graph, and the tips of the tree (from all_simple_paths search)
+    #     '''
+    #     others=frozenset(others)
+    #     graph=networkx.DiGraph()
+    #     last_added=frozenset([refpeak])
+    #     for _ in range(depth):
+    #         others=others-last_added
+    #         alladded=[] # type: List
+    #         for newroot in last_added:
+    #             toadd=OPeakArray.may_overlap(newroot,others,min_overl)
+    #             graph.add_edges_from([(newroot,add) for add in toadd])
+    #             alladded+=toadd
 
-            last_added=frozenset(alladded)
+    #         last_added=frozenset(alladded)
 
-        return graph,list(last_added)
+    #     return graph,list(last_added)
 
     def __hash__(self)->int:
         '''

@@ -40,7 +40,8 @@ from scipy.optimize import OptimizeResult, basinhopping
 from utils.logconfig import getLogger
 from assemble.settings import SpringSetting
 import assemble.data as data
-import assemble.scaler as scaler
+#import assemble.scaler as scaler
+from assemble.scaler import OPeakArray, match_peaks#, Bounds
 
 LOGS=getLogger(__name__)
 
@@ -180,10 +181,10 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
                               for idx in self.rneighs[pkid]]))
 
         tomatch=np.sort(np.hstack([np.array(state[left])-1.1,np.array(state[right])+1.1]))
-        matches=scaler.match_peaks(tomatch,
-                                   self._pos[self.peakid],
-                                   self.bstretch,
-                                   self.bbias)
+        matches=match_peaks(tomatch,
+                            self._pos[self.peakid],
+                            self.bstretch,
+                            self.bbias)
         if not matches:
             LOGS.debug(f"no proposal for peak id {self.peakid}")
 
@@ -192,43 +193,54 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
         return None
 
 
-    def find_crystal(self,state:np.array)->List[Tuple[int, ...]]:
-        '''
-        there is crystallisation of two or more experiments if
-        their oligos overlap and that 2 oligos from different peaks
-        are located at 1.1 from one another
-        needs more complexity eg:
-        if (tgt) and (gtg,gtg) when (gtg,tgt,gtg) is the correct solution
-        '''
-        esp=0.25
-        signs=(0,0) if self.unsigned else (1,1)
-        overlap=lambda seq1,seq2:data.Oligo.overlap(seq1,
-                                                    seq2,
-                                                    signs=signs,
-                                                    min_overl=self.min_overl,
-                                                    shift=1)
-        oneway=lambda seq1,seq2:overlap(seq1,seq2) and not overlap(seq2,seq1)
-        groups:List[Tuple[int, ...]]=[]
-        for idx1,idx2 in itertools.permutations(range(len(state)),2):
-            if (state[idx2]-state[idx1]-1.1)**2<esp:
-                if oneway(self._olis[idx2].seq,self._olis[idx1].seq):
-                    groups.append((idx1,idx2))
+    # def find_crystal(self,state:np.array)->List[Tuple[int, ...]]:
+    #     '''
+    #     there is crystallisation of two or more experiments if
+    #     their oligos overlap and that 2 oligos from different peaks
+    #     are located at 1.1 from one another
+    #     needs more complexity eg:
+    #     if (tgt) and (gtg,gtg) when (gtg,tgt,gtg) is the correct solution
+    #     '''
+    #     esp=0.25
+    #     signs=(0,0) if self.unsigned else (1,1)
+    #     overlap=lambda seq1,seq2:data.Oligo.overlap(seq1,
+    #                                                 seq2,
+    #                                                 signs=signs,
+    #                                                 min_overl=self.min_overl,
+    #                                                 shift=1)
+    #     oneway=lambda seq1,seq2:overlap(seq1,seq2) and not overlap(seq2,seq1)
+    #     groups:List[Tuple[int, ...]]=[]
+    #     for idx1,idx2 in itertools.permutations(range(len(state)),2):
+    #         if (state[idx2]-state[idx1]-1.1)**2<esp:
+    #             if oneway(self._olis[idx2].seq,self._olis[idx1].seq):
+    #                 groups.append((idx1,idx2))
 
-        return groups
+    #     return groups
 
-    # not great implementation, will  be rewritten
-    def alt_proposal(self,state:np.array):
+    # # not great implementation, will  be rewritten
+    # def alt_proposal(self,state:np.array):
+    #     '''
+    #     When looking at sequence reconstructed by proposal
+    #     we see that after some random proposal, some peaks have 'crystalised'
+    #     In fact, groups of peaks have crystalised together (clumps)
+    #     once these are fixed after some time, what we want to do is move these
+    #     clumps relative to one another
+    #     '''
+    #     # find the clumps of peaks
+    #     # crystals=self.find_crystal(state)
+    #     # find the stre and bias which are compatible with all peaks in the clumps
+    #     # find a new stre, bias for each of the clumps
+    #     pass
+
+    def new_proposal(self,state:np.array):
         '''
-        When looking at sequence reconstructed by proposal
-        we see that after some random proposal, some peaks have 'crystalised'
-        In fact, groups of peaks have crystalised together (clumps)
-        once these are fixed after some time, what we want to do is move these
-        clumps relative to one another
+        consider only a subset of peaks (how to model this score-wise will be tricky)
+        create a score object from self.__dict__ with only  a subset of peaks
+        consider the first (more number of peaks together)
+        find the best grouping of peaks
+        same idea as a subscaler actually...
         '''
-        # find the clumps of peaks
-        # crystals=self.find_crystal(state)
-        # find the stre and bias which are compatible with all peaks in the clumps
-        # find a new stre, bias for each of the clumps
+
         pass
 
 class SpringMinimizer:
@@ -481,3 +493,95 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
                                                            scale=self._olis[idx].poserr))
                 for idx in range(len(self._olis))]
         return sorted(oligos,key=lambda x:x.pos)
+
+Match2Peaks=NamedTuple("Match2Peaks",[("score",float),("nmatches",int),("peak",OPeakArray)])
+
+class SpringCluster(SpringScaler): # inherit from SpringScaler instead
+    '''
+    The idea is to focus on a very small subset (2, max 3) set of peaks
+    and call SpringScaler on them to find the best match..
+    rinse and repeat
+    '''
+
+    def __init__(self,**kwa):
+        super().__init__(**kwa)
+        self.kwargs=kwa
+        self.scaler:SpringScaler
+
+    # finish improving
+    def cluster2peaks(self,
+                      exp1:OPeakArray,
+                      exp2:OPeakArray)->Match2Peaks:
+        '''
+        find the best way to stack to peaks together
+        exp1 is considered fixed
+        one stretches and gets biased for the 2
+        could use:
+                      stretches:Tuple[Bounds,...],
+                      biases:Tuple[Bounds,...])->OPeakArray:
+        '''
+        # more efficient way to implement but longer to implement
+        # nbias=Bounds(sum((bnd.lower for bnd in biases)),
+        #              sum((bnd.upper for bnd in biases)))
+        # nstre=Bounds(stretches[1].lower/stretches[0].upper,
+        #              stretches[1].upper/stretches[0].lower)
+
+        # # runs scaler on the 2 peaks
+        # scales=match_peaks(exp1.posarr,exp2.posarr,nstre,nbias)
+
+        # faster implementation and testing
+        # the mcmc scoring defines which is best in terms of k1, k2
+        self.scaler=SpringScaler(**dict(list(self.kwargs.items())+[("peaks",[exp1,exp2])]))
+        state=self.scaler.run(repeats=1)
+        # can rescale state such that one point is fixed (conserves stretch and bias boundaries)
+        # can compute the number of springs involved for normalisation
+        nmatches=len(SpringScore.used_springs(self.scaler.inter,state))
+        score=self.scaler.res[-1].fun
+        peak=OPeakArray(arr=self.scaler.ordered_oligos(state),
+                        min_overl=self.min_overl)
+        # returns the best result
+        return Match2Peaks(score=score,
+                           nmatches=nmatches,
+                           peak=peak)
+
+    def cluster(self):
+        '''
+        main clustering process which tries to add to peaks[0]
+        a peak at a time
+        '''
+
+        assigned=[False]*len(self.peakids)
+        assigned[0]=True
+        cluster=self.peaks[0].copy()
+        # while not all(assigned):
+            # assign=assigned.index(False)
+            # matches:List[Match2Peaks]=[] # scores and clusters
+
+        signs=(0,0) if self.unsigned else (1,1)
+        overlap=lambda seq1,seq2: data.Oligo.overlap(seq1,
+                                                     seq2,
+                                                     min_overl=self.min_overl,
+                                                     signs=signs,
+                                                     shift=1)
+
+        neighs=cluster.may_overlap(cluster,
+                                   [],
+                                   min_overl=self.min_overl,
+                                   unsigned=self.unsigned)
+
+        print(f'len(neighs)={len(neighs)}')
+
+        # scores and clusters
+        matches=[self.cluster2peaks(cluster,self.peaks[neigh]) for neigh in neighs]
+        return matches
+
+            # for neigh in self.rneigh[assign]:
+            #     matches.append(self.cluster2(cluster,neigh))
+
+            # # compare the clusters together
+            # # spring system energy?
+            # # normalisation by the number of springs used??
+            # # I like the normalisation one but needs to be weighted by k1 and k2
+
+            # for neigh in self.lneigh[assign]:
+            #     matches.append(self.cluster2(cluster,neigh))
