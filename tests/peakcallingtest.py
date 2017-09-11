@@ -2,18 +2,29 @@
 # -*- coding: utf-8 -*-
 u"testing peakcalling"
 # pylint: disable=import-error,no-name-in-module
-from concurrent.futures     import ProcessPoolExecutor
+from concurrent.futures         import ProcessPoolExecutor
+from itertools                  import product
 import numpy as np
-from numpy.testing          import assert_allclose, assert_equal
-from pytest                 import approx
+from numpy.testing              import assert_allclose, assert_equal
+from pytest                     import approx
 
-from control.taskcontrol    import create
-from simulator.processor    import ByPeaksEventSimulatorTask
-from peakcalling            import cost, match
-from peakcalling.processor  import (BeadsByHairpinProcessor, BeadsByHairpinTask,
-                                    PeakIdentifier, HairpinDistance,
-                                    DistanceConstraint)
-from testingcore            import DummyPool
+
+from control.taskcontrol        import create
+from simulator.processor        import ByPeaksEventSimulatorTask
+from peakcalling                import cost, match
+from peakcalling.toreference    import ReferenceDistance
+from peakcalling.processor      import (BeadsByHairpinProcessor, BeadsByHairpinTask,
+                                        PeakIdentifier, HairpinDistance,
+                                        DistanceConstraint)
+from testingcore                import DummyPool
+
+def test_toref():
+    "tests reference comparison"
+    for i in product([.96, 1., 1.04], [-.05, 0., 0.5]):
+        arr1 = np.array([1., 1., .5,  8.])
+        arr2 = np.array([1., .5, .5,  8.])/i[0]+i[1]
+        ret  = ReferenceDistance().optimize(arr1, arr2)
+        assert_allclose(ret[1:], i, rtol = 5e-4, atol = 5e-4)
 
 def test_cost_value():
     u"Tests peakcalling.cost.compute"
@@ -139,4 +150,4 @@ def test_control():
         assert tuple(beads.keys()) == ('hp100',)
 
 if __name__ == '__main__':
-    test_onehairpinid()
+    test_toref()

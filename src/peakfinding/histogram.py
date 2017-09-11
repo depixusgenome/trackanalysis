@@ -71,7 +71,7 @@ class Histogram(PrecisionAlg):
             events = np.array(aevents, dtype = 'f4')[None].T[None]
         elif (isinstance(aevents, np.ndarray)
               and len(aevents.shape) == 1           # type: ignore
-              and str(aevents.dtype[0]) == 'f'):    # type: ignore
+              and str(aevents.dtype)[0] == 'f'):    # type: ignore
             events = np.array(aevents, dtype = 'f4')[None].T[None]
         else:
             events = asdataarrays(aevents)

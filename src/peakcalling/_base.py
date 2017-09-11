@@ -10,12 +10,20 @@ from   utils        import initdefaults
 
 DEFAULT_BEST = float(np.finfo('f4').max)
 
-class OptimisationParams(NamedTuple): # pylint: disable=missing-docstring
+class CobylaParameters(NamedTuple): # pylint: disable=missing-docstring
+    rhobeg: Optional[Tuple[float,...]]
+    rhoend: Optional[Tuple[float,...]]
+    maxfun: Optional[float]
+    catol:  Optional[float]
+
+class LBFGSParameters(NamedTuple): # pylint: disable=missing-docstring
     threshold_param_rel: float
     threshold_param_abs: float
     threshold_func_rel:  float
     stopval:             float
     maxeval:             int
+
+OPTIM_TYPE = Union[CobylaParameters, LBFGSParameters]
 
 class Range(NamedTuple): # pylint: disable=missing-docstring
     center:  Optional[float]
@@ -27,21 +35,25 @@ class Distance(NamedTuple): # pylint: disable=missing-docstring
     stretch: float
     bias:    float
 
-def config(self:OptimisationParams, **kwa) -> Dict[str, Any]:
+def config(self:OPTIM_TYPE, **kwa) -> Dict[str, float]:
     "returns the configuration"
-    kwa.update(threshold_param_rel = self.threshold_param_rel, # type: ignore
-               threshold_param_abs = self.threshold_param_abs,
-               threshold_func_rel  = self.threshold_func_rel,
-               stopval             = self.stopval,
-               maxeval             = self.maxeval)
+    if isinstance(self, LBFGSParameters):
+        vals = ('threshold_param_rel',
+                'threshold_param_abs',
+                'threshold_func_rel',
+                'stopval', 'maxeval') # type: Tuple[str, ...]
+    else:
+        vals = 'rhobeg', 'rhoend', 'catol', 'maxfun'
+    kwa.update({i: getattr(self, i) for i in vals if getattr(self, i) is not None})
     return kwa
 
 class GriddedOptimization:
     "Optimizes using a rectangular grid"
-    symmetry  = False
-    stretch   = Range(1./8.8e-4, 200., 100.)
-    bias      = Range(None,       60.*8.8e-4, 60.*8.8e-4)
-    optim     = OptimisationParams(1e-4, 1e-8, 1e-4, 1e-8, 100)
+    symmetry          = False
+    stretch           = Range(1./8.8e-4, 200., 100.)
+    bias              = Range(None,       60.*8.8e-4, 60.*8.8e-4)
+    optim: OPTIM_TYPE = LBFGSParameters(1e-4, 1e-8, 1e-4, 1e-8, 100)
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
@@ -70,7 +82,7 @@ class PointwiseOptimization:
     stretch         = Range(1./8.8e-4, 200., 50.)
     bias            = Range(None,       20.*8.8e-4, 20.*8.8e-4)
     dataprecisions  = 1., 1e-3
-    optim           = OptimisationParams(1e-4, 1e-8, 1e-4, 1e-8, 100)
+    optim           = LBFGSParameters(1e-4, 1e-8, 1e-4, 1e-8, 100)
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
