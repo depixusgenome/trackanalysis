@@ -36,7 +36,6 @@ class Histogram(PrecisionAlg):
     * *weight*: function for computing the weight of an event. If *None*, the weight is 1.
     * *kernel*: used for smoothing the histogram
 
-
     The functor can be called with:
 
     * *events*: A sequence of events, or a sequence of sequence of events. Each event is
@@ -160,6 +159,39 @@ class Histogram(PrecisionAlg):
             return self.projection(vals)
         return HistogramData(*itm)
 
+    def variablekernelsize(self, peaks) -> HistogramData:
+        "computes a histogram where the kernel size may vary"
+        osamp  = (int(self.oversampling)//2) * 2 + 1
+        bwidth = self.getprecision(self.precision)/osamp
+        minv   = min(i for i, _ in peaks) - self.edge*bwidth*osamp
+        maxv   = max(i for i, _ in peaks) + self.edge*bwidth*osamp
+        lenv   = int((maxv-minv)/bwidth)+1
+        arr    = np.zeros((lenv,), dtype = 'f4')
+
+        peaks[:,0] -= minv
+        peaks       = np.int32(np.rint((peaks)/bwidth)) # type: ignore
+        peaks       = peaks[np.logical_and(peaks[:,0] >= 0, peaks[:,0] < lenv)]
+        if self.kernel is None:
+            arr[peaks[:,0]] += 1
+        else:
+            last = -1
+            for ipeak, std in sorted(peaks, key = lambda x: x[1]):
+                if last != std:
+                    kern = self.kernel.kernel(width = std)
+                    last = std
+                imin = ipeak-kern.size//2
+                imax = ipeak+kern.size//2+1
+
+                if imin < 0:
+                    kern = kern[-imin:]
+                    imin = None
+
+                if imax > lenv:
+                    kern = kern[:lenv-imax]
+                    imax = None
+
+                arr[imin:imax] = kern
+        return HistogramData(arr, minv, bwidth)
 
     @staticmethod
     def __eventpositions(events, bias, fcn):
