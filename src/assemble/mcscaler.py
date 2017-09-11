@@ -132,6 +132,7 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
         self.rneighs:Dict[int,Tuple[int]]=self.find_neighbors(side="right")
         self.lneighs:Dict[int,Tuple[int]]=self.find_neighbors(side="left")
 
+    # TO CORRECT: 2 vertices from the same peakid should not be in the neighbors
     # must not include bstretch, bbias to limit calculations
     def find_neighbors(self,side)->Dict[int,Tuple[int, ...]]:
         '''
@@ -480,8 +481,7 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
                           for id1,id2 in zip(pkids[:-1],pkids[1:])])
         return intra
 
-    # TO CORRECT: 2 vertices from the same exp can will have an
-    # additional spring if they can overlap between them
+    # TO CORRECT: 2 vertices from the same peakid should not have inter spring
     def find_inter(self,thres=-1)->Dict[int,List[Spring]]:
         'add springs between oligos of different experiments'
         signs=(0,0) if self.unsigned else (1,1)
