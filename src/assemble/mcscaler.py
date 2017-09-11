@@ -131,6 +131,7 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
         self.peakid:int=kwa.get("peakid",0) # index of peakid to update
         self.rneighs:Dict[int,Tuple[int]]=self.find_neighbors(side="right")
         self.lneighs:Dict[int,Tuple[int]]=self.find_neighbors(side="left")
+        self.proposal_call=self.proposal
 
     # TO CORRECT: 2 vertices from the same peakid should not be in the neighbors
     # must not include bstretch, bbias to limit calculations
@@ -166,7 +167,7 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
         updates a single peak and returns the position which minimizes the energy due to that peak
         '''
         state=args[0]
-        prop=self.proposal(state)
+        prop=self.proposal_call(state)
 
         if prop is None:
             return state
@@ -200,7 +201,29 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
     #         return random.choice(matches) # type: ignore
     #     return None
 
-    # testing, not fully tested
+    def random_proposal(self,state:np.array):
+        '''
+        More flexible proposal.
+        Does not check matching of new proposal.
+        Allows wider rearrangement of peaks
+        To use with SpringScaler, NOT with SpringCluster
+        '''
+        tomatch=np.sort(np.hstack([state[pkid]
+                                   for pkid in range(len(self.peakids))
+                                   if pkid!=self.peakid]))
+        matches=match_peaks(tomatch,
+                            self._pos[self.peakid],
+                            self.bstretch,
+                            self.bbias)
+        if not matches:
+            LOGS.debug(f"no proposal for peak id {self.peakid}")
+
+        if matches:
+            return random.choice(matches) # type: ignore
+        return None
+
+    # testing, not fully tested. Does not allow enough flexibility
+    # to apply a random arrangement
     def proposal(self,state:np.array):
         '''
         testing,
@@ -235,6 +258,7 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
             LOGS.debug(f"no proposal for peak id {self.peakid}")
 
         if matches:
+            # print(f"len(matches)={len(matches)}")
             return random.choice(matches) # type: ignore
         return None
 
@@ -452,6 +476,7 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
         self.stepper=SpringStep(intra=self.intra,
                                 inter=self.inter,
                                 **kwa)
+        self.stepper.proposal_call=self.stepper.random_proposal
         self.scoring=SpringScore(intra=self.intra,
                                  inter=self.inter,
                                  **kwa)
