@@ -82,8 +82,7 @@ class PeaksDisplay(Display): # type: ignore
         if not isinstance(dets, Iterator):
             dets = (dets,)
 
-
-        itms   = []
+        itms = []
         for det in dets:
             if opts.pop('zero', True):
                 cparams = params[0], params[1]+det.zero
@@ -169,14 +168,23 @@ def map(self, fcn, **kwa): # pylint: disable=redefined-builtin
 
 class PeaksTracksDictDisplay(TracksDictDisplay): # type: ignore
     "tracksdict display for peaks"
+    @staticmethod
+    def _refindex(specs):
+        return specs['kdims'][specs['overlay']].index(specs['reference'])
+
     @classmethod
-    def _all(cls, reference, name, fcn, kdims, key): # pylint: disable=too-many-arguments
-        ovrs = super()._all(reference, name, fcn, kdims, key)
-        if reference is not None:
-            ind  = kdims[name].index(reference)
-            area = next(iter(ovrs[ind].data.values())).to(hv.Area)
-            ovrs[ind] = area(style = dict(alpha = 0.5))*ovrs[ind]
+    def _toarea(cls, specs, ovrs):
+        if specs['reference'] is not None:
+            ind  = cls._refindex(specs)
+            area = next(iter(ovrs[ind])).to(hv.Area)
+            ovrs[ind] = hv.Overlay([area(style = dict(alpha = 0.5))] + list(ovrs[ind]),
+                                   label = ovrs[ind].label,
+                                   group = ovrs[ind].group)
         return ovrs
+
+    @classmethod
+    def _all(cls, specs, fcn, key):
+        return cls._toarea(specs, super()._all(specs, fcn, key))
 
 @addto(TracksDict) # type: ignore
 def peaks(self, overlay = 'key', reference = None, **kwa):

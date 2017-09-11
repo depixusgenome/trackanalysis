@@ -2,19 +2,23 @@
 # -*- coding: utf-8 -*-
 "Updating PeaksDict for oligo mapping purposes"
 import sys
-from   typing           import List
+from   typing           import List, Type
 import numpy            as np
 from   utils.decoration import addto
 import sequences
 from   ..processor      import PeaksDict, BeadsByHairpinProcessor
+from   ..toreference    import ReferenceDistance
 
-hv                 = sys.modules['holoviews']  # pylint: disable=invalid-name
-Detailed:     type = sys.modules['peakfinding.__scripting__'].Detailed
-PeaksDisplay: type = sys.modules['peakfinding.__scripting__.holoviewing'].PeaksDisplay
-Display:      type = sys.modules['data.__scripting__.holoviewing'].Display
-Tasks:        type = sys.modules['model.__scripting__'].Tasks
+def _get(name, val = None):
+    mod = sys.modules[name]
+    return mod if val is None else getattr(mod, val)
 
-class OligoMappingDisplay(PeaksDisplay): # type: ignore
+hv               = _get('holoviews')                             # pylint: disable=invalid-name
+_peakfinding     = _get('peakfinding.__scripting__.holoviewing') # pylint: disable=invalid-name
+Tasks:      Type = _get('model.__scripting__', 'Tasks')
+TracksDict: Type = _get('data.__scripting__', 'TracksDict')
+
+class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
     "displays peaks & oligos"
     @staticmethod
     def hpins(seq, oligos, labels, **opts):
@@ -22,15 +26,15 @@ class OligoMappingDisplay(PeaksDisplay): # type: ignore
         opts.setdefault('kdims', ['z'])
         opts.setdefault('vdims', ['events'])
         style = opts.pop('sequencestyle', dict(color = 'gray'))
-        peaks = {}
+        pks = {}
         if labels is not False:
             opts['label'] = 'sequence'
         for key, vals in sequences.peaks(seq, oligos):
             xvals = np.repeat(vals['position'], 3)
             yvals = np.concatenate([[(0, 1)[plus], (1, 2)[plus], np.NaN]
                                     for plus in vals['orientation']])
-            peaks[key] = hv.Curve((xvals, yvals), **opts)(style = style)
-        return peaks
+            pks[key] = hv.Curve((xvals, yvals), **opts)(style = style)
+        return pks
 
     @classmethod
     def fitmap(cls, itms, seq, oligos, labels = None, **opts):
@@ -120,5 +124,61 @@ def display(self, # pylint: disable=function-redefined,too-many-arguments
             return disp.run(self[[bead]], labels, **opts)
         return hv.DynamicMap(_fcn, kdims = ['bead']).redim.values(bead = beads)
     return disp.run(self, labels, **opts)
+
+class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignore
+    "tracksdict display for peaks"
+    @classmethod
+    def _all(cls, specs, fcn, key):
+        ovrs = super()._all(specs, fcn, key)
+        if None in (specs['reference'], specs['distance']):
+            return ovrs
+
+        dist = specs['distance']
+        ind  = cls._refindex(specs)
+        ref  = next(iter(ovrs[ind])).data
+        for i, j in enumerate(ovrs):
+            if i == ind:
+                continue
+            stretch, bias = dist.optimize(ref, next(iter(j)).data)[1:]
+            for itm in j:
+                itm.data[:,0]   = (itm.data[:,0] - bias)*stretch
+        return cls._toarea(specs, ovrs)
+
+    @classmethod
+    def _specs(cls):
+        return super()._specs() + (('distance', ReferenceDistance()),)
+
+@addto(TracksDict) # type: ignore
+def peaks(self, overlay = 'key', reference = None, **kwa):
+    """
+    A hv.DynamicMap showing peaks
+
+    Options are:
+
+        * *overlay* == 'key': for a given bead, all tracks are overlayed:
+
+            * *reference*: the reference is displayed as an area
+            * *distance*: a *ReferenceDistance* object (default) or *None*. This
+            objects computes a stretch and bias which is applied to the x-axis of
+            non-reference items.
+
+        * *overlay* == 'bead': for a given track, all beads are overlayed
+
+            * *reference*: the reference is displayed as an area
+            * *distance*: a *ReferenceDistance* object (default) or *None*. This
+            objects computes a stretch and bias which is applied to the x-axis of
+            non-reference items.
+
+        * *overlay* == None:
+
+            * *reference*: the reference is removed from the *key* widget and
+            allways displayed to the left independently.
+            * *refdims*: if set to *True*, the reference gets its own dimensions.
+            Thus zooming and spanning is independant.
+            * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
+
+    """
+    kwa.setdefault('reflayout', 'bottom')
+    return PeaksTracksDictDisplay.run(self, 'peaks', overlay, reference, kwa)
 
 __all__: List[str] = []

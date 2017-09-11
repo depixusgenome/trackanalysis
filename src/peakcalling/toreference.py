@@ -3,13 +3,13 @@
 """
 Matching experimental peaks to one another
 """
-from    typing                  import Sequence, NamedTuple, Iterator
+from    typing                  import Sequence, NamedTuple
 from    scipy.interpolate       import interp1d
 from    scipy.optimize          import fmin_cobyla
 import  numpy                   as     np
 
-from    utils                   import EventsArray, initdefaults
-from    peakfinding.histogram   import HistogramData, Histogram
+from    utils                   import initdefaults
+from    peakfinding.histogram   import Histogram
 from    ._base                  import (GriddedOptimization, CobylaParameters,
                                         Distance, Range, DEFAULT_BEST)
 
@@ -63,22 +63,7 @@ class ReferenceDistance(GriddedOptimization):
         return fcn(left, right, stretch, bias-right.minv+left.minv/stretch)
 
     def _get(self, left):
-        if hasattr(left, 'histogram'):
-            pass
-        elif ((isinstance(left, np.ndarray) and str(left.dtype)[0] == 'f') or
-              (isinstance(left, Sequence) and all(np.isscalar(i) for i in left))):
-            left = self.histogram.projection(left)
-        elif isinstance(left, EventsArray):
-            left = self.histogram.projection(left)
-        elif isinstance(left, Iterator):
-            # this should be a peaks output
-            vals = np.concatenate([i for _, i in left])
-            vals = np.concatenate([i if isinstance(i, np.ndarray) else [i]
-                                   for i in vals if i is not None and len(i)])
-            left = self.histogram.projection(vals)
-        else:
-            left = HistogramData(*left)
-
+        left = self.histogram.asprojection(left)
         vals = (np.arange(len(left.histogram), dtype = 'f4')*left.binwidth,
                 left.histogram)
 

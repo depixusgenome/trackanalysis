@@ -138,6 +138,29 @@ class Histogram(PrecisionAlg):
         "runs the algorithm"
         return cls()(*args, **kwa)
 
+    def asprojection(self, itm) -> HistogramData:
+        "returns a projection from a variety of data types"
+        if hasattr(itm, 'histogram'):
+            return HistogramData(itm.histogram, itm.minvalue, itm.binwidth)
+
+        if str(getattr(itm, 'dtype', ' '))[0] == 'f' and len(itm.shape) == 2:
+            # expecting a 2D table as in hv.Curve.data
+            return HistogramData(itm[:,1], itm[0,0], itm[1,0]-itm[0,0])
+
+        if (str(getattr(itm, 'dtype', ' '))[0] == 'f'
+                or getattr(itm, 'dtype', 'f4') == EVENTS_DTYPE
+                or (isinstance(itm, Sequence) and all(np.isscalar(i) for i in itm))):
+            return self.projection(itm)
+
+        if isinstance(itm, Iterator):
+            # this should be a peaks output
+            vals = np.concatenate([i for _, i in itm])
+            vals = np.concatenate([i if isinstance(i, np.ndarray) else [i]
+                                   for i in vals if i is not None and len(i)])
+            return self.projection(vals)
+        return HistogramData(*itm)
+
+
     @staticmethod
     def __eventpositions(events, bias, fcn):
         res = np.empty((len(events),), dtype = 'O')

@@ -27,74 +27,79 @@ def map(self, fcn, kdim = 'oligo', *extra, **kwa):
 class TracksDictDisplay:
     "displays a tracksdict"
     @staticmethod
-    def _base(itms, name, kwa, label):
-        refdims   = kwa.pop('refdims',   True)
-        reflayout = kwa.pop('reflayout', 'left')
+    def _specs():
+        return ('refdims',  True), ('reflayout', 'left')
 
-        args      = dict(kwa)
-        fcn       = lambda key, bead, **other: (getattr(itms[key], name)
-                                                .display(**kwa, **other)
-                                                [bead])
-
-        if 'labels' not in kwa and label:
-            fcn = lambda key, bead: (getattr(itms[key], name)
-                                     .display(labels = '{}'.format(key if label == 'key' else bead),
-                                              **args)
-                                     [bead])
-
-        kdims     = dict()
+    @classmethod
+    def _base(cls, itms, name, reference, overlay, kwa): # pylint: disable=too-many-arguments
+        kdims         = dict()
         kdims['key']  = kwa.pop('key')  if 'key'  in kwa else list(itms.keys())
         kdims['bead'] = kwa.pop('bead') if 'bead' in kwa else list(itms.beads(*kdims['key']))
-        return kdims, fcn, refdims, reflayout
+
+        specs = {i: kwa.pop(i, j) for i, j in cls._specs()}
+        specs.update(reference = reference, name = name, kdims = kdims, overlay = overlay)
+
+        display = getattr(cls, '_'+name, cls._default_display)
+        fcn     = lambda key, bead, **other: display(itms, key, bead, specs, **kwa, **other)
+        return fcn, specs
 
     @staticmethod
-    def _kdimreference(reflayout, kdims, name, reference):
-        if reference is None:
-            return
-
-        kdims[name] = [i for i in kdims[name] if i != reference]
-        if reflayout in ('right', 'top'):
-            kdims[name].append(reference)
+    def _default_display(itms, key, bead, specs, **kwa):
+        data = getattr(itms[key], specs['name'])
+        if specs['overlay'] == 'key' and 'labels' not in kwa:
+            kwa['labels'] = str(key)
+        elif specs['overlay'] == 'bead' and 'labels' not in kwa:
+            kwa['labels'] = str(bead)
         else:
-            kdims[name].insert(0, reference)
+            kwa.setdefault('group', key)
+        return data.display(**kwa)[bead]
 
     @staticmethod
-    def _all(_, name, fcn, kdims, key):
-        if name == 'bead':
-            return [fcn(key, i) for i in kdims[name]]
-        return [fcn(i, key) for i in kdims[name]]
+    def _all(specs, fcn, key):
+        if specs['overlay'] == 'bead':
+            return [fcn(key, i) for i in specs['kdims'][specs['overlay']]]
+        return [fcn(i, key) for i in specs['kdims'][specs['overlay']]]
 
     @classmethod
     def _overlay(cls, itms, name, reference, overlay, kwa): # pylint: disable=too-many-arguments
         "display overlaying keys"
-        kdims, fcn, _, reflayout = cls._base(itms, name, kwa, overlay)
-        cls._kdimreference(reflayout, kdims, overlay, reference)
-        fcn   = lambda key, _f_ = fcn: hv.Overlay(cls._all(reference, overlay, _f_, kdims, key))
+        fcn, specs = cls._base(itms, name, reference, overlay, kwa)
+
+        if reference:
+            kdims          = specs['kdims']
+            kdims[overlay] = [i for i in kdims[overlay] if i != reference]
+            if specs['reflayout'] in ('right', 'top'):
+                kdims[overlay].append(reference)
+            else:
+                kdims[overlay].insert(0, reference)
+
+        fcn   = lambda key, _f_ = fcn: hv.Overlay(cls._all(specs, _f_, key))
         other = 'key' if overlay == 'bead' else 'bead'
-        return hv.DynamicMap(fcn, kdims = [other]).redim.values(bead = kdims[other])
+        return hv.DynamicMap(fcn, kdims = [other]).redim.values(bead = specs['kdims'][other])
 
     @classmethod
     def refwithoutoverlay(cls, itms, name, reference, kwa):
         "display without overlay but with reference"
-        kdims, fcn, refdims, reflayout = cls._base(itms, name, kwa, None)
+        fcn, specs   = cls._base(itms, name, reference, False, kwa)
+        kdims        = specs['kdims']
         kdims['key'] = [i for i in kdims['key'] if i != reference]
         def _ref(key, bead, __fcn__ = fcn):
             val   = __fcn__(reference, bead).clone(label = reference)
-            if refdims:
+            if specs['refdims']:
                 val = val.redim(**{i.name: i.clone(label = f'{reference}{i.label}')
                                    for i in val.dimensions()})
 
             other = __fcn__(key, bead).clone(label = key)
-            if reflayout in ('left', 'top'):
-                return (val+other).cols(1 if reflayout == 'top' else 2)
-            return (other+val).cols(1 if reflayout == 'bottom' else 2)
+            if specs['reflayout'] in ('left', 'top'):
+                return (val+other).cols(1 if specs['reflayout'] == 'top' else 2)
+            return (other+val).cols(1 if specs['reflayout'] == 'bottom' else 2)
         return hv.DynamicMap(_ref, kdims = ['key', 'bead']).redim.values(**kdims)
 
     @classmethod
     def withoutoverlay(cls, itms, name, kwa):
         "display without overlay"
-        kdims, fcn = cls._base(itms, name, kwa, None)[:2]
-        return hv.DynamicMap(fcn, kdims = ['key', 'bead']).redim.values(**kdims)
+        fcn, specs = cls._base(itms, name, None, False, kwa)[:2]
+        return hv.DynamicMap(fcn, kdims = ['key', 'bead']).redim.values(**specs['kdims'])
 
     @classmethod
     def run(cls, itms, name, overlay, reference, kwa): # pylint: disable=too-many-arguments
