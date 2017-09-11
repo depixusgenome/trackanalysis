@@ -6,6 +6,7 @@ from   functools        import partial
 import sys
 import numpy            as np
 from   utils.decoration import addto
+from   ..probabilities  import Probability
 from   ..processor      import PeaksDict
 from   .                import Detailed
 
@@ -43,7 +44,7 @@ class PeaksDisplay(Display): # type: ignore
 
     @classmethod
     def __errorbars(cls, det, params, opts, pstyle, hist):
-        means = [((i-params[1])*params[0], cls.__errors(j)) for i, j in det.output]
+        means = [((i-params[1])*params[0], Probability.resolution(j)) for i, j in det.output]
         xvals = sum(([i-j, i+j, np.NaN] for i, j in means), [])
         yvals = sum(([hist[i], hist[i], np.NaN] for i, j in means), [])
         return hv.Curve((xvals, yvals), **opts)(style = pstyle)

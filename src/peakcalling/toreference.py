@@ -3,15 +3,16 @@
 """
 Matching experimental peaks to one another
 """
-from    typing                  import Sequence, NamedTuple
-from    scipy.interpolate       import interp1d
-from    scipy.optimize          import fmin_cobyla
-import  numpy                   as     np
+from    typing                      import Sequence, NamedTuple
+from    scipy.interpolate           import interp1d
+from    scipy.optimize              import fmin_cobyla
+import  numpy                       as     np
 
-from    utils                   import initdefaults
-from    peakfinding.histogram   import Histogram
-from    ._base                  import (GriddedOptimization, CobylaParameters,
-                                        Distance, Range, DEFAULT_BEST)
+from    utils                       import initdefaults
+from    peakfinding.histogram       import Histogram, HistogramData
+from    peakfinding.probabilities   import Probability
+from    ._base                      import (GriddedOptimization, CobylaParameters,
+                                            Distance, Range, DEFAULT_BEST)
 
 class ReferenceDistance(GriddedOptimization):
     """
@@ -23,16 +24,60 @@ class ReferenceDistance(GriddedOptimization):
         yaxis: np.ndarray
         minv:  float
 
-    histogram    = Histogram(precision = 0.001)
+    histogram    = Histogram(precision = 0.001, edge = 4)
     symmetry     = True
     stretch      = Range(1., .05, .025)
     bias         = Range(0,   .1, .05)
     optim        = CobylaParameters((1e-2, 5e-3), (1e-4, 1e-4), None, None)
     minthreshold = 1e-3
     maxthreshold = .5
-    @initdefaults
+    @initdefaults(frozenset(locals()),
+                  precision = lambda self, i: setattr(self, 'precision', i))
     def __init__(self, **kwa):
         super().__init__(**kwa)
+
+    precision    = property(lambda self: self.histogram.precision,
+                            lambda self, val: setattr(self.histogram, 'precision', val))
+    def getprecision(self, *args, **kwargs):
+        "returns the precision"
+        return self.histogram.getprecision(*args, **kwargs)
+
+    def frompeaks(self, peaks):
+        "creates a histogram from a list of peaks with their count"
+        if str(getattr(peaks, 'dtype', ' '))[0] != 'f':
+            peaks = np.array([(i, Probability.resolution(j)) for i, j in peaks])
+
+        osamp  = (int(self.histogram.oversampling)//2) * 2 + 1
+        bwidth = self.getprecision(self.precision)/osamp
+        minv   = min(i for i, _ in peaks) - self.histogram.edge*bwidth*osamp
+        maxv   = max(i for i, _ in peaks) + self.histogram.edge*bwidth*osamp
+        lenv   = int((maxv-minv)/bwidth)+1
+        arr    = np.zeros((lenv,), dtype = 'f8')
+
+        peaks[:,0] -= minv
+        peaks       = np.int32(np.rint((peaks)/bwidth))
+        peaks       = peaks[np.logical_and(0 <= peaks[:,0], peaks[:,0] < lenv)]
+        if self.histogram.kernel is None:
+            arr[peaks[:,0]] += 1
+        else:
+            last = -1
+            for ipeak, std in sorted(peaks, key = lambda x: x[1]):
+                if last != std:
+                    kern = self.histogram.kernel.kernel(width = std)
+                    last = std
+                imin = ipeak-kern.size//2
+                imax = ipeak+kern.size//2+1
+
+                if imin < 0:
+                    kern = kern[-imin:]
+                    imin = None
+
+                if imax > lenv:
+                    kern = kern[:lenv-imax]
+                    imax = None
+
+                arr[imin:imax] = kern
+        return HistogramData(arr, minv, bwidth)
 
     def optimize(self, aleft, aright):
         "find best stretch & bias to fit right against left"
