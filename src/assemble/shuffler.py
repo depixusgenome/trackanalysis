@@ -101,7 +101,7 @@ class Shuffler:
         self.ooverl=kwa.get("ooverl",-1) # type: int
         self.nscale=kwa.get("nscale",1) # type: int
         self.permgen=PermGenerator(ooverl=self.ooverl)
-
+        self.diffnoverl:int=kwa.get("diffnoverl",0) # diff in noverlaps kept for optimal solution
         if oligos:
             self.collection=data.BCollection.from_oligos(oligos)
             self.permgen.oligos=self.collection.oligos
@@ -225,7 +225,11 @@ class Shuffler:
             # the following line may be wrong if we have ambiguities in sequence,
             # CHECK when reducing.. ?
             max_overlap=max(part.noverlaps for part in added_partitions) # pylint: disable=no-member
-            partitions=[part for part in added_partitions if part.noverlaps==max_overlap] # pylint: disable=no-member
+            # before
+            #partitions=[part for part in added_partitions if part.noverlaps==max_overlap] # pylint: disable=no-member
+            partitions=[part for part in added_partitions
+                        if part.noverlaps>=max_overlap-self.diffnoverl]
+
             # if __debug__:
             #     for testid,testpart in enumerate(partitions):
             #         print(f"testid={testid}")
