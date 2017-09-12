@@ -29,9 +29,10 @@ class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
         pks = {}
         if labels is not False:
             opts['label'] = 'sequence'
+
         for key, vals in sequences.peaks(seq, oligos):
             xvals = np.repeat(vals['position'], 3)
-            yvals = np.concatenate([[(0, 1)[plus], (1, 2)[plus], np.NaN]
+            yvals = np.concatenate([[(0., .1)[plus], (.9, 1.)[plus], np.NaN]
                                     for plus in vals['orientation']])
             pks[key] = hv.Curve((xvals, yvals), **opts)(style = style)
         return pks
@@ -54,7 +55,10 @@ class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
                                    stretch = dist.stretch,
                                    bias    = dist.bias,
                                    group   = key)
-                return hv.Overlay(crv+[pins[key]], group = key)
+                hpc  = pins[key]
+                data = np.copy(hpc.data)
+                data[:,1] *= np.nanmax(next(iter(crv)).data[:,1])
+                return hv.Overlay(crv+[hpc.clone(data = data)], group = key)
 
         beads = list(set([i for i in itms.keys() if itms.isbead(i)]))
         return hv.DynamicMap(_fcn, kdims = ['bead']).redim.values(bead = beads)
@@ -62,25 +66,34 @@ class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
     @classmethod
     def hpinmap(cls, itms, seq, oligos, labels = None, **opts):
         "creates a DynamicMap with oligos to fit"
-        pins = cls.hpins(seq, oligos, opts)
+        params = {i: [opts.pop(i)] for i in ('stretch', 'bias') if i in opts}
+        pins   = cls.hpins(seq, oligos, opts)
         def _clone(itm, stretch, bias):
             data = np.copy(itm.data)
             data[:,0] = (data[:,0]-bias)*stretch
             return itm.clone(data = data)
 
         # pylint: disable=dangerous-default-value
-        def _over(bead, sequence, stretch, bias, cache = [None, ()]):
+        def _over(bead, sequence, stretch, bias, cache = [None, (), None, ()]):
             if bead != cache[0]:
                 cache[0] = bead
                 cache[1] = cls.elements(itms[[bead]], labels, **opts)
             clones = [_clone(i, stretch, bias) for i in cache[1]]
-            return hv.Overlay(clones+[pins[sequence]])
+
+            if sequence != cache[2]:
+                hpc        = pins[sequence]
+                data       = np.copy(hpc.data)
+                data[:,1] *= np.nanmax(clones[0].data[:,1])
+                cache[2]   = sequence
+                cache[3]   = [hpc.clone(data = data)]
+
+            return hv.Overlay(clones+cache[3])
 
         beads = list(set([i for i in itms.keys() if itms.isbead(i)]))
-        rngs  = Tasks.getconfig().fittohairpin.getitems(...)
+        rngs  = Tasks.getconfig().fittohairpin.range.getitems(...)
         return (hv.DynamicMap(_over, kdims = ['sequence', 'bead', 'stretch', 'bias'])
-                .redim.values(bead    = beads, sequence = list(pins.keys()))
-                .redim.range(**rngs))
+                .redim.values(bead = beads, sequence = list(pins.keys()), **params)
+                .redim.range(**{i: j for i, j in rngs.items() if i not in params}))
 
 @addto(PeaksDict)  # type: ignore
 def display(self, # pylint: disable=function-redefined,too-many-arguments

@@ -84,5 +84,9 @@ def detailed(self, ibead, precision: float = None) -> PeakSelectorDetails:
         return iter(self.detailed(i, precision) for i in set(self.keys) & set(ibead))
 
     prec = self._precision(ibead, precision) # pylint: disable=protected-access
+    if isinstance(self.data, PeaksDict):
+        if self.actions:
+            raise NotImplementedError()
+        return self.data.detailed(ibead, precision)
     evts = iter(i for _, i in self.data[ibead,...])
     return Detailed(self, self.config.detailed(evts, prec))
