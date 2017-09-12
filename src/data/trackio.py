@@ -343,15 +343,7 @@ class Handler:
         if kwargs is None:
             res['data'] = {}
         else:
-            from .track import FoV, Bead
-            calib = kwargs.pop('calibrations')
-            res['fov'] = FoV(image = kwargs.pop('fov'),
-                             dim   = kwargs.pop('dimensions'),
-                             beads = {i: Bead(position = j,
-                                              image    = calib.get(i, Bead.image))
-                                      for i, j in kwargs.pop('positions').items()
-                                      if i in kwargs})
-
+            self.__fov(res, kwargs)
             res.update({i: kwargs.pop(i) for i in ('phases', 'framerate')})
 
             if beadsonly:
@@ -404,6 +396,23 @@ class Handler:
             raise IOError("Unknown file format in: {}".format(paths), "warning")
 
         return res
+
+    @staticmethod
+    def __fov(res, kwargs):
+        from .track import FoV, Bead
+        calib = kwargs.pop('calibrations', {})
+        res['fov'] = FoV()
+        if 'fov' in kwargs:
+            res['fov'].image = kwargs.pop('fov')
+
+        if 'dimensions' in kwargs:
+            res['fov'].dim   = kwargs.pop('dimensions')
+
+        if 'positions' in kwargs:
+            res['fov'].beads = {i: Bead(position = j,
+                                        image    = calib.get(i, Bead.image))
+                                for i, j in kwargs.pop('positions', {}).items()
+                                if i in kwargs}
 
 def checkpath(track, **opts) -> Handler:
     u"""

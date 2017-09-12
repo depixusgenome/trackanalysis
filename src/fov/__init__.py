@@ -40,7 +40,7 @@ class FoVPlotCreator(TaskPlotCreator):
     @property
     def __fov(self):
         trk = self._model.track
-        return None if trk is None else trk.fov
+        return None if trk is None or trk.fov.image is None else trk.fov
 
     def _create(self, _):
         self._fig = figure(**self._figargs(name    = 'FoV:Fig',

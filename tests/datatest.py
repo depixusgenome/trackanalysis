@@ -7,12 +7,12 @@ import numpy as np
 
 from   legacy           import readtrack   # pylint: disable=import-error,no-name-in-module
 import data
-from   data.trackitems  import Items
+from   data.views       import ITrackView
 from   data.trackio     import LegacyGRFilesIO
 from   testingcore      import path as utpath
 
 # pylint: disable=missing-docstring,protected-access
-class _MyItem(Items):
+class _MyItem(ITrackView):
     def __init__(self, vals):
         super().__init__()
         self.vals = vals

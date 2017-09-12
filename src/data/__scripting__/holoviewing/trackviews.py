@@ -9,7 +9,7 @@ from   functools                import partial
 from   utils.decoration         import addto
 from   .display                 import Display
 from   ...track                 import Bead, FoV, Track
-from   ...trackitems            import Beads, Cycles
+from   ...views                 import Beads, Cycles
 
 hv    = sys.modules['holoviews']  # pylint: disable=invalid-name
 

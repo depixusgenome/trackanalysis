@@ -13,7 +13,7 @@ from bokeh.plotting         import Figure, figure
 from bokeh.io               import show as _show
 from bokeh.models           import DataRange1d, LinearAxis, ColumnDataSource
 
-from data                   import TrackItems
+from data.views             import TrackView
 
 class Multiplier:
     "basic right multiplier"
@@ -91,7 +91,7 @@ class Curve(Multiplier):
         return lambda *x, **y: getattr(plot, glyph)(*x, **y, **kwa)
 
     def __iterdata(self):
-        if isinstance(self.data, TrackItems):
+        if isinstance(self.data, TrackView):
             yield from (i for _, i in self.data)
         elif isinstance(self.data, dict):
             yield from self.data.values()

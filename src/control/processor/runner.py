@@ -13,7 +13,7 @@ import pickle
 
 import numpy
 
-from data               import TrackItems, createTrackItem
+from data.views         import TrackView, createTrackView
 from model              import Task, Level
 from .base              import Processor
 from .cache             import Cache
@@ -40,10 +40,10 @@ class Runner:
         gen = kwa.get('start', kwa.get('gen', None))
         gen = None if gen is None else iter(shallowcopy(i) for i in gen)
 
-        self.data  = data      # type: Cache
-        self.pool  = pool      # type: Any
-        self.gen   = gen       # type: Optional[Iterator[TrackItems]]
-        self.level = Level(kwa.get('level', 0))
+        self.data: Cache                         = data
+        self.pool: Any                           = pool
+        self.gen:  Optional[Iterator[TrackView]] = gen
+        self.level                               = Level(kwa.get('level', 0))
 
     def __getstate__(self):
         return {'data': self.data, }
@@ -90,15 +90,15 @@ class Runner:
 
         def collapse(gen):
             """
-            Collapses items from *gen* into a series of *TrackItem*s
+            Collapses items from *gen* into a series of *TrackView*s
             each of which contain sequential items with similar parents
             """
             for key, grp in groupby(gen, key = lambda frame: frame.parents[:-1]):
-                yield TrackItems(data = self.regroup(grp), parents = key)
+                yield TrackView(data = self.regroup(grp), parents = key)
 
         def expand(level:Level, gen):
-            "Transforms *gen* into *TrackItem*s, one per item in gen"
-            yield from (createTrackItem(level,
+            "Transforms *gen* into *TrackView*s, one per item in gen"
+            yield from (createTrackView(level,
                                         track   = frame.track,
                                         data    = frame[[key]],
                                         parents = frame.parents+(key,))

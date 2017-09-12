@@ -7,13 +7,13 @@ from copy             import deepcopy
 from functools        import wraps, partial
 import numpy          as     np
 
-from model            import PHASE
-from data             import Track
-from data.trackitems  import Items, Cycles, Level, CYCLEKEY
+from model            import PHASE, Level
+from data.track       import Track
+from data.views       import ITrackView, Cycles, CYCLEKEY
 from utils            import EVENTS_TYPE, EVENTS_DTYPE, asview, EventsArray
 from .                import EventDetectionConfig
 
-class Events(Cycles, EventDetectionConfig, Items):
+class Events(Cycles, EventDetectionConfig, ITrackView):
     u"""
     Class for iterating over events:
 

@@ -6,5 +6,5 @@ Adds shortcuts for using holoview
 from  .display    import Display
 
 # pylint: disable=redefined-builtin,wildcard-import
-from  .trackitems import *
+from  .trackviews import *
 from  .tracksdict import *

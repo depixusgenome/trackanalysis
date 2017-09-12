@@ -154,7 +154,7 @@ class Processor(metaclass=MetaProcessor):
         The cache is specific to the processor instance.
         It will be cleared if any prior task is updated/added/removed.
 
-        The decorated function can return an action. See TrackItems.withactions
+        The decorated function can return an action. See TrackView.withactions
         for an explanation.
 
         **Note:** default, the data is copied.
@@ -194,9 +194,9 @@ class Processor(metaclass=MetaProcessor):
     @staticmethod
     def action(fcn):
         """
-        Adds an action to the currently yielded TrackItems.
+        Adds an action to the currently yielded TrackView.
         The decorated function is expected to return an action.
-        See TrackItems.withactions for an explanation.
+        See TrackView.withactions for an explanation.
 
         **Note:** The action's closure must *not* contain a task as this can
         have hard-to-debug side-effects.

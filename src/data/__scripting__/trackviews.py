@@ -14,7 +14,7 @@ Monkeypatches as follows
 """
 from typing                 import List
 from signalfilter           import NonLinearFilter
-from ..                     import Beads, Cycles
+from ..views                import Beads, Cycles
 
 def _withfilter(self, tpe = NonLinearFilter, **kwa):
     "applies the filter to the data"

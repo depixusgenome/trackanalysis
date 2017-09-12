@@ -10,7 +10,7 @@ import  numpy       as     np
 
 from    utils       import initdefaults
 from    model       import levelprop, Level
-from   .trackitems  import Beads, Cycles, BEADKEY, _m_ALL
+from   .views       import Beads, Cycles, BEADKEY, _m_ALL
 from   .trackio     import opentrack, PATHTYPES
 
 IDTYPE       = Union[None, int, slice] # missing Ellipsys as mypy won't accept it

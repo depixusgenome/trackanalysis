@@ -7,7 +7,7 @@ from   functools    import partial
 import numpy        as     np
 
 from utils                      import StreamUnion, initdefaults, updatecopy, asobjarray
-from data.trackitems            import BEADKEY, TrackItems, Beads
+from data.views                 import BEADKEY, TrackView, Beads
 from peakfinding.selector       import Output as PeakFindingOutput, PeaksArray
 from peakfinding.processor      import PeaksDict
 from model                      import Task, Level
@@ -86,7 +86,7 @@ FitBead = NamedTuple('FitBead',
                       ('events',      PeakFindingOutput)])
 
 
-class FitToHairpinDict(TrackItems):
+class FitToHairpinDict(TrackView):
     "iterator over peaks grouped by beads"
     level = Level.bead
     def __init__(self, *_, config = None, **kwa):
@@ -215,7 +215,7 @@ class BeadsByHairpinProcessor(Processor):
         else:
             app = partial(cls.__pooled, pool, pooldump(data.append(cls.CHILD(cnf))))
 
-        fcn = lambda j: j.new(TrackItems, data = lambda: app(j))
+        fcn = lambda j: j.new(TrackView, data = lambda: app(j))
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):

@@ -14,7 +14,7 @@ from anastore                   import dumps
 from excelreports.creation      import fileobj
 
 from eventdetection             import EventDetectionConfig
-from data                       import TrackItems
+from data.views                 import TrackView
 
 from ._base                     import ReporterInfo
 from ._summary                  import SummarySheet
@@ -74,7 +74,7 @@ class PeakFindingExcelProcessor(Processor):
             run(path, cnf, track = frame.track, beads = beads, **kwa)
             return frame
 
-        fcn = lambda frame: frame.new(TrackItems).withdata(_save)
+        fcn = lambda frame: frame.new(TrackView).withdata(_save)
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):

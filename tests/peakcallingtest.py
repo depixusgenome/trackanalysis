@@ -26,7 +26,7 @@ def test_toref():
     for i in product([.96, 1., 1.04], [-.05, 0., 0.5]):
         arr1 = np.array([1., 1., .5,  8.])
         arr2 = np.array([1., .5, .5,  8.])/i[0]+i[1]
-        ret  = ReferenceDistance().optimize(arr1, arr2)
+        ret  = ReferenceDistance(maxthreshold = .5).optimize(arr1, arr2)
         assert_allclose(ret[1:], i, rtol = 5e-4, atol = 5e-4)
 
 def test_toref_frompeaks():

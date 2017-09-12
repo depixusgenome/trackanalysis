@@ -10,7 +10,7 @@ from    control.globalscontrol  import GlobalsController
 from    control.event           import Event, EmitPolicy
 from    control.taskcontrol     import TaskController
 from    control.processor       import Processor, Cache, Runner
-from    data                    import Cycles, Beads, TrackItems
+from    data.views              import Cycles, Beads, TrackView
 import  model.task           as tasks
 
 from    testingcore             import path as utpath
@@ -369,7 +369,7 @@ def test_task_expandandcollapse():
     assert keys == truth
 
     frames = tuple(frame for frame in ctrl.run(read, tb))
-    assert frozenset(type(fra) for fra in frames) == frozenset((TrackItems,))
+    assert frozenset(type(fra) for fra in frames) == frozenset((TrackView,))
     keys  = set(key for frame in frames for key, _ in frame)
     assert keys == beads
 

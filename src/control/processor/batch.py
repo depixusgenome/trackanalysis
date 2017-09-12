@@ -9,7 +9,7 @@ from itertools          import chain
 from functools          import partial
 
 from utils              import initdefaults, update
-from data.trackitems    import TrackItems
+from data.views         import TrackView
 from data.trackio       import PATHTYPES, PATHTYPE # pylint: disable=unused-import
 
 from model.task         import RootTask, Task, Level
@@ -107,8 +107,8 @@ class BatchProcessor(Processor):
         yield from(cls.model(i, template) for i in paths)
 
     @classmethod
-    def reports(cls, *paths, template = None, pool = None, **kwa) -> Iterator[TrackItems]:
-        "creates TrackItems"
+    def reports(cls, *paths, template = None, pool = None, **kwa) -> Iterator[TrackView]:
+        "creates TrackViews"
         mdls = cls.models(paths, template = template, **kwa)
         yield from chain.from_iterable(cls.create(i, pool = pool) for i in mdls)
 

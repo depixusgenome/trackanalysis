@@ -9,7 +9,7 @@ import numpy as np
 from utils              import initdefaults
 from model              import Task, Level, PHASE
 from control.processor  import Processor
-from data.trackitems    import BEADKEY, TrackItems, Beads
+from data.views         import BEADKEY, TrackView, Beads
 from signalfilter       import rawprecision
 from eventdetection     import EventDetectionConfig
 from .alignment         import PeakCorrelationAlignment
@@ -72,7 +72,7 @@ class PeakSelectorTask(PeakSelector, Task):
         PeakSelector.__init__(self, **kwa)
 
 Output = Tuple[BEADKEY, Iterator[PeakOutput]]
-class PeaksDict(TrackItems):
+class PeaksDict(TrackView):
     "iterator over peaks grouped by beads"
     level = Level.peak
     def __init__(self, *_, config = None, **kwa):

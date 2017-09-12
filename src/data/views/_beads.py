@@ -72,7 +72,7 @@ class Beads(TrackView, ITrackView):
                     if keys[1] not in self.cyclerange():
                         return res.new(data = {}, direct = True)
                     return res[keys]
-                res = self.track.cycles.withdata(data = self)
+                res = self.track.cycles.withdata(self)
                 return res if all(_m_ellipsis(i) for i in keys) else res[keys]
             raise NotImplementedError()
         return super().__getitem__(keys)

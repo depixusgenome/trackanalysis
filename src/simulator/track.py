@@ -12,9 +12,8 @@ import  numpy as np
 from    numpy.lib.index_tricks  import as_strided
 
 from    utils           import initdefaults, kwargsdefaults, EVENTS_DTYPE
-from    model           import PHASE
-from    data            import Track
-from    data.trackitems import Cycles, Level, TrackItems
+from    model           import Level, PHASE
+from    data            import Track, Cycles, TrackView
 
 class SingleStrandClosing:
     "Closes the strand in phase 4"
@@ -308,7 +307,7 @@ class TrackSimulator:
             track.data[bead[0]], curs =  self.__apply(_create)
             return bead[0], _generator(curs)
 
-        return (TrackItems(track = track, data = dict(track.data), level = Level.peak)
+        return (TrackView(track = track, data = dict(track.data), level = Level.peak)
                 .withaction(_action))
 
     def __events(self, cycles: np.ndarray) -> Iterator[np.ndarray]:
