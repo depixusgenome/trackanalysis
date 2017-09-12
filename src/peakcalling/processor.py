@@ -111,6 +111,10 @@ class FitToHairpinDict(TrackView):
             yield from (i for i in self.__keys if i in sel)
 
     def _iter(self, sel:Sequence = None) -> Iterator[Tuple[BEADKEY, FitBead]]:
+        if isinstance(self.data, FitToHairpinDict):
+            if sel is None:
+                yield from iter(self.data)
+            yield from ((i, j) for i, j in self.data if i in sel)
         yield from ((bead, self.compute(bead)) for bead in self.keys(sel))
 
     @staticmethod

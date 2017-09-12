@@ -48,6 +48,11 @@ class Events(Cycles, EventDetectionConfig, ITrackView):
         return _fcn
 
     def _iter(self, sel = None) -> Iterator[Tuple[CYCLEKEY, Sequence[EVENTS_TYPE]]]:
+        if isinstance(self.data, Events):
+            if sel is None:
+                yield from iter(self.data)
+            yield from ((i, j) for i, j in self.data if i in sel)
+
         prec  = None if self.precision in (0., None) else self.precision
         track = self.track
         fcn   = self.__filterfcn()
