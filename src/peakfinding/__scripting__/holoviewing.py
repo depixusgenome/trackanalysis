@@ -4,7 +4,7 @@
 from   typing           import List, Iterator, Type
 from   functools        import partial
 import sys
-import numpy            as np
+import numpy            as     np
 from   utils.decoration import addto
 from   ..probabilities  import Probability
 from   ..processor      import PeaksDict
@@ -36,17 +36,12 @@ class PeaksDisplay(Display): # type: ignore
         yvals = [hist[i] for i in pks]
         return hv.Scatter((pks, yvals), **opts)(style = estyle)
 
-    @staticmethod
-    def __errors(arr):
-        good = [np.nanmean(i[1] if isinstance(i, tuple) else np.concatenate(i['data']))
-                for i in arr if i is not None]
-        return 0. if len(good) == 1 else np.std(good)
-
     @classmethod
     def __errorbars(cls, det, params, opts, pstyle, hist):
-        means = [((i-params[1])*params[0], Probability.resolution(j)) for i, j in det.output]
-        xvals = sum(([i-j, i+j, np.NaN] for i, j in means), [])
-        yvals = sum(([hist[i], hist[i], np.NaN] for i, j in means), [])
+        means = [((i-params[1])*params[0], Probability.resolution(j))
+                 for i, j in det.output]
+        xvals = np.hstack([[i-j, i+j, np.NaN]         for i, j in means])
+        yvals = np.hstack([[hist[i], hist[i], np.NaN] for i, j in means])
         return hv.Curve((xvals, yvals), **opts)(style = pstyle)
 
     @staticmethod

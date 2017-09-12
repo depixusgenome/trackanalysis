@@ -134,14 +134,20 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
             return ovrs
 
         dist = specs['distance']
+        def _peaks(crvs):
+            crv   = tuple(crvs)[-1].data[:,0]
+            xvals = (crv[1::3]+crv[::3])*.5
+            yvals = (crv[1::3]-crv[::3])*.5
+            return dist.frompeaks(np.vstack([xvals, yvals]).T)
+
         ind  = cls._refindex(specs)
-        ref  = next(iter(ovrs[ind])).data
+        ref  = _peaks(ovrs[ind])
         for i, j in enumerate(ovrs):
             if i == ind:
                 continue
-            stretch, bias = dist.optimize(ref, next(iter(j)).data)[1:]
+            stretch, bias = dist.optimize(ref, _peaks(j))[1:]
             for itm in j:
-                itm.data[:,0]   = (itm.data[:,0] - bias)*stretch
+                itm.data[:,0] = (itm.data[:,0] - bias)*stretch
         return cls._toarea(specs, ovrs)
 
     @classmethod
