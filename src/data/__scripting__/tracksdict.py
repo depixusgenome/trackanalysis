@@ -3,22 +3,19 @@
 """
 Adds a dictionnaries to access tracks, experiments, ...
 """
-from typing                 import KeysView, Tuple, Iterator, List, Type
-from pathlib                import Path
+from typing                 import Tuple, Iterator, List, Type
 import sys
 import pickle
-import re
 
 from utils                  import initdefaults
 from model                  import Level, Task
 
-from ..                     import Track as _Track
 from .track                 import Track
-from ..trackio              import LegacyGRFilesIO, LegacyTrackIO
+from ..tracksdict           import TracksDict as _TracksDict
 
 Tasks: Type = sys.modules['model.__scripting__'].Tasks
 
-class TracksDict(dict):
+class TracksDict(_TracksDict):
     """
     Dictionnary of tracks
 
@@ -33,7 +30,6 @@ class TracksDict(dict):
     By default, the name of the track file is used as the key. Using the *match*
     requires defining a group which will be used as the key.
     """
-    __SCAN_OPTS = ('cgrdir',)
     def __init__(self,          # pylint: disable=too-many-arguments
                  tracks  = None,
                  grs     = None,
@@ -41,26 +37,12 @@ class TracksDict(dict):
                  allaxes = False,
                  tasks   = None,
                  **kwa):
-        super().__init__()
-        self.tasks  = tasks
-        self.update(tracks = tracks, grs = grs, match = match, allaxes = allaxes, **kwa)
+        super().__init__(tracks, grs, match, allaxes, **kwa)
+        self.tasks = tasks
 
-    def __set(self, key, val, allaxes = False):
-        if isinstance(val, (str, Path, tuple, list, set)):
-            val = Track(path = val)
-
-        elif isinstance(val, _Track) and not isinstance(val, Track):
-            val = Track(**val.__getstate__())
-
-        super().__setitem__(key, val)
-
-        if allaxes:
-            cnf = val.__getstate__()
-            for i in 'xy':
-                cnf['axis'] = i
-                super().__setitem__('X'+key, Track(**cnf))
-
-        return val
+    @staticmethod
+    def _newtrack(**kwa):
+        return Track(**kwa)
 
     def __getitem__(self, key):
         if isinstance(key, (Task, Tasks)):
@@ -70,61 +52,6 @@ class TracksDict(dict):
 
         trk = super().__getitem__(key)
         return trk.apply(*self.tasks) if self.tasks else trk
-
-    def __setitem__(self, key, val):
-        return self.__set(key, val)
-
-    def scan(self, tracks, grs = None, match = None, allaxes = False, **opts) -> KeysView[str]:
-        "scans for trks and grs"
-        if isinstance(match, str) or hasattr(match, 'match'):
-            grp = True
-            tmp = re.compile(match) if isinstance(match, str) else match
-            fcn = lambda i: tmp.match(str(i[0]))
-        else:
-            grp = False
-            fcn = lambda i: Path(str(i[0])).name if match is None else match
-
-        if grs is None:
-            itr = ((fcn((i,)), i) for i in LegacyTrackIO.scan(tracks))
-        else:
-            itr = ((fcn(i), i) for i in LegacyGRFilesIO.scan(tracks, grs, **opts)[0])
-
-        info = dict((i.group(1), j) for i, j in itr if i) if grp else dict(itr)
-        for i, j in info.items():
-            self.__set(i, j, allaxes)
-        return info.keys()
-
-    def update(self, *args,
-               tracks  = None,
-               grs     = None,
-               match   = None,
-               allaxes = False,
-               **kwargs):
-        "adds paths or tracks to self"
-        scan    = {}
-        for i in self.__SCAN_OPTS:
-            if i in kwargs:
-                scan[i] = kwargs.pop(i)
-
-        info = {} # type: ignore
-        info.update(*args, **kwargs)
-        for i, j in info.items():
-            self.__set(i, j, allaxes)
-
-        if tracks is not None:
-            assert sum(i is None for i in (tracks, grs)) in (0, 2)
-            self.scan(tracks, grs, match, allaxes, **scan)
-
-    def beads(self, *keys) -> List[int]:
-        "returns the intersection of all beads in requested tracks"
-        if len(keys) == 0:
-            keys = tuple(self.keys())
-
-        beads = set(self[keys[0]].beadsonly.keys())
-        for key in keys[1:]:
-            beads &= set(self[key].beadsonly.keys())
-
-        return sorted(beads)
 
     def apply(self, *tasks) -> 'TracksDict':
         "returns a new tracksdict with default tasks"
