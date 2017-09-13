@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Processors apply tasks to a data flow"
-from    abc         import ABCMeta, abstractmethod
-from    functools   import wraps
-from    itertools   import chain
-from    typing      import (TYPE_CHECKING,  # pylint: disable=unused-import
-                            Tuple, Callable, Iterable, Iterator, Type, Union, cast)
+from    abc             import ABCMeta, abstractmethod
+from    functools       import wraps
+from    itertools       import chain
+from    typing          import (TYPE_CHECKING, Tuple, Callable, Iterable,
+                                Iterator, Union, cast)
 
-import  model.task   as    _tasks
-from    model.level import Level
-from    data        import Track
+import  model.task      as     _tasks
+from    model.level     import Level
+from    data.track      import Track
+from    data.tracksdict import TracksDict
 
 if TYPE_CHECKING:
     from .runner    import Runner # pylint: disable=unused-import
@@ -73,7 +74,7 @@ class Processor(metaclass=MetaProcessor):
     """
     Main class for processing tasks
     """
-    tasktype = None # type: Union[type, Tuple[type, ...]]
+    tasktype: Union[type, Tuple[type, ...]] = None
     def __init__(self, task: _tasks.Task = None, **cnf) -> None:
         if task is None:
             task = cast(type, self.tasktype)(**cnf) # pylint: disable=not-callable
@@ -213,12 +214,22 @@ class Processor(metaclass=MetaProcessor):
 
 class TrackReaderProcessor(Processor):
     "Generates output from a _tasks.CycleCreatorTask"
+    @classmethod
+    def __get(cls, attr, cpy, trk):
+        vals = (trk,) if isinstance(trk, Track) else trk.values()
+        return tuple(getattr(i, attr).withcopy(cpy) for i in vals)
+
     def run(self, args:'Runner'):
         "returns a dask delayed item"
-        res   = args.data.setCacheDefault(self, Track(path = self.task.path))
+        task  = cast(_tasks.TrackReaderTask, self.task)
         attr  = 'cycles' if self.task.levelou is Level.cycle else 'beads'
         attr += 'only'   if self.task.beadsonly else ''
-        args.apply((getattr(res, attr).withcopy(self.task.copy),), levels = self.levels)
+        if isinstance(task.path, dict):
+            trk = args.data.setCacheDefault(self, TracksDict())
+            trk.update(task.path)
+        else:
+            trk = args.data.setCacheDefault(self, Track(path = task.path))
+            args.apply(self.__get(attr, task.copy, trk), levels = self.levels)
 
     @staticmethod
     def beads(cache, _) -> Iterable[int]:
@@ -260,14 +271,15 @@ class DataSelectionProcessor(Processor):
 
     def beads(self, _, selected: Iterable[int]) -> Iterable[int]: # type: ignore
         "Beads selected/discarded by the task"
-        if self.task.selected and self.task.discarded:
-            acc       = frozenset(self.task.selected) - frozenset(self.task.discarded)
+        task = cast(_tasks.DataSelectionTask, self.task)
+        if task.selected and task.discarded:
+            acc       = frozenset(task.selected) - frozenset(task.discarded)
             selected  = iter(i for i in selected if i in acc)
-        elif self.task.selected:
-            acc       = frozenset(self.task.selected)
+        elif task.selected:
+            acc       = frozenset(task.selected)
             selected  = iter(i for i in selected if i in acc)
-        elif self.task.discarded:
-            disc      = frozenset(self.task.discarded)
+        elif task.discarded:
+            disc      = frozenset(task.discarded)
             selected  = iter(i for i in selected if i not in disc)
         return selected
 
