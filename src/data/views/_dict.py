@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Adds easy access to cycles and events"
-from    abc         import ABCMeta, abstractmethod
+from    abc         import ABCMeta, abstractmethod, abstractproperty
 from    typing      import Tuple, Union, Iterator, TypeVar, cast, Dict, Optional
 import  numpy as np
 from    model       import Level
@@ -21,6 +21,12 @@ ISelf    = TypeVar('ISelf', bound = 'ITrackView')
 
 class ITrackView(metaclass=ABCMeta):
     "Class for iterating over data"
+    @property
+    @abstractproperty
+    def track(self):
+        "returns the track"
+        return None
+
     @abstractmethod
     def __getitem__(self:ISelf, val) -> Union[ISelf, np.ndarray]:
         "can return one item or a copy of self with only the selected keys"

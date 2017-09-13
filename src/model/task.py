@@ -6,7 +6,8 @@ Classes defining a type of data treatment.
 **Warning** Those definitions must remain data-independant.
 """
 from copy           import deepcopy
-from typing         import Sequence, Dict, Set, Tuple, Union, List
+from pathlib        import Path
+from typing         import Sequence, Dict, Set, Tuple, Union, List, Callable, Iterator
 from pickle         import dumps as _dumps
 from enum           import Enum, unique
 import numpy        as     np
@@ -114,12 +115,14 @@ class RootTask(Task):
         "returns whether the class should be a root"
         return True
 
+_PATHTYPE = Union[str, Path, Tuple[Union[str,Path],...]]
+PATHTYPE  = Union[_PATHTYPE, Dict[str,_PATHTYPE]]
 class TrackReaderTask(RootTask):
     "Class indicating that a track file should be added to memory"
     def __init__(self,
-                 path:      Union[str, Tuple[str,...]] = None,
-                 beadsonly: bool                       = False,
-                 copy:      bool                       = False, **kwa) -> None:
+                 path:      PATHTYPE = None,
+                 beadsonly: bool     = False,
+                 copy:      bool     = False, **kwa) -> None:
         super().__init__(**kwa)
         self.path      = path
         self.beadsonly = beadsonly
@@ -186,6 +189,47 @@ class CycleCreatorTask(Task):
         "returns class or parent task if must remain unique"
         return cls
 
+class DataFrameTask(Task):
+    "Adds it's task to the TrackItem using *withfunction*"
+    level                                     = Level.none
+    merge                                     = False
+    indexes: Sequence[str]                    = ['track', 'bead', 'cycle']
+    measures: Dict[str, Union[Callable, str]] = {}
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
+    def getfunctions(self) -> Iterator[Tuple[str, Callable]]:
+        "returns measures, with string changed to methods from np"
+        return ((i, self.getfunction(j)) for i, j in self.measures.items())
+
+    @staticmethod
+    def indexcolumns(cnt, key = None, frame = None) -> Dict[str, np.ndarray]:
+        "adds default columns"
+        res = {}
+        if frame is not None:
+            if frame.track.key:
+                res['track'] = np.full(cnt, frame.track.key)
+            elif isinstance(frame.track.path, (str, Path)):
+                res['track'] = np.full(cnt, str(Path(frame.track.path).name))
+            else:
+                res['track'] = np.full(cnt, str(Path(frame.track.path[0]).name))
+
+        if key is not None:
+            if isinstance(key, tuple) and len(key) == 2:
+                res['bead']  = np.full(cnt, key[0])
+                res['cycle'] = np.full(cnt, key[1])
+            elif np.isscalar(key):
+                res['bead'] = np.full(cnt, key)
+        return res
+
+    @staticmethod
+    def getfunction(name: Union[Callable, str]) -> Callable:
+        "returns measures, with string changed to methods from np"
+        if isinstance(name, str):
+            return getattr(np, f'nan{name}', getattr(np, name, None))
+        return name
+
 class DataFunctorTask(Task):
     "Adds it's task to the TrackItem using *withfunction*"
     copy      = False
@@ -223,7 +267,7 @@ def taskorder(lst):
     "yields a list of task types in the right order"
     for itm in lst:
         modname, clsname = itm[:itm.rfind('.')], itm[itm.rfind('.')+1:]
-        yield getattr(__import__(modname, fromlist = (clsname,)), clsname)
+        yield getattr(__import__(modname, fromlist = (clsname,)), clsname) # type: ignore
 
 __all__ = (tuple(i for i in locals() if i.endswith('Task') and len(i) >= len('Task'))
            + ('TagAction', 'TASK_ORDER'))

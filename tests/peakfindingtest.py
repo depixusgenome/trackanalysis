@@ -3,9 +3,12 @@
 "Tests histogram  creation and analysis"
 from pathlib                    import Path
 from tempfile                   import mktemp, gettempdir
-import numpy as np
+import numpy  as np
 from numpy.testing               import assert_equal, assert_allclose
 
+import pandas as pd
+
+from model.task                  import DataFrameTask
 from control.taskcontrol         import create
 from simulator                   import randpeaks
 from simulator.processor         import EventSimulatorTask, TrackSimulatorTask
@@ -241,5 +244,16 @@ def test_precision():
     exp   = np.array([i.averageduration for _, i in vals[1:]])
     assert_allclose(exp, truth, rtol = 1.5e-2, atol = 1e-3)
 
+def test_dataframe():
+    "tests dataframe production"
+    data = next(create(utfilepath('big_selected'),
+                       EventDetectionTask(),
+                       PeakSelectorTask(),
+                       DataFrameTask(merge = True)).run())
+    assert isinstance(data, pd.DataFrame)
+    assert 'track' in data.index.names
+    assert 'bead'  in data.index.names
+    assert 'peakposition' in data
+
 if __name__ == '__main__':
-    test_control()
+    test_dataframe()

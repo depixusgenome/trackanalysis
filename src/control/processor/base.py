@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 "Processors apply tasks to a data flow"
 from    abc             import ABCMeta, abstractmethod
-from    functools       import wraps
+from    functools       import wraps, partial
 from    itertools       import chain
 from    typing          import (TYPE_CHECKING, Tuple, Callable, Iterable,
-                                Iterator, Union, cast)
+                                Iterator, Union, Dict, cast)
 
+import  pandas          as     pd
 import  model.task      as     _tasks
 from    model.level     import Level
 from    data.track      import Track
@@ -222,8 +223,8 @@ class TrackReaderProcessor(Processor):
     def run(self, args:'Runner'):
         "returns a dask delayed item"
         task  = cast(_tasks.TrackReaderTask, self.task)
-        attr  = 'cycles' if self.task.levelou is Level.cycle else 'beads'
-        attr += 'only'   if self.task.beadsonly else ''
+        attr  = 'cycles' if task.levelou is Level.cycle else 'beads'
+        attr += 'only'   if task.beadsonly              else ''
         if isinstance(task.path, dict):
             trk = args.data.setCacheDefault(self, TracksDict())
             trk.update(task.path)
@@ -250,6 +251,12 @@ class CycleCreatorProcessor(Processor):
 
 class DataSelectionProcessor(Processor):
     "Generates output from a DataSelectionTask"
+    @staticmethod
+    def __apply(kwa, frame):
+        for name, value in kwa.items():
+            getattr(frame, name)(value)
+        return frame
+
     @classmethod
     def apply(cls, toframe = None, **kwa):
         "applies the task to a frame or returns a function that does so"
@@ -260,11 +267,7 @@ class DataSelectionProcessor(Processor):
         kwa   = {names(i): j for i, j in kwa.items()
                  if j is not None and i not in ('level', 'disabled')}
 
-        def _apply(frame):
-            for name, value in kwa.items():
-                getattr(frame, name)(value)
-            return frame
-        return _apply if toframe is None else _apply(toframe)
+        return partial(cls.__apply, kwa) if toframe is None else cls.__apply(kwa, toframe)
 
     def run(self, args):
         args.apply(self.apply(**self.config()))
@@ -282,6 +285,45 @@ class DataSelectionProcessor(Processor):
             disc      = frozenset(task.discarded)
             selected  = iter(i for i in selected if i not in disc)
         return selected
+
+class DataFrameProcessor(Processor):
+    "Generates pd.DataFrames"
+    FACTORY: Dict[str, Callable] = {}
+    @classmethod
+    def factory(cls, tpe):
+        'adds a element to the factory'
+        return lambda fcn: cls.FACTORY.__setitem__(tpe, fcn)
+
+    @classmethod
+    def apply(cls, toframe = None, **cnf):
+        "applies the task to a frame or returns a function that does so"
+        task = cast(_tasks.DataFrameTask, cls.tasktype(**cnf)) # pylint: disable=not-callable
+        fcn  = partial(cls.__merge if task.merge else cls.__apply, task)
+        return fcn if toframe is None else fcn(toframe)
+
+    def run(self, args):
+        args.apply(self.apply(**self.config()))
+
+    @classmethod
+    def __action(cls, task, frame, info):
+        data = pd.DataFrame(cls.FACTORY[type(frame)](task, frame, *info))
+
+        inds = task.indexcolumns(len(data), info[0], frame)
+        if len(inds):
+            data = pd.concat([pd.DataFrame(inds), data], 1)
+
+        cols = [i for i in task.indexes if i in data]
+        if len(cols):
+            data.set_index(cols, inplace = True)
+        return info[0], data
+
+    @classmethod
+    def __merge(cls, task, frame):
+        return pd.concat([i for _, i in cls.__apply(task, frame)])
+
+    @classmethod
+    def __apply(cls, task, frame):
+        return frame.withaction(partial(cls.__action, task, frame))
 
 class TaggingProcessor(Processor):
     "Generates output from a TaggingTask"
