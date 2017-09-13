@@ -32,8 +32,8 @@ class ChangeFields:
         self.obj = obj
         if __items__ is not None:
             items.update(__items__)
-        self.items = items
-        self.olds  = dict()
+        self.items                = items
+        self.olds: Dict[str, Any] = dict()
 
     def __enter__(self):
         for name, kwdef in self.items.items():
@@ -66,7 +66,7 @@ def kwargsdefaults(*items, asinit = True):
         return lambda _: accepted
 
     if len(items) == 1 and isinstance(items[0], Iterable) and not isinstance(items[0], str):
-        items = items[0]
+        items = items[0] # type: ignore
 
     if len(items):
         items = tuple(i for i in items if i[0].upper() != i[0])
@@ -214,7 +214,7 @@ def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
     """
     fcn = None
     if len(attrs) == 1 and isinstance(attrs[0], Iterable) and not isinstance(attrs[0], str):
-        attrs = attrs[0]
+        attrs = attrs[0] # type: ignore
 
     if len(attrs) == 1 and callable(attrs[0]):
         fcn   = attrs[0]
@@ -235,13 +235,13 @@ def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
             def __init__(self, *args, **kwargs):
                 updater(self, kwargs, cpy = args)
                 fcn    (self, **kwargs)
-            __init__.IS_GET_STATE = True
+            setattr(__init__, 'IS_GET_STATE', True)
 
         elif val.kind  == val.VAR_KEYWORD and not initafter:
             def __init__(self, *args, **kwargs):
                 fcn    (self, **kwargs)
                 updater(self, kwargs, cpy = args)
-            __init__.IS_GET_STATE = True
+            setattr(__init__, 'IS_GET_STATE', True)
 
         elif initafter:
             def __init__(self, *args, **kwargs):
@@ -253,14 +253,14 @@ def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
             def __init__(self, *args, **kwargs):
                 fcn    (self, kwargs)
                 updater(self, kwargs, cpy = args)
-            __init__.IS_GET_STATE = True
+            setattr(__init__, 'IS_GET_STATE', True)
 
         else:
             def __init__(self, *args, **kwargs):
                 fcn    (self, *args, **kwargs)
                 updater(self, kwargs)
 
-        __init__.KEYS         = attrs
+        setattr(__init__, 'KEYS', attrs)
         return wraps(fcn)(__init__)
 
     return _wrapper if fcn is None else _wrapper(fcn)
@@ -276,7 +276,7 @@ def fieldnames(obj) -> FrozenSet[str]:
                      if ('a' <= name[0] <= 'z'
                          and callable(getattr(tpe, '__set__', None))
                          and not getattr(tpe, 'fset', '') is None))
-    return dico | desc # type: ignore
+    return dico | desc
 
 def _update(cpy: Optional[Callable[[T], T]], obj:T, always:bool, **attrs) -> T:
     "Sets field to provided values"

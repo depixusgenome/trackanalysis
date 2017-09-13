@@ -18,11 +18,11 @@ class _PathPos:
         bad  = {'self', 'cls', 'mcs'}
         good = {'path', 'stream'}
         sig  = signature(fcn).parameters
-        i, j = next((i for i in enumerate(sig) if i[1] in good),
+        i, j = next((i for i in enumerate(sig) if i[1] in good), # type: ignore
                     next((i for i in enumerate(sig) if i[1] not in bad),
                          (0, next(iter(sig)))))
-        self.ind  = i # type: int
-        self.name = j # type: str
+        self.ind:  int = i
+        self.name: str = j
 
     def path(self, args, kwa):
         "returns the path arg"
