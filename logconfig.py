@@ -4,6 +4,7 @@
 from   pathlib  import Path
 import logging
 import logging.config
+import logging.handlers
 import os
 try:
     # setup using bokeh if available
@@ -40,7 +41,7 @@ def logToFile(path, **kwa):
                                                maxBytes    = kwa.get('maxBytes', 1024**2),
                                                backupCount = kwa.get('backupCount', 3),
                                                encoding    = 'utf-8')
-    hdl.set_name('file')
+    hdl.set_name('file') # type: ignore
     hdl.setLevel(getEnvironLevel())
     fmt  = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     date = '%m/%d/%Y %I:%M:%S %p'
@@ -74,9 +75,9 @@ if not (logging.getLogger().handlers or getLogger().handlers):
 
     _setdefault()
 
-def basicConfig(*args, **kwargs):
+def basicConfig(**kwargs):
     "A logging.basicConfig() wrapper that also undoes the default configuration."
     for hdl in tuple(getLogger().handlers):
         getLogger().removeHandler(hdl)
     getLogger().propagate = True
-    return logging.basicConfig(*args, **kwargs)
+    return logging.basicConfig(**kwargs)
