@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "easy access to cycles"
-from   typing import (TYPE_CHECKING, Iterator, Optional, Sequence, Tuple,
-                      Iterable, Union, cast)
+from   typing import (TYPE_CHECKING, Iterator, # pylint: disable=unused-import
+                      Optional, Sequence, Tuple, Dict, Iterable, Union, Any, cast)
 from   copy   import copy as shallowcopy
 import numpy  as     np
 
 from   utils  import initdefaults, isfunction
-from   ._dict import (CYCLEKEY, # pylint: disable=protected-access
+from   ._dict import (BEADKEY, CYCLEKEY, # pylint: disable=unused-import,protected-access
                       _m_ellipsis, _m_INTS, _m_NONE, _m_ALL)
 from   ._view import TrackView, ITrackView, Level
 
@@ -125,7 +125,7 @@ class Cycles(TrackView, ITrackView):
         first   = 0       if self.first is None else self.first
         last    = nphases if self.last  is None else self.last+1
 
-        data    = {}
+        data    = {} # type: Dict[BEADKEY, np.ndarray]
         def _getdata(bid:int, cid:int):
             bead = data.get(bid, None)
             if bead is None:

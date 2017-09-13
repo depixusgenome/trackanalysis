@@ -44,7 +44,7 @@ class TrackView(TrackViewConfigMixin, ITrackView):
             yield from ((bead, self.data[bead]) for bead in self.keys(sel))
 
     def __copy__(self):
-        other = type(self).__new__(type(self))
+        other = type(self).__new__(type(self))  # type: ignore
         other.__dict__.update(track = self.track,
                               **{i: shallowcopy(j)
                                  for i, j in self.__dict__.items() if i != 'track'})
