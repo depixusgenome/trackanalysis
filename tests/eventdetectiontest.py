@@ -6,7 +6,7 @@ import pandas as pd
 import numpy  as np
 from   numpy.testing          import assert_allclose
 from model                    import PHASE
-from model.task               import DataFrameTask
+from model.task.dataframe     import DataFrameTask
 from eventdetection.detection import DerivateSplitDetector, EventMerger, EventSelector
 from eventdetection.splitting import (MinMaxSplitDetector, IntervalExtensionAroundMean,
                                       IntervalExtensionAroundRange)

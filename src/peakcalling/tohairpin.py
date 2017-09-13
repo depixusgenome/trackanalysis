@@ -14,8 +14,9 @@ from ._base         import (Distance, GriddedOptimization, PointwiseOptimization
 
 class Hairpin:
     "Class containing theoretical peaks and means for matching them to experimental ones"
-    peaks        = np.empty((0,), dtype = 'f4') # type: np.array
-    lastpeak     = False
+    peaks     = np.empty((0,), dtype = 'f4') # type: np.array
+    firstpeak = True
+    lastpeak  = False
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
@@ -23,7 +24,7 @@ class Hairpin:
     @property
     def expectedpeaks(self):
         "returns the peaks +- the hairpin extension"
-        return self.peaks if self.lastpeak else self.peaks[:-1]
+        return self.peaks[None if self.firstpeak else 1:None if self.lastpeak  else -1]
 
     @property
     def hybridizations(self):
@@ -40,8 +41,8 @@ class Hairpin:
     def read(cls, path:Union[StreamUnion, Dict], oligos:Sequence[str], **kwa
             ) -> Iterator[Tuple[str, 'Hairpin']]:
         "creates a list of *Hairpin* from a fasta file and a list of oligos"
-        itr = (path         if isinstance(path, Iterator)               else
-               path.items() if callable(getattr(path, 'items', None))   else
+        itr = (path         if isinstance(path, Iterator)             else
+               path.items() if callable(getattr(path, 'items', None)) else # type: ignore
                _read(path))
         itr = cast(Iterator[Tuple[str,Any]], itr)
         return ((name, cls(**kwa, peaks = cls.topeaks(seq, oligos))) for name, seq in itr)
@@ -87,7 +88,7 @@ class HairpinDistance(Hairpin, GriddedOptimization):
 
             hpin  = self.expectedpeaks
             delta = peaks[0]
-            peaks = peaks - peaks[0]
+            peaks = (peaks - peaks[0])[None if self.firstpeak else 1:]
             for vals in self.grid:
                 args.update(rng('stretch', vals[0], self.stretch.step))
                 if self.bias.center is None:
@@ -108,12 +109,22 @@ class HairpinDistance(Hairpin, GriddedOptimization):
         "computes the cost value at a given stretch and bias as well as derivates"
         if len(peaks) == 0:
             return 0., 0., 0.
-        hpin = self.expectedpeaks
-        return _cost.compute(hpin, peaks - peaks[0],
+        hpin  = self.expectedpeaks
+        peaks = (peaks - peaks[0])[None if self.firstpeak else 1:]
+        if any(isinstance(i, (Sequence, np.ndarray)) for i in (stretch, bias)):
+            stretch = np.asarray(stretch)
+            bias    = -np.asarray(bias)*stretch
+            fcn     = lambda i, j: _cost.compute(hpin, peaks,
+                                                 symmetry = self.symmetry,
+                                                 noise    = self.precision,
+                                                 stretch  = i, bias     = j),
+            ufcn    = np.frompyfunc(fcn, 2, 3)
+            return ufcn(stretch, bias)
+        return _cost.compute(hpin, peaks,
                              symmetry = self.symmetry,
                              noise    = self.precision,
                              stretch  = stretch,
-                             bias     = (peaks[0]-bias)*stretch)
+                             bias     = -bias*stretch)
 
 PEAKS_DTYPE = np.dtype([('zvalue', 'f4'), ('key', 'i4')])
 PEAKS_TYPE  = Union[Sequence[Tuple[float,int]],np.ndarray]

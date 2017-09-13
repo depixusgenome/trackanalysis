@@ -10,7 +10,7 @@ from   utils              import initdefaults, updatecopy
 from   model              import Task, Level, PHASE
 from   control.processor  import Processor
 
-from   .dataframe         import dataframe            # pylint: disable=unused-import
+from   .dataframe         import EventsDataFrameFactory # pylint: disable=unused-import
 from   .data              import Events
 from   .alignment         import ExtremumAlignment, PhaseEdgeAlignment
 from   .                  import EventDetectionConfig

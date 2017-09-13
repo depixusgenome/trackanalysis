@@ -11,7 +11,7 @@ from typing             import (Callable,   # pylint: disable=unused-import
                                 Optional, Iterator, cast)
 import pickle
 
-import numpy
+import numpy            as     np
 
 from data.views         import TrackView, createTrackView
 from model              import Task, Level
@@ -68,11 +68,11 @@ class Runner:
     def regroup(grp) -> 'Callable':
         "regroups elements with a same key into an numpy.ndarray"
         def _regroup(cols = tuple(grp)):
-            data = dict()
+            data = dict() # type: Dict[Any, np.ndarray]
             for col in cols:
                 data.setdefault(col.parents[-1], []).append(col)
             for key in data:
-                data[key] = numpy.array(data[key])
+                data[key] = np.array(data[key])
             return data
         return _regroup
 

@@ -3,7 +3,7 @@
 u""" access to files """
 import  json
 import  warnings
-from    typing  import Union, Sequence, Optional
+from    typing  import Union, Sequence, Optional, cast
 from    pathlib import Path
 import  numpy as np
 
@@ -21,12 +21,12 @@ def _trackreadertask(fpath, beadsonly = True):
 
 def big_selected():
     u"returns a TrackReaderTask on 2 GR  files"
-    return _trackreadertask((Path(path("big_legacy")).parent/"*.trk",
+    return _trackreadertask((Path(cast(str, path("big_legacy"))).parent/"*.trk",
                              path("CTGT_selection")))
 
 def big_all():
     u"returns a TrackReaderTask on all GR files"
-    return _trackreadertask((Path(path("big_legacy")).parent/"*.trk",
+    return _trackreadertask((Path(cast(str, path("big_legacy"))).parent/"*.trk",
                              path("big_grlegacy")))
 
 PATHS = dict(small_pickle   = "small_pickle.pk",

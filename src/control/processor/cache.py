@@ -70,11 +70,11 @@ class Cache:
     "Contains the track and task-created data"
     __slots__ = ('_items',)
     def __init__(self, order: Iterable[Union[CacheItem, Processor]] = None) -> None:
-        if order is None:
-            order = []
+        if order is not None:
+            itms = [CacheItem(i) if isinstance(i, Processor) else i for i in order]
         else:
-            order = [CacheItem(i) if isinstance(i, Processor) else i for i in order]
-        self._items: List[CacheItem] = order
+            itms = []
+        self._items: List[CacheItem] = itms
 
     def index(self, tsk) -> int:
         "returns the index of the provided task"

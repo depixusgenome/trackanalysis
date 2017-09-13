@@ -18,7 +18,7 @@ from .probabilities         import Probability
 
 # pylint: disable=unused-import
 from .data                  import PeaksDict, Output
-from .dataframe             import dataframe
+from .dataframe             import PeaksDataFrameFactory
 
 class PeakCorrelationAlignmentTask(PeakCorrelationAlignment, Task):
     "Aligns cycles using peaks"

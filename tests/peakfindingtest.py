@@ -8,7 +8,7 @@ from numpy.testing               import assert_equal, assert_allclose
 
 import pandas as pd
 
-from model.task                  import DataFrameTask
+from model.task.dataframe        import DataFrameTask
 from control.taskcontrol         import create
 from simulator                   import randpeaks
 from simulator.processor         import EventSimulatorTask, TrackSimulatorTask
