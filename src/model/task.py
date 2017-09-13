@@ -193,7 +193,7 @@ class DataFrameTask(Task):
     "Adds it's task to the TrackItem using *withfunction*"
     level                                     = Level.none
     merge                                     = False
-    indexes: Sequence[str]                    = ['track', 'bead', 'cycle']
+    indexes: Sequence[str]                    = ['track', 'bead', 'cycle', 'event']
     measures: Dict[str, Union[Callable, str]] = {}
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):

@@ -10,6 +10,8 @@ import  numpy as np
 warnings.filterwarnings('error', category = FutureWarning)
 warnings.filterwarnings('error', category = DeprecationWarning)
 warnings.filterwarnings('error', category = PendingDeprecationWarning)
+warnings.filterwarnings('ignore', category = DeprecationWarning,
+                        message  = '.*generator .* raised StopIteration.*')
 np.seterr(all='raise')
 
 def _trackreadertask(fpath, beadsonly = True):

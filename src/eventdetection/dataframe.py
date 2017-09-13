@@ -17,13 +17,11 @@ def dataframe(task, _1, _2, events:EventsArray) -> dict:
         * *length*: event length
         * *mean*: event average position
     """
-    meas = task.getfunctions()
-    if not any(i[1] in (np.nanmean, np.mean) for i in meas):
-        meas = (('mean', np.nanmean),) + meas
-    if not any(i[1] is len for i in meas):
-        meas = (('length', len),) + meas
+    meas           = dict(task.getfunctions())
+    meas['mean']   = np.nanmean
+    meas['length'] = len
 
-    items = dict(event  = np.arange(len(events), dtype = 'i4'),
-                 start  = events['start'],
-                 **{name: [fcn(i) for i in events['data']] for name, fcn in meas})
-    return items
+    return dict(event  = np.arange(len(events), dtype = 'i4'),
+                start  = events['start'],
+                **{name: np.array([fcn(i) for i in events['data']])
+                   for name, fcn in meas.items()})

@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 "easy access to cycles"
 from   typing import (TYPE_CHECKING, Iterator, # pylint: disable=unused-import
-                      Optional, Sequence, Tuple, Dict, Iterable, Union, Any, cast)
+                      Callable, Optional, Sequence, Tuple, Dict, Iterable,
+                      Union, Any, cast)
 from   copy   import copy as shallowcopy
 import numpy  as     np
 
@@ -204,7 +205,7 @@ class Cycles(TrackView, ITrackView):
             return max((len(i) for i in self.data.values()), default = 0)
 
         if isfunction(self.track):
-            self.track = self.track()
+            self.track = cast(Callable, self.track)()
 
         first = self.track.phase(..., 0 if self.first is None else self.first)
         if self.last is None or self.last == self.track.nphases-1:

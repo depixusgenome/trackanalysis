@@ -2,18 +2,23 @@
 # -*- coding: utf-8 -*-
 "Tests interval detection"
 
+import pandas as pd
 import numpy  as np
 from   numpy.testing          import assert_allclose
 from model                    import PHASE
+from model.task               import DataFrameTask
 from eventdetection.detection import DerivateSplitDetector, EventMerger, EventSelector
 from eventdetection.splitting import (MinMaxSplitDetector, IntervalExtensionAroundMean,
                                       IntervalExtensionAroundRange)
 from eventdetection.alignment import (ExtremumAlignment, CorrelationAlignment,
                                       PhaseEdgeAlignment)
-from eventdetection.processor import ExtremumAlignmentProcessor, AlignmentTactic
+from eventdetection.processor import (ExtremumAlignmentProcessor, AlignmentTactic,
+                                      EventDetectionTask)
 from eventdetection.data      import Events
+from control.taskcontrol      import create
 from simulator                import randtrack
 from signalfilter             import samples
+from testingcore              import path as utfilepath
 
 def test_detectsplits():
     "Tests flat stretches detection"
@@ -263,8 +268,10 @@ def test_measure_alignment():
         ini += (track.cycles.withphases(PHASE.pull)[0,i].mean()-ini.mean())*.5
 
     bead    = ExtremumAlignmentProcessor.apply(track.beads, phase = AlignmentTactic.measure)
-    inipos  = [i.mean() for i in track.beads[0,...].withphases(PHASE.pull).values()]
-    corrpos = [i.mean() for i in bead       [0,...].withphases(PHASE.pull).values()]
+    inipos  = [i.mean() for i in # type: ignore
+               track.beads[0,...].withphases(PHASE.pull).values()]
+    corrpos = [i.mean() for i in # type: ignore
+               bead[0,...].withphases(PHASE.pull).values()]
     assert np.std(inipos[3:]) > 10*np.std(corrpos[3:])
     assert all(i > .95 for i in corrpos[:3])
 
@@ -307,5 +314,17 @@ def test_precision():
     sim   = np.sum(sizes >= data.events.select.minduration, 1)
     assert list(np.nonzero(found-sim-1)[0]) == []
 
+def test_dataframe():
+    "tests dataframe production"
+    data = next(create(utfilepath('big_selected'),
+                       EventDetectionTask(),
+                       DataFrameTask(merge = True)).run())
+    assert isinstance(data, pd.DataFrame)
+    assert 'track' in data.index.names
+    assert 'bead'  in data.index.names
+    assert 'cycle' in data.index.names
+    assert 'event' in data.index.names
+    assert 'mean' in data
+
 if __name__ == '__main__':
-    test_precision()
+    test_dataframe()
