@@ -92,7 +92,7 @@ class FoV:
             return tuple(i*k+j for (i, j), k in zip(dim, arr))
 
         tpe = iter if hasattr(arr, '__next__') else type(arr)
-        return tpe([(sl1*i+int1, sl2*j+int2) for i, j in arr])
+        return tpe([(sl1*i+int1, sl2*j+int2) for i, j in arr]) # type: ignore
 
 @levelprop(Level.project)
 class Track:
@@ -104,8 +104,9 @@ class Track:
     _path:          PATHTYPES   = None
     _rawprecisions: _PRECISIONS = {}
     _lazy                       = True
+    key:            str         = None
     axis                        = Axis.Zaxis
-    @initdefaults(('axis',), **{i: '_' for i in _LAZIES + ('phases',)})
+    @initdefaults(('axis', 'key'), **{i: '_' for i in _LAZIES + ('phases',)})
     def __init__(self, **_) -> None:
         pass
 
@@ -208,12 +209,12 @@ class Track:
         return vect - orig
 
     @property
-    def path(self) -> Union[None, str, Tuple[str, ...]]:
+    def path(self) -> Optional[PATHTYPES]:
         "returns the current path(s)"
         return self._path
 
     @path.setter
-    def path(self, val) -> Union[None, str, Tuple[str, ...]]:
+    def path(self, val) -> Optional[PATHTYPES]:
         "sets the current path(s) and clears the data"
         self._lazy = False
         self._path = val
@@ -244,22 +245,26 @@ class Track:
         "returns whether a column name is a bead's"
         return isinstance(key, int)
 
+    def __view(self, tpe, **kwa):
+        parent = (self.key,) if self.key else (self.path,)
+        return tpe(track = self, parent = parent, **kwa)
+
     @property
     def beads(self) -> Beads:
         "returns a helper object for extracting beads"
-        return Beads(track = self, parents = (self.path,), beadsonly = False)
+        return self.__view(Beads, beadsonly = False)
 
     @property
     def beadsonly(self) -> Beads:
         "returns a helper object for extracting beads from *beads* only"
-        return Beads(track = self, parents = (self.path,), beadsonly = True)
+        return self.__view(Beads, beadsonly = True)
 
     @property
     def cycles(self) -> Cycles:
         "returns a helper object for extracting cycles"
-        return Cycles(track = self, parents = (self.path,))
+        return self.__view(Cycles, beadsonly = False)
 
     @property
     def cyclesonly(self) -> Cycles:
         "returns a helper object for extracting cycles from *beads* only"
-        return Cycles(track = self, parents = (self.path,), beadsonly = True)
+        return self.__view(Cycles, beadsonly = True)

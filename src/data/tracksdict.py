@@ -41,18 +41,18 @@ class TracksDict(dict):
 
     def _set(self, key, val, allaxes = False):
         if isinstance(val, (str, Path, tuple, list, set)):
-            val = self._newtrack(path = val)
-
+            state = dict(path = val)
+        elif isinstance(val, dict):
+            state = val
         elif isinstance(val, Track):
-            val = self._newtrack(**val.__getstate__())
+            state = val.__getstate__()
+        else:
+            raise NotImplementedError()
 
-        super().__setitem__(key, val)
-
-        if allaxes:
-            cnf = val.__getstate__()
-            for i in 'xy':
-                cnf['axis'] = i
-                super().__setitem__('X'+key, Track(**cnf))
+        for i in 'XYZ' if allaxes else 'Z':
+            state['axis'] = i
+            state['key']  = f'{i if i != "Z" else ""}{key}'
+            super().__setitem__(state['key'], self._newtrack(**state))
 
         return val
 
