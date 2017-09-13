@@ -15,7 +15,7 @@ import  numpy       as     np
 
 from    legacy      import readtrack, readgr # pylint: disable=import-error,no-name-in-module
 if TYPE_CHECKING:
-    from data import Track  # pylint: disable=unused-import
+    from data.track import Track  # pylint: disable=unused-import
 
 PATHTYPE  = Union[str, Path]
 PATHTYPES = Union[PATHTYPE,Tuple[PATHTYPE,...]]
@@ -149,7 +149,7 @@ class LegacyGRFilesIO(_TrackIO):
         u"opens the directory"
         output = LegacyTrackIO.open(paths[0], **kwa)
         if output is None:
-            raise IOError("Could not open track. "
+            raise IOError(f"Could not open track '{paths[0]}'.\n"
                           "This could be because of a *root* mounted samba path")
         remove = set(i for i in output if isinstance(i, int))
 
@@ -251,8 +251,8 @@ class LegacyGRFilesIO(_TrackIO):
             bead[inds] = vals[1]
         return beadid
 
-    @staticmethod
-    def __scan(lst, fcn) -> Dict[str, Path]:
+    @classmethod
+    def __scan(cls, lst, fcn) -> Dict[str, Path]:
         return {i.stem: i for i in chain.from_iterable(_glob(fcn(str(k))) for k in lst)}
 
     @classmethod
@@ -272,10 +272,14 @@ class LegacyGRFilesIO(_TrackIO):
             projects = (projects,)
 
         res = {}
-        fcn = lambda match, grdir, i: (i if match(i) else i + grdir)
+        fcn = lambda match, grdir, i: (i if match(i) or cls.__CGREXT in i else i + grdir)
         for proj in projects:
-            grdir = f'/**/{proj}/*{cls.__CGREXT}'
-            part  = partial(fcn, re.compile(rf'\b{proj}\b').search, grdir)
+            if proj:
+                grdir = f'/**/{proj}/*{cls.__CGREXT}'
+                part  = partial(fcn, re.compile(rf'\b{proj}\b').search, grdir)
+            else:
+                grdir = f'/**/*{cls.__CGREXT}'
+                part  = partial(fcn, lambda _: False, grdir)
             res.update(cls.__scan(grdirs, part))
         return res
 
