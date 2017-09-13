@@ -262,29 +262,30 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
             return random.choice(matches) # type: ignore
         return None
 
-    # def find_crystal(self,state:np.array)->List[Tuple[int, ...]]:
-    #     '''
-    #     there is crystallisation of two or more experiments if
-    #     their oligos overlap and that 2 oligos from different peaks
-    #     are located at 1.1 from one another
-    #     needs more complexity eg:
-    #     if (tgt) and (gtg,gtg) when (gtg,tgt,gtg) is the correct solution
-    #     '''
-    #     esp=0.25
-    #     signs=(0,0) if self.unsigned else (1,1)
-    #     overlap=lambda seq1,seq2:data.Oligo.overlap(seq1,
-    #                                                 seq2,
-    #                                                 signs=signs,
-    #                                                 min_overl=self.min_overl,
-    #                                                 shift=1)
-    #     oneway=lambda seq1,seq2:overlap(seq1,seq2) and not overlap(seq2,seq1)
-    #     groups:List[Tuple[int, ...]]=[]
-    #     for idx1,idx2 in itertools.permutations(range(len(state)),2):
-    #         if (state[idx2]-state[idx1]-1.1)**2<esp:
-    #             if oneway(self._olis[idx2].seq,self._olis[idx1].seq):
-    #                 groups.append((idx1,idx2))
+    # TO FIX
+    def find_crystal(self,state:np.array)->List[Tuple[int, ...]]:
+        '''
+        there is crystallisation of two or more experiments if
+        their oligos overlap and that 2 oligos from different peaks
+        are located at 1.1 from one another
+        needs more complexity eg:
+        if (tgt) and (gtg,gtg) when (gtg,tgt,gtg) is the correct solution
+        '''
+        esp=0.25
+        signs=(0,0) if self.unsigned else (1,1)
+        overlap=lambda seq1,seq2:data.Oligo.overlap(seq1,
+                                                    seq2,
+                                                    signs=signs,
+                                                    min_overl=self.min_overl,
+                                                    shift=1)
+        oneway=lambda seq1,seq2:overlap(seq1,seq2) and not overlap(seq2,seq1)
+        groups:List[Tuple[int, ...]]=[]
+        for idx1,idx2 in itertools.permutations(range(len(state)),2):
+            if (state[idx2]-state[idx1]-1.1)**2<esp:
+                if oneway(self._olis[idx2].seq,self._olis[idx1].seq):
+                    groups.append((idx1,idx2))
 
-    #     return groups
+        return groups
 
     # # not great implementation, will  be rewritten
     # def alt_proposal(self,state:np.array):
@@ -340,9 +341,7 @@ class SpringMinimizer:
         springs=list(self.intra)+SpringScore.used_springs(self.inter,args[0])
         return self.equilibrium(springs,args[0])
 
-    # TO FIX! when no intra connect to a vertex
-    # and that vertex is the last argument then is not connected though inter
-    # then we have an unconstrained vertex.
+    # TO FIX: implement a new way to deal with unconstrained vertices
     @staticmethod
     def equilibrium(springs,xinit)->OptimizeResult:
         'find the equilibrium for a given list of springs and xinit'
@@ -355,6 +354,7 @@ class SpringMinimizer:
                                   nfev=1)
 
         if len(equil)!=len(xinit)-1:
+            print("unconstrained vertex")
             # unconstrained vertex by set of springs
             return OptimizeResult(x=xinit,
                                   fun=SpringScore.score_springs(springs,xinit),
@@ -506,23 +506,25 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
                           for id1,id2 in zip(pkids[:-1],pkids[1:])])
         return intra
 
-    # TO CORRECT: 2 vertices from the same peakid should not have inter spring
     def find_inter(self,thres=-1)->Dict[int,List[Spring]]:
         'add springs between oligos of different experiments'
         signs=(0,0) if self.unsigned else (1,1)
         inter:Dict[int,List[Spring]]={idx:[] for idx in range(len(self._olis))}
-        for id1,id2 in itertools.permutations(range(len(self._olis)),2):
-            if data.Oligo.overlap(self._olis[id1].seq,
-                                  self._olis[id2].seq,
-                                  min_overl=self.min_overl,
-                                  signs=signs,
-                                  shift=1):
-                inter[id1].append(Spring(type="inter",
-                                         force=self.kinter,
-                                         xeq=1.1,
-                                         id1=id1,
-                                         id2=id2,
-                                         thres=thres))
+
+
+        for exp1,exp2 in itertools.permutations(self.peakids,2):
+            for id1,id2 in itertools.product(exp1,exp2):
+                if data.Oligo.overlap(self._olis[id1].seq,
+                                      self._olis[id2].seq,
+                                      min_overl=self.min_overl,
+                                      signs=signs,
+                                      shift=1):
+                    inter[id1].append(Spring(type="inter",
+                                             force=self.kinter,
+                                             xeq=1.1,
+                                             id1=id1,
+                                             id2=id2,
+                                             thres=thres))
 
         return inter
 
@@ -571,6 +573,8 @@ class SpringCluster(SpringScaler): # inherit from SpringScaler instead
         self.scaler:SpringScaler
 
     # needs improvements
+    # to fix: clustered peaks must conserve inter springs
+    # otherwise the find_equilibirum will tear the clustered springs apart
     def cluster2peaks(self,
                       exp1:OPeakArray,
                       exp2:OPeakArray)->Match2Peaks:
@@ -595,13 +599,17 @@ class SpringCluster(SpringScaler): # inherit from SpringScaler instead
         # the mcmc scoring defines which is best in terms of k1, k2
         self.scaler=SpringScaler(**dict(list(self.kwargs.items())+[("peaks",[exp1,exp2])]))
         self.scaler.basinkwa["niter"]=500
+        self.scaler.stepper.proposal_call=self.scaler.stepper.random_proposal
         state=self.scaler.run(repeats=1)
         # can rescale state such that one point is fixed (conserves stretch and bias boundaries)
         # can compute the number of springs involved for normalisation
         nmatches=len(SpringScore.used_springs(self.scaler.inter,state))
         score=self.scaler.res[-1].fun
+
+        # testing meanshift
+        meanshift=np.mean(np.hstack([exp1.posarr,exp2.posarr]))-np.mean(state)
         peak=OPeakArray(arr=self.scaler.ordered_oligos(state),
-                        min_overl=self.min_overl)
+                        min_overl=self.min_overl)+meanshift
         # returns the best result
         return Match2Peaks(score=score,
                            nmatches=nmatches,
