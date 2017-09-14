@@ -24,7 +24,7 @@ class _Calls:
         elif isinstance(self._calls, tuple):
             path  = Path(self._calls[0])
             fname = str(path.relative_to(path.parent.parent))
-            self._calls = fname+"@%s [%s]" % self._calls[1:]
+            self._calls = f"{fname}@{self._calls[1]} [{self._calls[2]}]"
 
         elif hasattr(self._calls, '__code__'):
             fcn  = self._calls # type: ignore
