@@ -138,11 +138,11 @@ def test_cycles_cancyclefromcycle():
     assert set(cyc[...,0].keys()) == set(track.cycles[...,0].keys())
     assert np.array_equal(cyc[0,0], track.cycles[0,0])
 
-    def _act1(col):
+    def _act1(_, col):
         col[1][:] = 5.
         return col
 
-    def _act2(col):
+    def _act2(_, col):
         col[1][:] = all(x == 5. for x in col[1])
         return col
 

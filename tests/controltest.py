@@ -291,7 +291,7 @@ def test_task_cache():
         tasktype = TBeads
         @Processor.cache
         def run(self, _):
-            def _outp(x):
+            def _outp(_, x):
                 calls.append(1)
                 return x
             return _outp

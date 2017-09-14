@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Adds methods for configuring a TracksView"
+from   inspect          import signature
 from   copy             import copy as shallowcopy
 from   itertools        import product
 from   functools        import partial
@@ -104,6 +105,12 @@ class TrackViewConfigMixin: # pylint: disable=invalid-name
         if fcn is None:
             return self
 
+        try:
+            signature(fcn).bind(1)
+        except TypeError as exc:
+            msg = f'Function {fcn} should have a single positional argument'
+            raise TypeError(msg) from exc
+
         if beadsonly:
             self.actions.append(partial(self.__f_all, fcn))
         else:
@@ -117,6 +124,13 @@ class TrackViewConfigMixin: # pylint: disable=invalid-name
 
         if fcn is None:
             return self
+
+        try:
+            signature(fcn).bind(1, 2)
+        except TypeError as exc:
+            msg = (f'Function {fcn} should have two'
+                   ' positional arguments: TrackView, Tuple[key, value]')
+            raise TypeError(msg) from exc
 
         self.actions.append(fcn if beadsonly else partial(self.__a_beads, fcn))
         return self
