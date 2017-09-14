@@ -6,10 +6,11 @@
 use mcmc to try to converge to a good set of scales
 The score is the energy of the spring
 
+new proposal method is to assign inter springs between vertices of different experiments
+we can rank the proposals so that they lead to fewer and fewer changes
+use iterators
+
 to do:
-optimal position -> L-BFGS-B
-also forbid the the overlap of 2 or more peak
- -> L-BFGS-B
 * still need to apply correction of stre to xeq for different springs
 *how to fix the temperature? ...
 * consider the best relative of kintra, kinter
@@ -28,6 +29,17 @@ also forbid the the overlap of 2 or more peak
 where a vertex is not linked by an intra and is located at the tail of the sequence. This vertex
 is unconstrained.
 * will be necessary to replace 1.1 (distance between two consecutive oligos) by a named variable
+
+
+
+For a spring system
+* create inter springs with the constraints that oligos can have
+a max of 2 inter springs (left and right)
+* calculation of energy would penalize oligos which do not bind on both sides
+-> the penalty also applies to first and last oligos so it is just a constant to the energy
+* version 1 of used_springs must be improved but is a good basis
+* keep  scoring/ minimization "bare"
+
 '''
 
 from typing import List, Dict, Tuple, Callable, Iterable, NamedTuple, FrozenSet # pylint: disable=unused-import
@@ -66,6 +78,15 @@ LOGS=getLogger(__name__)
 #     graph=networkx.DiGraph()
 #     graph.add_edges_from(edges2)
 #     return graph
+
+
+# class OptimizeSpring:
+#     '''
+#     adds springs used during optimisation to OptimizeResult for dedbugging purposes
+#     '''
+#     def __init__(self,**kwa):
+#         self.res=OptimizeResult(**kwa)
+#         self.springs:List[Spring]=kwa.get("springs")
 
 
 class Spring:
@@ -107,6 +128,14 @@ class Spring:
 #         jac[idx]=force
 #     return jac
 
+
+class SpringStepExhaust(SpringSetting):
+    '''
+    Is there a way to generate all possible spring system?
+    Can we order them ?
+    '''
+    pass
+
 class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
     '''
     each moves consists of two steps for each experiment
@@ -115,7 +144,6 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
     '''
     def __init__(self,**kwa):
         super().__init__(**kwa)
-        self.poserr:float=kwa.get("poserr",1.0)
         scale=0.5 # large scale for stretch
         loc=1.0
         stre=(self.bstretch.lower,self.bstretch.upper)
@@ -124,17 +152,13 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
                                             loc=loc,scale=scale).rvs
         self.biasdist=scipy.stats.uniform(loc=self.bbias.lower,
                                           scale=self.bbias.upper-self.bbias.lower).rvs
-        # self.noise=scipy.stats.norm(loc=0.,
-        #                             scale=self.poserr).rvs
         self.intra:List[Spring]=kwa.get("intra",[])
         self.inter:Dict[int,List[Spring]]=kwa.get("inter",{})
         self.peakid:int=kwa.get("peakid",0) # index of peakid to update
         self.rneighs:Dict[int,Tuple[int]]=self.find_neighbors(side="right")
         self.lneighs:Dict[int,Tuple[int]]=self.find_neighbors(side="left")
-        self.proposal_call=self.proposal
+        self.proposal_call=self.random_proposal #self.proposal
 
-    # TO CORRECT: 2 vertices from the same peakid should not be in the neighbors
-    # must not include bstretch, bbias to limit calculations
     def find_neighbors(self,side)->Dict[int,Tuple[int, ...]]:
         '''
         returns the indices of self._olis which overlap on the right of given key
@@ -222,7 +246,9 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
             return random.choice(matches) # type: ignore
         return None
 
-    # testing, not fully tested. Does not allow enough flexibility
+    # TO FIX: assumes that rneighs and lneighs belong to different peaks
+    # -> this overestimate the number of possible scales (not necessarily a huge deal)
+    # Does not allow enough flexibility
     # to apply a random arrangement
     def proposal(self,state:np.array):
         '''
@@ -310,38 +336,57 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
         '''
         pass
 
-class SpringMinimizer:
+class SpringMinimizer(SpringSetting):
     'regroups the different ways to minimize the spring network'
     def __init__(self,**kwa):
+        super().__init__(**kwa)
         self.intra:List[Spring]=kwa.get("intra",[])
         self.inter:Dict[int,List[Spring]]=kwa.get("inter",dict())
-        self.call:Callable=kwa.get("method",self.bare)
+        method:str=kwa.get("method","bare")
+        self.call:Callable=self.__getattribute__(method)
 
     def __call__(self,*args,**kwa):
         return self.call(self,*args,**kwa)
 
     # problem with basinhopping with variable number of springs
-    def with_repulsion(self,_,_2,*args, **kwa): # pylint: disable=unused-argument
-        '''
-        compared to bare, adds springs between consecutive vertices
-        to force them appart'''
-        xinit=args[0]
-        springs=list(self.intra)+SpringScore.used_springs(self.inter,xinit)
-        repkwa={"force":30,"xeq":1.1} # force of spring same as kinter
-        # add springs with repulsion
-        springs+=[Spring(id1=id1 if xinit[id1]<xinit[id2] else id2,
-                         id2=id2 if xinit[id1]<xinit[id2] else id1,
-                         **repkwa)
-                  for id1,id2 in itertools.permutations(range(len(xinit)),2)
-                  if (xinit[id1]-xinit[id2])**2<1.1]
-        return self.equilibrium(springs,xinit)
+    # def with_repulsion(self,_,_2,*args, **kwa): # pylint: disable=unused-argument
+    #     '''
+    #     compared to bare, adds springs between consecutive vertices
+    #     to force them appart'''
+    #     xinit=args[0]
+    #     springs=list(self.intra)+SpringScore.used_springs(self.inter,xinit)
+    #     repkwa={"force":30,"xeq":1.1} # force of spring same as kinter
+    #     # add springs with repulsion
+    #     springs+=[Spring(id1=id1 if xinit[id1]<xinit[id2] else id2,
+    #                      id2=id2 if xinit[id1]<xinit[id2] else id1,
+    #                      **repkwa)
+    #               for id1,id2 in itertools.permutations(range(len(xinit)),2)
+    #               if (xinit[id1]-xinit[id2])**2<1.1]
+    #     return self.equilibrium(springs,xinit)
 
     def bare(self,_,_2,*args, **kwa): # pylint: disable=unused-argument
         'finds equilibrium of a system of springs'
         springs=list(self.intra)+SpringScore.used_springs(self.inter,args[0])
         return self.equilibrium(springs,args[0])
 
-    # TO FIX: implement a new way to deal with unconstrained vertices
+    def max_overlaps(self,_,_2,*args, **kwa): # pylint: disable=unused-argument
+        '''
+        finds equilibrium of a system of springs
+        returns minus the number of overlaps
+        '''
+        springs=list(self.intra)+SpringScore.used_springs(self.inter,args[0])
+        state=self.equilibrium(springs,args[0]).x
+        fun=-SpringScore.noverlaps(oligos=self._olis,
+                                   state=state,
+                                   unsigned=self.unsigned,
+                                   min_overl=self.min_overl)
+        return  OptimizeResult(x=state,
+                               fun=fun,
+                               success=True,
+                               nfev=1,
+                               springs=springs,
+                               state_pre_min=args[0])
+
     @staticmethod
     def equilibrium(springs,xinit)->OptimizeResult:
         'find the equilibrium for a given list of springs and xinit'
@@ -349,23 +394,31 @@ class SpringMinimizer:
 
         if equil is None:
             return OptimizeResult(x=xinit,
-                                  fun=SpringScore.score_springs(springs,xinit),
+                                  fun=SpringScore.energy_system(springs,xinit),
                                   success=True,
-                                  nfev=1)
+                                  nfev=1,
+                                  springs=springs,
+                                  state_pre_min=xinit)
 
         if len(equil)!=len(xinit)-1:
             print("unconstrained vertex")
             # unconstrained vertex by set of springs
             return OptimizeResult(x=xinit,
-                                  fun=SpringScore.score_springs(springs,xinit),
+                                  fun=SpringScore.energy_system(springs,xinit),
                                   success=True,
-                                  nfev=1)
+                                  nfev=1,
+                                  springs=springs,
+                                  state_pre_min=xinit)
 
         equil=xinit[0]+np.array([0.0]+equil)
+        # mean conservation
+        equil=equil-np.mean(equil)+np.mean(xinit)
         return OptimizeResult(x=equil,
-                              fun=SpringScore.score_springs(springs,equil),
+                              fun=SpringScore.energy_system(springs,equil),
                               success=True,
-                              nfev=1)
+                              nfev=1,
+                              springs=springs,
+                              state_pre_min=xinit)
 
 
     @staticmethod
@@ -405,7 +458,6 @@ class SpringMinimizer:
             return None
         return equil # returns x2,x3,...
 
-# testing in progress
 class SpringScore(SpringSetting):
     '''
     uses springs to scale experiments
@@ -423,40 +475,120 @@ class SpringScore(SpringSetting):
         'testing a cleaner __call__'
         state=args[0]
         springs=list(self.intra)+self.used_springs(self.inter,state)
-        return self.score_springs(springs,state)
+        return self.energy_system(springs,state)
 
     @staticmethod
-    def score_springs(springs,state):
-        'adds the energy of all springs'
+    def noverlaps(oligos,state,unsigned=True,min_overl=0)->int:
+        '''
+        returns the number of overlaps between consecutive oligos
+        advantage of this is the robustness with regard to missing peaks
+        state should be minimized such that inter springs connect neighbours oligos
+        '''
+
+        sorted_olis=sorted([(pos,oligos[idx])
+                            for idx,pos in enumerate(state)],
+                           key=lambda x:x[0])
+        seqs=[oli[1].seq for oli in sorted_olis]
+        # should/will count the number of overlaps of k-1, k-2 etc...
+
+        signs=(0,0) if unsigned else (1,1)
+        overlap=lambda x,y,z:data.Oligo.overlap(x,
+                                                y,
+                                                shift=1,
+                                                min_overl=z,
+                                                signs=signs)
+        return sum([min_overl for seq1,seq2 in zip(seqs[:-1],seqs[1:])
+                    if overlap(seq1,seq2,min_overl)])
+
+    @staticmethod
+    def energy_system(springs,state):
+        'returns the total energy of the system of spring'
         scores=[spr.energy(state[spr.id1],state[spr.id2]) for spr in springs]
         #penalty=np.sum((np.sort(state)[1:]-np.sort(state)[:-1])<1.1)
         return sum(scores)#+100*penalty
 
-
-    @staticmethod
-    def used_springs(inter,state)->List[Spring]:
-        'returns the spring used for a particular state'
-        springs:List[Spring]=[]
-        argmax=np.argmax(state)
-        # there could be a mistake in the calculus of the score
-        # or in the number of springs in inter
-        for id1 in inter.keys():
-            if id1!=argmax:
-                try:
-                    scores=sorted([(spr.energy(state[id1],state[spr.id2]),spr)
-                                   for spr in inter[id1]],key=lambda x:x[0])
-                    springs.append(scores[0][1])
-                except IndexError:
-                    # for small number of oligos it is possible that
-                    # one does not overlap with any other
-                    pass
-
-        return springs
-
+    # # version 3
+    # # to finish, should be robust to the missing of oligos
     # @staticmethod
-    # def potential(rad:np.array)->float:
-    #     'Lennard-Jones potential'
-    #     return sum((1.1/rad)**12-2*(1.1/rad)**6)
+    # def used_springs_v3(oligos,kinter,state:np.array)->List[Spring]:
+    #     '''
+    #     for each oligo compute the inter springs with minimal energy
+    #     uses poserr to define a threshold
+    #     '''
+    #     # use inter instead it has all possible springs
+    #     inter_springs:List[Spring]
+    #     ordered=sorted([(pos,idx,oligos[idx]) for idx,pos in enumerate(state)]
+    #                    ,key=lambda x:x[0])
+    #     for pos,index,oli in ordered:
+    #         neighbors=abs(state-pos)<oli.poserr
+    #         neighbors[index]=False
+    #         # overlap on the left of index
+    #         springs=[Spring(force=kinter,
+    #                         type="inter",
+    #                         id1=idx,
+    #                         id2=index,
+    #                         xeq=1.1) for idx,val in enumerate(neighbors) if val]
+    #         energy_spr=[spr.energy(pos,)]
+    #         inter_springs.append()
+    #         # pick the one with minimal energy
+    #         # on  the right of index
+
+    #     return inter_springs
+
+
+    # newer version does not converge towards good equilibrium... back to old version?
+    # this version behaves strangely..
+    # version 2
+    @staticmethod
+    def used_springs(inter,state:np.array)->List[Spring]:
+        '''
+        newer implementation of used_springs
+        1 oligo can only bind once on 1 side
+        '''
+        energies=sorted([(spr.energy(state[spr.id1],state[spr.id2]),spr.id1,spr.id2,spr)
+                         for key,springs in inter.items()
+                         for spr in springs],key=lambda x:x[0])
+        left:FrozenSet[int]=frozenset([])
+        right:FrozenSet[int]=frozenset([])
+        inters:List[Spring]=[]
+        for spr in energies:
+            print(spr)
+            if spr[1] in left or spr[2] in right:
+                continue
+            inters.append(spr[3])
+            left=left.union(frozenset([spr[1]]))
+            right=right.union(frozenset([spr[2]]))
+        return inters
+
+    # to fix such that any oligo can bind only once (for a given overlap value>0)
+    # on a single side
+    # version 1
+    # @staticmethod
+    # def used_springs(inter,state)->List[Spring]:
+    #     '''
+    #     returns the spring used for a particular state
+    #     simplest case, for each oligo use the spring that binds to another on the right
+    #     drawbacks (decreasing order of severity):
+    #     (1) if the last oligo is the only peak of the experiment, it is unbound (NEEDS FIXING)
+    #     -> can be fixed by checking that all ids are in springs.
+    #     (2) does not forbid multiple bindings to the same side of an oligo
+    #     -> could lead to misalignment
+    #     (3) considers all oligos, not only those within measurement error
+    #     '''
+    #     springs:List[Spring]=[]
+    #     argmax=np.argmax(state)
+    #     for id1 in inter.keys():
+    #         if id1!=argmax:
+    #             try:
+    #                 scores=sorted([(spr.energy(state[id1],state[spr.id2]),spr)
+    #                                for spr in inter[id1]],key=lambda x:x[0])
+    #                 springs.append(scores[0][1])
+    #             except IndexError:
+    #                 # for small number of oligos it is possible that
+    #                 # one does not overlap with any other
+    #                 pass
+
+    #     return springs
 
 class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
     '''
@@ -481,14 +613,15 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
                                  inter=self.inter,
                                  **kwa)
         self.minimizer=SpringMinimizer(intra=self.intra,
-                                       inter=self.inter)
+                                       inter=self.inter,
+                                       **kwa)
         self.res:List[OptimizeResult]=[]
         self.peakid:int=kwa.get("peakid",0) # id of peak to update
         self.basinkwa={"func":self.scoring,
                        "niter":100,
                        "minimizer_kwargs":dict(method=self.minimizer),
                        "take_step":self.stepper,
-                       "T":10} # guesstimate from simulations
+                       "T":1}
 
         # self.basinkwa["minimizer_kwargs"]=dict(method=no_minimizer)
         # self.basinkwa["minimizer_kwargs"]=dict(method="L-BFGS-B")
@@ -507,21 +640,38 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
         return intra
 
     def find_inter(self,thres=-1)->Dict[int,List[Spring]]:
-        'add springs between oligos of different experiments'
+        '''
+        add springs between experiments
+        also includes springs with force 0 to account for 
+        oligos within experiment which are supposed to overlap
+        '''
         signs=(0,0) if self.unsigned else (1,1)
         inter:Dict[int,List[Spring]]={idx:[] for idx in range(len(self._olis))}
-
-
+        overlap=lambda x,y:data.Oligo.overlap(x,y,
+                                              min_overl=self.min_overl,
+                                              signs=signs,
+                                              shift=1)
+        
+        # between experiments
         for exp1,exp2 in itertools.permutations(self.peakids,2):
             for id1,id2 in itertools.product(exp1,exp2):
-                if data.Oligo.overlap(self._olis[id1].seq,
-                                      self._olis[id2].seq,
-                                      min_overl=self.min_overl,
-                                      signs=signs,
-                                      shift=1):
+                if overlap(self._olis[id1],self._olis[id2]):
                     inter[id1].append(Spring(type="inter",
                                              force=self.kinter,
                                              xeq=1.1,
+                                             id1=id1,
+                                             id2=id2,
+                                             thres=thres))
+
+        # within experiments
+        # applying force 0 to not interfere with intra
+        # whilst allowing to consider the fact that the 2 are supposed to overlap
+        for pkid in self.peakids:
+            for id1,id2 in zip(pkid[:-1],pkid[1:]):
+                if overlap(self._olis[id1],self._olis[id2]):
+                    inter[id1].append(Spring(type="inter",
+                                             force=0,
+                                             xeq=abs(self._fpos[id1]-self._fpos[id2]),
                                              id1=id1,
                                              id2=id2,
                                              thres=thres))
@@ -560,7 +710,10 @@ Match2Peaks=NamedTuple("Match2Peaks",[("score",float),("nmatches",int),("peak",O
 
 # bugged in the position of the oligos after cluster.
 # stretch, bias boundaries are not respected!
-class SpringCluster(SpringScaler): # inherit from SpringScaler instead
+# must conserve the inter springs used to prefer one cluster over another
+# the old inter+intra springs become the new intra springs.
+# preserves coehrency of the cluster
+class SpringCluster(SpringScaler):
     '''
     The idea is to focus on a very small subset (2, max 3) set of peaks
     and call SpringScaler on them to find the best match..
