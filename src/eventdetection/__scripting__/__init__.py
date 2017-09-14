@@ -4,12 +4,15 @@
 Adds shortcuts for using Events
 """
 import sys
-from   typing           import Tuple, Callable, FrozenSet, Type
-import numpy            as np
-import pandas           as pd
-from   utils.decoration import addto
-from   data             import Track
-from   ..data           import Events
+from   typing                       import Tuple, Callable, FrozenSet, Type
+from   copy                         import copy as shallowcopy
+import numpy                        as     np
+import pandas                       as     pd
+
+from   utils.decoration             import addto
+from   control.processor.dataframe  import DataFrameProcessor
+from   data                         import Track
+from   ..data                       import Events
 
 Tasks:           Type     = sys.modules['model.__scripting__'].Tasks
 defaulttasklist: Callable = sys.modules['data.__scripting__'].defaulttasklist
@@ -107,6 +110,7 @@ def dataframe(self, **kwa) -> pd.DataFrame:
 
     Columns are:
 
+        * *track*: track name
         * *bead*: bead name
         * *cycle*: cycle number
         * *event*: event number in the cycle
@@ -121,21 +125,7 @@ def dataframe(self, **kwa) -> pd.DataFrame:
     If a string is provided, the numpy function is used. By default, its *nan*
     version is selected.
     """
-    meas = tuple((i, getattr(np, 'nan'+j, getattr(np, i)) if isinstance(j, str) else j)
-                 for i, j in kwa.items())
-    if not any(i[1] in (np.nanmean, np.mean) for i in meas):
-        meas = (('mean', np.nanmean),) + meas
-    if not any(i[1] is len for i in meas):
-        meas = (('length', len),) + meas
+    return DataFrameProcessor.apply(shallowcopy(self), measures = kwa, merge = True)
 
-    def _cnv(info):
-        items = dict(bead   = np.full(len(info[1]), info[0][0], dtype = 'i4'),
-                     cycle  = np.full(len(info[1]), info[0][1], dtype = 'i4'),
-                     event  = np.arange(len(info[1]), dtype = 'i4'),
-                     start  = info[1]['start'],
-                     **{name: [fcn(i) for i in info[1]['data']] for name, fcn in meas})
-        return info[0], pd.DataFrame(items)
-    return pd.concat([i for _, i in self[...,...].withaction(_cnv)])
-
-Events.any = property(lambda self: Comparator(self, any), doc = Comparator.__doc__)
-Events.all = property(lambda self: Comparator(self, all), doc = Comparator.__doc__)
+setattr(Events, 'any', property(lambda self: Comparator(self, any), doc = Comparator.__doc__))
+setattr(Events, 'all', property(lambda self: Comparator(self, all), doc = Comparator.__doc__))

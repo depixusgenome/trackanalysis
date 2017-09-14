@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 "Updating PeaksDict for oligo mapping purposes"
 import sys
-from   typing           import List, Type
-import numpy            as np
-from   utils.decoration import addto
+from   typing                   import List, Type
+import numpy                    as np
+from   utils.decoration         import addto
 import sequences
-from   ..processor      import PeaksDict, BeadsByHairpinProcessor
-from   ..toreference    import ReferenceDistance
+from   peakfinding.processor    import PeaksDict
+from   ..processor              import BeadsByHairpinProcessor
+from   ..toreference            import ReferenceDistance
 
 def _get(name, val = None):
     mod = sys.modules[name]

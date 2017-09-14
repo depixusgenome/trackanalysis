@@ -2,13 +2,14 @@
 # -*- coding: utf-8 -*-
 "Updating PeaksDict for scripting purposes"
 import sys
-from   typing               import List, Type, Callable
-from   copy                 import deepcopy, copy as shallowcopy
-import numpy                as np
-import pandas               as pd
-from   utils.decoration     import addto
-from   data                 import Track
-from   ..processor          import PeaksDict, FitToHairpinDict
+from   typing                   import List, Type, Callable
+from   copy                     import deepcopy, copy as shallowcopy
+import numpy                    as np
+import pandas                   as pd
+from   utils.decoration         import addto
+from   data                     import Track
+from   peakfinding.processor    import PeaksDict
+from   ..processor              import FitToHairpinDict
 
 Tasks:           Type     = sys.modules['model.__scripting__'].Tasks
 defaulttasklist: Callable = sys.modules['data.__scripting__'].defaulttasklist

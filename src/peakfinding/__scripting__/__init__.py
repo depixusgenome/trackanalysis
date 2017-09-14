@@ -2,15 +2,21 @@
 # -*- coding: utf-8 -*-
 "Simpler PeaksDict detection: merging and selecting the sections in the signal detected as flat"
 import sys
-from   typing           import Iterator, Iterable, Type, Callable
-import numpy as np
+from   typing                       import (Union, Iterator, Iterable, Type,
+                                            Callable, cast)
+from   copy                         import copy as shallowcopy
 
-from utils.decoration   import addto
-from eventdetection     import EventDetectionConfig
-from model              import PHASE
-from data               import Track
-from ..selector         import PeakSelectorDetails
-from ..processor        import PeaksDict, Probability, Output
+import pandas                       as     pd
+import numpy                        as     np
+
+from utils.decoration               import addto
+from control.processor.dataframe    import DataFrameProcessor
+from eventdetection                 import EventDetectionConfig
+from eventdetection.data            import Events
+from model                          import PHASE
+from data                           import Track
+from ..selector                     import PeakSelectorDetails
+from ..processor                    import PeaksDict, Probability, Output
 
 Tasks:           Type     = sys.modules['model.__scripting__'].Tasks
 defaulttasklist: Callable = sys.modules['data.__scripting__'].defaulttasklist
@@ -76,7 +82,7 @@ class Detailed:
         return self.histogram*val
 
 @addto(PeaksDict)
-def detailed(self, ibead, precision: float = None) -> PeakSelectorDetails:
+def detailed(self, ibead, precision: float = None) -> Union[Iterator[Detailed], Detailed]:
     "detailed output from config"
     if ibead is Ellipsis:
         return iter(self.detailed(i, precision) for i in self.keys())
@@ -90,3 +96,27 @@ def detailed(self, ibead, precision: float = None) -> PeakSelectorDetails:
         return self.data.detailed(ibead, precision)
     evts = iter(i for _, i in self.data[ibead,...])
     return Detailed(self, self.config.detailed(evts, prec))
+
+@addto(PeaksDict)
+def dataframe(self, **kwa) -> pd.DataFrame:
+    """
+    converts to a pandas dataframe.
+
+    Columns are:
+
+        * *track*
+        * *bead*
+        * *peakposition*
+        * *averageduration*
+        * *hybridizationrate*
+        * *eventcount*
+
+    Additionnal columns can be added with kwargs. The key is the title. The value
+    can either be:
+
+        * a callable with all events for that peak as input and expecting a number
+        as output,
+        * a attribute name from peakfinding.probabilities.Probability
+
+    """
+    return DataFrameProcessor.apply(shallowcopy(self), measures = kwa, merge = True)

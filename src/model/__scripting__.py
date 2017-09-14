@@ -16,9 +16,11 @@ from cleaning.processor         import DataCleaningTask
 from cordrift.processor         import DriftTask
 from eventdetection.processor   import ExtremumAlignmentTask, EventDetectionTask
 from peakfinding.processor      import PeakSelectorTask
+from peakcalling.toreference    import ReferenceDistance # pylint: disable=unused-import
 from peakcalling.processor      import FitToHairpinTask, BeadsByHairpinTask
 from .task                      import * # pylint: disable=wildcard-import,unused-wildcard-import
-from .task                      import __all__ as __all_tasks__, Task, TrackReaderTask
+from .task                      import Task, TrackReaderTask
+from .task.dataframe            import DataFrameTask
 
 assert 'scripting' in sys.modules
 RESET = type('Reset', (), {})
@@ -47,6 +49,7 @@ class Tasks(Enum):
     peakselector   = 'peakselector'
     fittohairpin   = 'fittohairpin'
     beadsbyhairpin = 'beadsbyhairpin'
+    dataframe      = 'dataframe'
 
     @staticmethod
     def defaults():
@@ -60,7 +63,8 @@ class Tasks(Enum):
                     eventdetection = EventDetectionTask(),
                     peakselector   = PeakSelectorTask(),
                     fittohairpin   = FitToHairpinTask(),
-                    beadsbyhairpin = BeadsByHairpinTask())
+                    beadsbyhairpin = BeadsByHairpinTask(),
+                    dataframe      = DataFrameTask())
 
     def default(self):
         "returns default tasks"
@@ -155,8 +159,10 @@ def dumps(self, **kwa):
     kwa.setdefault('sort_keys', True)
     kwa.setdefault('patch', None)
     return anastore.dumps(self, **kwa)
-Task.dumps = dumps
+Task.dumps = dumps # type: ignore
 
-__all__ = __all_tasks__ + ('Tasks', 'DriftTask', 'ExtremumAlignmentTask',
-                           'EventDetectionTask', 'PeakSelectorTask',
-                           'FitToHairpinTask')
+__all__ = ('Task', 'RootTask', 'Level', 'TASK_ORDER', 'taskorder',
+           'TrackReaderTask', 'CycleCreatorTask', 'DataSelectionTask',
+           'Tasks', 'DriftTask', 'ExtremumAlignmentTask',
+           'EventDetectionTask', 'PeakSelectorTask',
+           'FitToHairpinTask', 'DataFrameTask', 'ReferenceDistance')
