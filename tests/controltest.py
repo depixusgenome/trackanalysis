@@ -49,7 +49,7 @@ def test_evt():
         calls.append("e5")
         return ('e5',)
 
-    hdls = []
+    hdls = [] # type: ignore
 
     class _Obs:
         @staticmethod
@@ -156,7 +156,7 @@ def test_task_mutations():
 
     ctrl = TaskController()
 
-    events = dict()
+    events = dict() # type: ignore
     for evt in 'opentrack', 'closetrack', 'addtask', 'removetask', 'updatetask':
         def _obs(*args, name = evt, **kwargs):
             events.setdefault(name, []).append((args, kwargs))
@@ -244,7 +244,7 @@ def test_task_closure():
             return lambda x: x
 
     def _testClosure(task):
-        good = []
+        good = [] # type: ignore
         try:
             Runner.checkClosure(lambda x: (task, x)[1])
         except MemoryError:
@@ -358,7 +358,7 @@ def test_task_expandandcollapse():
     frames = tuple(ctrl.run(read,read))
     assert frozenset(type(fra) for fra in frames) == frozenset((Beads,))
     keys  = set(key for frame in frames for key, _ in frame)
-    beads = set(tuple(range(74))+('t', 'zmag'))
+    beads = {i for i in range(74)} | {'t', 'zmag'}
     assert keys == beads
 
     frames = tuple(ctrl.run(read,tc))
