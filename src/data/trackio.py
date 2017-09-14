@@ -110,7 +110,7 @@ class LegacyGRFilesIO(_TrackIO):
     __CGREXT = '.cgr'
     __GRDIR  = 'cgr_project'
     __TITLE  = re.compile(r"\\stack{{Bead (?P<id>\d+) Z.*?phase\(s\)"
-                          +r"(?:[^\d]|\d(?!,))*(?P<phases>[\d, ]*?)\]}}")
+                          r"(?:[^\d]|\d(?!,))*(?P<phases>[\d, ]*?)\].*?}}")
     __GRTITLE = re.compile(r"Bead Cycle (?P<id>\d+) p.*")
     @classmethod
     @_checktype
