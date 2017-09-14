@@ -45,7 +45,6 @@ class ExtremumAlignmentTask(Task):
             * |phase 3 - phase 5| < 'outlier' x median
             * |phase 3 - phase 1| < 'outlier' x median
             * |phase 1 - phase 5| < 'delta'
-            * std(phase 3)        < 'deviation'
 
         * *phase* = 'measure': alignment is performed on phase 5. If outliers
         are found on phase 5:
@@ -54,6 +53,8 @@ class ExtremumAlignmentTask(Task):
             median, a *phase* = None alignment is returned.
             * otherwise outliers are aligned on phase 1. Finally phase 3
             outliers are re-aligned on phase 3.
+
+    In any case, cycles that could not be aligned are removed.
 
     Attributes:
 
@@ -76,7 +77,7 @@ class ExtremumAlignmentTask(Task):
     pull       = .1
     opening    = .5
     delta      = .2
-    deviation  = .1
+    delete     = True
 
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_):
@@ -105,11 +106,14 @@ class ExtremumAlignmentProcessor(Processor):
                 align = ExtremumAlignment(binsize = window, mode = mode).many
             return align(vals, subtract = False)
 
-        def translate(self, bias):
+        def translate(self, delete, bias):
             "translates data according to provided biases"
             for val, delta in zip(self.cycles.withphases(...).values(), bias):
                 if np.isfinite(delta):
                     val += delta
+                elif delete:
+                    val[:] = np.NaN
+
             return next(iter(self.cycles.data.items()))
 
     _Args = NamedTuple('_Args',
@@ -134,17 +138,14 @@ class ExtremumAlignmentProcessor(Processor):
 
         bad  = cls.__less(args.measure-args.pull, kwa, 'opening')
         bad &= cls.__less(args.initial-args.pull, kwa, 'opening')
+        bad |= np.isnan(bias)
         if any(bad):
             bad = np.nonzero(bad)[0]
             bad = bad[cls.__less(args.initial[bad]-args.measure[bad], kwa, 'delta')]
             if len(bad):
-                cyc = args.cycles.cycles.withphases(PHASE.measure)[..., list(bad)].values()
-                std = np.array([np.nanstd(i[cls._get(kwa, 'window'):]) for i in cyc])
-                bad = bad[cls.__less(std, kwa, 'deviation')]
-                if len(bad):
-                    bias[bad] = args.initial[bad]
+                bias[bad] = args.initial[bad]
 
-        return args.cycles.translate(bias)
+        return args.cycles.translate(cls._get(kwa, 'delete'), bias)
 
     @classmethod
     def _apply_measure(cls, kwa, frame, info):
@@ -168,13 +169,13 @@ class ExtremumAlignmentProcessor(Processor):
     @classmethod
     def _apply_onlyinitial(cls, kwa, frame, info):
         args = cls.__args(kwa, frame, info, False)
-        return args.cycles.translate(args.initial)
+        return args.cycles.translate(cls._get(kwa, 'delete'), args.initial)
 
     @classmethod
     def _apply_onlypull(cls, kwa, frame, info):
         args = cls.__args(kwa, frame, info, False)
         bias = args.pull + np.nanmedian(args.initial-args.pull)
-        return args.cycles.translate(bias)
+        return args.cycles.translate(cls._get(kwa, 'delete'), bias)
 
     @classmethod
     def __args(cls, kwa, frame, info, meas) -> 'ExtremumAlignmentProcessor._Args':
@@ -235,7 +236,7 @@ class ExtremumAlignmentProcessor(Processor):
 
             np.logical_and(bad, tmp, bad)
             bias[bad] = args.pull[bad]+np.nanmedian(getattr(args, attr)-args.pull)
-        return args.cycles.translate(bias)
+        return args.cycles.translate(cls._get(kwa, 'delete'), bias)
 
     @classmethod
     def apply(cls, toframe = None, **kwa):
