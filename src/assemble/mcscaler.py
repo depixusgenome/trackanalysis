@@ -45,15 +45,12 @@ a max of 2 inter springs (left and right)
 from typing import List, Dict, Tuple, Callable, Iterable, NamedTuple, FrozenSet # pylint: disable=unused-import
 import itertools
 import random
-#import networkx
-#import pickle
 import numpy as np
 import scipy.stats
 from scipy.optimize import OptimizeResult, basinhopping
 from utils.logconfig import getLogger
 from assemble.settings import SpringSetting
 import assemble.data as data
-#import assemble.scaler as scaler
 from assemble.scaler import OPeakArray, match_peaks#, Bounds
 
 LOGS=getLogger(__name__)
@@ -97,18 +94,17 @@ class Spring:
         self.xeq:float=kwa.get("xeq",0)
         self.id1:int=kwa.get("id1",0)
         self.id2:int=kwa.get("id2",0)
-        self.thres:float=kwa.get("thres",-1)
 
     def energy(self,xpos1,xpos2):
         'returns energy on the spring'
-        if self.thres>0 and abs(xpos2-xpos1-self.xeq)>self.thres:
-            return 0
+        # if self.thres>0 and abs(xpos2-xpos1-self.xeq)>self.thres:
+        #     return 0
         return self.force*(xpos2-xpos1-self.xeq)**2
 
     def tension(self,xpos1,xpos2):
         'returns the tension applied on the spring'
-        if self.thres>0 and abs(xpos2-xpos1-self.xeq)>self.thres:
-            return 0
+        # if self.thres>0 and abs(xpos2-xpos1-self.xeq)>self.thres:
+        #     return 0
         return 2*self.force*(xpos2-xpos1-self.xeq)
 
     @property
@@ -380,12 +376,12 @@ class SpringMinimizer(SpringSetting):
                                    state=state,
                                    unsigned=self.unsigned,
                                    min_overl=self.min_overl)
-        return  OptimizeResult(x=state,
-                               fun=fun,
-                               success=True,
-                               nfev=1,
-                               springs=springs,
-                               state_pre_min=args[0])
+        return OptimizeResult(x=state,
+                              fun=fun,
+                              success=True,
+                              nfev=1,
+                              springs=springs,
+                              state_pre_min=args[0])
 
     @staticmethod
     def equilibrium(springs,xinit)->OptimizeResult:
@@ -468,6 +464,7 @@ class SpringScore(SpringSetting):
     '''
     def __init__(self,**kwa):
         super().__init__(**kwa)
+        self.poserr=kwa.get("poserr",5)
         self.intra:List[Spring]=kwa.get("intra",[])
         self.inter:Dict[int,List[Spring]]=kwa.get("inter",{})
 
@@ -507,6 +504,22 @@ class SpringScore(SpringSetting):
         #penalty=np.sum((np.sort(state)[1:]-np.sort(state)[:-1])<1.1)
         return sum(scores)#+100*penalty
 
+    @staticmethod
+    def penalised_energy(springs,state,poserr):
+        '''
+        total energy of the system of spring
+        plus a penalty (based on poserr)
+        applied to each oligos which do not have inter spring
+        on either side
+        '''
+        scores=[spr.energy(state[spr.id1],state[spr.id2]) for spr in springs]
+        left=frozenset([spr.id1 for spr in springs if spr.type=='inter'])
+        right=frozenset([spr.id2 for spr in springs if spr.type=='inter'])
+        unmatched=len([idx for idx in range(len(state)) if not idx in left])
+        unmatched+=len([idx for idx in range(len(state)) if not idx in right])
+        return sum(scores)+unmatched*(2*poserr)**2
+
+
     # # version 3
     # # to finish, should be robust to the missing of oligos
     # @staticmethod
@@ -536,14 +549,17 @@ class SpringScore(SpringSetting):
     #     return inter_springs
 
 
-    # newer version does not converge towards good equilibrium... back to old version?
-    # this version behaves strangely..
-    # version 2
+    # version 2 , seems to behave correctly.
+    # the issue is now to find a way such that all scales are eventually explored
     @staticmethod
     def used_springs(inter,state:np.array)->List[Spring]:
         '''
         newer implementation of used_springs
         1 oligo can only bind once on 1 side
+        drawbacks:
+        * need to add inter springs (to represent overlapping between consecutive oligos)
+        iff the distance is below a given threshold (depending on poserr. 2*poserr?)
+        penalised_energy will catch non-matched oligos
         '''
         energies=sorted([(spr.energy(state[spr.id1],state[spr.id2]),spr.id1,spr.id2,spr)
                          for key,springs in inter.items()
@@ -603,7 +619,7 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
         super().__init__(**kwa)
         # scoring and stepper must not be springsettings but inherit springs from scaler
         self.intra:List[Spring]=self.find_intra()
-        self.inter:Dict[int,List[Spring]]=self.find_inter(thres=kwa.get("thres",-1))
+        self.inter:Dict[int,List[Spring]]=self.find_inter()
 
         self.stepper=SpringStep(intra=self.intra,
                                 inter=self.inter,
@@ -639,10 +655,10 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
                           for id1,id2 in zip(pkids[:-1],pkids[1:])])
         return intra
 
-    def find_inter(self,thres=-1)->Dict[int,List[Spring]]:
+    def find_inter(self)->Dict[int,List[Spring]]:
         '''
         add springs between experiments
-        also includes springs with force 0 to account for 
+        also includes springs with force 0 to account for
         oligos within experiment which are supposed to overlap
         '''
         signs=(0,0) if self.unsigned else (1,1)
@@ -651,7 +667,7 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
                                               min_overl=self.min_overl,
                                               signs=signs,
                                               shift=1)
-        
+
         # between experiments
         for exp1,exp2 in itertools.permutations(self.peakids,2):
             for id1,id2 in itertools.product(exp1,exp2):
@@ -660,8 +676,7 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
                                              force=self.kinter,
                                              xeq=1.1,
                                              id1=id1,
-                                             id2=id2,
-                                             thres=thres))
+                                             id2=id2))
 
         # within experiments
         # applying force 0 to not interfere with intra
@@ -673,8 +688,7 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
                                              force=0,
                                              xeq=abs(self._fpos[id1]-self._fpos[id2]),
                                              id1=id1,
-                                             id2=id2,
-                                             thres=thres))
+                                             id2=id2))
 
         return inter
 

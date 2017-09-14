@@ -11,19 +11,27 @@ import numpy as np
 import assemble.data as data
 import assemble.scaler as scaler
 
-class BasePeakSetting: # pylint: disable=too-many-instance-attributes
+class ExpSetting:
+    '''
+    info on the sequencing experiments
+    '''
+    def __init__(self,**kwa):
+        self.min_overl:int=kwa.get("min_overl",2)
+        self.unsigned:bool=kwa.get("unsigned",True)
+        self.mposerr:float
+
+class BasePeakSetting(ExpSetting): # pylint: disable=too-many-instance-attributes
     '''
     regroups information regarding oligo experiments
     '''
     def __init__(self,**kwa):
+        super().__init__(**kwa)
         self._pos:List[np.array]=[]
         self._fpos:np.array=np.empty(shape=(0,),dtype='f4') # flat
         self._seqs:List[Tuple[str, ...]]=[]
         self._fseqs:List[str]=[] # flat
         self._peaks:List[scaler.OPeakArray]=[]
         self._olis:List[data.OligoPeak]=[]
-        self.min_overl:int=kwa.get("min_overl",2)
-        self.unsigned:bool=kwa.get("unsigned",True)
         self.peakids:List[List[int]]=[]
 
     def set_peaks(self,value:scaler.OPeakArray):
@@ -36,7 +44,7 @@ class BasePeakSetting: # pylint: disable=too-many-instance-attributes
         self._fseqs=[seq for seqs in self._seqs for seq in seqs]
         self.peakids=[[self._olis.index(oli) for oli in peak.arr]
                       for peak in self._peaks] # not great imp.
-
+        self.mposerr=np.mean([oli.poserr for oli in self._olis])
 
     def get_peaks(self):
         'prop'
