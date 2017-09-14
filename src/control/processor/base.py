@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Processors apply tasks to a data flow"
 from    abc             import ABCMeta, abstractmethod
-from    functools       import wraps
+from    functools       import wraps, partial
 from    itertools       import chain
 from    typing          import (TYPE_CHECKING, Tuple, Callable, Iterable,
                                 Iterator, Union, cast)
@@ -145,6 +145,28 @@ class Processor(metaclass=MetaProcessor):
         else:
             raise TypeError("{}.tasktype is not callable".format(cls))
 
+    @classmethod
+    def _get_cached(cls, dico, act, frame, item):
+        ans = dico.get(item[0], None)
+        if ans:
+            return item[0], ans
+
+        item          = frame.copy(frame, act(frame, item))
+        dico[item[0]] = item[1]
+        return item
+
+    @classmethod
+    def _setup_cache(cls, cache, action, frame):
+        if action is not None:
+            frame.withaction(action)
+        act = frame.getaction()
+        if act is None:
+            raise IndexError("Nothing to cache! Set an action prior to mixin")
+
+        dico = cache.setdefault(frame.parents, dict())
+        frame.withaction(partial(cls._get_cached, dico, act), clear = True)
+        return frame
+
     @staticmethod
     def cache(fcn):
         """
@@ -162,32 +184,10 @@ class Processor(metaclass=MetaProcessor):
         have hard-to-debug side-effects.
         """
         @wraps(fcn)
-        def _run(self, args:'Runner'):
+        def _run(self: 'Processor', args:'Runner'):
             cache  = args.data.setCacheDefault(self, dict())
-            action = fcn(self, args)
-
-            def _cache(frame):
-                if action is not None:
-                    frame.withaction(action)
-                act = frame.getaction()
-                if act is None:
-                    raise IndexError("Nothing to cache! Set an action prior to mixin")
-
-                dico = cache.setdefault(frame.parents, dict())
-                cpy  = type(frame).copy
-                def _cached(item):
-                    ans = dico.get(item[0], None)
-                    if ans:
-                        return item[0], ans
-
-                    item          = cpy(act(item))
-                    dico[item[0]] = item[1]
-                    return item
-
-                frame.withaction(_cached, clear = True)
-                return frame
-
-            args.apply(_cache)
+            # pylint: disable=protected-access
+            args.apply(partial(self._setup_cache, cache, fcn(self, args)))
         return _run
 
     @staticmethod

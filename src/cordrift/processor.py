@@ -10,7 +10,7 @@ from utils                      import initdefaults
 from model                      import Task, Level, PHASE
 from control.processor          import Processor
 from control.processor.runner   import pooledinput, poolchunk, pooldump
-from data                       import Track, Cycles
+from data                       import Cycles
 from signalfilter               import rawprecision
 from eventdetection             import EventDetectionConfig
 from eventdetection.detection   import EventDetector
@@ -67,7 +67,7 @@ class _BeadDriftAction:
     def profile(self, frame:Cycles, bcopy:bool) -> Profile:
         "action for removing bead drift"
         data = []
-        def _setcache(info):
+        def _setcache(_, info):
             data.append(info[1])
             return info
 
@@ -98,9 +98,10 @@ class _BeadDriftAction:
         for _, vals in cycle:
             vals[prof.xmin:prof.xmax] -= prof.value[:len(vals)-prof.xmin]
 
-    def onBead(self, track:Track, info:Tuple[Any,np.ndarray]):
+    def onBead(self, track, info:Tuple[Any,np.ndarray]):
         "Applies the cordrift subtraction to a bead"
-        cyc = Cycles(track = track, data = dict((info,)))
+        track = getattr(track, 'track', track)
+        cyc   = Cycles(track = track, data = dict((info,)))
         self.run((track.path, info[0]), cyc.withphases(self.task.phases))
         return info
 
@@ -153,8 +154,7 @@ class DriftProcessor(Processor):
         "applies the task to a frame or returns a function that does so"
         action = cls._ACTION(kwa, cache = cache)
         if kwa.get('onbeads', True):
-            fcn = lambda i: (i.new().withaction(partial(action.onBead, i.track),
-                                                beadsonly = True))
+            fcn = lambda i: (i.new().withaction(action.onBead, beadsonly = True))
         elif pool is None:
             fcn = lambda i: i.new().withdata(i, action.onCycles)
 

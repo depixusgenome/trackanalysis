@@ -123,6 +123,6 @@ def _test():
     import traceback
     traceback.print_stack()
     assert False, stack[-1]
-_test()
+#_test()
 del _test
 del _is_jupyter

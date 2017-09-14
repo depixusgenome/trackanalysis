@@ -13,15 +13,16 @@ Monkeypatches as follows
         * *with...* methods return an updated copy
 """
 from typing                 import List
+from functools              import partial
 from signalfilter           import NonLinearFilter
 from ..views                import Beads, Cycles
 
+def _action(filt, frame, info):
+    return (info[0], filt(info[1], precision = frame.track.rawprecision(info[0])))
+
 def _withfilter(self, tpe = NonLinearFilter, **kwa):
     "applies the filter to the data"
-    filt = tpe(**kwa)
-    fcn  = lambda info: (info[0],
-                         filt(info[1], precision = self.track.rawprecision(info[0])))
-    return self.withaction(fcn)
+    return self.withaction(partial(_action, tpe(**kwa)))
 
 for _cls in (Beads, Cycles):
     _cls.withfilter = _withfilter

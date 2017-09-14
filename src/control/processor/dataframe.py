@@ -15,9 +15,8 @@ from    .base                   import Processor
 class DataFrameFactory:
     "base class for creating dataframes"
     FRAME_TYPE: type = None
-    def __init__(self, task: DataFrameTask, frame: TrackView) -> None:
+    def __init__(self, task: DataFrameTask, _: TrackView) -> None:
         self.task  = task
-        self.frame = frame
 
     def getfunctions(self) -> Iterator[Tuple[str, Callable]]:
         "returns measures, with string changed to methods from np"
@@ -56,10 +55,10 @@ class DataFrameFactory:
         # pylint: disable=unidiomatic-typecheck
         return cls(task, frame) if type(frame) is cls.FRAME_TYPE else None
 
-    def dataframe(self, info) -> pd.DataFrame:
+    def dataframe(self, frame, info) -> pd.DataFrame:
         "creates a dataframe"
-        data = pd.DataFrame(self._run(*info))
-        inds = self.indexcolumns(len(data), info[0], self.frame)
+        data = pd.DataFrame(self._run(frame, *info))
+        inds = self.indexcolumns(len(data), info[0], frame)
         if len(inds):
             data = pd.concat([pd.DataFrame(inds), data], 1)
 
@@ -68,7 +67,7 @@ class DataFrameFactory:
             data.set_index(cols, inplace = True)
         return info[0], data
 
-    def _run(self, key, values) -> Dict[str, np.ndarray]:
+    def _run(self, frame, key, values) -> Dict[str, np.ndarray]:
         raise NotImplementedError()
 
 class DataFrameProcessor(Processor):

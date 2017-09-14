@@ -65,7 +65,7 @@ class BeadSubtractionProcessor(Processor):
     @classmethod
     def __run(cls, task, cache, frame):
         frame = frame.new().discarding(task.beads)
-        return frame.withaction(partial(cls.__action, task, cache, frame))
+        return frame.withaction(partial(cls.__action, task, cache))
 
     @classmethod
     def apply(cls, toframe = None, cache = None, **kwa):

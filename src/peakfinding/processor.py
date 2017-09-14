@@ -35,10 +35,10 @@ class PeakCorrelationAlignmentProcessor(Processor):
         return True
 
     @classmethod
-    def __action(cls, frame, cnf):
+    def __action(cls, cnf):
         cache = dict() # type: Dict[BEADKEY, np.ndarray]
         tsk   = PeakCorrelationAlignment(**cnf)
-        def _action(info):
+        def _action(frame, info):
             nonlocal cache
             deltas = cache.get(info[0][0], None)
             if deltas is None:
@@ -56,7 +56,7 @@ class PeakCorrelationAlignmentProcessor(Processor):
         # pylint: disable=not-callable
         fcn = lambda frame: (frame
                              .new()
-                             .withaction(cls.__action(frame, cnf), beadsonly = True))
+                             .withaction(cls.__action(cnf), beadsonly = True))
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
@@ -98,7 +98,7 @@ class PeakProbabilityTask(Task):
 class PeakProbabilityProcessor(Processor):
     "Computes probabilities for each peak"
     @staticmethod
-    def __action(frame, minduration, framerate, info):
+    def __action(minduration, framerate, frame, info):
         rate = frame.track.framerate if framerate is None else framerate
         prob = Probability(minduration = minduration, framerate = rate)
         ends = frame.track.phaseduration(..., PHASE.measure)
@@ -112,7 +112,7 @@ class PeakProbabilityProcessor(Processor):
                                if isinstance(i, EventDetectionConfig))
             minduration = events.events.select.minduration
 
-        fcn = lambda i: i.withaction(partial(cls.__action, i, minduration, framerate))
+        fcn = lambda i: i.withaction(partial(cls.__action, minduration, framerate))
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):

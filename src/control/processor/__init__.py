@@ -79,7 +79,7 @@ a *(bead key, bead data)* pair and must return the same or another such pair.
     >>>         #   2. It uses a copy of the task's dict because evaluations are
     >>>         #   done lazily and we don't want later changes to impact
     >>>         #   the current evaluation
-    >>>         def _action(info):
+    >>>         def _action(frame, info):
     >>>             i[1] *= cnf['factor']
     >>>             return i # don'f forget to return a (key, value) pair
     >>>         args.apply(lambda frame: frame.withaction(_action))

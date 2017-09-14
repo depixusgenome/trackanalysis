@@ -192,20 +192,21 @@ class DataCleaningException(Exception):
 
 class DataCleaningProcessor(Processor):
     "Processor for bead selection"
+    tasktype = DataCleaningTask
     @classmethod
     def __get(cls, name, cnf):
         return cnf.get(name, getattr(cls.tasktype, name))
 
     @classmethod
     def __test(cls, frame, cnf):
-        sel = DataCleaningTask(**cnf)
+        sel = cls.tasktype(**cnf)
         for name in sel.CYCLES:
             cycs = tuple(frame.withphases(*cls.__get(name+'phases', cnf)).values())
             yield getattr(sel, name)(cycs)
 
     @classmethod
-    def __compute(cls, frame, info, cache = None, **cnf):
-        res = cls.compute(frame, info, cache = cache, **cnf)
+    def __compute(cls, cnf, frame, info):
+        res = cls.compute(frame, info, **cnf)
         if res is None:
             return info
         raise res
@@ -244,12 +245,10 @@ class DataCleaningProcessor(Processor):
         return DataCleaningException(val, cnf, cls.tasktype) if discard else None
 
     @classmethod
-    def apply(cls, toframe = None, cache = None, **cnf):
+    def apply(cls, toframe = None, **cnf):
         "applies the task to a frame or returns a method that will"
-        cnf.update(cache = cache)
-        fcn = lambda frame: frame.withaction(partial(cls.__compute, frame, **cnf))
-        return fcn if toframe is None else fcn(toframe)
+        return toframe.withaction(partial(cls.__compute, cnf))
 
     def run(self, args):
         cache   = args.data.setCacheDefault(self, dict())
-        return args.apply(self.apply(cache = cache, **self.config()))
+        return args.apply(partial(self.apply, cache = cache, **self.config()))

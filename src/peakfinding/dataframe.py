@@ -37,7 +37,7 @@ class PeaksDataFrameFactory(DataFrameFactory):
                            ('eventcount',        'nevents')])
 
     # pylint: disable=arguments-differ
-    def _run(self, _, peaks) -> Dict[str, np.ndarray]:
+    def _run(self, _1, _2, peaks) -> Dict[str, np.ndarray]:
         peaks = tuple(peaks)
         meas  = [('peakposition', np.array([i for i, _ in peaks]))]
         meas += [(i, np.array([j(k) for k in peaks])) for i, j in self.__calls]

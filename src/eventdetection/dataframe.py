@@ -25,7 +25,7 @@ class EventsDataFrameFactory(DataFrameFactory):
         self.__meas['length'] = len
 
     # pylint: disable=arguments-differ
-    def _run(self, _, events: EventsArray) -> Dict[str, np.ndarray]:
+    def _run(self, _1, _2, events: EventsArray) -> Dict[str, np.ndarray]:
         return dict(event  = np.arange(len(events), dtype = 'i4'),
                     start  = events['start'],
                     **{name: np.array([fcn(i) for i in events['data']])

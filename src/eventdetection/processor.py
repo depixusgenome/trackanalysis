@@ -245,8 +245,7 @@ class ExtremumAlignmentProcessor(Processor):
         action = getattr(cls, '_apply_'+mode.value)
 
         def _apply(frame):
-            return frame.withaction(partial(action, kwa, frame),
-                                    beadsonly = True)
+            return frame.withaction(partial(action, kwa), beadsonly = True)
         return _apply if toframe is None else _apply(toframe)
 
     def run(self, args):
@@ -264,7 +263,7 @@ class BiasRemovalTask(Task):
 class BiasRemovalProcessor(Processor):
     "removes the bias from the whole bead"
     @staticmethod
-    def beadaction(frame, task, info):
+    def beadaction(task, frame, info):
         "removes the bias"
         cycles = (frame.new(data = dict((info,)))
                   [info[0],...]
@@ -287,7 +286,7 @@ class BiasRemovalProcessor(Processor):
         if toframe is None:
             return cls.apply
         task = cls.tasktype(**cnf) # pylint: disable=not-callable
-        return toframe.withaction(partial(cls.beadaction, toframe, task))
+        return toframe.withaction(partial(cls.beadaction, task))
 
     def run(self, args):
         args.apply(self.apply(**self.config()))

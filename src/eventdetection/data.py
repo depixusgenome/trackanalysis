@@ -78,7 +78,7 @@ class Events(Cycles, EventDetectionConfig, ITrackView):
 
     def swap(self, data: Union[Track, Cycles] = None) -> 'Events':
         "Returns indexes or values in data at the same key and index"
-        data = data.cycles if isinstance(data, Track) else data
+        data = getattr(data, 'cycles', data)
         return self.withaction(partial(self.__swap, data))
 
     def index(self) -> 'Events':
@@ -86,12 +86,12 @@ class Events(Cycles, EventDetectionConfig, ITrackView):
         return self.withaction(self.__index)
 
     @staticmethod
-    def __index(info):
+    def __index(_, info):
         info[1]['data'] = [range(i,i+len(j)) for i, j in info[1]]
         return info
 
     @staticmethod
-    def __swap(data, info):
+    def __swap(data, _, info):
         tmp             = data[info[0]]
         info[1]['data'] = [tmp[i:i+len(j)] for i, j in info[1]]
         return info

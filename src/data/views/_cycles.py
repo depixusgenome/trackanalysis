@@ -46,7 +46,7 @@ class Cycles(TrackView, ITrackView):
         self._direct = i
 
     def __keysfrombeads(self, sel, beadsonly):
-        beads     = tuple(self.track.beads.withdata(self.data).keys(None, beadsonly))
+        beads     = tuple(self.track.beads.new(data = self.data).keys(None, beadsonly))
         allcycles = range(self.track.ncycles)
         if sel is None:
             yield from ((col, cid) for col in beads for cid in allcycles)

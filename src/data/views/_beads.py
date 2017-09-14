@@ -64,7 +64,7 @@ class Beads(TrackView, ITrackView):
             if len(keys) == 2:
                 if isinstance(self.cycles, slice):
                     cpy = shallowcopy(self).withcycles(...) # don't select cycles twice
-                    res = self.track.cycles.withdata(cpy)
+                    res = self.track.cycles.new(data = cpy)
                     if all(_m_ellipsis(i) for i in keys):
                         return res.selecting([(..., i) for i in self.cyclerange()])
                     if _m_ellipsis(keys[1]):
@@ -72,7 +72,7 @@ class Beads(TrackView, ITrackView):
                     if keys[1] not in self.cyclerange():
                         return res.new(data = {}, direct = True)
                     return res[keys]
-                res = self.track.cycles.withdata(self)
+                res = self.track.cycles.new(data = self)
                 return res if all(_m_ellipsis(i) for i in keys) else res[keys]
             raise NotImplementedError()
         return super().__getitem__(keys)

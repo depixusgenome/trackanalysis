@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Adds methods for configuring a TracksView"
-from   inspect          import signature
 from   copy             import copy as shallowcopy
 from   itertools        import product
-from   functools        import wraps
+from   functools        import partial
 from   typing           import Tuple, Union, List, TypeVar, Hashable, cast
 import numpy            as     np
 
@@ -12,17 +11,9 @@ from   utils            import isfunction
 from   ._dict           import (TRACK_VIEW, # pylint: disable=protected-access
                                 TransformedTrackView, _m_ALL, _m_INTS, _m_ellipsis)
 
-def _m_copy(item):
+def _m_copy(_, item):
     "Copies the data"
     return item[0], np.copy(item[1])
-
-def _m_check_action_sig(fcn):
-    sig = signature(fcn)
-    try:
-        sig.bind(1)
-    except TypeError as exc:
-        msg = 'Function should have a single positional argument'
-        raise TypeError(msg) from exc
 
 def _m_torange(sli):
     start, stop, step = sli.start, sli.stop, sli.step
@@ -57,7 +48,7 @@ class TrackViewConfigMixin: # pylint: disable=invalid-name
 
         if kw.get('samples', None) is not None:
             samples = kw['samples']
-            self.actions.append(lambda item: (item[0], item[1][samples]))
+            self.actions.append(partial(self.__samples, samples))
 
     copy = staticmethod(_m_copy)    # type: ignore
 
@@ -74,10 +65,14 @@ class TrackViewConfigMixin: # pylint: disable=invalid-name
         self.beadsonly = beadsonly
         return self
 
+    @staticmethod
+    def __samples(samples, _, info):
+        return info[0], info[1][samples]
+
     def withsamples(self:CSelf, samples) -> CSelf:
         "specifies that only some samples should be taken"
         if samples is not None:
-            self.actions.append(lambda item: (item[0], item[1][samples]))
+            self.actions.append(partial(self.__samples, samples))
         return self
 
     def withcopy(self:CSelf, cpy:bool = True) -> CSelf:
@@ -89,6 +84,18 @@ class TrackViewConfigMixin: # pylint: disable=invalid-name
             self.actions.remove(fcn)
         return self
 
+    @staticmethod
+    def __f_all(_, fcn, items):
+        return items[0], fcn(items[1])
+
+    @staticmethod
+    def __f_beads(fcn, frame, items):
+        return items[0], (fcn(items[1]) if frame.isbead(items[0]) else items[1])
+
+    @staticmethod
+    def __a_beads(fcn, frame, items):
+        return fcn(frame, items) if frame.isbead(items[0]) else items
+
     def withfunction(self:CSelf, fcn = None, clear = False, beadsonly = False) -> CSelf:
         "Adds an action with fcn taking a value as single argument"
         if clear:
@@ -97,15 +104,10 @@ class TrackViewConfigMixin: # pylint: disable=invalid-name
         if fcn is None:
             return self
 
-        _m_check_action_sig(fcn)
         if beadsonly:
-            isbead = self.isbead
-            @wraps(fcn)
-            def _action(col):
-                return col[0], (fcn(col[1]) if isbead(col[0]) else col[1])
-            self.actions.append(_action)
+            self.actions.append(partial(self.__f_all, fcn))
         else:
-            self.actions.append(lambda col: (col[0], fcn(col[1])))
+            self.actions.append(partial(self.__f_beads, fcn))
         return self
 
     def withaction(self:CSelf, fcn = None, clear = False, beadsonly = False) -> CSelf:
@@ -116,15 +118,7 @@ class TrackViewConfigMixin: # pylint: disable=invalid-name
         if fcn is None:
             return self
 
-        _m_check_action_sig(fcn)
-        if beadsonly:
-            isbead = self.isbead
-            @wraps(fcn)
-            def _action(col):
-                return fcn(col) if isbead(col[0]) else col
-            self.actions.append(_action)
-        else:
-            self.actions.append(fcn)
+        self.actions.append(fcn if beadsonly else partial(self.__a_beads, fcn))
         return self
 
     def withdata(self:CSelf, dat, fcn = None) -> CSelf:
@@ -178,16 +172,17 @@ class TrackViewConfigMixin: # pylint: disable=invalid-name
             setattr(self, attr, None)
         return self
 
+    @staticmethod
+    def __act(actions, frame, item):
+        for action in actions:
+            item = action(frame, item)
+        return item
+
     def getaction(self, actions = None):
         "returns a function performing all actions"
         if actions is None:
             actions = self.actions
 
-        if len(actions) > 1:
-            def _act(item):
-                for action in actions:
-                    item = action(item)
-                return item
-            return _act
-
-        return actions[0] if len(actions) == 1 else None
+        return (partial(self.__act, actions) if len(actions) > 1  else
+                actions[0]                   if len(actions) == 1 else
+                None)

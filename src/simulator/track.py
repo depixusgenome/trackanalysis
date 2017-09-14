@@ -303,7 +303,7 @@ class TrackSimulator:
                 peak = np.mean([i[1].mean() for i in cur if i[1] is not None])
                 yield (peak, cur)
 
-        def _action(bead):
+        def _action(_, bead):
             track.data[bead[0]], curs =  self.__apply(_create)
             return bead[0], _generator(curs)
 

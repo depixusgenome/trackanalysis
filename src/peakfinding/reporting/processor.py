@@ -68,7 +68,7 @@ class PeakFindingExcelProcessor(Processor):
 
         def _save(frame):
             if pool is None:
-                beads = frame.withaction(lambda i: (i[0], tuple(i[1])))
+                beads = frame.withaction(lambda _, i: (i[0], tuple(i[1])))
             else:
                 beads = pooledinput(pool, pick, frame).items()
             run(path, cnf, track = frame.track, beads = beads, **kwa)

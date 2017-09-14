@@ -56,7 +56,7 @@ class TrackView(TrackViewConfigMixin, ITrackView):
         if act is None:
             yield from (col      for col in self._iter())
         else:
-            yield from (act(col) for col in self._iter())
+            yield from (act(self, col) for col in self._iter())
 
     def __getitem__(self:TSelf, keys) -> Union[TSelf, np.ndarray]:
         if (_m_ellipsis(keys)
@@ -122,7 +122,7 @@ class TrackView(TrackViewConfigMixin, ITrackView):
 
         act = self.getaction()
         if act is not None:
-            return act(vals)[1]
+            return act(self, vals)[1]
         return vals[1]
 
     @staticmethod

@@ -46,7 +46,7 @@ def beadsbyhairpin(self, sequence, oligos, **kwa):
 @addto(FitToHairpinDict)
 def dataframe(self, conversion = 'best') -> pd.DataFrame:
     "converts to a pandas dataframe"
-    def _cnv(info):
+    def _cnv(_, info):
         cnt   = 0
         items = [[], [], [], [], [], []]
         res   = info[1]

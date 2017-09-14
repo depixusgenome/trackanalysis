@@ -70,11 +70,11 @@ class PeaksDict(TrackView):
         return itm
 
     @classmethod
-    def __measure(cls, singles, multiples, info):
+    def __measure(cls, singles, multiples, _, info):
         return info[0], ((i, cls.__array2measure(singles, multiples, j)) for i, j in info[1])
 
     @classmethod
-    def __index(cls, info):
+    def __index(cls, _, info):
         return info[0], ((i, cls.__array2range(j)) for i, j in info[1])
 
     @staticmethod
