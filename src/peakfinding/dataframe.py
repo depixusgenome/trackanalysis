@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Creates a dataframe"
-from   typing                      import Dict
+from   typing                      import Dict, cast
 import numpy                       as     np
 
 from   model                       import PHASE
@@ -31,10 +31,10 @@ class PeaksDataFrameFactory(DataFrameFactory):
 
         meas          = task.measures.items()
         self.__calls  = [(i, j) for i, j in meas if callable(j)]
-        self.__attrs  = ([(i, j) for i, j in meas if isinstance(j, str)]
-                         +[('hybridizationrate',)*2,
-                           ('averageduration',)*2,
-                           ('eventcount', 'nevents')])
+        self.__attrs  = ([(i, cast(str, j)) for i, j in meas if isinstance(j, str)]
+                         +[('hybridizationrate', 'hybridizationrate'),
+                           ('averageduration',   'averageduration'),
+                           ('eventcount',        'nevents')])
 
     # pylint: disable=arguments-differ
     def _run(self, _, peaks) -> Dict[str, np.ndarray]:
