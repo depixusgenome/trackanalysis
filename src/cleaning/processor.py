@@ -147,6 +147,43 @@ class DataCleaning:
 
         return False
 
+class PostAlignmentDataCleaning:
+    "bead selection"
+    percentiles       = 5., 95.
+    percentilerange   = .1
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+    def aberrant(self, bead:np.ndarray, clip = False):
+        """
+        Removes aberrant values.
+
+        A value at position *n* is aberrant if any:
+
+            *  z[n] < percentile(z, percentiles[0]) - percentilerange
+            *  z[n] > percentile(z, percentiles[1]) + percentilerange
+
+        Aberrant values are replaced by:
+
+            * *NaN* if *clip* is true,
+            * *maxabsvalue ± median*, whichever is closest, if *clip* is false.
+
+        returns: *True* if the number of remaining values is too low
+        """
+        fin  = np.isfinite(bead)
+        good = bead[fin]
+        thr  = (np.percentile(good, self.percentiles)
+                + [-self.percentilerange, self.percentilerange])
+
+        if clip:
+            good[good < thr[0]] = thr[0]
+            good[good > thr[1]] = thr[1]
+        else:
+            good[good < thr[0]] = np.NaN
+            good[good > thr[1]] = np.NaN
+        bead[fin] = good
+
 class DataCleaningTask(DataCleaning, Task):
     "bead selection task"
     level            = Level.bead
