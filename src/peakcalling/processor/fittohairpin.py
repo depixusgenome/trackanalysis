@@ -72,7 +72,7 @@ class FitToHairpinTask(Task):
                    peakids   = {key: updatecopy(identifier, True, peaks = value.peaks)
                                 for key, value in items.items()})
 
-_INPUT = Sequence[Tuple[BEADKEY, Sequence[PeakFindingOutput]]]
+_INPUT = Iterable[PeakFindingOutput]
 _PEAKS = Tuple[np.ndarray, PeaksArray]
 Input  = Union[PeaksDict, _INPUT]
 class FitBead(NamedTuple): # pylint: disable=missing-docstring
@@ -116,11 +116,9 @@ class FitToHairpinDict(TrackView):
         yield from ((bead, self.compute(bead)) for bead in self.keys(sel))
 
     @staticmethod
-    def __topeaks(evts:Sequence[PeakFindingOutput]) -> _PEAKS:
+    def __topeaks(aevts:_INPUT) -> _PEAKS:
         "Regroups the beads from a frame by hairpin"
-        if isinstance(evts, Iterator):
-            evts = tuple(evts)
-
+        evts = tuple(aevts)
         if getattr(evts, 'dtype', 'O') == 'f4':
             return cast(np.ndarray, evts), PeaksArray([], dtype = 'O')
 
@@ -132,7 +130,7 @@ class FitToHairpinDict(TrackView):
                           discarded = disc)
         return np.array([i for i, _ in evts], dtype = 'f4'), cast(PeaksArray, evts)
 
-    def __distances(self, key: str, bead: Sequence[float])->Dict[Optional[str], Distance]:
+    def __distances(self, key: BEADKEY, bead: Sequence[float])->Dict[Optional[str], Distance]:
         distances   = self.config.distances
         constraints = self.config.constraints
         cstr        = constraints.get(key, None)
@@ -161,14 +159,15 @@ class FitToHairpinDict(TrackView):
     def compute(self, aitem: Union[BEADKEY, Tuple[BEADKEY, _INPUT]]) -> FitBead:
         "Action applied to the frame"
         if Beads.isbead(aitem):
-            item = aitem, self.data[aitem] # type: Tuple[BEADKEY, _INPUT]
+            bead = cast(BEADKEY, aitem)
+            inp  = cast(_INPUT,  self.data[bead])
         else:
-            item = aitem
+            bead, inp = cast(Tuple[BEADKEY, _INPUT], aitem)
 
 
-        peaks, events = self.__topeaks(item[1])
-        dist          = self.__distances(item[0], peaks)
-        return self.__beadoutput(aitem[0], peaks, events, dist)
+        peaks, events = self.__topeaks(inp)
+        dist          = self.__distances(bead, peaks)
+        return self.__beadoutput(bead, peaks, events, dist)
 
 class FitToHairpinProcessor(Processor):
     "Groups beads per hairpin"

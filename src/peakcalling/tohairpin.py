@@ -96,7 +96,7 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
                 else:
                     args.update(brng('bias', vals, delta, self.bias.step))
                 try:
-                    out = _cost.optimize(hpin, peaks, **args)
+                    out = self._optimize(hpin, peaks, args)
                 except: # pylint: disable=bare-except
                     continue
                 else:
@@ -114,17 +114,42 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
         if any(isinstance(i, (Sequence, np.ndarray)) for i in (stretch, bias)):
             stretch = np.asarray(stretch)
             bias    = -np.asarray(bias)*stretch
-            fcn     = lambda i, j: _cost.compute(hpin, peaks,
-                                                 symmetry = self.symmetry,
-                                                 noise    = self.precision,
-                                                 stretch  = i, bias     = j),
+            fcn     = lambda i, j: self._value(hpin, peaks, i, j,
+                                               symmetry = self.symmetry,
+                                               noise    = self.precision)
             ufcn    = np.frompyfunc(fcn, 2, 3)
             return ufcn(stretch, bias)
-        return _cost.compute(hpin, peaks,
-                             symmetry = self.symmetry,
-                             noise    = self.precision,
-                             stretch  = stretch,
-                             bias     = -bias*stretch)
+        return self._value(hpin, peaks, stretch, -bias*stretch,
+                           symmetry = self.symmetry,
+                           noise    = self.precision)
+
+    @staticmethod
+    def _value(hpin: np.ndarray, peaks: np.ndarray, stretch:float, bias:float, **_):
+        return _cost.compute(hpin, peaks, stretch = stretch, bias = bias, **_)
+
+    @staticmethod
+    def _optimize(hpin, peaks, args):
+        return _cost.optimize(hpin, peaks, **args)
+
+class MatchedPeakFit(GaussianProductFit):
+    """
+    We use the GaussianProductFit results to match peaks then estimate
+    the best Χ² fit between matched peaks, adding their count as well.
+    """
+    window = 10.
+    def _value(self, hpin: np.ndarray, peaks: np.ndarray, # type: ignore
+               stretch:float, bias:float, **_):
+        tmp   = peaks*stretch+bias
+        pairs = _match.compute(hpin, tmp, self.window)
+        if len(pairs) <= 1:
+            return np.NaN, stretch, bias
+
+        stretch, bias = np.polyfit(hpin[pairs[:,0]], peaks[pairs[:,1]], 1)
+        return _match.distance(hpin, peaks, self.window, stretch, bias), stretch, bias
+
+    def _optimize(self, hpin, peaks, args):
+        pars = _cost.optimize(hpin, peaks, **args)
+        return self._value(hpin, peaks, pars[1], pars[2])
 
 PEAKS_DTYPE = np.dtype([('zvalue', 'f4'), ('key', 'i4')])
 PEAKS_TYPE  = Union[Sequence[Tuple[float,int]],np.ndarray]
