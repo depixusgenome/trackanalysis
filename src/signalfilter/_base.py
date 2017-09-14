@@ -8,7 +8,7 @@ from itertools      import chain
 import numpy as np
 
 from utils          import initdefaults
-from ._core.stats   import hfsigma
+from ._core.stats   import hfsigma      # pylint: disable=import-error
 
 def nanhfsigma(arr: np.ndarray):
     "hfsigma which takes care of nans"

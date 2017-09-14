@@ -5,7 +5,7 @@ u"Signal Analysis: filters for removing noise"
 from typing     import Union
 #from functools  import wraps
 from pandas     import Series
-from ._core     import ForwardBackwardFilter, NonLinearFilter
+from ._core     import ForwardBackwardFilter, NonLinearFilter # pylint: disable=import-error
 
 class RollingFilter:
     u"interface to panda rolling window methods"
