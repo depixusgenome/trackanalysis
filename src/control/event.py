@@ -61,6 +61,8 @@ class EmitPolicy(Enum):
                 hdl(*args[0], **args[1])
 
 _CNT = 0
+_COMPLETIONS = Dict[Callable, Set[Callable]]
+_HANDLERS    = Dict[str, Union[Set[Callable], _COMPLETIONS]]
 class Event:
     "Event handler class"
     outasdict   = EmitPolicy.outasdict
@@ -73,11 +75,13 @@ class Event:
     __OBS_NAME  = re.compile(r'^_?on_?(\w+)', re.IGNORECASE).match
 
     def __init__(self, **kwargs):
-        self._handlers = kwargs.get('handlers', dict()) # type: Dict
+        self._handlers: _HANDLERS = kwargs.get('handlers', dict())
 
     def remove(self, name:str, fcn:Callable):
         "removes an event"
-        self._handlers.get(name, set()).discard(fcn)
+        itm = self._handlers.get(name, None)
+        if isinstance(itm, Set):
+            itm.discard(fcn)
 
     def getobservers(self, lst:Union[str,Set[str]]) -> Set[Callable]:
         "returns the list of observers"
@@ -88,9 +92,11 @@ class Event:
         for name in lst.intersection(self._handlers):
             allfcns.update(self._handlers[name])
 
-        for fcn, names in self._handlers.get('ㄡ', {}).items():
-            if any(patt(key) for patt, key in product(names, lst)):
-                allfcns.add(fcn)
+        completions = self._handlers.get('ㄡ', None)
+        if completions:
+            for fcn, names in cast(_COMPLETIONS, completions).items():
+                if any(patt(key) for patt, key in product(names, lst)):
+                    allfcns.add(fcn)
         return allfcns
 
     def handle(self,
@@ -125,7 +131,7 @@ class Event:
 
         return cls.__return(names, _wrapper)
 
-    def observe(self, *names, decorate = None, argstest = None, **kwargs):
+    def observe(self, *anames, decorate = None, argstest = None, **kwargs):
         """
         Wrapped method will handle events named in arguments.
 
@@ -155,12 +161,14 @@ class Event:
 
             return add((name,), fcn) if match is None else add((match.group(1),), fcn)
 
-        if len(names) == 1:
-            if hasattr(names[0], 'items'):
-                kwargs.update(names[0])
-                names = tuple()
+        if len(anames) == 1:
+            if hasattr(anames[0], 'items'):
+                kwargs.update(cast(dict, anames[0]))
+                names = tuple() # type: Sequence[Any]
             elif isinstance(names[0], (list, tuple)):
                 names = names[0]
+        else:
+            names = anames
 
         if len(kwargs):
             for name, val in kwargs.items():
@@ -277,11 +285,11 @@ class Event:
 
         for name in lst:
             if self.__SIMPLE(name):
-                self._handlers.setdefault(name.lower().strip(), set()).add(fcn)
+                cur = self._handlers.setdefault(name.lower().strip(), set())
+                cast(Set, cur).add(fcn)
             else:
-                (self._handlers.setdefault('ㄡ', {})
-                 .setdefault(fcn, set())
-                 .add(re.compile(name).match))
+                dcur = self._handlers.setdefault('ㄡ', {})
+                cast(_COMPLETIONS, dcur).setdefault(fcn, set()).add(re.compile(name).match)
 
         return fcn
 
