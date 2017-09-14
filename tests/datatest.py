@@ -3,6 +3,7 @@
 u""" Tests data access """
 from   pathlib      import Path
 from   itertools    import product
+from   typing       import cast # pylint: disable=unused-import
 import numpy as np
 
 from   legacy           import readtrack   # pylint: disable=import-error,no-name-in-module
@@ -20,6 +21,8 @@ class _MyItem(ITrackView):
     def __getitem__(self, key):
         return self.vals[key]
 
+    track = property(lambda self: data.Track(data = self.vals))
+
     def keys(self, sel = None, beadsonly = None):
         assert sel is None
         assert beadsonly is None
@@ -29,7 +32,7 @@ def test_beaditerkeys():
     u"tests wether keys are well listed"
     track = data.Track(path = utpath("small_legacy"), beadsonly = False)
     beads = lambda: data.Beads(track = track, data = _MyItem(track.data))
-    vals = set(tuple(range(92))+ ('zmag', 't'))
+    vals  = {i for i in range(92)} | {'zmag', 't'}
 
     assert len(tuple(beads().keys()))                 == len(vals)
     assert len(tuple(i for i, _ in beads()))          == len(vals)
@@ -70,8 +73,8 @@ def test_cycles_iterkeys():
     u"tests wether keys are well listed"
     track = data.Track(path = utpath("big_legacy"), beadsonly = False)
     cycs  = lambda: data.Cycles(track = track, data = _MyItem(track.data))
-    cids  = lambda _: set(tuple((i,_) for i in range(39)) + (('zmag', _), ('t', _)))
-    bids  = lambda _: set((_,i) for i in range(102))
+    cids  = lambda _: {(i,_) for i in range(39)} | {('zmag', _), ('t', _)}
+    bids  = lambda _: {(_,i) for i in range(102)}
     assert len(tuple(cycs().selecting(0).keys()))  == len(cids(0))
     assert len(tuple(cycs()[:,0].keys()))          == len(cids(0))
     assert len(tuple(cycs()[...,0].keys()))        == len(cids(0))
@@ -203,9 +206,10 @@ def test_loadgrdir():
     paths = utpath("big_legacy"), utpath("big_grlegacy")
     for time in range(2):
         if time == 1:
-            paths = paths[:1] + tuple(str(i) for i in Path(paths[1]).iterdir()
-                                      if i.suffix == '.gr')
-            paths = paths[5:] + paths[:5]
+            paths = (paths[:1]  # type: ignore
+                     + tuple(str(i) for i in Path(cast(str, paths[1])).iterdir()
+                             if i.suffix == '.gr'))
+            paths = paths[5:] + paths[:5] # type:ignore
         track = data.Track(path = paths)
         keys  = {0, 10, 12, 13, 14, 16, 17, 18, 1, 21, 22, 23,
                  24, 25, 26, 27, 28, 29, 2, 34, 35, 37, 3, 4, 6, 7}
@@ -221,23 +225,25 @@ def test_loadgrdir():
         assert all(np.isfinite(j).sum() == 0 for _, j in track.cycles.withphases(0)[28,...])
 
 def test_findgrdir():
-    paths = str(Path(utpath("big_legacy")).parent/'*.trk'), utpath("big_grlegacy")
-    track = data.Track(path = paths)
-    keys  = {0, 10, 12, 13, 14, 16, 17, 18, 1, 21, 22, 23,
-             24, 25, 26, 27, 28, 29, 2, 34, 35, 37, 3, 4, 6, 7}
+    trkpath = str(Path(cast(str, utpath("big_legacy"))).parent/'*.trk')
+    paths   = trkpath, utpath("big_grlegacy")
+    track   = data.Track(path = paths)
+    keys    = {0, 10, 12, 13, 14, 16, 17, 18, 1, 21, 22, 23,
+               24, 25, 26, 27, 28, 29, 2, 34, 35, 37, 3, 4, 6, 7}
     assert set(track.beadsonly.keys()) == keys
 
-    paths = str(Path(utpath("big_legacy")).parent/'test*.trk'), utpath("big_grlegacy")
-    track = data.Track(path = paths)
-    keys  = {0, 10, 12, 13, 14, 16, 17, 18, 1, 21, 22, 23,
-             24, 25, 26, 27, 28, 29, 2, 34, 35, 37, 3, 4, 6, 7}
+    trkpath = str(Path(cast(str, utpath("big_legacy"))).parent/'*.trk')
+    paths   = trkpath, utpath("big_grlegacy")
+    track   = data.Track(path = paths)
+    keys    = {0, 10, 12, 13, 14, 16, 17, 18, 1, 21, 22, 23,
+               24, 25, 26, 27, 28, 29, 2, 34, 35, 37, 3, 4, 6, 7}
     assert set(track.beadsonly.keys()) == keys
 
 def test_scancgr():
     "tests LegacyGRFilesIO.scancgr"
     assert LegacyGRFilesIO.scan("dummy", "dummy") == ((), (), ())
 
-    directory        = Path(utpath(None))
+    directory        = Path(cast(str, utpath(None)))
     pairs, grs, trks = LegacyGRFilesIO.scan(directory, directory)
     assert (pairs, grs) == ((), ())
     assert sorted(trks) == sorted(Path(directory).glob("*.trk"))

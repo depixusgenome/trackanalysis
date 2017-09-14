@@ -5,9 +5,10 @@ import sys
 import numpy
 
 import anastore
-from anastore._patches import (modifyclasses, # pylint: disable=protected-access
-                               TPE, DELETE, RESET)
-from model.task import TrackReaderTask, CycleCreatorTask, TaggingTask
+from anastore._patches  import (modifyclasses, # pylint: disable=protected-access
+                                TPE, DELETE, RESET)
+from model.task.track   import TrackReaderTask, CycleCreatorTask
+from model.task.tagging import TaggingTask
 
 BEENTHERE = []
 class _Toto(TaggingTask):
