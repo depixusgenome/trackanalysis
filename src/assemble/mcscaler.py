@@ -55,37 +55,6 @@ from assemble.scaler import OPeakArray, match_peaks#, Bounds
 
 LOGS=getLogger(__name__)
 
-# def make_graph(peaks,bstretch,bbias,min_overl=2,unsigned=True):
-#     '''
-#     creates a graph where each oligo expirement is a node
-#     '''
-#     # the first (larger) tree (DiGraph) checks if there is overlapping (unsigned==True)
-#     # between peaks seqs
-#     edges1=[(p1,p2)
-#             for p1,p2 in itertools.permutations(peaks,2)
-#             if scaler.OPeakArray.may_overlap(p1,[p2],min_overl=min_overl,unsigned=unsigned)]
-
-#     # the second (sub-tree) contains only edges between peaks which can be matched by stretch,bias
-#     edges2=[edge for edge in edges1 if scaler.match_peaks(edge[0].posarr,
-#                                                           edge[1].posarr,
-#                                                           bstretch,
-#                                                           bbias)]
-
-#     # find all paths starting with a given peakid
-#     graph=networkx.DiGraph()
-#     graph.add_edges_from(edges2)
-#     return graph
-
-
-# class OptimizeSpring:
-#     '''
-#     adds springs used during optimisation to OptimizeResult for dedbugging purposes
-#     '''
-#     def __init__(self,**kwa):
-#         self.res=OptimizeResult(**kwa)
-#         self.springs:List[Spring]=kwa.get("springs")
-
-
 class Spring:
     'models a spring'
     def __init__(self,**kwa):
@@ -111,18 +80,6 @@ class Spring:
     def ids(self)->Tuple[int, ...]:
         "ids"
         return tuple([self.id1,self.id2])
-
-# # probably no longer useful
-# def get_Jacobian(intra,inter,state):
-#     'returns Jacobian'
-#     springs=list(intra)+SpringScore.used_springs(inter,state)
-#     jac=np.array([0]*len(state))
-#     for idx,_ in enumerate(jac):
-#         force=sum([spr.tension(state[spr.id1],state[spr.id2]) for spr in springs if idx==spr.id1])
-#         force+=sum([-spr.tension(state[spr.id1],state[spr.id2])
-#                     for spr in springs if idx==spr.id2])
-#         jac[idx]=force
-#     return jac
 
 
 class SpringStepExhaust(SpringSetting):
@@ -198,28 +155,6 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
         nstate[self.peakids[self.peakid]]=stre*self._pos[self.peakid]+bias
         return nstate
 
-    # before
-    # def proposal(self,state:np.array):
-    #     '''
-    #     given the current position of oligos,
-    #     try to propose a new position for oligos in self.peakid
-    #     '''
-    #     left=list(frozenset([idx for pkid in self.peakids[self.peakid]
-    #                          for idx in self.lneighs[pkid]]))
-    #     right=list(frozenset([idx for pkid in self.peakids[self.peakid]
-    #                           for idx in self.rneighs[pkid]]))
-
-    #     tomatch=np.sort(np.hstack([np.array(state[left])-1.1,np.array(state[right])+1.1]))
-    #     matches=match_peaks(tomatch,
-    #                         self._pos[self.peakid],
-    #                         self.bstretch,
-    #                         self.bbias)
-    #     if not matches:
-    #         LOGS.debug(f"no proposal for peak id {self.peakid}")
-
-    #     if matches:
-    #         return random.choice(matches) # type: ignore
-    #     return None
 
     def random_proposal(self,state:np.array):
         '''
@@ -309,21 +244,6 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
 
         return groups
 
-    # # not great implementation, will  be rewritten
-    # def alt_proposal(self,state:np.array):
-    #     '''
-    #     When looking at sequence reconstructed by proposal
-    #     we see that after some random proposal, some peaks have 'crystalised'
-    #     In fact, groups of peaks have crystalised together (clumps)
-    #     once these are fixed after some time, what we want to do is move these
-    #     clumps relative to one another
-    #     '''
-    #     # find the clumps of peaks
-    #     # crystals=self.find_crystal(state)
-    #     # find the stre and bias which are compatible with all peaks in the clumps
-    #     # find a new stre, bias for each of the clumps
-    #     pass
-
     def new_proposal(self,state:np.array):
         '''
         given the current position of oligos,
@@ -343,22 +263,6 @@ class SpringMinimizer(SpringSetting):
 
     def __call__(self,*args,**kwa):
         return self.call(self,*args,**kwa)
-
-    # problem with basinhopping with variable number of springs
-    # def with_repulsion(self,_,_2,*args, **kwa): # pylint: disable=unused-argument
-    #     '''
-    #     compared to bare, adds springs between consecutive vertices
-    #     to force them appart'''
-    #     xinit=args[0]
-    #     springs=list(self.intra)+SpringScore.used_springs(self.inter,xinit)
-    #     repkwa={"force":30,"xeq":1.1} # force of spring same as kinter
-    #     # add springs with repulsion
-    #     springs+=[Spring(id1=id1 if xinit[id1]<xinit[id2] else id2,
-    #                      id2=id2 if xinit[id1]<xinit[id2] else id1,
-    #                      **repkwa)
-    #               for id1,id2 in itertools.permutations(range(len(xinit)),2)
-    #               if (xinit[id1]-xinit[id2])**2<1.1]
-    #     return self.equilibrium(springs,xinit)
 
     def bare(self,_,_2,*args, **kwa): # pylint: disable=unused-argument
         'finds equilibrium of a system of springs'
@@ -431,9 +335,6 @@ class SpringMinimizer(SpringSetting):
         solves the SpringSystem
         this function computes the equilibrium, not the minimisation of energy
         '''
-        # build the connectivity matrix
-        # build the K matrix (force)
-        # K=np.diag([kinter,kintra])
         # assumes x_init=0.0 # general
         lengths=np.matrix([spr.xeq for spr in springs]).T
         verts=set([idx for spr in springs for idx in spr.ids]) # careful with definition
@@ -519,36 +420,6 @@ class SpringScore(SpringSetting):
         unmatched+=len([idx for idx in range(len(state)) if not idx in right])
         return sum(scores)+unmatched*(2*poserr)**2
 
-
-    # # version 3
-    # # to finish, should be robust to the missing of oligos
-    # @staticmethod
-    # def used_springs_v3(oligos,kinter,state:np.array)->List[Spring]:
-    #     '''
-    #     for each oligo compute the inter springs with minimal energy
-    #     uses poserr to define a threshold
-    #     '''
-    #     # use inter instead it has all possible springs
-    #     inter_springs:List[Spring]
-    #     ordered=sorted([(pos,idx,oligos[idx]) for idx,pos in enumerate(state)]
-    #                    ,key=lambda x:x[0])
-    #     for pos,index,oli in ordered:
-    #         neighbors=abs(state-pos)<oli.poserr
-    #         neighbors[index]=False
-    #         # overlap on the left of index
-    #         springs=[Spring(force=kinter,
-    #                         type="inter",
-    #                         id1=idx,
-    #                         id2=index,
-    #                         xeq=1.1) for idx,val in enumerate(neighbors) if val]
-    #         energy_spr=[spr.energy(pos,)]
-    #         inter_springs.append()
-    #         # pick the one with minimal energy
-    #         # on  the right of index
-
-    #     return inter_springs
-
-
     # version 2 , seems to behave correctly.
     # the issue is now to find a way such that all scales are eventually explored
     @staticmethod
@@ -575,36 +446,6 @@ class SpringScore(SpringSetting):
             left=left.union(frozenset([spr[1]]))
             right=right.union(frozenset([spr[2]]))
         return inters
-
-    # to fix such that any oligo can bind only once (for a given overlap value>0)
-    # on a single side
-    # version 1
-    # @staticmethod
-    # def used_springs(inter,state)->List[Spring]:
-    #     '''
-    #     returns the spring used for a particular state
-    #     simplest case, for each oligo use the spring that binds to another on the right
-    #     drawbacks (decreasing order of severity):
-    #     (1) if the last oligo is the only peak of the experiment, it is unbound (NEEDS FIXING)
-    #     -> can be fixed by checking that all ids are in springs.
-    #     (2) does not forbid multiple bindings to the same side of an oligo
-    #     -> could lead to misalignment
-    #     (3) considers all oligos, not only those within measurement error
-    #     '''
-    #     springs:List[Spring]=[]
-    #     argmax=np.argmax(state)
-    #     for id1 in inter.keys():
-    #         if id1!=argmax:
-    #             try:
-    #                 scores=sorted([(spr.energy(state[id1],state[spr.id2]),spr)
-    #                                for spr in inter[id1]],key=lambda x:x[0])
-    #                 springs.append(scores[0][1])
-    #             except IndexError:
-    #                 # for small number of oligos it is possible that
-    #                 # one does not overlap with any other
-    #                 pass
-
-    #     return springs
 
 class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
     '''
@@ -638,11 +479,6 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
                        "minimizer_kwargs":dict(method=self.minimizer),
                        "take_step":self.stepper,
                        "T":1}
-
-        # self.basinkwa["minimizer_kwargs"]=dict(method=no_minimizer)
-        # self.basinkwa["minimizer_kwargs"]=dict(method="L-BFGS-B")
-        # minimization using L-BFGS-B also allows for minimization of vertices
-
 
     def find_intra(self)->List[Spring]:
         'add springs within an experiment'
@@ -753,15 +589,6 @@ class SpringCluster(SpringScaler):
                       stretches:Tuple[Bounds,...],
                       biases:Tuple[Bounds,...])->OPeakArray:
         '''
-        # more efficient way to implement but longer to implement
-        # nbias=Bounds(sum((bnd.lower for bnd in biases)),
-        #              sum((bnd.upper for bnd in biases)))
-        # nstre=Bounds(stretches[1].lower/stretches[0].upper,
-        #              stretches[1].upper/stretches[0].lower)
-
-        # # runs scaler on the 2 peaks
-        # scales=match_peaks(exp1.posarr,exp2.posarr,nstre,nbias)
-
         # faster implementation and testing
         # the mcmc scoring defines which is best in terms of k1, k2
         self.scaler=SpringScaler(**dict(list(self.kwargs.items())+[("peaks",[exp1,exp2])]))
