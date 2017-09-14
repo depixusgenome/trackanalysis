@@ -5,7 +5,7 @@
 from pathlib                        import Path
 from tempfile                       import mktemp, gettempdir
 from numpy.testing                  import assert_allclose
-from peakcalling.tohairpin          import np, Hairpin, PEAKS_DTYPE
+from peakcalling.tohairpin          import np, HairpinFitter, PEAKS_DTYPE
 from peakcalling.processor          import ByHairpinGroup, ByHairpinBead, Distance
 from data                           import Track
 from utils                          import EVENTS_DTYPE
@@ -61,8 +61,8 @@ def test_excel():
     fcn = lambda x: run(path      = x,
                         track     = track,
                         config    = "myconfig",
-                        hairpins  = {'hp100': Hairpin(peaks = truth[0]),
-                                     'hp101': Hairpin(peaks = truth[1])},
+                        hairpins  = {'hp100': HairpinFitter(peaks = truth[0]),
+                                     'hp101': HairpinFitter(peaks = truth[1])},
                         sequences = sequences,
                         oligos    = ['atgc'],
                         knownbeads= (98,),
@@ -160,8 +160,8 @@ def test_excelprocessor():
 
 
     task = HybridstatExcelTask(path      = mktemp()+"_hybridstattest2.xlsx",
-                               hairpins  = {'hp100': Hairpin(peaks = truth[0]),
-                                            'hp101': Hairpin(peaks = truth[1])},
+                               hairpins  = {'hp100': HairpinFitter(peaks = truth[0]),
+                                            'hp101': HairpinFitter(peaks = truth[1])},
                                sequences = sequences,
                                oligos    = ['atgc'],
                                knownbeads= (98,),

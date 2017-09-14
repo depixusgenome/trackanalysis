@@ -13,7 +13,7 @@ import numpy                    as     np
 
 from signalfilter               import rawprecision
 
-from peakcalling.tohairpin      import HairpinDistance
+from peakcalling.tohairpin      import GaussianProductFit
 
 from view.dialog                import FileDialog
 from view.pathinput             import PathInput
@@ -148,7 +148,7 @@ class PeaksStatsWidget(WidgetCreator):
             if nrem == 2:
                 self.values[8] += self.openhp
 
-            self.values[9] = HairpinDistance.silhouette(dist, key)
+            self.values[9] = GaussianProductFit.silhouette(dist, key)
 
             if nfound > 2:
                 stretch         = dist[key].stretch

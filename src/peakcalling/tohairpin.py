@@ -12,7 +12,7 @@ from ._core         import cost as _cost, match as _match # pylint: disable=impo
 from ._base         import (Distance, GriddedOptimization, PointwiseOptimization,
                             DEFAULT_BEST)
 
-class Hairpin:
+class HairpinFitter:
     "Class containing theoretical peaks and means for matching them to experimental ones"
     peaks     = np.empty((0,), dtype = 'f4') # type: np.array
     firstpeak = True
@@ -39,8 +39,8 @@ class Hairpin:
 
     @classmethod
     def read(cls, path:Union[StreamUnion, Dict], oligos:Sequence[str], **kwa
-            ) -> Iterator[Tuple[str, 'Hairpin']]:
-        "creates a list of *Hairpin* from a fasta file and a list of oligos"
+            ) -> Iterator[Tuple[str, 'HairpinFitter']]:
+        "creates a list of *HairpinFitter* from a fasta file and a list of oligos"
         itr = (path         if isinstance(path, Iterator)             else
                path.items() if callable(getattr(path, 'items', None)) else # type: ignore
                _read(path))
@@ -59,7 +59,7 @@ class Hairpin:
         else:
             return 1. if len(dist) == 1 else -3.
 
-class HairpinDistance(Hairpin, GriddedOptimization):
+class GaussianProductFit(HairpinFitter, GriddedOptimization):
     """
     Matching experimental peaks to hairpins using a cost function:
 
@@ -74,7 +74,7 @@ class HairpinDistance(Hairpin, GriddedOptimization):
     """
     precision = 15.
     def __init__(self, **kwa):
-        Hairpin.__init__(self, **kwa)
+        HairpinFitter.__init__(self, **kwa)
         GriddedOptimization.__init__(self, **kwa)
 
     def optimize(self, peaks: np.ndarray) -> Distance:
@@ -128,7 +128,7 @@ class HairpinDistance(Hairpin, GriddedOptimization):
 
 PEAKS_DTYPE = np.dtype([('zvalue', 'f4'), ('key', 'i4')])
 PEAKS_TYPE  = Union[Sequence[Tuple[float,int]],np.ndarray]
-class PeakIdentifier(Hairpin, PointwiseOptimization):
+class PeakMatching(HairpinFitter, PointwiseOptimization):
     "Identifying experimental peaks with the theoretical ones"
     window          = 10.
     lastpeak        = True
@@ -136,7 +136,7 @@ class PeakIdentifier(Hairpin, PointwiseOptimization):
     dataprecisions  = 1., 1e-3
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
-        Hairpin.__init__(self, **kwa)
+        HairpinFitter.__init__(self, **kwa)
         PointwiseOptimization.__init__(self, **kwa)
 
     @property

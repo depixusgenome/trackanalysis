@@ -14,14 +14,14 @@ from excelreports.creation  import Reporter as _Reporter, column_method, FILEOBJ
 from data.track             import Track, BEADKEY
 from signalfilter           import rawprecision
 from sequences              import read as readsequence
-from peakcalling.tohairpin  import Hairpin
+from peakcalling.tohairpin  import HairpinFitter
 from peakcalling.processor  import ByHairpinGroup as Group, ByHairpinBead as Bead
 
 class HasLengthPeak:
     "Deals with the number of peaks"
     def __init__(self, base:'HasLengthPeak') -> None:
-        self.haslengthpeak                = getattr(base, 'haslengthpeak', False)
-        self.hairpins: Dict[str, Hairpin] = getattr(base, 'hairpins', {})
+        self.haslengthpeak                   = getattr(base, 'haslengthpeak', False)
+        self.hairpins: Dict[str, HairpinFitter] = getattr(base, 'hairpins', {})
 
     def isstructural(self, ref:Group, bead:Bead, ipk:int) -> bool:
         "not peak 0 or size of hairpin"
@@ -124,14 +124,14 @@ class TrackInfo:
 
 class ReporterInfo(HasLengthPeak):
     "All info relevant to the current analysis report"
-    groups:        Sequence[Group]    = []
-    hairpins:      Dict[str, Hairpin] = {}
-    sequences:     Dict[str, str]     = {}
-    oligos:        Sequence[str]      = []
-    knownbeads:    Sequence[BEADKEY]  = []
-    minduration                       = 1
-    haslengthpeak                     = False
-    track                             = TrackInfo(None)
+    groups:     Sequence[Group]          = []
+    hairpins:   Dict[str, HairpinFitter] = {}
+    sequences:  Dict[str, str]           = {}
+    oligos:     Sequence[str]            = []
+    knownbeads: Sequence[BEADKEY]        = []
+    minduration                          = 1
+    haslengthpeak                        = False
+    track                                = TrackInfo(None)
     @initdefaults(frozenset(locals()))
     def __init__(self, *args:dict, **_) -> None:
         kwa = args[0] # initdefaults will have set args to [kwargs]
@@ -147,7 +147,7 @@ class ReporterInfo(HasLengthPeak):
         kwa['sequences'] = {i: j.lower() for i, j in kwa['sequences'].items()}
 
         if kwa.get('hairpins', None) is None:
-            kwa['hairpins'] = dict(Hairpin.read(kwa['sequences'], kwa['oligos']))
+            kwa['hairpins'] = dict(HairpinFitter.read(kwa['sequences'], kwa['oligos']))
 
         if kwa.get('knownbeads', None) is None:
             kwa.pop('knownbeads')

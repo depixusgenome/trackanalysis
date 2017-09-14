@@ -12,8 +12,9 @@ from control.processor          import processors
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
 from peakfinding.processor      import PeakSelectorTask
 from peakfinding.probabilities  import Probability
-from peakcalling.tohairpin      import HairpinDistance, PeakIdentifier, Distance
-from peakcalling.processor      import FitToHairpinTask, FitToHairpinProcessor, FitBead
+from peakcalling.tohairpin      import GaussianProductFit, PeakMatching, Distance
+from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
+                                        FitBead)
 
 from view.plots.tasks           import TaskPlotModelAccess, TaskAccess
 from view.plots.sequence        import (readsequence,
@@ -28,8 +29,8 @@ class FitToHairpinAccess(TaskAccess):
     def __init__(self, ctrl):
         super().__init__(ctrl, FitToHairpinTask)
         self.__defaults = self.config.root.tasks.fittohairpin
-        self.__defaults.defaults = {'distances': HairpinDistance(),
-                                    'peakids':   PeakIdentifier()}
+        self.__defaults.defaults = {'distances': GaussianProductFit(),
+                                    'peakids':   PeakMatching()}
 
     def setobservers(self, mdl):
         "observes the global model"

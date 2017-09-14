@@ -11,16 +11,16 @@ from control.processor          import Processor
 from data.views                 import BEADKEY, TrackView, Beads
 from peakfinding.selector       import Output as PeakFindingOutput, PeaksArray
 from peakfinding.processor      import PeaksDict
-from ..tohairpin                import (HairpinDistance, Distance,
-                                        PeakIdentifier, PEAKS_TYPE)
+from ..tohairpin                import (GaussianProductFit, Distance,
+                                        PeakMatching, PEAKS_TYPE)
 
 class DistanceConstraint(NamedTuple): # pylint: disable=missing-docstring
     hairpin     : str
     constraints : dict
 
-Distances   = Dict[str,     HairpinDistance]
+Distances   = Dict[str,     GaussianProductFit]
 Constraints = Dict[BEADKEY, DistanceConstraint]
-PeakIds     = Dict[str,     PeakIdentifier]
+PeakIds     = Dict[str,     PeakMatching]
 
 class FitToHairpinTask(Task):
     "Fits a bead to all hairpins"
@@ -57,17 +57,17 @@ class FitToHairpinTask(Task):
     def read(cls,
              path       : StreamUnion,
              oligos     : Sequence[str],
-             distance   : HairpinDistance = None,
-             identifier : PeakIdentifier  = None
+             distance   : GaussianProductFit = None,
+             identifier : PeakMatching  = None
             ) -> 'FitToHairpinTask':
         "creates a BeadsByHairpin from a fasta file and a list of oligos"
-        items = dict(HairpinDistance.read(path, oligos))
+        items = dict(GaussianProductFit.read(path, oligos))
         if distance is not None:
             items = {i: updatecopy(distance, True, peaks = j.peaks)
                      for i, j in items.items()}
 
         if identifier is None:
-            identifier = PeakIdentifier()
+            identifier = PeakMatching()
         return cls(distances = items,
                    peakids   = {key: updatecopy(identifier, True, peaks = value.peaks)
                                 for key, value in items.items()})
@@ -153,8 +153,8 @@ class FitToHairpinDict(TrackView):
                      dist    : Dict[Optional[str], Distance],
                     ) -> FitBead:
         best = min(dist, key = dist.__getitem__)
-        silh = HairpinDistance.silhouette(dist, best)
-        alg  = self.config.peakids.get(best, PeakIdentifier())
+        silh = GaussianProductFit.silhouette(dist, best)
+        alg  = self.config.peakids.get(best, PeakMatching())
         ids  = alg.pair(peaks, *dist.get(best, (0., 1., 0))[1:])
         return FitBead(key, silh, dist, ids, events)
 

@@ -6,10 +6,10 @@ from  typing                import Union, Iterable
 import numpy as np
 
 from  peakfinding.alignment import PeakCorrelationAlignment
-from .tohairpin             import Hairpin
+from .tohairpin             import HairpinFitter
 
 
-class HairpinCycleAlignment(PeakCorrelationAlignment, Hairpin):
+class HairpinCycleAlignment(PeakCorrelationAlignment, HairpinFitter):
     "Aligns each cycle to the sequence"
     class WorkTable(PeakCorrelationAlignment.WorkTable):
         "Contains data to be saved from action to action"
@@ -32,7 +32,7 @@ class HairpinCycleAlignment(PeakCorrelationAlignment, Hairpin):
 
     def __init__(self, **kwa):
         PeakCorrelationAlignment.__init__(self, **kwa)
-        Hairpin                 .__init__(self, **kwa)
+        HairpinFitter           .__init__(self, **kwa)
 
     def __call__(self,
                  data:      Union[np.ndarray, Iterable[np.ndarray]],

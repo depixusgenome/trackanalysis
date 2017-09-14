@@ -17,7 +17,7 @@ from peakfinding.histogram      import HistogramData
 from peakcalling                import cost, match
 from peakcalling.toreference    import ReferenceDistance
 from peakcalling.processor      import (BeadsByHairpinProcessor, BeadsByHairpinTask,
-                                        PeakIdentifier, HairpinDistance,
+                                        PeakMatching, GaussianMatrixFit,
                                         DistanceConstraint)
 from testingcore                import DummyPool, path as utpath
 
@@ -82,14 +82,14 @@ def test_onehairpincost():
     u"tests hairpin cost method"
     truth = np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')/8.8e-4
     bead  = (truth*1.03+1.)*8.8e-4
-    res   = HairpinDistance(peaks = truth).optimize(bead[:-1])
+    res   = GaussianMatrixFit(peaks = truth).optimize(bead[:-1])
     assert_allclose((bead-res[2])*res[1], truth, rtol = 1e-4, atol = 1e-2)
 
 def test_onehairpinid():
     u"tests haipin id method"
     truth = np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')/8.8e-4
     bead  = np.array([0., 0.01, .1, .2, .5, 1.], dtype = 'f4') - 1.
-    res   = PeakIdentifier(peaks = truth).pair(bead, 1./8.8e-4, -1.)
+    res   = PeakMatching(peaks = truth).pair(bead, 1./8.8e-4, -1.)
     assert_allclose(res['zvalue'], bead)
     assert_allclose(res['key'], np.insert(np.int32(truth[:-1]+.1), 1, np.iinfo('i4').min))
 
@@ -102,10 +102,10 @@ def test_hairpincost():
              (101, (truth[1][:-1]*.97-1) *8.8e-4),
              (110, np.empty((0,), dtype = 'f4'))]
 
-    hpins   = {'hp100': HairpinDistance(peaks = truth[0]),
-               'hp101': HairpinDistance(peaks = truth[1])}
-    ids     = {'hp100': PeakIdentifier(peaks = truth[0]),
-               'hp101': PeakIdentifier(peaks = truth[1])}
+    hpins   = {'hp100': GaussianMatrixFit(peaks = truth[0]),
+               'hp101': GaussianMatrixFit(peaks = truth[1])}
+    ids     = {'hp100': PeakMatching(peaks = truth[0]),
+               'hp101': PeakMatching(peaks = truth[1])}
     results = dict(BeadsByHairpinProcessor.compute(hpins, {}, ids, beads))
     assert len(results) == 3
     assert len(results['hp100']) == 1
@@ -127,8 +127,8 @@ def test_constrainedhairpincost():
              (101, (truth[1][:-1]*.97-1) *8.8e-4),
              (110, np.empty((0,), dtype = 'f4'))]
 
-    hpins   = {'hp100': HairpinDistance(peaks = truth[0]),
-               'hp101': HairpinDistance(peaks = truth[1])}
+    hpins   = {'hp100': GaussianMatrixFit(peaks = truth[0]),
+               'hp101': GaussianMatrixFit(peaks = truth[1])}
     cstrs   = dict.fromkeys((100, 110), DistanceConstraint('hp101', {}))
 
     results = dict(BeadsByHairpinProcessor.compute(hpins, cstrs, {}, beads))
@@ -140,8 +140,8 @@ def test_control():
     peaks = np.array([0.,  .1, .5, .6, 1.], dtype = 'f4')
     truth = [np.array([0., .1, .5, 1.,       1.5], dtype = 'f4')/8.8e-4,
              np.array([0.,     .5,      1.2, 1.5], dtype = 'f4')/8.8e-4]
-    hpins = {'hp100': HairpinDistance(peaks = truth[0]),
-             'hp101': HairpinDistance(peaks = truth[1])}
+    hpins = {'hp100': GaussianMatrixFit(peaks = truth[0]),
+             'hp101': GaussianMatrixFit(peaks = truth[1])}
     pair  = create((ByPeaksEventSimulatorTask(peaks    = peaks,
                                               brownian = .01,
                                               stretch  = None,
