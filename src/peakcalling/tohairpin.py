@@ -8,7 +8,7 @@ import numpy        as np
 
 from utils          import StreamUnion, initdefaults
 from sequences      import read as _read, peaks as _peaks
-from ._core         import cost as _cost, match as _match # pylint: disable=no-name-in-module
+from ._core         import cost as _cost, match as _match # pylint: disable=import-error
 from ._base         import (Distance, GriddedOptimization, PointwiseOptimization,
                             DEFAULT_BEST)
 
