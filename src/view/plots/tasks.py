@@ -100,8 +100,12 @@ class TaskPlotModelAccess(PlotModelAccess):
         for i, task in tuple(enumerate(tasks))[::-1]:
             if self.checktask(root, task):
                 if len(procs):
-                    procs = (Processor,)+procs if Processor not in procs else procs
-                    ctrl  = ProcessorController.create(*tasks[:i+1], processors = procs)
+                    cache = ProcessorController.register(Processor)
+                    for proc in procs:
+                        ProcessorController.register(proc, cache, force = True)
+
+                    ctrl  = ProcessorController.create(*tasks[:i+1],
+                                                       processors = cache)
                     ctrl.data.setCacheDefault(0, track)
                     return ctrl
                 return self._ctrl.processors(root, task)

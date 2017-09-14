@@ -84,6 +84,11 @@ class Processor(metaclass=MetaProcessor):
             raise TypeError('"task" must have type '+ str(self.tasktype))
         self.task = task
 
+    @staticmethod
+    def canregister():
+        "allows discarding some specific processors from automatic registration"
+        return True
+
     @property
     def levelin(self) -> Level:
         "returns the task's input level"

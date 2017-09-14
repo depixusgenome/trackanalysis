@@ -122,7 +122,8 @@ class ProcessorController:
     @classmethod
     def register(cls,
                  processor: _M_PROCS_T = None,
-                 cache:     dict       = None
+                 cache:     dict       = None,
+                 force                 = False,
                 ) -> Dict[_M_PROC_T, Any]:
         "registers a task processor"
         if cache is None:
@@ -136,10 +137,11 @@ class ProcessorController:
         elif processor is None:
             return cache
 
-        if isinstance(processor.tasktype, tuple):
-            cache.update(dict.fromkeys(processor.tasktype, processor))
-        elif processor.tasktype is not None:
-            cache[processor.tasktype] = processor
+        if processor.canregister() or force:
+            if isinstance(processor.tasktype, tuple):
+                cache.update(dict.fromkeys(processor.tasktype, processor))
+            elif processor.tasktype is not None:
+                cache[processor.tasktype] = processor
 
         for sclass in getattr(processor, '__subclasses__', lambda: ())():
             cls.register(sclass, cache)

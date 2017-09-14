@@ -22,12 +22,18 @@ from    ..processor             import DataCleaningProcessor, DataCleaning
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"
     tasktype = DataCleaningProcessor.tasktype
+    @staticmethod
+    def canregister():
+        "allows discarding some specific processors from automatic registration"
+        return False
+
     @classmethod
     def compute(cls, frame, info, cache = None, **cnf):
         "returns the result of the beadselection"
-        super().compute(frame, (info[0], np.copy(info[1])), cache = cache, **cnf)
+        curr = np.copy(info[1])
+        super().compute(frame, (info[0], curr), cache = cache, **cnf)
         DataCleaning(**cnf).aberrant(info[1], clip = True)
-        cache['gui'] = np.isnan(info[1])
+        cache['gui'] = np.isnan(curr)
         return None
 
     @staticmethod
