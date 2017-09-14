@@ -3,8 +3,7 @@
 """
 Defines basic hybridstat related report objects and functions
 """
-from typing                 import (Optional, Sequence, # pylint:disable= unused-import
-                                    Callable, Dict, Iterator)
+from typing                 import Optional, Sequence, Dict, Iterator
 from abc                    import abstractmethod
 
 import numpy as np
@@ -12,19 +11,17 @@ import numpy as np
 from utils                  import initdefaults
 from model                  import PHASE
 from excelreports.creation  import Reporter as _Reporter, column_method, FILEOBJ
-from data.track             import Track, BEADKEY            # pylint: disable=unused-import
+from data.track             import Track, BEADKEY
 from signalfilter           import rawprecision
 from sequences              import read as readsequence
 from peakcalling.tohairpin  import Hairpin
-from peakcalling.processor  import (ByHairpinGroup as Group, # pylint: disable=unused-import
-                                    ByHairpinBead  as Bead,
-                                    Distance)
+from peakcalling.processor  import ByHairpinGroup as Group, ByHairpinBead as Bead
 
 class HasLengthPeak:
     "Deals with the number of peaks"
     def __init__(self, base:'HasLengthPeak') -> None:
-        self.haslengthpeak = getattr(base, 'haslengthpeak', False)
-        self.hairpins      = getattr(base, 'hairpins', {}) # type: Dict[str, Hairpin]
+        self.haslengthpeak                = getattr(base, 'haslengthpeak', False)
+        self.hairpins: Dict[str, Hairpin] = getattr(base, 'hairpins', {})
 
     def isstructural(self, ref:Group, bead:Bead, ipk:int) -> bool:
         "not peak 0 or size of hairpin"
@@ -57,7 +54,7 @@ class ChartCreator:
         self._pos    = tuple(peaks.columnindex(u'Peak Position in Reference',
                                                u'Hybridisation Rate'))
         self._parent = parent
-        self._rseries= None      # type: dict
+        self._rseries:dict = None
         self._row    = peaks.tablerow()+1
         self._sheet  = peakstype.sheet_name
 
@@ -78,7 +75,7 @@ class ChartCreator:
     def _peaks(self, ref:Group, bead:Bead):
         if bead is None:
             return self._parent.config.hairpins[ref.key].peaks
-        return bead.peaks['zvalue']
+        return bead.peaks['zvalue'] # type: ignore
 
     def __call__(self, ref:Group, bead:Bead):
         "returns a chart for this bead if peak is peaks zero"
@@ -112,11 +109,11 @@ class TrackInfo:
     All info in Track which is relevant to Reporter.
     This allows pickling ReporterInfo and producing reports later.
     """
-    path            = ''
-    framerate       = 0.
-    ncycles         = 0
-    uncertainties   = {}    # type: Dict[BEADKEY,float]
-    durations       = []    # type: Sequence[int]
+    path                                 = ''
+    framerate                            = 0.
+    ncycles                              = 0
+    uncertainties:   Dict[BEADKEY,float] = {}
+    durations:       Sequence[int]       = []
     def __init__(self, track: Optional[Track]) -> None:
         if track is not None:
             self.path          = track.path
@@ -127,14 +124,14 @@ class TrackInfo:
 
 class ReporterInfo(HasLengthPeak):
     "All info relevant to the current analysis report"
-    groups        = [] # type: Sequence[Group]
-    hairpins      = {} # type: Dict[str, Hairpin]
-    sequences     = {} # type: Dict[str, str]
-    oligos        = [] # type: Sequence[str]
-    knownbeads    = [] # type: Sequence[BEADKEY]
-    minduration   = 1
-    haslengthpeak = False
-    track         = TrackInfo(None)
+    groups:        Sequence[Group]    = []
+    hairpins:      Dict[str, Hairpin] = {}
+    sequences:     Dict[str, str]     = {}
+    oligos:        Sequence[str]      = []
+    knownbeads:    Sequence[BEADKEY]  = []
+    minduration                       = 1
+    haslengthpeak                     = False
+    track                             = TrackInfo(None)
     @initdefaults(frozenset(locals()))
     def __init__(self, *args:dict, **_) -> None:
         kwa = args[0] # initdefaults will have set args to [kwargs]

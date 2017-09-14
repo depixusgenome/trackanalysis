@@ -93,7 +93,7 @@ class Beads(TrackView, ITrackView):
         return self.__withcycles(cyc)
 
     @staticmethod
-    def isbead(key:BEADKEY) -> bool:
+    def isbead(key) -> bool:
         "returns whether the key is one for a bead"
         return isinstance(key, _m_INTS)
 

@@ -13,7 +13,7 @@ import numpy                    as     np
 
 from signalfilter               import rawprecision
 
-from peakcalling.processor      import HairpinDistance
+from peakcalling.tohairpin      import HairpinDistance
 
 from view.dialog                import FileDialog
 from view.pathinput             import PathInput

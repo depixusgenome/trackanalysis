@@ -12,9 +12,8 @@ from control.processor          import processors
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
 from peakfinding.processor      import PeakSelectorTask
 from peakfinding.probabilities  import Probability
-from peakcalling.tohairpin      import HairpinDistance, PeakIdentifier
-from peakcalling.processor      import (FitToHairpinTask, # pylint: disable=unused-import
-                                        FitToHairpinProcessor, FitBead, Distance)
+from peakcalling.tohairpin      import HairpinDistance, PeakIdentifier, Distance
+from peakcalling.processor      import FitToHairpinTask, FitToHairpinProcessor, FitBead
 
 from view.plots.tasks           import TaskPlotModelAccess, TaskAccess
 from view.plots.sequence        import (readsequence,

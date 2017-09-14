@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Batch creator for hybridstat tasks"
-from typing                         import (Optional, # pylint: disable=unused-import
-                                            Iterator, Union, Sequence)
+from typing                         import Optional, Iterator, Union, Sequence, cast
 from copy                           import deepcopy
 from pathlib                        import Path
 import re
 
 from utils                          import initdefaults
-from data.trackio                   import checkpath, PATHTYPE # pylint: disable=unused-import
+from data.trackio                   import checkpath, PATHTYPE
 
 from model.task                     import Task, TrackReaderTask
 from control.processor.batch        import BatchTask, BatchProcessor, PathIO
 from peakfinding.reporting.batch    import PeakFindingBatchTemplate
+from peakcalling                    import Range
+from peakcalling.tohairpin          import HairpinDistance
 from peakcalling.processor          import (BeadsByHairpinTask, # pylint: disable=unused-import
                                             FitToHairpinTask, DistanceConstraint,
-                                            Constraints, HairpinDistance)
-from peakcalling                    import Range
+                                            Constraints)
 from .processor                     import HybridstatExcelTask
 from .identification                import readparams
 
@@ -29,7 +29,7 @@ def readconstraints(idtask   : FitToHairpinTask,
     if idpath is None or not Path(idpath).exists():
         return idtask
 
-    for item in readparams(idpath):
+    for item in readparams(cast(str, idpath)):
         cstrs[item[0]] = DistanceConstraint(item[1], {})
         if len(item) == 2 or not useparams:
             continue
@@ -65,7 +65,7 @@ def beadsbyhairpintask(seqpath    : Union[Path, str],
 
 class HybridstatTemplate(PeakFindingBatchTemplate):
     "Template of tasks to run"
-    identity  = BeadsByHairpinTask()    # type: Optional[BeadsByHairpinTask]
+    identity: Optional[BeadsByHairpinTask] = BeadsByHairpinTask()
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -86,10 +86,10 @@ OLIGO_PATTERNS = {1: (r'.*[_-]{}[-_].*'
 
 class HybridstatIO(PathIO):
     "Paths (as regex) on which to run"
-    sequence  = None                 # type: Optional[PATHTYPE]
-    idpath    = None                 # type: Optional[PATHTYPE]
-    useparams = False
-    oligos    = OLIGO_PATTERNS[1]    # type: Union[Sequence[str], str]
+    sequence: PATHTYPE                = None
+    idpath:   PATHTYPE                = None
+    useparams                         = False
+    oligos: Union[Sequence[str], str] = OLIGO_PATTERNS[1]
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)

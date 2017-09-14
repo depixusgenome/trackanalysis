@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Matching experimental peaks to hairpins: tasks and processors"
-from   typing       import (Dict, Sequence, NamedTuple,
-                            Iterator, Tuple, Union, Iterable, Optional)
-from   functools    import partial
+from   typing       import (Dict, Sequence, NamedTuple, FrozenSet,
+                            Iterator, Tuple, Union, Optional, Iterable, cast)
 import numpy        as     np
 
 from utils                      import StreamUnion, initdefaults, updatecopy, asobjarray
+from model                      import Task, Level
+from control.processor          import Processor
 from data.views                 import BEADKEY, TrackView, Beads
 from peakfinding.selector       import Output as PeakFindingOutput, PeaksArray
 from peakfinding.processor      import PeaksDict
-from model                      import Task, Level
-from control.processor          import Processor
-from control.processor.runner   import pooledinput, pooldump
-from .tohairpin                 import (HairpinDistance, Distance,
+from ..tohairpin                import (HairpinDistance, Distance,
                                         PeakIdentifier, PEAKS_TYPE)
 
-DistanceConstraint = NamedTuple('DistanceConstraint',
-                                [('hairpin', str), ('constraints', dict)])
+class DistanceConstraint(NamedTuple): # pylint: disable=missing-docstring
+    hairpin     : str
+    constraints : dict
 
 Distances   = Dict[str,     HairpinDistance]
 Constraints = Dict[BEADKEY, DistanceConstraint]
@@ -25,10 +24,10 @@ PeakIds     = Dict[str,     PeakIdentifier]
 
 class FitToHairpinTask(Task):
     "Fits a bead to all hairpins"
-    level       = Level.peak
-    distances   = dict() # type: Distances
-    constraints = dict() # type: Constraints
-    peakids     = dict() # type: PeakIds
+    level                     = Level.peak
+    distances   : Distances   = dict()
+    constraints : Constraints = dict()
+    peakids     : PeakIds     = dict()
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **kwa):
         super().__init__()
@@ -56,10 +55,10 @@ class FitToHairpinTask(Task):
 
     @classmethod
     def read(cls,
-             path   : StreamUnion,
-             oligos : Sequence[str],
-             distance:   HairpinDistance = None,
-             identifier: PeakIdentifier  = None
+             path       : StreamUnion,
+             oligos     : Sequence[str],
+             distance   : HairpinDistance = None,
+             identifier : PeakIdentifier  = None
             ) -> 'FitToHairpinTask':
         "creates a BeadsByHairpin from a fasta file and a list of oligos"
         items = dict(HairpinDistance.read(path, oligos))
@@ -73,18 +72,15 @@ class FitToHairpinTask(Task):
                    peakids   = {key: updatecopy(identifier, True, peaks = value.peaks)
                                 for key, value in items.items()})
 
-class BeadsByHairpinTask(FitToHairpinTask):
-    "Groups beads per hairpin"
-
-Input   = Union[PeaksDict, Iterable[Tuple[BEADKEY,np.ndarray]]]
-_PEAKS  = Tuple[Sequence[float], Sequence[PeakFindingOutput]]
-FitBead = NamedTuple('FitBead',
-                     [('key',         BEADKEY),
-                      ('silhouette',  float),
-                      ('distances',   Dict[Optional[str], Distance]),
-                      ('peaks',       PEAKS_TYPE),
-                      ('events',      PeakFindingOutput)])
-
+_INPUT = Sequence[Tuple[BEADKEY, Sequence[PeakFindingOutput]]]
+_PEAKS = Tuple[np.ndarray, PeaksArray]
+Input  = Union[PeaksDict, _INPUT]
+class FitBead(NamedTuple): # pylint: disable=missing-docstring
+    key        : BEADKEY
+    silhouette : float
+    distances  : Dict[Optional[str], Distance]
+    peaks      : PEAKS_TYPE
+    events     : _INPUT
 
 class FitToHairpinDict(TrackView):
     "iterator over peaks grouped by beads"
@@ -99,7 +95,7 @@ class FitToHairpinDict(TrackView):
         else:
             assert isinstance(config, FitToHairpinTask), config
             self.config = config
-        self.__keys = None
+        self.__keys: FrozenSet[BEADKEY] = None
 
     def _keys(self, sel:Sequence = None, _ = None) -> Iterator[BEADKEY]:
         if self.__keys is None:
@@ -112,9 +108,11 @@ class FitToHairpinDict(TrackView):
 
     def _iter(self, sel:Sequence = None) -> Iterator[Tuple[BEADKEY, FitBead]]:
         if isinstance(self.data, FitToHairpinDict):
+            itr = iter(cast(Iterable, self.data))
             if sel is None:
-                yield from iter(self.data)
-            yield from ((i, j) for i, j in self.data if i in sel)
+                yield from itr
+            else:
+                yield from ((i, j) for i, j in itr if i in sel)
         yield from ((bead, self.compute(bead)) for bead in self.keys(sel))
 
     @staticmethod
@@ -124,7 +122,7 @@ class FitToHairpinDict(TrackView):
             evts = tuple(evts)
 
         if getattr(evts, 'dtype', 'O') == 'f4':
-            return evts, PeaksArray([], dtype = 'O')
+            return cast(np.ndarray, evts), PeaksArray([], dtype = 'O')
 
         disc = (getattr(evts, 'discarded', 0) if hasattr(evts, 'discarded') else
                 0                             if len(evts) == 0             else
@@ -132,7 +130,7 @@ class FitToHairpinDict(TrackView):
         evts = asobjarray(((i, asobjarray(j)) for i, j in evts),
                           view      = PeaksArray,
                           discarded = disc)
-        return np.array([i for i, _ in evts], dtype = 'f4'), evts
+        return np.array([i for i, _ in evts], dtype = 'f4'), cast(PeaksArray, evts)
 
     def __distances(self, key: str, bead: Sequence[float])->Dict[Optional[str], Distance]:
         distances   = self.config.distances
@@ -151,7 +149,7 @@ class FitToHairpinDict(TrackView):
     def __beadoutput(self,
                      key     : BEADKEY,
                      peaks   : Sequence[float],
-                     events  : Sequence[PeakFindingOutput],
+                     events  : _INPUT,
                      dist    : Dict[Optional[str], Distance],
                     ) -> FitBead:
         best = min(dist, key = dist.__getitem__)
@@ -160,14 +158,17 @@ class FitToHairpinDict(TrackView):
         ids  = alg.pair(peaks, *dist.get(best, (0., 1., 0))[1:])
         return FitBead(key, silh, dist, ids, events)
 
-    def compute(self, item: Union[BEADKEY, Tuple[BEADKEY,Sequence[PeakFindingOutput]]]) -> FitBead:
+    def compute(self, aitem: Union[BEADKEY, Tuple[BEADKEY, _INPUT]]) -> FitBead:
         "Action applied to the frame"
-        if Beads.isbead(item):
-            item = item, self.data[item]
+        if Beads.isbead(aitem):
+            item = aitem, self.data[aitem] # type: Tuple[BEADKEY, _INPUT]
+        else:
+            item = aitem
+
 
         peaks, events = self.__topeaks(item[1])
         dist          = self.__distances(item[0], peaks)
-        return self.__beadoutput(item[0], peaks, events, dist)
+        return self.__beadoutput(aitem[0], peaks, events, dist)
 
 class FitToHairpinProcessor(Processor):
     "Groups beads per hairpin"
@@ -179,10 +180,10 @@ class FitToHairpinProcessor(Processor):
 
     @classmethod
     def compute(cls,
-                item        : Tuple[BEADKEY,Sequence[PeakFindingOutput]],
-                distances   : Optional[Distances]   = None,
-                constraints : Optional[Constraints] = None,
-                peakids     : Optional[PeakIds]     = None,
+                item        : Input,
+                distances   : Distances   = None,
+                constraints : Constraints = None,
+                peakids     : PeakIds     = None,
                 **cnf
                ) -> Tuple[BEADKEY,FitBead]:
         "Action applied to the frame"
@@ -194,66 +195,3 @@ class FitToHairpinProcessor(Processor):
 
     def run(self, args):
         args.apply(self.apply(**self.config()))
-
-ByHairpinBead  = NamedTuple('ByHairpinBead',
-                            [('key',         BEADKEY),
-                             ('silhouette',  float),
-                             ('distance',    Distance),
-                             ('peaks',       PEAKS_TYPE),
-                             ('events',      PeakFindingOutput)])
-ByHairpinGroup = NamedTuple('ByHairpinGroup',
-                            [('key', str), ('beads', Sequence[ByHairpinBead])])
-
-class BeadsByHairpinProcessor(Processor):
-    "Groups beads per hairpin"
-    CHILD = FitToHairpinProcessor
-    @staticmethod
-    def canpool():
-        return True
-
-    @classmethod
-    def apply(cls, toframe = None, data = None, pool = None, **cnf):
-        "applies the task to a frame or returns a function that does so"
-        if pool is None:
-            app = partial(cls.__unpooled, cnf)
-        else:
-            app = partial(cls.__pooled, pool, pooldump(data.append(cls.CHILD(cnf))))
-
-        fcn = lambda j: j.new(TrackView, data = lambda: app(j))
-        return fcn if toframe is None else fcn(toframe)
-
-    def run(self, args):
-        args.apply(self.apply(**args.poolkwargs(self.task), **self.config()))
-
-    @classmethod
-    def compute(cls,
-                dist  : Distances,
-                cstr  : Constraints,
-                ids   : PeakIds,
-                frame : Input
-               ) -> Iterator[ByHairpinGroup]:
-        "Regroups the beads from a frame by hairpin"
-        fcn = cls.CHILD.compute
-        yield from cls.__output(dict(fcn(i, dist, cstr, ids) for i in frame))
-
-    @classmethod
-    def __output(cls, out):
-        one  = lambda i, j: ByHairpinBead(*i[:2], i[2][j], *i[3:])
-        best = {itm.key: min(itm.distances, key = itm.distances.__getitem__)
-                for itm in out.values()}
-        for hpname in sorted(set(best.values()), key = lambda x: x or chr(255)):
-            vals = (one(val, hpname) for key, val in out.items() if best[key] == hpname)
-            yield ByHairpinGroup(hpname,
-                                 sorted(vals,
-                                        key     = lambda i: i.silhouette,
-                                        reverse = True))
-
-    @classmethod
-    def __unpooled(cls, cnf, frame):
-        vals = (cnf.get(i, {}) for i in ('distances', 'constrainst', 'peakids'))
-        return {i.key: i for i in cls.compute(*vals, frame)}
-
-    @classmethod
-    def __pooled(cls, pool, pickled, frame):
-        out  = cls.__output(pooledinput(pool, pickled, frame))
-        return {i.key: i for i in out}
