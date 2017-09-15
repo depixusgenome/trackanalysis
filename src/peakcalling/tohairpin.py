@@ -5,7 +5,6 @@ Matching experimental peaks to hairpins
 """
 from   typing       import Dict, Sequence, Iterator, Tuple, Any, Union, cast
 import numpy        as np
-from   scipy.optimize   import curve_fit
 
 from utils          import StreamUnion, initdefaults
 from sequences      import read as _read, peaks as _peaks
@@ -103,6 +102,7 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
                 else:
                     if out[0] < best[0]:
                         best = out
+        print(type(self), best)
         return Distance(best[0], best[1], delta-best[2]/best[1])
 
     def value(self, peaks: np.ndarray, stretch, bias) -> Tuple[float, float, float]:
@@ -144,14 +144,19 @@ class ChiSquareFit(GaussianProductFit):
         if self.firstpeak and any(i == 0 for i in pairs[0]):
             pairs = pairs[1:]
         if len(pairs) > 1:
-            stretch, bias = curve_fit(lambda x, *y: x*y[0]+y[1],
-                                      peaks[pairs[:,1]],
-                                      hpin[pairs[:,0]],
-                                      (stretch, bias),
-                                      loss = 'soft_l1',
-                                      x_scale= [1./stretch, 1.],
-                                      f_scale=self.window)[0]
-        return _match.distance(hpin, peaks, self.window, stretch, bias)[0], stretch, bias
+            stretch, bias = np.polyfit(peaks[pairs[:,1]], hpin[pairs[:,0]], 1)
+            dist  = ((stretch*peaks[pairs[:,1]]+bias - hpin[pairs[:,0]])**2).sum()
+            dist /= self.window**2
+        else:
+            dist = 0.
+
+        if self.symmetry:
+            dist += (len(peaks)+len(hpin)-2.*len(pairs))**2
+            dist  = np.sqrt(dist*.5/(len(peaks)+len(hpin)))
+        else:
+            dist += (len(peaks)-len(pairs))**2
+            dist  = np.sqrt(dist/len(peaks))
+        return dist, stretch, bias
 
     def _optimize(self, hpin, peaks, args):
         pars = _cost.optimize(hpin, peaks, **args)
