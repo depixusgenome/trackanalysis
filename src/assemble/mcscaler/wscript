@@ -1,2 +1,0 @@
-require('python',  scipy = '0.18.1')
-make()
