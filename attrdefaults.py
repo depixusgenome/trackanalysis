@@ -11,7 +11,8 @@ from    enum           import Enum
 
 from   .inspection     import getlocals
 
-NoArgs = type('NoArgs', (), {})
+NoArgs       = type('NoArgs', (), {})
+DefaultValue = NoArgs
 
 def toenum(tpe, val):
     "returns an enum object"
@@ -286,7 +287,9 @@ def _update(cpy: Optional[Callable[[T], T]], obj:T, always:bool, **attrs) -> T:
 
     if len(fields):
         for name in fieldnames(obj) & frozenset(attrs):
-            setattr(obj, name, attrs[name])
+            val = attrs[name]
+            if val is not NoArgs:
+                setattr(obj, name, val)
     return obj
 
 def update(obj:T, **attrs) -> T:
