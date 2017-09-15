@@ -10,7 +10,7 @@ import  numpy       as     np
 
 from    utils       import initdefaults
 from    model       import levelprop, Level
-from   .views       import Beads, Cycles, BEADKEY, _m_ALL
+from   .views       import Beads, Cycles, BEADKEY, isellipsis
 from   .trackio     import opentrack, PATHTYPES
 
 IDTYPE       = Union[None, int, slice] # missing Ellipsys as mypy won't accept it
@@ -185,7 +185,7 @@ class Track:
     def phaseduration(self, cid:IDTYPE, pid:IDTYPE) -> Union[int, np.ndarray]:
         "returns the duration of the cycle and phase"
         phases = self.__getter('_phases')
-        if pid in _m_ALL:
+        if isellipsis(pid):
             ix1, ix2 = 0, -1
         elif isinstance(pid, int):
             if pid in (-1, phases.shape[1]):
@@ -198,11 +198,12 @@ class Track:
         "returns the starttime of the cycle and phase"
         vect = self.__getter('_phases')
         orig = vect[0,0]
-        if cid in _m_ALL and pid in _m_ALL:
+        ells = isellipsis(cid), isellipsis(pid)
+        if all(ells):
             pass
-        elif cid in _m_ALL:
+        elif ells[0]:
             vect = vect[:,pid]
-        elif pid in _m_ALL:
+        elif ells[1]:
             vect = vect[cid,:]
         else:
             vect = vect[cid,pid]

@@ -6,7 +6,7 @@ from   typing import (TYPE_CHECKING, Iterator, Optional, Sequence, Tuple,
 from   copy   import copy as shallowcopy
 import numpy  as     np
 from   ._dict import (BEADKEY, # pylint: disable=protected-access
-                      _m_ellipsis, _m_INTS)
+                      isellipsis, _m_INTS)
 from   ._view import TrackView, ITrackView, Level
 
 class Beads(TrackView, ITrackView):
@@ -65,15 +65,15 @@ class Beads(TrackView, ITrackView):
                 if isinstance(self.cycles, slice):
                     cpy = shallowcopy(self).withcycles(...) # don't select cycles twice
                     res = self.track.cycles.new(data = cpy)
-                    if all(_m_ellipsis(i) for i in keys):
+                    if all(isellipsis(i) for i in keys):
                         return res.selecting([(..., i) for i in self.cyclerange()])
-                    if _m_ellipsis(keys[1]):
+                    if isellipsis(keys[1]):
                         return res.selecting([(keys[0], i) for i in self.cyclerange()])
                     if keys[1] not in self.cyclerange():
                         return res.new(data = {}, direct = True)
                     return res[keys]
                 res = self.track.cycles.new(data = self)
-                return res if all(_m_ellipsis(i) for i in keys) else res[keys]
+                return res if all(isellipsis(i) for i in keys) else res[keys]
             raise NotImplementedError()
         return super().__getitem__(keys)
 

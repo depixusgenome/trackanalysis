@@ -10,7 +10,7 @@ import numpy            as     np
 
 from   utils            import isfunction
 from   ._dict           import (TRACK_VIEW, # pylint: disable=protected-access
-                                TransformedTrackView, _m_ALL, _m_INTS, _m_ellipsis)
+                                TransformedTrackView, _m_ALL, _m_INTS, isellipsis)
 
 def _m_copy(_, item):
     "Copies the data"
@@ -166,10 +166,10 @@ class TrackViewConfigMixin: # pylint: disable=invalid-name
             setattr(self, attr, [])
 
         if isinstance(cyc, tuple):
-            if all(isinstance(i, _m_INDEX) or _m_ellipsis(i) for i in cyc):
+            if all(isinstance(i, _m_INDEX) or isellipsis(i) for i in cyc):
                 getattr(self, attr).append(cyc)
             else:
-                vals = ((i,)          if (isinstance(i, _m_INDEX) or _m_ellipsis(i)) else
+                vals = ((i,)          if (isinstance(i, _m_INDEX) or isellipsis(i)) else
                         _m_torange(i) if isinstance(i, slice)                        else
                         i   for i in cyc)
                 getattr(self, attr).extend(product(*vals))

@@ -9,7 +9,7 @@ import numpy  as     np
 
 from   utils  import initdefaults, isfunction
 from   ._dict import (BEADKEY, CYCLEKEY, # pylint: disable=unused-import,protected-access
-                      _m_ellipsis, _m_INTS, _m_NONE, _m_ALL)
+                      isellipsis, _m_INTS, _m_NONE, _m_ALL)
 from   ._view import TrackView, ITrackView, Level
 
 class Cycles(TrackView, ITrackView):
@@ -191,7 +191,7 @@ class Cycles(TrackView, ITrackView):
     def phase(self, cid:Optional[int] = None, pid:Optional[int] = None):
         "returns phase ids for the given cycle"
         vect = self.track.phases
-        if _m_ellipsis(cid) and _m_ellipsis(pid):
+        if isellipsis(cid) and isellipsis(pid):
             return vect         - vect[:,0]
         if cid in _m_ALL:
             return vect[:,pid]  - vect[:,0]

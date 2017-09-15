@@ -12,7 +12,8 @@ _m_KEYS  = int, cast(type, np.integer), str
 _m_INDEX = int, cast(type, np.integer), str, tuple
 _m_NONE  = type('_m_NONE', (), {})          # pylint: disable=invalid-name
 
-def _m_ellipsis(vals):
+def isellipsis(vals):
+    "checks whether the argument can be understood as an ellipsis"
     return (not isinstance(vals, np.ndarray)) and vals in _m_ALL
 
 BEADKEY  = Union[str,int]

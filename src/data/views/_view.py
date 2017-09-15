@@ -10,7 +10,7 @@ from    utils       import initdefaults, isfunction
 from    model       import Level
 from    ._config    import TrackViewConfigMixin
 from    ._dict      import (ITrackView, # pylint: disable=protected-access
-                            _m_ellipsis, _m_NONE)
+                            isellipsis, _m_NONE)
 
 _m_KEYS  = int, cast(type, np.integer), str
 TSelf    = TypeVar('TSelf', bound = 'TrackView')
@@ -59,8 +59,8 @@ class TrackView(TrackViewConfigMixin, ITrackView):
             yield from (act(self, col) for col in self._iter())
 
     def __getitem__(self:TSelf, keys) -> Union[TSelf, np.ndarray]:
-        if (_m_ellipsis(keys)
-                or (isinstance(keys, tuple) and all(_m_ellipsis(i) for i in keys))):
+        if (isellipsis(keys)
+                or (isinstance(keys, tuple) and all(isellipsis(i) for i in keys))):
             return shallowcopy(self)
 
         if (isinstance(keys, _m_KEYS)

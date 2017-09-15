@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Tasks related to peakfinding"
-from typing                 import Iterator, Tuple, FrozenSet, Sequence, Optional, cast
+from typing                 import (Iterable, Iterator, Tuple, FrozenSet, Sequence,
+                                    Optional, cast)
 from functools              import partial
 import numpy as np
 
 from model                  import Level
-from data.views             import BEADKEY, TrackView, Beads
+from data.views             import BEADKEY, TrackView, Beads, isellipsis
 from eventdetection.data    import EventDetectionConfig, Events
 from .selector              import PeakSelector, Output as PeakOutput, PeaksArray
 
@@ -110,7 +111,25 @@ class PeaksDict(TrackView):
         if sel is None:
             yield from self.__keys
         else:
-            yield from (i for i in self.__keys if i in sel)
+            ids = tuple(self._transform_ids(sel))
+            yield from (i for i in self.__keys if i in ids)
+
+    @staticmethod
+    def _transform_ids(sel: Iterable) -> Iterator[int]:
+        for i in sel:
+            if isinstance(i, tuple):
+                if len(i) == 0:
+                    continue
+                elif len(i) == 2 and not isellipsis(i[1]):
+                    raise NotImplementedError()
+                elif len(i) > 2 :
+                    raise KeyError(f"Unknown key {i} in PeaksDict")
+                if np.isscalar(i[0]):
+                    yield i[0]
+                else:
+                    yield from i[0]
+            else:
+                yield i
 
     def _iter(self, sel:Sequence = None) -> Iterator[Output]:
         if isinstance(self.data, PeaksDict):
