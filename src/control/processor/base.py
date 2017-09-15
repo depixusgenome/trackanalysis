@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Processors apply tasks to a data flow"
-from    abc         import ABCMeta, abstractmethod
-from    functools   import wraps
-from    itertools   import chain
-from    typing      import (TYPE_CHECKING,  # pylint: disable=unused-import
-                            Tuple, Callable, Iterable, Iterator, Type, Union, cast)
+from    abc             import ABCMeta, abstractmethod
+from    functools       import wraps, partial
+from    itertools       import chain
+from    typing          import (TYPE_CHECKING, Tuple, Callable, Iterable,
+                                Iterator, Union, Dict, cast)
 
-import  model.task   as    _tasks
-from    model.level import Level
-from    data        import Track
+import  pandas          as     pd
+import  model.task      as     _tasks
+from    model.level     import Level
+from    data.track      import Track
+from    data.tracksdict import TracksDict
 
 if TYPE_CHECKING:
     from .runner    import Runner # pylint: disable=unused-import
@@ -73,7 +75,7 @@ class Processor(metaclass=MetaProcessor):
     """
     Main class for processing tasks
     """
-    tasktype = None # type: Union[type, Tuple[type, ...]]
+    tasktype: Union[type, Tuple[type, ...]] = None
     def __init__(self, task: _tasks.Task = None, **cnf) -> None:
         if task is None:
             task = cast(type, self.tasktype)(**cnf) # pylint: disable=not-callable
@@ -107,6 +109,11 @@ class Processor(metaclass=MetaProcessor):
     def isslow(self) -> bool:
         "wether computations take a long time or not"
         return self.task.isslow()
+
+    @staticmethod
+    def beads(_, selected: Iterable[int]) -> Iterable[int]:
+        "Beads selected/discarded by the task"
+        return selected
 
     @staticmethod
     def canpool():
@@ -149,7 +156,7 @@ class Processor(metaclass=MetaProcessor):
         The cache is specific to the processor instance.
         It will be cleared if any prior task is updated/added/removed.
 
-        The decorated function can return an action. See TrackItems.withactions
+        The decorated function can return an action. See TrackView.withactions
         for an explanation.
 
         **Note:** default, the data is copied.
@@ -189,9 +196,9 @@ class Processor(metaclass=MetaProcessor):
     @staticmethod
     def action(fcn):
         """
-        Adds an action to the currently yielded TrackItems.
+        Adds an action to the currently yielded TrackView.
         The decorated function is expected to return an action.
-        See TrackItems.withactions for an explanation.
+        See TrackView.withactions for an explanation.
 
         **Note:** The action's closure must *not* contain a task as this can
         have hard-to-debug side-effects.
@@ -208,12 +215,27 @@ class Processor(metaclass=MetaProcessor):
 
 class TrackReaderProcessor(Processor):
     "Generates output from a _tasks.CycleCreatorTask"
+    @classmethod
+    def __get(cls, attr, cpy, trk):
+        vals = (trk,) if isinstance(trk, Track) else trk.values()
+        return tuple(getattr(i, attr).withcopy(cpy) for i in vals)
+
     def run(self, args:'Runner'):
         "returns a dask delayed item"
-        res   = args.data.setCacheDefault(self, Track(path = self.task.path))
-        attr  = 'cycles' if self.task.levelou is Level.cycle else 'beads'
-        attr += 'only'   if self.task.beadsonly else ''
-        args.apply((getattr(res, attr).withcopy(self.task.copy),), levels = self.levels)
+        task  = cast(_tasks.TrackReaderTask, self.task)
+        attr  = 'cycles' if task.levelou is Level.cycle else 'beads'
+        attr += 'only'   if task.beadsonly              else ''
+        if isinstance(task.path, dict):
+            trk = args.data.setCacheDefault(self, TracksDict())
+            trk.update(task.path)
+        else:
+            trk = args.data.setCacheDefault(self, Track(path = task.path))
+            args.apply(self.__get(attr, task.copy, trk), levels = self.levels)
+
+    @staticmethod
+    def beads(cache, _) -> Iterable[int]:
+        "Beads selected/discarded by the task"
+        return cache.beadsonly.keys()
 
 class CycleCreatorProcessor(Processor):
     "Generates output from a _tasks.CycleCreatorTask"
@@ -229,6 +251,12 @@ class CycleCreatorProcessor(Processor):
 
 class DataSelectionProcessor(Processor):
     "Generates output from a DataSelectionTask"
+    @staticmethod
+    def __apply(kwa, frame):
+        for name, value in kwa.items():
+            getattr(frame, name)(value)
+        return frame
+
     @classmethod
     def apply(cls, toframe = None, **kwa):
         "applies the task to a frame or returns a function that does so"
@@ -239,14 +267,63 @@ class DataSelectionProcessor(Processor):
         kwa   = {names(i): j for i, j in kwa.items()
                  if j is not None and i not in ('level', 'disabled')}
 
-        def _apply(frame):
-            for name, value in kwa.items():
-                getattr(frame, name)(value)
-            return frame
-        return _apply if toframe is None else _apply(toframe)
+        return partial(cls.__apply, kwa) if toframe is None else cls.__apply(kwa, toframe)
 
     def run(self, args):
         args.apply(self.apply(**self.config()))
+
+    def beads(self, _, selected: Iterable[int]) -> Iterable[int]: # type: ignore
+        "Beads selected/discarded by the task"
+        task = cast(_tasks.DataSelectionTask, self.task)
+        if task.selected and task.discarded:
+            acc       = frozenset(task.selected) - frozenset(task.discarded)
+            selected  = iter(i for i in selected if i in acc)
+        elif task.selected:
+            acc       = frozenset(task.selected)
+            selected  = iter(i for i in selected if i in acc)
+        elif task.discarded:
+            disc      = frozenset(task.discarded)
+            selected  = iter(i for i in selected if i not in disc)
+        return selected
+
+class DataFrameProcessor(Processor):
+    "Generates pd.DataFrames"
+    FACTORY: Dict[str, Callable] = {}
+    @classmethod
+    def factory(cls, tpe):
+        'adds a element to the factory'
+        return lambda fcn: cls.FACTORY.__setitem__(tpe, fcn)
+
+    @classmethod
+    def apply(cls, toframe = None, **cnf):
+        "applies the task to a frame or returns a function that does so"
+        task = cast(_tasks.DataFrameTask, cls.tasktype(**cnf)) # pylint: disable=not-callable
+        fcn  = partial(cls.__merge if task.merge else cls.__apply, task)
+        return fcn if toframe is None else fcn(toframe)
+
+    def run(self, args):
+        args.apply(self.apply(**self.config()))
+
+    @classmethod
+    def __action(cls, task, frame, info):
+        data = pd.DataFrame(cls.FACTORY[type(frame)](task, frame, *info))
+
+        inds = task.indexcolumns(len(data), info[0], frame)
+        if len(inds):
+            data = pd.concat([pd.DataFrame(inds), data], 1)
+
+        cols = [i for i in task.indexes if i in data]
+        if len(cols):
+            data.set_index(cols, inplace = True)
+        return info[0], data
+
+    @classmethod
+    def __merge(cls, task, frame):
+        return pd.concat([i for _, i in cls.__apply(task, frame)])
+
+    @classmethod
+    def __apply(cls, task, frame):
+        return frame.withaction(partial(cls.__action, task, frame))
 
 class TaggingProcessor(Processor):
     "Generates output from a TaggingTask"

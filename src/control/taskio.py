@@ -26,7 +26,7 @@ class TaskIO:
     @classmethod
     def __get(cls, ctrl, attr:str):
         ctrl = getattr(ctrl, 'taskcontroller', ctrl)
-        return getattr(ctrl, '_TaskController__'+attr)
+        return getattr(ctrl, '_BaseTaskController__'+attr)
 
     @classmethod
     def extensions(cls, ctrl, attr:str):
@@ -40,7 +40,7 @@ class TrackIO(TaskIO):
         "opens a track file"
         if len(model):
             raise NotImplementedError()
-        LOGS.info('%s -> path = %s', type(self).__name__, path)
+        LOGS.info('%s loading %s', type(self).__name__, path)
         return [(TrackReaderTask(path = path),)]
 
 class ConfigTrackIO(TrackIO):

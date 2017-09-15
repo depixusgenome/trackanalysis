@@ -14,7 +14,7 @@ from excelreports.creation      import fileobj
 
 from eventdetection             import EventDetectionConfig
 from peakcalling.processor      import FitToHairpinTask
-from data                       import TrackItems, BEADKEY # pylint: disable=unused-import
+from data.views                 import TrackView, BEADKEY # pylint: disable=unused-import
 
 from ._base                     import ReporterInfo
 from ._summary                  import SummarySheet
@@ -77,7 +77,7 @@ class HybridstatExcelProcessor(Processor):
         def _save(frame):
             run(path, cnf, track = frame.track, groups = frame, **kwa)
             return frame
-        fcn = lambda frame: frame.new(TrackItems).withdata(_save)
+        fcn = lambda frame: frame.new(TrackView).withdata(_save)
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):

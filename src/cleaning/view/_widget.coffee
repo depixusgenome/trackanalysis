@@ -17,14 +17,21 @@ export class DpxCleaningView extends WidgetView
 
     connect_signals: () ->
         super()
+        @connect(@model.properties.subtracted.change,
+                 () => $(@el).find("#dpx-cl-subtracted").val("#{@model.subtracted}"))
         for evt in @cl_inputs
-            @connect(@model.properties[evt].change, do (event = evt, me = @) ->
-                      () -> me.on_change_input(event))
-        @connect(@model.properties.frozen.change,    () => @on_change_frozen())
+            @connect(@model.properties[evt].change,
+                     do (event = evt, me = @) -> (val) -> me.on_change_input(event))
+        @connect(@model.properties.frozen.change, () => @on_change_frozen())
 
     render: () ->
         super()
-        html = "<div class='dpx-span'>"+
+        html = "<div><div class='dpx-span'>"+
+                   "<p>Subtracted</p>"+
+                   "#{@mk_txt("subtracted")}"+
+                   "#{@mk_btn("add", "╋")}"+
+               "</div></div>"+
+               "<div><div class='dpx-span'>"+
                    "<div><p>|z| ≤</p><p>Δz  ≥</p><p/></div>"+
                    "<div>#{@mk_inp("maxabsvalue")}"+
                         "#{@mk_inp("minextent")}"+
@@ -33,14 +40,16 @@ export class DpxCleaningView extends WidgetView
                    "<div>#{@mk_inp("maxderivate")}"+
                         "#{@mk_inp("minpopulation", 100, 0.1)}"+
                         "#{@mk_inp("maxhfsigma", 0.05,  0.001)}</diV>"+
-               "</div>"
+               "</div></div>"
 
+        @el.innerHTML = html
         elem = $(@el)
-        elem.html(html)
+
+        elem.find("#dpx-cl-subtracted").change((e) => @model.subtracted = e.target.value)
+        elem.find("#dpx-cl-add").click(() => @model.subtractcurrent =  @model.subtractcurrent+1)
         for evt in @cl_inputs
             el = elem.find("#dpx-cl-#{evt}")
-            el.change(do (mdl = @model, inp = el, event = evt) ->
-                        () -> mdl[event] = Number(inp.val()))
+            el.change((e) => @model[e.target.id[7...]] = Number(e.target.value))
         return @
 
     cl_inputs: ['maxabsvalue', 'maxderivate', 'minpopulation', 'minhfsigma',
@@ -52,6 +61,17 @@ export class DpxCleaningView extends WidgetView
                     " class='dpx-cl-freeze bk-widget-form-input'"+
                     " type='number' min=0 max=#{maxv} step=#{dv} "+
                     " value=#{@model[name]}#{disabled}>"
+
+    mk_txt: (name) ->
+        disabled = if @model.frozen then ' disabled=true' else ''
+        return  "<input id='dpx-cl-#{name}'"+
+                    " type='text' class='dpx-cl-freeze bk-widget-form-input'"+
+                    " value='#{@model[name]}'#{disabled}>"
+
+    mk_btn: (name, label) ->
+        str = "<button type='button' id='dpx-cl-#{name}' "+
+              "class='dpx-cl-freeze bk-bs-btn bk-bs-btn-default'>#{label}</button>"
+        return str
 
 export class DpxCleaning extends Widget
     default_view: DpxCleaningView
@@ -75,6 +95,8 @@ export class DpxCleaning extends Widget
         frozen: [p.Bool, true],
         framerate: [p.Number, 30],
         figure: [p.Instance],
+        subtracted: [p.String, ""],
+        subtractcurrent: [p.Number, 0],
         maxabsvalue: [p.Number, 5],
         maxderivate: [p.Number, 2],
         minpopulation: [p.Number, 80],

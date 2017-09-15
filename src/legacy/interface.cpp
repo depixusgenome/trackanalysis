@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include "legacy/legacyrecord.h"
@@ -6,8 +7,8 @@ namespace legacy
 {
     namespace
     {
-        template <typename T>
-        pybind11::object _toimage(auto & shape, void *ptr)
+        template <typename T, typename K>
+        pybind11::object _toimage(K & shape, void *ptr)
         {
             std::vector<size_t> strides(2);
             strides = { shape[1]*sizeof(T), sizeof(T) };
@@ -15,6 +16,7 @@ namespace legacy
             return pybind11::array(shape, strides, (T*) ptr);
         }
     }
+    pybind11::object _readim(std::string name, bool all = true);
 
     pybind11::object _readrecfov(legacy::GenRecord &rec)
     {
@@ -67,8 +69,12 @@ namespace legacy
         int axis = tpe.size() == 0 || tpe[0] == 'Z' || tpe[0] == 'z' ? 0 :
                                       tpe[0] == 'X' || tpe[0] == 'x' ? 1 : 2;
 
+        auto calibpos = rec.pos();
+        auto sdi      = rec.sdi();
+            
         for(size_t ibead = size_t(0), ebead = rec.nbeads(); ibead < ebead; ++ibead)
-            if(notall == false || !rec.islost(int(ibead)))
+            if((notall == false || !rec.islost(int(ibead)))
+                && (sdi || calibpos.find(ibead) != calibpos.end()))
                 add(ibead, [&]() { return rec.bead(ibead, axis); });
 
         add("t",    [&]() { return rec.t(); });
@@ -81,11 +87,20 @@ namespace legacy
         res["framerate"] = pybind11::cast(rec.camerafrequency());
         res["fov"]       = _readrecfov(rec);
 
+        pybind11::dict calib;
         pybind11::dict pos;
-        for(auto const & val: rec.pos())
+        char tmpname[L_tmpnam];
+        std::string fname = std::tmpnam(tmpname);
+        for(auto const & val: calibpos)
+        {
             pos[pybind11::int_(val.first)] = pybind11::make_tuple(std::get<0>(val.second),
                                                                   std::get<1>(val.second),
                                                                   std::get<2>(val.second));
+            rec.readcalib(val.first, fname);
+            calib[pybind11::int_(val.first)] = _readim(fname, false);
+        }
+
+        res["calibrations"] = calib;
         res["positions"] = pos;
 
         auto dim = rec.dimensions();
@@ -132,7 +147,7 @@ namespace legacy
         return res;
     }
 
-    pybind11::object _readim(std::string name)
+    pybind11::object _readim(std::string name, bool all)
     {
         ImData gr(name);
         if(gr.isnone())
@@ -149,6 +164,8 @@ namespace legacy
             strides = { dims.first*sizeof(float), sizeof(float) };
             std::vector<float> dt(dims.first*dims.second);
             gr.data((void*)dt.data());
+            if(!all)
+                return pybind11::array(shape, strides, dt.data());
             res["image"] = pybind11::array(shape, strides, dt.data());
         }
         else if(gr.ischar())
@@ -156,8 +173,12 @@ namespace legacy
             strides = { dims.first*sizeof(char), sizeof(char) };
             std::vector<unsigned char> dt(dims.first*dims.second);
             gr.data((void*)dt.data());
+            if(!all)
+                return pybind11::array(shape, strides, dt.data());
             res["image"] = pybind11::array(shape, strides, dt.data());
         }
+        if(!all)
+            return pybind11::none();
         return res;
     }
 
@@ -165,17 +186,17 @@ namespace legacy
     {
         using namespace pybind11::literals;
         mod.def("readtrack", _readtrack, "path"_a,
-                "clipcycles"_a = true, "axis"_a = 0,
+                "clipcycles"_a = true, "axis"_a = "z",
                 "Reads a '.trk' file and returns a dictionnary of beads,\n"
                 "possibly removing the first 3 cycles and the last one.\n"
-                "axes are z(0), x(1), y(2)");
+                "axes are x, y or z");
         mod.def("readtrackrotation", _readtrackrotation, "path"_a,
                 "Reads a '.trk' file's rotation");
         mod.def("readgr", _readgr, "path"_a,
                 "Reads a '.gr' file and returns a dictionnary of datasets");
-        mod.def("readim", _readim, "path"_a,
+        mod.def("readim", _readim, "path"_a, "readall"_a = true,
                 "Reads a '.gr' file and returns an image");
         mod.def("fov",    _readfov, "path"_a,
-                "Reads a '.trk' file and returns the FOV image");
+                "Reads a '.trk' file and returns the FoV image");
     }
 }

@@ -6,14 +6,17 @@ from wafbuilder import copyroot, make
 
 def build_bokehjs(bld, *modules):
     "compiles the bokeh js code"
-    srcs  = bld.path.ant_glob('**/*.coffee')
-    srcs += bld.path.parent.ant_glob('view/**/*.coffee')
-    srcs += bld.path.parent.ant_glob('app/**/*.coffee')
-    tgt   = copyroot(bld, modules[0]+'.js')
+    root = bld.path.ctx.bldnode
+    mods = [i.split('.')[0] for i in modules]
+    mods = [j for i, j in enumerate(mods) if j not in mods[:i]]
+    srcs = sum((root.ant_glob(i.replace('.', '/')+'/**/*.coffee') for i in mods), [])
+    tgt  = copyroot(bld, modules[0]+'.js')
+
+    cmd  = str(bld.path.ctx.srcnode.find_resource('makescripts/bokehcompiler.py'))
     bld(source      = srcs,
         name        = modules[0]+':bokeh',
         color       = 'BLUE',
-        rule        = '../makescripts/bokehcompiler.py '+' '.join(modules)+' -o ${TGT}',
+        rule        = f'python {cmd} '+' '.join(modules)+' -o ${TGT}',
         target      = tgt,
         cls_keyword = lambda _: 'Bokeh',
         group       = 'bokeh')

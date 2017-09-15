@@ -20,7 +20,7 @@ class EventDetector(PrecisionAlg):
 
     def __call__(self, data:np.ndarray, precision: float = None):
         precision = self.getprecision(precision, data)
-        return self.select(self.merge(data, self.split(data, precision), precision))
+        return self.select(data, self.merge(data, self.split(data, precision), precision))
 
     @classmethod
     def run(cls, *args, **kwa):

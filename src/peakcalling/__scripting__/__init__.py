@@ -2,14 +2,45 @@
 # -*- coding: utf-8 -*-
 "Updating PeaksDict for scripting purposes"
 import sys
-from   typing       import List
-from   copy         import deepcopy, copy as shallowcopy
-import numpy        as np
-import pandas       as pd
-from   utils.decoration import addto
-from   .processor       import PeaksDict, FitToHairpinDict
+from   typing               import List, Type, Callable
+from   copy                 import deepcopy, copy as shallowcopy
+import numpy                as np
+import pandas               as pd
+from   utils.decoration     import addto
+from   data                 import Track
+from   ..processor          import PeaksDict, FitToHairpinDict
 
-assert 'scripting' in sys.modules
+Tasks:           Type     = sys.modules['model.__scripting__'].Tasks
+defaulttasklist: Callable = sys.modules['data.__scripting__'].defaulttasklist
+
+def _fit(self, tpe, sequence, oligos, kwa) -> PeaksDict:
+    "computes hairpin fits"
+    if None not in (sequence, oligos):
+        kwa['sequence'] = sequence
+        kwa['oligos']   = oligos
+
+    tasks = defaulttasklist(self.path, None)+ (getattr(Tasks, tpe)(**kwa),) # type: tuple
+    if len(tasks[-1].distances) == 0:
+        raise IndexError('No distances found')
+    return self.apply(*tasks)
+
+@addto(Track) # type: ignore
+def fittohairpin(self, sequence = None, oligos = None, **kwa) -> FitToHairpinDict:
+    """
+    Computes hairpin fits.
+
+    Arguments are for creating the FitToHairpinTask.
+    """
+    return _fit(self, 'fittohairpin', sequence, oligos, kwa)
+
+@addto(Track) # type: ignore
+def beadsbyhairpin(self, sequence, oligos, **kwa):
+    """
+    Computes hairpin fits, sorted by best hairpin.
+
+    Arguments are for creating the FitToHairpinTask.
+    """
+    return _fit(self, 'beadsbyhairpin', sequence, oligos, kwa)
 
 @addto(FitToHairpinDict)
 def dataframe(self, conversion = 'best') -> pd.DataFrame:

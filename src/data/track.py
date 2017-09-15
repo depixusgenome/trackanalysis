@@ -10,15 +10,15 @@ import  numpy       as     np
 
 from    utils       import initdefaults
 from    model       import levelprop, Level
-from   .trackitems  import Beads, Cycles, BEADKEY, _m_ALL
+from   .views       import Beads, Cycles, BEADKEY, _m_ALL
 from   .trackio     import opentrack, PATHTYPES
 
-IDTYPE      = Union[None, int, slice] # missing Ellipsys as mypy won't accept it
-DATA        = Dict[BEADKEY, np.ndarray]
-POSITIONS   = Dict[BEADKEY, Tuple[float, float, float]]
-DIMENSIONS  = Tuple[Tuple[float, float], Tuple[float, float]]
-_PRECISIONS = Dict[BEADKEY, float]
-_LAZIES     = ('fov',  'framerate', 'data', 'path', 'lazy', 'rawprecisions')
+IDTYPE       = Union[None, int, slice] # missing Ellipsys as mypy won't accept it
+DATA         = Dict[BEADKEY, np.ndarray]
+BEADS        = Dict[BEADKEY, 'Bead']
+DIMENSIONS   = Tuple[Tuple[float, float], Tuple[float, float]]
+_PRECISIONS  = Dict[BEADKEY, float]
+_LAZIES      = ('fov',  'framerate', 'data', 'path', 'lazy', 'rawprecisions')
 
 class Axis(Enum):
     "which axis to look at"
@@ -33,18 +33,44 @@ class Axis(Enum):
             name += 'axis'
         return cls(name)
 
-class FOV:
+class Bead:
+    "characteristics of a bead"
+    position: Tuple[float, float, float] = (0., 0., 0.)
+    image:    np.ndarray                 = np.zeros(0, dtype = np.uint8)
+    @initdefaults(locals())
+    def __init__(self, **_):
+        pass
+
+class FoV:
     """
-    Data concerning the FOV
+    Data concerning the FoV
 
     Dimensions are provided as : (X slope, X bias), (Y slope, Y bias)
     """
-    image              = np.empty((0,0), dtype = np.uint8)
-    beads:  POSITIONS  = {}
-    dim:    DIMENSIONS = ((1., 0.), (1., 0.))
+    image                       = np.empty((0,0), dtype = np.uint8)
+    beads:         BEADS        = {}
+    dim:           DIMENSIONS   = ((1., 0.), (1., 0.))
     @initdefaults(locals())
     def __init__(self, **kwa):
         pass
+
+    def bounds(self, pixel = False):
+        "image bounds in nm (*pixel == False*) or pixels"
+        rng = self.image.shape[1], self.image.shape[0]
+        return (0, 0) + rng if pixel else self.tonm((0,0))+ self.tonm(rng)
+
+    def size(self, pixel = False):
+        "image size in nm (*pixel == False*) or pixels"
+        rng = self.image.shape[1], self.image.shape[0]
+        return rng if pixel else self.tonm(rng)
+
+    def tonm(self, arr):
+        "converts pixels to nm"
+        return self.__convert(arr, self.dim)
+
+    def topixel(self, arr):
+        "converts pixels to nm"
+        return self.__convert(arr, tuple((1./i, -j/i) for i, j in self.dim))
 
     @property
     def scale(self):
@@ -53,18 +79,34 @@ class FOV:
             raise ValueError("Pixel is not square")
         return self.dim[0][0]
 
+    @staticmethod
+    def __convert(arr, dim):
+        if len(arr) == 0:
+            return arr
+
+        (sl1, int1), (sl2, int2) = dim
+        if isinstance(arr, np.ndarray):
+            return [sl1, sl2] * arr + [int1, int2]
+
+        if isinstance(arr, tuple) and len(arr) == 2 and np.isscalar(arr[0]):
+            return tuple(i*k+j for (i, j), k in zip(dim, arr))
+
+        tpe = iter if hasattr(arr, '__next__') else type(arr)
+        return tpe([(sl1*i+int1, sl2*j+int2) for i, j in arr]) # type: ignore
+
 @levelprop(Level.project)
 class Track:
     "Model for track files. This must not contain actual data."
     _framerate                  = 0.
-    _fov: FOV                   = None
+    _fov: FoV                   = None
     _phases                     = np.empty((0,9), dtype = 'i4')
     _data:          DATA        = None
     _path:          PATHTYPES   = None
     _rawprecisions: _PRECISIONS = {}
     _lazy                       = True
+    key:            str         = None
     axis                        = Axis.Zaxis
-    @initdefaults(('axis',), **{i: '_' for i in _LAZIES + ('phases',)})
+    @initdefaults(('axis', 'key'), **{i: '_' for i in _LAZIES + ('phases',)})
     def __init__(self, **_) -> None:
         pass
 
@@ -122,12 +164,12 @@ class Track:
 
     @property
     def fov(self) -> np.ndarray:
-        "returns the FOV"
+        "returns the FoV"
         return self.__getter('_fov')
 
     @fov.setter
     def fov(self, val) -> np.ndarray:
-        "returns the FOV"
+        "returns the FoV"
         return self.__setter('_fov', val)
 
     @property
@@ -156,7 +198,7 @@ class Track:
         "returns the starttime of the cycle and phase"
         vect = self.__getter('_phases')
         orig = vect[0,0]
-        if {cid, pid}.issubset(_m_ALL):
+        if cid in _m_ALL and pid in _m_ALL:
             pass
         elif cid in _m_ALL:
             vect = vect[:,pid]
@@ -167,12 +209,12 @@ class Track:
         return vect - orig
 
     @property
-    def path(self) -> Union[None, str, Tuple[str, ...]]:
+    def path(self) -> Optional[PATHTYPES]:
         "returns the current path(s)"
         return self._path
 
     @path.setter
-    def path(self, val) -> Union[None, str, Tuple[str, ...]]:
+    def path(self, val) -> Optional[PATHTYPES]:
         "sets the current path(s) and clears the data"
         self._lazy = False
         self._path = val
@@ -203,22 +245,26 @@ class Track:
         "returns whether a column name is a bead's"
         return isinstance(key, int)
 
+    def __view(self, tpe, **kwa):
+        parent = (self.key,) if self.key else (self.path,)
+        return tpe(track = self, parent = parent, **kwa)
+
     @property
     def beads(self) -> Beads:
         "returns a helper object for extracting beads"
-        return Beads(track = self, parents = (self.path,), beadsonly = False)
+        return self.__view(Beads, beadsonly = False)
 
     @property
     def beadsonly(self) -> Beads:
         "returns a helper object for extracting beads from *beads* only"
-        return Beads(track = self, parents = (self.path,), beadsonly = True)
+        return self.__view(Beads, beadsonly = True)
 
     @property
     def cycles(self) -> Cycles:
         "returns a helper object for extracting cycles"
-        return Cycles(track = self, parents = (self.path,))
+        return self.__view(Cycles, beadsonly = False)
 
     @property
     def cyclesonly(self) -> Cycles:
         "returns a helper object for extracting cycles from *beads* only"
-        return Cycles(track = self, parents = (self.path,), beadsonly = True)
+        return self.__view(Cycles, beadsonly = True)

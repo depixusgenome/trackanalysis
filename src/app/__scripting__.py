@@ -88,7 +88,7 @@ def save(cls, task):
             raise TypeError('Unknown task: '+str(task))
 
     cnf[name].set(deepcopy(task))
-    scriptapp.control.writeconfig()
+    scriptapp.control.writeuserconfig()
 Tasks.save = classmethod(save)
 
 def getconfig():

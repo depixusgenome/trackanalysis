@@ -7,7 +7,7 @@ from   functools    import partial
 import numpy        as     np
 
 from utils                      import StreamUnion, initdefaults, updatecopy, asobjarray
-from data.trackitems            import BEADKEY, TrackItems, Beads
+from data.views                 import BEADKEY, TrackView, Beads
 from peakfinding.selector       import Output as PeakFindingOutput, PeaksArray
 from peakfinding.processor      import PeaksDict
 from model                      import Task, Level
@@ -86,7 +86,7 @@ FitBead = NamedTuple('FitBead',
                       ('events',      PeakFindingOutput)])
 
 
-class FitToHairpinDict(TrackItems):
+class FitToHairpinDict(TrackView):
     "iterator over peaks grouped by beads"
     level = Level.bead
     def __init__(self, *_, config = None, **kwa):
@@ -111,6 +111,10 @@ class FitToHairpinDict(TrackItems):
             yield from (i for i in self.__keys if i in sel)
 
     def _iter(self, sel:Sequence = None) -> Iterator[Tuple[BEADKEY, FitBead]]:
+        if isinstance(self.data, FitToHairpinDict):
+            if sel is None:
+                yield from iter(self.data)
+            yield from ((i, j) for i, j in self.data if i in sel)
         yield from ((bead, self.compute(bead)) for bead in self.keys(sel))
 
     @staticmethod
@@ -133,7 +137,7 @@ class FitToHairpinDict(TrackItems):
     def __distances(self, key: str, bead: Sequence[float])->Dict[Optional[str], Distance]:
         distances   = self.config.distances
         constraints = self.config.constraints
-        cstr = constraints.get(key, None)
+        cstr        = constraints.get(key, None)
         if cstr is not None:
             hpin = distances.get(cstr[0], None)
             if hpin is not None:
@@ -215,7 +219,7 @@ class BeadsByHairpinProcessor(Processor):
         else:
             app = partial(cls.__pooled, pool, pooldump(data.append(cls.CHILD(cnf))))
 
-        fcn = lambda j: j.new(TrackItems, data = lambda: app(j))
+        fcn = lambda j: j.new(TrackView, data = lambda: app(j))
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):

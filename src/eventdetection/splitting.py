@@ -156,7 +156,10 @@ class IntervalExtensionAroundRange(IntervalExtension):
     @classmethod
     def _test(cls, inds, data, precision, window):
         vals  = cls._sidedata(inds[0], data, window, 1e30)
+
         refs  = cls._sidedata(inds[0], data, -window, np.NaN, inds[1])
+        refs[0, np.all(np.isnan(refs), 0)] = np.finfo('f4').max
+
         meanv = np.nanmean(refs, 0)
         maxv  = np.maximum(np.nanmax(refs, 0), meanv+precision)
         minv  = np.minimum(np.nanmin(refs, 0), meanv-precision)
@@ -177,7 +180,7 @@ class BaseSplitDetector(PrecisionAlg):
         super().__init__(**kwa)
 
     @staticmethod
-    def _tointervals(nans, data, ends):
+    def _tointervals(nans, data, alldata, ends):
         if len(ends) == 0:
             return np.array(((0,len(nans)),), dtype = 'i4')
 
@@ -189,7 +192,8 @@ class BaseSplitDetector(PrecisionAlg):
         ends = as_strided(ends,
                           shape   = (len(ends)-1, 2),
                           strides = (ends.strides[0],)*2)
-        return ends[np.nonzero(np.diff(ends, 1).ravel() > 1)[0]]
+        ends = ends[np.nonzero(np.diff(ends, 1).ravel() > 1)[0]]
+        return ends[[np.any(np.isfinite(alldata[slice(*i)])) for i in ends]]
 
     @staticmethod
     def _init(data):
@@ -214,7 +218,7 @@ class BaseSplitDetector(PrecisionAlg):
         deltas    = self._deltas(tmp)
         precision = self._precision(tmp, deltas, precision)
         threshold = self._threshold(tmp, deltas, precision)
-        ends      = self._tointervals(nans, tmp, (deltas > threshold).nonzero()[0])
+        ends      = self._tointervals(nans, tmp, data, (deltas > threshold).nonzero()[0])
         if self.extend is not None:
             return self.extend(ends, data, precision, self.window)
         return ends

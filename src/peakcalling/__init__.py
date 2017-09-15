@@ -4,3 +4,4 @@ u"""
 Matching or clustering experimental peaks together & identifying peaks
 """
 from ._core import match, cost # pylint: disable=no-name-in-module,import-error
+from ._base import Range

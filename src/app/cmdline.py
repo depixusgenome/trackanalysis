@@ -164,7 +164,7 @@ def _files(files, bead):
 
     if len(files):
         def _open(ctrl):
-            ctrl.getGlobal('config').last.path.open.set(files[0])
+            ctrl.getGlobal('css').last.path.open.set(files[0])
             ctrl.openTrack(files)
             if bead is not None:
                 ctrl.getGlobal("project").bead.set(bead)

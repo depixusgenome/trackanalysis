@@ -100,19 +100,43 @@ class PlotAttrs:
             colors  = palette(count)
             return [colors[i] for i in indexes] if indexes is not None else colors
 
-    def addto(self, fig, **kwa) -> GlyphRenderer:
-        "adds itself to plot: defines color, size and glyph to use"
-        args  = dict(self.__dict__)
-        args.pop('glyph')
-        args.pop('palette')
-        args.update(kwa)
+    @classmethod
+    def _text(cls, args):
+        cls._default(args)
+        args.pop('size',   None)
+        args.pop('radius', None)
+        args['text_color'] = args.pop('color')
 
-        if self.glyph == 'circle' and 'radius' in args:
+    @classmethod
+    def _circle(cls, args):
+        cls._default(args)
+        if 'radius' in args:
             args.pop('size')
 
-        if self.glyph in ('line', 'quad'):
-            args['line_width'] = args.pop('size')
+    @classmethod
+    def _line(cls, args):
+        cls._default(args)
+        args['line_width'] = args.pop('size')
 
+    _quad = _line
+
+    @staticmethod
+    def _image(args):
+        color = args.pop('color')
+        args.pop('size')
+        if args['palette'] is None:
+            args['palette'] = color
+
+    @staticmethod
+    def _default(args):
+        args.pop('palette')
+
+    def addto(self, fig, **kwa) -> GlyphRenderer:
+        "adds itself to plot: defines color, size and glyph to use"
+        args = dict(self.__dict__)
+        args.pop('glyph')
+        args.update(kwa)
+        getattr(self, '_'+self.glyph, self._default)(args)
         return getattr(fig, self.glyph)(**args)
 
 class WidgetCreator(GlobalsAccess, metaclass = ABCMeta):
@@ -254,7 +278,8 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                     j(i)
                 else:
                     upd(**j)
-
+        except ValueError as exc:
+            raise ValueError(f'Error updating {i} = {j}') from exc
         finally:
             self._bkmodels.clear()
             self.state = old
@@ -508,6 +533,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         elif 'dpxhover' in args['tools']:
             args['tools'] = [i if i != 'dpxhover' else DpxHoverTool()
                              for i in args['tools']]
+
         for name in ('x_range', 'y_range'):
             if args.get(name, _m_none) is Range1d:
                 args[name] = Range1d(start = 0., end = 1.)

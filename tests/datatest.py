@@ -7,12 +7,12 @@ import numpy as np
 
 from   legacy           import readtrack   # pylint: disable=import-error,no-name-in-module
 import data
-from   data.trackitems  import Items
+from   data.views       import ITrackView
 from   data.trackio     import LegacyGRFilesIO
 from   testingcore      import path as utpath
 
 # pylint: disable=missing-docstring,protected-access
-class _MyItem(Items):
+class _MyItem(ITrackView):
     def __init__(self, vals):
         super().__init__()
         self.vals = vals
@@ -30,12 +30,26 @@ def test_beaditerkeys():
     track = data.Track(path = utpath("small_legacy"), beadsonly = False)
     beads = lambda: data.Beads(track = track, data = _MyItem(track.data))
     vals = set(tuple(range(92))+ ('zmag', 't'))
+
+    assert len(tuple(beads().keys()))                 == len(vals)
+    assert len(tuple(i for i, _ in beads()))          == len(vals)
+    assert len(tuple(beads().selecting(['t', 0]).withbeadsonly().keys())) == len({0})
+    assert len(tuple(beads().withbeadsonly().keys())) == len((vals-{'zmag', 't'}))
+    assert len(tuple(beads().selecting(all).keys()))  == len(vals)
+    assert len(tuple(beads().selecting(None).keys())) == len(vals)
+    assert len(tuple(beads()[:].keys())) == len(vals)
+    assert len(tuple(beads()[:2].keys())) == len({0, 1})
+    assert len(tuple(beads()[:2][1:5].keys())) == len({1}) # pylint: disable=unsubscriptable-object
+
     assert set(beads().keys())                 == vals
     assert set(i for i, _ in beads())          == vals
     assert set(beads().selecting(['t', 0]).withbeadsonly().keys()) == {0}
     assert set(beads().withbeadsonly().keys()) == (vals-{'zmag', 't'})
     assert set(beads().selecting(all).keys())  == vals
     assert set(beads().selecting(None).keys()) == vals
+    assert set(beads()[:].keys()) == vals
+    assert set(beads()[:2].keys()) == {0, 1}
+    assert set(beads()[:2][1:5].keys()) == {1} # pylint: disable=unsubscriptable-object
     assert isinstance(beads()['t'], np.ndarray)
     assert isinstance(beads()[0],   np.ndarray)
 
@@ -58,11 +72,26 @@ def test_cycles_iterkeys():
     cycs  = lambda: data.Cycles(track = track, data = _MyItem(track.data))
     cids  = lambda _: set(tuple((i,_) for i in range(39)) + (('zmag', _), ('t', _)))
     bids  = lambda _: set((_,i) for i in range(102))
-    assert set  (cycs().selecting(0).keys())         == cids(0)
-    assert tuple(cycs().selecting((0,0)).keys())     == ((0,0),)
-    assert set  (cycs()[...,0].keys())               == cids(0)
-    assert set  (cycs()[0,...].keys())               == bids(0)
-    assert set  (cycs()['zmag',...].keys())          == bids('zmag')
+    assert len(tuple(cycs().selecting(0).keys()))  == len(cids(0))
+    assert len(tuple(cycs()[:,0].keys()))          == len(cids(0))
+    assert len(tuple(cycs()[...,0].keys()))        == len(cids(0))
+    assert len(tuple(cycs()[...,0][1,...].keys())) == len({(1,0)})
+    assert len(tuple(cycs()[:1,0].keys()))         == len({i for i in cids(0) if i[0] == 0})
+    assert len(tuple(cycs()[0,...].keys()))        == len(bids(0))
+    assert len(tuple(cycs()[0,:].keys()))          == len(bids(0))
+    assert len(tuple(cycs()[0,2:5].keys()))        == len({i for i in bids(0) if 2<= i[1] < 5})
+    assert len(tuple(cycs()['zmag',...].keys()))   == len(bids('zmag'))
+
+    assert set  (cycs().selecting(0).keys())     == cids(0)
+    assert tuple(cycs().selecting((0,0)).keys()) == ((0,0),)
+    assert set  (cycs()[:,0].keys())             == cids(0)
+    assert set  (cycs()[...,0].keys())           == cids(0)
+    assert set  (cycs()[...,0][1,...].keys())    == {(1,0)}
+    assert set  (cycs()[:1,0].keys())            == {i for i in cids(0) if i[0] == 0}
+    assert set  (cycs()[0,...].keys())           == bids(0)
+    assert set  (cycs()[0,:].keys())             == bids(0)
+    assert set  (cycs()[0,2:5].keys())           == {i for i in bids(0) if 2<= i[1] < 5}
+    assert set  (cycs()['zmag',...].keys())      == bids('zmag')
     assert set(i[0] for i in (cycs()
                               .selecting([('t',...), (0,...)])
                               .withbeadsonly().keys())) == {0}

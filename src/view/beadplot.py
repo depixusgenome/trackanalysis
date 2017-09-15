@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Track plot view"
-
-from typing         import Optional, Any # pylint: disable=unused-import
-
-from bokeh.plotting import figure, Figure # pylint: disable=unused-import
+from bokeh.plotting import figure, Figure
 from bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 
 from control            import Controller
@@ -26,8 +23,8 @@ class BeadPlotCreator(TaskPlotCreator):
                              'tooltips':        ttips,
                              'figure.width' :   900,
                              'figure.height':   600}
-        self._source = None # type: Optional[ColumnDataSource]
-        self._fig    = None # type: Optional[Figure]
+        self._source: ColumnDataSource = None
+        self._fig:    Figure           = None
 
     def __data(self):
         track = self._model.track

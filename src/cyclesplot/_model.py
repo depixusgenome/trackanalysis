@@ -2,14 +2,14 @@
 # -*- coding: utf-8 -*-
 "access to the model"
 
-from    typing                      import Optional, Sequence, Tuple
-
+from    typing                      import Tuple, Optional
 from    utils                       import NoArgs
 from    cordrift.processor          import DriftTask
 from    eventdetection.processor    import (ExtremumAlignmentTask,
                                             EventDetectionTask)
-from    view.plots.tasks            import TaskPlotModelAccess, TaskAccess
-from    view.plots.sequence         import SequenceKeyProp, FitParamProp
+from    view.plots.tasks            import TaskAccess, TaskPlotModelAccess
+from    view.plots.sequence         import (SequenceKeyProp, FitParamProp,
+                                            SequencePlotModelAccess)
 
 class EventDetectionTaskAccess(TaskAccess):
     "Access to the event detection task"
@@ -38,12 +38,11 @@ class EventDetectionTaskAccess(TaskAccess):
         self.config.eventdetection.isactive.set(not kwa.pop('disabled', False))
         super().update(**kwa)
 
-class CyclesModelAccess(TaskPlotModelAccess):
+class CyclesModelAccess(SequencePlotModelAccess):
     "Model for Cycles View"
-    def __init__(self, ctrl, key: Optional[str] = None) -> None:
+    def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
         cls = type(self)
-        cls.oligos      .setdefault(self, [], size = 4)
         cls.binwidth    .setdefault(self, 0.003)
         cls.minframes   .setdefault(self, 10)
         cls.stretch     .setdefault(self)
@@ -64,8 +63,6 @@ class CyclesModelAccess(TaskPlotModelAccess):
 
     props        = TaskPlotModelAccess.props
     sequencekey  = SequenceKeyProp()
-    sequencepath = props.configroot[Optional[str]]          ('last.path.sequence')
-    oligos       = props.configroot[Optional[Sequence[str]]]('oligos')
     binwidth     = props.config[float]                      ('binwidth')
     minframes    = props.config[int]                        ('minframes')
     stretch      = FitParamProp                             ('stretch')

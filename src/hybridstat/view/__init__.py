@@ -5,7 +5,8 @@ from bokeh.models   import Tabs, Panel
 from bokeh          import layouts
 from view.base      import BokehView
 from view.plots     import PlotState
-from view.beadplot  import BeadPlotView
+from cleaning.view  import CleaningView
+from fov            import FoVPlotView
 from cyclesplot     import CyclesPlotView
 from .peaksplot     import PeaksPlotView
 
@@ -15,7 +16,8 @@ class HybridStatView(BokehView):
         "Sets up the controller"
         super().__init__(**kwa)
         self._tabs   = None
-        self._panels = [BeadPlotView  (**kwa),
+        self._panels = [FoVPlotView   (**kwa),
+                        CleaningView  (**kwa),
                         CyclesPlotView(**kwa),
                         PeaksPlotView (**kwa)]
 
@@ -23,14 +25,15 @@ class HybridStatView(BokehView):
                                                     sizing_mode = 'fixed')
         self._ctrl.getGlobal('css.plot').figure.defaults = dict(responsive  = False,
                                                                 sizing_mode = 'fixed')
-        self._ctrl.getGlobal('css').hybridstat.defaults = dict(width = 300, height = 30)
+        self._ctrl.getGlobal('css').hybridstat.defaults = dict(width = 500, height = 30)
         titles = self._ctrl.getGlobal('css').hybridstat.title
         for panel in self._panels:
             key                         = self.__key(panel)
             titles[key].default         = key.capitalize()
             self.__state(panel).default = PlotState.disabled
+        titles['fov'].default           = 'FoV'
 
-        self.__state(self._panels[1]).default = PlotState.active
+        self.__state(self.__select(CleaningView)).default = PlotState.active
 
     @staticmethod
     def __key(panel):
@@ -43,9 +46,13 @@ class HybridStatView(BokehView):
             ret.set(PlotState(val))
         return ret
 
+    def __select(self, tpe):
+        return next(i for i in self._panels if isinstance(i, tpe))
+
     def ismain(self):
         "Allows setting-up stuff only when the view is the main one"
-        self._panels[-1].ismain()
+        self.__select(PeaksPlotView).ismain()
+        self.__select(CleaningView).ismain()
         def _advanced():
             for panel in self._panels:
                 if self.__state(panel).get() is PlotState.active:
@@ -65,9 +72,12 @@ class HybridStatView(BokehView):
                 ret = layouts.column(ret, **mode)
             return Panel(title = titles[self.__key(view)].get(), child = ret, **mode)
 
-        ind  = next((i for i, j in enumerate(self._panels)
-                     if self.__state(j).get() is PlotState.active),
-                    1)
+        ind = next((i for i, j in enumerate(self._panels)
+                    if self.__state(j).get() is PlotState.active),
+                   None)
+        if ind is None:
+            ind = next(i for i, j in enumerate(self._panels)
+                       if isinstance(i, CleaningView))
 
         for panel in self._panels[:ind]:
             self.__state(panel, PlotState.disabled)

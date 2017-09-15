@@ -15,7 +15,7 @@ import  numpy       as     np
 
 from    legacy      import readtrack, readgr # pylint: disable=import-error,no-name-in-module
 if TYPE_CHECKING:
-    from data import Track  # pylint: disable=unused-import
+    from data.track import Track  # pylint: disable=unused-import
 
 PATHTYPE  = Union[str, Path]
 PATHTYPES = Union[PATHTYPE,Tuple[PATHTYPE,...]]
@@ -149,7 +149,7 @@ class LegacyGRFilesIO(_TrackIO):
         u"opens the directory"
         output = LegacyTrackIO.open(paths[0], **kwa)
         if output is None:
-            raise IOError("Could not open track. "
+            raise IOError(f"Could not open track '{paths[0]}'.\n"
                           "This could be because of a *root* mounted samba path")
         remove = set(i for i in output if isinstance(i, int))
 
@@ -159,12 +159,17 @@ class LegacyGRFilesIO(_TrackIO):
         else:
             itr = (Path(i) for i in paths[1:])
 
+        # in case of axis != 'Z: we keep a backup,
+        # find which beads are valid and recover only these
+        axis   = kwa.pop('axis', 'Z')
+        axis   = getattr(axis, 'value', axis)[0]
+        backup = dict(output) if axis != 'Z' else output
+
         for grpath in itr:
-            if grpath.suffix != ".gr":
-                continue
+            if grpath.suffix == ".gr":
+                remove.discard(cls.__update(str(grpath), output))
 
-            remove.discard(cls.__update(str(grpath), output))
-
+        output = backup # this only affects axis != 'Z'
         for key in remove:
             output.pop(key)
         return output
@@ -246,8 +251,8 @@ class LegacyGRFilesIO(_TrackIO):
             bead[inds] = vals[1]
         return beadid
 
-    @staticmethod
-    def __scan(lst, fcn) -> Dict[str, Path]:
+    @classmethod
+    def __scan(cls, lst, fcn) -> Dict[str, Path]:
         return {i.stem: i for i in chain.from_iterable(_glob(fcn(str(k))) for k in lst)}
 
     @classmethod
@@ -267,10 +272,14 @@ class LegacyGRFilesIO(_TrackIO):
             projects = (projects,)
 
         res = {}
-        fcn = lambda match, grdir, i: (i if match(i) else i + grdir)
+        fcn = lambda match, grdir, i: (i if match(i) or cls.__CGREXT in i else i + grdir)
         for proj in projects:
-            grdir = f'/**/{proj}/*{cls.__CGREXT}'
-            part  = partial(fcn, re.compile(rf'\b{proj}\b').search, grdir)
+            if proj:
+                grdir = f'/**/{proj}/*{cls.__CGREXT}'
+                part  = partial(fcn, re.compile(rf'\b{proj}\b').search, grdir)
+            else:
+                grdir = f'/**/*{cls.__CGREXT}'
+                part  = partial(fcn, lambda _: False, grdir)
             res.update(cls.__scan(grdirs, part))
         return res
 
@@ -338,11 +347,8 @@ class Handler:
         if kwargs is None:
             res['data'] = {}
         else:
-            from .track import FOV
-            res['fov']    = FOV(image = kwargs.pop('fov'),
-                                dim   = kwargs.pop('dimensions'),
-                                beads = kwargs.pop('positions'))
-            res['phases'] = kwargs.pop('phases')
+            self.__fov(res, kwargs)
+            res.update({i: kwargs.pop(i) for i in ('phases', 'framerate')})
 
             if beadsonly:
                 data = {i: j for i, j in kwargs.items()
@@ -394,6 +400,23 @@ class Handler:
             raise IOError("Unknown file format in: {}".format(paths), "warning")
 
         return res
+
+    @staticmethod
+    def __fov(res, kwargs):
+        from .track import FoV, Bead
+        calib = kwargs.pop('calibrations', {})
+        res['fov'] = FoV()
+        if 'fov' in kwargs:
+            res['fov'].image = kwargs.pop('fov')
+
+        if 'dimensions' in kwargs:
+            res['fov'].dim   = kwargs.pop('dimensions')
+
+        if 'positions' in kwargs:
+            res['fov'].beads = {i: Bead(position = j,
+                                        image    = calib.get(i, Bead.image))
+                                for i, j in kwargs.pop('positions', {}).items()
+                                if i in kwargs}
 
 def checkpath(track, **opts) -> Handler:
     u"""

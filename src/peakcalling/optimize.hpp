@@ -18,13 +18,14 @@ namespace peakcalling { namespace optimizer
     {
         T     const * params;
         float const * beads[2];
+        float const * weights[2];
         size_t        sizes[2];
     };
 
     template <typename T>
     Output optimize (T     const & cf,
-                     float const * bead1, size_t size1,
-                     float const * bead2, size_t size2,
+                     float const * bead1, float const * weight1, size_t size1,
+                     float const * bead2, float const * weight2, size_t size2,
                      double  fcn(unsigned, double const *, double *, void *)
                     )
     {
@@ -40,7 +41,7 @@ namespace peakcalling { namespace optimizer
             opt.set_stopval (cf.stopval);
             opt.set_maxeval (int(cf.maxeval));
 
-            NLOptCall<T> call = {&cf, {bead1, bead2}, {size1, size2}};
+            NLOptCall<T> call = {&cf, {bead1, bead2}, {weight1, weight2}, {size1, size2}};
             opt.set_min_objective(fcn, static_cast<void*>(&call));
 
             std::ostringstream stream;

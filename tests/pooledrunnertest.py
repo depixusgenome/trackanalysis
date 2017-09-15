@@ -10,7 +10,7 @@ import os
 import sys
 
 from model.task               import Task, RootTask, Level
-from data.trackitems          import TrackItems
+from data.views               import TrackView
 from control.processor        import Processor
 from control.processor.runner import Cache, pooledinput, run, poolchunk
 from testingcore              import DummyPool
@@ -24,7 +24,7 @@ class _RootProcessor(Processor):
     def _run(cls):
         cls.CNT += 1
         data = {i: [(os.getpid(), 'r')] for i in range(3)}
-        yield TrackItems(data = data, parents = ('rr',))
+        yield TrackView(data = data, parents = ('rr',))
 
     @staticmethod
     def isslow():

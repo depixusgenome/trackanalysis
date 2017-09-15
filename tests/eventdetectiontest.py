@@ -43,6 +43,25 @@ def test_detectsplits():
     items[[0, 10, 25, 29]] = np.nan
     assert det(items) == ((0, 11), (11,20), (21,30))
 
+    items       = np.zeros((50,))
+    items[20:] -= thr
+    items[30:] -= thr
+    items[31:] -= thr
+    items[[10, 20, 35, 39]] = np.nan
+    items[:10] = np.nan
+    items[40:] = np.nan
+    assert det(items) == ((0, 21), (21,30), (31,50))
+
+    items       = np.zeros((50,))
+    items[:10] = np.nan
+    items[12:] -= thr
+    items[20:] -= thr
+    items[30:] -= thr
+    items[31:] -= thr
+    items[[10, 20, 35, 39]] = np.nan
+    items[40:] = np.nan
+    assert det(items) == ((0, 12), (12, 21), (21,30), (31,50))
+
 def test_minmaxsplitdetector():
     "Tests flat stretches detection"
     for i in (1,3):
@@ -141,10 +160,18 @@ def test_select():
     "Tests flat stretches filtering"
     det   = lambda  i, j, k: tuple(tuple(_)
                                    for _ in EventSelector(edgelength = i, minlength = j)
-                                   (np.array(k)))
+                                   (np.ones(100), np.array(k)))
     assert det(0, 0, ((0,0),(1,1)))                 == ((0,0), (1,1))
     assert det(0, 5, ((0,0),(1,1),(5,10)))          == ((5,10),)
     assert det(1, 5, ((0,0),(1,1),(5,10), (20,30))) == ((21,29),)
+
+    det         = EventSelector(edgelength = 0, minlength = 5)
+    data        = np.ones(50)
+    data[:5]    = np.NaN
+    data[10:15] = np.NaN
+    data[:5]    = np.NaN
+    data[19:20] = np.NaN
+    assert tuple(det(data, np.array(((0,15), (10, 20))))) == ((0, 15),)
 
 def test_minmaxalign():
     "align on min/max value"
@@ -281,4 +308,4 @@ def test_precision():
     assert list(np.nonzero(found-sim-1)[0]) == []
 
 if __name__ == '__main__':
-    test_intervalextension()
+    test_precision()

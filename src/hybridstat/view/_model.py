@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Model for peaksplot"
-from typing                     import Optional, Sequence, Dict, Any
+from typing                     import Optional, Dict, Any
 from itertools                  import product
 
 import numpy                    as     np
@@ -19,7 +19,8 @@ from peakcalling.processor      import (FitToHairpinTask, # pylint: disable=unus
 from view.plots.tasks           import TaskPlotModelAccess, TaskAccess
 from view.plots.sequence        import (readsequence,
                                         FitParamProp    as _FitParamProp,
-                                        SequenceKeyProp as _SequenceKeyProp)
+                                        SequenceKeyProp as _SequenceKeyProp,
+                                        SequencePlotModelAccess)
 
 from ..reporting.batch          import fittohairpintask
 
@@ -100,23 +101,19 @@ class SequenceKeyProp(_SequenceKeyProp):
                 return min(obj.distances, key = obj.distances.__getitem__)
         return super().__get__(obj, tpe)
 
-class IdentificationModelAccess(TaskPlotModelAccess):
+class IdentificationModelAccess(SequencePlotModelAccess):
     "Access to identification"
-    def __init__(self, ctrl, key: Optional[str] = None) -> None:
+    def __init__(self, ctrl, key: str = None) -> None:
         if key is None:
             key = '.plot.peaks'
         super().__init__(ctrl, key)
         self.identification = FitToHairpinAccess(self)
 
         cls = type(self)
-        cls.sequencepath    .setdefault(self, None)
-        cls.oligos          .setdefault(self, [], size = 4)
         cls.constraintspath .setdefault(self, None)
         cls.useparams       .setdefault(self, True)
 
     props           = TaskPlotModelAccess.props
-    sequencepath    = props.configroot[Optional[str]]('last.path.sequence')
-    oligos          = props.configroot[Optional[Sequence[str]]]('oligos')
     constraintspath = props.projectroot[Optional[str]]('constraints.path')
     useparams       = props.projectroot[bool]('constraints.useparams')
     @property
@@ -131,15 +128,15 @@ class IdentificationModelAccess(TaskPlotModelAccess):
 
 class PeaksPlotModelAccess(IdentificationModelAccess):
     "Access to peaks"
-    def __init__(self, ctrl, key: Optional[str] = None) -> None:
+    def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
         self.config.root.tasks.extremumalignment.default = ExtremumAlignmentTask()
 
-        self.eventdetection     = TaskAccess(self, EventDetectionTask)
-        self.peakselection      = TaskAccess(self, PeakSelectorTask)
-        self.fits               = None   # type: Optional[FitBead]
-        self.peaks              = dict() # type: Dict[str, np.ndarray]
-        self.estimatedbias      = 0.
+        self.eventdetection                 = TaskAccess(self, EventDetectionTask)
+        self.peakselection                  = TaskAccess(self, PeakSelectorTask)
+        self.fits : FitBead                 = None
+        self.peaks: Dict[str, np.ndarray]   = dict()
+        self.estimatedbias                  = 0.
 
         cls = type(self)
         cls.sequencekey .setdefault(self, None) # type: ignore

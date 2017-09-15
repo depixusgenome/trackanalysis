@@ -4,8 +4,7 @@
 """
 Creates peaks sheet
 """
-from typing                 import (Tuple, Iterator,  # pylint: disable=unused-import
-                                    Optional, Dict)
+from typing                 import Tuple, Iterator, Optional, Dict
 from functools              import wraps
 from math                   import floor
 from xlsxwriter.utility     import xl_col_to_name
@@ -13,7 +12,7 @@ from xlsxwriter.utility     import xl_col_to_name
 import numpy as np
 
 from excelreports.creation      import column_method as _column_method, sheet_class, Columns
-from data.trackitems            import BEADKEY            # pylint: disable=unused-import
+from data.views                 import BEADKEY
 from peakfinding.probabilities  import Probability
 from ._base                     import Reporter, HasLengthPeak, Group, Bead
 
@@ -44,7 +43,7 @@ class Probabilities(HasLengthPeak):
         super().__init__(base.config)
         self._proba  = Probability(framerate   = base.config.track.framerate,
                                    minduration = base.config.minduration)
-        self._values = dict()   # type: Dict[Tuple[BEADKEY,int], Probability]
+        self._values: Dict[Tuple[BEADKEY,int], Probability] = dict()
         self._ends   = base.config.track.durations
 
     def __cache(self, bead:Bead, ipk:int) -> Probability:
@@ -90,7 +89,7 @@ class Neighbours(HasLengthPeak):
     def __init__(self, base:Reporter) -> None:
         super().__init__(base.config)
         self._seqs     = base.config.sequences
-        self._oldbead  = (None, None)   # type: Tuple[Optional[Group], Optional[Bead]]
+        self._oldbead:  Tuple[Optional[Group], Optional[Bead]] = (None, None)
         self._sz       = max(len(x) for x in base.config.oligos)
         self._pos      = frozenset(base.config.oligos)
 
@@ -151,7 +150,7 @@ class PositionInRef(HasLengthPeak):
         self._isxlsx  = peaks.isxlsx()
         self._peakrow = 1+peaks.tablerow()
         self._beadrow = 1+summ.tablerow()
-        self._oldbead = None # type: Optional[Tuple[Group, Bead]]
+        self._oldbead: Optional[Tuple[Group, Bead]] = None
 
         def _cell(name):
             for i, col in enumerate(summ.columns()):

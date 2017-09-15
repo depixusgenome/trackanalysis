@@ -23,7 +23,7 @@ def test_toolbar(bokehaction):
             assert not tbar.frozen
             assert track.path  == server.path('small_legacy')
             assert track       is curr.task.get()
-            assert ctrl.getGlobal('config').last.path.trk.get() == track.path
+            assert ctrl.getGlobal('css').last.path.trk.get() == track.path
 
         _checknone()
         server.load('small_legacy')
@@ -70,7 +70,6 @@ def test_beadplot(bokehaction):
     "test plot"
     vals = [0.]*4
     def _printrng(evts):
-        print(evts)
         if 'x' in evts:
             vals[:2] = [0. if i is None else i for i in evts['x'].value]
         if 'y' in evts:

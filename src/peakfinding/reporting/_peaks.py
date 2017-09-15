@@ -3,11 +3,9 @@
 """
 Creates peaks sheet
 """
-from typing                 import (Tuple, Iterator,  # pylint: disable=unused-import
-                                    Optional, Dict)
+from typing                     import Tuple, Iterator, Optional, Dict
 
 from excelreports.creation      import column_method, sheet_class
-from data.trackitems            import BEADKEY            # pylint: disable=unused-import
 from ..probabilities            import Probability
 from ._base                     import Reporter, BEADKEY, PeakOutput
 
@@ -16,7 +14,7 @@ class Probabilities:
     def __init__(self, base:Reporter) -> None:
         self._proba  = Probability(framerate   = base.config.track.framerate,
                                    minduration = base.config.minduration)
-        self._values = dict()   # type: Dict[Tuple[BEADKEY,int], Probability]
+        self._values: Dict[Tuple[BEADKEY,int], Probability] = dict()
         self._ends   = base.config.track.durations
 
     def __cache(self, bead:BEADKEY, ipk:int, peak:PeakOutput) -> Probability:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Create a grid displaying a sequence"
-from    typing         import List, Optional, Tuple # pylint: disable=unused-import
+from    typing         import List, Optional, Tuple, Sequence # pylint: disable=unused-import
 from    collections    import OrderedDict
 from    pathlib        import Path
 import  numpy   as np
@@ -17,8 +17,9 @@ from    utils.gui       import implementation
 
 from   model.globals    import BeadProperty
 from   ..dialog         import FileDialog
-from    .base           import checksizes, WidgetCreator
-from    .bokehext       import DpxHoverTool, from_py_func
+from   .base            import checksizes, WidgetCreator
+from   .tasks           import TaskPlotModelAccess
+from   .bokehext        import DpxHoverTool, from_py_func
 
 _CACHE = CachedIO(lambda path: OrderedDict(sequences.read(path)), size = 1)
 def readsequence(path):
@@ -319,8 +320,9 @@ class OligoListWidget(WidgetCreator):
     def __init__(self, model) -> None:
         super().__init__(model)
         self.__widget: AutocompleteInput = None
-        self.config.plot.oligos.defaults = {'history': [], 'history.maxlength': 10}
-        self.css.plot.defaults = {'title.oligos'     : u'Oligos',
+        self.css.plot.defaults = {'oligos.history'          : [],
+                                  'oligos.history.maxlength': 10,
+                                  'title.oligos'     : u'Oligos',
                                   'title.oligos.help': u'comma-separated list'}
 
     def create(self, action) -> List[Widget]:
@@ -335,7 +337,7 @@ class OligoListWidget(WidgetCreator):
         @action
         def _py_cb(attr, old, new):
             ols  = sequences.splitoligos(new)
-            hist = self.config.plot.oligos.history
+            hist = self.css.plot.oligos.history
             lst  = list(i for i in hist.get() if i != ols)[:hist.maxlength.get()]
             hist.set(([ols] if len(ols) else []) + lst)
             self._model.oligos = ols
@@ -348,7 +350,7 @@ class OligoListWidget(WidgetCreator):
         resets[self.__widget].update(**self.__data())
 
     def __data(self):
-        hist = self.config.oligos.history.get()
+        hist = self.css.plot.oligos.history.get()
         lst  = [', '.join(sorted(j.lower() for j in i)) for i in hist]
         ols  = ', '.join(sorted(j.lower() for j in self._model.oligos))
         return dict(value = ols, completions = lst)
@@ -378,6 +380,19 @@ class SequenceKeyProp(BeadProperty[Optional[str]]):
 
         dseq = readsequence(obj.sequencepath)
         return next(iter(dseq), None) if key not in dseq else key
+
+class SequencePlotModelAccess(TaskPlotModelAccess):
+    "access to the sequence path and the oligo"
+    crprop       = TaskPlotModelAccess.props.configroot
+    sequencepath = crprop[Optional[str]]          ('tasks.sequence.path')
+    oligos       = crprop[Optional[Sequence[str]]]('tasks.oligos')
+    del crprop
+
+    def __init__(self, ctrl, key: str = None) -> None:
+        super().__init__(ctrl, key)
+        cls = type(self)
+        cls.sequencepath.setdefault(self, None)
+        cls.oligos      .setdefault(self, [], size = 4)
 
 class FitParamProp(BeadProperty[float]):
     "access to bias or stretch"

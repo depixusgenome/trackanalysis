@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Creates a histogram from available events"
-from    typing import (Optional, Iterator, # pylint: disable=unused-import
+from    typing import (NamedTuple, Optional, Iterator,
                        Iterable, Union, Sequence, Callable, Tuple, cast)
 from    enum   import Enum
 import  itertools
@@ -12,10 +12,18 @@ from    scipy.signal            import find_peaks_cwt
 from    utils                   import (kwargsdefaults, initdefaults,
                                         NoArgs, asdataarrays, EVENTS_DTYPE)
 from    signalfilter            import PrecisionAlg
-from    signalfilter.convolve   import KernelConvolution # pylint: disable=unused-import
+from    signalfilter.convolve   import KernelConvolution
 
-HistInputs = Union[Iterable[Iterable[float]], Iterable[Iterable[np.ndarray]]]
+HistInputs = Union[Iterable[Iterable[float]],
+                   Iterable[Iterable[np.ndarray]],
+                   Iterable[float]]
 BiasType   = Union[None, float, np.ndarray]
+
+class HistogramData(NamedTuple): # pylint: disable=missing-docstring
+    histogram:  np.ndarray
+    minvalue:   float
+    binwidth:   float
+
 class Histogram(PrecisionAlg):
     """
     Creates a gaussian smeared histogram of events.
@@ -27,7 +35,6 @@ class Histogram(PrecisionAlg):
     * *zmeasure*: function for computing the z-position of an event (np.nanmean per default)
     * *weight*: function for computing the weight of an event. If *None*, the weight is 1.
     * *kernel*: used for smoothing the histogram
-
 
     The functor can be called with:
 
@@ -43,11 +50,11 @@ class Histogram(PrecisionAlg):
     2. the histogram's origin
     3. the histogram's bin width
     """
-    edge         = 0
-    oversampling = 5
-    zmeasure     = 'nanmean'            # type: Union[str, Callable, None]
-    weight       = None                 # type: Optional[Callable]
-    kernel       = KernelConvolution()  # type: Optional[KernelConvolution]
+    edge                                  = 0
+    oversampling                          = 5
+    zmeasure: Union[str, Callable, None]  = 'nanmean'
+    weight:   Union[str, Callable, None]  = None
+    kernel:   Optional[KernelConvolution] = KernelConvolution()
 
     @initdefaults(frozenset(locals()), kernel = 'update')
     def __init__(self, **kwa):
@@ -59,13 +66,20 @@ class Histogram(PrecisionAlg):
                  bias     : BiasType = None,
                  separate : bool     = False,
                 ) -> Tuple[Iterator[np.ndarray], float, float]:
-        events = asdataarrays(aevents)
-        if events is None:
-            return np.empty((0,), dtype = 'f4'), np.inf, 0.
+        if isinstance(aevents, Iterable) and all(np.isscalar(i) for i in aevents):
+            events = np.array(aevents, dtype = 'f4')[None].T[None]
+        elif (isinstance(aevents, np.ndarray)
+              and len(aevents.shape) == 1           # type: ignore
+              and str(aevents.dtype)[0] == 'f'):    # type: ignore
+            events = np.array(aevents, dtype = 'f4')[None].T[None]
+        else:
+            events = asdataarrays(aevents)
+            if events is None:
+                return np.empty((0,), dtype = 'f4'), np.inf, 0.
 
-        if (self.zmeasure is not None
-                and np.isscalar(next(i[0] for i in events if len(i)))):
-            events = (events,)
+            if (self.zmeasure is not None
+                    and np.isscalar(next(i[0] for i in events if len(i)))):
+                events = (events,)
 
         gen          = self.__compute(events, bias, separate)
         minv, bwidth = next(gen)
@@ -74,7 +88,7 @@ class Histogram(PrecisionAlg):
     def projection(self, aevents : HistInputs, bias: BiasType = None, **kwa):
         "Calls itself and returns the sum of histograms + min value and bin size"
         tmp, minv, bwidth = self(aevents, bias, separate = False, **kwa)
-        return next(tmp), minv, bwidth
+        return HistogramData(next(tmp), minv, bwidth)
 
     def apply(self, minv, bwidth, lenv, arr):
         "Applies to one array"
@@ -122,6 +136,62 @@ class Histogram(PrecisionAlg):
     def run(cls, *args, **kwa):
         "runs the algorithm"
         return cls()(*args, **kwa)
+
+    def asprojection(self, itm) -> HistogramData:
+        "returns a projection from a variety of data types"
+        if hasattr(itm, 'histogram'):
+            return HistogramData(itm.histogram, itm.minvalue, itm.binwidth)
+
+        if str(getattr(itm, 'dtype', ' '))[0] == 'f' and len(itm.shape) == 2:
+            # expecting a 2D table as in hv.Curve.data
+            return HistogramData(itm[:,1], itm[0,0], itm[1,0]-itm[0,0])
+
+        if (str(getattr(itm, 'dtype', ' '))[0] == 'f'
+                or getattr(itm, 'dtype', 'f4') == EVENTS_DTYPE
+                or (isinstance(itm, Sequence) and all(np.isscalar(i) for i in itm))):
+            return self.projection(itm)
+
+        if isinstance(itm, Iterator):
+            # this should be a peaks output
+            vals = np.concatenate([i for _, i in itm])
+            vals = np.concatenate([i if isinstance(i, np.ndarray) else [i]
+                                   for i in vals if i is not None and len(i)])
+            return self.projection(vals)
+        return HistogramData(*itm)
+
+    def variablekernelsize(self, peaks) -> HistogramData:
+        "computes a histogram where the kernel size may vary"
+        osamp  = (int(self.oversampling)//2) * 2 + 1
+        bwidth = self.getprecision(self.precision)/osamp
+        minv   = min(i for i, _ in peaks) - self.edge*bwidth*osamp
+        maxv   = max(i for i, _ in peaks) + self.edge*bwidth*osamp
+        lenv   = int((maxv-minv)/bwidth)+1
+        arr    = np.zeros((lenv,), dtype = 'f4')
+
+        peaks[:,0] -= minv
+        peaks       = np.int32(np.rint((peaks)/bwidth)) # type: ignore
+        peaks       = peaks[np.logical_and(peaks[:,0] >= 0, peaks[:,0] < lenv)]
+        if self.kernel is None:
+            arr[peaks[:,0]] += 1
+        else:
+            last = -1
+            for ipeak, std in sorted(peaks, key = lambda x: x[1]):
+                if last != std:
+                    kern = self.kernel.kernel(width = std)
+                    last = std
+                imin = ipeak-kern.size//2
+                imax = ipeak+kern.size//2+1
+
+                if imin < 0:
+                    kern = kern[-imin:]
+                    imin = None
+
+                if imax > lenv:
+                    kern = kern[:lenv-imax]
+                    imax = None
+
+                arr[imin:imax] = kern
+        return HistogramData(arr, minv, bwidth)
 
     @staticmethod
     def __eventpositions(events, bias, fcn):
@@ -186,7 +256,7 @@ class Histogram(PrecisionAlg):
 
         zmeas  -= minv
         zmeas  /= bwidth
-        items   = (np.int32(np.rint(i)) for i in zmeas)      # type: ignore
+        items   = (np.int32(np.rint(i)) for i in zmeas)  # type: ignore
         weight  = self.__weights(self.weight,   events)
 
         if not separate:
@@ -206,9 +276,9 @@ class SubPixelPeakPosition:
     """
     Refines the peak position using a quadratic fit
     """
-    fitwidth = 1 # type: Optional[int]
-    fitcount = 2
-    fitmode  = FitMode.quadratic
+    fitwidth: Optional[int] = 1
+    fitcount                = 2
+    fitmode                 = FitMode.quadratic
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -242,19 +312,19 @@ class SubPixelPeakPosition:
                      i) for i in cast(Iterable, inds))
 
             vals = np.array([fitfcn(*i) for i in rngs], dtype = 'f4')
-            inds = np.int32(np.rint(vals)) # type: ignore
+            inds = np.int32(np.rint(vals))      # type: ignore
         return (vals[0] if np.isscalar(ainds) else vals) * rho + bias
 
 class CWTPeakFinder:
     "Finds peaks using scipy's find_peaks_cwt. See the latter's documentation"
-    subpixel      = SubPixelPeakPosition()
-    widths        = np.arange(5, 11) # type: Sequence[int]
-    wavelet       = None             # type: Optional[Callable]
-    max_distances = None             # type: Optional[Sequence[int]]
-    gap_tresh     = None             # type: Optional[float]
-    min_length    = None             # type: Optional[int]
-    min_snr       = 1.
-    noise_perc    = 10.
+    subpixel                               = SubPixelPeakPosition()
+    widths:        Sequence[int]           = np.arange(5, 11)
+    wavelet:       Optional[Callable]      = None
+    max_distances: Optional[Sequence[int]] = None
+    gap_tresh:     Optional[float]         = None
+    min_length:    Optional[int]           = None
+    min_snr                                = 1.
+    noise_perc                             = 10.
     @initdefaults(frozenset(locals()), subpixel = 'update')
     def __init__(self, **_):
         pass
@@ -272,9 +342,9 @@ class ZeroCrossingPeakFinder:
     """
     Finds peaks with a minimum *half*width and threshold
     """
-    subpixel  = SubPixelPeakPosition()
-    peakwidth = 1
-    threshold = getattr(np.finfo('f4'), 'resolution') # type: float
+    subpixel         = SubPixelPeakPosition()
+    peakwidth        = 1
+    threshold: float = getattr(np.finfo('f4'), 'resolution')
     @initdefaults(frozenset(locals()), subpixel = 'update')
     def __init__(self, **_):
         pass
@@ -363,7 +433,6 @@ class GroupByPeakAndBase(GroupByPeak):
         * *baserange:* the range starting from the very left where the baseline
         peak should be, in µm.
     """
-
     baserange = .1
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):

@@ -7,13 +7,13 @@ from copy             import deepcopy
 from functools        import wraps, partial
 import numpy          as     np
 
-from model            import PHASE
-from data             import Track
-from data.trackitems  import Items, Cycles, Level, CYCLEKEY
+from model            import PHASE, Level
+from data.track       import Track
+from data.views       import ITrackView, Cycles, CYCLEKEY
 from utils            import EVENTS_TYPE, EVENTS_DTYPE, asview, EventsArray
 from .                import EventDetectionConfig
 
-class Events(Cycles, EventDetectionConfig, Items):
+class Events(Cycles, EventDetectionConfig, ITrackView):
     u"""
     Class for iterating over events:
 
@@ -48,6 +48,11 @@ class Events(Cycles, EventDetectionConfig, Items):
         return _fcn
 
     def _iter(self, sel = None) -> Iterator[Tuple[CYCLEKEY, Sequence[EVENTS_TYPE]]]:
+        if isinstance(self.data, Events):
+            if sel is None:
+                yield from iter(self.data)
+            yield from ((i, j) for i, j in self.data if i in sel)
+
         prec  = None if self.precision in (0., None) else self.precision
         track = self.track
         fcn   = self.__filterfcn()

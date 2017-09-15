@@ -6,8 +6,8 @@ Classes defining a type of data treatment.
 **Warning** Those definitions must remain data-independant.
 """
 from copy           import deepcopy
-from typing         import (Optional, Sequence,  # pylint: disable=unused-import
-                            Dict, Callable, Set, Tuple, Union, List)
+from pathlib        import Path
+from typing         import Sequence, Dict, Set, Tuple, Union, List, Callable, Iterator
 from pickle         import dumps as _dumps
 from enum           import Enum, unique
 import numpy        as     np
@@ -115,12 +115,14 @@ class RootTask(Task):
         "returns whether the class should be a root"
         return True
 
+_PATHTYPE = Union[str, Path, Tuple[Union[str,Path],...]]
+PATHTYPE  = Union[_PATHTYPE, Dict[str,_PATHTYPE]]
 class TrackReaderTask(RootTask):
     "Class indicating that a track file should be added to memory"
     def __init__(self,
-                 path:     Union[str, Tuple[str,...], None] = None,
-                 beadsonly:bool          = False,
-                 copy:     bool          = False, **kwa) -> None:
+                 path:      PATHTYPE = None,
+                 beadsonly: bool     = False,
+                 copy:      bool     = False, **kwa) -> None:
         super().__init__(**kwa)
         self.path      = path
         self.beadsonly = beadsonly
@@ -128,13 +130,13 @@ class TrackReaderTask(RootTask):
 
 class DataSelectionTask(Task):
     "selects some part of the data"
-    level     = Level.none
-    beadsonly = None    # type: Optional[bool]
-    samples   = None    # type: Union[Sequence[int], slice, None]
-    phases    = None    # type: Union[Tuple[int,...], int, None]
-    selected  = None    # type: Optional[List]
-    discarded = None    # type: Optional[List]
-    cycles    = None    # type: Optional[slice]
+    level                                  = Level.none
+    beadsonly: bool                        = None
+    samples:   Union[Sequence[int], slice] = None
+    phases:    Union[Tuple[int,...], int]  = None
+    selected:  List                        = None
+    discarded: List                        = None
+    cycles:    slice                       = None
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **_) -> None:
         super().__init__()
@@ -154,9 +156,9 @@ class TaggingTask(Task):
 
     def __init__(self, level:Level, **kw) -> None:
         super().__init__(level = level)
-        self.tags      = dict(kw.get('tags', []))  # type: Dict[str,Set[int]]
-        self.selection = set (kw.get('tags', []))  # type: Set
-        self.action    = toenum(TagAction, kw.get('action', 'none')) # type: TagAction
+        self.tags:      Dict[str,Set[int]] = dict(kw.get('tags', []))
+        self.selection: Set                = set (kw.get('tags', []))
+        self.action:    TagAction          = toenum(TagAction, kw.get('action', 'none'))
 
     def selected(self, item) -> bool:
         "Returns whether an item is selected"
@@ -178,13 +180,55 @@ class TaggingTask(Task):
 
 class CycleCreatorTask(Task):
     "Task for dividing a bead's data into cycles"
-    levelin = Level.bead
-    levelou = Level.cycle
-
+    levelin    = Level.bead
+    levelou    = Level.cycle
+    first: int = None
+    last:  int = None
     @classmethod
     def unique(cls):
         "returns class or parent task if must remain unique"
         return cls
+
+class DataFrameTask(Task):
+    "Adds it's task to the TrackItem using *withfunction*"
+    level                                     = Level.none
+    merge                                     = False
+    indexes: Sequence[str]                    = ['track', 'bead', 'cycle']
+    measures: Dict[str, Union[Callable, str]] = {}
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
+    def getfunctions(self) -> Iterator[Tuple[str, Callable]]:
+        "returns measures, with string changed to methods from np"
+        return ((i, self.getfunction(j)) for i, j in self.measures.items())
+
+    @staticmethod
+    def indexcolumns(cnt, key = None, frame = None) -> Dict[str, np.ndarray]:
+        "adds default columns"
+        res = {}
+        if frame is not None:
+            if frame.track.key:
+                res['track'] = np.full(cnt, frame.track.key)
+            elif isinstance(frame.track.path, (str, Path)):
+                res['track'] = np.full(cnt, str(Path(frame.track.path).name))
+            else:
+                res['track'] = np.full(cnt, str(Path(frame.track.path[0]).name))
+
+        if key is not None:
+            if isinstance(key, tuple) and len(key) == 2:
+                res['bead']  = np.full(cnt, key[0])
+                res['cycle'] = np.full(cnt, key[1])
+            elif np.isscalar(key):
+                res['bead'] = np.full(cnt, key)
+        return res
+
+    @staticmethod
+    def getfunction(name: Union[Callable, str]) -> Callable:
+        "returns measures, with string changed to methods from np"
+        if isinstance(name, str):
+            return getattr(np, f'nan{name}', getattr(np, name, None))
+        return name
 
 class DataFunctorTask(Task):
     "Adds it's task to the TrackItem using *withfunction*"
@@ -210,6 +254,7 @@ class DataFunctorTask(Task):
 
 TASK_ORDER = ('model.task.RootTask',
               'model.task.DataSelectionTask',
+              'cleaning.beadsubtraction.BeadSubtractionTask',
               'cleaning.processor.DataCleaningTask',
               'eventdetection.processor.ExtremumAlignmentTask',
               'cordrift.processor.DriftTask',
@@ -222,7 +267,7 @@ def taskorder(lst):
     "yields a list of task types in the right order"
     for itm in lst:
         modname, clsname = itm[:itm.rfind('.')], itm[itm.rfind('.')+1:]
-        yield getattr(__import__(modname, fromlist = (clsname,)), clsname)
+        yield getattr(__import__(modname, fromlist = (clsname,)), clsname) # type: ignore
 
-__all__  = tuple(i for i in locals() if i.endswith('Task') and len(i) >= len('Task'))
-__all__ += 'TagAction', 'TASK_ORDER' # type: ignore
+__all__ = (tuple(i for i in locals() if i.endswith('Task') and len(i) >= len('Task'))
+           + ('TagAction', 'TASK_ORDER'))

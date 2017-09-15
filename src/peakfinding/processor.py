@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Tasks related to peakfinding"
-from typing             import (Iterator, Tuple, # pylint: disable=unused-import
-                                Sequence, List, Set, Optional)
-from functools          import partial
-import numpy as np
+from typing                 import Dict     # pylint: disable=unused-import
+from functools              import partial
 
-from utils              import initdefaults
-from model              import Task, Level, PHASE
-from control.processor  import Processor
-from data.trackitems    import BEADKEY, TrackItems, Beads
-from signalfilter       import rawprecision
-from eventdetection     import EventDetectionConfig
-from .alignment         import PeakCorrelationAlignment
-from .selector          import PeakSelector, Output as PeakOutput, PeaksArray
-from .probabilities     import Probability
+import numpy                as     np       # pylint: disable=unused-import
+
+from utils                  import initdefaults
+from model                  import Task, Level, PHASE
+from control.processor      import Processor
+from signalfilter           import rawprecision
+from data.views             import BEADKEY  # pylint: disable=unused-import
+from eventdetection.data    import EventDetectionConfig
+from .alignment             import PeakCorrelationAlignment
+from .selector              import PeakSelector
+from .probabilities         import Probability
+
+# pylint: disable=unused-import
+from .data                  import PeaksDict, Output
+from .dataframe             import dataframe
 
 class PeakCorrelationAlignmentTask(PeakCorrelationAlignment, Task):
     "Aligns cycles using peaks"
@@ -32,7 +36,7 @@ class PeakCorrelationAlignmentProcessor(Processor):
 
     @classmethod
     def __action(cls, frame, cnf):
-        cache = dict()
+        cache = dict() # type: Dict[BEADKEY, np.ndarray]
         tsk   = PeakCorrelationAlignment(**cnf)
         def _action(info):
             nonlocal cache
@@ -71,104 +75,6 @@ class PeakSelectorTask(PeakSelector, Task):
         Task.__init__(self)
         PeakSelector.__init__(self, **kwa)
 
-Output = Tuple[BEADKEY, Iterator[PeakOutput]]
-class PeaksDict(TrackItems):
-    "iterator over peaks grouped by beads"
-    level = Level.peak
-    def __init__(self, *_, config = None, **kwa):
-        assert len(_) == 0
-        super().__init__(**kwa)
-        if config is None:
-            self.config = PeakSelector()
-        elif isinstance(config, dict):
-            self.config = PeakSelector(**config)
-        else:
-            assert isinstance(config, PeakSelector), config
-            self.config = config
-
-        self.__keys = None
-
-    def compute(self, ibead, precision: float = None) -> Iterator[PeakOutput]:
-        "Computes values for one bead"
-        vals = iter(i for _, i in self.data[ibead,...])
-        yield from self.config(vals, self.__precision(ibead, precision))
-
-    def detailed(self, ibead, precision: float = None):
-        "detailed output from config"
-        return self.config.detailed(iter(i for _, i in self.data[ibead,...]),
-                                    self.__precision(ibead, precision))
-
-    def index(self) -> 'PeaksDict':
-        "Returns indexes at the same key and positions"
-        return self.withaction(self.__index)
-
-    def withmeasure(self, singles = np.nanmean, multiples = None) -> 'PeaksDict':
-        "Returns a measure per events."
-        if multiples is None:
-            multiples = lambda x: singles(np.concatenate(x))
-        return self.withaction(partial(self.__measure, singles, multiples))
-
-    @classmethod
-    def measure(cls, itm: PeaksArray, singles = np.nanmean, multiples = None) -> PeaksArray:
-        "Returns a measure per events."
-        if len(itm) == 0:
-            return itm
-
-        if multiples is None:
-            multiples = lambda x: singles(np.concatenate(x))
-
-        if isinstance(itm[0][1], PeaksArray):
-            itm[:] = [(i, cls.__array2measure(singles, multiples, j)) for i, j in itm]
-        else :
-            itm[:] = cls.__array2measure(singles, multiples, itm)
-        return itm
-
-    @classmethod
-    def __measure(cls, singles, multiples, info):
-        return info[0], ((i, cls.__array2measure(singles, multiples, j)) for i, j in info[1])
-
-    @classmethod
-    def __index(cls, info):
-        return info[0], ((i, cls.__array2range(j)) for i, j in info[1])
-
-    @staticmethod
-    def __array2measure(singles, multiples, arr):
-        if arr.dtype == 'O':
-            arr[:] = [None                  if i is None            else
-                      singles  (i[1])       if isinstance(i, tuple) else
-                      multiples(i['data'])
-                      for i in arr[:]]
-        else:
-            arr['data'] = [singles(i) for i in arr['data']]
-        return arr
-
-    @staticmethod
-    def __array2range(arr):
-        if arr.dtype == 'O':
-            return np.array([None                        if i is None            else
-                             range(i[0], i[0]+len(i[1])) if isinstance(i, tuple) else
-                             range(i[0][0], i[-1][0]+len(i[-1][1]))
-                             for i in arr])
-        return np.array([None                        if i is None            else
-                         range(i[0], i[0]+len(i[1])) if np.isscalar(i[1][0]) else
-                         range(i[0][0], i[-1][0]+len(i[-1][1]))
-                         for i in arr])
-
-    def _keys(self, sel:Sequence = None, _ = None) -> Iterator[BEADKEY]:
-        if self.__keys is None:
-            self.__keys = frozenset(i for i, _ in self.data.keys() if Beads.isbead(i))
-
-        if sel is None:
-            yield from self.__keys
-        else:
-            yield from (i for i in self.__keys if i in sel)
-
-    def _iter(self, sel:Sequence = None) -> Iterator[Output]:
-        yield from ((bead, self.compute(bead)) for bead in self.keys(sel))
-
-    def __precision(self, ibead: int, precision: Optional[float]):
-        return self.config.getprecision(precision, self.data.track, ibead)
-
 class PeakSelectorProcessor(Processor):
     "Groups events per peak"
     @classmethod
@@ -182,9 +88,9 @@ class PeakSelectorProcessor(Processor):
 
 class PeakProbabilityTask(Task):
     "Computes probabilities for each peak"
-    level       = Level.peak
-    minduration = None # type: float
-    framerate   = None # type: float
+    level              = Level.peak
+    minduration: float = None
+    framerate:   float = None
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **kwa):
         super().__init__(**kwa)

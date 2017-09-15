@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "List of processes and cache"
-from typing         import Union, Iterable, List, Tuple, Any
+from typing         import Union, Iterable, List, Tuple, Any, Iterator
 from utils          import isfunction
 from .base          import Processor
 
@@ -157,8 +157,12 @@ class Cache:
     def __len__(self):
         return len(self._items)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Processor]:
         yield from (i.proc for i in self._items)
+
+    def items(self) -> Iterator[CacheItem]:
+        "yields processors and caches"
+        return iter(self._items)
 
     def __getitem__(self, ide):
         if isinstance(ide, slice):

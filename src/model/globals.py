@@ -493,6 +493,10 @@ class Globals:
             maps = {i: j.maps[index] for i, j in self.__maps.items() if 'project' not in i}
             maps = {i: j for i, j in maps.items() if len(j)}
 
+        if protocol is dict:
+            return (maps        if configpath is None else
+                    {i: j for i, j in maps.items() if configpath(i)})
+
         path = configpath(protocol.version(patchname))
         path.parent.mkdir(parents = True, exist_ok = True)
         path.touch(exist_ok = True)
@@ -501,20 +505,23 @@ class Globals:
 
     def readconfig(self, configpath, protocol, patchname = 'config') -> Optional[dict]:
         "Sets-up the user preferences"
-        cnf   = None
-        first = True
-        for version in protocol.iterversions(patchname):
-            path = configpath(version)
-            if not path.exists():
-                continue
-            try:
-                cnf = protocol.load(path, patch = patchname)
-            except Exception as exc: # pylint: disable=broad-except
-                LOGS.warning("Failed loading %s", path, exc_info = exc)
-                first = False
-                continue
-            (LOGS.debug if first else LOGS.info)("Loaded %s", path)
-            break
+        if protocol is dict:
+            cnf = configpath
+        else:
+            cnf   = None
+            first = True
+            for version in protocol.iterversions(patchname):
+                path = configpath(version)
+                if not path.exists():
+                    continue
+                try:
+                    cnf = protocol.load(path, patch = patchname)
+                except Exception as exc: # pylint: disable=broad-except
+                    LOGS.warning("Failed loading %s", path, exc_info = exc)
+                    first = False
+                    continue
+                (LOGS.debug if first else LOGS.info)("Loaded %s", path)
+                break
 
         if cnf is None:
             return None

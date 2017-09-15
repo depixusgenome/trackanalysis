@@ -107,6 +107,12 @@ class Probability:
 
         return skews
 
+    @classmethod
+    def positionprecision(cls, events):
+        "returns the resolution"
+        nevts = sum(1 for i in events if i is not None) - getattr(events, 'discarded', 0)
+        return np.NaN if nevts <= 0 else cls.resolution(events)/np.sqrt(nevts)
+
     @staticmethod
     def resolution(events):
         "returns the resolution"

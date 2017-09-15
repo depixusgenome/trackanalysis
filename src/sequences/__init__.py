@@ -120,8 +120,11 @@ class Translator:
             >>> assert len(res) == 4
         """
         ispath = False
-        if isinstance(oligs, pathlib.Path):
+        if isinstance(oligs, (dict, pathlib.Path)):
             seq, oligs = oligs, seq
+
+        if isinstance(seq, dict):
+            return ((i, cls.peaks(j, oligs)) for i, j in seq.items())
 
         try:
             ispath = isinstance(seq, pathlib.Path) or pathlib.Path(seq).exists()

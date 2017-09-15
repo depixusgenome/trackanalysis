@@ -31,6 +31,7 @@ namespace legacy
         size_t ncycles  () const;
         size_t nphases  () const;
         std::tuple<float, float, float, float> dimensions() const;
+        bool   readcalib(int im, std::string fname) const;
 
         bool   islost(int i) const;
         void   cycles(int *)            const;
@@ -70,6 +71,7 @@ namespace legacy
         std::vector<int>    cycles()         const { decltype(cycles()) x; cycles(x);   return x; }
 
         float  camerafrequency() const;
+        bool   sdi() const;
 
         private:
             template <typename T>

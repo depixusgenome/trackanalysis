@@ -137,13 +137,21 @@ class EventSelector:
         "returns 2*edgelength+minlength"
         return 2*self.edgelength+self.minlength
 
-    def __call__(self, intervals: np.ndarray) -> np.ndarray:
+    @staticmethod
+    def __good(minl, data):
+        return (np.all(np.isfinite(data[[0,-1]]))
+                or np.diff(np.nonzero(np.isfinite(data))[0][[0,-1]]) >= minl-1)
+
+    def __call__(self, data: np.ndarray, intervals: np.ndarray) -> np.ndarray:
         edx  = self.edgelength
         minl = self.minduration
         if minl <= 0:
             return intervals
         else:
             intervals = intervals[np.nonzero(np.diff(intervals, 1) >= minl)[0]] # type: ignore
+            good      = np.fromiter((self.__good(minl, data[slice(*rng)]) for rng in intervals),
+                                    'bool', len(intervals))
+            intervals = intervals[good]
             if edx != 0:
                 intervals[:,0] += edx
                 intervals[:,1] -= edx
