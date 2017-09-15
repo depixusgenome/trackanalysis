@@ -37,34 +37,34 @@ def test_toolbar(bokehaction):
 def test_beadtoolbar(bokehaction):
     "test the toolbar"
     with bokehaction.launch('view.toolbar.BeadToolbar', 'app.default') as server:
-        beads = server.get('BeadToolbar', '_BeadToolbar__bead')
-
         # pylint: disable=protected-access
+        beads = server.get('BeadToolbar', '_BeadToolbar__bead')._bdctrl
+
         server.load('big_legacy')
-        assert frozenset(beads._BeadInput__beads) == frozenset(range(39))
+        assert frozenset(beads.availablebeads) == frozenset(range(39))
 
         server.change('Main:toolbar', 'discarded', '0,1,3')
-        assert frozenset(beads._BeadInput__beads) == (frozenset(range(39))-{0,1,3})
+        assert frozenset(beads.availablebeads) == (frozenset(range(39))-{0,1,3})
 
         server.change('Main:toolbar', 'discarded', '')
-        assert frozenset(beads._BeadInput__beads) == frozenset(range(39))
+        assert frozenset(beads.availablebeads) == frozenset(range(39))
 
         bead1 = server.widget['Main:toolbar'].bead
         server.press('Shift-Delete')
-        assert frozenset(beads._BeadInput__beads) == frozenset(range(39))-{bead1}
+        assert frozenset(beads.availablebeads) == frozenset(range(39))-{bead1}
 
         bead2 = server.widget['Main:toolbar'].bead
         server.press('Shift-Delete')
-        assert frozenset(beads._BeadInput__beads) == frozenset(range(39))-{bead1, bead2}
+        assert frozenset(beads.availablebeads) == frozenset(range(39))-{bead1, bead2}
 
         server.load('CTGT_selection/Z(t)bd1track10.gr')
-        assert frozenset(beads._BeadInput__beads) == frozenset((1,))
+        assert frozenset(beads.availablebeads) == frozenset((1,))
 
         server.load('CTGT_selection/Z(t)bd0track10.gr')
-        assert frozenset(beads._BeadInput__beads) == frozenset((0, 1))
+        assert frozenset(beads.availablebeads) == frozenset((0, 1))
 
         server.change('Main:toolbar', 'discarded', '0')
-        assert frozenset(beads._BeadInput__beads) == frozenset((1,))
+        assert frozenset(beads.availablebeads) == frozenset((1,))
 
 def test_beadplot(bokehaction):
     "test plot"

@@ -9,19 +9,20 @@ The controller stores:
 
 It can add/delete/update tasks, emitting the corresponding events
 """
-from typing         import (Union, Iterator, Type,
+from typing         import (Union, Iterator, Type, cast, Tuple,
                             Optional, Any, List, Iterable, Dict)
 from pathlib        import Path
-from itertools      import chain
 from functools      import partial
 
-from model.task     import Task, RootTask, TaskIsUniqueError, taskorder
+from model.task     import Task, RootTask, TaskIsUniqueError, taskorder, TASK_ORDER
 from .event         import Controller, NoEmission
 from .processor     import Cache, Processor, run as _runprocessors
 
 _m_none    = type('_m_none', (), {}) # pylint: disable=invalid-name
 _M_PROC_T  = Type[Processor]
 _M_PROCS_T = Union[Iterable[_M_PROC_T], _M_PROC_T]
+PATHTYPE   = Union[str, Path]
+PATHTYPES  = Union[PATHTYPE,Tuple[PATHTYPE,...]]
 
 class ProcessorController:
     "data and model for tasks"
@@ -96,11 +97,17 @@ class ProcessorController:
 
     @classmethod
     def create(cls,
-               *models   : Task,
+               *models   : Tuple[Task, ...],
                processors: Union[Dict,_M_PROCS_T,None] = Processor
               ) -> 'ProcessorController':
         "creates a task pair for this model"
-        tasks = tuple(chain(*(i if isinstance(i, (tuple, list)) else (i,) for i in models)))
+        tasks = [] # type: List[Task]
+        for i in models:
+            if isinstance(i, Task):
+                tasks.append(i)
+            else:
+                tasks.extend(cast(Iterable[Task], i))
+
         if len(tasks) == 0:
             raise IndexError('no models were provided')
 
@@ -124,7 +131,7 @@ class ProcessorController:
                  processor: _M_PROCS_T = None,
                  cache:     dict       = None,
                  force                 = False,
-                ) -> Dict[_M_PROC_T, Any]:
+                ) -> Dict[Type[Task], Type[Processor]]:
         "registers a task processor"
         if cache is None:
             cache = dict()
@@ -154,7 +161,7 @@ class BaseTaskController(Controller):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.__items: Dict[RootTask, ProcessorController] = dict()
-        self.__procs: Dict[_M_PROC_T, Any]                = dict()
+        self.__procs: Dict[Type[Task], Type[Processor]]   = dict()
         self.__procs = (ProcessorController.register(kwargs['processors'])
                         if 'processors' in kwargs else None)
 
@@ -185,12 +192,13 @@ class BaseTaskController(Controller):
             track = self.__items[parent].data[0].cache()
         return track
 
-    def tasks(self, task:Optional[RootTask]) -> Iterator[Task]:
+    def tasks(self, task:Optional[RootTask]
+             ) -> Union[Iterator[Iterator[Task]], Iterator[Task]]:
         "Returns a data object in memory."
         if task is None:
             return iter(tuple())
         if task is Ellipsis:
-            return iter(self.tasks(tsk) for tsk in self.__items)
+            return iter(cast(Iterator[Task], self.tasks(tsk)) for tsk in self.__items)
         return iter(tsk for tsk in self.__items[task].model)
 
     def cache(self, parent:RootTask, tsk:Optional[Task]):
@@ -224,18 +232,18 @@ class BaseTaskController(Controller):
 
     @Controller.emit
     def openTrack(self,
-                  task : Union[str, RootTask] = None,
-                  model: Iterable[Task]       = tuple()) -> dict:
+                  task : Union[PATHTYPES, RootTask] = None,
+                  model: Iterable[Task]             = tuple()) -> dict:
         "opens a new file"
         tasks = tuple(model)
         if task is None and len(tasks) == 0:
             raise NoEmission()
 
         elif task is None:
-            task = tasks[0]
+            task = cast(RootTask, tasks[0])
 
         if not isinstance(task, RootTask):
-            self.__withopeners(task, tasks)
+            self.__withopeners(cast(PATHTYPES, task), tasks)
             raise NoEmission()
 
         if len(tasks) == 0:
@@ -244,7 +252,8 @@ class BaseTaskController(Controller):
         elif tasks[0] is not task:
             raise ValueError("model[0] ≠ root")
 
-        self.__items[task] = create(tasks, processors = self.__processors)
+        ctrl = create(tasks, processors = self.__processors)
+        self.__items[cast(RootTask, task)] = ctrl
         return dict(controller = self, model = tasks)
 
     @Controller.emit
@@ -262,7 +271,7 @@ class BaseTaskController(Controller):
         return dict(controller = self, parent = parent, task = task, old = old)
 
     @Controller.emit
-    def updateTask(self, parent:RootTask, task:Union[Task,int,type], **kwargs) -> dict:
+    def updateTask(self, parent:RootTask, task:Union[Type[Task],int], **kwargs) -> dict:
         "updates a task"
         tsk = self.task(parent, task, noemission = True)
         old = Controller.updateModel(tsk, **kwargs)
@@ -270,7 +279,7 @@ class BaseTaskController(Controller):
         return dict(controller = self, parent = parent, task = tsk, old = old)
 
     @Controller.emit
-    def removeTask(self, parent:RootTask, task:Union[Task,int,type]) -> dict:
+    def removeTask(self, parent:RootTask, task:Union[Type[Task],int]) -> dict:
         "removes a task"
         tsk = self.task(parent, task, noemission = True)
         old = tuple(self.__items[parent].model)
@@ -278,14 +287,14 @@ class BaseTaskController(Controller):
         return dict(controller = self, parent = parent, task = tsk, old = old)
 
     @Controller.emit
-    def clearData(self, parent:Optional[RootTask] = _m_none) -> dict:
+    def clearData(self, parent: Union[None, RootTask, type] = _m_none) -> dict:
         "clears all data"
         if parent is _m_none:
             self.__items.clear()
         elif parent not in self.__items:
             raise NoEmission('wrong key')
         else:
-            self.__items[parent].clear()
+            self.__items[cast(RootTask, parent)].clear()
         return dict(controller = self, parent = parent)
 
     def __withopeners(self, task, tasks):
@@ -335,8 +344,8 @@ class TaskController(BaseTaskController):
     "Task controller class which knows about globals"
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.__order      = None
-        self.__readconfig = None
+        self.__order:      Any = None
+        self.__readconfig: Any = None
 
     def setup(self, ctrl):
         "sets up the missing info"
@@ -344,7 +353,7 @@ class TaskController(BaseTaskController):
             if not isinstance(name, str):
                 return name
             modname, clsname = name[:name.rfind('.')], name[name.rfind('.')+1:]
-            return getattr(__import__(modname, fromlist = (clsname,)), clsname)
+            return getattr(__import__(modname, fromlist = [clsname]), clsname)
 
         getter = lambda x:    getattr(self, '_BaseTaskController__'+x)
         setter = lambda x, y: setattr(self, '_BaseTaskController__'+x, y)
@@ -359,7 +368,8 @@ class TaskController(BaseTaskController):
         if getter('savers') is None:
             setter('savers', [_import(itm)(ctrl) for itm in cnf.io.save.get()])
 
-        self.__order = ctrl.getGlobal("config").tasks.order
+        self.__order         = ctrl.getGlobal("config").tasks.order
+        self.__order.default = list(TASK_ORDER)
 
         def _clear(itm):
             if ctrl.getGlobal('config').tasks.clear.get(default = True):
@@ -368,14 +378,14 @@ class TaskController(BaseTaskController):
 
         self.__readconfig = ctrl.readconfig
 
-    def defaulttaskindex(self, parent:RootTask, task:Task, side = 0) -> int:
+    def defaulttaskindex(self, parent:RootTask, task:Type[Task], side = 0) -> int:
         "returns the default task index"
         if not isinstance(task, type):
             task = type(task)
         order    = tuple(taskorder(self.__order.get()))
         previous = order[:order.index(task)+side]
 
-        curr     = tuple(self.tasks(parent))
+        curr     = tuple(cast(Iterator[Task], self.tasks(parent)))
         for i, tsk in enumerate(curr[1:]):
             if not isinstance(tsk, previous):
                 return i+1
@@ -395,7 +405,7 @@ class TaskController(BaseTaskController):
                 index = _m_none, side = 0):
         "opens a new file"
         if index == 'auto':
-            index = self.defaulttaskindex(parent, task, side)
+            index = self.defaulttaskindex(parent, cast(Type[Task], task), side)
         return super().addTask(parent, task, index)
 
     @staticmethod
