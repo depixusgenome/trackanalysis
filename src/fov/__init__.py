@@ -22,8 +22,8 @@ class FoVPlotCreator(TaskPlotCreator):
                              'radius'       : 1.,
                              'figure.width' : 800,
                              'figure.height': 800,
-                             'ylabel'       : u'Y (nm)',
-                             'xlabel'       : u'X (nm)',
+                             'ylabel'       : u'Y (μm)',
+                             'xlabel'       : u'X (μm)',
                             }
         self.css.calib.defaults = {'image'  : PlotAttrs('Greys256', 'image'),
                                    'start'  : 1./16.,

@@ -107,7 +107,7 @@ def display(self,  # pylint: disable=function-redefined,too-many-arguments
                          hv.Points((xvals, yvals))(style = dict(color = ptcolor))]
                         +[hv.Text(*i)(style = dict(color = txtcolor))
                           for i in zip(xvals, yvals, txt)])
-             .redim(x = 'x (nm)', y = 'y (nm)'))
+             .redim(x = 'x (μm)', y = 'y (μm)'))
     if not calib:
         return top
     bottom = hv.DynamicMap(lambda bead: self.beads[bead].display(colorbar = colorbar),
