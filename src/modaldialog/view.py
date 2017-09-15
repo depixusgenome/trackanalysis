@@ -3,7 +3,7 @@
 """
 Allows creating modals from anywhere
 """
-from typing             import List, Tuple, TYPE_CHECKING   # pylint: disable=unused-import
+from typing             import Dict, List, Tuple, Any, TYPE_CHECKING
 from copy               import deepcopy
 from bokeh.document     import Document                     # pylint: disable=unused-import
 from bokeh.models       import Widget, Button
@@ -13,12 +13,12 @@ LOGS = getLogger(__name__)
 
 class AdvancedWidgetMixin:
     "A button to access the modal dialog"
-    _TITLE = None # type: str
-    _BODY  = None # type: Tuple[Tuple[str, ...]]
+    _TITLE : str                    = None
+    _BODY  : Tuple[Tuple[str, str]] = None
     def __init__(self):
-        self.__widget = None # type: Optional[Button]
-        self.__doc    = None # type: Optional[Document]
-        self.__action = None # type: Optional[type]
+        self.__widget: Button   = None
+        self.__doc:    Document = None
+        self.__action: type     = None
         assert self._TITLE is not None
         assert self._BODY is not None
         self.config.root.keypress.advanced.default = 'Alt-a'
@@ -74,7 +74,7 @@ class AdvancedTaskMixin(AdvancedWidgetMixin):
     "Means for configuring tasks with a modal dialog"
     def __init__(self):
         super().__init__()
-        self.__outp = {} # type: Dict[str, Dict[str, Any]]
+        self.__outp: Dict[str, Dict[str, Any]] = {}
 
     def __enter__(self):
         self.__outp.clear()
