@@ -10,16 +10,16 @@ from utils          import StreamUnion, initdefaults
 from sequences      import read as _read, peaks as _peaks
 from ._core         import cost as _cost, match as _match # pylint: disable=import-error
 from ._base         import (Distance, GriddedOptimization, PointwiseOptimization,
-                            DEFAULT_BEST)
+                            DEFAULT_BEST, OptimizationParams)
 
-class HairpinFitter:
+class HairpinFitter(OptimizationParams):
     "Class containing theoretical peaks and means for matching them to experimental ones"
     peaks     = np.empty((0,), dtype = 'f4') # type: np.array
     firstpeak = True
     lastpeak  = False
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
-        pass
+        super().__init__(**kwa)
 
     @property
     def expectedpeaks(self):

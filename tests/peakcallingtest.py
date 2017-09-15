@@ -149,7 +149,7 @@ def test_control():
                                               rates    = None,
                                               nbeads   = 1,
                                               ncycles  = 5),
-                    BeadsByHairpinTask(distances = hpins)))
+                    BeadsByHairpinTask(fit = hpins)))
 
     beads = tuple(i for i in pair.run())[0]
     assert tuple(beads.keys()) == ('hp100',)

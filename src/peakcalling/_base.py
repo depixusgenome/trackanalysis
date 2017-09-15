@@ -47,16 +47,21 @@ def config(self:OPTIM_TYPE, **kwa) -> Dict[str, float]:
     kwa.update({i: getattr(self, i) for i in vals if getattr(self, i) is not None})
     return kwa
 
-class GriddedOptimization:
-    "Optimizes using a rectangular grid"
-    symmetry          = False
+class OptimizationParams:
+    "Optimizing parameters"
     stretch           = Range(1./8.8e-4, 200., 100.)
     bias              = Range(None,       60.*8.8e-4, 60.*8.8e-4)
     optim: OPTIM_TYPE = LBFGSParameters(1e-4, 1e-8, 1e-4, 1e-8, 100)
-
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
+
+class GriddedOptimization(OptimizationParams):
+    "Optimizes using a rectangular grid"
+    symmetry = False
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
 
     @property
     def grid(self) -> Union[np.ndarray, Iterator[Tuple[float, ...]]]:
@@ -76,16 +81,13 @@ class GriddedOptimization:
             return np.linspace(-val.size, val.size, cnt)
         return np.linspace(val.center-val.size, val.center+val.size, cnt)
 
-class PointwiseOptimization:
+class PointwiseOptimization(OptimizationParams):
     "Optimizes using a grid where nodes are such that at least one match occurs"
     bases           = (20, 20)
-    stretch         = Range(1./8.8e-4, 200., 50.)
-    bias            = Range(None,       20.*8.8e-4, 20.*8.8e-4)
     dataprecisions  = 1., 1e-3
-    optim           = LBFGSParameters(1e-4, 1e-8, 1e-4, 1e-8, 100)
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
-        pass
+        super().__init__(**kwa)
 
     def pointgrid(self, ref:np.ndarray, exp:np.ndarray) -> Iterator[Tuple[float, float]]:
         "computes stretch and bias for potential pairings"

@@ -5,8 +5,8 @@
 from pathlib                        import Path
 from tempfile                       import mktemp, gettempdir
 from numpy.testing                  import assert_allclose
-from peakcalling.tohairpin          import np, HairpinFitter, PEAKS_DTYPE
-from peakcalling.processor          import ByHairpinGroup, ByHairpinBead, Distance
+from peakcalling.tohairpin          import np, HairpinFitter, PEAKS_DTYPE, Distance
+from peakcalling.processor          import ByHairpinGroup, ByHairpinBead
 from data                           import Track
 from utils                          import EVENTS_DTYPE
 from hybridstat.reporting           import (run, HybridstatExcelProcessor,

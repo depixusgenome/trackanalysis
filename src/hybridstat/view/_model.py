@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Model for peaksplot"
-from typing                     import Optional, Dict, Any
+from typing                     import Optional, Dict, Any, cast
 from itertools                  import product
 
 import numpy                    as     np
@@ -29,8 +29,8 @@ class FitToHairpinAccess(TaskAccess):
     def __init__(self, ctrl):
         super().__init__(ctrl, FitToHairpinTask)
         self.__defaults = self.config.root.tasks.fittohairpin
-        self.__defaults.defaults = {'distances': GaussianProductFit(),
-                                    'peakids':   PeakMatching()}
+        self.__defaults.defaults = {'fit':   GaussianProductFit(),
+                                    'match': PeakMatching()}
 
     def setobservers(self, mdl):
         "observes the global model"
@@ -42,8 +42,8 @@ class FitToHairpinAccess(TaskAccess):
                 self.update(**task.config())
 
         mdl.observeprop('oligos', 'sequencepath', 'constraintspath', 'useparams',
-                        'config.root.tasks.fittohairpin.peakids',
-                        'config.root.tasks.fittohairpin.distances',
+                        'config.root.tasks.fittohairpin.fit',
+                        'config.root.tasks.fittohairpin.match',
                         _observe)
 
     @staticmethod
@@ -67,11 +67,11 @@ class FitToHairpinAccess(TaskAccess):
         if ols is None or len(ols) == 0 or len(mdl.sequences) == 0:
             return None
 
-        dist = self.__defaults.distances.get()
-        pid  = self.__defaults.peakids.get()
+        dist = self.__defaults.fit.get()
+        pid  = self.__defaults.match.get()
         return fittohairpintask(mdl.sequencepath,    ols,
                                 mdl.constraintspath, mdl.useparams,
-                                distance = dist, identifier = pid)
+                                fit = dist, match = pid)
 
     def resetmodel(self, mdl):
         "resets the model"
@@ -84,7 +84,7 @@ class FitToHairpinAccess(TaskAccess):
 
 class FitParamProp(_FitParamProp):
     "access to bias or stretch"
-    def __get__(self, obj, tpe) -> Optional[str]:
+    def __get__(self, obj, tpe) -> Optional[str]: # type: ignore
         if obj is not None:
             dist = obj.distances.get(obj.sequencekey, None)
             if dist is not None:
@@ -160,8 +160,9 @@ class PeaksPlotModelAccess(IdentificationModelAccess):
             self.fits  = None
             return self.peaks
 
+        tsk        = cast(PeakSelectorTask, self.peakselection.task)
+        peaks      = tuple(tsk.details2output(dtl))
         nan        = lambda: np.full((len(peaks),), np.NaN, dtype = 'f4')
-        peaks      = tuple(self.peakselection.task.details2output(dtl))
         self.peaks = dict(z        = np.array([i for i, _ in peaks], dtype = 'f4'),
                           sigma    = nan(),
                           skew     = nan(),
@@ -186,10 +187,11 @@ class PeaksPlotModelAccess(IdentificationModelAccess):
             task  = self.config.tasks.eventdetection.get()
             ind   = self.eventdetection.index
             beads = next(iter(self._ctrl.run(root, ind-1, copy = True)))
-            return next(processors(task)).apply(beads, **task.config())[ibead, ...]
+            proc  = next(processors(task)) # type: ignore
+            return proc.apply(beads, **task.config())[ibead, ...]
         return next(iter(self._ctrl.run(root, task, copy = True)))[ibead, ...]
 
-    def reset(self) -> bool:
+    def reset(self) -> bool: # type: ignore
         "adds tasks if needed"
         if self.track is None or self.checkbead(False):
             return True
@@ -233,18 +235,17 @@ class PeaksPlotModelAccess(IdentificationModelAccess):
                 continue
 
             dist = alldist[key].stretch, alldist[key].bias
-            tmp  = task.peakids[key].pair(dico['z'], *dist)['key']
+            tmp  = task.match[key].pair(dico['z'], *dist)['key']
             good = tmp >= 0
             ori  = dict(sequences.peaks(seq, self.oligos))
 
-            dico[key+'bases']          = (dico['z'] - dist[1])*dist[0]
-            dico[key+'id']      [good] = tmp[good]
-            dico[key+'distance'][good] = (tmp - dico[key+'bases'])[good]
-            dico[key+'orient']  [good] = [strori[ori.get(int(i+0.01), 2)]
-                                          for i in dico[key+'id'][good]]
-
-        for key in names:
-            dico[key] = dico[self.sequencekey+key]
+            dico[f'{key}bases']          = (dico['z'] - dist[1])*dist[0]
+            dico[f'{key}id']      [good] = tmp[good]
+            dico[f'{key}distance'][good] = (tmp - dico[f'{key}bases'])[good]
+            dico[f'{key}orient']  [good] = [strori[ori.get(int(i+0.01), 2)]
+                                            for i in dico[f'{key}id'][good]]
+        for i in names:
+            dico[i] = dico[self.sequencekey+key]
 
     def __set_probas(self, peaks):
         task = self.eventdetection.task

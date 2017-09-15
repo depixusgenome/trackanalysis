@@ -34,7 +34,7 @@ def readconstraints(idtask   : FitToHairpinTask,
         if len(item) == 2 or not useparams:
             continue
 
-        rngs = idtask.distances.get(item[1], GaussianProductFit())
+        rngs = idtask.fit.get(item[1], GaussianProductFit())
         if item[2] is not None:
             stretch = Range(item[2], rngs.stretch[-1]*.1, rngs.stretch[-1])
             cstrs[item[0]].constraints['stretch'] = stretch
@@ -51,7 +51,7 @@ def fittohairpintask(seqpath    : Union[Path, str],
                      **kwa) -> FitToHairpinTask:
     "creates and identification task from paths"
     task = FitToHairpinTask.read(seqpath, oligos, **kwa)
-    if len(task.distances) == 0:
+    if len(task.fit) == 0:
         raise IOError("Could not find any sequence in "+str(seqpath))
     return readconstraints(task, idpath, useparams)
 
@@ -114,7 +114,9 @@ class HybridstatBatchProcessor(BatchProcessor):
     Constructs a list of tasks depending on a template and paths.
     """
     @classmethod
-    def model(cls, paths: HybridstatIO, modl: HybridstatTemplate) -> Sequence[Task]:
+    def model(cls,  # type: ignore
+              paths : HybridstatIO,
+              modl  : HybridstatTemplate) -> Sequence[Task]:
         "creates a specific model for each path"
         modl    = deepcopy(modl)
 
@@ -122,8 +124,9 @@ class HybridstatBatchProcessor(BatchProcessor):
         oligos  = cls.__oligos(track, paths.oligos)
         cls.__identity(oligos, paths, modl)
 
-        model = [track] + list(modl) + [cls.__excel (oligos, track, paths, modl)]
-        return model[:-1 if model[-1] is None else None]
+        model = [cast(Task, track)] + list(cast(Iterator[Task], modl))
+        excel = cls.__excel (oligos, track, paths, modl)
+        return model+ ([cast(Task, excel)] if excel else [])
 
     @staticmethod
     def __oligos(track:TrackReaderTask, oligos:Union[Sequence[str],str]):
@@ -146,7 +149,7 @@ class HybridstatBatchProcessor(BatchProcessor):
             return
 
         if paths.sequence is None:
-            if len(modl.identity.distances) == 0:
+            if len(modl.identity.fit) == 0:
                 modl.identity = None
             return
 

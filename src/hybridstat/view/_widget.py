@@ -140,10 +140,10 @@ class PeaksStatsWidget(WidgetCreator):
             self.values[1] = dist[key].bias
 
             task      = mdl.identification.task
-            remove    = task.peakids[key].peaks[[0,-1]]
+            remove    = task.match[key].peaks[[0,-1]]
             nrem      = sum(i in remove for i in mdl.peaks[key+'id'])
             nfound    = np.isfinite(mdl.peaks[key+'id']).sum()-nrem
-            npks      = len(task.peakids[key].hybridizations)
+            npks      = len(task.match[key].hybridizations)
             self.values[8] = '{}/{}'.format(nfound, npks)
             if nrem == 2:
                 self.values[8] += self.openhp
@@ -294,7 +294,7 @@ class AdvancedWidget(AdvancedTaskMixin, WidgetCreator):
     def __init__(self, model:PeaksPlotModelAccess) -> None:
         WidgetCreator.__init__(self, model)
         AdvancedTaskMixin.__init__(self)
-        self._outp  = {} # type: Dict[str, Dict[str, Any]]
+        self._outp: Dict[str, Dict[str, Any]] = {}
 
     _framecount = AdvancedTaskMixin.attr('eventdetection.events.select.minlength')
     _eventcount = AdvancedTaskMixin.attr('peakselection.group.mincount')
@@ -303,9 +303,9 @@ class AdvancedWidget(AdvancedTaskMixin, WidgetCreator):
 
     @property
     def _dist2theo(self) -> int:
-        mdl = self._model.identification.default('peakids')
+        mdl = self._model.identification.default('match')
         return mdl.window
 
     @_dist2theo.setter
     def _dist2theo(self, val:int):
-        self._model.identification.updatedefault('peakids', window = val)
+        self._model.identification.updatedefault('match', window = val)
