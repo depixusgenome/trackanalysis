@@ -33,8 +33,8 @@ class TracksDictDisplay:
     @classmethod
     def _base(cls, itms, name, reference, overlay, kwa): # pylint: disable=too-many-arguments
         kdims         = dict()
-        kdims['key']  = kwa.pop('key')  if 'key'  in kwa else list(itms.keys())
-        kdims['bead'] = kwa.pop('bead') if 'bead' in kwa else list(itms.beads(*kdims['key']))
+        kdims['key']  = sorted(kwa.pop('key')  if 'key'  in kwa else itms.keys())
+        kdims['bead'] = sorted(kwa.pop('bead') if 'bead' in kwa else itms.beads(*kdims['key']))
 
         specs = {i: kwa.pop(i, j) for i, j in cls._specs()}
         specs.update(reference = reference, name = name, kdims = kdims, overlay = overlay)

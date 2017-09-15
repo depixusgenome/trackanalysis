@@ -47,6 +47,7 @@ from signalfilter                 import *
 from model.__scripting__          import *
 from app.__scripting__            import *
 from data.__scripting__           import *
+from cleaning.__scripting__       import *
 from eventdetection.__scripting__ import *
 from peakfinding.__scripting__    import *
 from peakcalling.__scripting__    import *
