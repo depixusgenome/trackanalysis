@@ -5,12 +5,16 @@ Monkey patches the Track class.
 
 Adds a method for discarding beads with Cleaning warnings
 """
-from typing                 import Dict, Optional, Iterator, List, Set, Tuple, cast
-from itertools              import product
-from utils.decoration       import addto
-from data.track             import Track, BEADKEY
-from data.tracksdict        import TracksDict
-from ..processor            import DataCleaningProcessor, DataCleaningException
+from   typing                       import (Dict, Optional, Iterator, List,
+                                            Set, Tuple, cast)
+from   itertools                    import product
+import numpy                        as     np
+import pandas                       as     pd
+from   utils.decoration             import addto
+from   control.processor.dataframe  import DataFrameFactory
+from   data.track                   import Track, BEADKEY
+from   data.tracksdict              import TracksDict
+from   ..processor                  import DataCleaningProcessor, DataCleaningException
 
 class TrackCleaningScript:
     "Adds a method for discarding beads with Cleaning warnings"
@@ -32,9 +36,20 @@ class TrackCleaningScript:
         "returns beads with warnings"
         return [i for i, j in self.process(**kwa).items() if j is not None]
 
-    def messages(self, **kwa) -> Dict[BEADKEY, str] :
+    def messages(self, **kwa) -> pd.DataFrame:
         "returns beads and warnings where applicable"
-        return {i: str(j) for i, j in self.process(**kwa).items() if j is not None}
+        beads = [] # type: List[int]
+        msgs  = [] # type: List[str]
+        for i, j in self.process(**kwa).items():
+            if j is None:
+                continue
+            msgs.extend(str(j).split('\n'))
+            beads.extend((cast(int, i),)*(len(msgs)-len(beads)))
+
+        name = DataFrameFactory.trackname(self.track)
+        return pd.DataFrame(dict(track   = np.full(len(beads), name),
+                                 bead    = beads,
+                                 message = msgs))
 
     def dropbad(self, **kwa):
         "removes bad beads *forever*"
@@ -63,6 +78,11 @@ class TracksDictCleaningScript:
             beads |= cur
             bad   |= {i[0] for i in frame[list(cur)] if fcn(frame, i, **kwa) is None}
         return bad, beads-bad
+
+    def messages(self, **kwa) -> pd.DataFrame:
+        "returns beads and warnings where applicable"
+        return pd.concat([TrackCleaningScript(i).messages(**kwa)
+                          for i in self.tracks.values()])
 
     def good(self, **kwa) -> List[BEADKEY]:
         "returns beads without warnings"

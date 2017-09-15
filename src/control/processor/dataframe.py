@@ -9,6 +9,7 @@ import  pandas                  as     pd
 import  numpy                   as     np
 
 from    model.task.dataframe    import DataFrameTask
+from    data.track              import Track
 from    data.views              import TrackView
 from    .base                   import Processor
 
@@ -30,16 +31,20 @@ class DataFrameFactory:
         return name
 
     @staticmethod
-    def indexcolumns(cnt, key = None, frame = None) -> Dict[str, np.ndarray]:
+    def trackname(track:Track) -> str:
+        "returns the track name"
+        if track.key:
+            return track.key
+        elif isinstance(track.path, (str, Path)):
+            return str(Path(track.path).name)
+        return str(Path(track.path[0]).name)
+
+    @classmethod
+    def indexcolumns(cls, cnt, key = None, frame = None) -> Dict[str, np.ndarray]:
         "adds default columns"
         res = {}
         if frame is not None:
-            if frame.track.key:
-                res['track'] = np.full(cnt, frame.track.key)
-            elif isinstance(frame.track.path, (str, Path)):
-                res['track'] = np.full(cnt, str(Path(frame.track.path).name))
-            else:
-                res['track'] = np.full(cnt, str(Path(frame.track.path[0]).name))
+            res['track'] = np.full(cnt, cls.trackname(frame.track))
 
         if key is not None:
             if isinstance(key, tuple) and len(key) == 2:
