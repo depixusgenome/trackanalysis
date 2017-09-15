@@ -124,8 +124,8 @@ class PeaksPlotCreator(TaskPlotCreator):
                              'widgets.border'  : 10}
 
         css = self.css.peaks
-        css.defaults = {'duration'  : PlotAttrs('gray',     'diamond', 10),
-                        'count'     : PlotAttrs('lightblue', 'square',  10)}
+        css.defaults = {'duration'  : PlotAttrs('lightgreen', 'diamond', 10),
+                        'count'     : PlotAttrs('lightblue',  'square',  10)}
         css.colors.missing.default = 'red'
         css.colors.found.defaults  = {'dark': 'black', 'default': 'white'}
 
@@ -237,9 +237,9 @@ class PeaksPlotCreator(TaskPlotCreator):
         self._fig.extra_x_ranges = {"duration": Range1d(start = 0., end = 1.)}
         axis  = LinearAxis(x_range_name          = "duration",
                            axis_label            = self.css.xtoplabel.get(),
-                           axis_label_text_color = self.__foundcolor.get()
+                           axis_label_text_color = self.css.peaks.duration.get().color
                           )
-        self._fig.xaxis[0].axis_label_text_color = self.css.count.get().color
+        self._fig.xaxis[0].axis_label_text_color = self.css.peaks.count.get().color
         self._fig.add_layout(axis, 'above')
         self._addcallbacks(self._fig)
 

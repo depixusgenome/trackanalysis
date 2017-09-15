@@ -245,7 +245,7 @@ class PeaksPlotModelAccess(IdentificationModelAccess):
             dico[f'{key}orient']  [good] = [strori[ori.get(int(i+0.01), 2)]
                                             for i in dico[f'{key}id'][good]]
         for i in names:
-            dico[i] = dico[self.sequencekey+key]
+            dico[i] = dico[self.sequencekey+i]
 
     def __set_probas(self, peaks):
         task = self.eventdetection.task
