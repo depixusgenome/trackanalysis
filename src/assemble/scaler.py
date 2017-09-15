@@ -259,38 +259,43 @@ class OPeakArray:
         'returns sequences in peakarray'
         return tuple(i.seq for i in self.arr)
 
-    # @staticmethod
-    # def may_overlap(peak,others:Iterable,min_overl:int,unsigned=True)->List:
-    #     '''
-    #     compare the sequences of the 2 experiments
-    #     returns True if the 2 sequences may overlap
-    #     False otherwise
-    #     if unsigned, also considers reverse_complement of others
-    #     '''
-    #     to_match=frozenset(i.seq for i in peak.arr)
-    #     match=[]
-    #     for seq in to_match:
-    #         for opk in others:
-    #             for tocheck in opk.seqs:
-    #                 if data.Oligo.can_tail_overlap(seq,tocheck,min_overl,not unsigned,shift=1):
-    #                     match.append(opk)
-    #                     break
-    #     return match
-
     @staticmethod
-    def which_overlap(peak,others:Iterable,min_overl:int,unsigned=True)->List:
+    def may_overlap(peak,others:Iterable,min_overl:int,unsigned=True)->List:
         '''
-        if unsigned, also considers reverse_complement of peak and others
+        compare the sequences of the 2 experiments
+        returns True if the 2 sequences may overlap
+        False otherwise
+        if unsigned, also considers reverse_complement of others
         '''
         to_match=frozenset(i.seq for i in peak.arr)
         match=[]
         for seq in to_match:
             for opk in others:
                 for tocheck in opk.seqs:
-                    if #data.Oligo.can_tail_overlap(seq,tocheck,min_overl,not unsigned,shift=1):
+                    if data.Oligo.can_tail_overlap(seq,tocheck,min_overl,not unsigned,shift=1):
                         match.append(opk)
                         break
         return match
+
+
+    def overlap_with(self,
+                     other,
+                     min_overl:int,
+                     signs:Tuple[int, ...]=(0,0),
+                     shift:int=0)->bool:
+        '''
+        returns true if any oligo in self overlap with any in other
+        '''
+        seqs1=frozenset(self.seqs)
+        seqs2=frozenset(other.seqs)
+        for seq1,seq2 in itertools.product(seqs1,seqs2):
+            if data.Oligo.overlap(seq1,
+                                  seq2,
+                                  min_overl=min_overl,
+                                  signs=signs,
+                                  shift=shift):
+                return True
+        return False
 
     # @classmethod
     # def list2edgeids(cls,
