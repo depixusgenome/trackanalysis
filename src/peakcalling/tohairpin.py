@@ -102,7 +102,6 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
                 else:
                     if out[0] < best[0]:
                         best = out
-        print(type(self), best)
         return Distance(best[0], best[1], delta-best[2]/best[1])
 
     def value(self, peaks: np.ndarray, stretch, bias) -> Tuple[float, float, float]:
