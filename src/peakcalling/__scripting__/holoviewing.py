@@ -4,6 +4,7 @@
 import sys
 from   typing                   import List, Type
 import numpy                    as np
+from   utils                    import DefaultValue
 from   utils.decoration         import addto
 import sequences
 from   peakfinding.processor    import PeaksDict
@@ -39,10 +40,11 @@ class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
         return pks
 
     @classmethod
-    def fitmap(cls, itms, seq, oligos, labels = None, **opts):
+    def fitmap(cls, itms, seq, oligos, # pylint: disable=too-many-arguments
+               labels = None, fit = DefaultValue, **opts):
         "creates a DynamicMap with fitted oligos"
         pins = cls.hpins(seq, oligos, opts)
-        task = Tasks.beadsbyhairpin.get(sequence = seq, oligos = oligos)
+        task = Tasks.beadsbyhairpin.get(sequence = seq, oligos = oligos, fit = fit)
         info = {i: [(k.key, k.distance) for k in j.beads]
                 for i, j in BeadsByHairpinProcessor.apply(itms, **task.config())}
 
@@ -125,7 +127,10 @@ def display(self, # pylint: disable=function-redefined,too-many-arguments
     """
     disp = OligoMappingDisplay
     if None not in (sequence, oligos):
-        if fit:
+        opts['zero'] = False
+        if isinstance(fit, type):
+            return disp.fitmap(self, sequence, oligos, labels, fit = fit, **opts)
+        elif fit:
             return disp.fitmap(self, sequence, oligos, labels, **opts)
         return disp.hpinmap(self, sequence, oligos, labels, **opts)
 

@@ -5,6 +5,7 @@ Matching experimental peaks to hairpins
 """
 from   typing       import Dict, Sequence, Iterator, Tuple, Any, Union, cast
 import numpy        as np
+from   scipy.optimize   import curve_fit
 
 from utils          import StreamUnion, initdefaults
 from sequences      import read as _read, peaks as _peaks
@@ -102,7 +103,6 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
                 else:
                     if out[0] < best[0]:
                         best = out
-
         return Distance(best[0], best[1], delta-best[2]/best[1])
 
     def value(self, peaks: np.ndarray, stretch, bias) -> Tuple[float, float, float]:
@@ -131,7 +131,7 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
     def _optimize(hpin, peaks, args):
         return _cost.optimize(hpin, peaks, **args)
 
-class MatchedPeakFit(GaussianProductFit):
+class ChiSquareFit(GaussianProductFit):
     """
     We use the GaussianProductFit results to match peaks then estimate
     the best Χ² fit between matched peaks, adding their count as well.
@@ -141,11 +141,17 @@ class MatchedPeakFit(GaussianProductFit):
                stretch:float, bias:float, **_):
         tmp   = peaks*stretch+bias
         pairs = _match.compute(hpin, tmp, self.window)
-        if len(pairs) <= 1:
-            return np.NaN, stretch, bias
-
-        stretch, bias = np.polyfit(hpin[pairs[:,0]], peaks[pairs[:,1]], 1)
-        return _match.distance(hpin, peaks, self.window, stretch, bias), stretch, bias
+        if self.firstpeak and any(i == 0 for i in pairs[0]):
+            pairs = pairs[1:]
+        if len(pairs) > 1:
+            stretch, bias = curve_fit(lambda x, *y: x*y[0]+y[1],
+                                      peaks[pairs[:,1]],
+                                      hpin[pairs[:,0]],
+                                      (stretch, bias),
+                                      loss = 'soft_l1',
+                                      x_scale= [1./stretch, 1.],
+                                      f_scale=self.window)[0]
+        return _match.distance(hpin, peaks, self.window, stretch, bias)[0], stretch, bias
 
     def _optimize(self, hpin, peaks, args):
         pars = _cost.optimize(hpin, peaks, **args)

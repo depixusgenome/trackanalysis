@@ -15,7 +15,7 @@ from eventdetection.processor   import EventDetectionTask
 from peakfinding.processor      import PeakSelectorTask
 from peakfinding.histogram      import HistogramData
 from peakcalling                import cost, match
-from peakcalling.tohairpin      import PeakMatching, GaussianProductFit
+from peakcalling.tohairpin      import PeakMatching, GaussianProductFit, ChiSquareFit
 from peakcalling.toreference    import ReferenceDistance
 from peakcalling.processor      import (BeadsByHairpinProcessor, BeadsByHairpinTask,
                                         DistanceConstraint)
@@ -118,6 +118,20 @@ def test_hairpincost():
     assert_equal(results['hp101'][0].peaks['key'], np.int32(truth[1][:-1]+.1))
     assert results[None][0].key    == 110
 
+    hpins   = {'hp100': ChiSquareFit(peaks = truth[0]),
+               'hp101': ChiSquareFit(peaks = truth[1])}
+    results = dict(BeadsByHairpinProcessor.compute(hpins, {}, ids, beads))
+    assert len(results) == 3
+    assert len(results['hp100']) == 1
+    assert len(results['hp101']) == 1
+    assert len(results[None])    == 1
+    assert results['hp100'][0].key == 100
+    assert results['hp101'][0].key == 101
+    assert_equal(results['hp100'][0].peaks['key'],
+                 np.insert(np.int32(truth[0][:-1]+.1), 1, np.iinfo('i4').min))
+    assert_equal(results['hp101'][0].peaks['key'], np.int32(truth[1][:-1]+.1))
+    assert results[None][0].key    == 110
+
 def test_constrainedhairpincost():
     u"tests hairpin cost method with constraints"
     truth = [np.array([0., .1, .2, .5, 1.,  1.5], dtype = 'f4')/8.8e-4,
@@ -164,4 +178,4 @@ def test_control():
         assert tuple(beads.keys()) == ('hp100',)
 
 if __name__ == '__main__':
-    test_control()
+    test_hairpincost()

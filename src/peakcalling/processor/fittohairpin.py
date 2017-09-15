@@ -5,7 +5,8 @@ from   typing       import (Dict, Sequence, NamedTuple, FrozenSet, Type,
                             Iterator, Tuple, Union, Optional, Iterable, cast)
 import numpy        as     np
 
-from utils                      import StreamUnion, initdefaults, updatecopy, asobjarray
+from utils                      import (StreamUnion, initdefaults, updatecopy,
+                                        asobjarray, DefaultValue)
 from model                      import Task, Level
 from control.processor          import Processor
 from data.views                 import BEADKEY, TrackView, Beads
@@ -31,11 +32,17 @@ class FitToHairpinTask(Task):
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **kwa):
         super().__init__()
+
         if 'sequence' in kwa:
             assert 'oligo' in kwa
             self.__init_sequence(kwa)
 
     def __init_sequence(self, kwa):
+        if not isinstance(self.fit, dict):
+            self.fit = {}
+        if not isinstance(self.match, dict):
+            self.match = {}
+
         if 'sequence' in kwa:
             other = self.read(kwa['sequence'], kwa['oligos'],
                               fit   = kwa.get('fit',   None),
@@ -60,7 +67,7 @@ class FitToHairpinTask(Task):
              match  : Type[PeakMatching]  = None
             ) -> 'FitToHairpinTask':
         "creates a BeadsByHairpin from a fasta file and a list of oligos"
-        if fit is None:
+        if fit is None or fit is DefaultValue:
             fits = dict(GaussianProductFit.read(path, oligos))
         elif isinstance(fit, type):
             fits = dict(cast(Type[HairpinFitter], fit).read(path, oligos))
@@ -69,7 +76,7 @@ class FitToHairpinTask(Task):
             fits = {i: updatecopy(ifit, True, peaks = j.peaks)
                     for i, j in ifit.read(path, oligos)}
 
-        imatch = (PeakMatching()                    if match is None           else
+        imatch = (PeakMatching() if match in (None, DefaultValue) else
                   cast(Type[PeakMatching], match)() if isinstance(match, type) else
                   cast(PeakMatching, match))
 
