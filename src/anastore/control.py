@@ -19,10 +19,11 @@ class AnaIO(TaskIO):
                 return None
             path = path[0]
 
-        LOGS.info('%s loading %s', type(self).__name__, path)
         out = load(path)
         if out is not None and len(model):
             raise NotImplementedError()
+        if out is not None:
+            LOGS.info(f'{type(self).__name__} loading {path}')
         return [out] if isinstance(out, dict) else out
 
     def save(self, path:str, models):
