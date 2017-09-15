@@ -101,7 +101,6 @@ class Overseer(PeakSetting):
         partitions=[]
 
         for ite in range(5):
-            print(f"ite={ite}")
             scaled=self.scaler.run()
             # translate scales to peaks and to oligos
             # scaled=[scales[2*idx]*self.peaks[idx]+scales[2*idx+1]

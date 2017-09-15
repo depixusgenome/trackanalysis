@@ -159,8 +159,6 @@ class BestScoreAssemble:
         # can add permutations if intersection of permuted oligo sets is empty
 
         # brute force impl.: underestimate of assemblies
-        print("number of checks to do:",
-              len(list(itertools.combinations_with_replacement([0,1],len(self.operms)))))
 
         # add all permutation which do not intersect
 

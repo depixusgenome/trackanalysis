@@ -8,8 +8,11 @@ import itertools
 import numpy as np
 
 from utils import initdefaults
+from utils.logconfig import getLogger
 from . import data # pylint: disable=unused-import
 from ._types import SciDist # pylint: disable=unused-import
+
+LOGS=getLogger(__name__)
 
 class DefaultCallable:
     u'defines a Default Callable'
@@ -294,9 +297,9 @@ class LScPermCollection:
         u'product of 2 LScPermCollections'
         if __debug__:
             if collection1.intersect_with(collection2):
-                print(collection1.scperms[0].domain)
-                print(collection2.scperms[0].domain)
-                print("pb the 2 permutations are not independant")
+                LOGS.debug(collection1.scperms[0].domain)
+                LOGS.debug(collection2.scperms[0].domain)
+                LOGS.debug("pb the 2 permutations are not independant")
         perms1=np.matrix([i.permids for i in collection1.scperms])
         perms2=np.matrix([i.permids for i in collection2.scperms])
         merged_permids=perms1[:,perms2]

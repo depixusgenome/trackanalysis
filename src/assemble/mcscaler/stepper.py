@@ -152,7 +152,6 @@ class SpringStep(SpringSetting): # pylint: disable=too-many-instance-attributes
             LOGS.debug(f"no proposal for peak id {self.peakid}")
 
         if matches:
-            # print(f"len(matches)={len(matches)}")
             return random.choice(matches) # type: ignore
         return None
 

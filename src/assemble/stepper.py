@@ -71,7 +71,6 @@ def find_swaps(batches,nscale,min_overl):
     '''
     allswaps = []
     while len(batches)>1:
-        print(nscale,min_overl)
         swaps = [] # utils.swaps_between_batches([batches[0],batches[1]],nscale,min_overl)
         if any(numpy.array([len(i) for i in swaps])<2):
             LOGS.warning("problem with swap size")

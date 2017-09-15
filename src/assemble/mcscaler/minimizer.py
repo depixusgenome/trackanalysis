@@ -66,7 +66,6 @@ class SpringMinimizer(SpringSetting):
                                   state_pre_min=xinit)
 
         if len(equil)!=len(xinit)-1:
-            print("unconstrained vertex")
             # unconstrained vertex by set of springs
             return OptimizeResult(x=xinit,
                                   fun=SpringScore.energy_system(springs,xinit),
@@ -116,6 +115,5 @@ class SpringMinimizer(SpringSetting):
         try:
             equil=(np.linalg.inv(left_term)*right_term).T[0,:].tolist()[0] # type: ignore
         except np.linalg.linalg.LinAlgError: # type: ignore
-            print("raised")
             return None
         return equil # returns x2,x3,...

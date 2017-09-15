@@ -12,10 +12,13 @@ from typing import Tuple, List, Generator, Dict # pylint: disable=unused-import
 import pickle # pylint: disable=unused-import
 import numpy
 import networkx
+from utils.logconfig import getLogger
 from . import data
 from . import scores
 from . import processor
 from . import _utils as utils
+
+LOGS=getLogger(__name__)
 
 # possible optimisations:
 
@@ -128,8 +131,8 @@ class Shuffler:
             merged=part.merge() # careful, merge merges only common perms in case of ambiguities
             if __debug__:
                 if not all(i in part.domain for i in range(index)):
-                    print("missing index values in "+str(part.domain))
-                    print("index=",index)
+                    LOGS.debug("missing index values in "+str(part.domain))
+                    LOGS.debug("index=",index)
                     raise ValueError
 
 
@@ -177,10 +180,10 @@ class Shuffler:
         # if __debug__:
         #     pickle.dump(self.oligos,open("debugoligos.pickle","wb"))
 
-        print("looking for permutations")
+        LOGS.debug("looking for permutations")
         groupedids=utils.group_overlapping_normdists([oli.dist for oli in self.oligos],
                                                      nscale=self.nscale)[1]
-        print(f"len(groupedids)={len(groupedids)}")
+        LOGS.debug(f"len(groupedids)={len(groupedids)}")
         # if __debug__:
         #     pickle.dump(groupedids,open("debuggroupedids.pickle","wb"))
 
@@ -188,7 +191,7 @@ class Shuffler:
         for group in groupedids:
             full_kperms.update(set(self.find_kperms(group)))
 
-        print(f"len(full_kperms)={len(full_kperms)}")
+        LOGS.debug(f"len(full_kperms)={len(full_kperms)}")
         # if __debug__:
         #     pickle.dump(full_kperms,open("debugfull_kperms.pickle","wb"))
 
@@ -206,12 +209,12 @@ class Shuffler:
                                                    shift=1)==self.ooverl
                     or len(kpr.domain)==1]
 
-        print(f"len(add_kperms)={len(add_kperms)}")
+        LOGS.debug(f"len(add_kperms)={len(add_kperms)}")
         #partitions=[[kpr] for kpr in add_kperms] # before
         partitions=[data.Partition(perms=[kpr],domain=kpr.domain) for kpr in add_kperms]
 
         for index in range(len(self.oligos)):
-            print(f"index={index}")
+            LOGS.debug(f"index={index}")
             add_kperms=[kpr for kpr in full_kperms if kpr.span.intersection({index})]
             added_partitions=[] # type: List[data.Partition]
 
@@ -232,9 +235,9 @@ class Shuffler:
 
             # if __debug__:
             #     for testid,testpart in enumerate(partitions):
-            #         print(f"testid={testid}")
+            #         LOGS.debug(f"testid={testid}")
             #         testmerged=data.OligoPerm.add(*testpart.perms) # pylint: disable=unused-variable
-            #         print("ok")
+            #         LOGS.debug("ok")
 
             resume_parts=data.Partition.reduce_partitions(partitions,index)
             partitions=resume_parts

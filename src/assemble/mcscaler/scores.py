@@ -99,7 +99,6 @@ class SpringScore(SpringSetting):
         right:FrozenSet[int]=frozenset([])
         inters:List[Spring]=[]
         for spr in energies:
-            print(spr)
             if spr[1] in left or spr[2] in right:
                 continue
             inters.append(spr[3])

@@ -55,7 +55,7 @@ class NestedAsmrs:
             try:
                 self._pool = Pool(processes=self.nprocs)
             except OSError:
-                print("could not create Pool")
+                LOGS.debug("could not create Pool")
                 self._pool = None
 
     def __del__(self,):
@@ -89,7 +89,7 @@ class NestedAsmrs:
         try:
             _pool = Pool(processes=state["nprocs"])
         except OSError:
-            print("could not create Pool")
+            LOGS.debug("could not create Pool")
             _pool = None
         state.update({"_pool":_pool})
         self.__dict__=state # pylint: disable=attribute-defined-outside-init

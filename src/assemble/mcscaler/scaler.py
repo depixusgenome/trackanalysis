@@ -146,7 +146,6 @@ class SpringScaler(SpringSetting): # pylint:disable=too-many-instance-attributes
         for peakid in chains:
             self.stepper.peakid=peakid
             curr_res=basinhopping(x0=state,**self.basinkwa)
-            print(f"fun={curr_res.fun}")
             LOGS.debug(f"fun={curr_res.fun}")
             self.res.append(curr_res)
             state=curr_res.x

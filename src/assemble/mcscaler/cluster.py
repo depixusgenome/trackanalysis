@@ -89,7 +89,6 @@ class SpringCluster(SpringScaler):
         cluster=self.peaks[0].copy()
         # all_matches:List[Match2Peaks]=[]
         while not all(assigned):
-            print(f"unassigned={assigned.count(False)}")
             # assign=assigned.index(False)
             # matches:List[Match2Peaks]=[] # scores and clusters
             neighs=[pkid for pkid,peak in enumerate(self.peaks)
@@ -97,8 +96,6 @@ class SpringCluster(SpringScaler):
             neighs+=[pkid for pkid,peak in enumerate(self.peaks)
                      if not assigned[pkid] and overlap(peak,cluster)]
             neighs=list(frozenset(neighs))
-            print(f'len(neighs)={len(neighs)}')
-            print(f'neighs={neighs}')
             # scores and clusters
             matches=[(self.cluster2peaks(cluster,self.peaks[neigh]),neigh) for neigh in neighs]
             matches=sorted(matches,key=lambda x:x[0].score/x[0].nmatches)

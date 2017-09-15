@@ -7,10 +7,13 @@ from typing import List, NamedTuple, Tuple, FrozenSet, Set, Dict, Generator # py
 import itertools
 import numpy
 from utils import initdefaults
+from utils.logconfig import getLogger
 from ._types import SciDist # pylint: disable=unused-import
 from . import _utils as utils
 from . import graph as pgraph
 
+
+LOGS=getLogger(__name__)
 REVERSE={"a":"t","c":"g","g":"c","t":"a"}
 REVERSE.update({"A":"T","C":"G","G":"C","T":"A"})
 
@@ -309,7 +312,6 @@ class BCollection:
     def group_overlapping_batches(self,nscale)->List[List[OligoPeak]]:
         'same as group_overlapping_oligos except that only oligos in batches are considered'
         olis=[] # type: List[OligoPeak]
-        print("nscale=",nscale)
         for bat in self.batches:
             olis+=bat.oligos
         groups = utils.group_overlapping_normdists([oli.dist for oli in olis],
@@ -378,8 +380,8 @@ class OligoPerm:
         '''
         if __debug__:
             if len(frozenset(perm1.domain).intersection(frozenset(perm2.domain)))>0:
-                print("perm1.domain",perm1.domain)
-                print("perm2.domain",perm2.domain)
+                LOGS.debug("perm1.domain",perm1.domain)
+                LOGS.debug("perm2.domain",perm2.domain)
                 raise ValueError("perm1 and perm2 are not independant")
         #changes = perm1.changes+perm2.changes
         permids = perm1.permids[perm2.permids]

@@ -10,7 +10,10 @@ from typing import List, Tuple, Dict, FrozenSet, Iterable, Generator # pylint:di
 import numpy as np
 import networkx
 from utils import initdefaults
+from utils.logconfig import getLogger
 import assemble.data as data
+
+LOGS=getLogger(__name__)
 
 BP2NM=1.1
 
@@ -719,7 +722,7 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         #         else:
         #             addstacks+=self.stack_key_fromtuple(key2fit,stack,path[1:])
         # if __debug__:
-        #     print(f"len(addstacks)={len(addstacks)}")
+        #     LOGS.debug(f"len(addstacks)={len(addstacks)}")
         return addstacks
 
     def run(self,iteration=1)->List[PeakStack]:
@@ -766,9 +769,9 @@ class Scaler: # pylint: disable=too-many-instance-attributes
         key2fit=getattr(self,"key2fit",None)
         for _ in range(iteration):
             if __debug__:
-                print(f"iteration={_}")
-                print(f'len(pstacks)={len(pstacks)}')
-                print(f'fixed,pstacks={len(fixed),len(pstacks)}')
+                LOGS.debug(f"iteration={_}")
+                LOGS.debug(f'len(pstacks)={len(pstacks)}')
+                LOGS.debug(f'fixed,pstacks={len(fixed),len(pstacks)}')
             new_stacks=[] # type: List[PeakStack]
             for stack in pstacks:
                 toadd=frozenset(self.incr_build(stack,key2fit=key2fit))
@@ -778,7 +781,7 @@ class Scaler: # pylint: disable=too-many-instance-attributes
                 else:
                     new_stacks+=toadd
             # if __debug__:
-            #     print(f"len(fixed)={len(fixed)}")
+            #     LOGS.debug(f"len(fixed)={len(fixed)}")
             pstacks=frozenset(new_stacks)
 
             if try_concatenate and key2fit:
@@ -926,8 +929,8 @@ class SubScaler(Scaler):
         toadd=[(peak,scale) for peak,scales in scperpeak.items()
                for scale in scales if stack.can_add(scale(peak))]
         # if __debug__:
-        #     print(f"toadd={toadd}")
-        #     print(f"scperpeak={scperpeak}")
+        #     LOGS.debug(f"toadd={toadd}")
+        #     LOGS.debug(f"scperpeak={scperpeak}")
         if not toadd:
             return [stack]
 
@@ -957,9 +960,6 @@ class SubScaler(Scaler):
         * can need a score
         '''
         pstacks=[self.pstack]
-        #for _ in range(len(self.pstack.keys)):
-        #    print(f"posid={_}")
-        #    self.posid=_
         self.posid=0
         pstacks=self.resume(pstacks,iteration=32,try_concatenate=try_concatenate)
         return pstacks
