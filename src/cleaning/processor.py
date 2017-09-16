@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 "Selecting beads"
 
-from    typing                import Optional, NamedTuple, Dict, Any
+from    typing                import (Optional, NamedTuple, Dict, Any, List,
+                                      Tuple, Type)
 from    itertools             import repeat
 from    functools             import partial
 import  numpy                 as     np
@@ -199,13 +200,30 @@ class DataCleaningException(Exception):
     "Exception thrown when a bead is not selected"
     class ErrorMessage:
         "creates the error message upon request"
-        def __init__(self, stats, cnf:Dict[str,Any], tasktype:type) -> None:
+        def __init__(self, stats, cnf:Dict[str,Any], tasktype:Type[DataCleaningTask]) -> None:
             self.stats    = stats
             self.config   = cnf
             self.tasktype = tasktype
 
         def __str__(self):
             return self.message(self.tasktype, self.stats, **self.config)
+
+        def data(self) -> List[Tuple[Optional[int], str, str]]:
+            "returns a message if the test is invalid"
+            if self.stats is None:
+                pop = self.config.get('minpopulation', self.tasktype.minpopulation)
+                return [(None, 'population', '< %d' % pop)]
+
+            stats = {i.name: i  for i in self.stats}
+            get1  = lambda i, j: len(getattr(stats[i], j))
+            get2  = lambda i, j: self.config.get(j+i, getattr(self.tasktype, j+i))
+            msg   = (('population', '< %.0f%%', 'min'),
+                     ('hfsigma',    '< %.4f',   'min'),
+                     ('hfsigma',    '> %.4f',   'max'),
+                     ('extent',     '< %.2f',   'min'))
+
+            vals  = ((get1(i[0], i[-1]), i[0], i[1] % get2(i[0], i[-1])) for i in msg)
+            return [i for i in vals if i[0]]
 
         @classmethod
         def message(cls, tasktype, stats, **cnf) -> str:
@@ -217,10 +235,10 @@ class DataCleaningException(Exception):
             stats = {i.name: i  for i in stats}
             get   = lambda i, j: (len(getattr(stats[i], j)),
                                   cnf.get(j+i, getattr(tasktype, j+i)))
-            msg   = ('%d cycles: population < %.0f%%'  % get('population', 'min'),
+            msg   = ('%d cycles: %%good < %.0f%%'      % get('population', 'min'),
                      '%d cycles: σ[HF] < %.4f'         % get('hfsigma',    'min'),
                      '%d cycles: σ[HF] > %.4f'         % get('hfsigma',    'max'),
-                     '%d cycles: max(z)-min(z) < %.2f' % get('extent',     'min'))
+                     '%d cycles: Δz < %.2f' % get('extent',     'min'))
 
             return '\n'.join(i for i in msg if i[0] != '0')
 
