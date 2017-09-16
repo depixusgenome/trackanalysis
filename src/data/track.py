@@ -247,8 +247,8 @@ class Track:
         return isinstance(key, int)
 
     def __view(self, tpe, **kwa):
-        parent = (self.key,) if self.key else (self.path,)
-        return tpe(track = self, parent = parent, **kwa)
+        parents = (self.key,) if self.key else (self.path,)
+        return tpe(track = self, parents = parents, **kwa)
 
     @property
     def beads(self) -> Beads:

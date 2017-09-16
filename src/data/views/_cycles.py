@@ -148,6 +148,7 @@ class Cycles(TrackView, ITrackView):
 
             if sel is None:
                 yield from cycles.__iter__() # pylint: disable=no-member
+                return
             elif cycles.selected:
                 parent = frozenset(cycles.keys())
                 sel    = [i for i in shallowcopy(cycles).selecting(sel, True).keys()
