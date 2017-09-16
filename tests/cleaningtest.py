@@ -92,14 +92,14 @@ def test_processor():
     # pylint: disable=expression-not-assigned
     cache = {}
     trk   = randtrack().beads
-    DataCleaningProcessor.apply(trk, cache)[0]
+    DataCleaningProcessor.apply(trk, cache = cache)[0]
     assert len(list(cache.keys())) == 1
     assert isinstance(next(iter(cache.keys())), Track)
 
     trkcache = next(iter(cache.values()))
     assert list(trkcache) == [0]
     tmp = trkcache[0]
-    DataCleaningProcessor.apply(trk, cache)[0]
+    DataCleaningProcessor.apply(trk, cache = cache)[0]
     assert tmp is next(iter(cache.values()))[0]
 
 def test_processor2():
