@@ -270,6 +270,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         "Stops on_change events for a time"
         self._bkmodels.clear()
         old, self.state = self.state, PlotState.resetting
+        i = j = None
         try:
             yield self
             for i, j in self._bkmodels.items():
@@ -279,7 +280,10 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
                 else:
                     upd(**j)
         except ValueError as exc:
-            raise ValueError(f'Error updating {i} = {j}') from exc
+            if i is not None:
+                raise ValueError(f'Error updating {i} = {j}') from exc
+            else:
+                raise ValueError(f'Error updating') from exc
         finally:
             self._bkmodels.clear()
             self.state = old
