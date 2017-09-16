@@ -12,7 +12,7 @@ from control.processor          import Processor
 from data.views                 import BEADKEY, TrackView, Beads
 from peakfinding.selector       import Output as PeakFindingOutput, PeaksArray
 from peakfinding.processor      import PeaksDict
-from ..tohairpin                import (HairpinFitter, GaussianProductFit, Distance,
+from ..tohairpin                import (HairpinFitter, ChiSquareFit, Distance,
                                         PeakMatching, PEAKS_TYPE)
 
 class DistanceConstraint(NamedTuple): # pylint: disable=missing-docstring
@@ -68,7 +68,7 @@ class FitToHairpinTask(Task):
             ) -> 'FitToHairpinTask':
         "creates a BeadsByHairpin from a fasta file and a list of oligos"
         if fit is None or fit is DefaultValue:
-            fits = dict(GaussianProductFit.read(path, oligos))
+            fits = dict(ChiSquareFit.read(path, oligos))
         elif isinstance(fit, type):
             fits = dict(cast(Type[HairpinFitter], fit).read(path, oligos))
         else:
