@@ -9,18 +9,24 @@ Messages issued by the automated cleaning are collected in an independant task.
 
 Stretch and bias is now estimated in 3 steps:
 
-    1. A global cost function is used to find an approximate stretch and bias.
-    This function is: F(X, Y) = 1 - R(X, Y)/sqrt(R(X, X) R(Y, Y))
-    where X and Y are 2 series of peak postions and R(X, Y) = Σ_{i, j} exp(-((x_i -y_j)/σ)²)
-    2. Peaks from X and Y are paired together using the approximate stretch an bias.
-    3. A linear regression is used on the pairs to estimate the best stretch and bias.
+1. A global cost function is used to find an approximate stretch and bias.
+   This function is, where X and Y are 2 series of peak postions:
+
+        F(X, Y) = 1 - R(X, Y)/sqrt(R(X, X) R(Y, Y))
+   with
+
+        R(X, Y) = Σ_{i, j} exp(-((x_i -y_j)/σ)²)
+
+
+2. Peaks from X and Y are paired together using the approximate stretch an bias.
+3. A linear regression is used on the pairs to estimate the best stretch and bias.
 
 ### Bugs
 
-    * Beads without a calibration file are discarded.
-    * Regression: excel reports could not be used as constraints anymore
-    * The cleaning tab had various visualization bugs.
-    * Cleaning was not correctly ported to all tabs.
+* Beads without a calibration file are discarded.
+* Regression: excel reports could not be used as constraints anymore
+* The cleaning tab had various visualization bugs.
+* Cleaning was not correctly ported to all tabs.
 
 # tag cycles_v4.3
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
@@ -36,19 +42,19 @@ clicking on the FoV.
 Added an automated cleaning process. A *cleaning* tab is available which displays
 which data points or cycles are missing. The criteria are:
 
-    1. For removing single data points:
+1. For removing single data points:
 
-        * |z - median(z)| > 5.
-        * |dz/dt| > 2.
-        * constant intervals: |z[n] - z[n+1]| < 1e-6 and |z[n] == z[n+2]| ...
-        In such a case, only the first point is kept.
+    * |z - median(z)| > 5.
+    * |dz/dt| > 2.
+    * constant intervals: |z[n] - z[n+1]| < 1e-6 and |z[n] == z[n+2]| ...
+    In such a case, only the first point is kept.
 
-    2. For removing cycles:
+2. For removing cycles:
 
-        * percentage of good data points < 80
-        * max(z) < min(z) + 0.5
-        * values are constant: σ[HF] < 1e-4
-        * values are too noisy: or σ[HF] > 1e-2
+    * percentage of good data points < 80
+    * max(z) < min(z) + 0.5
+    * values are constant: σ[HF] < 1e-4
+    * values are too noisy: or σ[HF] > 1e-2
 
 These values can be updated throught the gui
 
@@ -106,10 +112,10 @@ This is available in the *Peaks/Advanced* dialog.
 
 Alignments  in the *Cycles* tab have been improved. Choices available are:
 
-    * "ø": no alignment. This is the default when loading gr files.
-    * "Best": Alignment occurs on phase three then phase one cycles detected as unopened.
-    * "Φ₁": Alignment occurs on phase one only.
-    * "Φ₃": Alignment occurs on phase three only.
+* "ø": no alignment. This is the default when loading gr files.
+* "Best": Alignment occurs on phase three then phase one cycles detected as unopened.
+* "Φ₁": Alignment occurs on phase one only.
+* "Φ₃": Alignment occurs on phase three only.
 
 The *best* choice is different from the previous version which used to align
 primarily on phase 1 then align phase 3 outliers on the median of phase 3.
@@ -127,9 +133,9 @@ column pertaining to the sequence is discarded.
 
 Two pieces of information are addded:
 
-    * *Down Time* is the average amount of time spent with a bead completely zipped
-    in phase 5.
-    * *Events per Cycle* is the average number of events detected per cycle.
+* *Down Time* is the average amount of time spent with a bead completely zipped
+in phase 5.
+* *Events per Cycle* is the average number of events detected per cycle.
 
 For better throughput, one should have both a low down time and multiple events
 per cycle. A higher number of events per cycle will also increase the
@@ -152,12 +158,12 @@ possible. This is necessary for security reasons.
 
 Alignments can be performed on both phase 1 and phase 3 as follows:
 
-    1. Alignments are performed on phase 1.
-    2. Cycles with a small phase 1 to phase 3 extension are aligned using phase 3.
-    That extension should be less than 0.9 time the median of such extensions.
-    3. Step 2 is cancelled for cycles for which the bead did not open. These are
-    defined as those with a phase 3 to phase 5 extension smaller than 0.9 times the
-    median of such extensions.
+1. Alignments are performed on phase 1.
+2. Cycles with a small phase 1 to phase 3 extension are aligned using phase 3.
+   That extension should be less than 0.9 time the median of such extensions.
+3. Step 2 is cancelled for cycles for which the bead did not open. These are
+   defined as those with a phase 3 to phase 5 extension smaller than 0.9 times
+   the median of such extensions.
 
 Alignments used to be performed on the min of a phase. It is now on the median of
 a the last 15 points in a phase.
@@ -182,19 +188,19 @@ There are no distinctions between upper and lower cases.
 
 ### Other Features
 
-    * Beads can be discarded using comma-separated values in a text box to the
-    right of the bead number.
-    * Beads with too high or too low a σ[HF] are discarded.
-    * Server GUI computations are threaded. This should improve the response time
-    of the application.
-    * In case of failure, a message is displayed at top right of the application.
-    The message is in *blue* if the failure is an expected one (incorrect file, ...).
-    Messages in *red* indicate a bug.
+* Beads can be discarded using comma-separated values in a text box to the
+  right of the bead number.
+* Beads with too high or too low a σ[HF] are discarded.
+* Server GUI computations are threaded. This should improve the response time
+  of the application.
+* In case of failure, a message is displayed at top right of the application.
+  The message is in *blue* if the failure is an expected one (incorrect file,
+  ...).  Messages in *red* indicate a bug.
 
 ### Solved Bugs
 
-    * Changing the *stretch* and *bias* resulted in infinite client-server loops.
-    * Could not load *.gr* files.
+* Changing the *stretch* and *bias* resulted in infinite client-server loops.
+* Could not load *.gr* files.
 
 # tag cycles_v2.0
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
@@ -204,30 +210,30 @@ New application for viewing peaks
 
 There are 3 tabs:
 
-    1. Bead: displays the raw bead data. Nothing more.
-    2. Cycles: displays cycles as in the 1st version
-    3. Peaks: A histogram of events is shown, similar to cycles tab, but using a
-    gaussian kernel on the position. This allows peak detection:
+1. Bead: displays the raw bead data. Nothing more.
+2. Cycles: displays cycles as in the 1st version
+3. Peaks: A histogram of events is shown, similar to cycles tab, but using a
+   gaussian kernel on the position. This allows peak detection:
 
-        * The x-axis is the percentage of cycles when an event is detected (bottom)
-        and their average duration (top).
-        * The y-axis is the position of events in nm (left) or base number (right).
-        * The kernel-smoothed histogram is the smooth blue curve.
-        * Detected peaks display the percentage of cycles (blue squares) and
-        their average durations (gray diamonds).
-        * Global and peak-wise statistics are **repeated** in table on the left of
-        the figure. Selecting a peak in the figure selects a line in the table and
-        vice-versa.
-        * Use the mouse to view the sequence at a given z.
+    * The x-axis is the percentage of cycles when an event is detected (bottom)
+      and their average duration (top).
+    * The y-axis is the position of events in nm (left) or base number (right).
+    * The kernel-smoothed histogram is the smooth blue curve.
+    * Detected peaks display the percentage of cycles (blue squares) and their
+      average durations (gray diamonds).
+    * Global and peak-wise statistics are **repeated** in table on the left of
+      the figure. Selecting a peak in the figure selects a line in the table
+      and vice-versa.
+    * Use the mouse to view the sequence at a given z.
 
 The **Peaks** tab applies to the data all treatments selected in the **Cycles**
 tab. It furthermore aligns cycles using phase 5 events.
 
 ### Fixed Bugs
 
-    * fasta files can be opened whatever their extension
-    * gr files can be opened
-    * With chrome, the bead number could not be typed in.
+* fasta files can be opened whatever their extension
+* gr files can be opened
+* With chrome, the bead number could not be typed in.
 
 # tag cycles_v1.0
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
