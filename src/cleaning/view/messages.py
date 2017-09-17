@@ -4,7 +4,7 @@
 from    typing             import List, Dict, cast, TYPE_CHECKING
 
 from    bokeh.models       import (ColumnDataSource, DataTable, TableColumn,
-                                   Widget, StringFormatter)
+                                   Widget, StringFormatter, Div)
 from    bokeh.layouts      import widgetbox
 
 from    view.plots         import DpxNumberFormatter, WidgetCreator, PlotView
@@ -31,10 +31,12 @@ class MessagesModelAccess(TaskPlotModelAccess):
     "access to data cleaning"
     def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
-        self.cleaning   = TaskAccess(self, DataCleaningTask)
+        self.cleaning                    = TaskAccess(self, DataCleaningTask)
+        self.__messages: Dict[str, List] = dict(bead = [], cycles  = [],
+                                                type = [], message = [])
 
-    def messages(self) -> Dict[str, List]:
-        "returns beads and warnings where applicable"
+    def buildmessages(self):
+        "creates beads and warnings where applicable"
         default = dict(type = [], message = [], bead = []) # type: Dict[str, List]
         tsk     = self.cleaning.task
         if tsk is None:
@@ -51,10 +53,47 @@ class MessagesModelAccess(TaskPlotModelAccess):
         if mem is None:
             return default
 
-        return dict(bead    = [i[0] for i in mem],
-                    cycles  = [i[1] for i in mem],
-                    type    = [i[2] for i in mem],
-                    message = [i[3] for i in mem])
+        self.__messages = dict(bead    = [i[0] for i in mem],
+                               cycles  = [i[1] for i in mem],
+                               type    = [i[2] for i in mem],
+                               message = [i[3] for i in mem])
+
+    def messages(self) -> Dict[str, List]:
+        "returns beads and warnings where applicable"
+        return self.__messages
+
+class SummaryWidget(WidgetCreator):
+    "summary info on the track"
+    def __init__(self, model:MessagesModelAccess) -> None:
+        super().__init__(model)
+        self.__widget: Div = None
+
+    def create(self, _):
+        self.__widget = Div()
+        return [self.__widget]
+
+    def reset(self, resets):
+        itm = self.__widget if resets is None else resets[self.__widget]
+        txt = self.__text()
+        itm.update(text = txt)
+
+    def __text(self):
+        track = self._model.track
+        if track is None:
+            return ''
+
+        nbeads = sum(1 for i in track.beadsonly.keys())
+        beads  = sorted(set(self._model.messages()['bead']))
+        txt    = ("<div class='dpx-span'><div>"
+                  "<p>Number of cycles:</p>"
+                  "<p>Number of beads:</p>"
+                  "<p>Bad beads:</p>"
+                  "</div><div>"
+                  f"<p>{track.ncycles}</p>"
+                  f"<p>{nbeads}</p>"
+                  f"<p>{len(beads)}=[{', '.join(str(i) for i in beads)}]</p>"
+                  "</div></div>")
+        return txt
 
 class MessagesListWidget(WidgetCreator):
     "Table containing stats per peaks"
@@ -114,7 +153,8 @@ class MessagesPlotCreator(TaskPlotCreator):
     _MODEL = MessagesModelAccess # type: ignore
     def __init__(self, *args):
         super().__init__(*args)
-        self._widgets = dict(messages = MessagesListWidget(self._model))
+        self._widgets = dict(messages = MessagesListWidget(self._model),
+                             summary  = SummaryWidget(self._model))
         if TYPE_CHECKING:
             self._model = MessagesModelAccess(self)
 
@@ -125,9 +165,14 @@ class MessagesPlotCreator(TaskPlotCreator):
 
     def _create(self, doc):
         "returns the figure"
-        return widgetbox(self._widgets['messages'].create(self.action))
+        act   = self.action
+        order = 'summary', 'messages'
+        get   = lambda i: self._widgets[i].create(act)
+        lst   = sum((get(i) for i in order), [])
+        return widgetbox(lst)
 
     def _reset(self):
+        self._model.buildmessages()
         for widget in self._widgets.values():
             widget.reset(self._bkmodels)
 
