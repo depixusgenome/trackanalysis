@@ -39,6 +39,7 @@ def setup(cnf):
 
 class _CondaApp(BuildContext):
     fun = cmd = 'app'
+    DOALL = True
 
     def __clean(self):
         self.options.APP_PATH = self.bldnode.make_node("OUTPUT_PY")
@@ -82,51 +83,37 @@ class _CondaApp(BuildContext):
         wafbuilder.os.chdir(str(old))
 
     @staticmethod
-    def __final(mods):
-        path  = Path("build")/"OUTPUT_PY"
-        iswin = sys.platform.startswith("win")
-        dll   = '.cp*-win*.pyd' if iswin else '.cpython-*.so'
+    def __compile(path, inp, outp):
+        with open(str(inp), encoding = 'utf-8') as stream:
+            if not any('from_py_func' in i for i in stream):
+                cur = outp/inp.relative_to(path).with_suffix('.pyc')
+                out = str(cur)
+                opt = 0 if 'reporting' in out else 2
+                py_compile.compile(str(inp), out, optimize = opt)
+                return cur
+        return inp
 
+    @classmethod
+    def __zip_files(cls, path, out, zips):
+        with ZipFile(str(out/"trackanalysis.pyz"), "w") as zfile:
+            for pyc in path.glob("*.py"):
+                pyc = cls.__compile(path, pyc, path)
+                zfile.write(str(pyc), str(pyc.relative_to(path)))
 
-        mods = [path/Path(mod).name for mod in mods]
-        zips = [mod for mod in mods
-                if (mod.exists() and mod.name != 'app'
-                    and next(mod.glob("_core"+dll), None) is None)]
-
-        def _compile(inp, outp):
-            with open(str(inp), encoding = 'utf-8') as stream:
-                if not any('from_py_func' in i for i in stream):
-                    cur = outp/inp.relative_to(path).with_suffix('.pyc')
-                    out = str(cur)
-                    opt = 0 if 'reporting' in out else 2
-                    py_compile.compile(str(inp), out, optimize = opt)
-                    return cur
-            return inp
-
-        out = Path("build")/"OUTPUT"
-        if len(zips):
-            with ZipFile(str(out/"trackanalysis.pyz"), "w") as zfile:
-                for pyc in path.glob("*.py"):
-                    pyc = _compile(pyc, path)
+            for mod in zips:
+                for pyc in chain(mod.glob("**/*.pyc"), mod.glob("**/*.py")):
+                    pyc = cls.__compile(path, pyc, path)
                     zfile.write(str(pyc), str(pyc.relative_to(path)))
-
-                for mod in zips:
-                    for pyc in chain(mod.glob("**/*.pyc"), mod.glob("**/*.py")):
-                        pyc = _compile(pyc, path)
-                        zfile.write(str(pyc), str(pyc.relative_to(path)))
-
-
+    @classmethod
+    def __move_files(cls, mods, out, path, dll):
         for mod in mods:
-            if mod in zips:
-                continue
-
             for name in chain(mod.glob('**/*.coffee'), mod.glob("_core"+dll)):
                 outp = out/name.relative_to(path)
                 outp.parent.mkdir(exist_ok = True, parents = True)
                 name.rename(outp)
 
             for pyc in mod.glob('**/*.py'):
-                outp = _compile(pyc, out)
+                outp = cls.__compile(path, pyc, out)
                 if outp == pyc:
                     pyc.rename(out/pyc.relative_to(path))
 
@@ -141,6 +128,23 @@ class _CondaApp(BuildContext):
         for itm in path.glob("*.js"):
             itm.rename(out/itm.relative_to(path))
 
+    @classmethod
+    def __final(cls, mods):
+        path  = Path("build")/"OUTPUT_PY"
+        iswin = sys.platform.startswith("win")
+        dll   = '.cp*-win*.pyd' if iswin else '.cpython-*.so'
+
+        mods = [path/Path(mod).name for mod in mods]
+        zips = [mod for mod in mods
+                if (mod.exists() and mod.name != 'app'
+                    and next(mod.glob("_core"+dll), None) is None)]
+
+        out = Path("build")/"OUTPUT"
+        if len(zips):
+            cls.__zip_files(path, out, zips)
+
+        cls.__move_files([i for i in mods if i not in zips], out, path, dll)
+
         final = Path(".")/wafbuilder.git.version()
         if final.exists():
             rmtree(str(final))
@@ -153,9 +157,11 @@ class _CondaApp(BuildContext):
         mods = [i for i in MODULES(self)
                 if not any(j in i for j in ('tests','scripting'))]
         _basebuild(self, mods)
-        wafbuilder.condasetup(self, copy = 'build/OUTPUT', runtimeonly = True)
+        if self.DOALL:
+            wafbuilder.condasetup(self, copy = 'build/OUTPUT', runtimeonly = True)
         self.__startscripts(mods)
-        self.__electron()
+        if self.DOALL:
+            self.__electron()
 
         self.add_group()
         self(rule = lambda _: self.__final(mods), always = True)
@@ -164,4 +170,12 @@ def app(bld):
     "Creates an application"
     bld.build_app()
 
-__all__ = ['app', 'setup', 'condaenv']
+class _CondaPatch(_CondaApp):
+    fun = cmd = 'apppatch'
+    DOALL = False
+
+def apppatch(bld):
+    "Creates an application patch"
+    bld.build_app()
+
+__all__ = ['app', 'apppatch', 'setup', 'condaenv']
