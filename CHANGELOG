@@ -1,3 +1,27 @@
+# tag cycles_v4.4
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+### Messages
+
+Messages issued by the automated cleaning are collected in an independant task.
+
+### Hybridstat
+
+Stretch and bias is now estimated in 3 steps:
+
+    1. A global cost function is used to find an approximate stretch and bias.
+    This function is: F(X, Y) = 1 - R(X, Y)/sqrt(R(X, X) R(Y, Y))
+    where X and Y are 2 series of peak postions and R(X, Y) = Σ_{i, j} exp(-((x_i -y_j)/σ)²)
+    2. Peaks from X and Y are paired together using the approximate stretch an bias.
+    3. A linear regression is used on the pairs to estimate the best stretch and bias.
+
+### Bugs
+
+    * Beads without a calibration file are discarded.
+    * Regression: excel reports could not be used as constraints anymore
+    * The cleaning tab had various visualization bugs.
+    * Cleaning was not correctly ported to all tabs.
+
 # tag cycles_v4.3
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
