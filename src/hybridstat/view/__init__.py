@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"all view aspects here"
-from bokeh.models   import Tabs, Panel
-from bokeh          import layouts
-from view.base      import BokehView
-from view.plots     import PlotState
-from cleaning.view  import CleaningView
-from fov            import FoVPlotView
-from cyclesplot     import CyclesPlotView
-from .peaksplot     import PeaksPlotView
+from bokeh.models           import Tabs, Panel
+from bokeh                  import layouts
+from view.base              import BokehView
+from view.plots             import PlotState
+from cleaning.view          import CleaningView
+from cleaning.view.messages import MessagesView
+from fov                    import FoVPlotView
+from cyclesplot             import CyclesPlotView
+from .peaksplot             import PeaksPlotView
 
 class HybridStatView(BokehView):
     "A view with all plots"
@@ -17,6 +18,7 @@ class HybridStatView(BokehView):
         super().__init__(**kwa)
         self._tabs   = None
         self._panels = [FoVPlotView   (**kwa),
+                        MessagesView  (**kwa),
                         CleaningView  (**kwa),
                         CyclesPlotView(**kwa),
                         PeaksPlotView (**kwa)]

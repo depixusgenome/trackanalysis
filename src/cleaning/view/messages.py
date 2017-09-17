@@ -27,7 +27,7 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
             cache.setdefault('messages', []).extend([(info[0],)+ i for i in err.args[0].data()])
         return None
 
-class DiscardsModelAccess(TaskPlotModelAccess):
+class MessagesModelAccess(TaskPlotModelAccess):
     "access to data cleaning"
     def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
@@ -44,7 +44,7 @@ class DiscardsModelAccess(TaskPlotModelAccess):
         if ctrl is None:
             return default
 
-        for _ in next(iter(ctrl.run())):
+        for _ in next(iter(ctrl.run(copy = True))):
             pass
 
         mem = ctrl.data.getCache(tsk)().pop('messages', None)
@@ -56,10 +56,9 @@ class DiscardsModelAccess(TaskPlotModelAccess):
                     type    = [i[2] for i in mem],
                     message = [i[3] for i in mem])
 
-
-class DiscardsListWidget(WidgetCreator):
+class MessagesListWidget(WidgetCreator):
     "Table containing stats per peaks"
-    def __init__(self, model:DiscardsModelAccess) -> None:
+    def __init__(self, model:MessagesModelAccess) -> None:
         super().__init__(model)
         self.__widget: DataTable   = None
         css                        = self.__config
@@ -91,7 +90,7 @@ class DiscardsListWidget(WidgetCreator):
                                   editable    = False,
                                   row_headers = False,
                                   width       = sum([i[-1] for i in cnf.get()]),
-                                  name        = "Discards:List")
+                                  name        = "Messages:List")
         return [self.__widget]
 
     def reset(self, resets):
@@ -101,7 +100,7 @@ class DiscardsListWidget(WidgetCreator):
         itm.update(data = data)
 
     def __data(self) -> Dict[str, List]:
-        mdl   = cast(DiscardsModelAccess, self._model)
+        mdl   = cast(MessagesModelAccess, self._model)
         msgs  = mdl.messages()
         if len(msgs['bead']):
             trans = self.__config.type.getitems(...)
@@ -110,14 +109,14 @@ class DiscardsListWidget(WidgetCreator):
             msgs['type']   = [trans.get(i, i)           for i in msgs['type']]
         return msgs
 
-class DiscardsPlotCreator(TaskPlotCreator):
+class MessagesPlotCreator(TaskPlotCreator):
     "Creates plots for discard list"
-    _MODEL = DiscardsModelAccess # type: ignore
+    _MODEL = MessagesModelAccess # type: ignore
     def __init__(self, *args):
         super().__init__(*args)
-        self._widgets = dict(messages = DiscardsListWidget(self._model))
+        self._widgets = dict(messages = MessagesListWidget(self._model))
         if TYPE_CHECKING:
-            self._model = DiscardsModelAccess(self)
+            self._model = MessagesModelAccess(self)
 
     def observe(self):
         super().observe()
@@ -132,9 +131,9 @@ class DiscardsPlotCreator(TaskPlotCreator):
         for widget in self._widgets.values():
             widget.reset(self._bkmodels)
 
-class DiscardsView(PlotView):
+class MessagesView(PlotView):
     "a widget with all discards messages"
-    PLOTTER = DiscardsPlotCreator
+    PLOTTER = MessagesPlotCreator
     def ismain(self):
         "Cleaning and alignment, ... are set-up by default"
         super()._ismain(tasks  = ['datacleaning', 'extremumalignment'],

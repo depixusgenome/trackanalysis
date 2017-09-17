@@ -311,6 +311,9 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
         over  = self.config.boundary.overshoot.get()
 
         if isinstance(arr, np.ndarray):
+            if all(np.isnan(i) for i in arr):
+                return OrderedDict()
+
             vmin  = np.nanmin(arr)
             vmax  = np.nanmax(arr)
         else:
