@@ -26,17 +26,29 @@ export class DpxCleaningView extends WidgetView
 
     render: () ->
         super()
+        dbal  = 'data-balloon="'
+        pos   = '" data-balloon-length="medium" data-balloon-pos="right"'
+        ttips = [dbal+'Average of listed bead is subtracted from other beads'+pos,
+                 dbal+'Adds the current bead to the list'+pos,
+                 dbal+'Values too far are deleted '+pos,
+                 dbal+'Closed-hairpin cycles are deleted'+pos,
+                 dbal+'Values with a high derivate are deleted'+pos,
+                 dbal+'Underpopulated cycles are deleted'+pos,
+                 dbal+'Constant or noist cycles are deleted'+pos]
+
         html = "<div><div class='dpx-span'>"+
-                   "<p>Subtracted</p>"+
+                   "<p #{ttips[0]}>Subtracted</p>"+
                    "#{@mk_txt("subtracted")}"+
-                   "#{@mk_btn("add", "╋")}"+
+                   "#{@mk_btn("add", "╋", ttips[1])}"+
                "</div></div>"+
                "<div><div class='dpx-span'>"+
-                   "<div><p>|z| ≤</p><p>Δz  ≥</p><p/></div>"+
+                   "<div><p #{ttips[2]}>|z| ≤</p><p #{ttips[3]}>Δz  ≥</p>"+
+                        "<p/></div>"+
                    "<div>#{@mk_inp("maxabsvalue")}"+
                         "#{@mk_inp("minextent")}"+
                         "#{@mk_inp("minhfsigma", 0.05, 0.0001)}</div>"+
-                   "<div><p>|dz/dt| ≤</p><p>% good  ≥</p><p>≤ σ[HF] ≤</p></div>"+
+                   "<div><p #{ttips[4]}>|dz/dt| ≤</p><p #{ttips[5]}>% good  ≥</p>"+
+                        "<p #{ttips[6]}>≤ σ[HF] ≤</p></div>"+
                    "<div>#{@mk_inp("maxderivate")}"+
                         "#{@mk_inp("minpopulation", 100, 0.1)}"+
                         "#{@mk_inp("maxhfsigma", 0.05,  0.001)}</diV>"+
@@ -68,8 +80,8 @@ export class DpxCleaningView extends WidgetView
                     " type='text' class='dpx-cl-freeze bk-widget-form-input'"+
                     " value='#{@model[name]}'#{disabled}>"
 
-    mk_btn: (name, label) ->
-        str = "<button type='button' id='dpx-cl-#{name}' "+
+    mk_btn: (name, label, ttip) ->
+        str = "<button type='button' id='dpx-cl-#{name}' #{ttip} "+
               "class='dpx-cl-freeze bk-bs-btn bk-bs-btn-default'>#{label}</button>"
         return str
 
