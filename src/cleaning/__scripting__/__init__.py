@@ -39,16 +39,24 @@ class TrackCleaningScript:
     def messages(self, **kwa) -> pd.DataFrame:
         "returns beads and warnings where applicable"
         beads = [] # type: List[int]
+        types = [] # type: List[str]
+        cycs  = [] # type: List[int]
         msgs  = [] # type: List[str]
         for i, j in self.process(**kwa).items():
             if j is None:
                 continue
-            msgs.extend(str(j).split('\n'))
+            itms = j.data()
+
+            cycs .extend([i[0] for i in itms])
+            types.extend([i[1] for i in itms])
+            msgs .extend([i[2] for i in itms])
             beads.extend((cast(int, i),)*(len(msgs)-len(beads)))
 
         name = DataFrameFactory.trackname(self.track)
         return pd.DataFrame(dict(track   = np.full(len(beads), name),
                                  bead    = beads,
+                                 cycles  = cycs,
+                                 types   = types,
                                  message = msgs))
 
     def dropbad(self, **kwa):
