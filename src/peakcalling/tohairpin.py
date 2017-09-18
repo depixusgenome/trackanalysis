@@ -10,7 +10,7 @@ from utils          import StreamUnion, initdefaults
 from sequences      import read as _read, peaks as _peaks
 from ._core         import cost as _cost, match as _match # pylint: disable=import-error
 from ._base         import (Distance, GriddedOptimization, PointwiseOptimization,
-                            DEFAULT_BEST, OptimizationParams)
+                            DEFAULT_BEST, OptimizationParams, chisquare, chisquarevalue)
 
 class HairpinFitter(OptimizationParams):
     "Class containing theoretical peaks and means for matching them to experimental ones"
@@ -136,30 +136,21 @@ class ChiSquareFit(GaussianProductFit):
     the best Χ² fit between matched peaks, adding their count as well.
     """
     window = 10.
+    def _optimalvalue(self, hpin: np.ndarray, peaks: np.ndarray, # type: ignore
+                      stretch:float, bias:float, **_):
+        return chisquare(hpin, peaks,
+                         self.firstpeak, self.symmetry, self.window,
+                         stretch, bias)
+
     def _value(self, hpin: np.ndarray, peaks: np.ndarray, # type: ignore
                stretch:float, bias:float, **_):
-        tmp   = peaks*stretch+bias
-        pairs = _match.compute(hpin, tmp, self.window)
-        if self.firstpeak and any(i == 0 for i in pairs[0]):
-            pairs = pairs[1:]
-        if len(pairs) > 1:
-            stretch, bias = np.polyfit(peaks[pairs[:,1]], hpin[pairs[:,0]], 1)
-            dist  = ((stretch*peaks[pairs[:,1]]+bias - hpin[pairs[:,0]])**2).sum()
-            dist /= self.window**2
-        else:
-            dist = 0.
-
-        if self.symmetry:
-            dist += (len(peaks)+len(hpin)-2.*len(pairs))**2
-            dist  = np.sqrt(dist*.5/(len(peaks)+len(hpin)))
-        else:
-            dist += (len(peaks)-len(pairs))**2
-            dist  = np.sqrt(dist/len(peaks))
-        return dist, stretch, bias
+        return chisquarevalue(hpin, peaks,
+                              self.firstpeak, self.symmetry, self.window,
+                              stretch, bias)
 
     def _optimize(self, hpin, peaks, args):
         pars = _cost.optimize(hpin, peaks, **args)
-        return self._value(hpin, peaks, pars[1], pars[2])
+        return self._optimalvalue(hpin, peaks, pars[1], pars[2])
 
 PEAKS_DTYPE = np.dtype([('zvalue', 'f4'), ('key', 'i4')])
 PEAKS_TYPE  = Union[Sequence[Tuple[float,int]],np.ndarray]

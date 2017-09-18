@@ -8,6 +8,8 @@ from   itertools    import product
 import numpy        as     np
 from   utils        import initdefaults
 
+from ._core         import match as _match # pylint: disable=import-error
+
 DEFAULT_BEST = float(np.finfo('f4').max)
 
 class CobylaParameters(NamedTuple): # pylint: disable=missing-docstring
@@ -124,3 +126,64 @@ class PointwiseOptimization(OptimizationParams):
     def optimconfig(self, **kwa) -> Dict[str, Any]:
         "returns the configuration"
         return config(self.optim, **kwa)
+
+def chisquare(ref       : np.ndarray, # pylint: disable=too-many-arguments
+              exp       : np.ndarray,
+              firstpeak : bool,
+              symmetry  : bool,
+              window    : float,
+              stretch   : float,
+              bias      : float):
+    """
+    We use the GaussianProductFit results to match exp then estimate
+    the best Χ² fit between matched exp, adding their count as well.
+    """
+    tmp   = exp*stretch+bias
+    pairs = _match.compute(ref, tmp, window)
+    if firstpeak and len(pairs) and any(i == 0 for i in pairs[0]):
+        pairs = pairs[1:]
+
+    if len(pairs) > 1:
+        stretch, bias = np.polyfit(exp[pairs[:,1]], ref[pairs[:,0]], 1)
+        dist  = ((stretch*exp[pairs[:,1]]+bias - ref[pairs[:,0]])**2).sum()
+        dist /= window**2
+    else:
+        dist = 0.
+
+    if symmetry:
+        dist += (len(exp)+len(ref)-2.*len(pairs))**2
+        dist  = np.sqrt(dist/(len(exp)+len(ref)))
+    else:
+        dist += (len(exp)-len(pairs))**2
+        dist  = np.sqrt(dist/len(exp))
+    return dist, stretch, bias
+
+def chisquarevalue(ref       : np.ndarray, # pylint: disable=too-many-arguments
+                   exp       : np.ndarray,
+                   firstpeak : bool,
+                   symmetry  : bool,
+                   window    : float,
+                   stretch   : float,
+                   bias      : float):
+    """
+    We use the GaussianProductFit results to match exp then estimate
+    the best Χ² fit between matched exp, adding their count as well.
+    """
+    tmp   = exp*stretch+bias
+    pairs = _match.compute(ref, tmp, window)
+    if firstpeak and len(pairs) and any(i == 0 for i in pairs[0]):
+        pairs = pairs[1:]
+
+    if len(pairs) > 1:
+        dist  = ((stretch*exp[pairs[:,1]]+bias - ref[pairs[:,0]])**2).sum()
+        dist /= window**2
+    else:
+        dist = 0.
+
+    if symmetry:
+        dist += (len(exp)+len(ref)-2.*len(pairs))**2
+        dist  = np.sqrt(dist/(len(exp)+len(ref)))
+    else:
+        dist += (len(exp)-len(pairs))**2
+        dist  = np.sqrt(dist/len(exp))
+    return dist, stretch, bias

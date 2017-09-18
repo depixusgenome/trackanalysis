@@ -16,7 +16,7 @@ from peakfinding.processor      import PeakSelectorTask
 from peakfinding.histogram      import HistogramData
 from peakcalling                import cost, match
 from peakcalling.tohairpin      import PeakMatching, GaussianProductFit, ChiSquareFit
-from peakcalling.toreference    import ReferenceDistance
+from peakcalling.toreference    import HistogramFit, ChiSquareHistogramFit
 from peakcalling.processor      import (BeadsByHairpinProcessor, BeadsByHairpinTask,
                                         DistanceConstraint)
 from testingcore                import DummyPool, path as utpath
@@ -26,17 +26,21 @@ def test_toref():
     for i in product([.96, 1., 1.04], [-.05, 0., 0.5]):
         arr1 = np.array([1., 1., .5,  8.])
         arr2 = np.array([1., .5, .5,  8.])/i[0]+i[1]
-        ret  = ReferenceDistance(maxthreshold = .5).optimize(arr1, arr2)
+        ret  = HistogramFit(maxthreshold = .5).optimize(arr1, arr2)
         assert_allclose(ret[1:], i, rtol = 5e-4, atol = 5e-4)
+
+        ret2 = ChiSquareHistogramFit(maxthreshold = .5).optimize((arr1, np.unique(arr1)),
+                                                                 (arr2, np.unique(arr2)))
+        assert_allclose(ret2[1:], i, rtol = 5e-4, atol = 5e-4)
 
 def test_toref_frompeaks():
     "tests reference comparison"
     pair = create(utpath("big_selected"), EventDetectionTask(), PeakSelectorTask())
     pks  = {i: tuple(j) for i, j in next(iter(pair.run()))}
-    res  = ReferenceDistance().frompeaks(next(iter(pks.values())))
-    ret  = ReferenceDistance().optimize(res, HistogramData(res.histogram,
-                                                           res.minvalue+.01,
-                                                           res.binwidth/1.01))
+    res  = HistogramFit().frompeaks(next(iter(pks.values())))
+    ret  = HistogramFit().optimize(res, HistogramData(res.histogram,
+                                                      res.minvalue+.01,
+                                                      res.binwidth/1.01))
 
     assert_allclose(ret[1:], [1.01, .01], rtol = 5e-4, atol = 5e-4)
 
@@ -178,4 +182,4 @@ def test_control():
         assert tuple(beads.keys()) == ('hp100',)
 
 if __name__ == '__main__':
-    test_hairpincost()
+    test_toref()

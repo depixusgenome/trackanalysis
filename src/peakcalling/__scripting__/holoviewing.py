@@ -9,7 +9,7 @@ from   utils.decoration         import addto
 import sequences
 from   peakfinding.processor    import PeaksDict
 from   ..processor              import BeadsByHairpinProcessor
-from   ..toreference            import ReferenceDistance
+from   ..toreference            import ChiSquareHistogramFit
 
 def _get(name, val = None):
     mod = sys.modules[name]
@@ -165,13 +165,14 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
             if i == ind:
                 continue
             stretch, bias = dist.optimize(ref, _peaks(j))[1:]
+            print(dist, stretch, bias)
             for itm in j:
                 itm.data[:,0] = (itm.data[:,0] - bias)*stretch
         return cls._toarea(specs, ovrs)
 
     @classmethod
     def _specs(cls):
-        return super()._specs() + (('distance', ReferenceDistance()),)
+        return super()._specs() + (('distance', ChiSquareHistogramFit()),)
 
 @addto(TracksDict) # type: ignore
 def peaks(self, overlay = 'key', reference = None, **kwa):
@@ -183,14 +184,14 @@ def peaks(self, overlay = 'key', reference = None, **kwa):
         * *overlay* == 'key': for a given bead, all tracks are overlayed:
 
             * *reference*: the reference is displayed as an area
-            * *distance*: a *ReferenceDistance* object (default) or *None*. This
+            * *distance*: a *HistogramFit* object (default) or *None*. This
             objects computes a stretch and bias which is applied to the x-axis of
             non-reference items.
 
         * *overlay* == 'bead': for a given track, all beads are overlayed
 
             * *reference*: the reference is displayed as an area
-            * *distance*: a *ReferenceDistance* object (default) or *None*. This
+            * *distance*: a *HistogramFit* object (default) or *None*. This
             objects computes a stretch and bias which is applied to the x-axis of
             non-reference items.
 

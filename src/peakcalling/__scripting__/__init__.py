@@ -9,6 +9,7 @@ import pandas                   as pd
 from   utils.decoration         import addto
 from   data                     import Track
 from   peakfinding.processor    import PeaksDict
+from   ..toreference            import HistogramFit, ChiSquareHistogramFit
 from   ..processor              import FitToHairpinDict
 
 Tasks:           Type     = sys.modules['model.__scripting__'].Tasks
@@ -75,4 +76,4 @@ def dataframe(self, conversion = 'best') -> pd.DataFrame:
         return info[0], data
     return pd.concat([i for _, i in shallowcopy(self).withaction(_cnv)])
 
-__all__: List[str] = []
+__all__: List[str] = ['HistogramFit', 'ChiSquareHistogramFit']

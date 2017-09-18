@@ -16,7 +16,6 @@ from cleaning.processor         import DataCleaningTask
 from cordrift.processor         import DriftTask
 from eventdetection.processor   import ExtremumAlignmentTask, EventDetectionTask
 from peakfinding.processor      import PeakSelectorTask
-from peakcalling.toreference    import ReferenceDistance # pylint: disable=unused-import
 from peakcalling.processor      import FitToHairpinTask, BeadsByHairpinTask
 from .task                      import * # pylint: disable=wildcard-import,unused-wildcard-import
 from .task                      import Task, TrackReaderTask
@@ -165,4 +164,4 @@ __all__ = ('Task', 'RootTask', 'Level', 'TASK_ORDER', 'taskorder',
            'TrackReaderTask', 'CycleCreatorTask', 'DataSelectionTask',
            'Tasks', 'DriftTask', 'ExtremumAlignmentTask',
            'EventDetectionTask', 'PeakSelectorTask',
-           'FitToHairpinTask', 'DataFrameTask', 'ReferenceDistance')
+           'FitToHairpinTask', 'DataFrameTask')
