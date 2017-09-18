@@ -132,6 +132,27 @@ def cycles(self, overlay = None, reference = None, **kwa):
     return TracksDictDisplay.run(self, 'cycles', overlay, reference, kwa)
 
 @addto(TracksDict) # type: ignore
+def cleancycles(self, overlay = None, reference = None, **kwa):
+    """
+    A hv.DynamicMap showing cycles
+
+    Options are:
+
+        * *overlay* == 'key': for a given bead, all tracks are overlayed
+        The *reference* option can be used to indicate the top-most track.
+        * *overlay* == 'bead': for a given track, all beads are overlayed
+        The *reference* option can be used to indicate the top-most bead.
+        * *overlay* == None:
+
+            * *reference*: the reference is removed from the *key* widget and
+            allways displayed to the left independently.
+            * *refdims*: if set to *True*, the reference gets its own dimensions.
+            Thus zooming and spanning is independant.
+            * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
+    """
+    return TracksDictDisplay.run(self, 'cleancycles', overlay, reference, kwa)
+
+@addto(TracksDict) # type: ignore
 def measures(self, overlay = None, reference = None, **kwa):
     """
     A hv.DynamicMap showing measures

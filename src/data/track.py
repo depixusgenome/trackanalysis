@@ -163,12 +163,12 @@ class Track:
         return self.__setter('_framerate', val)
 
     @property
-    def fov(self) -> np.ndarray:
+    def fov(self) -> FoV:
         "returns the FoV"
         return self.__getter('_fov')
 
     @fov.setter
-    def fov(self, val) -> np.ndarray:
+    def fov(self, val) -> FoV:
         "returns the FoV"
         return self.__setter('_fov', val)
 

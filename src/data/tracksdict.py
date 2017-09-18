@@ -27,6 +27,7 @@ class TracksDict(dict):
     requires defining a group which will be used as the key.
     """
     __SCAN_OPTS = ('cgrdir',)
+    _TRACK_TYPE = Track
     def __init__(self,          # pylint: disable=too-many-arguments
                  tracks  = None,
                  grs     = None,
@@ -36,11 +37,16 @@ class TracksDict(dict):
         super().__init__()
         self.update(tracks = tracks, grs = grs, match = match, allaxes = allaxes, **kwa)
 
-    @staticmethod
-    def _newtrack(**kwa):
-        return Track(**kwa)
+    @classmethod
+    def _newtrack(cls, **kwa):
+        return cls._TRACK_TYPE(**kwa)
 
     def _set(self, key, val, allaxes = False):
+        # pylint: disable=unidiomatic-typecheck
+        if type(val) is self._TRACK_TYPE and not allaxes:
+            super().__setitem__(key, val)
+            return
+
         if isinstance(val, (str, Path, tuple, list, set)):
             state = dict(path = val)
         elif isinstance(val, dict):

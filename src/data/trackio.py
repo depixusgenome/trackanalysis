@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # pylint: disable=arguments-differ
-u"Loading and save tracks"
-from    typing      import (Sequence, Callable,
-                            Any, Union, Tuple, Optional, Iterator, Dict,
-                            TYPE_CHECKING)
+"Loading and save tracks"
+from    typing      import (Sequence, Callable, Any, Union, Tuple, Optional,
+                            Iterator, Dict, cast, overload, TYPE_CHECKING)
 from    itertools   import chain
 from    inspect     import signature
+from    copy        import copy as shallowcopy
 import  pickle
 import  re
 from    functools   import wraps, partial
@@ -15,7 +15,9 @@ import  numpy       as     np
 
 from    legacy      import readtrack, readgr # pylint: disable=import-error,no-name-in-module
 if TYPE_CHECKING:
-    from data.track import Track  # pylint: disable=unused-import
+    # pylint: disable=unused-import
+    from data.track      import Track
+    from data.tracksdict import TracksDict
 
 PATHTYPE  = Union[str, Path]
 PATHTYPES = Union[PATHTYPE,Tuple[PATHTYPE,...]]
@@ -54,40 +56,46 @@ def _checktype(fcn):
 class _TrackIO:
     @staticmethod
     def check(path, **_):
-        u"checks the existence of a path"
+        "checks the existence of a path"
         raise NotImplementedError()
 
     @staticmethod
     def open(path, **_):
-        u"opens a track file"
+        "opens a track file"
         raise NotImplementedError()
 
 class PickleIO(_TrackIO):
-    u"checks and opens pickled paths"
+    "checks and opens pickled paths"
     @staticmethod
     @_checktype
     def check(path:PATHTYPE, **_) -> Optional[PATHTYPE]:
-        u"checks the existence of a path"
+        "checks the existence of a path"
         return path if Path(path).suffix == ".pk" else None
 
     @staticmethod
     def open(path:PATHTYPE, **_) -> dict:
-        u"opens a track file"
-        with open(str(path), 'rb') as stream:
+        "opens a track file"
+        with open(path, 'rb') as stream:
             return pickle.load(stream)
 
+    @classmethod
+    def save(cls, path: PATHTYPE, track: 'Track'):
+        "saves a track file"
+        with open(path, 'wb') as stream:
+            return pickle.dump(Handler.todict(track), stream)
+
 class LegacyTrackIO(_TrackIO):
-    u"checks and opens legacy track paths"
+    "checks and opens legacy track paths"
     __TRKEXT = '.trk'
     @classmethod
     @_checktype
     def check(cls, path:PATHTYPE, **_) -> Optional[PATHTYPE]: # type: ignore
-        u"checks the existence of a path"
+        "checks the existence of a path"
         return path if Path(path).suffix == cls.__TRKEXT else None
 
     @staticmethod
     def open(path:PATHTYPE, **kwa) -> dict:
-        u"opens a track file"
+        "opens a track file"
         axis = kwa.pop('axis', 'Z')
         axis = getattr(axis, 'value', axis)[0]
         return readtrack(str(path), kwa.pop('notall', True), axis)
@@ -104,7 +112,7 @@ class LegacyTrackIO(_TrackIO):
         yield from (i for i in chain.from_iterable(_glob(fcn(str(k))) for k in trkdirs))
 
 class LegacyGRFilesIO(_TrackIO):
-    u"checks and opens legacy GR files"
+    "checks and opens legacy GR files"
     __TRKEXT = '.trk'
     __GREXT  = '.gr'
     __CGREXT = '.cgr'
@@ -117,7 +125,7 @@ class LegacyGRFilesIO(_TrackIO):
     def check(cls, # type: ignore
               apaths:Tuple[PATHTYPE,...],
               **kwa) -> Optional[Tuple[PATHTYPE,...]]:
-        u"checks the existence of paths"
+        "checks the existence of paths"
         if len(apaths) < 2:
             return None
 
@@ -146,7 +154,7 @@ class LegacyGRFilesIO(_TrackIO):
 
     @classmethod
     def open(cls, paths:Tuple[PATHTYPE,PATHTYPE], **kwa) -> dict: # type: ignore
-        u"opens the directory"
+        "opens the directory"
         output = LegacyTrackIO.open(paths[0], **kwa)
         if output is None:
             raise IOError(f"Could not open track '{paths[0]}'.\n"
@@ -218,7 +226,7 @@ class LegacyGRFilesIO(_TrackIO):
 
     @classmethod
     def __update(cls, path:str, output:dict) -> int:
-        u"verifies one gr"
+        "verifies one gr"
         grdict = readgr(path)
         tit    = cls.__TITLE.match(grdict['title'].decode("utf8", "replace"))
 
@@ -327,7 +335,7 @@ class LegacyGRFilesIO(_TrackIO):
 _CALLERS = _TrackIO.__subclasses__()
 
 class Handler:
-    u"A handler for opening the provided path"
+    "A handler for opening the provided path"
     def __init__(self, path: str, handler: Any) -> None:
         self.path    = path
         self.handler = handler
@@ -365,8 +373,20 @@ class Handler:
         return track
 
     @classmethod
+    def todict(cls, track: 'Track') -> Dict[str, Any]:
+        "the oposite of __call__"
+        data = dict(track.data)
+        for i in ('phases', 'framerate'):
+            data[i]= getattr(track, i)
+        data['fov']          = track.fov.image
+        data['dimensions']   = track.fov.dim
+        data['positions']    = {i: j.position for i, j in track.fov.beads.items()}
+        data['calibrations'] = {i: j.image    for i, j in track.fov.beads.items()}
+        return data
+
+    @classmethod
     def check(cls, track, **opts) -> 'Handler':
-        u"""
+        """
         Checks that a path exists without actually opening the track.
 
         It raises an IOError in case the provided path does not exist or
@@ -419,7 +439,7 @@ class Handler:
                                 if i in kwargs}
 
 def checkpath(track, **opts) -> Handler:
-    u"""
+    """
     Checks that a path exists without actually opening the track.
 
     It raises an IOError in case the provided path does not exist or
@@ -430,5 +450,41 @@ def checkpath(track, **opts) -> Handler:
     return Handler.check(track, **opts)
 
 def opentrack(track, beadsonly = False):
-    u"Opens a track depending on its extension"
+    "Opens a track depending on its extension"
     checkpath(track)(track, beadsonly)
+
+@overload
+def savetrack(path: PATHTYPE, track: 'Track') -> 'Track': # pylint: disable=unused-argument
+    "saves a track"
+    pass
+
+@overload
+def savetrack(path  : PATHTYPE,             # pylint: disable=unused-argument,function-redefined
+              track : 'TracksDict'          # pylint: disable=unused-argument
+             ) -> 'TracksDict':
+    "saves a tracksdict"
+    pass
+
+def savetrack(path  : PATHTYPE,     # pylint: disable=unused-argument,function-redefined
+              track : Union['Track', Dict[str,'Track']]
+             ) -> Union['Track', Dict[str,'Track']]:
+    "Saves a track"
+    if isinstance(track, (str, Path)):
+        path, track = track, path
+
+    if isinstance(track, dict):
+        root = Path(path)
+        root.mkdir(parents=True, exist_ok=True)
+
+        new = shallowcopy(track)
+        new.update({key: savetrack((root/key).with_suffix(".pk"), trk)
+                    for key, trk in cast(dict, track).items()})
+
+    else:
+        PickleIO.save(path, cast('Track', track))
+
+        new = type(track).__new__(type(track)) # type: ignore
+        new.__dict__.update(shallowcopy(track.__dict__))
+        setattr(new, '_path', path)
+
+    return new

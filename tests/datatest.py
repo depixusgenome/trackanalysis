@@ -4,12 +4,16 @@ u""" Tests data access """
 from   pathlib      import Path
 from   itertools    import product
 from   typing       import cast # pylint: disable=unused-import
+import tempfile
 import numpy as np
+from   numpy.testing    import assert_equal
 
 from   legacy           import readtrack   # pylint: disable=import-error,no-name-in-module
 import data
 from   data.views       import ITrackView
-from   data.trackio     import LegacyGRFilesIO
+from   data.trackio     import LegacyGRFilesIO, savetrack
+from   data.track       import FoV
+from   data.tracksdict  import TracksDict
 from   testingcore      import path as utpath
 
 # pylint: disable=missing-docstring,protected-access
@@ -127,7 +131,6 @@ def test_cycles_mixellipsisnumbers():
 
     assert (tuple(beads()[np.arange(5), [3, 5]].selected)
             == tuple(product(range(5), [3, 5])))
-
 
 def test_cycles_cancyclefromcycle():
     u"A cycle can contain a cycle as data"
@@ -254,5 +257,44 @@ def test_scancgr():
                          directory/'CTGT_selection'),)
     assert len(trks) == len(tuple(Path(directory).glob("*.trk"))) - len(pairs)
 
+def test_trktopk():
+    "tests conversion to pk"
+    trk   = data.Track(path = utpath("big_legacy"))
+    fname = tempfile.mktemp()+".pk"
+
+    new   = savetrack(fname, trk)
+    for key, val in trk._data.items():
+        assert new._data[key] is val
+
+    assert new.fov is trk.fov
+    assert str(new._path) == fname
+    assert new.framerate == trk.framerate
+    assert new.phases is trk.phases
+
+    trk = data.Track(path = fname)
+    trk.data # pylint: disable=pointless-statement
+    for key, val in trk._data.items():
+        assert_equal(new._data[key], val)
+    assert new.framerate == trk.framerate
+    assert_equal(new.phases, trk.phases)
+
+    new = cast(FoV, new.fov)
+    fov = cast(FoV, trk.fov)
+    # pylint: disable=no-member
+    assert_equal(new.image, fov.image)
+    assert list(new.dim) == list(fov.dim)
+    for i, j in new.beads.items():
+        assert list(j.position) == list(fov.beads[i].position)
+        assert_equal(j.image, fov.beads[i].image)
+
+    fname = tempfile.mktemp()
+    trk = TracksDict()
+    trk['i'] = utpath("big_legacy")
+    new      = savetrack(fname, trk)
+
+    assert list(new.keys()) == ['i']
+    assert new['i'].path == (Path(fname)/"i").with_suffix(".pk")
+    assert (Path(fname)/"i").with_suffix(".pk").exists()
+
 if __name__ == '__main__':
-    test_scancgr()
+    test_trktopk()

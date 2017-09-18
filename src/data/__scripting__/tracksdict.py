@@ -3,15 +3,16 @@
 """
 Adds a dictionnaries to access tracks, experiments, ...
 """
-from typing                 import Tuple, Iterator, List, Type, cast
+from   typing               import Tuple, Iterator, List, Type, cast
 import sys
 import pickle
 
-from utils                  import initdefaults
-from model                  import Level, Task
+from   utils                import initdefaults
+from   model                import Level, Task
 
-from .track                 import Track
-from ..tracksdict           import TracksDict as _TracksDict
+from   .track               import Track
+from   ..trackio            import savetrack, PATHTYPE
+from   ..tracksdict         import TracksDict as _TracksDict
 
 Tasks: Type = sys.modules['model.__scripting__'].Tasks
 
@@ -30,6 +31,7 @@ class TracksDict(_TracksDict):
     By default, the name of the track file is used as the key. Using the *match*
     requires defining a group which will be used as the key.
     """
+    _TRACK_TYPE = Track
     def __init__(self,          # pylint: disable=too-many-arguments
                  tracks  = None,
                  grs     = None,
@@ -39,10 +41,6 @@ class TracksDict(_TracksDict):
                  **kwa):
         super().__init__(tracks, grs, match, allaxes, **kwa)
         self.tasks = tasks
-
-    @staticmethod
-    def _newtrack(**kwa):
-        return Track(**kwa)
 
     def __getitem__(self, key):
         if isinstance(key, list):
@@ -62,6 +60,10 @@ class TracksDict(_TracksDict):
         other = type(self)(tasks = tasks)
         other.update(self)
         return other
+
+    def save(self, path: PATHTYPE) -> 'TracksDict':
+        "saves the data to a directory"
+        return savetrack(path, self)
 
 class ExperimentList(dict):
     "Provides access to keys belonging to a single experiment"
