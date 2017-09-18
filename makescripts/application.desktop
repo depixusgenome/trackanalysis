@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Encoding=UTF-8
+Name=CyclesApp_v4.4
+Comment= Data Treatment.
+Exec=bash /home/biology/depixus/CyclesApp/v4.4/hybridstat.sh '%f'
+Categories=DataVisualization;NumericalAnalysis;Physics;GTK;
+MimeType=application/x-xv-track
+Terminal=true
+Icon=/home/biology/depixus/CyclesApp/v4.4/index.gif

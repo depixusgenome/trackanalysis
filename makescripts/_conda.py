@@ -5,7 +5,7 @@ import sys
 from pathlib    import Path
 from itertools  import chain
 from zipfile    import ZipFile
-from shutil     import rmtree
+from shutil     import rmtree, copy2
 import py_compile
 
 from waflib         import Logs
@@ -54,8 +54,11 @@ class _CondaApp(BuildContext):
     def make_startup_script(self, name, val):
         "creates the startup script"
         iswin = sys.platform.startswith("win")
-        ext   = ".bat"                         if iswin else ".sh"
-        cmd   = r"start /min %~dp0pythonw -I " if iswin else r"./bin/python"
+        ext   = ".bat"                          if iswin else ".sh"
+        cmd   = (r"start /min %~dp0pythonw -I " if iswin else
+                 r'IR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"\n'
+                 r'cd $DIR\n'
+                 r'./bin/python')
         for optext, opts in (('', ''), ('_chrome', ' --electron')):
             fname = str(self.options.STARTSCRIPT_PATH.make_node(name+optext+ext))
             with open(fname, 'w', encoding = 'utf-8') as stream:
@@ -128,8 +131,17 @@ class _CondaApp(BuildContext):
         for itm in path.glob("*.js"):
             itm.rename(out/itm.relative_to(path))
 
-    @classmethod
-    def __final(cls, mods):
+    def __copy_gif(self, path):
+        src = self.srcnode.find_resource('makescripts/index.gif')
+        tgt = path/"index.gif"
+        copy2(src.abspath(), tgt)
+
+        if not sys.platform.startswith("win"):
+            src = self.srcnode.find_resource('makescripts/application.desktop')
+            tgt = path/"application.desktop"
+            copy2(src.abspath(), tgt)
+
+    def __final(self, mods):
         path  = Path("build")/"OUTPUT_PY"
         iswin = sys.platform.startswith("win")
         dll   = '.cp*-win*.pyd' if iswin else '.cpython-*.so'
@@ -141,14 +153,15 @@ class _CondaApp(BuildContext):
 
         out = Path("build")/"OUTPUT"
         if len(zips):
-            cls.__zip_files(path, out, zips)
+            self.__zip_files(path, out, zips)
 
-        cls.__move_files([i for i in mods if i not in zips], out, path, dll)
+        self.__move_files([i for i in mods if i not in zips], out, path, dll)
 
         final = Path(".")/wafbuilder.git.version()
         if final.exists():
             rmtree(str(final))
         wafbuilder.os.rename(str(out), str(final))
+        self.__copy_gif(final)
         rmtree(str(path))
 
     def build_app(self):
