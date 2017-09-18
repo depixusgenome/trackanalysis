@@ -43,14 +43,12 @@ Added an automated cleaning process. A *cleaning* tab is available which display
 which data points or cycles are missing. The criteria are:
 
 1. For removing single data points:
-
     * |z - median(z)| > 5.
     * |dz/dt| > 2.
     * constant intervals: |z[n] - z[n+1]| < 1e-6 and |z[n] == z[n+2]| ...
-    In such a case, only the first point is kept.
+      In such a case, only the first point is kept.
 
 2. For removing cycles:
-
     * percentage of good data points < 80
     * max(z) < min(z) + 0.5
     * values are constant: σ[HF] < 1e-4
@@ -214,7 +212,6 @@ There are 3 tabs:
 2. Cycles: displays cycles as in the 1st version
 3. Peaks: A histogram of events is shown, similar to cycles tab, but using a
    gaussian kernel on the position. This allows peak detection:
-
     * The x-axis is the percentage of cycles when an event is detected (bottom)
       and their average duration (top).
     * The y-axis is the position of events in nm (left) or base number (right).
