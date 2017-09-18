@@ -3,7 +3,7 @@
 """
 Adds a dictionnaries to access tracks, experiments, ...
 """
-from typing                 import Tuple, Iterator, List, Type
+from typing                 import Tuple, Iterator, List, Type, cast
 import sys
 import pickle
 
@@ -45,8 +45,12 @@ class TracksDict(_TracksDict):
         return Track(**kwa)
 
     def __getitem__(self, key):
+        if isinstance(key, list):
+            return super().__getitem__(key)
+
         if isinstance(key, (Task, Tasks)):
             return self.apply(key)
+
         if isinstance(key, tuple) and all(isinstance(i, (Task, Tasks)) for i in key):
             return self.apply(*key)
 
@@ -73,7 +77,7 @@ class ExperimentList(dict):
         vals = None
         for key in keys:
             tmp  = frozenset(self.tracks[key].beadsonly.keys())
-            vals = tmp if vals is None else vals & tmp
+            vals = tmp if vals is None else cast(frozenset, vals) & tmp
         self.__setitem__(keys, vals)
         return vals
 

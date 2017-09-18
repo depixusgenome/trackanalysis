@@ -5,6 +5,7 @@ Adds a dictionnaries to access tracks, experiments, ...
 """
 from typing                 import KeysView, List, Dict
 from pathlib                import Path
+from copy                   import copy as shallowcopy
 import re
 
 from .track                 import Track
@@ -58,6 +59,14 @@ class TracksDict(dict):
 
     def __setitem__(self, key, val):
         return self._set(key, val)
+
+    def __getitem__(self, key):
+        if isinstance(key, list):
+            other = shallowcopy(self)
+            for i in set(other)-set(key):
+                other.pop(i)
+            return other
+        return super().__getitem__(key)
 
     @staticmethod
     def scangrs(grdirs, **opts) -> Dict[str, Path]:
