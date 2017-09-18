@@ -58,7 +58,7 @@ class _AProcessor(Processor):
 
             return lambda i: i.new().withdata(_fcn)
 
-        def _act(info):
+        def _act(_, info):
             cls.DONE_NORM.append((cnf['name'], info[0]))
             info[1].append((os.getpid(), cnf['name']))
             return info
