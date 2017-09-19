@@ -371,7 +371,9 @@ class Handler:
         if track is None:
             return Track(**res)
 
-        track.__setstate__(res)
+        state = track.__getstate__()
+        state.update(res)
+        track.__setstate__(state)
         return track
 
     @classmethod
