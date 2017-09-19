@@ -3,7 +3,7 @@
 "Simpler PeaksDict detection: merging and selecting the sections in the signal detected as flat"
 import sys
 from   typing                       import (Union, Iterator, Iterable, Type,
-                                            Callable, cast)
+                                            Callable, Tuple, cast)
 from   copy                         import copy as shallowcopy
 
 import pandas                       as     pd
@@ -16,7 +16,8 @@ from eventdetection.data            import Events
 from model                          import PHASE
 from data                           import Track
 from ..selector                     import PeakSelectorDetails
-from ..processor                    import PeaksDict, Probability, Output
+from ..probabilities                import Probability
+from ..data                         import PeaksDict, PeakOutput
 
 Tasks:           Type     = sys.modules['model.__scripting__'].Tasks
 defaulttasklist: Callable = sys.modules['data.__scripting__'].defaulttasklist
@@ -25,7 +26,7 @@ defaulttasklist: Callable = sys.modules['data.__scripting__'].defaulttasklist
 @property
 def peaks(self) -> PeaksDict:
     "returns peaks found"
-    return self.apply(*defaulttasklist(self.path, Tasks.peakselector))
+    return self.apply(*defaulttasklist(self.path, Tasks.peakselector, self.cleaned))
 
 class Detailed:
     "Deals with easy acccess to peaks data"
@@ -44,12 +45,12 @@ class Detailed:
     ids         = property(lambda self: self.details.id)
 
     @property
-    def output(self) -> Iterator[Output]:
+    def output(self) -> Iterator[PeakOutput]:
         "yields results from precomputed details"
         return self.frame.config.details2output(self.details)
 
     @property
-    def probabilities(self) -> Iterator[Probability]:
+    def probabilities(self) -> Iterator[Tuple[float, Probability]]:
         "yields results from precomputed details"
         trk  = self.frame.track
 
@@ -93,7 +94,7 @@ def detailed(self, ibead, precision: float = None) -> Union[Iterator[Detailed], 
     if isinstance(self.data, PeaksDict):
         if self.actions:
             raise NotImplementedError()
-        return self.data.detailed(ibead, precision)
+        return self.data.detailed(ibead, precision) # type: ignore
     evts = iter(i for _, i in self.data[ibead,...])
     return Detailed(self, self.config.detailed(evts, prec))
 

@@ -12,6 +12,7 @@ We add some methods and change the default behaviour:
         * a *rawprecision* method is added
 """
 import sys
+from typing                 import Tuple # pylint:disable=unused-import
 from pathlib                import Path
 from itertools              import product
 
@@ -25,6 +26,7 @@ scriptapp = sys.modules['app.__scripting__'].scriptapp # pylint: disable=invalid
 
 class Track(_Track):
     "Adding helper functions for simple calls"
+    cleaned = False
     def __init__(self, path = None, **kwa):
         cnf = scriptapp.control.getGlobal('css').last.path.trk
         if path in (Ellipsis, 'prev', ''):
@@ -39,6 +41,7 @@ class Track(_Track):
             cnf.set(path)
             scriptapp.control.writeuserconfig()
         super().__init__(path = path, **kwa)
+        self.cleaned = kwa.get('cleaned', type(self).cleaned)
 
 @addto(_Track)
 def grfiles(self):
@@ -74,10 +77,10 @@ def apply(self, *args, copy = True, beadsonly = True):
     "returns an iterator over the result of provided tasks"
     return next(iter(self.processors(*args, beadsonly = beadsonly).run(copy = copy)))
 
-def defaulttasklist(paths, upto):
+def defaulttasklist(paths, upto, cleaned:bool):
     "Returns a default task list depending on the type of raw data"
-    tasks = (Tasks.eventdetection, Tasks.peakselector)
-    if isinstance(paths, (str, Path)) or len(paths) == 1:
+    tasks = (Tasks.eventdetection, Tasks.peakselector) # type: Tuple
+    if (not cleaned) and (isinstance(paths, (str, Path)) or len(paths) == 1):
         tasks = (Tasks.cleaning, Tasks.alignment)+tasks
     return (tasks if upto is None       else
             ()    if upto not in tasks  else
@@ -87,7 +90,7 @@ def defaulttasklist(paths, upto):
 @property
 def cleancycles(self):
     "returns cleaned cycles"
-    return self.apply(*defaulttasklist(self.path, Tasks.alignment))[...,...]
+    return self.apply(*defaulttasklist(self.path, Tasks.alignment, self.cleaned))[...,...]
 
 @addto(_Track) # type: ignore
 @property

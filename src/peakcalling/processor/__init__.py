@@ -5,3 +5,4 @@ from .fittohairpin   import (FitBead, FitToHairpinTask, FitToHairpinProcessor,
                              DistanceConstraint, Constraints, FitToHairpinDict)
 from .beadsbyhairpin import (ByHairpinBead, ByHairpinGroup, BeadsByHairpinTask,
                              BeadsByHairpinProcessor)
+from .dataframe      import FitsDataFrameFactory

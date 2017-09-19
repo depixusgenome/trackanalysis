@@ -65,6 +65,17 @@ class TracksDict(_TracksDict):
         "saves the data to a directory"
         return savetrack(path, self)
 
+    @property
+    def cleaned(self):
+        "wether all tracks are cleaned"
+        return all(i.cleaned for i in self.values())
+
+    @cleaned.setter
+    def cleaned(self, value):
+        "sets tracks to cleaned"
+        for i in self.values():
+            i.cleaned = value
+
 class ExperimentList(dict):
     "Provides access to keys belonging to a single experiment"
     tracks : dict                 = TracksDict()

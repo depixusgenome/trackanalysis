@@ -1,27 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"Updating PeaksDict for scripting purposes"
+"Updating FitToHairpinDict for scripting purposes"
 import sys
-from   typing                   import List, Type, Callable
-from   copy                     import deepcopy, copy as shallowcopy
-import numpy                    as np
-import pandas                   as pd
-from   utils.decoration         import addto
-from   data                     import Track
-from   peakfinding.processor    import PeaksDict
-from   ..toreference            import HistogramFit, ChiSquareHistogramFit
-from   ..processor              import FitToHairpinDict
+from   typing                           import List, Callable
+from   copy                             import copy as shallowcopy
+import pandas                           as pd
+from   utils.decoration                 import addto
+from   data                             import Track
+from   control.processor.dataframe      import DataFrameProcessor
+from   ..toreference                    import HistogramFit, ChiSquareHistogramFit
+from   ..processor                      import FitToHairpinDict
 
-Tasks:           Type     = sys.modules['model.__scripting__'].Tasks
+Tasks:           type     = sys.modules['model.__scripting__'].Tasks
 defaulttasklist: Callable = sys.modules['data.__scripting__'].defaulttasklist
 
-def _fit(self, tpe, sequence, oligos, kwa) -> PeaksDict:
+def _fit(self, tpe, sequence, oligos, kwa):
     "computes hairpin fits"
     if None not in (sequence, oligos):
         kwa['sequence'] = sequence
         kwa['oligos']   = oligos
 
-    tasks = defaulttasklist(self.path, None)+ (getattr(Tasks, tpe)(**kwa),) # type: tuple
+    tasks = (defaulttasklist(self.path, None, self.cleaned)
+             +(getattr(Tasks, tpe)(**kwa),))
     if len(tasks[-1].distances) == 0:
         raise IndexError('No distances found')
     return self.apply(*tasks)
@@ -45,35 +45,10 @@ def beadsbyhairpin(self, sequence, oligos, **kwa):
     return _fit(self, 'beadsbyhairpin', sequence, oligos, kwa)
 
 @addto(FitToHairpinDict)
-def dataframe(self, conversion = 'best') -> pd.DataFrame:
-    "converts to a pandas dataframe"
-    def _cnv(_, info):
-        cnt   = 0
-        items = [[], [], [], [], [], []]
-        res   = info[1]
-        for (peak, evts), dna in zip(PeaksDict.measure(deepcopy(res.events)),
-                                     res.peaks):
-            vals = [i for i in enumerate(evts) if i[1] is not None]
-            dna  = dna[1] if dna[1] >= 0 else np.NaN
-
-            items[2].append([i for i, _ in vals])
-            items[3].append(np.full(len(vals), peak, dtype = 'f4'))
-            items[4].append(np.full(len(vals), dna,  dtype = 'f4'))
-            items[5].append([i for _, i in vals])
-            cnt += len(vals)
-
-
-        key = min(res.distances, key = lambda x: res.distances[x].value)
-        items[0].append(np.full(cnt, key))
-        items[1].append(np.full(cnt, info[0]))
-
-        names = ('hpin', 'bead', 'cycle', 'peak', 'dnapeak', 'event')
-        data  = pd.DataFrame(dict(zip(names, (np.concatenate(i) for i in items))))
-
-        dist  = res.distances[key if conversion == 'best' else conversion]
-        data.insert(4, 'dnaevent', (data.event-dist.bias)*dist.stretch)
-        data.insert(4, 'distance', data.dnaevent-data.dnapeak)
-        return info[0], data
-    return pd.concat([i for _, i in shallowcopy(self).withaction(_cnv)])
+def dataframe(self, **kwa) -> pd.DataFrame:
+    """
+    converts to a pandas dataframe.
+    """
+    return DataFrameProcessor.apply(shallowcopy(self), measures = kwa, merge = True)
 
 __all__: List[str] = ['HistogramFit', 'ChiSquareHistogramFit']

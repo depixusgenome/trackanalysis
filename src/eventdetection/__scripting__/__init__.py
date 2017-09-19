@@ -21,7 +21,7 @@ defaulttasklist: Callable = sys.modules['data.__scripting__'].defaulttasklist
 @property
 def events(self) -> Events:
     "returns events in phase 5 only"
-    return self.apply(*defaulttasklist(self.path, Tasks.eventdetection))
+    return self.apply(*defaulttasklist(self.path, Tasks.eventdetection, self.cleaned))
 
 _RETURN_TYPE = FrozenSet[Tuple[int, int]]
 class Comparator:
