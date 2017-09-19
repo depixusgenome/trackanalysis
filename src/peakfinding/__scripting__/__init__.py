@@ -3,7 +3,7 @@
 "Simpler PeaksDict detection: merging and selecting the sections in the signal detected as flat"
 import sys
 from   typing                       import (Union, Iterator, Iterable, Type,
-                                            Callable, Tuple, cast)
+                                            Callable, Tuple, List, cast)
 from   copy                         import copy as shallowcopy
 
 import pandas                       as     pd
@@ -121,3 +121,5 @@ def dataframe(self, **kwa) -> pd.DataFrame:
 
     """
     return DataFrameProcessor.apply(shallowcopy(self), measures = kwa, merge = True)
+
+__all__: List[str] = []

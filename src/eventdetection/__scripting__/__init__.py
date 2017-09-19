@@ -4,7 +4,7 @@
 Adds shortcuts for using Events
 """
 import sys
-from   typing                       import Tuple, Callable, FrozenSet, Type
+from   typing                       import Tuple, Callable, FrozenSet, Type, List
 from   copy                         import copy as shallowcopy
 import numpy                        as     np
 import pandas                       as     pd
@@ -129,3 +129,5 @@ def dataframe(self, **kwa) -> pd.DataFrame:
 
 setattr(Events, 'any', property(lambda self: Comparator(self, any), doc = Comparator.__doc__))
 setattr(Events, 'all', property(lambda self: Comparator(self, all), doc = Comparator.__doc__))
+
+__all__: List[str] = []
