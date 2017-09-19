@@ -9,8 +9,7 @@ from   typing           import Tuple, Union, List, TypeVar, Hashable, cast
 import numpy            as     np
 
 from   utils            import isfunction
-from   ._dict           import (TRACK_VIEW, # pylint: disable=protected-access
-                                TransformedTrackView, _m_ALL, _m_INTS, isellipsis)
+from   ._dict           import TRACK_VIEW, TransformedTrackView, isint, isellipsis
 
 def _m_copy(_, item):
     "Copies the data"
@@ -58,8 +57,8 @@ class TrackViewConfigMixin: # pylint: disable=invalid-name
         "returns whether the key is one for a bead"
         return ((isinstance(key, tuple)
                  and len(key) > 0
-                 and isinstance(key[0], _m_INTS)
-                ) or isinstance(key,    _m_INTS))
+                 and isint(key[0])
+                ) or isint(key))
 
     def withbeadsonly(self:CSelf, beadsonly = True) -> CSelf:
         "discards all but beads"
@@ -155,7 +154,7 @@ class TrackViewConfigMixin: # pylint: disable=invalid-name
         return self.__selection('discarded', cyc, clear)
 
     def __selection(self:CSelf, attr, cyc, clear) -> CSelf:
-        if not isinstance(cyc, List) and cyc in _m_ALL:
+        if not isinstance(cyc, List) and isellipsis(cyc):
             setattr(self, attr, None)
             return self
 

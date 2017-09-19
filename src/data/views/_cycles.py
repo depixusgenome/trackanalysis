@@ -8,9 +8,11 @@ from   copy   import copy as shallowcopy
 import numpy  as     np
 
 from   utils  import initdefaults, isfunction
-from   ._dict import (BEADKEY, CYCLEKEY, # pylint: disable=unused-import,protected-access
-                      isellipsis, _m_INTS, _m_NONE, _m_ALL)
+from   ._dict import (BEADKEY, CYCLEKEY,       # pylint: disable=unused-import
+                      isellipsis, isint)
 from   ._view import TrackView, ITrackView, Level
+
+_m_NONE  = type('_m_NONE', (), {})             # pylint: disable=invalid-name
 
 class Cycles(TrackView, ITrackView):
     """
@@ -54,26 +56,24 @@ class Cycles(TrackView, ITrackView):
 
         isbead = self.track.beads.isbead
         for thisid in sel:
-            if isinstance(thisid, (tuple, list)):
-                bid, tmp = thisid[0], thisid[1] # type: BEADKEY, Any
-                if bid in _m_ALL and tmp in _m_ALL:
-                    thisid = ...
-                elif bid in _m_ALL:
-                    thisid = tmp
-                elif beadsonly and not isbead(bid):
-                    continue
-                elif tmp in _m_ALL:
-                    yield from ((bid, cid) for cid in allcycles)
-                    continue
-                else:
-                    yield (bid, tmp)
-                    continue
-
-            if thisid in _m_ALL:
+            if isellipsis(thisid):
                 yield from ((col, cid) for col in beads for cid in allcycles)
 
+            elif np.isscalar(thisid):
+                yield from ((thisid, cid) for cid in allcycles)
+
             else:
-                yield from ((col, thisid) for col in beads)
+                bid, tmp = thisid[0], thisid[1] # type: BEADKEY, Any
+                if isellipsis(bid) and isellipsis(tmp):
+                    yield from ((col, cid) for col in beads for cid in allcycles)
+                elif isellipsis(bid):
+                    yield from ((bid, tmp) for bid in beads)
+                elif beadsonly and not isbead(bid):
+                    continue
+                elif isellipsis(tmp):
+                    yield from ((bid, cid) for cid in allcycles)
+                else:
+                    yield (bid, tmp)
 
     def __keysdirect(self, sel, beadsonly):
         if beadsonly:
@@ -86,24 +86,20 @@ class Cycles(TrackView, ITrackView):
 
         keys = list(self.data.keys())
         for thisid in sel:
-            if isinstance(thisid, (tuple, list)):
+            if isellipsis(thisid):
+                yield from keys
+            elif np.isscalar(thisid):
+                yield from (i for i in keys if i[0] == thisid)
+            else:
                 bid, tmp = thisid[0], thisid[1] # type: BEADKEY, Any
-                if bid in _m_ALL and tmp in _m_ALL:
-                    thisid = ...
-                elif bid in _m_ALL:
-                    thisid = tmp
-                elif tmp in _m_ALL:
+                if isellipsis(bid) and isellipsis(tmp):
+                    yield from keys
+                elif isellipsis(bid):
+                    yield from (i for i in keys if i[1] == tmp)
+                elif isellipsis(tmp):
                     yield from (i for i in keys if i[0] == bid)
-                    continue
                 else:
                     yield (bid, tmp)
-                    continue
-
-            if thisid in _m_ALL:
-                yield from keys
-
-            else:
-                yield from (i for i in keys if i[1] == thisid)
 
     def _keys(self, sel, beadsonly) -> Iterable[CYCLEKEY]:
         if isinstance(self.data, Cycles):
@@ -194,9 +190,9 @@ class Cycles(TrackView, ITrackView):
         vect = self.track.phases
         if isellipsis(cid) and isellipsis(pid):
             return vect         - vect[:,0]
-        if cid in _m_ALL:
+        if isellipsis(cid):
             return vect[:,pid]  - vect[:,0]
-        if pid in _m_ALL:
+        if isellipsis(pid):
             return vect[cid,:]  - vect[cid,0]
         return vect[cid,pid]- vect[cid,0]
 
@@ -217,7 +213,7 @@ class Cycles(TrackView, ITrackView):
     @staticmethod
     def isbead(key:CYCLEKEY) -> bool:
         "returns whether the key is one for a bead"
-        return isinstance(key[0], _m_INTS)
+        return isint(key[0])
 
     if TYPE_CHECKING:
         # pylint: disable=useless-super-delegation

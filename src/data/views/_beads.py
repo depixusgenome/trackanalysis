@@ -5,8 +5,7 @@ from   typing import (TYPE_CHECKING, Iterator, Optional, Sequence, Tuple,
                       Union, cast)
 from   copy   import copy as shallowcopy
 import numpy  as     np
-from   ._dict import (BEADKEY, # pylint: disable=protected-access
-                      isellipsis, _m_INTS)
+from   ._dict import BEADKEY, isellipsis, isint
 from   ._view import TrackView, ITrackView, Level
 
 class Beads(TrackView, ITrackView):
@@ -95,7 +94,7 @@ class Beads(TrackView, ITrackView):
     @staticmethod
     def isbead(key) -> bool:
         "returns whether the key is one for a bead"
-        return isinstance(key, _m_INTS)
+        return isint(key)
 
     def __withcycles(self, cyc) -> 'Beads':
         "specifies that only some cycles should be taken"

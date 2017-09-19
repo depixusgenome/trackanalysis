@@ -16,12 +16,11 @@ from    utils           import initdefaults
 from    signalfilter    import Filter
 
 Range   = NamedTuple('Range', [('start', int), ('values', np.ndarray)])
-_m_INTS = (int, cast(type, np.integer))
 
 class Profile(Sized):
     "A bead profile: the behaviour common to all stretches of data"
     def __init__(self, inter:Union[Sequence[Range], 'Profile', int]) -> None:
-        if isinstance(inter, _m_INTS):
+        if isinstance(inter, (int, cast(type, np.integer))):
             self.xmin: int = 0
             self.xmax: int = cast(int, inter)
         elif isinstance(inter, Profile):

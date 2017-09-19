@@ -79,7 +79,7 @@ def test_cycles_iterkeys():
     cycs  = lambda: data.Cycles(track = track, data = _MyItem(track.data))
     cids  = lambda _: {(i,_) for i in range(39)} | {('zmag', _), ('t', _)}
     bids  = lambda _: {(_,i) for i in range(102)}
-    assert len(tuple(cycs().selecting(0).keys()))  == len(cids(0))
+    assert len(tuple(cycs().selecting(0).keys()))  == len(bids(0))
     assert len(tuple(cycs()[:,0].keys()))          == len(cids(0))
     assert len(tuple(cycs()[...,0].keys()))        == len(cids(0))
     assert len(tuple(cycs()[...,0][1,...].keys())) == len({(1,0)})
@@ -89,7 +89,7 @@ def test_cycles_iterkeys():
     assert len(tuple(cycs()[0,2:5].keys()))        == len({i for i in bids(0) if 2<= i[1] < 5})
     assert len(tuple(cycs()['zmag',...].keys()))   == len(bids('zmag'))
 
-    assert set  (cycs().selecting(0).keys())     == cids(0)
+    assert set  (cycs().selecting(0).keys())     == bids(0)
     assert tuple(cycs().selecting((0,0)).keys()) == ((0,0),)
     assert set  (cycs()[:,0].keys())             == cids(0)
     assert set  (cycs()[...,0].keys())           == cids(0)
@@ -297,4 +297,4 @@ def test_trktopk():
     assert (Path(fname)/"i").with_suffix(".pk").exists()
 
 if __name__ == '__main__':
-    test_trktopk()
+    test_cycles_iterkeys()
