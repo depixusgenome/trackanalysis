@@ -3,13 +3,13 @@
 """
 Adds a dictionnaries to access tracks, experiments, ...
 """
-from typing                 import KeysView, List, Dict
+from typing                 import KeysView, List, Dict, Any, Iterator, Tuple, cast
 from pathlib                import Path
 from copy                   import copy as shallowcopy
 import re
 
 from .track                 import Track
-from .trackio               import LegacyGRFilesIO, LegacyTrackIO
+from .trackio               import LegacyGRFilesIO, LegacyTrackIO, PATHTYPES
 
 class TracksDict(dict):
     """
@@ -47,8 +47,13 @@ class TracksDict(dict):
             super().__setitem__(key, val)
             return
 
-        if isinstance(val, (str, Path, tuple, list, set)):
-            state = dict(path = val)
+        if isinstance(val, (tuple, list, set)) and len(val) == 1:
+            val = str(next(iter(val)))
+
+        if isinstance(val, (tuple, list, set)):
+            state = dict(path = [str(i) for i in val]) # type: Dict[str, Any]
+        elif isinstance(val, (str, Path)):
+            state = dict(path = str(val))
         elif isinstance(val, dict):
             state = val
         elif isinstance(val, Track):
@@ -89,13 +94,15 @@ class TracksDict(dict):
         if isinstance(match, str) or hasattr(match, 'match'):
             grp = True
             tmp = re.compile(match) if isinstance(match, str) else match
-            fcn = lambda i: tmp.match(str(i[0]))
+            fcn = lambda i: tmp.match(str(i if isinstance(i, (str, Path)) else i[0]))
         else:
             grp = False
-            fcn = lambda i: Path(str(i[0])).name if match is None else match
+            fcn = lambda i: (Path(str(i if isinstance(i, (str, Path)) else i[0])).name
+                             if match is None else match)
 
-        if grs is None:
-            itr = ((fcn((i,)), i) for i in LegacyTrackIO.scan(tracks))
+        if not grs:
+            itr = cast(Iterator[Tuple[Any, PATHTYPES]],
+                       ((fcn((i,)), i) for i in LegacyTrackIO.scan(tracks)))
         else:
             itr = ((fcn(i), i) for i in LegacyGRFilesIO.scan(tracks, grs, **opts)[0])
 
@@ -122,7 +129,7 @@ class TracksDict(dict):
             self._set(i, j, allaxes)
 
         if tracks is not None:
-            assert sum(i is None for i in (tracks, grs)) in (0, 2)
+            assert sum(i is None for i in (tracks, grs)) in (0, 1, 2)
             self.scan(tracks, grs, match, allaxes, **scan)
 
     def beads(self, *keys) -> List[int]:

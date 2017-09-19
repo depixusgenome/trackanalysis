@@ -108,7 +108,7 @@ class LegacyTrackIO(_TrackIO):
         trkdirs = tuple(str(i) for i in trkdirs)
 
         trk = cls.__TRKEXT
-        fcn = lambda i: i if i.endswith(trk) else i+'/**/*'+trk
+        fcn = lambda i: i if '*' in i or i.endswith(trk) else i+'/**/*'+trk
         yield from (i for i in chain.from_iterable(_glob(fcn(str(k))) for k in trkdirs))
 
 class LegacyGRFilesIO(_TrackIO):
@@ -295,7 +295,9 @@ class LegacyGRFilesIO(_TrackIO):
     def scan(cls,
              trkdirs: Union[str, Sequence[str]],
              grdirs:  Union[str, Sequence[str]],
-             matchfcn: Callable[[Path, Path], bool] = None, **opts):
+             matchfcn: Callable[[Path, Path], bool] = None,
+             **opts
+            ) -> Tuple[Tuple[PATHTYPES,...], Tuple[PATHTYPES,...], Tuple[PATHTYPES,...]]:
         """
         Scans for pairs
 
