@@ -66,7 +66,7 @@ class Histogram(PrecisionAlg):
                  bias     : BiasType = None,
                  separate : bool     = False,
                 ) -> Tuple[Iterator[np.ndarray], float, float]:
-        if isinstance(aevents, Iterable) and all(np.isscalar(i) for i in aevents):
+        if isinstance(aevents, (list, tuple)) and all(np.isscalar(i) for i in aevents):
             events = np.array(aevents, dtype = 'f4')[None].T[None]
         elif (isinstance(aevents, np.ndarray)
               and len(aevents.shape) == 1           # type: ignore

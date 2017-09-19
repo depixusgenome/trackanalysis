@@ -10,6 +10,7 @@ from    scipy.optimize              import fmin_cobyla
 import  numpy                       as     np
 
 from    utils                       import initdefaults
+from    eventdetection.data         import Events
 from    peakfinding.histogram       import Histogram, HistogramData
 from    peakfinding.probabilities   import Probability
 from    peakfinding.selector        import PeakSelectorDetails
@@ -36,8 +37,8 @@ class HistogramFit(GriddedOptimization):
     "Matching experimental peaks by correlating peak positions in the histograms"
     histogram    = Histogram(precision = 0.001, edge = 4)
     symmetry     = True
-    stretch      = Range(1., .05, .025)
-    bias         = Range(0,   .1, .05)
+    stretch      = Range(1., .05, .02)
+    bias         = Range(0,   .1, .01)
     optim        = CobylaParameters((1e-2, 5e-3), (1e-4, 1e-4), None, None)
     minthreshold = 1e-3
     maxthreshold: Union[str, float, None] = 'auto'
@@ -52,11 +53,16 @@ class HistogramFit(GriddedOptimization):
         "returns the precision"
         return self.histogram.getprecision(*args, **kwargs)
 
-    def frompeaks(self, peaks):
+    def frompeaks(self, peaks, firstpeak = 0):
         "creates a histogram from a list of peaks with their count"
         if str(getattr(peaks, 'dtype', ' '))[0] != 'f':
             peaks = np.array([(i, Probability.resolution(j)) for i, j in peaks])
+        peaks = peaks[firstpeak:,:]
         return self.histogram.variablekernelsize(peaks)
+
+    def fromevents(self, evts:Events):
+        "creates a histogram from a list of events"
+        return self.histogram.asprojection(np.concatenate(list(evts.values())))
 
     def optimize(self, aleft, aright):
         "find best stretch & bias to fit right against left"
@@ -66,6 +72,7 @@ class HistogramFit(GriddedOptimization):
         kwa   = self.optimconfig(disp = 0, cons = self.__constraints())
         ret   = min((self._optimize(left, right, kwa, i) for i in self.grid),
                     default = (DEFAULT_BEST, 1., 0.))
+
         return Distance(ret[0], ret[1], ret[2]+right.minv-left.minv/ret[1])
 
     def value(self, aleft, aright, stretch, bias):
@@ -82,7 +89,7 @@ class HistogramFit(GriddedOptimization):
 
     def _get(self, left) -> FitData:
         hist, vals = self._to_2d(left)
-        vals       = self._apply_minthreshold(hist, vals)
+        vals       = self._apply_minthreshold(vals)
         self._apply_maxthreshold(vals)
         return self._to_data(hist, vals)
 
@@ -103,10 +110,9 @@ class HistogramFit(GriddedOptimization):
                 left.histogram)
         return left, vals
 
-    def _apply_minthreshold(self, left: HistogramData, vals: Tuple[np.ndarray, np.ndarray]):
+    def _apply_minthreshold(self, vals: Tuple[np.ndarray, np.ndarray]):
         if self.minthreshold not in (None, np.NaN):
-            mask = np.insert(left.histogram >= self.minthreshold,
-                             [0, len(left.histogram)], True)
+            mask = np.insert(vals[1] >= self.minthreshold, [0, len(vals[1])], True)
             np.logical_or(mask[:-2], mask[1:-1], mask[1:-1])
             mask = np.logical_or(mask[2:],  mask[1:-1], mask[1:-1])
             vals = vals[0][mask], vals[1][mask]
@@ -163,15 +169,14 @@ class ChiSquareHistogramFit(HistogramFit):
     3. fitting a linear regression to paired peaks
     """
 
-    firstpeak = True
     window    = 1.5e-2
-    def frompeaks(self, peaks):
+    def frompeaks(self, peaks, firstpeak = 0):
         "creates a histogram from a list of peaks with their count"
         if str(getattr(peaks, 'dtype', ' '))[0] != 'f':
             peaks = np.array([(i, Probability.resolution(j)) for i, j in peaks])
         else:
             peaks = np.asarray(peaks)
-
+        peaks = peaks[firstpeak:,:]
         return self.histogram.variablekernelsize(peaks), peaks[:,0]
 
     @staticmethod
@@ -196,7 +201,7 @@ class ChiSquareHistogramFit(HistogramFit):
             peaks       = None
 
         hist, vals  = self._to_2d(left)
-        vals        = self._apply_minthreshold(hist, vals)
+        vals        = self._apply_minthreshold(vals)
         if peaks is None:
             peaks   = self._getpeaks(left, vals)
 
@@ -206,13 +211,13 @@ class ChiSquareHistogramFit(HistogramFit):
 
     def _optimize(self, left: ChiSquareData, right: ChiSquareData,      # type: ignore
                   kwa, params):
-        tmp = super()._optimize(left, right, kwa, params)[1:]
-        return chisquare(left.peaks, right.peaks,
-                         self.firstpeak, self.symmetry, self.window,
-                         *tmp)
+        tmp = super()._optimize(left, right, kwa, params)
+        res = chisquare(left.peaks, right.peaks,
+                        False, self.symmetry, self.window, tmp[1], -tmp[1]*tmp[2])
+        return res[0], res[1], -res[2]/res[1]
 
     def _cost_function(self, left: ChiSquareData, right: ChiSquareData, # type: ignore
                        stretch: float, bias: float):
-        return chisquarevalue(left.peaks, (right.peaks-bias)*stretch,
-                              self.firstpeak, self.symmetry, self.window,
-                              1., 0.)
+        return chisquarevalue(left.peaks, right,
+                              False, self.symmetry, self.window,
+                              stretch, -stretch*bias)[0], stretch, bias

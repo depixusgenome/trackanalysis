@@ -134,6 +134,9 @@ def display(self, # pylint: disable=function-redefined,too-many-arguments
             return disp.fitmap(self, sequence, oligos, labels, **opts)
         return disp.hpinmap(self, sequence, oligos, labels, **opts)
 
+    if 'bias' in opts:
+        opts['zero'] = False
+
     if None not in (sequence, oligos):
         return disp.hpinmap(self, sequence, oligos, labels)
 
@@ -165,7 +168,6 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
             if i == ind:
                 continue
             stretch, bias = dist.optimize(ref, _peaks(j))[1:]
-            print(dist, stretch, bias)
             for itm in j:
                 itm.data[:,0] = (itm.data[:,0] - bias)*stretch
         return cls._toarea(specs, ovrs)

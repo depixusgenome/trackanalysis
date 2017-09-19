@@ -138,24 +138,31 @@ def chisquare(ref       : np.ndarray, # pylint: disable=too-many-arguments
     We use the GaussianProductFit results to match exp then estimate
     the best Χ² fit between matched exp, adding their count as well.
     """
-    tmp   = exp*stretch+bias
-    pairs = _match.compute(ref, tmp, window)
-    if firstpeak and len(pairs) and any(i == 0 for i in pairs[0]):
-        pairs = pairs[1:]
+    prev = None
+    for _ in range(10):
+        tmp   = exp*stretch+bias
+        pairs = _match.compute(ref, tmp, window)
+        if prev is not None and len(pairs) <= len(prev):
+            break
 
-    if len(pairs) > 1:
-        stretch, bias = np.polyfit(exp[pairs[:,1]], ref[pairs[:,0]], 1)
-        dist  = ((stretch*exp[pairs[:,1]]+bias - ref[pairs[:,0]])**2).sum()
-        dist /= window**2
-    else:
-        dist = 0.
+        if firstpeak and len(pairs) and any(i == 0 for i in pairs[0]):
+            pairs = pairs[1:]
 
-    if symmetry:
-        dist += (len(exp)+len(ref)-2.*len(pairs))**2
-        dist  = np.sqrt(dist/(len(exp)+len(ref)))
-    else:
-        dist += (len(exp)-len(pairs))**2
-        dist  = np.sqrt(dist/len(exp))
+        if len(pairs) > 1:
+            stretch, bias = np.polyfit(exp[pairs[:,1]], ref[pairs[:,0]], 1)
+            dist  = ((stretch*exp[pairs[:,1]]+bias - ref[pairs[:,0]])**2).sum()
+            dist /= window**2
+        else:
+            dist = 0.
+
+        if symmetry:
+            dist += (len(exp)+len(ref)-2.*len(pairs))**2
+            dist  = np.sqrt(dist/(len(exp)+len(ref)))
+        else:
+            dist += (len(exp)-len(pairs))**2
+            dist  = np.sqrt(dist/len(exp))
+
+        prev = pairs
     return dist, stretch, bias
 
 def chisquarevalue(ref       : np.ndarray, # pylint: disable=too-many-arguments
