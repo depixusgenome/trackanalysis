@@ -115,14 +115,14 @@ def __call__(self, *resets, __old__ = Tasks.__call__, **kwa):
     return __old__(self, *resets, current = cnf, **kwa)
 Tasks.__call__ = __call__
 
-def defaulttaskorder(__old__ = Tasks.defaulttaskorder) -> Tuple[type, ...]:
+def defaulttaskorder(cls, __old__ = Tasks.defaulttaskorder) -> Tuple[type, ...]:
     "returns the default task order"
-    order = scriptapp.control.getGlobal("config").tasks.order.scripting.get(default = None)
+    order = cls.getconfig().order.scripting.get(default = None)
     return __old__(order)
 
-Tasks.defaulttaskorder = staticmethod(defaulttaskorder)
+Tasks.defaulttaskorder = classmethod(defaulttaskorder)
 
 # pylint: disable=no-member,invalid-name
-scriptapp = default.application(main = ScriptingView, creator = lambda x: x)()
+scriptapp = default.application(main = ScriptingView, creator = lambda x: x)() # type: ignore
 
 __all__ = ['scriptapp', 'Tasks']
