@@ -94,9 +94,13 @@ class ReporterInfo:
     track         = TrackInfo(None)
     @initdefaults(frozenset(locals()),
                   track = lambda obj, val: setattr(obj, 'track', TrackInfo(val)),
-                  beads = lambda obj, val: setattr(obj, 'beads', sorted(val)))
+                  beads = lambda obj, val: obj.setbeads(val))
     def __init__(self, **_):
         pass
+
+    def setbeads(self, beads):
+        "sets the beads"
+        self.beads = sorted(i for i in beads if Beads.isbead(i))
 
     @staticmethod
     def sheettype(name:str):
