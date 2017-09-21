@@ -27,6 +27,12 @@ class _MyItem(ITrackView):
 
     track = property(lambda self: data.Track(data = self.vals))
 
+    def __iter__(self):
+        return iter(self.vals)
+
+    def __copy__(self):
+        return _MyItem(self.vals)
+
     def keys(self, sel = None, beadsonly = None):
         assert sel is None
         assert beadsonly is None
@@ -118,6 +124,18 @@ def test_cycles_iterkeys():
 
     for _, vals in cycs().withfirst(2).withlast(3).selecting((0,1)):
         assert np.array_equal(vals, truth[1206-678:1275-678])
+
+def test_cycles_iterkeys2():
+    u"tests wether keys are well listed"
+    track = data.Track(path = utpath("big_legacy"), beadsonly = False)
+    beads = track.beads.withcycles(range(5, 15))
+    cycles = beads.new(data.Cycles)
+    assert len(tuple(cycles[0, ...])) == 10
+    assert set(cycles[0,...].keys()) == {(0, i) for i in range(5, 15)}
+
+    beads = track.beads.withcycles(...)
+    cycles = beads.new(data.Cycles)
+    assert len(tuple(cycles[0, ...])) == 102
 
 def test_cycles_mixellipsisnumbers():
     "mixing ellipis and lists of numbers in the indexes"

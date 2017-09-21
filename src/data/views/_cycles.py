@@ -49,7 +49,10 @@ class Cycles(TrackView, ITrackView):
 
     def __keysfrombeads(self, sel, beadsonly):
         beads     = tuple(self.track.beads.new(data = self.data).keys(None, beadsonly))
-        allcycles = range(self.track.ncycles)
+        if hasattr(self.data, 'cyclerange'):
+            allcycles = self.data.cyclerange()
+        else:
+            allcycles = range(self.track.ncycles)
         if sel is None:
             yield from ((col, cid) for col in beads for cid in allcycles)
             return
