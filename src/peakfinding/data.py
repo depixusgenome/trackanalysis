@@ -2,13 +2,12 @@
 # -*- coding: utf-8 -*-
 "Tasks related to peakfinding"
 from typing                 import (Iterable, Iterator, Tuple, FrozenSet, Sequence,
-                                    Optional, cast)
+                                    Optional)
 from functools              import partial
 import numpy as np
 
 from model                  import Level
 from data.views             import BEADKEY, TrackView, Beads, isellipsis
-from eventdetection.data    import EventDetectionConfig, Events
 from .selector              import PeakSelector, Output as PeakOutput, PeaksArray
 
 Output = Tuple[BEADKEY, Iterator[PeakOutput]]
@@ -43,18 +42,6 @@ class PeaksDict(TrackView):
             multiples = lambda x: singles(np.concatenate(x))
         return self.withaction(partial(self.__measure, singles, multiples))
 
-    @property
-    def eventsdetectionconfig(self) -> Optional[EventDetectionConfig]:
-        "returns the config for the event creation"
-        evts = self.data
-        while not isinstance(evts, (dict, Events)):
-            evts = cast(TrackView, evts).data
-        if isinstance(evts, Events):
-            while isinstance(cast(Events, evts).data, Events):
-                evts = cast(Events, evts).data
-            return cast(EventDetectionConfig, evts)
-        return None
-
     @classmethod
     def measure(cls, itm: PeaksArray, singles = np.nanmean, multiples = None) -> PeaksArray:
         "Returns a measure per events."
@@ -70,6 +57,16 @@ class PeaksDict(TrackView):
             itm[:] = cls.__array2measure(singles, multiples, itm)
         return itm
 
+    @staticmethod
+    def singles(arr: PeaksArray) -> np.ndarray:
+        "returns an array indicating where single events are"
+        return np.array([isinstance(i, (tuple, np.void)) for i in arr], dtype = 'bool')
+
+    @staticmethod
+    def multiples(arr: PeaksArray) -> np.ndarray:
+        "returns an array indicating where single events are"
+        return np.array([isinstance(i, (list, np.ndarray)) for i in arr], dtype = 'bool')
+
     @classmethod
     def __measure(cls, singles, multiples, _, info):
         return info[0], ((i, cls.__array2measure(singles, multiples, j)) for i, j in info[1])
@@ -77,6 +74,7 @@ class PeaksDict(TrackView):
     @classmethod
     def __index(cls, _, info):
         return info[0], ((i, cls.__array2range(j)) for i, j in info[1])
+
 
     @staticmethod
     def __array2measure(singles, multiples, arr):
