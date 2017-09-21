@@ -45,7 +45,7 @@ class KernelConvolution:
         "returns the kernel used for the convolution"
         window = self.window
         osamp  = int(self.oversampling//2) * 2 + 1
-        size   = 2*int(np.rint(self.width*window*osamp))+1
+        size   = (int(np.rint(self.width*window*osamp))//2)*2+1
         if self.mode is KernelMode.normal:
             kern  = np.arange(size, dtype = 'f4') / osamp
             kern  = np.exp(-.5*((kern-kern[size//2])/ self.width)**2)
@@ -57,6 +57,7 @@ class KernelConvolution:
 
         else:
             raise KeyError(self.mode)
+        assert kern.size%2 == 1
         return kern
 
     def __call__(self, **kwa) -> Callable[[np.ndarray], np.ndarray]:
