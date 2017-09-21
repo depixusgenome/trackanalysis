@@ -97,7 +97,7 @@ class FoV:
 @levelprop(Level.project)
 class Track:
     "Model for track files. This must not contain actual data."
-    _framerate                  = 0.
+    _framerate                  = 30.
     _fov: FoV                   = None
     _phases                     = np.empty((0,9), dtype = 'i4')
     _data:          DATA        = None
@@ -160,7 +160,10 @@ class Track:
     @framerate.setter
     def framerate(self, val) -> float:
         "returns the frame rate"
-        return self.__setter('_framerate', val)
+        val = self.__setter('_framerate', val)
+        if val <= 0.:
+            raise ValueError("Track.framerate <= 0.")
+        return val
 
     @property
     def fov(self) -> FoV:
