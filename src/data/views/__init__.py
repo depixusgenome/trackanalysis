@@ -3,6 +3,7 @@
 "Adds easy access to cycles and events"
 from ._dict         import (ITrackView, TransformedTrackView, createTrackView,
                             isellipsis)
-from ._view         import TrackView
+from ._view         import TrackView, selectparent
 from ._cycles       import Cycles, CYCLEKEY
 from ._beads        import Beads,  BEADKEY
+from ._task         import TaskView

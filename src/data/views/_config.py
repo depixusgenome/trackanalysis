@@ -5,7 +5,7 @@ from   inspect          import signature
 from   copy             import copy as shallowcopy
 from   itertools        import product
 from   functools        import partial
-from   typing           import Tuple, Union, List, TypeVar, Hashable, cast
+from   typing           import Tuple, Iterable, Union, List, TypeVar, Hashable, cast
 import numpy            as     np
 
 from   utils            import isfunction
@@ -24,7 +24,7 @@ def _m_torange(sli):
 _m_INDEX = int, cast(type, np.integer), str, tuple
 
 CSelf = TypeVar('CSelf',  bound = 'TrackViewConfigMixin')
-class TrackViewConfigMixin: # pylint: disable=invalid-name
+class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name
     "Adds methods for configuring a TracksView"
     data:      TRACK_VIEW             = None
     selected:  List                   = None

@@ -3,7 +3,7 @@
 "Adds easy access to cycles and events"
 from    copy        import copy as shallowcopy
 from    typing      import (Optional, Tuple, Union, Any, Sequence, TypeVar,
-                            Iterable, Iterator, Generator, cast)
+                            Iterable, Iterator, Generator, Type, cast)
 import  numpy as np
 
 from    utils       import initdefaults, isfunction
@@ -147,3 +147,16 @@ class TrackView(TrackViewConfigMixin, ITrackView):
 
         if self.data is None:
             self.data = shallowcopy(self.track.data)
+
+TrackViewType = TypeVar('TrackViewType', bound = TrackView)
+def selectparent(self: TrackViewType, tpe: Type[TrackViewType]) -> Optional[TrackViewType]:
+    "returns the config for the event creation"
+    dummy = dict() # type: ignore
+    evts  = getattr(self, 'data', dummy)
+    while not isinstance(evts, (dict, tpe)):
+        evts = getattr(evts, 'data', dummy)
+    if isinstance(evts, tpe):
+        while isinstance(getattr(evts, 'data', dummy), tpe):
+            evts = getattr(evts, 'data', dummy)
+        return evts
+    return None

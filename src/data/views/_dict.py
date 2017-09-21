@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Adds easy access to cycles and events"
-from    abc         import ABCMeta, abstractmethod, abstractproperty
-from    typing      import Tuple, Union, Iterator, TypeVar, cast, Dict, Optional
+from    abc         import abstractmethod, abstractproperty
+from    typing      import Tuple, Union, Iterable, Iterator, TypeVar, cast, Dict, Optional
 import  numpy as np
 from    model       import Level
 
@@ -24,7 +24,7 @@ BEADKEY  = Union[str,int]
 CYCLEKEY = Tuple[BEADKEY,int]
 ISelf    = TypeVar('ISelf', bound = 'ITrackView')
 
-class ITrackView(metaclass=ABCMeta):
+class ITrackView(Iterable):
     "Class for iterating over data"
     @property
     @abstractproperty
@@ -79,6 +79,7 @@ class TransformedTrackView:
 TRACK_VIEW = Union[ITrackView, TransformedTrackView, Dict]
 
 def createTrackView(level:Optional[Level] = Level.none, **kwargs):
+
     "Returns the item type associated to a level"
     subs = ITrackView.__subclasses__()
     cls  = next(opt for opt in subs if level is getattr(opt, 'level', '--NONE--'))
