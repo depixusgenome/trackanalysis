@@ -149,9 +149,9 @@ def display(self, # pylint: disable=function-redefined,too-many-arguments
 
 class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignore
     "tracksdict display for peaks"
+
     @classmethod
-    def _all(cls, specs, fcn, key):
-        ovrs = super()._all(specs, fcn, key)
+    def _doref(cls, specs, ovrs, ind):
         if None in (specs['reference'], specs['distance']):
             return ovrs
 
@@ -162,7 +162,6 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
             yvals = (crv[1::3]-crv[::3])*.5
             return dist.frompeaks(np.vstack([xvals, yvals]).T)
 
-        ind  = cls._refindex(specs)
         ref  = _peaks(ovrs[ind])
         for i, j in enumerate(ovrs):
             if i == ind:
@@ -170,7 +169,15 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
             stretch, bias = dist.optimize(ref, _peaks(j))[1:]
             for itm in j:
                 itm.data[:,0] = (itm.data[:,0] - bias)*stretch
-        return cls._toarea(specs, ovrs)
+        return cls._toarea(specs, ovrs, ind)
+
+    @classmethod
+    def _same(cls, specs, ref, other):
+        return cls._doref(specs, super()._same(specs, ref, other), 0)
+
+    @classmethod
+    def _all(cls, specs, fcn, key):
+        return cls._doref(specs, super()._all(specs, fcn, key), cls._refindex(specs))
 
     @classmethod
     def _specs(cls):
@@ -206,7 +213,8 @@ def peaks(self, overlay = 'key', reference = None, **kwa):
             * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
 
     """
-    kwa.setdefault('reflayout', 'bottom')
+    kwa.setdefault('reflayout', 'same' if overlay is None else 'bottom')
+    kwa.setdefault('refdims', False)
     return PeaksTracksDictDisplay.run(self, 'peaks', overlay, reference, kwa)
 
 __all__: List[str] = []

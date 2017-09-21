@@ -169,9 +169,8 @@ class PeaksTracksDictDisplay(TracksDictDisplay): # type: ignore
         return specs['kdims'][specs['overlay']].index(specs['reference'])
 
     @classmethod
-    def _toarea(cls, specs, ovrs):
+    def _toarea(cls, specs, ovrs, ind):
         if specs['reference'] is not None:
-            ind  = cls._refindex(specs)
             area = next(iter(ovrs[ind])).to(hv.Area)
             ovrs[ind] = hv.Overlay([area(style = dict(alpha = 0.5))] + list(ovrs[ind]),
                                    label = ovrs[ind].label,
@@ -180,7 +179,7 @@ class PeaksTracksDictDisplay(TracksDictDisplay): # type: ignore
 
     @classmethod
     def _all(cls, specs, fcn, key):
-        return cls._toarea(specs, super()._all(specs, fcn, key))
+        return cls._toarea(specs, super()._all(specs, fcn, key), cls._refindex(specs))
 
 @addto(TracksDict) # type: ignore
 def peaks(self, overlay = 'key', reference = None, **kwa):

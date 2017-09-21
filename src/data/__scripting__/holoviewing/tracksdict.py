@@ -50,8 +50,6 @@ class TracksDictDisplay:
             kwa['labels'] = str(key)
         elif specs['overlay'] == 'bead' and 'labels' not in kwa:
             kwa['labels'] = str(bead)
-        else:
-            kwa.setdefault('group', key)
         return data.display(**kwa)[bead]
 
     @staticmethod
@@ -77,6 +75,10 @@ class TracksDictDisplay:
         other = 'key' if overlay == 'bead' else 'bead'
         return hv.DynamicMap(fcn, kdims = [other]).redim.values(bead = specs['kdims'][other])
 
+    @staticmethod
+    def _same(_, ref, other):
+        return [ref, other]
+
     @classmethod
     def refwithoutoverlay(cls, itms, name, reference, kwa):
         "display without overlay but with reference"
@@ -90,6 +92,8 @@ class TracksDictDisplay:
                                    for i in val.dimensions()})
 
             other = __fcn__(key, bead).clone(label = key)
+            if specs['reflayout'] == 'same':
+                return hv.Overlay(cls._same(specs, val, other))
             if specs['reflayout'] in ('left', 'top'):
                 return (val+other).cols(1 if specs['reflayout'] == 'top' else 2)
             return (other+val).cols(1 if specs['reflayout'] == 'bottom' else 2)
