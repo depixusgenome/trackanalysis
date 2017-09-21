@@ -10,6 +10,7 @@ from pytest                     import approx
 
 
 from control.taskcontrol        import create
+from model.task.dataframe       import DataFrameTask
 from simulator.processor        import ByPeaksEventSimulatorTask
 from eventdetection.processor   import EventDetectionTask
 from peakfinding.processor      import PeakSelectorTask
@@ -18,7 +19,7 @@ from peakcalling                import cost, match
 from peakcalling.tohairpin      import PeakMatching, GaussianProductFit, ChiSquareFit
 from peakcalling.toreference    import HistogramFit, ChiSquareHistogramFit
 from peakcalling.processor      import (BeadsByHairpinProcessor, BeadsByHairpinTask,
-                                        DistanceConstraint)
+                                        DistanceConstraint, FitToReferenceTask)
 from testingcore                import DummyPool, path as utpath
 
 def test_toref():
@@ -44,6 +45,45 @@ def test_toref_frompeaks():
 
     assert_allclose(ret[1:], [1.01, .01], rtol = 5e-4, atol = 5e-4)
 
+def test_toref_controller():
+    "tests reference comparison"
+    peaks = np.array([.1, .5, .6, 1.], dtype = 'f4')
+    ref   = tuple(create(ByPeaksEventSimulatorTask(peaks    = peaks,
+                                                   brownian = .001,
+                                                   stretch  = None,
+                                                   bias     = None,
+                                                   rates    = None,
+                                                   nbeads   = 1,
+                                                   ncycles  = 5)).run())[0]
+    tsk   = FitToReferenceTask(fitalg  = ChiSquareHistogramFit())
+    tsk.frompeaks(ref)
+
+    peaks = peaks*1.01 + .05
+    pair  = create(ByPeaksEventSimulatorTask(peaks    = peaks,
+                                             brownian = .001,
+                                             stretch  = None,
+                                             bias     = None,
+                                             rates    = None,
+                                             nbeads   = 1,
+                                             ncycles  = 5), tsk)
+
+    beads = tuple(i for i in pair.run())[0][0]
+    assert beads['peaks'][0] < 0
+    assert beads['peaks'][1] < .17
+
+    pair  = create(ByPeaksEventSimulatorTask(peaks    = peaks,
+                                             brownian = .001,
+                                             stretch  = None,
+                                             bias     = None,
+                                             rates    = None,
+                                             nbeads   = 1,
+                                             ncycles  = 5),
+                   tsk, DataFrameTask())
+    beads = tuple(i for i in pair.run())[0][0]
+    assert set(beads.index.names) == {'track', 'bead'}
+    assert set(beads.columns)     == {'peakposition',      'averageduration',
+                                      'hybridizationrate', 'eventcount',
+                                      'referenceposition'}
 def test_cost_value():
     u"Tests peakcalling.cost.compute"
     bead1 = np.arange(10)
@@ -182,4 +222,4 @@ def test_control():
         assert tuple(beads.keys()) == ('hp100',)
 
 if __name__ == '__main__':
-    test_toref()
+    test_toref_controller()
