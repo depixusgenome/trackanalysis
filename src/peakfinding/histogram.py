@@ -177,8 +177,9 @@ class Histogram(PrecisionAlg):
             last = -1
             for ipeak, std in sorted(peaks, key = lambda x: x[1]):
                 if last != std:
-                    kern = self.kernel.kernel(width = std)
+                    base = self.kernel.kernel(width = std)
                     last = std
+                kern = base
                 imin = ipeak-kern.size//2
                 imax = ipeak+kern.size//2+1
 
