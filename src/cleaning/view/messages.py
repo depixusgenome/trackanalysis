@@ -62,6 +62,11 @@ class MessagesModelAccess(TaskPlotModelAccess):
         "returns beads and warnings where applicable"
         return self.__messages
 
+    def clear(self):
+        "clears the model's cache"
+        for i in self.__messages.values():
+            i.clear()
+
 class SummaryWidget(WidgetCreator):
     "summary info on the track"
     def __init__(self, model:MessagesModelAccess) -> None:
@@ -136,7 +141,7 @@ class MessagesListWidget(WidgetCreator):
         "this widget has a source in common with the plots"
         itm  = self.__widget.source if resets is None else resets[self.__widget.source]
         data = self.__data()
-        itm.update(data = data)
+        itm.update(data = {i: list(j) for i, j in data.items()})
 
     def __data(self) -> Dict[str, List]:
         mdl   = cast(MessagesModelAccess, self._model)
@@ -151,6 +156,7 @@ class MessagesListWidget(WidgetCreator):
 class MessagesPlotCreator(TaskPlotCreator):
     "Creates plots for discard list"
     _MODEL = MessagesModelAccess # type: ignore
+    _RESET = frozenset()         # type: frozenset
     def __init__(self, *args):
         super().__init__(*args)
         self._widgets = dict(messages = MessagesListWidget(self._model),
