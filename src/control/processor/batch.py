@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Batch creator basics"
 from typing             import (Optional,  # pylint: disable=unused-import
-                                Iterator, Union, Iterable, Sequence)
+                                TypeVar, Iterator, Union, Generic, Iterable, Sequence)
 from pathlib            import Path
 from copy               import deepcopy, copy as shallowcopy
 from itertools          import chain
@@ -14,6 +14,8 @@ from data.trackio       import PATHTYPES, PATHTYPE # pylint: disable=unused-impo
 
 from model.task         import RootTask, Task, Level
 from .base              import Processor
+
+TaskType = TypeVar('TaskType', bound = Task)
 
 class BatchTemplate(Iterable):
     "Template of tasks to run"
@@ -74,7 +76,7 @@ class BatchTask(RootTask):
         "appends a PathIO to the list"
         self.paths.append(self.pathtype()(**kwa))
 
-class BatchProcessor(Processor):
+class BatchProcessor(Processor, Generic[TaskType]):
     "Constructs a list of tasks depending on a template and paths."
     @staticmethod
     def create(mdl: Sequence[Task], **kwa) -> Iterator:

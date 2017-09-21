@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Processors apply tasks to a data flow"
-from    abc             import ABCMeta, abstractmethod
+from    abc             import abstractmethod
 from    functools       import wraps, partial
 from    itertools       import chain
-from    typing          import (TYPE_CHECKING, Tuple, Callable, Iterable,
-                                Iterator, Union, cast)
+from    typing          import (TYPE_CHECKING, TypeVar, Generic, Tuple, Callable, Iterable,
+                                Dict, Any, Iterator, Union, cast)
 
 import  model.task      as     _tasks
 from    model.level     import Level
@@ -13,81 +13,42 @@ from    model.level     import Level
 if TYPE_CHECKING:
     from .runner    import Runner # pylint: disable=unused-import
 
-_PROTECTED = ('tasktype',)
-class ProtectedDict(dict):
-    "Dictionary with read-only keys"
-    def __setitem__(self, key, val):
-        if key in _PROTECTED and key in self:
-            raise KeyError('"{}" is read-only'.format(key))
-        else:
-            super().__setitem__(key, val)
-
-    def __delitem__(self, key):
-        if key in _PROTECTED:
-            raise KeyError('"{}" is read-only'.format(key))
-        else:
-            super().__delitem__(key)
-
 class TaskTypeDescriptor:
     """
     Dynamically finds all Task subclasses implementing
     the __processor__ protocol.
     """
-    def __get__(self, obj, tpe) -> Tuple[type, ...]:
-        return getattr(tpe, '_tasktypes')()
+    def __get__(self, obj, tpe) -> Union[type, Tuple[type, ...]]:
+        tasks = getattr(tpe, '_tasktypes', None)
+        if tasks is None:
+            args = (getattr(i, '__args__') for i in tpe.__orig_bases__
+                    if getattr(i, '__args__', None))
+            task = next(args, None)
+            if task is None:
+                raise TypeError(f"Missing Generic specialization in {self.__class__}")
+            return task if len(task) > 1 else task[0]
+        return tasks()
 
-class MetaProcessor(ABCMeta):
-    "Protects attribute tasktype"
-    def __new__(mcs, name, bases, nspace): #pylint: disable=arguments-differ
-        if name != 'Processor' and 'tasktype' not in nspace:
-            tskname = name.replace('Processor', 'Task')
-            tsk     = getattr(_tasks, tskname, None)
-            cur     = [_tasks.Task]
-            while len(cur) and tsk is None:
-                tsk = next((i for i in cur if i.__name__ == tskname), None)
-                if tsk is None:
-                    cur = list(chain(*(i.__subclasses__() for i in cur)))
-
-            assert tsk is not None
-            nspace['tasktype'] = tsk
-
-        if isinstance(nspace['tasktype'], type):
-            if not issubclass(nspace['tasktype'], _tasks.Task):
-                raise TypeError('Only Task classes in the tasktype attribute')
-        elif isinstance(nspace['tasktype'], Iterable):
-            nspace['tasktype'] = tuple(set(nspace['tasktype']))
-            if not all(isinstance(tsk, type) and issubclass(tsk, _tasks.Task)
-                       for tsk in nspace['tasktype']):
-                raise TypeError('"tasktype" should all be Task classes', str(nspace['tasktype']))
-        elif name != 'Processor' and not isinstance(nspace['tasktype'], TaskTypeDescriptor):
-            raise AttributeError('"tasktype" must be defined in '+name)
-        return super().__new__(mcs, name, bases, nspace)
-
-    def __setattr__(cls, key, value):
-        if key in _PROTECTED:
-            raise AttributeError('"{}" is read-only'.format(key))
-        super().__setattr__(key, value)
-
-class Processor(metaclass=MetaProcessor):
+TaskType = TypeVar('TaskType', bound = _tasks.Task)
+class Processor(Generic[TaskType]):
     """
     Main class for processing tasks
     """
-    tasktype: Union[type, Tuple[type, ...]] = None
-    def __init__(self, task: _tasks.Task = None, **cnf) -> None:
-        if task is None:
-            task = cast(type, self.tasktype)(**cnf) # pylint: disable=not-callable
-        elif isinstance(task, dict):
-            tmp  = cast(dict, task)
-            tmp.update(cnf)
-            task = cast(type, self.tasktype)(**tmp) # pylint: disable=not-callable
+    tasktype = TaskTypeDescriptor()
+    def __init__(self, task: Union[Dict[str, Any], TaskType] = None, **cnf) -> None:
+        tpe = self.tasktype
+        if task is None and isinstance(tpe, type):
+            task = cast(type, tpe)(**cnf) # pylint: disable=not-callable
+        elif isinstance(task, dict) and isinstance(tpe, type):
+            task = cast(type, tpe)(**cast(dict, task), **cnf) # pylint: disable=not-callable
         elif not isinstance(task, self.tasktype):
             raise TypeError('"task" must have type '+ str(self.tasktype))
-        self.task = task
+        self.task: TaskType = cast(TaskType, task)
 
-    @staticmethod
-    def canregister():
+    @classmethod
+    def canregister(cls):
         "allows discarding some specific processors from automatic registration"
-        return True
+        return len(cls.__abstractmethods__) == 0 and not isinstance(cls.tasktype, TypeVar)
 
     @property
     def levelin(self) -> Level:
@@ -213,12 +174,11 @@ class Processor(metaclass=MetaProcessor):
 
     @abstractmethod
     def run(self, args:'Runner'):
-        "iterates over possible data"
+        "updates the frames"
+        raise NotImplementedError()
 
-class ProtocolProcessor(Processor):
+class ProtocolProcessor(Processor, Generic[TaskType]):
     "A processor that can deal with any task having the __processor__ attribute"
-    tasktype = cast(Tuple[type, ...], TaskTypeDescriptor())
-
     @staticmethod
     def _tasktypes():
         treating = _tasks.Task.__subclasses__()

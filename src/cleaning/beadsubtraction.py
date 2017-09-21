@@ -46,7 +46,7 @@ class BeadSubtractionTask(SignalAverage, Task):
         super().__init__(**kwa)
         Task.__init__(self)
 
-class BeadSubtractionProcessor(Processor):
+class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
     "Processor for subtracting beads"
     @staticmethod
     def __action(task, cache, frame, info):
@@ -75,6 +75,7 @@ class BeadSubtractionProcessor(Processor):
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
+        "updates frames"
         cache = args.data.setCacheDefault(self, {})
         args.apply(self.apply(cache =  cache, **self.config()))
 

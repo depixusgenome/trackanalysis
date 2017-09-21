@@ -42,7 +42,7 @@ class PeakFindingBatchTask(BatchTask):
         "the type of reports"
         return PeakFindingExcelTask
 
-class PeakFindingBatchProcessor(BatchProcessor):
+class PeakFindingBatchProcessor(BatchProcessor[PeakFindingBatchTask]):
     """
     Constructs a list of tasks depending on a template and paths.
     """

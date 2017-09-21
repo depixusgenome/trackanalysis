@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 "Processors apply tasks to a data flow"
 from    functools               import partial
-from    typing                  import Callable, Dict, Union, Iterator, Tuple, cast
+from    typing                  import (Generic, TypeVar, Callable, Dict,
+                                        Union, Type, Iterator, Tuple, cast)
 from    pathlib                 import Path
 
 import  pandas                  as     pd
@@ -13,11 +14,16 @@ from    data.track              import Track
 from    data.views              import TrackView
 from    .base                   import Processor
 
-class DataFrameFactory:
+Frame = TypeVar('Frame', bound = TrackView)
+class DataFrameFactory(Generic[Frame]):
     "base class for creating dataframes"
-    FRAME_TYPE: type = None
     def __init__(self, task: DataFrameTask, _: TrackView) -> None:
         self.task  = task
+
+    @classmethod
+    def frametype(cls)-> Type[Frame]:
+        "returns the frame type"
+        return cls.__orig_bases__[0].__args__[0] # type: ignore
 
     def getfunctions(self) -> Iterator[Tuple[str, Callable]]:
         "returns measures, with string changed to methods from np"
@@ -35,9 +41,11 @@ class DataFrameFactory:
         "returns the track name"
         if track.key:
             return track.key
-        elif isinstance(track.path, (str, Path)):
-            return str(Path(track.path).name)
-        return str(Path(track.path[0]).name)
+
+        path = track.path
+        if isinstance(path, (str, Path)):
+            return str(Path(path).name)
+        return str(Path(path[0]).name)
 
     @classmethod
     def indexcolumns(cls, cnt, key = None, frame = None) -> Dict[str, np.ndarray]:
@@ -58,7 +66,7 @@ class DataFrameFactory:
     def create(cls, task, frame):
         "creates a dataframefactory if frame is of the right type"
         # pylint: disable=unidiomatic-typecheck
-        return cls(task, frame) if type(frame) is cls.FRAME_TYPE else None
+        return cls(task, frame) if type(frame) is cls.frametype() else None
 
     def dataframe(self, frame, info) -> pd.DataFrame:
         "creates a dataframe"
@@ -75,7 +83,7 @@ class DataFrameFactory:
     def _run(self, frame, key, values) -> Dict[str, np.ndarray]:
         raise NotImplementedError()
 
-class DataFrameProcessor(Processor):
+class DataFrameProcessor(Processor[DataFrameTask]):
     "Generates pd.DataFrames"
     @classmethod
     def apply(cls, toframe = None, **cnf):
@@ -85,6 +93,7 @@ class DataFrameProcessor(Processor):
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
+        "updates the frames"
         args.apply(self.apply(**self.config()))
 
     @classmethod
@@ -92,8 +101,17 @@ class DataFrameProcessor(Processor):
         return pd.concat([i for _, i in cls.__apply(task, frame)])
 
     @staticmethod
-    def __apply(task, frame):
-        for sub in DataFrameFactory.__subclasses__():
+    def __iter_subclasses() -> Iterator[type]:
+        rem = [DataFrameFactory]
+        while len(rem):
+            cur = rem.pop()
+            if not len(cur.__abstractmethods__): # type: ignore
+                yield cur
+            rem.extend(i for i in cur.__subclasses__() if issubclass(i, DataFrameFactory))
+
+    @classmethod
+    def __apply(cls, task, frame):
+        for sub in cls.__iter_subclasses():
             inst = sub.create(task, frame)
             if inst is not None:
                 return frame.withaction(inst.dataframe)

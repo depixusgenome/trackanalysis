@@ -5,11 +5,13 @@ from   typing                      import Dict, cast
 import numpy                       as     np
 
 from   model                       import PHASE
+from   data.views                  import selectparent
 from   control.processor.dataframe import DataFrameFactory
+from   eventdetection.data         import Events, EventDetectionConfig
 from   .probabilities              import Probability
 from   .data                       import PeaksDict
 
-class PeaksDataFrameFactory(DataFrameFactory):
+class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
     """
     converts to a pandas dataframe.
 
@@ -20,12 +22,13 @@ class PeaksDataFrameFactory(DataFrameFactory):
         * *hybridizationrate*
         * *eventcount*
     """
-    FRAME_TYPE = PeaksDict
     def __init__(self, task, frame):
         super().__init__(task, frame)
 
-        mdur          = frame.eventsdetectionconfig.events.select.minduration
-        frate         = frame.track.framerate
+        tmp   = selectparent(frame, Events)
+        mdur  = (EventDetectionConfig() if tmp is None else tmp).events.select.minduration
+        frate = frame.track.framerate
+
         self.__prob   = Probability(minduration = mdur, framerate = frate)
         self.__ends   = frame.track.phaseduration(..., PHASE.measure)
 

@@ -5,9 +5,8 @@ from model.task.tagging import TaggingTask
 from .base              import Processor
 
 
-class TaggingProcessor(Processor):
+class TaggingProcessor(Processor[TaggingTask]):
     "Generates output from a TaggingTask"
-    tasktype = TaggingTask
     @classmethod
     def apply(cls, toframe = None, **kwa):
         "applies the task to a frame or returns a function that does so"
@@ -21,4 +20,5 @@ class TaggingProcessor(Processor):
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
+        "updates frames"
         args.apply(self.apply(**self.config()))

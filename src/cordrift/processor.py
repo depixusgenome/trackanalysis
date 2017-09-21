@@ -142,7 +142,7 @@ class _BeadDriftAction:
             self.run(i, data[..., i])
         return dict(data)
 
-class DriftProcessor(Processor):
+class DriftProcessor(Processor[DriftTask]):
     "Deals with bead drift"
     _ACTION  = _BeadDriftAction
     def canpool(self):
@@ -164,6 +164,7 @@ class DriftProcessor(Processor):
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
+        "updates frames"
         kwa          = self.config()
         kwa['cache'] = args.data.setCacheDefault(self, {})
         if not (self.task.onbeads or args.pool is None):

@@ -52,10 +52,11 @@ class PeakFindingExcelTask(Task):
             trk       = trk[0] if isinstance(trk, tuple) else trk
             self.path = self.path.replace('*', Path(trk).stem)
 
-class PeakFindingExcelProcessor(Processor):
+class PeakFindingExcelProcessor(Processor[PeakFindingExcelTask]):
     u"Reporter for PeakFinding"
     @staticmethod
     def canpool():
+        "returns whether this is pooled"
         return True
 
     @classmethod
@@ -78,6 +79,7 @@ class PeakFindingExcelProcessor(Processor):
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
+        "updates frames"
         args.apply(self.apply(**args.poolkwargs(self.task), **self.config()))
 
 def run(path:str, config:str = '', **kwa):

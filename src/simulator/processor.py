@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Processes TrackSimulatorTask"
-from typing             import Optional     # pylint: disable=unused-import
 from utils              import initdefaults
 from model.task         import RootTask, Level
 from control.processor  import Processor
@@ -9,8 +8,8 @@ from .track             import TrackSimulator
 
 class _SimulatorTask(TrackSimulator):
     u"Class indicating that a track file should be added to memory"
-    nbeads = 1      # type: int
-    seed   = None   # type: Optional[int]
+    nbeads: int = 1
+    seed:   int = None
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -21,13 +20,13 @@ class TrackSimulatorTask(_SimulatorTask, RootTask):
 
 class EventSimulatorTask(_SimulatorTask, RootTask):
     u"Class that creates fake event data each time it is called upon"
-    ncycles = 20    # type: int
-    levelou = Level.event
+    ncycles: int = 20
+    levelou      = Level.event
 
 class ByPeaksEventSimulatorTask(_SimulatorTask, RootTask):
     u"Class that creates fake peak data each time it is called upon"
-    ncycles = 20    # type: int
-    levelou = Level.peak
+    ncycles: int = 20
+    levelou      = Level.peak
 
 class SimulatorMixin:
     u"Processes a simulator task"
@@ -49,14 +48,14 @@ class SimulatorMixin:
         """
         return True
 
-class TrackSimulatorProcessor(SimulatorMixin, Processor):
+class TrackSimulatorProcessor(SimulatorMixin, Processor[TrackSimulatorTask]):
     u"Processes TrackSimulatorTask"
     _FCN     = 'beads'
 
-class EventSimulatorProcessor(SimulatorMixin, Processor):
+class EventSimulatorProcessor(SimulatorMixin, Processor[EventSimulatorTask]):
     u"Processes EventSimulatorTask"
     _FCN     = 'bybeadevents'
 
-class ByPeaksEventSimulatorProcessor(SimulatorMixin, Processor):
+class ByPeaksEventSimulatorProcessor(SimulatorMixin, Processor[ByPeaksEventSimulatorTask]):
     u"Processes EventSimulatorTask"
     _FCN     = 'bypeakevents'

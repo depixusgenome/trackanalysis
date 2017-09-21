@@ -109,7 +109,7 @@ class HybridstatBatchTask(BatchTask):
         "the type of reports"
         return HybridstatExcelTask
 
-class HybridstatBatchProcessor(BatchProcessor):
+class HybridstatBatchProcessor(BatchProcessor[HybridstatBatchTask]):
     """
     Constructs a list of tasks depending on a template and paths.
     """

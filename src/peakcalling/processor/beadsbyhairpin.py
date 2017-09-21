@@ -27,11 +27,12 @@ class ByHairpinGroup(NamedTuple): # pylint: disable=missing-docstring
     key   : str
     beads : Sequence[ByHairpinBead]
 
-class BeadsByHairpinProcessor(Processor):
+class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
     "Groups beads per hairpin"
     CHILD = FitToHairpinProcessor
     @staticmethod
     def canpool():
+        "returns whether this is pooled"
         return True
 
     @classmethod
@@ -46,6 +47,7 @@ class BeadsByHairpinProcessor(Processor):
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
+        "updates frames"
         args.apply(self.apply(**args.poolkwargs(self.task), **self.config()))
 
     @classmethod

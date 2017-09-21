@@ -13,7 +13,7 @@ from    .base           import Processor
 if TYPE_CHECKING:
     from .runner    import Runner # pylint: disable=unused-import
 
-class TrackReaderProcessor(Processor):
+class TrackReaderProcessor(Processor[_tasks.TrackReaderTask]):
     "Generates output from a _tasks.CycleCreatorTask"
     @classmethod
     def __get(cls, attr, cpy, trk):
@@ -21,7 +21,7 @@ class TrackReaderProcessor(Processor):
         return tuple(getattr(i, attr).withcopy(cpy) for i in vals)
 
     def run(self, args:'Runner'):
-        "returns a dask delayed item"
+        "updates frames"
         task  = cast(_tasks.TrackReaderTask, self.task)
         attr  = 'cycles' if task.levelou is Level.cycle else 'beads'
         attr += 'only'   if task.beadsonly              else ''
@@ -37,7 +37,7 @@ class TrackReaderProcessor(Processor):
         "Beads selected/discarded by the task"
         return cache.beadsonly.keys()
 
-class CycleCreatorProcessor(Processor):
+class CycleCreatorProcessor(Processor[_tasks.CycleCreatorTask]):
     "Generates output from a _tasks.CycleCreatorTask"
     @classmethod
     def apply(cls, toframe = None, **kwa):
@@ -49,7 +49,7 @@ class CycleCreatorProcessor(Processor):
         "iterates through beads and yields cycles"
         args.apply(self.apply(**self.config()), levels = self.levels)
 
-class DataSelectionProcessor(Processor):
+class DataSelectionProcessor(Processor[_tasks.DataSelectionTask]):
     "Generates output from a DataSelectionTask"
     @staticmethod
     def __apply(kwa, frame):
@@ -70,6 +70,7 @@ class DataSelectionProcessor(Processor):
         return partial(cls.__apply, kwa) if toframe is None else cls.__apply(kwa, toframe)
 
     def run(self, args):
+        "updates frames"
         args.apply(self.apply(**self.config()))
 
     def beads(self, _, selected: Iterable[int]) -> Iterable[int]: # type: ignore

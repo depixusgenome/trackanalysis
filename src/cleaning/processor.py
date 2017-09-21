@@ -245,9 +245,8 @@ class DataCleaningException(Exception):
     def __init__(self, stats, cnf, tasktype):
         super().__init__(self.ErrorMessage(stats, cnf, tasktype), 'warning')
 
-class DataCleaningProcessor(Processor):
+class DataCleaningProcessor(Processor[DataCleaningTask]):
     "Processor for bead selection"
-    tasktype = DataCleaningTask
     @classmethod
     def __get(cls, name, cnf):
         return cnf.get(name, getattr(cls.tasktype, name))
@@ -305,5 +304,6 @@ class DataCleaningProcessor(Processor):
         return toframe.withaction(partial(cls.__compute, cnf))
 
     def run(self, args):
+        "updates the frames"
         cache   = args.data.setCacheDefault(self, dict())
         return args.apply(partial(self.apply, cache = cache, **self.config()))

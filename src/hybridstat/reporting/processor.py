@@ -64,7 +64,7 @@ class HybridstatExcelTask(Task):
             else:
                 self.path = str((Path(self.path)/stem).with_suffix('.xlsx'))
 
-class HybridstatExcelProcessor(Processor):
+class HybridstatExcelProcessor(Processor[HybridstatExcelTask]):
     "Reporter for Hybridstat"
     @staticmethod
     def apply(toframe = None, model = None, **kwa):
@@ -81,6 +81,7 @@ class HybridstatExcelProcessor(Processor):
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
+        "updates frames"
         args.apply(self.apply(model = args.data.model, **self.config()))
 
 def run(path:str, config:str = '', **kwa):

@@ -6,7 +6,7 @@ import numpy  as np
 from   control.processor.dataframe import DataFrameFactory
 from   .data                       import Events, EventsArray
 
-class EventsDataFrameFactory(DataFrameFactory):
+class EventsDataFrameFactory(DataFrameFactory[Events]):
     """
     converts to a pandas dataframe.
 
@@ -17,7 +17,6 @@ class EventsDataFrameFactory(DataFrameFactory):
         * *length*: event length
         * *mean*: event average position
     """
-    FRAME_TYPE = Events
     def __init__(self, task, frame):
         super().__init__(task, frame)
         self.__meas           = dict(self.getfunctions())

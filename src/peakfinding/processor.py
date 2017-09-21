@@ -27,7 +27,7 @@ class PeakCorrelationAlignmentTask(PeakCorrelationAlignment, Task):
         Task.__init__(self)
         super().__init__(**kwa)
 
-class PeakCorrelationAlignmentProcessor(Processor):
+class PeakCorrelationAlignmentProcessor(Processor[PeakCorrelationAlignmentTask]):
     "Groups events per peak"
     @classmethod
     def isslow(cls) -> bool:
@@ -60,6 +60,7 @@ class PeakCorrelationAlignmentProcessor(Processor):
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
+        "updates frames"
         args.apply(self.apply(**self.config()))
 
 class PeakSelectorTask(PeakSelector, Task):
@@ -75,7 +76,7 @@ class PeakSelectorTask(PeakSelector, Task):
         Task.__init__(self)
         PeakSelector.__init__(self, **kwa)
 
-class PeakSelectorProcessor(Processor):
+class PeakSelectorProcessor(Processor[PeakSelectorTask]):
     "Groups events per peak"
     @classmethod
     def apply(cls, toframe = None, **cnf):
@@ -84,6 +85,7 @@ class PeakSelectorProcessor(Processor):
         fcn = lambda frame: frame.new(PeaksDict, config = cnf)
         return fcn if toframe is None else fcn(toframe)
     def run(self, args):
+        "updates frames"
         args.apply(self.apply(**self.config()), levels = self.levels)
 
 class PeakProbabilityTask(Task):
@@ -95,7 +97,7 @@ class PeakProbabilityTask(Task):
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-class PeakProbabilityProcessor(Processor):
+class PeakProbabilityProcessor(Processor[PeakProbabilityTask]):
     "Computes probabilities for each peak"
     @staticmethod
     def __action(minduration, framerate, frame, info):
@@ -116,4 +118,5 @@ class PeakProbabilityProcessor(Processor):
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
+        "updates frames"
         args.apply(self.apply(model = args.model, **self.config()))

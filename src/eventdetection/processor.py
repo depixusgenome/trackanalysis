@@ -83,7 +83,7 @@ class ExtremumAlignmentTask(Task):
     def __init__(self, **_):
         super().__init__()
 
-class ExtremumAlignmentProcessor(Processor):
+class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
     "Aligns cycles to zero"
     class _Utils:
         "Aligns cycles to zero"
@@ -250,6 +250,7 @@ class ExtremumAlignmentProcessor(Processor):
         return _apply if toframe is None else _apply(toframe)
 
     def run(self, args):
+        "updates frames"
         args.apply(self.apply(**self.config()))
 
 class BiasRemovalTask(Task):
@@ -261,7 +262,7 @@ class BiasRemovalTask(Task):
     zerodelta   = 1e-2
     binsize     = 1e-3
 
-class BiasRemovalProcessor(Processor):
+class BiasRemovalProcessor(Processor[BiasRemovalTask]):
     "removes the bias from the whole bead"
     @staticmethod
     def beadaction(task, frame, info):
@@ -290,6 +291,7 @@ class BiasRemovalProcessor(Processor):
         return toframe.withaction(partial(cls.beadaction, task))
 
     def run(self, args):
+        "updates frames"
         args.apply(self.apply(**self.config()))
 
 class EventDetectionTask(EventDetectionConfig, Task):
@@ -302,7 +304,7 @@ class EventDetectionTask(EventDetectionConfig, Task):
         EventDetectionConfig.__init__(self, **kw)
         Task.__init__(self)
 
-class EventDetectionProcessor(Processor):
+class EventDetectionProcessor(Processor[EventDetectionTask]):
     "Generates output from a _tasks."
     @classmethod
     def apply(cls, toframe, **kwa):

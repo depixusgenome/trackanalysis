@@ -1,19 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Matching experimental peaks to hairpins: tasks and processors"
-from   typing       import (Dict, Sequence, NamedTuple, FrozenSet, Type,
-                            Iterator, Tuple, Union, Optional, Iterable, cast)
-import numpy        as     np
+from   typing                      import (Dict, # pylint: disable=unused-import
+                                           List, Sequence, NamedTuple, FrozenSet,
+                                           Type, Iterator, Tuple, Union, Optional,
+                                           Iterable, cast)
+from   copy                        import deepcopy
 
-from utils                      import (StreamUnion, initdefaults, updatecopy,
-                                        asobjarray, DefaultValue)
-from model                      import Task, Level
-from control.processor          import Processor
-from data.views                 import BEADKEY, TrackView, Beads
-from peakfinding.selector       import Output as PeakFindingOutput, PeaksArray
-from peakfinding.processor      import PeaksDict
-from ..tohairpin                import (HairpinFitter, ChiSquareFit, Distance,
-                                        PeakMatching, PEAKS_TYPE)
+import numpy                       as     np
+
+from   utils                       import (StreamUnion, initdefaults, updatecopy,
+                                           asobjarray, DefaultValue)
+from   model                       import Task, Level
+from   control.processor           import Processor
+from   control.processor.dataframe import DataFrameFactory
+from   data.views                  import BEADKEY, TrackView, Beads
+from   peakfinding.selector        import Output as PeakFindingOutput, PeaksArray
+from   peakfinding.processor       import PeaksDict
+from   ..tohairpin                 import (HairpinFitter, ChiSquareFit, Distance,
+                                           PeakMatching, PEAKS_TYPE)
 
 class DistanceConstraint(NamedTuple): # pylint: disable=missing-docstring
     hairpin     : str
@@ -185,7 +190,7 @@ class FitToHairpinDict(TrackView):
         dist          = self.__distances(bead, peaks)
         return self.__beadoutput(bead, peaks, events, dist)
 
-class FitToHairpinProcessor(Processor):
+class FitToHairpinProcessor(Processor[FitToHairpinTask]):
     "Groups beads per hairpin"
     @classmethod
     def apply(cls, toframe = None, **cnf):
@@ -209,4 +214,22 @@ class FitToHairpinProcessor(Processor):
         return out.key, out
 
     def run(self, args):
+        "updates frames"
         args.apply(self.apply(**self.config()))
+
+class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
+    "converts to a pandas dataframe."
+    # pylint: disable=arguments-differ
+    @staticmethod
+    def _run(_1, _2, res:FitBead) -> Dict[str, np.ndarray]: # type: ignore
+        out = {i: [] for i in ('cycle', 'peak', 'event')}   # type: Dict[str, List[np.ndarray]]
+        out.update({i: [] for i in res.distances})
+        for (peak, evts) in PeaksDict.measure(cast(PeaksArray, deepcopy(res.events))):
+            vals = [i for i in enumerate(evts) if i[1] is not None]
+
+            out['cycle'].append(np.array([i for i, _ in vals]))
+            out['peak'].append(np.full(len(vals), peak, dtype = 'f4'))
+            out['event'].append(np.array([i for _, i in vals]))
+            for i, j in res.distances.items():
+                out[i].append((out['event'][-1]-j.bias)*j.stretch)
+        return {i: np.concatenate(j) for i, j in out.items()}
