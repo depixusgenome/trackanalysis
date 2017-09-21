@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "The default order for common tasks"
+from typing import Iterable, Iterator, Type
+from .base  import Task
+
 TASK_ORDER = ['model.task.RootTask',
               'model.task.DataSelectionTask',
               'cleaning.beadsubtraction.BeadSubtractionTask',
@@ -12,7 +15,7 @@ TASK_ORDER = ['model.task.RootTask',
               'peakcalling.processor.FitToHairpinTask',
              ]
 
-def taskorder(lst):
+def taskorder(lst: Iterable[str]) -> Iterator[Type[Task]]:
     "yields a list of task types in the right order"
     for itm in lst:
         modname, clsname = itm[:itm.rfind('.')], itm[itm.rfind('.')+1:]

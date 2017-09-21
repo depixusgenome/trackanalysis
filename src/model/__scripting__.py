@@ -5,6 +5,7 @@ Monkeypatches tasks and provides a simpler access to usual tasks
 """
 import sys
 from pathlib                import Path
+from typing                 import Type, Tuple, cast
 
 from copy                   import deepcopy
 from enum                   import Enum
@@ -18,7 +19,7 @@ from eventdetection.processor   import ExtremumAlignmentTask, EventDetectionTask
 from peakfinding.processor      import PeakSelectorTask
 from peakcalling.processor      import FitToHairpinTask, BeadsByHairpinTask
 from .task                      import * # pylint: disable=wildcard-import,unused-wildcard-import
-from .task                      import Task, TrackReaderTask
+from .task                      import Task, TrackReaderTask, taskorder
 from .task.dataframe            import DataFrameTask
 
 assert 'scripting' in sys.modules
@@ -76,6 +77,13 @@ class Tasks(Enum):
             return cls.__create(args[0], kwa, beadsonly)
         return [cls.__create(i, kwa, beadsonly) for i in args]
 
+    @staticmethod
+    def defaulttaskorder(order = None) -> Tuple[Type[Task],...]:
+        "returns the default task order"
+        default = FitToHairpinTask, PeakSelectorTask, EventDetectionTask
+        items   = tuple(taskorder(order))[::-1] if order else default
+        return cast(Tuple[Type[Task],...], items)
+
     @classmethod
     def tasklist(cls, *tasks, **kwa):
         "Same as create except that a list may be completed as necessary"
@@ -83,7 +91,7 @@ class Tasks(Enum):
         if isinstance(lst, Task):
             lst = [lst]
 
-        order = FitToHairpinTask, PeakSelectorTask, EventDetectionTask,
+        order = cls.defaulttaskorder()
         for i, itm in enumerate(order[:-1]):
             ind = next((i for i, j in enumerate(lst) if isinstance(j, itm)), None)
             if ind is None:
