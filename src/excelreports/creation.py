@@ -264,6 +264,7 @@ class XlsReporter(_BaseReporter):
 
             fcns = tuple((*i, _get(i[1])) for i in enumerate(self.columns()))
 
+            irow = 1
             for i, line in enumerate(self.iterate()):
                 irow = self.tablerow() + i + 1
                 mark = self.linemark(line)
@@ -344,7 +345,7 @@ FILEOBJ  = Union[IO,Workbook]
 def fileobj(fname:FILENAME) -> Iterator[FILEOBJ]:
     u"Context manager for opening xlsx or text file"
     if Path(str(fname)).suffix in ('.xlsx', '.xls'):
-        with closing(Workbook(str(fname))) as book:
+        with closing(Workbook(str(fname), {'nan_inf_to_errors': True})) as book:
             yield book
     else:
         with open(str(fname), 'w', encoding = 'utf-8') as stream:
