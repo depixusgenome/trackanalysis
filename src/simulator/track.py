@@ -3,7 +3,7 @@
 "Simulates track files"
 from    typing          import (Sequence, Union, # pylint: disable=unused-import
                                 Optional, NamedTuple, Iterable, List,
-                                Callable, Iterator, Any, Tuple, Dict)
+                                Callable, Iterator, Any, Tuple, Dict, Type)
 import  random
 from    itertools       import chain
 from    collections     import OrderedDict
@@ -41,8 +41,8 @@ class SingleStrandClosing:
 
 class LadderEvents:
     """ Creates events on a given range """
-    randzargs    = (0., .1, .9)     # type: Optional[Tuple[float, float, float]]
-    randtargs    = (10, 100)        # type: Optional[Tuple[int, int]]
+    randzargs: Optional[Tuple[float, float, float]] = (0., .1, .9)
+    randtargs: Optional[Tuple[int, int]]            = (10, 100)
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -90,13 +90,13 @@ class PoissonEvents:
     **Note:** the peak at zero is implicit. It occurs unless stochastic events
     last too long.
     """
-    peaks  = [.1, .3, .5, .9, 1.5]   # type: Sequence[float]
-    rates  = 1.                      # type: Union[None,float,Sequence[float]]
-    sizes  = None                    # type: Union[None,float,Sequence[float]]
-    store  = []                      # type: List[str]
+    peaks:  Sequence[float]                   = [.1, .3, .5, .9, 1.5]
+    rates:  Union[None,float,Sequence[float]] = 1.
+    sizes:  Union[None,float,Sequence[float]] = None
+    store:  List[str]                         = []
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
-        self.__store = {} # type: Dict[str,np.ndarray]
+        self.__store: Dict[str,np.ndarray] = {}
 
     def __rates(self, sorts, cycsize):
         if self.rates is None:
@@ -156,15 +156,15 @@ class PoissonEvents:
 
 class TrackSimulator:
     "Simulates bead data over a number of cycles"
-    ncycles      = 15
-    durations    = [ 1,  15,  1,  15,  1,  100,   1,  15]
-    zmax         = [ 0., 0.,  1., 1.,  0.,  0., -.3, -.3]
-    events       = PoissonEvents()
-    closing      = SingleStrandClosing()
-    brownian     = [.003] * 9           # type: Union[None, float, Sequence[float]]
-    baselineargs = (.1, 10.1, 'stairs') # type: Optional[Tuple[float, float, str]]
-    driftargs    = (.1, 29.)            # type: Optional[Tuple[float, float]]
-    framerate    = 30.
+    ncycles                                           = 15
+    durations                                         = [ 1,  15,  1,  15,  1,  100,   1,  15]
+    zmax                                              = [ 0., 0.,  1., 1.,  0.,  0., -.3, -.3]
+    events                                            = PoissonEvents()
+    closing                                           = SingleStrandClosing()
+    brownian:     Union[None, float, Sequence[float]] = [.003] * 9
+    baselineargs: Optional[Tuple[float, float, str]]  = (.1, 10.1, 'stairs')
+    driftargs:    Optional[Tuple[float, float]]       = (.1, 29.)
+    framerate                                         = 30.
     __KEYS       = frozenset(locals())
     @initdefaults(__KEYS,
                   events    = 'update',
@@ -241,7 +241,10 @@ class TrackSimulator:
     def track(self, nbeads = 1, seed = None):
         "creates a simulated track"
         self.seed(seed)
-        track = Track(data = {}, phases = self.phases, framerate = self.framerate)
+        track = Track(data      = {},
+                      phases    = self.phases,
+                      framerate = self.framerate,
+                      key       = 'tracksimulator')
         sim   = {}
         for i in range(nbeads):
             track.data[i] = self()
@@ -261,7 +264,9 @@ class TrackSimulator:
         "Creates events in a Events object"
         self.seed(seed)
 
-        track = Track(data = None, phases = self.phases)
+        track = Track(data   = None,
+                      phases = self.phases,
+                      key    = 'bybeadeventssimulator')
         def _createall():
             evts = OrderedDict() # type: Dict[Tuple[int,int], np.ndarray]
             def _createone(cycs, bead):
@@ -281,7 +286,9 @@ class TrackSimulator:
         "Creates events grouped by peaks"
         self.seed(seed)
 
-        track = Track(data = {i: None for i in range(nbeads)}, phases = self.phases)
+        track = Track(data   = {i: None for i in range(nbeads)},
+                      phases = self.phases,
+                      key    = 'bypeakevents')
         def _create(cycles):
             events = tuple(self.__events(cycles))
             labels = [np.array([i[0] for i in evt['data']]) for evt in events]
