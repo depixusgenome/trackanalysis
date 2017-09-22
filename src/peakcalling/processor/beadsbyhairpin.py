@@ -35,6 +35,10 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
         "returns whether this is pooled"
         return True
 
+    @staticmethod
+    def __apply(app, frame):
+        return frame.new(TrackView).selecting(app)
+
     @classmethod
     def apply(cls, toframe = None, data = None, pool = None, **cnf):
         "applies the task to a frame or returns a function that does so"
@@ -43,8 +47,7 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
         else:
             app = partial(cls.__pooled, pool, pooldump(data.append(cls.CHILD(cnf))))
 
-        fcn = lambda j: j.new(TrackView, data = lambda: app(j))
-        return fcn if toframe is None else fcn(toframe)
+        return partial(cls.__apply, app) if toframe is None else cls.__apply(app, toframe)
 
     def run(self, args):
         "updates frames"
@@ -76,10 +79,12 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
 
     @classmethod
     def __unpooled(cls, cnf, frame):
-        vals = (cnf.get(i, {}) for i in ('fit', 'constrainst', 'match'))
-        return {i.key: i for i in cls.compute(*vals, frame)}
+        vals       = (cnf.get(i, {}) for i in ('fit', 'constrainst', 'match'))
+        frame.data = {i.key: i for i in cls.compute(*vals, frame.data)}
+        return []
 
     @classmethod
     def __pooled(cls, pool, pickled, frame):
-        out  = cls.__output(pooledinput(pool, pickled, frame))
-        return {i.key: i for i in out}
+        out        = cls.__output(pooledinput(pool, pickled, frame.data))
+        frame.data = {i.key: i for i in out}
+        return []
