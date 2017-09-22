@@ -8,6 +8,7 @@ from pathlib                import Path
 from copy                   import copy as shallowcopy
 import re
 
+from .views                 import isellipsis
 from .track                 import Track
 from .trackio               import LegacyGRFilesIO, LegacyTrackIO, PATHTYPES
 
@@ -72,6 +73,9 @@ class TracksDict(dict):
         return self._set(key, val)
 
     def __getitem__(self, key):
+        if isellipsis(key):
+            return shallowcopy(self)
+
         if isinstance(key, list):
             other = shallowcopy(self)
             for i in set(other)-set(key):
