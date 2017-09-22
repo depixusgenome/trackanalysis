@@ -4,7 +4,7 @@
 Base track file data.
 """
 from    typing      import Optional, Union, Dict, Tuple
-from    copy        import deepcopy
+from    copy        import deepcopy, copy as shallowcopy
 from    enum        import Enum
 import  numpy       as     np
 
@@ -272,3 +272,14 @@ class Track:
     def cyclesonly(self) -> Cycles:
         "returns a helper object for extracting cycles from *beads* only"
         return self.__view(Cycles, beadsonly = True)
+
+def dropbeads(trk, *beads:Tuple[BEADKEY]) -> Track:
+    "returns a track without the given beads"
+    cpy           = shallowcopy(trk)
+    good          = frozenset(trk.data.keys()) - frozenset(beads)
+    cpy.data      = {i: cpy.data[i] for i in good}
+
+    cpy.fov       = shallowcopy(trk.fov)
+    good          = good & frozenset(cpy.fov.beads)
+    cpy.fov.beads = {i: cpy.fov.beads[i] for i in good}
+    return cpy

@@ -12,7 +12,7 @@ import numpy                        as     np
 import pandas                       as     pd
 from   utils.decoration             import addto
 from   control.processor.dataframe  import DataFrameFactory
-from   data.track                   import Track, BEADKEY
+from   data.track                   import Track, BEADKEY, dropbeads
 from   data.tracksdict              import TracksDict
 from   ..processor                  import DataCleaningProcessor, DataCleaningException
 
@@ -59,10 +59,9 @@ class TrackCleaningScript:
                                  types   = types,
                                  message = msgs))
 
-    def dropbad(self, **kwa):
+    def dropbad(self, **kwa) -> Track:
         "removes bad beads *forever*"
-        for i in self.bad(**kwa):
-            self.track.data.pop(i)
+        return dropbeads(self.track, *self.bad(**kwa))
 
 @addto(Track) # type: ignore
 @property
@@ -100,10 +99,12 @@ class TracksDictCleaningScript:
         "returns beads with warnings"
         return sorted(self.process(**kwa)[0])
 
-    def dropbad(self, **kwa):
+    def dropbad(self, **kwa) -> TracksDict:
         "removes bad beads *forever*"
-        for bead, track in product(self.bad(**kwa), self.tracks.values()):
-            track.data.pop(bead, None)
+        cpy = self.tracks[...]
+        for key, track in cpy.items():
+            cpy[key] = TrackCleaningScript(track).dropbad(**kwa)
+        return cpy
 
 @addto(TracksDict) # type: ignore
 @property
