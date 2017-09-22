@@ -142,6 +142,9 @@ class Tasks(Enum):
         if isinstance(arg, Task):
             return update(deepcopy(arg), **kwa)
 
+        if isinstance(arg, type) and issubclass(arg, Task):
+            return arg()
+
         if isinstance(arg, str) and arg in cls.__members__:
             return cls(arg)(**kwa)
 
