@@ -21,7 +21,8 @@ def toenum(tpe, val):
     if not issubclass(tpe, Enum):
         return val
     if isinstance(val, (int, str)):
-        return tpe(val)
+        elem = next((i for i in tpe if i.value == val), None)
+        return getattr(tpe, val) if elem is None else elem
     if isinstance(val, tpe):
         return val
     if val is not None:
