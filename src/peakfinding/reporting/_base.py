@@ -101,7 +101,7 @@ class ReporterInfo:
 
     def setbeads(self, beads):
         "sets the beads"
-        self.beads = sorted(i for i in beads if Beads.isbead(i))
+        self.beads = sorted(i for i in beads if Beads.isbead(i[0]))
 
     @staticmethod
     def sheettype(name:str):
