@@ -3,8 +3,9 @@
 # pylint: disable=invalid-name
 u"utils for inspecting objects and frames"
 import inspect
-from   typing import cast
-from   types  import LambdaType, FunctionType, MethodType
+from   typing    import cast
+from   types     import LambdaType, FunctionType, MethodType
+from   functools import partial
 
 signature           = inspect.signature
 getmembers          = inspect.getmembers
@@ -12,7 +13,7 @@ isgeneratorfunction = inspect.isgeneratorfunction
 
 def isfunction(fcn) -> bool:
     u"Returns whether the object is a function"
-    return isinstance(fcn, (LambdaType, FunctionType, MethodType))
+    return isinstance(fcn, (LambdaType, FunctionType, MethodType, partial))
 
 def ismethod(fcn) -> bool:
     u"to be called in method decorators"
