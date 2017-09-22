@@ -6,9 +6,8 @@ from functools        import partial
 from model.task.utils import ExceptionCatchingTask
 from .base            import Processor
 
-class ExceptionCatchingProcessor(Processor):
+class ExceptionCatchingProcessor(Processor[ExceptionCatchingTask]):
     "Discards beads which throw an exception"
-    tasktype = ExceptionCatchingTask
     @staticmethod
     def __test(exc: Tuple[Type[Exception],...], frame):
         if not exc:
