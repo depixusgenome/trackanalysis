@@ -242,8 +242,10 @@ class DataCleaningException(Exception):
 
             return '\n'.join(i for i in msg if i[0] != '0')
 
-    def __init__(self, stats, cnf, tasktype):
-        super().__init__(self.ErrorMessage(stats, cnf, tasktype), 'warning')
+    @classmethod
+    def create(cls, stats, cnf, tasktype):
+        "creates the exception"
+        cls(cls.ErrorMessage(stats, cnf, tasktype), 'warning')
 
 class DataCleaningProcessor(Processor[DataCleaningTask]):
     "Processor for bead selection"
@@ -272,7 +274,7 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
         if cache is not None:
             val, discard = cache.get(frame.track, {}).get(info[0], ('', False))
             if discard:
-                return DataCleaningException(val, cnf, cls.tasktype)
+                return DataCleaningException.create(val, cnf, cls.tasktype)
             tested       = val != ''
 
         discard = DataCleaning(**cnf).aberrant(info[1])
@@ -296,7 +298,7 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
 
         if not (tested or cache is None):
             cache.setdefault(frame.track, {})[info[0]] = val, discard
-        return DataCleaningException(val, cnf, cls.tasktype) if discard else None
+        return DataCleaningException.create(val, cnf, cls.tasktype) if discard else None
 
     @classmethod
     def apply(cls, toframe = None, **cnf):
