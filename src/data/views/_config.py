@@ -34,6 +34,7 @@ class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name
     parents:   Union[Tuple, Hashable] = tuple()
     _COPY:     bool                   = None
     def __init__(self, **kw) -> None:
+        super().__init__()
         get = lambda x: kw.get(x, shallowcopy(getattr(self.__class__, x)))
         self.data      = get('data')
         self.parents   = get('parents')

@@ -95,7 +95,7 @@ class Event:
         completions = self._handlers.get('ㄡ', None)
         if completions:
             for fcn, names in cast(_COMPLETIONS, completions).items():
-                if any(patt(key) for patt, key in product(names, lst)):
+                if any(patt(key) for patt, key in product(names, lst)): # type: ignore
                     allfcns.add(fcn)
         return allfcns
 

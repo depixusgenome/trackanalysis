@@ -13,7 +13,7 @@ from data.views       import ITrackView, Cycles, CYCLEKEY
 from utils            import EVENTS_TYPE, EVENTS_DTYPE, asview, EventsArray
 from .                import EventDetectionConfig
 
-class Events(Cycles, EventDetectionConfig, ITrackView):
+class Events(Cycles, EventDetectionConfig, ITrackView):# pylint:disable=too-many-ancestors
     u"""
     Class for iterating over events:
 
