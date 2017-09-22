@@ -86,17 +86,20 @@ class PeakSelector(PrecisionAlg):
         else:
             zmeas = cast(Callable, self.histogram.zmeasure)
 
+        if getattr(evts, 'dtype', 'f4') == EVENTS_DTYPE:
+            return zmeas([zmeas(i) for i in evts['data']])
+
         first = next((i for i in evts if i is not None), None)
         if first is None:
             return peak
 
         if isinstance(first, tuple) or first.dtype == EVENTS_DTYPE:
             def _measure(item):
-                return ([zmeas(item[1])]    if isinstance(item, tuple)  else
+                return ([zmeas(item[1])]        if isinstance(item, tuple)  else
                         [zmeas(i) for i in item['data']])
         else:
             def _measure(item):
-                return ([zmeas(item)]       if np.isscalar(item[0])     else
+                return ([zmeas(item)]           if np.isscalar(item[0])     else
                         [zmeas(i[1]) for i in item])
 
         vals = [_measure(i) for i in evts if i is not None]

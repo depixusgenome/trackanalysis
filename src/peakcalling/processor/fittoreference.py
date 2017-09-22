@@ -27,20 +27,33 @@ class FitToReferenceTask(Task):
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **kwa):
         super().__init__(**kwa)
+        self.__init_data(kwa)
 
-    def frompeaks(self, peaks: PeaksDict):
+    def __scripting__(self, kwa) -> 'FitToReferenceTask':
+        self.__init_data(kwa)
+        return self
+
+    def frompeaks(self, peaks: PeaksDict) -> 'FitToReferenceTask':
         "creates fit data for references from a PeaksDict"
         self.fitdata = {i: self.fitalg.frompeaks(j) for i, j in peaks}
+        return self
 
-    def fromevents(self, events: Events):
+    def fromevents(self, events: Events) -> 'FitToReferenceTask':
         "creates fit data for references from a PeaksDict"
         keys = {i for i, _ in events.keys()}
         self.fitdata = {i: self.fitalg.fromevents(cast(Events, events[i, ...])) for i in keys}
+        return self
 
     @classmethod
     def isslow(cls) -> bool:
         "whether this task implies long computations"
         return True
+
+    def __init_data(self, kwa):
+        if 'peaks' in kwa:
+            self.frompeaks(kwa['peaks'])
+        elif 'events' in kwa:
+            self.fromevents(kwa['events'])
 
 class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
     "iterator over peaks grouped by beads"

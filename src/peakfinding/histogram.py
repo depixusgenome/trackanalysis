@@ -55,6 +55,8 @@ class Histogram(PrecisionAlg):
     zmeasure: Union[str, Callable, None]  = 'nanmean'
     weight:   Union[str, Callable, None]  = None
     kernel:   Optional[KernelConvolution] = KernelConvolution()
+    stdpercentile                         = 75.
+    stdfactor                             = 4.
 
     @initdefaults(frozenset(locals()), kernel = 'update')
     def __init__(self, **kwa):
@@ -168,9 +170,7 @@ class Histogram(PrecisionAlg):
         lenv   = int((maxv-minv)/bwidth)+1
         arr    = np.zeros((lenv,), dtype = 'f4')
 
-        peaks[:,0] -= minv
-        peaks       = np.int32(np.rint((peaks)/bwidth)) # type: ignore
-        peaks       = peaks[np.logical_and(peaks[:,0] >= 0, peaks[:,0] < lenv)]
+        peaks  = self.__rint_peaks(peaks, minv, bwidth, lenv)
         if self.kernel is None:
             arr[peaks[:,0]] += 1
         else:
@@ -193,6 +193,16 @@ class Histogram(PrecisionAlg):
 
                 arr[imin:imax] = kern
         return HistogramData(arr, minv, bwidth)
+
+    def __rint_peaks(self, peaks, minv, bwidth, lenv):
+        peaks[:,0] -= minv
+        peaks       = np.int32(np.rint((peaks)/bwidth)) # type: ignore
+        peaks       = peaks[np.logical_and(peaks[:,0] >= 0, peaks[:,0] < lenv)]
+        defaultstd  = np.percentile(peaks[:,1][peaks[:,1]>0], self.stdpercentile)
+        peaks[:,1][peaks[:,1] <= 0] = defaultstd
+        if defaultstd == 0:
+            peaks[:,1] = bwidth*self.stdfactor
+        return peaks
 
     @staticmethod
     def __eventpositions(events, bias, fcn):
