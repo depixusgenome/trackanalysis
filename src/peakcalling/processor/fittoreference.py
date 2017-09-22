@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Matching experimental peaks to hairpins: tasks and processors"
-from   typing                      import Dict, Iterator, Tuple, Union, cast
+from   typing                      import (Optional, Sequence, Iterable,
+                                           Dict, Iterator, Tuple, Union, cast)
 import numpy                       as     np
 
-from   utils                       import initdefaults, EventsArray
+from   utils                       import initdefaults
 from   data.views                  import TaskView, BEADKEY
 from   model.task                  import Task, Level
 from   control.processor.taskview  import TaskViewProcessor
@@ -24,13 +25,17 @@ class FitToReferenceTask(Task):
     fitdata : Fitters      = dict()
     fitalg  : HistogramFit = ChiSquareHistogramFit()
     window  : float        = 10./8.8e-4
-    @initdefaults(frozenset(locals()) - {'level'})
+    @initdefaults(frozenset(locals()) - {'level'},
+                  peaks  = lambda self, val: self.frompeaks (val),
+                  events = lambda self, val: self.fromevents(val))
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.__init_data(kwa)
 
     def __scripting__(self, kwa) -> 'FitToReferenceTask':
-        self.__init_data(kwa)
+        if 'peaks' in kwa:
+            self.frompeaks(kwa['peaks'])
+        elif 'events' in kwa:
+            self.fromevents(kwa['events'])
         return self
 
     def frompeaks(self, peaks: PeaksDict) -> 'FitToReferenceTask':
@@ -49,39 +54,35 @@ class FitToReferenceTask(Task):
         "whether this task implies long computations"
         return True
 
-    def __init_data(self, kwa):
-        if 'peaks' in kwa:
-            self.frompeaks(kwa['peaks'])
-        elif 'events' in kwa:
-            self.fromevents(kwa['events'])
-
 class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
     "iterator over peaks grouped by beads"
     level = Level.bead
     dtype = np.dtype([('peaks', 'f4'), ('events', 'O')])
+    def _keys(self, sel:Optional[Sequence], _: bool) -> Iterable:
+        available = frozenset(self.config.fitdata)
+        if sel is None:
+            return super()._keys(tuple(available), True)
+        return super()._keys([i for i in sel if i in available], True)
+
     def compute(self, key: BEADKEY) -> np.ndarray:
         "Action applied to the frame"
         fit           = self.config.fitalg
         data          = np.array(list(cast(Iterator[PeakOutput], self.data[key])),
                                  dtype = self.dtype)
+        if key not in self.config.fitdata:
+            raise KeyError(f"Missing reference id {key} in {self}")
         stretch, bias = fit.optimize(self.config.fitdata[key],
                                      fit.frompeaks(data))[1:]
 
         data['peaks'][:] = (data['peaks']-bias)*stretch
 
-        mult  = self.__multiple
         for evts in data['events']:
-            good               = PeaksDict.singles(evts)
-            evts['data'][good] = (evts['data'][good]-bias)*stretch
+            for _, i in evts[PeaksDict.singles(evts)]:
+                i[:] = (i[:]-bias)*stretch
 
-            good               = PeaksDict.multiples(evts)
-            evts['data'][good] = [mult(i, stretch, bias) for i in evts['data'][good]]
+            for i in evts[PeaksDict.multiples(evts)]:
+                i['data'][:] = [(j-bias)*stretch for j in i['data']]
         return data
-
-    @staticmethod
-    def __multiple(evts:EventsArray, stretch: float, bias: float) -> EventsArray:
-        evts['data'] = [(i-bias)*stretch for i in evts['data']]
-        return evts
 
 class FitToReferenceProcessor(TaskViewProcessor[FitToReferenceTask, FitToReferenceDict, BEADKEY]):
     "Changes the Z axis to fit the reference"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Makes TrackViews for specific tasks easier"
-from typing import (Generic, TypeVar, Type, Union,
+from typing import (Generic, TypeVar, Type, Union, Optional,
                     Iterable, Sequence, Iterator, FrozenSet, cast)
 from abc    import abstractmethod
 from ._view import TrackView
@@ -39,7 +39,7 @@ class TaskView(TrackView, Generic[Config, Key]):
                 yield from ((i, j) for i, j in itr if i in sel)
         yield from ((key, self.compute(key)) for key in self.keys(sel))
 
-    def _keys(self, sel:Sequence = None, _ = None) -> Iterator[Key]:
+    def _keys(self, sel:Optional[Sequence[Key]], beadsonly: bool) -> Iterable[Key]:
         if self.__keys is None:
             self.__keys = frozenset(self.data.keys())
 

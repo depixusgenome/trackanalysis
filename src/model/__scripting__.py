@@ -17,7 +17,8 @@ from cleaning.processor         import DataCleaningTask
 from cordrift.processor         import DriftTask
 from eventdetection.processor   import ExtremumAlignmentTask, EventDetectionTask
 from peakfinding.processor      import PeakSelectorTask
-from peakcalling.processor      import FitToHairpinTask, BeadsByHairpinTask
+from peakcalling.processor      import (FitToReferenceTask, FitToHairpinTask,
+                                        BeadsByHairpinTask)
 from .task                      import * # pylint: disable=wildcard-import,unused-wildcard-import
 from .task                      import Task, TrackReaderTask, taskorder
 from .task.dataframe            import DataFrameTask
@@ -62,6 +63,7 @@ class Tasks(Enum):
                     cycles         = CycleCreatorTask(),
                     eventdetection = EventDetectionTask(),
                     peakselector   = PeakSelectorTask(),
+                    fittoreference = FitToReferenceTask(),
                     fittohairpin   = FitToHairpinTask(),
                     beadsbyhairpin = BeadsByHairpinTask(),
                     dataframe      = DataFrameTask())
