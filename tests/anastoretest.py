@@ -79,6 +79,14 @@ def test_storenumpy():
     assert numpy.array_equal(vals['c'], loaded['c'])
     assert loaded['d'] is numpy.nanmedian
 
+def test_storetype():
+    u"tests storing arrays"
+    vals = dict(a = TaggingTask, b = [TaggingTask])
+    loaded = anastore.loads(anastore.dumps(vals))
+    assert set(vals.keys()) == set(loaded.keys()) # pylint: disable=no-member
+    assert vals['a'] is TaggingTask
+    assert vals['b'][0] is TaggingTask
+
 def test_modifyclass():
     "tests class modifications"
     val = [{TPE: 'toto'}, {TPE: 'titi', 'attr': 1}]
@@ -105,4 +113,5 @@ def test_modifyclass():
     assert val == [{'a': {TPE: 'toto', 'newname': 2}}]
 
 if __name__ == '__main__':
-    test_modifyclass()
+    from _pytest.monkeypatch import MonkeyPatch
+    test_storetasks(MonkeyPatch())

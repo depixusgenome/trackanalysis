@@ -20,6 +20,17 @@ class _ItemIO(metaclass=ABCMeta):
     def run(val, runner):
         "returns the dict to be dumped"
 
+class _TypeIO(_ItemIO):
+    @staticmethod
+    def check(val):
+        "returns wether this class deals with val"
+        return isinstance(val, type)
+
+    @staticmethod
+    def run(val, runner):
+        "returns the dict to be dumped"
+        return {TPE: 'τ', CNT: val.__module__+'.'+val.__name__}
+
 class _ContainerIO(_ItemIO):
     @staticmethod
     def check(val):

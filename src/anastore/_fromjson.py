@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Track Analysis conversion from json'able items."
-import  numpy
+import  numpy       as     np
 
 from    ._utils     import isjsonable, CNT, TPE, STATE
 
@@ -18,6 +18,29 @@ class _ItemIO:
     def run(cls, val, runner):
         "returns the loaded item"
         return cls._CONTENTS[val[TPE]](runner(val[CNT]))
+
+class _TypeIO(_ItemIO):
+    @staticmethod
+    def check(val):
+        "returns wether this class deals with val"
+        return isinstance(val, dict) and val.get(TPE, None) == 'τ'
+
+    @classmethod
+    def run(cls, val, runner):
+        return cls.loadclass(val[CNT])
+
+    @staticmethod
+    def loadclass(name:str) -> type:
+        "loads and returns a class"
+        elems = name.split('.')
+        cur   = ''
+        cls   = __import__(elems[0])
+        for i in elems[1:]:
+            if not hasattr(cls, i):
+                cur += '.'+i
+                __import__(cur)
+            cls = getattr(cls, i)
+        return cls
 
 class _ListIO(_ItemIO):
     @staticmethod
@@ -51,9 +74,9 @@ class _NDArrayIO(_ItemIO):
     def run(val, runner):
         "returns the loaded item"
         if val[TPE] == 'npo':
-            return numpy.array(tuple(runner(ite) for ite in val[CNT]),
-                               dtype = numpy.object)
-        return numpy.array(val[CNT], dtype = val[TPE][2:])
+            return np.array(tuple(runner(ite) for ite in val[CNT]),
+                            dtype = np.object)
+        return np.array(val[CNT], dtype = val[TPE][2:])
 
 class _NPFunction(_ItemIO):
     @staticmethod
@@ -64,7 +87,7 @@ class _NPFunction(_ItemIO):
     @staticmethod
     def run(val, runner):
         "returns thishe dict to be dumped"
-        return getattr(numpy, val[1:])
+        return getattr(np, val[1:])
 
 class Runner:
     "loads json'ables"
@@ -87,25 +110,14 @@ class Runner:
 
     @staticmethod
     def __create_obj(item):
-        elems = item.split('.')
-        for i in range(-1, -len(elems), -1):
-            try:
-                cls = getattr(__import__('.'.join(elems[:i]), fromlist = elems[i]),
-                              elems[i])
-            except ImportError:
-                continue
-            for j in range(i+1, 0):
-                cls = getattr(cls, elems[j])
-            break
-        else:
-            raise ImportError('Could not load class '+ '.'.join(elems))
+        cls = _TypeIO.loadclass(item)
 
         if hasattr(cls, '__getnewargs_ex__'):
-            i, j = cls.__getnewargs_ex__()
+            i, j = cls.__getnewargs_ex__()              # type: ignore
             return cls.__new__(*i, **j)
         if hasattr(cls, '__getnewargs__'):
-            return cls.__new__(*cls.__getnewargs__())
-        return cls.__new__(cls)
+            return cls.__new__(*cls.__getnewargs__())   # type: ignore
+        return cls.__new__(cls)                         # type: ignore
 
     def __init_obj(self, obj, item):
         state = {name: self(val) for name, val in item.items()}
