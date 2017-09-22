@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "List of processes and cache"
-from typing         import Union, Iterable, List, Tuple, Any, Iterator
+from typing         import Union, Iterable, Sized, List, Tuple, Any, Iterator
 from utils          import isfunction
 from .base          import Processor
 
@@ -66,7 +66,7 @@ class CacheItem:
     cache   = property(lambda self: self.getCache(), setCache)
     proc    = property(lambda self: self._proc)
 
-class Cache:
+class Cache(Iterable[Processor], Sized):
     "Contains the track and task-created data"
     __slots__ = ('_items',)
     def __init__(self, order: Iterable[Union[CacheItem, Processor]] = None) -> None:
@@ -163,6 +163,9 @@ class Cache:
     def items(self) -> Iterator[CacheItem]:
         "yields processors and caches"
         return iter(self._items)
+
+    def __contains__(self, tsk:type):
+        return any(tsk is i or tsk is i.tasktype for i in self)
 
     def __getitem__(self, ide):
         if isinstance(ide, slice):
