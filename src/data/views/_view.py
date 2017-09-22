@@ -132,7 +132,7 @@ class TrackView(TrackViewConfigMixin, ITrackView):
     def __unlazyfy(self):
         for name, val in self.__dict__.items():
             if isfunction(val):
-                setattr(self, name, val())
+                setattr(self, name, val(self))
 
         for attr in ('selected', 'discarded'):
             # pylint: disable=not-an-iterable
@@ -143,7 +143,7 @@ class TrackView(TrackViewConfigMixin, ITrackView):
             method = getattr(self, attr[:-2]+'ing')
             method(None)
             for i in old:
-                method(i() if isfunction(i) else i)
+                method(i(self) if isfunction(i) else i)
 
         if self.data is None:
             self.data = shallowcopy(self.track.data)

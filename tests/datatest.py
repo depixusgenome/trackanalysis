@@ -174,10 +174,10 @@ def test_cycles_cancyclefromcycle():
 def test_cycles_lazy():
     u"tests what happens when using lazy mode"
     truth = readtrack(utpath("big_legacy"))[0]
-    for _, vals in data.Cycles(track    = lambda:data.Track(path = utpath("big_legacy")),
-                               first    = lambda:2,
-                               last     = lambda:3,
-                               selected = lambda:[(0,1)]):
+    for _, vals in data.Cycles(track    = lambda _:data.Track(path = utpath("big_legacy")),
+                               first    = lambda _:2,
+                               last     = lambda _:3,
+                               selected = lambda _:[(0,1)]):
         assert np.array_equal(vals, truth[1206-678:1275-678])
 
 def test_cycles_nocopy():
