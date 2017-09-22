@@ -98,7 +98,7 @@ class Tasks(Enum):
                 continue
 
             if ind == 0 or not isinstance(lst[ind-1], order[i+1]):
-                name = order[ind+1].__name__.lower().replace('Task', '')
+                name = order[i+1].__name__.lower().replace('task', '')
                 lst.insert(ind, cls.get(name, **kwa))
         return lst
 
