@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "IO for peaksplot"
-from typing                          import Tuple, Union
+from typing                          import (Optional, Tuple, # pylint: disable=unused-import
+                                             Union, List)
 from pathlib                         import Path
 from copy                            import deepcopy
 from concurrent.futures              import ProcessPoolExecutor, ThreadPoolExecutor
 
+from control.processor.utils         import ExceptionCatchingTask
 from control.taskcontrol             import create as _createdata
 from control.taskio                  import (ConfigTrackIO, ConfigGrFilesIO, TaskIO,
                                              currentmodelonly)
+from cleaning.processor              import DataCleaningTask, DataCleaningException
 from peakfinding.reporting.processor import PeakFindingExcelTask
 from peakcalling.processor           import FitToHairpinTask, BeadsByHairpinTask
 
@@ -86,7 +89,6 @@ class ConfigXlsxIO(TaskIO):
             self.__msg.set(exc)
 
         model = self.__complete_model(list(models[0]))
-        print(model)
         try:
             LOGS.info('%s saving %s', type(self).__name__, path)
             ret = self._run(dict(path      = path,
@@ -106,10 +108,16 @@ class ConfigXlsxIO(TaskIO):
         return ret
 
     def __complete_model(self, model):
+        ind = next((i for i, j in enumerate(model) if isinstance(j, DataCleaningTask)),
+                   None)
+        if ind is not None:
+            model.insert(ind+1, ExceptionCatchingTask(exceptions = [DataCleaningException]))
+
         if isinstance(model[-1], self.__model.identification.tasktype):
             return model
 
-        missing = self.__model.eventdetection, self.__model.peakselection
+        missing = (self.__model.eventdetection,
+                   self.__model.peakselection) # type: Tuple
         while len(missing):
             if not isinstance(model[-1], tuple(i.tasktype for i in missing)):
                 return model + [deepcopy(i.configtask.get()) for i in missing]
@@ -133,7 +141,10 @@ class ConfigXlsxIO(TaskIO):
                                  PeakFindingExcelTask(model     = model,
                                                       **xlscnf))
 
-        error    = [None]
+        for itm in cache.run():
+            tuple(itm)
+
+        error = [None] # type: List[Optional[Exception]]
         def _process():
             try:
                 with cls.POOLTYPE() as pool:
