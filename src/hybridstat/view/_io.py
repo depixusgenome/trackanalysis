@@ -3,6 +3,7 @@
 "IO for peaksplot"
 from typing                          import Tuple, Union
 from pathlib                         import Path
+from copy                            import deepcopy
 from concurrent.futures              import ProcessPoolExecutor, ThreadPoolExecutor
 
 from control.taskcontrol             import create as _createdata
@@ -84,12 +85,14 @@ class ConfigXlsxIO(TaskIO):
                 startfile(path)
             self.__msg.set(exc)
 
+        model = self.__complete_model(list(models[0]))
+        print(model)
         try:
             LOGS.info('%s saving %s', type(self).__name__, path)
             ret = self._run(dict(path      = path,
                                  oligos    = self.__model.oligos,
                                  sequences = self.__model.sequences),
-                            models[0],
+                            model,
                             _end)
         except IOError as exc:
             if len(exc.args) == 1:
@@ -101,6 +104,17 @@ class ConfigXlsxIO(TaskIO):
         if ret:
             self.__msg.set(self.__css.start.get())
         return ret
+
+    def __complete_model(self, model):
+        if isinstance(model[-1], self.__model.identification.tasktype):
+            return model
+
+        missing = self.__model.eventdetection, self.__model.peakselection
+        while len(missing):
+            if not isinstance(model[-1], tuple(i.tasktype for i in missing)):
+                return model + [deepcopy(i.configtask.get()) for i in missing]
+            missing = missing[1:]
+        return model
 
     @classmethod
     def _run(cls, xlscnf, model, end = None):
@@ -119,7 +133,7 @@ class ConfigXlsxIO(TaskIO):
                                  PeakFindingExcelTask(model     = model,
                                                       **xlscnf))
 
-        error  = [None]
+        error    = [None]
         def _process():
             try:
                 with cls.POOLTYPE() as pool:

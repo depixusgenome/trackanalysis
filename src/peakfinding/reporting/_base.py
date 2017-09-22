@@ -12,6 +12,7 @@ import numpy as np
 from utils                  import initdefaults
 from model                  import PHASE
 from excelreports.creation  import Reporter as _Reporter, column_method, FILEOBJ
+from data.views             import Beads
 from data.track             import Track, BEADKEY           # pylint: disable=unused-import
 from signalfilter           import rawprecision
 from ..selector             import Output as PeakOutput     # pylint: disable=unused-import
