@@ -17,14 +17,19 @@ PATHTYPE  = Union[_PATHTYPE, Dict[str,_PATHTYPE]]
 
 class TrackReaderTask(RootTask):
     "Class indicating that a track file should be added to memory"
-    def __init__(self,
+    def __init__(self,  # pylint: disable=too-many-arguments
                  path:      PATHTYPE = None,
                  beadsonly: bool     = False,
-                 copy:      bool     = False, **kwa) -> None:
+                 copy:      bool     = False,
+                 key:       str      = None,
+                 axis:      str      = 'Z',
+                 **kwa) -> None:
         super().__init__(**kwa)
         self.path      = path
         self.beadsonly = beadsonly
         self.copy      = copy
+        self.key       = key
+        self.axis      = axis
 
 class CycleCreatorTask(Task):
     "Task for dividing a bead's data into cycles"

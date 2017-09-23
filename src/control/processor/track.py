@@ -29,7 +29,10 @@ class TrackReaderProcessor(Processor[_tasks.TrackReaderTask]):
             trk = args.data.setCacheDefault(self, TracksDict())
             trk.update(task.path)
         else:
-            trk = args.data.setCacheDefault(self, Track(path = task.path))
+            trk = args.data.setCacheDefault(self,
+                                            Track(path = task.path,
+                                                  key  = task.key,
+                                                  axis = task.axis))
             args.apply(self.__get(attr, task.copy, trk), levels = self.levels)
 
     @staticmethod
