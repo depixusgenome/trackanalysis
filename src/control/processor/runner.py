@@ -4,46 +4,52 @@
 from inspect            import signature
 from itertools          import groupby
 from functools          import partial
+from concurrent.futures import ProcessPoolExecutor
 from multiprocessing    import cpu_count
 from copy               import copy as shallowcopy
 from typing             import (Callable,   # pylint: disable=unused-import
-                                Iterable, Tuple, Dict, Any, Sequence,
+                                Iterable, Tuple, Dict, Any, Sequence, Union,
                                 Optional, Iterator, cast)
 import pickle
 
 import numpy            as     np
 
+from utils              import toenum
 from data.views         import TrackView, createTrackView
 from model              import Task, Level
 from .base              import Processor
 from .cache             import Cache
 
+DATA_TYPE = Union[Cache, Iterable[Processor], bytes]
 class Runner:
     "Arguments used for iterating"
     __slots__ = ('data', 'pool', 'level', 'gen')
-    def __init__(self, **kwa):
-        pool = kwa.get('pool', None)
+    def __init__(self, # pylint: disable=too-many-arguments
+                 data:  DATA_TYPE,
+                 task:  Task                = None,
+                 pool:  ProcessPoolExecutor = None,
+                 gen:   Iterator[TrackView] = None,
+                 start: Iterator[TrackView] = None,
+                 level: Level               = Level(0)
+                ) -> None:
+        data = (Cache(list(pickle.loads(data))) if isinstance(data, bytes) else
+                data                            if isinstance(data, Cache) else
+                Cache(list(data))).keepupto(task)
         if pool is not None and not hasattr(pool, 'nworkers'):
             nproc = getattr(pool, '_max_workers', None)
             if nproc is None:
                 nproc = cpu_count()
-            pool.nworkers = nproc
+            setattr(pool, 'nworkers', nproc)
 
-        data = kwa['data']
-        if   isinstance(data, Iterator):
-            data = Cache(list(data))
-        elif isinstance(data, (tuple, list)):
-            data = Cache(data)
-        data = data.keepupto(kwa.get('task', None))
+        gen   = (iter(shallowcopy(i) for i in start) if start is not None else
+                 iter(shallowcopy(i) for i in gen)   if gen   is not None else
+                 None)
+        level = toenum(Level, level)
 
-        # make sure the original input is not changed
-        gen = kwa.get('start', kwa.get('gen', None))
-        gen = None if gen is None else iter(shallowcopy(i) for i in gen)
-
-        self.data: Cache                         = data
-        self.pool: Any                           = pool
-        self.gen:  Optional[Iterator[TrackView]] = gen
-        self.level                               = Level(kwa.get('level', 0))
+        self.data:  Cache                         = data
+        self.pool:  Optional[ProcessPoolExecutor] = pool
+        self.gen:   Iterator[TrackView]           = gen
+        self.level: Level                         = toenum(Level, level)
 
     def __getstate__(self):
         return {'data': self.data, }
@@ -189,7 +195,6 @@ class Runner:
                 first  = False
         return () if self.gen is None else self.gen
 
-
 def poolchunk(items, nproc, iproc):
     "returns a chunk of keys"
     if isinstance(items, Iterator):
@@ -243,9 +248,15 @@ def pooledinput(pool, pickled, frame) -> dict:
             res.update(val)
         return res
 
-def run(data, tsk = None, copy = False, pool = None,  **kwa):
+def run(data:  DATA_TYPE, # pylint: disable=too-many-arguments
+        task:  Task                = None,
+        copy                       = False,
+        pool:  ProcessPoolExecutor = None,
+        start: Iterator[TrackView] = None,
+        level: Level               = Level(0)):
     """
-    Iterates through the list up to and including *tsk*.
-    Iterates through all if *tsk* is None
+    Iterates through the list up to and including *task*.
+    Iterates through all if *task* is None
     """
-    return Runner(data = data, pool = pool, task = tsk, **kwa)(copy = copy)
+    runner = Runner(data, task = task, pool = pool, start = start, level = level)
+    return runner(copy = copy)
