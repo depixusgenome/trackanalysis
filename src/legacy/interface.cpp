@@ -15,6 +15,12 @@ namespace legacy
             std::vector<T> dt(shape[1]*shape[2]);
             return pybind11::array(shape, strides, (T*) ptr);
         }
+
+        void _open(legacy::GenRecord & rec, std::string name)
+        {
+            pybind11::gil_scoped_release lock;
+            rec.open(name);
+        }
     }
     pybind11::object _readim(std::string name, bool all = true);
 
@@ -41,7 +47,9 @@ namespace legacy
 
     pybind11::object _readfov(std::string name)
     {
-        legacy::GenRecord rec(name);
+        legacy::GenRecord rec;
+        _open(rec, name);
+
         return rec.ncycles() == 0 ? pybind11::none() : _readrecfov(rec);
     }
 
@@ -49,7 +57,8 @@ namespace legacy
                                 bool notall     = true,
                                 std::string tpe = "")
     {
-        legacy::GenRecord   rec(name);
+        legacy::GenRecord   rec;
+        _open(rec, name);
         if((notall && rec.ncycles() <= 4) || rec.ncycles() == 0)
             return pybind11::none();
 
@@ -119,7 +128,8 @@ namespace legacy
 
     pybind11::object _readtrackrotation(std::string name)
     {
-        legacy::GenRecord   rec(name);
+        legacy::GenRecord   rec;
+        _open(rec, name);
         if(rec.ncycles() == 0)
             return pybind11::none();
 
