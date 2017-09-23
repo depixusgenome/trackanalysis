@@ -154,7 +154,8 @@ class ProcessorController:
             cls.register(sclass, cache)
         return cache
 
-create = ProcessorController.create # pylint: disable=invalid-name
+create   = ProcessorController.create # pylint: disable=invalid-name
+register = ProcessorController.register # pylint: disable=invalid-name
 
 class BaseTaskController(Controller):
     "Data controller class"
