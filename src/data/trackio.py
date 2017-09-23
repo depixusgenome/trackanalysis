@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=arguments-differ
 "Loading and save tracks"
-from    typing      import (Sequence, Callable, Any, Union, Tuple, Optional,
-                            Iterator, Dict, cast, overload, TYPE_CHECKING)
-from    itertools   import chain
-from    inspect     import signature
-from    copy        import copy as shallowcopy
+from    typing             import (Sequence, Callable, Any, Union, Tuple, Optional,
+                                   Iterator, Dict, cast, overload, TYPE_CHECKING)
+from    itertools          import chain
+from    concurrent.futures import ThreadPoolExecutor
+from    inspect            import signature
+from    copy               import copy as shallowcopy
 import  pickle
 import  re
 from    functools   import wraps, partial
@@ -79,10 +80,11 @@ class PickleIO(_TrackIO):
             return pickle.load(stream)
 
     @classmethod
-    def save(cls, path: PATHTYPE, track: 'Track'):
+    def save(cls, path: PATHTYPE, track: Union[dict, 'Track']):
         "saves a track file"
+        info = track if isinstance(track, dict) else Handler.todict(track)
         with open(path, 'wb') as stream:
-            return pickle.dump(Handler.todict(track), stream)
+            return pickle.dump(info, stream)
 
 class LegacyTrackIO(_TrackIO):
     "checks and opens legacy track paths"
@@ -457,6 +459,10 @@ def opentrack(track, beadsonly = False):
     "Opens a track depending on its extension"
     checkpath(track)(track, beadsonly)
 
+N_SAVE_THREADS = 3
+def _savetrack(args):
+    PickleIO.save(args[0], args[1])
+
 @overload
 def savetrack(path: PATHTYPE, track: 'Track') -> 'Track': # pylint: disable=unused-argument
     "saves a track"
@@ -480,12 +486,14 @@ def savetrack(path  : PATHTYPE,     # pylint: disable=unused-argument,function-r
         root = Path(path)
         root.mkdir(parents=True, exist_ok=True)
 
-        new = shallowcopy(track)
-        new.update({key: savetrack((root/key).with_suffix(".pk"), trk)
-                    for key, trk in cast(dict, track).items()})
+        args = [((root/key).with_suffix(".pk"), trk)
+                for key, trk in cast(dict, track).items()]
+        new  = shallowcopy(track)
+        with ThreadPoolExecutor(N_SAVE_THREADS) as pool:
+            new.update({i.key: i for i in pool.map(savetrack, args)})
 
     else:
-        PickleIO.save(path, cast('Track', track))
+        _savetrack((path, track))
 
         new = type(track).__new__(type(track)) # type: ignore
         new.__dict__.update(shallowcopy(track.__dict__))
