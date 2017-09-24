@@ -6,7 +6,7 @@ import numpy as np
 
 from utils                      import NoArgs
 from eventdetection.processor   import ExtremumAlignmentTask
-from view.plots.tasks           import TaskPlotModelAccess, TaskAccess
+from control.modelaccess        import TaskPlotModelAccess, TaskAccess
 
 from ..beadsubtraction          import BeadSubtractionTask
 from ..processor                import DataCleaningTask

@@ -5,7 +5,6 @@ from    typing              import (Tuple, Optional, Type, # pylint: disable=unu
                                     Iterator, Sequence, List, Union, Any,
                                     Generic, Dict, TypeVar, cast)
 from    collections         import OrderedDict
-from    enum                import Enum
 from    abc                 import abstractmethod
 from    contextlib          import contextmanager
 from    functools           import wraps
@@ -19,8 +18,7 @@ from    bokeh.models            import (Range1d, RadioButtonGroup, Model,
                                         Paragraph, Widget, GlyphRenderer)
 
 from    utils.logconfig         import getLogger
-from    control                 import Controller
-from    control.globalscontrol  import GlobalsAccess
+from    control.modelaccess     import GlobalsAccess, PlotModelAccess, PlotState
 from    ..base                  import (BokehView, threadmethod, spawn,
                                         defaultsizingmode as _defaultsizingmode,
                                         SINGLE_THREAD)
@@ -28,14 +26,6 @@ from    .bokehext               import DpxHoverTool, from_py_func, DpxKeyedRow
 
 LOGS    = getLogger(__name__)
 _m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
-
-class PlotState(Enum):
-    "plot state"
-    active       = 'active'
-    abouttoreset = 'abouttoreset'
-    resetting    = 'resetting'
-    disabled     = 'disabled'
-    outofdate    = 'outofdate'
 
 def checksizes(fcn):
     "Checks that the ColumnDataSource have same sizes"
@@ -139,23 +129,6 @@ class PlotAttrs:
         args.update(kwa)
         getattr(self, '_'+self.glyph, self._default)(args)
         return getattr(fig, self.glyph)(**args)
-
-class PlotModelAccess(GlobalsAccess):
-    "Default plot model"
-    def __init__(self, model:Union[Controller, 'PlotModelAccess'], key = None) -> None:
-        super().__init__(model, key)
-        self._ctrl   = getattr(model, '_ctrl', model)
-
-    def clear(self):
-        "clears the model's cache"
-
-    def create(self, _):
-        "creates the model"
-
-    @staticmethod
-    def reset() -> bool:
-        "resets the model"
-        return False
 
 ModelType = TypeVar('ModelType', bound = PlotModelAccess)
 

@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View module showing all messages concerning discarded beads"
-from    typing             import List, Dict, cast
+from    typing              import List, Dict, cast
 
-from    bokeh.models       import (ColumnDataSource, DataTable, TableColumn,
-                                   Widget, StringFormatter, Div)
-from    bokeh.layouts      import widgetbox
+from    bokeh.models        import (ColumnDataSource, DataTable, TableColumn,
+                                    Widget, StringFormatter, Div)
+from    bokeh.layouts       import widgetbox
 
-from    view.plots         import DpxNumberFormatter, WidgetCreator, PlotView
-from    view.plots.tasks   import TaskPlotCreator, TaskPlotModelAccess, TaskAccess
-from    ..processor        import DataCleaningTask, DataCleaningProcessor
+from    view.plots          import DpxNumberFormatter, WidgetCreator, PlotView
+from    view.plots.tasks    import TaskPlotCreator
+from    control.modelaccess import TaskPlotModelAccess, TaskAccess
+from    ..processor         import DataCleaningTask, DataCleaningProcessor
 
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"

@@ -7,7 +7,7 @@ from    utils                       import NoArgs
 from    cordrift.processor          import DriftTask
 from    eventdetection.processor    import (ExtremumAlignmentTask,
                                             EventDetectionTask)
-from    view.plots.tasks            import TaskAccess, TaskPlotModelAccess
+from    control.modelaccess         import TaskAccess, TaskPlotModelAccess
 from    view.plots.sequence         import (SequenceKeyProp, FitParamProp,
                                             SequencePlotModelAccess)
 

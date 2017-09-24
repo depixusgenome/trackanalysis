@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 "Widgets for configuration"
 
-from    typing         import TypeVar
-from    bokeh.models   import CheckboxGroup, RadioButtonGroup
+from    typing                  import TypeVar
+from    bokeh.models            import CheckboxGroup, RadioButtonGroup
 
-from    view.plots     import GroupWidget, PlotModelAccess
-from    .processor     import AlignmentTactic
+from    view.plots              import GroupWidget
+from    control.modelaccess     import PlotModelAccess
+from    .processor              import AlignmentTactic
 
 ModelType = TypeVar('ModelType', bound = PlotModelAccess)
 class AlignmentWidget(GroupWidget[ModelType]):

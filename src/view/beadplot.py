@@ -4,14 +4,14 @@
 from bokeh.plotting import figure, Figure
 from bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 
-from control            import Controller
-from .plots             import PlotAttrs, DpxKeyedRow, PlotView
-from .plots.bokehext    import DpxHoverTool, from_py_func
-from .plots.tasks       import TaskPlotCreator, TaskPlotModelAccess
+from control.modelaccess import TaskPlotModelAccess
+from .plots              import PlotAttrs, DpxKeyedRow, PlotView
+from .plots.bokehext     import DpxHoverTool, from_py_func
+from .plots.tasks        import TaskPlotCreator
 
 class BeadPlotCreator(TaskPlotCreator[TaskPlotModelAccess]):
     "Plots a default bead"
-    def __init__(self,  ctrl:Controller) -> None:
+    def __init__(self,  ctrl) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
         ttips = [(u'Index', '$index'), (u'(t, z, zmag)', '($~x, $data_y, @zmag)')]

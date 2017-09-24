@@ -9,6 +9,8 @@ import numpy                    as     np
 import sequences
 from utils                      import updatecopy
 from control.processor          import processors
+from control.modelaccess        import TaskPlotModelAccess, TaskAccess
+
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
 from peakfinding.processor      import PeakSelectorTask
 from peakfinding.probabilities  import Probability
@@ -16,7 +18,6 @@ from peakcalling.tohairpin      import GaussianProductFit, PeakMatching, Distanc
 from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
                                         FitBead)
 
-from view.plots.tasks           import TaskPlotModelAccess, TaskAccess
 from view.plots.sequence        import (readsequence,
                                         FitParamProp    as _FitParamProp,
                                         SequenceKeyProp as _SequenceKeyProp,
