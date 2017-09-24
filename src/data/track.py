@@ -3,7 +3,7 @@
 """
 Base track file data.
 """
-from    typing      import Optional, Union, Dict, Tuple
+from    typing      import Optional, Union, Dict, Tuple, TypeVar, Generic, cast
 from    copy        import deepcopy, copy as shallowcopy
 from    enum        import Enum
 import  numpy       as     np
@@ -94,6 +94,54 @@ class FoV:
         tpe = iter if hasattr(arr, '__next__') else type(arr)
         return tpe([(sl1*i+int1, sl2*j+int2) for i, j in arr]) # type: ignore
 
+T = TypeVar("T")
+class LazyProperty(Generic[T]):
+    "Checks whether the file was opened prior to returning a value"
+    def __init__(self):
+        self.__name = ''
+
+    def __set_name__(self, _, name):
+        self.__name = '_'+name
+
+    def __get__(self, obj: 'Track', _) -> T:
+        if obj is None:
+            return self # type: ignore
+
+        if getattr(obj, '_lazy'):
+            setattr(obj, '_lazy', False)
+            getattr(obj, 'data') # call property: opens the file
+        return getattr(obj, self.__name)
+
+    def __set__(self, obj: 'Track', val) -> T:
+        if getattr(obj, '_lazy'):
+            setattr(obj, '_lazy', False)
+            getattr(obj, 'data') # call property: opens the file
+        setattr(obj, self.__name, val)
+        return getattr(obj, self.__name)
+
+class ResettingProperty(Generic[T]):
+    "Resets all if this attribute is changed"
+    def __init__(self):
+        self.__name   = ''
+
+    def __set_name__(self, _, name):
+        self.__name = '_'+name
+
+    def __get__(self, obj: 'Track', _) -> T:
+        return cast(T, getattr(obj, self.__name) if obj else self)
+
+    def __set__(self, obj: 'Track', val) -> T:
+        setattr(obj, '_lazy', False)
+        setattr(obj, self.__name, cast(T, val))
+
+        for name in ('_framerate', '_phases', '_fov'):
+            setattr(obj, name, deepcopy(getattr((type(obj)), name)))
+
+        setattr(obj, '_data', None)
+        getattr(obj, '_rawprecisions').clear()
+        setattr(obj, '_lazy', True)
+        return getattr(self, self.__name)
+
 @levelprop(Level.project)
 class Track:
     "Model for track files. This must not contain actual data."
@@ -104,9 +152,9 @@ class Track:
     _path:          PATHTYPES   = None
     _rawprecisions: _PRECISIONS = {}
     _lazy                       = True
+    _axis                       = Axis.Zaxis
     key:            str         = None
-    axis                        = Axis.Zaxis
-    @initdefaults(('axis', 'key'), **{i: '_' for i in _LAZIES + ('phases',)})
+    @initdefaults(( 'key'), **{i: '_' for i in _LAZIES + ('phases', 'axis')})
     def __init__(self, **_) -> None:
         pass
 
@@ -117,7 +165,7 @@ class Track:
             if val !=  getattr(type(self), '_'+name):
                 info[name] = val
 
-        info['axis'] = info['axis'].value
+        info['axis'] = info.pop('_axis').value
         val = info.pop('_phases')
         if len(val) > 0:
             info['phases'] = val
@@ -129,107 +177,13 @@ class Track:
     def __setstate__(self, values):
         self.__init__(**values)
 
-    def __getter(self, name):
-        if self._lazy:
-            self._lazy = False
-            getattr(self, 'data') # call property: opens the file
-        return getattr(self, name)
-
-    def __setter(self, name, val):
-        if self._lazy:
-            self._lazy = False
-            getattr(self, 'data') # call property: opens the file
-        setattr(self, name, val)
-        return getattr(self, name)
-
-    @property
-    def phases(self) -> np.ndarray:
-        "returns the number of cycles in the track file"
-        return self.__getter('_phases')
-
-    @phases.setter
-    def phases(self, val) -> np.ndarray:
-        "returns the number of cycles in the track file"
-        return self.__setter('_phases', val)
-
-    @property
-    def framerate(self) -> float:
-        "returns the frame rate"
-        return self.__getter('_framerate')
-
-    @framerate.setter
-    def framerate(self, val) -> float:
-        "returns the frame rate"
-        val = self.__setter('_framerate', val)
-        if val <= 0.:
-            raise ValueError("Track.framerate <= 0.")
-        return val
-
-    @property
-    def fov(self) -> FoV:
-        "returns the FoV"
-        return self.__getter('_fov')
-
-    @fov.setter
-    def fov(self, val) -> FoV:
-        "returns the FoV"
-        return self.__setter('_fov', val)
-
-    @property
-    def ncycles(self) -> int:
-        "returns the number of cycles in the track file"
-        return len(self.__getter('_phases'))
-
-    @property
-    def nphases(self) -> Optional[int]:
-        "returns the number of phases in the track"
-        return self.__getter('_phases').shape[1]
-
-    def phaseduration(self, cid:IDTYPE, pid:IDTYPE) -> Union[int, np.ndarray]:
-        "returns the duration of the cycle and phase"
-        phases = self.__getter('_phases')
-        if isellipsis(pid):
-            ix1, ix2 = 0, -1
-        elif isinstance(pid, int):
-            if pid in (-1, phases.shape[1]):
-                return np.insert(phases[0,1:]-phases[-1,:-1], len(phases), np.iinfo('i4').max)
-            else:
-                ix1, ix2 = pid, pid+1
-        return phases[cid,ix2]-phases[cid,ix1]
-
-    def phase(self, cid:IDTYPE = None, pid:IDTYPE = None) -> Union[np.ndarray, int]:
-        "returns the starttime of the cycle and phase"
-        vect = self.__getter('_phases')
-        orig = vect[0,0]
-        ells = isellipsis(cid), isellipsis(pid)
-        if all(ells):
-            pass
-        elif ells[0]:
-            vect = vect[:,pid]
-        elif ells[1]:
-            vect = vect[cid,:]
-        else:
-            vect = vect[cid,pid]
-        return vect - orig
-
-    @property
-    def path(self) -> Optional[PATHTYPES]:
-        "returns the current path(s)"
-        return self._path
-
-    @path.setter
-    def path(self, val) -> Optional[PATHTYPES]:
-        "sets the current path(s) and clears the data"
-        self._lazy = False
-        self._path = val
-
-        for name in ('_framerate', '_phases', '_fov'):
-            setattr(self, name, deepcopy(getattr((type(self)), name)))
-
-        self._data = None
-        self._rawprecisions.clear()
-        self._lazy = True
-        return self._path
+    phases    = LazyProperty[np.ndarray]()
+    framerate = LazyProperty[float]()
+    fov       = LazyProperty[FoV]()
+    path      = ResettingProperty[Optional[PATHTYPES]]()
+    axis      = ResettingProperty[Axis]()
+    ncycles   = cast(int, property(lambda self: len(self.phases)))
+    nphases   = cast(int, property(lambda self: self.phases.shape[1]))
 
     @property
     def data(self) -> Dict:
@@ -249,9 +203,32 @@ class Track:
         "returns whether a column name is a bead's"
         return isinstance(key, int)
 
-    def __view(self, tpe, **kwa):
-        parents = (self.key,) if self.key else (self.path,)
-        return tpe(track = self, parents = parents, **kwa)
+    def phaseduration(self, cid:IDTYPE, pid:IDTYPE) -> Union[int, np.ndarray]:
+        "returns the duration of the cycle and phase"
+        phases = self.phases
+        if isellipsis(pid):
+            ix1, ix2 = 0, -1
+        elif isinstance(pid, int):
+            if pid in (-1, phases.shape[1]):
+                return np.insert(phases[0,1:]-phases[-1,:-1], len(phases), np.iinfo('i4').max)
+            else:
+                ix1, ix2 = pid, pid+1
+        return phases[cid,ix2]-phases[cid,ix1]
+
+    def phase(self, cid:IDTYPE = None, pid:IDTYPE = None) -> Union[np.ndarray, int]:
+        "returns the starttime of the cycle and phase"
+        vect = self.phases
+        orig = vect[0,0]
+        ells = isellipsis(cid), isellipsis(pid)
+        if all(ells):
+            pass
+        elif ells[0]:
+            vect = vect[:,pid]
+        elif ells[1]:
+            vect = vect[cid,:]
+        else:
+            vect = vect[cid,pid]
+        return vect - orig
 
     @property
     def beads(self) -> Beads:
@@ -272,6 +249,10 @@ class Track:
     def cyclesonly(self) -> Cycles:
         "returns a helper object for extracting cycles from *beads* only"
         return self.__view(Cycles, beadsonly = True)
+
+    def __view(self, tpe, **kwa):
+        parents = (self.key,) if self.key else (self.path,)
+        return tpe(track = self, parents = parents, **kwa)
 
 def dropbeads(trk, *beads:Tuple[BEADKEY]) -> Track:
     "returns a track without the given beads"
