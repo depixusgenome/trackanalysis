@@ -22,7 +22,11 @@ def toenum(tpe, val):
         return val
     if isinstance(val, (int, str)):
         elem = next((i for i in tpe if i.value == val), None)
-        return getattr(tpe, val) if elem is None else elem
+        if elem is None and isinstance(val, str):
+            elem = getattr(tpe, val, None)
+        if elem is None:
+            elem = tpe(val)
+        return elem
     if isinstance(val, tpe):
         return val
     if val is not None:
