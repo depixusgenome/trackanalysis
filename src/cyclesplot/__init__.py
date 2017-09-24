@@ -16,12 +16,11 @@ from   ._raw                import RawMixin
 from   ._hist               import HistMixin
 from   ._widget             import WidgetMixin
 
-class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, WidgetMixin):
+class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess], HistMixin, RawMixin, WidgetMixin):
     "Displays cycles and their projection"
-    _MODEL = CyclesModelAccess
     def __init__(self, ctrl:Controller) -> None:
         "sets up this plotter's info"
-        TaskPlotCreator.__init__(self, ctrl)
+        super().__init__(ctrl)
         RawMixin       .__init__(self)
         HistMixin      .__init__(self)
         WidgetMixin    .__init__(self)
@@ -47,8 +46,8 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, WidgetMixin):
         self._resethist(data, shape)
         self._resetwidget()
 
-    def ismain(self, keypressmanager):
-        WidgetMixin.ismain(self, keypressmanager)
+    def ismain(self, _):
+        WidgetMixin.ismain(self, _)
 
     def observe(self):
         "sets-up model observers"
@@ -58,9 +57,8 @@ class CyclesPlotCreator(TaskPlotCreator, HistMixin, RawMixin, WidgetMixin):
         self._model.config.observe('eventdetection.isactive', 'binwidth', 'minframes',
                                    lambda: self.reset(False))
 
-class CyclesPlotView(PlotView):
+class CyclesPlotView(PlotView[CyclesPlotCreator]):
     "Cycles plot view"
-    PLOTTER = CyclesPlotCreator
     APPNAME = 'cyclesplot'
     def advanced(self):
         "triggers the advanced dialog"

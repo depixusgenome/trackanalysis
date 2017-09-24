@@ -7,9 +7,9 @@ from bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 from control            import Controller
 from .plots             import PlotAttrs, DpxKeyedRow, PlotView
 from .plots.bokehext    import DpxHoverTool, from_py_func
-from .plots.tasks       import TaskPlotCreator
+from .plots.tasks       import TaskPlotCreator, TaskPlotModelAccess
 
-class BeadPlotCreator(TaskPlotCreator):
+class BeadPlotCreator(TaskPlotCreator[TaskPlotModelAccess]):
     "Plots a default bead"
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
@@ -85,6 +85,5 @@ class BeadPlotCreator(TaskPlotCreator):
         self.setbounds(self._fig.x_range,                 'x', data['t'])
         self.setbounds(self._fig.y_range,                 'y', data['z'])
 
-class BeadPlotView(PlotView):
+class BeadPlotView(PlotView[BeadPlotCreator]):
     "Bead plot view"
-    PLOTTER = BeadPlotCreator

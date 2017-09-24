@@ -3,7 +3,7 @@
 "Utils for dealing with the JS side of the view"
 from typing                 import (Tuple, Optional, # pylint: disable =unused-import
                                     Iterator, List, Union, Any, Callable, Dict,
-                                    TYPE_CHECKING)
+                                    TypeVar)
 from functools              import wraps
 
 from signalfilter           import rawprecision
@@ -11,6 +11,7 @@ from model.task             import RootTask, Task, taskorder, TASK_ORDER
 from model.globals          import (ConfigProperty, ConfigRootProperty, BeadProperty,
                                     ProjectRootProperty)
 from data.track             import Track
+from data.views             import BEADKEY
 from utils                  import NoArgs, updatecopy, updatedeepcopy
 from control.processor      import Processor
 from control.taskcontrol    import ProcessorController
@@ -27,7 +28,7 @@ class TaskPlotModelAccess(PlotModelAccess):
                                   +"{min:.4f} ≮ σ[HF] = {val:.4f} ≮ {max:.4f}")}
 
     @property
-    def bead(self) -> Optional[int]:
+    def bead(self) -> Optional[BEADKEY]:
         "returns the current bead number"
         bead = self.project.bead.get()
         if bead is None:
@@ -277,17 +278,14 @@ class TaskAccess(TaskPlotModelAccess):
     def _configattributes(kwa):
         return kwa
 
-class TaskPlotCreator(PlotCreator):
+TModelType = TypeVar('TModelType', bound = TaskPlotModelAccess)
+class TaskPlotCreator(PlotCreator[TModelType]):
     "Base plotter for tracks"
-    _MODEL = TaskPlotModelAccess
     def __init__(self, *args, **kwa):
         super().__init__(*args, **kwa)
         self._ctrl.getGlobal("project").bead.default = None
         css = self._ctrl.getGlobal('css.plot').title
         css.defaults = {'stretch': u'Stretch (base/µm)', 'bias': u'Bias (µm)'}
-
-        if TYPE_CHECKING:
-            self._model = TaskPlotModelAccess('', '')
 
     def observe(self):
         "sets-up model observers"

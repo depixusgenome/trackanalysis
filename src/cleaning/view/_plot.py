@@ -62,9 +62,8 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
         mdl.processors().data.setCacheDefault(tsk, {}).update(cache)
         return items, nans
 
-class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
+class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin):
     "Building the graph of cycles"
-    _MODEL = DataCleaningModelAccess
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
@@ -88,7 +87,7 @@ class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
         if TYPE_CHECKING:
             self._model = DataCleaningModelAccess(self._ctrl, '')
 
-    def _create(self, doc):
+    def _create(self, _):
         self.__source = ColumnDataSource(data = self.__data(None, None))
 
         self.__fig = fig = figure(**self._figargs(y_range = Range1d,
@@ -155,9 +154,8 @@ class CleaningPlotCreator(TaskPlotCreator, WidgetMixin):
                     tmp[order[value.max]] = color
         return tmp.ravel()
 
-class CleaningView(PlotView):
+class CleaningView(PlotView[CleaningPlotCreator]):
     "Peaks plot view"
-    PLOTTER = CleaningPlotCreator
     def ismain(self):
         "Cleaning and alignment, ... are set-up by default"
         super()._ismain(tasks  = ['datacleaning', 'extremumalignment'],

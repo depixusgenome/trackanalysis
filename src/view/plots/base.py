@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 "The basic architecture"
 from    typing              import (Tuple, Optional, Type, # pylint: disable=unused-import
-                                    Iterator, Sequence, List, Union, Dict, Any, cast)
+                                    Iterator, Sequence, List, Union, Any,
+                                    Generic, Dict, TypeVar, cast)
 from    collections         import OrderedDict
 from    enum                import Enum
 from    abc                 import ABCMeta, abstractmethod
@@ -206,17 +207,18 @@ class PlotModelAccess(GlobalsAccess):
         "resets the model"
         return False
 
-class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
+ModelType = TypeVar('ModelType', bound = PlotModelAccess)
+class PlotCreator(Generic[ModelType], GlobalsAccess):
     "Base plotter class"
-    _MODEL  = PlotModelAccess
     _RESET  = frozenset(('bead',))
     _CLEAR  = frozenset(('track',))
     class _OrderedDict(OrderedDict):
         def __missing__(self, key):
-            self[key] = value = OrderedDict()
+            value     = OrderedDict() # type: Dict
+            self[key] = value
             return value
 
-    def __init__(self, ctrl:Controller, *_) -> None:
+    def __init__(self, ctrl, *_) -> None:
         "sets up this plotter's info"
         css = ctrl.getGlobal("css.plot")
         if css.ylabel.get(default = None) is None:
@@ -237,11 +239,16 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
             ctrl.addGlobalMap(name+key)
 
         super().__init__(ctrl, key)
-        self._model = self._MODEL(ctrl, key)
+        self._model: ModelType = self.modeltype()(ctrl, key)
         self._ctrl  = ctrl
         self._bkmodels: Dict[Model,Dict[str,Any]] = self._OrderedDict()
         self._doc:      Document                  = None
         self.project.state.default = PlotState.active
+
+    @classmethod
+    def modeltype(cls) -> Type[ModelType]:
+        "the model class object"
+        return cls.__orig_bases__[0].__args__[0] # type: ignore
 
     state = cast(PlotState,
                  property(lambda self:    self.project.state.get(),
@@ -458,7 +465,7 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
 
             def _on_cb(attr, old, new):
                 if self.state is PlotState.active:
-                    vals = axis.start, axis.end
+                    vals = axis.start, axis.end # type: tuple
                     if axis.bounds is not None:
                         rng = 1e-3*(axis.bounds[1]-axis.bounds[0])
                         vals = tuple(None if abs(i-j) < rng else j
@@ -560,9 +567,9 @@ class PlotCreator(GlobalsAccess, metaclass = ABCMeta):
     def _reset(self):
         "initializes the plot for a new file"
 
-class PlotView(BokehView):
+PlotType = TypeVar('PlotType', bound = PlotCreator)
+class PlotView(Generic[PlotType], BokehView):
     "plot view"
-    PLOTTER: Type[PlotCreator] = None
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
@@ -581,7 +588,12 @@ class PlotView(BokehView):
         plt.keypress.pan       .defaults = _gesture('Alt-')
         plt.keypress.zoom      .defaults = _gesture('Shift-')
 
-        self._plotter = self.PLOTTER(self._ctrl) # pylint: disable=not-callable
+        self._plotter = self.plottype()(self._ctrl)
+
+    @classmethod
+    def plottype(cls) -> Type[PlotCreator]:
+        "the model class object"
+        return cls.__orig_bases__[0].__args__[0] # type: ignore
 
     @property
     def plotter(self):

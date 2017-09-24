@@ -3,6 +3,7 @@
 "Building a projection of phase 5"
 
 import  warnings
+from    abc            import ABC
 
 from    bokeh.plotting import figure, Figure
 from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
@@ -12,7 +13,7 @@ import  numpy        as np
 from    view.plots          import PlotAttrs, checksizes
 from    view.plots.sequence import SequenceTicker, estimatebias
 
-class HistMixin:
+class HistMixin(ABC):
     "Building a projection of phase 5 onto the Z axis"
     def __init__(self):
         "sets up this plotter's info"

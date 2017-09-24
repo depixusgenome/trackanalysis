@@ -3,6 +3,7 @@
 "Cycles plot view"
 
 from    typing         import Tuple, TYPE_CHECKING
+from    abc            import ABC
 
 from    bokeh.plotting import figure, Figure
 from    bokeh.models   import LinearAxis, ColumnDataSource, CustomJS, Range1d
@@ -12,7 +13,7 @@ from    numpy.lib.index_tricks  import as_strided
 
 from    view.plots              import PlotAttrs
 
-class RawMixin:
+class RawMixin(ABC):
     "Building the graph of cycles"
     def __init__(self):
         "sets up this plotter's info"

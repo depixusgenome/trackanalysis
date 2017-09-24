@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View module showing all messages concerning discarded beads"
-from    typing             import List, Dict, cast, TYPE_CHECKING
+from    typing             import List, Dict, cast
 
 from    bokeh.models       import (ColumnDataSource, DataTable, TableColumn,
                                    Widget, StringFormatter, Div)
@@ -13,7 +13,6 @@ from    ..processor        import DataCleaningTask, DataCleaningProcessor
 
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"
-    tasktype = DataCleaningProcessor.tasktype
     @staticmethod
     def canregister():
         "allows discarding some specific processors from automatic registration"
@@ -153,23 +152,21 @@ class MessagesListWidget(WidgetCreator):
             msgs['type']   = [trans.get(i, i)           for i in msgs['type']]
         return msgs
 
-class MessagesPlotCreator(TaskPlotCreator):
+class MessagesPlotCreator(TaskPlotCreator[MessagesModelAccess]):
     "Creates plots for discard list"
-    _MODEL = MessagesModelAccess # type: ignore
     _RESET = frozenset()         # type: frozenset
     def __init__(self, *args):
         super().__init__(*args)
         self._widgets = dict(messages = MessagesListWidget(self._model),
                              summary  = SummaryWidget(self._model))
-        if TYPE_CHECKING:
-            self._model = MessagesModelAccess(self)
 
     def observe(self):
+        "observes the model"
         super().observe()
         for widget in self._widgets.values():
             widget.observe()
 
-    def _create(self, doc):
+    def _create(self, _):
         "returns the figure"
         act   = self.action
         order = 'summary', 'messages'
@@ -182,9 +179,8 @@ class MessagesPlotCreator(TaskPlotCreator):
         for widget in self._widgets.values():
             widget.reset(self._bkmodels)
 
-class MessagesView(PlotView):
+class MessagesView(PlotView[MessagesPlotCreator]):
     "a widget with all discards messages"
-    PLOTTER = MessagesPlotCreator
     def ismain(self):
         "Cleaning and alignment, ... are set-up by default"
         super()._ismain(tasks  = ['datacleaning', 'extremumalignment'],

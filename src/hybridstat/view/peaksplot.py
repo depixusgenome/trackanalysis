@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
-from typing                     import Tuple, TYPE_CHECKING
+from typing                     import Tuple
 
 import bokeh.core.properties as props
 from bokeh                      import layouts
@@ -111,9 +111,8 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
 
         fig.y_range.callback = from_py_func(_onchangebounds)
 
-class PeaksPlotCreator(TaskPlotCreator):
+class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
     "Creates plots for peaks"
-    _MODEL = PeaksPlotModelAccess
     def __init__(self, *args):
         super().__init__(*args)
         self.css.defaults = {'count'           : PlotAttrs('lightblue', 'line', 1),
@@ -145,8 +144,6 @@ class PeaksPlotCreator(TaskPlotCreator):
                              advanced = AdvancedWidget(self._model))
         self._ticker  = SequenceTicker()
         self._hover   = PeaksSequenceHover()
-        if TYPE_CHECKING:
-            self._model = PeaksPlotModelAccess(self)
 
     @property
     def model(self):
@@ -208,13 +205,15 @@ class PeaksPlotCreator(TaskPlotCreator):
         return self._keyedlayout(self._fig, right = self.__setup_widgets())
 
     def observe(self):
+        "observes the model"
         super().observe()
         self._model.observe()
         for widget in self._widgets.values():
             widget.observe()
 
-    def ismain(self, keypressmanager):
-        self._widgets['advanced'].ismain(keypressmanager)
+    def ismain(self, _):
+        "specific setup for when this view is the main one"
+        self._widgets['advanced'].ismain(_)
 
     def _reset(self):
         data, peaks = self.__data()
@@ -294,9 +293,8 @@ class PeaksPlotCreator(TaskPlotCreator):
         "triggers the advanced dialog"
         self._widgets['advanced'].on_click()
 
-class PeaksPlotView(PlotView):
+class PeaksPlotView(PlotView[PeaksPlotCreator]):
     "Peaks plot view"
-    PLOTTER = PeaksPlotCreator
     def advanced(self):
         "triggers the advanced dialog"
         self._plotter.advanced()

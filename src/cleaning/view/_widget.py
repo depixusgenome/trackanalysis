@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "Cleaning beads"
 from    typing          import List
+from    abc             import ABC
 
 import  bokeh.core.properties as props
 from    bokeh.plotting  import Figure
@@ -137,7 +138,7 @@ class CleaningFilterWidget(WidgetCreator):
         fig.x_range.callback = CustomJS.from_coffeescript('mdl.onchangebounds()',
                                                           dict(mdl = self.__widget))
 
-class WidgetMixin:
+class WidgetMixin(ABC):
     "Everything dealing with changing the config"
     def __init__(self):
         self.__widgets = dict(table    = CyclesListWidget(self._model),

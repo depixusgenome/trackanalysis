@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "basic view module"
 from typing               import Callable, Set, TYPE_CHECKING # pylint: disable=unused-import
+from abc                  import ABC
 from concurrent.futures   import ThreadPoolExecutor
 
 from bokeh.document       import Document
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
 
 SINGLE_THREAD = False
 
-class View:
+class View(ABC):
     "Classes to be passed a controller"
     action      = ActionDescriptor(Action)
     computation = ActionDescriptor(Computation)

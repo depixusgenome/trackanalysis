@@ -3,6 +3,7 @@
 "Widgets for configuration"
 
 from    typing              import List, TYPE_CHECKING
+from    abc                 import ABC
 
 from    bokeh               import layouts
 from    bokeh.models        import (ColumnDataSource, Slider, CustomJS, Paragraph,
@@ -208,7 +209,7 @@ class AdvancedWidget(AdvancedWidgetMixin, _Widget):
     def _args(self, **kwa):
         return super()._args(model = self._model, **kwa)
 
-class WidgetMixin:
+class WidgetMixin(ABC):
     "Everything dealing with changing the config"
     def __init__(self):
         self.__widgets = dict(table    = PeaksTableWidget(self._model),

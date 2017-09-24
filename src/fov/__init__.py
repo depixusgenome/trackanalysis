@@ -7,10 +7,10 @@ from bokeh.models     import ColumnDataSource, Range1d, TapTool
 from bokeh.plotting   import figure, Figure
 from control          import Controller
 from control.action   import Action
-from view.plots.tasks import TaskPlotCreator
+from view.plots.tasks import TaskPlotCreator, TaskPlotModelAccess
 from view.plots       import PlotAttrs, PlotView
 
-class FoVPlotCreator(TaskPlotCreator):
+class FoVPlotCreator(TaskPlotCreator[TaskPlotModelAccess]):
     "Plots a default bead and its FoV"
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
@@ -166,6 +166,5 @@ class FoVPlotCreator(TaskPlotCreator):
                      text = [f'{i}'        for i in items.keys()])
         return dict(data = data)
 
-class FoVPlotView(PlotView):
+class FoVPlotView(PlotView[FoVPlotCreator]):
     "FoV plot view"
-    PLOTTER = FoVPlotCreator
