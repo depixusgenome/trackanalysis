@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
-from typing                     import (Optional,   # pylint: disable=unused-import
-                                        List, Dict, Any, Type)
+from typing                     import List, Dict, Any
 from pathlib                    import Path
 
 import bokeh.core.properties as props
@@ -20,20 +19,19 @@ from view.pathinput             import PathInput
 from view.plots                 import from_py_func, DpxNumberFormatter, WidgetCreator
 from view.plots.sequence        import (SequenceTicker, SequenceHoverMixin,
                                         SequencePathWidget)
-from peakfinding.selector       import PeakSelector # pylint: disable=unused-import
-from modaldialog.view           import AdvancedTaskMixin
+from modaldialog.view           import AdvancedTaskMixin, T_BODY
 from ._model                    import PeaksPlotModelAccess
 
 class PeaksSequencePathWidget(SequencePathWidget):
     "Widget for setting the sequence to use"
-    def _sort(self, lst) -> List[str]:
+    def _sort(self, lst) -> List[str]: # type: ignore
         dist = self._model.distances
         if len(dist):
             lst  = [i for i in lst if i in dist]
             return sorted(lst, key = lambda i: dist[i].value)
         return super()._sort(lst)
 
-    def callbacks(self,                     # pylint: disable=arguments-differ
+    def callbacks(self,             # type: ignore # pylint: disable=arguments-differ
                   hover: SequenceHoverMixin,
                   tick1: SequenceTicker,
                   div:   'PeaksStatsDiv',
@@ -81,11 +79,11 @@ class PeaksStatsDiv(Div): # pylint: disable = too-many-ancestors
     data               = props.Dict(props.String, props.String)
     __implementation__ = "peakstats.coffee"
 
-class PeaksStatsWidget(WidgetCreator):
+class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
     "Table containing stats per peaks"
     def __init__(self, model:PeaksPlotModelAccess) -> None:
         super().__init__(model)
-        self.__widget = None # type: Optional[PeaksStatsDiv]
+        self.__widget: PeaksStatsDiv = None
         css = self.css.stats
         css.defaults = {'title.format': '{}',
                         'title.openhairpin': u' & open hairpin',
@@ -103,11 +101,13 @@ class PeaksStatsWidget(WidgetCreator):
                                   [u'reduced χ²',       '.1f']]}
 
     def create(self, _) -> List[Widget]:
+        "creates the widget"
         self.__widget = PeaksStatsDiv()
         self.reset(None)
         return [self.__widget]
 
     def reset(self, resets):
+        "resets the widget upon opening a new file, ..."
         itm  = self.__widget if resets is None else resets[self.__widget]
         data = self.__data()
         itm.update(data = data, text = data.get(self._model.sequencekey, data['']))
@@ -188,11 +188,11 @@ class PeaksStatsWidget(WidgetCreator):
                 ret[key] = tab()
         return ret
 
-class PeakListWidget(WidgetCreator):
+class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
     "Table containing stats per peaks"
     def __init__(self, model:PeaksPlotModelAccess) -> None:
         super().__init__(model)
-        self.__widget     = None # type: Optional[DataTable]
+        self.__widget: DataTable = None
         css               = self.css.peaks.columns
         css.width.default = 60
         css.default       = [['z',        'css:ylabel',    '0.0000'],
@@ -206,6 +206,7 @@ class PeakListWidget(WidgetCreator):
                              ['skew',     u'skew',         '0.00']]
 
     def create(self, _) -> List[Widget]:
+        "creates the widget"
         width = self.css.peaks.columns.width.get()
         get   = lambda i: self.css[i[4:]].get() if i.startswith('css:') else i
         fmt   = lambda i: (StringFormatter(text_align = 'center',
@@ -229,13 +230,14 @@ class PeakListWidget(WidgetCreator):
         self.__widget.source = src
 
     def reset(self, resets):
+        "resets the wiget when a new file is opened"
         pass
 
-class PeakIDPathWidget(WidgetCreator):
+class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
     "Selects an id file"
     def __init__(self, model:PeaksPlotModelAccess) -> None:
         super().__init__(model)
-        self.__widget = None # type: Optional[PathInput]
+        self.__widget: PathInput = None
         self.__dlg    = FileDialog(config    = self._ctrl,
                                    storage   = 'constraints.path',
                                    filetypes = '*|xlsx')
@@ -244,6 +246,7 @@ class PeakIDPathWidget(WidgetCreator):
         css.defaults = {'title': u'Id file path'}
 
     def create(self, action) -> List[Widget]:
+        "creates the widget"
         title         = self.css.constraints.title.get()
         width         = self.css.input.width.get() - 10
         self.__widget = PathInput(width = width, title = title,
@@ -275,26 +278,35 @@ class PeakIDPathWidget(WidgetCreator):
         return [self.__widget]
 
     def reset(self, resets):
+        "resets the wiget when a new file is opened, ..."
         txt  = ''
         path = self._model.constraintspath
         if path is not None and Path(path).exists():
             txt = str(Path(path).resolve())
         (self.__widget if resets is None else resets[self.__widget]).update(value = txt)
 
-class AdvancedWidget(AdvancedTaskMixin, WidgetCreator):
+class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin):
     "access to the modal dialog"
-    _TITLE = 'Hybridstat Configuration'
-    _BODY  = (('Minimum frame count per event',    '%(_framecount)d'),
-              ('Minimum event count per peak',     '%(_eventcount)d'),
-              ('Align cycles using peaks',         '%(_align5)b'),
-              ('Peak kernel size (blank ⇒ auto)',  '%(_precision)of'),
-              ('Max distance to theoretical peak', '%(_dist2theo)d'),
-             )
+    _TITLE        = 'Hybridstat Configuration'
+    _BODY: T_BODY = (('Minimum frame count per event',    '%(_framecount)d'),
+                     ('Minimum event count per peak',     '%(_eventcount)d'),
+                     ('Align cycles using peaks',         '%(_align5)b'),
+                     ('Peak kernel size (blank ⇒ auto)',  '%(_precision)of'),
+                     ('Max distance to theoretical peak', '%(_dist2theo)d'),
+                    )
 
     def __init__(self, model:PeaksPlotModelAccess) -> None:
-        WidgetCreator.__init__(self, model)
+        super().__init__(model)
         AdvancedTaskMixin.__init__(self)
         self._outp: Dict[str, Dict[str, Any]] = {}
+
+    def reset(self, resets):
+        "resets the wiget when a new file is opened, ..."
+        AdvancedTaskMixin.reset(resets)
+
+    def create(self, action) -> List[Widget]:
+        "creates the widget"
+        return AdvancedTaskMixin.create(self, action)
 
     _framecount = AdvancedTaskMixin.attr('eventdetection.events.select.minlength')
     _eventcount = AdvancedTaskMixin.attr('peakselection.group.mincount')

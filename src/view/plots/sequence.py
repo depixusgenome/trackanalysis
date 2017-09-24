@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Create a grid displaying a sequence"
-from    typing         import List, Optional, Tuple, Sequence # pylint: disable=unused-import
+from    typing         import (List, # pylint: disable=unused-import
+                               Optional, Tuple, Sequence, TypeVar)
 from    collections    import OrderedDict
 from    pathlib        import Path
 import  numpy   as np
@@ -223,7 +224,8 @@ class SequenceHoverMixin:
         data['z']    = data['values']/mdl.stretch+(0. if mdl.bias is None else mdl.bias)
         return data
 
-class SequencePathWidget(WidgetCreator):
+ModelType = TypeVar("ModelType", bound = TaskPlotModelAccess)
+class SequencePathWidget(WidgetCreator[ModelType]):
     "Dropdown for choosing a fasta file"
     def __init__(self, model) -> None:
         super().__init__(model)
@@ -315,7 +317,7 @@ class SequencePathWidget(WidgetCreator):
                     label = title if val is None else key,
                     value = '→'   if val is None else val)
 
-class OligoListWidget(WidgetCreator):
+class OligoListWidget(WidgetCreator[ModelType]):
     "Input for defining a list of oligos"
     def __init__(self, model) -> None:
         super().__init__(model)

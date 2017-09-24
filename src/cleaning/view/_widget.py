@@ -18,7 +18,7 @@ from    view.plots          import DpxNumberFormatter, WidgetCreator
 from    eventdetection.view import AlignmentWidget
 from    ._model             import DataCleaningModelAccess, DataCleaningTask
 
-class CyclesListWidget(WidgetCreator):
+class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
     "Table containing stats per peaks"
     def __init__(self, model:DataCleaningModelAccess) -> None:
         super().__init__(model)
@@ -37,6 +37,7 @@ class CyclesListWidget(WidgetCreator):
         return self.css.table
 
     def create(self, _) -> List[Widget]:
+        "creates the widget"
         cnf   = self.__config.columns
         width = cnf.width.get()
         get   = lambda i: self.css[i[4:]].get() if i.startswith('css:') else i
@@ -91,13 +92,14 @@ class DpxCleaning(Widget):
     maxhfsigma         = props.Float(DataCleaningTask.maxhfsigma)
     minextent          = props.Float(DataCleaningTask.minextent)
 
-class CleaningFilterWidget(WidgetCreator):
+class CleaningFilterWidget(WidgetCreator[DataCleaningModelAccess]):
     "All inputs for cleaning"
     def __init__(self, model:DataCleaningModelAccess) -> None:
         super().__init__(model)
         self.__widget: DpxCleaning = None
 
     def create(self, action) -> List[Widget]:
+        "creates the widget"
         self.__widget = DpxCleaning(name = "Cleaning:Filter")
 
         @action
@@ -121,6 +123,7 @@ class CleaningFilterWidget(WidgetCreator):
         return [self.__widget]
 
     def reset(self, resets):
+        "resets the widget when opening a new file, ..."
         task = self._model.cleaning.task
         if task is None:
             task = self._model.cleaning.configtask
@@ -141,8 +144,9 @@ class CleaningFilterWidget(WidgetCreator):
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"
     def __init__(self):
+        align = AlignmentWidget[DataCleaningModelAccess](self._model)
         self.__widgets = dict(table    = CyclesListWidget(self._model),
-                              align    = AlignmentWidget(self._model),
+                              align    = align,
                               cleaning = CleaningFilterWidget(self._model))
 
     def _widgetobservers(self):

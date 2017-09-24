@@ -2,21 +2,19 @@
 # -*- coding: utf-8 -*-
 "Widgets for configuration"
 
-from    typing         import (Optional, List,    # pylint: disable=unused-import
-                               Tuple, TYPE_CHECKING)
+from    typing         import TypeVar
+from    bokeh.models   import CheckboxGroup, RadioButtonGroup
 
-from    bokeh.models   import (CheckboxGroup,      # pylint: disable=unused-import
-                               RadioButtonGroup)
-
-from    view.plots     import PlotModelAccess, GroupWidget
+from    view.plots     import GroupWidget, PlotModelAccess
 from    .processor     import AlignmentTactic
 
-class AlignmentWidget(GroupWidget):
+ModelType = TypeVar('ModelType', bound = PlotModelAccess)
+class AlignmentWidget(GroupWidget[ModelType]):
     "Allows aligning the cycles on a given phase"
     INPUT   = RadioButtonGroup
     __ORDER = (None, AlignmentTactic.pull, AlignmentTactic.onlyinitial,
                AlignmentTactic.onlypull)
-    def __init__(self, model:PlotModelAccess) -> None:
+    def __init__(self, model:ModelType) -> None:
         super().__init__(model)
         self.css.title.alignment.labels.default = [u'ø', u'best', u'Φ1', u'Φ3']
         self.css.title.alignment.default        = u'Alignment'
@@ -33,10 +31,10 @@ class AlignmentWidget(GroupWidget):
         active = 0 if val is None else self.__ORDER.index(AlignmentTactic(val))
         return dict(active = active)
 
-class EventDetectionWidget(GroupWidget):
+class EventDetectionWidget(GroupWidget[ModelType]):
     "Allows displaying only events"
     INPUT = CheckboxGroup
-    def __init__(self, model:PlotModelAccess) -> None:
+    def __init__(self, model:ModelType) -> None:
         super().__init__(model)
         self.css.title.eventdetection.labels.default = [u'Find events']
 

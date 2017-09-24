@@ -4,17 +4,19 @@
 Allows creating modals from anywhere
 """
 from typing             import Dict, List, Tuple, Any, TYPE_CHECKING
+from abc                import ABC
 from copy               import deepcopy
 from bokeh.document     import Document                     # pylint: disable=unused-import
 from bokeh.models       import Widget, Button
 from utils.logconfig    import getLogger
 from .                  import dialog
-LOGS = getLogger(__name__)
+LOGS   = getLogger(__name__)
+T_BODY = Tuple[Tuple[str, str],...]
 
-class AdvancedWidgetMixin:
+class AdvancedWidgetMixin(ABC):
     "A button to access the modal dialog"
-    _TITLE : str                    = None
-    _BODY  : Tuple[Tuple[str, str]] = None
+    _TITLE : str    = None
+    _BODY  : T_BODY = None
     def __init__(self):
         self.__widget: Button   = None
         self.__doc:    Document = None
@@ -26,8 +28,8 @@ class AdvancedWidgetMixin:
                                         button = 'Advanced',
                                         body   = tuple(i for i, _ in self._BODY))
         if TYPE_CHECKING:
-            self.css    = None
-            self._ctrl  = None
+            self.css:   Any = None
+            self._ctrl: Any = None
 
     def _args(self, **kwa):
         css  = self.css.dialog

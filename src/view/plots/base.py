@@ -6,7 +6,7 @@ from    typing              import (Tuple, Optional, Type, # pylint: disable=unu
                                     Generic, Dict, TypeVar, cast)
 from    collections         import OrderedDict
 from    enum                import Enum
-from    abc                 import ABCMeta, abstractmethod
+from    abc                 import abstractmethod
 from    contextlib          import contextmanager
 from    functools           import wraps
 from    time                import time
@@ -140,9 +140,28 @@ class PlotAttrs:
         getattr(self, '_'+self.glyph, self._default)(args)
         return getattr(fig, self.glyph)(**args)
 
-class WidgetCreator(GlobalsAccess, metaclass = ABCMeta):
+class PlotModelAccess(GlobalsAccess):
+    "Default plot model"
+    def __init__(self, model:Union[Controller, 'PlotModelAccess'], key = None) -> None:
+        super().__init__(model, key)
+        self._ctrl   = getattr(model, '_ctrl', model)
+
+    def clear(self):
+        "clears the model's cache"
+
+    def create(self, _):
+        "creates the model"
+
+    @staticmethod
+    def reset() -> bool:
+        "resets the model"
+        return False
+
+ModelType = TypeVar('ModelType', bound = PlotModelAccess)
+
+class WidgetCreator(GlobalsAccess, Generic[ModelType]):
     "Base class for creating a widget"
-    def __init__(self, model:GlobalsAccess) -> None:
+    def __init__(self, model:ModelType) -> None:
         super().__init__(model)
         self._model = model
         self._ctrl  = getattr(model, '_ctrl')
@@ -158,7 +177,7 @@ class WidgetCreator(GlobalsAccess, metaclass = ABCMeta):
     def reset(self, resets):
         "resets the wiget when a new file is opened"
 
-class GroupWidget(WidgetCreator):
+class GroupWidget(WidgetCreator[ModelType]):
     "Allows creating group widgets"
     INPUT = RadioButtonGroup
     def __init__(self, model) -> None:
@@ -190,24 +209,6 @@ class GroupWidget(WidgetCreator):
     def _data(self) -> dict:
         "returns  a dict of updated widget attributes"
 
-class PlotModelAccess(GlobalsAccess):
-    "Default plot model"
-    def __init__(self, model:Union[Controller, 'PlotModelAccess'], key = None) -> None:
-        super().__init__(model, key)
-        self._ctrl   = getattr(model, '_ctrl', model)
-
-    def clear(self):
-        "clears the model's cache"
-
-    def create(self, _):
-        "creates the model"
-
-    @staticmethod
-    def reset() -> bool:
-        "resets the model"
-        return False
-
-ModelType = TypeVar('ModelType', bound = PlotModelAccess)
 class PlotCreator(Generic[ModelType], GlobalsAccess):
     "Base plotter class"
     _RESET  = frozenset(('bead',))

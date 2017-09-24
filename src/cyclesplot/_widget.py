@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Widgets for configuration"
 
-from    typing              import List, TYPE_CHECKING
+from    typing              import List, Tuple, TYPE_CHECKING
 from    abc                 import ABC
 
 from    bokeh               import layouts
@@ -11,17 +11,17 @@ from    bokeh.models        import (ColumnDataSource, Slider, CustomJS, Paragrap
                                     CheckboxButtonGroup, Widget)
 
 import  sequences
-from    view.plots          import (PlotModelAccess, GroupWidget,
-                                    WidgetCreator as _Widget, DpxNumberFormatter)
+from    view.plots          import GroupWidget, WidgetCreator as _Widget, DpxNumberFormatter
 from    view.plots.sequence import readsequence, OligoListWidget, SequencePathWidget
 from    view.base           import enableOnTrack
 from    modaldialog.view    import AdvancedWidgetMixin
 
 from    eventdetection.view import AlignmentWidget, EventDetectionWidget
+from    ._model             import CyclesModelAccess
 
-class PeaksTableWidget(_Widget):
+class PeaksTableWidget(_Widget[CyclesModelAccess]):
     "Table of peaks in z and dna units"
-    def __init__(self, model:PlotModelAccess) -> None:
+    def __init__(self, model:CyclesModelAccess) -> None:
         super().__init__(model)
         self.__widget: DataTable = None
         self.css.table.defaults  = {'height' : 100,
@@ -104,9 +104,9 @@ class PeaksTableWidget(_Widget):
         info         += info[0]/stretch+bias, info[1]/stretch+bias
         return dict(bases = info[:2], z = info[2:])
 
-class ConversionSlidersWidget(_Widget):
+class ConversionSlidersWidget(_Widget[CyclesModelAccess]):
     "Sliders for managing stretch and bias factors"
-    def __init__(self, model:PlotModelAccess) -> None:
+    def __init__(self, model:CyclesModelAccess) -> None:
         super().__init__(model)
         self.__stretch: Slider           = None
         self.__bias:    Slider           = None
@@ -171,10 +171,10 @@ class ConversionSlidersWidget(_Widget):
             mdl.updating  = 'bias'
         bias   .js_on_change('value', _js_bias_cb)
 
-class DriftWidget(GroupWidget):
+class DriftWidget(GroupWidget[CyclesModelAccess]):
     "Allows removing the drifts"
     INPUT = CheckboxButtonGroup
-    def __init__(self, model:PlotModelAccess) -> None:
+    def __init__(self, model:CyclesModelAccess) -> None:
         super().__init__(model)
         self.css.title.drift.labels.default = [u'Per bead', u'Per cycle']
         self.css.title.drift.default        = u'Drift Removal'
@@ -197,17 +197,25 @@ class DriftWidget(GroupWidget):
             value += [1]
         return dict(active = value)
 
-class AdvancedWidget(AdvancedWidgetMixin, _Widget):
+class AdvancedWidget(_Widget[CyclesModelAccess], AdvancedWidgetMixin):
     "access to the modal dialog"
     _TITLE = 'Cycles Plot Configuration'
-    _BODY  = (('Histogram bin width',         '%(binwidth).3f'),
-              ('Minimum frames per position', '%(minframes)d'))
-    def __init__(self, model:PlotModelAccess) -> None:
-        _Widget.__init__(self, model)
+    _BODY: Tuple[Tuple[str,str],...]  = (('Histogram bin width',         '%(binwidth).3f'),
+                                         ('Minimum frames per position', '%(minframes)d'))
+    def __init__(self, model:CyclesModelAccess) -> None:
+        super().__init__(model)
         AdvancedWidgetMixin.__init__(self)
 
     def _args(self, **kwa):
         return super()._args(model = self._model, **kwa)
+
+    def reset(self, resets):
+        "resets the wiget when a new file is opened"
+        AdvancedWidgetMixin.reset(resets)
+
+    def create(self, action) -> List[Widget]:
+        "creates the widget"
+        return AdvancedWidgetMixin.create(self, action)
 
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"
@@ -216,9 +224,9 @@ class WidgetMixin(ABC):
                               sliders  = ConversionSlidersWidget(self._model),
                               seq      = SequencePathWidget(self._model),
                               oligos   = OligoListWidget(self._model),
-                              align    = AlignmentWidget(self._model),
+                              align    = AlignmentWidget[CyclesModelAccess](self._model),
                               drift    = DriftWidget(self._model),
-                              events   = EventDetectionWidget(self._model),
+                              events   = EventDetectionWidget[CyclesModelAccess](self._model),
                               advanced = AdvancedWidget(self._model))
 
     def ismain(self, keys):

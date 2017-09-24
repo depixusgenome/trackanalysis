@@ -66,17 +66,19 @@ class MessagesModelAccess(TaskPlotModelAccess):
         for i in self.__messages.values():
             i.clear()
 
-class SummaryWidget(WidgetCreator):
+class SummaryWidget(WidgetCreator[MessagesModelAccess]):
     "summary info on the track"
     def __init__(self, model:MessagesModelAccess) -> None:
         super().__init__(model)
         self.__widget: Div = None
 
     def create(self, _):
+        "creates the widget"
         self.__widget = Div()
         return [self.__widget]
 
     def reset(self, resets):
+        "resets the widget"
         itm = self.__widget if resets is None else resets[self.__widget]
         txt = self.__text()
         itm.update(text = txt)
@@ -99,7 +101,7 @@ class SummaryWidget(WidgetCreator):
                   "</div></div>")
         return txt
 
-class MessagesListWidget(WidgetCreator):
+class MessagesListWidget(WidgetCreator[MessagesModelAccess]):
     "Table containing stats per peaks"
     def __init__(self, model:MessagesModelAccess) -> None:
         super().__init__(model)
@@ -118,6 +120,7 @@ class MessagesListWidget(WidgetCreator):
         return self.css.table
 
     def create(self, _) -> List[Widget]:
+        "creates the widget"
         cnf   = self.__config.columns
         get   = lambda i: self.css[i[4:]].get() if i.startswith('css:') else i
         fmt   = lambda i: (StringFormatter() if i == '' else
@@ -137,7 +140,7 @@ class MessagesListWidget(WidgetCreator):
         return [self.__widget]
 
     def reset(self, resets):
-        "this widget has a source in common with the plots"
+        "resets the widget"
         itm  = self.__widget.source if resets is None else resets[self.__widget.source]
         data = self.__data()
         itm.update(data = {i: list(j) for i, j in data.items()})

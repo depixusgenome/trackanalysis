@@ -25,7 +25,10 @@ class TaskTypeDescriptor:
                     if getattr(i, '__args__', None))
             task = next(args, None)
             if task is None:
-                raise TypeError(f"Missing Generic specialization in {self.__class__}")
+                for cls in tpe.__bases__:
+                    if hasattr(cls, 'tasktype'):
+                        return cls.tasktype
+                raise TypeError(f"Missing Generic specialization in {tpe}")
             return task if len(task) > 1 else task[0]
         return tasks()
 
