@@ -30,7 +30,8 @@ class Runner:
                  pool:  ProcessPoolExecutor = None,
                  gen:   Iterator[TrackView] = None,
                  start: Iterator[TrackView] = None,
-                 level: Level               = Level(0)
+                 level: Level               = Level(0),
+                 **_
                 ) -> None:
         data = (Cache(list(pickle.loads(data))) if isinstance(data, bytes) else
                 data                            if isinstance(data, Cache) else
