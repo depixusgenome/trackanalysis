@@ -177,7 +177,7 @@ class Processor(Generic[TaskType]):
         "updates the frames"
         raise NotImplementedError()
 
-class ProtocolProcessor(Processor, Generic[TaskType]):
+class ProtocolProcessor(Processor[TaskType]):
     "A processor that can deal with any task having the __processor__ attribute"
     @staticmethod
     def _tasktypes():
@@ -197,6 +197,7 @@ class ProtocolProcessor(Processor, Generic[TaskType]):
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args:'Runner'):
+        "updates the frames"
         args.apply(self.apply(**self.config()))
 
 def processors(atask: Union[_tasks.Task, type]) -> Iterator[type]:

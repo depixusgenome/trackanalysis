@@ -12,7 +12,7 @@ TaskType = TypeVar('TaskType', bound = Task)
 TaskDict = TypeVar('TaskDict', bound = TaskView)
 Key      = TypeVar('Key')
 
-class TaskViewProcessor(Processor, Generic[TaskType, TaskDict, Key]):
+class TaskViewProcessor(Generic[TaskType, TaskDict, Key], Processor[TaskType]):
     "Groups beads per hairpin"
     @classmethod
     def taskdicttype(cls) -> type:
@@ -33,4 +33,5 @@ class TaskViewProcessor(Processor, Generic[TaskType, TaskDict, Key]):
         return out.key, out
 
     def run(self, args):
+        "updates the frames"
         args.apply(self.apply(**self.config()))

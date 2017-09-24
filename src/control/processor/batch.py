@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Batch creator basics"
-from typing             import (Optional,  # pylint: disable=unused-import
-                                TypeVar, Iterator, Union, Generic, Iterable, Sequence)
+from typing             import (TypeVar, Iterator, Union, Iterable, Sequence,
+                                Type, cast)
 from pathlib            import Path
 from copy               import deepcopy, copy as shallowcopy
 from itertools          import chain
@@ -10,12 +10,10 @@ from functools          import partial
 
 from utils              import initdefaults, update
 from data.views         import TrackView
-from data.trackio       import PATHTYPES, PATHTYPE # pylint: disable=unused-import
+from data.trackio       import PATHTYPES, PATHTYPE
 
 from model.task         import RootTask, Task, Level
 from .base              import Processor
-
-TaskType = TypeVar('TaskType', bound = Task)
 
 class BatchTemplate(Iterable):
     "Template of tasks to run"
@@ -39,8 +37,8 @@ class BatchTemplate(Iterable):
 
 class PathIO:
     "Paths (as regex) on which to run"
-    track     = ''    # type: PATHTYPES
-    reporting = None  # type: Optional[PATHTYPE]
+    track:     PATHTYPES = ''
+    reporting: PATHTYPE  = None
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
@@ -51,8 +49,8 @@ class BatchTask(RootTask):
     """
     levelin      = Level.project
     levelou      = Level.peak
-    paths        = []           # type: Sequence[PathIO]
-    template     = None         # type: BatchTemplate
+    paths:    Sequence[PathIO] = []
+    template: BatchTemplate    = None
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -76,18 +74,19 @@ class BatchTask(RootTask):
         "appends a PathIO to the list"
         self.paths.append(self.pathtype()(**kwa))
 
-class BatchProcessor(Processor, Generic[TaskType]):
+BTaskType = TypeVar('BTaskType', bound = BatchTask)
+class BatchProcessor(Processor[BTaskType]):
     "Constructs a list of tasks depending on a template and paths."
     @staticmethod
     def create(mdl: Sequence[Task], **kwa) -> Iterator:
         "creates a specific model for each path"
         from ..taskcontrol import create
-        return create(mdl).run(**kwa)
+        return create(tuple(mdl)).run(**kwa)
 
     @classmethod
     def models(cls, *paths, template = None, **kwa) -> Iterator[Sequence[Task]]:
         "iterates through all instanciated models"
-        tsk = cls.tasktype
+        tsk = cast(Type[BatchTask], cls.tasktype)
         if template is None:
             template = next((i for i in paths if isinstance(i, tsk.templatetype())), None)
             paths    = tuple(i for i in paths if not isinstance(i, tsk.templatetype()))
@@ -135,6 +134,7 @@ class BatchProcessor(Processor, Generic[TaskType]):
         raise NotImplementedError()
 
     def run(self, args):
+        "updates frames"
         fcn   = partial(self.reports, *self.task.paths, pool = args.pool,
                         **self.task.template.config())
         args.apply(fcn, levels = self.levels)
