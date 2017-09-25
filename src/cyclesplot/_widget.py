@@ -11,8 +11,8 @@ from    bokeh.models        import (ColumnDataSource, Slider, CustomJS, Paragrap
                                     CheckboxButtonGroup, Widget)
 
 import  sequences
+from    sequences.view      import readsequence, OligoListWidget, SequencePathWidget
 from    view.plots          import GroupWidget, WidgetCreator as _Widget, DpxNumberFormatter
-from    view.plots.sequence import readsequence, OligoListWidget, SequencePathWidget
 from    view.base           import enableOnTrack
 from    modaldialog.view    import AdvancedWidgetMixin
 

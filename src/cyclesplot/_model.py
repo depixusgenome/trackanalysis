@@ -8,8 +8,8 @@ from    cordrift.processor          import DriftTask
 from    eventdetection.processor    import (ExtremumAlignmentTask,
                                             EventDetectionTask)
 from    control.modelaccess         import TaskAccess, TaskPlotModelAccess
-from    view.plots.sequence         import (SequenceKeyProp, FitParamProp,
-                                            SequencePlotModelAccess)
+from    sequences.view              import SequenceKeyProp, FitParamProp
+from    sequences.modelaccess       import SequencePlotModelAccess
 
 class EventDetectionTaskAccess(TaskAccess):
     "Access to the event detection task"

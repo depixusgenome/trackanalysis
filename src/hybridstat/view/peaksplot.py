@@ -14,7 +14,7 @@ import numpy                    as     np
 from view.base                  import enableOnTrack
 from view.plots                 import PlotView, PlotAttrs, from_py_func
 from view.plots.tasks           import TaskPlotCreator
-from view.plots.sequence        import (SequenceTicker, OligoListWidget,
+from sequences.view             import (SequenceTicker, OligoListWidget,
                                         SequenceHoverMixin)
 
 from ._model                    import PeaksPlotModelAccess

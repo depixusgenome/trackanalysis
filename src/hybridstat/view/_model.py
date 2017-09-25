@@ -7,6 +7,11 @@ from itertools                  import product
 import numpy                    as     np
 
 import sequences
+from sequences.view             import (readsequence,
+                                        FitParamProp    as _FitParamProp,
+                                        SequenceKeyProp as _SequenceKeyProp)
+from sequences.modelaccess      import SequencePlotModelAccess
+
 from utils                      import updatecopy
 from control.processor          import processors
 from control.modelaccess        import TaskPlotModelAccess, TaskAccess
@@ -17,11 +22,6 @@ from peakfinding.probabilities  import Probability
 from peakcalling.tohairpin      import GaussianProductFit, PeakMatching, Distance
 from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
                                         FitBead)
-
-from view.plots.sequence        import (readsequence,
-                                        FitParamProp    as _FitParamProp,
-                                        SequenceKeyProp as _SequenceKeyProp,
-                                        SequencePlotModelAccess)
 
 from ..reporting.batch          import fittohairpintask
 

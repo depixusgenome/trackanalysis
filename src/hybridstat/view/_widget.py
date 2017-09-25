@@ -17,7 +17,7 @@ from peakcalling.tohairpin      import GaussianProductFit
 from view.dialog                import FileDialog
 from view.pathinput             import PathInput
 from view.plots                 import from_py_func, DpxNumberFormatter, WidgetCreator
-from view.plots.sequence        import (SequenceTicker, SequenceHoverMixin,
+from sequences.view             import (SequenceTicker, SequenceHoverMixin,
                                         SequencePathWidget)
 from modaldialog.view           import AdvancedTaskMixin, T_BODY
 from ._model                    import PeaksPlotModelAccess

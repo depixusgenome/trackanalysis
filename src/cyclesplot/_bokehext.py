@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Cycles plot view"
-from typing         import Optional, Tuple      # pylint: disable=unused-import
+from typing            import Any
 
 import  bokeh.core.properties as props
 from    bokeh.model    import Model
-from    bokeh.models   import (LinearAxis,      # pylint: disable=unused-import
-                               ColumnDataSource, GlyphRenderer, Range1d,
-                               CustomJS, ContinuousTicker, BasicTicker, Ticker)
+from    bokeh.models   import ColumnDataSource, GlyphRenderer, CustomJS
 
-from    view.plots.sequence import SequenceHoverMixin
-from    view.plots          import PlotAttrs, DpxHoverTool
+from    sequences.view import SequenceHoverMixin
+from    view.plots     import PlotAttrs, DpxHoverTool
 
 class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-instance-attributes
     "controls keypress actions"
@@ -28,11 +26,11 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
                               __file__)
 
     def __init__(self, **kwa):
-        super().__init__(**kwa)
+        super().__init__(**kwa) # type: ignore
         SequenceHoverMixin.__init__(self)
-        self._rawsource  = None # type: Optional[ColumnDataSource]
-        self._rawglyph   = None # type: Optional[GlyphRenderer]
-        self._model      = None # type: Any
+        self._rawsource: ColumnDataSource = None
+        self._rawglyph:  GlyphRenderer    = None
+        self._model:     Any              = None
 
     @staticmethod
     def defaultconfig(mdl):

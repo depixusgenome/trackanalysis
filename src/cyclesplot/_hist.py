@@ -10,8 +10,8 @@ from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 
 import  numpy        as np
 
-from    view.plots          import PlotAttrs, checksizes
-from    view.plots.sequence import SequenceTicker, estimatebias
+from    view.plots     import PlotAttrs, checksizes
+from    sequences.view import SequenceTicker, estimatebias
 
 class HistMixin(ABC):
     "Building a projection of phase 5 onto the Z axis"

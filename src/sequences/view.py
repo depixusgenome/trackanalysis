@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Create a grid displaying a sequence"
 from    typing         import (List, # pylint: disable=unused-import
-                               Optional, Tuple, Sequence, TypeVar)
+                               Optional, Tuple, Sequence, TypeVar, cast)
 from    collections    import OrderedDict
 from    pathlib        import Path
 import  numpy   as np
@@ -11,18 +11,20 @@ import  bokeh.core.properties as props
 from    bokeh.models    import (LinearAxis, ColumnDataSource, Range1d, Widget,
                                 BasicTicker, Dropdown, Paragraph, AutocompleteInput)
 
-import  sequences
-
 from    utils           import CachedIO
 from    utils.gui       import implementation
 
-from   model.globals    import BeadProperty
-from   ..dialog         import FileDialog
-from   .base            import checksizes, WidgetCreator
-from   .tasks           import TaskPlotModelAccess
-from   .bokehext        import DpxHoverTool, from_py_func
+from   model.globals        import BeadProperty
+from   view.dialog          import FileDialog
+from   view.plots.base      import checksizes, WidgetCreator
+from   view.plots.bokehext  import DpxHoverTool, from_py_func
 
-_CACHE = CachedIO(lambda path: OrderedDict(sequences.read(path)), size = 1)
+from   .                    import (read as _readsequence, peaks as sequencepeaks,
+                                    marksequence, splitoligos)
+from   .modelaccess         import SequencePlotModelAccess
+
+
+_CACHE = CachedIO(lambda path: OrderedDict(_readsequence(path)), size = 1)
 def readsequence(path):
     "Reads / caches DNA sequences"
     if path is None or not Path(path).exists():
@@ -54,11 +56,11 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
 
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.__standoff = None
-        self.__defaults = dict()
-        self.__withbase = []
-        self.__model    = None
-        self.__fig      = None
+        self.__standoff      = None
+        self.__defaults:dict = dict()
+        self.__withbase:list = []
+        self.__model         = None
+        self.__fig           = None
         self.__axis: SequenceTicker = None
 
     @property
@@ -122,14 +124,15 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
         else:
             resets[fig.ygrid[0]].update(self.__withbase)
             for name, seq in readsequence(mdl.sequencepath).items():
-                peaks        = sequences.peaks(seq, mdl.oligos)
+                peaks        = sequencepeaks(seq, mdl.oligos)
                 majors[name] = tuple(peaks['position'][peaks['orientation']])
                 minors[name] = tuple(peaks['position'][~peaks['orientation']])
 
         resets[self].update(major = majors, minor = minors, key = key)
-        resets[self.__axis].update(major = {i: majors[i]+minors[i] for i in majors},
-                                   minor = dict.fromkeys(majors.keys(), tuple()),
-                                   key   = key)
+
+        minor = dict.fromkeys(majors.keys(), tuple()) # type:ignore
+        major = {i: majors[i]+minors[i] for i in majors}
+        resets[self.__axis].update(major = major, minor = minor, key = key)
 
 class SequenceHoverMixin:
     "controls keypress actions"
@@ -216,7 +219,7 @@ class SequenceHoverMixin:
         data   = dict(values = np.arange(osiz, nbases+osiz),
                       inds   = np.full((nbases,), 1, dtype = 'f4'))
         for name, seq in dseq.items():
-            seq        = sequences.marksequence(seq, oligs)
+            seq        = marksequence(seq, oligs)
             data[name] = np.full((nbases,), ' ', dtype = 'U%d' % osiz)
             data[name][:len(seq)-osiz+1] = [seq[i:i+osiz] for i in range(len(seq)-osiz+1)]
 
@@ -224,7 +227,7 @@ class SequenceHoverMixin:
         data['z']    = data['values']/mdl.stretch+(0. if mdl.bias is None else mdl.bias)
         return data
 
-ModelType = TypeVar("ModelType", bound = TaskPlotModelAccess)
+ModelType = TypeVar("ModelType", bound = SequencePlotModelAccess)
 class SequencePathWidget(WidgetCreator[ModelType]):
     "Dropdown for choosing a fasta file"
     def __init__(self, model) -> None:
@@ -338,11 +341,11 @@ class OligoListWidget(WidgetCreator[ModelType]):
         widget = self.__widget
         @action
         def _py_cb(attr, old, new):
-            ols  = sequences.splitoligos(new)
+            ols  = splitoligos(new)
             hist = self.css.plot.oligos.history
             lst  = list(i for i in hist.get() if i != ols)[:hist.maxlength.get()]
             hist.set(([ols] if len(ols) else []) + lst)
-            self._model.oligos = ols
+            self._model.oligos = ols  # type: ignore
 
         widget.on_change('value', _py_cb)
         return [self.__widget]
@@ -374,7 +377,7 @@ class SequenceKeyProp(BeadProperty[Optional[str]]):
     def __get__(self, obj, tpe) -> Optional[str]:
         "returns the current sequence key"
         if obj is None:
-            return self
+            return self # type: ignore
 
         key  = self.fromglobals(obj)
         if key is not None:
@@ -383,32 +386,19 @@ class SequenceKeyProp(BeadProperty[Optional[str]]):
         dseq = readsequence(obj.sequencepath)
         return next(iter(dseq), None) if key not in dseq else key
 
-class SequencePlotModelAccess(TaskPlotModelAccess):
-    "access to the sequence path and the oligo"
-    crprop       = TaskPlotModelAccess.props.configroot
-    sequencepath = crprop[Optional[str]]          ('tasks.sequence.path')
-    oligos       = crprop[Optional[Sequence[str]]]('tasks.oligos')
-    del crprop
-
-    def __init__(self, ctrl, key: str = None) -> None:
-        super().__init__(ctrl, key)
-        cls = type(self)
-        cls.sequencepath.setdefault(self, None)
-        cls.oligos      .setdefault(self, [], size = 4)
-
 class FitParamProp(BeadProperty[float]):
     "access to bias or stretch"
     def __init__(self, attr):
         super().__init__('base.'+attr)
         self._key = attr
 
-    def __get__(self, obj, tpe) -> Optional[str]:
-        val = super().__get__(obj, tpe)
+    def __get__(self, obj, tpe) -> Optional[str]:  # type: ignore
+        val = cast(str, super().__get__(obj, tpe))
         if val is None:
             return getattr(obj, 'estimated'+self._key)
-        return val
+        return cast(str, val)
 
-    def setdefault(self, obj, items:Optional[dict] = None, **kwa):
+    def setdefault(self, obj, items:Optional[dict] = None, **kwa):  # type: ignore
         "initializes the property stores"
         super().setdefault(obj,
                            (None if self._key == 'bias' else 1./8.8e-4),

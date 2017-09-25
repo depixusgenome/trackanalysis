@@ -28,7 +28,6 @@ def compileapp(*modules) -> str:
     "compiles the application as would a normal call to bokeh"
     for mod in modules:
         __import__(mod)
-    __import__('app.launcher')
     string = _compiler.bundle_all_models()
     string = re.sub(r'//\s[^\n]*?\n', '',  string)
     string = re.sub(r'\s\s+',         ' ', string)
