@@ -3,6 +3,7 @@
 "Updating PeaksDict for oligo mapping purposes"
 import sys
 from   typing                   import List, Type
+from   scipy.interpolate        import interp1d
 import numpy                    as np
 from   utils                    import DefaultValue
 from   utils.decoration         import addto
@@ -183,14 +184,44 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
     def _specs(cls):
         return super()._specs() + (('distance', ChiSquareHistogramFit()),)
 
+    @staticmethod
+    def to2d(plot, _):
+        "converts 1d histograms to 2D"
+        crvs  = [(i[1], j) for i, j in plot.data.items() if i[0] == 'Curve'][::2]
+        axis  = crvs[0][1].data[:,0]
+        inte  = lambda i: interp1d(i.data[:,0], i.data[:,1],
+                                   fill_value = 0.,
+                                   bounds_error = False,
+                                   assume_sorted = True)(axis)
+
+        normed = np.concatenate([inte(j) for i, j in crvs]).reshape(-1, axis.size)
+        quad   = hv.QuadMesh((np.append(axis, axis[-1]+axis[1]-axis[0]),
+                              np.arange(normed.shape[0]+1),
+                              normed))(style = dict(yaxis = None))
+        text   = hv.Overlay([hv.Text(0., i+.5, j)(style = dict(text_color='white'))
+                             for i, (j, _) in enumerate(crvs)])
+
+        sp1 = [j.data[:,0] for i, j in plot.data.items() if i[0] == 'Scatter'][1::2]
+        sp2 = [(np.ones((len(j),3))*(i+.5)+[-.5,.5, np.NaN]).ravel()
+               for i, j in enumerate(sp1)]
+        pks = hv.Curve((np.repeat(np.concatenate(sp1), 3), np.concatenate(sp2)))
+        return (quad*pks*text).redim(x = 'z', y = 'key', z ='events')
+
 @addto(TracksDict) # type: ignore
-def peaks(self, overlay = 'key', reference = None, **kwa):
+def peaks(self, overlay = '2d', reference = None, **kwa):
     """
     A hv.DynamicMap showing peaks
 
     Options are:
 
         * *overlay* == 'key': for a given bead, all tracks are overlayed:
+
+            * *reference*: the reference is displayed as an area
+            * *distance*: a *HistogramFit* object (default) or *None*. This
+            objects computes a stretch and bias which is applied to the x-axis of
+            non-reference items.
+
+        * *overlay* == '2d': for a given bead, all tracks are shown on a 2D histogram:
 
             * *reference*: the reference is displayed as an area
             * *distance*: a *HistogramFit* object (default) or *None*. This
@@ -215,6 +246,14 @@ def peaks(self, overlay = 'key', reference = None, **kwa):
     """
     kwa.setdefault('reflayout', 'same' if overlay is None else 'bottom')
     kwa.setdefault('refdims', False)
-    return PeaksTracksDictDisplay.run(self, 'peaks', overlay, reference, kwa)
+    is2d    = overlay.lower() == '2d'
+    overlay = 'key' if is2d else overlay.lower()
+    if is2d:
+        beads = kwa['bead'] if 'bead' in kwa else self.beads(*kwa.get('key', ()))
+    dmap    = PeaksTracksDictDisplay.run(self, 'peaks', overlay, reference, kwa)
+    if is2d:
+        fcn   = lambda bead: PeaksTracksDictDisplay.to2d(dmap[bead], kwa)
+        return hv.DynamicMap(fcn, kdims = ['bead']).redim.values(bead = beads)
+    return dmap
 
 __all__: List[str] = []

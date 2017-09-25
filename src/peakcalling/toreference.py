@@ -169,7 +169,12 @@ class ChiSquareHistogramFit(HistogramFit):
     3. fitting a linear regression to paired peaks
     """
 
-    window    = 1.5e-2
+    window       = 1.5e-2
+    firstregpeak = 1
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
     def frompeaks(self, peaks, firstpeak = 0):
         "creates a histogram from a list of peaks with their count"
         if str(getattr(peaks, 'dtype', ' '))[0] != 'f':
@@ -212,12 +217,12 @@ class ChiSquareHistogramFit(HistogramFit):
     def _optimize(self, left: ChiSquareData, right: ChiSquareData,      # type: ignore
                   kwa, params):
         tmp = super()._optimize(left, right, kwa, params)
-        res = chisquare(left.peaks, right.peaks,
+        res = chisquare(left.peaks[self.firstregpeak:], right.peaks,
                         False, self.symmetry, self.window, tmp[1], -tmp[1]*tmp[2])
         return res[0], res[1], -res[2]/res[1]
 
     def _cost_function(self, left: ChiSquareData, right: ChiSquareData, # type: ignore
                        stretch: float, bias: float):
-        return chisquarevalue(left.peaks, right,
+        return chisquarevalue(left.peaks[self.firstregpeak:], right,
                               False, self.symmetry, self.window,
                               stretch, -stretch*bias)[0], stretch, bias
