@@ -267,7 +267,7 @@ class TrackSimulator:
         track = Track(data   = None,
                       phases = self.phases,
                       key    = 'bybeadeventssimulator')
-        def _createall():
+        def _createall(_):
             evts = OrderedDict() # type: Dict[Tuple[int,int], np.ndarray]
             def _createone(cycs, bead):
                 evts.update(((bead, cid), evt) for cid, evt in enumerate(self.__events(cycs)))
