@@ -9,7 +9,8 @@ from   utils.decoration                 import addto
 from   data                             import Track
 from   control.processor.dataframe      import DataFrameProcessor
 from   ..toreference                    import HistogramFit, ChiSquareHistogramFit
-from   ..processor                      import FitToHairpinDict
+from   ..processor                      import (FitToHairpinDict, FitToReferenceDict,
+                                                FitToReferenceTask)
 
 Tasks:           type     = sys.modules['model.__scripting__'].Tasks
 defaulttasklist: Callable = sys.modules['data.__scripting__'].defaulttasklist
@@ -36,6 +37,19 @@ def fittohairpin(self, sequence = None, oligos = None, **kwa) -> FitToHairpinDic
     return _fit(self, 'fittohairpin', sequence, oligos, kwa)
 
 @addto(Track) # type: ignore
+def fittoreference(self, task: FitToReferenceTask = None, **kwa) -> FitToReferenceDict:
+    """
+    Computes fits to a reference.
+
+    Arguments are for creating the FitToReferenceTask.
+    """
+    if task is not None and len(kwa):
+        raise NotImplementedError()
+    return self.apply(Tasks.peakselector, # type: ignore
+                      (task if isinstance(task, FitToReferenceTask) else
+                       FitToReferenceTask(**kwa)))
+
+@addto(Track) # type: ignore
 def beadsbyhairpin(self, sequence, oligos, **kwa):
     """
     Computes hairpin fits, sorted by best hairpin.
@@ -46,6 +60,13 @@ def beadsbyhairpin(self, sequence, oligos, **kwa):
 
 @addto(FitToHairpinDict)
 def dataframe(self, **kwa) -> pd.DataFrame:
+    """
+    converts to a pandas dataframe.
+    """
+    return DataFrameProcessor.apply(shallowcopy(self), measures = kwa, merge = True)
+
+@addto(FitToReferenceDict)                  # type: ignore
+def dataframe(self, **kwa) -> pd.DataFrame: # pylint: disable=function-redefined
     """
     converts to a pandas dataframe.
     """
