@@ -164,11 +164,13 @@ class PeaksTracksDictDisplay(TracksDictDisplay): # type: ignore
     "tracksdict display for peaks"
     @staticmethod
     def _refindex(specs):
+        if specs.get('reference', None) is None:
+            return None
         return specs['kdims'][specs['overlay']].index(specs['reference'])
 
     @classmethod
     def _toarea(cls, specs, ovrs, ind):
-        if specs['reference'] is not None:
+        if specs.get('reference', None) is not None:
             area = next(iter(ovrs[ind])).to(hv.Area)
             ovrs[ind] = hv.Overlay([area(style = dict(alpha = 0.5))] + list(ovrs[ind]),
                                    label = ovrs[ind].label,
