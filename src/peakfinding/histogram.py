@@ -139,28 +139,6 @@ class Histogram(PrecisionAlg):
         "runs the algorithm"
         return cls()(*args, **kwa)
 
-    def asprojection(self, itm) -> HistogramData:
-        "returns a projection from a variety of data types"
-        if hasattr(itm, 'histogram'):
-            return HistogramData(itm.histogram, itm.minvalue, itm.binwidth)
-
-        if str(getattr(itm, 'dtype', ' '))[0] == 'f' and len(itm.shape) == 2:
-            # expecting a 2D table as in hv.Curve.data
-            return HistogramData(itm[:,1], itm[0,0], itm[1,0]-itm[0,0])
-
-        if (str(getattr(itm, 'dtype', ' '))[0] == 'f'
-                or getattr(itm, 'dtype', 'f4') == EVENTS_DTYPE
-                or (isinstance(itm, Sequence) and all(np.isscalar(i) for i in itm))):
-            return self.projection(itm)
-
-        if isinstance(itm, Iterator):
-            # this should be a peaks output
-            vals = np.concatenate([i for _, i in itm])
-            vals = np.concatenate([i if isinstance(i, np.ndarray) else [i]
-                                   for i in vals if i is not None and len(i)])
-            return self.projection(vals)
-        return HistogramData(*itm)
-
     def variablekernelsize(self, peaks) -> HistogramData:
         "computes a histogram where the kernel size may vary"
         osamp  = (int(self.oversampling)//2) * 2 + 1
@@ -195,8 +173,7 @@ class Histogram(PrecisionAlg):
         return HistogramData(arr, minv, bwidth)
 
     def __rint_peaks(self, peaks, minv, bwidth, lenv):
-        peaks[:,0] -= minv
-        peaks       = np.int32(np.rint((peaks)/bwidth)) # type: ignore
+        peaks       = np.int32(np.rint((peaks-[minv,0])/bwidth)) # type: ignore
         peaks       = peaks[np.logical_and(peaks[:,0] >= 0, peaks[:,0] < lenv)]
         defaultstd  = np.percentile(peaks[:,1][peaks[:,1]>0], self.stdpercentile)
         peaks[:,1][peaks[:,1] <= 0] = defaultstd

@@ -26,9 +26,7 @@ class PeaksDisplay(Display): # type: ignore
     # pylint: disable=too-many-arguments,arguments-differ
     @staticmethod
     def __histogram(det, params, norm, opts, estyle):
-        xvals = det.xaxis(*params)
-        yvals = det.yaxis(norm)
-        return hv.Curve((xvals, yvals), **opts)(style = estyle)
+        return hv.Curve((det.xaxis(*params), det.yaxis(norm)), **opts)(style = estyle)
 
     @staticmethod
     def __events(det, params, opts, estyle, hist):

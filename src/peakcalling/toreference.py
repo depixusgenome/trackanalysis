@@ -3,13 +3,14 @@
 """
 Matching experimental peaks to one another
 """
-from    typing                      import Sequence, NamedTuple, Tuple, Union, cast
+from    typing                      import (Sequence, NamedTuple, Tuple, Union,
+                                            Iterator, cast)
 from    functools                   import partial
 from    scipy.interpolate           import interp1d
 from    scipy.optimize              import fmin_cobyla
 import  numpy                       as     np
 
-from    utils                       import initdefaults
+from    utils                       import initdefaults, EVENTS_DTYPE
 from    eventdetection.data         import Events
 from    peakfinding.histogram       import Histogram, HistogramData
 from    peakfinding.probabilities   import Probability
@@ -62,7 +63,7 @@ class HistogramFit(GriddedOptimization):
 
     def fromevents(self, evts:Events):
         "creates a histogram from a list of events"
-        return self.histogram.asprojection(np.concatenate(list(evts.values())))
+        return self.__asprojection(np.concatenate(list(evts.values())))
 
     def optimize(self, aleft, aright):
         "find best stretch & bias to fit right against left"
@@ -105,7 +106,7 @@ class HistogramFit(GriddedOptimization):
         return (cost(tmp), tmp[0], tmp[1])
 
     def _to_2d(self, left) -> Tuple[HistogramData, Tuple[np.ndarray, np.ndarray]]:
-        left = self.histogram.asprojection(left)
+        left = self.__asprojection(left)
         vals = (np.arange(len(left.histogram), dtype = 'f4')*left.binwidth,
                 left.histogram)
         return left, vals
@@ -159,6 +160,28 @@ class HistogramFit(GriddedOptimization):
         bright = cntr + self.bias.size + .5*self.bias.step
         return [lambda x: x[0]-sleft, lambda x: sright-x[0],
                 lambda x: x[1]-bleft, lambda x: bright-x[1]]
+
+    def __asprojection(self, itm) -> HistogramData:
+        "returns a projection from a variety of data types"
+        if hasattr(itm, 'histogram'):
+            return HistogramData(itm.histogram, itm.minvalue, itm.binwidth)
+
+        if str(getattr(itm, 'dtype', ' '))[0] == 'f' and len(itm.shape) == 2:
+            # expecting a 2D table as in hv.Curve.data
+            return HistogramData(itm[:,1], itm[0,0], itm[1,0]-itm[0,0])
+
+        if (str(getattr(itm, 'dtype', ' '))[0] == 'f'
+                or getattr(itm, 'dtype', 'f4') == EVENTS_DTYPE
+                or (isinstance(itm, Sequence) and all(np.isscalar(i) for i in itm))):
+            return self.histogram.projection(itm)
+
+        if isinstance(itm, Iterator):
+            # this should be a peaks output
+            vals = np.concatenate([i for _, i in itm])
+            vals = np.concatenate([i if isinstance(i, np.ndarray) else [i]
+                                   for i in vals if i is not None and len(i)])
+            return self.histogram.projection(vals)
+        return HistogramData(*itm)
 
 class ChiSquareHistogramFit(HistogramFit):
     """
