@@ -99,6 +99,7 @@ class FitToReferenceDataFrameFactory(DataFrameFactory[FitToReferenceDict]):
         * *eventcount*
         * *referenceposition*: the peak position in the reference
     """
+    PREC = 5e-6
     def __init__(self, task, frame):
         super().__init__(task, frame)
         self.__parent = PeaksDataFrameFactory(task, frame)
@@ -113,10 +114,12 @@ class FitToReferenceDataFrameFactory(DataFrameFactory[FitToReferenceDict]):
         meas['referenceposition'] = arr
 
         ref   = self.__peaks[key]
-        cur   = meas['peakposition']
+        cur   = np.unique(meas['peakposition'])
         pairs = _match.compute(ref, cur, frame.config.window)
 
-        arr[pairs[:,1]] = self.__peaks[key][pairs[:,0]]
+        allv  = meas['peakposition']
+        for i, j in pairs:
+            arr[np.abs(allv - cur[j]) < self.PREC] = self.__peaks[key][i]
         return meas
 
     @staticmethod

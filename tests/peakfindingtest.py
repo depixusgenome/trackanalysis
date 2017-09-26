@@ -253,6 +253,17 @@ def test_dataframe():
     assert isinstance(data, pd.DataFrame)
     assert 'track' in data.index.names
     assert 'bead'  in data.index.names
+    assert 'cycle' not in data.index.names
+    assert 'peakposition' in data
+
+    data = next(create(utfilepath('big_selected'),
+                       EventDetectionTask(),
+                       PeakSelectorTask(),
+                       DataFrameTask(merge = True, measures = dict(events = True))).run())
+    assert isinstance(data, pd.DataFrame)
+    assert 'track' in data.index.names
+    assert 'bead'  in data.index.names
+    assert 'cycle' in data.index.names
     assert 'peakposition' in data
 
 if __name__ == '__main__':

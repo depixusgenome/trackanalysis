@@ -84,6 +84,22 @@ def test_toref_controller():
     assert set(beads.columns)     == {'peakposition',      'averageduration',
                                       'hybridizationrate', 'eventcount',
                                       'referenceposition'}
+
+
+    pair  = create(ByPeaksEventSimulatorTask(peaks    = peaks,
+                                             brownian = .001,
+                                             stretch  = None,
+                                             bias     = None,
+                                             rates    = None,
+                                             nbeads   = 1,
+                                             ncycles  = 5),
+                   tsk, DataFrameTask(measures = dict(events = True)))
+    beads = tuple(i for i in pair.run())[0][0]
+    assert set(beads.index.names) == {'track', 'bead', 'cycle'}
+    assert set(beads.columns)     == {'peakposition',      'averageduration',
+                                      'hybridizationrate', 'eventcount',
+                                      'referenceposition', 'mean', 'length', 'start'}
+
 def test_cost_value():
     u"Tests peakcalling.cost.compute"
     bead1 = np.arange(10)
