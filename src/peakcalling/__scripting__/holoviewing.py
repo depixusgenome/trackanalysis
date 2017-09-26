@@ -184,8 +184,8 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
     def _specs(cls):
         return super()._specs() + (('distance', ChiSquareHistogramFit()),)
 
-    @staticmethod
-    def to2d(plot, _):
+    @classmethod
+    def to2d(cls, plot, reference):
         "converts 1d histograms to 2D"
         crvs  = [(i[1], j) for i, j in plot.data.items() if i[0] == 'Curve'][::2]
         axis  = crvs[0][1].data[:,0]
@@ -204,7 +204,18 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
         sp1 = [j.data[:,0] for i, j in plot.data.items() if i[0] == 'Scatter'][1::2]
         sp2 = [(np.ones((len(j),3))*(i+.5)+[-.5,.5, np.NaN]).ravel()
                for i, j in enumerate(sp1)]
-        pks = hv.Curve((np.repeat(np.concatenate(sp1), 3), np.concatenate(sp2)))
+        if reference is not None:
+            ind  = 0
+            sp2.pop(ind)
+            ref2 = (np.zeros((len(sp1[ind]),3))+[0., len(sp1), np.NaN]).ravel()
+            ref  = hv.Curve((np.repeat(sp1.pop(ind), 3), ref2), label = reference)
+            ref  = ref(style = dict(color ='gray'))
+
+        pks = hv.Curve((np.repeat(np.concatenate(sp1), 3), np.concatenate(sp2)),
+                       label = 'peaks')
+        pks = pks(style = dict(color ='blue'))
+        if reference is not None:
+            return (quad*ref*pks*text).redim(x = 'z', y = 'key', z ='events')
         return (quad*pks*text).redim(x = 'z', y = 'key', z ='events')
 
 @addto(TracksDict) # type: ignore
@@ -252,7 +263,7 @@ def peaks(self, overlay = '2d', reference = None, **kwa):
         beads = kwa['bead'] if 'bead' in kwa else self.beads(*kwa.get('key', ()))
     dmap    = PeaksTracksDictDisplay.run(self, 'peaks', overlay, reference, kwa)
     if is2d:
-        fcn   = lambda bead: PeaksTracksDictDisplay.to2d(dmap[bead], kwa)
+        fcn = lambda bead: PeaksTracksDictDisplay.to2d(dmap[bead], reference)
         return hv.DynamicMap(fcn, kdims = ['bead']).redim.values(bead = beads)
     return dmap
 
