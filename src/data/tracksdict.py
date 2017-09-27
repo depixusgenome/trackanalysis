@@ -3,18 +3,24 @@
 """
 Adds a dictionnaries to access tracks, experiments, ...
 """
-from typing                 import KeysView, List, Dict, Any, Iterator, Tuple, cast
-from pathlib                import Path
-from copy                   import copy as shallowcopy
+from typing             import (KeysView, List, Dict, Any, # pylint: disable=unused-import
+                                Iterator, Tuple, TypeVar, Union, Set, Optional, cast)
+from pathlib            import Path
+from concurrent.futures import ThreadPoolExecutor
+from copy               import copy as shallowcopy
 import re
 
-from .views                 import isellipsis
-from .track                 import Track
-from .trackio               import LegacyGRFilesIO, LegacyTrackIO, PATHTYPES
+from .views   import isellipsis, BEADKEY
+from .track   import Track
+from .trackio import LegacyGRFilesIO, LegacyTrackIO, PATHTYPES
 
+TDictType = TypeVar('TDictType', bound = 'TracksDict')
+TrackType = TypeVar('TrackType', bound = 'Track')
 class TracksDict(dict):
     """
     Dictionnary of tracks
+
+    ### Initialisation
 
     It can be initialized using list of directories
 
@@ -26,8 +32,36 @@ class TracksDict(dict):
 
     By default, the name of the track file is used as the key. Using the *match*
     requires defining a group which will be used as the key.
+
+    ### Shortcuts
+
+    *TracksDict.beads* returns the beads in common to all tracks in the *TracksDict*.
+
+    ### Slicing
+
+    Providing a list of keys as argument creates a new TracksDict containing
+    only those keys. The same *Track* objects are used.
+
+        >>> dico = TracksDict()
+        >>> dico.update(A = "a.trk", B = "b.trk", C = "c.trk")
+        >>> assert dico['A'].path == "a.trk"
+
+        >>> fraction = dico[['A']]
+        >>> assert isinstance(fraction, TracksDict)
+        >>> assert set(fraction.keys()) == {'A'}
+        >>> assert fraction['A'] is dico['A']
+
+    If within that list, the key "~" appears, then all but the provided
+    keys are used:
+
+        >>> assert set(dico['~A'].keys()) == {'B', 'C'}
+        >>> assert set(dico[['~', 'B', 'C'].keys()) == {'A'}
+
+    Should a key  with "~", then that keye
+    only those keys.
     """
-    __SCAN_OPTS = ('cgrdir',)
+    _SCAN_OPTS  = ('cgrdir',)
+    _NTHREADS   = 4
     _TRACK_TYPE = Track
     def __init__(self,          # pylint: disable=too-many-arguments
                  tracks  = None,
@@ -72,15 +106,22 @@ class TracksDict(dict):
     def __setitem__(self, key, val):
         return self._set(key, val)
 
-    def __getitem__(self, key):
+    def __getitem__(self: TDictType, # pylint: disable=function-redefined
+                    key: Union[List,Any]
+                   ) -> Union[TDictType, TrackType]:
         if isellipsis(key):
             return shallowcopy(self)
 
+        if isinstance(key, str) and len(key) and key[0] == '~' and key not in self:
+            key = ['~', key[1:]]
+
         if isinstance(key, list):
             other = shallowcopy(self)
-            for i in set(other)-set(key):
+            bad   = set(key) - {'~'} if '~' in key else set(other)-set(key)
+            for i in bad:
                 other.pop(i)
             return other
+
         return super().__getitem__(key)
 
     @staticmethod
@@ -123,7 +164,7 @@ class TracksDict(dict):
                **kwargs):
         "adds paths or tracks to self"
         scan    = {}
-        for i in self.__SCAN_OPTS:
+        for i in self._SCAN_OPTS:
             if i in kwargs:
                 scan[i] = kwargs.pop(i)
 
@@ -136,13 +177,15 @@ class TracksDict(dict):
             assert sum(i is None for i in (tracks, grs)) in (0, 1, 2)
             self.scan(tracks, grs, match, allaxes, **scan)
 
-    def beads(self, *keys) -> List[int]:
-        "returns the intersection of all beads in requested tracks"
+    def beads(self, *keys) -> List[BEADKEY]:
+        "returns the intersection of all beads in requested tracks (all by default)"
         if len(keys) == 0:
             keys = tuple(self.keys())
 
-        beads = set(self[keys[0]].beadsonly.keys())
-        for key in keys[1:]:
-            beads &= set(self[key].beadsonly.keys())
+        fcn   = lambda key: set(cast(Track, self[key]).beadsonly.keys())
+        beads = None # type: Optional[Set[BEADKEY]]
+        with ThreadPoolExecutor(self._NTHREADS) as pool:
+            for cur in pool.map(fcn, keys):
+                beads = cur if beads is None else (cur & beads)
 
         return sorted(beads)
