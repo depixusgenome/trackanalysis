@@ -9,7 +9,11 @@ EVENTS_TYPE  = Tuple[int, np.ndarray]
 EVENTS_DTYPE = np.dtype([('start', 'i4'), ('data', 'O')])
 
 class EventsArray(np.ndarray):
-    """Array with metadata."""
+    """
+    Array with the following fields:
+
+    * *discarded*: the number of discarded cycles
+    """
     # pylint: disable=unused-argument
     _discarded = False
     _dtype     = EVENTS_DTYPE
