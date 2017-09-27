@@ -78,13 +78,14 @@ def test_toref_controller():
                                              rates    = None,
                                              nbeads   = 1,
                                              ncycles  = 5),
-                   tsk, DataFrameTask())
+                   tsk, DataFrameTask(measures = dict(std1 = 'std',
+                                                      std2 = ('std', 'mean'),
+                                                      std3 = 'resolution')))
     beads = tuple(i for i in pair.run())[0][0]
     assert set(beads.index.names) == {'track', 'bead'}
     assert set(beads.columns)     == {'peakposition',      'averageduration',
                                       'hybridizationrate', 'eventcount',
-                                      'referenceposition'}
-
+                                      'referenceposition', 'std1', 'std2', 'std3'}
 
     pair  = create(ByPeaksEventSimulatorTask(peaks    = peaks,
                                              brownian = .001,
