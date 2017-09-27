@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Makes TaskView Dicts easier"
-from typing     import Generic, TypeVar
+from typing     import Generic, TypeVar, Dict, Any
 from functools  import partial
 
 from data.views import TaskView
@@ -19,9 +19,15 @@ class TaskViewProcessor(Generic[TaskType, TaskDict, Key], Processor[TaskType]):
         "returns the taskdicttype"
         return cls.__orig_bases__[0].__args__[1] # type: ignore
 
+    @staticmethod
+    def keywords(cnf:Dict[str, Any]) -> Dict[str, Any]:
+        "changes keywords as needed"
+        return cnf
+
     @classmethod
     def apply(cls, toframe = None, **cnf):
         "applies the task to a frame or returns a function that does so"
+        cnf = cls.keywords(cnf)
         if toframe is None:
             return partial(cls.apply, **cnf)
         return toframe.new(cls.taskdicttype(), config = cnf)
