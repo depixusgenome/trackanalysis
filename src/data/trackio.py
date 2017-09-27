@@ -459,9 +459,13 @@ def opentrack(track, beadsonly = False):
     "Opens a track depending on its extension"
     checkpath(track)(track, beadsonly)
 
-N_SAVE_THREADS = 3
+N_SAVE_THREADS = 4
 def _savetrack(args):
     PickleIO.save(args[0], args[1])
+    new = type(args[1]).__new__(type(args[1])) # type: ignore
+    new.__dict__.update(shallowcopy(args[1].__dict__))
+    setattr(new, '_path', args[0])
+    return new
 
 @overload
 def savetrack(path: PATHTYPE, track: 'Track') -> 'Track': # pylint: disable=unused-argument
@@ -490,13 +494,7 @@ def savetrack(path  : PATHTYPE,     # pylint: disable=unused-argument,function-r
                 for key, trk in cast(dict, track).items()]
         new  = shallowcopy(track)
         with ThreadPoolExecutor(N_SAVE_THREADS) as pool:
-            new.update({i.key: i for i in pool.map(savetrack, args)})
+            new.update({i.key: i for i in pool.map(_savetrack, args)})
+        return new
 
-    else:
-        _savetrack((path, track))
-
-        new = type(track).__new__(type(track)) # type: ignore
-        new.__dict__.update(shallowcopy(track.__dict__))
-        setattr(new, '_path', path)
-
-    return new
+    return _savetrack((path, track))
