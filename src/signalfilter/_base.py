@@ -20,6 +20,7 @@ def nanhfsigma(arr: np.ndarray):
         arr = np.float32(arr) # type: ignore
     return hfsigma(arr[~np.isnan(arr)])
 
+BEADKEY   = Union[str,int]
 DATATYPE  = Union[Sequence[Sequence[np.ndarray]],
                   Sequence[np.ndarray],
                   np.ndarray,
@@ -37,7 +38,7 @@ class PrecisionAlg:
     def getprecision(self, # pylint: disable=too-many-branches
                      precision:PRECISION = None,
                      data     :DATATYPE  = tuple(),
-                     beadid   :int       = None) -> float:
+                     beadid   :BEADKEY   = None) -> float:
         """
         Returns the precision, possibly extracted from the data.  Raises
         AttributeError if the precision was neither set nor could be extracted
