@@ -97,7 +97,7 @@ class Probability:
 
     @staticmethod
     def skew(events):
-        "returns the resolution"
+        "returns the skew of the population of points"
         arrs  = np.array([isinstance(i, (list, np.ndarray)) for i in events])
         skews = [_skew(np.concatenate(list(i['data']))) for i in events[arrs]]
 
