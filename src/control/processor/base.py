@@ -18,17 +18,24 @@ class TaskTypeDescriptor:
     Dynamically finds all Task subclasses implementing
     the __processor__ protocol.
     """
+    @staticmethod
+    def __tasks(base):
+        args = getattr(base, '__args__', ())
+        return tuple(i for i in args
+                     if (isinstance(i, cast(type, TypeVar))
+                         or (isinstance(i, type) and issubclass(i, _tasks.Task))))
+
     def __get__(self, obj, tpe) -> Union[type, Tuple[type, ...]]:
         tasks = getattr(tpe, '_tasktypes', None)
         if tasks is None:
-            args = (getattr(i, '__args__') for i in tpe.__orig_bases__
-                    if getattr(i, '__args__', None))
-            task = next(args, None)
+            args = (self.__tasks(i) for i in tpe.__orig_bases__)
+            task = next((i for i in args if i), None)
             if task is None:
                 for cls in tpe.__bases__:
                     if hasattr(cls, 'tasktype'):
                         return cls.tasktype
                 raise TypeError(f"Missing Generic specialization in {tpe}")
+
             return task if len(task) > 1 else task[0]
         return tasks()
 
@@ -51,7 +58,9 @@ class Processor(Generic[TaskType]):
     @classmethod
     def canregister(cls):
         "allows discarding some specific processors from automatic registration"
-        return len(cls.__abstractmethods__) == 0 and not isinstance(cls.tasktype, TypeVar)
+        if cls.__abstractmethods__:
+            return False
+        return not isinstance(cls.tasktype, cast(type, TypeVar))
 
     @property
     def levelin(self) -> Level:
