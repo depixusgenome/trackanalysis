@@ -4,7 +4,7 @@
 from   typing                      import (Dict, # pylint: disable=unused-import
                                            List, Sequence, NamedTuple, FrozenSet,
                                            Type, Iterator, Tuple, Union, Optional,
-                                           Iterable, cast)
+                                           Iterable, Any, cast)
 from   copy                        import deepcopy
 
 import numpy                       as     np
@@ -12,9 +12,9 @@ import numpy                       as     np
 from   utils                       import (StreamUnion, initdefaults, updatecopy,
                                            asobjarray, DefaultValue)
 from   model                       import Task, Level
-from   control.processor           import Processor
+from   control.processor.taskview  import TaskViewProcessor
 from   control.processor.dataframe import DataFrameFactory
-from   data.views                  import BEADKEY, TrackView, Beads
+from   data.views                  import BEADKEY, Beads, TaskView
 from   peakfinding.selector        import Output as PeakFindingOutput, PeaksArray
 from   peakfinding.processor       import PeaksDict
 from   ..tohairpin                 import (HairpinFitter, ChiSquareFit, Distance,
@@ -100,39 +100,9 @@ class FitBead(NamedTuple): # pylint: disable=missing-docstring
     peaks      : PEAKS_TYPE
     events     : PeakEvents
 
-class FitToHairpinDict(TrackView):
+class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]):
     "iterator over peaks grouped by beads"
-    level = Level.bead
-    def __init__(self, *_, config = None, **kwa):
-        assert len(_) == 0
-        super().__init__(**kwa)
-        if config is None:
-            self.config = FitToHairpinTask()
-        elif isinstance(config, dict):
-            self.config = FitToHairpinTask(**config)
-        else:
-            assert isinstance(config, FitToHairpinTask), config
-            self.config = config
-        self.__keys: FrozenSet[BEADKEY] = None
-
-    def _keys(self, sel:Sequence = None, _ = None) -> Iterator[BEADKEY]:
-        if self.__keys is None:
-            self.__keys = frozenset(self.data.keys())
-
-        if sel is None:
-            yield from self.__keys
-        else:
-            yield from (i for i in self.__keys if i in sel)
-
-    def _iter(self, sel:Sequence = None) -> Iterator[Tuple[BEADKEY, FitBead]]:
-        if isinstance(self.data, FitToHairpinDict):
-            itr = iter(cast(Iterable, self.data))
-            if sel is None:
-                yield from itr
-            else:
-                yield from ((i, j) for i, j in itr if i in sel)
-        yield from ((bead, self.compute(bead)) for bead in self.keys(sel))
-
+    level  = Level.bead
     @staticmethod
     def __topeaks(aevts:PeakEvents) -> _PEAKS:
         "Regroups the beads from a frame by hairpin"
@@ -190,32 +160,18 @@ class FitToHairpinDict(TrackView):
         dist          = self.__distances(bead, peaks)
         return self.__beadoutput(bead, peaks, events, dist)
 
-class FitToHairpinProcessor(Processor[FitToHairpinTask]):
+class FitToHairpinProcessor(TaskViewProcessor[FitToHairpinTask, FitToHairpinDict, BEADKEY]):
     "Groups beads per hairpin"
-    @classmethod
-    def apply(cls, toframe = None, **cnf):
-        "applies the task to a frame or returns a function that does so"
-        fcn = lambda frame: frame.new(FitToHairpinDict, config = cnf)
-        return fcn if toframe is None else fcn(toframe)
-
-    @classmethod
-    def compute(cls,
-                item        : Union[BEADKEY, PeakEventsTuple],
-                fit         : Fitters     = None,
-                constraints : Constraints = None,
-                match       : Matchers    = None,
-                **cnf
-               ) -> Tuple[BEADKEY,FitBead]:
-        "Action applied to the frame"
-        cnf.update(fit         = {} if fit         is None else fit, # type: ignore
-                   constraints = {} if constraints is None else constraints,
-                   match       = {} if match       is None else match)
-        out = FitToHairpinDict(config = cnf).compute(item)
-        return out.key, out
-
-    def run(self, args):
-        "updates frames"
-        args.apply(self.apply(**self.config()))
+    @staticmethod
+    def keywords(cnf:Dict[str, Any]) -> Dict[str, Any]:
+        "changes keywords as needed"
+        fit         = cnf.get('fit',         None)
+        match       = cnf.get('match',       None)
+        constraints = cnf.get('constraints', None)
+        cnf.update(fit         = {} if not fit         else fit, # type: ignore
+                   constraints = {} if not constraints else constraints,
+                   match       = {} if not match       else match)
+        return cnf
 
 class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
     "converts to a pandas dataframe."

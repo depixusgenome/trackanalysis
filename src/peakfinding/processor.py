@@ -6,19 +6,19 @@ from functools              import partial
 
 import numpy                as     np       # pylint: disable=unused-import
 
-from utils                  import initdefaults
-from model                  import Task, Level, PHASE
-from control.processor      import Processor
-from signalfilter           import rawprecision
-from data.views             import BEADKEY  # pylint: disable=unused-import
-from eventdetection.data    import EventDetectionConfig
-from .alignment             import PeakCorrelationAlignment
-from .selector              import PeakSelector
-from .probabilities         import Probability
+from utils                          import initdefaults
+from model                          import Task, Level, PHASE
+from control.processor              import Processor
+from control.processor.taskview     import TaskViewProcessor
+from signalfilter                   import rawprecision
+from data.views                     import BEADKEY  # pylint: disable=unused-import
+from eventdetection.data            import EventDetectionConfig
+from .alignment                     import PeakCorrelationAlignment
+from .probabilities                 import Probability
 
 # pylint: disable=unused-import
-from .data                  import PeaksDict, Output
-from .dataframe             import PeaksDataFrameFactory
+from .data                          import PeaksDict, PeakSelectorTask, Output
+from .dataframe                     import PeaksDataFrameFactory
 
 class PeakCorrelationAlignmentTask(PeakCorrelationAlignment, Task):
     "Aligns cycles using peaks"
@@ -63,30 +63,8 @@ class PeakCorrelationAlignmentProcessor(Processor[PeakCorrelationAlignmentTask])
         "updates frames"
         args.apply(self.apply(**self.config()))
 
-class PeakSelectorTask(PeakSelector, Task):
+class PeakSelectorProcessor(TaskViewProcessor[PeakSelectorTask, PeaksDict, BEADKEY]):
     "Groups events per peak"
-    levelin = Level.event
-    levelou = Level.peak
-    @classmethod
-    def isslow(cls) -> bool:
-        "whether this task implies long computations"
-        return True
-
-    def __init__(self, **kwa):
-        Task.__init__(self)
-        PeakSelector.__init__(self, **kwa)
-
-class PeakSelectorProcessor(Processor[PeakSelectorTask]):
-    "Groups events per peak"
-    @classmethod
-    def apply(cls, toframe = None, **cnf):
-        "applies the task to a frame or returns a function that does so"
-        # pylint: disable=not-callable
-        fcn = lambda frame: frame.new(PeaksDict, config = cnf)
-        return fcn if toframe is None else fcn(toframe)
-    def run(self, args):
-        "updates frames"
-        args.apply(self.apply(**self.config()), levels = self.levels)
 
 class PeakProbabilityTask(Task):
     "Computes probabilities for each peak"

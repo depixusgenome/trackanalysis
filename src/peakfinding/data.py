@@ -1,32 +1,32 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Tasks related to peakfinding"
-from typing                 import (Iterable, Iterator, Tuple, FrozenSet, Sequence,
-                                    Optional)
+from typing                 import Iterable, Iterator, Tuple, Optional
 from functools              import partial
 import numpy as np
 
-from model                  import Level
-from data.views             import BEADKEY, TrackView, Beads, isellipsis
+from model                  import Level, Task
+from data.views             import BEADKEY, TaskView, Beads, isellipsis
 from .selector              import PeakSelector, Output as PeakOutput, PeaksArray
 
+
+class PeakSelectorTask(PeakSelector, Task):
+    "Groups events per peak"
+    levelin = Level.event
+    levelou = Level.peak
+    @classmethod
+    def isslow(cls) -> bool:
+        "whether this task implies long computations"
+        return True
+
+    def __init__(self, **kwa):
+        Task.__init__(self)
+        PeakSelector.__init__(self, **kwa)
+
 Output = Tuple[BEADKEY, Iterator[PeakOutput]]
-class PeaksDict(TrackView):
+class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]):
     "iterator over peaks grouped by beads"
-    level = Level.peak
-    def __init__(self, *_, config = None, **kwa):
-        assert len(_) == 0
-        super().__init__(**kwa)
-        if config is None:
-            self.config = PeakSelector()
-        elif isinstance(config, dict):
-            self.config = PeakSelector(**config)
-        else:
-            assert isinstance(config, PeakSelector), config
-            self.config = config
-
-        self.__keys: FrozenSet[BEADKEY] = None
-
+    level  = Level.peak
     def compute(self, ibead, precision: float = None) -> Iterator[PeakOutput]:
         "Computes values for one bead"
         vals = iter(i for _, i in self.data[ibead,...]) # type: ignore
@@ -75,7 +75,6 @@ class PeaksDict(TrackView):
     def __index(cls, _, info):
         return info[0], ((i, cls.__array2range(j)) for i, j in info[1])
 
-
     @staticmethod
     def __array2measure(singles, multiples, arr):
         if arr.dtype == 'O':
@@ -99,21 +98,13 @@ class PeaksDict(TrackView):
                          range(i[0][0], i[-1][0]+len(i[-1][1]))
                          for i in arr])
 
-    def _keys(self, sel:Sequence = None, _ = None) -> Iterator[BEADKEY]:
-        if self.__keys is None:
-            if isinstance(self.data, PeaksDict):
-                self.__keys = frozenset(i for i in self.data.keys() if Beads.isbead(i))
-            else:
-                self.__keys = frozenset(i for i, _ in self.data.keys() if Beads.isbead(i))
-
-        if sel is None:
-            yield from self.__keys
-        else:
-            ids = tuple(self._transform_ids(sel))
-            yield from (i for i in self.__keys if i in ids)
+    def _get_data_keys(self):
+        if isinstance(self.data, self.__class__):
+            return (i for i in self.data.keys() if Beads.isbead(i))
+        return (i for i, _ in self.data.keys() if Beads.isbead(i))
 
     @staticmethod
-    def _transform_ids(sel: Iterable) -> Iterator[int]:
+    def _transform_ids(sel: Iterable) -> Iterator[BEADKEY]:
         for i in sel:
             if isinstance(i, tuple):
                 if len(i) == 0:
@@ -128,14 +119,6 @@ class PeaksDict(TrackView):
                     yield from i[0]
             else:
                 yield i
-
-    def _iter(self, sel:Sequence = None) -> Iterator[Output]:
-        if isinstance(self.data, PeaksDict):
-            if sel is None:
-                yield from iter(self.data)                          # type: ignore
-            yield from ((i, j) for i, j in self.data if i in sel)   # type: ignore
-
-        yield from ((bead, self.compute(bead)) for bead in self.keys(sel))
 
     def _precision(self, ibead: int, precision: Optional[float]):
         return self.config.getprecision(precision, getattr(self.data, 'track', None), ibead)

@@ -55,15 +55,18 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
 
     @classmethod
     def compute(cls,
-                fit       : Fitters,
-                constrain : Constraints,
-                match     : Matchers,
-                frame     : Input
+                frame       : Input,
+                fit         : Fitters     = None,
+                constraints : Constraints = None,
+                match       : Matchers    = None
                ) -> Iterator[ByHairpinGroup]:
         "Regroups the beads from a frame by hairpin"
-        fcn    = cls.CHILD.compute
-        iframe = cast(Iterator[PeakEventsTuple], frame)
-        yield from cls.__output(dict(fcn(i, fit, constrain, match) for i in iframe))
+        cnf = cls.CHILD.keywords(dict(fit         = fit,
+                                      constraints = constraints,
+                                      match       = match))
+        fcn = partial(cls.CHILD.compute, **cnf)
+        itr = cast(Iterator[PeakEventsTuple], frame)
+        yield from cls.__output(dict(fcn(i) for i in itr))
 
     @classmethod
     def __output(cls, out) -> Iterator[ByHairpinGroup]:
@@ -79,8 +82,8 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
 
     @classmethod
     def __unpooled(cls, cnf, frame):
-        vals       = (cnf.get(i, {}) for i in ('fit', 'constrainst', 'match'))
-        frame.data = {i.key: i for i in cls.compute(*vals, frame.data)}
+        vals       = {i: cnf[i] for i in set(cnf) & {'fit', 'constrainst', 'match'}}
+        frame.data = {i.key: i for i in cls.compute(frame.data, **vals)}
         return []
 
     @classmethod

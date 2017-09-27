@@ -176,7 +176,9 @@ def test_select():
     data[10:15] = np.NaN
     data[:5]    = np.NaN
     data[19:20] = np.NaN
-    assert tuple(det(data, np.array(((0,15), (10, 20))))) == ((0, 15),)
+
+    val = det(data, np.array(((0,15), (10, 20))))
+    assert [tuple(i) for i in val] == [(0, 15)]
 
 def test_minmaxalign():
     "align on min/max value"
@@ -258,7 +260,7 @@ def test_pull_alignment():
 
 def test_measure_alignment():
     "align on 1 phase or another as needed"
-    track   = randtrack(driftargs = None, baselineargs = (.1, .05, 'rand'))
+    track   = randtrack(driftargs = None, baselineargs = (.1, .05, 'rand'), seed = 0)
     for i in range(3):
         ini  = track.cycles.withphases(PHASE.initial)[0,i]
         ini += (track.cycles.withphases(PHASE.pull)[0,i].mean()-ini.mean())*.5
@@ -327,4 +329,4 @@ def test_dataframe():
     assert 'mean' in data
 
 if __name__ == '__main__':
-    test_dataframe()
+    test_measure_alignment()
