@@ -59,6 +59,10 @@ class HairpinFitter(OptimizationParams):
         else:
             return 1. if len(dist) == 1 else -3.
 
+    def optimize(self, peaks: np.ndarray) -> Distance:
+        "optimizes the cost function"
+        raise NotImplementedError()
+
 class GaussianProductFit(HairpinFitter, GriddedOptimization):
     """
     Matching experimental peaks to hairpins using a cost function:
