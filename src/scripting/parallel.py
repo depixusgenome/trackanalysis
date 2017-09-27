@@ -9,8 +9,8 @@ import pickle
 import pandas               as     pd
 
 from model.task.track       import TrackReaderTask, RootTask, Task
-from control.taskcontrol    import register, create
-from control.processor      import Processor
+from control.taskcontrol    import register
+from control.processor      import Processor, run as _runprocessors
 from data.views             import TrackView
 from data.tracksdict        import TracksDict
 
@@ -26,7 +26,8 @@ class Parallel:
             lroots = [TrackReaderTask(path = i.path, key  = i.key, axis = i.axis.value)
                       for i in cast(TracksDict, roots).values()]
 
-        procs     = (register(processors) if not isinstance(processors, dict) else
+        procs     = (register(Processor if not processors else processors)
+                     if not isinstance(processors, dict) else
                      processors)
         toproc    = lambda i: cast(Processor,
                                    (i if isinstance(i, Processor) else
@@ -64,8 +65,7 @@ class Parallel:
                     res = tuple((i, tuple(j)) for i, j in res)
             return res
 
-        res = tuple(_cnv(i) for i in create(pickle.loads(args)).run())
-        return res
+        return tuple(_cnv(i) for i in _runprocessors(args))
 
 def parallel(roots     : Union[TracksDict, Sequence[RootTask]],
              *tasks    : Task,
