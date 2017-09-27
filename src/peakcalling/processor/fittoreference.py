@@ -19,6 +19,43 @@ from   .._core                     import match as _match # pylint: disable=impo
 FitData = Union[HistogramData, Tuple[HistogramData, np.ndarray]]
 Fitters = Dict[BEADKEY, FitData]
 
+class FitToRefArray(np.ndarray):
+    """
+    Array with the following fields:
+
+    * *discarded*: the number of discarded cycles
+    * *params*: the stretch and bias
+    """
+    # pylint: disable=unused-argument
+    discarded = False
+    params    = (1., 0.)
+    _dtype    = np.dtype([('peaks', 'f4'), ('events', 'O')])
+    _order    = None
+    def __new__(cls, array, **kwa):
+        obj  = np.asarray(array,
+                          dtype = kwa.get('dtype', cls._dtype),
+                          order = kwa.get('order', cls._order)
+                         ).view(cls)
+        obj.discarded = kwa.get('discarded', cls.discarded)
+        obj.params    = kwa.get('params',    cls.params)
+        return obj
+
+    def __array_finalize__(self, obj):
+        if obj is None:
+            return
+        # pylint: disable=attribute-defined-outside-init
+        self.discarded = getattr(obj, 'discarded', False)
+        self.params    = getattr(obj, 'params', False)
+
+    def __reduce_ex__(self, arg):
+        fcn, red, state = super().__reduce_ex__(arg)
+        return fcn, red, (state, self.discarded, self.params)
+
+    def __setstate__(self, vals):
+        super().__setstate__(vals[0])
+        self.discarded = vals[1] # pylint: disable=attribute-defined-outside-init
+        self.params    = vals[2] # pylint: disable=attribute-defined-outside-init
+
 class FitToReferenceTask(Task):
     "Fits a bead to a reference"
     level                  = Level.peak
@@ -57,7 +94,6 @@ class FitToReferenceTask(Task):
 class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
     "iterator over peaks grouped by beads"
     level = Level.bead
-    dtype = np.dtype([('peaks', 'f4'), ('events', 'O')])
     def _keys(self, sel:Optional[Sequence], _: bool) -> Iterable:
         available = frozenset(self.config.fitdata)
         if sel is None:
@@ -66,14 +102,16 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
 
     def compute(self, key: BEADKEY) -> np.ndarray:
         "Action applied to the frame"
-        fit           = self.config.fitalg
-        data          = np.array(list(cast(Iterator[PeakOutput], self.data[key])),
-                                 dtype = self.dtype)
+        fit  = self.config.fitalg
+        data = FitToRefArray(list(cast(Iterator[PeakOutput], self.data[key])))
+        if len(data):
+            data.discarded = getattr(data[0][1], 'discarded', 0)
+
         if key not in self.config.fitdata:
             raise KeyError(f"Missing reference id {key} in {self}")
-        stretch, bias = fit.optimize(self.config.fitdata[key],
-                                     fit.frompeaks(data))[1:]
 
+        data.params      = fit.optimize(self.config.fitdata[key], fit.frompeaks(data))[1:]
+        stretch, bias    = data.params
         data['peaks'][:] = (data['peaks']-bias)*stretch
 
         for evts in data['events']:
