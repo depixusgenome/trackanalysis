@@ -1,3 +1,20 @@
+# tag cycles_v4.4.1
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+### Cleaning & Xlsx reports
+
+* Beads responsible for an automated warning are systematically discarded from
+  xlsx reports. The only way to have them in the reports is to update the
+  filters in the *Cleaning* tab.
+
+### Bugs
+
+* Saving an xlsx file from a tab other than *Cycles* or *Peaks* could result in
+  a crash.
+* If beads responsible for an automated warning (in the messages tab) were not
+  discarded, saving an xlxs file resulted in a crash
+
+
 # tag cycles_v4.4
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
