@@ -182,7 +182,9 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
 
     @classmethod
     def _specs(cls):
-        return super()._specs() + (('distance', ChiSquareHistogramFit()),)
+        return (super()._specs()
+                + (('distance', ChiSquareHistogramFit()),
+                   ('loglog',   True)))
 
     @classmethod
     def to2d(cls, plot, reference, **kwa):
