@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 u"Finds peak positions on a bead"
 from typing           import (Iterator, Tuple, Union, Sequence,
-                              Optional, TYPE_CHECKING)
+                              Optional, cast, TYPE_CHECKING)
 from copy             import deepcopy
 from functools        import wraps, partial
 import numpy          as     np
@@ -49,9 +49,9 @@ class Events(Cycles, EventDetectionConfig, ITrackView):# pylint:disable=too-many
 
     def _iter(self, sel = None) -> Iterator[Tuple[CYCLEKEY, Sequence[EVENTS_TYPE]]]:
         if isinstance(self.data, Events):
-            if sel is None:
-                yield from iter(self.data)
-            yield from ((i, j) for i, j in self.data if i in sel)
+            yield from ((i, cast(Sequence[EVENTS_TYPE], self.data[i]))
+                        for i in self.keys(self.selected if sel is None else sel))
+            return
 
         prec  = None if self.precision in (0., None) else self.precision
         track = self.track
@@ -102,7 +102,7 @@ class Events(Cycles, EventDetectionConfig, ITrackView):# pylint:disable=too-many
             yield from super().keys(sel, beadsonly)
 
         def __getitem__(self, keys) -> Union['Events', Sequence[EVENTS_TYPE]]:
-            return super().__getitem__(keys)
+            return cast(Union['Events', Sequence[EVENTS_TYPE]], super().__getitem__(keys))
 
         def __iter__(self) -> Iterator[Tuple[CYCLEKEY, Sequence[EVENTS_TYPE]]]:
             yield from super().__iter__()
