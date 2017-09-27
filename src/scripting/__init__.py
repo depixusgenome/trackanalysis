@@ -73,7 +73,7 @@ except ImportError:
     pass
 else:
     # type: ignore
-    from data.__scripting__.holoviewing           import * # pylint: discard=redefined-builtin
+    from data.__scripting__.holoviewing           import * # pylint: disable=redefined-builtin
     from eventdetection.__scripting__.holoviewing import *
     from peakfinding.__scripting__.holoviewing    import *
     from peakcalling.__scripting__.holoviewing    import *
@@ -81,16 +81,28 @@ else:
         if not _is_jupyter():
             return
 
-        # pylint: disable=import-error,bare-except
+        # pylint: disable=import-error,bare-except,unused-import,unused-variable
+        exts = []
         try:
             import bokeh.io as _io
             _io.output_notebook()
-            hv.notebook_extension('bokeh')
-
-            from IPython import get_ipython
-            get_ipython().magic('output size=150')
+            exts.append('bokeh')
         except:
             pass
+
+        try:
+            import matplotlib
+            exts.append('matplotlib')
+        except ImportError:
+            pass
+
+        if exts:
+            hv.notebook_extension(*exts)
+            try:
+                from IPython import get_ipython
+                get_ipython().magic('output size=150')
+            except:
+                pass
 
     _configure_hv()
     del _configure_hv
