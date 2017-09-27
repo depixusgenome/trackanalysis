@@ -26,6 +26,7 @@ from   itertools import chain, product, repeat
 from   functools import wraps, partial
 from   pathlib   import Path
 
+import pickle                           # pylint: disable=unused-import
 import inspect
 import re
 import numpy                 as np
@@ -50,13 +51,14 @@ from data.__scripting__           import *
 from cleaning.__scripting__       import *
 from eventdetection.__scripting__ import *
 from peakfinding.__scripting__    import *
-from peakcalling.__scripting__    import *
+from peakcalling.__scripting__    import * # type: ignore
+from .parallel                    import parallel
 
 LOGS = getLogger(__name__)
 LOGS.info(f'version is {version.version()}')
 
 try:
-    from .curve                   import *
+    from .curve                   import * # type: ignore
 except ImportError:
     pass
 
@@ -70,7 +72,8 @@ try:
 except ImportError:
     pass
 else:
-    from data.__scripting__.holoviewing           import * # pylint: disable=redefined-builtin
+    # type: ignore
+    from data.__scripting__.holoviewing           import * # pylint: discard=redefined-builtin
     from eventdetection.__scripting__.holoviewing import *
     from peakfinding.__scripting__.holoviewing    import *
     from peakcalling.__scripting__.holoviewing    import *
@@ -100,9 +103,10 @@ def _configure_jupyter():
     try:
         from IPython              import get_ipython
         from IPython.core.display import display as _display, HTML
-        get_ipython().magic('load_ext autoreload')
-        get_ipython().magic('autoreload 2')
-        get_ipython().magic('matplotlib inline')
+        if 'autoreload' not in get_ipython().extension_manager.loaded:
+            get_ipython().magic('load_ext autoreload')
+            get_ipython().magic('autoreload 2')
+            get_ipython().magic('matplotlib inline')
         _display(HTML("<style>.container { width:100% !important; }</style>"))
     except:
         pass
