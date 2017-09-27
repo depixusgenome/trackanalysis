@@ -185,9 +185,28 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
         return super()._specs() + (('distance', ChiSquareHistogramFit()),)
 
     @classmethod
-    def to2d(cls, plot, reference):
+    def to2d(cls, plot, reference, **kwa):
         "converts 1d histograms to 2D"
         crvs  = [(i[1], j) for i, j in plot.data.items() if i[0] == 'Curve'][::2]
+        quad  = cls.__quadmesh(crvs, kwa)
+        text  = cls.__quadmeshtext(crvs, kwa)
+
+        sp1 = [j.data[:,0] for i, j in plot.data.items() if i[0] == 'Scatter'][1::2]
+        sp2 = [(np.ones((len(j),3))*(i+.5)+[-.5,.5, np.NaN]).ravel()
+               for i, j in enumerate(sp1)]
+
+        if reference is not None:
+            ref = cls.__quadmeshref(sp1, sp2, reference, kwa)
+
+        pks = hv.Curve((np.repeat(np.concatenate(sp1), 3), np.concatenate(sp2)),
+                       label = 'peaks')
+        pks = pks(style = dict(color = kwa.get('peakcolor', 'blue')))
+        if reference is not None:
+            return (quad*ref*pks*text).redim(x = 'z', y = 'key', z ='events')
+        return (quad*pks*text).redim(x = 'z', y = 'key', z ='events')
+
+    @staticmethod
+    def __quadmesh(crvs, kwa):
         axis  = crvs[0][1].data[:,0]
         inte  = lambda i: interp1d(i.data[:,0], i.data[:,1],
                                    fill_value = 0.,
@@ -195,28 +214,26 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
                                    assume_sorted = True)(axis)
 
         normed = np.concatenate([inte(j) for i, j in crvs]).reshape(-1, axis.size)
-        quad   = hv.QuadMesh((np.append(axis, axis[-1]+axis[1]-axis[0]),
-                              np.arange(normed.shape[0]+1),
-                              normed))(style = dict(yaxis = None))
-        text   = hv.Overlay([hv.Text(0., i+.5, j)(style = dict(text_color='white'))
-                             for i, (j, _) in enumerate(crvs)])
+        if kwa.get('loglog', False):
+            normed = np.log(normed+1.)
+        style  = dict(yaxis = None, logz  = kwa.get('logz', True))
+        return hv.QuadMesh((np.append(axis, axis[-1]+axis[1]-axis[0]),
+                            np.arange(normed.shape[0]+1),
+                            normed))(style = style)
 
-        sp1 = [j.data[:,0] for i, j in plot.data.items() if i[0] == 'Scatter'][1::2]
-        sp2 = [(np.ones((len(j),3))*(i+.5)+[-.5,.5, np.NaN]).ravel()
-               for i, j in enumerate(sp1)]
-        if reference is not None:
-            ind  = 0
-            sp2.pop(ind)
-            ref2 = (np.zeros((len(sp1[ind]),3))+[0., len(sp1), np.NaN]).ravel()
-            ref  = hv.Curve((np.repeat(sp1.pop(ind), 3), ref2), label = reference)
-            ref  = ref(style = dict(color ='gray'))
+    @staticmethod
+    def __quadmeshtext(crvs, kwa):
+        color = kwa.get('textcolor', 'white')
+        return hv.Overlay([hv.Text(0., i+.5, j)(style = dict(text_color=color))
+                           for i, (j, _) in enumerate(crvs)])
 
-        pks = hv.Curve((np.repeat(np.concatenate(sp1), 3), np.concatenate(sp2)),
-                       label = 'peaks')
-        pks = pks(style = dict(color ='blue'))
-        if reference is not None:
-            return (quad*ref*pks*text).redim(x = 'z', y = 'key', z ='events')
-        return (quad*pks*text).redim(x = 'z', y = 'key', z ='events')
+    @staticmethod
+    def __quadmeshref(sp1, sp2, reference, kwa):
+        ind  = 0
+        sp2.pop(ind)
+        ref2 = (np.zeros((len(sp1[ind]),3))+[0., len(sp1), np.NaN]).ravel()
+        ref  = hv.Curve((np.repeat(sp1.pop(ind), 3), ref2), label = reference)
+        return ref(style = dict(color = kwa.get('refcolor', 'gray')))
 
 @addto(TracksDict) # type: ignore
 def peaks(self, overlay = '2d', reference = None, **kwa):
@@ -263,7 +280,7 @@ def peaks(self, overlay = '2d', reference = None, **kwa):
         beads = kwa['bead'] if 'bead' in kwa else self.beads(*kwa.get('key', ()))
     dmap    = PeaksTracksDictDisplay.run(self, 'peaks', overlay, reference, kwa)
     if is2d:
-        fcn = lambda bead: PeaksTracksDictDisplay.to2d(dmap[bead], reference)
+        fcn = lambda bead: PeaksTracksDictDisplay.to2d(dmap[bead], reference, **kwa)
         return hv.DynamicMap(fcn, kdims = ['bead']).redim.values(bead = beads)
     return dmap
 
