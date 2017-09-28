@@ -285,7 +285,7 @@ def peaks(self, overlay = '2d', reference = None, **kwa):
     overlay = 'key' if is2d else overlay.lower()
     if is2d:
         beads = kwa['bead'] if 'bead' in kwa else self.beads(*kwa.get('key', ()))
-    dmap    = PeaksTracksDictDisplay.run(self, 'peaks', overlay, reference, kwa)
+    dmap    = PeaksTracksDictDisplay.run(self, 'peaks', overlay, reference, dict(kwa))
     if is2d:
         fcn = lambda bead: PeaksTracksDictDisplay.to2d(dmap[bead], reference, **kwa)
         return hv.DynamicMap(fcn, kdims = ['bead']).redim.values(bead = beads)
