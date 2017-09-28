@@ -1,3 +1,11 @@
+# tag cycles_v4.4.3
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+### Bugs
+
+* Could not open a SDI track file.
+* Could not launch the chrome version.
+
 # tag cycles_v4.4.1
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
