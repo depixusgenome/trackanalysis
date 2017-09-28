@@ -21,7 +21,6 @@ from    ..processor             import DataCleaningProcessor, DataCleaning
 
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"
-    tasktype = DataCleaningProcessor.tasktype
     @staticmethod
     def canregister():
         "allows discarding some specific processors from automatic registration"
@@ -41,7 +40,8 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
         "returns an array with nan positions per cycle"
         if nans is None:
             return ()
-        return np.array(list(mdl.track.cycles.withdata({0:nans}).values()), dtype = 'O')
+        return (np.asarray(i, dtype = 'bool')
+                for i in mdl.track.cycles.withdata({0:nans}).values())
 
     @staticmethod
     def runbead(mdl):
