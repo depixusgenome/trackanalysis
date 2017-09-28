@@ -59,11 +59,19 @@ class _CondaApp(BuildContext):
                  r'IR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"\n'
                  r'cd $DIR\n'
                  r'./bin/python')
-        for optext, opts in (('', ''), ('_chrome', ' --electron')):
+        for optext, opts in (('', ''), ('_chrome', ' -g chrome')):
             fname = str(self.options.STARTSCRIPT_PATH.make_node(name+optext+ext))
             with open(fname, 'w', encoding = 'utf-8') as stream:
                 print(cmd + r" app/cmdline.pyc " + val + opts + r' --port random',
                       file = stream)
+
+        if iswin:
+            cmd   = r"%~dp0python -I "
+            fname = str(self.options.STARTSCRIPT_PATH.make_node(name+"_debug"+ext))
+            with open(fname, 'w', encoding = 'utf-8') as stream:
+                print(cmd + r" app/cmdline.pyc " + val + r' -g default --port random',
+                      file = stream)
+                print(r"pause", file = stream)
 
     def __startscripts(self, mods):
         self.recurse(mods, "startscripts", mandatory = False)
