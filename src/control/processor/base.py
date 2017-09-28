@@ -21,6 +21,9 @@ class TaskTypeDescriptor:
     @staticmethod
     def __tasks(base):
         args = getattr(base, '__args__', ())
+        if not args:
+            return ()
+
         return tuple(i for i in args
                      if (isinstance(i, cast(type, TypeVar))
                          or (isinstance(i, type) and issubclass(i, _tasks.Task))))
