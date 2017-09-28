@@ -70,7 +70,7 @@ class HistogramFit(GriddedOptimization):
         np.seterr(under = "ignore")
         left  = self._get(aleft)
         right = self._get(aright)
-        kwa   = self.optimconfig(disp = 0, cons = self.__constraints())
+        kwa   = self.optimconfig(disp = 0, cons = self._constraints())
         ret   = min((self._optimize(left, right, kwa, i) for i in self.grid),
                     default = (DEFAULT_BEST, 1., 0.))
 
@@ -151,7 +151,7 @@ class HistogramFit(GriddedOptimization):
         res   = fvals*right.yaxis
         return -res.sum()
 
-    def __constraints(self):
+    def _constraints(self):
         sleft  = self.stretch.center - self.stretch.size - .5*self.stretch.step
         sright = self.stretch.center + self.stretch.size + .5*self.stretch.step
 
@@ -183,20 +183,15 @@ class HistogramFit(GriddedOptimization):
             return self.histogram.projection(vals)
         return HistogramData(*itm)
 
-class ChiSquareHistogramFit(HistogramFit):
+class CorrectedHistogramFit(HistogramFit):
     """
     Matching experimental peaks by:
 
-    1. correlating peak positions in the histograms
-    2. finding paired peaks
-    3. fitting a linear regression to paired peaks
+    1. finding the best correlation for histograms
+    2. fitting a linear regression to paired peaks
     """
-
     window       = 1.5e-2
     firstregpeak = 1
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **kwa):
-        super().__init__(**kwa)
 
     def frompeaks(self, peaks, firstpeak = 0):
         "creates a histogram from a list of peaks with their count"
@@ -237,6 +232,39 @@ class ChiSquareHistogramFit(HistogramFit):
         data        = self._to_data(hist, vals)
         return ChiSquareData(data.fcn, data.xaxis, data.yaxis, data.minv, peaks-data.minv)
 
+    def optimize(self, aleft, aright):
+        "find best stretch & bias to fit right against left"
+        np.seterr(under = "ignore")
+        left  = self._get(aleft)
+        right = self._get(aright)
+        kwa   = self.optimconfig(disp = 0, cons = self._constraints())
+
+        first = min((self._optimize(left, right, kwa, i) for i in self.grid),
+                    default = (DEFAULT_BEST, 1., 0.))
+
+        sec   = chisquare(left.peaks[self.firstregpeak:], right.peaks,
+                          False, self.symmetry, self.window,
+                          first[1], -first[1]*first[2])
+
+        ret   = sec[0], sec[1], -sec[2]/sec[1]
+        return Distance(ret[0], ret[1], ret[2]+right.minv-left.minv/ret[1])
+
+class ChiSquareHistogramFit(CorrectedHistogramFit):
+    """
+    Matching experimental peaks by:
+
+    1. correlating peak positions in the histograms
+    2. finding paired peaks
+    3. fitting a linear regression to paired peaks
+    """
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
+    def optimize(self, aleft, aright):
+        "find best stretch & bias to fit right against left"
+        return HistogramFit.optimize(self, aleft, aright)
+
     def _optimize(self, left: ChiSquareData, right: ChiSquareData,      # type: ignore
                   kwa, params):
         tmp = super()._optimize(left, right, kwa, params)
@@ -246,6 +274,6 @@ class ChiSquareHistogramFit(HistogramFit):
 
     def _cost_function(self, left: ChiSquareData, right: ChiSquareData, # type: ignore
                        stretch: float, bias: float):
-        return chisquarevalue(left.peaks[self.firstregpeak:], right,
+        return chisquarevalue(left.peaks[self.firstregpeak:], right.peaks,
                               False, self.symmetry, self.window,
-                              stretch, -stretch*bias)[0], stretch, bias
+                              stretch, -stretch*bias)[0]

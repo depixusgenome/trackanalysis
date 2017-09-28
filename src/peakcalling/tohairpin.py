@@ -10,7 +10,8 @@ from utils          import StreamUnion, initdefaults
 from sequences      import read as _read, peaks as _peaks
 from ._core         import cost as _cost, match as _match # pylint: disable=import-error
 from ._base         import (Distance, GriddedOptimization, PointwiseOptimization,
-                            DEFAULT_BEST, OptimizationParams, chisquare, chisquarevalue)
+                            DEFAULT_BEST, OptimizationParams, Symmetry,
+                            chisquare, chisquarevalue)
 
 class HairpinFitter(OptimizationParams):
     "Class containing theoretical peaks and means for matching them to experimental ones"
@@ -88,7 +89,8 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
         if len(peaks) > 1:
             rng   = lambda x, y, z: (('min_'+x, y-z), (x, y), ('max_'+x, y+z))
             brng  = lambda w, x, y, z: rng(w, x[0]*(x[1]+y), z*x[0])
-            args  = self.optimconfig(symmetry = self.symmetry, noise = self.precision)
+            args  = self.optimconfig(symmetry = self.symmetry is Symmetry.both,
+                                     noise = self.precision)
 
             hpin  = self.expectedpeaks
             delta = peaks[0]
@@ -118,12 +120,12 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
             stretch = np.asarray(stretch)
             bias    = -np.asarray(bias)*stretch
             fcn     = lambda i, j: self._value(hpin, peaks, i, j,
-                                               symmetry = self.symmetry,
+                                               symmetry = self.symmetry is Symmetry.both,
                                                noise    = self.precision)
             ufcn    = np.frompyfunc(fcn, 2, 3)
             return ufcn(stretch, bias)
         return self._value(hpin, peaks, stretch, -bias*stretch,
-                           symmetry = self.symmetry,
+                           symmetry = self.symmetry is Symmetry.both,
                            noise    = self.precision)
 
     @staticmethod
@@ -139,22 +141,32 @@ class ChiSquareFit(GaussianProductFit):
     We use the GaussianProductFit results to match peaks then estimate
     the best Χ² fit between matched peaks, adding their count as well.
     """
-    window = 10.
+    symmetry = Symmetry.right
+    window   = 10.
     def _optimalvalue(self, hpin: np.ndarray, peaks: np.ndarray, # type: ignore
                       stretch:float, bias:float, **_):
-        return chisquare(hpin, peaks,
-                         self.firstpeak, self.symmetry, self.window,
-                         stretch, bias)
+        sym = Symmetry.both if self.symmetry is Symmetry.both else Symmetry.left
+        return chisquare(hpin, peaks, self.firstpeak, sym, self.window, stretch, bias)
 
     def _value(self, hpin: np.ndarray, peaks: np.ndarray, # type: ignore
                stretch:float, bias:float, **_):
-        return chisquarevalue(hpin, peaks,
-                              self.firstpeak, self.symmetry, self.window,
-                              stretch, bias)
+        sym = Symmetry.both if self.symmetry is Symmetry.both else Symmetry.left
+        return chisquarevalue(hpin, peaks, self.firstpeak, sym, self.window, stretch, bias)
 
     def _optimize(self, hpin, peaks, args):
+        "optimizes the cost function"
         pars = _cost.optimize(hpin, peaks, **args)
         return self._optimalvalue(hpin, peaks, pars[1], pars[2])
+
+    def optimize(self, peaks: np.ndarray) -> Distance:
+        "optimizes the cost function"
+        ret = super().optimize(peaks)
+        if self.symmetry is Symmetry.right:
+            hpin = self.expectedpeaks
+            return Distance(chisquarevalue(hpin, (peaks-ret[2])*ret[1], self.firstpeak,
+                                           self.symmetry, self.window, 1., 0.)[0],
+                            ret[1], ret[2])
+        return ret
 
 PEAKS_DTYPE = np.dtype([('zvalue', 'f4'), ('key', 'i4')])
 PEAKS_TYPE  = Union[Sequence[Tuple[float,int]],np.ndarray]

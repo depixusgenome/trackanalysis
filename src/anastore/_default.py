@@ -21,10 +21,17 @@ def _v0task(data:dict) -> dict:
                        phase = RESET, factor = RESET))
     return data
 
-__TASKS__   = Patches(_v0task)
+def _v1(data:dict) -> dict:
+    mods = dict(symmetry = lambda val: 'both' if val else RESET)
+    modifyclasses(data,
+                  "peakcalling.processor.fittohairpin.FitToHairpinTask", mods,
+                  "peakcalling.processor.fittoreference.FitToReferenceTask", mods)
+    return data
+
+__TASKS__   = Patches(_v0task, _v1)
 
 def _v0cnf(data:dict) -> dict:
     data = _v0task(data)
     data.get('config', {}).pop('precision.max', None)
     return data
-__CONFIGS__ = Patches(_v0cnf)
+__CONFIGS__ = Patches(_v0cnf, _v1)

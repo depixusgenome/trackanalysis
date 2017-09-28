@@ -4,6 +4,7 @@
 Basic stuff for dealing with peak calling
 """
 from   typing       import NamedTuple, Dict, Any, Optional, Union, Iterator, Tuple
+from   enum         import Enum
 from   itertools    import product
 import numpy        as     np
 from   utils        import initdefaults
@@ -37,6 +38,12 @@ class Distance(NamedTuple): # pylint: disable=missing-docstring
     stretch: float
     bias:    float
 
+class Symmetry(Enum):
+    "Which side to consider"
+    both  = 'both'
+    left  = 'left'
+    right = 'right'
+
 def config(self:OPTIM_TYPE, **kwa) -> Dict[str, float]:
     "returns the configuration"
     if isinstance(self, LBFGSParameters):
@@ -60,7 +67,7 @@ class OptimizationParams:
 
 class GriddedOptimization(OptimizationParams):
     "Optimizes using a rectangular grid"
-    symmetry = False
+    symmetry = Symmetry.left
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -127,10 +134,22 @@ class PointwiseOptimization(OptimizationParams):
         "returns the configuration"
         return config(self.optim, **kwa)
 
+def _chi2cost(ref, exp, pairs, symmetry):
+    if symmetry is Symmetry.both:
+        dist = (len(exp)+len(ref)-2.*len(pairs))**2
+        return np.sqrt(dist/(len(exp)+len(ref))) if len(exp)+len(ref) else np.finfo('f4').max
+
+    if symmetry is Symmetry.left:
+        dist = (len(ref)-len(pairs))**2
+        return np.sqrt(dist/len(ref)) if len(ref) else np.finfo('f4').max
+
+    dist = (len(exp)-len(pairs))**2
+    return np.sqrt(dist/len(exp)) if len(exp) else np.finfo('f4').max
+
 def chisquare(ref       : np.ndarray, # pylint: disable=too-many-arguments
               exp       : np.ndarray,
               firstpeak : bool,
-              symmetry  : bool,
+              symmetry  : Symmetry,
               window    : float,
               stretch   : float,
               bias      : float):
@@ -138,37 +157,33 @@ def chisquare(ref       : np.ndarray, # pylint: disable=too-many-arguments
     We use the GaussianProductFit results to match exp then estimate
     the best Χ² fit between matched exp, adding their count as well.
     """
-    prev = None
-    for _ in range(10):
-        tmp   = exp*stretch+bias
+    def _pairs(params):
+        tmp   = exp*params[0]+params[1]
         pairs = _match.compute(ref, tmp, window)
-        if prev is not None and len(pairs) <= len(prev):
-            break
-
         if firstpeak and len(pairs) and any(i == 0 for i in pairs[0]):
-            pairs = pairs[1:]
+            return pairs[1:]
+        return pairs
 
-        if len(pairs) > 1:
-            stretch, bias = np.polyfit(exp[pairs[:,1]], ref[pairs[:,0]], 1)
-            dist  = ((stretch*exp[pairs[:,1]]+bias - ref[pairs[:,0]])**2).sum()
-            dist /= window**2
-        else:
-            dist = 0.
+    pairs = _pairs((stretch, bias))
+    if len(pairs) > 1:
+        params   = np.polyfit(exp[pairs[:,1]], ref[pairs[:,0]], 1)
+        newpairs = _pairs(params)
+        if len(newpairs) > len(pairs):
+            params = np.polyfit(exp[newpairs[:,1]], ref[newpairs[:,0]], 1)
+            pairs  = _pairs(params)
 
-        if symmetry:
-            dist += (len(exp)+len(ref)-2.*len(pairs))**2
-            dist  = np.sqrt(dist/(len(exp)+len(ref)))
-        else:
-            dist += (len(exp)-len(pairs))**2
-            dist  = np.sqrt(dist/len(exp))
+        dist  = ((params[0]*exp[pairs[:,1]]+params[1] - ref[pairs[:,0]])**2).sum()
+        dist /= window**2
+    else:
+        params = (stretch, bias)
+        dist   = 0.
 
-        prev = pairs
-    return dist, stretch, bias
+    return dist+_chi2cost(ref, exp, pairs, symmetry), params[0], params[1]
 
 def chisquarevalue(ref       : np.ndarray, # pylint: disable=too-many-arguments
                    exp       : np.ndarray,
                    firstpeak : bool,
-                   symmetry  : bool,
+                   symmetry  : Symmetry,
                    window    : float,
                    stretch   : float,
                    bias      : float):
@@ -187,10 +202,4 @@ def chisquarevalue(ref       : np.ndarray, # pylint: disable=too-many-arguments
     else:
         dist = 0.
 
-    if symmetry:
-        dist += (len(exp)+len(ref)-2.*len(pairs))**2
-        dist  = np.sqrt(dist/(len(exp)+len(ref)))
-    else:
-        dist += (len(exp)-len(pairs))**2
-        dist  = np.sqrt(dist/len(exp))
-    return dist, stretch, bias
+    return dist+_chi2cost(ref, exp, pairs, symmetry), stretch, bias
