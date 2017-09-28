@@ -184,7 +184,10 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
     def _specs(cls):
         return (super()._specs()
                 + (('distance', ChiSquareHistogramFit()),
-                   ('loglog',   True)))
+                   ('peakcolor', 'blue'), ('peakdash', 'dotted'),
+                   ('refcolor',  'gray'), ('refdash',  'dotted'),
+                   ('logz',      True),   ('loglog',    True),
+                   ('textcolor', 'white')))
 
     @classmethod
     def to2d(cls, plot, reference, **kwa):
@@ -202,7 +205,8 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
 
         pks = hv.Curve((np.repeat(np.concatenate(sp1), 3), np.concatenate(sp2)),
                        label = 'peaks')
-        pks = pks(style = dict(color = kwa.get('peakcolor', 'blue')))
+        pks = pks(style = dict(color     = kwa.get('peakcolor', 'blue'),
+                               line_dash = kwa.get('peakdash', 'dotted')))
         if reference is not None:
             return (quad*ref*pks*text).redim(x = 'z', y = 'key', z ='events')
         return (quad*pks*text).redim(x = 'z', y = 'key', z ='events')
@@ -235,7 +239,8 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
         sp2.pop(ind)
         ref2 = (np.zeros((len(sp1[ind]),3))+[0., len(sp1), np.NaN]).ravel()
         ref  = hv.Curve((np.repeat(sp1.pop(ind), 3), ref2), label = reference)
-        return ref(style = dict(color = kwa.get('refcolor', 'gray')))
+        return ref(style = dict(color = kwa.get('refcolor', 'gray'),
+                                line_dash = kwa.get('refdash', 'dotted')))
 
 @addto(TracksDict) # type: ignore
 def peaks(self, overlay = '2d', reference = None, **kwa):
