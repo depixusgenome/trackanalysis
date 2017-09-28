@@ -35,9 +35,13 @@ class TaskView(TrackView, Generic[Config, Key]):
             sel = self.selected
         if isinstance(self.data, self.__class__):
             data = cast(TrackView, self.data)
-            yield from ((key, data[key]) for key in self.keys(sel))
+            yield from ((key, data.get(key)) for key in self.keys(sel))
         else:
-            yield from ((key, self.compute(key)) for key in self.keys(sel))
+            fcn = self._get_iter_function()
+            yield from ((key, fcn(key)) for key in self.keys(sel))
+
+    def _get_iter_function(self):
+        return self.compute
 
     def _get_data_keys(self):
         return self.data.keys()
@@ -50,7 +54,7 @@ class TaskView(TrackView, Generic[Config, Key]):
             yield from self.__keys
         else:
             good = self._transform_ids(cast(Iterable, sel))
-            yield from (i for i in self.__keys if i in good)
+            yield from (i for i in good if i in self.__keys)
 
     @staticmethod
     def _transform_ids(sel: Iterable) -> Iterator[Key]:
