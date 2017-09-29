@@ -261,7 +261,7 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
             yield getattr(sel, name)(cycs)
 
     @classmethod
-    def __compute(cls, cnf, frame, info):
+    def _compute(cls, cnf, frame, info):
         res = cls.compute(frame, info, **cnf)
         if res is None:
             return info
@@ -303,7 +303,7 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
     @classmethod
     def apply(cls, toframe = None, **cnf):
         "applies the task to a frame or returns a method that will"
-        return toframe.withaction(partial(cls.__compute, cnf))
+        return toframe.withaction(partial(cls._compute, cnf))
 
     def run(self, args):
         "updates the frames"
