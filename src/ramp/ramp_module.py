@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-u'''Small library for computing ramp characteristics : zmag open, zmag close
+'''Small library for computing ramp characteristics : zmag open, zmag close
 needs more structure
 need to allow for beads with only a subset of good cycles
 need to add a little marker specifying when the data is loaded
@@ -17,7 +17,7 @@ from utils.logconfig import getLogger
 LOGS = getLogger(__name__)
 
 class RampModel:
-    u''' holds instruction to handle the data
+    ''' holds instruction to handle the data
     If values change in the Model the Controller must be notified and act accordingly
     '''
     def __init__(self, **kwargs):
@@ -30,45 +30,45 @@ class RampModel:
         self.good_ratio = kwargs.get("good_ratio",0.8) # if good_cycles/cycles above, then good
 
     def set_zclthreshold(self,value):
-        u'''
+        '''
         sets _zclthreshold
         if _minExt is changed call controller and apply changes in RampData
         '''
         self._zclthreshold = value
 
     def get_zclthreshold(self):
-        u'''
+        '''
         returns  _zclthreshold
         '''
         return self._zclthreshold
 
-    def setMinExt(self,value):
-        u'''
+    def set_minext(self,value):
+        '''
         set _minExt
         if _minExt is changed call controller and apply changes in RampData
         '''
         self._minExt = value
 
-    def getMinExt(self):
-        u'''
+    def get_minext(self):
+        '''
         Returns _minExt value.
         Warns User if _minExt has not be set.
         '''
         return self._minExt
 
 class RampTask:
-    u'''
+    '''
     will define a set of action called by RampController
     '''
     pass
 class RampController:
-    u'''
+    '''
     will dictate changes to RampData relative to a ramp
     '''
     pass
 
 class RampData: # pylint: disable=too-many-public-methods
-    u'''sets up ramp analysis using RampModel for parametrisation'''
+    '''sets up ramp analysis using RampModel for parametrisation'''
 
     def __init__(self, **kwargs) -> None:
         self.dataz = kwargs.get("data", None)
@@ -84,7 +84,7 @@ class RampData: # pylint: disable=too-many-public-methods
 
     @classmethod
     def openTrack(cls,trk,model:RampModel):
-        u''' creates ramp from track
+        ''' creates ramp from track
         '''
         trkd = Track(path = trk, beadsonly = False) if isinstance(trk,str) else trk
         return cls(data = pd.DataFrame({k:pd.Series(v) for k, v in dict(trkd.cycles).items()})
@@ -92,24 +92,24 @@ class RampData: # pylint: disable=too-many-public-methods
 
 
     def beads(self)->set:
-        u'''
+        '''
         returns the set of bead ids
         '''
         return {i[0] for i in self.bcids}
     def zmagids(self):
-        u'''
+        '''
         returns all pairs (zmag,cycleid)
         '''
         return [k for k in self.dzdt.keys() if k[0] == "zmag"]
 
     def tids(self):
-        u'''
+        '''
         returns all pairs (time,cycleid)
         '''
         return [k for k in self.dzdt.keys() if k[0] == "t"]
 
     def setTrack(self,trk):
-        u'''
+        '''
         changes the data using trk
         '''
         trkd = Track(path = trk, beadsonly = False) if isinstance(trk,str) else trk
@@ -124,7 +124,7 @@ class RampData: # pylint: disable=too-many-public-methods
         self.ncycles = max(i[1] for i in self.bcids) +1
 
     def zmagClose(self, reverse_time:bool = False):
-        u'''estimate value of zmag to close the hairpin'''
+        '''estimate value of zmag to close the hairpin'''
         if reverse_time:
             ids = self.dzdt[self.dzdt[self.det]<0].apply(lambda x:x.last_valid_index())
         else:
@@ -138,7 +138,7 @@ class RampData: # pylint: disable=too-many-public-methods
 
 
     def zmagOpen(self)->pd.DataFrame:
-        u''' estimate value of zmag to open the hairpin'''
+        ''' estimate value of zmag to open the hairpin'''
         ids = self.dzdt[self.dzdt[self.det]>0].apply(lambda x:x.last_valid_index())
         zmop = pd.DataFrame(index = self.beads(), columns = range(self.ncycles))
         for bcid in ids.valid().index:
@@ -147,7 +147,7 @@ class RampData: # pylint: disable=too-many-public-methods
         return zmop
 
     def _estZAtOpening(self)-> pd.Series:
-        u'''
+        '''
         detect indices of changes in dzdt
         take the index preceding the first in dataz
         '''
@@ -160,7 +160,7 @@ class RampData: # pylint: disable=too-many-public-methods
         return zest
 
     def _estZWhenOpened(self)-> pd.Series:
-        u'''
+        '''
         detect indices of changes in dzdt
         take the last index in dataz
         '''
@@ -173,7 +173,7 @@ class RampData: # pylint: disable=too-many-public-methods
         return zest
 
     def keepBeadIds(self,bids:set)->None:
-        u'''
+        '''
         pops all unwanted beads
         '''
 
@@ -188,7 +188,7 @@ class RampData: # pylint: disable=too-many-public-methods
 
 
     def getGoodBeadIds(self)->set:
-        u'''
+        '''
         returns the list of beads selected by _isGoodBead
         All cycles of a bead  must match the conditions for qualification as good bead.
         This condition may be too harsh for some track files (will improve).
@@ -201,13 +201,13 @@ class RampData: # pylint: disable=too-many-public-methods
         return goods - self.getFixedBeadIds() - self.noBeadCrossIds()
 
     def clean(self):
-        u'''good beads open and close with zmag
+        '''good beads open and close with zmag
         '''
         goods = self.getGoodBeadIds()
         self.keepBeadIds(goods)
 
     def areGoodBeadCycle(self): # ok as is
-        u'''
+        '''
         Test for each (bead,cycle) if an opening is detected before a detected closing.
         If no opening or no closing are detected the returned corresponding results is False
         '''
@@ -222,10 +222,8 @@ class RampData: # pylint: disable=too-many-public-methods
 
         return keep
 
-
-
     def noBeadCrossIds(self)->set:
-        u'''
+        '''
         returns cross ids who does not have a match with a bead
         '''
         # could do with more thorough testing but a couple of checks showed correct behaviour
@@ -233,33 +231,30 @@ class RampData: # pylint: disable=too-many-public-methods
         return {i for i in self.beads() if i not in corrids}
 
     def _estimateZPhase3(self):
-        u''' estimate the z value corresponding to phase 3 (i.e. highest value of zmag)
+        ''' estimate the z value corresponding to phase 3 (i.e. highest value of zmag)
         '''
-
         return self.dataz[self.bcids].apply(
             lambda x:x.rolling(window=self.model.window,center=True).median()).max()
 
     def _estimateZPhase1(self):
-        u''' estimate the z value corresponding to phase 1
+        ''' estimate the z value corresponding to phase 1
         (i.e. lower value of zmag IN CASE OF RAMP ANALYSIS)
         '''
-
         return self.dataz[self.bcids].apply(
             lambda x:x.rolling(window=self.model.window,center=True).median()).min()
 
     def _estimateUnitScale(self)->int:
-        u'''
+        '''
         uses information on zmag to find the smallest interval overwhich no changes occur in zmag
         assumes that phase3 is the smallest (this assumption could be removed)
         '''
         maxzm = max(self.dataz[self.zmagids()].max())
-
         scale = numpy.median([(self.dataz[zm]==maxzm).sum() for zm in self.zmagids()])
         return scale
 
 
     def getFixedBeadIds(self)->set:
-        u'''
+        '''
         returns set of bead ids considered fixed
         could be modified to use estExtHPsize instead of dataz
         '''
@@ -271,10 +266,9 @@ class RampData: # pylint: disable=too-many-public-methods
 
 
     def _beadIdsCorr2zmag(self,toconsider:set=None):
-        u'''
+        '''
         returns the list of bead ids whose z value correlates with zmag for each cycle
         '''
-
         if toconsider is None:
             toconsider = self.beads()
             data = self.dataz
@@ -295,7 +289,7 @@ class RampData: # pylint: disable=too-many-public-methods
 
 
     def estExtHPsize(self):
-        u''' estimates the size of the extended HP
+        ''' estimates the size of the extended HP
         diff of z before opening () to its value in phase 3'''
         zph3 = self._estimateZPhase3()
 
@@ -303,7 +297,7 @@ class RampData: # pylint: disable=too-many-public-methods
         return zph3-zop
 
     def estHPsize(self)->pd.DataFrame:
-        u''' estimates HP size before extension
+        ''' estimates HP size before extension
         from z before opening () to its value when opened but before stretching
         bead ids are rows and cycleids are in column
         '''
@@ -315,23 +309,22 @@ class RampData: # pylint: disable=too-many-public-methods
             size_est.loc[key[0],key[1]]=val
         return size_est
 
-
     def can_be_structure_event(self):
-        u'''
+        '''
         returns a boolean map. True if a plateau in z(t) is detected. False otherwise.
         '''
         se_map = self.dzdt[(self.det) & (self.dzdt<0)].apply(_se_map)
         return (se_map) & (~self.det) # pylint: disable=invalid-unary-operand-type
 
     def z_blockings(self):
-        u'''
+        '''
         for each bead, return the values of z where a blocking has occured
         '''
         se_map = self.can_be_structure_event()
         return self.dataz[se_map]
 
     def count_z_blockings(self):
-        u'''
+        '''
         returns a value of z and the number of times the bead has blocked at this value.
         Questions : can we use this differentiate between hairpins ?
         If this is provides a way to fingerprint the hairpin then
@@ -348,7 +341,7 @@ class RampData: # pylint: disable=too-many-public-methods
 
 
 def _continuous_indices(ser:pd.Series)->list:
-    u'''
+    '''
     To finish
     returns the list of continuous indices.
     e.g: [2,3,7,8,9,10] returns [[2,3],[7,10]]
@@ -360,7 +353,7 @@ def _continuous_indices(ser:pd.Series)->list:
     return boud
 
 def map_boundaries(bdata:pd.DataFrame)->pd.DataFrame:
-    u'''
+    '''
     To finish
     If bdata is a data frame which contains cluster of True values
     returns the boundaries of these clusters
@@ -371,7 +364,7 @@ def map_boundaries(bdata:pd.DataFrame)->pd.DataFrame:
     return indices
 
 def probability_false_positive(data:RampData):
-    u'''
+    '''
     To finish
     For each bead compute the probability (frequentist approach) of observing a
     blocking during the ramp stage
@@ -380,7 +373,7 @@ def probability_false_positive(data:RampData):
     return data
 
 def cluster1D_dbscan(values,eps=0.2,min_samples=3,**kwargs):
-    u'''
+    '''
     use DBSCAN algorithm to define clusters. Assumes a drop in density
     values is a numpy array of 1D-values
     applies the dbscan algorithm to cluster values
@@ -400,7 +393,7 @@ def cluster1D_dbscan(values,eps=0.2,min_samples=3,**kwargs):
 
 
 def _se_map(data:pd.Series):
-    u'''
+    '''
     return True for values whose index>first_valid_index()
     and index<last_valid_index()
     '''
@@ -415,14 +408,10 @@ def _se_map(data:pd.Series):
 
 
 def detectOutliers(dzdt,scale:float):
-    u'''detects opening and closing '''
+    '''detects opening and closing '''
     # quantile detection
     quant1 = dzdt.quantile(0.25)
     quant3 = dzdt.quantile(0.75)
     max_outlier = quant3+scale*(quant3-quant1)
     min_outlier = quant1-scale*(quant3-quant1)
     return (dzdt>max_outlier)|(dzdt<min_outlier)
-
-
-if __name__=="__main__":
-    pass
