@@ -16,7 +16,8 @@ from eventdetection.processor   import EventDetectionTask
 from peakfinding.processor      import PeakSelectorTask
 from peakfinding.histogram      import HistogramData
 from peakcalling                import cost, match
-from peakcalling.tohairpin      import PeakMatching, GaussianProductFit, ChiSquareFit
+from peakcalling.tohairpin      import (PeakMatching, GaussianProductFit,
+                                        ChiSquareFit, PeakGridFit)
 from peakcalling.toreference    import HistogramFit, ChiSquareHistogramFit
 from peakcalling.processor      import (BeadsByHairpinProcessor, BeadsByHairpinTask,
                                         DistanceConstraint, FitToReferenceTask)
@@ -44,6 +45,35 @@ def test_toref_frompeaks():
                                                       res.binwidth/1.01))
 
     assert_allclose(ret[1:], [1.01, .01], rtol = 5e-4, atol = 5e-4)
+
+def test_toref_peaksgrid():
+    "tests reference comparison"
+    fit = PeakGridFit(firstpeak = True, lastpeak = True)
+    for i in product([.96, 1., 1.04], [-.05, 0., .05]):
+        arr1 = np.array([.1, .5,  1.])
+        arr2 = np.array([.1, .5,  1.])/i[0]+i[1]
+        arr1 /= 8.8e-4
+        fit.peaks = arr1
+        ret  = fit.optimize(arr2)
+        ret  = ret[1]*8.8e-4, ret[2]
+        assert_allclose(ret, i, rtol = 5e-4, atol = 5e-4)
+
+    for i in product([.96, 1., 1.04], [-.05, 0., .05]):
+        arr1 = np.array([.1, .5,  1., 1.2])
+        arr2 = np.array([.1, .15, .5,  1.])/i[0]+i[1]
+        arr1 /= 8.8e-4
+        fit.peaks = arr1
+        ret  = fit.optimize(arr2)
+        ret  = ret[1]*8.8e-4, ret[2]
+        assert_allclose(ret, i, rtol = 5e-4, atol = 5e-4)
+
+    arr1 = np.arange(50, dtype='f4').cumsum()
+    arr2 = arr1/.96+0.05
+    arr1 /= 8.8e-4
+    fit.peaks = arr1
+    ret  = fit.optimize(arr2)
+    ret  = ret[1]*8.8e-4, ret[2]
+    assert_allclose(ret, (.96, 0.05), rtol = 5e-4, atol = 5e-4)
 
 def test_toref_controller():
     "tests reference comparison"
@@ -238,5 +268,19 @@ def test_control():
         beads = tuple(i for i in pair.run(pool = pool))[0]
         assert tuple(beads.keys()) == ('hp100',)
 
+def test_peaksgrid():
+    "tests peaks iterator"
+    vals = list(match.PeakIterator([1., 2., 5.], [1., 2.], 0., 10., -10., 10.))
+    assert_allclose([i for i, _ in vals], [1., 4., 3.], rtol = 1e-3)
+    assert_allclose([i for _, i in vals], [0., .75, 1./3.], rtol = 1e-3)
+
+    vals = list(match.PeakIterator([1., 2., 5.], [1., 2.], 1.1, 10., -10., 10.))
+    assert_allclose([i for i, _ in vals], [4., 3.], rtol = 1e-3)
+    assert_allclose([i for _, i in vals], [.75, 1./3.], rtol = 1e-3)
+
+    vals = list(match.PeakIterator([1., 2., 5.], [1., 2.], 0., 10., -10., .5))
+    assert_allclose([i for i, _ in vals], [1., 3.], rtol = 1e-3)
+    assert_allclose([i for _, i in vals], [0., 1./3.], rtol = 1e-3)
+
 if __name__ == '__main__':
-    test_toref_controller()
+    test_toref_peaksgrid()

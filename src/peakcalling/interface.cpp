@@ -177,6 +177,67 @@ namespace peakcalling
 
     namespace match
     {
+        struct Iterator
+        {
+            float   minstretch, maxstretch, minbias, maxbias;
+            float const * ref;  size_t nref;
+            float const * exp;  size_t nexp;
+            size_t i1r, i2r, i1e, i2e;
+
+            pybind11::object next()
+            {
+                float stretch, bias;
+                while(true)
+                {
+                    if(i1r == nref-1)
+                        throw pybind11::stop_iteration();
+
+                    bool good = false;
+                    stretch = (ref[i2r]-ref[i1r])/(exp[i2e]-exp[i1e]);
+                    if(stretch > minstretch && stretch < maxstretch)
+                    {
+                        bias = exp[i1e] - ref[i1r]/stretch;
+                        good = bias > minbias && bias < maxbias;
+                    }
+
+                    if(i2e == nexp-1 && i1e == nexp-2)
+                    {
+                        i1e = 0;
+                        i2e = 1;
+                        if(i2r == nref-1)
+                        {
+                            ++i1r;
+                            i2r = i1r+1;
+                        } else
+                            ++i2r;
+                    } else if(i2e == nexp-1)
+                    {
+                        ++i1e;
+                        i2e = i1e+1;
+                    } else
+                        ++i2e;
+
+                    if(good)
+                        return pybind11::make_tuple(stretch, bias);
+                }
+            }
+        };
+
+        void _init(Iterator & inst,
+                   pybind11::array_t<float> const & ref,
+                   pybind11::array_t<float> const & exp,
+                   float minstretch, float maxstretch,
+                   float minbias, float maxbias)
+        {
+            new (&inst) Iterator();
+            inst.ref        = ref.data(); inst.nref       = ref.size();
+            inst.exp        = exp.data(); inst.nexp       = exp.size();
+            inst.minstretch = minstretch; inst.maxstretch = maxstretch;
+            inst.minbias    = minbias;    inst.maxbias    = maxbias;
+            inst.i1r        = 0;          inst.i2r        = 1;
+            inst.i1e        = 0;          inst.i2e        = 1;
+        }
+
         void pymodule(pybind11::module & mod)
         {
             using namespace pybind11::literals;
@@ -257,9 +318,16 @@ namespace peakcalling
                     "maxeval"_a             = size_t(100),
                     "Optimizes the distance for given parameters."
                     "Returns a tuple (min cost, best stretch, best bias)");
+
+            pybind11::class_<Iterator> cls(ht, "PeakIterator");
+            cls.def("__init__",     &_init,
+                    "reference"_a,  "experiment"_a,
+                    "minstretch"_a, "maxstretch"_a,
+                    "minbias"_a,    "maxbias"_a);
+            cls.def("__next__", &Iterator::next);
+            cls.def("__iter__", [](pybind11::object & self) { return self; });
         }
     }
-
 
     void pymodule(pybind11::module & mod)
     {

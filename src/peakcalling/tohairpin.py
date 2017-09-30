@@ -4,7 +4,8 @@
 Matching experimental peaks to hairpins
 """
 from   typing       import Dict, Sequence, Iterator, Tuple, Any, Union, cast
-import numpy        as np
+from   functools    import partial
+import numpy        as     np
 
 from utils          import StreamUnion, initdefaults
 from sequences      import read as _read, peaks as _peaks
@@ -167,6 +168,45 @@ class ChiSquareFit(GaussianProductFit):
                                            self.symmetry, self.window, 1., 0.)[0],
                             ret[1], ret[2])
         return ret
+
+class PeakGridFit(HairpinFitter):
+    """
+    fit  to reference peaks
+    """
+    window    = 10.
+    symmetry  = Symmetry.left
+    firstpeak = False
+    lastpeak  = False
+    DEFAULT   = (DEFAULT_BEST, 1./8.8e-4, 0.)
+    def optimize(self, peaks:np.ndarray) -> Distance:
+        "computes stretch and bias for potential pairings"
+        ref  = self.expectedpeaks
+        fcn  = partial(chisquarevalue, ref, peaks, False, self.symmetry, self.window)
+        rng  = lambda val: ((val.center if val.center else 0.) - val.size,
+                            (val.center if val.center else 0.) + val.size)
+
+        itr  = _match.PeakIterator(ref, peaks, *rng(self.stretch), *rng(self.bias))
+        minv = min((fcn(stretch, -stretch*bias) for stretch, bias in itr),
+                   default = self.DEFAULT)
+        return Distance(minv[0], minv[1], -minv[2]/minv[1])
+
+    def value(self, peaks:np.ndarray,
+              stretch: Union[float, np.ndarray],
+              bias:    Union[float, np.ndarray]) -> float:
+        "computes the cost value at a given stretch and bias"
+        np.seterr(under = "ignore")
+        left  = self.expectedpeaks
+        fcn   = partial(self._cost_function, left, peaks)
+        if any(isinstance(i, (np.ndarray, Sequence)) for i in  (stretch, bias)):
+            bias = np.asarray(bias)-peaks.minv+left.minv/np.asarray(stretch)
+            ufcn = np.frompyfunc(fcn, 2, 1)
+            return ufcn(stretch, bias)
+        return fcn(stretch, bias-peaks.minv+left.minv/stretch)
+
+    def _cost_function(self, left, right, stretch: float, bias: float):
+        return chisquarevalue(left, right,
+                              False, self.symmetry, self.window,
+                              stretch, -stretch*bias)[0]
 
 PEAKS_DTYPE = np.dtype([('zvalue', 'f4'), ('key', 'i4')])
 PEAKS_TYPE  = Union[Sequence[Tuple[float,int]],np.ndarray]

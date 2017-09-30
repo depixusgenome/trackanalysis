@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Matching experimental peaks to hairpins: tasks and processors"
-from   typing                      import (Optional, Sequence, Iterable,
-                                           Dict, Iterator, Tuple, Union, cast)
+from   typing                      import (Optional, # pylint: disable=unused-import
+                                           Iterable, Sequence, Any, Dict,
+                                           Iterator, Tuple, Union, NamedTuple,
+                                           cast)
 import numpy                       as     np
 
 from   utils                       import initdefaults
@@ -16,7 +18,10 @@ from   peakfinding.data            import PeakOutput, PeaksDict
 from   ..toreference               import HistogramFit, ChiSquareHistogramFit
 from   .._core                     import match as _match # pylint: disable=import-error
 
-FitData = Union[HistogramData, Tuple[HistogramData, np.ndarray]]
+class FitData(NamedTuple): # pylint: disable=missing-docstring
+    data   : Union[HistogramData, Tuple[HistogramData, np.ndarray]]
+    params : Tuple[float, float]
+
 Fitters = Dict[BEADKEY, FitData]
 
 class FitToRefArray(np.ndarray):
@@ -59,12 +64,13 @@ class FitToRefArray(np.ndarray):
 class FitToReferenceTask(Task):
     "Fits a bead to a reference"
     level                  = Level.peak
-    fitdata : Fitters      = dict()
+    _fitdata: Fitters      = dict()
     fitalg  : HistogramFit = ChiSquareHistogramFit()
     window  : float        = 10./8.8e-4
-    @initdefaults(frozenset(locals()) - {'level'},
-                  peaks  = lambda self, val: self.frompeaks (val),
-                  events = lambda self, val: self.fromevents(val))
+    @initdefaults(frozenset(locals()) - {'level', '_fitdata'},
+                  peaks   = lambda self, val: self.frompeaks (val),
+                  events  = lambda self, val: self.fromevents(val),
+                  fitdata = '_')
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
@@ -75,15 +81,46 @@ class FitToReferenceTask(Task):
             self.fromevents(kwa['events'])
         return self
 
+    def __getstate__(self):
+        info = self.__dict__.copy()
+        info['fitdata'] = info.pop('_fitdata')
+        return info
+
+    def config(self) -> Dict[str,Any]:
+        "returns a deepcopy of its dict which can be safely used in generators"
+        cnf = super().config()
+        cnf['fitdata']  = cnf.pop('_fitdata')
+        return cnf
+
+    @property
+    def fitdata(self):
+        "returns the fitting data"
+        return self._fitdata
+
+    @fitdata.setter
+    def fitdata(self, val: Union[PeaksDict, Events, Fitters]):
+        "returns the fitting data"
+        if isinstance(val, PeaksDict):
+            self.frompeaks(val)
+        elif isinstance(val, Events):
+            self.fromevents(val)
+        else:
+            fcn           = lambda j: (j if isinstance(j, FitData) else
+                                       FitData(j, (1., 0)))
+            self._fitdata = {i: fcn(j) for i, j in cast(Dict, val).items()}
+
     def frompeaks(self, peaks: PeaksDict) -> 'FitToReferenceTask':
         "creates fit data for references from a PeaksDict"
-        self.fitdata = {i: self.fitalg.frompeaks(j) for i, j in peaks}
+        fcn           = self.fitalg.frompeaks
+        self._fitdata = {i: FitData(fcn(j), (1., 0.))
+                         for i, j in peaks}
         return self
 
     def fromevents(self, events: Events) -> 'FitToReferenceTask':
         "creates fit data for references from a PeaksDict"
-        keys = {i for i, _ in events.keys()}
-        self.fitdata = {i: self.fitalg.fromevents(cast(Events, events[i, ...])) for i in keys}
+        fcn           = self.fitalg.fromevents
+        keys          = {i for i, _ in events.keys()}
+        self._fitdata = {i: fcn(cast(Events, events[i, ...])) for i in keys}
         return self
 
     @classmethod
@@ -110,8 +147,12 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
         if key not in self.config.fitdata:
             raise KeyError(f"Missing reference id {key} in {self}")
 
-        data.params      = fit.optimize(self.config.fitdata[key], fit.frompeaks(data))[1:]
-        stretch, bias    = data.params
+        ref           = self.config.fitdata[key]
+        stretch, bias = fit.optimize(ref.data, fit.frompeaks(data))[1:]
+        if ref not in ((1., 0.), None):
+            stretch, bias = ref.params[0]*stretch, ref.params[1]+stretch*bias
+
+        data.params      = stretch, bias
         data['peaks'][:] = (data['peaks']-bias)*stretch
 
         for evts in data['events']:
