@@ -46,21 +46,12 @@ def test_toref_frompeaks():
 
     assert_allclose(ret[1:], [1.01, .01], rtol = 5e-4, atol = 5e-4)
 
-def test_toref_peaksgrid():
-    "tests reference comparison"
+def test_ref_peaksgrid():
+    "tests peaks grid with a single read"
     fit = PeakGridFit(firstpeak = True, lastpeak = True)
     for i in product([.96, 1., 1.04], [-.05, 0., .05]):
         arr1 = np.array([.1, .5,  1.])
         arr2 = np.array([.1, .5,  1.])/i[0]+i[1]
-        arr1 /= 8.8e-4
-        fit.peaks = arr1
-        ret  = fit.optimize(arr2)
-        ret  = ret[1]*8.8e-4, ret[2]
-        assert_allclose(ret, i, rtol = 5e-4, atol = 5e-4)
-
-    for i in product([.96, 1., 1.04], [-.05, 0., .05]):
-        arr1 = np.array([.1, .5,  1., 1.2])
-        arr2 = np.array([.1, .15, .5,  1.])/i[0]+i[1]
         arr1 /= 8.8e-4
         fit.peaks = arr1
         ret  = fit.optimize(arr2)
@@ -74,6 +65,17 @@ def test_toref_peaksgrid():
     ret  = fit.optimize(arr2)
     ret  = ret[1]*8.8e-4, ret[2]
     assert_allclose(ret, (.96, 0.05), rtol = 5e-4, atol = 5e-4)
+
+def test_ref_peaksgrid_2D():
+    "tests peaks grid with a top and a bottom fraction read"
+    fit = PeakGridFit(firstpeak = True, lastpeak = True)
+    for i in product([.96, 1., 1.04], [-.05, 0., .05]):
+        seq  = np.array([.01, .02,  .035, .7, .85, .95])
+        arr2 = seq/i[0]+i[1]
+        fit.peaks = [seq[:3]/ 8.8e-4, (seq[3:]-.5)/ 8.8e-4]
+        ret  = fit.optimize(arr2)
+        ret  = ret[1]*8.8e-4, ret[2]
+        assert_allclose(ret, i, rtol = 5e-4, atol = 5e-4)
 
 def test_toref_controller():
     "tests reference comparison"
@@ -266,4 +268,4 @@ def test_peaksgrid():
     assert_allclose([i for _, i in vals], [0., 1./3.], rtol = 1e-3)
 
 if __name__ == '__main__':
-    test_toref_controller()
+    test_ref_peaksgrid_2D()
