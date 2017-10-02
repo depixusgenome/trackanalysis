@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Matching experimental peaks to hairpins: tasks and processors"
-from   typing                      import (Optional, # pylint: disable=unused-import
-                                           Iterable, Sequence, Any, Dict,
-                                           Iterator, Tuple, Union, NamedTuple,
-                                           cast)
-import numpy                       as     np
+from   typing                           import (Optional, # pylint: disable=unused-import
+                                                Iterable, Sequence, Any, Dict,
+                                                Iterator, Tuple, Union, NamedTuple,
+                                                cast)
+import numpy                            as     np
 
-from   utils                       import initdefaults
-from   data.views                  import TaskView, BEADKEY
-from   model.task                  import Task, Level
-from   control.processor.taskview  import TaskViewProcessor
-from   eventdetection.data         import Events
-from   peakfinding.histogram       import HistogramData
-from   peakfinding.dataframe       import PeaksDataFrameFactory, DataFrameFactory
-from   peakfinding.data            import PeakOutput, PeaksDict
-from   ..toreference               import HistogramFit, ChiSquareHistogramFit
-from   .._core                     import match as _match # pylint: disable=import-error
+from   utils                            import initdefaults
+from   data.views                       import TaskView, BEADKEY
+from   model.task                       import Task, Level
+from   control.processor.taskview       import TaskViewProcessor
+from   eventdetection.data              import Events
+from   peakfinding.histogram            import HistogramData
+from   peakfinding.processor.dataframe  import PeaksDataFrameFactory, DataFrameFactory
+from   peakfinding.processor.selector   import PeakOutput, PeaksDict
+from   ..toreference                    import HistogramFit, ChiSquareHistogramFit
+from   .._core                          import match as _match # pylint: disable=import-error
 
 class FitData(NamedTuple): # pylint: disable=missing-docstring
     data   : Union[HistogramData, Tuple[HistogramData, np.ndarray]]

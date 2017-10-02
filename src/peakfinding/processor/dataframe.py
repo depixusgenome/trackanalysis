@@ -10,8 +10,8 @@ from   model                       import PHASE
 from   data.views                  import selectparent
 from   control.processor.dataframe import DataFrameFactory
 from   eventdetection.data         import Events, EventDetectionConfig
-from   .probabilities              import Probability
-from   .data                       import PeaksDict
+from   ..probabilities             import Probability
+from   .selector                   import PeaksDict
 
 class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
     """

@@ -78,53 +78,36 @@ def test_toref_peaksgrid():
 def test_toref_controller():
     "tests reference comparison"
     peaks = np.array([.1, .5, .6, 1.], dtype = 'f4')
-    ref   = tuple(create(ByPeaksEventSimulatorTask(peaks    = peaks,
-                                                   brownian = .001,
-                                                   stretch  = None,
-                                                   bias     = None,
-                                                   rates    = None,
-                                                   nbeads   = 1,
-                                                   ncycles  = 5)).run())[0]
+    root  = ByPeaksEventSimulatorTask(peaks    = peaks,
+                                      brownian = .001,
+                                      stretch  = None,
+                                      bias     = None,
+                                      rates    = None,
+                                      baseline = None,
+                                      nbeads   = 1,
+                                      ncycles  = 5)
+    ref   = tuple(create(root).run())[0]
     tsk   = FitToReferenceTask(fitalg  = ChiSquareHistogramFit())
     tsk.frompeaks(ref)
 
-    peaks = peaks*1.01 + .05
-    pair  = create(ByPeaksEventSimulatorTask(peaks    = peaks,
-                                             brownian = .001,
-                                             stretch  = None,
-                                             bias     = None,
-                                             rates    = None,
-                                             nbeads   = 1,
-                                             ncycles  = 5), tsk)
+    root.peaks = peaks/.99 + .05
+    pair       = create(root, tsk)
 
     beads = tuple(i for i in pair.run())[0][0]
+    assert_allclose(beads.params, [.99, 0.05], rtol = 5e-3, atol = 5e-3)
     assert beads['peaks'][0] < 0
     assert beads['peaks'][1] < .17
 
-    pair  = create(ByPeaksEventSimulatorTask(peaks    = peaks,
-                                             brownian = .001,
-                                             stretch  = None,
-                                             bias     = None,
-                                             rates    = None,
-                                             nbeads   = 1,
-                                             ncycles  = 5),
-                   tsk, DataFrameTask(measures = dict(std1 = 'std',
-                                                      std2 = ('std', 'mean'),
-                                                      std3 = 'resolution')))
+    pair  = create(root, tsk, DataFrameTask(measures = dict(std1 = 'std',
+                                                            std2 = ('std', 'mean'),
+                                                            std3 = 'resolution')))
     beads = tuple(i for i in pair.run())[0][0]
     assert set(beads.index.names) == {'track', 'bead'}
     assert set(beads.columns)     == {'peakposition',      'averageduration',
                                       'hybridizationrate', 'eventcount',
                                       'referenceposition', 'std1', 'std2', 'std3'}
 
-    pair  = create(ByPeaksEventSimulatorTask(peaks    = peaks,
-                                             brownian = .001,
-                                             stretch  = None,
-                                             bias     = None,
-                                             rates    = None,
-                                             nbeads   = 1,
-                                             ncycles  = 5),
-                   tsk, DataFrameTask(measures = dict(events = True)))
+    pair  = create(root, tsk, DataFrameTask(measures = dict(events = True)))
     beads = tuple(i for i in pair.run())[0][0]
     assert set(beads.index.names) == {'track', 'bead', 'cycle'}
     assert set(beads.columns)     == {'peakposition',      'averageduration',
@@ -283,4 +266,4 @@ def test_peaksgrid():
     assert_allclose([i for _, i in vals], [0., 1./3.], rtol = 1e-3)
 
 if __name__ == '__main__':
-    test_toref_peaksgrid()
+    test_toref_controller()

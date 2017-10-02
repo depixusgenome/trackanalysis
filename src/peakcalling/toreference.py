@@ -12,7 +12,7 @@ import  numpy                       as     np
 
 from    utils                       import initdefaults, EVENTS_DTYPE
 from    eventdetection.data         import Events
-from    peakfinding.data            import PeaksDict
+from    peakfinding.processor       import PeaksDict
 from    peakfinding.histogram       import Histogram, HistogramData
 from    peakfinding.probabilities   import Probability
 from    peakfinding.selector        import PeakSelectorDetails
