@@ -74,7 +74,7 @@ def test_ref_peaksgrid_2D():
         arr2 = seq/i[0]+i[1]
         fit.peaks = [seq[:3]/ 8.8e-4, (seq[3:]-.5)/ 8.8e-4]
         ret  = fit.optimize(arr2)
-        ret  = ret[1]*8.8e-4, ret[2]
+        ret  = ret[1]*8.8e-4, ret[2][0]
         assert_allclose(ret, i, rtol = 5e-4, atol = 5e-4)
 
 def test_toref_controller():
