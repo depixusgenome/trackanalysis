@@ -2,17 +2,20 @@
 # -*- coding: utf-8 -*-
 "Selecting beads"
 
-from    typing                import (Optional, NamedTuple, Dict, Any, List,
-                                      Tuple, Type)
-from    itertools             import repeat
-from    functools             import partial
-import  numpy                 as     np
-from    scipy.ndimage.filters import correlate1d
+from    typing                  import (Optional, NamedTuple, Dict, Any, List,
+                                        Tuple, Type)
+from    itertools               import repeat
+from    functools               import partial
 
-from    utils                 import initdefaults
-from    signalfilter          import nanhfsigma
-from    model                 import Task, Level, PHASE
-from    control.processor     import Processor
+import  numpy                   as     np
+from    numpy.lib.stride_tricks import as_strided
+
+from    scipy.ndimage.filters   import correlate1d
+
+from    utils                   import initdefaults
+from    signalfilter            import nanhfsigma
+from    model                   import Task, Level, PHASE
+from    control.processor       import Processor
 
 Partial = NamedTuple('Partial',
                      [('name', str),
@@ -20,12 +23,36 @@ Partial = NamedTuple('Partial',
                       ('max', np.ndarray),
                       ('values', np.ndarray)])
 
+class LocalNaNPopulation:
+    "Removes frames which have NaN values to their right and their left"
+    window = 5
+    ratio  = 20
+    @initdefaults
+    def __init__(self, **_):
+        pass
+
+    def apply(self, bead: np.ndarray):
+        "Removes frames which have NaN values to their right and their left"
+        tmp = np.asarray(np.isnan(bead), dtype = 'i1')
+        if self.window > 1:
+            tmp = np.sum(as_strided(tmp,
+                                    strides = (tmp.strides[0], tmp.strides[0]),
+                                    shape   = (tmp.size-self.window+1,self.window)),
+                         axis = 1)
+        tmp = tmp > self.ratio/100.*self.window
+
+        tmp = np.logical_and(tmp[:-self.window-1], tmp[self.window+1:])
+        bead[self.window:-self.window][tmp] = np.NaN
+
 class DataCleaning:
     "bead selection"
     mindeltavalue = 1e-6
     mindeltarange = 3
+    localnancount = [LocalNaNPopulation(window = 24, ratio = 50),
+                     LocalNaNPopulation(window = 8,  ratio = 50),
+                     LocalNaNPopulation(window = 2,  ratio = 50)]
     maxabsvalue   = 5.
-    maxderivate   = 2.
+    maxderivate   = .6
     minpopulation = 80.
     minhfsigma    = 1e-4
     maxhfsigma    = 1e-2
@@ -73,6 +100,11 @@ class DataCleaning:
         test = [ 0. if len(i) == 0 else np.isfinite(i).sum()/len(i)*100. for i in cycs]
         return self.__test('population', test)
 
+    def localpopulation(self, bead:np.ndarray):
+        "Removes values which have too few good neighbours"
+        for itm in self.localnancount:
+            itm.apply(bead)
+
     def constant(self, bead:np.ndarray):
         """
         Removes constant values.
@@ -116,6 +148,7 @@ class DataCleaning:
               && ...
               && |z[I-mindeltarange+1] - z[I]|               < mindeltavalue
               && n ∈ [I-mindeltarange+2, I]
+            * #{z[I-nanwindow//2:I+nanwindow//2] is nan} < nanratio*nanwindow
 
         Aberrant values are replaced by:
 
@@ -141,7 +174,9 @@ class DataCleaning:
                                np.abs(der) > self.maxderivate)] = np.NaN
 
             bead[fin] = good
-            self.constant(bead)
+
+        self.constant(bead)
+        self.localpopulation(bead)
 
         if len(good)-np.isnan(good).sum() <= len(bead) * self.minpopulation * 1e-2:
             return True
