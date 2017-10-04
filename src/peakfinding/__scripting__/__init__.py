@@ -17,7 +17,7 @@ from model                          import PHASE
 from data                           import Track
 from ..selector                     import PeakSelectorDetails
 from ..probabilities                import Probability
-from ..data                         import PeaksDict, PeakOutput
+from ..processor.selector           import PeaksDict, PeakOutput
 
 Tasks:           Type     = sys.modules['model.__scripting__'].Tasks
 defaulttasklist: Callable = sys.modules['data.__scripting__'].defaulttasklist
