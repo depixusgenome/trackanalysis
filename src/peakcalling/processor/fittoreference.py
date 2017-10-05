@@ -1,22 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Matching experimental peaks to hairpins: tasks and processors"
-from   typing                      import (Optional, Sequence, Iterable,
-                                           Dict, Iterator, Tuple, Union, cast)
-import numpy                       as     np
+from   typing                           import (Optional, # pylint: disable=unused-import
+                                                Iterable, Sequence, Any, Dict,
+                                                Iterator, Tuple, Union, NamedTuple,
+                                                cast)
+import numpy                            as     np
 
-from   utils                       import initdefaults
-from   data.views                  import TaskView, BEADKEY
-from   model.task                  import Task, Level
-from   control.processor.taskview  import TaskViewProcessor
-from   eventdetection.data         import Events
-from   peakfinding.histogram       import HistogramData
-from   peakfinding.dataframe       import PeaksDataFrameFactory, DataFrameFactory
-from   peakfinding.data            import PeakOutput, PeaksDict
-from   ..toreference               import HistogramFit, ChiSquareHistogramFit
-from   .._core                     import match as _match # pylint: disable=import-error
+from   utils                            import initdefaults
+from   data.views                       import TaskView, BEADKEY
+from   model.task                       import Task, Level
+from   control.processor.taskview       import TaskViewProcessor
+from   eventdetection.data              import Events
+from   peakfinding.histogram            import HistogramData
+from   peakfinding.processor.dataframe  import PeaksDataFrameFactory, DataFrameFactory
+from   peakfinding.processor.selector   import PeakOutput, PeaksDict
+from   ..toreference                    import ReferenceFit, ChiSquareHistogramFit
+from   ..tohairpin                      import HairpinFitter
+from   .._core                          import match as _match # pylint: disable=import-error
 
-FitData = Union[HistogramData, Tuple[HistogramData, np.ndarray]]
+class FitData(NamedTuple): # pylint: disable=missing-docstring
+    data   : Union[HistogramData, Tuple[HistogramData, np.ndarray], HairpinFitter]
+    params : Tuple[float, float]
+
 Fitters = Dict[BEADKEY, FitData]
 
 class FitToRefArray(np.ndarray):
@@ -59,12 +65,15 @@ class FitToRefArray(np.ndarray):
 class FitToReferenceTask(Task):
     "Fits a bead to a reference"
     level                  = Level.peak
-    fitdata : Fitters      = dict()
-    fitalg  : HistogramFit = ChiSquareHistogramFit()
+    _fitdata: Fitters      = dict()
+    fitalg  : ReferenceFit = ChiSquareHistogramFit()
     window  : float        = 10./8.8e-4
-    @initdefaults(frozenset(locals()) - {'level'},
-                  peaks  = lambda self, val: self.frompeaks (val),
-                  events = lambda self, val: self.fromevents(val))
+    DEFAULTKEY             = ''
+    @initdefaults(frozenset(locals()) - {'level', '_fitdata'},
+                  peaks       = lambda self, val: self.frompeaks (val),
+                  events      = lambda self, val: self.fromevents(val),
+                  fitdata     = '_',
+                  defaultdata = lambda self, val: setattr(self, 'defaultdata', val))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
@@ -75,16 +84,70 @@ class FitToReferenceTask(Task):
             self.fromevents(kwa['events'])
         return self
 
+    def __getstate__(self):
+        info = self.__dict__.copy()
+        info['fitdata'] = info.pop('_fitdata')
+        return info
+
+    def config(self) -> Dict[str,Any]:
+        "returns a deepcopy of its dict which can be safely used in generators"
+        cnf = super().config()
+        cnf['fitdata']  = cnf.pop('_fitdata')
+        return cnf
+
+    @property
+    def fitdata(self):
+        "returns the fitting data"
+        return self._fitdata
+
+    @fitdata.setter
+    def fitdata(self, val: Union[PeaksDict, Events, Fitters]):
+        "returns the fitting data"
+        if isinstance(val, PeaksDict):
+            self.frompeaks(val)
+        elif isinstance(val, Events):
+            self.fromevents(val)
+        else:
+            fcn           = lambda j: (j if isinstance(j, FitData) else
+                                       FitData(j, (1., 0)))
+            self._fitdata = {i: fcn(j) for i, j in cast(Dict, val).items()}
+
     def frompeaks(self, peaks: PeaksDict) -> 'FitToReferenceTask':
         "creates fit data for references from a PeaksDict"
-        self.fitdata = {i: self.fitalg.frompeaks(j) for i, j in peaks}
+        fcn           = self.fitalg.frompeaks
+        self._fitdata = {i: FitData(fcn(j), (1., 0.))
+                         for i, j in peaks}
         return self
 
     def fromevents(self, events: Events) -> 'FitToReferenceTask':
         "creates fit data for references from a PeaksDict"
-        keys = {i for i, _ in events.keys()}
-        self.fitdata = {i: self.fitalg.fromevents(cast(Events, events[i, ...])) for i in keys}
+        fcn           = self.fitalg.fromevents
+        keys          = {i for i, _ in events.keys()}
+        self._fitdata = {i: fcn(cast(Events, events[i, ...])) for i in keys}
         return self
+
+    @property
+    def defaultdata(self) -> Optional[FitData]:
+        "returns the default data"
+        return self._fitdata.get(self.DEFAULTKEY, None)
+
+    @defaultdata.setter
+    def defaultdata(self, val) -> Optional[FitData]:
+        "returns the default data"
+        fcn = lambda j: (j if isinstance(j, FitData) else FitData(j, (1., 0)))
+        out = fcn(self.fitalg.frompeaks(val)  if isinstance(val, PeaksDict) else
+                  self.fitalg.fromevents(val) if isinstance(val, Events)    else
+                  val)
+        self._fitdata[self.DEFAULTKEY] = out
+        return out
+
+    def getdata(self, key) -> FitData:
+        "returns the fitdata"
+        val = self._fitdata.get(key, None)
+        out = val if val else self._fitdata.get(self.DEFAULTKEY, None)
+        if out is None:
+            raise KeyError(f"Missing {key}")
+        return out
 
     @classmethod
     def isslow(cls) -> bool:
@@ -95,7 +158,10 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
     "iterator over peaks grouped by beads"
     level = Level.bead
     def _keys(self, sel:Optional[Sequence], _: bool) -> Iterable:
-        available = frozenset(self.config.fitdata)
+        if self.config.defaultdata:
+            return super()._keys(sel, _)
+
+        available = frozenset(self.config.fitdata) - {self.config.DEFAULTKEY}
         if sel is None:
             return super()._keys(tuple(available), True)
         return super()._keys([i for i in sel if i in available], True)
@@ -110,8 +176,12 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
         if key not in self.config.fitdata:
             raise KeyError(f"Missing reference id {key} in {self}")
 
-        data.params      = fit.optimize(self.config.fitdata[key], fit.frompeaks(data))[1:]
-        stretch, bias    = data.params
+        ref           = self.config.getdata(key)
+        stretch, bias = fit.optimize(ref.data, fit.frompeaks(data))[1:]
+        if ref not in ((1., 0.), None):
+            stretch, bias = ref.params[0]*stretch, ref.params[1]+stretch*bias
+
+        data.params      = stretch, bias
         data['peaks'][:] = (data['peaks']-bias)*stretch
 
         for evts in data['events']:

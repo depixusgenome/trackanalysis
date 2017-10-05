@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"Tasks related to peakfinding"
-from typing                 import Iterable, Iterator, Tuple, Optional
-from functools              import partial
-import numpy as np
+"""
+Deals with tasks & processors for finding peaks
+"""
 
-from model                  import Level, Task
-from data.views             import BEADKEY, TaskView, Beads, isellipsis
-from .selector              import PeakSelector, Output as PeakOutput, PeaksArray
+from   typing                     import Iterable, Iterator, Tuple, Optional
+from   functools                  import partial
+import numpy                      as     np
 
+from   model                      import Level, Task
+from   data.views                 import BEADKEY, TaskView, Beads, isellipsis
+from   control.processor.taskview import TaskViewProcessor
+from   ..selector                 import PeakSelector, Output as PeakOutput, PeaksArray
 
 class PeakSelectorTask(PeakSelector, Task):
     "Groups events per peak"
@@ -122,3 +125,6 @@ class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]):
 
     def _precision(self, ibead: int, precision: Optional[float]):
         return self.config.getprecision(precision, getattr(self.data, 'track', None), ibead)
+
+class PeakSelectorProcessor(TaskViewProcessor[PeakSelectorTask, PeaksDict, BEADKEY]):
+    "Groups events per peak"

@@ -10,8 +10,8 @@ from   model                       import PHASE
 from   data.views                  import selectparent
 from   control.processor.dataframe import DataFrameFactory
 from   eventdetection.data         import Events, EventDetectionConfig
-from   .probabilities              import Probability
-from   .data                       import PeaksDict
+from   ..probabilities             import Probability
+from   .selector                   import PeaksDict
 
 class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
     """
@@ -141,7 +141,7 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
         meas.update({i: np.concatenate(j) for (i, _), j in zip(self.__np, curr)})
 
     def __aggmeasure(self, meas, peaks, counts):
-        curr = [[] for _ in self.__np] # type: List[List[np.ndarray]]
+        curr = [[] for _ in self.__aggs] # type: List[List[np.ndarray]]
         for cnt, (_, pks) in zip(counts, peaks):
             arrs = [(i[1] if isinstance(i, (tuple, np.void)) else
                      np.concatenate(i['data']))

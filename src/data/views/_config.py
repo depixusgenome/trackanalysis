@@ -86,15 +86,15 @@ class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name
         return self
 
     @staticmethod
-    def __f_all(_, fcn, items):
+    def _f_all(_, fcn, items):
         return items[0], fcn(items[1])
 
     @staticmethod
-    def __f_beads(fcn, frame, items):
+    def _f_beads(fcn, frame, items):
         return items[0], (fcn(items[1]) if frame.isbead(items[0]) else items[1])
 
     @staticmethod
-    def __a_beads(fcn, frame, items):
+    def _a_beads(fcn, frame, items):
         return fcn(frame, items) if frame.isbead(items[0]) else items
 
     def withfunction(self:CSelf, fcn = None, clear = False, beadsonly = False) -> CSelf:
@@ -112,9 +112,9 @@ class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name
             raise TypeError(msg) from exc
 
         if beadsonly:
-            self.actions.append(partial(self.__f_all, fcn))
+            self.actions.append(partial(self._f_all, fcn))
         else:
-            self.actions.append(partial(self.__f_beads, fcn))
+            self.actions.append(partial(self._f_beads, fcn))
         return self
 
     def withaction(self:CSelf, fcn = None, clear = False, beadsonly = False) -> CSelf:
@@ -132,7 +132,7 @@ class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name
                    ' positional arguments: TrackView, Tuple[key, value]')
             raise TypeError(msg) from exc
 
-        self.actions.append(fcn if beadsonly else partial(self.__a_beads, fcn))
+        self.actions.append(fcn if beadsonly else partial(self._a_beads, fcn))
         return self
 
     def withdata(self:CSelf, dat, fcn = None) -> CSelf:

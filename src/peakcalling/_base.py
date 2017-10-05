@@ -134,16 +134,16 @@ class PointwiseOptimization(OptimizationParams):
         "returns the configuration"
         return config(self.optim, **kwa)
 
-def _chi2cost(ref, exp, pairs, symmetry):
+def _chi2cost(ref, exp, pairs, symmetry, dist):
     if symmetry is Symmetry.both:
-        dist = (len(exp)+len(ref)-2.*len(pairs))**2
+        dist += (len(exp)+len(ref)-2.*len(pairs))**2
         return np.sqrt(dist/(len(exp)+len(ref))) if len(exp)+len(ref) else np.finfo('f4').max
 
     if symmetry is Symmetry.left:
-        dist = (len(ref)-len(pairs))**2
+        dist += (len(ref)-len(pairs))**2
         return np.sqrt(dist/len(ref)) if len(ref) else np.finfo('f4').max
 
-    dist = (len(exp)-len(pairs))**2
+    dist += (len(exp)-len(pairs))**2
     return np.sqrt(dist/len(exp)) if len(exp) else np.finfo('f4').max
 
 def chisquare(ref       : np.ndarray, # pylint: disable=too-many-arguments
@@ -178,7 +178,7 @@ def chisquare(ref       : np.ndarray, # pylint: disable=too-many-arguments
         params = (stretch, bias)
         dist   = 0.
 
-    return dist+_chi2cost(ref, exp, pairs, symmetry), params[0], params[1]
+    return _chi2cost(ref, exp, pairs, symmetry, dist), params[0], params[1]
 
 def chisquarevalue(ref       : np.ndarray, # pylint: disable=too-many-arguments
                    exp       : np.ndarray,
@@ -202,4 +202,4 @@ def chisquarevalue(ref       : np.ndarray, # pylint: disable=too-many-arguments
     else:
         dist = 0.
 
-    return dist+_chi2cost(ref, exp, pairs, symmetry), stretch, bias
+    return _chi2cost(ref, exp, pairs, symmetry, dist), stretch, bias

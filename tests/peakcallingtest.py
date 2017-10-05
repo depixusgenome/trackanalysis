@@ -16,7 +16,8 @@ from eventdetection.processor   import EventDetectionTask
 from peakfinding.processor      import PeakSelectorTask
 from peakfinding.histogram      import HistogramData
 from peakcalling                import cost, match
-from peakcalling.tohairpin      import PeakMatching, GaussianProductFit, ChiSquareFit
+from peakcalling.tohairpin      import (PeakMatching, GaussianProductFit,
+                                        ChiSquareFit, PeakGridFit)
 from peakcalling.toreference    import HistogramFit, ChiSquareHistogramFit
 from peakcalling.processor      import (BeadsByHairpinProcessor, BeadsByHairpinTask,
                                         DistanceConstraint, FitToReferenceTask)
@@ -45,56 +46,70 @@ def test_toref_frompeaks():
 
     assert_allclose(ret[1:], [1.01, .01], rtol = 5e-4, atol = 5e-4)
 
+def test_ref_peaksgrid():
+    "tests peaks grid with a single read"
+    fit = PeakGridFit(firstpeak = True, lastpeak = True)
+    for i in product([.96, 1., 1.04], [-.05, 0., .05]):
+        arr1 = np.array([.1, .5,  1.])
+        arr2 = np.array([.1, .5,  1.])/i[0]+i[1]
+        arr1 /= 8.8e-4
+        fit.peaks = arr1
+        ret  = fit.optimize(arr2)
+        ret  = ret[1]*8.8e-4, ret[2]
+        assert_allclose(ret, i, rtol = 5e-4, atol = 5e-4)
+
+    arr1 = np.arange(50, dtype='f4').cumsum()
+    arr2 = arr1/.96+0.05
+    arr1 /= 8.8e-4
+    fit.peaks = arr1
+    ret  = fit.optimize(arr2)
+    ret  = ret[1]*8.8e-4, ret[2]
+    assert_allclose(ret, (.96, 0.05), rtol = 5e-4, atol = 5e-4)
+
+def test_ref_peaksgrid_2D():
+    "tests peaks grid with a top and a bottom fraction read"
+    fit = PeakGridFit(firstpeak = True, lastpeak = True)
+    for i in product([.96, 1., 1.04], [-.05, 0., .05]):
+        seq  = np.array([.01, .02,  .035, .7, .85, .95])
+        arr2 = seq/i[0]+i[1]
+        fit.peaks = [seq[:3]/ 8.8e-4, (seq[3:]-.5)/ 8.8e-4]
+        ret  = fit.optimize(arr2)
+        ret  = ret[1]*8.8e-4, ret[2][0]
+        assert_allclose(ret, i, rtol = 5e-4, atol = 5e-4)
+
 def test_toref_controller():
     "tests reference comparison"
     peaks = np.array([.1, .5, .6, 1.], dtype = 'f4')
-    ref   = tuple(create(ByPeaksEventSimulatorTask(peaks    = peaks,
-                                                   brownian = .001,
-                                                   stretch  = None,
-                                                   bias     = None,
-                                                   rates    = None,
-                                                   nbeads   = 1,
-                                                   ncycles  = 5)).run())[0]
+    root  = ByPeaksEventSimulatorTask(peaks    = peaks,
+                                      brownian = .001,
+                                      stretch  = None,
+                                      bias     = None,
+                                      rates    = None,
+                                      baseline = None,
+                                      nbeads   = 1,
+                                      ncycles  = 5)
+    ref   = tuple(create(root).run())[0]
     tsk   = FitToReferenceTask(fitalg  = ChiSquareHistogramFit())
     tsk.frompeaks(ref)
 
-    peaks = peaks*1.01 + .05
-    pair  = create(ByPeaksEventSimulatorTask(peaks    = peaks,
-                                             brownian = .001,
-                                             stretch  = None,
-                                             bias     = None,
-                                             rates    = None,
-                                             nbeads   = 1,
-                                             ncycles  = 5), tsk)
+    root.peaks = peaks/.99 + .05
+    pair       = create(root, tsk)
 
     beads = tuple(i for i in pair.run())[0][0]
+    assert_allclose(beads.params, [.99, 0.05], rtol = 5e-3, atol = 5e-3)
     assert beads['peaks'][0] < 0
     assert beads['peaks'][1] < .17
 
-    pair  = create(ByPeaksEventSimulatorTask(peaks    = peaks,
-                                             brownian = .001,
-                                             stretch  = None,
-                                             bias     = None,
-                                             rates    = None,
-                                             nbeads   = 1,
-                                             ncycles  = 5),
-                   tsk, DataFrameTask(measures = dict(std1 = 'std',
-                                                      std2 = ('std', 'mean'),
-                                                      std3 = 'resolution')))
+    pair  = create(root, tsk, DataFrameTask(measures = dict(std1 = 'std',
+                                                            std2 = ('std', 'mean'),
+                                                            std3 = 'resolution')))
     beads = tuple(i for i in pair.run())[0][0]
     assert set(beads.index.names) == {'track', 'bead'}
     assert set(beads.columns)     == {'peakposition',      'averageduration',
                                       'hybridizationrate', 'eventcount',
                                       'referenceposition', 'std1', 'std2', 'std3'}
 
-    pair  = create(ByPeaksEventSimulatorTask(peaks    = peaks,
-                                             brownian = .001,
-                                             stretch  = None,
-                                             bias     = None,
-                                             rates    = None,
-                                             nbeads   = 1,
-                                             ncycles  = 5),
-                   tsk, DataFrameTask(measures = dict(events = True)))
+    pair  = create(root, tsk, DataFrameTask(measures = dict(events = True)))
     beads = tuple(i for i in pair.run())[0][0]
     assert set(beads.index.names) == {'track', 'bead', 'cycle'}
     assert set(beads.columns)     == {'peakposition',      'averageduration',
@@ -238,5 +253,19 @@ def test_control():
         beads = tuple(i for i in pair.run(pool = pool))[0]
         assert tuple(beads.keys()) == ('hp100',)
 
+def test_peaksgrid():
+    "tests peaks iterator"
+    vals = list(match.PeakIterator([1., 2., 5.], [1., 2.], 0., 10., -10., 10.))
+    assert_allclose([i for i, _ in vals], [1., 4., 3.], rtol = 1e-3)
+    assert_allclose([i for _, i in vals], [0., .75, 1./3.], rtol = 1e-3)
+
+    vals = list(match.PeakIterator([1., 2., 5.], [1., 2.], 1.1, 10., -10., 10.))
+    assert_allclose([i for i, _ in vals], [4., 3.], rtol = 1e-3)
+    assert_allclose([i for _, i in vals], [.75, 1./3.], rtol = 1e-3)
+
+    vals = list(match.PeakIterator([1., 2., 5.], [1., 2.], 0., 10., -10., .5))
+    assert_allclose([i for i, _ in vals], [1., 3.], rtol = 1e-3)
+    assert_allclose([i for _, i in vals], [0., 1./3.], rtol = 1e-3)
+
 if __name__ == '__main__':
-    test_toref_controller()
+    test_ref_peaksgrid_2D()

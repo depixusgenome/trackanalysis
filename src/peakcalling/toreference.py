@@ -5,6 +5,7 @@ Matching experimental peaks to one another
 """
 from    typing                      import (Sequence, NamedTuple, Tuple, Union,
                                             Iterator, cast)
+from    abc                         import ABC, abstractmethod
 from    functools                   import partial
 from    scipy.interpolate           import interp1d
 from    scipy.optimize              import fmin_cobyla
@@ -12,12 +13,13 @@ import  numpy                       as     np
 
 from    utils                       import initdefaults, EVENTS_DTYPE
 from    eventdetection.data         import Events
+from    peakfinding.processor       import PeaksDict
 from    peakfinding.histogram       import Histogram, HistogramData
 from    peakfinding.probabilities   import Probability
 from    peakfinding.selector        import PeakSelectorDetails
 from    ._base                      import (GriddedOptimization, CobylaParameters,
                                             Distance, Range, chisquare, chisquarevalue,
-                                            DEFAULT_BEST)
+                                            Symmetry, DEFAULT_BEST)
 
 class HistogramFitData(NamedTuple): # pylint: disable=missing-docstring
     fcn:   interp1d
@@ -32,12 +34,28 @@ class ChiSquareData(NamedTuple): # pylint: disable=missing-docstring
     minv:  float
     peaks: np.ndarray
 
-FitData = Union[HistogramFitData, ChiSquareData]
+FitData  = Union[HistogramFitData, ChiSquareData]
 
-class HistogramFit(GriddedOptimization):
+class ReferenceFit(ABC):
+    "Abstract class for reference fitting"
+    # pylint: disable=unused-argument
+    @abstractmethod
+    def fromevents(self, evts:Events):
+        "creates a histogram from a list of events"
+        raise TypeError(f"This method should not be invoked when using {self.__class__}")
+
+    @abstractmethod
+    def frompeaks(self, peaks:PeaksDict, firstpeak = 0):
+        "creates a histogram from a list of events"
+        raise TypeError(f"This method should not be invoked when using {self.__class__}")
+
+    @abstractmethod
+    def optimize(self, aleft, aright) -> Distance:
+        "find best stretch & bias to fit right against left"
+
+class HistogramFit(GriddedOptimization, ReferenceFit):
     "Matching experimental peaks by correlating peak positions in the histograms"
     histogram    = Histogram(precision = 0.001, edge = 4)
-    symmetry     = True
     stretch      = Range(1., .05, .02)
     bias         = Range(0,   .1, .01)
     optim        = CobylaParameters((1e-2, 5e-3), (1e-4, 1e-4), None, None)
@@ -65,7 +83,7 @@ class HistogramFit(GriddedOptimization):
         "creates a histogram from a list of events"
         return self.__asprojection(np.concatenate(list(evts.values())))
 
-    def optimize(self, aleft, aright):
+    def optimize(self, aleft, aright) -> Distance:
         "find best stretch & bias to fit right against left"
         np.seterr(under = "ignore")
         left  = self._get(aleft)
@@ -76,7 +94,9 @@ class HistogramFit(GriddedOptimization):
 
         return Distance(ret[0], ret[1], ret[2]+right.minv-left.minv/ret[1])
 
-    def value(self, aleft, aright, stretch, bias):
+    def value(self, aleft, aright,
+              stretch: Union[float, np.ndarray],
+              bias:    Union[float, np.ndarray]) -> float:
         "compute cost value for fitting right against left with given stretch & bias"
         np.seterr(under = "ignore")
         left  = self._get(aleft)
@@ -95,13 +115,19 @@ class HistogramFit(GriddedOptimization):
         return self._to_data(hist, vals)
 
     def _cost_function(self, left: FitData, right: FitData, stretch: float, bias: float):
-        return (self._sym if self.symmetry else self._asym)(left, right, stretch, bias)
+        if self.symmetry is Symmetry.both:
+            return self._sym(left, right, stretch, bias)
+        if self.symmetry is Symmetry.left:
+            return self._asym(left, right, stretch, bias)
+        return self._asym(right, left, 1./stretch, -stretch*bias)
 
     def _optimize(self, left: FitData, right: FitData, kwa, params):
-        if self.symmetry:
+        if self.symmetry is Symmetry.both:
             cost = lambda x: self._sym(left, right, x[0], x[1])
-        else:
+        elif self.symmetry is Symmetry.left:
             cost = lambda x: self._asym(left, right, x[0], x[1])
+        else:
+            cost = lambda x: self._asym(left, right, 1./x[0], -x[0]*x[1])
         tmp  = fmin_cobyla(cost, params, **kwa)
         return (cost(tmp), tmp[0], tmp[1])
 
@@ -202,6 +228,10 @@ class CorrectedHistogramFit(HistogramFit):
         peaks = peaks[firstpeak:,:]
         return self.histogram.variablekernelsize(peaks), peaks[:,0]
 
+    def fromevents(self, evts:Events):
+        "creates a histogram from a list of events"
+        return self.frompeaks(cast(PeaksDict, evts.new(PeaksDict)))
+
     @staticmethod
     def _getpeaks(orig, data) -> np.ndarray:
         if isinstance(orig, PeakSelectorDetails):
@@ -232,7 +262,7 @@ class CorrectedHistogramFit(HistogramFit):
         data        = self._to_data(hist, vals)
         return ChiSquareData(data.fcn, data.xaxis, data.yaxis, data.minv, peaks-data.minv)
 
-    def optimize(self, aleft, aright):
+    def optimize(self, aleft, aright) -> Distance:
         "find best stretch & bias to fit right against left"
         np.seterr(under = "ignore")
         left  = self._get(aleft)
@@ -261,7 +291,7 @@ class ChiSquareHistogramFit(CorrectedHistogramFit):
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-    def optimize(self, aleft, aright):
+    def optimize(self, aleft, aright) -> Distance:
         "find best stretch & bias to fit right against left"
         return HistogramFit.optimize(self, aleft, aright)
 
@@ -277,3 +307,17 @@ class ChiSquareHistogramFit(CorrectedHistogramFit):
         return chisquarevalue(left.peaks[self.firstregpeak:], right.peaks,
                               False, self.symmetry, self.window,
                               stretch, -stretch*bias)[0]
+
+class HairpinFitAlg(ReferenceFit):
+    "adaptor for hairpin fitters"
+    def optimize(self, aleft, aright) -> Distance:
+        "find best stretch & bias to fit right against left"
+        return aleft.optimize(aright)
+
+    def frompeaks(self, peaks:PeaksDict, firstpeak = 0):
+        "returns the list of peaks"
+        return [i for i, _ in peaks][firstpeak:]
+
+    def fromevents(self, evts:Events):
+        "returns the list of peaks"
+        return self.frompeaks(cast(PeaksDict, evts.new(PeaksDict)))

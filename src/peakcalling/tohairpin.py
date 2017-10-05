@@ -4,7 +4,9 @@
 Matching experimental peaks to hairpins
 """
 from   typing       import Dict, Sequence, Iterator, Tuple, Any, Union, cast
-import numpy        as np
+from   functools    import partial
+from   itertools    import product
+import numpy        as     np
 
 from utils          import StreamUnion, initdefaults
 from sequences      import read as _read, peaks as _peaks
@@ -23,14 +25,15 @@ class HairpinFitter(OptimizationParams):
         super().__init__(**kwa)
 
     @property
-    def expectedpeaks(self):
+    def expectedpeaks(self) -> np.ndarray:
         "returns the peaks +- the hairpin extension"
-        return self.peaks[None if self.firstpeak else 1:None if self.lastpeak  else -1]
+        pks = self.peaks[None if self.firstpeak else 1:None if self.lastpeak  else -1]
+        return np.asarray(pks)
 
     @property
-    def hybridizations(self):
+    def hybridizations(self) -> np.ndarray:
         "returns only peaks linked to hibridizations"
-        return self.peaks[1:-1]
+        return np.asarray(self.peaks[1:-1])
 
     @staticmethod
     def topeaks(seq:str, oligos:Sequence[str]) -> np.ndarray:
@@ -84,6 +87,7 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
 
     def optimize(self, peaks: np.ndarray) -> Distance:
         "optimizes the cost function"
+        peaks = np.asarray(peaks)
         best  = DEFAULT_BEST, self.stretch.center, (self.bias.center or 0.)
         delta = 0.
         if len(peaks) > 1:
@@ -160,13 +164,226 @@ class ChiSquareFit(GaussianProductFit):
 
     def optimize(self, peaks: np.ndarray) -> Distance:
         "optimizes the cost function"
-        ret = super().optimize(peaks)
+        peaks = np.asarray(peaks)
+        ret   = super().optimize(peaks)
         if self.symmetry is Symmetry.right:
             hpin = self.expectedpeaks
             return Distance(chisquarevalue(hpin, (peaks-ret[2])*ret[1], self.firstpeak,
                                            self.symmetry, self.window, 1., 0.)[0],
                             ret[1], ret[2])
         return ret
+
+class PeakGridFit(HairpinFitter):
+    """
+    Fit to one or two lists of reference peaks.
+
+    The concept is to consider over all associations of a reference peak with an
+    experimental peak and to iterate over pairs of such associations.
+
+    For each of these pairs:
+
+    * we estimate a stretch and bias using these 2 pairs
+    * we match the reference to the experiment using this estimation
+    * we re-estimate a stretch and bias using this match
+    * we estimate a reduced χ² as the cost function
+
+    The stretch & bias with the least χ² value is returned.
+    """
+    window    = 10.
+    symmetry  = Symmetry.left
+    firstpeak = False
+    lastpeak  = False
+    DEFAULT   = Distance(DEFAULT_BEST, 1./8.8e-4, 0.)
+    def optimize(self, peaks:np.ndarray) -> Distance:
+        "computes stretch and bias for potential pairings"
+        peaks = np.asarray(peaks)
+        if len(peaks) < 2:
+            return self.DEFAULT
+
+        ref   = self.expectedpeaks
+        rng   = lambda val: ((val.center if val.center else 0.) - val.size,
+                             (val.center if val.center else 0.) + val.size)
+
+        args  = rng(self.stretch)+rng(self.bias)
+        itr   = tuple(np.copy(i) for i in _match.PeakIterator(ref, peaks, *args))
+        minv  = min((chisquare(ref, peaks, False, self.symmetry, self.window,
+                               stretch, -stretch*bias)
+                     for stretch, bias in itr),
+                    default = self.DEFAULT)
+
+        return Distance(minv[0], minv[1], -minv[2]/minv[1])
+
+    def value(self, peaks:np.ndarray,
+              stretch: Union[float, np.ndarray],
+              bias:    Union[float, np.ndarray]) -> float:
+        "computes the cost value at a given stretch and bias"
+        np.seterr(under = "ignore")
+        left  = self.expectedpeaks
+        fcn   = partial(self._cost_function, left, peaks)
+        if any(isinstance(i, (np.ndarray, Sequence)) for i in  (stretch, bias)):
+            bias = np.asarray(bias)-peaks.minv+left.minv/np.asarray(stretch)
+            ufcn = np.frompyfunc(fcn, 2, 1)
+            return ufcn(stretch, bias)
+        return fcn(stretch, bias-peaks.minv+left.minv/stretch)
+
+    def _cost_function(self, left, right, stretch: float, bias: float):
+        return chisquarevalue(left, right,
+                              False, self.symmetry, self.window,
+                              stretch, -stretch*bias)[0]
+
+class EdgePeaksGridFit(HairpinFitter):
+    """
+    Fit to two lists of reference peaks.
+
+    # Consider one list of reference peaks
+
+    The concept is to consider over all associations of a reference peak with an
+    experimental peak and to iterate over pairs of such associations.
+
+    For each of these pairs:
+
+    * we estimate a stretch and bias using these 2 pairs
+    * we match the reference to the experiment using this estimation
+    * we re-estimate a stretch and bias using this match
+    * we estimate a reduced χ² as the cost function
+
+    The stretch & bias with the least χ² value is returned.
+
+    # With two lists of reference peaks
+
+    The same idea is used except that the 1st list is fit to the bottom peaks
+    and the 2nd is fit to the top peaks. The fit is actually performed over both
+    lists at the same time using a single stretch value but allowing a different
+    bias for top and bottom. The χ² is estimated over both lists.
+
+    The cost function is, where *i* iterates over lists of peaks and *j* over
+    elements in that list:
+
+        F(x, y) = Σ_{ij} (y_{ij} - a x_{ij} -b_i) **2
+
+    thus:
+
+        ∂_a  F   = 0 ⇔  0 = Σ_{ij} x_{ij} (y_{ij} - a x_{ij} -b_i)
+        ∂_{b_i}F = 0 ⇔  0 = Σ_j (y_{ij} - a x_{ij} -b_i)
+
+    and:
+        b_i = <y>_i - a <x>_i
+        a   = (<xy> - Σ_i N_i/N <x>_i <y>_i) / (<x²> - Σ_i N_i/N (<x>_i)²)
+
+    We also have, if δx = σ:
+
+        δa  = a∙σ/N∙√(Σ_{ij}((y_ij - <y>_i)/U -2 (x_{ij} - <x>_i)/V)²)
+
+    where:
+        a   = U/V
+    """
+    window    = 10.
+    symmetry  = Symmetry.left
+    firstpeak = False
+    lastpeak  = False
+    DEFAULT   = Distance(DEFAULT_BEST, 1./8.8e-4, (0., 0.))
+    def optimize(self, peaks:np.ndarray) -> Distance:
+        "computes stretch and bias for potential pairings"
+        rng  = lambda val: ((val.center if val.center else 0.) - val.size,
+                            (val.center if val.center else 0.) + val.size)
+        bias, stretch = rng(self.bias), rng(self.stretch)
+
+
+        if len(self.peaks) > 2:
+            raise NotImplementedError()
+
+        extr = [(i[-1]-i[0])/stretch[0]+bias[1] for i in self.peaks]
+        pks  = [np.asarray(peaks[:np.searchsorted(peaks, peaks[0]+extr[0])]),
+                np.asarray(peaks[np.searchsorted(peaks,  peaks[-1]-extr[1]):])
+               ]
+        if any(len(i) < 2 for i in pks):
+            return self.DEFAULT
+
+        args = stretch + (-np.finfo('f4').max, np.finfo('f4').max) + (True,)
+        itrs = [tuple(np.copy(i) for i in _match.PeakIterator(ref, item, *args))
+                for ref, item in zip(self.peaks, pks)]
+
+        nref = sum(len(i) for i in self.peaks)
+        minv = min((self.__chisquare(nref, pks, inds) for inds in product(*itrs)),
+                   default = self.DEFAULT)
+        return Distance(minv[0], minv[1], -(np.asarray(minv[2])/minv[1]))
+
+    def value(self, peaks:np.ndarray,
+              stretch: Union[float, np.ndarray],
+              bias:    Union[float, np.ndarray]) -> float:
+        "computes the cost value at a given stretch and bias"
+        np.seterr(under = "ignore")
+        left  = self.expectedpeaks
+        fcn   = partial(self._cost_function, left, peaks)
+        if any(isinstance(i, (np.ndarray, Sequence)) for i in  (stretch, bias)):
+            bias = np.asarray(bias)-peaks.minv+left.minv/np.asarray(stretch)
+            ufcn = np.frompyfunc(fcn, 2, 1)
+            return ufcn(stretch, bias)
+        return fcn(stretch, bias-peaks.minv+left.minv/stretch)
+
+    def _cost_function(self, left, right, stretch: float, bias: float):
+        return chisquarevalue(left, right,
+                              False, self.symmetry, self.window,
+                              stretch, -stretch*bias)[0]
+
+    def __selection(self, peaks:Sequence[np.ndarray], inds: Sequence[np.ndarray]):
+        return ([i[j[:,0]] for i, j in zip(self.peaks, inds)],
+                [i[j[:,1]] for i, j in zip(peaks,      inds)])
+
+    def __params(self, peaks: Sequence[np.ndarray], inds: Sequence[np.ndarray]):
+        """
+        we have:
+                F(x, y) = Σ_{ij} (y_{ij} - a x_{ij} -b_i) **2
+
+        with:
+            d/da   = 0 = Σ_{ij} x_{ij} (y_{ij} - a x_{ij} -b_i)
+            d/db_i = 0 = Σ_j (y_{ij} - a x_{ij} -b_i)
+
+        thus:
+            b_i = <y>_i - a <x>_i
+            a   = (<xy> - Σ_i N_i/N <x>_i <y>_i) / (<x²> - Σ_i N_i/N (<x>_i)²)
+
+        We also have, if δx = σ:
+
+            δa  = sqrt(Σ_{ij}((da/dx_{ij})²)) σ
+            δa  = sqrt((Σ_{ij}((y_ij - <y>_i)/(<x²> - Σ_i N_i/N (<x>_i)²)
+                                -((<xy> - Σ_i N_i/N <x>_i <y>_i)
+                                  2 (x_{ij} - Σ_i <x>_i)
+                                 /(<x²> - Σ_i N_i/N (<x>_i)²)²))) σ/N
+        """
+        refs, pks = self.__selection(peaks, inds)
+        xyv  = sum((i*j) .sum()             for i, j in zip(refs, pks))
+        xyv -= sum(i.mean()*j.mean()*len(i) for i, j in zip(refs, pks))
+
+        x2v  = sum((i**2).sum()       for i in pks)
+        x2v -= sum(i.mean()**2*len(i) for i in pks)
+
+        stretch = xyv/x2v
+        biases  = [j.mean()-i.mean()*stretch for i, j in zip(pks, refs)]
+        return stretch, biases
+
+    def __chisquare(self,
+                    npeaksexpected: int,
+                    peaks:          Sequence[np.ndarray],
+                    indexes:        Sequence[np.ndarray]):
+        if any(len(i) == 0 for i in indexes):
+            return self.DEFAULT
+        stretch, biases = self.__params(peaks, indexes)
+
+        inds = [_match.compute(i, j*stretch+bias, self.window)
+                for i, j, bias in zip(self.peaks, peaks, biases)]
+        if any(len(i) == 0 for i in inds):
+            return self.DEFAULT
+        stretch, biases = self.__params(peaks, inds)
+
+        inds = [_match.compute(i, j*stretch+bias, self.window)
+                for i, j, bias in zip(self.peaks, peaks, biases)]
+        chi2 = sum(((i-stretch*j-bias)**2).sum()
+                   for i, j, bias in zip(*self.__selection(peaks, inds),
+                                         biases))/self.window**2
+
+        chi2 += (npeaksexpected-sum(len(i) for i in inds))**2
+        return np.sqrt(max(0., chi2)/npeaksexpected), stretch, biases
 
 PEAKS_DTYPE = np.dtype([('zvalue', 'f4'), ('key', 'i4')])
 PEAKS_TYPE  = Union[Sequence[Tuple[float,int]],np.ndarray]
