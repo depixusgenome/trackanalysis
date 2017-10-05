@@ -3,14 +3,15 @@
 """
 Base track file data.
 """
-from    typing      import Optional, Union, Dict, Tuple, TypeVar, Generic, cast
+from    typing      import (Type, Optional, Union, Dict, Tuple, TypeVar,
+                            Generic, cast)
 from    copy        import deepcopy, copy as shallowcopy
 from    enum        import Enum
 import  numpy       as     np
 
 from    utils       import initdefaults
 from    model       import levelprop, Level
-from   .views       import Beads, Cycles, BEADKEY, isellipsis
+from   .views       import Beads, Cycles, BEADKEY, isellipsis, TrackView
 from   .trackio     import opentrack, PATHTYPES
 
 IDTYPE       = Union[None, int, slice] # missing Ellipsys as mypy won't accept it
@@ -233,26 +234,31 @@ class Track:
     @property
     def beads(self) -> Beads:
         "returns a helper object for extracting beads"
-        return self.__view(Beads, beadsonly = False)
+        return self.view(Beads, beadsonly = False)
 
     @property
     def beadsonly(self) -> Beads:
         "returns a helper object for extracting beads from *beads* only"
-        return self.__view(Beads, beadsonly = True)
+        return self.view(Beads, beadsonly = True)
 
     @property
     def cycles(self) -> Cycles:
         "returns a helper object for extracting cycles"
-        return self.__view(Cycles, beadsonly = False)
+        return self.view(Cycles, beadsonly = False)
 
     @property
     def cyclesonly(self) -> Cycles:
         "returns a helper object for extracting cycles from *beads* only"
-        return self.__view(Cycles, beadsonly = True)
+        return self.view(Cycles, beadsonly = True)
 
-    def __view(self, tpe, **kwa):
-        parents = (self.key,) if self.key else (self.path,)
-        return tpe(track = self, parents = parents, **kwa)
+    def view(self, tpe:Union[Type[TrackView], str], **kwa):
+        "Creates a view of the suggested type"
+        viewtype = (tpe     if isinstance(tpe, type) else
+                    Cycles  if tpe.lower() == 'cycles' else
+                    Beads)
+        kwa.setdefault('parents', (self.key,) if self.key else (self.path,))
+        kwa.setdefault('track',   self)
+        return viewtype(**kwa)
 
 def dropbeads(trk, *beads:Tuple[BEADKEY]) -> Track:
     "returns a track without the given beads"
