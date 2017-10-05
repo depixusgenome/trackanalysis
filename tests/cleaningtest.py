@@ -9,9 +9,10 @@ from testingcore                import path as utpath
 from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 from cleaning.processor         import (DataCleaning, DataCleaningTask,
                                         DataCleaningProcessor, LocalNaNPopulation,
-                                        DerivateIslands)
+                                        DerivateIslands, DataCleaningException)
 from cleaning.beadsubtraction   import BeadSubtractionTask, BeadSubtractionProcessor
 from simulator                  import randtrack, setseed
+from model.task.track           import TrackReaderTask
 from control.taskcontrol        import create
 from data                       import Beads, Track
 
@@ -292,6 +293,18 @@ def test_processor2():
     assert len(cache) == 1
     assert 0 in cache
 
+def test_message_creation():
+    "test message creation"
+    proc  = create(TrackReaderTask(path = utpath("big_legacy")),
+                   DataCleaningTask())
+    data  = next(iter(proc.run()))
+    try:
+        data[5]
+    except DataCleaningException:
+        pass
+    else:
+        assert False
+
 def test_view(bokehaction):
     "test the view"
     with bokehaction.launch('cleaning.view.CleaningView', 'app.toolbar') as server:
@@ -317,4 +330,4 @@ def test_view_messages(bokehaction):
         server.load('big_legacy', andstop = False)
 
 if __name__ == '__main__':
-    test_cleaning_localpop()
+    test_message_creation()
