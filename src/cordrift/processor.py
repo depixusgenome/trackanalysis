@@ -150,17 +150,31 @@ class DriftProcessor(Processor[DriftTask]):
         return self.task.onbeads
 
     @classmethod
+    def _onbeads(cls, cache, kwa, frame):
+        action = cls._ACTION(kwa, cache = cache)
+        return frame.new().withaction(action.onBead, beadsonly = True)
+
+    @classmethod
+    def _oncycles_no_pool(cls, cache, kwa, frame):
+        action = cls._ACTION(kwa, cache = cache)
+        return frame.new().withdata(frame, action.onCycles)
+
+    @classmethod
+    def _oncycles_with_pool(cls, cache, # pylint: disable=too-many-arguments
+                            kwa, pool, data, frame):
+        action = cls._ACTION(kwa, cache = cache)
+        par    = partial(action.poolOnCycles, pool, pooldump(data))
+        return frame.new().withdata(frame, par)
+
+    @classmethod
     def apply(cls, toframe = None, pool = None, data = None, cache = None, **kwa):
         "applies the task to a frame or returns a function that does so"
-        action = cls._ACTION(kwa, cache = cache)
         if kwa.get('onbeads', True):
-            fcn = lambda i: (i.new().withaction(action.onBead, beadsonly = True))
+            fcn = partial(cls._onbeads, cache, kwa)
         elif pool is None:
-            fcn = lambda i: i.new().withdata(i, action.onCycles)
-
+            fcn = partial(cls._oncycles_no_pool, cache, kwa)
         else:
-            par = partial(action.poolOnCycles, pool, pooldump(data))
-            fcn = lambda i: i.new().withdata(i, par)
+            fcn = partial(cls._oncycles_with_pool, cache, kwa, pool, data)
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
