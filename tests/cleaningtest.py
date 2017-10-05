@@ -8,7 +8,8 @@ from   numpy.testing            import assert_equal, assert_allclose
 from testingcore                import path as utpath
 from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
 from cleaning.processor         import (DataCleaning, DataCleaningTask,
-                                        DataCleaningProcessor, LocalNaNPopulation)
+                                        DataCleaningProcessor, LocalNaNPopulation,
+                                        DerivateIslands)
 from cleaning.beadsubtraction   import BeadSubtractionTask, BeadSubtractionProcessor
 from simulator                  import randtrack, setseed
 from control.taskcontrol        import create
@@ -77,6 +78,16 @@ def test_cleaning_localpop():
     cycs[[7, 10, 19, 21, 30, 48, 49, 51,52]] = np.NaN
     LocalNaNPopulation(window = 3, ratio = 50).apply(cycs)
     assert set(np.nonzero(np.isnan(cycs))[0]) == {7, 10, 19, 21, 30, 48, 49, 50, 51, 52}
+
+    cycs = np.ones(100)
+    cycs[5:15]  = np.NaN
+    cycs[20:35] = np.NaN
+    cycs[15:20:2] = 2
+    cycs[55:65] = np.NaN
+    cycs[70:85] = np.NaN
+
+    DerivateIslands().apply(cycs)
+    assert np.all(np.isnan(cycs[5:35]))
 
     arr = np.array([-0.79690832, -0.79579473, -0.79837704, -0.79940188, -0.79769713,
                     -0.79858971, -0.8066749 , -0.79106545, -0.77895606, -0.7706582 ,
@@ -230,7 +241,8 @@ def test_cleaning_localpop():
                     -0.8487556 , -0.85013884, -0.84805053, -0.84800196, -0.85113859,
                     -0.85277474, -0.8499831 , -0.85259891], dtype='f4')
 
-    out = DataCleaningTask().aberrant(arr)
+    DataCleaningTask().aberrant(arr)
+    assert np.all(np.isnan(arr[401:624]))
 
 def test_subtract():
     "tests subtractions"

@@ -4,6 +4,7 @@
 
 from    typing                  import (Optional, NamedTuple, Dict, Any, List,
                                         Tuple, Type)
+from    abc                     import ABC, abstractmethod
 from    itertools               import repeat
 from    functools               import partial
 
@@ -23,43 +24,95 @@ Partial = NamedTuple('Partial',
                       ('max', np.ndarray),
                       ('values', np.ndarray)])
 
-class LocalNaNPopulation:
+class NaNDensity(ABC):
+    "removes frames affected by NaN value in their neighborhood"
+    @staticmethod
+    def _countnans(bead, width, cnt):
+        tmp = np.asarray(np.isnan(bead), dtype = 'i1')
+        if width > 1:
+            tmp = np.sum(as_strided(tmp,
+                                    strides = (tmp.strides[0], tmp.strides[0]),
+                                    shape   = (tmp.size-width+1, width)),
+                         axis = 1) >= cnt
+        return tmp
+
+    @abstractmethod
+    def apply(self, bead:np.ndarray) -> None:
+        "removes bad frames"
+
+class LocalNaNPopulation(NaNDensity):
     "Removes frames which have NaN values to their right and their left"
     window = 5
     ratio  = 20
     @initdefaults
     def __init__(self, **_):
-        pass
+        super().__init__()
 
     def apply(self, bead: np.ndarray):
         "Removes frames which have NaN values to their right and their left"
-        tmp = np.asarray(np.isnan(bead), dtype = 'i1')
-        if self.window > 1:
-            tmp = np.sum(as_strided(tmp,
-                                    strides = (tmp.strides[0], tmp.strides[0]),
-                                    shape   = (tmp.size-self.window+1,self.window)),
-                         axis = 1)
-        tmp = tmp > self.ratio/100.*self.window
-
+        tmp = self._countnans(bead, self.window, self.ratio/100.*self.window)
         tmp = np.logical_and(tmp[:-self.window-1], tmp[self.window+1:])
         bead[self.window:-self.window][tmp] = np.NaN
 
+class DerivateIslands(NaNDensity):
+    """
+    Removes frame intervals with the following characteristics:
+
+    * there are *islandwidth* or less good values in a row,
+    * with a derivate of at least *maxderivate*
+    * surrounded by *riverwidth* or more NaN values in a row on both sides
+    """
+    riverwidth  = 2
+    islandwidth = 10
+    ratio       = 80
+    maxderivate = .1
+    @initdefaults
+    def __init__(self, **_):
+        super().__init__()
+
+    def apply(self, bead: np.ndarray):
+        "Removes frames which have NaN values to their right and their left"
+        tmp = np.nonzero(self._countnans(bead, self.riverwidth, self.riverwidth))[0]
+        if len(tmp) == 0:
+            return
+
+        left  = np.setdiff1d(tmp, tmp-1)+self.riverwidth
+
+        right = np.setdiff1d(tmp, tmp+1)
+        right = right[np.searchsorted(right, left[0]):]
+
+        rinds = np.searchsorted(left, right)
+
+        good  = right-left[rinds-1] <= self.islandwidth
+        if good.sum() == 0:
+            return
+
+        mder = self.maxderivate
+        for ileft, iright in zip(left[rinds[good]-1], right[good]):
+            vals = bead[ileft:iright]
+            if len(vals) < 3:
+                vals[:] = np.NaN
+                continue
+
+            cnt = self.ratio*1e-2*(len(vals)-2)
+            if (np.abs(vals[1:-1]-vals[:-2]*.5-vals[2:]*.5) > mder).sum() >= cnt:
+                vals[:] = np.NaN
+
 class DataCleaning:
     "bead selection"
-    mindeltavalue = 1e-6
-    mindeltarange = 3
-    localnancount = [LocalNaNPopulation(window = 24, ratio = 50),
-                     LocalNaNPopulation(window = 8,  ratio = 50),
-                     LocalNaNPopulation(window = 2,  ratio = 50)]
-    maxabsvalue   = 5.
-    maxderivate   = .6
-    minpopulation = 80.
-    minhfsigma    = 1e-4
-    maxhfsigma    = 1e-2
-    minextent     = .5
-    __ZERO        = np.zeros(0, dtype = 'i4')
+    mindeltavalue                = 1e-6
+    mindeltarange                = 3
+    nandensity: List[NaNDensity] = [LocalNaNPopulation(window = 16, ratio = 50),
+                                    DerivateIslands()]
+    maxabsvalue                  = 5.
+    maxderivate                  = .6
+    minpopulation                = 80.
+    minhfsigma                   = 1e-4
+    maxhfsigma                   = 1e-2
+    minextent                    = .5
+    __ZERO                       = np.zeros(0, dtype = 'i4')
 
-    CYCLES        = 'hfsigma', 'extent', 'population'
+    CYCLES                       = 'hfsigma', 'extent', 'population'
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -102,7 +155,7 @@ class DataCleaning:
 
     def localpopulation(self, bead:np.ndarray):
         "Removes values which have too few good neighbours"
-        for itm in self.localnancount:
+        for itm in self.nandensity:
             itm.apply(bead)
 
     def constant(self, bead:np.ndarray):
@@ -318,7 +371,7 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
             val  = tuple(cls.__test(cycs, cnf))
 
         if not discard:
-            bad = cls.tasktype.badcycles(val)
+            bad = cls.tasktype.badcycles(val) # type: ignore
             if len(bad):
                 for _, cyc in (frame.track.cycles
                                .withdata({info[0]: info[1]})
