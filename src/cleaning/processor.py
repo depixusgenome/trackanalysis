@@ -333,7 +333,7 @@ class DataCleaningException(Exception):
     @classmethod
     def create(cls, stats, cnf, tasktype):
         "creates the exception"
-        cls(cls.ErrorMessage(stats, cnf, tasktype), 'warning')
+        return cls(cls.ErrorMessage(stats, cnf, tasktype), 'warning')
 
 class DataCleaningProcessor(Processor[DataCleaningTask]):
     "Processor for bead selection"
@@ -367,15 +367,15 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
 
         discard = DataCleaning(**cnf).aberrant(info[1])
         if not tested:
-            cycs = frame.track.cycles.withdata({info[0]: info[1]})
+            cycs = frame.track.view("cycles", data = {info[0]: info[1]})
             val  = tuple(cls.__test(cycs, cnf))
 
         if not discard:
             bad = cls.tasktype.badcycles(val) # type: ignore
             if len(bad):
-                for _, cyc in (frame.track.cycles
-                               .withdata({info[0]: info[1]})
-                               .selecting(zip(repeat(info[0]), bad))):
+                for _, cyc in frame.track.view("cycles",
+                                               data     = {info[0]: info[1]},
+                                               selected = zip(repeat(info[0]), bad)):
                     cyc[:] = np.NaN
 
                 if not tested:

@@ -89,7 +89,7 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
         "Aligns cycles to zero"
         def __init__(self, frame, info):
             "returns computed cycles for this bead"
-            self.cycles = frame[info[0],...].withdata({info[0]: info[1]})
+            self.cycles = frame.track.view('cycles', data = {info[0]: info[1]})
             if frame.cycles is not None:
                 phases            = frame.track.phases[frame.cycles,:]
                 self.cycles.track = updatecopy(frame.track, phases = phases)
