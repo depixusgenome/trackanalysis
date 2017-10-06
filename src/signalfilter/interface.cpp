@@ -279,6 +279,52 @@ namespace pybind11 { namespace detail {
 }}
 
 namespace samples { namespace normal {
+    namespace 
+    {
+        pybind11::array _valuekn(bool iseq, pybind11::array arr)
+        {
+            if(arr.shape()[0] == 0)
+                return pybind11::array_t<float>(0);
+
+            pybind11::array_t<float> out(arr.shape()[0]-1);
+            float * res = out.mutable_data();
+            for(size_t i = 0, end = arr.shape()[0]-1; i < end; ++i)
+            {
+                int   const * data  = (int const *) arr.data(i);
+                float const * fdata = (float const *) (data+1);
+                Input         left  = {size_t(*data), *fdata, 0.f};
+
+                data        = (int   const *) arr.data(i+1);
+                fdata       = (float const *) (data+1);
+                Input right = {size_t(*data), *fdata, 0.f};
+                res[i] = knownsigma::value(iseq, left, right);
+            }
+            return out;
+        }
+
+        template <float (*FCN)(Input const &, Input const &)>
+        pybind11::array _value(pybind11::array arr)
+        {
+            if(arr.shape()[0] == 0)
+                return pybind11::array_t<float>(0);
+
+            pybind11::array_t<float> out(arr.shape()[0]-1);
+            float * res = out.mutable_data();
+            for(size_t i = 0, end = arr.shape()[0]-1; i < end; ++i)
+            {
+                int   const * data  = (int const *) arr.data(i);
+                float const * fdata = (float const *) (data+1);
+                Input         left  = {size_t(*data), fdata[0], fdata[1]};
+
+                data        = (int   const *) arr.data(i+1);
+                fdata       = (float const *) (data+1);
+                Input right = {size_t(*data), fdata[0], fdata[1]};
+                res[i] = FCN(left, right);
+            }
+            return out;
+        }
+    }
+
     void pymodule(pybind11::module & mod)
     {
         auto smod  = mod.def_submodule("samples");
@@ -286,6 +332,7 @@ namespace samples { namespace normal {
         auto ksmod = nmod.def_submodule("knownsigma");
         ksmod.def("value",     [](bool a, SimpleInput const & b, SimpleInput const & c)
                                { return knownsigma::value(a,b,c); });
+        ksmod.def("value",     _valuekn);
         ksmod.def("threshold", (float (*)(bool, float, float))
                                 (knownsigma::threshold));
         ksmod.def("threshold", (float (*)(bool, float, float, size_t, size_t))
@@ -294,12 +341,18 @@ namespace samples { namespace normal {
 
         auto hsmod = nmod.def_submodule("homoscedastic");
         hsmod.def("value",      homoscedastic::value);
+        hsmod.def("threshold",  homoscedastic::threshold);
+        hsmod.def("thresholdvalue", homoscedastic::tothresholdvalue);
+        hsmod.def("thresholdvalue", _value<homoscedastic::tothresholdvalue>);
         hsmod.def("islower",    homoscedastic::islower);
         hsmod.def("isgreater",  homoscedastic::isgreater);
         hsmod.def("isequal",    homoscedastic::isequal);
 
         auto ht = nmod.def_submodule("heteroscedastic");
         ht.def("value",         heteroscedastic::value);
+        ht.def("threshold",  heteroscedastic::threshold);
+        ht.def("thresholdvalue", heteroscedastic::tothresholdvalue);
+        ht.def("thresholdvalue", _value<heteroscedastic::tothresholdvalue>);
         ht.def("islower",       heteroscedastic::islower);
         ht.def("isgreater",     heteroscedastic::isgreater);
         ht.def("isequal",       heteroscedastic::isequal);

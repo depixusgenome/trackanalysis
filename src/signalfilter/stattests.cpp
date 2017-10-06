@@ -62,6 +62,14 @@ namespace samples
                 return {free, t};
             }
 
+            float  threshold(float val) { return 1.-val*.5; }
+
+            float  tothresholdvalue(Input const & left, Input const & right)
+            {
+                float val = _level(value(left, right));
+                return val < .5 ? 1.-val : val;
+            }
+
             bool isequal(float alpha, Input const & left, Input const & right)
             { return _isequal(alpha, value(left, right)); }
 
@@ -85,6 +93,14 @@ namespace samples
                 auto free   = sumson*sumson/(div(sonL, left)+div(sonR, right));
                 auto t      = (left.mean-right.mean) / std::sqrt(sumson);
                 return {free, t};
+            }
+
+            float  threshold(float val) { return 1.-val*.5; }
+
+            float  tothresholdvalue(Input const & left, Input const & right)
+            {
+                float val = _level(value(left, right));
+                return val < .5 ? 1.-val : val;
             }
 
             bool isequal(float alpha, Input const & left, Input const & right)

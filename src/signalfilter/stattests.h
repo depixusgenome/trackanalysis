@@ -23,14 +23,18 @@ namespace samples
         namespace homoscedastic
         {
             std::pair<size_t, float> value(Input const &, Input const &);
-            bool isequal  (float, Input const &, Input const &);
-            bool islower  (float, Input const &, Input const &);
-            bool isgreater(float, Input const &, Input const &);
+            float  threshold(float val);
+            float  tothresholdvalue(Input const &, Input const &);
+            bool   isequal  (float, Input const &, Input const &);
+            bool   islower  (float, Input const &, Input const &);
+            bool   isgreater(float, Input const &, Input const &);
         }
 
         namespace heteroscedastic
         {
             std::pair<float, float> value(Input const &, Input const &);
+            float  threshold(float val);
+            float  tothresholdvalue(Input const &, Input const &);
             bool isequal  (float, Input const &, Input const &);
             bool islower  (float, Input const &, Input const &);
             bool isgreater(float, Input const &, Input const &);

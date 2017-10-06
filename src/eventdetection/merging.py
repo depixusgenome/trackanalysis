@@ -2,54 +2,54 @@
 # -*- coding: utf-8 -*-
 "Interval detection: merging and selecting the sections in the signal detected as flat"
 
-from    typing import Optional
+from    typing                  import Optional, Callable, Tuple
+from    abc                     import abstractmethod
 
-import  numpy as np
+import  numpy                   as     np
 from    numpy.lib.stride_tricks import as_strided
 
-from    utils        import initdefaults
-from    signalfilter import samples as _samples, PrecisionAlg
-norm = _samples.normal.knownsigma # pylint: disable=invalid-name
+from    utils                   import initdefaults
+from    signalfilter            import samples as _samples, PrecisionAlg
 
-class EventMerger(PrecisionAlg):
-    """
-    Merges neighbouring stretches of data.
-
-    Two intervals are merged whenever the mean for the second cannot be
-    certified as being below that of the first. The p-value is estimated
-    considering that distributions for both stretches are normal with a know
-    sigma.
-
-    The sigma (precision) is either provided or measured. In the latter case,
-    the estimation used is the median-deviation of the derivate of the data.
-    """
-    confidence  = 0.1  # type: Optional[float]
-    isequal     = True
-    oneperrange = True
+class EventMerger(Callable[[np.ndarray,np.ndarray,Optional[float]], np.ndarray]): # type: ignore
+    "Merges neighbouring stretches of data."
+    confidence: Optional[float] = 0.1
+    oneperrange                 = True
     @initdefaults(frozenset(locals()))
-    def __init__(self, **kwa):
-        super().__init__(**kwa)
+    def __init__(self, **_):
+        super().__init__()
+
+    @abstractmethod
+    def _initthreshold(self, data: np.ndarray, precision: Optional[float]):
+        pass
+
+    @abstractmethod
+    def _initprobs(self, stats: np.ndarray):
+        pass
+
+    @abstractmethod
+    def _stats(self, data: np.ndarray, index: Tuple[int, int]) -> np.ndarray:
+        pass
 
     @staticmethod
-    def __initstats(data : np.ndarray, intervals: np.ndarray):
-        inds     = np.insert(intervals.ravel(), intervals.size-1, len(data))
-        inds     = as_strided(inds,
-                              shape   = (len(inds)-1, 2),
-                              strides = (inds.strides[0],)*2)
+    @abstractmethod
+    def _statsupdate(stats: np.ndarray, index: Tuple[int, int]) -> np.ndarray:
+        pass
 
-        dtype    = np.dtype([('c', 'i4'), ('m', 'f4')])
-        def _stats(i):
-            count = (~np.isnan(data[i[0]:i[1]])).sum()
-            mean  = 0. if count == 0 else np.nanmean(data[i[0]:i[1]])
-            return np.array([(count, mean)], dtype = dtype)
+    def __initstats(self, data : np.ndarray, intervals: np.ndarray):
+        inds = np.insert(intervals.ravel(), intervals.size-1, len(data))
+        inds = as_strided(inds,
+                          shape   = (len(inds)-1, 2),
+                          strides = (inds.strides[0],)*2)
 
-        tmp = np.apply_along_axis(_stats, 1, inds)
+        tmp  = np.apply_along_axis(lambda i: self._stats(data, i), 1, inds)
         return tmp.reshape(intervals.shape)
 
-    def __initprobs(self, stats):
-        fcn = lambda i: norm.value(self.isequal, stats[i,0], stats[i+1,0])
-        siz = len(stats)-1
-        return np.fromiter((fcn(i) for i in range(siz)), dtype = 'f4', count = siz)
+    @staticmethod
+    def __initmerge(probs, thr) -> np.ndarray:
+        merge       = np.zeros(len(probs)+2, dtype = 'bool')
+        merge[1:-1] = probs < thr
+        return merge
 
     def __intervalstomerge(self, merge, probs):
         if not any(merge):
@@ -67,22 +67,16 @@ class EventMerger(PrecisionAlg):
         return tomerge
 
     @staticmethod
-    def __updatestats(tomerge, tokeep, stats):
-        dtype = stats.dtype
-        def _update(rng):
-            sel  = stats[rng[0]:rng[1]].ravel()[:-1]
-            cnt  = sel['c']
-            return np.array([(cnt.sum(), np.average(sel['m'], weights = cnt))],
-                            dtype = dtype)
-
-        stats[tomerge[:,0],0] = np.apply_along_axis(_update, 1, tomerge).ravel()
-        stats[tomerge[:,0],1] = stats[tomerge[:,1],1]
-        return stats[tokeep]
-
-    @staticmethod
     def __updateintervals(tomerge, tokeep, intervals):
         intervals[tomerge[:,0],1] = intervals[tomerge[:,1],1]
         return intervals[tokeep]
+
+    @classmethod
+    def __updatestats(cls, tomerge, tokeep, stats):
+        fcn                   = lambda i: cls._statsupdate(stats, i)
+        stats[tomerge[:,0],0] = np.apply_along_axis(fcn, 1, tomerge).ravel()
+        stats[tomerge[:,0],1] = stats[tomerge[:,1],1]
+        return stats[tokeep]
 
     def __call__(self,
                  data     : np.ndarray,
@@ -92,19 +86,13 @@ class EventMerger(PrecisionAlg):
         if len(data) == 0 or len(intervals) == 0:
             return np.empty((0,2), dtype = 'i4')
 
-        if self.confidence is None or self.confidence <= 0.:
-            thr = precision
-        else:
-            thr = norm.threshold(self.isequal, self.confidence,
-                                 self.getprecision(precision, data))
+        thr   = self._initthreshold(data, precision)
         stats = self.__initstats(data, intervals)
         while len(intervals) > 1:
-            probs       = self.__initprobs(stats)
-            merge       = np.zeros(len(intervals)+1, dtype = 'bool')
-            merge[1:-1] = probs < thr
+            probs   = self._initprobs(stats)
+            merge   = self.__initmerge(probs, thr)
 
-
-            tomerge     = self.__intervalstomerge(merge, probs)
+            tomerge = self.__intervalstomerge(merge, probs)
             if len(tomerge) == 0:
                 break
 
@@ -118,6 +106,86 @@ class EventMerger(PrecisionAlg):
     def run(cls, *args, **kwa):
         "instantiates and calls class"
         return cls(**kwa)(*args)
+
+class KnownSigmaEventMerger(EventMerger, PrecisionAlg):
+    """
+    Merges neighbouring stretches of data.
+
+    Two intervals are merged whenever the mean for the second cannot be
+    certified as being below that of the first. The p-value is estimated
+    considering that distributions for both stretches are normal with a know
+    sigma.
+
+    The sigma (precision) is either provided or measured. In the latter case,
+    the estimation used is the median-deviation of the derivate of the data.
+    """
+    isequal = True
+    __DTYPE = np.dtype([('c', 'i4'), ('m', 'f4')])
+    __NORM  = _samples.normal.knownsigma
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+        PrecisionAlg.__init__(self, **kwa)
+
+    def _initthreshold(self, data, precision):
+        if self.confidence is None or self.confidence <= 0.:
+            return precision
+        return self.__NORM.threshold(self.isequal, self.confidence,
+                                     self.getprecision(precision, data))
+
+    def _initprobs(self, stats):
+        return self.__NORM.value(self.isequal, stats[:,0])
+
+    def _stats(self, data: np.ndarray, index: Tuple[int, int]) -> np.ndarray:
+        count = (~np.isnan(data[index[0]:index[1]])).sum()
+        mean  = 0. if count == 0 else np.nanmean(data[index[0]:index[1]])
+        return np.array([(count, mean)], dtype = self.__DTYPE)
+
+    @staticmethod
+    def _statsupdate(stats: np.ndarray, index: Tuple[int, int]) -> np.ndarray:
+        sel  = stats[index[0]:index[1]].ravel()[:-1]
+        cnt  = sel['c']
+        return np.array([(cnt.sum(), np.average(sel['m'], weights = cnt))],
+                        dtype = stats.dtype)
+
+class HeteroscedasticEventMerger(EventMerger):
+    """
+    Merges neighbouring stretches of data.
+
+    Two intervals are merged whenever the mean for the second cannot be
+    certified as being below that of the first. The p-value is estimated
+    considering that distributions for both stretches are normal with a possibly
+    different sigma.
+    """
+    __DTYPE      = np.dtype([('c', 'i4'), ('m', 'f4'), ('s', 'f4')])
+    __NORM       = _samples.normal.heteroscedastic
+    minprecision = 5e-4
+    def _initthreshold(self, _1, _2):
+        return self.__NORM.threshold(self.confidence)
+
+    def _initprobs(self, stats):
+        return self.__NORM.thresholdvalue(stats[:,0])
+
+    @staticmethod
+    def _initmerge(probs, thr) -> np.ndarray:
+        merge       = np.zeros(len(probs)+2, dtype = 'bool')
+        merge[1:-1] = probs < thr
+        return merge
+
+    def _stats(self, data: np.ndarray, index: Tuple[int, int]) -> np.ndarray:
+        count = (~np.isnan(data[index[0]:index[1]])).sum()
+        mean  = 0. if count == 0 else np.nanmean(data[index[0]:index[1]])
+        std   = 0. if count == 0 else np.nanstd(data[index[0]:index[1]])
+        return np.array([(count, mean, max(self.minprecision, std))], dtype = self.__DTYPE)
+
+    @staticmethod
+    def _statsupdate(stats: np.ndarray, index: Tuple[int, int]) -> np.ndarray:
+        sel  = stats[index[0]:index[1]].ravel()[:-1]
+        cnt  = sel['c']
+        return np.array([(cnt.sum(),
+                          np.average(sel['m'], weights = cnt),
+                          np.average(sel['s'], weights = cnt))],
+                        dtype = stats.dtype)
 
 class EventSelector:
     """
