@@ -36,6 +36,13 @@ class EventMerger(PrecisionAlg):
         inds     = as_strided(inds,
                               shape   = (len(inds)-1, 2),
                               strides = (inds.strides[0],)*2)
+        zeros    = (inds[:,0] == inds[:,1]).nonzero()[0]
+        if len(zeros) and zeros[-1] == len(inds)-1:
+            zeros = zeros[:-1]
+
+        if len(zeros):
+            inds        = np.copy(inds)
+            inds[zeros] = inds[zeros+1]
 
         dtype    = np.dtype([('c', 'i4'), ('m', 'f4')])
         def _stats(i):
