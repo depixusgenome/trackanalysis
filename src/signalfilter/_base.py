@@ -3,6 +3,7 @@
 "Signal Analysis: filters for removing noise"
 # pylint: disable=no-name-in-module,import-error
 from typing         import Union, Iterator, Tuple, Sequence, cast
+from abc            import ABC
 from itertools      import chain
 
 import numpy as np
@@ -27,7 +28,7 @@ DATATYPE  = Union[Sequence[Sequence[np.ndarray]],
                   None]
 PRECISION = Union[float, Tuple[DATATYPE, int], None]
 
-class PrecisionAlg:
+class PrecisionAlg(ABC):
     "Implements precision extraction from data"
     precision = None # type: float
     rawfactor = 1.

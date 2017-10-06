@@ -7,8 +7,10 @@ import numpy  as np
 from   numpy.testing          import assert_allclose
 from model                    import PHASE
 from model.task.dataframe     import DataFrameTask
-from eventdetection.detection import DerivateSplitDetector, EventMerger, EventSelector
-from eventdetection.splitting import (MinMaxSplitDetector, IntervalExtensionAroundMean,
+from eventdetection.merging   import (KnownSigmaEventMerger,
+                                      HeteroscedasticEventMerger, EventSelector)
+from eventdetection.splitting import (MinMaxSplitDetector, DerivateSplitDetector,
+                                      IntervalExtensionAroundMean,
                                       IntervalExtensionAroundRange)
 from eventdetection.alignment import (ExtremumAlignment, CorrelationAlignment,
                                       PhaseEdgeAlignment)
@@ -127,39 +129,40 @@ def test_intervalextension():
     vals = IntervalExtensionAroundRange.extend(rngs, data, 1.1, 3)
     assert_allclose(vals, [[0,7],[7,9],[17,28]])
 
-def _merges(oneperrange):
-    "Tests flat stretches merging"
-    inst  = EventMerger(precision = 1., confidence = 0.1, isequal = True,
-                        oneperrange = oneperrange)
-    det   = lambda  i, j: tuple(tuple(_) for _ in inst(i, np.array(j)))
-    items = np.zeros((30,))
 
-    assert det([], ((0,30),)) == tuple()
-    assert det([1], tuple())  == tuple()
-    assert det(items, ((0, 30),))                == ((0,30),)
-    assert det(items, ((0, 10),(11,20),(22,30))) == ((0,30),)
-    assert det(items, ((2, 10),(11,20),(22,28))) == ((2,28),)
-
-    items[11:20] = 1000.
-    assert det(items, ((0, 10),(11,20),(22,30))) == ((0, 10),(11,20),(22,30))
-
-    items[:20] = 1000.
-    assert det(items, ((0, 10),(11,20),(22,30))) == ((0,20),(22,30))
-
-    items[11:] = 0.
-    assert det(items, ((0, 10),(11,20),(22,30))) == ((0,10),(11,30))
-
-    items[11:] = 0.
-    items[25]  = np.nan
-    assert det(items, ((0, 10),(11,20),(22,30))) == ((0,10),(11,30))
-
-def test_fastmerge():
+def test_merge():
     "Tests merging events, all at a time"
-    _merges(False)
+    def _merges(inst):
+        "Tests flat stretches merging"
+        np.random.seed(0)
+        det   = lambda  i, j: tuple(tuple(_) for _ in inst(i, np.array(j)))
+        items = np.random.normal(0., 1e-3, (30,))
 
-def test_slowmerge():
-    "Tests merging events, one by one"
-    _merges(True)
+        assert det([], ((0,30),)) == tuple()
+        assert det([1], tuple())  == tuple()
+        assert det(items, ((0, 30),))                == ((0,30),)
+        assert det(items, ((0, 10),(11,20),(22,30))) == ((0,30),)
+        assert det(items, ((2, 10),(11,20),(22,28))) == ((2,28),)
+
+        items[11:20] += 1.
+        assert det(items, ((0, 10),(11,20),(22,30))) == ((0, 10),(11,20),(22,30))
+
+        items[:10]   += 1.
+        assert det(items, ((0, 10),(11,20),(22,30))) == ((0,20),(22,30))
+
+        items[11:20] -= 1.
+        assert det(items, ((0, 10),(11,20),(22,30))) == ((0,10),(11,30))
+
+        items[25]    = np.nan
+        assert det(items, ((0, 10),(11,20),(22,30))) == ((0,10),(11,30))
+
+    _merges(KnownSigmaEventMerger(precision = 1e-3, confidence = 0.1, isequal = True,
+                                  oneperrange = False))
+
+    _merges(KnownSigmaEventMerger(precision = 1e-3, confidence = 0.1, isequal = True,
+                                  oneperrange = True))
+    _merges(HeteroscedasticEventMerger(confidence = 0.1, oneperrange = False))
+    _merges(HeteroscedasticEventMerger(confidence = 0.1, oneperrange = True))
 
 def test_select():
     "Tests flat stretches filtering"
@@ -329,4 +332,4 @@ def test_dataframe():
     assert 'mean' in data
 
 if __name__ == '__main__':
-    test_measure_alignment()
+    test_merge()
