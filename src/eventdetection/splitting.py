@@ -196,24 +196,21 @@ class BaseSplitDetector(PrecisionAlg):
         return ends[[np.any(np.isfinite(alldata[slice(*i)])) for i in ends]]
 
     @staticmethod
-    def _init(data):
+    def _init(data:np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         nans = None
         if len(data) > 1:
             nans = np.isnan(data)
             if any(nans):
                 data = data[~nans] # pylint: disable=invalid-unary-operand-type
 
-        if len(data) <= 1:
-            return None, None
-
-        return nans, data
+        return (np.array([]),)*2 if len(data) <= 1 else nans, data
 
     def __call__(self,
                  data     : np.ndarray,
                  precision: Optional[float] = None
                 ) -> np.ndarray:
         nans, tmp = self._init(data)
-        if tmp is None:
+        if len(tmp) == 0:
             return np.empty((0,2), dtype = 'i4')
         deltas    = self._deltas(tmp)
         precision = self._precision(tmp, deltas, precision)
@@ -222,6 +219,26 @@ class BaseSplitDetector(PrecisionAlg):
         if self.extend is not None:
             return self.extend(ends, data, precision, self.window)
         return ends
+
+    def grade(self, data : np.ndarray, precision: float = None) -> np.ndarray:
+        """
+        Returns the likeliness of an interval being declared.
+
+        Values above one define an interval boundary.
+        """
+        nans, tmp = self._init(data)
+        if len(tmp) == 0:
+            return np.full((len(data),), np.NaN, dtype = 'f4')
+
+        deltas    = self._deltas(tmp)
+        precision = self._precision(tmp, deltas, precision)
+        deltas   /= self._threshold(tmp, deltas, precision)
+        if len(data) == len(nans):
+            return deltas
+
+        result        = np.full((len(data),), np.NaN, dtype = 'f4')
+        result[~nans] = deltas
+        return result
 
     @classmethod
     def run(cls, data, **kwa):
