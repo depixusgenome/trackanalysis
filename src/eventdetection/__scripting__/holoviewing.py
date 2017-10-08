@@ -28,9 +28,17 @@ class EventDisplay(Display): # type: ignore
         "shows overlayed Curve items"
         vals = lambda x: (cls.concat([np.arange(i[0], i[0]+len(i[1])) for i in x]),
                           cls.concat(x['data']))
-
         try:
-            good = tuple((i, vals(j)) for i, j in itms if len(j))
+            if overlay in (all, Ellipsis):
+                good = [] # type: ignore
+                for i, j in itms:
+                    if len(j):
+                        good.extend((i, (np.arange(k[0], k[0]+len(k[1])), k[1]))
+                                    for k in j)
+                overlay = True
+                good    = tuple(good)
+            else:
+                good    = tuple((i, vals(j)) for i, j in itms if len(j))
         except Exception as exc: # pylint: disable=broad-except
             return cls.errormessage(exc,
                                     x = opts.get('kdims', ['frames'])[0],
@@ -39,6 +47,7 @@ class EventDisplay(Display): # type: ignore
         if not overlay:
             good = (('', (cls.concat(i[0] for _, i in good),
                           cls.concat(i[1] for _, i in good))),)
+
         return cls._create(labels, tpe, overlay, opts, good)
 
 @addto(Events)   # type: ignore
