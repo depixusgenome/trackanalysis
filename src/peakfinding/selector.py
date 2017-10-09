@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Selects peaks and yields all events related to each peak"
+"Selects peaks and yields all events related to each peak"
 from   typing               import (Iterable, Iterator, Tuple, Union, Sequence,
                                     Callable, cast)
 from   collections          import namedtuple
@@ -10,7 +10,7 @@ from utils                  import (initdefaults, asobjarray, asdataarrays, asvi
                                     updatecopy, EVENTS_TYPE, EVENTS_DTYPE, EventsArray)
 from signalfilter           import PrecisionAlg, PRECISION
 from .alignment             import PeakCorrelationAlignment
-from .histogram             import (Histogram, # pylint: disable=unused-import
+from .histogram             import (Histogram,
                                     ZeroCrossingPeakFinder, PeakFinder,
                                     GroupByPeakAndBase, GroupByPeak)
 
@@ -27,12 +27,12 @@ class PeaksArray(EventsArray):
     _dtype     = None
 
 class PeakSelector(PrecisionAlg):
-    u"Selects peaks and yields all events related to each peak"
-    rawfactor = 2.
-    histogram = Histogram(edge = 2)
-    align     = PeakCorrelationAlignment()
-    find      = ZeroCrossingPeakFinder() # type: PeakFinder
-    group     = GroupByPeakAndBase()     # type: GroupByPeak
+    "Selects peaks and yields all events related to each peak"
+    rawfactor          = 2.
+    histogram          = Histogram(edge = 2)
+    align              = PeakCorrelationAlignment()
+    find : PeakFinder  = ZeroCrossingPeakFinder()
+    group: GroupByPeak = GroupByPeakAndBase()
     @initdefaults(frozenset(locals()) - {'rawfactor'})
     def __init__(self, **_):
         super().__init__(**_)

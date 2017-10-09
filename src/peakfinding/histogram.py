@@ -5,6 +5,8 @@ from    typing import (NamedTuple, Optional, Iterator,
                        Iterable, Union, Sequence, Callable, Tuple, cast)
 from    enum   import Enum
 import  itertools
+
+from sklearn.mixture import BayesianGaussianMixture
 import  numpy  as     np
 from    numpy.lib.stride_tricks import as_strided
 from    scipy.signal            import find_peaks_cwt
@@ -353,6 +355,36 @@ class ZeroCrossingPeakFinder:
             inds = self.subpixel(hist, inds)
         return inds * slope + bias
 
+class ByGaussianMix:
+    '''
+    finds peaks and groups events
+    '''
+    max_iter  = 10000
+    cov_type  = 'tied'
+    peakwidth = np.array([[1]])
+    dpgmm = BayesianGaussianMixture()
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+    def find(self,hist: np.ndarray, bias:float = 0., slope:float = 1.):
+        'find peaks'
+        ncmps = int((max(hist)-min(hist))/min(self.peakwidth)) # find better, smaller
+        kwa   = {'n_components'     : ncmps,
+                 'covariance_prior' : self.peakwidth,
+                 'covariance_type'  : self.cov_type,
+                 'max_iter'         : self.max_iter}
+        self.dpgmm = BayesianGaussianMixture(**kwa)
+        self.dpgmm.fit(np.matrix(hist).T)
+        pos   = self.dpgmm.means_[self.dpgmm.weights_>0.01][:,0]
+        return pos * slope + bias
+
+    def group(self, elems,*_1,**_2):
+        'group events'
+        return self.dpgmm.predict(elems)
+
+
+PeakFinderMethod = Union[ByGaussianMix]
 PeakFinder = Union[CWTPeakFinder, ZeroCrossingPeakFinder]
 
 class GroupByPeak:
