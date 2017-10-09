@@ -5,15 +5,14 @@ import numpy as np
 
 from  utils        import initdefaults
 from  signalfilter import PrecisionAlg
-from .splitting    import (BaseSplitDetector, # pylint: disable=unused-import
-                           DerivateSplitDetector)
+from .splitting    import SplitDetector, DerivateSplitDetector
 from .merging      import KnownSigmaEventMerger, EventMerger, EventSelector
 
 class EventDetector(PrecisionAlg):
     "detects, mergers and selects intervals"
-    split              = DerivateSplitDetector() # type: BaseSplitDetector
-    merge: EventMerger = KnownSigmaEventMerger()
-    select             = EventSelector()
+    split: SplitDetector = DerivateSplitDetector()
+    merge: EventMerger   = KnownSigmaEventMerger()
+    select               = EventSelector()
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)

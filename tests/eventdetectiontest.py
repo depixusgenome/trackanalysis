@@ -9,9 +9,9 @@ from model                    import PHASE
 from model.task.dataframe     import DataFrameTask
 from eventdetection.merging   import (KnownSigmaEventMerger,
                                       HeteroscedasticEventMerger, EventSelector)
-from eventdetection.splitting import (MinMaxSplitDetector, DerivateSplitDetector,
-                                      IntervalExtensionAroundMean,
-                                      IntervalExtensionAroundRange)
+from eventdetection.splitting import MinMaxSplitDetector, DerivateSplitDetector
+from eventdetection.intervalextension import (IntervalExtensionAroundMean,
+                                              IntervalExtensionAroundRange)
 from eventdetection.alignment import (ExtremumAlignment, CorrelationAlignment,
                                       PhaseEdgeAlignment)
 from eventdetection.processor import (ExtremumAlignmentProcessor, AlignmentTactic,
