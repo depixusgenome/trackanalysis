@@ -105,6 +105,7 @@ class GradedSplitDetector(SplitDetector):
             return np.full((len(data),), np.NaN, dtype = 'f4')
 
         deltas    = self._flatness(tmp)
+        precision = self.getprecision(precision, data)
         deltas   /= self._threshold(data, deltas, precision)
         if len(tmp) == len(nans):
             return deltas
@@ -187,7 +188,7 @@ class ChiSquareSplitDetector(GradedSplitDetector):
 
     Flatness is estimated using residues of a fit to the mean of the interval.
     """
-    confidence: Threshold = MedianThreshold()
+    confidence: Optional[Threshold] = MedianThreshold()
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -210,6 +211,8 @@ class ChiSquareSplitDetector(GradedSplitDetector):
                    deltas    : np.ndarray,
                    precision : Optional[float]
                   ) -> float:
+        if self.confidence is None:
+            return precision
         return self.confidence(data, deltas, precision)
 
 class MinMaxSplitDetector(GradedSplitDetector):
@@ -275,7 +278,8 @@ class MultiGradeSplitDetector(SplitDetector):
         if len(good) == 0:
             return np.full((len(data),), np.NaN, dtype = 'f4')
 
-        flatness = self.__fullflatness(data, good, precision)
+        precision = self.getprecision(precision, data)
+        flatness  = self.__fullflatness(data, good, precision)
         if len(good) >= len(nans):
             return flatness
 
