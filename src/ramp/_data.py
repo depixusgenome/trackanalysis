@@ -13,7 +13,7 @@ from data import Track
 from utils.logconfig import getLogger
 
 from ._model import RampModel
-
+from ._process import RampProcess
 
 LOGS = getLogger(__name__)
 
@@ -30,7 +30,7 @@ class RampData: # pylint: disable=too-many-public-methods
         if self.dataz is not None :
             self._setup()
             if self.model is not None :
-                self.det = detectOutliers(self.dzdt,self.model.scale)
+                self.det = RampProcess.detect_outliers(self,self.model.scale)
 
     @classmethod
     def open_track(cls,trk,model:RampModel):
@@ -66,7 +66,7 @@ class RampData: # pylint: disable=too-many-public-methods
         self.dataz = pd.DataFrame({k:pd.Series(v) for k, v in dict(trkd.cycles).items()})
         self._setup()
         if self.model is not None :
-            self.det = detectOutliers(self.dzdt,self.model.scale)
+            self.det = RampProcess.detect_outliers(self,self.model.scale)
 
     def _setup(self):
         self.dzdt = self.dataz.rename_axis(lambda x:x-1)-self.dataz.rename_axis(lambda x:x+1)

@@ -2,21 +2,15 @@
 # -*- coding: utf-8 -*-
 
 '''
-need to allow for beads with only a subset of good cycles
-need to add a little marker specifying when the data is loaded
-Add a test : if min molextension is too big
+subdivise this file into Opening/closing processors, and good, fixed and bad bead detection
 '''
 
-from typing import Set
+from typing import Set, List, Dict
 import numpy
 import pandas as pd
-from utils.logconfig import getLogger
 
 from ramp import RampModel, RampData
-
-
-LOGS = getLogger(__name__)
-
+# needs change: data also includes its own model
 
 class RampProcess:
     'all processing units'
@@ -97,7 +91,7 @@ class RampProcess:
         data.det = RampProcess.detect_outliers(data,scale)
 
     @staticmethod
-    def are_good_bead_cycle(data): # ok as is
+    def are_good_bead_cycle(data):
         '''
         Test for each (bead,cycle) if an opening is detected before a detected closing.
         If no opening or no closing are detected the returned corresponding results is False
@@ -120,134 +114,127 @@ class RampProcess:
         All cycles of a bead  must match the conditions for qualification as good bead.
         This condition may be too harsh for some track files (will improve).
         '''
-        are_good = RampProcess.are_good_bead_cycle()
+        are_good = RampProcess.are_good_bead_cycle(data)
         pbead = {bead:[bcid for bcid in data.bcids if bcid[0]==bead] for bead in data.beads()}
         gpbead = {bead:[bc for bc in bcids if are_good[bc]] for bead,bcids in pbead.items()}
         goods ={i for i in data.beads() if len(gpbead[i])/len(pbead[i])>model.good_ratio}
-        goods = goods & data._beadIdsCorr2zmag(toconsider = goods)
-        return goods - self.getFixedBeadIds() - self.noBeadCrossIds()
-
-    
-    def clean(self):
-        '''good beads open and close with zmag
-        '''
-        goods = self.getGoodBeadIds()
-        self.keepBeadIds(goods)
+        goods = goods & RampProcess._beadids_corr2zmag(model,data,toconsider=goods)
+        out=goods-RampProcess.get_fixed_beadids(model,data)
+        return out-RampProcess.no_bead_cross_ids(model,data)
 
 
-    
-    def noBeadCrossIds(self)->set:
-        '''
-        returns cross ids who does not have a match with a bead
-        '''
-        # could do with more thorough testing but a couple of checks showed correct behaviour
-        corrids = self._beadIdsCorr2zmag(toconsider = None)
-        return {i for i in self.beads() if i not in corrids}
+    @staticmethod
+    def clean(model:RampModel,data:RampData)->None:
+        'good beads open and close with zmag'
+        goods = RampProcess.get_good_beadids(model,data)
+        RampProcess.keep_beadids(data,model.scale,goods)
 
-    
-    def _estimateZPhase3(self):
-        ''' estimate the z value corresponding to phase 3 (i.e. highest value of zmag)
-        '''
-        return self.dataz[self.bcids].apply(
-            lambda x:x.rolling(window=self.model.window,center=True).median()).max()
 
-    
-    def _estimateZPhase1(self):
+    @staticmethod
+    def no_bead_cross_ids(model:RampModel,data:RampData)->Set[int]:
+        'returns cross ids who does not have a match with a bead'
+        corrids=RampProcess._beadids_corr2zmag(model,data,toconsider=None)
+        return {i for i in data.beads() if i not in corrids}
+
+    @staticmethod
+    def _est_zphase3(model:RampModel,data:RampData):
+        'estimate the z value corresponding to phase 3 (i.e. highest value of zmag)'
+        return data.dataz[data.bcids].apply(
+            lambda x:x.rolling(window=model.window,center=True).median()).max()
+
+    @staticmethod
+    def _est_zphase1(model:RampModel,data:RampData):
         ''' estimate the z value corresponding to phase 1
         (i.e. lower value of zmag IN CASE OF RAMP ANALYSIS)
         '''
-        return self.dataz[self.bcids].apply(
-            lambda x:x.rolling(window=self.model.window,center=True).median()).min()
+        return data.dataz[data.bcids].apply(
+            lambda x:x.rolling(window=model.window,center=True).median()).min()
 
-    
-    def _estimateUnitScale(self)->int:
+    @staticmethod
+    def _est_unitscale(data:RampData)->int:
         '''
         uses information on zmag to find the smallest interval overwhich no changes occur in zmag
         assumes that phase3 is the smallest (this assumption could be removed)
         '''
-        maxzm = max(self.dataz[self.zmagids()].max())
-        scale = numpy.median([(self.dataz[zm]==maxzm).sum() for zm in self.zmagids()])
+        maxzm = max(data.dataz[data.zmagids()].max())
+        scale = numpy.median([(data.dataz[zm]==maxzm).sum() for zm in data.zmagids()])
         return scale
 
 
-    
-    def getFixedBeadIds(self)->set:
+    @staticmethod
+    def get_fixed_beadids(model:RampModel,data:RampData)->Set[int]:
         '''
         returns set of bead ids considered fixed
         could be modified to use estExtHPsize instead of dataz
         '''
         # check that the bead never opens
-        closed = (self.dataz[self.bcids].max()-self.dataz[self.bcids].min()) <self.model.getMinExt()
-        clids = {i[0] for i in self.bcids if\
-                 all([closed[bcid] for bcid in self.bcids if bcid[0]==i[0]]) }
-        return self._beadIdsCorr2zmag(toconsider = clids)
+        closed = (data.dataz[data.bcids].max()-data.dataz[data.bcids].min())\
+                 <model.getMinExt()
+        clids = {i[0] for i in data.bcids if\
+                 all([closed[bcid] for bcid in data.bcids if bcid[0]==i[0]]) }
+        return RampProcess._beadids_corr2zmag(model,data,toconsider = clids)
 
 
-    
-    def _beadIdsCorr2zmag(self,toconsider:set=None):
+    @staticmethod
+    def _beadids_corr2zmag(model:RampModel,data:RampData,toconsider:Set[int]=None)->Set[int]:
         '''
         returns the list of bead ids whose z value correlates with zmag for each cycle
         '''
         if toconsider is None:
-            toconsider = self.beads()
-            data = self.dataz
+            toconsider = data.beads()
+            dataz = data.dataz
         else:
             # why is "zmag" not in keys
-            data = self.dataz[[bcid for bcid in self.dataz.keys()
-                               if bcid[0] in toconsider or isinstance(bcid[0],str)]]
+            dataz = data.dataz[[bcid for bcid in data.dataz.keys()
+                                if bcid[0] in toconsider or isinstance(bcid[0],str)]]
 
 
-        corr = data.corr()
+        corr = dataz.corr()
         beadids=[]
         for bid in toconsider:
-            if all(corr[(bid,cid)][("zmag",cid)]>self.model.corrThreshold
-                   for cid in range(self.ncycles) ):
+            if all(corr[(bid,cid)][("zmag",cid)]>model.corrThreshold
+                   for cid in range(data.ncycles) ):
                 beadids.append(bid)
 
         return set(beadids)
 
-
-    
-    def estExtHPsize(self):
+    @staticmethod
+    def est_ext_hpsize(model:RampModel,data:RampData):
         ''' estimates the size of the extended HP
         diff of z before opening () to its value in phase 3'''
-        zph3 = self._estimateZPhase3()
+        zph3 = RampProcess._est_zphase3(model,data)
 
-        zop = self._estZAtOpening()
+        zop = RampProcess._estZAtOpening(data)
         return zph3-zop
 
-    
-    def estHPsize(self)->pd.DataFrame:
+    @staticmethod
+    def est_hpsize(data:RampData)->pd.DataFrame:
         ''' estimates HP size before extension
         from z before opening () to its value when opened but before stretching
         bead ids are rows and cycleids are in column
         '''
-        diff_op = self._estZWhenOpened() - self._estZAtOpening()
-        nbeads = len(self.beads())
+        diff_op = RampProcess._estZWhenOpened(data) - RampProcess._estZAtOpening(data)
+        nbeads = len(data.beads())
         size_est = pd.DataFrame({i:[numpy.nan]*nbeads\
-                                  for i in range(self.ncycles)}, index = self.beads())
+                                  for i in range(data.ncycles)}, index = data.beads())
         for key,val in diff_op.items():
             size_est.loc[key[0],key[1]]=val
         return size_est
 
-    
-    def can_be_structure_event(self):
-        '''
-        returns a boolean map. True if a plateau in z(t) is detected. False otherwise.
-        '''
-        se_map = self.dzdt[(self.det) & (self.dzdt<0)].apply(_se_map)
-        return (se_map) & (~self.det) # pylint: disable=invalid-unary-operand-type
+    @staticmethod
+    def can_be_structure_event(data:RampData):
+        'returns a boolean map. True if a plateau in z(t) is detected. False otherwise.'
+        se_map = data.dzdt[(data.det) & (data.dzdt<0)].apply(RampProcess._se_map)
+        return (se_map) & (~data.det) # pylint: disable=invalid-unary-operand-type
 
-    
-    def z_blockings(self):
-        '''
-        for each bead, return the values of z where a blocking has occured
-        '''
-        se_map = self.can_be_structure_event()
-        return self.dataz[se_map]
+    @staticmethod
+    def z_blockings(data:RampData):
+        'for each bead, return the values of z where a blocking has occured'
+        se_map = RampProcess.can_be_structure_event(data)
+        return data.dataz[se_map]
 
-    
-    def count_z_blockings(self):
+    @staticmethod
+    def count_z_blockings(data:RampData):
         '''
         returns a value of z and the number of times the bead has blocked at this value.
         Questions : can we use this differentiate between hairpins ?
@@ -257,25 +244,22 @@ class RampProcess:
         '''
         # over estimating each z counts
         # take the histogram of each cycles, if there is overlap between bins, merge
-        zvalues = {i:[] for i in self.beads()}
-        zblocks = self.z_blockings()
-        for bcid in self.bcids:
+        zvalues:Dict[int,List[float]] = {i:[] for i in data.beads()}
+        zblocks = RampProcess.z_blockings(data)
+        for bcid in data.bcids:
             zvalues[bcid[0]].extend(zblocks[bcid].dropna().values)
         return [numpy.array(zvalues[i]) for i in zvalues.keys()]
 
-def _se_map(data:pd.Series):
-    '''
-    return True for values whose index>first_valid_index()
-    and index<last_valid_index()
-    '''
-    fid = data.first_valid_index()
-    if fid is None:
-        fid = data.index[-1]
-    lid = data.last_valid_index()
-    if lid is None:
-        lid = data.index[0]
-    return (data.index> fid) &\
-        (data.index<lid)
-
-
-
+    @staticmethod
+    def _se_map(data:pd.Series):
+        '''
+        return True for values whose index>first_valid_index()
+        and index<last_valid_index()
+        '''
+        fid = data.first_valid_index()
+        if fid is None:
+            fid = data.index[-1]
+        lid = data.last_valid_index()
+        if lid is None:
+            lid = data.index[0]
+        return (data.index> fid) & (data.index<lid)

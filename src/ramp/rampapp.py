@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u'''
+'''
 first simple version
 Will need rewritting to use Event()
 '''
@@ -18,7 +18,7 @@ import ramp
 from . import _utils as utils
 
 class DisplayText:
-    u''' Manages the Display: div widgets, bokeh doc
+    ''' Manages the Display: div widgets, bokeh doc
     '''
     def __init__(self,**kwargs):
 
@@ -29,13 +29,13 @@ class DisplayText:
                        width=width, height=height)
 
     def update(self, newstr:str):
-        u''' update shown text
+        ''' update shown text
         '''
         self.div.text = self.prefix + str(newstr)
 
 
 class DisplaySlider:
-    u'''Manages slides
+    '''Manages slides
     '''
     def __init__(self,**kwargs):
         title = kwargs.get("title","")
@@ -52,10 +52,10 @@ class DisplaySlider:
                              callback_policy=policy)
 
 class DisplayHist:
-    u''' Contains fig and ColumnDataSource
+    ''' Contains fig and ColumnDataSource
     '''
     def __init__(self, **kwargs):
-        u'''
+        '''
         '''
         title = kwargs.get("title", None)
         x_label = kwargs.get("x_label", None)
@@ -97,7 +97,7 @@ class DisplayHist:
                             fill_color = fill_color)
 
     def update(self, data)->None:
-        u'''
+        '''
         updates the values displayed
         '''
         self.rawdata = pd.Series(numpy.sort(data))
@@ -123,13 +123,13 @@ class DisplayHist:
         return
 
 class Data:
-    u''' Manages the data
+    ''' Manages the data
     '''
     def __init__(self):
-        u''' initialise  rampData, RampModel
+        ''' initialise  rampData, RampModel
         '''
         self.rpmod = ramp.RampModel()
-        self.rpmod.setMinExt(0.0)
+        self.rpmod.set_minext(0.0)
         self.rpdata = ramp.RampData()
         self.rpdata.model = self.rpmod
         self.rpfulldata = ramp.RampData()
@@ -137,7 +137,7 @@ class Data:
 
 
     def update_data(self,filename: str):
-        u'''
+        '''
         updates data if the filename changes
         '''
         self.rpdata.setTrack(filename)
@@ -145,11 +145,11 @@ class Data:
         self.rpfulldata.setTrack(filename)
 
 class Select:
-    u'''
+    '''
     Select widget. Open file dialog on update
     '''
     def __init__(self,label,filetypes):
-        u'''
+        '''
         sets a Button label and a file dialog
         '''
 
@@ -158,12 +158,12 @@ class Select:
                                            title = "please choose a ramp file")
 
 class MyDisplay: # pylint: disable=too-many-instance-attributes
-    u'''
+    '''
     My display
     '''
 
     def __init__(self, *args, **kwargs): # pylint: disable=unused-argument
-        u'''create all widgets
+        '''create all widgets
         '''
         self.data = kwargs.get("data", None)
         self.doc = kwargs.get("doc", None)
@@ -212,7 +212,7 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
                                             with_cdf = False)}
 
         def call_changegratio(attr,old,new): # pylint: disable=unused-argument
-            u''' bokeh requires attr, old, new'''
+            ''' bokeh requires attr, old, new'''
             return self.changegratio()
 
         self.sliders = {"gratio":Slider(title="ratio of clean cycles for good beads",
@@ -233,11 +233,11 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
                                      zmag close is below :")}
 
         def call_changeminext(attr,old,new): # pylint: disable=unused-argument
-            u''' bokeh requires attr, old, new'''
+            ''' bokeh requires attr, old, new'''
             return self.changeminext()
 
         def call_changezclthreshold(attr,old,new): # pylint: disable=unused-argument
-            u''' bokeh requires attr, old, new'''
+            ''' bokeh requires attr, old, new'''
             return self.changezclthreshold()
 
         self.txt_inputs["minext"].on_change("value",call_changeminext)
@@ -254,13 +254,13 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
         self.set_layout()
 
     def set_layout(self):
-        u''' specific layout of widgets
+        ''' specific layout of widgets
         '''
         self.doc.add_root(column(*self.get_layout()))
 
 
     def get_layout(self):
-        u'''
+        '''
         returns docrows
         '''
         docrows = []
@@ -281,7 +281,7 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
         return docrows
 
     def changegratio(self):
-        u'Called when the minimal ratio of good cycles is modified'
+        'Called when the minimal ratio of good cycles is modified'
         self.data.rpmod.good_ratio = self.sliders["gratio"].value
         self._update_rpdata_from_file(self.filename)
         self._update_text_info()
@@ -289,14 +289,14 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
         self._update_HP_info()
 
     def changezclthreshold(self):
-        u'''
+        '''
         Called when the threshold of zcl value is changed
         '''
         self.data.rpmod.set_zclthreshold(float(self.txt_inputs["zcl_threshold"].value))
 
 
     def changeminext(self):
-        u'''
+        '''
         Called when minimal extension value is changed
         '''
         self.data.rpmod.setMinExt(float(self.txt_inputs["minext"].value))
@@ -306,7 +306,7 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
         self._update_HP_info()
 
     def change_data_file(self):
-        u'''
+        '''
         called when User selects a new file
         '''
         file_diag = view.dialog.FileDialog(filetypes = "trk", title = "please choose a ramp file")
@@ -319,7 +319,7 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
         self.divs["filestatus"].update("New file loaded!")
 
     def generate_rpdiscard(self):
-        u'''
+        '''
         Generates the ramp_discard.csv file for pias input
         '''
         noisy = self.data.rpfulldata.noBeadCrossIds()
@@ -337,7 +337,7 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
 
     @classmethod
     def open(cls,doc):
-        u'''
+        '''
         returns a bokeh doc view a set up layout
         '''
         self = cls(doc = doc)
@@ -382,7 +382,7 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
 
 
 def _gen_ramp_discard(beads:dict,rpfile):
-    u'''
+    '''
     outputs a csv with the same format as ramp_discard.csv
     '''
     with open(os.path.join(os.path.dirname(rpfile),"ramp_discarded.csv"),"w") as outfile:
