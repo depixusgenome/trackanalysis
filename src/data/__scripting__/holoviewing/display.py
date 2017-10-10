@@ -36,7 +36,9 @@ class Display:
         opts.setdefault('vdims', ['z'])
         if isinstance(tpe, str):
             tpe = getattr(hv, tpe) if hasattr(hv, tpe) else getattr(hv, tpe.capitalize())
-        if len(good) < 3 or labels is True:
+        if isinstance(labels, str):
+            crvs = [tpe(j, label = labels, **opts) for i, j in good]
+        elif (len(good) < 3 and labels) or labels is True:
             crvs = [tpe(j, label = f'{i}', **opts) for i, j in good]
         else:
             crvs = [tpe(j, **opts) for _, j in good]

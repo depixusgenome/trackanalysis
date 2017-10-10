@@ -10,8 +10,9 @@ from model.task.dataframe     import DataFrameTask
 from eventdetection.merging   import (KnownSigmaEventMerger,
                                       HeteroscedasticEventMerger, EventSelector)
 from eventdetection.splitting import (MinMaxSplitDetector, DerivateSplitDetector,
-                                      IntervalExtensionAroundMean,
-                                      IntervalExtensionAroundRange)
+                                      ChiSquareSplitDetector)
+from eventdetection.intervalextension import (IntervalExtensionAroundMean,
+                                              IntervalExtensionAroundRange)
 from eventdetection.alignment import (ExtremumAlignment, CorrelationAlignment,
                                       PhaseEdgeAlignment)
 from eventdetection.processor import (ExtremumAlignmentProcessor, AlignmentTactic,
@@ -68,6 +69,17 @@ def test_detectsplits():
     items[[10, 20, 35, 39]] = np.nan
     items[40:] = np.nan
     assert det(items) == ((0, 12), (12, 21), (21,30), (31,50))
+
+def test_chi2split():
+    "Tests flat stretches detection"
+    inst = ChiSquareSplitDetector(precision = 1., confidence = None, window = 3)
+    vals = np.zeros(30, dtype = 'f4')
+    assert_allclose(inst.flatness(vals), vals)
+
+    vals[5] = 1.
+    res     = inst.flatness(vals)
+    truth   = [0.]*4+[np.sqrt(2)/3.]*3+[0.]*23
+    assert_allclose(res, truth)
 
 def test_minmaxsplitdetector():
     "Tests flat stretches detection"
@@ -128,7 +140,6 @@ def test_intervalextension():
     rngs = np.array([[0, 5], [7, 9], [20, 25]])
     vals = IntervalExtensionAroundRange.extend(rngs, data, 1.1, 3)
     assert_allclose(vals, [[0,7],[7,9],[17,28]])
-
 
 def test_merge():
     "Tests merging events, all at a time"
@@ -332,4 +343,4 @@ def test_dataframe():
     assert 'mean' in data
 
 if __name__ == '__main__':
-    test_merge()
+    test_chi2split()

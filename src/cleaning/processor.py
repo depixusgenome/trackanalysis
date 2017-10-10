@@ -89,14 +89,15 @@ class DerivateIslands(NaNDensity):
 
         mder = self.maxderivate
         for ileft, iright in zip(left[rinds[good]-1], right[good]):
-            vals = bead[ileft:iright]
+            cur  = bead[ileft:iright]
+            vals = cur[np.isfinite(cur)]
             if len(vals) < 3:
-                vals[:] = np.NaN
+                cur[:] = np.NaN
                 continue
 
             cnt = self.ratio*1e-2*(len(vals)-2)
             if (np.abs(vals[1:-1]-vals[:-2]*.5-vals[2:]*.5) > mder).sum() >= cnt:
-                vals[:] = np.NaN
+                cur[:] = np.NaN
 
 class DataCleaning:
     "bead selection"

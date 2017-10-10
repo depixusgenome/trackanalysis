@@ -97,7 +97,11 @@ else:
             pass
 
         if exts:
-            hv.notebook_extension(*exts)
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning, lineno = 6)
+                hv.notebook_extension(*exts)
+            del warnings
             try:
                 from IPython import get_ipython
                 get_ipython().magic('output size=150')
