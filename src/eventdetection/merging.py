@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Interval detection: merging and selecting the sections in the signal detected as flat"
 
-from    typing                  import Optional, Tuple
+from    typing                  import Optional, Tuple, List
 from    abc                     import ABC, abstractmethod
 
 import  numpy                   as     np
@@ -243,6 +243,22 @@ class PopulationMerger(EventMerger):
                 ileft, left = iright, right
 
         return intervals[rem]
+
+class MultiMerger(EventMerger):
+    "Multiple merge tools applied in a row"
+    merges: List[EventMerger] = [HeteroscedasticEventMerger(), PopulationMerger()]
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__()
+
+    def __call__(self,
+                 data     : np.ndarray,
+                 intervals: np.ndarray,
+                 precision: float = None
+                ) -> np.ndarray:
+        for merge in self.merges:
+            intervals = merge(data, intervals, precision)
+        return intervals
 
 class EventSelector:
     """
