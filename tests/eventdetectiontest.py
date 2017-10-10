@@ -8,7 +8,9 @@ from   numpy.testing          import assert_allclose
 from model                    import PHASE
 from model.task.dataframe     import DataFrameTask
 from eventdetection.merging   import (KnownSigmaEventMerger,
-                                      HeteroscedasticEventMerger, EventSelector)
+                                      HeteroscedasticEventMerger,
+                                      PopulationMerger,
+                                      EventSelector)
 from eventdetection.splitting import (MinMaxSplitDetector, DerivateSplitDetector,
                                       ChiSquareSplitDetector)
 from eventdetection.intervalextension import (IntervalExtensionAroundMean,
@@ -174,6 +176,14 @@ def test_merge():
                                   oneperrange = True))
     _merges(HeteroscedasticEventMerger(confidence = 0.1, oneperrange = False))
     _merges(HeteroscedasticEventMerger(confidence = 0.1, oneperrange = True))
+
+
+def test_population_merge():
+    "tests population merge"
+    data  = np.arange(100)
+    intervals = np.array([(0,10), (5,17), (8, 20), (30, 40), (37,41)])
+    merged    = PopulationMerger()(data, intervals)
+    assert tuple(tuple(i) for i in merged) == ((0,10), (5,20), (30,41))
 
 def test_select():
     "Tests flat stretches filtering"
@@ -343,4 +353,4 @@ def test_dataframe():
     assert 'mean' in data
 
 if __name__ == '__main__':
-    test_chi2split()
+    test_population_merge()

@@ -230,15 +230,17 @@ class PopulationMerger(EventMerger):
                 todo = todo[::-1]
 
             for one, other in todo:
-                good = np.isfinite(other[0])
-                both = np.logical_and(other[good] >= one[1], other[good] <= one[2])
-                if good.sum() * self.percentile * 1e-2 < both.sum():
+                good = other[0][np.isfinite(other[0])]
+                both = np.logical_and(good >= one[1], good <= one[2])
+                if len(good) * self.percentile * 1e-2 <= both.sum():
                     rem[iright]      = False
                     intervals[ileft] = intervals[ileft][0], intervals[iright][1]
                     left             = (data[intervals[ileft][0]:intervals[ileft][1]],
                                         left[1], right[2])
 
                     break
+            else:
+                ileft, left = iright, right
 
         return intervals[rem]
 
