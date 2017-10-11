@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Tests interval detection"
+import pickle
 
 import pandas as pd
 import numpy  as np
@@ -74,7 +75,7 @@ def test_detectsplits():
 
 def test_chi2split():
     "Tests flat stretches detection"
-    inst = ChiSquareSplitDetector(precision = 1., confidence = None, window = 3)
+    inst = ChiSquareSplitDetector(precision = 1., confidence = None, window = 1)
     vals = np.zeros(30, dtype = 'f4')
     assert_allclose(inst.flatness(vals), vals)
 
@@ -177,13 +178,18 @@ def test_merge():
     _merges(HeteroscedasticEventMerger(confidence = 0.1, oneperrange = False))
     _merges(HeteroscedasticEventMerger(confidence = 0.1, oneperrange = True))
 
-
 def test_population_merge():
     "tests population merge"
     data  = np.arange(100)
     intervals = np.array([(0,10), (5,17), (8, 20), (30, 40), (37,41)])
     merged    = PopulationMerger()(data, intervals)
     assert tuple(tuple(i) for i in merged) == ((0,10), (5,20), (30,41))
+
+    data  = pickle.load(open(utfilepath("eventsdata.pk"), 'rb'))
+    intervals = np.array([[  1,  11], [ 12,  15], [ 16,  25], [ 26,  52],
+                          [ 55, 121], [125, 136], [138, 453]])
+    merged    = PopulationMerger()(data, intervals)
+    assert tuple(tuple(i) for i in merged) == ((1, 52), (55, 121), (125, 136), (138, 453))
 
 def test_select():
     "Tests flat stretches filtering"

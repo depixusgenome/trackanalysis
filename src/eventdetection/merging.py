@@ -210,18 +210,31 @@ class PopulationMerger(EventMerger):
     def __call__(self,
                  data     : np.ndarray,
                  intervals: np.ndarray,
-                 precision: float = None
+                 _: float = None
                 ) -> np.ndarray:
+
+        rem   = np.ones(len(intervals), dtype = 'bool')
+        cnt   = 0
+        while rem.sum() != cnt:
+            cnt   = rem.sum()
+            self.__apply(data, intervals, rem)
+        return intervals[rem]
+
+    def __apply(self, data, intervals, rem):
         stats = lambda i: (data[i[0]:i[1]],
                            np.nanmin(data[i[0]:i[1]]),
                            np.nanmax(data[i[0]:i[1]]))
         ileft = 0
         left  = stats(intervals[0])
-
-        rem   = np.ones(len(intervals), dtype = 'bool')
         for iright in range(1, len(intervals)):
+            if not rem[iright]:
+                continue
+
             right = stats(intervals[iright])
-            if not (left[1] <= right[1] <= left[2] or left[1] <= right[2] <= left[2]):
+            if not (left[1] <= right[1] <= left[2]
+                    or left[1]  <= right[2] <= left[2]
+                    or right[1] <= left[1]  <= right[2]
+                    or right[1] <= left[2]  <= right[2]):
                 ileft, left = iright, right
                 continue
 
@@ -232,7 +245,10 @@ class PopulationMerger(EventMerger):
             for one, other in todo:
                 good = other[0][np.isfinite(other[0])]
                 both = np.logical_and(good >= one[1], good <= one[2])
-                if len(good) * self.percentile * 1e-2 <= both.sum():
+                nmin = int(len(good) * self.percentile * 1e-2+.5)
+                if nmin == len(good) and nmin > 1:
+                    nmin = len(good)-2
+                if nmin <= both.sum():
                     rem[iright]      = False
                     intervals[ileft] = intervals[ileft][0], intervals[iright][1]
                     left             = (data[intervals[ileft][0]:intervals[ileft][1]],
@@ -241,8 +257,6 @@ class PopulationMerger(EventMerger):
                     break
             else:
                 ileft, left = iright, right
-
-        return intervals[rem]
 
 class MultiMerger(EventMerger):
     "Multiple merge tools applied in a row"
