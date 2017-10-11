@@ -10,7 +10,7 @@ from model                    import PHASE
 from model.task.dataframe     import DataFrameTask
 from eventdetection.merging   import (KnownSigmaEventMerger,
                                       HeteroscedasticEventMerger,
-                                      PopulationMerger,
+                                      PopulationMerger, ZRangeMerger,
                                       EventSelector)
 from eventdetection.splitting import (MinMaxSplitDetector, DerivateSplitDetector,
                                       ChiSquareSplitDetector)
@@ -182,7 +182,7 @@ def test_population_merge():
     "tests population merge"
     data  = np.arange(100)
     intervals = np.array([(0,10), (5,17), (8, 20), (30, 40), (37,41)])
-    merged    = PopulationMerger()(data, intervals)
+    merged    = PopulationMerger(percentile = 75.)(data, intervals)
     assert tuple(tuple(i) for i in merged) == ((0,10), (5,20), (30,41))
 
     data  = pickle.load(open(utfilepath("eventsdata.pk"), 'rb'))
@@ -190,6 +190,13 @@ def test_population_merge():
                           [ 55, 121], [125, 136], [138, 453]])
     merged    = PopulationMerger()(data, intervals)
     assert tuple(tuple(i) for i in merged) == ((1, 52), (55, 121), (125, 136), (138, 453))
+
+def test_range_merge():
+    "tests population merge"
+    data  = np.arange(100)
+    intervals = np.array([(0,10), (5,17), (8, 23), (30, 40), (35,41)])
+    merged    = ZRangeMerger(percentile = 70.)(data, intervals)
+    assert tuple(tuple(i) for i in merged) == ((0,10), (5,23), (30,41))
 
 def test_select():
     "Tests flat stretches filtering"
@@ -359,4 +366,4 @@ def test_dataframe():
     assert 'mean' in data
 
 if __name__ == '__main__':
-    test_population_merge()
+    test_range_merge()

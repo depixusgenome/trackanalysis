@@ -258,9 +258,62 @@ class PopulationMerger(EventMerger):
             else:
                 ileft, left = iright, right
 
+class ZRangeMerger(EventMerger):
+    """
+    Merges neighbouring stretches of data if enough of their population have a
+    common range.
+    """
+    percentile = 80.
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__()
+
+    def __call__(self,
+                 data     : np.ndarray,
+                 intervals: np.ndarray,
+                 _: float = None
+                ) -> np.ndarray:
+
+        rem   = np.ones(len(intervals), dtype = 'bool')
+        cnt   = 0
+        while rem.sum() != cnt:
+            cnt   = rem.sum()
+            self.__apply(data, intervals, rem)
+        return intervals[rem]
+
+    def __apply(self, data, intervals, rem):
+        stats = lambda i: (np.nanmin(data[i[0]:i[1]]),
+                           np.nanmax(data[i[0]:i[1]]))
+        ileft = 0
+        left  = stats(intervals[0])
+        for iright in range(1, len(intervals)):
+            if not rem[iright]:
+                continue
+
+            right = stats(intervals[iright])
+
+            if left[1] == left[0] and right[0] <= left[0] <= right[1]:
+                merge = True
+            if right[1] == right[0] and left[0] <= right[0] <= left[1]:
+                merge = True
+            else:
+                rng   = min(left[1], right[1]) - max(left[0], right[0])
+                rng  /= self.percentile*1e-2
+                merge = (rng > left[1]-left[0]) or (rng > right[1]-right[0])
+
+            if merge:
+                rem[iright]      = False
+                intervals[ileft] = intervals[ileft][0], intervals[iright][1]
+                left             = left[0], right[1]
+
+            else:
+                ileft, left = iright, right
+
 class MultiMerger(EventMerger):
     "Multiple merge tools applied in a row"
-    merges: List[EventMerger] = [HeteroscedasticEventMerger(), PopulationMerger()]
+    merges: List[EventMerger] = [HeteroscedasticEventMerger(),
+                                 ZRangeMerger(percentile = 80),
+                                 PopulationMerger(percentile = 66)]
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__()
