@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 "Interval detection: splitting the trace into flat events"
 
-from    typing                  import Optional, Tuple, Union, List, cast
+from    typing                  import Optional, Tuple, Union, List, NamedTuple, cast
 from    abc                     import abstractmethod
+from    enum                    import Enum
 
 import  numpy as np
 from    numpy.lib.stride_tricks import as_strided
@@ -188,13 +189,14 @@ class ChiSquareSplitDetector(GradedSplitDetector):
 
     Flatness is estimated using residues of a fit to the mean of the interval.
     """
+    window                          = 2
     confidence: Optional[Threshold] = MedianThreshold()
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
     def _flatness(self, data : np.ndarray) -> np.ndarray:
-        win = (self.window//2)*2+1
+        win = self.window*2+1
         tmp = np.concatenate([[data[0]]*(win//2), data, [data[-1]]*(win//2)])
         arr = as_strided(tmp,
                          shape   = (len(data), win),
@@ -259,11 +261,23 @@ class MinMaxSplitDetector(GradedSplitDetector):
             return precision
         return norm.threshold(True, self.confidence, precision)
 
+class GradeStrategy(Enum):
+    "Possible strategies for MultiGradeSplitDetector items"
+    minimum = 'minimum'
+    maximum = 'maximum'
+
+class GradeItem(NamedTuple): # pylint: disable=missing-docstring
+    detector: GradedSplitDetector
+    operator: GradeStrategy
+
 class MultiGradeSplitDetector(SplitDetector):
     """
     Detects flat stretches of value collating multiple *flatness* indicators.
     """
-    detectors: List[GradedSplitDetector] = [ChiSquareSplitDetector(), DerivateSplitDetector()]
+    detectors: List[GradeItem] = [GradeItem(ChiSquareSplitDetector(),
+                                            GradeStrategy.maximum),
+                                  GradeItem(DerivateSplitDetector(window = 4),
+                                            GradeStrategy.maximum)]
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -306,7 +320,8 @@ class MultiGradeSplitDetector(SplitDetector):
                        good      : np.ndarray,
                        precision : Optional[float]) -> np.ndarray:
         "Computes a flatness characteristic on all indices"
-        deltas = self.__detectorflatness(self.detectors[0], data, good, precision)
-        for det in self.detectors[1:]:
-            deltas = np.minimum(deltas, self.__detectorflatness(det, data, good, precision))
+        deltas = self.__detectorflatness(self.detectors[0].detector, data, good, precision)
+        for det, tpe in self.detectors[1:]:
+            fcn    = getattr(np, tpe.value)
+            deltas = fcn(deltas, self.__detectorflatness(det, data, good, precision))
         return deltas
