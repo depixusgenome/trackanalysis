@@ -355,38 +355,6 @@ class ZeroCrossingPeakFinder:
             inds = self.subpixel(hist, inds)
         return inds * slope + bias
 
-class ByGaussianMix:
-    '''
-    finds peaks and groups events
-    '''
-    max_iter  = 10000
-    cov_type  = 'tied'
-    peakwidth = np.array([[1]])
-    dpgmm = BayesianGaussianMixture()
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
-
-    def find(self,hist: np.ndarray, bias:float = 0., slope:float = 1.):
-        'find peaks'
-        ncmps = int((max(hist)-min(hist))/min(self.peakwidth)) # find better, smaller
-        kwa   = {'n_components'     : ncmps,
-                 'covariance_prior' : self.peakwidth,
-                 'covariance_type'  : self.cov_type,
-                 'max_iter'         : self.max_iter}
-        self.dpgmm = BayesianGaussianMixture(**kwa)
-        self.dpgmm.fit(np.matrix(hist).T)
-        pos   = self.dpgmm.means_[self.dpgmm.weights_>0.01][:,0]
-        return pos * slope + bias
-
-    def group(self, elems,*_1,**_2):
-        'group events'
-        return self.dpgmm.predict(elems)
-
-
-PeakFinderMethod = Union[ByGaussianMix]
-PeakFinder = Union[CWTPeakFinder, ZeroCrossingPeakFinder]
-
 class GroupByPeak:
     """
     Groups events by peak position.
@@ -468,3 +436,54 @@ class GroupByPeakAndBase(GroupByPeak):
             imin       = min(i for i in range(imax+1) if cnts[i] == cnts[imax])
             cnts[imin] = self.mincount # make sure peak is accepted
         return tags, cnts
+
+class ByZeroCrossing:
+    """
+    Finds peaks with a minimum *half*width and threshold
+    """
+    subpixel         = SubPixelPeakPosition()
+    peakwidth        = 1
+    threshold: float = getattr(np.finfo('f4'), 'resolution')
+    finder           =ZeroCrossingPeakFinder()
+    grouper          =GroupByPeakAndBase()
+    @initdefaults(frozenset(locals()), subpixel = 'update')
+    def __init__(self, **_):
+        pass
+
+    def find(self, *args, **kwa):
+        'find peaks'
+        return self.finder(*args,**kwa)
+
+    def group(self, *args, **kwa):
+        'group events'
+        return self.grouper(*args, **kwa)
+
+class ByGaussianMix:
+    '''
+    finds peaks and groups events
+    '''
+    max_iter  = 10000
+    cov_type  = 'tied'
+    peakwidth = np.array([[1]])
+    dpgmm = BayesianGaussianMixture()
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+    def find(self,hist: np.array, bias:float = 0., slope:float = 1.):
+        'find peaks'
+        ncmps      = min(int((max(hist)-min(hist))/min(self.peakwidth)),1) # find better, smaller
+        kwa        = {'n_components'     : ncmps,
+                      'covariance_prior' : self.peakwidth,
+                      'covariance_type'  : self.cov_type,
+                      'max_iter'         : self.max_iter}
+        self.dpgmm = BayesianGaussianMixture(**kwa)
+        self.dpgmm.fit(np.matrix(hist).T)
+        pos        = self.dpgmm.means_[self.dpgmm.weights_>0.01][:,0]
+        return pos * slope + bias
+
+    def group(self, pos,*_1,**_2):
+        'group events'
+        return self.dpgmm.predict(pos)
+
+PeakFinder = Union[ByZeroCrossing, ByGaussianMix]
