@@ -6,7 +6,6 @@ from    typing      import (Sequence, Union,  # pylint: disable=unused-import
 import  pathlib
 import  re
 import  numpy       as np
-from    Bio.Seq     import Seq
 from    utils       import fromstream
 
 @fromstream('r')
@@ -59,6 +58,10 @@ class Translator:
     __SPLIT   = re.compile((r'(?:[^%(alph)s]*)([%(alph)s]+)(?:[^%(alph)s]+|$)*'
                             % dict(alph =__ALPHABET)), re.IGNORECASE)
 
+    __COMPLE  = {'a': 't', 't': 'a', 'c': 'g', 'g': 'c', 'w': 'w', 's': 's',
+                 'k': 'm', 'm': 'k', 'r': 'y', 'y': 'r', 'b': 'v', 'v': 'b',
+                 'h': 'd', 'd': 'h', 'n': 'n', 'x': 'x', 'u': 'a'}
+    __COMPLE.update({i.upper(): j.upper() for i, j in __COMPLE.items()})
     @classmethod
     def __trarep(cls, item):
         return cls.__TRANS[item.string[slice(*item.span())]]
@@ -66,10 +69,15 @@ class Translator:
     @classmethod
     def __translate(cls, olig, state):
         if not state:
-            olig = str(Seq(olig).reverse_complement())
+            olig = cls.reversecomplement(olig)
         if cls.__SYMBOL in olig:
             olig = cls.__METHS[state][0].sub(cls.__METHS[state][1], olig)
         return cls.__TRAFIND.sub(cls.__trarep, olig)
+
+    @classmethod
+    def reversecomplement(cls, oligo:str) -> str:
+        "returns the reverse complement for that oligo"
+        return ''.join(cls.__COMPLE.get(i, i) for i in oligo[::-1])
 
     @classmethod
     def __get(cls, state, seq, oligs, flags):
@@ -159,7 +167,7 @@ def marksequence(seq:str, oligs: Sequence[str]) -> str:
     for olig in oligs:
         seq  = seq.replace(olig.lower(), olig.upper())
 
-        olig = str(Seq(olig).reverse_complement())
+        olig = Translator.reversecomplement(olig)
         seq  = seq.replace(olig.lower(), olig.upper())
     return seq
 

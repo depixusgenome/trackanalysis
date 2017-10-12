@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "All sequences-related stuff"
-from sequences import peaks, overlap, splitoligos
+from sequences import peaks, overlap, splitoligos, Translator
 
 def test_peaks():
     "tests peaks"
@@ -53,6 +53,11 @@ def test_overlap():
     assert  not overlap('CATA', 'ATAT', minoverlap = 4)
     assert  not overlap('CCAT', 'ATAT', minoverlap = 3)
     assert  not overlap('CCCA', 'ATAT', minoverlap = 2)
+
+def test_rv():
+    "testing reverse complements"
+    assert Translator.reversecomplement("atgcws") == "swgcat"
+    assert Translator.reversecomplement("ATGCws") == "swGCAT"
 
 def test_splits():
     "testing oligo splitting"

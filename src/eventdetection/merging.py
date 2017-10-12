@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 "Interval detection: merging and selecting the sections in the signal detected as flat"
 
-from    typing                  import Optional, Callable, Tuple
-from    abc                     import abstractmethod
+from    typing                  import Optional, Tuple, List
+from    abc                     import ABC, abstractmethod
 
 import  numpy                   as     np
 from    numpy.lib.stride_tricks import as_strided
@@ -11,8 +11,23 @@ from    numpy.lib.stride_tricks import as_strided
 from    utils                   import initdefaults
 from    signalfilter            import samples as _samples, PrecisionAlg
 
-class EventMerger(Callable[[np.ndarray,np.ndarray,Optional[float]], np.ndarray]): # type: ignore
-    "Merges neighbouring stretches of data."
+class EventMerger(ABC):
+    "merges neighbouring stretches of data."
+    @abstractmethod
+    def __call__(self,
+                 data     : np.ndarray,
+                 intervals: np.ndarray,
+                 precision: float = None
+                ) -> np.ndarray:
+        pass
+
+    @classmethod
+    def run(cls, *args, **kwa):
+        "instantiates and calls class"
+        return cls(**kwa)(*args)
+
+class StatsEventMerger(EventMerger):
+    "merges neighbouring stretches of data."
     confidence: Optional[float] = 0.1
     oneperrange                 = True
     @initdefaults(frozenset(locals()))
@@ -81,7 +96,7 @@ class EventMerger(Callable[[np.ndarray,np.ndarray,Optional[float]], np.ndarray])
     def __call__(self,
                  data     : np.ndarray,
                  intervals: np.ndarray,
-                 precision: Optional[float] = None
+                 precision: float = None
                 ) -> np.ndarray:
         if len(data) == 0 or len(intervals) == 0:
             return np.empty((0,2), dtype = 'i4')
@@ -102,12 +117,7 @@ class EventMerger(Callable[[np.ndarray,np.ndarray,Optional[float]], np.ndarray])
 
         return intervals
 
-    @classmethod
-    def run(cls, *args, **kwa):
-        "instantiates and calls class"
-        return cls(**kwa)(*args)
-
-class KnownSigmaEventMerger(EventMerger, PrecisionAlg):
+class KnownSigmaEventMerger(StatsEventMerger, PrecisionAlg):
     """
     Merges neighbouring stretches of data.
 
@@ -148,7 +158,7 @@ class KnownSigmaEventMerger(EventMerger, PrecisionAlg):
         return np.array([(cnt.sum(), np.average(sel['m'], weights = cnt))],
                         dtype = stats.dtype)
 
-class HeteroscedasticEventMerger(EventMerger):
+class HeteroscedasticEventMerger(StatsEventMerger):
     """
     Merges neighbouring stretches of data.
 
@@ -187,6 +197,136 @@ class HeteroscedasticEventMerger(EventMerger):
                           np.average(sel['s'], weights = cnt))],
                         dtype = stats.dtype)
 
+class PopulationMerger(EventMerger):
+    """
+    Merges neighbouring stretches of data if enough of their population have a
+    common range.
+    """
+    percentile = 75.
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__()
+
+    def __call__(self,
+                 data     : np.ndarray,
+                 intervals: np.ndarray,
+                 _: float = None
+                ) -> np.ndarray:
+
+        rem   = np.ones(len(intervals), dtype = 'bool')
+        cnt   = 0
+        while rem.sum() != cnt:
+            cnt   = rem.sum()
+            self.__apply(data, intervals, rem)
+        return intervals[rem]
+
+    def __apply(self, data, intervals, rem):
+        stats = lambda i: (data[i[0]:i[1]],
+                           np.nanmin(data[i[0]:i[1]]),
+                           np.nanmax(data[i[0]:i[1]]))
+        ileft = 0
+        left  = stats(intervals[0])
+        for iright in range(1, len(intervals)):
+            if not rem[iright]:
+                continue
+
+            right = stats(intervals[iright])
+            if not (left[1] <= right[1] <= left[2]
+                    or left[1]  <= right[2] <= left[2]
+                    or right[1] <= left[1]  <= right[2]
+                    or right[1] <= left[2]  <= right[2]):
+                ileft, left = iright, right
+                continue
+
+            todo = ((left, right), (right, left))
+            if len(left[0]) < len(right[0]):
+                todo = todo[::-1]
+
+            for one, other in todo:
+                good = other[0][np.isfinite(other[0])]
+                both = np.logical_and(good >= one[1], good <= one[2])
+                nmin = int(len(good) * self.percentile * 1e-2+.5)
+                if nmin == len(good) and nmin > 1:
+                    nmin = len(good)-2
+                if nmin <= both.sum():
+                    rem[iright]      = False
+                    intervals[ileft] = intervals[ileft][0], intervals[iright][1]
+                    left             = (data[intervals[ileft][0]:intervals[ileft][1]],
+                                        left[1], right[2])
+
+                    break
+            else:
+                ileft, left = iright, right
+
+class ZRangeMerger(EventMerger):
+    """
+    Merges neighbouring stretches of data if enough of their population have a
+    common range.
+    """
+    percentile = 80.
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__()
+
+    def __call__(self,
+                 data     : np.ndarray,
+                 intervals: np.ndarray,
+                 _: float = None
+                ) -> np.ndarray:
+
+        rem   = np.ones(len(intervals), dtype = 'bool')
+        cnt   = 0
+        while rem.sum() != cnt:
+            cnt   = rem.sum()
+            self.__apply(data, intervals, rem)
+        return intervals[rem]
+
+    def __apply(self, data, intervals, rem):
+        stats = lambda i: (np.nanmin(data[i[0]:i[1]]),
+                           np.nanmax(data[i[0]:i[1]]))
+        ileft = 0
+        left  = stats(intervals[0])
+        for iright in range(1, len(intervals)):
+            if not rem[iright]:
+                continue
+
+            right = stats(intervals[iright])
+
+            if left[1] == left[0] and right[0] <= left[0] <= right[1]:
+                merge = True
+            if right[1] == right[0] and left[0] <= right[0] <= left[1]:
+                merge = True
+            else:
+                rng   = min(left[1], right[1]) - max(left[0], right[0])
+                rng  /= self.percentile*1e-2
+                merge = (rng > left[1]-left[0]) or (rng > right[1]-right[0])
+
+            if merge:
+                rem[iright]      = False
+                intervals[ileft] = intervals[ileft][0], intervals[iright][1]
+                left             = left[0], right[1]
+
+            else:
+                ileft, left = iright, right
+
+class MultiMerger(EventMerger):
+    "Multiple merge tools applied in a row"
+    merges: List[EventMerger] = [HeteroscedasticEventMerger(),
+                                 PopulationMerger(percentile = 66),
+                                 ZRangeMerger(percentile = 80)]
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__()
+
+    def __call__(self,
+                 data     : np.ndarray,
+                 intervals: np.ndarray,
+                 precision: float = None
+                ) -> np.ndarray:
+        for merge in self.merges:
+            intervals = merge(data, intervals, precision)
+        return intervals
+
 class EventSelector:
     """
     Filters flat stretches:
@@ -195,7 +335,7 @@ class EventSelector:
     * makes sure their length is enough
     """
     edgelength = 0
-    minlength  = 5
+    minlength  = 4
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass

@@ -114,7 +114,7 @@ class ConversionSlidersWidget(_Widget[CyclesModelAccess]):
 
         base = self.css.base
         base.stretch.defaults = dict(start = 900,  step  = 5, end = 1400)
-        base.bias   .defaults = dict(step  = 1e-4, ratio = .25)
+        base.bias   .defaults = dict(step  = 1e-4, ratio = .25, offset = .05)
 
     def addinfo(self, histsource):
         "adds info to the widget"
@@ -135,9 +135,14 @@ class ConversionSlidersWidget(_Widget[CyclesModelAccess]):
 
     def reset(self, resets):
         "updates the widgets"
-        ratio = self.css.base.bias.ratio.get()
-        start = self.__figdata.data['bottom'][0]
-        end   = start + (self.__figdata.data['top'][-1] - start)*ratio
+        ratio  = self.css.base.bias.ratio.get()
+        if resets and self.__figdata in resets and 'data' in resets[self.__figdata]:
+            data = resets[self.__figdata]['data']
+        else:
+            data = self.__figdata.data
+        start  = data['bottom'][0]
+        end    = start + (data['top'][-1] - start)*ratio
+        start -= self.css.base.bias.offset.get()
 
         resets[self.__bias].update(value = self._model.bias, start = start, end = end)
         resets[self.__stretch].update(value = self._model.stretch)
@@ -197,7 +202,7 @@ class DriftWidget(GroupWidget[CyclesModelAccess]):
             value += [1]
         return dict(active = value)
 
-class AdvancedWidget(_Widget[CyclesModelAccess], AdvancedWidgetMixin):
+class AdvancedWidget(_Widget[CyclesModelAccess], AdvancedWidgetMixin): # type: ignore
     "access to the modal dialog"
     _TITLE = 'Cycles Plot Configuration'
     _BODY: Tuple[Tuple[str,str],...]  = (('Histogram bin width',         '%(binwidth).3f'),

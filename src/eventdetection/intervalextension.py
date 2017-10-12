@@ -5,9 +5,10 @@ Interval extension: splitting may produce smaller intervals then necessary.
 
 Their boundary is extended.
 """
-from    abc   import ABC, abstractmethod
+from    abc     import ABC, abstractmethod
 
-import  numpy as     np
+import  numpy   as     np
+from    utils   import initdefaults
 
 class IntervalExtension(ABC):
     """
@@ -16,6 +17,11 @@ class IntervalExtension(ABC):
     This means to remove the range size bias created by using a window to compute
     derivates.
     """
+    window = 3
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__()
+
     @classmethod
     def extend(cls, ends, data, precision, window):
         "extends the provided ranges by as much as *window*"
@@ -34,8 +40,8 @@ class IntervalExtension(ABC):
         ends[:,1] = newmax
         return ends
 
-    def __call__(self, ends, data, precision, window):
-        return self.extend(ends, data, precision, window)
+    def __call__(self, ends, data, precision):
+        return self.extend(ends, data, precision, self.window)
 
     @staticmethod
     def _sidedata(inters, data, window, default, imax = None):
