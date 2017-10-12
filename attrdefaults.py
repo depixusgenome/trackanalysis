@@ -109,7 +109,11 @@ def setdefault(self, name, kwargs, roots = ('',), # pylint: disable=too-many-arg
     """
     if fieldname is None:
         fieldname = name
+
     clsdef = getattr(type(self), fieldname)
+    if isinstance(clsdef, property):
+        clsdef = getattr(self, fieldname)
+
     for root in roots:
         kwdef = kwargs.get(root+name, NoArgs)
 
