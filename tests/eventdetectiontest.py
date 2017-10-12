@@ -13,6 +13,7 @@ from eventdetection.merging   import (KnownSigmaEventMerger,
                                       PopulationMerger, ZRangeMerger,
                                       EventSelector)
 from eventdetection.splitting import (MinMaxSplitDetector, DerivateSplitDetector,
+                                      GradedSplitDetector, MultiGradeSplitDetector,
                                       ChiSquareSplitDetector)
 from eventdetection.intervalextension import (IntervalExtensionAroundMean,
                                               IntervalExtensionAroundRange)
@@ -28,7 +29,7 @@ from testingcore              import path as utfilepath
 
 def test_detectsplits():
     "Tests flat stretches detection"
-    inst  = DerivateSplitDetector(precision = 1., confidence = 0.1, window = 1)
+    inst  = DerivateSplitDetector(precision = 1., confidence = 0.1, window = 1, erode = 0)
     det   = lambda  i: tuple(tuple(j) for j in inst(i))
     items = np.zeros((30,))
     thr   = 1.01*samples.normal.knownsigma.threshold(True, inst.confidence, inst.precision,
@@ -73,9 +74,56 @@ def test_detectsplits():
     items[40:] = np.nan
     assert det(items) == ((0, 12), (12, 21), (21,30), (31,50))
 
+def test_splittererosion():
+    "tests erosion"
+    class _Dummy(GradedSplitDetector):
+        def _flatness(self, data):
+            return data
+
+        def _threshold(self, *_): # pylint: disable=arguments-differ
+            return .9
+
+    data = np.zeros(100, dtype = 'f4')
+    data[10:20] = 1.
+    data[15]    = 2.
+
+    data[30]    = 1.
+
+    data[40]    = 1.
+    data[41]    = 2.
+
+    data[50]    = 2.
+    data[51]    = 1.
+
+    data[60]    = 1.
+    data[61]    = 2.
+    data[62]    = 1.
+
+    data[70]    = 2.
+    data[71:75] = 1.
+
+    ends = _Dummy(erode = 0, extend = None)(data)
+    assert tuple(tuple(i) for i in ends) == ((0,10), (19, 30), (30, 40), (41,50),
+                                             (51,60), (62, 70), (74, 100))
+
+    ends = _Dummy(erode = 1, extend = None)(data)
+    assert tuple(tuple(i) for i in ends) == ((0,11), (18, 30), (30, 41), (41,50),
+                                             (50,61), (61, 70), (73, 100))
+
+    data = np.zeros(20, dtype = 'f4')
+    data[0] = 1
+    data[-1] = 1
+    ends = _Dummy(erode = 1, extend = None)(data)
+    assert tuple(tuple(i) for i in ends) == ((0,19),)
+
+    data = np.zeros(20, dtype = 'f4')
+    data[0] = 1
+    ends = _Dummy(erode = 1, extend = None)(data)
+    assert tuple(tuple(i) for i in ends) == ((0,20),)
+
 def test_chi2split():
     "Tests flat stretches detection"
-    inst = ChiSquareSplitDetector(precision = 1., confidence = None, window = 1)
+    inst = ChiSquareSplitDetector(precision = 1., confidence = None, window = 3)
     vals = np.zeros(30, dtype = 'f4')
     assert_allclose(inst.flatness(vals), vals)
 
@@ -177,6 +225,20 @@ def test_merge():
                                   oneperrange = True))
     _merges(HeteroscedasticEventMerger(confidence = 0.1, oneperrange = False))
     _merges(HeteroscedasticEventMerger(confidence = 0.1, oneperrange = True))
+
+    left  = np.zeros(100, dtype = 'f4')
+    right = np.zeros(100, dtype = 'f4')
+
+    left[10]    = 1
+    left[20:22] = 1
+    left[30:33] = 1
+    left[40:43] = 1
+
+    right[40:43] = 1
+
+    agg = MultiGradeSplitDetector.Aggregation.patch
+    assert (list(np.nonzero(agg.apply(left, right))[0])
+            == [10, 20, 21, 30, 32, 40, 41, 42])
 
 def test_population_merge():
     "tests population merge"
@@ -366,4 +428,4 @@ def test_dataframe():
     assert 'mean' in data
 
 if __name__ == '__main__':
-    test_range_merge()
+    test_splittererosion()

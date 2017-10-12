@@ -19,8 +19,12 @@ from    .intervalextension      import (IntervalExtension,
 norm = _samples.normal.knownsigma # pylint: disable=invalid-name
 
 class SplitDetector(PrecisionAlg):
-    "Basic splitter"
-    window                              = 3
+    """
+    Splits the data into flat stretches of value.
+
+    The child class will define how to compute the stretches. The latter can
+    be extended using the *extend* field.
+    """
     extend: Optional[IntervalExtension] = IntervalExtensionAroundRange()
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
@@ -37,7 +41,7 @@ class SplitDetector(PrecisionAlg):
         bnds = self._boundaries(data, tmp, prec)
         ends = self.__tointervals(nans, tmp, data, bnds)
         if self.extend is not None:
-            return self.extend(ends, data, prec, self.window)
+            return self.extend(ends, data, prec)
         return ends
 
     @classmethod
@@ -84,8 +88,37 @@ class GradedSplitDetector(SplitDetector):
     Detects flat stretches of value using a single *flatness* characteristic on
     every indices versus a global threshold value.
 
-    The intervals thus found are extended using the *extend* field.
+    if *erode* is above 0, intervals of *flatness* are eroded on both sides by
+    by up to *erode* unless it means discarding the maximum from that interval.
     """
+    erode = 0
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
+    @staticmethod
+    def _erode(erode, deltas, threshold):
+        if erode <= 0:
+            return
+
+        above = deltas > threshold
+
+        below = ~above
+        rngs  = (np.logical_and(above[1:], below[:-1]).nonzero()[0],
+                 np.logical_and(below[1:], above[:-1]).nonzero()[0])
+
+        if len(rngs[0]) and rngs[0][0] > rngs[1][0]:
+            rngs = rngs[0], rngs[1][1:]
+
+        for i, j in zip(*rngs):
+            if i+1 == j:
+                continue
+
+            inter = deltas[i+1:j+1]
+            imax  = np.argmax(inter)
+            inter[:min(erode, imax)]              = 0.
+            inter[max(imax+1, len(inter)-erode):] = 0.
+
     def _boundaries(self,
                     data      : np.ndarray,
                     good      : np.ndarray,
@@ -93,6 +126,7 @@ class GradedSplitDetector(SplitDetector):
                    ) -> np.ndarray:
         deltas    = self._flatness(good)
         threshold = self._threshold(data, deltas, precision)
+        self._erode(self.erode, deltas, threshold)
         return (deltas > threshold).nonzero()[0]
 
     def flatness(self, data : np.ndarray, precision: float = None) -> np.ndarray:
@@ -141,8 +175,10 @@ class DerivateSplitDetector(GradedSplitDetector):
     The precision is either provided or measured. In the latter case,
     the estimation used is the median-deviation of the derivate of the data.
     """
-    shape                       = 'square'
+    window                      = 3
     truncate                    = 4
+    shape                       = 'square'
+    erode                       = 1
     confidence: CONFIDENCE_TYPE = MedianThreshold()
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
@@ -189,14 +225,14 @@ class ChiSquareSplitDetector(GradedSplitDetector):
 
     Flatness is estimated using residues of a fit to the mean of the interval.
     """
-    window                          = 2
+    window                          = 4
     confidence: Optional[Threshold] = MedianThreshold()
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
     def _flatness(self, data : np.ndarray) -> np.ndarray:
-        win = self.window*2+1
+        win = self.window
         tmp = np.concatenate([[data[0]]*(win//2), data, [data[-1]]*(win//2)])
         arr = as_strided(tmp,
                          shape   = (len(data), win),
@@ -261,26 +297,78 @@ class MinMaxSplitDetector(GradedSplitDetector):
             return precision
         return norm.threshold(True, self.confidence, precision)
 
-class GradeStrategy(Enum):
-    "Possible strategies for MultiGradeSplitDetector items"
-    minimum = 'minimum'
-    maximum = 'maximum'
-
-class GradeItem(NamedTuple): # pylint: disable=missing-docstring
-    detector: GradedSplitDetector
-    operator: GradeStrategy
-
 class MultiGradeSplitDetector(SplitDetector):
     """
     Detects flat stretches of value collating multiple *flatness* indicators.
+
+    Possible strategies for aggregation are:
+
+    * *patch*: the final grade is the values on the left patched with values on
+    the right for every index where neighbours on both sides are above
+    threshold. This corrects for index cross-talking on the left grade.
+
+    * *maximum*: the final grade is the greater value at each index: each grade
+    is independant of the other and neither is too noisy. Adding their *hits*
+    musn't increase the noise.
+
+    * *minimum*: the final grade is the minor value at each index: the grades
+    are noisy and thus must be in agreement.
     """
-    detectors: List[GradeItem] = [GradeItem(ChiSquareSplitDetector(),
-                                            GradeStrategy.maximum),
-                                  GradeItem(DerivateSplitDetector(window = 4),
-                                            GradeStrategy.maximum)]
-    @initdefaults(frozenset(locals()))
+    class Aggregation(Enum):
+        "Possible strategies for MultiGradeSplitDetector items"
+        patch   = 'patch'
+        minimum = 'minimum'
+        maximum = 'maximum'
+
+        @staticmethod
+        def _apply_minimum(left, right):
+            np.minimum(left, right)
+
+        @staticmethod
+        def _apply_maximum(left, right):
+            np.maximum(left, right)
+
+        @staticmethod
+        def _apply_patch(left, right):
+            bad = left >= 1.
+            bad[1:-1][np.logical_and(bad[2:], bad[:-2])] = True
+
+            pot = np.logical_and(bad[1:-1], bad[:-2])
+            pot = np.logical_and(pot, bad[2:], out = pot)
+            left[1:-1][pot] = right[1:-1][pot]
+            return left
+
+        def apply(self, left, right):
+            "applies the strategy"
+            return getattr(self.__class__, '_apply_'+self.value)(left, right)
+
+    class Item(NamedTuple): # pylint: disable=missing-docstring
+        detector: GradedSplitDetector
+        operator: 'MultiGradeSplitDetector.Aggregation'
+
+    erode                  = 1
+    _detectors: List[Item] = [Item(DerivateSplitDetector (), Aggregation.minimum),
+                              Item(ChiSquareSplitDetector(), Aggregation.patch)]
+    @initdefaults('detectors')
     def __init__(self, **kwa):
         super().__init__(**kwa)
+
+    @property
+    def detectors(self) -> 'List[MultiGradeSplitDetector.Item]':
+        "returns the list of detectors and their aggregation strategy"
+        return self._detectors
+
+    @detectors.setter
+    def detectors(self, value) -> 'List[MultiGradeSplitDetector.Item]':
+        "returns the list of detectors and their aggregation strategy"
+        self._detectors = []
+        default         = self.Aggregation.minimum
+        for i in value:
+            tpe, agg = (i, default) if isinstance(i, (type, SplitDetector)) else i
+            self._detectors.append(self.Item(tpe() if isinstance(tpe, type) else tpe,
+                                             self.Aggregation(agg)))
+
+        return self._detectors
 
     def flatness(self, data : np.ndarray, precision: float = None) -> np.ndarray:
         """
@@ -306,7 +394,11 @@ class MultiGradeSplitDetector(SplitDetector):
                     good      : np.ndarray,
                     precision : float
                    ) -> np.ndarray:
-        return (self.__fullflatness(data, good, precision) >= 1.).nonzero()[0]
+        deltas = self.__fullflatness(data, good, precision)
+
+        # pylint: disable=protected-access
+        GradedSplitDetector._erode(self.erode, deltas, 1.)
+        return (deltas >= 1.).nonzero()[0]
 
     @staticmethod
     def __detectorflatness(detector, data, good, precision):
@@ -320,8 +412,8 @@ class MultiGradeSplitDetector(SplitDetector):
                        good      : np.ndarray,
                        precision : Optional[float]) -> np.ndarray:
         "Computes a flatness characteristic on all indices"
-        deltas = self.__detectorflatness(self.detectors[0].detector, data, good, precision)
+        args   = data, good, precision
+        deltas = self.__detectorflatness(self.detectors[0].detector, *args)
         for det, tpe in self.detectors[1:]:
-            fcn    = getattr(np, tpe.value)
-            deltas = fcn(deltas, self.__detectorflatness(det, data, good, precision))
+            deltas = tpe.apply(deltas, self.__detectorflatness(det, *args))
         return deltas

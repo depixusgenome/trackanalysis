@@ -335,7 +335,7 @@ class EventSelector:
     * makes sure their length is enough
     """
     edgelength = 0
-    minlength  = 5
+    minlength  = 4
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
