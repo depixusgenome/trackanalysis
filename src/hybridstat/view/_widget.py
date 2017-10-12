@@ -12,7 +12,7 @@ import numpy                    as     np
 
 from signalfilter               import rawprecision
 
-from peakcalling.tohairpin      import GaussianProductFit
+from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit
 
 from view.dialog                import FileDialog
 from view.pathinput             import PathInput
@@ -148,7 +148,7 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
             if nrem == 2:
                 self.values[8] += self.openhp
 
-            self.values[9] = GaussianProductFit.silhouette(dist, key)
+            self.values[9] = PeakGridFit.silhouette(dist, key)
 
             if nfound > 2:
                 stretch         = dist[key].stretch
@@ -292,7 +292,10 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin):
                      ('Minimum event count per peak',     '%(_eventcount)d'),
                      ('Align cycles using peaks',         '%(_align5)b'),
                      ('Peak kernel size (blank ⇒ auto)',  '%(_precision)of'),
+                     ('Exhaustive fit algorithm',         '%(_fittype)b'),
+                     ('Use a theoretical peak 0 in fits', '%(_peak0)b'),
                      ('Max distance to theoretical peak', '%(_dist2theo)d'),
+
                     )
 
     def __init__(self, model:PeaksPlotModelAccess) -> None:
@@ -314,10 +317,37 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin):
     _precision  = AdvancedTaskMixin.attr('peakselection.precision')
 
     @property
+    def _peak0(self) -> bool:
+        return self._model.identification.default('fit').firstpeak
+
+    @_peak0.setter
+    def _peak0(self, value):
+        if value == self._peak0:
+            return
+
+        self._model.identification.updatedefault('fit', firstpeak = value)
+        self._model.identification.resetmodel(self._model)
+
+    @property
+    def _fittype(self) -> bool:
+        return isinstance(self._model.identification.default('fit'), PeakGridFit)
+
+    @_fittype.setter
+    def _fittype(self, value):
+        if value == self._fittype:
+            return
+
+        inst = (ChiSquareFit, PeakGridFit)[value]()
+        self._model.identification.updatedefault('fit', inst)
+        self._model.identification.resetmodel(self._model)
+
+    @property
     def _dist2theo(self) -> int:
-        mdl = self._model.identification.default('match')
-        return mdl.window
+        return self._model.identification.default('match').window
 
     @_dist2theo.setter
-    def _dist2theo(self, val:int):
-        self._model.identification.updatedefault('match', window = val)
+    def _dist2theo(self, value:int):
+        if value == self._dist2theo:
+            return
+        self._model.identification.updatedefault('match', window = value)
+        self._model.identification.resetmodel(self._model)

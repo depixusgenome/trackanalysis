@@ -19,7 +19,7 @@ from control.modelaccess        import TaskPlotModelAccess, TaskAccess
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
 from peakfinding.processor      import PeakSelectorTask
 from peakfinding.probabilities  import Probability
-from peakcalling.tohairpin      import GaussianProductFit, PeakMatching, Distance
+from peakcalling.tohairpin      import Distance
 from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
                                         FitBead)
 
@@ -30,8 +30,8 @@ class FitToHairpinAccess(TaskAccess):
     def __init__(self, ctrl):
         super().__init__(ctrl, FitToHairpinTask)
         self.__defaults = self.config.root.tasks.fittohairpin
-        self.__defaults.defaults = {'fit':   GaussianProductFit(),
-                                    'match': PeakMatching()}
+        self.__defaults.defaults = {'fit':   FitToHairpinTask.DEFAULT_FIT(),
+                                    'match': FitToHairpinTask.DEFAULT_MATCH()}
 
     def setobservers(self, mdl):
         "observes the global model"
@@ -51,13 +51,16 @@ class FitToHairpinAccess(TaskAccess):
     def _configattributes(kwa):
         return {}
 
-    def updatedefault(self, attr, **kwa):
+    def updatedefault(self, attr, inst = None, **kwa):
         "updates the identifiers for this task"
-        if len(kwa) == 0:
+        if inst is None and len(kwa) == 0:
             return
 
-        cnf = self.__defaults[attr]
-        cnf.set(updatecopy(cnf.get(), **kwa))
+        cnf  = self.__defaults[attr]
+        inst = (inst() if isinstance(inst, type) else
+                inst   if inst is not None       else
+                cnf.get())
+        cnf.set(updatecopy(inst, **kwa))
 
     def default(self, mdl):
         "returns the default identification task"

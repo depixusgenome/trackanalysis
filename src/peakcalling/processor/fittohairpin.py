@@ -17,7 +17,7 @@ from   control.processor.dataframe import DataFrameFactory
 from   data.views                  import BEADKEY, Beads, TaskView
 from   peakfinding.selector        import Output as PeakFindingOutput, PeaksArray
 from   peakfinding.processor       import PeaksDict
-from   ..tohairpin                 import (HairpinFitter, ChiSquareFit, Distance,
+from   ..tohairpin                 import (HairpinFitter, PeakGridFit, Distance,
                                            PeakMatching, PEAKS_TYPE)
 
 class DistanceConstraint(NamedTuple): # pylint: disable=missing-docstring
@@ -34,6 +34,8 @@ class FitToHairpinTask(Task):
     fit         : Fitters     = dict()
     constraints : Constraints = dict()
     match       : Matchers    = dict()
+    DEFAULT_FIT               = PeakGridFit
+    DEFAULT_MATCH             = PeakMatching
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **kwa):
         super().__init__()
@@ -73,7 +75,7 @@ class FitToHairpinTask(Task):
             ) -> 'FitToHairpinTask':
         "creates a BeadsByHairpin from a fasta file and a list of oligos"
         if fit is None or fit is DefaultValue:
-            fits = dict(ChiSquareFit.read(path, oligos))
+            fits = dict(cls.DEFAULT_FIT.read(path, oligos))
         elif isinstance(fit, type):
             fits = dict(cast(Type[HairpinFitter], fit).read(path, oligos))
         else:
@@ -81,7 +83,7 @@ class FitToHairpinTask(Task):
             fits = {i: updatecopy(ifit, True, peaks = j.peaks)
                     for i, j in ifit.read(path, oligos)}
 
-        imatch = (PeakMatching() if match in (None, DefaultValue) else
+        imatch = (cls.DEFAULT_MATCH() if match in (None, DefaultValue) else
                   cast(Type[PeakMatching], match)() if isinstance(match, type) else
                   cast(PeakMatching, match))
 
@@ -143,7 +145,7 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]):
                     ) -> FitBead:
         best = min(dist, key = dist.__getitem__)
         silh = HairpinFitter.silhouette(dist, best)
-        alg  = self.config.match.get(best, PeakMatching())
+        alg  = self.config.match.get(best, self.config.DEFAULT_MATCH())
         ids  = alg.pair(peaks, *dist.get(best, (0., 1., 0))[1:])
         return FitBead(key, silh, dist, ids, events)
 
