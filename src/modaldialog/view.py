@@ -148,7 +148,7 @@ class AdvancedTaskMixin(AdvancedWidgetMixin):
         "sets a task's attribute to None or the default value"
         key = akeys.split('.')[-1]
         def _fset(obj, val):
-            if val:
+            if val is False:
                 return None
 
             attr = getattr(obj, key)

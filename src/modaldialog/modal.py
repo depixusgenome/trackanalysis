@@ -89,13 +89,17 @@ class CheckOption(Option):
     _PATT = re.compile(Option.NAME+'b')
     @staticmethod
     def __cnv(val):
-        return val == 'on'
+        if val in ('on', True):
+            return True
+        if val in ('off', False):
+            return False
+        raise ValueError()
 
     @classmethod
     def converter(cls, model, body:str) -> Callable:
         "returns a method which sets values in a model"
         elems = frozenset(i.group('name') for i in cls._PATT.finditer(body))
-        return cls._converter(model, elems, bool, AssertionError())
+        return cls._converter(model, elems, cls.__cnv, AssertionError())
 
     @classmethod
     def replace(cls, model, body:str) -> str:
