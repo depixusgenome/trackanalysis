@@ -297,6 +297,38 @@ class MinMaxSplitDetector(GradedSplitDetector):
             return precision
         return norm.threshold(True, self.confidence, precision)
 
+class MultiGradeAggregation(Enum):
+    "Possible strategies for MultiGradeSplitDetector items"
+    patch   = 'patch'
+    minimum = 'minimum'
+    maximum = 'maximum'
+
+    @staticmethod
+    def _apply_minimum(left, right):
+        np.minimum(left, right)
+
+    @staticmethod
+    def _apply_maximum(left, right):
+        np.maximum(left, right)
+
+    @staticmethod
+    def _apply_patch(left, right):
+        bad = left >= 1.
+        bad[1:-1][np.logical_and(bad[2:], bad[:-2])] = True
+
+        pot = np.logical_and(bad[1:-1], bad[:-2])
+        pot = np.logical_and(pot, bad[2:], out = pot)
+        left[1:-1][pot] = right[1:-1][pot]
+        return left
+
+    def apply(self, left, right):
+        "applies the strategy"
+        return getattr(self.__class__, '_apply_'+self.value)(left, right)
+
+class MultiGradeItem(NamedTuple): # pylint: disable=missing-docstring
+    detector: GradedSplitDetector
+    operator: MultiGradeAggregation
+
 class MultiGradeSplitDetector(SplitDetector):
     """
     Detects flat stretches of value collating multiple *flatness* indicators.
@@ -314,59 +346,29 @@ class MultiGradeSplitDetector(SplitDetector):
     * *minimum*: the final grade is the minor value at each index: the grades
     are noisy and thus must be in agreement.
     """
-    class Aggregation(Enum):
-        "Possible strategies for MultiGradeSplitDetector items"
-        patch   = 'patch'
-        minimum = 'minimum'
-        maximum = 'maximum'
-
-        @staticmethod
-        def _apply_minimum(left, right):
-            np.minimum(left, right)
-
-        @staticmethod
-        def _apply_maximum(left, right):
-            np.maximum(left, right)
-
-        @staticmethod
-        def _apply_patch(left, right):
-            bad = left >= 1.
-            bad[1:-1][np.logical_and(bad[2:], bad[:-2])] = True
-
-            pot = np.logical_and(bad[1:-1], bad[:-2])
-            pot = np.logical_and(pot, bad[2:], out = pot)
-            left[1:-1][pot] = right[1:-1][pot]
-            return left
-
-        def apply(self, left, right):
-            "applies the strategy"
-            return getattr(self.__class__, '_apply_'+self.value)(left, right)
-
-    class Item(NamedTuple): # pylint: disable=missing-docstring
-        detector: GradedSplitDetector
-        operator: 'MultiGradeSplitDetector.Aggregation'
-
-    erode                  = 1
-    _detectors: List[Item] = [Item(DerivateSplitDetector (), Aggregation.minimum),
-                              Item(ChiSquareSplitDetector(), Aggregation.patch)]
+    AGG                              = MultiGradeAggregation
+    ITEM                             = MultiGradeItem
+    erode                            = 1
+    _detectors: List[MultiGradeItem] = [ITEM(DerivateSplitDetector (), AGG.minimum),
+                                        ITEM(ChiSquareSplitDetector(), AGG.patch)]
     @initdefaults('detectors')
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
     @property
-    def detectors(self) -> 'List[MultiGradeSplitDetector.Item]':
+    def detectors(self) -> List[MultiGradeItem]:
         "returns the list of detectors and their aggregation strategy"
         return self._detectors
 
     @detectors.setter
-    def detectors(self, value) -> 'List[MultiGradeSplitDetector.Item]':
+    def detectors(self, value) -> List[MultiGradeItem]:
         "returns the list of detectors and their aggregation strategy"
         self._detectors = []
-        default         = self.Aggregation.minimum
+        default         = self.AGG.minimum
         for i in value:
             tpe, agg = (i, default) if isinstance(i, (type, SplitDetector)) else i
-            self._detectors.append(self.Item(tpe() if isinstance(tpe, type) else tpe,
-                                             self.Aggregation(agg)))
+            self._detectors.append(self.ITEM(tpe() if isinstance(tpe, type) else tpe,
+                                             self.AGG(agg)))
 
         return self._detectors
 
