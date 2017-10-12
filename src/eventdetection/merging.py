@@ -312,8 +312,8 @@ class ZRangeMerger(EventMerger):
 class MultiMerger(EventMerger):
     "Multiple merge tools applied in a row"
     merges: List[EventMerger] = [HeteroscedasticEventMerger(),
-                                 ZRangeMerger(percentile = 80),
-                                 PopulationMerger(percentile = 66)]
+                                 PopulationMerger(percentile = 66),
+                                 ZRangeMerger(percentile = 80)]
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__()
