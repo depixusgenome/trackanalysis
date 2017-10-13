@@ -1,6 +1,17 @@
 # tag cycles_v4.5
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
+### Cleaning
+
+* Frames with missing values on both sides are discarded.
+* Intervals of values with missing values on both sides are discarded if:
+
+    1. the width of the interval is less than 10,
+    2. there are 2 missing values on each side,
+    3. more than 80 percent of the interval derivates are above 0.1 µm
+
+The settings can be changed only by editing the user configuration file.
+
 ### Cycles
 
 The bias could not be set lower than the lowest z value in the histogram. One can
