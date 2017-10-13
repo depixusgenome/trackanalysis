@@ -107,7 +107,7 @@ class GradedSplitDetector(SplitDetector):
         rngs  = (np.logical_and(above[1:], below[:-1]).nonzero()[0],
                  np.logical_and(below[1:], above[:-1]).nonzero()[0])
 
-        if len(rngs[0]) and rngs[0][0] > rngs[1][0]:
+        if len(rngs[0]) and len(rngs[1]) and rngs[0][0] > rngs[1][0]:
             rngs = rngs[0], rngs[1][1:]
 
         for i, j in zip(*rngs):
