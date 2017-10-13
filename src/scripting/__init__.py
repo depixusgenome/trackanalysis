@@ -55,7 +55,11 @@ from peakcalling.__scripting__    import * # type: ignore
 from .parallel                    import parallel
 
 LOGS = getLogger(__name__)
-LOGS.info(f'version is {version.version()}')
+
+try:
+    LOGS.info(f'version is {version.version()}')
+except TypeError:
+    LOGS.info(f'version is {version.version}')
 
 try:
     from .curve                   import * # type: ignore
