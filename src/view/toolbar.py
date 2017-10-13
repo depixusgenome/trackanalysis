@@ -180,6 +180,9 @@ class MessagesInput(BokehView):
                     args = text.value.args[0], 'error'
                 elif len(args) != 2:
                     args = text.value,         'error'
+                elif args[1] not in templ:
+                    args = str(args), 'error'
+
                 val = templ[args[1]].format(str(args[0]))
             else:
                 val = templ[text.value[1]].format(text.value[0])
