@@ -1,3 +1,78 @@
+# tag cycles_v4.5
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+### Cycles
+
+The bias could not be set lower than the lowest z value in the histogram. One can
+now go 50nm below that.
+
+Events smaller than about 6 frames were never detected. We can now detect 5-frames
+events reliably and 4-frames events sometimes.
+
+Events tended to be split: multiple events were found in a same cycle at a same
+z value. These are now merged back into a single event using the following rules:
+
+* *statistical distribution*: Event populations are hypothesized to be normally
+  distributed. To see whether 2 neighbouring events should merge, a statistical
+  test to see how their averages and standard deviations aggree. Prior to this
+  version, the standard deviation was considered to be known and estimated over
+  the whole bead. This prevented events at high z, where the noise is greater,
+  from merging.
+* *population count*: 2 neighbouring events are merged if at least 66 percent
+  of the population of one has its z values between the min and max of the
+  other.
+* *range comparison*: 2 neighbouring events are merged if the intersection of their
+  range of z values occupies 80 percent or more of one of these ranges.
+
+### Hybridstat
+
+#### Fitting Beads
+
+A new fitting algorithm is available: see the *Advanced* menu. The 2 available
+algorithms are now:
+
+* *Gaussian distance*: the algorithm described at tag *cycles_v4.4*
+* *Exhaustive search* (**default**): the concept is to iterate over all 2 pair
+  of one experimental peak with a theoretical counterpart and
+  
+  1. Estimate a stretch and bias using those 2 pairs
+  2. Pair-up experimental peaks with theoretical ones using this 1st approximation.
+  3. Re-estimate the stretch and bias using a linear regression on the new pairs.
+  4. Pair-up experimental peaks with theoretical ones using this 2nd approximation.
+  5. Re-estimate the stretch and bias using a linear regression on the new pairs.
+
+The main difference is in the way potential stretch and biases are found. The
+new approach is quasi-certain to hit upon a good 1st estimate. It will run for
+very long unless there are less than 10~20 theoretical peaks.
+
+#### Applying Constraints
+
+Some help is provided in applying constraints to stretch and biases:
+
+* *creating a new constraints file* can be done by simply typing the name of a
+  new file in the *Id file path* input box. The new file will open using excel.
+  It will contain the following columns:
+
+  1. *Bead*: the bead number. One does not need to provide all beads. Numbers
+     in the excel file not in the track file, and vice-versa, will
+     automatically be ignored by *CyclesApp*.
+  2. *Reference*: the hairpin reference name. This is useful if there are
+     multiple hairpins in the mix. It still must be indicated even if there is
+     only one.
+  3. *Stretch (bases/µm)*: the number of bases per micrometer. Please beware of
+     the units.
+  4. *Bias (µm)*: the zero position, in micrometer. Please beware of the units.
+
+* *updating a constraints file* will affect *CyclesApp* within half a second:
+  The software checks the file modification date and reloads the data
+  accordingly. Please note that an update is a modification followed by a
+  file *save*.
+
+The files do not need to be created through the new feature. They do require to
+have the same structure: at least 4 columns *bead*, *reference*, *stretch* and
+*bias* in a *summary* tab. This means a previously created excel report can
+also be used.
+
 # tag cycles_v4.4.3
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
