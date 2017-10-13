@@ -236,7 +236,7 @@ def test_merge():
 
     right[40:43] = 1
 
-    agg = MultiGradeSplitDetector.Aggregation.patch
+    agg = MultiGradeSplitDetector.AGG.patch
     assert (list(np.nonzero(agg.apply(left, right))[0])
             == [10, 20, 21, 30, 32, 40, 41, 42])
 
