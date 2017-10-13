@@ -83,7 +83,7 @@ class FitToHairpinAccess(TaskAccess):
         cur  = self.task
         if task is None and cur is not None:
             self.remove()
-        elif task is not None and cur is None:
+        elif task != cur:
             self.update(**task.config())
 
 class FitParamProp(_FitParamProp):

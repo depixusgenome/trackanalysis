@@ -3,6 +3,7 @@
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
 from typing                     import List, Dict, Any
 from pathlib                    import Path
+import os
 
 import bokeh.core.properties as props
 from bokeh.models               import (ColumnDataSource, DataTable, TableColumn,
@@ -14,6 +15,8 @@ from signalfilter               import rawprecision
 
 from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit
 
+from utils.gui                  import startfile
+from excelreports.creation      import writecolumns
 from view.dialog                import FileDialog
 from view.pathinput             import PathInput
 from view.plots                 import from_py_func, DpxNumberFormatter, WidgetCreator
@@ -140,8 +143,12 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
             self.values[1] = dist[key].bias
 
             task      = mdl.identification.task
-            remove    = task.match[key].peaks[[0,-1]]
-            nrem      = sum(i in remove for i in mdl.peaks[key+'id'])
+            tmp       = task.match[key].peaks
+            if len(tmp):
+                remove = task.match[key].peaks[[0,-1]]
+                nrem   = sum(i in remove for i in mdl.peaks[key+'id'])
+            else:
+                nrem   = 0
             nfound    = np.isfinite(mdl.peaks[key+'id']).sum()-nrem
             npks      = len(task.match[key].hybridizations)
             self.values[8] = '{}/{}'.format(nfound, npks)
@@ -237,13 +244,47 @@ class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
     "Selects an id file"
     def __init__(self, model:PeaksPlotModelAccess) -> None:
         super().__init__(model)
+        self.keeplistening       = True
         self.__widget: PathInput = None
         self.__dlg    = FileDialog(config    = self._ctrl,
                                    storage   = 'constraints.path',
                                    filetypes = '*|xlsx')
 
         css          = self.css.constraints
-        css.defaults = {'title': u'Id file path'}
+        css.defaults = {'title': u'Id file path', 'filechecks': 500}
+
+    def listentofile(self, doc, action):
+        "sets-up a periodic callback which checks whether the id file has changed"
+        finfo = [None, None]
+
+        @action
+        def _do_resetmodel():
+            self._model.identification.resetmodel(self._model)
+
+        def _callback():
+            if not self.keeplistening:
+                return
+
+            path = self._model.constraintspath
+            if path is None:
+                finfo[0] = None
+                return
+
+            new  = finfo[0] is None
+            time = os.path.getmtime(path) if Path(path).exists() else 0
+            diff = time != finfo[1]
+
+            finfo[1] = time # type: ignore
+            if new:
+                finfo[0] = path
+                return
+
+            if not diff:
+                return
+
+            _do_resetmodel()
+
+        doc.add_periodic_callback(_callback, self.css.constraints.filechecks.get())
 
     def create(self, action) -> List[Widget]:
         "creates the widget"
@@ -266,10 +307,14 @@ class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
                 self._model.constraintspath = None
 
             elif not Path(path).exists():
-                self.reset(None)
+                writecolumns(path, "Summary",
+                             [('Bead', [self._model.bead]),
+                              ('Reference', [self._model.sequencekey]),
+                              ('Stretch (base/µm)', [self._model.stretch]),
+                              ('Bias (µm)', [self._model.bias])])
+                startfile(path)
 
-            else:
-                self._model.constraintspath = str(Path(path).resolve())
+            self._model.constraintspath = str(Path(path).resolve())
 
         self.__widget.on_change('click', _onclick_cb)
         self.__widget.on_change('value', _onchangetext_cb)

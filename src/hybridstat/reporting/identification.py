@@ -57,8 +57,9 @@ def _read_summary(rows) -> List[Tuple[int, str, Optional[float], Optional[float]
     names = ('bead', 'reference', 'stretch', 'bias')
     for row in rows:
         for i, cell in enumerate(row):
+            cur = str(cell.value).split('(')[0].strip().lower()
             try:
-                ids[names.index(str(cell.value).lower())] = i
+                ids[names.index(cur)] = i
             except ValueError:
                 pass
         if ids.count(None) != 4:
@@ -105,8 +106,12 @@ def readparams(fname:str) -> Union[List[Tuple[int,str,Optional[float],Optional[f
         if sheetname.lower() == "summary":
             return _read_summary(iter(wbook[sheetname].rows))
 
-        elif sheetname.lower() == "identification":
+    for sheetname in wbook.sheetnames:
+        if sheetname.lower() == "identification":
             return _read_identifications(iter(wbook[sheetname].rows))
+
+    for sheetname in wbook.sheetnames:
+        return _read_identifications(iter(wbook[sheetname].rows))
     res = [] # type: List[Tuple[int, str]]
     return res
 

@@ -202,7 +202,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         self.__create_fig()
         rends = self.__add_curves()
         self.__setup_tools(doc, rends)
-        return self._keyedlayout(self._fig, right = self.__setup_widgets())
+        return self._keyedlayout(self._fig, right = self.__setup_widgets(doc))
 
     def observe(self):
         "observes the model"
@@ -271,10 +271,12 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         self._ticker.create(self._fig, self._model, self)
         self._hover.jsslaveaxes(self._fig, self._peaksrc)
 
-    def __setup_widgets(self):
+    def __setup_widgets(self, doc):
         action  = self.action
         wdg     = {i: j.create(action) for i, j in self._widgets.items()}
         enableOnTrack(self, self._fig, wdg)
+        self._widgets['cstrpath'].listentofile(doc, action)
+
 
         self._widgets['advanced'].callbacks(self._doc)
         self._widgets['peaks'].setsource(self._peaksrc)
@@ -292,6 +294,11 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
     def advanced(self):
         "triggers the advanced dialog"
         self._widgets['advanced'].on_click()
+
+    def activate(self, val):
+        "activates the component: resets can occur"
+        self._widgets['cstrpath'].listentofile = val
+        super().activate(val)
 
 class PeaksPlotView(PlotView[PeaksPlotCreator]):
     "Peaks plot view"
