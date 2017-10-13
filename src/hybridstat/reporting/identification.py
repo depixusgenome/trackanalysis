@@ -6,6 +6,7 @@ Extracts information from a report
 from typing                 import (Optional,   # pylint: disable=unused-import
                                     Sequence, Tuple, List, Union,
                                     Dict, Callable, cast)
+from pathlib                import Path
 from openpyxl               import load_workbook
 from excelreports.creation  import writecolumns
 
@@ -95,6 +96,10 @@ def _read_identifications(rows) -> List[Tuple[int,str]]:
 def readparams(fname:str) -> Union[List[Tuple[int,str,Optional[float],Optional[float]]],
                                    List[Tuple[int,str]]]:
     "extracts bead ids and their reference from a report"
+    if not Path(fname).exists():
+        raise ValueError("Id file path unreachable","warning")
+    if Path(fname).is_dir():
+        raise ValueError("Id file path is a directory", "warning")
     wbook = load_workbook(filename=fname, read_only=True)
     for sheetname in wbook.sheetnames:
         if sheetname.lower() == "summary":
