@@ -45,3 +45,6 @@ class HairpinCycleAlignment(PeakCorrelationAlignment, HairpinFitter):
                                 bias      = bias,
                                 precision = precision,
                                 **kwa)
+    def optimize(self, peaks: np.ndarray):
+        "optimizes the cost function"
+        raise AttributeError()

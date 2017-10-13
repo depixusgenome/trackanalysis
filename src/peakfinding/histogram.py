@@ -444,8 +444,8 @@ class ByZeroCrossing:
     subpixel         = SubPixelPeakPosition()
     peakwidth        = 1
     threshold: float = getattr(np.finfo('f4'), 'resolution')
-    finder           =ZeroCrossingPeakFinder()
-    grouper          =GroupByPeakAndBase()
+    finder           = ZeroCrossingPeakFinder()
+    grouper          = GroupByPeakAndBase()
     @initdefaults(frozenset(locals()), subpixel = 'update')
     def __init__(self, **_):
         pass
@@ -464,17 +464,18 @@ class ByGaussianMix:
     '''
     max_iter  = 10000
     cov_type  = 'tied'
-    peakwidth = np.array([[1]])
-    dpgmm = BayesianGaussianMixture()
+    peakwidth = 1
+    dpgmm     = BayesianGaussianMixture()
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 
     def find(self,hist: np.array, bias:float = 0., slope:float = 1.):
         'find peaks'
+        cov        = np.array([[self.peakwidth]])
         ncmps      = min(int((max(hist)-min(hist))/min(self.peakwidth)),1) # find better, smaller
         kwa        = {'n_components'     : ncmps,
-                      'covariance_prior' : self.peakwidth,
+                      'covariance_prior' : cov,
                       'covariance_type'  : self.cov_type,
                       'max_iter'         : self.max_iter}
         self.dpgmm = BayesianGaussianMixture(**kwa)
