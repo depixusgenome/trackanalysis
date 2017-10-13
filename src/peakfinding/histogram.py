@@ -453,13 +453,13 @@ class ByZeroCrossing:
     def __init__(self, **_):
         pass
 
-    def find(self, *args, **kwa):
-        'find peaks'
-        return self.finder(*args,**kwa)
-
-    def group(self, *args, **kwa):
-        'group events'
-        return self.grouper(*args, **kwa)
+    def __call__(self,**kwa):
+        hist  = kwa.get("hist",(np.array([]),0,1))
+        peaks = self.finder(*hist)
+        ids   = self.grouper(peaks     = kwa.get("peaks"),
+                             pos       = kwa.get("pos") ,
+                             precision = kwa.get("precision",None))
+        return peaks, ids
 
 class ByGaussianMix:
     '''
@@ -469,27 +469,32 @@ class ByGaussianMix:
     cov_type  = 'tied'
     peakwidth = 1
     dpgmm     = BayesianGaussianMixture()
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 
-    def find(self,hist: np.array, bias:float = 0., slope:float = 1.):
+    def __call__(self,**kwa):
+        pos            = kwa.get("pos",None)
+        self.peakwidth = kwa.get("precision",1)
+        _,bias,slope   = kwa.get("hist",(0,0,1))
+        return self.find(pos, bias, slope)
+
+    def find(self,pos: np.array, bias:float = 0., slope:float = 1.):
         'find peaks'
         cov        = np.array([[self.peakwidth]])
-        ncmps      = max(int((max(hist)-min(hist))/self.peakwidth),1) # find better, smaller
-        # LOGS.info(f"cov={cov}")
-        # LOGS.info(f"ncmps={ncmps}")
+        ncmps      = max(int((max(pos)-min(pos))/self.peakwidth),1) # find better, smaller
         kwa        = {'n_components'     : ncmps,
                       'covariance_prior' : cov,
                       'covariance_type'  : self.cov_type,
                       'max_iter'         : self.max_iter}
         self.dpgmm = BayesianGaussianMixture(**kwa)
-        self.dpgmm.fit(np.matrix(hist).T)
-        pos        = self.dpgmm.means_[self.dpgmm.weights_>0.01][:,0]
-        return pos * slope + bias
+        trpos      = np.matrix(pos).T
+        self.dpgmm.fit(trpos)
+        predict    = self.dpgmm.predict(trpos)
 
-    def group(self, pos,*_1,**_2):
-        'group events'
-        return self.dpgmm.predict(pos)
+        peaks      = self.dpgmm.means_[list(set(predict))][:,0]
+        return peaks * slope + bias, predict
+
 
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix]
