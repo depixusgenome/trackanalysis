@@ -6,15 +6,18 @@ from    typing import (NamedTuple, Optional, Iterator,
 from    enum   import Enum
 import  itertools
 
-from sklearn.mixture import BayesianGaussianMixture
+from sklearn.mixture            import BayesianGaussianMixture
 import  numpy  as     np
 from    numpy.lib.stride_tricks import as_strided
 from    scipy.signal            import find_peaks_cwt
 
 from    utils                   import (kwargsdefaults, initdefaults,
                                         NoArgs, asdataarrays, EVENTS_DTYPE)
+from    utils.logconfig         import getLogger
 from    signalfilter            import PrecisionAlg
 from    signalfilter.convolve   import KernelConvolution
+
+LOGS       = getLogger(__name__)
 
 HistInputs = Union[Iterable[Iterable[float]],
                    Iterable[Iterable[np.ndarray]],
@@ -473,7 +476,9 @@ class ByGaussianMix:
     def find(self,hist: np.array, bias:float = 0., slope:float = 1.):
         'find peaks'
         cov        = np.array([[self.peakwidth]])
-        ncmps      = min(int((max(hist)-min(hist))/min(self.peakwidth)),1) # find better, smaller
+        ncmps      = max(int((max(hist)-min(hist))/self.peakwidth),1) # find better, smaller
+        # LOGS.info(f"cov={cov}")
+        # LOGS.info(f"ncmps={ncmps}")
         kwa        = {'n_components'     : ncmps,
                       'covariance_prior' : cov,
                       'covariance_type'  : self.cov_type,
