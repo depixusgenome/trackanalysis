@@ -388,10 +388,17 @@ class _ManagedServerLoop:
                model: Union[str,dict,Model],
                attrs: Union[str, Sequence[str]],
                value: Any,
-               browser  = True,
-               withpath = None):
+               browser     = True,
+               withpath    = None,
+               withnewpath = None):
         "Changes a model attribute on the browser side"
-        if withpath is not None:
+        if withnewpath is not None:
+            import view.dialog  # pylint: disable=import-error
+            def _tkopen1(*_1, **_2):
+                return withnewpath
+            self.monkeypatch.setattr(view.dialog, '_tkopen', _tkopen1)
+
+        elif withpath is not None:
             import view.dialog  # pylint: disable=import-error
             def _tkopen(*_1, **_2):
                 return self.path(withpath)

@@ -103,9 +103,9 @@ def test_peaksplot(bokehaction):
             if fig.extra_x_ranges['duration'].end is None:
                 server.wait()
         _press('Shift- ',         0.,       0.)
-        _press('Shift-ArrowUp',   0.319146, 0.478953)
-        _press('Alt-ArrowUp',     0.351107, 0.510914)
-        _press('Alt-ArrowDown',   0.319146, 0.478953)
+        _press('Shift-ArrowUp',   0.312381, 0.476166)
+        _press('Alt-ArrowUp',     0.345138, 0.508923)
+        _press('Alt-ArrowDown',   0.312381, 0.476166)
         _press('Shift-ArrowDown', 0.,       0.)
 
         src = server.widget['Peaks:List'].source
@@ -128,7 +128,7 @@ def test_peaksplot(bokehaction):
 
         menu = server.widget['Cycles:Sequence'].menu
         lst  = tuple(i if i is None else i[0] for i in list(menu))
-        assert lst == ('GF2', 'GF4', 'GF1', 'GF3', '015', None, 'Select sequence')
+        assert lst == ('GF4', 'GF2', 'GF1', 'GF3', '015', None, 'Select sequence')
 
         out = mktemp()+"_hybridstattest100.xlsx"
         writeparams(out, [('GF3', (0,))])
@@ -138,6 +138,18 @@ def test_peaksplot(bokehaction):
         menu = server.widget['Cycles:Sequence'].menu
         lst  = tuple(i if i is None else i[0] for i in list(menu))
         assert lst == ('GF3', None, 'Select sequence')
+
+        out = mktemp()+"_hybridstattest101.xlsx"
+        import hybridstat.view._widget as widgetmod
+        found = [0]
+        def _startfile(path):
+            found[0] = path
+            return
+        bokehaction.setattr(widgetmod, 'startfile', _startfile)
+        server.click('Peaks:IDPath', withnewpath = out)
+        server.wait()
+        assert found[0] == out
+        assert Path(out).exists()
 
 def test_hybridstat(bokehaction):
     "test hybridstat"
