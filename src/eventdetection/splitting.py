@@ -2,20 +2,22 @@
 # -*- coding: utf-8 -*-
 "Interval detection: splitting the trace into flat events"
 
-from    typing                  import Optional, Tuple, Union, List, NamedTuple, cast
-from    abc                     import abstractmethod
-from    enum                    import Enum
+from    typing                      import (Optional, Tuple, Union, List,
+                                            NamedTuple, cast)
+from    abc                         import abstractmethod
+from    enum                        import Enum
 
 import  numpy as np
-from    numpy.lib.stride_tricks import as_strided
-from    scipy.ndimage.filters   import correlate1d
+from    numpy.lib.stride_tricks     import as_strided
+from    scipy.ndimage.filters       import correlate1d
+from    scipy.stats.distributions   import chi2
 
-from    utils                   import initdefaults
-from    signalfilter            import samples as _samples, PrecisionAlg
+from    utils                       import initdefaults
+from    signalfilter                import samples as _samples, PrecisionAlg
 
-from    .threshold              import Threshold, MedianThreshold
-from    .intervalextension      import (IntervalExtension,
-                                        IntervalExtensionAroundRange)
+from    .threshold                  import Threshold, MedianThreshold
+from    .intervalextension          import (IntervalExtension,
+                                            IntervalExtensionAroundRange)
 norm = _samples.normal.knownsigma # pylint: disable=invalid-name
 
 class SplitDetector(PrecisionAlg):
@@ -225,8 +227,8 @@ class ChiSquareSplitDetector(GradedSplitDetector):
 
     Flatness is estimated using residues of a fit to the mean of the interval.
     """
-    window                          = 4
-    confidence: Optional[Threshold] = MedianThreshold()
+    window                                    = 4
+    confidence: Union[float, None, Threshold] = .10
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -251,7 +253,11 @@ class ChiSquareSplitDetector(GradedSplitDetector):
                   ) -> float:
         if self.confidence is None:
             return precision
-        return self.confidence(data, deltas, precision)
+        if callable(self.confidence):
+            return self.confidence(data, deltas, precision) # pylint: disable=not-callable
+        return (precision
+                * chi2.ppf(1.-cast(float,self.confidence), self.window-1)
+                / self.window)
 
 class MinMaxSplitDetector(GradedSplitDetector):
     """
