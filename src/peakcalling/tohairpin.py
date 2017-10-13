@@ -200,16 +200,17 @@ class PeakGridFit(HairpinFitter):
         if len(peaks) < 2:
             return self.DEFAULT
 
-        ref   = self.expectedpeaks
         rng   = lambda val: ((val.center if val.center else 0.) - val.size,
                              (val.center if val.center else 0.) + val.size)
-
         args  = rng(self.stretch)+rng(self.bias)
-        itr   = tuple(np.copy(i) for i in _match.PeakIterator(ref, peaks, *args))
-        minv  = min((chisquare(ref, peaks, False, self.symmetry, self.window,
-                               stretch, -stretch*bias)
-                     for stretch, bias in itr),
-                    default = self.DEFAULT)
+        centr = sum(args[:2])*.5, sum(args[2:])*.5
+        if len(peaks) < 2:
+            return Distance(DEFAULT_BEST, *centr)
+
+        ref   = self.expectedpeaks
+        itr   = tuple(i for i in _match.PeakIterator(ref, peaks, *args)) + (centr,)
+        args  = ref, peaks, False, self.symmetry, self.window
+        minv  = min(chisquare(*args, stretch, -stretch*bias) for stretch, bias in itr)
 
         return Distance(minv[0], minv[1], -minv[2]/minv[1])
 
