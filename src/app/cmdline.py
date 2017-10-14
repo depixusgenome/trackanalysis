@@ -235,8 +235,6 @@ def main(view, files, bead,  # pylint: disable=too-many-arguments
     _win_opts()
 
     kwargs = dict(port = _port(port), apponly = False)
-    if gui != 'firefox':
-        kwargs['unused_session_linger_milliseconds'] = 60000
 
     _files(files, bead)
     server = _launch(view, 'app.toolbar', gui == 'firefox', kwargs)

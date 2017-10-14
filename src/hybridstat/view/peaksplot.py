@@ -249,11 +249,12 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         rends = []
         for key in ('count', 'peaks.count', 'peaks.duration'):
             src = self._peaksrc if 'peaks' in key else self._histsrc
-            rng = 'duration' if 'duration' in key else None
             args= dict(y            = 'z',
                        x            = key.split('.')[-1],
-                       source       = src,
-                       x_range_name = rng)
+                       source       = src)
+            if 'duration' in key:
+                args['x_range_name'] = 'duration'
+
             if 'peaks' in key:
                 args['line_color'] = 'color'
             val = css[key].addto(self._fig, **args)
