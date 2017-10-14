@@ -108,6 +108,7 @@ class MessagesListWidget(WidgetCreator[MessagesModelAccess]):
         super().__init__(model)
         self.__widget: DataTable   = None
         css                        = self.__config
+        css.height.default   = 500
         css.type.defaults    = {'extent'     : 'Δz',
                                 'hfsigma'    : 'σ[HF]',
                                 'population' : '% good'}
@@ -137,6 +138,7 @@ class MessagesListWidget(WidgetCreator[MessagesModelAccess]):
                                   editable    = False,
                                   row_headers = False,
                                   width       = sum([i[-1] for i in cnf.get()]),
+                                  height      = self.__config.height.get(),
                                   name        = "Messages:List")
         return [self.__widget]
 
@@ -145,6 +147,13 @@ class MessagesListWidget(WidgetCreator[MessagesModelAccess]):
         itm  = self.__widget.source if resets is None else resets[self.__widget.source]
         data = self.__data()
         itm.update(data = {i: list(j) for i, j in data.items()})
+
+        # bug in bokeh 0.12.9: table update is incorrect unless the number
+        # of rows is fixed
+        width = sum([i[-1] for i in self.__config.columns.get()])
+        if width == self.__widget.width:
+            width = width+1
+        resets[self.__widget].update(width = width)
 
     def __data(self) -> Dict[str, List]:
         mdl   = cast(MessagesModelAccess, self._model)
