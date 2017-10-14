@@ -1,7 +1,6 @@
 import {build_views}    from "core/build_views"
 import {logger}         from "core/logging"
 import * as p           from "core/properties"
-import * as $           from "jquery"
 
 import {WidgetView, Widget} from "models/widgets/widget"
 

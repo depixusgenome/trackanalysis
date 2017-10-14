@@ -79,6 +79,7 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
 class DpxCleaning(Widget):
     "This starts tests once flexx/browser window has finished loading"
     __css__            = ROUTE+"/cleaning.css"
+    __javascript__     = ROUTE+"/jquery.min.js"
     __implementation__ = "_widget.coffee"
     frozen             = props.Bool(True)
     framerate          = props.Float(30.)

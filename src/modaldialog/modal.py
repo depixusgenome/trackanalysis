@@ -12,8 +12,8 @@ import  re
 import  bokeh.core.properties   as props
 from    bokeh.models            import Model, Callback
 from    utils.logconfig         import getLogger
+from    view.static             import ROUTE
 LOGS  = getLogger()
-ROUTE = 'modaldialog'
 
 class Option(metaclass = ABCMeta):
     "Converts a text tag to an html input"
@@ -187,7 +187,8 @@ class DpxModal(Model):
                           CSVOption(str,    _OPT+r'csv'))
     __css__            = [ROUTE+"/backbone.modal.css",
                           ROUTE+"/backbone.modal.theme.css"]
-    __javascript__     =  ROUTE+"/underscore-min.js"
+    __javascript__     = [ROUTE+"/underscore-min.js",
+                          ROUTE+"/jquery.min.js"]
     __implementation__ = "modal.coffee"
     title              = props.String("")
     body               = props.String("")
