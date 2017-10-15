@@ -18,13 +18,14 @@
             return
 
         @_hvr_cnt = if @_hvr_cnt? then @_hvr_cnt + 1 else 0
-        inds      = data.index['1d'].indices
-        if (not inds?) || inds.length == 0
-            if glyph.visible
-                glyph.visible = false
-                glyph.change.emit()
-            return
+        if data.index['1d']?
+            inds      = data.index['1d'].indices
+            if (not inds?) || inds.length == 0
+                if glyph.visible
+                    glyph.visible = false
+                    glyph.change.emit()
+                return
 
-        window.setTimeout(((a,b,c,d,e) => @set_hover(a,b,c,d,e)),
-                          100, rawsrc, hvrsrc, glyph,
-                          inds, @_hvr_cnt)
+            window.setTimeout(((a,b,c,d,e) => @set_hover(a,b,c,d,e)),
+                              100, rawsrc, hvrsrc, glyph,
+                              inds, @_hvr_cnt)

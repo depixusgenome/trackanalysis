@@ -68,10 +68,10 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
                     glyph  = self._rawglyph)
         code = "hvr.launch_hover(rawsrc, hvrsrc, glyph, cb_data)"
         hover[0].callback = CustomJS(code = code, args = args)
-        hover[0].tooltips = None
 
         tooltips = css.tooltips.get()
         if tooltips is None or len(tooltips) == 0:
+            hover[0].tooltips = None
             return
 
         hover[0].tooltips  = tooltips
@@ -81,8 +81,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
                                          radius           = css.tooltips.radius.get(),
                                          radius_dimension = 'x',
                                          line_alpha       = 0.,
-                                         fill_alpha       = 0.,
-                                         visible          = False)]
+                                         fill_alpha       = 0.)]
 
     def createhist(self, fig, mdl, cnf):
         "Creates the hover tool for histograms"

@@ -252,7 +252,6 @@ class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
         if height == self.__widget.height:
             height = height+1
         resets[self.__widget].update(height = height)
-        print("****", height)
 
 class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
     "Selects an id file"
