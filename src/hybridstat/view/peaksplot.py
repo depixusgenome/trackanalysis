@@ -14,13 +14,14 @@ import numpy                    as     np
 from view.base                  import enableOnTrack
 from view.plots                 import PlotView, PlotAttrs, from_py_func
 from view.plots.tasks           import TaskPlotCreator
-from sequences.view             import (SequenceTicker, OligoListWidget,
+from sequences.view             import (SequenceTicker,
                                         SequenceHoverMixin)
 
 from ._model                    import PeaksPlotModelAccess
 from ._widget                   import (PeaksSequencePathWidget,
                                         PeaksStatsWidget, PeakListWidget,
-                                        PeakIDPathWidget, AdvancedWidget)
+                                        PeakIDPathWidget, AdvancedWidget,
+                                        PeaksOligoListWidget)
 from ._io                       import setupio
 
 class PeaksSequenceHover(Model, SequenceHoverMixin):
@@ -137,7 +138,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         self._peaksrc: ColumnDataSource = None
         self._fig:     Figure           = None
         self._widgets = dict(seq      = PeaksSequencePathWidget(self._model),
-                             oligos   = OligoListWidget(self._model),
+                             oligos   = PeaksOligoListWidget(self._model),
                              stats    = PeaksStatsWidget(self._model),
                              peaks    = PeakListWidget(self._model),
                              cstrpath = PeakIDPathWidget(self._model),
@@ -274,13 +275,12 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
 
     def __setup_widgets(self, doc):
         action  = self.action
-        wdg     = {i: j.create(action) for i, j in self._widgets.items()}
+        wdg     = {i: j.create(action, self._peaksrc) for i, j in self._widgets.items()}
         enableOnTrack(self, self._fig, wdg)
         self._widgets['cstrpath'].listentofile(doc, action)
 
 
         self._widgets['advanced'].callbacks(self._doc)
-        self._widgets['peaks'].setsource(self._peaksrc)
         self._widgets['seq'].callbacks(self._hover,
                                        self._ticker,
                                        wdg['stats'][-1],
