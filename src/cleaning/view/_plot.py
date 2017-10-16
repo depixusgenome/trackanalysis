@@ -114,7 +114,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
         widgets = self._createwidget(fig)
         bottom  = layouts.widgetbox(widgets['align'], **mode)
         left    = layouts.widgetbox(widgets['cleaning']+widgets['table'], **mode)
-        return self._keyedlayout(fig, right = left, bottom = bottom)
+        return self._keyedlayout(fig, left = left, bottom = bottom)
 
     def _reset(self):
         items, nans = GuiDataCleaningProcessor.runbead(self._model)

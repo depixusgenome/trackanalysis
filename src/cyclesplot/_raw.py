@@ -17,16 +17,17 @@ class RawMixin(ABC):
     "Building the graph of cycles"
     def __init__(self):
         "sets up this plotter's info"
-        self.css.defaults = {'raw.dark'     : PlotAttrs('color',  'circle', 1,
+        self.css.defaults = {'raw.dark'     : PlotAttrs('color',  'circle', .1,
                                                         alpha   = .5,
                                                         palette = 'YlOrBr'),
-                             'raw.basic'    : PlotAttrs('color',  'circle', 1,
+                             'raw.basic'    : PlotAttrs('color',  'circle', .1,
                                                         alpha   = .5,
                                                         palette = 'inferno'),
                              'figure.width' : 450,
                              'figure.height': 450}
         self._rawsource: ColumnDataSource = None
         self._raw:       Figure           = None
+        self.config.tools.raw.default     = 'tap,ypan,ybox_zoom,reset,save,dpxhover'
 
     @staticmethod
     def __normal_data(items):
@@ -96,7 +97,9 @@ class RawMixin(ABC):
 
     def _createraw(self):
         css             = self.css
-        self._raw       = figure(**self._figargs(y_range = Range1d,
+        tools           = self.config.tools.raw.get()
+        self._raw       = figure(**self._figargs(tools   = tools,
+                                                 y_range = Range1d,
                                                  name    = 'Cycles:Raw'))
         raw, shape      = self.__data()
         self._rawsource = ColumnDataSource(data = raw)

@@ -28,6 +28,7 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess], HistMixin, RawMixin,
         DpxHoverModel.defaultconfig(self)
         self.config.tools.default  = 'ypan,ybox_zoom,reset,save,dpxhover'
         self._hover: DpxHoverModel = None
+
         if TYPE_CHECKING:
             self._model = CyclesModelAccess('', '')
 
@@ -38,7 +39,9 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess], HistMixin, RawMixin,
 
         shape = self._createraw()
         self._createhist(self._rawsource.data, shape, self._raw.y_range)
-        return [self._keyedlayout(self._raw, self._hist), self._createwidget()]
+        if 'fixed' in self.defaultsizingmode().values():
+            return [self._keyedlayout(self._raw, self._hist), self._createwidget()]
+        return [self._createwidget(), self._keyedlayout(self._raw, self._hist)]
 
     def _reset(self):
         shape = self._resetraw()

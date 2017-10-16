@@ -203,7 +203,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         self.__create_fig()
         rends = self.__add_curves()
         self.__setup_tools(doc, rends)
-        return self._keyedlayout(self._fig, right = self.__setup_widgets(doc))
+        return self._keyedlayout(self._fig, left = self.__setup_widgets(doc))
 
     def observe(self):
         "observes the model"
