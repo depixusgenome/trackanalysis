@@ -14,13 +14,14 @@ import numpy                    as     np
 from view.base                  import enableOnTrack
 from view.plots                 import PlotView, PlotAttrs, from_py_func
 from view.plots.tasks           import TaskPlotCreator
-from sequences.view             import (SequenceTicker, OligoListWidget,
+from sequences.view             import (SequenceTicker,
                                         SequenceHoverMixin)
 
 from ._model                    import PeaksPlotModelAccess
 from ._widget                   import (PeaksSequencePathWidget,
                                         PeaksStatsWidget, PeakListWidget,
-                                        PeakIDPathWidget, AdvancedWidget)
+                                        PeakIDPathWidget, AdvancedWidget,
+                                        PeaksOligoListWidget)
 from ._io                       import setupio
 
 class PeaksSequenceHover(Model, SequenceHoverMixin):
@@ -137,7 +138,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         self._peaksrc: ColumnDataSource = None
         self._fig:     Figure           = None
         self._widgets = dict(seq      = PeaksSequencePathWidget(self._model),
-                             oligos   = OligoListWidget(self._model),
+                             oligos   = PeaksOligoListWidget(self._model),
                              stats    = PeaksStatsWidget(self._model),
                              peaks    = PeakListWidget(self._model),
                              cstrpath = PeakIDPathWidget(self._model),
@@ -202,7 +203,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         self.__create_fig()
         rends = self.__add_curves()
         self.__setup_tools(doc, rends)
-        return self._keyedlayout(self._fig, right = self.__setup_widgets(doc))
+        return self._keyedlayout(self._fig, left = self.__setup_widgets(doc))
 
     def observe(self):
         "observes the model"
@@ -249,11 +250,12 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         rends = []
         for key in ('count', 'peaks.count', 'peaks.duration'):
             src = self._peaksrc if 'peaks' in key else self._histsrc
-            rng = 'duration' if 'duration' in key else None
             args= dict(y            = 'z',
                        x            = key.split('.')[-1],
-                       source       = src,
-                       x_range_name = rng)
+                       source       = src)
+            if 'duration' in key:
+                args['x_range_name'] = 'duration'
+
             if 'peaks' in key:
                 args['line_color'] = 'color'
             val = css[key].addto(self._fig, **args)
@@ -273,13 +275,12 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
 
     def __setup_widgets(self, doc):
         action  = self.action
-        wdg     = {i: j.create(action) for i, j in self._widgets.items()}
+        wdg     = {i: j.create(action, self._peaksrc) for i, j in self._widgets.items()}
         enableOnTrack(self, self._fig, wdg)
         self._widgets['cstrpath'].listentofile(doc, action)
 
 
         self._widgets['advanced'].callbacks(self._doc)
-        self._widgets['peaks'].setsource(self._peaksrc)
         self._widgets['seq'].callbacks(self._hover,
                                        self._ticker,
                                        wdg['stats'][-1],

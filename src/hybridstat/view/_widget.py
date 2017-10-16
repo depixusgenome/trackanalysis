@@ -6,7 +6,7 @@ from pathlib                    import Path
 import os
 
 import bokeh.core.properties as props
-from bokeh.models               import (ColumnDataSource, DataTable, TableColumn,
+from bokeh.models               import (DataTable, TableColumn,
                                         Widget, Div, StringFormatter)
 
 import numpy                    as     np
@@ -21,9 +21,15 @@ from view.dialog                import FileDialog
 from view.pathinput             import PathInput
 from view.plots                 import from_py_func, DpxNumberFormatter, WidgetCreator
 from sequences.view             import (SequenceTicker, SequenceHoverMixin,
-                                        SequencePathWidget)
+                                        OligoListWidget, SequencePathWidget)
 from modaldialog.view           import AdvancedTaskMixin, T_BODY
 from ._model                    import PeaksPlotModelAccess
+
+class PeaksOligoListWidget(OligoListWidget):
+    "deals with oligos"
+    def create(self, action, *_) -> List[Widget]: # pylint: disable=arguments-differ
+        "creates the widget"
+        return super().create(action)
 
 class PeaksSequencePathWidget(SequencePathWidget):
     "Widget for setting the sequence to use"
@@ -33,6 +39,10 @@ class PeaksSequencePathWidget(SequencePathWidget):
             lst  = [i for i in lst if i in dist]
             return sorted(lst, key = lambda i: dist[i].value)
         return super()._sort(lst)
+
+    def create(self, action, *_) -> List[Widget]: # pylint: disable=arguments-differ
+        "creates the widget"
+        return super().create(action)
 
     def callbacks(self,             # type: ignore # pylint: disable=arguments-differ
                   hover: SequenceHoverMixin,
@@ -103,7 +113,7 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
                                   [u'Silhouette',       '.1f'],
                                   [u'reduced χ²',       '.1f']]}
 
-    def create(self, _) -> List[Widget]:
+    def create(self, *_) -> List[Widget]: # pylint: disable=arguments-differ
         "creates the widget"
         self.__widget = PeaksStatsDiv()
         self.reset(None)
@@ -199,7 +209,8 @@ class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
     "Table containing stats per peaks"
     def __init__(self, model:PeaksPlotModelAccess) -> None:
         super().__init__(model)
-        self.__widget: DataTable = None
+        self.__widget: DataTable      = None
+        self.css.peaks.height.default = 400
         css               = self.css.peaks.columns
         css.width.default = 60
         css.default       = [['z',        'css:ylabel',    '0.0000'],
@@ -212,7 +223,7 @@ class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
                              ['sigma',    u'σ (µm)',       '0.0000'],
                              ['skew',     u'skew',         '0.00']]
 
-    def create(self, _) -> List[Widget]:
+    def create(self, _, src) -> List[Widget]: # pylint: disable=arguments-differ
         "creates the widget"
         width = self.css.peaks.columns.width.get()
         get   = lambda i: self.css[i[4:]].get() if i.startswith('css:') else i
@@ -224,21 +235,23 @@ class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
                                  formatter  = fmt(i[2]))
                      for i in self.css.peaks.columns.get())
 
-        self.__widget = DataTable(source      = ColumnDataSource(self._model.peaks),
+        self.__widget = DataTable(source      = src,
                                   columns     = cols,
                                   editable    = False,
                                   row_headers = False,
                                   width       = width*len(cols),
+                                  height      = self.css.peaks.height.get(),
                                   name        = "Peaks:List")
         return [self.__widget]
 
-    def setsource(self, src):
-        "this widget has a source in common with the plots"
-        self.__widget.source = src
-
     def reset(self, resets):
         "resets the wiget when a new file is opened"
-        pass
+        # bug in bokeh 0.12.9: table update is incorrect unless the number
+        # of rows is fixed
+        height = self.css.peaks.height.get()
+        if height == self.__widget.height:
+            height = height+1
+        resets[self.__widget].update(height = height)
 
 class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
     "Selects an id file"
@@ -286,7 +299,7 @@ class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
 
         doc.add_periodic_callback(_callback, self.css.constraints.filechecks.get())
 
-    def create(self, action) -> List[Widget]:
+    def create(self, action, _) -> List[Widget]: # pylint: disable=arguments-differ
         "creates the widget"
         title         = self.css.constraints.title.get()
         width         = self.css.input.width.get() - 10
@@ -352,7 +365,7 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin):
         "resets the wiget when a new file is opened, ..."
         AdvancedTaskMixin.reset(resets)
 
-    def create(self, action) -> List[Widget]:
+    def create(self, action, _) -> List[Widget]: # pylint: disable=arguments-differ
         "creates the widget"
         return AdvancedTaskMixin.create(self, action)
 

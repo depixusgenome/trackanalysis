@@ -26,6 +26,7 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
         css                       = self.__config
         css.lines.order.default   = ('extent', 'hfsigma', 'population', 'aberrant', 'good')
         css.columns.width.default = 65
+        css.height.default        = 500
         css.columns.default       = [['cycle',       u'Cycle',   '0'],
                                      ['population', u'% good',   '0.'],
                                      ['hfsigma',    'σ[HF]',     '0.0000'],
@@ -54,6 +55,7 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
                                   editable    = False,
                                   row_headers = False,
                                   width       = width*len(cols),
+                                  height      = self.__config.height.get(),
                                   name        = "Cleaning:List")
         return [self.__widget]
 
@@ -62,6 +64,13 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
         itm  = self.__widget.source if resets is None else resets[self.__widget.source]
         data = self.__data()
         itm.update(data = data)
+
+        # bug in bokeh 0.12.9: table update is incorrect unless the number
+        # of rows is fixed
+        width = self.__config.columns.width.get()*len(data)
+        if width == self.__widget.width:
+            width = width+1
+        resets[self.__widget].update(width = width)
 
     def __data(self) -> dict:
         cache = self._model.cleaning.cache
@@ -79,6 +88,7 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
 class DpxCleaning(Widget):
     "This starts tests once flexx/browser window has finished loading"
     __css__            = ROUTE+"/cleaning.css"
+    __javascript__     = [ROUTE+"/jquery.min.js", ROUTE+"/jquery-ui.min.js"]
     __implementation__ = "_widget.coffee"
     frozen             = props.Bool(True)
     framerate          = props.Float(30.)

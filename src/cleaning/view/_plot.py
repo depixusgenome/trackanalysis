@@ -11,7 +11,7 @@ import  bokeh.colors   as     _bkclr
 import  numpy                   as     np
 
 from    utils.array             import repeat
-from    view.plots              import PlotAttrs, PlotView
+from    view.plots              import PlotAttrs, PlotView, DpxHoverTool
 from    view.plots.tasks        import TaskPlotCreator
 from    control                 import Controller
 
@@ -70,6 +70,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
         WidgetMixin.__init__(self)
         cnf = self.css
         cnf.plot.figure.height.default = self.css.plot.figure.width.get()//2
+        cnf.plot.figure.defaults  = {'width': 500, 'height': 800}
         cnf.points.default  = PlotAttrs('color',  'circle', 1, alpha   = .5)
 
         colors = dict(good       = '#6baed6', # blue
@@ -80,7 +81,10 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
         cnf.colors.basic.defaults = colors
         cnf.colors.dark .defaults = colors
         cnf.colors.order.default  = ('aberrant', 'hfsigma', 'extent', 'population', 'good')
-        self.css.figure.defaults  = dict(width = 500, height = 800)
+        self.css.figure.defaults  = dict(width    = 500,
+                                         height   = 800,
+                                         tooltips = [(u'(cycle, t, z)',
+                                                      '(@cycle, $~x{1}, $data_y{1.1111})')])
 
         self.__source: ColumnDataSource = None
         self.__fig:    Figure           = None
@@ -93,7 +97,12 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
         self.__fig = fig = figure(**self._figargs(y_range = Range1d,
                                                   x_range = Range1d,
                                                   name    = 'Clean:Cycles'))
-        self.css.points.addto(fig, x = 't', y = 'z', source = self.__source)
+        glyph = self.css.points.addto(fig, x = 't', y = 'z', source = self.__source)
+        hover = fig.select(DpxHoverTool)
+        if hover:
+            hover[0].tooltips  = self.css.figure.tooltips.get()
+            hover[0].renderers = [glyph]
+
         fig.extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}
         axis = LinearAxis(x_range_name = "time", axis_label = self.css.xtoplabel.get())
         fig.add_layout(axis, 'above')
@@ -105,7 +114,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
         widgets = self._createwidget(fig)
         bottom  = layouts.widgetbox(widgets['align'], **mode)
         left    = layouts.widgetbox(widgets['cleaning']+widgets['table'], **mode)
-        return self._keyedlayout(fig, right = left, bottom = bottom)
+        return self._keyedlayout(fig, left = left, bottom = bottom)
 
     def _reset(self):
         items, nans = GuiDataCleaningProcessor.runbead(self._model)

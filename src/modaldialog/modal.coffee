@@ -1,4 +1,3 @@
-import * as $               from "jquery"
 import * as p               from "core/properties"
 import {DOMView}            from "core/dom_view"
 import {Model}              from "model"

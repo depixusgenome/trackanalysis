@@ -511,13 +511,18 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
             args['tools'] = args['tools'].split(',')
 
         ttips = _m_none
-        for css in cssarr:
+        for css in cssarr if len(cssarr) else iter((self.config, self.css)):
             ttips = css.get('tooltips', default = _m_none)
             if ttips is not _m_none:
+                print(ttips)
                 break
 
-        if ttips not in (_m_none, '', None) and 'dpxhover' not in args['tools']:
-            args['tools'] += [DpxHoverTool()]
+        if ttips not in (_m_none, '', None):
+            if 'dpxhover' not in args['tools']:
+                args['tools'] += [DpxHoverTool(tooltips = ttips)]
+            else:
+                args['tools'] = [i if i != 'dpxhover' else DpxHoverTool(tooltips = ttips)
+                                 for i in args['tools']]
         elif 'dpxhover' in args['tools']:
             args['tools'] = [i if i != 'dpxhover' else DpxHoverTool()
                              for i in args['tools']]
