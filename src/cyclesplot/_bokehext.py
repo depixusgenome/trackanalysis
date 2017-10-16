@@ -40,7 +40,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
                         'selection.basic' : PlotAttrs('blue', 'line',   3),
                         'tooltips'        : [(u'(cycle, t, z)',
                                               '(@cycle, $~x{1}, $data_y{1.1111})')],
-                        'tooltips.radius' : 1.5}
+                        'tooltips.radius' : 1.}
         SequenceHoverMixin.defaultconfig(mdl)
 
     @staticmethod
@@ -61,13 +61,11 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
                 hover[0].tooltips = None
         elif len(hover):
             hover[0].tooltips  = tooltips
-            hover[0].renderers = [fig.circle(x                = 't',
-                                             y                = 'z',
-                                             source           = source,
-                                             radius           = css.tooltips.radius.get(),
-                                             radius_dimension = 'x',
-                                             line_alpha       = 0.,
-                                             fill_alpha       = 0.)]
+            hover[0].renderers = [fig.renderers[-1]]
+            fig.renderers[-1].selection_glyph        = None
+            fig.renderers[-1].nonselection_glyph     = None
+            fig.renderers[-1].glyph.radius_dimension = 'x'
+            fig.renderers[-1].glyph.radius           = css.tooltips.radius.get()
 
         tap  = fig.select(TapTool)
         if tap is not None and len(tap):
@@ -78,7 +76,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
                         hvrsrc = self._rawsource,
                         rawsrc = source,
                         glyph  = self._rawglyph)
-            code = "hvr.launch_hover(rawsrc, hvrsrc, glyph, cb_obj.selected)"
+            code = "hvr.launch_hover(rawsrc, hvrsrc, glyph)"
             source.callback = CustomJS(code = code, args = args)
 
     def createhist(self, fig, mdl, cnf):
