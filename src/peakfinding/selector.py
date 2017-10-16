@@ -4,16 +4,16 @@
 from   typing               import (Iterable, Iterator, Tuple, Union, Sequence,
                                     Callable, cast)
 from   collections          import namedtuple
+import pickle
 import numpy    as              np
 
 from utils                  import (initdefaults, asobjarray, asdataarrays, asview,
                                     updatecopy, EVENTS_TYPE, EVENTS_DTYPE, EventsArray)
 from signalfilter           import PrecisionAlg, PRECISION
 from .alignment             import PeakCorrelationAlignment
-from .histogram             import Histogram, ByZeroCrossing, PeakFinder
-                                    #ZeroCrossingPeakFinder, PeakFinder,
-                                    #GroupByPeakAndBase, GroupByPeak)
-
+rom .histogram             import (Histogram,
+                                    PeakFinder,
+                                    ByZeroCrossing)
 EventsOutput        = Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]]
 Input               = Union[Iterable[Iterable[np.ndarray]], Sequence[EVENTS_TYPE]]
 Output              = Tuple[float, EventsOutput]
@@ -26,15 +26,15 @@ class PeaksArray(EventsArray):
     _discarded = 0
     _dtype     = None
 
+
+
 class PeakSelector(PrecisionAlg):
     "Selects peaks and yields all events related to each peak"
     rawfactor          = 2.
     histogram          = Histogram(edge = 2)
     align              = PeakCorrelationAlignment()
     finder: PeakFinder = ByZeroCrossing()
-    #find : PeakFinder  = ZeroCrossingPeakFinder()
-    #group: GroupByPeak = GroupByPeakAndBase()
-    @initdefaults(frozenset(locals()) - {'rawfactor'})
+   @initdefaults(frozenset(locals()) - {'rawfactor'})
     def __init__(self, **_):
         super().__init__(**_)
 
@@ -124,6 +124,7 @@ class PeakSelector(PrecisionAlg):
         else:
             delta  = None
 
+<<<<<<< a874f7f3a5b17519297782cd5f80b79834460221
         histdata = projector.projection(pos, zmeasure = None)
         peaks, ids = self.finder(hist      = histdata,
                                  pos       = pos,
@@ -131,7 +132,7 @@ class PeakSelector(PrecisionAlg):
         print(f"peaks={peaks}")
         print(f"ids={ids}")
         hist, minv, binwidth = histdata
-        return PeakSelectorDetails(pos, hist, minv, binwidth, delta, peaks, orig, ids)
+       return PeakSelectorDetails(pos, hist, minv, binwidth, delta, peaks, orig, ids)
 
     def details2output(self, dtl:PeakSelectorDetails) -> Iterator[Output]:
         "yields results from precomputed details"

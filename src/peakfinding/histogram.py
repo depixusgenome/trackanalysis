@@ -3,6 +3,7 @@
 "Creates a histogram from available events"
 from    typing import (NamedTuple, Optional, Iterator,
                        Iterable, Union, Sequence, Callable, Tuple, cast)
+import pickle
 from    enum   import Enum
 import  itertools
 from sklearn.mixture            import BayesianGaussianMixture
@@ -449,16 +450,15 @@ class ByZeroCrossing:
     finder           = ZeroCrossingPeakFinder()
     grouper          = GroupByPeakAndBase()
     @initdefaults(frozenset(locals()), subpixel = 'update')
-    def __init__(self, **_):
+    def __init__(self, **kwa):
         pass
-
     def __call__(self,**kwa):
         hist  = kwa.get("hist",(np.array([]),0,1))
         peaks = self.finder(*hist)
         ids   = self.grouper(peaks     = peaks,
                              elems     = kwa.get("pos"),
                              precision = kwa.get("precision",None))
-        return peaks, ids
+       return peaks, ids
 
 class ByGaussianMix:
     '''
@@ -481,20 +481,24 @@ class ByGaussianMix:
 
     def find(self,pos: np.array, bias:float = 0., slope:float = 1.):
         'find peaks'
+        apos       = np.hstack(pos)
         cov        = np.array([[self.peakwidth]])
-        positions   = list(itertools.chain.from_iterable(pos))
-        ncmps      = max(int((max(positions)-min(positions))/self.peakwidth),1)
+        ncmps      = max(int((max(apos)-min(apos))/self.peakwidth),1) # find better, smaller
         kwa        = {'n_components'     : ncmps,
                       'covariance_prior' : cov,
                       'covariance_type'  : self.cov_type,
                       'max_iter'         : self.max_iter}
+        # fails without proper sampling. use bootstrap
         self.dpgmm = BayesianGaussianMixture(**kwa)
-        trpos      = np.matrix(positions).T
-        self.dpgmm.fit(trpos)
+       trpos      = np.matrix(apos).T
+       self.dpgmm.fit(trpos)
         # must change predict to correspond to correct ids
         predict    = self.dpgmm.predict(trpos)
 
         peaks      = self.dpgmm.means_[list(set(predict))][:,0]
-        return peaks * slope + bias, predict
+        # peaks are not ordered
+        return (peaks * slope + bias,
+                np.array([self.dpgmm.predict(zpos.reshape(-1,1))
+                          for zpos in pos]))
 
-PeakFinder = Union[ByZeroCrossing, ByGaussianMix]
+PeakFinder = Union[ByZeroCrossing, ByGaussianMix]
