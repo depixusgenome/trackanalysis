@@ -1,6 +1,14 @@
 # tag cycles_v4.5
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
+### User Interface
+
+The graphics library has been updated. It reports some improvements on speed of
+execution.
+
+Graphics have been moved around in order to circumvent sizing bugs which still
+havn't been solved.
+
 ### Cleaning
 
 * Frames with missing values on both sides are discarded.
@@ -14,9 +22,15 @@ The settings can be changed only by editing the user configuration file.
 
 ### Cycles
 
+#### User Interface
+
 The bias could not be set lower than the lowest z value in the histogram. One can
 now go 50nm below that.
 
+Highlighting a cycle now requires selecting a point. This makes the interface
+more responsive the rest of the time.
+
+#### Event Detection
 Events smaller than about 6 frames were never detected. We can now detect 5-frames
 events reliably and 4-frames events sometimes.
 
