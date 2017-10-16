@@ -4,7 +4,8 @@
 Adds shortcuts for using Events
 """
 import sys
-from   typing                       import Tuple, Callable, FrozenSet, Type, List
+from   typing                       import (Tuple, Callable, FrozenSet, Type,
+                                            List, cast)
 from   copy                         import copy as shallowcopy
 import numpy                        as     np
 import pandas                       as     pd
@@ -55,6 +56,9 @@ class Comparator:
         return self
 
     def __getattr__(self, name):
+        if name[0] == '_':
+            return super().__getattribute__(name)
+
         if name.lower() in ('data', 'start'):
             self.__key = name
         else:
@@ -67,17 +71,18 @@ class Comparator:
         "selects cycles that have a condition"
         key  = self.__key
         if self.__func is None:
-            fcn = np.nanmean if key == 'data' else lambda i: i
+            fcn = (cast(Callable, np.nanmean) if key == 'data' else
+                   cast(Callable, lambda i: i))
         else:
-            fcn = self.__func
+            fcn = cast(Callable, self.__func)
 
         ind  = self.__index
         evts = self.__events
         if np.isscalar(ind):
             return ((i, iter((fcn(j[key][ind]),)))  for i, j in evts if len(j) > ind)
         if ind not in (None, Ellipsis):
-            return ((i, iter((fcn(j[key][ind]),)))  for i, j in evts)
-        return ((i, iter(fcn(k) for k in j[key])) for i, j in evts if len(j) > ind)
+            return ((i, iter((fcn(j[key][ind]),)))  for i, j in evts  if len(j) > ind)
+        return ((i, iter(fcn(k) for k in j[key])) for i, j in evts)
 
     def __lt__(self, other) -> _RETURN_TYPE:
         cond = self.__cond
