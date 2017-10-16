@@ -5,7 +5,7 @@ from typing            import Any
 
 import  bokeh.core.properties as props
 from    bokeh.model    import Model
-from    bokeh.models   import ColumnDataSource, GlyphRenderer, CustomJS
+from    bokeh.models   import ColumnDataSource, GlyphRenderer, CustomJS, TapTool
 
 from    sequences.view import SequenceHoverMixin
 from    view.plots     import PlotAttrs, DpxHoverTool
@@ -40,7 +40,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
                         'selection.basic' : PlotAttrs('blue', 'line',   3),
                         'tooltips'        : [(u'(cycle, t, z)',
                                               '(@cycle, $~x{1}, $data_y{1.1111})')],
-                        'tooltips.radius' : 1.5}
+                        'tooltips.radius' : 1.}
         SequenceHoverMixin.defaultconfig(mdl)
 
     @staticmethod
@@ -52,37 +52,32 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         self._model = model
         self.shape  = tuple(shape)
 
-        hover       = fig.select(DpxHoverTool)
-        if len(hover) == 0:
-            return
-
-        self._rawsource = ColumnDataSource(self._createrawdata(source.data, shape))
-        css             = self._model.css.raw
-
-        sel             = css.selection[self._model.css.theme.get()].get()
-        self._rawglyph  = sel.addto(fig,  x = 't', y = 'z', source = self._rawsource)
-
-        args = dict(hvr    = self,
-                    hvrsrc = self._rawsource,
-                    rawsrc = source,
-                    glyph  = self._rawglyph)
-        code = "hvr.launch_hover(rawsrc, hvrsrc, glyph, cb_data)"
-        hover[0].callback = CustomJS(code = code, args = args)
-        hover[0].tooltips = None
-
+        css      = self._model.css.raw
         tooltips = css.tooltips.get()
-        if tooltips is None or len(tooltips) == 0:
-            return
+        hover    = fig.select(DpxHoverTool)
 
-        hover[0].tooltips  = tooltips
-        hover[0].renderers = [fig.circle(x                = 't',
-                                         y                = 'z',
-                                         source           = source,
-                                         radius           = css.tooltips.radius.get(),
-                                         radius_dimension = 'x',
-                                         line_alpha       = 0.,
-                                         fill_alpha       = 0.,
-                                         visible          = False)]
+        if tooltips is None or len(tooltips) == 0:
+            if len(hover):
+                hover[0].tooltips = None
+        elif len(hover):
+            hover[0].tooltips  = tooltips
+            hover[0].renderers = [fig.renderers[-1]]
+            fig.renderers[-1].selection_glyph        = None
+            fig.renderers[-1].nonselection_glyph     = None
+            fig.renderers[-1].glyph.radius_dimension = 'x'
+            fig.renderers[-1].glyph.radius           = css.tooltips.radius.get()
+
+        tap  = fig.select(TapTool)
+        if tap is not None and len(tap):
+            self._rawsource = ColumnDataSource(self._createrawdata(source.data, shape))
+            sel             = css.selection[self._model.css.theme.get()].get()
+            self._rawglyph  = sel.addto(fig,  x = 't', y = 'z', source = self._rawsource)
+            args = dict(hvr    = self,
+                        hvrsrc = self._rawsource,
+                        rawsrc = source,
+                        glyph  = self._rawglyph)
+            code = "hvr.launch_hover(rawsrc, hvrsrc, glyph)"
+            source.callback = CustomJS(code = code, args = args)
 
     def createhist(self, fig, mdl, cnf):
         "Creates the hover tool for histograms"
@@ -135,8 +130,9 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
             return
 
         resets[self]['shape']             = shape
-        resets[self._rawsource]['data']   = self._createrawdata(rdata, shape)
-        resets[self._rawglyph]['visible'] = False
+        if self._rawsource is not None:
+            resets[self._rawglyph]['visible'] = False
+            resets[self._rawsource]['data']   = self._createrawdata(rdata, shape)
 
     def resethist(self, resets):
         "updates the tooltips for a new file"

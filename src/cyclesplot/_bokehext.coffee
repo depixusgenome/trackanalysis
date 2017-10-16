@@ -13,18 +13,18 @@
         glyph.visible    = true
         hvrsrc.change.emit()
 
-    launch_hover: (rawsrc, hvrsrc, glyph, data) ->
+    launch_hover: (rawsrc, hvrsrc, glyph) ->
         if @shape[1] == 2
+            return
+        if not rawsrc.selected['1d']?
             return
 
         @_hvr_cnt = if @_hvr_cnt? then @_hvr_cnt + 1 else 0
-        inds      = data.index['1d'].indices
+        inds      = rawsrc.selected['1d'].indices
         if (not inds?) || inds.length == 0
             if glyph.visible
                 glyph.visible = false
                 glyph.change.emit()
             return
 
-        window.setTimeout(((a,b,c,d,e) => @set_hover(a,b,c,d,e)),
-                          100, rawsrc, hvrsrc, glyph,
-                          inds, @_hvr_cnt)
+        @set_hover(rawsrc, hvrsrc, glyph, inds, @_hvr_cnt)

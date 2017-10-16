@@ -185,8 +185,7 @@ class SequenceHoverMixin:
                     radius_dimension = 'y',
                     line_alpha       = 0.,
                     fill_alpha       = 0.,
-                    y_range_name     = 'bases',
-                    visible          = False)
+                    y_range_name     = 'bases')
         if xrng is not None:
             args['x_range_name'] = xrng
         self.__tool.update(tooltips  = css.get(),

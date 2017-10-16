@@ -41,19 +41,20 @@ class WithToolbar:
 
             def getroots(self, doc):
                 "adds items to doc"
-                tbar     = self._bar.getroots(doc)
-                others   = self._mainview.getroots(doc)
+                tbar   = self._bar.getroots(doc)
+                others = self._mainview.getroots(doc)
+                mode   = self.defaultsizingmode()
                 while isinstance(others, (tuple, list)) and len(others) == 1:
                     others = others[0]
 
                 if isinstance(others, list):
                     children = [tbar] + others
                 elif isinstance(others, tuple):
-                    children = [tbar, layout(others, **self.defaultsizingmode())]
+                    children = [tbar, layout(others, **mode)]
                 else:
                     children = [tbar, others]
 
-                return column(children, **self.defaultsizingmode())
+                return column(children, **mode)
 
         return ViewWithToolbar
 

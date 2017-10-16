@@ -1,4 +1,3 @@
-import * as $         from "jquery"
 import * as p         from "core/properties"
 import {RowView, Row} from "models/layouts/row"
 import {ToolbarBox}   from "models/tools/toolbar_box"
@@ -8,8 +7,8 @@ export class DpxKeyedRowView extends RowView
     render: () ->
         super()
         @el.setAttribute("tabindex", 1)
-        $(@el).keydown((evt) => @model.dokeydown(evt))
-        $(@el).keyup((evt) => @model.dokeyup(evt))
+        @el.onkeydown = (evt) => @model.dokeydown(evt)
+        @el.onkeyup   = (evt) => @model.dokeyup(evt)
 
 export class DpxKeyedRow extends Row
     default_view: DpxKeyedRowView

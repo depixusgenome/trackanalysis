@@ -17,26 +17,26 @@ export class PathInputView extends InputWidgetView
     super()
     mdl   = @model
     label = "<label for=#{mdl.id}> #{mdl.title} </label>"
-    txt   = "<input class='bk-widget-form-input' type='text' "  +
+    txt   = "<input class='bk-widget-form-input' type='text' "    +
             "id=#{mdl.id} name=#{mdl.name} value='#{mdl.value}' " +
             "placeholder='#{mdl.placeholder}' />"
 
     btn   = "<button type='button' "                            +
             "class='bk-bs-btn bk-bs-btn-default' "              +
             "style='margin-left:5px'>+</button>"
-    @$el.html("<fragment>#{label}<table><tr>"                   +
+    $(@el).html("<fragment>#{label}<table><tr>"                 +
               "<td>#{txt}</td><td>#{btn}</td>"                  +
               "</tr></table></fragment>")
 
     # TODO - This 35 is a hack we should be able to compute it
     if @model.height
-      @$el.find('input').height(@model.height - 35)
+      $(@el).find('input').height(@model.height - 35)
 
     if @model.width
-      @$el.find('input').width(@model.width-25)
-    @$el.find('button').width(5)
-    @$el.find('input').prop("disabled", @model.disabled)
-    @$el.find('button').prop("disabled", @model.disabled)
+      $(@el).find('input').width(@model.width-25)
+    $(@el).find('button').width(5)
+    $(@el).find('input').prop("disabled", @model.disabled)
+    $(@el).find('button').prop("disabled", @model.disabled)
 
     return @
 
@@ -45,7 +45,7 @@ export class PathInputView extends InputWidgetView
     super()
 
   change_input: () ->
-    @model.value = @$el.find('input').val()
+    @model.value = $(@el).find('input').val()
     super()
 
 export class PathInput extends InputWidget

@@ -1,4 +1,4 @@
-import {NumberFormatter, StringFormatter} from "models/widgets/cell_formatters"
+import {NumberFormatter, StringFormatter} from "models/widgets/tables/cell_formatters"
 
 export class DpxNumberFormatter extends NumberFormatter
   type: 'DpxNumberFormatter'
