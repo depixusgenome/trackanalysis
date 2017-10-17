@@ -65,27 +65,9 @@ class PeaksTableWidget(_Widget[CyclesModelAccess]):
 
     def callbacks(self, hover):
         "adding callbacks"
-        @CustomJS.from_py_func
-        def _js_cb(cb_obj = None, mdl = hover):
-            if mdl.updating != '':
-                return
-
-            zval  = cb_obj.data['z']
-            bases = cb_obj.data['bases']
-            if zval[0] == zval[1] or bases[0] == bases[1]:
-                return
-
-            aval = (bases[1]-bases[0])/(zval[1]-zval[0])
-            bval = zval[0] - bases[0]/aval
-
-            if abs(aval - mdl.stretch) < 1e-2 and abs(bval-mdl.bias) < 1e-5:
-                return
-
-            mdl.stretch   = aval
-            mdl.bias      = bval
-            mdl.updating  = 'table'
-
-        self.__widget.source.js_on_change("data", _js_cb) # pylint: disable=no-member
+        jsc = CustomJS(code = "hvr.on_change_peaks_table(cb_obj)",
+                       args = dict(hvr = hover))
+        self.__widget.source.js_on_change("data", jsc)
 
     def __data(self):
         info = self._model.peaks
@@ -151,30 +133,10 @@ class ConversionSlidersWidget(_Widget[CyclesModelAccess]):
         "adding callbacks"
         stretch, bias = self.__stretch, self.__bias
 
-        @CustomJS.from_py_func
-        def _js_stretch_cb(cb_obj = None, mdl = hover):
-            if mdl.updating != '':
-                return
-
-            if abs(cb_obj.value - mdl.stretch) < 1e-2:
-                return
-
-            mdl.stretch   = cb_obj.value
-            mdl.updating  = 'stretch'
-
-        stretch.js_on_change('value', _js_stretch_cb)
-
-        @CustomJS.from_py_func
-        def _js_bias_cb(cb_obj = None, mdl = hover):
-            if mdl.updating != '':
-                return
-
-            if abs(cb_obj.value - mdl.bias) < 1e-5:
-                return
-
-            mdl.bias      = cb_obj.value
-            mdl.updating  = 'bias'
-        bias   .js_on_change('value', _js_bias_cb)
+        stretch.js_on_change('value', CustomJS(code = "hvr.on_change_stretch(cb_obj)",
+                                               args = dict(hvr = hover)))
+        bias   .js_on_change('value', CustomJS(code = "hvr.on_change_bias(cb_obj)",
+                                               args = dict(hvr = hover)))
 
 class DriftWidget(GroupWidget[CyclesModelAccess]):
     "Allows removing the drifts"
@@ -268,39 +230,14 @@ class WidgetMixin(ABC):
             ite.reset(self._bkmodels)
 
     def __slave_to_hover(self, widgets):
-        table         = widgets['table'][-1].source
-        stretch, bias = widgets['sliders']
-        ttip          = self._hover.source
-        fig           = self._hist
-        @CustomJS.from_py_func
-        def _js_cb(cb_obj  = None, # pylint: disable=too-many-arguments
-                   table   = table,
-                   stretch = stretch,
-                   bias    = bias,
-                   fig     = fig,
-                   ttip    = ttip):
-            if cb_obj.updating == '':
-                return
-
-            if cb_obj.updating != 'table':
-                bases = table.data["bases"]
-                aval  = bases[0] / cb_obj.stretch + cb_obj.bias
-                bval  = bases[1] / cb_obj.stretch + cb_obj.bias
-                if abs(aval-table.data['z']) < 1e-5 and abs(bval-table.data['z']) < 1e-5:
-                    return
-
-                table.data["z"] = [aval, bval]
-                table.properties.data.change.emit() # pylint: disable=no-member
-
-            if cb_obj.updating != 'stretch':
-                stretch.value = cb_obj.stretch
-
-            if cb_obj.updating != 'bias':
-                bias.value = cb_obj.bias
-
-            cb_obj.apply_update(fig, ttip)
-
-        self._hover.js_on_change("updating", _js_cb)
+        jsc = CustomJS(code = "hvr.on_change_hover(table, stretch, bias, fig, ttip)",
+                       args = dict(table   = widgets['table'][-1].source,
+                                   stretch = widgets['sliders'][0],
+                                   bias    = widgets['sliders'][1],
+                                   fig     = self._hist,
+                                   hvr     = self._hover,
+                                   ttip    = self._hover.source))
+        self._hover.js_on_change("updating", jsc)
 
     def advanced(self):
         "triggers the advanced dialog"

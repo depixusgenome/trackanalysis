@@ -82,18 +82,9 @@ class RawMixin(ABC):
     def __addcallbacks(self):
         fig = self._raw
         self._addcallbacks(fig)
-
-        trng = fig.extra_x_ranges["time"]
-        mdl  = self._hover
-        @CustomJS.from_py_func
-        def _onchangebounds(cb_obj = None, trng = trng, mdl = mdl):
-            # pylint: disable=protected-access,no-member
-            if cb_obj.bounds is not None:
-                cb_obj._initial_start = cb_obj.bounds[0]
-                cb_obj._initial_end   = cb_obj.bounds[1]
-            trng.start = cb_obj.start/mdl.framerate
-            trng.end   = cb_obj.end  /mdl.framerate
-        fig.x_range.callback = _onchangebounds
+        fig.x_range.callback = CustomJS(code = "hvr.on_change_raw_bounds(cb_obj, trng)",
+                                        args = dict(hvr  = self._hover,
+                                                    trng = fig.extra_x_ranges["time"]))
 
     def _createraw(self):
         css             = self.css

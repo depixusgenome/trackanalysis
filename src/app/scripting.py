@@ -89,7 +89,7 @@ if 'scripting' not in sys.modules:
     from view.static import ROUTE
 
     class DpxLoaded(Model):
-        "This starts tests once flexx/browser window has finished loading"
+        "This starts tests once browser window has finished loading"
         __implementation__ = "scripting.coffee"
         __javascript__     = ROUTE+"/jquery.min.js"
         done = props.Int(0)

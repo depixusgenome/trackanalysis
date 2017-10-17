@@ -2,37 +2,14 @@
 # -*- coding: utf-8 -*-
 "Basic bokeh models for dealing with it's idiosyncraties"
 from itertools               import product
-import re
 
 from    bokeh                   import layouts
-from    bokeh.models            import (Row, Model, HoverTool, CustomJS,
+from    bokeh.models            import (Row, Model, HoverTool,
                                         NumberFormatter, ToolbarBox)
 from    bokeh.plotting.figure   import Figure
 import  bokeh.core.properties   as     props
 
 from    ..base                  import defaultsizingmode
-
-def from_py_func(func, **kwa):
-    """ Create a CustomJS instance from a Python function. The
-    function is translated to Python using PyScript.
-    """
-    def _isgood(val):
-        if isinstance(val, dict):
-            return (all(isinstance(i, str) for i in val)
-                    and all(_isgood(i) for i in val.items()))
-        elif isinstance(val, (tuple, list)):
-            val = list(val)
-            return all(_isgood(i) for i in val)
-        return isinstance(val, (float, int, str))
-
-    cust = CustomJS.from_py_func(func)
-    for name, val in kwa.items():
-        assert _isgood(val)
-        cust.code = re.sub(r'(\W)%s(\W)' % name,
-                           # pylint: disable=cell-var-from-loop
-                           lambda x: x.group(1)+repr(val)+x.group(2),
-                           cust.code)
-    return cust
 
 class DpxKeyedRow(Row): # pylint: disable=too-many-ancestors
     "define div with tabIndex"

@@ -86,7 +86,7 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
         return info
 
 class DpxCleaning(Widget):
-    "This starts tests once flexx/browser window has finished loading"
+    "Interface to filters needed for cleaning"
     __css__            = ROUTE+"/cleaning.css"
     __javascript__     = [ROUTE+"/jquery.min.js", ROUTE+"/jquery-ui.min.js"]
     __implementation__ = "_widget.coffee"
