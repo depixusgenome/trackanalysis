@@ -8,7 +8,7 @@ from   typing                           import (Optional, # pylint: disable=unus
 import numpy                            as     np
 
 from   utils                            import initdefaults
-from   data.views                       import TaskView, BEADKEY
+from   data.views                       import TaskView, BEADKEY, isellipsis
 from   model.task                       import Task, Level
 from   control.processor.taskview       import TaskViewProcessor
 from   eventdetection.data              import Events
@@ -157,6 +157,23 @@ class FitToReferenceTask(Task):
 class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
     "iterator over peaks grouped by beads"
     level = Level.bead
+    @staticmethod
+    def _transform_ids(sel: Iterable) -> Iterator[BEADKEY]:
+        for i in sel:
+            if isinstance(i, tuple):
+                if len(i) == 0:
+                    continue
+                elif len(i) == 2 and not isellipsis(i[1]):
+                    raise NotImplementedError()
+                elif len(i) > 2 :
+                    raise KeyError(f"Unknown key {i} in FitToReferenceDict")
+                if np.isscalar(i[0]):
+                    yield i[0]
+                else:
+                    yield from i[0]
+            else:
+                yield i
+
     def _keys(self, sel:Optional[Sequence], _: bool) -> Iterable:
         if self.config.defaultdata:
             return super()._keys(sel, _)
@@ -164,6 +181,7 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
         available = frozenset(self.config.fitdata) - {self.config.DEFAULTKEY}
         if sel is None:
             return super()._keys(tuple(available), True)
+        sel = self._transform_ids(sel)
         return super()._keys([i for i in sel if i in available], True)
 
     def compute(self, key: BEADKEY) -> np.ndarray:
