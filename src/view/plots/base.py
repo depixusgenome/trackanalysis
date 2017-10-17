@@ -200,7 +200,7 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
                             'yrightlabel'        : u'Base number',
                             'xtoplabel'          : u'Time (s)',
                             'xlabel'             : u'Frames',
-                            'toolbar_location'   : 'left',
+                            'toolbar_location'   : 'right',
                             'toolbar_sticky'     : False,
                             'input.width'        : 205,
                             'figure.width'       : 800,
@@ -269,14 +269,14 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
             self._bkmodels.clear()
             self.state = old
 
-    _JS_RESET = CustomJS(code = ("if(!(cb_obj.bounds == null))"
-                                 "{ cb_obj._initial_start = cb_obj.bounds[0];"
-                                 "  cb_obj._initial_end   = cb_obj.bounds[1]; }"))
     @classmethod
-    def fixreset(cls, arng):
+    def fixreset(arng):
         "Corrects the reset bug in bokeh"
         assert isinstance(arng, Range1d)
-        arng.callback = cls._JS_RESET
+        jsc = CustomJS(code = ("if(!(cb_obj.bounds == null))"
+                               "{ cb_obj._initial_start = cb_obj.bounds[0];"
+                               "  cb_obj._initial_end   = cb_obj.bounds[1]; }"))
+        arng.callback = jsc
 
     def close(self):
         "Removes the controller"

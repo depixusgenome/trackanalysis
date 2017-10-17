@@ -81,7 +81,8 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
         cnf.colors.basic.defaults = colors
         cnf.colors.dark .defaults = colors
         cnf.colors.order.default  = ('aberrant', 'hfsigma', 'extent', 'population', 'good')
-        self.css.figure.defaults  = dict(width    = 500,
+        self.css.widgets.width.default = 400
+        self.css.figure.defaults  = dict(width    = 600,
                                          height   = 800,
                                          tooltips = [(u'(cycle, t, z)',
                                                       '(@cycle, $~x{1}, $data_y{1.1111})')])
@@ -110,7 +111,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
         self.fixreset(fig.y_range)
         self._addcallbacks(fig)
 
-        mode    = self.defaultsizingmode()
+        mode    = self.defaultsizingmode(width = self.css.widgets.width.get())
         widgets = self._createwidget(fig)
         bottom  = layouts.widgetbox(widgets['align'], **mode)
         left    = layouts.widgetbox(widgets['cleaning']+widgets['table'], **mode)
