@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 "Track plot view"
 from bokeh.plotting import figure, Figure
-from bokeh.models   import LinearAxis, ColumnDataSource, Range1d
+from bokeh.models   import LinearAxis, ColumnDataSource, Range1d, CustomJS
 
 from control.modelaccess import TaskPlotModelAccess
 from .plots              import PlotAttrs, DpxKeyedRow, PlotView
-from .plots.bokehext     import DpxHoverTool, from_py_func
+from .plots.bokehext     import DpxHoverTool
 from .plots.tasks        import TaskPlotCreator
 
 class BeadPlotCreator(TaskPlotCreator[TaskPlotModelAccess]):
@@ -54,12 +54,9 @@ class BeadPlotCreator(TaskPlotCreator[TaskPlotModelAccess]):
 
     def _addcallbacks(self, fig):
         super()._addcallbacks(fig)
-        rng = self._fig.extra_y_ranges['zmag']
-        def _onRangeChange(rng = rng):
-            rng.start = rng.bounds[0]
-            rng.end   = rng.bounds[1]
-
-        rng.callback = from_py_func(_onRangeChange)
+        rng          = self._fig.extra_y_ranges['zmag']
+        rng.callback = CustomJS(code = ("cb_obj.start = cb_obj.bounds[0];"
+                                        "cb_obj.end   = cb_obj.bounds[1];"))
 
     def _create(self, _) -> DpxKeyedRow:
         "sets-up the figure"

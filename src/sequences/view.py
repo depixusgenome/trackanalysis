@@ -9,7 +9,8 @@ import  numpy   as np
 
 import  bokeh.core.properties as props
 from    bokeh.models    import (LinearAxis, ColumnDataSource, Range1d, Widget,
-                                BasicTicker, Dropdown, Paragraph, AutocompleteInput)
+                                BasicTicker, Dropdown, Paragraph, CustomJS,
+                                AutocompleteInput)
 
 from    utils           import CachedIO
 from    utils.gui       import implementation
@@ -17,7 +18,7 @@ from    utils.gui       import implementation
 from   model.globals        import BeadProperty
 from   view.dialog          import FileDialog
 from   view.plots.base      import checksizes, WidgetCreator
-from   view.plots.bokehext  import DpxHoverTool, from_py_func
+from   view.plots.bokehext  import DpxHoverTool
 
 from   .                    import (read as _readsequence, peaks as sequencepeaks,
                                     marksequence, splitoligos)
@@ -283,17 +284,14 @@ class SequencePathWidget(WidgetCreator[ModelType]):
 
     def callbacks(self, hover: SequenceHoverMixin, tick1: SequenceTicker):
         "sets-up callbacks for the tooltips and grids"
-        tick2 = tick1.axis
-        src   = hover.source
-        @from_py_func
-        def _js_cb(tick1 = tick1, tick2 = tick2, src = src, cb_obj = None):
-            if cb_obj.value in src.column_names:
-                cb_obj.label     = cb_obj.value
-                tick1.key        = cb_obj.value
-                tick2.key        = cb_obj.value
-                src.data['text'] = src.data[cb_obj.value]
-                src.change.emit()
-        self.__widget.js_on_change('value', _js_cb)
+        jsc = CustomJS(code = ("if(src.column_names.indexOf(cb_obj.value) > -1)"
+                               "{ cb_obj.label     = cb_obj.value;"
+                               "  tick1.key        = cb_obj.value;"
+                               "  tick2.key        = cb_obj.value;"
+                               "  src.data['text'] = src.data[cb_obj.value];"
+                               "  src.change.emit(); }"),
+                       args = dict(tick1 = tick1, tick2 = tick1.axis, src = hover.source))
+        self.__widget.js_on_change('value', jsc)
         return self.__widget
 
     @staticmethod

@@ -15,14 +15,14 @@ import  numpy        as     np
 import  bokeh.palettes
 from    bokeh.document          import Document
 from    bokeh.models            import (Range1d, RadioButtonGroup, Model,
-                                        Paragraph, Widget, GlyphRenderer)
+                                        Paragraph, Widget, GlyphRenderer, CustomJS)
 
 from    utils.logconfig         import getLogger
 from    control.modelaccess     import GlobalsAccess, PlotModelAccess, PlotState
 from    ..base                  import (BokehView, threadmethod, spawn,
                                         defaultsizingmode as _defaultsizingmode,
                                         SINGLE_THREAD)
-from    .bokehext               import DpxHoverTool, from_py_func, DpxKeyedRow
+from    .bokehext               import DpxHoverTool, DpxKeyedRow
 
 LOGS    = getLogger(__name__)
 _m_none = type('_m_none', (), {}) # pylint: disable=invalid-name
@@ -269,18 +269,14 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
             self._bkmodels.clear()
             self.state = old
 
-    @staticmethod
-    def fixreset(arng):
+    _JS_RESET = CustomJS(code = ("if(!(cb_obj.bounds == null))"
+                                 "{ cb_obj._initial_start = cb_obj.bounds[0];"
+                                 "  cb_obj._initial_end   = cb_obj.bounds[1]; }"))
+    @classmethod
+    def fixreset(cls, arng):
         "Corrects the reset bug in bokeh"
         assert isinstance(arng, Range1d)
-        @from_py_func
-        def _onchangebounds(cb_obj = None):
-            # pylint: disable=protected-access,no-member
-            if cb_obj.bounds is not None:
-                cb_obj._initial_start = cb_obj.bounds[0]
-                cb_obj._initial_end   = cb_obj.bounds[1]
-
-        arng.callback = _onchangebounds
+        arng.callback = cls._JS_RESET
 
     def close(self):
         "Removes the controller"
@@ -514,7 +510,6 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
         for css in cssarr if len(cssarr) else iter((self.config, self.css)):
             ttips = css.get('tooltips', default = _m_none)
             if ttips is not _m_none:
-                print(ttips)
                 break
 
         if ttips not in (_m_none, '', None):
