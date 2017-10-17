@@ -132,7 +132,24 @@ class PeakSelector(PrecisionAlg):
         print(f"peaks={peaks}")
         print(f"ids={ids}")
         hist, minv, binwidth = histdata
+<<<<<<< f323117aadf79a731b22c732c457cfdac8948813
        return PeakSelectorDetails(pos, hist, minv, binwidth, delta, peaks, orig, ids)
+=======
+        results={'pos':pos,
+                 'hist':hist,
+                 'minv':minv,
+                 'binwidth':binwidth,
+                 'delta':delta,
+                 'precision':precision,
+                 'peaks': peaks,
+                 'orig':orig,
+                 'ids': ids}
+        pickle.dump(results,
+                    open("/home/david/work/my_scripts/simulations/event_detection/results",
+                         "wb"))
+
+        return PeakSelectorDetails(pos, hist, minv, binwidth, delta, peaks, orig, ids)
+>>>>>>> added mincount to ByGaussianMix
 
     def details2output(self, dtl:PeakSelectorDetails) -> Iterator[Output]:
         "yields results from precomputed details"

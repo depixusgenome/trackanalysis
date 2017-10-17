@@ -514,6 +514,7 @@ lass ByGaussianMix:
     peakwidth:float = 1
     gmm             = GaussianMixture()
     crit:str        = 'aic'
+    mincount        = 5
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -528,15 +529,29 @@ lass ByGaussianMix:
         'find peaks'
 
         events   = np.hstack(pos)
-        maxncmps = max(int((max(events)-min(events))/self.peakwidth),1) # find better, smaller
+        #maxncmps = max(int((max(events)-min(events))/self.peakwidth),1) # find better, smaller
+        maxncmps = len(events)//self.mincount
         kwargs   = {'covariance_type'  : self.cov_type,
                     'max_iter'         : self.max_iter}
         self.gmm = self.__fit(events.reshape(-1,1),maxncmps,kwargs)
-        peaks    = self.gmm.means_
-        # peaks are not ordered
-        return (peaks * slope + bias,
-                np.array([self.gmm.predict(zpos.reshape(-1,1))
-                          for zpos in pos]))
+        peaks, ids =  self.__strip(pos,events.reshape(-1,1),self.gmm)
+        # peaks not ordered
+        return (peaks * slope + bias, ids)
+
+    def __strip(self,pos,evts,gmm):
+        'removes peaks which have fewer than mincount events'
+        predicts = gmm.predict(evts)
+        keep     = [pkid for pkid in range(gmm.n_components) if sum(predicts==pkid)>=self.mincount]
+        kdict    = {val:key for key,val in enumerate(keep)}
+        peaks    = gmm.means_[keep]
+
+        def assign(zpos):
+            'set id'
+            idx=gmm.predict(zpos)[0]
+            return kdict.get(idx,np.iinfo("i4").max)
+
+        vids = np.vectorize(assign)
+        return peaks,np.array([vids(zpos) for zpos in pos])
 
     def __fit(self,evts,maxcmpts,kwargs):
         '''
