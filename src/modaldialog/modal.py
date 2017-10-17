@@ -108,7 +108,9 @@ class CheckOption(Option):
             key = match.group('name')
             assert len(key), "keys must have a name"
             val = 'checked' if bool(cls.getvalue(model, key, False)) else ''
-            return '<input type="checkbox" name="{}" {} />'.format(key, val)
+            return ('<input type="checkbox" class="bk-bs-checkbox '
+                    'bk-widget-form-input" name="{}" {} />'
+                    .format(key, val))
 
         return cls._PATT.sub(_replace, body)
 

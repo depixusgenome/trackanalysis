@@ -376,9 +376,11 @@ export class DpxModal       extends Model
                     '<form id="dpxbbmform">' + @body + "</form>"       +
                 "</div>"
 
-        btns  = "<div class='bbm-modal__bottombar'>"                            +
-                    "<a href='#' class='bbm-button dpx-modal-cancel'>Cancel</a>"+
-                    "<a href='#' class='bbm-button dpx-modal-done'>Apply</a>"   +
+        btns  = "<div class='bbm-modal__bottombar'>"                    +
+                    "<button type='button' class='bk-bs-btn bk-bs-btn-default "   +
+                    "dpx-modal-cancel'>Cancel</button>"                      +
+                    "<button type='button' class='bk-bs-btn bk-bs-btn-default "   +
+                    "dpx-modal-done'>Apply</button>"                         +
                 "</div>"
         return {template: "<fragment>#{title} #{body} #{btns}</fragment>"}
 
