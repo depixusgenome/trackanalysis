@@ -269,7 +269,7 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
             self._bkmodels.clear()
             self.state = old
 
-    @classmethod
+    @staticmethod
     def fixreset(arng):
         "Corrects the reset bug in bokeh"
         assert isinstance(arng, Range1d)

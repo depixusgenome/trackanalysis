@@ -179,6 +179,8 @@ class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
         super().__init__(model)
         self.__widget: DataTable      = None
         self.css.peaks.height.default = 400
+        self.css.peaks.table.error.default = ('File extension must be .xlsx',
+                                              'warning')
         css               = self.css.peaks.columns
         css.width.default = 60
         css.default       = [['z',        'css:ylabel',    '0.0000'],
@@ -267,7 +269,7 @@ class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
 
         doc.add_periodic_callback(_callback, self.css.constraints.filechecks.get())
 
-    def create(self, action, _) -> List[Widget]: # pylint: disable=arguments-differ
+    def create(self, action, _) -> List[Widget]: # type: ignore # pylint: disable=arguments-differ
         "creates the widget"
         title         = self.css.constraints.title.get()
         width         = self.css.input.width.get() - 10
@@ -288,12 +290,18 @@ class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
                 self._model.constraintspath = None
 
             elif not Path(path).exists():
-                writecolumns(path, "Summary",
-                             [('Bead', [self._model.bead]),
-                              ('Reference', [self._model.sequencekey]),
-                              ('Stretch (base/µm)', [self._model.stretch]),
-                              ('Bias (µm)', [self._model.bias])])
-                startfile(path)
+                if not path.endswith(".xlsx"):
+                    raise IOError(*self.css.peaks.table.error.get())
+                try:
+                    writecolumns(path, "Summary",
+                                 [('Bead', [self._model.bead]),
+                                  ('Reference', [self._model.sequencekey]),
+                                  ('Stretch (base/µm)', [self._model.stretch]),
+                                  ('Bias (µm)', [self._model.bias])])
+                except:
+                    raise
+                else:
+                    startfile(path)
 
             self._model.constraintspath = str(Path(path).resolve())
 

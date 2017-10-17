@@ -4,10 +4,6 @@ import {InputWidget, InputWidgetView} from "models/widgets/input_widget"
 
 
 export class PathInputView extends InputWidgetView
-  events: {
-    "change input": "change_input"
-    "click button": "change_click"
-  }
 
   connect_signals: () ->
     super()
@@ -28,16 +24,21 @@ export class PathInputView extends InputWidgetView
               "<td>#{txt}</td><td>#{btn}</td>"                  +
               "</tr></table></fragment>")
 
-    # TODO - This 35 is a hack we should be able to compute it
+    elem = $(@el)
+
+    inp  = elem.find('input')
     if @model.height
-      $(@el).find('input').height(@model.height - 35)
-
+      # TODO - This 35 is a hack we should be able to compute it
+      inp.height(@model.height - 35)
     if @model.width
-      $(@el).find('input').width(@model.width-25)
-    $(@el).find('button').width(5)
-    $(@el).find('input').prop("disabled", @model.disabled)
-    $(@el).find('button').prop("disabled", @model.disabled)
+      inp.width(@model.width-25)
+    inp.prop("disabled", @model.disabled)
+    inp.change(() => @change_input())
 
+    btn = elem.find('button')
+    btn.width(5)
+    btn.prop("disabled", @model.disabled)
+    btn.click(() => @change_click())
     return @
 
   change_click: () ->
