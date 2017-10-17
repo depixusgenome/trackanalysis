@@ -13,6 +13,8 @@ namespace samples
             template <typename T>
             inline auto _level(std::pair<T,float> val)
             {
+                if(val.first <= 0)
+                    return 1.;
                 bm::students_t dist(double(val.first));
                 return bm::cdf(dist, std::abs(val.second));
             }
@@ -66,6 +68,9 @@ namespace samples
 
             float  tothresholdvalue(Input const & left, Input const & right)
             {
+                if(left.count < 2 or right.count < 2)
+                    return 1.;
+
                 float val = _level(value(left, right));
                 return val < .5 ? 1.-val : val;
             }
