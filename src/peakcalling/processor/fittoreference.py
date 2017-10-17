@@ -181,8 +181,8 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
         available = frozenset(self.config.fitdata) - {self.config.DEFAULTKEY}
         if sel is None:
             return super()._keys(tuple(available), True)
-        sel = self._transform_ids(sel)
-        return super()._keys([i for i in sel if i in available], True)
+        seq = self._transform_ids(cast(Iterable, sel))
+        return super()._keys([i for i in seq if i in available], True)
 
     def compute(self, key: BEADKEY) -> np.ndarray:
         "Action applied to the frame"
@@ -196,8 +196,9 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
 
         ref           = self.config.getdata(key)
         stretch, bias = fit.optimize(ref.data, fit.frompeaks(data))[1:]
-        if ref not in ((1., 0.), None):
-            stretch, bias = ref.params[0]*stretch, ref.params[1]+stretch*bias
+        if ref.params not in ((1., 0.), None):
+            stretch, bias = (stretch/ref.params[0],
+                             bias-ref.params[1]*ref.params[0]/stretch)
 
         data.params      = stretch, bias
         data['peaks'][:] = (data['peaks']-bias)*stretch
@@ -250,9 +251,9 @@ class FitToReferenceDataFrameFactory(DataFrameFactory[FitToReferenceDict]):
 
     @staticmethod
     def __getpeaks(itm: FitData) -> np.ndarray:
-        if isinstance(itm, tuple):
-            return itm[1]
-        elem = cast(HistogramData, itm)
+        if isinstance(itm.data, tuple):
+            return itm.data[1]
+        elem = cast(HistogramData, itm.data)
         ipks = np.logical_and(elem.histogram[2:,  1] < elem.histogram[1:-1, 1],
                               elem.histogram[:-2, 1] < elem.histogram[1:-1, 1])
         return elem.minvalue+ipks*elem.binwidth
