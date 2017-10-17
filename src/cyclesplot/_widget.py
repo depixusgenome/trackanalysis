@@ -67,7 +67,7 @@ class PeaksTableWidget(_Widget[CyclesModelAccess]):
         "adding callbacks"
         jsc = CustomJS(code = "hvr.on_change_peaks_table(cb_obj)",
                        args = dict(hvr = hover))
-        self.__widget.source.js_on_change("data", jsc)
+        self.__widget.source.js_on_change("data", jsc) # pylint: disable=no-member
 
     def __data(self):
         info = self._model.peaks
