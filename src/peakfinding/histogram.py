@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 "Creates a histogram from available events"
 from    typing import (NamedTuple, Optional, Iterator,
-                       Iterable, Union, Sequence, Callable, Tuple, cast)
+                       Iterable, Union, Sequence, Callable, Tuple, cast,
+                       Dict)
 import pickle
 from    enum   import Enum
 import  itertools
-from sklearn.mixture            import BayesianGaussianMixture
-import  numpy  as     np
+rom sklearn.mixture            import BayesianGaussianMixture, GaussianMixture
+mport  numpy  as     np
 from    numpy.lib.stride_tricks import as_strided
 from    scipy.signal            import find_peaks_cwt
 
@@ -460,9 +461,10 @@ class ByZeroCrossing:
                              precision = kwa.get("precision",None))
        return peaks, ids
 
-class ByGaussianMix:
+class ByBayesGaussianMix:
     '''
-    finds peaks and groups events
+    finds peaks and groups events using Bayesian Gaussian mixture
+    known to have convergence issues for small data sets
     '''
     max_iter  = 10000
     cov_type  = 'tied'
@@ -488,7 +490,8 @@ class ByGaussianMix:
                       'covariance_prior' : cov,
                       'covariance_type'  : self.cov_type,
                       'max_iter'         : self.max_iter}
-        # fails without proper sampling. use bootstrap
+
+        # converge may fail without proper sampling.
         self.dpgmm = BayesianGaussianMixture(**kwa)
        trpos      = np.matrix(apos).T
        self.dpgmm.fit(trpos)
@@ -501,4 +504,59 @@ class ByGaussianMix:
                 np.array([self.dpgmm.predict(zpos.reshape(-1,1))
                           for zpos in pos]))
 
-PeakFinder = Union[ByZeroCrossing, ByGaussianMix]
+lass ByGaussianMix:
+    '''
+    finds peaks and groups events using Gaussian mixture
+    the number of components is estimated using AIC criteria
+    '''
+    max_iter        = 10000
+    cov_type        = 'full'
+    peakwidth:float = 1
+    gmm             = GaussianMixture()
+    crit:str        = 'aic'
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+    def __call__(self,**kwa):
+        pos            = kwa.get("pos",None)
+        self.peakwidth = kwa.get("precision",1)
+        _,bias,slope   = kwa.get("hist",(0,0,1))
+        return self.find(pos, bias, slope)
+
+    def find(self,pos: np.array, bias:float = 0., slope:float = 1.):
+        'find peaks'
+
+        events   = np.hstack(pos)
+        maxncmps = max(int((max(events)-min(events))/self.peakwidth),1) # find better, smaller
+        kwargs   = {'covariance_type'  : self.cov_type,
+                    'max_iter'         : self.max_iter}
+        self.gmm = self.__fit(events.reshape(-1,1),maxncmps,kwargs)
+        peaks    = self.gmm.means_
+        # peaks are not ordered
+        return (peaks * slope + bias,
+                np.array([self.gmm.predict(zpos.reshape(-1,1))
+                          for zpos in pos]))
+
+    def __fit(self,evts,maxcmpts,kwargs):
+        '''
+        runs Gaussian Mixture for different components
+        returns the one which minimizes crit
+        '''
+        gmms = self.__run_gmms(evts,maxcmpts,kwargs)
+        return self.__min_crit(self.crit,evts,gmms)
+
+    @staticmethod
+    def __run_gmms(evts:np.array,maxncmps:int,kwargs:Dict):
+        gmms = [GaussianMixture(n_components = ite,**kwargs) for ite in range(1,maxncmps)]
+        for ite in range(maxncmps-1):
+            gmms[ite].fit(evts)
+        return gmms
+
+    @staticmethod
+    def __min_crit(crit:str,evts:np.array,gmms)->int:
+        values = [getattr(gmm,crit)(evts) for gmm in gmms]
+        return gmms[np.argmin(values)]
+
+PeakFinder = Union[ByZeroCrossing, ByBayesGaussianMix, ByGaussianMix]
+
