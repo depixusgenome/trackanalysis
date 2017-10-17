@@ -12,7 +12,7 @@ import bokeh.colors             as     bkcolors
 import numpy                    as     np
 
 from view.base                  import enableOnTrack
-from view.plots                 import PlotView, PlotAttrs, from_py_func
+from view.plots                 import PlotView, PlotAttrs
 from view.plots.tasks           import TaskPlotCreator
 from sequences.view             import (SequenceTicker,
                                         SequenceHoverMixin)
@@ -34,7 +34,8 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
     stretches = props.Dict(props.String, props.Float)
     __implementation__ = SequenceHoverMixin.impl('PeaksSequenceHover',
                                                  ('stretches: [p.Any, {}], '
-                                                  'biases:    [p.Any, {}],'))
+                                                  'biases:    [p.Any, {}],'),
+                                                 __file__)
 
 
     def create(self, fig, *args, **kwa):   # pylint: disable=arguments-differ
@@ -75,42 +76,8 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
 
     def jsslaveaxes(self, fig, src): # pylint: disable=arguments-differ
         "slaves a histogram's axes to its y-axis"
-        # pylint: disable=too-many-arguments,protected-access
-        hvr = self
-        def _onchangebounds(fig = fig, hvr = hvr, src = src):
-            yrng = fig.y_range
-            if hasattr(yrng, '_initial_start') and yrng.bounds is not None:
-                yrng._initial_start = yrng.bounds[0]
-                yrng._initial_end   = yrng.bounds[1]
-
-            bases        = fig.extra_y_ranges['bases']
-            bases.start  = (yrng.start - hvr.bias)*hvr.stretch
-            bases.end    = (yrng.end   - hvr.bias)*hvr.stretch
-
-            zval = src.data["z"]
-            ix1  = 0
-            ix2  = len(zval)
-            for i in range(ix2):
-                if zval[i] < yrng.start:
-                    ix1 = i+1
-                    continue
-                if zval[i] > yrng.end:
-                    ix2 = i
-                    break
-
-            dur = fig.extra_x_ranges['duration']
-            cnt = fig.x_range
-
-            dur.start = 0.
-            cnt.start = 0.
-            if len(zval) < 2 or ix1 == ix2:
-                dur.end = 0.
-                cnt.end = 0.
-            else:
-                dur.end = max(src.data["duration"][ix1:ix2])
-                cnt.end = max(src.data["count"][ix1:ix2])
-
-        fig.y_range.callback = from_py_func(_onchangebounds)
+        fig.y_range.callback = CustomJS(code = "hvr.on_change_bounds(fig, src)",
+                                        args = dict(fig = fig, src = src, hvr = self))
 
 class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
     "Creates plots for peaks"

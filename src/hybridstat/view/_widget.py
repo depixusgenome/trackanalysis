@@ -6,7 +6,7 @@ from pathlib                    import Path
 import os
 
 import bokeh.core.properties as props
-from bokeh.models               import (DataTable, TableColumn,
+from bokeh.models               import (DataTable, TableColumn, CustomJS,
                                         Widget, Div, StringFormatter)
 
 import numpy                    as     np
@@ -19,7 +19,7 @@ from utils.gui                  import startfile
 from excelreports.creation      import writecolumns
 from view.dialog                import FileDialog
 from view.pathinput             import PathInput
-from view.plots                 import from_py_func, DpxNumberFormatter, WidgetCreator
+from view.plots                 import DpxNumberFormatter, WidgetCreator
 from sequences.view             import (SequenceTicker, SequenceHoverMixin,
                                         OligoListWidget, SequencePathWidget)
 from modaldialog.view           import AdvancedTaskMixin, T_BODY
@@ -50,42 +50,10 @@ class PeaksSequencePathWidget(SequencePathWidget):
                   div:   'PeaksStatsDiv',
                   table: DataTable):
         "sets-up callbacks for the tooltips and grids"
-        widget = self.widget
-        source = hover.source
-        tick2  = tick1.axis
-
-        @from_py_func
-        def _js_cb(hvr    = hover,  # pylint: disable=too-many-arguments
-                   src    = source,
-                   peaks  = table,
-                   stats  = div,
-                   tick1  = tick1,
-                   tick2  = tick2,
-                   cb_obj = None):
-            if cb_obj.value in src.column_names:
-                cb_obj.label     = cb_obj.value
-                tick1.key        = cb_obj.value
-                tick2.key        = cb_obj.value
-                src.data['text'] = src.data[cb_obj.value]
-                src.change.emit()
-
-                if cb_obj.value in stats.data:
-                    stats.text   = stats.data   [cb_obj.value]
-
-                if cb_obj.value+'id' in peaks.source.column_names:
-                    for key in ('id', 'bases', 'distance', 'orient', 'color'):
-                        ref = cb_obj.value+key
-                        peaks.source.data[key] = peaks.source.data[ref]
-                    peaks.change.emit()
-
-                if cb_obj.value in hvr.stretches:
-                    hvr.updating = 'seq'
-                    hvr.stretch  = hvr.stretches[cb_obj.value]
-                    hvr.bias     = hvr.biases   [cb_obj.value]
-                    hvr.updating = '*'
-                    hvr.updating = ''
-
-        widget.js_on_change('value', _js_cb)
+        code = "hvr.on_change_sequence(src, peaks, stats, tick1, tick2, cb_obj)"
+        args = dict(hvr   = hover, src   = hover.source, peaks = table,
+                    stats = div,   tick1 = tick1,        tick2 = tick1.axis)
+        self.widget.js_on_change('value', CustomJS(code = code, args = args))
 
 class PeaksStatsDiv(Div): # pylint: disable = too-many-ancestors
     "div for displaying stats"
