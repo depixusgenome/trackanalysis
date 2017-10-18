@@ -6,7 +6,7 @@ from    typing         import Dict, TYPE_CHECKING
 from    bokeh.plotting import figure, Figure
 from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 from    bokeh          import layouts
-import  bokeh.colors   as     _bkclr
+from    bokeh.colors   import named as _bkclr
 
 import  numpy                   as     np
 

@@ -8,7 +8,7 @@ from bokeh                      import layouts
 from bokeh.plotting             import figure, Figure
 from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
                                         Model, TapTool, CustomJS)
-import bokeh.colors             as     bkcolors
+from bokeh.colors               import named as bkcolors
 import numpy                    as     np
 
 from view.base                  import enableOnTrack

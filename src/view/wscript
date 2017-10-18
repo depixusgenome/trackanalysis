@@ -1,5 +1,5 @@
-require(python = dict(nodejs = '6.6.0', flexx = '0.4.1', bokeh = '0.12.9'), rtime = True)
-require(coffee = '1.10.0',                                                  rtime = False)
+require(python = dict(nodejs = '6.10.0', bokeh = '0.12.10'), rtime = True)
+require(coffee = '1.10.0', rtime = False)
 make(locals())
 
 @patch
