@@ -11,12 +11,12 @@ namespace samples
         namespace
         {
             template <typename T>
-            inline auto _level(std::pair<T,float> val)
+            inline float _level(std::pair<T,float> val)
             {
                 if(val.first <= 0)
                     return 1.;
                 bm::students_t dist(double(val.first));
-                return bm::cdf(dist, std::abs(val.second));
+                return float(bm::cdf(dist, std::abs(val.second)));
             }
 
             template <typename T>
@@ -64,15 +64,15 @@ namespace samples
                 return {free, t};
             }
 
-            float  threshold(float val) { return 1.-val*.5; }
+            float  threshold(float val) { return 1.0f-val*.5f; }
 
             float  tothresholdvalue(Input const & left, Input const & right)
             {
-                if(left.count < 2 or right.count < 2)
-                    return 1.;
+                if(left.count < 2 || right.count < 2)
+                    return 1.0f;
 
                 float val = _level(value(left, right));
-                return val < .5 ? 1.-val : val;
+                return val < .5f ? 1.0f-val : val;
             }
 
             bool isequal(float alpha, Input const & left, Input const & right)
@@ -100,12 +100,12 @@ namespace samples
                 return {free, t};
             }
 
-            float  threshold(float val) { return 1.-val*.5; }
+            float  threshold(float val) { return 1.0f-val*.5f; }
 
             float  tothresholdvalue(Input const & left, Input const & right)
             {
                 float val = _level(value(left, right));
-                return val < .5 ? 1.-val : val;
+                return val < .5f ? 1.0f-val : val;
             }
 
             bool isequal(float alpha, Input const & left, Input const & right)
