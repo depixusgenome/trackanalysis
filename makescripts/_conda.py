@@ -39,7 +39,8 @@ def setup(cnf):
 
 class _CondaApp(BuildContext):
     fun = cmd = 'app'
-    DOALL = True
+    DOALL     = True
+    EXCLUDED  = 'tests','scripting', 'ramp'
 
     def __clean(self):
         self.options.APP_PATH = self.bldnode.make_node("OUTPUT_PY")
@@ -164,6 +165,8 @@ class _CondaApp(BuildContext):
             self.__zip_files(path, out, zips)
 
         self.__move_files([i for i in mods if i not in zips], out, path, dll)
+        if Path("CHANGELOG.md").exists():
+            copy2("CHANGELOG.md", path/"CHANGELOG.md")
 
         final = Path(".")/wafbuilder.git.version()
         if final.exists():
@@ -176,7 +179,7 @@ class _CondaApp(BuildContext):
         "builds the app"
         self.__clean()
         mods = [i for i in MODULES(self)
-                if not any(j in i for j in ('tests','scripting'))]
+                if not any(j in i for j in self.EXCLUDED)]
         _basebuild(self, mods)
         if self.DOALL:
             wafbuilder.condasetup(self, copy = 'build/OUTPUT', runtimeonly = True)
