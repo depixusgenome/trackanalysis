@@ -84,6 +84,18 @@ class Comparator:
             return ((i, iter((fcn(j[key][ind]),)))  for i, j in evts  if len(j) > ind)
         return ((i, iter(fcn(k) for k in j[key])) for i, j in evts)
 
+    def within(self, aother) -> _RETURN_TYPE:
+        "Wether there are any/all events within a given range"
+        if isinstance(aother, (slice, range)):
+            other = aother.start, aother.stop # type: ignore
+        else:
+            other = tuple(aother)             # type: ignore
+            if len(other) != 2:
+                raise ValueError(f'Did not recognize {aother} as an interval')
+        cond = self.__cond
+        return frozenset(tuple(i for i, j in self.__vals()
+                               if cond(other[0] < k < other[1] for k in j)))
+
     def __lt__(self, other) -> _RETURN_TYPE:
         cond = self.__cond
         return frozenset(tuple(i for i, j in self.__vals() if cond(k < other for k in j)))
