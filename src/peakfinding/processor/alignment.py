@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "Tasks related to cycle alignment"
 from   typing               import Dict     # pylint: disable=unused-import
+from   functools            import partial
 
 import numpy                as     np       # pylint: disable=unused-import
 
@@ -26,29 +27,25 @@ class PeakCorrelationAlignmentProcessor(Processor[PeakCorrelationAlignmentTask])
         return True
 
     @classmethod
-    def __action(cls, cnf):
-        cache = dict() # type: Dict[BEADKEY, np.ndarray]
-        tsk   = PeakCorrelationAlignment(**cnf)
-        def _action(frame, info):
-            nonlocal cache
-            deltas = cache.get(info[0][0], None)
-            if deltas is None:
-                precision = rawprecision(frame.data.track, info[0][0])
-                data      = tuple(i for _, i in frame[info[0][0], ...])
-                cache[info[0][0]] = deltas = tsk(data, precision)
+    def _action(cls, tsk, cache, frame, info):
+        deltas = cache.get(info[0][0], None)
+        if deltas is None:
+            precision = rawprecision(frame.data.track, info[0][0])
+            data      = tuple(i for _, i in frame.data[info[0][0], ...])
+            cache[info[0][0]] = deltas = tsk(data, precision)
 
-            info[1]['data'] += deltas[info[0][1]]
-            return info
-        return _action
+        info[1]['data'] += deltas[info[0][1]]
+        return info
 
     @classmethod
     def apply(cls, toframe = None, **cnf):
         "applies the task to a frame or returns a function that does so"
         # pylint: disable=not-callable
-        fcn = lambda frame: (frame
-                             .new()
-                             .withaction(cls.__action(cnf), beadsonly = True))
-        return fcn if toframe is None else fcn(toframe)
+        if toframe is None:
+            return partial(cls.apply, **cnf)
+        cache = dict() # type: Dict[BEADKEY, np.ndarray]
+        tsk   = PeakCorrelationAlignment(**cnf)
+        return toframe.new().withaction(partial(cls._action, tsk, cache), beadsonly = True)
 
     def run(self, args):
         "updates frames"
