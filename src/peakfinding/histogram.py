@@ -513,7 +513,7 @@ lass ByGaussianMix:
     cov_type        = 'full'
     peakwidth:float = 1
     gmm             = GaussianMixture()
-    crit:str        = 'aic'
+    crit:str        = 'bic'
     mincount        = 5
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
