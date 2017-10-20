@@ -23,7 +23,10 @@ class TrackCleaningScript:
 
     def process(self, **kwa) -> Dict[BEADKEY, Optional[DataCleaningException.ErrorMessage]]:
         "returns a dictionnary of cleaning results"
-        beads = self.track.beadsonly
+        if 'beads' in kwa:
+            beads = self.track.beadsonly[list(kwa.pop('beads'))]
+        else:
+            beads = self.track.beadsonly
         get   = lambda x: x if x is None else x.args[0]
         return {info[0]: get(DataCleaningProcessor.compute(beads, info, **kwa))
                 for info in cast(Iterator, beads)}
