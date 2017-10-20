@@ -24,10 +24,11 @@ PATHTYPE  = Union[str, Path]
 PATHTYPES = Union[PATHTYPE,Tuple[PATHTYPE,...]]
 
 def _glob(path:str):
-    ind  = path.find('*')
+    ind1 = path.find('*')
+    ind2 = path.find('[')
+    ind  = ind1 if ind2 == -1 else ind2 if ind1 == -1 else min(ind1, ind2)
     if ind == -1:
         return path
-    assert ind != 0
 
     root = Path(path[:ind])
     if path[ind-1] not in ('/', '\\') and root != Path(path).parent:
