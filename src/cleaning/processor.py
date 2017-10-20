@@ -168,17 +168,20 @@ class DataCleaning:
             *  & |z[I-mindeltarange+1] - z[I]|              < mindeltavalue
             *  & n ∈ [I-mindeltarange+2, I]
         """
-        mind  = self.mindeltavalue
-        rng   = self.mindeltarange-1
+        mind       = self.mindeltavalue
+        rng        = self.mindeltarange-1
 
-        bead[np.isnan(bead)] = np.finfo('f4').max
+        nans       = np.isnan(bead)
+        bead[nans] = np.finfo('f4').max
 
-        inds  = np.abs(bead[:-rng]-bead[1:1-rng]) < mind
-        inds &= np.abs(bead[:-rng]-bead[2:2-rng if rng > 2 else None]) < mind
-        inds  = np.nonzero(inds)[0]
+        inds       = np.abs(bead[:-rng]-bead[1:1-rng]) < mind
+        inds      &= np.abs(bead[:-rng]-bead[2:2-rng if rng > 2 else None]) < mind
+        inds       = np.nonzero(inds)[0]
 
         for i in range(2, rng):
             inds = inds[np.abs(bead[inds]-bead[inds+i]) < mind]
+
+        inds       = np.setdiff1d(inds, np.nonzero(nans)[0])
 
         while len(inds):
             i     = inds[0]
@@ -188,7 +191,7 @@ class DataCleaning:
 
             inds  = inds[np.searchsorted(inds, i+j+2):]
 
-        bead[bead == np.finfo('f4').max] = np.NaN
+        bead[nans] = np.NaN
 
     def aberrant(self, bead:np.ndarray, clip = False) -> bool:
         """
