@@ -94,19 +94,20 @@ namespace
     };
 
     template <typename T>
-    void _init(T & inst, pybind11::kwargs kwa)
+    std::unique_ptr<T> _init(pybind11::kwargs kwa)
     {
-        new (&inst) T();
-        _fromkwa(inst, kwa);
+        std::unique_ptr<T> ptr(new T());
+        _fromkwa(*ptr, kwa);
+        return ptr;
     }
 
-    template <>
-    void _init<signalfilter::clip::Args>(signalfilter::clip::Args & inst,
-                                         pybind11::kwargs kwa)
+    template <typename T>
+    std::unique_ptr<T> _setstate(pybind11::dict kwa)
     {
-        new (&inst) signalfilter::clip::Args();
-        _fromkwa(inst, kwa);
-    };
+        std::unique_ptr<T> ptr(new T());
+        _fromkwa(*ptr, kwa);
+        return ptr;
+    }
 
     template<typename T>
     pybind11::array & _run(T                  const & self,
@@ -122,7 +123,7 @@ namespace
     template <typename T, typename K>
     void    _apply(K & cls)
     {
-        cls.def("__init__", &_init<T>)
+        cls.def(pybind11::init(&_init<T>))
            .def_readwrite("derivate",  &T::derivate)
            .def_readwrite("power",     &T::power)
            .def_property("precision",  _get_prec<T>, _set_prec<T>)
@@ -151,14 +152,14 @@ namespace signalfilter {
             pybind11::class_<Args> cls(mod,"ForwardBackwardFilter");
             cls.def_readwrite("normalize",     &Args::normalize)
                .def_readwrite("window",        &Args::window)
-               .def("__getstate__",  [](Args const & p)
-                    {
-                        auto d = _getdict(p);
-                        d["normalize"] = p.normalize;
-                        d["window"]    = p.window;
-                        return d;
-                    })
-               .def("__setstate__",  [](Args & p, pybind11::dict d) { _init(p, d); })
+               .def(pybind11::pickle([](Args const & p)
+                                     {
+                                         auto d = _getdict(p);
+                                         d["normalize"] = p.normalize;
+                                         d["window"]    = p.window;
+                                         return d;
+                                     },
+                                     [](pybind11::dict d) { return _setstate<Args>(d); }))
                ;
             _apply<Args>(cls);
         }
@@ -169,8 +170,8 @@ namespace signalfilter {
         void pymodule(pybind11::module & mod)
         {
             pybind11::class_<Args> cls(mod, "NonLinearFilter");
-            cls.def("__getstate__",  _getdict<Args>)
-               .def("__setstate__",  [](Args & p, pybind11::dict d) { _init(p, d); })
+            cls.def(pybind11::pickle([](Args const & p) { return _getdict<Args>(p); },
+                                     [](pybind11::dict d) { return _setstate<Args>(d); }))
                ;
             _apply<Args>(cls);
         }
@@ -181,16 +182,16 @@ namespace signalfilter {
         void pymodule(pybind11::module & mod)
         {
             pybind11::class_<Args>(mod, "Clip")
-                .def("__init__", &_init<Args>)
+                .def(pybind11::init(&_init<Args>))
                 .def_readwrite("minval", &Args::minval)
                 .def_readwrite("maxval", &Args::maxval)
-                .def("__getstate__",  [](Args const & p)
-                    {
-                        using namespace pybind11::literals;
-                        return pybind11::dict("minval"_a = p.minval,
-                                              "maxval"_a = p.maxval);
-                    })
-                .def("__setstate__",  [](Args & p, pybind11::dict d) { _init(p, d); })
+                .def(pybind11::pickle([](Args const & p)
+                                      {
+                                          using namespace pybind11::literals;
+                                          return pybind11::dict("minval"_a = p.minval,
+                                                                "maxval"_a = p.maxval);
+                                      },
+                                     [](pybind11::dict d) { return _setstate<Args>(d); }))
                 .def("__call__", &_run<Args>)
                 ;
         }

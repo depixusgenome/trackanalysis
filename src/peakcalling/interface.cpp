@@ -245,20 +245,20 @@ namespace peakcalling
             }
         };
 
-        void _init(Iterator & inst,
-                   pybind11::array_t<float> const & ref,
-                   pybind11::array_t<float> const & exp,
-                   float minstretch, float maxstretch,
-                   float minbias,    float maxbias, bool index)
+        std::unique_ptr<Iterator> _init(pybind11::array_t<float> const & ref,
+                                        pybind11::array_t<float> const & exp,
+                                        float minstretch, float maxstretch,
+                                        float minbias,    float maxbias, bool index)
         {
-            new (&inst) Iterator();
-            inst.ref        = ref.data(); inst.nref       = ref.size();
-            inst.exp        = exp.data(); inst.nexp       = exp.size();
-            inst.minstretch = minstretch; inst.maxstretch = maxstretch;
-            inst.minbias    = minbias;    inst.maxbias    = maxbias;
-            inst.i1r        = 0;          inst.i2r        = 1;
-            inst.i1e        = 0;          inst.i2e        = 1;
-            inst.index      = index;
+            auto ptr = std::unique_ptr<Iterator>(new Iterator());
+            ptr->ref        = ref.data(); ptr->nref       = ref.size();
+            ptr->exp        = exp.data(); ptr->nexp       = exp.size();
+            ptr->minstretch = minstretch; ptr->maxstretch = maxstretch;
+            ptr->minbias    = minbias;    ptr->maxbias    = maxbias;
+            ptr->i1r        = 0;          ptr->i2r        = 1;
+            ptr->i1e        = 0;          ptr->i2e        = 1;
+            ptr->index      = index;
+            return ptr;
         }
 
         void pymodule(pybind11::module & mod)
@@ -343,7 +343,7 @@ namespace peakcalling
                     "Returns a tuple (min cost, best stretch, best bias)");
 
             pybind11::class_<Iterator> cls(ht, "PeakIterator");
-            cls.def("__init__",     &_init,
+            cls.def(pybind11::init(&_init),
                     "reference"_a,  "experiment"_a,
                     "minstretch"_a = .01,   "maxstretch"_a = 10.,
                     "minbias"_a    = -10.,  "maxbias"_a    = 10.,
