@@ -11,12 +11,12 @@ from    functools               import partial
 import  numpy                   as     np
 from    numpy.lib.stride_tricks import as_strided
 
-from    scipy.ndimage.filters   import correlate1d
-
 from    utils                   import initdefaults
 from    signalfilter            import nanhfsigma
 from    model                   import Task, Level, PHASE
 from    control.processor       import Processor
+from    ._core                  import (constant as _cleaningcst, # pylint: disable=import-error
+                                        clip     as _cleaningclip)
 
 Partial = NamedTuple('Partial',
                      [('name', str),
@@ -159,86 +159,31 @@ class DataCleaning:
         for itm in self.nandensity:
             itm.apply(bead)
 
-    def constant(self, bead:np.ndarray):
-        """
-        Removes constant values.
-
-            * |z[I-mindeltarange+1] - z[I-mindeltarange+2] | < mindeltavalue
-            *  & ...
-            *  & |z[I-mindeltarange+1] - z[I]|              < mindeltavalue
-            *  & n ∈ [I-mindeltarange+2, I]
-        """
-        mind       = self.mindeltavalue
-        rng        = self.mindeltarange-1
-
-        nans       = np.isnan(bead)
-        bead[nans] = np.finfo('f4').max
-
-        inds       = np.abs(bead[:-rng]-bead[1:1-rng]) < mind
-        inds      &= np.abs(bead[:-rng]-bead[2:2-rng if rng > 2 else None]) < mind
-        inds       = np.nonzero(inds)[0]
-
-        for i in range(2, rng):
-            inds = inds[np.abs(bead[inds]-bead[inds+i]) < mind]
-
-        inds       = np.setdiff1d(inds, np.nonzero(nans)[0])
-
-        while len(inds):
-            i     = inds[0]
-            start = bead[i]
-            j     = next((j for j, v in enumerate(bead[i+3:]) if abs(start-v) > mind), 0)
-            bead[i+1:i+j+3] = np.NaN
-
-            inds  = inds[np.searchsorted(inds, i+j+2):]
-
-        bead[nans] = np.NaN
-
     def aberrant(self, bead:np.ndarray, clip = False) -> bool:
         """
         Removes aberrant values.
 
-        A value at position *n* is aberrant if either or both:
+        A value at position *n* is aberrant if any:
 
-            * |z[n] - median(z)| > maxabsvalue
-            * |(z[n+1]-z[n-1])/2-z[n]| > maxderivate
-            * |z[I-mindeltarange+1] - z[I-mindeltarange+2] | < mindeltavalue
-              && ...
-              && |z[I-mindeltarange+1] - z[I]|               < mindeltavalue
-              && n ∈ [I-mindeltarange+2, I]
-            * #{z[I-nanwindow//2:I+nanwindow//2] is nan} < nanratio*nanwindow
+        * |z[n] - median(z)| > maxabsvalue
+        * |(z[n+1]-z[n-1])/2-z[n]| > maxderivate
+        * |z[I-mindeltarange+1] - z[I-mindeltarange+2] | < mindeltavalue
+          && ...
+          && |z[I-mindeltarange+1] - z[I]|               < mindeltavalue
+          && n ∈ [I-mindeltarange+2, I]
+        * #{z[I-nanwindow//2:I+nanwindow//2] is nan} < nanratio*nanwindow
 
         Aberrant values are replaced by:
 
-            * *NaN* if *clip* is true,
-            * *maxabsvalue ± median*, whichever is closest, if *clip* is false.
+        * *NaN* if *clip* is true,
+        * *maxabsvalue ± median*, whichever is closest, if *clip* is false.
 
         returns: *True* if the number of remaining values is too low
         """
-        fin  = np.isfinite(bead)
-        good = bead[fin]
-        if len(good) < len(bead) * self.minpopulation * 1e-2:
-            return True
-
-        zero = np.nanmedian(good)
-        med  = good-zero
-        if clip:
-            good[med >  self.maxabsvalue] = zero+self.maxabsvalue
-            good[med < -self.maxabsvalue] = zero-self.maxabsvalue
-            bead[fin] = good
-        else:
-            der = correlate1d(good, [.5, -1., .5], mode = 'nearest')
-            good[np.logical_or(np.abs(med) > self.maxabsvalue,
-                               np.abs(der) > self.maxderivate)] = np.NaN
-
-            bead[fin] = good
-
-        self.constant(bead)
+        _cleaningclip(self, clip, np.nanmedian(bead), bead)
+        _cleaningcst(self, bead)
         self.localpopulation(bead)
-
-        if len(good)-np.isnan(good).sum() <= len(bead) * self.minpopulation * 1e-2:
-            return True
-
-        return False
+        return np.isfinite(bead).sum() <= len(bead) * self.minpopulation * 1e-2
 
 class PostAlignmentDataCleaning:
     "bead selection"

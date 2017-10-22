@@ -11,6 +11,7 @@ from cleaning.processor         import (DataCleaning, DataCleaningTask,
                                         DataCleaningProcessor, LocalNaNPopulation,
                                         DerivateIslands, DataCleaningException)
 from cleaning.beadsubtraction   import BeadSubtractionTask, BeadSubtractionProcessor
+import cleaning._core           as     cleaningcore # pylint:disable=no-name-in-module
 from simulator                  import randtrack, setseed
 from model.task.track           import TrackReaderTask
 from control.taskcontrol        import create
@@ -19,7 +20,7 @@ from data                       import Beads, Track
 def test_constantvalues():
     "test constant values"
     setseed(0)
-    bead = np.random.normal(.1, 3e-3, 50)
+    bead = np.asarray(np.random.normal(.1, 3e-3, 50), dtype = 'f4')
 
     bead[:3]    = 100.
     bead[10:13] = 100.
@@ -30,7 +31,7 @@ def test_constantvalues():
     fin                  =  np.abs(bead-100.) < 1e-5
     fin[[0,10,20,40,41,-3]] = False
 
-    DataCleaning().constant(bead)
+    cleaningcore.constant(DataCleaning(), bead)  # pylint: disable=no-member
 
     assert_equal(np.isnan(bead), fin)
 
@@ -40,7 +41,7 @@ def test_constantvalues():
     bead[40:42] = 100.
     bead[-3:]   = 100.
 
-    DataCleaning(mindeltarange=5).constant(bead)
+    cleaningcore.constant(DataCleaning(mindeltarange=5), bead) # pylint: disable=no-member
     fin[:] = False
     fin[21:30] = True
     assert_equal(np.isnan(bead), fin)
@@ -48,7 +49,7 @@ def test_constantvalues():
 def test_cleaning_base():
     "test cleaning"
     setseed(0)
-    cycs = np.random.normal(.1, 3e-3, 1000).reshape(10,-1)
+    cycs = np.asarray(np.random.normal(.1, 3e-3, 1000).reshape(10,-1), dtype = 'f4')
     cycs[0,:]      = np.random.normal(1., 4e-2, 100)
     cycs[:,50:]   += .51
     cycs[1,:]      = np.random.normal(.5, 1e-5, 100)
