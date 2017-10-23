@@ -98,7 +98,6 @@ class TracksDictDisplay:
 
     @staticmethod
     def _default_display(itms, key, bead, specs, **kwa):
-        print(type(itms), type(itms[key]))
         data = getattr(itms[key], specs['name'], itms[key])
         if specs['overlay'] == 'key' and 'labels' not in kwa:
             kwa['labels'] = str(key)
