@@ -253,7 +253,7 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
         objects computes a stretch and bias which is applied to the x-axis of
         non-reference items.
         """
-        return self.display('2d', reference, **kwa)
+        return self.display('bead', reference, **kwa)
 
     def display1d(self, reference = None, **kwa):
         """

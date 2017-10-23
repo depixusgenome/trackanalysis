@@ -37,8 +37,15 @@ class TracksDictDisplay:
     def __getitem__(self, values):
         if isinstance(values, tuple):
             tracks, beads = values
-            if tracks in self.tracks:
-                return getattr(self.tracks[values], self.name)[self.beads]
+            if not isinstance(tracks, list) and tracks in self.tracks:
+                trk = self.tracks[tracks]
+                return getattr(trk, self.name, trk)[beads]
+
+            if isinstance(tracks, list) and isinstance(beads, int):
+                beads = [beads]
+            elif isinstance(beads, list) and not isinstance(tracks, list):
+                tracks = [tracks]
+
             self.keys  = None if isellipsis(tracks) else tracks
             self.beads = None if isellipsis(beads) else beads
 
@@ -52,13 +59,25 @@ class TracksDictDisplay:
             self.tracks = None
 
         elif values in self.tracks:
-            if self.beads:
-                return getattr(self.tracks[values], self.name)[self.beads]
-            return getattr(self.tracks[values], self.name)
+            trk = self.tracks[values]
+            itm = getattr(trk, self.name, trk)
+            return itm[self.beads] if self.beads else itm
 
         else:
             raise KeyError("Could not slice the display")
         return self
+
+    def __add__(self, other):
+        return self.display() + (other if isinstance(other, hv.Element) else other.display())
+
+    def __mul__(self, other):
+        return self.display() * (other if isinstance(other, hv.Element) else other.display())
+
+    def __lshift__(self, other):
+        return self.display() << (other if isinstance(other, hv.Element) else other.display())
+
+    def __rshift__(self, other):
+        return self.display() >> (other if isinstance(other, hv.Element) else other.display())
 
     @staticmethod
     def _specs():
@@ -79,7 +98,8 @@ class TracksDictDisplay:
 
     @staticmethod
     def _default_display(itms, key, bead, specs, **kwa):
-        data = getattr(itms[key], specs['name'])
+        print(type(itms), type(itms[key]))
+        data = getattr(itms[key], specs['name'], itms[key])
         if specs['overlay'] == 'key' and 'labels' not in kwa:
             kwa['labels'] = str(key)
         elif specs['overlay'] == 'bead' and 'labels' not in kwa:

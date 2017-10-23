@@ -39,7 +39,7 @@ def display(self,                       # pylint: disable=function-redefined
             kdim    = 'bead',
             labels  = None,
             tpe     = 'curve',
-            overlay = True,
+            overlay = False,
             **opts):
     """
     Displays cycles.
