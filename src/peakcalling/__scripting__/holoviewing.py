@@ -6,7 +6,7 @@ from   typing                   import List, Type
 from   scipy.interpolate        import interp1d
 import numpy                    as np
 from   utils                    import DefaultValue
-from   utils.decoration         import addto
+from   scripting.holoviewing    import addto
 import sequences
 from   peakfinding.processor    import PeaksDict
 from   ..processor              import BeadsByHairpinProcessor
@@ -150,7 +150,6 @@ def display(self, # pylint: disable=function-redefined,too-many-arguments
 
 class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignore
     "tracksdict display for peaks"
-
     @classmethod
     def _doref(cls, specs, ovrs, ind):
         if None in (specs['reference'], specs['distance']):
@@ -158,7 +157,10 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
 
         dist = specs['distance']
         def _peaks(crvs):
-            crv   = tuple(crvs)[-1].data[:,0]
+            print(crvs)
+            good  = tuple(crvs)[-1]
+            print(good, type(good.data))
+            crv   = good.data[:,0] if isinstance(good, np.ndarray) else good.data[0]
             xvals = (crv[1::3]+crv[::3])*.5
             yvals = (crv[1::3]-crv[::3])*.5
             return dist.frompeaks(np.vstack([xvals, yvals]).T)
@@ -190,7 +192,7 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
                    ('textcolor', 'white')))
 
     @classmethod
-    def to2d(cls, plot, reference, **kwa):
+    def _to2d(cls, plot, reference, **kwa):
         "converts 1d histograms to 2D"
         crvs  = [(i[1], j) for i, j in plot.data.items() if i[0] == 'Curve'][::2]
         quad  = cls.__quadmesh(crvs, kwa)
@@ -242,53 +244,104 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
         return ref(style = dict(color = kwa.get('refcolor', 'gray'),
                                 line_dash = kwa.get('refdash', 'dotted')))
 
+    def displaybead(self, reference = None, **kwa):
+        """
+        For a given track, all beads are overlayed.
+
+        Keywords are:
+
+        * *reference*: the reference is displayed as an area
+        * *distance*: a *HistogramFit* object (default) or *None*. This
+        objects computes a stretch and bias which is applied to the x-axis of
+        non-reference items.
+        """
+        return self.display('2d', reference, **kwa)
+
+    def display1d(self, reference = None, **kwa):
+        """
+        For a given bead, all tracks are overlayed.
+
+        Keywords are:
+
+        * *reference*: the reference is displayed as an area,
+        * *distance*: a *HistogramFit* object (default) or *None*. This objects
+        computes a stretch and bias which is applied to the x-axis of
+        non-reference items.
+        """
+        return self.display('1d', reference, **kwa)
+
+    def display2d(self, reference = None, **kwa):
+        """
+        For a given bead, all tracks are shown on a 2D histogram.
+
+        Keywords are:
+
+        * *reference*: the reference is displayed as an area,
+        * *distance*: a *HistogramFit* object (default) or *None*. This objects
+        computes a stretch and bias which is applied to the x-axis of
+        non-reference items.
+        """
+        return self.display('2d', reference, **kwa)
+
+    def displayonebyone(self, reference = None, **kwa):
+        """
+        Keywords are:
+
+
+        * *reference*: the reference is removed from the *key* widget and
+        allways displayed to the left independently.
+        * *refdims*: if set to *True*, the reference gets its own dimensions.
+        Thus zooming and spanning is independant.
+        * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
+        """
+        return self.display(None, reference, **kwa)
+
+    def display(self, overlay = '2d', reference = None, **kwa):
+        """
+        A hv.DynamicMap showing peaks
+
+        Options are:
+
+            * *overlay* == '1d': for a given bead, all tracks are overlayed,
+            see 'display1d'.
+
+            * *overlay* == '2d': for a given bead, all tracks are shown on a 2D
+            histogram, see 'display2d'.
+
+            * *overlay* == 'bead': for a given track, all beads are overlayed,
+            see 'displaybead'.
+
+
+            * *overlay* == None: see 'displayonebyone'.
+        """
+
+        kwa.setdefault('reflayout', 'same' if overlay is None else 'bottom')
+        kwa.setdefault('refdims', False)
+        if self.beads:
+            kwa.setdefault('bead', self.beads)
+        if self.keys:
+            kwa.setdefault('key', self.keys)
+
+        if overlay is not None:
+            overlay = overlay.lower()
+            is2d    = overlay == '2d'
+            overlay = 'key' if overlay in ("1d", "2d") else overlay
+        else:
+            is2d    = False
+
+        if is2d:
+            beads = kwa['bead'] if 'bead' in kwa else self.tracks.beads(*kwa.get('key', ()))
+
+        dmap    = self.run(self.tracks, 'peaks', overlay, reference, dict(kwa))
+        if is2d:
+            fcn = lambda bead: self._to2d(dmap[bead], reference, **kwa)
+            return hv.DynamicMap(fcn, kdims = ['bead']).redim.values(bead = beads)
+        return dmap
+
 @addto(TracksDict) # type: ignore
-def peaks(self, overlay = '2d', reference = None, **kwa):
-    """
-    A hv.DynamicMap showing peaks
-
-    Options are:
-
-        * *overlay* == 'key': for a given bead, all tracks are overlayed:
-
-            * *reference*: the reference is displayed as an area
-            * *distance*: a *HistogramFit* object (default) or *None*. This
-            objects computes a stretch and bias which is applied to the x-axis of
-            non-reference items.
-
-        * *overlay* == '2d': for a given bead, all tracks are shown on a 2D histogram:
-
-            * *reference*: the reference is displayed as an area
-            * *distance*: a *HistogramFit* object (default) or *None*. This
-            objects computes a stretch and bias which is applied to the x-axis of
-            non-reference items.
-
-        * *overlay* == 'bead': for a given track, all beads are overlayed
-
-            * *reference*: the reference is displayed as an area
-            * *distance*: a *HistogramFit* object (default) or *None*. This
-            objects computes a stretch and bias which is applied to the x-axis of
-            non-reference items.
-
-        * *overlay* == None:
-
-            * *reference*: the reference is removed from the *key* widget and
-            allways displayed to the left independently.
-            * *refdims*: if set to *True*, the reference gets its own dimensions.
-            Thus zooming and spanning is independant.
-            * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
-
-    """
-    kwa.setdefault('reflayout', 'same' if overlay is None else 'bottom')
-    kwa.setdefault('refdims', False)
-    is2d    = overlay.lower() == '2d'
-    overlay = 'key' if is2d else overlay.lower()
-    if is2d:
-        beads = kwa['bead'] if 'bead' in kwa else self.beads(*kwa.get('key', ()))
-    dmap    = PeaksTracksDictDisplay.run(self, 'peaks', overlay, reference, dict(kwa))
-    if is2d:
-        fcn = lambda bead: PeaksTracksDictDisplay.to2d(dmap[bead], reference, **kwa)
-        return hv.DynamicMap(fcn, kdims = ['bead']).redim.values(bead = beads)
-    return dmap
+@property
+def peaks(self):
+    "A hv.DynamicMap showing peaks"
+    return PeaksTracksDictDisplay(self)
 
 __all__: List[str] = []

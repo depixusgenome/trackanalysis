@@ -6,7 +6,7 @@ Adds shortcuts for using holoview
 import sys
 from   typing                   import List
 from   functools                import partial
-from   utils.decoration         import addto
+from   scripting.holoviewing    import addto
 from   .display                 import Display
 from   ...track                 import Bead, FoV, Track
 from   ...views                 import Beads, Cycles
@@ -32,7 +32,7 @@ def display(self,
         * *tpe*: can be scatter or curve.
         * *overlay*: if *False*, all data is concatenated into one array.
     """
-    return Display.beads(self, kdim, labels, tpe, overlay, **opts)
+    return Display.displaybeads(self, kdim, labels, tpe, overlay, **opts)
 
 @addto(Cycles)                          # type: ignore
 def display(self,                       # pylint: disable=function-redefined
@@ -54,7 +54,7 @@ def display(self,                       # pylint: disable=function-redefined
         * *tpe*: can be scatter or curve.
         * *overlay*: if *False*, all data is concatenated into one array.
     """
-    return Display.cycles(self, kdim, labels, tpe, overlay, **opts)
+    return Display.displaycycles(self, kdim, labels, tpe, overlay, **opts)
 
 @addto(Track, Beads)
 def map(self, fcn, **kwa):              # pylint: disable=redefined-builtin

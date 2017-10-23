@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Updating PeaksDict for scripting purposes"
-from   typing           import List, Iterator, Type
-from   functools        import partial
+from   typing                import List, Iterator, Type
+from   functools             import partial
 import sys
 import numpy            as     np
-from   utils.decoration import addto
-from   ..probabilities  import Probability
-from   ..processor      import PeaksDict
-from   .                import Detailed
+from   scripting.holoviewing import addto
+from   ..probabilities       import Probability
+from   ..processor           import PeaksDict
+from   .                     import Detailed
 
 def _get(name, attr = None):
     mod = sys.modules[name]
@@ -162,6 +162,9 @@ def map(self, fcn, **kwa): # pylint: disable=redefined-builtin
 
 class PeaksTracksDictDisplay(TracksDictDisplay): # type: ignore
     "tracksdict display for peaks"
+    def __init__(self, dico):
+        super().__init__(dico, 'peaks')
+
     @staticmethod
     def _refindex(specs):
         if specs.get('reference', None) is None:
@@ -181,26 +184,36 @@ class PeaksTracksDictDisplay(TracksDictDisplay): # type: ignore
     def _all(cls, specs, fcn, key):
         return cls._toarea(specs, super()._all(specs, fcn, key), cls._refindex(specs))
 
+
+    def display(self, overlay = '2d', reference = None, **kwa):
+        """
+        A hv.DynamicMap showing peaks
+
+        Options are:
+
+            * *overlay* == 'key': for a given bead, all tracks are overlayed
+            The *reference* option can be used to indicate the top-most track.
+            * *overlay* == 'bead': for a given track, all beads are overlayed
+            The *reference* option can be used to indicate the top-most bead.
+            * *overlay* == None:
+
+                * *reference*: the reference is removed from the *key* widget and
+                allways displayed to the left independently.
+                * *refdims*: if set to *True*, the reference gets its own dimensions.
+                Thus zooming and spanning is independant.
+                * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
+        """
+        kwa.setdefault('reflayout', 'bottom')
+        if self.beads:
+            kwa.setdefault('bead', self.beads)
+        if self.keys:
+            kwa.setdefault('key', self.keys)
+        return self.run(self.tracks, 'peaks', overlay, reference, kwa)
+
 @addto(TracksDict) # type: ignore
-def peaks(self, overlay = 'key', reference = None, **kwa):
-    """
-    A hv.DynamicMap showing peaks
-
-    Options are:
-
-        * *overlay* == 'key': for a given bead, all tracks are overlayed
-        The *reference* option can be used to indicate the top-most track.
-        * *overlay* == 'bead': for a given track, all beads are overlayed
-        The *reference* option can be used to indicate the top-most bead.
-        * *overlay* == None:
-
-            * *reference*: the reference is removed from the *key* widget and
-            allways displayed to the left independently.
-            * *refdims*: if set to *True*, the reference gets its own dimensions.
-            Thus zooming and spanning is independant.
-            * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
-    """
-    kwa.setdefault('reflayout', 'bottom')
-    return PeaksTracksDictDisplay.run(self, 'peaks', overlay, reference, kwa)
+@property
+def peaks(self):
+    "A hv.DynamicMap showing peaks"
+    return PeaksTracksDictDisplay(self)
 
 __all__: List[str] = []

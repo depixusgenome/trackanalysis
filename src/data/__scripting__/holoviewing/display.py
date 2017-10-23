@@ -60,12 +60,12 @@ class Display:
         return cls._create(labels, tpe, overlay, opts, good)
 
     @classmethod
-    def cycles(cls, itms, # pylint: disable=too-many-arguments
-               kdim    = 'bead',
-               labels  = None,
-               tpe     = 'curve',
-               overlay = True,
-               **opts):
+    def displaycycles(cls, itms, # pylint: disable=too-many-arguments
+                      kdim    = 'bead',
+                      labels  = None,
+                      tpe     = 'curve',
+                      overlay = True,
+                      **opts):
         """
         Displays cycles.
 
@@ -96,12 +96,12 @@ class Display:
         return hv.DynamicMap(fcn, kdims = [kdim]).redim.values(**{kdim: keys})
 
     @classmethod
-    def beads(cls, itms, # pylint: disable=too-many-arguments
-              kdim    = 'bead',
-              labels  = None,
-              tpe     = 'curve',
-              overlay = True,
-              **opts):
+    def displaybeads(cls, itms, # pylint: disable=too-many-arguments
+                     kdim    = 'bead',
+                     labels  = None,
+                     tpe     = 'curve',
+                     overlay = True,
+                     **opts):
         """
         Displays beads.
 

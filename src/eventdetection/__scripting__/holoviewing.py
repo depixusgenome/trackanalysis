@@ -4,11 +4,11 @@
 Adds shortcuts for using holoview
 """
 import sys
-from   typing           import List, Type
-from   functools        import partial
-import numpy            as np
-from   utils.decoration import addto
-from   ..data           import Events
+from   typing                import List, Type
+from   functools             import partial
+import numpy                 as     np
+from   scripting.holoviewing import addto
+from   ..data                import Events
 
 def _get(name, attr = None):
     mod = sys.modules[name]
@@ -70,7 +70,7 @@ def display(self,       # pylint: disable=function-redefined
         * *tpe*: can be scatter or curve.
         * *overlay*: if *False*, all data is concatenated into one array.
     """
-    return EventDisplay.cycles(self, kdim, labels, tpe, overlay, **opts)
+    return EventDisplay.displaycycles(self, kdim, labels, tpe, overlay, **opts)
 
 @addto(Events)  # type: ignore
 def map(self, fcn, kdim = None, **kwa): # pylint: disable=redefined-builtin,function-redefined
