@@ -150,7 +150,7 @@ class HistogramFit(GriddedOptimization, ReferenceFit):
             thr = self.maxthreshold
             if thr == 'auto':
                 pks = vals[1][1:-1][np.logical_and(vals[1][2:]  < vals[1][1:-1],
-                                                   vals[-1][:-2] < vals[1][1:-1])]
+                                                   vals[1][:-2] < vals[1][1:-1])]
                 thr = np.nanmedian(pks)
             if thr not in (None, np.NaN):
                 vals[1][vals[1] > thr] = thr

@@ -157,10 +157,8 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
 
         dist = specs['distance']
         def _peaks(crvs):
-            print(crvs)
             good  = tuple(crvs)[-1]
-            print(good, type(good.data))
-            crv   = good.data[:,0] if isinstance(good, np.ndarray) else good.data[0]
+            crv   = good.data[:,0] if isinstance(good.data, np.ndarray) else good.data[0]
             xvals = (crv[1::3]+crv[::3])*.5
             yvals = (crv[1::3]-crv[::3])*.5
             return dist.frompeaks(np.vstack([xvals, yvals]).T)

@@ -82,9 +82,6 @@ else:
     from peakfinding.__scripting__.holoviewing    import *
     from peakcalling.__scripting__.holoviewing    import *
     def _configure_hv():
-        if not _is_jupyter():
-            return
-
         # pylint: disable=import-error,bare-except,unused-import,unused-variable
         exts = []
         try:

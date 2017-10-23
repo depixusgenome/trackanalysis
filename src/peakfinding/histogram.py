@@ -475,7 +475,6 @@ class ByGaussianMix:
         pass
 
     def __call__(self,**kwa):
-        print(f"kwa={kwa}")
         pos            = kwa.get("pos",None)
         self.peakwidth = kwa.get("precision",1)
         _,bias,slope   = kwa.get("hist",(0,0,1))
