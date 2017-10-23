@@ -170,7 +170,7 @@ class TracksDictDisplay:
             kwa.setdefault('bead', self.beads)
         if self.keys:
             kwa.setdefault('key', self.keys)
-        return TracksDictDisplay.run(self.tracks, self.name, overlay, reference, kwa)
+        return self.run(self.tracks, self.name, overlay, reference, kwa)
 
 @addto(TracksDict) # type: ignore
 @property
