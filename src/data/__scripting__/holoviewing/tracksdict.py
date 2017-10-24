@@ -43,7 +43,9 @@ class TracksDictDisplay:
 
             if isinstance(tracks, list) and isinstance(beads, int):
                 beads = [beads]
-            elif isinstance(beads, list) and not isinstance(tracks, list):
+            elif (isinstance(beads, list)
+                  and not isinstance(tracks, list)
+                  and not isellipsis(tracks)):
                 tracks = [tracks]
 
             self.keys  = None if isellipsis(tracks) else tracks

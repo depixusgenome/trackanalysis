@@ -2,14 +2,13 @@
 # -*- coding: utf-8 -*-
 "All sequences-related stuff"
 from    typing      import (Sequence, Union,  # pylint: disable=unused-import
-                            Iterator, Tuple, TextIO, Dict)
+                            Iterator, Tuple, TextIO, Dict, cast)
 import  pathlib
 import  re
 import  numpy       as np
 from    utils       import fromstream
 
-@fromstream('r')
-def read(stream:TextIO) -> 'Iterator[Tuple[str,str]]':
+def _read(stream:TextIO) -> Iterator[Tuple[str,str]]:
     "reads a path and yields pairs (name, sequence)"
     title = None
     seq   = ""
@@ -40,6 +39,27 @@ def read(stream:TextIO) -> 'Iterator[Tuple[str,str]]':
             yield (pathlib.Path(str(stream.name)).stem, seq)
         else:
             yield ("hairpin %d" % (ind+1) if title is None else title, seq)
+
+def read(stream:Union[pathlib.Path, str, Dict[str,str], TextIO]) -> Iterator[Tuple[str,str]]:
+    "reads a path and yields pairs (name, sequence)"
+    if isinstance(stream, pathlib.Path):
+        with open(stream) as tmp:
+            return _read(tmp)
+
+    if isinstance(stream, dict):
+        return cast(Iterator[Tuple[str, str]], stream.items())
+
+    if isinstance(stream, Iterator):
+        return cast(Iterator[Tuple[str, str]], stream)
+
+    if isinstance(stream, str) and '/' not in stream and '.' not in stream:
+        try:
+            if not pathlib.Path(stream).exists():
+                return iter((('hairpin 1', stream),))
+        except OSError:
+            pass
+
+    return _read(cast(TextIO, stream))
 
 PEAKS_DTYPE = [('position', 'i4'), ('orientation', 'bool')]
 PEAKS_TYPE  = Sequence[Tuple[int, bool]]

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Updating PeaksDict for oligo mapping purposes"
 import sys
-from   typing                   import List, Type
+from   typing                   import List, Type, Sequence, Tuple, cast
 from   scipy.interpolate        import interp1d
 import numpy                    as np
 from   utils                    import DefaultValue
@@ -33,7 +33,11 @@ class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
         if labels is not False:
             opts['label'] = 'sequence'
 
-        for key, vals in sequences.peaks(seq, oligos):
+        tmp = sequences.peaks(seq, oligos)
+        if isinstance(tmp, np.ndarray):
+            tmp = (('hairpin 1', tmp),)
+
+        for key, vals in cast(Sequence[Tuple[str, np.ndarray]], tmp):
             xvals = np.repeat(vals['position'], 3)
             yvals = np.concatenate([[(0., .1)[plus], (.9, 1.)[plus], np.NaN]
                                     for plus in vals['orientation']])
@@ -62,7 +66,14 @@ class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
                 hpc  = pins[key]
                 data = np.copy(hpc.data)
                 data[:,1] *= np.nanmax(next(iter(crv)).data[:,1])
-                return hv.Overlay(crv+[hpc.clone(data = data)], group = key)
+
+                pos  = lambda x: .8*np.nanmax(x)+.2*np.nanmin(x)
+                if dist.bias < 0:
+                    txt  = f'y = {dist.stretch:.1f} (x  + {np.abs(dist.bias) : .4f})'
+                else:
+                    txt  = f'y = {dist.stretch:.1f} (x  - {dist.bias : .4f})'
+                text = hv.Text(pos(data[:,0]), pos(data[:,1]), txt)
+                return hv.Overlay(crv+[hpc.clone(data = data), text], group = key)
 
         beads = list(set([i for i in itms.keys() if itms.isbead(i)]))
         return hv.DynamicMap(_fcn, kdims = ['bead']).redim.values(bead = beads)
