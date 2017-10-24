@@ -66,8 +66,9 @@ try:
 except ImportError:
     pass
 
+_STACK = [i.filename for i in inspect.stack()]
 def _is_jupyter():
-    return any(i.filename.endswith("ipykernel/zmqshell.py") for i in inspect.stack())
+    return any(i.endswith("ipykernel/zmqshell.py") for i in _STACK)
 
 try:
     # pylint: disable=import-error
@@ -81,6 +82,7 @@ else:
     from eventdetection.__scripting__.holoviewing import *
     from peakfinding.__scripting__.holoviewing    import *
     from peakcalling.__scripting__.holoviewing    import *
+    from ramp.__scripting__.holoviews             import *
     def _configure_hv():
         # pylint: disable=import-error,bare-except,unused-import,unused-variable
         exts = []
@@ -103,11 +105,13 @@ else:
                 warnings.simplefilter("ignore", UserWarning, lineno = 6)
                 hv.notebook_extension(*exts)
             del warnings
-            try:
-                from IPython import get_ipython
-                get_ipython().magic('output size=150')
-            except:
-                pass
+
+            if _is_jupyter():
+                try:
+                    from IPython import get_ipython
+                    get_ipython().magic('output size=150')
+                except:
+                    pass
 
     _configure_hv()
     del _configure_hv
@@ -134,8 +138,7 @@ del _configure_jupyter
 def _test():
     if _is_jupyter():
         return
-    stack  = [i.filename for i in inspect.stack()[1:]
-              if 'importlib' not in i.filename and i.filename != '<stdin>']
+    stack  = [i for i in _STACK if 'importlib' not in i and i != '<stdin>']
     ends   = "IPython/core/magics/execution.py", "/trackanalysis.py"
     starts = ("<ipython-input",)
     if any(any(i.endswith(j) for j in ends) or any(i.startswith(j) for j in starts)
@@ -148,3 +151,4 @@ def _test():
 #_test()
 del _test
 del _is_jupyter
+del _STACK
