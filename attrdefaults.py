@@ -222,9 +222,13 @@ def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
         >>> assert Agg(attr = [2]).elem.attr == [2]
 
     """
-    fcn = None
+
+    fcn     = None
     if len(attrs) == 1 and isinstance(attrs[0], Iterable) and not isinstance(attrs[0], str):
         attrs = attrs[0] # type: ignore
+
+    delayed = next((i for i in attrs if i == '__delayed_init__'), None) is not None
+    attrs   = tuple(i for i in attrs if i != '__delayed_init__')
 
     if len(attrs) == 1 and callable(attrs[0]):
         fcn   = attrs[0]
@@ -245,30 +249,41 @@ def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
             def __init__(self, *args, **kwargs):
                 updater(self, kwargs, cpy = args)
                 fcn    (self, **kwargs)
+                if delayed:
+                    self.__delayed_init__(kwargs)
+
             setattr(__init__, 'IS_GET_STATE', True)
 
         elif val.kind  == val.VAR_KEYWORD and not initafter:
             def __init__(self, *args, **kwargs):
                 fcn    (self, **kwargs)
                 updater(self, kwargs, cpy = args)
+                if delayed:
+                    self.__delayed_init__(kwargs)
             setattr(__init__, 'IS_GET_STATE', True)
 
         elif initafter:
             def __init__(self, *args, **kwargs):
                 updater(self, kwargs)
                 fcn    (self, *args, **kwargs)
+                if delayed:
+                    self.__delayed_init__(*args, **kwargs)
 
         elif ((val.annotation, val.kind) == (dict, val.VAR_POSITIONAL)
               and (len(sig) == 2 or (len(sig) == 3 and tuple(sig)[2] == '_'))):
             def __init__(self, *args, **kwargs):
                 fcn    (self, kwargs)
                 updater(self, kwargs, cpy = args)
+                if delayed:
+                    self.__delayed_init__(kwargs)
             setattr(__init__, 'IS_GET_STATE', True)
 
         else:
             def __init__(self, *args, **kwargs):
                 fcn    (self, *args, **kwargs)
                 updater(self, kwargs)
+                if delayed:
+                    self.__delayed_init__(*args, **kwargs)
 
         setattr(__init__, 'KEYS', attrs)
         return wraps(fcn)(__init__)
