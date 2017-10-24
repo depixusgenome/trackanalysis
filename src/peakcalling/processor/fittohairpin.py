@@ -36,15 +36,8 @@ class FitToHairpinTask(Task):
     match       : Matchers    = dict()
     DEFAULT_FIT               = PeakGridFit
     DEFAULT_MATCH             = PeakMatching
-    @initdefaults(frozenset(locals()) - {'level'})
-    def __init__(self, **kwa):
-        super().__init__()
 
-        if 'sequence' in kwa:
-            assert 'oligo' in kwa
-            self.__init_sequence(kwa)
-
-    def __init_sequence(self, kwa):
+    def __delayed_init__(self, kwa):
         if not isinstance(self.fit, dict):
             self.fit = {}
         if not isinstance(self.match, dict):
@@ -57,8 +50,12 @@ class FitToHairpinTask(Task):
             self.fit.update(other.fit)
             self.match.update(other.match)
 
+    @initdefaults(frozenset(locals()) - {'level'})
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
     def __scripting__(self, kwa):
-        self.__init_sequence(kwa)
+        self.__delayed_init__(kwa)
         return self
 
     @classmethod
