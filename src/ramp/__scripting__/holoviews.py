@@ -30,26 +30,32 @@ class RampDisplay:
                            [cycles] if isinstance(cycles, int) else
                            cycles)
 
-    def _action(self, cycles, align, length):
+    def _action(self, cycles, align, length, stretch, bias): # pylint: disable=too-many-arguments
         if cycles is None:
             cycles = ... if self.cycles is None else self.cycles
 
         items = self.track.cycles
         zmag  = {i[1]: j for i, j in items['zmag', cycles]}
-        maxes = {i: int(.1+np.median((j == np.nanmax(j)).nonzero()[0]))
-                 for i, j in zmag.items()}
-        imax  = {i: slice(max(0, j-length//2), j+length//2) for i, j in maxes.items()}
+
+        if align.lower() == 'first':
+            imax = dict.fromkeys(zmag.keys(), slice(length))        # type: ignore
+        elif align.lower() == 'last':
+            imax  = dict.fromkeys(zmag.keys(), slice(-length,0))    # type: ignore
+        elif align.lower() == 'max':
+            maxes = {i: int(.1+np.median((j == np.nanmax(j)).nonzero()[0]))
+                     for i, j in zmag.items()}
+            imax  = {i: slice(max(0, j-length//2), j+length//2) for i, j in maxes.items()}
+        else:
+            imax  = None
 
         def _show(bead):
             data = {i[1]: j for i, j in items[bead,cycles]}
-            if   align is None:
-                pass
-            elif align.lower() == 'first':
-                data.update({i: j - np.nanmean(j[:length])  for i, j in data.items()})
-            elif align.lower() == 'last':
-                data.update({i: j - np.nanmean(j[-length:]) for i, j in data.items()})
-            elif align.lower() == 'max':
-                data.update({i: j - np.nanmean(j[imax[i]]) for i, j in data.items()})
+            if imax:
+                data = {i: data[i] - np.nanmean(data[i][j]) for i, j in imax.items()}
+
+            zero = np.nanmedian([np.nanmean(j[:length]) for j in data.values()])
+            for j in data.values():
+                j[:] = (j-zero-bias)*stretch
 
             return hv.Overlay([hv.Curve((zmag[i], data[i]),
                                         label = f'cycle {i}',
@@ -59,7 +65,9 @@ class RampDisplay:
         return _show
 
     def display(self, beads = None, cycles = None, # pylint: disable=too-many-arguments
-                align = 'max', alignmentlength = 5, legend = 'left'):
+                align   = 'max', alignmentlength = 5,
+                stretch = 1.,    bias            = 0.,
+                legend  = 'left'):
         """
         Displays ramps
 
@@ -83,7 +91,8 @@ class RampDisplay:
         elif beads is None:
             beads = self.track.beadsonly.keys() if self.beads is None else self.beads
 
-        dmap = hv.DynamicMap(self._action(cycles, align, alignmentlength), kdims = ['bead'])
+        dmap = hv.DynamicMap(self._action(cycles, align, alignmentlength, stretch, bias),
+                             kdims = ['bead'])
         dmap = dmap.redim.values(bead = list(beads))
         return dmap(plot = (dict(legend_position = legend) if legend else
                             dict(show_legend     = False)))
