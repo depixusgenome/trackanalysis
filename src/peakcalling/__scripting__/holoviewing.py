@@ -266,12 +266,15 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
     @staticmethod
     def __quadmesh(crvs, kwa):
         axis  = crvs[0][1].data[:,0]
-        inte  = lambda i: interp1d(i.data[:,0], i.data[:,1],
-                                   fill_value = 0.,
-                                   bounds_error = False,
-                                   assume_sorted = True)(axis)
+        def _inte(other):
+            if other.data[:,0].size == 0:
+                return np.zeros(axis.size, dtype = 'f4')
+            return interp1d(other.data[:,0], other.data[:,1],
+                            fill_value = 0.,
+                            bounds_error = False,
+                            assume_sorted = True)(axis)
 
-        normed = np.concatenate([inte(j) for i, j in crvs]).reshape(-1, axis.size)
+        normed = np.concatenate([_inte(j) for i, j in crvs]).reshape(-1, axis.size)
         if kwa.get('loglog', False):
             normed = np.log(normed+1.)
         style  = dict(yaxis = None, logz  = kwa.get('logz', True))
