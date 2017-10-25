@@ -22,18 +22,47 @@ Tasks:      Type = _get('model.__scripting__', 'Tasks')
 TracksDict: Type = _get('data.__scripting__', 'TracksDict')
 
 class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
-    "displays peaks & oligos"
-    @staticmethod
-    def hpins(seq, oligos, labels, **opts):
+    """
+    Displays peaks.
+
+    Attributes are:
+
+    * *kdim*: if 'bead', then a *holoviews.DynamicMap* is returned, displaying
+    beads independently.
+    * *precision* is the noise level used to find peaks
+    * *labels*: if *False*, no labels are added. If *None*, labels are added
+    if 3 or less beads are shown.
+    * *sequence* and *oligo*: can be used to display dna positions. If
+    *fit* is *False*, then the returned dynamic map will have *sequence*,
+    *stretch* and *bias* widgets as well as *bead*.
+    * *stretch* and *bias* values can be provided manually
+    * *zero* set to *True* will set the x-axis zero to the first peak position.
+    * *fit*: if used in conjunction with *sequence* and *oligo*, each bead
+    will be displayed with the best fit sequence.
+    * *sequencestyle*, *eventstyle*, *peakstyle* can be used to set the style
+    of corresponding graph elements.
+    """
+    def __init__(self, items, **opts):
+        super().__init__(items, **opts)
+        self._sequence = self._opts.pop('sequence', None)
+        self._oligos   = self._opts.pop('oligos',   None)
+        self._fit      = self._opts.pop('fit', DefaultValue)
+        if 'bias' in self._opts or None not in (self._sequence, self._oligos):
+            self._opts['zero'] = False
+
+    def hpins(self):
         "returns haipin positions"
+        opts = dict(self._opts)
+        opts.pop('stretch', None)
+        opts.pop('bias',    None)
         opts.setdefault('kdims', ['z'])
         opts.setdefault('vdims', ['events'])
         style = opts.pop('sequencestyle', dict(color = 'gray'))
-        pks = {}
-        if labels is not False:
+        pks   = {}
+        if self._labels is not False:
             opts['label'] = 'sequence'
 
-        tmp = sequences.peaks(seq, oligos)
+        tmp = sequences.peaks(self._sequence, self._oligos)
         if isinstance(tmp, np.ndarray):
             tmp = (('hairpin 1', tmp),)
 
@@ -44,14 +73,14 @@ class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
             pks[key] = hv.Curve((xvals, yvals), **opts)(style = style)
         return pks
 
-    @classmethod
-    def fitmap(cls, itms, seq, oligos, # pylint: disable=too-many-arguments
-               labels = None, fit = DefaultValue, **opts):
+    def fitmap(self):
         "creates a DynamicMap with fitted oligos"
-        pins = cls.hpins(seq, oligos, opts)
-        task = Tasks.beadsbyhairpin.get(sequence = seq, oligos = oligos, fit = fit)
+        pins = self.hpins()
+        task = Tasks.beadsbyhairpin.get(sequence = self._sequence,
+                                        oligos   = self._oligos,
+                                        fit      = self._fit)
         info = {i: [(k.key, k.distance) for k in j.beads]
-                for i, j in BeadsByHairpinProcessor.apply(itms, **task.config())}
+                for i, j in BeadsByHairpinProcessor.apply(self._items, **task.config())}
 
         def _fcn(bead):
             for key, other in info.items():
@@ -59,10 +88,10 @@ class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
                 if dist is None:
                     continue
 
-                crv = cls.elements(itms[[bead]], labels, **opts,
-                                   stretch = dist.stretch,
-                                   bias    = dist.bias,
-                                   group   = key)
+                crv = self.elements(self._items[[bead]], self._labels, **self._opts,
+                                    stretch = dist.stretch,
+                                    bias    = dist.bias,
+                                    group   = key)
                 hpc  = pins[key]
                 data = np.copy(hpc.data)
                 data[:,1] *= np.nanmax(next(iter(crv)).data[:,1])
@@ -75,14 +104,14 @@ class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
                 text = hv.Text(pos(data[:,0]), pos(data[:,1]), txt)
                 return hv.Overlay(crv+[hpc.clone(data = data), text], group = key)
 
-        beads = list(set([i for i in itms.keys() if itms.isbead(i)]))
-        return hv.DynamicMap(_fcn, kdims = ['bead']).redim.values(bead = beads)
+        return _fcn
 
-    @classmethod
-    def hpinmap(cls, itms, seq, oligos, labels = None, **opts):
+    def hpinmap(self):
         "creates a DynamicMap with oligos to fit"
-        params = {i: [opts.pop(i)] for i in ('stretch', 'bias') if i in opts}
-        pins   = cls.hpins(seq, oligos, opts)
+        opts = dict(self._opts)
+        opts.pop('stretch', None)
+        opts.pop('bias',    None)
+        pins   = self.hpins()
         def _clone(itm, stretch, bias):
             data = np.copy(itm.data)
             data[:,0] = (data[:,0]-bias)*stretch
@@ -92,7 +121,7 @@ class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
         def _over(bead, sequence, stretch, bias, cache = [None, (), None, ()]):
             if bead != cache[0]:
                 cache[0] = bead
-                cache[1] = cls.elements(itms[[bead]], labels, **opts)
+                cache[1] = self.elements(self._items[[bead]], self._labels, **opts)
             clones = [_clone(i, stretch, bias) for i in cache[1]]
 
             if sequence != cache[2]:
@@ -104,60 +133,33 @@ class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
 
             return hv.Overlay(clones+cache[3])
 
-        beads = list(set([i for i in itms.keys() if itms.isbead(i)]))
-        rngs  = Tasks.getconfig().fittohairpin.range.getitems(...)
-        return (hv.DynamicMap(_over, kdims = ['sequence', 'bead', 'stretch', 'bias'])
-                .redim.values(bead = beads, sequence = list(pins.keys()), **params)
-                .redim.range(**{i: j for i, j in rngs.items() if i not in params}))
+        return _over
+
+    def getmethod(self):
+        "Returns the method used by the dynamic map"
+        if None not in (self._sequence, self._oligos):
+            return self.hpinmap() if self._fit is True else self.fitmap()
+        return super().getmethod()
+
+    def getredim(self):
+        "Returns the keys used by the dynamic map"
+        beads = super().getredim()
+        if None not in (self._sequence, self._oligos) and self._fit is True:
+            params = {i: [self._opts[i]] for i in ('stretch', 'bias') if i in self._opts}
+            rngs   = Tasks.getconfig().fittohairpin.range.getitems(...)
+
+            pins   = sequences.peaks(self._sequence, self._oligos)
+            if isinstance(pins, np.ndarray):
+                pins = {'hairpin 1': None}
+
+            return dict(values = dict(bead = beads, sequence = list(dict(pins).keys()), **params),
+                        range  = dict(**{i: j for i, j in rngs.items() if i not in params}))
+        return beads
 
 @addto(PeaksDict)  # type: ignore
-def display(self, # pylint: disable=function-redefined,too-many-arguments
-            kdim     = 'bead',
-            labels   = None,
-            sequence = None,
-            oligos   = None,
-            fit      = False, **opts):
-    """
-    Displays peaks.
-
-    Arguments are:
-
-        * *kdim*: if 'bead', then a *holoviews.DynamicMap* is returned, displaying
-        beads independently.
-        * *precision* is the noise level used to find peaks
-        * *labels*: if *False*, no labels are added. If *None*, labels are added
-        if 3 or less beads are shown.
-        * *sequence* and *oligo*: can be used to display dna positions. If
-        *fit* is *False*, then the returned dynamic map will have *sequence*,
-        *stretch* and *bias* widgets as well as *bead*.
-        * *stretch* and *bias* values can be provided manually
-        * *zero* set to *True* will set the x-axis zero to the first peak position.
-        * *fit*: if used in conjunction with *sequence* and *oligo*, each bead
-        will be displayed with the best fit sequence.
-        * *sequencestyle*, *eventstyle*, *peakstyle* can be used to set the style
-        of corresponding graph elements.
-    """
-    disp = OligoMappingDisplay
-    if None not in (sequence, oligos):
-        opts['zero'] = False
-        if isinstance(fit, type):
-            return disp.fitmap(self, sequence, oligos, labels, fit = fit, **opts)
-        elif fit:
-            return disp.fitmap(self, sequence, oligos, labels, **opts)
-        return disp.hpinmap(self, sequence, oligos, labels, **opts)
-
-    if 'bias' in opts:
-        opts['zero'] = False
-
-    if None not in (sequence, oligos):
-        return disp.hpinmap(self, sequence, oligos, labels)
-
-    if kdim == 'bead':
-        beads = list(set([i for i in self.keys() if self.isbead(i)]))
-        def _fcn(bead):
-            return disp.run(self[[bead]], labels, **opts)
-        return hv.DynamicMap(_fcn, kdims = ['bead']).redim.values(bead = beads)
-    return disp.run(self, labels, **opts)
+def display(self): # pylint: disable=function-redefined
+    "displays peaks"
+    return OligoMappingDisplay(self)
 
 class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignore
     "tracksdict display for peaks"

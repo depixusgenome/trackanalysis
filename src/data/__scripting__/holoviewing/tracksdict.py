@@ -48,8 +48,10 @@ class TracksDictDisplay:
                   and not isellipsis(tracks)):
                 tracks = [tracks]
 
-            self.keys  = None if isellipsis(tracks) else tracks
-            self.beads = None if isellipsis(beads) else beads
+            self.keys  = None     if isellipsis(tracks) else list(tracks)
+            self.beads = (None    if isellipsis(beads)  else
+                          [beads] if isinstance(beads, (int, str)) else
+                          list(beads))
 
         elif isinstance(values, list):
             if all(i in self.tracks for i in values):
@@ -100,12 +102,13 @@ class TracksDictDisplay:
 
     @staticmethod
     def _default_display(itms, key, bead, specs, **kwa):
-        data = getattr(itms[key], specs['name'], itms[key])
         if specs['overlay'] == 'key' and 'labels' not in kwa:
             kwa['labels'] = str(key)
         elif specs['overlay'] == 'bead' and 'labels' not in kwa:
             kwa['labels'] = str(bead)
-        return data.display(**kwa)[bead]
+
+        data = getattr(itms[key], specs['name'], itms[key]).display(**kwa)
+        return data.getmethod()(bead)
 
     @staticmethod
     def _all(specs, fcn, key):

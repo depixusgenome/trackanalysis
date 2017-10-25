@@ -35,7 +35,10 @@ def addto(*types, addhook = 'auto'):
     fmt = shell.display_formatter.formatters['text/html']
     def _wrap(fcn):
         wrapper(fcn)
-        name = getattr(fcn, '__name__', None)
+        if isinstance(fcn, property):
+            name = getattr(fcn.fget, '__name__', None)
+        else:
+            name = getattr(fcn, '__name__', None)
         if (name == 'display' and addhook == 'auto') or addhook is True:
             for cls in types:
                 fmt.for_type(cls, _display_hook)

@@ -7,54 +7,23 @@ import sys
 from   typing                   import List
 from   functools                import partial
 from   scripting.holoviewing    import addto
-from   .display                 import Display
+from   .display                 import CycleDisplay, BeadDisplay
 from   ...track                 import Bead, FoV, Track
 from   ...views                 import Beads, Cycles
 
 hv    = sys.modules['holoviews']  # pylint: disable=invalid-name
 
-@addto(Beads)
-def display(self,
-            kdim    = 'bead',
-            labels  = None,
-            tpe     = 'curve',
-            overlay = True,
-            **opts):
-    """
-    Displays beads.
-
-    Arguments are:
-
-        * *kdim*: if 'bead', then a *holoviews.DynamicMap* is returned, displaying
-        beads independently.
-        * *labels*: if *False*, no labels are added. If *None*, labels are added
-        if 3 or less beads are shown.
-        * *tpe*: can be scatter or curve.
-        * *overlay*: if *False*, all data is concatenated into one array.
-    """
-    return Display.displaybeads(self, kdim, labels, tpe, overlay, **opts)
+@addto(Beads) # type: ignore
+@property
+def display(self):                      # pylint: disable=function-redefined
+    "Displays beads"
+    return BeadDisplay(self)
 
 @addto(Cycles)                          # type: ignore
-def display(self,                       # pylint: disable=function-redefined
-            kdim    = 'bead',
-            labels  = None,
-            tpe     = 'curve',
-            overlay = False,
-            **opts):
-    """
-    Displays cycles.
-
-    Arguments are:
-
-        * *kdim*: if set to 'bead', then a *holoviews.DynamicMap* is returned,
-        displaying beads independently. If set to 'cycle', the map displays cycles
-        independently.
-        * *labels*: if *False*, no labels are added. If *None*, labels are added
-        if 3 or less beads are shown.
-        * *tpe*: can be scatter or curve.
-        * *overlay*: if *False*, all data is concatenated into one array.
-    """
-    return Display.displaycycles(self, kdim, labels, tpe, overlay, **opts)
+@property
+def display(self):                      # pylint: disable=function-redefined
+    "Displays cycles."
+    return CycleDisplay(self)
 
 @addto(Track, Beads)
 def map(self, fcn, **kwa):              # pylint: disable=redefined-builtin

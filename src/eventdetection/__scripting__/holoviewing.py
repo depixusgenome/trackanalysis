@@ -15,62 +15,65 @@ def _get(name, attr = None):
     return mod if attr is None else getattr(mod, attr)
 
 # pylint: disable=invalid-name
-hv                   = _get('holoviews')
-TracksDict: Type     = _get('data.__scripting__', 'TracksDict')
-Display:    Type     = _get('data.__scripting__.holoviewing', 'Display')
+hv                      = _get('holoviews')
+TracksDict:        Type = _get('data.__scripting__', 'TracksDict')
+CycleDisplay:      Type = _get('data.__scripting__.holoviewing.display',
+                               'CycleDisplay')
 TracksDictDisplay: Type = _get('data.__scripting__.holoviewing.tracksdict',
                                'TracksDictDisplay')
 
-class EventDisplay(Display): # type: ignore
-    "displays the events"
-    @classmethod
-    def run(cls, itms, labels, tpe, overlay, opts): # pylint: disable=too-many-arguments
+class EventDisplay(CycleDisplay): # type: ignore
+    """
+    Displays cycles.
+
+    Attributes are:
+
+    * *kdim*: if set to 'bead', then a *holoviews.DynamicMap* is returned,
+    displaying beads independently. If set to 'cycle', the map displays cycles
+    independently.
+    * *labels*: if *False*, no labels are added. If *None*, labels are added
+    if 3 or less beads are shown.
+    * *tpe*: can be scatter or curve.
+    * *overlay*: if *False*, all data is concatenated into one array.
+    """
+    def _run(self, itms):
         "shows overlayed Curve items"
-        vals = lambda x: (cls.concat([np.arange(i[0], i[0]+len(i[1])) for i in x]),
-                          cls.concat(x['data']))
+        opts    = dict(self._opts)
+        stretch = opts.pop('stretch', 1.)
+        bias    = opts.pop('bias',    0.)
+        overlay = self._overlay
+
+        vals = lambda x: (self.concat([np.arange(i[0], i[0]+len(i[1])) for i in x]),
+                          (self.concat(x['data'])-bias)*stretch)
         try:
             if overlay in (all, Ellipsis):
                 good = [] # type: ignore
                 for i, j in itms:
                     if len(j):
-                        good.extend((i, (np.arange(k[0], k[0]+len(k[1])), k[1]))
+                        good.extend((i, (np.arange(k[0], k[0]+len(k[1])),
+                                         (k[1]-bias)*stretch))
                                     for k in j)
                 overlay = True
                 good    = tuple(good)
             else:
                 good    = tuple((i, vals(j)) for i, j in itms if len(j))
         except Exception as exc: # pylint: disable=broad-except
-            return cls.errormessage(exc,
-                                    x = opts.get('kdims', ['frames'])[0],
-                                    y = opts.get('vdims', ['z'])[0])
+            return self.errormessage(exc)
 
         if not overlay:
-            good = (('', (cls.concat(i[0] for _, i in good),
-                          cls.concat(i[1] for _, i in good))),)
+            if len(good):
+                good = (('', (self.concat(i[0] for _, i in good),
+                              self.concat(i[1] for _, i in good))),)
+            else:
+                good = (('', (np.ones(0, dtype = 'f4'), np.ones(0, dtype = 'f4'))),)
 
-        return cls._create(labels, tpe, overlay, opts, good)
+        return self._create(opts, good)
 
-@addto(Events)   # type: ignore
-def display(self,       # pylint: disable=function-redefined
-            kdim    = 'bead',
-            labels  = None,
-            tpe     = 'curve',
-            overlay = False,
-            **opts):
-    """
-    Displays cycles.
-
-    Arguments are:
-
-        * *kdim*: if set to 'bead', then a *holoviews.DynamicMap* is returned,
-        displaying beads independently. If set to 'cycle', the map displays cycles
-        independently.
-        * *labels*: if *False*, no labels are added. If *None*, labels are added
-        if 3 or less beads are shown.
-        * *tpe*: can be scatter or curve.
-        * *overlay*: if *False*, all data is concatenated into one array.
-    """
-    return EventDisplay.displaycycles(self, kdim, labels, tpe, overlay, **opts)
+@addto(Events)      # type: ignore
+@property
+def display(self):  # pylint: disable=function-redefined
+    "Displays events."
+    return EventDisplay(self)
 
 @addto(Events)  # type: ignore
 def map(self, fcn, kdim = None, **kwa): # pylint: disable=redefined-builtin,function-redefined

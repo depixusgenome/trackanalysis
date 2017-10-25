@@ -4,120 +4,213 @@
 Adds shortcuts for using holoview
 """
 import sys
-from   itertools import chain, repeat
-import numpy     as     np
-from   ...       import Beads
+from   abc                   import ABC, abstractmethod
+from   itertools             import chain, repeat
+from   copy                  import deepcopy
+import numpy                 as     np
+
+from   scripting.holoviewing import displayhook
+from   ...                   import Beads
 
 hv    = sys.modules['holoviews']  # pylint: disable=invalid-name
 
-class Display:
+@displayhook
+class Display(ABC):
     "displays the beads or cycles"
+    _kdim    = 'bead'
+    _labels  = None
+    _tpe     = 'curve'
+    _overlay = False
+    def __init__(self, items, **opts):
+        self._items   = items
+        get           = lambda x: opts.pop(x, getattr(self.__class__, '_'+x))
+        self._kdim    = get('kdim')
+        self._labels  = get('labels')
+        self._tpe     = get('tpe')
+        if isinstance(self._tpe, str):
+            self._tpe = (getattr(hv, self._tpe) if hasattr(hv, self._tpe) else
+                         getattr(hv, self._tpe.capitalize()))
+        self._overlay = get('overlay')
+        self._opts    = opts
+
+    def config(self, name = ...):
+        "returns the config"
+        cnf = deepcopy(self._opts)
+        cnf.update({i[1:]: deepcopy(j) for i, j in self.__dict__.items()
+                    if (i != '_opts'                and
+                        len(i) > 2 and i[0] == '_'  and
+                        i[1].lower() == i[1])})
+        return cnf if name is Ellipsis else cnf[name]
+
+    def __getstate__(self):
+        return self._items, self.config()
+
+    def __setstate__(self, values):
+        self.__init__(values[0], **values[1])
+
+    def __call__(self, **opts):
+        config = self.config()
+        config.update(opts)
+        return self.__class__(self._items, **opts)
+
     @staticmethod
     def concat(itr):
         "concatenates arrays, appending a NaN"
         return np.concatenate(list(chain.from_iterable(zip(itr, repeat([np.NaN])))))
 
-    @staticmethod
-    def errormessage(exc, **dims):
+    def errormessage(self, exc):
         "displays error message"
         args = getattr(exc, 'args', tuple())
-        if isinstance(args, (list, tuple)) and len(args) == 2:
-            txt = str(exc.args[0]).split('\n')
-        else:
-            raise RuntimeError("error") from exc
+        if not (isinstance(args, (list, tuple)) and len(args) == 2):
+            return None
 
-        ovr = hv.Overlay([hv.Text(0.4, len(txt)*.1+.5-i*.1, j)
-                          for i, j in enumerate(txt)])
-        return ovr.redim(**dims) if len(dims) else ovr
+        opts  = self.graphdims()
+        opts.update(self._opts)
+        cdims = {i: opts[i] for i in ('kdims', 'vdims') if i in opts}
+        tdims = (cdims['kdims']+opts.get('vdims', []))[:2]
+        return hv.Overlay([hv.Text(0.5, .9, args[0], kdims = tdims),
+                           self._tpe(([0., np.NaN, 1.],[0., np.NaN, 1.]),
+                                     **cdims)])
 
     @staticmethod
-    def _create(labels, tpe, overlay, opts, good):
-        opts.setdefault('kdims', ['frames'])
-        opts.setdefault('vdims', ['z'])
-        if isinstance(tpe, str):
-            tpe = getattr(hv, tpe) if hasattr(hv, tpe) else getattr(hv, tpe.capitalize())
-        if isinstance(labels, str):
-            crvs = [tpe(j, label = labels, **opts) for i, j in good]
-        elif (len(good) < 3 and labels) or labels is True:
-            crvs = [tpe(j, label = f'{i}', **opts) for i, j in good]
-        else:
-            crvs = [tpe(j, **opts) for _, j in good]
-        return crvs[0] if len(crvs) == 1 and overlay is False else hv.Overlay(crvs)
+    def graphdims():
+        "returns the dimension names"
+        return {'kdims': ['frames'], 'vdims': ['z']}
 
-    @classmethod
-    def run(cls, itms, labels, tpe, overlay, opts): # pylint: disable=too-many-arguments
+    def _create(self, opts, good):
+        opts = deepcopy(opts)
+        for i, j in self.graphdims().items():
+            opts.setdefault(i, j)
+
+        if isinstance(self._labels, str):
+            crvs = [self._tpe(j, label = self._labels, **opts) for i, j in good]
+        elif (len(good) < 3 and self._labels) or self._labels is True:
+            crvs = [self._tpe(j, label = f'{i}', **opts) for i, j in good]
+        else:
+            crvs = [self._tpe(j, **opts) for _, j in good]
+
+        if not any(isinstance(i, hv.Text) for i in crvs): # dummy text for warnings
+            for i in crvs:
+                val = next(((j[0], j[1]) for j in i.data if np.isnan(j).sum() == 0), None)
+                if val is not None:
+                    break
+            else:
+                val = .5, 5.
+            crvs.insert(0, hv.Text(*val, '', kdims = [opts['kdims'][0], opts['vdims'][0]]))
+        return hv.Overlay(crvs)
+
+    def _run(self, itms): # pylint: disable=too-many-arguments
         "shows overlayed Curve items"
+        opts    = deepcopy(self._opts)
+        stretch = opts.pop('stretch', 1.)
+        bias    = opts.pop('bias',    0.)
         try:
-            good = tuple((i, j) for i, j in itms if np.any(np.isfinite(j)))
+            good = tuple((i, (j-bias)*stretch) for i, j in itms if np.any(np.isfinite(j)))
+        except KeyError as exc: # pylint: disable=broad-except
+            txt  = f'Missing {self.config("kdim")} {exc.args[0]}'
+            return self.errormessage(KeyError(txt, 'warning'))
         except Exception as exc: # pylint: disable=broad-except
-            return cls.errormessage(exc,
-                                    x = opts.get('kdims', ['frames'])[0],
-                                    y = opts.get('vdims', ['z'])[0])
+            ret  = self.errormessage(exc)
+            if ret is None:
+                raise
+            return ret
 
-        if not overlay:
-            good = (('', (cls.concat(np.arange(len(i), dtype = 'f4') for _, i in good),
-                          cls.concat(i for _, i in good))),)
-        return cls._create(labels, tpe, overlay, opts, good)
+        if not self._overlay:
+            if len(good):
+                good = (('', (self.concat(np.arange(len(i), dtype = 'f4') for _, i in good),
+                              self.concat(i for _, i in good))),)
+            else:
+                good = (('', (np.ones(0, dtype = 'f4'), np.ones(0, dtype = 'f4'))),)
+        return self._create(opts, good)
 
-    @classmethod
-    def displaycycles(cls, itms, # pylint: disable=too-many-arguments
-                      kdim    = 'bead',
-                      labels  = None,
-                      tpe     = 'curve',
-                      overlay = False,
-                      **opts):
-        """
-        Displays cycles.
+    def display(self):
+        "displays the cycles using a dynamic map"
+        fcn  = self.getmethod()
+        keys = self.getredim()
+        if keys is None:
+            return fcn()
 
-        Arguments are:
+        if isinstance(keys, dict):
+            values = keys.pop('values')
+            ranges = keys.pop('range')
+            return (hv.DynamicMap(fcn, kdims = list(values)+list(ranges))
+                    .redim.values(**values)
+                    .redim.range(**ranges))
+        return hv.DynamicMap(fcn, kdims = [i for i, _ in keys]).redim.values(**dict(keys))
 
-            * *kdim*: if set to 'bead', then a *holoviews.DynamicMap* is returned,
-            displaying beads independently. If set to 'cycle', the map displays cycles
-            independently.
-            * *labels*: if *False*, no labels are added. If *None*, labels are added
-            if 3 or less beads are shown.
-            * *tpe*: can be scatter or curve.
-            * *overlay*: if *False*, all data is concatenated into one array.
-        """
-        disp = cls.run
+    @abstractmethod
+    def getmethod(self):
+        "Returns the method used by the dynamic map"
+
+    @abstractmethod
+    def getredim(self):
+        "Returns the keys used by the dynamic map"
+
+class CycleDisplay(Display):
+    """
+    Displays cycles.
+
+    Options are:
+
+    * *kdim*: if set to 'bead', then a *holoviews.DynamicMap* is returned,
+    displaying beads independently. If set to 'cycle', the map displays cycles
+    independently.
+    * *labels*: if *False*, no labels are added. If *None*, labels are added
+    if 3 or less beads are shown.
+    * *tpe*: can be scatter or curve.
+    * *overlay*: if *False*, all data is concatenated into one array.
+    * *stretch*: applies a stretch to z values
+    * *bias*: applies a bias to z values
+    """
+    def _percycle(self, cyc):
+        return self._run(self._items[..., cyc])
+
+    def _perbead(self, bead):
+        return self._run(self._items[bead, ...])
+
+    def _perall(self):
+        return self._run(self._items)
+
+    def getmethod(self):
+        "Returns the method used by the dynamic map"
+        return getattr(self, '_per'+str(self._kdim), self._perall)
+
+    def getredim(self):
+        "Returns the keys used by the dynamic map"
+        itms = self._items
+        kdim = self._kdim
         if kdim == 'cycle':
-            keys = list(set([i for _, i in itms.keys() if Beads.isbead(_)]))
-            def _percycle(cyc):
-                return disp(itms[...,cyc], labels, tpe, overlay, opts)
-            fcn  = _percycle
-        elif kdim == 'bead':
-            keys = list(set([i for i, _ in itms.keys() if Beads.isbead(i)]))
-            def _perbead(bead):
-                return disp(itms[bead,...], labels, tpe, overlay, opts)
-            fcn  = _perbead
-        else:
-            return disp(itms, labels, tpe, overlay, opts)
-
-        return hv.DynamicMap(fcn, kdims = [kdim]).redim.values(**{kdim: keys})
-
-    @classmethod
-    def displaybeads(cls, itms, # pylint: disable=too-many-arguments
-                     kdim    = 'bead',
-                     labels  = None,
-                     tpe     = 'curve',
-                     overlay = True,
-                     **opts):
-        """
-        Displays beads.
-
-        Arguments are:
-
-            * *kdim*: if 'bead', then a *holoviews.DynamicMap* is returned, displaying
-            beads independently.
-            * *labels*: if *False*, no labels are added. If *None*, labels are added
-            if 3 or less beads are shown.
-            * *tpe*: can be scatter or curve.
-            * *overlay*: if *False*, all data is concatenated into one array.
-        """
-        disp = cls.run
+            return ((kdim, list(set([i for _, i in itms.keys() if Beads.isbead(_)]))),)
         if kdim == 'bead':
-            beads = list(set([i for i in itms.keys() if itms.isbead(i)]))
-            def _fcn(bead):
-                return disp(itms[[bead]], labels, tpe, overlay, opts)
-            return hv.DynamicMap(_fcn, kdims = ['bead']).redim.values(bead = beads)
-        return disp(itms, labels, tpe, overlay, opts)
+            return ((kdim, list(set([i for i, _ in itms.keys() if Beads.isbead(i)]))),)
+        return None
+
+class BeadDisplay(Display):
+    """
+    Displays beads.
+
+    Attributes are:
+
+    * *kdim*: if 'bead', then a *holoviews.DynamicMap* is returned, displaying
+    beads independently.
+    * *labels*: if *False*, no labels are added. If *None*, labels are added
+    if 3 or less beads are shown.
+    * *tpe*: can be scatter or curve.
+    * *overlay*: if *False*, all data is concatenated into one array.
+    """
+    def _perbead(self, bead):
+        return self._run(self._items[[bead]])
+
+    def _perall(self):
+        return self._run(self._items)
+
+    def getmethod(self):
+        "Returns the method used by the dynamic map"
+        return getattr(self, '_per'+str(self._kdim), self._perall)
+
+    def getredim(self):
+        "Returns the keys used by the dynamic map"
+        if self._kdim == 'bead':
+            return ((self._kdim, list(set([i for i in self._items.keys()
+                                           if self._items.isbead(i)]))),)
+        return None

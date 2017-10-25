@@ -15,14 +15,34 @@ def _get(name, attr = None):
     return mod if attr is None else getattr(mod, attr)
 
 # pylint: disable=invalid-name
-hv               = _get('holoviews')
-TracksDict: Type = _get('data.__scripting__', 'TracksDict')
-Display:    Type = _get('data.__scripting__.holoviewing', 'Display')
+hv                      = _get('holoviews')
+TracksDict:        Type = _get('data.__scripting__', 'TracksDict')
+CycleDisplay:      Type = _get('data.__scripting__.holoviewing.display',
+                               'CycleDisplay')
 TracksDictDisplay: Type = _get('data.__scripting__.holoviewing.tracksdict',
                                'TracksDictDisplay')
 
-class PeaksDisplay(Display): # type: ignore
-    "displays peaks"
+class PeaksDisplay(CycleDisplay): # type: ignore
+    """
+    Displays peaks.
+
+    Attributes are:
+
+    * *kdim*: if 'bead', then a *holoviews.DynamicMap* is returned, displaying
+    beads independently.
+    * *precision* is the noise level used to find peaks
+    * *labels*: if *False*, no labels are added. If *None*, labels are added
+    if 3 or less beads are shown.
+    * *sequence* and *oligo*: can be used to display dna positions. If
+    *fit* is *False*, then the returned dynamic map will have *sequence*,
+    *stretch* and *bias* widgets as well as *bead*.
+    * *stretch* and *bias* values can be provided manually
+    * *zero* set to *True* will set the x-axis zero to the first peak position.
+    * *fit*: if used in conjunction with *sequence* and *oligo*, each bead
+    will be displayed with the best fit sequence.
+    * *sequencestyle*, *eventstyle*, *peakstyle* can be used to set the style
+    of corresponding graph elements.
+    """
     # pylint: disable=too-many-arguments,arguments-differ
     @staticmethod
     def __histogram(det, params, norm, opts, estyle):
@@ -48,16 +68,18 @@ class PeaksDisplay(Display): # type: ignore
         yvals = [hist[i] for i in means]
         return hv.Scatter((means, yvals), **opts)(style = pstyle)
 
-    @classmethod
-    def elements(cls, evts, labels, **opts):
+    @staticmethod
+    def graphdims():
+        "returns the dimension names"
+        return {'kdims': ['z'], 'vdims': ['events']}
+
+    def elements(self, evts, labels, **opts):
         "shows overlayed Curve items"
         prec = opts.pop('precision', None)
         try:
-            return cls.detailed(evts.detailed(..., prec), labels, **opts)
+            return self.detailed(evts.detailed(..., prec), labels, **opts)
         except Exception as exc: # pylint: disable=broad-except
-            return cls.errormessage(exc,
-                                    x = opts.get('kdims', ['z'])[0],
-                                    y = opts.get('vdims', ['events'])[0])
+            return self.errormessage(exc)
 
     @classmethod
     def detailed(cls, dets, labels, **opts):
@@ -99,60 +121,47 @@ class PeaksDisplay(Display): # type: ignore
             itms.append(cls.__errorbars(det, cparams, opts, pstyle, itms[-3]))
         return itms
 
-    @classmethod
-    def run(cls, evts, labels, **opts):
+    def _run(self, evts):
         "shows overlayed Curve items"
-        return hv.Overlay(cls.elements(evts, labels, **opts))
+        return hv.Overlay(self.elements(evts, self._labels, **dict(self._opts)))
+
+    def getmethod(self):
+        "Returns the method used by the dynamic map"
+        if self._kdim == 'bead':
+            def _fcn(bead):
+                return self._run(self._items[[bead]])
+            return _fcn
+        return partial(self._run, self._items)
+
+    def getredim(self):
+        "Returns the keys used by the dynamic map"
+        if self._kdim == 'bead':
+            return ((self._kdim, list(set([i for i in self._items.keys()
+                                           if self._items.isbead(i)]))),)
+        return None
 
 @addto(Detailed)  # type: ignore
-def display(self, # pylint: disable=function-redefined,too-many-arguments
+def display(self, # pylint: disable=function-redefined
             labels = None, **opts):
     """
     Displays peaks.
 
     Arguments are:
 
-        * *labels*: if *False*, no labels are added. If *None*, labels are added
-        if 3 or less beads are shown.
-        * *stretch* and *bias* values can be provided manually
-        * *zero* set to *True* will set the x-axis zero to the first peak position.
-        * *eventstyle*, *peakstyle* can be used to set the style
-        of corresponding graph elements.
+    * *labels*: if *False*, no labels are added. If *None*, labels are added
+    if 3 or less beads are shown.
+    * *stretch* and *bias* values can be provided manually
+    * *zero* set to *True* will set the x-axis zero to the first peak position.
+    * *eventstyle*, *peakstyle* can be used to set the style
+    of corresponding graph elements.
     """
     return PeaksDisplay.detailed(self, labels, **opts)
 
 @addto(PeaksDict)  # type: ignore
-def display(self, # pylint: disable=function-redefined,too-many-arguments
-            kdim     = 'bead',
-            labels   = None,
-            **opts):
-    """
-    Displays peaks.
-
-    Arguments are:
-
-        * *kdim*: if 'bead', then a *holoviews.DynamicMap* is returned, displaying
-        beads independently.
-        * *precision* is the noise level used to find peaks
-        * *labels*: if *False*, no labels are added. If *None*, labels are added
-        if 3 or less beads are shown.
-        * *sequence* and *oligo*: can be used to display dna positions. If
-        *fit* is *False*, then the returned dynamic map will have *sequence*,
-        *stretch* and *bias* widgets as well as *bead*.
-        * *stretch* and *bias* values can be provided manually
-        * *zero* set to *True* will set the x-axis zero to the first peak position.
-        * *fit*: if used in conjunction with *sequence* and *oligo*, each bead
-        will be displayed with the best fit sequence.
-        * *sequencestyle*, *eventstyle*, *peakstyle* can be used to set the style
-        of corresponding graph elements.
-    """
-    disp = PeaksDisplay
-    if kdim == 'bead':
-        beads = list(set([i for i in self.keys() if self.isbead(i)]))
-        def _fcn(bead):
-            return disp.run(self[[bead]], labels, **opts)
-        return hv.DynamicMap(_fcn, kdims = ['bead']).redim.values(bead = beads)
-    return disp.run(self, labels, **opts)
+@property
+def display(self): # pylint: disable=function-redefined
+    "displays peaks"
+    return PeaksDisplay(self)
 
 @addto(PeaksDict)
 def map(self, fcn, **kwa): # pylint: disable=redefined-builtin
@@ -183,7 +192,6 @@ class PeaksTracksDictDisplay(TracksDictDisplay): # type: ignore
     @classmethod
     def _all(cls, specs, fcn, key):
         return cls._toarea(specs, super()._all(specs, fcn, key), cls._refindex(specs))
-
 
     def display(self, overlay = '2d', reference = None, **kwa):
         """
