@@ -32,7 +32,16 @@ class Detailed:
     "Deals with easy acccess to peaks data"
     def __init__(self, frame, det):
         self.frame       = frame
-        self.details     = det
+        if det is None:
+            self.details = PeakSelectorDetails(np.ones(0, dtype = 'f4'),
+                                               np.ones(0, dtype = 'f4'),
+                                               0., 1e-3,
+                                               np.ones(0, dtype = 'f4'),
+                                               np.ones(0, dtype = 'f4'),
+                                               np.ones(0, dtype = 'f4'),
+                                               np.ones(0, dtype = 'i4'))
+        else:
+            self.details = det
 
     positions   = property(lambda self: self.details.positions)
     histogram   = property(lambda self: self.details.histogram)
@@ -40,18 +49,23 @@ class Detailed:
     binwidth    = property(lambda self: self.details.binwidth)
     corrections = property(lambda self: self.details.corrections)
     peaks       = property(lambda self: self.details.peaks)
-    zero        = property(lambda self: next(self.output)[0])
+    zero        = property(lambda self: next(self.output, [0])[0])
     events      = property(lambda self: self.details.events)
     ids         = property(lambda self: self.details.id)
 
     @property
     def output(self) -> Iterator[PeakOutput]:
         "yields results from precomputed details"
+        if self.frame is None:
+            return iter(tuple())
         return self.frame.config.details2output(self.details)
 
     @property
     def probabilities(self) -> Iterator[Tuple[float, Probability]]:
         "yields results from precomputed details"
+        if self.frame is None:
+            return iter(tuple())
+
         trk  = self.frame.track
 
         evts = self.frame.data
@@ -74,9 +88,9 @@ class Detailed:
 
     def yaxis(self, norm = 'events'):
         "returns the histogram's y-axis"
-        if norm == 'events':
+        if norm == 'events' and self.frame is not None:
             val = 1./self.frame.config.histogram.kernelarray().max()
-        elif norm in (1., 'probability'):
+        elif norm in (1., 'probability') and len(self.histogram):
             val = 1./self.histogram.sum()
         else:
             val = 1.

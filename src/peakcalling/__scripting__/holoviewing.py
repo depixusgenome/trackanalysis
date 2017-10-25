@@ -88,7 +88,7 @@ class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
                 if dist is None:
                     continue
 
-                crv = self.elements(self._items[[bead]], self._labels, **self._opts,
+                crv = self.elements(self._items[[bead]],
                                     stretch = dist.stretch,
                                     bias    = dist.bias,
                                     group   = key)
@@ -108,10 +108,7 @@ class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
 
     def hpinmap(self):
         "creates a DynamicMap with oligos to fit"
-        opts = dict(self._opts)
-        opts.pop('stretch', None)
-        opts.pop('bias',    None)
-        pins   = self.hpins()
+        pins = self.hpins()
         def _clone(itm, stretch, bias):
             data = np.copy(itm.data)
             data[:,0] = (data[:,0]-bias)*stretch
@@ -121,7 +118,7 @@ class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
         def _over(bead, sequence, stretch, bias, cache = [None, (), None, ()]):
             if bead != cache[0]:
                 cache[0] = bead
-                cache[1] = self.elements(self._items[[bead]], self._labels, **opts)
+                cache[1] = self.elements(self._items[[bead]])
             clones = [_clone(i, stretch, bias) for i in cache[1]]
 
             if sequence != cache[2]:
@@ -167,6 +164,8 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
     def _doref(cls, specs, ovrs, ind):
         if None in (specs['reference'], specs['distance']):
             return ovrs
+        if ind >= len(ovrs) or len(tuple(ovrs[ind])) == 0:
+            return ovrs
 
         dist = specs['distance']
         def _peaks(crvs):
@@ -176,10 +175,15 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
             yvals = (crv[1::3]-crv[::3])*.5
             return dist.frompeaks(np.vstack([xvals, yvals]).T)
 
-        ref  = _peaks(ovrs[ind])
+        ref = _peaks(ovrs[ind])
         for i, j in enumerate(ovrs):
             if i == ind:
                 continue
+
+            j = tuple(j)
+            if len(j) == 0 or len(j[0].data) == 0:
+                continue
+
             stretch, bias = dist.optimize(ref, _peaks(j))[1:]
             for itm in j:
                 itm.data[:,0] = (itm.data[:,0] - bias)*stretch

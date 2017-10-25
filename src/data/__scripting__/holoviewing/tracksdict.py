@@ -107,8 +107,9 @@ class TracksDictDisplay:
         elif specs['overlay'] == 'bead' and 'labels' not in kwa:
             kwa['labels'] = str(bead)
 
-        data = getattr(itms[key], specs['name'], itms[key]).display(**kwa)
-        return data.getmethod()(bead)
+        never = kwa.pop('neverempty', False)
+        data  = getattr(itms[key], specs['name'], itms[key]).display(**kwa)
+        return data.getmethod()(bead, neverempty = never)
 
     @staticmethod
     def _all(specs, fcn, key):
@@ -144,12 +145,12 @@ class TracksDictDisplay:
         kdims        = specs['kdims']
         kdims['key'] = [i for i in kdims['key'] if i != reference]
         def _ref(key, bead, __fcn__ = fcn):
-            val   = __fcn__(reference, bead).clone(label = reference)
+            val   = __fcn__(reference, bead, neverempty = True).clone(label = reference)
             if specs['refdims']:
                 val = val.redim(**{i.name: i.clone(label = f'{reference}{i.label}')
                                    for i in val.dimensions()})
 
-            other = __fcn__(key, bead).clone(label = key)
+            other = __fcn__(key, bead, neverempty = True).clone(label = key)
             if specs['reflayout'] == 'same':
                 return hv.Overlay(cls._same(specs, val, other))
             if specs['reflayout'] in ('left', 'top'):

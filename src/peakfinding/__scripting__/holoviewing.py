@@ -3,6 +3,7 @@
 "Updating PeaksDict for scripting purposes"
 from   typing                import List, Iterator, Type
 from   functools             import partial
+from   copy                  import deepcopy
 import sys
 import numpy            as     np
 from   scripting.holoviewing import addto
@@ -50,12 +51,18 @@ class PeaksDisplay(CycleDisplay): # type: ignore
 
     @staticmethod
     def __events(det, params, opts, estyle, hist):
+        if len(det.positions) == 0:
+            return hv.Scatter(([], []), **opts)(style = estyle)
+
         pks   = (np.concatenate(det.positions)-params[1])*params[0]
         yvals = [hist[i] for i in pks]
         return hv.Scatter((pks, yvals), **opts)(style = estyle)
 
     @classmethod
     def __errorbars(cls, det, params, opts, pstyle, hist):
+        if len(det.positions) == 0:
+            return hv.Curve(([], []), **opts)(style = pstyle)
+
         means = [((i-params[1])*params[0], Probability.resolution(j))
                  for i, j in det.output]
         xvals = np.hstack([[i-j, i+j, np.NaN]         for i, j in means])
@@ -64,6 +71,9 @@ class PeaksDisplay(CycleDisplay): # type: ignore
 
     @staticmethod
     def __peaks(det, params, opts, pstyle, hist):
+        if len(det.positions) == 0:
+            return hv.Scatter(([], []), **opts)(style = pstyle)
+
         means = [(i-params[1])*params[0] for i, _ in det.output]
         yvals = [hist[i] for i in means]
         return hv.Scatter((means, yvals), **opts)(style = pstyle)
@@ -73,22 +83,24 @@ class PeaksDisplay(CycleDisplay): # type: ignore
         "returns the dimension names"
         return {'kdims': ['z'], 'vdims': ['events']}
 
-    def elements(self, evts, labels, **opts):
+    def elements(self, evts, **opts):
         "shows overlayed Curve items"
+        cnf  = {i: deepcopy(j) for i, j in self._opts.items()
+                if i not in ('bias', 'stretch')}
+        cnf.update(opts)
         prec = opts.pop('precision', None)
         try:
-            return self.detailed(evts.detailed(..., prec), labels, **opts)
+            return self.detailed(evts.detailed(..., prec), **cnf)
         except Exception as exc: # pylint: disable=broad-except
             return self.errormessage(exc)
 
-    @classmethod
-    def detailed(cls, dets, labels, **opts):
+    def detailed(self, dets, **opts):
         "shows overlayed Curve items"
         opts.pop('sequencestyle', None)
+        for i, j in self.graphdims().items():
+            opts.setdefault(i, j)
 
-        opts.setdefault('kdims', ['z'])
-        opts.setdefault('vdims', ['events'])
-
+        never  = opts.pop('neverempty', False)
         pstyle = dict(opts.pop('peakstyle',  dict(size = 5, color = 'green')))
         estyle = dict(opts.pop('eventstyle', dict(size = 3)))
 
@@ -99,39 +111,45 @@ class PeaksDisplay(CycleDisplay): # type: ignore
             dets = (dets,)
 
         itms = []
-        for det in dets:
+        def _do(det):
             if opts.pop('zero', True):
                 cparams = params[0], params[1]+det.zero
             else:
                 cparams = params
 
-            if isinstance(labels, str):
-                opts['label'] = labels
-            elif labels is True:
+            if isinstance(self._labels, str):
+                opts['label'] = self._labels
+            elif self._labels is True:
                 opts['label'] = 'histogram'
-            itms.append(cls.__histogram(det, cparams, norm, opts, estyle))
-            itms.append(cls.__events   (det, cparams, opts, estyle, itms[-1]))
+            itms.append(self.__histogram(det, cparams, norm, opts, estyle))
+            itms.append(self.__events   (det, cparams, opts, estyle, itms[-1]))
 
-            if isinstance(labels, str):
+            if isinstance(self._labels, str):
                 opts.pop('label')
-            elif labels is True:
+            elif self._labels is True:
                 opts['label'] = 'peaks'
 
-            itms.append(cls.__peaks    (det, cparams, opts, pstyle, itms[-2]))
-            itms.append(cls.__errorbars(det, cparams, opts, pstyle, itms[-3]))
+            itms.append(self.__peaks    (det, cparams, opts, pstyle, itms[-2]))
+            itms.append(self.__errorbars(det, cparams, opts, pstyle, itms[-3]))
+        for det in dets:
+            _do(det)
+        if len(itms) == 0 and never:
+            _do(Detailed(None, None))
         return itms
 
-    def _run(self, evts):
+    def _run(self, evts, **opts):
         "shows overlayed Curve items"
-        return hv.Overlay(self.elements(evts, self._labels, **dict(self._opts)))
+        return hv.Overlay(self.elements(evts, **opts))
+
+    def _perbead(self, bead, **opts):
+        return self._run(self._items[[bead]], **opts)
+
+    def _perall(self, **opts):
+        return self._run(self._items, **opts)
 
     def getmethod(self):
         "Returns the method used by the dynamic map"
-        if self._kdim == 'bead':
-            def _fcn(bead):
-                return self._run(self._items[[bead]])
-            return _fcn
-        return partial(self._run, self._items)
+        return getattr(self, '_per'+str(self._kdim), self._perall)
 
     def getredim(self):
         "Returns the keys used by the dynamic map"
@@ -140,9 +158,7 @@ class PeaksDisplay(CycleDisplay): # type: ignore
                                            if self._items.isbead(i)]))),)
         return None
 
-@addto(Detailed)  # type: ignore
-def display(self, # pylint: disable=function-redefined
-            labels = None, **opts):
+class DetailedDisplay(PeaksDisplay): # type: ignore
     """
     Displays peaks.
 
@@ -155,7 +171,25 @@ def display(self, # pylint: disable=function-redefined
     * *eventstyle*, *peakstyle* can be used to set the style
     of corresponding graph elements.
     """
-    return PeaksDisplay.detailed(self, labels, **opts)
+    def getredim(self):
+        "Returns the method used by the dynamic map"
+        return None
+
+    def getmethod(self):
+        "Returns the method used by the dynamic map"
+        return self._perall
+
+    def _perall(self, **opts):
+        "Returns the method used by the dynamic map"
+        return self.detailed(self._items, **opts)
+
+    display = _perall
+
+@addto(Detailed)  # type: ignore
+@property
+def display(self): # pylint: disable=function-redefined
+    "Displays peaks."
+    return DetailedDisplay(self)
 
 @addto(PeaksDict)  # type: ignore
 @property
