@@ -224,8 +224,10 @@ class PeaksTracksDictDisplay(TracksDictDisplay): # type: ignore
         return ovrs
 
     @classmethod
-    def _all(cls, specs, fcn, key):
-        return cls._toarea(specs, super()._all(specs, fcn, key), cls._refindex(specs))
+    def _all(cls, specs, fcn, key, **opts):
+        return cls._toarea(specs,
+                           super()._all(specs, fcn, key, **opts),
+                           cls._refindex(specs))
 
     def display(self, overlay = '2d', reference = None, **kwa):
         """

@@ -154,6 +154,7 @@ class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
         return beads
 
 @addto(PeaksDict)  # type: ignore
+@property
 def display(self): # pylint: disable=function-redefined
     "displays peaks"
     return OligoMappingDisplay(self)
@@ -194,8 +195,10 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
         return cls._doref(specs, super()._same(specs, ref, other), 0)
 
     @classmethod
-    def _all(cls, specs, fcn, key):
-        return cls._doref(specs, super()._all(specs, fcn, key), cls._refindex(specs))
+    def _all(cls, specs, fcn, key, **opts):
+        return cls._doref(specs,
+                          super()._all(specs, fcn, key, **opts),
+                          cls._refindex(specs))
 
     @classmethod
     def _specs(cls):

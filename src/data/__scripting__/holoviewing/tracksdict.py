@@ -107,15 +107,14 @@ class TracksDictDisplay:
         elif specs['overlay'] == 'bead' and 'labels' not in kwa:
             kwa['labels'] = str(bead)
 
-        never = kwa.pop('neverempty', False)
-        data  = getattr(itms[key], specs['name'], itms[key]).display(**kwa)
-        return data.getmethod()(bead, neverempty = never)
+        data = getattr(itms[key], specs['name'], itms[key]).display(**kwa)
+        return data.getmethod()(bead)
 
     @staticmethod
-    def _all(specs, fcn, key):
+    def _all(specs, fcn, key, **opts):
         if specs['overlay'] == 'bead':
-            return [fcn(key, i) for i in specs['kdims'][specs['overlay']]]
-        return [fcn(i, key) for i in specs['kdims'][specs['overlay']]]
+            return [fcn(key, i, **opts) for i in specs['kdims'][specs['overlay']]]
+        return [fcn(i, key, **opts) for i in specs['kdims'][specs['overlay']]]
 
     @classmethod
     def _overlay(cls, itms, name, reference, overlay, kwa): # pylint: disable=too-many-arguments
@@ -130,7 +129,8 @@ class TracksDictDisplay:
             else:
                 kdims[overlay].insert(0, reference)
 
-        fcn   = lambda key, _f_ = fcn: hv.Overlay(cls._all(specs, _f_, key))
+        never = True
+        fcn   = lambda key, _f_ = fcn: hv.Overlay(cls._all(specs, _f_, key, neverempty = never))
         other = 'key' if overlay == 'bead' else 'bead'
         return hv.DynamicMap(fcn, kdims = [other]).redim.values(bead = specs['kdims'][other])
 
