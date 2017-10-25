@@ -6,6 +6,7 @@ Adds shortcuts for using holoview
 """
 import sys
 from   typing                   import List
+from   copy                     import deepcopy
 from   scripting.holoviewing    import addto, displayhook
 from   utils.logconfig          import getLogger
 from   ...views                 import isellipsis
@@ -27,19 +28,58 @@ def map(self, fcn, kdim = 'oligo', *extra, **kwa):
 
 @displayhook
 class TracksDictDisplay:
-    "displays a tracksdict"
-    def __init__(self, dico, name):
-        self.tracks = dico
-        self.name   = name
-        self.beads  = None
-        self.keys   = None
+    """
+    A hv.DynamicMap showing measures
+
+    Options are:
+
+        * *overlay* == 'key': for a given bead, all tracks are overlayed
+        The *reference* option can be used to indicate the top-most track.
+        * *overlay* == 'bead': for a given track, all beads are overlayed
+        The *reference* option can be used to indicate the top-most bead.
+        * *overlay* == None:
+
+            * *reference*: the reference is removed from the *key* widget and
+            allways displayed to the left independently.
+            * *refdims*: if set to *True*, the reference gets its own dimensions.
+            Thus zooming and spanning is independant.
+            * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
+    """
+    _beads     = None
+    _keys      = None
+    _name      = None
+    _overlay   = '2d'
+    _reference = None
+    def __init__(self, dico, **opts):
+        self._items     = dico
+        get             = lambda x: opts.pop(x, getattr(self.__class__, '_'+x))
+        self._name      = get('name')
+        self._beads     = get('beads')
+        self._keys      = get('keys')
+        self._overlay   = get('overlay')
+        self._reference = get('reference')
+        self._opts      = opts
+
+    def config(self, name = ...):
+        "returns the config"
+        cnf = deepcopy(self._opts)
+        cnf.update({i[1:]: deepcopy(j) for i, j in self.__dict__.items()
+                    if (i not in ('_opts', '_items') and
+                        len(i) > 2 and i[0] == '_'   and
+                        i[1].lower() == i[1])})
+        return cnf if name is Ellipsis else cnf[name]
+
+    def __call__(self, **opts):
+        default = self.__class__(self._items).config()
+        config  = {i: j for i, j in self.config().items() if j != default[i]}
+        config.update(opts)
+        return self.__class__(self._items, **config)
 
     def __getitem__(self, values):
         if isinstance(values, tuple):
             tracks, beads = values
-            if not isinstance(tracks, list) and tracks in self.tracks:
-                trk = self.tracks[tracks]
-                return getattr(trk, self.name, trk)[beads]
+            if not isinstance(tracks, list) and tracks in self._items:
+                tracks = [tracks]
 
             if isinstance(tracks, list) and isinstance(beads, int):
                 beads = [beads]
@@ -48,24 +88,24 @@ class TracksDictDisplay:
                   and not isellipsis(tracks)):
                 tracks = [tracks]
 
-            self.keys  = None     if isellipsis(tracks) else list(tracks)
-            self.beads = (None    if isellipsis(beads)  else
-                          [beads] if isinstance(beads, (int, str)) else
-                          list(beads))
+            self._keys  = None     if isellipsis(tracks) else list(tracks)
+            self._beads = (None    if isellipsis(beads)  else
+                           [beads] if isinstance(beads, (int, str)) else
+                           list(beads))
 
         elif isinstance(values, list):
-            if all(i in self.tracks for i in values):
-                self.keys = None if isellipsis(values) else values
+            if all(i in self._items for i in values):
+                self._keys = None if isellipsis(values) else values
             else:
-                self.beads = None if isellipsis(values) else values
+                self._beads = None if isellipsis(values) else values
 
         elif isellipsis(values):
-            self.tracks = None
+            self._items = None
 
-        elif values in self.tracks:
-            trk = self.tracks[values]
-            itm = getattr(trk, self.name, trk)
-            return itm[self.beads] if self.beads else itm
+        elif values in self._items:
+            trk = self._items[values]
+            itm = getattr(trk, self._name, trk)
+            return itm[self._beads] if self._beads else itm
 
         else:
             raise KeyError("Could not slice the display")
@@ -84,19 +124,32 @@ class TracksDictDisplay:
         return self.display() >> (other if isinstance(other, hv.Element) else other.display())
 
     @staticmethod
-    def _specs():
+    def _specs(_):
         return ('refdims',  True), ('reflayout', 'left')
 
-    @classmethod
-    def _base(cls, itms, name, reference, overlay, kwa): # pylint: disable=too-many-arguments
+    def _base(self):
+        itms  = self._items
+        kwa   = deepcopy(self._opts)
+
         kdims         = dict()
-        kdims['key']  = sorted(kwa.pop('key')  if 'key'  in kwa else itms.keys())
-        kdims['bead'] = sorted(kwa.pop('bead') if 'bead' in kwa else itms.beads(*kdims['key']))
+        kdims['key']  = sorted(kwa.pop('key')  if 'key'  in kwa else
+                               self._keys      if self._keys    else
+                               itms.keys())
+        kdims['bead'] = sorted(kwa.pop('bead') if 'bead' in kwa else
+                               self._beads     if self._beads   else
+                               itms.beads(*kdims['key']))
+        if self._reference is not None:
+            key = 'bead' if self._overlay == 'bead' else 'key'
+            if self._reference not in kdims[key]:
+                kdims[key].insert(0, self._reference)
 
-        specs = {i: kwa.pop(i, j) for i, j in cls._specs()}
-        specs.update(reference = reference, name = name, kdims = kdims, overlay = overlay)
+        specs = {i: kwa.pop(i, j) for i, j in self._specs(kwa)}
+        specs.update(reference = self._reference,
+                     name      = self._name,
+                     kdims     = kdims,
+                     overlay   = self._overlay)
 
-        display = getattr(cls, '_'+name, cls._default_display)
+        display = getattr(self, '_'+self._name, self._default_display)
         fcn     = lambda key, bead, **other: display(itms, key, bead, specs, **kwa, **other)
         return fcn, specs
 
@@ -116,104 +169,78 @@ class TracksDictDisplay:
             return [fcn(key, i, **opts) for i in specs['kdims'][specs['overlay']]]
         return [fcn(i, key, **opts) for i in specs['kdims'][specs['overlay']]]
 
-    @classmethod
-    def _overlay(cls, itms, name, reference, overlay, kwa): # pylint: disable=too-many-arguments
-        "display overlaying keys"
-        fcn, specs = cls._base(itms, name, reference, overlay, kwa)
-
-        if reference:
-            kdims          = specs['kdims']
-            kdims[overlay] = [i for i in kdims[overlay] if i != reference]
-            if specs['reflayout'] in ('right', 'top'):
-                kdims[overlay].append(reference)
-            else:
-                kdims[overlay].insert(0, reference)
-
-        never = True
-        fcn   = lambda key, _f_ = fcn: hv.Overlay(cls._all(specs, _f_, key, neverempty = never))
-        other = 'key' if overlay == 'bead' else 'bead'
-        return hv.DynamicMap(fcn, kdims = [other]).redim.values(bead = specs['kdims'][other])
-
     @staticmethod
     def _same(_, ref, other):
         return [ref, other]
 
-    @classmethod
-    def refwithoutoverlay(cls, itms, name, reference, kwa):
-        "display without overlay but with reference"
-        fcn, specs   = cls._base(itms, name, reference, False, kwa)
-        kdims        = specs['kdims']
-        kdims['key'] = [i for i in kdims['key'] if i != reference]
-        def _ref(key, bead, __fcn__ = fcn):
-            val   = __fcn__(reference, bead, neverempty = True).clone(label = reference)
-            if specs['refdims']:
-                val = val.redim(**{i.name: i.clone(label = f'{reference}{i.label}')
-                                   for i in val.dimensions()})
+    def getmethod(self):
+        "Returns the method used by the dynamic map"
+        fcn, specs = self._base()
 
-            other = __fcn__(key, bead, neverempty = True).clone(label = key)
-            if specs['reflayout'] == 'same':
-                return hv.Overlay(cls._same(specs, val, other))
-            if specs['reflayout'] in ('left', 'top'):
-                return (val+other).cols(1 if specs['reflayout'] == 'top' else 2)
-            return (other+val).cols(1 if specs['reflayout'] == 'bottom' else 2)
-        return hv.DynamicMap(_ref, kdims = ['key', 'bead']).redim.values(**kdims)
+        if self._overlay in ('key', 'bead'):
+            def _over(key, _fcn_ = fcn):
+                return hv.Overlay(self._all(specs, _fcn_, key, neverempty = True))
+            return _over
 
-    @classmethod
-    def withoutoverlay(cls, itms, name, kwa):
-        "display without overlay"
-        fcn, specs = cls._base(itms, name, None, False, kwa)[:2]
-        return hv.DynamicMap(fcn, kdims = ['key', 'bead']).redim.values(**specs['kdims'])
+        if self._reference is not None:
+            def _ref(key, bead, _fcn_ = fcn):
+                val   = (_fcn_(self._reference, bead, neverempty = True)
+                         .clone(label = self._reference))
+                if specs['refdims']:
+                    val = val.redim(**{i.name: i.clone(label = f'{self._reference}{i.label}')
+                                       for i in val.dimensions()})
 
-    @classmethod
-    def run(cls, itms, name, overlay, reference, kwa): # pylint: disable=too-many-arguments
+                other = _fcn_(key, bead, neverempty = True).clone(label = key)
+                if specs['reflayout'] == 'same':
+                    return hv.Overlay(self._same(specs, val, other))
+                if specs['reflayout'] in ('left', 'top'):
+                    return (val+other).cols(1 if specs['reflayout'] == 'top' else 2)
+                return (other+val).cols(1 if specs['reflayout'] == 'bottom' else 2)
+            return _ref
+
+        return fcn
+
+    def getredim(self):
+        "Returns the method used by the dynamic map"
+        kdims = self._base()[1]['kdims']
+
+        if self._overlay in ('key', 'bead'):
+            kdims.pop(self._overlay)
+
+        key = 'bead' if self._overlay == 'bead' else 'key'
+        if self._reference in kdims.get(key, []):
+            kdims[key] = [i for i in kdims[key] if i != self._reference]
+
+        return kdims
+
+    def display(self):
         "displays"
-        if overlay in ('key', 'bead'):
-            return cls._overlay(itms, name, reference, overlay, kwa)
-        if reference is not None:
-            return cls.refwithoutoverlay(itms, name, reference, kwa)
-        return cls.withoutoverlay(itms, name, kwa)
+        fcn   = self.getmethod()
+        kdims = self.getredim()
+        if set(kdims) == {'key', 'bead'}:
+            vals = ['key', 'bead']
+        else:
+            vals = [i for i, _ in getattr(kdims, 'items', lambda: kdims)()]
 
-    def display(self, overlay = None, reference = None, **kwa):
-        """
-        A hv.DynamicMap showing measures
-
-        Options are:
-
-            * *overlay* == 'key': for a given bead, all tracks are overlayed
-            The *reference* option can be used to indicate the top-most track.
-            * *overlay* == 'bead': for a given track, all beads are overlayed
-            The *reference* option can be used to indicate the top-most bead.
-            * *overlay* == None:
-
-                * *reference*: the reference is removed from the *key* widget and
-                allways displayed to the left independently.
-                * *refdims*: if set to *True*, the reference gets its own dimensions.
-                Thus zooming and spanning is independant.
-                * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
-        """
-        if self.beads:
-            kwa.setdefault('bead', self.beads)
-        if self.keys:
-            kwa.setdefault('key', self.keys)
-        return self.run(self.tracks, self.name, overlay, reference, kwa)
+        return hv.DynamicMap(fcn, kdims = vals).redim.values(**dict(kdims))
 
 @addto(TracksDict) # type: ignore
 @property
 def cycles(self):
     "displays cycles"
-    return TracksDictDisplay(self, 'cycles')
+    return TracksDictDisplay(self, name = 'cycles')
 
 @addto(TracksDict) # type: ignore
 @property
 def cleancycles(self):
     "displays cleaned cycles"
-    return TracksDictDisplay(self, 'cleancycles')
+    return TracksDictDisplay(self, name = 'cleancycles')
 
 @addto(TracksDict) # type: ignore
 @property
 def measures(self):
     "displays cleaned measures"
-    return TracksDictDisplay(self, 'measures')
+    return TracksDictDisplay(self, name = 'measures')
 
 @displayhook
 class TracksDictFovDisplayProperty:

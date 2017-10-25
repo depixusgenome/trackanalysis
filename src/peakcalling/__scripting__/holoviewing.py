@@ -160,7 +160,28 @@ def display(self): # pylint: disable=function-redefined
     return OligoMappingDisplay(self)
 
 class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignore
-    "tracksdict display for peaks"
+    """
+    A hv.DynamicMap showing peaks
+
+    Attributes are:
+
+    * *format* == '1d': for a given bead, all tracks are overlayed,
+    see 'display1d'.
+
+    * *format* == '2d': for a given bead, all tracks are shown on a 2D
+    histogram, see 'display2d'.
+
+    * *format* == None: see 'displayone'.
+    """
+    _format = "2d"
+    def __init__(self, items, **opts):
+        self._format = opts.pop('format', getattr(self.__class__, '_format'))
+        if self._format in ('1d', '2d'):
+            opts['overlay'] = 'key'
+        else:
+            opts.setdefault('overlay', None)
+        super().__init__(items, **opts)
+
     @classmethod
     def _doref(cls, specs, ovrs, ind):
         if None in (specs['reference'], specs['distance']):
@@ -170,13 +191,22 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
 
         dist = specs['distance']
         def _peaks(crvs):
+            if len(tuple(crvs)) == 0:
+                return
+
             good  = tuple(crvs)[-1]
+            if len(good.data) == 0:
+                return
+
             crv   = good.data[:,0] if isinstance(good.data, np.ndarray) else good.data[0]
             xvals = (crv[1::3]+crv[::3])*.5
             yvals = (crv[1::3]-crv[::3])*.5
             return dist.frompeaks(np.vstack([xvals, yvals]).T)
 
         ref = _peaks(ovrs[ind])
+        if ref is None:
+            return cls._toarea(specs, ovrs, ind)
+
         for i, j in enumerate(ovrs):
             if i == ind:
                 continue
@@ -185,9 +215,11 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
             if len(j) == 0 or len(j[0].data) == 0:
                 continue
 
-            stretch, bias = dist.optimize(ref, _peaks(j))[1:]
-            for itm in j:
-                itm.data[:,0] = (itm.data[:,0] - bias)*stretch
+            pks  = _peaks(j)
+            if pks is not None:
+                stretch, bias = dist.optimize(ref, pks)[1:]
+                for itm in j:
+                    itm.data[:,0] = (itm.data[:,0] - bias)*stretch
         return cls._toarea(specs, ovrs, ind)
 
     @classmethod
@@ -200,34 +232,34 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
                           super()._all(specs, fcn, key, **opts),
                           cls._refindex(specs))
 
-    @classmethod
-    def _specs(cls):
-        return (super()._specs()
-                + (('distance', ChiSquareHistogramFit()),
-                   ('peakcolor', 'blue'), ('peakdash', 'dotted'),
-                   ('refcolor',  'gray'), ('refdash',  'dotted'),
-                   ('logz',      True),   ('loglog',    True),
-                   ('textcolor', 'white')))
+    def _specs(self, _):
+        return (('refdims',   False),
+                ('reflayout', 'same' if self._format is None else 'bottom'),
+                ('distance',  ChiSquareHistogramFit()),
+                ('peakcolor', 'blue'), ('peakdash', 'dotted'),
+                ('refcolor',  'gray'), ('refdash',  'dotted'),
+                ('logz',      True),   ('loglog',    True),
+                ('textcolor', 'white'))
 
-    @classmethod
-    def _to2d(cls, plot, reference, **kwa):
+    def _to2d(self, plot):
         "converts 1d histograms to 2D"
+        kwa   = dict(self._opts)
         crvs  = [(i[1], j) for i, j in plot.data.items() if i[0] == 'Curve'][::2]
-        quad  = cls.__quadmesh(crvs, kwa)
-        text  = cls.__quadmeshtext(crvs, kwa)
+        quad  = self.__quadmesh(crvs, kwa)
+        text  = self.__quadmeshtext(crvs, kwa)
 
         sp1 = [j.data[:,0] for i, j in plot.data.items() if i[0] == 'Scatter'][1::2]
         sp2 = [(np.ones((len(j),3))*(i+.5)+[-.5,.5, np.NaN]).ravel()
                for i, j in enumerate(sp1)]
 
-        if reference is not None:
-            ref = cls.__quadmeshref(sp1, sp2, reference, kwa)
+        if self._reference is not None:
+            ref = self.__quadmeshref(sp1, sp2, self._reference, kwa)
 
         pks = hv.Curve((np.repeat(np.concatenate(sp1), 3), np.concatenate(sp2)),
                        label = 'peaks')
         pks = pks(style = dict(color     = kwa.get('peakcolor', 'blue'),
                                line_dash = kwa.get('peakdash', 'dotted')))
-        if reference is not None:
+        if self._reference is not None:
             return (quad*ref*pks*text).redim(x = 'z', y = 'key', z ='events')
         return (quad*pks*text).redim(x = 'z', y = 'key', z ='events')
 
@@ -262,20 +294,7 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
         return ref(style = dict(color = kwa.get('refcolor', 'gray'),
                                 line_dash = kwa.get('refdash', 'dotted')))
 
-    def displaybead(self, reference = None, **kwa):
-        """
-        For a given track, all beads are overlayed.
-
-        Keywords are:
-
-        * *reference*: the reference is displayed as an area
-        * *distance*: a *HistogramFit* object (default) or *None*. This
-        objects computes a stretch and bias which is applied to the x-axis of
-        non-reference items.
-        """
-        return self.display('bead', reference, **kwa)
-
-    def display1d(self, reference = None, **kwa):
+    def display1d(self, **kwa):
         """
         For a given bead, all tracks are overlayed.
 
@@ -286,9 +305,9 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
         computes a stretch and bias which is applied to the x-axis of
         non-reference items.
         """
-        return self.display('1d', reference, **kwa)
+        return self(format = '1d', **kwa).display()
 
-    def display2d(self, reference = None, **kwa):
+    def display2d(self, **kwa):
         """
         For a given bead, all tracks are shown on a 2D histogram.
 
@@ -299,12 +318,11 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
         computes a stretch and bias which is applied to the x-axis of
         non-reference items.
         """
-        return self.display('2d', reference, **kwa)
+        return self(format = '2d', **kwa).display()
 
-    def displayonebyone(self, reference = None, **kwa):
+    def displayone(self, **kwa):
         """
         Keywords are:
-
 
         * *reference*: the reference is removed from the *key* widget and
         allways displayed to the left independently.
@@ -312,49 +330,21 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
         Thus zooming and spanning is independant.
         * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
         """
-        return self.display(None, reference, **kwa)
+        return self(format = None, **kwa).display()
 
-    def display(self, overlay = '2d', reference = None, **kwa):
-        """
-        A hv.DynamicMap showing peaks
+    def getmethod(self):
+        "Returns the method used by the dynamic map"
+        fcn = super().getmethod()
+        if self._format == '2d':
+            return lambda bead: self._to2d(fcn(bead))
+        return fcn
 
-        Options are:
-
-            * *overlay* == '1d': for a given bead, all tracks are overlayed,
-            see 'display1d'.
-
-            * *overlay* == '2d': for a given bead, all tracks are shown on a 2D
-            histogram, see 'display2d'.
-
-            * *overlay* == 'bead': for a given track, all beads are overlayed,
-            see 'displaybead'.
-
-
-            * *overlay* == None: see 'displayonebyone'.
-        """
-
-        kwa.setdefault('reflayout', 'same' if overlay is None else 'bottom')
-        kwa.setdefault('refdims', False)
-        if self.beads:
-            kwa.setdefault('bead', self.beads)
-        if self.keys:
-            kwa.setdefault('key', self.keys)
-
-        if overlay is not None:
-            overlay = overlay.lower()
-            is2d    = overlay == '2d'
-            overlay = 'key' if overlay in ("1d", "2d") else overlay
-        else:
-            is2d    = False
-
-        if is2d:
-            beads = kwa['bead'] if 'bead' in kwa else self.tracks.beads(*kwa.get('key', ()))
-
-        dmap    = self.run(self.tracks, 'peaks', overlay, reference, dict(kwa))
-        if is2d:
-            fcn = lambda bead: self._to2d(dmap[bead], reference, **kwa)
-            return hv.DynamicMap(fcn, kdims = ['bead']).redim.values(bead = beads)
-        return dmap
+    def getredim(self):
+        "Returns the method used by the dynamic map"
+        redim = super().getredim()
+        if self._format == '2d':
+            redim.pop("key", None)
+        return redim
 
 @addto(TracksDict) # type: ignore
 @property

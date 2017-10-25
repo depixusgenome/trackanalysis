@@ -33,25 +33,32 @@ class Display(ABC):
         self._overlay = get('overlay')
         self._opts    = opts
 
+    def __add__(self, other):
+        return self.display() + (other if isinstance(other, hv.Element) else other.display())
+
+    def __mul__(self, other):
+        return self.display() * (other if isinstance(other, hv.Element) else other.display())
+
+    def __lshift__(self, other):
+        return self.display() << (other if isinstance(other, hv.Element) else other.display())
+
+    def __rshift__(self, other):
+        return self.display() >> (other if isinstance(other, hv.Element) else other.display())
+
     def config(self, name = ...):
         "returns the config"
         cnf = deepcopy(self._opts)
         cnf.update({i[1:]: deepcopy(j) for i, j in self.__dict__.items()
-                    if (i != '_opts'                and
-                        len(i) > 2 and i[0] == '_'  and
+                    if (i not in ('_opts', '_items') and
+                        len(i) > 2 and i[0] == '_'   and
                         i[1].lower() == i[1])})
         return cnf if name is Ellipsis else cnf[name]
 
-    def __getstate__(self):
-        return self._items, self.config()
-
-    def __setstate__(self, values):
-        self.__init__(values[0], **values[1])
-
     def __call__(self, **opts):
-        config = self.config()
+        default = self.__class__(self._items).config()
+        config  = {i: j for i, j in self.config().items() if j != default[i]}
         config.update(opts)
-        return self.__class__(self._items, **opts)
+        return self.__class__(self._items, **config)
 
     @staticmethod
     def concat(itr):

@@ -205,8 +205,13 @@ def map(self, fcn, **kwa): # pylint: disable=redefined-builtin
 
 class PeaksTracksDictDisplay(TracksDictDisplay): # type: ignore
     "tracksdict display for peaks"
-    def __init__(self, dico):
-        super().__init__(dico, 'peaks')
+    def __init__(self, dico, **opts):
+        opts['name'] = 'peaks'
+        super().__init__(dico, **opts)
+
+    @staticmethod
+    def _specs(_):
+        return ('refdims',  True), ('reflayout', 'bottom')
 
     @staticmethod
     def _refindex(specs):
@@ -229,30 +234,6 @@ class PeaksTracksDictDisplay(TracksDictDisplay): # type: ignore
                            super()._all(specs, fcn, key, **opts),
                            cls._refindex(specs))
 
-    def display(self, overlay = '2d', reference = None, **kwa):
-        """
-        A hv.DynamicMap showing peaks
-
-        Options are:
-
-            * *overlay* == 'key': for a given bead, all tracks are overlayed
-            The *reference* option can be used to indicate the top-most track.
-            * *overlay* == 'bead': for a given track, all beads are overlayed
-            The *reference* option can be used to indicate the top-most bead.
-            * *overlay* == None:
-
-                * *reference*: the reference is removed from the *key* widget and
-                allways displayed to the left independently.
-                * *refdims*: if set to *True*, the reference gets its own dimensions.
-                Thus zooming and spanning is independant.
-                * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
-        """
-        kwa.setdefault('reflayout', 'bottom')
-        if self.beads:
-            kwa.setdefault('bead', self.beads)
-        if self.keys:
-            kwa.setdefault('key', self.keys)
-        return self.run(self.tracks, 'peaks', overlay, reference, kwa)
 
 @addto(TracksDict) # type: ignore
 @property
