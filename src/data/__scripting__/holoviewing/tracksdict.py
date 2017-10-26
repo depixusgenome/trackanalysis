@@ -11,6 +11,7 @@ from   scripting.holoviewing    import addto, displayhook
 from   utils.logconfig          import getLogger
 from   ...views                 import isellipsis
 from   ..tracksdict             import ExperimentList, TracksDict
+from   .display                 import BasicDisplay
 
 LOGS  = getLogger(__name__)
 hv    = sys.modules['holoviews']  # pylint: disable=invalid-name
@@ -26,8 +27,7 @@ def map(self, fcn, kdim = 'oligo', *extra, **kwa):
 
     return hv.DynamicMap(fcn, kdims = list(kwa)+list(extra)).redim.values(**kwa)
 
-@displayhook
-class TracksDictDisplay:
+class TracksDictDisplay(BasicDisplay):
     """
     A hv.DynamicMap showing measures
 
@@ -45,36 +45,14 @@ class TracksDictDisplay:
             Thus zooming and spanning is independant.
             * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
     """
-    _beads     = None
-    _keys      = None
-    _name      = None
-    _overlay   = '2d'
-    _reference = None
-    def __init__(self, dico, **opts):
-        self._items     = dico
-        get             = lambda x: opts.pop(x, getattr(self.__class__, '_'+x))
-        self._name      = get('name')
-        self._beads     = get('beads')
-        self._keys      = get('keys')
-        self._overlay   = get('overlay')
-        self._reference = get('reference')
-        self._opts      = opts
-
-    def config(self, name = ...):
-        "returns the config"
-        cnf = deepcopy(self._opts)
-        cnf.update({i[1:]: deepcopy(j) for i, j in self.__dict__.items()
-                    if (i not in ('_opts', '_items') and
-                        len(i) > 2 and i[0] == '_'   and
-                        i[1].lower() == i[1])})
-        return cnf if name is Ellipsis else cnf[name]
-
-    def __call__(self, **opts):
-        default = self.__class__(self._items).config()
-        config  = {i: j for i, j in self.config().items() if j != default[i]}
-        config.update(opts)
-        return self.__class__(self._items, **config)
-
+    _beads      = None
+    _keys       = None
+    _name       = None
+    _overlay    = '2d'
+    _reference  = None
+    _refdims    = True
+    _reflayout  = 'left'
+    KEYWORDS    = BasicDisplay.KEYWORDS | frozenset(locals())
     def __getitem__(self, values):
         if isinstance(values, tuple):
             tracks, beads = values
@@ -100,32 +78,14 @@ class TracksDictDisplay:
                 self._beads = None if isellipsis(values) else values
 
         elif isellipsis(values):
-            self._items = None
+            self._keys  = None
+            self._beads = None
 
         elif values in self._items:
-            trk = self._items[values]
-            itm = getattr(trk, self._name, trk)
-            return itm[self._beads] if self._beads else itm
-
+            self._keys  = [values]
         else:
             raise KeyError("Could not slice the display")
         return self
-
-    def __add__(self, other):
-        return self.display() + (other if isinstance(other, hv.Element) else other.display())
-
-    def __mul__(self, other):
-        return self.display() * (other if isinstance(other, hv.Element) else other.display())
-
-    def __lshift__(self, other):
-        return self.display() << (other if isinstance(other, hv.Element) else other.display())
-
-    def __rshift__(self, other):
-        return self.display() >> (other if isinstance(other, hv.Element) else other.display())
-
-    @staticmethod
-    def _specs(_):
-        return ('refdims',  True), ('reflayout', 'left')
 
     def _base(self):
         itms  = self._items
@@ -143,66 +103,62 @@ class TracksDictDisplay:
             if self._reference not in kdims[key]:
                 kdims[key].insert(0, self._reference)
 
-        specs = {i: kwa.pop(i, j) for i, j in self._specs(kwa)}
-        specs.update(reference = self._reference,
-                     name      = self._name,
-                     kdims     = kdims,
-                     overlay   = self._overlay)
-
         display = getattr(self, '_'+self._name, self._default_display)
-        fcn     = lambda key, bead, **other: display(itms, key, bead, specs, **kwa, **other)
-        return fcn, specs
+        fcn     = lambda key, bead, **other: display(itms, key, bead, kdims, **kwa, **other)
+        return fcn, kdims
 
-    @staticmethod
-    def _default_display(itms, key, bead, specs, **kwa):
-        if specs['overlay'] == 'key' and 'labels' not in kwa:
+    def _default_display(self, itms, key, bead, _, **kwa):
+        if self._overlay == 'key' and 'labels' not in kwa:
             kwa['labels'] = str(key)
-        elif specs['overlay'] == 'bead' and 'labels' not in kwa:
+        elif self._overlay == 'bead' and 'labels' not in kwa:
             kwa['labels'] = str(bead)
 
-        data = getattr(itms[key], specs['name'], itms[key]).display(**kwa)
+        data = getattr(itms[key], self._name, itms[key]).display(**kwa)
         return data.getmethod()(bead)
 
     @staticmethod
-    def _all(specs, fcn, key, **opts):
-        if specs['overlay'] == 'bead':
-            return [fcn(key, i, **opts) for i in specs['kdims'][specs['overlay']]]
-        return [fcn(i, key, **opts) for i in specs['kdims'][specs['overlay']]]
+    def _convert(_, elems):
+        return elems
 
     @staticmethod
-    def _same(_, ref, other):
+    def _same(ref, other):
         return [ref, other]
 
     def getmethod(self):
         "Returns the method used by the dynamic map"
-        fcn, specs = self._base()
+        fcn, kdims = self._base()
 
         if self._overlay in ('key', 'bead'):
             def _over(key, _fcn_ = fcn):
-                return hv.Overlay(self._all(specs, _fcn_, key, neverempty = True))
+                if self._overlay == 'bead':
+                    crvs = [fcn(key, i, neverempty = True) for i in kdims[self._overlay]]
+                else:
+                    crvs = [fcn(i, key, neverempty = True) for i in kdims[self._overlay]]
+                return hv.Overlay(self._convert(kdims, crvs))
             return _over
 
         if self._reference is not None:
             def _ref(key, bead, _fcn_ = fcn):
                 val   = (_fcn_(self._reference, bead, neverempty = True)
                          .clone(label = self._reference))
-                if specs['refdims']:
+                if self._refdims:
                     val = val.redim(**{i.name: i.clone(label = f'{self._reference}{i.label}')
                                        for i in val.dimensions()})
 
                 other = _fcn_(key, bead, neverempty = True).clone(label = key)
-                if specs['reflayout'] == 'same':
-                    return hv.Overlay(self._same(specs, val, other))
-                if specs['reflayout'] in ('left', 'top'):
-                    return (val+other).cols(1 if specs['reflayout'] == 'top' else 2)
-                return (other+val).cols(1 if specs['reflayout'] == 'bottom' else 2)
+                self._convert(kdims, [val, other])
+                if self._reflayout == 'same':
+                    return hv.Overlay([val, other])
+                if self._reflayout in ('left', 'top'):
+                    return (val+other).cols(1 if self._reflayout == 'top' else 2)
+                return (other+val).cols(1 if self._reflayout == 'bottom' else 2)
             return _ref
 
         return fcn
 
     def getredim(self):
         "Returns the method used by the dynamic map"
-        kdims = self._base()[1]['kdims']
+        kdims = self._base()[1]
 
         if self._overlay in ('key', 'bead'):
             kdims.pop(self._overlay)
@@ -211,18 +167,9 @@ class TracksDictDisplay:
         if self._reference in kdims.get(key, []):
             kdims[key] = [i for i in kdims[key] if i != self._reference]
 
-        return kdims
-
-    def display(self):
-        "displays"
-        fcn   = self.getmethod()
-        kdims = self.getredim()
         if set(kdims) == {'key', 'bead'}:
-            vals = ['key', 'bead']
-        else:
-            vals = [i for i, _ in getattr(kdims, 'items', lambda: kdims)()]
-
-        return hv.DynamicMap(fcn, kdims = vals).redim.values(**dict(kdims))
+            return [(i, kdims[i]) for i in ('key', 'bead')]
+        return kdims
 
 @addto(TracksDict) # type: ignore
 @property

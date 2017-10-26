@@ -44,6 +44,13 @@ class PeaksDisplay(CycleDisplay): # type: ignore
     * *sequencestyle*, *eventstyle*, *peakstyle* can be used to set the style
     of corresponding graph elements.
     """
+    _zero       = True
+    _peakstyle  = dict(size = 5, color = 'green')
+    _eventstyle = dict(size = 3)
+    _norm       = 'event'
+    _precision  = None
+    KEYWORDS    = CycleDisplay.KEYWORDS | frozenset(locals())
+
     # pylint: disable=too-many-arguments,arguments-differ
     @staticmethod
     def __histogram(det, params, norm, opts, estyle):
@@ -85,34 +92,30 @@ class PeaksDisplay(CycleDisplay): # type: ignore
 
     def elements(self, evts, **opts):
         "shows overlayed Curve items"
-        cnf  = {i: deepcopy(j) for i, j in self._opts.items()
-                if i not in ('bias', 'stretch')}
+        cnf  = deepcopy(self._opts)
         cnf.update(opts)
-        prec = opts.pop('precision', None)
         try:
-            return self.detailed(evts.detailed(..., prec), **cnf)
+            return self.detailed(evts.detailed(..., self._precision), **cnf)
         except Exception as exc: # pylint: disable=broad-except
             return self.errormessage(exc)
 
     def detailed(self, dets, **opts):
         "shows overlayed Curve items"
-        opts.pop('sequencestyle', None)
         for i, j in self.graphdims().items():
             opts.setdefault(i, j)
 
         never  = opts.pop('neverempty', False)
-        pstyle = dict(opts.pop('peakstyle',  dict(size = 5, color = 'green')))
-        estyle = dict(opts.pop('eventstyle', dict(size = 3)))
-
-        params = opts.pop('stretch', 1.), opts.pop('bias', 0.)
-        norm   = opts.pop('norm', 'events')
+        pstyle = self._peakstyle
+        estyle = self._eventstyle
+        norm   = self._norm
+        params = self._stretch, self._bias
 
         if not isinstance(dets, Iterator):
             dets = (dets,)
 
         itms = []
         def _do(det):
-            if opts.pop('zero', True):
+            if self._zero:
                 cparams = params[0], params[1]+det.zero
             else:
                 cparams = params
@@ -205,35 +208,23 @@ def map(self, fcn, **kwa): # pylint: disable=redefined-builtin
 
 class PeaksTracksDictDisplay(TracksDictDisplay): # type: ignore
     "tracksdict display for peaks"
-    def __init__(self, dico, **opts):
-        opts['name'] = 'peaks'
-        super().__init__(dico, **opts)
-
-    @staticmethod
-    def _specs(_):
-        return ('refdims',  True), ('reflayout', 'bottom')
-
-    @staticmethod
-    def _refindex(specs):
-        if specs.get('reference', None) is None:
+    _reflayout  = 'bottom'
+    _name       = property(lambda _: 'peaks', lambda _1, _2: None) # constant attribute
+    def _refindex(self, kdims):
+        if self._reference is None:
             return None
-        return specs['kdims'][specs['overlay']].index(specs['reference'])
+        if self._overlay in ('bead', 'key'):
+            return kdims[self._overlay].index(self._reference)
+        return 0
 
-    @classmethod
-    def _toarea(cls, specs, ovrs, ind):
-        if specs.get('reference', None) is not None:
+    def _convert(self, kdims, ovrs):
+        ind = self._refindex(kdims)
+        if self._reference is not None and ind is not None:
             area = next(iter(ovrs[ind])).to(hv.Area)
             ovrs[ind] = hv.Overlay([area(style = dict(alpha = 0.5))] + list(ovrs[ind]),
                                    label = ovrs[ind].label,
                                    group = ovrs[ind].group)
         return ovrs
-
-    @classmethod
-    def _all(cls, specs, fcn, key, **opts):
-        return cls._toarea(specs,
-                           super()._all(specs, fcn, key, **opts),
-                           cls._refindex(specs))
-
 
 @addto(TracksDict) # type: ignore
 @property

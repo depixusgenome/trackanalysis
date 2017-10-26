@@ -15,22 +15,13 @@ from   ...                   import Beads
 hv    = sys.modules['holoviews']  # pylint: disable=invalid-name
 
 @displayhook
-class Display(ABC):
-    "displays the beads or cycles"
-    _kdim    = 'bead'
-    _labels  = None
-    _tpe     = 'curve'
-    _overlay = False
+class BasicDisplay(ABC):
+    "Everything needed for creating a dynamic map display"
+    KEYWORDS = frozenset(locals())
     def __init__(self, items, **opts):
         self._items   = items
-        get           = lambda x: opts.pop(x, getattr(self.__class__, '_'+x))
-        self._kdim    = get('kdim')
-        self._labels  = get('labels')
-        self._tpe     = get('tpe')
-        if isinstance(self._tpe, str):
-            self._tpe = (getattr(hv, self._tpe) if hasattr(hv, self._tpe) else
-                         getattr(hv, self._tpe.capitalize()))
-        self._overlay = get('overlay')
+        for i in self.KEYWORDS:
+            setattr(self, i, opts.pop(i[1:], getattr(self.__class__, i)))
         self._opts    = opts
 
     def __add__(self, other):
@@ -65,6 +56,56 @@ class Display(ABC):
         "concatenates arrays, appending a NaN"
         return np.concatenate(list(chain.from_iterable(zip(itr, repeat([np.NaN])))))
 
+    def display(self, **kwa):
+        "displays the cycles using a dynamic map"
+        this = self(**kwa) if kwa else self
+        fcn  = this.getmethod()
+        keys = this.getredim()
+        if keys is None:
+            return fcn()
+
+        itr   = getattr(keys, 'items', lambda : keys)
+        kdims = [i                      for i, _ in itr()]
+        vals  = [(i, j)                 for i, j in itr() if isinstance(j, list)]
+        rngs  = [(i, (j.start, j.stop)) for i, j in itr() if isinstance(j, slice)]
+        done  = set(dict(vals)) | set(dict(rngs))
+        sels  = [(i, [j])               for i, j in itr() if i not in done]
+        return (hv.DynamicMap(fcn, kdims = kdims)
+                .redim.values(**dict(vals), **dict(sels))
+                .redim.range(**dict(rngs)))
+
+    @abstractmethod
+    def getmethod(self):
+        "Returns the method used by the dynamic map"
+
+    @abstractmethod
+    def getredim(self):
+        "Returns the keys used by the dynamic map"
+
+class Display(BasicDisplay): # pylint: disable=abstract-method
+    "displays the beads or cycles"
+    _kdim    = 'bead'
+    _labels  = None
+    _tpe     = 'curve'
+    _overlay = False
+    _keys    = None
+    _stretch = 1.
+    _bias    = 0.
+    KEYWORDS = BasicDisplay.KEYWORDS | frozenset(locals())
+    def __init__(self, items, **opts):
+        super().__init__(items, **opts)
+        if isinstance(self._tpe, str):
+            self._tpe = (getattr(hv, self._tpe) if hasattr(hv, self._tpe) else
+                         getattr(hv, self._tpe.capitalize()))
+
+    def __getitem__(self, value):
+        self._keys = value if isinstance(value, list) else [value]
+
+    @staticmethod
+    def graphdims():
+        "returns the dimension names"
+        return {'kdims': ['frames'], 'vdims': ['z']}
+
     def errormessage(self, exc):
         "displays error message"
         args = getattr(exc, 'args', tuple())
@@ -78,11 +119,6 @@ class Display(ABC):
         return hv.Overlay([hv.Text(0.5, .9, args[0], kdims = tdims),
                            self._tpe(([0., np.NaN, 1.],[0., np.NaN, 1.]),
                                      **cdims)])
-
-    @staticmethod
-    def graphdims():
-        "returns the dimension names"
-        return {'kdims': ['frames'], 'vdims': ['z']}
 
     def _create(self, opts, good):
         opts = deepcopy(opts)
@@ -109,8 +145,8 @@ class Display(ABC):
     def _run(self, itms): # pylint: disable=too-many-arguments
         "shows overlayed Curve items"
         opts    = deepcopy(self._opts)
-        stretch = opts.pop('stretch', 1.)
-        bias    = opts.pop('bias',    0.)
+        stretch = self._stretch
+        bias    = self._bias
         try:
             good = tuple((i, (j-bias)*stretch) for i, j in itms if np.any(np.isfinite(j)))
         except KeyError as exc: # pylint: disable=broad-except
@@ -129,29 +165,6 @@ class Display(ABC):
             else:
                 good = (('', (np.ones(0, dtype = 'f4'), np.ones(0, dtype = 'f4'))),)
         return self._create(opts, good)
-
-    def display(self):
-        "displays the cycles using a dynamic map"
-        fcn  = self.getmethod()
-        keys = self.getredim()
-        if keys is None:
-            return fcn()
-
-        if isinstance(keys, dict):
-            values = keys.pop('values')
-            ranges = keys.pop('range')
-            return (hv.DynamicMap(fcn, kdims = list(values)+list(ranges))
-                    .redim.values(**values)
-                    .redim.range(**ranges))
-        return hv.DynamicMap(fcn, kdims = [i for i, _ in keys]).redim.values(**dict(keys))
-
-    @abstractmethod
-    def getmethod(self):
-        "Returns the method used by the dynamic map"
-
-    @abstractmethod
-    def getredim(self):
-        "Returns the keys used by the dynamic map"
 
 class CycleDisplay(Display):
     """
@@ -184,8 +197,11 @@ class CycleDisplay(Display):
 
     def getredim(self):
         "Returns the keys used by the dynamic map"
-        itms = self._items
         kdim = self._kdim
+        if kdim is not None and self._keys:
+            return self._keys
+
+        itms = self._items
         if kdim == 'cycle':
             return ((kdim, list(set([i for _, i in itms.keys() if Beads.isbead(_)]))),)
         if kdim == 'bead':
@@ -217,6 +233,8 @@ class BeadDisplay(Display):
 
     def getredim(self):
         "Returns the keys used by the dynamic map"
+        if self._kdim is not None and self._keys:
+            return self._keys
         if self._kdim == 'bead':
             return ((self._kdim, list(set([i for i in self._items.keys()
                                            if self._items.isbead(i)]))),)
