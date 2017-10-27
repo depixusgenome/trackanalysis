@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 "Utils for easily  with the JS side of the view"
 from    typing      import (Generic, TypeVar, Type, # pylint: disable=unused-import
-                            Callable, Iterator, Optional, Sequence, Union, Any)
+                            Dict, List, Callable, Iterator, Optional, cast)
+from    abc         import ABC
 from    collections import ChainMap, namedtuple
 import  inspect
 
@@ -43,9 +44,9 @@ class SingleMapAccess:
     defaults = property(None,
                         lambda self, val:   self.setdefaults(**val))
 
-    _key  = ''      # type: str
-    _base = property(lambda self: (self._key[:-1] if len(self._key) else ''))
-    _map  = None    # type: GlobalsChild
+    _key                 = ''
+    _base                = property(lambda self: (self._key[:-1] if len(self._key) else ''))
+    _map: 'GlobalsChild' = None
     def __init__(self, _model, key):
         self.__dict__.update(_map = _model, _key = key)
 
@@ -183,12 +184,11 @@ class GlobalsChild(ChainMap): # pylint: disable=too-many-ancestors
     __NAME    = 'の'
     __slots__ = ('__name',)
     def __init__(self, name:str, parent: Optional['GlobalsChild'] = None) -> None:
-        maps = [dict() for i in range(_CNT)] # type: ignore
+        maps = [dict() for i in range(_CNT)] # type: List[Dict]
         if parent is not None:
-            # pylint:disable=protected-access
-            maps.append(parent) # type: ignore
+            maps.append(cast(Dict, parent))
         super().__init__(*maps)
-        self.__name  = name # type: str
+        self.__name = name
 
     def setdefaults(self, *args, version = None, **kwargs):
         "adds defaults to the config"
@@ -356,7 +356,7 @@ class BeadProperty(Generic[T]):
     def clear(cls, obj):
         "clears the property stores"
         for prop in getglobalsproperties(cls, obj):
-            obj.project[prop.key].get().clear()
+            obj.project[getattr(prop, 'key')].get().clear()
 
     def __get__(self, obj, tpe) -> T:
         if obj is None:
@@ -403,11 +403,11 @@ class _GlobalsAccess:
 
     __setitem__ = __setattr__
 
-class GlobalsAccess:
+class GlobalsAccess(ABC):
     "Contains all access to model items likely to be set by user actions"
     def __init__(self, ctrl, key:Optional[str] = None, **_) -> None:
-        self.__model = getattr(ctrl, '_GlobalsAccess__model', ctrl) # type: Any
-        self.__key   = getattr(ctrl, '_GlobalsAccess__key',  key)  # type: Optional[str]
+        self.__model              = getattr(ctrl, '_GlobalsAccess__model', ctrl)
+        self.__key: Optional[str] = getattr(ctrl, '_GlobalsAccess__key',  key)
 
     @property
     def config(self):
@@ -438,9 +438,8 @@ class Globals:
     >> # Get secondary keys starting with 'keypress.pan.x'
     >> ctrl.getGlobal('plot').keypress.pan.x.items
     """
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.__maps  = dict()
+    def __init__(self, **_):
+        self.__maps: Dict[str, GlobalsChild] = dict()
 
     def items(self):
         "access to all maps"
