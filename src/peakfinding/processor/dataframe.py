@@ -21,7 +21,7 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
 
     * *peakposition*
     * *averageduration*
-    * *hybridizationrate*
+    * *hybridisationrate*
     * *eventcount*
 
     ### Aggregated values
@@ -85,7 +85,7 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
                             or callable(i) and getattr(np, i.__name__, None) is i)
         method = lambda i: partial(lambda j, k: j(k[1]), getattr(Probability, i))
 
-        self.__attrs  = ([('hybridizationrate', 'hybridizationrate'),
+        self.__attrs  = ([('hybridisationrate', 'hybridisationrate'),
                           ('averageduration',   'averageduration'),
                           ('eventcount',        'nevents')]
                          +add(isprop))

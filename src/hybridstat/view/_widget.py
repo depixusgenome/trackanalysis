@@ -128,7 +128,7 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
             else:
                 nrem   = 0
             nfound    = np.isfinite(mdl.peaks[key+'id']).sum()-nrem
-            npks      = len(task.match[key].hybridizations)
+            npks      = len(task.match[key].hybridisations)
             self.values[8] = '{}/{}'.format(nfound, npks)
             if nrem == 2:
                 self.values[8] += self.openhp

@@ -135,7 +135,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
             peaks['color'] = [colors[0]]*len(peaks['id'])
         else:
             alldist = self._model.distances
-            for key in self._model.sequences:
+            for key in self._model.sequences(...):
                 if key not in alldist:
                     continue
                 peaks[key+'color'] = np.where(np.isfinite(peaks[key+'id']), *colors)

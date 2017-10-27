@@ -71,12 +71,12 @@ class PeaksSheet(Reporter):
     @column_method("Hybridisation Rate")
     def _hrate(self, *args) -> float:
         "Event count divided by the number of cycles"
-        return self._proba('hybridizationrate', *args)
+        return self._proba('hybridisationrate', *args)
 
     @column_method("Hybridisation Time", units = 'seconds')
     def _averageduration(self, *args) -> float:
         """
-        Average time to de-hybridization, for a frame rate of 30Hz.
+        Average time to de-hybridisation, for a frame rate of 30Hz.
         Note that: TIME = -1/(RATE * log(1.-PROBABILITY)
         """
         return self._proba('averageduration', *args)
@@ -92,7 +92,7 @@ class PeaksSheet(Reporter):
     @column_method("Hybridisation Time Uncertainty", units = 'seconds')
     def _uncert(self, *args) -> float:
         """
-        1-sigma uncertainty on the de-hybridization time:
+        1-sigma uncertainty on the de-hybridisation time:
             UNCERTAINTY ~ TIME / sqrt(NUMBER OF HYBRIDISATIONS)
         """
         return self._proba('uncertainty', *args)

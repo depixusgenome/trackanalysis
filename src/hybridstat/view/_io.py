@@ -22,14 +22,14 @@ from utils.logconfig                 import getLogger
 from utils.gui                       import startfile
 
 from ..reporting.processor           import HybridstatExcelTask
-from ._model                         import IdentificationModelAccess, PeaksPlotModelAccess
+from ._model                         import PeaksPlotModelAccess
 
 LOGS = getLogger(__name__)
 
 class _PeaksIOMixin:
     def __init__(self, ctrl):
         type(self).__bases__ [1].__init__(self, ctrl)
-        self.__model = IdentificationModelAccess(ctrl)
+        self.__model = PeaksPlotModelAccess(ctrl)
 
     def open(self, path:Union[str, Tuple[str,...]], model:tuple):
         "opens a track file and adds a alignment"
@@ -93,7 +93,7 @@ class ConfigXlsxIO(TaskIO):
             LOGS.info('%s saving %s', type(self).__name__, path)
             ret = self._run(dict(path      = path,
                                  oligos    = self.__model.oligos,
-                                 sequences = self.__model.sequences),
+                                 sequences = self.__model.sequences(...)),
                             model,
                             _end)
         except IOError as exc:

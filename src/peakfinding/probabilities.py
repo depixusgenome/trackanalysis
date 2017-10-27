@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-    Computing the MLE for the probability of an hybridization such that:
+    Computing the MLE for the probability of an hybridisation such that:
 
     #. It was observed at during at least Δ_{self.minduration} time
     #. It disappeared after a time nmax
@@ -9,9 +9,9 @@
     Consider the de-hibridization probability rho between measures n and n+1.
     Then:
 
-    #. The probability of hybridization lasting K measures is
+    #. The probability of hybridisation lasting K measures is
        proportional to: p (1-p)^K
-    #. The probability of hybridization lasting until the end of the cycle
+    #. The probability of hybridisation lasting until the end of the cycle
        is proportional to: (1-p)^N
 
     Normalizing them, we find: P(K) = p (1-p)^(K-D), P(N) = (1-p)^(N-D)
@@ -178,8 +178,8 @@ class Probability:
         return self.FMAX if lnp <= 0. else 1./lnp if np.isfinite(lnp) else 0.
 
     @property
-    def hybridizationrate(self) -> float:
-        "Probability of observing a hybridization"
+    def hybridisationrate(self) -> float:
+        "Probability of observing a hybridisation"
         return 0. if self.ncycles <= 0 else min(1., self.nevents/self.ncycles)
 
     @property

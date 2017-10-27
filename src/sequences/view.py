@@ -3,8 +3,6 @@
 "Create a grid displaying a sequence"
 from    typing         import (List, # pylint: disable=unused-import
                                Optional, Tuple, Sequence, TypeVar, cast)
-from    collections    import OrderedDict
-from    pathlib        import Path
 import  numpy   as np
 
 import  bokeh.core.properties as props
@@ -12,28 +10,15 @@ from    bokeh.models    import (LinearAxis, ColumnDataSource, Range1d, Widget,
                                 BasicTicker, Dropdown, Paragraph, CustomJS,
                                 AutocompleteInput)
 
-from    utils           import CachedIO
 from    utils.gui       import implementation
 
-from   model.globals        import BeadProperty
 from   view.dialog          import FileDialog
 from   view.plots.base      import checksizes, WidgetCreator
 from   view.plots.bokehext  import DpxHoverTool
 
-from   .                    import (read as _readsequence, peaks as sequencepeaks,
-                                    marksequence, splitoligos)
+from   .                    import marksequence, splitoligos
 from   .modelaccess         import SequencePlotModelAccess
 
-
-_CACHE = CachedIO(lambda path: OrderedDict(_readsequence(path)), size = 1)
-def readsequence(path):
-    "Reads / caches DNA sequences"
-    if path is None or not Path(path).exists():
-        return dict()
-    try:
-        return _CACHE(path)
-    except: # pylint: disable=bare-except
-        return dict()
 
 def estimatebias(position: np.ndarray, cnt: np.ndarray) -> float:
     "estimate the bias using the plot data"
@@ -124,8 +109,7 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
             resets[fig.ygrid[0]].update(self.__defaults)
         else:
             resets[fig.ygrid[0]].update(self.__withbase)
-            for name, seq in readsequence(mdl.sequencepath).items():
-                peaks        = sequencepeaks(seq, mdl.oligos)
+            for name, peaks in self.__model.hybridisations(...).items():
                 majors[name] = tuple(peaks['position'][peaks['orientation']])
                 minors[name] = tuple(peaks['position'][~peaks['orientation']])
 
@@ -211,7 +195,7 @@ class SequenceHoverMixin:
         key   = mdl.sequencekey
         oligs = mdl.oligos
         osiz  = max((len(i) for i in oligs), default = self.__size.get())
-        dseq  = readsequence(mdl.sequencepath)
+        dseq  = mdl.sequences(...)
         if len(dseq) == 0:
             return dict(values = [0], inds = [0], text = [''], z = [0])
 
@@ -255,12 +239,7 @@ class SequencePathWidget(WidgetCreator[ModelType]):
                 self._model.sequencekey = new
             elif new == '←':
                 path = self.__dialog.open()
-
-                seqs = readsequence(path)
-                if len(seqs) > 0:
-                    self._model.sequencepath = path
-                    self._model.sequencekey  = next(iter(seqs))
-                else:
+                if self._model.setnewsequencepath(path):
                     self.__widget.value = '→'
                     if path is not None:
                         raise IOError("Could not find any sequence in the file")
@@ -301,7 +280,7 @@ class SequencePathWidget(WidgetCreator[ModelType]):
     def __data(self) -> dict:
         lst = self.__list
         lst.clear()
-        lst.extend(self._sort(sorted(readsequence(self._model.sequencepath).keys())))
+        lst.extend(self._sort(sorted(self._model.sequences(...).keys())))
 
         key   = self._model.sequencekey
         val   = key if key in lst else None
@@ -361,43 +340,3 @@ class OligoListWidget(WidgetCreator[ModelType]):
         "sets-up config observers"
         fcn = lambda: self.__widget.update(**self.__data())
         self._model.observeprop('oligos', fcn)
-
-class SequenceKeyProp(BeadProperty[Optional[str]]):
-    "access to the sequence key"
-    def __init__(self):
-        super().__init__('sequence.key')
-
-    def fromglobals(self, obj) -> Optional[str]:
-        "returns the current sequence key stored in globals"
-        return super().__get__(obj, None)
-
-    def __get__(self, obj, tpe) -> Optional[str]:
-        "returns the current sequence key"
-        if obj is None:
-            return self # type: ignore
-
-        key  = self.fromglobals(obj)
-        if key is not None:
-            return key
-
-        dseq = readsequence(obj.sequencepath)
-        return next(iter(dseq), None) if key not in dseq else key
-
-class FitParamProp(BeadProperty[float]):
-    "access to bias or stretch"
-    def __init__(self, attr):
-        super().__init__('base.'+attr)
-        self._key = attr
-
-    def __get__(self, obj, tpe) -> Optional[str]:  # type: ignore
-        val = cast(str, super().__get__(obj, tpe))
-        if val is None:
-            return getattr(obj, 'estimated'+self._key)
-        return cast(str, val)
-
-    def setdefault(self, obj, items:Optional[dict] = None, **kwa):  # type: ignore
-        "initializes the property stores"
-        super().setdefault(obj,
-                           (None if self._key == 'bias' else 1./8.8e-4),
-                           items,
-                           **kwa)

@@ -8,8 +8,8 @@ from    cordrift.processor          import DriftTask
 from    eventdetection.processor    import (ExtremumAlignmentTask,
                                             EventDetectionTask)
 from    control.modelaccess         import TaskAccess, TaskPlotModelAccess
-from    sequences.view              import SequenceKeyProp, FitParamProp
-from    sequences.modelaccess       import SequencePlotModelAccess
+from    sequences.modelaccess       import (SequencePlotModelAccess,
+                                            SequenceKeyProp, FitParamProp)
 
 class EventDetectionTaskAccess(TaskAccess):
     "Access to the event detection task"
@@ -45,8 +45,8 @@ class CyclesModelAccess(SequencePlotModelAccess):
         cls = type(self)
         cls.binwidth    .setdefault(self, 0.003)
         cls.minframes   .setdefault(self, 10)
-        cls.stretch     .setdefault(self)
-        cls.bias        .setdefault(self)
+        cls.stretch     .setdefault(self)       # type: ignore
+        cls.bias        .setdefault(self)       # type: ignore
         cls.peaks       .setdefault(self, None)
         cls.sequencekey .setdefault(self, None) # type: ignore
 

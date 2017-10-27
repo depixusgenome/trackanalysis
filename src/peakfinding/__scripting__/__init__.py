@@ -123,7 +123,7 @@ def dataframe(self, **kwa) -> pd.DataFrame:
         * *bead*
         * *peakposition*
         * *averageduration*
-        * *hybridizationrate*
+        * *hybridisationrate*
         * *eventcount*
 
     Additionnal columns can be added with kwargs. The key is the title. The value

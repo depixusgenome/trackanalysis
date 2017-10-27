@@ -10,8 +10,7 @@ from    bokeh.models        import (ColumnDataSource, Slider, CustomJS, Paragrap
                                     DataTable, TableColumn, IntEditor, NumberEditor,
                                     CheckboxButtonGroup, Widget)
 
-import  sequences
-from    sequences.view      import readsequence, OligoListWidget, SequencePathWidget
+from    sequences.view      import OligoListWidget, SequencePathWidget
 from    view.plots          import GroupWidget, WidgetCreator as _Widget, DpxNumberFormatter
 from    view.base           import enableOnTrack
 from    modaldialog.view    import AdvancedWidgetMixin
@@ -71,13 +70,9 @@ class PeaksTableWidget(_Widget[CyclesModelAccess]):
 
     def __data(self):
         info = self._model.peaks
-        if (self._model.sequencekey is not None
-                and len(self._model.oligos)
-                and info is None):
-            seq   = readsequence(self._model.sequencepath)[self._model.sequencekey]
-            peaks = sequences.peaks(seq, self._model.oligos)['position']
-            if len(peaks) > 2:
-                info = peaks[0], peaks[-1]
+        hyb  = self._model.hybridisations(None)
+        if hyb is not None  and len(hyb) > 2 and info is None:
+            info =  hyb['position'][0], hyb['position'][-1]
 
         if info is None:
             info = 0, 1000

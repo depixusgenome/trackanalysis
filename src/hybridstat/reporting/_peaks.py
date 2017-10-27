@@ -291,7 +291,7 @@ class PeaksSheet(Reporter):
 
     @column_method("Peak Height", median = True)
     def _nevt(self, ref:Group, bead:Bead, ipk:int) -> int:
-        "Number of hybridizations in that peak."
+        "Number of hybridisations in that peak."
         return self._proba('nevents', ref, bead, ipk)
 
     @column_method("Neighbours", exclude = Reporter.nohairpin)
@@ -306,12 +306,12 @@ class PeaksSheet(Reporter):
     @column_method("Hybridisation Rate", median = True)
     def _hrate(self, *args) -> Optional[float]:
         "Number of events divided by number of cycles."
-        return self._proba('hybridizationrate', *args)
+        return self._proba('hybridisationrate', *args)
 
     @column_method("Hybridisation Time", units = 'seconds', median = True)
     def _averageduration(self, *args) -> Optional[float]:
         """
-        Average time to de-hybridization, for a frame rate of 30Hz.
+        Average time to de-hybridisation, for a frame rate of 30Hz.
         Note that: TIME = -1/(RATE * log(1.-PROBABILITY)
         """
         return self._proba('averageduration', *args)
@@ -327,7 +327,7 @@ class PeaksSheet(Reporter):
     @column_method("Hybridisation Time Uncertainty", units = 'seconds', median = True)
     def _uncert(self, *args) -> Optional[float]:
         """
-        1-sigma uncertainty on the de-hybridization time:
+        1-sigma uncertainty on the de-hybridisation time:
             UNCERTAINTY ~ TIME / sqrt(NUMBER OF HYBRIDISATIONS)
         """
         return self._proba('uncertainty', *args)

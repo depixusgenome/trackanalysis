@@ -222,7 +222,7 @@ class FitToReferenceDataFrameFactory(DataFrameFactory[FitToReferenceDict]):
 
         * *peakposition*
         * *averageduration*
-        * *hybridizationrate*
+        * *hybridisationrate*
         * *eventcount*
         * *referenceposition*: the peak position in the reference
     """

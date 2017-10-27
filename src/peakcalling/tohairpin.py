@@ -31,7 +31,7 @@ class HairpinFitter(OptimizationParams):
         return np.asarray(pks)
 
     @property
-    def hybridizations(self) -> np.ndarray:
+    def hybridisations(self) -> np.ndarray:
         "returns only peaks linked to hibridizations"
         return np.asarray(self.peaks[1:-1])
 
