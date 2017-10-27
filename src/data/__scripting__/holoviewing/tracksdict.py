@@ -7,27 +7,21 @@ Adds shortcuts for using holoview
 import sys
 from   typing                   import List
 from   copy                     import deepcopy
-from   scripting.holoviewing    import addto, displayhook
+from   scripting.holoviewing    import addto, displayhook, addproperty
 from   utils.logconfig          import getLogger
 from   ...views                 import isellipsis
-from   ..tracksdict             import ExperimentList, TracksDict
+from   ...tracksdict            import TracksDict
+from   ..tracksdict             import ExperimentList
 from   .display                 import BasicDisplay
 
 LOGS  = getLogger(__name__)
 hv    = sys.modules['holoviews']  # pylint: disable=invalid-name
 
-@addto(TracksDict)         # type: ignore
-def map(self, fcn, kdim = 'oligo', *extra, **kwa):
-    "returns a hv.DynamicMap"
-    if kdim is not None and kdim not in kwa:
-        kwa[kdim] = list(self.keys())
-
-    if 'bead' not in kwa:
-        kwa['bead'] = self.beads(*kwa.get(kdim, ()))
-
-    return hv.DynamicMap(fcn, kdims = list(kwa)+list(extra)).redim.values(**kwa)
-
-class TracksDictDisplay(BasicDisplay):
+class TracksDictDisplay(BasicDisplay,
+                        cycles      = (TracksDict, dict(name = 'cycles')),
+                        cleancycles = (TracksDict, dict(name = 'cleancycles')),
+                        measures    = (TracksDict, dict(name = 'measures'))
+                       ):
     """
     A hv.DynamicMap showing measures
 
@@ -171,62 +165,45 @@ class TracksDictDisplay(BasicDisplay):
             return [(i, kdims[i]) for i in ('key', 'bead')]
         return kdims
 
-@addto(TracksDict) # type: ignore
-@property
-def cycles(self):
-    "displays cycles"
-    return TracksDictDisplay(self, name = 'cycles')
-
-@addto(TracksDict) # type: ignore
-@property
-def cleancycles(self):
-    "displays cleaned cycles"
-    return TracksDictDisplay(self, name = 'cleancycles')
-
-@addto(TracksDict) # type: ignore
-@property
-def measures(self):
-    "displays cleaned measures"
-    return TracksDictDisplay(self, name = 'measures')
-
 @displayhook
+@addproperty(TracksDict, 'fov')
 class TracksDictFovDisplayProperty:
-    "displays measures for a TracksDict"
+    """
+    A hv.DynamicMap showing measures
+
+    Options are:
+
+        * *overlay* == 'key': for a given bead, all tracks are overlayed
+        The *reference* option can be used to indicate the top-most track.
+        * *overlay* == 'bead': for a given track, all beads are overlayed
+        The *reference* option can be used to indicate the top-most bead.
+        * *overlay* == None:
+
+            * *reference*: the reference is removed from the *key* widget and
+            allways displayed to the left independently.
+            * *refdims*: if set to *True*, the reference gets its own dimensions.
+            Thus zooming and spanning is independant.
+            * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
+    """
     def __init__(self, dico):
         self.tracks = dico
-        self.keys   = None
+        self._keys  = None
 
     def __getitem__(self, values):
         if isinstance(values, list):
-            self.tracks = values
+            self._keys = values
         elif isellipsis(values):
-            self.tracks = None
-        elif values in self.tracks:
-            return self.tracks[values].fov
+            self._keys = None
+        elif values in self._keys:
+            self._keys = [values]
         else:
             raise KeyError("Could not slice the display")
         return self
 
     def display(self, *keys, calib = False, layout = False, cols = 2, **opts):
-        """
-        A hv.DynamicMap showing measures
-
-        Options are:
-
-            * *overlay* == 'key': for a given bead, all tracks are overlayed
-            The *reference* option can be used to indicate the top-most track.
-            * *overlay* == 'bead': for a given track, all beads are overlayed
-            The *reference* option can be used to indicate the top-most bead.
-            * *overlay* == None:
-
-                * *reference*: the reference is removed from the *key* widget and
-                allways displayed to the left independently.
-                * *refdims*: if set to *True*, the reference gets its own dimensions.
-                Thus zooming and spanning is independant.
-                * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
-        """
+        "displays measures for a TracksDict"
         if len(keys) == 0:
-            keys = self.keys if self.keys else self.tracks.keys()
+            keys = self._keys if self._keys else self.tracks.keys()
 
         opts['calib'] = calib
         fcn           = lambda key: self.tracks[key].fov.display(**opts).relabel(f'{key}')
@@ -234,11 +211,16 @@ class TracksDictFovDisplayProperty:
             return hv.Layout([fcn(i) for i in keys]).cols(cols)
         return hv.DynamicMap(fcn, kdims = ['key']).redim.values(key = list(keys))
 
-@addto(TracksDict)  # type: ignore
-@property
-def fov(self):
-    "displays all fovs"
-    return TracksDictFovDisplayProperty(self)
+@addto(TracksDict)         # type: ignore
+def map(self, fcn, kdim = 'oligo', *extra, **kwa):
+    "returns a hv.DynamicMap"
+    if kdim is not None and kdim not in kwa:
+        kwa[kdim] = list(self.keys())
+
+    if 'bead' not in kwa:
+        kwa['bead'] = self.beads(*kwa.get(kdim, ()))
+
+    return hv.DynamicMap(fcn, kdims = list(kwa)+list(extra)).redim.values(**kwa)
 
 @addto(ExperimentList)
 def oligomap(self:ExperimentList, oligo, fcn, **kwa):

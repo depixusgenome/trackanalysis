@@ -6,7 +6,7 @@ from   functools             import partial
 from   copy                  import deepcopy
 import sys
 import numpy            as     np
-from   scripting.holoviewing import addto
+from   scripting.holoviewing import addto, displayhook
 from   ..probabilities       import Probability
 from   ..processor           import PeaksDict
 from   .                     import Detailed
@@ -17,13 +17,13 @@ def _get(name, attr = None):
 
 # pylint: disable=invalid-name
 hv                      = _get('holoviews')
+hvdata                  = _get('data.__scripting__.holoviewing.trackviews')
 TracksDict:        Type = _get('data.__scripting__', 'TracksDict')
-CycleDisplay:      Type = _get('data.__scripting__.holoviewing.display',
-                               'CycleDisplay')
 TracksDictDisplay: Type = _get('data.__scripting__.holoviewing.tracksdict',
                                'TracksDictDisplay')
 
-class PeaksDisplay(CycleDisplay): # type: ignore
+displayhook(PeaksDict)
+class PeaksDisplay(hvdata.CycleDisplay, display = PeaksDict): # type: ignore
     """
     Displays peaks.
 
@@ -49,7 +49,7 @@ class PeaksDisplay(CycleDisplay): # type: ignore
     _eventstyle = dict(size = 3)
     _norm       = 'event'
     _precision  = None
-    KEYWORDS    = CycleDisplay.KEYWORDS | frozenset(locals())
+    KEYWORDS    = hvdata.CycleDisplay.KEYWORDS | frozenset(locals())
 
     # pylint: disable=too-many-arguments,arguments-differ
     @staticmethod
@@ -161,7 +161,7 @@ class PeaksDisplay(CycleDisplay): # type: ignore
                                            if self._items.isbead(i)]))),)
         return None
 
-class DetailedDisplay(PeaksDisplay): # type: ignore
+class DetailedDisplay(PeaksDisplay, display = Detailed): # type: ignore
     """
     Displays peaks.
 
@@ -188,25 +188,13 @@ class DetailedDisplay(PeaksDisplay): # type: ignore
 
     display = _perall
 
-@addto(Detailed)  # type: ignore
-@property
-def display(self): # pylint: disable=function-redefined
-    "Displays peaks."
-    return DetailedDisplay(self)
-
-@addto(PeaksDict)  # type: ignore
-@property
-def display(self): # pylint: disable=function-redefined
-    "displays peaks"
-    return PeaksDisplay(self)
-
 @addto(PeaksDict)
 def map(self, fcn, **kwa): # pylint: disable=redefined-builtin
     "returns a hv.DynamicMap with beads and kwargs in the kdims"
     kwa.setdefault('bead', list(i for i in self.keys()))
     return hv.DynamicMap(partial(fcn, self), kdims = list(kwa)).redim.values(**kwa)
 
-class PeaksTracksDictDisplay(TracksDictDisplay): # type: ignore
+class PeaksTracksDictDisplay(TracksDictDisplay, peaks = TracksDict): # type: ignore
     "tracksdict display for peaks"
     _reflayout  = 'bottom'
     _name       = property(lambda _: 'peaks', lambda _1, _2: None) # constant attribute
@@ -225,11 +213,5 @@ class PeaksTracksDictDisplay(TracksDictDisplay): # type: ignore
                                    label = ovrs[ind].label,
                                    group = ovrs[ind].group)
         return ovrs
-
-@addto(TracksDict) # type: ignore
-@property
-def peaks(self):
-    "A hv.DynamicMap showing peaks"
-    return PeaksTracksDictDisplay(self)
 
 __all__: List[str] = []

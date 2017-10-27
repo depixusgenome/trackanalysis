@@ -7,10 +7,12 @@ from   typing                   import (List, Type, # pylint: disable=unused-imp
 from   copy                     import deepcopy
 from   scipy.interpolate        import interp1d
 import numpy                    as np
-from   utils                    import DefaultValue
-from   scripting.holoviewing    import addto
+
 import sequences
-from   peakfinding.processor    import PeaksDict
+
+from   utils                    import DefaultValue
+from   peakfinding.processor    import PeaksDict    # pylint: disable=unused-import
+
 from   ..processor.fittohairpin import (BEADKEY,    # pylint: disable=unused-import
                                         FitToHairpinDict, Distance)
 from   ..toreference            import ChiSquareHistogramFit
@@ -19,12 +21,12 @@ def _get(name, val = None):
     mod = sys.modules[name]
     return mod if val is None else getattr(mod, val)
 
-hv               = _get('holoviews')                             # pylint: disable=invalid-name
-_peakfinding     = _get('peakfinding.__scripting__.holoviewing') # pylint: disable=invalid-name
+hv               = _get('holoviews')                              # pylint: disable=invalid-name
+hvpeakfinding    = _get('peakfinding.__scripting__.holoviewing')  # pylint: disable=invalid-name
 Tasks:      Type = _get('model.__scripting__', 'Tasks')
 TracksDict: Type = _get('data.__scripting__', 'TracksDict')
 
-class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
+class OligoMappingDisplay(hvpeakfinding.PeaksDisplay, display = PeaksDict): # type: ignore
     """
     Displays peaks.
 
@@ -50,7 +52,7 @@ class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
     _oligos        = None
     _fit           = DefaultValue
     _sequencestyle = dict(color = 'gray')
-    KEYWORDS       = _peakfinding.PeaksDisplay.KEYWORDS | frozenset(locals())
+    KEYWORDS       = hvpeakfinding.PeaksDisplay.KEYWORDS | frozenset(locals())
     def __init__(self, items, **opts):
         super().__init__(items, **opts)
         if self._bias is not None or None not in (self._sequence, self._oligos):
@@ -102,7 +104,8 @@ class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
                 txt  = f'y = {dist.stretch:.1f} (x  + {np.abs(dist.bias) : .4f})'
             else:
                 txt  = f'y = {dist.stretch:.1f} (x  - {dist.bias : .4f})'
-            text = hv.Text(pos(data[:,0]), pos(data[:,1]), txt)
+            text = hv.Text(pos(data[:,0]), pos(data[:,1]), txt,
+                           kdims = hpc.kdims+hpc.vdims)
             return hv.Overlay(crv+[hpc.clone(data = data), text], group = key)
         return _fcn
 
@@ -157,25 +160,36 @@ class OligoMappingDisplay(_peakfinding.PeaksDisplay): # type: ignore
             return values
         return values
 
-@addto(PeaksDict)  # type: ignore
-@property
-def display(self): # pylint: disable=function-redefined
-    "displays peaks"
-    return OligoMappingDisplay(self)
-
-class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignore
+class PeaksTracksDictDisplay(hvpeakfinding.PeaksTracksDictDisplay, # type: ignore
+                             peaks = TracksDict):
     """
     A hv.DynamicMap showing peaks
 
     Attributes are:
 
-    * *format* == '1d': for a given bead, all tracks are overlayed,
-    see 'display1d'.
+    * *format* == '1d': for a given bead, all tracks are overlayed, For a given
+      bead, all tracks are overlayed.  Keywords are:
+
+        * *reference*: the reference is displayed as an area,
+        * *distance*: a *HistogramFit* object (default) or *None*. This objects
+        computes a stretch and bias which is applied to the x-axis of
+        non-reference items.
 
     * *format* == '2d': for a given bead, all tracks are shown on a 2D
-    histogram, see 'display2d'.
+    histogram. Keywords are:
 
-    * *format* == None: see 'displayone'.
+        * *reference*: the reference is displayed as an area,
+        * *distance*: a *HistogramFit* object (default) or *None*. This objects
+        computes a stretch and bias which is applied to the x-axis of
+        non-reference items.
+
+    * *format* == None: keywords are:
+
+        * *reference*: the reference is removed from the *key* widget and
+        allways displayed to the left independently.
+        * *refdims*: if set to *True*, the reference gets its own dimensions.
+        Thus zooming and spanning is independant.
+        * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
     """
     _format    = "2d"
     _distance  = ChiSquareHistogramFit()
@@ -186,7 +200,7 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
     _logz      = True
     _loglog    = True
     _textcolor = 'white'
-    KEYWORDS   = _peakfinding.PeaksTracksDictDisplay.KEYWORDS | frozenset(locals())
+    KEYWORDS   = hvpeakfinding.PeaksTracksDictDisplay.KEYWORDS | frozenset(locals())
     def __init__(self, items, **opts):
         super().__init__(items, **opts)
         if self._format in ('1d', '2d'):
@@ -338,11 +352,5 @@ class PeaksTracksDictDisplay(_peakfinding.PeaksTracksDictDisplay): # type: ignor
         if self._format == '2d':
             redim.pop("key", None)
         return redim
-
-@addto(TracksDict) # type: ignore
-@property
-def peaks(self):
-    "A hv.DynamicMap showing peaks"
-    return PeaksTracksDictDisplay(self)
 
 __all__: List[str] = []

@@ -4,83 +4,13 @@
 Adds shortcuts for using holoview
 """
 import sys
-from   abc                   import ABC, abstractmethod
-from   itertools             import chain, repeat
 from   copy                  import deepcopy
 import numpy                 as     np
 
-from   scripting.holoviewing import displayhook
+from   scripting.holoviewing import BasicDisplay
 from   ...                   import Beads
 
 hv    = sys.modules['holoviews']  # pylint: disable=invalid-name
-
-@displayhook
-class BasicDisplay(ABC):
-    "Everything needed for creating a dynamic map display"
-    KEYWORDS = frozenset(locals())
-    def __init__(self, items, **opts):
-        self._items   = items
-        for i in self.KEYWORDS:
-            setattr(self, i, opts.pop(i[1:], getattr(self.__class__, i)))
-        self._opts    = opts
-
-    def __add__(self, other):
-        return self.display() + (other if isinstance(other, hv.Element) else other.display())
-
-    def __mul__(self, other):
-        return self.display() * (other if isinstance(other, hv.Element) else other.display())
-
-    def __lshift__(self, other):
-        return self.display() << (other if isinstance(other, hv.Element) else other.display())
-
-    def __rshift__(self, other):
-        return self.display() >> (other if isinstance(other, hv.Element) else other.display())
-
-    def config(self, name = ...):
-        "returns the config"
-        cnf = deepcopy(self._opts)
-        cnf.update({i[1:]: deepcopy(j) for i, j in self.__dict__.items()
-                    if (i not in ('_opts', '_items') and
-                        len(i) > 2 and i[0] == '_'   and
-                        i[1].lower() == i[1])})
-        return cnf if name is Ellipsis else cnf[name]
-
-    def __call__(self, **opts):
-        default = self.__class__(self._items).config()
-        config  = {i: j for i, j in self.config().items() if j != default[i]}
-        config.update(opts)
-        return self.__class__(self._items, **config)
-
-    @staticmethod
-    def concat(itr):
-        "concatenates arrays, appending a NaN"
-        return np.concatenate(list(chain.from_iterable(zip(itr, repeat([np.NaN])))))
-
-    def display(self, **kwa):
-        "displays the cycles using a dynamic map"
-        this = self(**kwa) if kwa else self
-        fcn  = this.getmethod()
-        keys = this.getredim()
-        if keys is None:
-            return fcn()
-
-        itr   = getattr(keys, 'items', lambda : keys)
-        kdims = [i                      for i, _ in itr()]
-        vals  = [(i, j)                 for i, j in itr() if isinstance(j, list)]
-        rngs  = [(i, (j.start, j.stop)) for i, j in itr() if isinstance(j, slice)]
-        done  = set(dict(vals)) | set(dict(rngs))
-        sels  = [(i, [j])               for i, j in itr() if i not in done]
-        return (hv.DynamicMap(fcn, kdims = kdims)
-                .redim.values(**dict(vals), **dict(sels))
-                .redim.range(**dict(rngs)))
-
-    @abstractmethod
-    def getmethod(self):
-        "Returns the method used by the dynamic map"
-
-    @abstractmethod
-    def getredim(self):
-        "Returns the keys used by the dynamic map"
 
 class Display(BasicDisplay): # pylint: disable=abstract-method
     "displays the beads or cycles"

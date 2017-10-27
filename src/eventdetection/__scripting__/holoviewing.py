@@ -7,7 +7,7 @@ import sys
 from   typing                import List, Type
 from   functools             import partial
 import numpy                 as     np
-from   scripting.holoviewing import addto
+from   scripting.holoviewing import addto, addproperty
 from   ..data                import Events
 
 def _get(name, attr = None):
@@ -16,13 +16,12 @@ def _get(name, attr = None):
 
 # pylint: disable=invalid-name
 hv                      = _get('holoviews')
+CycleDisplay:      Type = _get('data.__scripting__.holoviewing.trackviews', 'CycleDisplay')
 TracksDict:        Type = _get('data.__scripting__', 'TracksDict')
-CycleDisplay:      Type = _get('data.__scripting__.holoviewing.display',
-                               'CycleDisplay')
 TracksDictDisplay: Type = _get('data.__scripting__.holoviewing.tracksdict',
                                'TracksDictDisplay')
 
-class EventDisplay(CycleDisplay): # type: ignore
+class EventDisplay(CycleDisplay, display = Events): # type: ignore
     """
     Displays cycles.
 
@@ -69,12 +68,6 @@ class EventDisplay(CycleDisplay): # type: ignore
 
         return self._create(opts, good)
 
-@addto(Events)      # type: ignore
-@property
-def display(self):  # pylint: disable=function-redefined
-    "Displays events."
-    return EventDisplay(self)
-
 @addto(Events)  # type: ignore
 def map(self, fcn, kdim = None, **kwa): # pylint: disable=redefined-builtin,function-redefined
     "returns a hv.DynamicMap with beads or cycles, as well as kwargs in the kdims"
@@ -87,10 +80,6 @@ def map(self, fcn, kdim = None, **kwa): # pylint: disable=redefined-builtin,func
         kwa.setdefault(kdim, list(set(i for i, _ in self.keys())))
     return hv.DynamicMap(partial(fcn, self), kdims = list(kwa)).redim.values(**kwa)
 
-@addto(TracksDict) # type: ignore
-@property
-def events(self):
-    "displays events"
-    return TracksDictDisplay(self, 'events')
+addproperty(TracksDict, 'events', name = 'events', prop = TracksDictDisplay)
 
 __all__: List[str] = []
