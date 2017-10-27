@@ -42,10 +42,6 @@ def _read(stream:TextIO) -> Iterator[Tuple[str,str]]:
 
 def read(stream:Union[pathlib.Path, str, Dict[str,str], TextIO]) -> Iterator[Tuple[str,str]]:
     "reads a path and yields pairs (name, sequence)"
-    if isinstance(stream, pathlib.Path):
-        with open(stream) as tmp:
-            return _read(tmp)
-
     if isinstance(stream, dict):
         return cast(Iterator[Tuple[str, str]], stream.items())
 
@@ -59,7 +55,7 @@ def read(stream:Union[pathlib.Path, str, Dict[str,str], TextIO]) -> Iterator[Tup
         except OSError:
             pass
 
-    return _read(cast(TextIO, stream))
+    return _read(open(cast(str, stream)))
 
 PEAKS_DTYPE = [('position', 'i4'), ('orientation', 'bool')]
 PEAKS_TYPE  = Sequence[Tuple[int, bool]]
