@@ -12,12 +12,17 @@ export class DpxToolbarView extends WidgetView
         @model.bead = parseInt(val)
 
     on_discard_current: () ->
-        ele = $(@el)
-        val = Number(ele.find('#dpx-tb-bead').val())
-        @model.discarded = ele.find('#dpx-tb-discard').val()+",#{val}"
+        @model.current = !@model.current
+
+    on_selection: () ->
+        @model.seltype = !@model.seltype
+        @on_change_discarded()
 
     on_discard: () ->
-        @model.discarded = $(@el).find('#dpx-tb-discard').val()
+        if @model.seltype
+            @model.discarded = $(@el).find('#dpx-tb-discard').val()
+        else
+            @model.accepted  = $(@el).find('#dpx-tb-discard').val()
 
     on_change_frozen:  () ->
         $(@el).find('.dpx-freeze').prop('disabled', @model.frozen)
@@ -27,7 +32,12 @@ export class DpxToolbarView extends WidgetView
         $(@el).find('#dpx-tb-bead').val(val)
 
     on_change_discarded: () ->
-        $('#dpx-tb-discard').val("#{@model.discarded}")
+        if @model.seltype
+            $('#dpx-tb-discard').val("#{@model.discarded}")
+            $('#dpx-tb-selection').html('=')
+        else
+            $('#dpx-tb-discard').val("#{@model.accepted}")
+            $('#dpx-tb-selection').html('≠')
 
     on_change_message: () ->
         $(@el).find('#dpx-tb-message').html(@model.message)
@@ -39,9 +49,16 @@ export class DpxToolbarView extends WidgetView
         @connect(@model.properties.message.change,   () => @on_change_message())
         @connect(@model.properties.frozen.change,    () => @on_change_frozen())
 
-    make_btn: (name, label, freeze = 'dpx-freeze') ->
-        str = "<button type='button' id='dpx-tb-#{name}' "+
-              "class='#{freeze} bk-bs-btn bk-bs-btn-default'>#{label}</button>"
+    make_btn: (name, label, ttip = '', freeze = 'dpx-freeze') ->
+        if ttip == ''
+            str = "<button type='button' id='dpx-tb-#{name}' "+
+                  "class='#{freeze} bk-bs-btn bk-bs-btn-default'>#{label}</button>"
+        else
+            str = "<button type='button' id='dpx-tb-#{name}' "+
+                  "class='#{freeze} bk-bs-btn bk-bs-btn-default' "+
+                  "data-balloon='#{ttip}' "+
+                    'data-balloon-length="medium" data-balloon-pos="right">'+
+                  label+'</button>'
         return str
 
     render: () ->
@@ -52,17 +69,22 @@ export class DpxToolbarView extends WidgetView
         else
             quit =''
 
-        html = "#{@make_btn('open', 'Open', '')}"+
-               "#{@make_btn('save', 'Save')}"+
+        ttips = ['Save the configuration or create an xlsx report',
+                 'Change wether to discard (=) or select (≠) specific beads',
+                 'Remove the current bead']
+
+        html = "#{@make_btn('open', 'Open', '', '')}"+
+               "#{@make_btn('save', 'Save', ttips[0])}"+
                "<label>Bead</label>"+
                "<input id='dpx-tb-bead'"+
                    " class='dpx-freeze bk-widget-form-input'"+
                    " type='number' min=0  max=10000 step=1  value=#{mdl.bead}>"+
                "<label>Discarded</label>"+
+               "#{@make_btn('selection', '=', ttips[1])}"+
                "<input id='dpx-tb-discard'"+
                    " class='dpx-freeze bk-widget-form-input'"+
                    " type='text' value='#{mdl.discarded}'>"+
-               "#{@make_btn('del', '━', true)}"+
+               "#{@make_btn('del', '━', ttips[2])}"+
                "<div id='dpx-tb-message' class='bk-markup'>"+
                    "#{mdl.message}</div>"+
                "#{quit}"
@@ -75,6 +97,7 @@ export class DpxToolbarView extends WidgetView
         elem.find('#dpx-tb-del') .click(() => @on_discard_current())
         elem.find('#dpx-tb-bead').change(() => @on_bead())
         elem.find('#dpx-tb-discard').change(() => @on_discard())
+        elem.find('#dpx-tb-selection').click(() => @on_selection())
 
         @on_change_frozen()
         return @
@@ -100,6 +123,9 @@ export class DpxToolbar extends Widget
         quit:       [p.Number,  0]
         bead:       [p.Number,  -1]
         discarded:  [p.String,  '']
+        accepted:   [p.String,  '']
+        current:    [p.Bool,    true]
+        seltype:    [p.Bool,    true]
         message:    [p.String,  '']
         hasquit:    [p.Bool,    false]
     }

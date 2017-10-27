@@ -386,6 +386,7 @@ width: 100%; }
 .dpx-tb  button { width: 60px; min-width: unset !important; }
 #dpx-tb-bead    { width: 50px; height: 28px; }
 #dpx-tb-discard { width: 120px; height: 28px; min-width: unset; }
+#dpx-tb-selection { width: 30px; }
 #dpx-tb-message {
     margin-right:5px;
     margin-left:5px;

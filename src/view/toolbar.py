@@ -120,6 +120,9 @@ class DpxToolbar(Widget):
     quit      = props.Int(0)
     bead      = props.Int(-1)
     discarded = props.String('')
+    accepted  = props.String('')
+    current   = props.Bool(True)
+    seltype   = props.Bool(True)
     message   = props.String('')
     frozen    = props.Bool(True)
     hasquit   = props.Bool(False)
@@ -128,9 +131,9 @@ class DpxToolbar(Widget):
 
 class MessagesInput(BokehView):
     "Everything related to messages"
-    def __init__(self, *args, **kwargs):
+    def __init__(self, **kwargs):
         "initializes globals"
-        super().__init__(*args, **kwargs)
+        super().__init__(**kwargs)
         self._ctrl.getGlobal('project').message.default = None
         msg = self._ctrl.getGlobal('css').message
         siz = 'heigth: 28px; margin-top: 0px;'
@@ -262,15 +265,29 @@ class RejectedBeadsInput(BeadView):
             with self.action:
                 self._bdctrl.discarded = set(self._bdctrl.discarded) | {bead}
 
-        def _ondiscarded_cb(attr, old, new):
+        def _ondiscard_current_cb(attr, old, value):
+            _ondiscard_current()
+
+        def _onaccepted_cb(attr, old, new):
+            beads = set(self._bdctrl.allbeads) - parseints(new)
             with self.action:
-                self._bdctrl.discarded = parseints(new)
+                self._bdctrl.discarded = beads
+
+        def _ondiscarded_cb(attr, old, new):
+            beads = parseints(new)
+            with self.action:
+                self._bdctrl.discarded = beads
 
         def _onproject():
-            self.__toolbar.discarded = ', '.join(str(i) for i in sorted(self._bdctrl.discarded))
+            disc = set(self._bdctrl.discarded)
+            acc  = set(self._bdctrl.allbeads) - disc
+            self.__toolbar.accepted  = ', '.join(str(i) for i in sorted(acc))
+            self.__toolbar.discarded = ', '.join(str(i) for i in sorted(disc))
 
         self._keys.addKeyPress(('keypress.delbead', _ondiscard_current))
+        toolbar.on_change('current',                _ondiscard_current_cb)
         toolbar.on_change('discarded',              _ondiscarded_cb)
+        toolbar.on_change('accepted',               _onaccepted_cb)
         self._ctrl.observe("updatetask", "addtask", "removetask", lambda **_: _onproject())
         self._ctrl.getGlobal('project').track.observe(_onproject)
         self.__toolbar = toolbar
