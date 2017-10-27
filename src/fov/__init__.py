@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"all FoV view aspects here"
-from typing                 import Dict, Any
+from typing                 import Dict, List, Any # pylint: disable=unused-import
 import numpy as np
-from bokeh.models           import ColumnDataSource, Range1d, TapTool
+from bokeh.models           import ColumnDataSource, Range1d, TapTool, HoverTool
 from bokeh.plotting         import figure, Figure
+from data                   import BEADKEY
 from control                import Controller
 from control.action         import Action
 from control.beadscontrol   import DataSelectionBeadController
+from signalfilter           import rawprecision
 from view.plots.tasks       import TaskPlotCreator, TaskPlotModelAccess
 from view.plots             import PlotAttrs, PlotView
 from view.colors            import getcolors, setcolors
@@ -32,7 +34,18 @@ class FoVPlotCreator(TaskPlotCreator[MessagesModelAccess]):
         self.css.calib.defaults = {'image'  : PlotAttrs('Greys256', 'image'),
                                    'start'  : 1./16.,
                                    'size'   : 6./16}
-        self.config.plot.fov.tools.default       = 'pan,box_zoom,tap,save'
+        self.css.tooltip.default = '<table>@ttips{safe}</table>'
+        self.css.tooltip.type.defaults    = {'extent'     : 'Δz',
+                                             'hfsigma'    : 'σ[HF]',
+                                             'population' : '% good'}
+        self.css.tooltip.row.default = ('<tr>'
+                                        +'<td>{cycle} cycle{plural} with:</td>'
+                                        +'<td>{type}</td><td>{message}</td>'
+                                        +'</tr>')
+        self.css.tooltip.good.default = ('<tr><td><td>'
+                                         +'<td>σ[HF] =</td><td>{:.4f}</td>'
+                                         +'</tr>')
+        self.config.plot.fov.tools.default       = 'pan,box_zoom,tap,save,hover'
         self.config.plot.fov.calib.tools.default = 'pan,box_zoom,save'
         self._fig:         Figure           = None
         self._beadssource: ColumnDataSource = None
@@ -69,6 +82,8 @@ class FoVPlotCreator(TaskPlotCreator[MessagesModelAccess]):
         gl1  = self.css.beads.addto(self._fig, **args)
         gl2  = self.css.text .addto(self._fig, **args, text = 'text')
         self._fig.select(TapTool)[0].renderers = [gl1, gl2]
+        self._fig.select(HoverTool)[0].update(renderers = [gl1, gl2],
+                                              tooltips  = self.css.tooltip.get())
 
         def _onselect_cb(attr, old, new):
             inds = new.get('1d', {}).get('indices', [])
@@ -160,16 +175,38 @@ class FoVPlotCreator(TaskPlotCreator[MessagesModelAccess]):
         pos = fov.beads[bead].position
         return dict(data = dict(x = [pos[0]], y = [pos[1]]))
 
+    def __tooltips(self):
+        msgs  = self._model.messages()
+        trans = self.css.tooltip.type.getitems(...)
+        ttips = {} # type: Dict[BEADKEY, List[str]]
+        row   = self.css.tooltip.row.get()
+        for bead, cyc, tpe, msg  in sorted(zip(msgs['bead'], msgs['cycles'],
+                                               msgs['type'], msgs['message']),
+                                           key = lambda i: (i[0], -i[1])):
+            val = row.format(cycle   = cyc,
+                             type    = trans[tpe],
+                             message = msg.replace('<', '&lt').replace('>', '&gt'),
+                             plural  = 's' if cyc > 1 else '')
+            ttips.setdefault(bead, []).append(val)
+
+        row  = self.css.tooltip.good.get()
+        trk  = self._model.track
+        for bead in self._bdctrl.allbeads:
+            if bead not in ttips:
+                ttips[bead] = [row.format(rawprecision(trk, bead))]
+
+        return {i: ''.join(j) for i, j in ttips.items()}
+
     def __beadsdata(self):
         fov = self.__fov
         if fov is None:
-            return dict(data = dict.fromkeys(('x', 'y', 'text', 'color'), []))
+            return dict(data = dict.fromkeys(('x', 'y', 'text', 'color', 'ttips'), []))
 
         hexes = getcolors(self)
         clrs  = hexes['good'], hexes['bad'], hexes['discarded']
         disc  = set(self._bdctrl.discarded)
         bad   = self._model.badbeads() - disc
-        print(disc)
+        ttips = self.__tooltips()
 
         items = fov.beads
         data  = dict(x     = [i.position[0]  for i in items.values()],
@@ -177,7 +214,8 @@ class FoVPlotCreator(TaskPlotCreator[MessagesModelAccess]):
                      text  = [f'{i}'         for i in items.keys()],
                      color = [clrs[2 if i in disc else
                                    1 if i in bad  else
-                                   0] for i in items.keys()])
+                                   0] for i in items.keys()],
+                     ttips = [ttips[i] for i in items.keys()])
         return dict(data = data)
 
 class FoVPlotView(PlotView[FoVPlotCreator]):
