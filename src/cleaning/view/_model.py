@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "access to the model"
-from   typing                   import Tuple
 import numpy as np
 
 from utils                      import NoArgs
@@ -87,27 +86,3 @@ class DataCleaningModelAccess(TaskPlotModelAccess):
         self.alignment  = TaskAccess(self, ExtremumAlignmentTask)
         self.cleaning   = DataCleaningAccess(self)
         self.subtracted = BeadSubtractionAccess(self)
-        self.__bead: int                                          = None
-        self.__colorstore: Tuple[int, np.ndarray, Tuple[int,...]] = None
-
-    @property
-    def colorstore(self):
-        "returns the colorstore"
-        if self.__colorstore is None or self.bead != self.__bead:
-            return None
-
-        return self.__colorstore
-
-    @colorstore.setter
-    def colorstore(self, val):
-        "sets the colorstore"
-        self.__bead       = self.bead
-        self.__colorstore = val
-
-    def clear(self):
-        self.__bead = self.__colorstore = None
-        super().clear()
-
-    def reset(self) -> bool:
-        self.__bead = self.__colorstore = None
-        return super().reset()

@@ -7,16 +7,12 @@ from    bokeh.plotting import figure, Figure
 from    bokeh.models   import LinearAxis, ColumnDataSource, Range1d
 from    bokeh          import layouts
 
-try:
-    from    bokeh.colors   import named as _bkclr
-except ImportError:
-    import  bokeh.colors   as _bkclr
-
 import  numpy                   as     np
 
 from    utils.array             import repeat
 from    view.plots              import PlotAttrs, PlotView, DpxHoverTool
 from    view.plots.tasks        import TaskPlotCreator
+from    view.colors             import getcolors, setcolors
 from    control                 import Controller
 
 from    ._model                 import DataCleaningModelAccess
@@ -77,13 +73,13 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
         cnf.plot.figure.defaults  = {'width': 500, 'height': 800}
         cnf.points.default  = PlotAttrs('color',  'circle', 1, alpha   = .5)
 
-        colors = dict(good       = '#6baed6', # blue
-                      hfsigma    = 'gold',
-                      extent     = 'orange',
-                      population = 'hotpink',
-                      aberrant   = 'red')
-        cnf.colors.basic.defaults = colors
-        cnf.colors.dark .defaults = colors
+        setcolors(self,
+                  good       = 'blue',
+                  hfsigma    = 'gold',
+                  extent     = 'orange',
+                  population = 'hotpink',
+                  aberrant   = 'red')
+
         cnf.colors.order.default  = ('aberrant', 'hfsigma', 'extent', 'population', 'good')
         self.css.widgets.width.default = 400
         self.css.figure.defaults  = dict(width    = 600,
@@ -148,10 +144,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
 
 
     def __color(self, order, nancache, items) -> np.ndarray:
-        colors = self.css.colors[self.css.theme.get()].getitems(...)
-        tohex  = lambda clr: clr if clr[0] == '#' else getattr(_bkclr, clr).to_hex()
-        hexes  = {i: tohex(j) for i, j in colors.items()}
-
+        hexes  = getcolors(self)
         tmp    = np.full(items.shape, hexes['good'], dtype = '<U7')
         cache  = self._model.cleaning.cache
         for name in self.css.colors.order.get():

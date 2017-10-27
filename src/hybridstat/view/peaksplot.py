@@ -8,14 +8,11 @@ from bokeh                      import layouts
 from bokeh.plotting             import figure, Figure
 from bokeh.models               import (LinearAxis, Range1d, ColumnDataSource,
                                         Model, TapTool, CustomJS)
-try:
-    from    bokeh.colors   import named as bkcolors
-except ImportError:
-    import  bokeh.colors   as bkcolors
 
 import numpy                    as     np
 
 from view.base                  import enableOnTrack
+from view.colors                import tohex
 from view.plots                 import PlotView, PlotAttrs
 from view.plots.tasks           import TaskPlotCreator
 from sequences.view             import (SequenceTicker,
@@ -127,8 +124,8 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         return self.css.peaks.colors.found[self.css.root.theme.get()]
 
     def __peaks(self, vals = None):
-        tohex  = lambda x: getattr(bkcolors, x.get()).to_hex()
-        colors = [tohex(self.__foundcolor), tohex(self.css.peaks.colors.missing)]
+        colors = [tohex(self.__foundcolor.get()),
+                  tohex(self.css.peaks.colors.missing.get())]
 
         peaks  = dict(self._model.setpeaks(vals))
         if vals is None or self._model.identification.task is None:

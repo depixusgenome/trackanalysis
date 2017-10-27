@@ -1,30 +1,34 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"all FoV view aspects here"
-from typing           import Dict, Any
+from typing                 import Dict, Any
 import numpy as np
-from bokeh.models     import ColumnDataSource, Range1d, TapTool
-from bokeh.plotting   import figure, Figure
-from control          import Controller
-from control.action   import Action
-from view.plots.tasks import TaskPlotCreator, TaskPlotModelAccess
-from view.plots       import PlotAttrs, PlotView
+from bokeh.models           import ColumnDataSource, Range1d, TapTool
+from bokeh.plotting         import figure, Figure
+from control                import Controller
+from control.action         import Action
+from control.beadscontrol   import DataSelectionBeadController
+from view.plots.tasks       import TaskPlotCreator, TaskPlotModelAccess
+from view.plots             import PlotAttrs, PlotView
+from view.colors            import getcolors, setcolors
+from cleaning.view.messages import MessagesModelAccess
 
-class FoVPlotCreator(TaskPlotCreator[TaskPlotModelAccess]):
+class FoVPlotCreator(TaskPlotCreator[MessagesModelAccess]):
     "Plots a default bead and its FoV"
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
-        self.css.defaults = {'beads':   PlotAttrs('goldenrod', 'circle', alpha = .5),
-                             'text':    PlotAttrs('gold', 'text'),
+        self.css.defaults = {'beads':   PlotAttrs('color', 'circle', alpha = .5),
+                             'text':    PlotAttrs('color',  'text'),
                              'image':   PlotAttrs('Greys256', 'image', x = 0, y = 0),
-                             'current': PlotAttrs('red', 'circle', 16),
+                             'current': PlotAttrs('skyblue', 'circle', 16),
                              'radius'       : 1.,
                              'figure.width' : 800,
                              'figure.height': 800,
                              'ylabel'       : u'Y (μm)',
                              'xlabel'       : u'X (μm)',
                             }
+        setcolors(self, good = 'palegreen', bad = 'orange', discarded = 'red')
         self.css.calib.defaults = {'image'  : PlotAttrs('Greys256', 'image'),
                                    'start'  : 1./16.,
                                    'size'   : 6./16}
@@ -35,6 +39,7 @@ class FoVPlotCreator(TaskPlotCreator[TaskPlotModelAccess]):
         self._cursource:   ColumnDataSource = None
         self._imgsource:   ColumnDataSource = None
         self._calibsource: ColumnDataSource = None
+        self._bdctrl                        = DataSelectionBeadController(self._ctrl)
         self.__idfov:      int              = None
 
     @property
@@ -98,8 +103,8 @@ class FoVPlotCreator(TaskPlotCreator[TaskPlotModelAccess]):
         if fov is not None and self.__idfov != id(fov):
             self.__idfov = id(fov)
             self.__imagedata()
-            self._bkmodels[self._beadssource].update(self.__beadsdata())
 
+        self._bkmodels[self._beadssource].update(self.__beadsdata())
         self._bkmodels[self._beadssource].update(selected = self.__SELECTED)
         self._bkmodels[self._cursource].update(self.__curdata())
         self._bkmodels[self._cursource].update(selected = self.__SELECTED)
@@ -119,7 +124,7 @@ class FoVPlotCreator(TaskPlotCreator[TaskPlotModelAccess]):
             rng   = (max(fov.size()),)*2
             start = self.css.calib.start.get()
             size  = self.css.calib.size.get()
-            dist  = [rng[0] * (start+ (0.5 if pos[0] < rng[0]*.5 else 0.)),
+            dist  = [rng[0] * (start+ (0.5 if pos[0] < rng[0]*.5 else 0.)), # type: ignore
                      rng[1] * (start+ (0.5 if pos[1] < rng[1]*.5 else 0.)),
                      rng[0] * size,
                      rng[1] * size]
@@ -158,12 +163,21 @@ class FoVPlotCreator(TaskPlotCreator[TaskPlotModelAccess]):
     def __beadsdata(self):
         fov = self.__fov
         if fov is None:
-            return dict(data = dict.fromkeys(('x', 'y', 'text'), []))
+            return dict(data = dict.fromkeys(('x', 'y', 'text', 'color'), []))
+
+        hexes = getcolors(self)
+        clrs  = hexes['good'], hexes['bad'], hexes['discarded']
+        disc  = set(self._bdctrl.discarded)
+        bad   = self._model.badbeads() - disc
+        print(disc)
 
         items = fov.beads
-        data  = dict(x    = [i.position[0] for i in items.values()],
-                     y    = [i.position[1] for i in items.values()],
-                     text = [f'{i}'        for i in items.keys()])
+        data  = dict(x     = [i.position[0]  for i in items.values()],
+                     y     = [i.position[1]  for i in items.values()],
+                     text  = [f'{i}'         for i in items.keys()],
+                     color = [clrs[2 if i in disc else
+                                   1 if i in bad  else
+                                   0] for i in items.keys()])
         return dict(data = data)
 
 class FoVPlotView(PlotView[FoVPlotCreator]):
