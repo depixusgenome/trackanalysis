@@ -23,7 +23,7 @@ class FoVPlotCreator(TaskPlotCreator[MessagesModelAccess]):
         self.css.defaults = {'beads':   PlotAttrs('color', 'circle', alpha = .5),
                              'text':    PlotAttrs('color',  'text'),
                              'image':   PlotAttrs('Greys256', 'image', x = 0, y = 0),
-                             'current': PlotAttrs('skyblue', 'circle', 16),
+                             'current': PlotAttrs('blue', 'circle', 10),
                              'radius'       : 1.,
                              'figure.width' : 800,
                              'figure.height': 800,
@@ -39,7 +39,7 @@ class FoVPlotCreator(TaskPlotCreator[MessagesModelAccess]):
                                              'hfsigma'    : 'σ[HF]',
                                              'population' : '% good'}
         self.css.tooltip.row.default = ('<tr>'
-                                        +'<td>{cycle} cycle{plural} with:</td>'
+                                        +'<td>{cycle}</td><td>cycle{plural} with:</td>'
                                         +'<td>{type}</td><td>{message}</td>'
                                         +'</tr>')
         self.css.tooltip.good.default = ('<tr><td><td>'
@@ -77,6 +77,9 @@ class FoVPlotCreator(TaskPlotCreator[MessagesModelAccess]):
         self.css.calib.image.addto(self._fig, **{i:i for i in ('image', 'x', 'y', 'dw', 'dh')},
                                    source = self._calibsource)
 
+        self._cursource = ColumnDataSource(**self.__curdata())
+        self.css.current.addto(self._fig, x = 'x', y = 'y', source = self._cursource)
+
         self._beadssource  = ColumnDataSource(**self.__beadsdata())
         args = dict(x = 'x', y = 'y', radius = self.css.radius.get(), source = self._beadssource)
         gl1  = self.css.beads.addto(self._fig, **args)
@@ -101,10 +104,6 @@ class FoVPlotCreator(TaskPlotCreator[MessagesModelAccess]):
                 self.project.root.bead.set(bead)
 
         self._beadssource.on_change('selected', _onselect_cb)
-
-        self._cursource = ColumnDataSource(**self.__curdata())
-        args['source']  = self._cursource
-        self.css.current.addto(self._fig, **args)
 
         for rng in self._fig.x_range, self._fig.y_range:
             self.fixreset(rng)
