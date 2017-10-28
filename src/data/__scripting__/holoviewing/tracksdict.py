@@ -140,9 +140,8 @@ class TracksDictDisplay(BasicDisplay,
                                        for i in val.dimensions()})
 
                 other = _fcn_(key, bead, neverempty = True).clone(label = key)
-                self._convert(kdims, [val, other])
                 if self._reflayout == 'same':
-                    return hv.Overlay([val, other])
+                    return hv.Overlay(self._convert(kdims, [val, other]))
                 if self._reflayout in ('left', 'top'):
                     return (val+other).cols(1 if self._reflayout == 'top' else 2)
                 return (other+val).cols(1 if self._reflayout == 'bottom' else 2)
