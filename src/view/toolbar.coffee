@@ -69,22 +69,24 @@ export class DpxToolbarView extends WidgetView
         else
             quit =''
 
-        ttips = ['Save the configuration or create an xlsx report',
+        ttips = ['Open an analysis, i.e. ".ana" extension, or a track file and '+
+                 'then its ".gr" files',
+                 'Save an analysis, i.e. ".ana" extension, or create an xlsx report',
                  'Change wether to discard (=) or select (≠) specific beads',
                  'Remove the current bead']
 
-        html = "#{@make_btn('open', 'Open', '', '')}"+
-               "#{@make_btn('save', 'Save', ttips[0])}"+
+        html = "#{@make_btn('open', 'Open', ttips[0], '')}"+
+               "#{@make_btn('save', 'Save', ttips[1])}"+
                "<label>Bead</label>"+
                "<input id='dpx-tb-bead'"+
                    " class='dpx-freeze bk-widget-form-input'"+
                    " type='number' min=0  max=10000 step=1  value=#{mdl.bead}>"+
                "<label>Discarded</label>"+
-               "#{@make_btn('selection', '=', ttips[1])}"+
+               "#{@make_btn('selection', '=', ttips[2])}"+
                "<input id='dpx-tb-discard'"+
                    " class='dpx-freeze bk-widget-form-input'"+
                    " type='text' value='#{mdl.discarded}'>"+
-               "#{@make_btn('del', '━', ttips[2])}"+
+               "#{@make_btn('del', '━', ttips[3])}"+
                "<div id='dpx-tb-message' class='bk-markup'>"+
                    "#{mdl.message}</div>"+
                "#{quit}"

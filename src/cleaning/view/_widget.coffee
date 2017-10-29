@@ -33,7 +33,7 @@ export class DpxCleaningView extends WidgetView
                  dbal+'Closed-hairpin cycles are deleted'+pos,
                  dbal+'Values with a high derivate are deleted'+pos,
                  dbal+'Underpopulated cycles are deleted'+pos,
-                 dbal+'Constant or noist cycles are deleted'+pos]
+                 dbal+'Constant or noisy cycles are deleted'+pos]
 
         html = "<div><div class='dpx-span'>"+
                    "<p #{ttips[0]}>Subtracted</p>"+
