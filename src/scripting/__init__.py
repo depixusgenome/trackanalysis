@@ -82,7 +82,7 @@ else:
     from eventdetection.__scripting__.holoviewing import *
     from peakfinding.__scripting__.holoviewing    import *
     from peakcalling.__scripting__.holoviewing    import *
-    from ramp.__scripting__.holoviews             import *
+    from ramp.__scripting__.holoviewing           import *
     def _configure_hv():
         # pylint: disable=import-error,bare-except,unused-import,unused-variable
         exts = []
