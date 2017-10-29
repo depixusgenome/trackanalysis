@@ -6,8 +6,8 @@ from functools                import partial
 from data.views               import BEADKEY, TrackView
 from control.processor        import Processor
 from control.processor.runner import pooledinput, pooldump
-from peakfinding.selector     import Output as PeakFindingOutput
-from ..tohairpin              import Distance, PEAKS_TYPE
+from peakfinding.selector     import Output as PeakFindingOutput, PeaksArray
+from ..tohairpin              import Distance
 from .fittohairpin            import (FitToHairpinTask, FitToHairpinProcessor,
                                       Fitters, Constraints, Matchers, Input,
                                       PeakEventsTuple)
@@ -20,7 +20,7 @@ class ByHairpinBead(NamedTuple): # pylint: disable=missing-docstring
     key        : BEADKEY
     silhouette : float
     distance   : Distance
-    peaks      : PEAKS_TYPE
+    peaks      : PeaksArray
     events     : PeakFindingOutput
 
 class ByHairpinGroup(NamedTuple): # pylint: disable=missing-docstring

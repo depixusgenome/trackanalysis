@@ -171,15 +171,24 @@ class SummarySheet(Reporter):
 
         return (bead.peaks['key'][1:] < 0).sum()
 
-    @column_method("Ratios")
-    def _sens(self, ref:Group, bead:Bead) -> Optional[str]:
-        """Ratios: Identified peaks / Expected peaks,  Unknown peaks/ Found peaks"""
+    @column_method("Identified Peak Ratio")
+    def _identified_ratio(self, ref:Group, bead:Bead) -> Optional[str]:
+        """Identified peaks / Expected peaks"""
         npks   = self._npeaks(ref, bead)
         ntheo  = self._npeaks(ref, None)
         nundef = self._unidentifiedpeaks(ref, bead)
-        if None in (npks, nundef, ntheo):
+        if None in (npks, nundef, ntheo) or ntheo == 0:
             return None
-        return '{}% / {}%'.format(int(100.*(npks-nundef)/ntheo), int(100.*nundef/npks))
+        return '{}%'.format(int(100.*(npks-nundef)/ntheo))
+
+    @column_method("Unknown Peak Ratio")
+    def _unknown_ratio(self, ref:Group, bead:Bead) -> Optional[str]:
+        """Unknown peaks/ Found peaks"""
+        npks   = self._npeaks(ref, bead)
+        nundef = self._unidentifiedpeaks(ref, bead)
+        if None in (npks, nundef) or npks == 0:
+            return None
+        return '{}%'.format(int(100.*nundef/npks))
 
     @column_method("Valid Cycles")
     def _ncycles(self, _, bead:Bead) -> int:
@@ -208,7 +217,7 @@ class SummarySheet(Reporter):
         if len(bead.events) == 0:
             return Probability.FMAX
 
-        prob = prob(bead.events[0][1], self.config.track.durations)
+        prob = prob(bead.events[0][1], self.config.track.durations) # type: ignore
         return prob.averageduration
 
     @column_method("", exclude = lambda x: not x.isxlsx())
