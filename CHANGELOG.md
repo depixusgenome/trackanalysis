@@ -1,3 +1,29 @@
+# tag cycles_v4.6
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+### Bead Selection
+
+It's now possible to either select beads to discard or beads to keep. In the
+toolbar, click on the '=' or '≠' button to do one or the other.
+
+### Field of View
+
+Beads now have a color:
+
+* *green*: good beads.
+* *orange*: beads which the automated cleaning will discard.
+* *red*: beads discarded by the user.
+
+A tooltip is shown on orange beads showing the warnings issued by the automated
+cleaning. The tooltip on other beads is the bead's σ[HF].
+
+### Hybridstat Reports
+
+The *Ratios* column has been split into 2 columns:
+
+* *Identified Peak Ratio*: identified peaks / Expected peaks
+* *Unknown Peak Ratio*: Unknown peaks/ Found peaks
+
 # tag cycles_v4.5
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
