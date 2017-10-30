@@ -42,10 +42,11 @@ class TracksDictDisplay(BasicDisplay,
     _beads      = None
     _keys       = None
     _name       = None
-    _overlay    = '2d'
+    _overlay    = 'key'
     _reference  = None
     _refdims    = True
     _reflayout  = 'left'
+    _labels     = True
     KEYWORDS    = BasicDisplay.KEYWORDS | frozenset(locals())
     def __getitem__(self, values):
         if isinstance(values, tuple):
@@ -86,12 +87,15 @@ class TracksDictDisplay(BasicDisplay,
         kwa   = deepcopy(self._opts)
 
         kdims         = dict()
-        kdims['key']  = sorted(kwa.pop('key')  if 'key'  in kwa else
-                               self._keys      if self._keys    else
-                               itms.keys())
-        kdims['bead'] = sorted(kwa.pop('bead') if 'bead' in kwa else
-                               self._beads     if self._beads   else
-                               itms.beads(*kdims['key']))
+        keys          = kwa.pop('key')  if 'key'  in kwa else self._keys
+        beads         = kwa.pop('key')  if 'key'  in kwa else self._beads
+        if beads is None:
+            kdims['key']  = sorted(itms.keys()) if keys is None else keys
+            kdims['bead'] = sorted(itms.availablebeads(*kdims['key']))
+        else:
+            kdims['bead'] = beads
+            kdims['key']  = sorted(itms.availablekeys(*beads)) if keys is None else keys
+
         if self._reference is not None:
             key = 'bead' if self._overlay == 'bead' else 'key'
             if self._reference not in kdims[key]:
@@ -102,10 +106,10 @@ class TracksDictDisplay(BasicDisplay,
         return fcn, kdims
 
     def _default_display(self, itms, key, bead, _, **kwa):
-        if self._overlay == 'key' and 'labels' not in kwa:
-            kwa['labels'] = str(key)
-        elif self._overlay == 'bead' and 'labels' not in kwa:
-            kwa['labels'] = str(bead)
+        if self._labels is True and self._overlay in ('key', 'bead'):
+            kwa.setdefault('labels', str(key) if self._overlay == 'key' else str(bead))
+        elif isinstance(self._labels, str):
+            kwa.setdefault('labels', self._labels)
 
         data = getattr(itms[key], self._name, itms[key]).display(**kwa)
         return data.getmethod()(bead)
@@ -118,36 +122,33 @@ class TracksDictDisplay(BasicDisplay,
     def _same(ref, other):
         return [ref, other]
 
+    def _overlayed_method(self, key):
+        fcn, kdims = self._base()
+        if self._overlay == 'bead':
+            crvs = [fcn(key, i, neverempty = True) for i in kdims[self._overlay]]
+        else:
+            crvs = [fcn(i, key, neverempty = True) for i in kdims[self._overlay]]
+        return hv.Overlay(self._convert(kdims, crvs))
+
+    def _reference_method(self, key, bead):
+        fcn, kdims = self._base()
+        val        = fcn(self._reference, bead, neverempty = True, labels = self._reference)
+        if self._refdims:
+            val = val.redim(**{i.name: i.clone(label = f'{self._reference}{i.label}')
+                               for i in val.dimensions()})
+
+        other = fcn(key, bead, neverempty = True, labels = key)
+        if self._reflayout == 'same':
+            return hv.Overlay(self._convert(kdims, [val, other]))
+        if self._reflayout in ('left', 'top'):
+            return (val+other).cols(1 if self._reflayout == 'top' else 2)
+        return (other+val).cols(1 if self._reflayout == 'bottom' else 2)
+
     def getmethod(self):
         "Returns the method used by the dynamic map"
-        fcn, kdims = self._base()
-
-        if self._overlay in ('key', 'bead'):
-            def _over(key, _fcn_ = fcn):
-                if self._overlay == 'bead':
-                    crvs = [fcn(key, i, neverempty = True) for i in kdims[self._overlay]]
-                else:
-                    crvs = [fcn(i, key, neverempty = True) for i in kdims[self._overlay]]
-                return hv.Overlay(self._convert(kdims, crvs))
-            return _over
-
-        if self._reference is not None:
-            def _ref(key, bead, _fcn_ = fcn):
-                val   = (_fcn_(self._reference, bead, neverempty = True)
-                         .clone(label = self._reference))
-                if self._refdims:
-                    val = val.redim(**{i.name: i.clone(label = f'{self._reference}{i.label}')
-                                       for i in val.dimensions()})
-
-                other = _fcn_(key, bead, neverempty = True).clone(label = key)
-                if self._reflayout == 'same':
-                    return hv.Overlay(self._convert(kdims, [val, other]))
-                if self._reflayout in ('left', 'top'):
-                    return (val+other).cols(1 if self._reflayout == 'top' else 2)
-                return (other+val).cols(1 if self._reflayout == 'bottom' else 2)
-            return _ref
-
-        return fcn
+        return (self._overlayed_method if self._overlay in ('key', 'bead') else
+                self._reference_method if self._reference is not None      else
+                self._base()[0])
 
     def getredim(self):
         "Returns the method used by the dynamic map"
