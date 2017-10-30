@@ -32,7 +32,6 @@ namespace legacy
         try
         {
             rec.readfov(nx, ny, dt, ptr);
-
             std::vector<size_t> shape = {(size_t) ny, (size_t) nx};
 
             if(dt == 512)

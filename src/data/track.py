@@ -62,6 +62,14 @@ class FoV:
 
     def size(self, pixel = False):
         "image size in nm (*pixel == False*) or pixels"
+        if self.image is None:
+            xpos = [i.position[0] for i in self.beads.values()]
+            ypos = [i.position[1] for i in self.beads.values()]
+            if len(xpos) and len(ypos):
+                return (max(1., np.nanmax(ypos)-np.nanmin(ypos)),
+                        max(1., np.nanmax(xpos)-np.nanmin(xpos)))
+            return 1., 1.
+
         rng = self.image.shape[1], self.image.shape[0]
         return rng if pixel else self.tonm(rng)
 

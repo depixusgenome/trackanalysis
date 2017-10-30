@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=arguments-differ
 "Loading and save tracks"
+import  sys
 from    typing             import (Sequence, Callable, Any, Union, Tuple, Optional,
                                    Iterator, Dict, cast, overload, TYPE_CHECKING)
 from    itertools          import chain
@@ -14,7 +15,9 @@ from    functools   import wraps, partial
 from    pathlib     import Path
 import  numpy       as     np
 
-from    legacy      import readtrack, readgr # pylint: disable=import-error,no-name-in-module
+# pylint: disable=import-error,no-name-in-module
+from    legacy      import readtrack, readgr, fov as readfov
+
 if TYPE_CHECKING:
     # pylint: disable=unused-import
     from data.track      import Track
@@ -435,6 +438,12 @@ class Handler:
         res['fov'] = FoV()
         if 'fov' in kwargs:
             res['fov'].image = kwargs.pop('fov')
+            if res['fov'].image is None and sys.platform.startswith("win"):
+                if isinstance(res['path'], (list, tuple)):
+                    path = str(res['path'][0])
+                else:
+                    path = str(res['path'])
+                res['fov'].image = readfov(path)
 
         if 'dimensions' in kwargs:
             res['fov'].dim   = kwargs.pop('dimensions')
