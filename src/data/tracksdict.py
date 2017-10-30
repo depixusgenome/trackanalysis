@@ -177,7 +177,7 @@ class TracksDict(dict):
             assert sum(i is None for i in (tracks, grs)) in (0, 1, 2)
             self.scan(tracks, grs, match, allaxes, **scan)
 
-    def beads(self, *keys) -> List[BEADKEY]:
+    def availablebeads(self, *keys) -> List[BEADKEY]:
         "returns the intersection of all beads in requested tracks (all by default)"
         if len(keys) == 0:
             keys = tuple(self.keys())
@@ -189,3 +189,18 @@ class TracksDict(dict):
                 beads = cur if beads is None else (cur & beads)
 
         return sorted(beads)
+
+    def availablekeys(self, *abeads) -> List:
+        "returns the intersection of all beads in requested tracks (all by default)"
+        if len(abeads) == 0:
+            return sorted(super().keys())
+
+        beads = set(abeads)
+        fcn   = lambda key: (key, len(beads - set(cast(Track, self[key]).beadsonly.keys())))
+        keys  = [] # type: list
+        with ThreadPoolExecutor(self._NTHREADS) as pool:
+            for key, cur in pool.map(fcn, tuple(super().keys())):
+                if cur == 0:
+                    keys.append(key)
+
+        return sorted(keys)
