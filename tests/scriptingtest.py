@@ -3,7 +3,7 @@
 # pylint: disable=redefined-builtin,wildcard-import,unused-wildcard-import
 # pylint: disable=wrong-import-position,ungrouped-imports
 "Tests interval detection"
-from IPython   import get_ipython
+from IPython   import get_ipython # pylint:disable=import-error
 assert get_ipython() is not None
 from scripting import *
 

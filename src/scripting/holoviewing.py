@@ -10,7 +10,7 @@ from   itertools        import chain, repeat
 from   copy             import deepcopy
 
 import numpy            as     np
-from   IPython          import get_ipython
+from   IPython          import get_ipython # pylint: disable=import-error
 
 from   utils.decoration import addto as _addto
 hv    = sys.modules['holoviews']  # pylint: disable=invalid-name
