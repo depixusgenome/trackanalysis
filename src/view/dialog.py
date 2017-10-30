@@ -70,16 +70,26 @@ class FileDialog:
         return [Path(i) for i in pot]
 
     @staticmethod
-    def firstexistingpath(pot: List[Path]) -> Optional[str]:
+    def exists(path):
+        "safe call to Path.exists"
+        try:
+            return path.exists()
+        except OSError:
+            return False
+
+    @classmethod
+    def firstexistingpath(cls, pot: List[Path]) -> Optional[str]:
         "selects the first existing path from a list"
-        return next((str(i) for i in pot if i.exists()),
-                    next((str(i.parent) for i in pot if i.parent.exists()), # type: ignore
+        exists = cls.exists
+        return next((str(i) for i in pot if exists(i)),
+                    next((str(i.parent) for i in pot if exists(i.parent)), # type: ignore
                          None))
 
-    @staticmethod
-    def firstexistingparent(pot: List[Path]) -> Optional[str]:
+    @classmethod
+    def firstexistingparent(cls, pot: List[Path]) -> Optional[str]:
         "selects the first existing path from a list"
-        return next((str(i) for i in pot if i.parent.exists()), None) # type: ignore
+        exists = cls.exists
+        return next((str(i) for i in pot if exists(i.parent)), None) # type: ignore
 
     @classmethod
     def _getconfig(cls, ctrl, storage = None):
@@ -91,7 +101,8 @@ class FileDialog:
 
     @classmethod
     def _setconfig(cls, ctrl, storage = None):
-        cnf = cls.globals(ctrl)
+        cnf    = cls.globals(ctrl)
+        exists = cls.exists
         def _defaultpath(rets, bcheck: bool = True):
             vals  = {} # type: Dict[str, str]
             itr   = (rets,) if isinstance(rets, str) else rets
@@ -99,7 +110,7 @@ class FileDialog:
             for ret in itr:
                 ret = Path(ret)
                 if bcheck:
-                    if not ret.exists():
+                    if not exists(ret):
                         continue
                     ret = ret.resolve()
 
