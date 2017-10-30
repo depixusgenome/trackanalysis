@@ -105,6 +105,10 @@ def setconfig(cls, cnf):
     cnf.defaults = cls.defaults()
     cnf.fittohairpin.range.defaults = dict(stretch = (900., 1400.),
                                            bias    = (-.25, .25))
+    cnf.fittoreference.range.defaults = dict(stretch = (.8, 1.2),
+                                             bias    = (-.15, .15))
+    cnf.alignment.always.default = True
+
 Tasks.setconfig = classmethod(setconfig)
 
 def __call__(self, *resets, __old__ = Tasks.__call__, **kwa):
@@ -119,8 +123,24 @@ def defaulttaskorder(cls, __old__ = Tasks.defaulttaskorder) -> Tuple[type, ...]:
     "returns the default task order"
     order = cls.getconfig().order.scripting.get(default = None)
     return __old__(order)
-
 Tasks.defaulttaskorder = classmethod(defaulttaskorder)
+
+def defaulttasklist(cls, paths, upto, cleaned:bool, __old__ = Tasks.defaulttasklist):
+    "Returns a default task list depending on the type of raw data"
+    tasks = __old__(paths, upto, cleaned)
+    if cls.getconfig().alignment.always.get() is False:
+        return tasks
+
+    inst = Tasks.alignment.get()
+    tpe  = type(inst)
+    if any(isinstance(i, tpe) for i in tasks):
+        return tasks
+    if isinstance(tasks[0], type(Tasks.cleaning.get())):
+        return tasks[:1]+(inst,)+tasks[1:]
+    return (inst,)+tasks
+
+Tasks.defaulttasklist = classmethod(defaulttasklist)
+
 
 # pylint: disable=no-member,invalid-name
 scriptapp = default.application(main = ScriptingView, creator = lambda x: x)() # type: ignore

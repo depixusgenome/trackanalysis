@@ -171,6 +171,16 @@ class Tasks(Enum):
 
         raise RuntimeError('arguments are unexpected')
 
+    @classmethod
+    def defaulttasklist(cls, paths, upto, cleaned:bool):
+        "Returns a default task list depending on the type of raw data"
+        tasks = (cls.eventdetection, cls.peakselector) # type: Tuple
+        if (not cleaned) and (isinstance(paths, (str, Path)) or len(paths) == 1):
+            tasks = (cls.cleaning, cls.alignment)+tasks
+        return (tasks if upto is None       else
+                ()    if upto not in tasks  else
+                tasks[:tasks.index(upto)+1])
+
 def dumps(self, **kwa):
     "returns the json configuration"
     kwa.setdefault('saveall', False)

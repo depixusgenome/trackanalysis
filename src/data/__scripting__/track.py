@@ -5,15 +5,12 @@ Monkey patches the Track class.
 
 We add some methods and change the default behaviour:
 
-    * Track:
-
-        * *__init__* takes *path* as it's first positional argument
-        * an *events* property is added
-        * a *rawprecision* method is added
+* *__init__* takes *path* as it's first positional argument
+* an *events* property is added
+* a *rawprecision* method is added
 """
 import sys
 from typing                 import Tuple # pylint:disable=unused-import
-from pathlib                import Path
 from itertools              import product
 
 from utils.decoration       import addto
@@ -77,20 +74,11 @@ def apply(self, *args, copy = True, beadsonly = True):
     "returns an iterator over the result of provided tasks"
     return next(iter(self.processors(*args, beadsonly = beadsonly).run(copy = copy)))
 
-def defaulttasklist(paths, upto, cleaned:bool):
-    "Returns a default task list depending on the type of raw data"
-    tasks = (Tasks.eventdetection, Tasks.peakselector) # type: Tuple
-    if (not cleaned) and (isinstance(paths, (str, Path)) or len(paths) == 1):
-        tasks = (Tasks.cleaning, Tasks.alignment)+tasks
-    return (tasks if upto is None       else
-            ()    if upto not in tasks  else
-            tasks[:tasks.index(upto)+1])
-
 @addto(_Track) # type: ignore
 @property
 def cleancycles(self):
     "returns cleaned cycles"
-    return self.apply(*defaulttasklist(self.path, Tasks.alignment, self.cleaned))[...,...]
+    return self.apply(*Tasks.defaulttasklist(self.path, Tasks.alignment, self.cleaned))[...,...]
 
 @addto(_Track) # type: ignore
 @property
@@ -106,4 +94,4 @@ def _addprop(name):
 for tname in product(('beads', 'cycles'), ('only', '')):
     _addprop(''.join(tname))
 
-__all__ = ['Track', 'defaulttasklist']
+__all__ = ['Track']

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Updating FitToHairpinDict for scripting purposes"
 import sys
-from   typing                           import List, Callable
+from   typing                           import List
 from   copy                             import copy as shallowcopy
 import pandas                           as pd
 from   utils.decoration                 import addto
@@ -12,8 +12,7 @@ from   ..toreference                    import HistogramFit, ChiSquareHistogramF
 from   ..processor                      import (FitToHairpinDict, FitToReferenceDict,
                                                 FitToReferenceTask)
 
-Tasks:           type     = sys.modules['model.__scripting__'].Tasks
-defaulttasklist: Callable = sys.modules['data.__scripting__'].defaulttasklist
+Tasks = sys.modules['model.__scripting__'].Tasks
 
 def _fit(self, tpe, sequence, oligos, kwa):
     "computes hairpin fits"
@@ -21,7 +20,7 @@ def _fit(self, tpe, sequence, oligos, kwa):
         kwa['sequence'] = sequence
         kwa['oligos']   = oligos
 
-    tasks = (defaulttasklist(self.path, None, self.cleaned)
+    tasks = (Tasks.defaulttasklist(self.path, None, self.cleaned)
              +(getattr(Tasks, tpe)(**kwa),))
     if len(tasks[-1].distances) == 0:
         raise IndexError('No distances found')

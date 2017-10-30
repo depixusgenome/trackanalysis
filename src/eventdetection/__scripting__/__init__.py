@@ -4,7 +4,7 @@
 Adds shortcuts for using Events
 """
 import sys
-from   typing                       import (Tuple, Callable, FrozenSet, Type,
+from   typing                       import (Tuple, Callable, FrozenSet,
                                             List, cast)
 from   copy                         import copy as shallowcopy
 import numpy                        as     np
@@ -15,14 +15,13 @@ from   control.processor.dataframe  import DataFrameProcessor
 from   data                         import Track
 from   ..data                       import Events
 
-Tasks:           Type     = sys.modules['model.__scripting__'].Tasks
-defaulttasklist: Callable = sys.modules['data.__scripting__'].defaulttasklist
+Tasks = sys.modules['model.__scripting__'].Tasks
 
 @addto(Track) # type: ignore
 @property
 def events(self) -> Events:
     "returns events in phase 5 only"
-    return self.apply(*defaulttasklist(self.path, Tasks.eventdetection, self.cleaned))
+    return self.apply(*Tasks.defaulttasklist(self.path, Tasks.eventdetection, self.cleaned))
 
 _RETURN_TYPE = FrozenSet[Tuple[int, int]]
 class Comparator:
