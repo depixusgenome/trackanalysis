@@ -5,6 +5,7 @@ Monkeypatches tasks and provides a simpler access to usual tasks
 """
 import sys
 from pathlib                  import Path
+from functools                import partial
 from typing                   import (Type, Tuple, Union, Sequence, Dict,
                                       cast, TYPE_CHECKING)
 
@@ -16,10 +17,11 @@ from utils                    import update
 from utils.decoration         import addto
 from control.taskcontrol      import create as _create
 from control.processor        import Processor
+from control.processor.utils  import ActionTask
 from cleaning.processor       import DataCleaningTask
 from cordrift.processor       import DriftTask
 from eventdetection.processor import ExtremumAlignmentTask, EventDetectionTask
-from peakfinding.processor    import PeakSelectorTask
+from peakfinding.processor    import PeakSelectorTask, PeakCorrelationAlignmentTask
 from peakcalling.processor    import (FitToReferenceTask, FitToHairpinTask,
                                       BeadsByHairpinTask)
 from scripting.parallel       import Parallel
@@ -43,11 +45,29 @@ class Tasks(Enum):
         >>> assert isinstance(task, ExtremumAlignmentTask)
 
     Attribute values can be set
+
         >>> assert Tasks.peakselector().align is not None         # default value
         >>> assert Tasks.peakselector(align = None).align is None # change default
         >>> assert Tasks.peakselector('align').align is not None  # back to true default
         >>> assert Tasks.peakselector(align = None).align is None # change default
+
+    For example, to create aligned events and change their stretch and bias:
+
+        >>> def fcn(stretch, bias, info):
+        ...     info['data'][:] = [(i-bias)*stretch for i in info['data']]
+        >>> Tasks.apply("my path to data",
+        ...             Tasks.alignment, Tasks.eventdetection,
+        ...             lambda i: fcn(2., .5, i),
+        ...             Tasks.peakalignment)
+
+    or:
+
+        >>> Tasks.apply("my path to data",
+        ...             Tasks.alignment, Tasks.eventdetection,
+        ...             Task.action(fcn, 2., .5),
+        ...             Tasks.peakalignment)
     """
+    action         = 'action'
     cleaning       = 'cleaning'
     selection      = 'selection'
     alignment      = 'alignment'
@@ -55,6 +75,7 @@ class Tasks(Enum):
     driftpercycle  = 'driftpercycle'
     cycles         = 'cycles'
     eventdetection = 'eventdetection'
+    peakalignment  = 'peakalignment'
     peakselector   = 'peakselector'
     fittohairpin   = 'fittohairpin'
     beadsbyhairpin = 'beadsbyhairpin'
@@ -70,6 +91,7 @@ class Tasks(Enum):
                     driftpercycle  = DriftTask(onbeads = False),
                     cycles         = CycleCreatorTask(),
                     eventdetection = EventDetectionTask(),
+                    peakalignment  = PeakCorrelationAlignmentTask(),
                     peakselector   = PeakSelectorTask(),
                     fittoreference = FitToReferenceTask(),
                     fittohairpin   = FitToHairpinTask(),
@@ -124,7 +146,26 @@ class Tasks(Enum):
         "returns an iterator over the result of provided tasks"
         return next(iter(cls.processors(*args, beadsonly = beadsonly).run(copy = copy)))
 
+    @staticmethod
+    def _default_action(*args, **kwa):
+        call = kwa.pop('call', None)
+        if len(args) >= 1 and call is None:
+            call, args = args[0], args[1:]
+        if call is None:
+            assert False
+            return ActionTask()
+        if not callable(call):
+            raise RuntimeError("Incorrect action")
+
+        if len(args) > 0 or len(kwa):
+            call = partial(call, *args, **kwa)
+        return ActionTask(call = call)
+
     def __call__(self, *resets, **kwa):
+        fcn     = getattr(self, '_default_'+self.value, None)
+        if fcn is not None:
+            return fcn(*resets, **kwa)
+
         current = kwa.pop('current', None)
         cnf     = self.default() if current is None else deepcopy(current)
         cls     = type(cnf)
@@ -145,7 +186,7 @@ class Tasks(Enum):
     get = _TaskGetter()
 
     @classmethod
-    def __create(cls, arg, kwa, beadsonly):
+    def __create(cls, arg, kwa, beadsonly): # pylint: disable=too-many-return-statements
         if isinstance(arg, cls):
             return arg(**kwa)
 
@@ -157,6 +198,12 @@ class Tasks(Enum):
 
         if isinstance(arg, str) and arg in cls.__members__:
             return cls(arg)(**kwa)
+
+        if isinstance(arg, (tuple, list)) and len(arg) >= 1 and callable(arg[0]):
+            return cls.action(*arg, **kwa)
+
+        if callable(arg):
+            return cls.action(arg)
 
         if (isinstance(arg, (Path, str))
                 or (isinstance(arg, (tuple, list))
@@ -199,8 +246,5 @@ def __init__(self,
              __old__ = Parallel.__init__) -> None:
     __old__(self, roots, *Tasks.tasklist(*tasks), processors = processors)
 
-__all__ = ('Task', 'RootTask', 'Level', 'TASK_ORDER', 'taskorder',
-           'TrackReaderTask', 'CycleCreatorTask', 'DataSelectionTask',
-           'Tasks', 'DriftTask', 'ExtremumAlignmentTask',
-           'EventDetectionTask', 'PeakSelectorTask',
-           'FitToHairpinTask', 'FitToReferenceTask', 'DataFrameTask')
+__all__ = (('Task', 'Tasks', 'RootTask', 'Level', 'TASK_ORDER', 'taskorder')
+           + tuple(i.__class__.__name__ for i in Tasks.defaults().values()))

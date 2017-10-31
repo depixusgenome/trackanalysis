@@ -115,7 +115,9 @@ def __call__(self, *resets, __old__ = Tasks.__call__, **kwa):
     if Ellipsis in resets:
         cnf = self.default()
     else:
-        cnf = self.getconfig()[self.value].get()
+        cnf = self.getconfig()[self.value].get(default = None)
+    if cnf is None:
+        return __old__(self, *resets, **kwa)
     return __old__(self, *resets, current = cnf, **kwa)
 Tasks.__call__ = __call__
 
