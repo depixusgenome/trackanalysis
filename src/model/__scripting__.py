@@ -129,7 +129,10 @@ class Tasks(Enum):
             if ind is None:
                 continue
 
-            if ind == 0 or not isinstance(lst[ind-1], order[i+1]):
+            ival = ind
+            while ival > 0 and getattr(lst[ival-1], 'level', None) is Level.none:
+                ival -= 1
+            if ival == 0 or not isinstance(lst[ival-1], order[i+1]):
                 name = order[i+1].__name__.lower().replace('task', '')
                 lst.insert(ind, cls.get(name, **kwa))
         return lst
