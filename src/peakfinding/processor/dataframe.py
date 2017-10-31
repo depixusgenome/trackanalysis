@@ -47,7 +47,7 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
     * *cycle*: event cycle
     * *start*: event start position
     * *length*: event length
-    * *mean*: event average
+    * *avg*: event average
 
     The following will also measure each event's std:
 
@@ -73,8 +73,8 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
             self.__events = dict()
 
         if self.__events is not None:
-            self.__events         = {i: self.getfunction(j) for i, j in self.__events.items()}
-            self.__events['mean'] = np.nanmean
+            self.__events        = {i: self.getfunction(j) for i, j in self.__events.items()}
+            self.__events['avg'] = np.nanmean
 
         add    = lambda verif: [(i, meas.pop(i)) for i in tuple(meas) if verif(meas[i])]
         isprop = lambda i: (isinstance(i, str)

@@ -3,7 +3,7 @@
 "Processors apply tasks to a data flow"
 from    functools               import partial
 from    typing                  import (Generic, TypeVar, Callable, Dict,
-                                        Union, Type, Iterator, Tuple, cast)
+                                        Union, Type, Iterator, Tuple, Optional, cast)
 from    pathlib                 import Path
 
 import  pandas                  as     pd
@@ -62,12 +62,6 @@ class DataFrameFactory(Generic[Frame]):
                 res['bead'] = np.full(cnt, key)
         return res
 
-    @classmethod
-    def create(cls, task, frame):
-        "creates a dataframefactory if frame is of the right type"
-        # pylint: disable=unidiomatic-typecheck
-        return cls(task, frame) if type(frame) is cls.frametype() else None
-
     def dataframe(self, frame, info) -> pd.DataFrame:
         "creates a dataframe"
         data = pd.DataFrame(self._run(frame, *info))
@@ -78,6 +72,12 @@ class DataFrameFactory(Generic[Frame]):
         cols = [i for i in self.task.indexes if i in data]
         if len(cols):
             data.set_index(cols, inplace = True)
+
+        for fcn in self.task.transform if self.task.transform else []:
+            itm = fcn(data)
+            if itm is not None:
+                data = itm
+                assert isinstance(data, pd.DataFrame)
         return info[0], data
 
     def _run(self, frame, key, values) -> Dict[str, np.ndarray]:
@@ -110,9 +110,16 @@ class DataFrameProcessor(Processor[DataFrameTask]):
             rem.extend(i for i in cur.__subclasses__() if issubclass(i, DataFrameFactory))
 
     @classmethod
+    def factory(cls, frame) -> Optional[Type[DataFrameFactory]]:
+        "returns the appropriate factory"
+        if not isinstance(frame, type):
+            frame = type(frame)
+
+        return next((i for i in cls.__iter_subclasses() if frame is i.frametype()), None)
+
+    @classmethod
     def __apply(cls, task, frame):
-        for sub in cls.__iter_subclasses():
-            inst = sub.create(task, frame)
-            if inst is not None:
-                return frame.withaction(inst.dataframe)
+        sub = cls.factory(frame)
+        if sub is not None:
+            return frame.withaction(sub(task, frame).dataframe)
         raise RuntimeError(f'Could not process {type(frame)} into a pd.DataFrame')

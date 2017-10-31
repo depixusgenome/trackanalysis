@@ -3,7 +3,6 @@
 """
 Adds shortcuts for using Events
 """
-import sys
 from   typing                       import (Tuple, Callable, FrozenSet,
                                             List, cast)
 from   copy                         import copy as shallowcopy
@@ -12,10 +11,10 @@ import pandas                       as     pd
 
 from   utils.decoration             import addto
 from   control.processor.dataframe  import DataFrameProcessor
+from   model.__scripting__          import Tasks
 from   data                         import Track
+from   data.__scripting__.dataframe import adddataframe
 from   ..data                       import Events
-
-Tasks = sys.modules['model.__scripting__'].Tasks
 
 @addto(Track) # type: ignore
 @property
@@ -119,30 +118,7 @@ class Comparator:
         cond = self.__cond
         return frozenset(tuple(i for i, j in self.__vals() if cond(k != other for k in j)))
 
-@addto(Events)
-def dataframe(self, **kwa) -> pd.DataFrame:
-    """
-    converts to a pandas dataframe.
-
-    Columns are:
-
-        * *track*: track name
-        * *bead*: bead name
-        * *cycle*: cycle number
-        * *event*: event number in the cycle
-        * *start*: event start position in phase 5
-        * *length*: event length
-        * *mean*: event average position
-
-    Additionnal columns can be added with kwargs:
-
-        >>> Event(..).dataframe(std = np.nanstd, median = 'median')
-
-    If a string is provided, the numpy function is used. By default, its *nan*
-    version is selected.
-    """
-    return DataFrameProcessor.apply(shallowcopy(self), measures = kwa, merge = True)
-
+adddataframe(Events)
 setattr(Events, 'any', property(lambda self: Comparator(self, any), doc = Comparator.__doc__))
 setattr(Events, 'all', property(lambda self: Comparator(self, all), doc = Comparator.__doc__))
 

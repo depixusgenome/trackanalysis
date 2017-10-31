@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Simpler PeaksDict detection: merging and selecting the sections in the signal detected as flat"
-import sys
 from   typing                       import (Union, Iterator, Iterable,
                                             Tuple, List, cast)
 from   copy                         import copy as shallowcopy
@@ -14,12 +13,12 @@ from control.processor.dataframe    import DataFrameProcessor
 from eventdetection                 import EventDetectionConfig
 from eventdetection.data            import Events
 from model                          import PHASE
+from model.__scripting__            import Tasks
 from data                           import Track
+from data.__scripting__.dataframe   import adddataframe
 from ..selector                     import PeakSelectorDetails
 from ..probabilities                import Probability
 from ..processor.selector           import PeaksDict, PeakOutput
-
-Tasks = sys.modules['model.__scripting__'].Tasks
 
 @addto(Track) # type: ignore
 @property
@@ -111,28 +110,5 @@ def detailed(self, ibead, precision: float = None) -> Union[Iterator[Detailed], 
     evts = iter(i for _, i in self.data[ibead,...])
     return Detailed(self, self.config.detailed(evts, prec))
 
-@addto(PeaksDict)
-def dataframe(self, **kwa) -> pd.DataFrame:
-    """
-    converts to a pandas dataframe.
-
-    Columns are:
-
-        * *track*
-        * *bead*
-        * *peakposition*
-        * *averageduration*
-        * *hybridisationrate*
-        * *eventcount*
-
-    Additionnal columns can be added with kwargs. The key is the title. The value
-    can either be:
-
-        * a callable with all events for that peak as input and expecting a number
-        as output,
-        * a attribute name from peakfinding.probabilities.Probability
-
-    """
-    return DataFrameProcessor.apply(shallowcopy(self), measures = kwa, merge = True)
-
+adddataframe(PeaksDict)
 __all__: List[str] = []

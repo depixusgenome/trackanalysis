@@ -425,7 +425,7 @@ def test_dataframe():
     assert 'bead'  in data.index.names
     assert 'cycle' in data.index.names
     assert 'event' in data.index.names
-    assert 'mean' in data
+    assert 'avg'   in data
 
 if __name__ == '__main__':
     test_splittererosion()
