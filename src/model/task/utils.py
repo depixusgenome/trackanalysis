@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """ Utilitary tasks """
-from typing  import List
+from typing  import List, Callable
 from utils   import initdefaults
 from ..level import Level
 from .base   import Task
+
+class ActionTask(Task):
+    "Adds a callable to a frame"
+    level          = Level.none
+    call: Callable = None
+
+    @initdefaults
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
 
 class ExceptionCatchingTask(Task):
     "Discards beads which throw an exception"
@@ -14,4 +23,3 @@ class ExceptionCatchingTask(Task):
     @initdefaults
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        Task.__init__(self, **kwa)
