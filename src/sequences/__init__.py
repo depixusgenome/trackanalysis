@@ -53,7 +53,8 @@ def read(stream:Union[pathlib.Path, str, Dict[str,str], TextIO]) -> Iterator[Tup
             if not pathlib.Path(stream).exists():
                 return iter((('hairpin 1', stream),))
         except OSError:
-            pass
+            return iter((('hairpin 1', stream),))
+
 
     return _read(open(cast(str, stream)))
 
