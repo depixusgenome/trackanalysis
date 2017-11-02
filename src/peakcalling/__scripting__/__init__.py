@@ -25,7 +25,7 @@ def _fit(self, tpe, sequence, oligos, kwa):
         raise IndexError('No distances found')
     return self.apply(*tasks)
 
-@addto(Track) # type: ignore
+@addto(Track)
 def fittohairpin(self, sequence = None, oligos = None, **kwa) -> FitToHairpinDict:
     """
     Computes hairpin fits.
@@ -34,7 +34,7 @@ def fittohairpin(self, sequence = None, oligos = None, **kwa) -> FitToHairpinDic
     """
     return _fit(self, 'fittohairpin', sequence, oligos, kwa)
 
-@addto(Track) # type: ignore
+@addto(Track)
 def fittoreference(self, task: FitToReferenceTask = None, **kwa) -> FitToReferenceDict:
     """
     Computes fits to a reference.
@@ -47,7 +47,7 @@ def fittoreference(self, task: FitToReferenceTask = None, **kwa) -> FitToReferen
                       (task if isinstance(task, FitToReferenceTask) else
                        FitToReferenceTask(**kwa)))
 
-@addto(Track) # type: ignore
+@addto(Track)
 def beadsbyhairpin(self, sequence, oligos, **kwa):
     """
     Computes hairpin fits, sorted by best hairpin.

@@ -3,23 +3,13 @@
 """
 Saves stuff from session to session
 """
-import sys
-import inspect
-from   typing      import Tuple
-from   copy        import deepcopy
+from   typing               import Tuple
+from   copy                 import deepcopy
 
-from   view.dialog import FileDialog
-from   .           import default
-
-Tasks = sys.modules['model.__scripting__'].Tasks
-
-_frame = None
-for _frame in inspect.stack()[1:]:
-    if 'importlib' not in _frame.filename:
-        assert (_frame.filename == '<stdin>'
-                or _frame.filename.startswith('<ipython'))
-    break
-del _frame
+from   utils.decoration     import addto
+from   view.dialog          import FileDialog
+from   model.__scripting__  import Tasks, Task
+from   .                    import default
 
 class ScriptingView:
     "Dummy view for scripting"
@@ -39,7 +29,7 @@ class ScriptingView:
 
         self._ctrl.getGlobal("config").tasks.order.scripting.default = None
 
-        Tasks.setconfig(self._ctrl)
+        getattr(Tasks, 'setconfig')(self._ctrl)
 
     def observe(self):
         "whatever needs to be initialized"
@@ -57,26 +47,7 @@ class ScriptingView:
         "returns the controller"
         return self._ctrl
 
-Tasks.__doc__ = """
-    Possible tasks
-
-    These can be created as follows:
-
-        >>> task = Tasks.alignment()
-        >>> assert isinstance(task, ExtremumAlignmentTask)
-
-    Attribute values can be set. The choice is saved for future creations
-    within the session and in the next ones.  This can be reset by passing the
-    attribute name or an ellipsis.
-
-        >>> assert Tasks.peakselector().align is not None         # default value
-        >>> assert Tasks.peakselector(align = None).align is None # change default
-        >>> assert Tasks.peakselector().align is None             # default has changed
-        >>> assert Tasks.peakselector('align').align is not None  # back to true default
-        >>> assert Tasks.peakselector(align = None).align is None # change default
-        >>> assert Tasks.peakselector(...) is not None            # back to true default
-    """
-
+@addto(Tasks, classmethod)
 def save(cls, task):
     "saves the task to the default config"
     cnf  = scriptapp.control.getGlobal("config").tasks
@@ -92,13 +63,13 @@ def save(cls, task):
 
     cnf[name].set(deepcopy(task))
     scriptapp.control.writeuserconfig()
-Tasks.save = classmethod(save)
 
+@addto(Tasks, staticmethod)
 def getconfig():
     "returns the config accessor"
     return scriptapp.control.getGlobal('config').tasks
-Tasks.getconfig = staticmethod(getconfig)
 
+@addto(Tasks, classmethod)
 def setconfig(cls, cnf):
     "add default values to the config"
     cnf = cnf.getGlobal('config').tasks
@@ -109,24 +80,25 @@ def setconfig(cls, cnf):
                                              bias    = (-.15, .15))
     cnf.alignment.always.default = True
 
-Tasks.setconfig = classmethod(setconfig)
-
-def __call__(self, *resets, __old__ = Tasks.__call__, **kwa):
+@addto(Tasks)
+def __call__(self, *resets, __old__ = Tasks.__call__, **kwa) -> Task:
     if Ellipsis in resets:
         cnf = self.default()
     else:
         cnf = self.getconfig()[self.value].get(default = None)
     if cnf is None:
         return __old__(self, *resets, **kwa)
-    return __old__(self, *resets, current = cnf, **kwa)
-Tasks.__call__ = __call__
+    res = __old__(self, *resets, current = cnf, **kwa)
+    self.save(res)
+    return res
 
+@addto(Tasks, classmethod)
 def defaulttaskorder(cls, __old__ = Tasks.defaulttaskorder) -> Tuple[type, ...]:
     "returns the default task order"
     order = cls.getconfig().order.scripting.get(default = None)
     return __old__(order)
-Tasks.defaulttaskorder = classmethod(defaulttaskorder)
 
+@addto(Tasks, classmethod)
 def defaulttasklist(cls, paths, upto, cleaned:bool, __old__ = Tasks.defaulttasklist):
     "Returns a default task list depending on the type of raw data"
     tasks = __old__(paths, upto, cleaned)
@@ -140,9 +112,6 @@ def defaulttasklist(cls, paths, upto, cleaned:bool, __old__ = Tasks.defaulttaskl
     if isinstance(tasks[0], type(Tasks.cleaning.get())):
         return tasks[:1]+(inst,)+tasks[1:]
     return (inst,)+tasks
-
-Tasks.defaulttasklist = classmethod(defaulttasklist)
-
 
 # pylint: disable=no-member,invalid-name
 scriptapp = default.application(main = ScriptingView, creator = lambda x: x)() # type: ignore

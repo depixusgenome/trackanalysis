@@ -78,8 +78,13 @@ class Tasks(Enum):
     peakalignment  = 'peakalignment'
     peakselector   = 'peakselector'
     fittohairpin   = 'fittohairpin'
+    fittoreference = 'fittoreference'
     beadsbyhairpin = 'beadsbyhairpin'
     dataframe      = 'dataframe'
+
+    __taskorder__  = 'eventdetection', 'peakselector', 'fittohairpin'
+    __cleaning__   = 'cleaning', 'alignment'
+    __tasklist__   = __cleaning__ + __taskorder__
 
     @staticmethod
     def defaults():
@@ -109,12 +114,25 @@ class Tasks(Enum):
             return cls.__create(args[0], kwa, beadsonly)
         return [cls.__create(i, kwa, beadsonly) for i in args]
 
-    @staticmethod
-    def defaulttaskorder(order = None) -> Tuple[Type[Task],...]:
+    @classmethod
+    def defaulttaskorder(cls, order = None) -> Tuple[Type[Task],...]:
         "returns the default task order"
-        default = FitToHairpinTask, PeakSelectorTask, EventDetectionTask
-        items   = tuple(taskorder(order))[::-1] if order else default
-        return cast(Tuple[Type[Task],...], items)
+        if order is None:
+            order =  cls.__taskorder__
+        items = tuple(cls(i)() for i in order[::-1])
+        return cast(Tuple[Type[Task],...], items[::-1])
+
+    @classmethod
+    def defaulttasklist(cls, paths, upto, cleaned:bool):
+        "Returns a default task list depending on the type of raw data"
+        tasks = list(cls.__tasklist__) # type: ignore
+        if cleaned or (isinstance(paths, (tuple, list)) and len(paths) > 1):
+            tasks = [i for i in tasks if i not in cls.__cleaning__] # type: ignore
+
+        itms = (tasks if upto is None       else
+                ()    if upto not in tasks  else
+                tasks[:tasks.index(upto)+1])
+        return tuple(cls(i) for i in itms) # type: ignore
 
     @classmethod
     def tasklist(cls, *tasks, **kwa):
@@ -149,6 +167,15 @@ class Tasks(Enum):
         "returns an iterator over the result of provided tasks"
         return next(iter(cls.processors(*args, beadsonly = beadsonly).run(copy = copy)))
 
+    def dumps(self, **kwa):
+        "returns the json configuration"
+        kwa.setdefault('saveall', False)
+        kwa.setdefault('indent', 4)
+        kwa.setdefault('ensure_ascii', False)
+        kwa.setdefault('sort_keys', True)
+        kwa.setdefault('patch', None)
+        return anastore.dumps(self, **kwa)
+
     @staticmethod
     def _default_action(*args, **kwa):
         call = kwa.pop('call', None)
@@ -164,7 +191,7 @@ class Tasks(Enum):
             call = partial(call, *args, **kwa)
         return ActionTask(call = call)
 
-    def __call__(self, *resets, **kwa):
+    def __call__(self, *resets, **kwa)-> Task:
         fcn     = getattr(self, '_default_'+self.value, None)
         if fcn is not None:
             return fcn(*resets, **kwa)
@@ -178,9 +205,7 @@ class Tasks(Enum):
         kwa.update({i: getattr(cls, i) for i, j in kwa.items() if j is RESET})
         kwa.update({i: getattr(cls, i) for i in resets})
         task = update(deepcopy(cnf), **kwa)
-        task = getattr(task, '__scripting__', lambda x: task)(kwa)
-        self.save(task)
-        return task
+        return getattr(task, '__scripting__', lambda x: task)(kwa)
 
     class _TaskGetter:
         def __get__(self, obj, tpe):
@@ -220,26 +245,6 @@ class Tasks(Enum):
             return cls(arg[0])(**arg[1], **kwa)
 
         raise RuntimeError('arguments are unexpected')
-
-    @classmethod
-    def defaulttasklist(cls, paths, upto, cleaned:bool):
-        "Returns a default task list depending on the type of raw data"
-        tasks = (cls.eventdetection, cls.peakselector) # type: Tuple
-        if (not cleaned) and (isinstance(paths, (str, Path)) or len(paths) == 1):
-            tasks = (cls.cleaning, cls.alignment)+tasks
-        return (tasks if upto is None       else
-                ()    if upto not in tasks  else
-                tasks[:tasks.index(upto)+1])
-
-def dumps(self, **kwa):
-    "returns the json configuration"
-    kwa.setdefault('saveall', False)
-    kwa.setdefault('indent', 4)
-    kwa.setdefault('ensure_ascii', False)
-    kwa.setdefault('sort_keys', True)
-    kwa.setdefault('patch', None)
-    return anastore.dumps(self, **kwa)
-Task.dumps = dumps # type: ignore
 
 @addto(Parallel)
 def __init__(self,

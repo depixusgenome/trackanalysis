@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint: disable=function-redefined
 """
 Monkey patches the Track class.
 
@@ -10,14 +11,15 @@ from   typing                       import (Dict, Optional, Iterator, List,
 from   itertools                    import product
 import numpy                        as     np
 import pandas                       as     pd
-from   utils.decoration             import addto
+from   utils.decoration             import addproperty
 from   control.processor.dataframe  import DataFrameFactory
 from   data.track                   import Track, BEADKEY, dropbeads
 from   data.tracksdict              import TracksDict
 from   ..processor                  import DataCleaningProcessor, DataCleaningException
 
+@addproperty(Track, 'cleaning')
 class TrackCleaningScript:
-    "Adds a method for discarding beads with Cleaning warnings"
+    "Adds means for discarding beads with cleaning warnings"
     def __init__(self, track: Track) -> None:
         self.track = track
 
@@ -64,16 +66,11 @@ class TrackCleaningScript:
 
     def dropbad(self, **kwa) -> Track:
         "removes bad beads *forever*"
-        return dropbeads(self.track, *self.bad(**kwa))
+        return dropbeads(self.track, *self.bad(**kwa)) # type: ignore
 
-@addto(Track) # type: ignore
-@property
-def cleaning(self) -> TrackCleaningScript:
-    "returns a TrackCleaningScript"
-    return TrackCleaningScript(self)
-
+@addproperty(TracksDict, 'cleaning')
 class TracksDictCleaningScript:
-    "Adds a method for discarding beads with Cleaning warnings"
+    "Adds a method for discarding beads with cleaning warnings"
     def __init__(self, tracks: TracksDict) -> None:
         self.tracks = tracks
 
@@ -108,11 +105,5 @@ class TracksDictCleaningScript:
         for key, track in cpy.items():
             cpy[key] = TrackCleaningScript(track).dropbad(**kwa)
         return cpy
-
-@addto(TracksDict) # type: ignore
-@property
-def cleaning(self) -> TracksDictCleaningScript: # pylint: disable=function-redefined
-    "returns a TrackCleaningScript"
-    return TracksDictCleaningScript(self)
 
 __all__ : Tuple[str, ...] = ()

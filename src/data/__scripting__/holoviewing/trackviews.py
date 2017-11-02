@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint: disable=redefined-builtin,function-redefined
 """
 Adds shortcuts for using holoview
 """
-import sys
 from   typing                   import List
 from   functools                import partial
 from   copy                     import deepcopy
 import numpy                    as     np
 
-from   scripting.holoviewing    import addto, displayhook, BasicDisplay
+from   scripting.holoviewing    import addto, displayhook, BasicDisplay, hv
 from   ...track                 import Bead, FoV, Track
 from   ...views                 import Beads, Cycles
-
-
-hv    = sys.modules['holoviews']  # pylint: disable=invalid-name
 
 displayhook(Beads, Cycles)
 
@@ -177,13 +174,13 @@ class BeadDisplay(Display, display = Beads):
         return None
 
 @addto(Track, Beads)
-def map(self, fcn, **kwa):              # pylint: disable=redefined-builtin
+def map(self, fcn, **kwa):
     "returns a hv.DynamicMap with beads and kwargs in the kdims"
     kwa.setdefault('bead', list(i for i in self.keys()))
     return hv.DynamicMap(partial(fcn, self), kdims = list(kwa)).redim.values(**kwa)
 
-@addto(Cycles)                          # type: ignore
-def map(self, fcn, kdim = None, **kwa): # pylint: disable=redefined-builtin,function-redefined
+@addto(Cycles)      # type: ignore
+def map(self, fcn, kdim = None, **kwa):
     "returns a hv.DynamicMap with beads or cycles, as well as kwargs in the kdims"
     if kdim is None:
         kdim = 'cycle' if ('cycle' in kwa and 'bead' not in kwa) else 'bead'
@@ -194,9 +191,8 @@ def map(self, fcn, kdim = None, **kwa): # pylint: disable=redefined-builtin,func
         kwa.setdefault(kdim, list(set(i for i, _ in self.keys())))
     return hv.DynamicMap(partial(fcn, self), kdims = list(kwa)).redim.values(**kwa)
 
-@addto(Bead)       # type: ignore
-def display(self,  # pylint: disable=function-redefined
-            colorbar = True):
+@addto(Bead)        # type: ignore
+def display(self, colorbar = True):
     "displays the bead calibration"
     if self.image is None:
         return
@@ -205,8 +201,8 @@ def display(self,  # pylint: disable=function-redefined
     return (hv.Image(self.image[::-1], bnd, kdims = ['z focus (pixel)', 'profile'])
             (plot = dict(colorbar = colorbar)))
 
-@addto(FoV)        # type: ignore
-def display(self,  # pylint: disable=function-redefined,too-many-arguments
+@addto(FoV)         # type: ignore
+def display(self,   # pylint: disable=too-many-arguments
             beads    = None,
             calib    = True,
             colorbar = True,

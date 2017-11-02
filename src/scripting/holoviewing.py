@@ -3,17 +3,16 @@
 """
 Adds shortcuts for using holoview
 """
-import sys
 from   abc              import ABC, abstractmethod
 from   itertools        import chain, repeat
 
 from   copy             import deepcopy
 
 import numpy            as     np
+import holoviews        as     hv
 from   IPython          import get_ipython # pylint: disable=import-error
 
-from   utils.decoration import addto as _addto
-hv    = sys.modules['holoviews']  # pylint: disable=invalid-name
+from   utils.decoration import addto as _addto, addproperty
 
 def _display_hook(item):
     "displays an item"
@@ -51,20 +50,9 @@ def addto(*types, addhook = 'auto'):
             name = getattr(fcn, '__name__', None)
         if (name == 'display' and addhook == 'auto') or addhook is True:
             for cls in types:
-                fmt.for_type(cls, _display_hook)
+                if cls not in (property, classmethod, staticmethod):
+                    fmt.for_type(cls, _display_hook)
     return _wrap
-
-def addproperty(other, attr = 'display', prop = None, **args):
-    "Adds the property to TracksDict"
-    def _wrapper(cls):
-        if args:
-            prop = property(lambda self: cls(self, **args), doc = cls.__doc__)
-        else:
-            prop = property(cls, doc = cls.__doc__)
-
-        setattr(other, attr, prop)
-        return cls
-    return _wrapper if prop is None else _wrapper(prop)
 
 @displayhook
 class BasicDisplay(ABC):
@@ -79,9 +67,9 @@ class BasicDisplay(ABC):
     def __init_subclass__(cls, **args):
         for name, itm in args.items():
             if isinstance(itm, tuple):
-                addproperty(itm[0], name, **itm[1], prop = cls)
+                addproperty(itm[0], name, cls **itm[1])
             else:
-                addproperty(itm, name, prop = cls)
+                addproperty(itm, name, cls)
 
     def __add__(self, other):
         return self.display() + (other if isinstance(other, hv.Element) else other.display())
@@ -141,4 +129,4 @@ class BasicDisplay(ABC):
     def getredim(self):
         "Returns the keys used by the dynamic map"
 
-__all__ = ['addto', 'displayhook']
+__all__ = ['addto', 'displayhook', 'addproperty']

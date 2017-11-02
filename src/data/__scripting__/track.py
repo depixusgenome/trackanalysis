@@ -74,14 +74,12 @@ def apply(self, *args, copy = True, beadsonly = True):
     "returns an iterator over the result of provided tasks"
     return next(iter(self.processors(*args, beadsonly = beadsonly).run(copy = copy)))
 
-@addto(_Track) # type: ignore
-@property
+@addto(_Track, property)
 def cleancycles(self):
     "returns cleaned cycles"
     return self.apply(*Tasks.defaulttasklist(self.path, Tasks.alignment, self.cleaned))[...,...]
 
-@addto(_Track) # type: ignore
-@property
+@addto(_Track, property)
 def measures(self):
     "returns cleaned cycles for phase 5 only"
     phase = scriptapp.control.getGlobal('config').phase.measure.get()

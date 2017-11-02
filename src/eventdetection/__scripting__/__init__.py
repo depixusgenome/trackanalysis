@@ -16,8 +16,7 @@ from   data                         import Track
 from   data.__scripting__.dataframe import adddataframe
 from   ..data                       import Events
 
-@addto(Track) # type: ignore
-@property
+@addto(Track, property)
 def events(self) -> Events:
     "returns events in phase 5 only"
     return self.apply(*Tasks.defaulttasklist(self.path, Tasks.eventdetection, self.cleaned))

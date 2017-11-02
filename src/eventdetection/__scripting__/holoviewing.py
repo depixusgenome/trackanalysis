@@ -68,7 +68,7 @@ class EventDisplay(CycleDisplay, display = Events): # type: ignore
 
         return self._create(opts, good)
 
-@addto(Events)  # type: ignore
+@addto(Events)
 def map(self, fcn, kdim = None, **kwa): # pylint: disable=redefined-builtin,function-redefined
     "returns a hv.DynamicMap with beads or cycles, as well as kwargs in the kdims"
     if kdim is None:
