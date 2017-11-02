@@ -207,6 +207,40 @@ def cachedio(fcn):
 def addto(*types):
     "add method to a class"
     def _wrapper(fcn):
+        pots = classmethod, staticmethod, property
+        wrap = next((i for i in pots if i in types), None)
         for tpe in types:
-            setattr(tpe, getattr(fcn, 'fget', fcn).__name__, fcn)
+            if tpe in pots:
+                continue
+            if wrap is None:
+                setattr(tpe, getattr(fcn, 'fget', fcn).__name__, fcn)
+            else:
+                setattr(tpe, fcn.__name__, wrap(fcn))
     return _wrapper
+
+def addproperty(other, attr = 'display', prop = None, **args):
+    """
+    Adds the decorated class as a property to another.
+
+        >>> class A:
+        ...     pass
+        >>> @addproperty(A, 'toto')
+        ... class B:
+        ...     "class doc for B"
+        ...     def __init__(self, other):
+        ...         self.other = other
+        >>> a = A()
+        >>> assert A.toto.__doc__ == "class doc for B"
+        >>> assert isinstance(a.toto, B)
+        >>> assert a.toto is not a.toto     # new instances on each call
+        >>> assert a.toto.other is a
+    """
+    def _wrapper(cls):
+        if args:
+            prop = property(lambda self: cls(self, **args), doc = cls.__doc__)
+        else:
+            prop = property(cls, doc = cls.__doc__)
+
+        setattr(other, attr, prop)
+        return cls
+    return _wrapper if prop is None else _wrapper(prop)
