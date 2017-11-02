@@ -42,7 +42,7 @@ class TracksDictDisplay(BasicDisplay,
     _beads      = None
     _keys       = None
     _name       = None
-    _overlay    = 'key'
+    _overlay    = None
     _reference  = None
     _refdims    = True
     _reflayout  = 'left'

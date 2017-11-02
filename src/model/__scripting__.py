@@ -119,7 +119,7 @@ class Tasks(Enum):
         "returns the default task order"
         if order is None:
             order =  cls.__taskorder__
-        items = tuple(cls(i)() for i in order[::-1])
+        items = tuple(type(cls(i)()) for i in order[::-1])
         return cast(Tuple[Type[Task],...], items[::-1])
 
     @classmethod
@@ -129,6 +129,7 @@ class Tasks(Enum):
         if cleaned or (isinstance(paths, (tuple, list)) and len(paths) > 1):
             tasks = [i for i in tasks if i not in cls.__cleaning__] # type: ignore
 
+        upto = getattr(upto, 'value', upto)
         itms = (tasks if upto is None       else
                 ()    if upto not in tasks  else
                 tasks[:tasks.index(upto)+1])
@@ -141,8 +142,8 @@ class Tasks(Enum):
         if isinstance(lst, Task):
             lst = [lst]
 
-        order = cls.defaulttaskorder()
-        for i, itm in enumerate(order[:-1]):
+        torder = cls.defaulttaskorder()[::-1]
+        for i, itm in enumerate(torder[:-1]):
             ind = next((i for i, j in enumerate(lst) if isinstance(j, itm)), None)
             if ind is None:
                 continue
@@ -150,8 +151,8 @@ class Tasks(Enum):
             ival = ind
             while ival > 0 and getattr(lst[ival-1], 'level', None) is Level.none:
                 ival -= 1
-            if ival == 0 or not isinstance(lst[ival-1], order[i+1]):
-                name = order[i+1].__name__.lower().replace('task', '')
+            if ival == 0 or not isinstance(lst[ival-1], torder[i+1]):
+                name = torder[i+1].__name__.lower().replace('task', '')
                 lst.insert(ind, cls.get(name, **kwa))
         return lst
 

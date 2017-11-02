@@ -196,6 +196,7 @@ def map(self, fcn, **kwa): # pylint: disable=redefined-builtin
 
 class PeaksTracksDictDisplay(TracksDictDisplay, peaks = TracksDict): # type: ignore
     "tracksdict display for peaks"
+    _overlay    = 'key'
     _reflayout  = 'bottom'
     _name       = property(lambda _: 'peaks', lambda _1, _2: None) # constant attribute
     def _refindex(self, kdims):

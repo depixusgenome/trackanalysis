@@ -61,13 +61,15 @@ class BasicDisplay(ABC):
     def __init__(self, items, **opts):
         self._items   = items
         for i in self.KEYWORDS:
+            if len(i) >= 2 and i[:2] == '__':
+                continue
             setattr(self, i, opts.pop(i[1:], getattr(self.__class__, i)))
         self._opts    = opts
 
     def __init_subclass__(cls, **args):
         for name, itm in args.items():
             if isinstance(itm, tuple):
-                addproperty(itm[0], name, cls **itm[1])
+                addproperty(itm[0], name, cls, **itm[1])
             else:
                 addproperty(itm, name, cls)
 
