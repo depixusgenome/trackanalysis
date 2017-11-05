@@ -320,27 +320,6 @@ class BaseTaskController(Controller):
         for elem in models:
             self.openTrack(model = elem)
 
-    @staticmethod
-    def __undos__():
-        "yields all undoable user actions"
-        # pylint: disable=unused-variable
-        def _onOpenTrack (controller = None, model = None, **_2):
-            return partial(controller.closeTrack, model[0])
-
-        def _onCloseTrack(controller = None, model = None, **_2):
-            return partial(controller.openTrack, model[0], model)
-
-        def _onAddTask   (controller = None, parent = None, task = None, **_2):
-            return partial(controller.removeTask, parent, task)
-
-        def _onUpdateTask(controller = None, parent = None, task = None, old = None, **_):
-            return partial(controller.updateTask, parent, task, **old)
-
-        def _onRemoveTask(controller = None, parent = None, task = None, old = None, **_):
-            return partial(controller.addTask, parent, task, old.index(task))
-
-        yield from (fcn for name, fcn in locals().items() if name[:3] == '_on')
-
 class TaskController(BaseTaskController):
     "Task controller class which knows about globals"
     def __init__(self, **kwa):
