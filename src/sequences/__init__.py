@@ -55,8 +55,7 @@ def read(stream:Union[pathlib.Path, str, Dict[str,str], TextIO]) -> Iterator[Tup
         except OSError:
             return iter((('hairpin 1', stream),))
 
-
-    return _read(open(cast(str, stream)))
+    return _read(cast(TextIO, open(cast(str, stream))))
 
 PEAKS_DTYPE = [('position', 'i4'), ('orientation', 'bool')]
 PEAKS_TYPE  = Sequence[Tuple[int, bool]]
