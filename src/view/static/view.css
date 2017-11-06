@@ -397,6 +397,36 @@ width: 100%; }
 #dpx-tb-del  { width: 30px; }
 #dpx-tb-quit { float: right; }
 
+#dpx-tb-flist {
+    overflow: hidden;
+    height:50px;
+}
+
+#dpx-tb-flist-menu {
+    display: none;
+    position: absolute;
+    min-width: 400px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 1;
+}
+
+#dpx-tb-flist-btn  { width: 30px; }
+#dpx-tb-flist-menu a {
+    float: none;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+    text-align: left;
+}
+
+#dpx-tb-flist-menu a:hover {
+    background-color: #ddd;
+}
+
+#dpx-tb-flist:hover #dpx-tb-flist-menu {
+    display: block;
+}
+
 .dpx-inner { display: inline-block; }
 .dpx-span  { display: -webkit-inline-box; }
 .dpx-widget label { margin-left: 9px; margin-top: 3px; margin-right: 3px; }

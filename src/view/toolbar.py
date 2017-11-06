@@ -115,17 +115,19 @@ class DpxToolbar(Widget):
     __css__            = ROUTE+"/view.css"
     __javascript__     = ROUTE+"/jquery.min.js"
     __implementation__ = 'toolbar.coffee'
-    open      = props.Int(0)
-    save      = props.Int(0)
-    quit      = props.Int(0)
-    bead      = props.Int(-1)
-    discarded = props.String('')
-    accepted  = props.String('')
-    current   = props.Bool(True)
-    seltype   = props.Bool(True)
-    message   = props.String('')
-    frozen    = props.Bool(True)
-    hasquit   = props.Bool(False)
+    open        = props.Int(0)
+    save        = props.Int(0)
+    quit        = props.Int(0)
+    bead        = props.Int(-1)
+    discarded   = props.String('')
+    accepted    = props.String('')
+    currentbead = props.Bool(True)
+    currentfile = props.Int(-1)
+    filelist    = props.List(props.String)
+    seltype     = props.Bool(True)
+    message     = props.String('')
+    frozen      = props.Bool(True)
+    hasquit     = props.Bool(False)
     def __init__(self, **kwa):
         super().__init__(name = 'Main:toolbar', **kwa)
 
@@ -258,15 +260,15 @@ class RejectedBeadsInput(BeadView):
 
     def setup(self, toolbar):
         "sets-up the gui"
-        def _ondiscard_current(*_):
+        def _ondiscard_currentbead(*_):
             bead = self._bdctrl.bead
             if bead is None:
                 return
             with self.action:
                 self._bdctrl.discarded = set(self._bdctrl.discarded) | {bead}
 
-        def _ondiscard_current_cb(attr, old, value):
-            _ondiscard_current()
+        def _ondiscard_currentbead_cb(attr, old, value):
+            _ondiscard_currentbead()
 
         def _onaccepted_cb(attr, old, new):
             beads = set(self._bdctrl.allbeads) - parseints(new)
@@ -284,13 +286,45 @@ class RejectedBeadsInput(BeadView):
             self.__toolbar.accepted  = ', '.join(str(i) for i in sorted(acc))
             self.__toolbar.discarded = ', '.join(str(i) for i in sorted(disc))
 
-        self._keys.addKeyPress(('keypress.delbead', _ondiscard_current))
-        toolbar.on_change('current',                _ondiscard_current_cb)
+        self._keys.addKeyPress(('keypress.delbead', _ondiscard_currentbead))
+        toolbar.on_change('currentbead',            _ondiscard_currentbead_cb)
         toolbar.on_change('discarded',              _ondiscarded_cb)
         toolbar.on_change('accepted',               _onaccepted_cb)
         self._ctrl.observe("updatetask", "addtask", "removetask", lambda **_: _onproject())
         self._ctrl.getGlobal('project').track.observe(_onproject)
         self.__toolbar = toolbar
+
+class FileListInput(BeadView):
+    "Selection of opened files"
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+        self.__toolbar = None
+
+    def setup(self, tbar):
+        "sets-up the gui"
+        self.__toolbar = tbar
+
+        @self._ctrl.observe
+        def _onOpenTrack(model = None, **_):
+            lst  = list(self._ctrl.track(...))
+            path = lambda i: Path(i if isinstance(i, (str, Path)) else i[0]).name
+            self.__toolbar.currentfile = lst.index(model[0])
+            print(lst, model[0], self.__toolbar.currentfile)
+            self.__toolbar.filelist    = [path(i.path) for i in lst]
+
+        def _oncurrentfile_cb(attr, old, new):
+            new = int(new)
+            if new == -1:
+                return
+
+            track = self._ctrl.getGlobal("project").track
+            lst   = list(self._ctrl.track(...))
+            if new >= len(lst):
+                _onOpenTrack(model = [track.get()])
+            else:
+                track.set(lst[new])
+
+        self.__toolbar.on_change('currentfile', _oncurrentfile_cb)
 
 class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
     "Toolbar"
@@ -312,6 +346,7 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         self.__bead     = BeadInput(**kwa)
         self.__rejected = RejectedBeadsInput(**kwa)
         self.__messages = MessagesInput(**kwa)
+        self.__filelist = FileListInput(**kwa)
         self.__toolbar  = None
         self.__diagopen = TrackFileDialog(self._ctrl)
         self.__diagsave = SaveFileDialog(self._ctrl)
@@ -345,6 +380,7 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         self.__messages.setup(self.__toolbar, doc)
         self.__bead    .setup(self.__toolbar)
         self.__rejected.setup(self.__toolbar)
+        self.__filelist.setup(self.__toolbar)
         self.__setup_title(doc)
 
         def _onproject(items):
