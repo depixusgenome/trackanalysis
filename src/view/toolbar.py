@@ -299,6 +299,19 @@ class FileListInput(BeadView):
     def __init__(self, **kwa):
         super().__init__(**kwa)
         self.__toolbar = None
+        fnames = self._ctrl.getGlobal('css').filenames
+        fnames.defaults = {'many': '{Path(files[0]).stem} + ...',
+                           'single': '{Path(path).stem}'}
+
+    def _pathname(self, lst):
+        cnf = self._ctrl.getGlobal('css').filenames
+        if isinstance(lst, (tuple, list)):
+            if len(lst) > 1:
+                # pylint: disable=eval-used
+                return eval(f'f"{cnf.many.get()}"', dict(files = lst, Path = Path))
+            lst = lst[0]
+        # pylint: disable=eval-used
+        return eval(f'f"{cnf.single.get()}"', dict(path = lst, Path = Path))
 
     def setup(self, tbar):
         "sets-up the gui"
@@ -306,11 +319,9 @@ class FileListInput(BeadView):
 
         @self._ctrl.observe
         def _onOpenTrack(model = None, **_):
-            lst  = list(self._ctrl.track(...))
-            path = lambda i: Path(i if isinstance(i, (str, Path)) else i[0]).name
+            lst  = [next(i) for i in self._ctrl.tasks(...)]
             self.__toolbar.currentfile = lst.index(model[0])
-            print(lst, model[0], self.__toolbar.currentfile)
-            self.__toolbar.filelist    = [path(i.path) for i in lst]
+            self.__toolbar.filelist    = [self._pathname(i.path) for i in lst]
 
         def _oncurrentfile_cb(attr, old, new):
             new = int(new)
@@ -318,7 +329,7 @@ class FileListInput(BeadView):
                 return
 
             track = self._ctrl.getGlobal("project").track
-            lst   = list(self._ctrl.track(...))
+            lst   = [next(i) for i in self._ctrl.tasks(...)]
             if new >= len(lst):
                 _onOpenTrack(model = [track.get()])
             else:
