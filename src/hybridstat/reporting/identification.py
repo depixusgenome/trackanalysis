@@ -10,6 +10,9 @@ from pathlib                import Path
 from openpyxl               import load_workbook
 from excelreports.creation  import writecolumns
 
+ID_TYPE  = Tuple[int,str,Optional[float],Optional[float]]
+IDS_TYPE = List[ID_TYPE]
+
 def _id(row, ibead):
     val = row[ibead].value
     if val is None:
@@ -41,7 +44,7 @@ def _add(info, row, ibead, ref):
 
     if isinstance(val, str):
         try:
-            return int(val.split('B')[-1]) if 'B' in val else int(val)
+            beadid = int(val.split('B')[-1]) if 'B' in val else int(val)
         except ValueError:
             return
 
@@ -52,7 +55,7 @@ def _add(info, row, ibead, ref):
 
     info.setdefault(ref, []).append(beadid)
 
-def _read_summary(rows) -> List[Tuple[int, str, Optional[float], Optional[float]]]:
+def _read_summary(rows) -> IDS_TYPE:
     ids   = [None, None, None, None] # type: List[Optional[int]]
     names = ('bead', 'reference', 'stretch', 'bias')
     for row in rows:
@@ -74,7 +77,7 @@ def _read_summary(rows) -> List[Tuple[int, str, Optional[float], Optional[float]
                 info.append(cast(Tuple[int, str, Optional[float], Optional[float]], vals))
     return info
 
-def _read_identifications(rows) -> List[Tuple[int,str]]:
+def _read_identifications(rows) -> IDS_TYPE:
     info = dict() # type: Dict[str,List[int]]
     inds = []     # type: List[Tuple[int,str]]
     for row in rows:
@@ -89,13 +92,12 @@ def _read_identifications(rows) -> List[Tuple[int,str]]:
         for ibead, ref in inds:
             _add(info, row, ibead, ref)
 
-    res = [] # type: List[Tuple[int,str]]
+    res = [] # type: IDS_TYPE
     for hpin, beads in info.items():
-        res.extend((i,hpin) for i in beads)
+        res.extend((i, hpin, None, None) for i in beads)
     return res
 
-def readparams(fname:str) -> Union[List[Tuple[int,str,Optional[float],Optional[float]]],
-                                   List[Tuple[int,str]]]:
+def readparams(fname:str) -> IDS_TYPE:
     "extracts bead ids and their reference from a report"
     if not Path(fname).exists():
         raise ValueError("Id file path unreachable","warning")
@@ -112,7 +114,7 @@ def readparams(fname:str) -> Union[List[Tuple[int,str,Optional[float],Optional[f
 
     for sheetname in wbook.sheetnames:
         return _read_identifications(iter(wbook[sheetname].rows))
-    res = [] # type: List[Tuple[int, str]]
+    res = [] # type: IDS_TYPE
     return res
 
 def writeparams(fname:str, items: Sequence[Tuple[str,Sequence[int]]]):

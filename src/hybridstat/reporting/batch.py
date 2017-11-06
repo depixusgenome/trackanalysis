@@ -13,7 +13,6 @@ from model.task                     import Task, TrackReaderTask
 from control.processor.batch        import BatchTask, BatchProcessor, PathIO
 from peakfinding.reporting.batch    import PeakFindingBatchTemplate
 from peakcalling                    import Range
-from peakcalling.tohairpin          import GaussianProductFit
 from peakcalling.processor          import (BeadsByHairpinTask, # pylint: disable=unused-import
                                             FitToHairpinTask, DistanceConstraint,
                                             Constraints)
@@ -29,12 +28,13 @@ def readconstraints(idtask   : FitToHairpinTask,
     if idpath is None or not Path(idpath).exists():
         return idtask
 
+    deflt = FitToHairpinTask.DEFAULT_FIT()
     for item in readparams(cast(str, idpath)):
         cstrs[item[0]] = DistanceConstraint(item[1], {})
         if len(item) == 2 or not useparams:
             continue
 
-        rngs = idtask.fit.get(item[1], GaussianProductFit())
+        rngs = idtask.fit.get(item[1], deflt)
         if item[2] is not None:
             stretch = Range(item[2], rngs.stretch[-1]*.1, rngs.stretch[-1])
             cstrs[item[0]].constraints['stretch'] = stretch
