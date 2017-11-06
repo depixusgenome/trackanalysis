@@ -9,7 +9,7 @@ from   itertools        import chain, repeat
 from   copy             import deepcopy
 
 import numpy            as     np
-import holoviews        as     hv
+import holoviews        as     hv          # pylint: disable=import-error
 from   IPython          import get_ipython # pylint: disable=import-error
 
 from   utils.decoration import addto as _addto, addproperty
