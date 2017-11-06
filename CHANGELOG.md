@@ -1,3 +1,14 @@
+# tag cycles_v4.7
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+### Menu
+
+Added access to previously loaded tracks.
+
+### Bugs
+
+* Could not read identification files
+
 # tag cycles_v4.6
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
