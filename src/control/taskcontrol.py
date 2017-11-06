@@ -10,13 +10,19 @@ The controller stores:
 It can add/delete/update tasks, emitting the corresponding events
 """
 from typing         import (Union, Iterator, Type, cast, Tuple,
-                            Optional, Any, List, Iterable, Dict)
+                            Optional, Any, List, Iterable, Dict, overload,
+                            TYPE_CHECKING)
 from pathlib        import Path
 from functools      import partial
 
 from model.task     import Task, RootTask, TaskIsUniqueError, taskorder, TASK_ORDER
 from .event         import Controller, NoEmission
 from .processor     import Cache, Processor, run as _runprocessors
+
+if TYPE_CHECKING:
+    from data import Track # pylint: disable=unused-import
+    class _Ellipsis:
+        pass
 
 _m_none    = type('_m_none', (), {}) # pylint: disable=invalid-name
 _M_PROC_T  = Type[Processor]
@@ -183,8 +189,25 @@ class BaseTaskController(Controller):
         ctrl = ProcessorController() if parent is None else self.__items[parent]
         return ctrl.task(task, noemission = noemission)
 
-    def track(self, parent : Optional[RootTask]):
+    @overload
+    def track(self, parent: None) -> None: # pylint: disable=no-self-use,unused-argument
+        "returns None"
+
+    @overload
+    def track(self, # pylint: disable=no-self-use,unused-argument,function-redefined
+              parent: RootTask) -> 'Track':
         "returns the root cache, i;e. the track"
+
+    @overload
+    def track(self, # pylint: disable=no-self-use,unused-argument,function-redefined
+              parent: '_Ellipsis') -> Iterator['Track']:
+        "returns all root cache, i;e. tracks"
+
+    def track(self, parent): # pylint: disable=function-redefined
+        "returns the root cache, i;e. the track"
+        if parent is Ellipsis:
+            return (i.data[0].cache() for i in self.__items.values())
+
         if parent not in self.__items:
             return None
         track = self.__items[parent].data[0].cache()
@@ -193,14 +216,14 @@ class BaseTaskController(Controller):
             track = self.__items[parent].data[0].cache()
         return track
 
-    def tasks(self, task:Optional[RootTask]
+    def tasks(self, parent: Union[None, '_Ellipsis', RootTask]
              ) -> Union[Iterator[Iterator[Task]], Iterator[Task]]:
-        "Returns a data object in memory."
-        if task is None:
+        "Returns tasks associated to one or each root"
+        if parent is None:
             return iter(tuple())
-        if task is Ellipsis:
-            return iter(cast(Iterator[Task], self.tasks(tsk)) for tsk in self.__items)
-        return iter(tsk for tsk in self.__items[task].model)
+        if parent is Ellipsis:
+            return iter(iter(tsk for tsk in itm.model) for itm in self.__items.values())
+        return iter(tsk for tsk in self.__items[cast(RootTask, parent)].model)
 
     def cache(self, parent:RootTask, tsk:Optional[Task]):
         "Returns the cache for a given task"
