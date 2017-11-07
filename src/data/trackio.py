@@ -31,7 +31,7 @@ def _glob(path:str):
     ind2 = path.find('[')
     ind  = ind1 if ind2 == -1 else ind2 if ind1 == -1 else min(ind1, ind2)
     if ind == -1:
-        return path
+        return Path(path)
 
     root = Path(path[:ind])
     if path[ind-1] not in ('/', '\\') and root != Path(path).parent:
@@ -282,6 +282,7 @@ class LegacyGRFilesIO(_TrackIO):
 
         grdirs   = tuple(str(i) for i in grdirs)
         projects = opts.get("cgrdir", cls.__GRDIR)
+        allleaves = opts.get('allleaves', False)
         if isinstance(projects, str):
             projects = (projects,)
 
@@ -291,10 +292,18 @@ class LegacyGRFilesIO(_TrackIO):
             if proj:
                 grdir = f'/**/{proj}/*{cls.__CGREXT}'
                 part  = partial(fcn, re.compile(rf'\b{proj}\b').search, grdir)
-            else:
-                grdir = f'/**/*{cls.__CGREXT}'
+            elif not allleaves:
                 part  = partial(fcn, lambda _: False, grdir)
-            res.update(cls.__scan(grdirs, part))
+            else:
+                grdir = f'/**'
+                # add check on gr-files
+                part  = partial(fcn, lambda _: True, grdir)
+
+            update=cls.__scan(grdirs, part)
+            if allleaves:
+                res.update({Path(_).parent.stem:_ for _ in update.values()})
+            else:
+                res.update(update)
         return res
 
     @classmethod

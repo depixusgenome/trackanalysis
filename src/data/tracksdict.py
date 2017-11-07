@@ -30,6 +30,10 @@ class TracksDict(dict):
         >>> TRACKS = TracksDict(tracks, grs, match)
         >>> TRACKS['AAA'].cycles                  # access the track
 
+    If the option allleaves = True, the parent directory containing the gr-files is used
+    for pairing gr and trk files.
+
+    pair track
     By default, the name of the track file is used as the key. Using the *match*
     requires defining a group which will be used as the key.
 
@@ -60,7 +64,7 @@ class TracksDict(dict):
     Should a key  with "~", then that keye
     only those keys.
     """
-    _SCAN_OPTS  = ('cgrdir',)
+    _SCAN_OPTS  = ('cgrdir', 'allleaves')
     _NTHREADS   = 4
     _TRACK_TYPE = Track
     def __init__(self,          # pylint: disable=too-many-arguments
