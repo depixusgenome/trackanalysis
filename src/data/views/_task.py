@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Makes TrackViews for specific tasks easier"
-from typing import (Generic, TypeVar, Type, Union, Optional,
-                    Iterable, Sequence, Iterator, FrozenSet, cast)
-from abc    import abstractmethod
-from ._view import TrackView
+from typing     import (Generic, TypeVar, Type, Union, Optional,
+                        Iterable, Sequence, Iterator, FrozenSet, cast)
+from abc        import abstractmethod
+import numpy    as     np
+
+from ._view     import TrackView, isellipsis
 
 Config = TypeVar('Config')
 Key    = TypeVar('Key')
@@ -24,6 +26,10 @@ class TaskView(TrackView, Generic[Config, Key]):
 
         self.config: Config         = cast(Config, cnf)
         self.__keys: FrozenSet[Key] = None
+
+    def __init_subclass__(cls, transform2beads = False, **_):
+        if transform2beads:
+            cls._transform_ids = cls._transform_to_bead_ids
 
     @classmethod
     def tasktype(cls) -> Type[Config]:
@@ -59,6 +65,23 @@ class TaskView(TrackView, Generic[Config, Key]):
     @staticmethod
     def _transform_ids(sel: Iterable) -> Iterator[Key]:
         return cast(Iterator[Key], iter(sel))
+
+    @classmethod
+    def _transform_to_bead_ids(cls, sel: Iterable) -> Iterator[Key]:
+        for i in sel:
+            if isinstance(i, tuple):
+                if len(i) == 0:
+                    continue
+                elif len(i) == 2 and not isellipsis(i[1]):
+                    raise NotImplementedError()
+                elif len(i) > 2 :
+                    raise KeyError(f"Unknown key {i} in {cls}")
+                if np.isscalar(i[0]):
+                    yield i[0]
+                else:
+                    yield from i[0]
+            else:
+                yield i
 
     @abstractmethod
     def compute(self, key: Key):

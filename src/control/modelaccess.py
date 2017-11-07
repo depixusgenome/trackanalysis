@@ -143,8 +143,7 @@ class TaskPlotModelAccess(PlotModelAccess):
         ctrl  = self.processors(*procs)
         ibead = self.bead
         if ctrl is None:
-            track = self.track
-            return None if track is None else track.cycles[ibead,...]
+            return None
 
         return next(iter(ctrl.run(copy = True)))[ibead, ...]
 

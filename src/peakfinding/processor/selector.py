@@ -27,7 +27,7 @@ class PeakSelectorTask(PeakSelector, Task):
         PeakSelector.__init__(self, **kwa)
 
 Output = Tuple[BEADKEY, Iterator[PeakOutput]]
-class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]):
+class PeaksDict(TaskView[PeakSelectorTask,BEADKEY], transform2beads = True):
     """
     * `withmeasure` allows computing whatever one wants on events in a peak. One
     or two functions should be provided:
@@ -163,23 +163,6 @@ class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]):
         if isinstance(self.data, self.__class__):
             return (i for i in self.data.keys() if Beads.isbead(i))
         return (i for i, _ in self.data.keys() if Beads.isbead(i))
-
-    @staticmethod
-    def _transform_ids(sel: Iterable) -> Iterator[BEADKEY]:
-        for i in sel:
-            if isinstance(i, tuple):
-                if len(i) == 0:
-                    continue
-                elif len(i) == 2 and not isellipsis(i[1]):
-                    raise NotImplementedError()
-                elif len(i) > 2 :
-                    raise KeyError(f"Unknown key {i} in PeaksDict")
-                if np.isscalar(i[0]):
-                    yield i[0]
-                else:
-                    yield from i[0]
-            else:
-                yield i
 
     def _precision(self, ibead: int, precision: Optional[float]):
         return self.config.getprecision(precision, getattr(self.data, 'track', None), ibead)

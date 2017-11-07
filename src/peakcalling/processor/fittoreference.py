@@ -162,26 +162,9 @@ class FitToReferenceTask(Task):
         "whether this task implies long computations"
         return True
 
-class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
+class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY], transform2beads = True):
     "iterator over peaks grouped by beads"
     level = Level.bead
-    @staticmethod
-    def _transform_ids(sel: Iterable) -> Iterator[BEADKEY]:
-        for i in sel:
-            if isinstance(i, tuple):
-                if len(i) == 0:
-                    continue
-                elif len(i) == 2 and not isellipsis(i[1]):
-                    raise NotImplementedError()
-                elif len(i) > 2 :
-                    raise KeyError(f"Unknown key {i} in FitToReferenceDict")
-                if np.isscalar(i[0]):
-                    yield i[0]
-                else:
-                    yield from i[0]
-            else:
-                yield i
-
     def _keys(self, sel:Optional[Sequence], _: bool) -> Iterable:
         if self.config.defaultdata:
             return super()._keys(sel, _)
@@ -192,22 +175,25 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
         seq = self._transform_ids(cast(Iterable, sel))
         return super()._keys([i for i in seq if i in available], True)
 
+    def optimize(self, key: BEADKEY, data: FitToRefArray):
+        "returns stretch & bias"
+        if len(data) == 0:
+            return 1., 0.
+
+        ref           = self.config.getdata(key)
+        fit           = self.config.fitalg
+        stretch, bias = fit.optimize(ref.data, fit.frompeaks(data))[1:]
+        if ref.params not in ((1., 0.), None):
+            return stretch/ref.params[0], bias-ref.params[1]*ref.params[0]/stretch
+        return stretch, bias
+
     def compute(self, key: BEADKEY) -> np.ndarray:
         "Action applied to the frame"
-        fit  = self.config.fitalg
         data = FitToRefArray(list(cast(Iterator[PeakOutput], self.data[key])))
         if len(data):
             data.discarded = getattr(data[0][1], 'discarded', 0)
 
-        if key not in self.config.fitdata:
-            raise KeyError(f"Missing reference id {key} in {self}")
-
-        ref           = self.config.getdata(key)
-        stretch, bias = fit.optimize(ref.data, fit.frompeaks(data))[1:]
-        if ref.params not in ((1., 0.), None):
-            stretch, bias = (stretch/ref.params[0],
-                             bias-ref.params[1]*ref.params[0]/stretch)
-
+        stretch, bias    = self.optimize(key, data)
         data.params      = stretch, bias
         data['peaks'][:] = (data['peaks']-bias)*stretch
 
