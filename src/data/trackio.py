@@ -296,12 +296,13 @@ class LegacyGRFilesIO(_TrackIO):
                 part  = partial(fcn, lambda _: False, grdir)
             else:
                 grdir = f'/**'
-                # add check on gr-files
                 part  = partial(fcn, lambda _: True, grdir)
 
-            update=cls.__scan(grdirs, part)
+            update = cls.__scan(grdirs, part)
             if allleaves:
-                res.update({Path(_).parent.stem:_ for _ in update.values()})
+                # add check on gr-files
+                res.update({Path(_).parent.stem:_ for _ in update.values()
+                            if cls.__GREXT in _.suffixes})
             else:
                 res.update(update)
         return res
