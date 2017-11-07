@@ -166,7 +166,7 @@ class ChiSquareFit(GaussianProductFit):
         "optimizes the cost function"
         peaks = np.asarray(peaks)
         ret   = super().optimize(peaks)
-        if self.symmetry is Symmetry.right:
+        if self.symmetry is Symmetry.right and len(peaks) > 1:
             hpin = self.expectedpeaks
             return Distance(chisquarevalue(hpin, (peaks-ret[2])*ret[1], self.firstpeak,
                                            self.symmetry, self.window, 1., 0.)[0],
