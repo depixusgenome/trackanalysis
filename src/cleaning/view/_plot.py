@@ -19,13 +19,8 @@ from    ._model                 import DataCleaningModelAccess
 from    ._widget                import WidgetMixin
 from    ..processor             import DataCleaningProcessor, DataCleaning
 
-class GuiDataCleaningProcessor(DataCleaningProcessor):
+class GuiDataCleaningProcessor(DataCleaningProcessor, canregister = False):
     "gui data cleaning processor"
-    @staticmethod
-    def canregister():
-        "allows discarding some specific processors from automatic registration"
-        return False
-
     @classmethod
     def compute(cls, frame, info, cache = None, **cnf):
         "returns the result of the beadselection"
