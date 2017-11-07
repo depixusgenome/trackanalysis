@@ -8,7 +8,7 @@ from   typing                           import (Optional, # pylint: disable=unus
 import numpy                            as     np
 
 from   utils                            import initdefaults
-from   data.views                       import TaskView, BEADKEY, isellipsis
+from   data.views                       import TaskView, BEADKEY
 from   model.task                       import Task, Level
 from   control.processor.taskview       import TaskViewProcessor
 from   eventdetection.data              import Events
