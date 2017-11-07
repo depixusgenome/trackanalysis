@@ -23,6 +23,7 @@ from ._widget                   import (PeaksSequencePathWidget,
                                         PeaksStatsWidget, PeakListWidget,
                                         PeakIDPathWidget, AdvancedWidget,
                                         PeaksOligoListWidget)
+from ._processors               import GuiFitToReferenceProcessor, GuiPeakSelectorProcessor
 from ._io                       import setupio
 
 class PeaksSequenceHover(Model, SequenceHoverMixin):
@@ -144,26 +145,24 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         return peaks
 
     def __data(self) -> Tuple[dict, dict]:
-        cycles = self._model.runbead()
-        data   = {i: np.empty(0, dtype = 'f4') for i in ('z', 'count')}
-        if cycles is None:
-            return data, self.__peaks(None)
-
-        items = tuple(i for _, i in cycles)
-        if len(items) == 0 or not any(len(i) for i in items):
-            return data, self.__peaks(None)
-
+        data  = {i: np.empty(0, dtype = 'f4') for i in ('z', 'count')}
         peaks = self._model.peakselection.task
         if peaks is None:
             return data, self.__peaks(None)
 
-        track = self._model.track
-        dtl   = peaks.detailed(items, (track, self._model.bead))
+        dtlstore = [None]
+        _        = (self._model.runbead(GuiPeakSelectorProcessor(dtlstore),
+                                        GuiFitToReferenceProcessor(self._model))
+                    [self._model.bead])
+        if dtlstore[0] is None or len(dtlstore[0].positions) == 0:
+            return data, self.__peaks(None)
 
+        dtl   = dtlstore[0]
         maxv  = max(peaks.histogram.kernelarray())
         data  = dict(z     = (dtl.binwidth*np.arange(len(dtl.histogram), dtype = 'f4')
                               +dtl.minvalue),
-                     count = dtl.histogram/(maxv*track.ncycles)*100.)
+                     count = dtl.histogram/(maxv*self._model.track.ncycles)*100.)
+        data['ref'] = self._model.fittoreference(data['z'])
         return data, self.__peaks(dtl)
 
     def _create(self, doc):

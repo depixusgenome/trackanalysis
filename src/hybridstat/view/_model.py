@@ -1,27 +1,145 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Model for peaksplot"
-from typing                     import Optional, Dict, Any, cast
+from typing                     import Optional, Dict, Any, Tuple, cast
 from itertools                  import product
+import pickle
 
 import numpy                    as     np
+from   scipy.interpolate        import interp1d
 
 from sequences.modelaccess      import (SequencePlotModelAccess,
                                         FitParamProp    as _FitParamProp,
                                         SequenceKeyProp as _SequenceKeyProp)
 
 from utils                      import updatecopy
-from control.processor          import processors
+from control.modelaccess        import PROPS, TaskAccess
+from control.processor          import processors, Processor
 from control.modelaccess        import PROPS, TaskAccess
 
+from model.task                 import RootTask
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
 from peakfinding.processor      import PeakSelectorTask
 from peakfinding.probabilities  import Probability
 from peakcalling.tohairpin      import Distance
+from peakcalling.processor.fittoreference   import FitData
 from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
-                                        FitBead)
+                                        FitToReferenceTask, FitBead)
 
 from ..reporting.batch          import fittohairpintask
+
+class FitToReferenceAccess(TaskAccess):
+    "access to the FitToReferenceTask"
+    def __init__(self, ctrl):
+        super().__init__(ctrl, FitToReferenceTask)
+        self.__store.defaults           = dict(id = None, cache = {}, reference = None)
+        self.configtask.histmin.default = 1e-3
+
+    @staticmethod
+    def _configattributes(kwa):
+        return {}
+
+    @property
+    def __store(self):
+        return self.project.fittoreference.gui
+
+    def __setconfig(self, ident, cache, ref):
+        self.__store.update(id        = ident,
+                            cache     = cache,
+                            reference = ref)
+
+    __params = property(lambda self: self.__store.cache)
+    __ref    = property(lambda self: self.__store.reference)
+    __id     = property(lambda self: self.__store.id)
+
+    @property
+    def params(self) -> Optional[Tuple[float, float]]:
+        "returns the computed stretch or 1."
+        tsk = cast(FitToReferenceTask, self.task)
+        if tsk is None:
+            return None
+
+        ibead = self.bead
+        if ibead not in tsk.fitdata:
+            return 1., 0.
+
+        return self.__params.get().get(ibead, None)
+
+    @params.setter
+    def params(self, vals):
+        self.__params.get()[self.bead] = tuple(vals)
+
+    stretch = property(lambda self: self.params[0])
+    bias    = property(lambda self: self.params[1])
+
+    @property
+    def reference(self) -> Optional[RootTask]:
+        "returns the current reference"
+        return self.__ref.get()
+
+    @reference.setter
+    def reference(self, value:Optional[RootTask]):
+        "sets the current reference"
+        if value is self.__ref.get():
+            return
+
+        if value is None:
+            self.remove()
+            self.__store.update(id = None, cache = {}, reference = None)
+        else:
+            ident, fitdata = self.__computefitdata()
+            self.update(fitdata = fitdata)
+            self.__store.update(id = ident, cache = {}, reference = value)
+
+    def __computefitdata(self):
+        ibead = self.bead
+        task  = cast(FitToReferenceTask, self.task)
+        ident = pickle.dumps(tuple(self._ctrl.tasks(self.reference)))
+        if self.__id.get() == ident:
+            if ibead in task.fitdata:
+                return None, None
+            fits = dict(task.fitdata)
+        else:
+            fits = dict()
+
+        peaks       = next(iter(self._ctrl.run(self.reference, EventDetectionTask,
+                                               copy = True)))
+        fits[ibead] = FitData(task.fitalg.frompeaks(peaks[ibead,...]), (1., 0.))
+        return ident, fits
+
+    def resetmodel(self):
+        "adds a bead to the task"
+        task = self.task
+        if task is None:
+            return
+
+        ident, fits = self.__computefitdata()
+        if fits is None:
+            return
+
+        self.update(fitdata = fits)
+        if ident == self.__id.get():
+            self.__store.update(id = ident)
+        else:
+            self.__store.update(id = ident, cache = {})
+
+    def refhistogram(self, xaxis):
+        "returns the histogram interpolated to the provided values"
+        task  = self.task
+        ibead = self.bead
+        if task is None or ibead not in task.fitdata:
+            return np.full(len(xaxis), np.NaN, dtype = 'f4')
+
+        data  = task.fitdata[ibead].data
+        good  = data.histogram >= self.configtask.histmin.get()
+        histx = np.arange(len(data), dtype = 'f4')[good]*data.binwidth+data.minvalue
+        histy = data.histogram[good]
+        reslt = interp1d(histx, histy,
+                         fill_value    = np.NaN,
+                         bounds_error  = False,
+                         assume_sorted = True)(xaxis)
+        reslt[reslt <= self.configtask.histmin.get()*1.01] = 0.
+        return reslt
 
 class FitToHairpinAccess(TaskAccess):
     "access to the FitToHairpinTask"
@@ -116,6 +234,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         self.fits : FitBead                 = None
         self.peaks: Dict[str, np.ndarray]   = dict()
         self.estimatedbias                  = 0.
+        self.reference                      = FitToReferenceAccess(self)
         self.identification                 = FitToHairpinAccess(self)
 
         cls = type(self)
@@ -164,22 +283,6 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         self.__set_probas(peaks)
         return self.peaks
 
-    def runbead(self, *_):
-        "returns a tuple (dataitem, bead) to be displayed"
-        if self.track is None or self.checkbead(False):
-            return None
-
-        root  = self.roottask
-        ibead = self.bead
-        task  = self.eventdetection.task
-        if task is None:
-            task  = self.config.tasks.eventdetection.get()
-            ind   = self.eventdetection.index
-            beads = next(iter(self._ctrl.run(root, ind-1, copy = True)))
-            proc  = next(processors(task)) # type: ignore
-            return proc.apply(beads, **task.config())[ibead, ...]
-        return next(iter(self._ctrl.run(root, task, copy = True)))[ibead, ...]
-
     def reset(self) -> bool: # type: ignore
         "adds tasks if needed"
         if self.track is None or self.checkbead(False):
@@ -191,6 +294,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         if self.peakselection.task is None:
             self.peakselection.update()
 
+        self.reference.resetmodel()
         self.identification.resetmodel(self)
         return False
 
