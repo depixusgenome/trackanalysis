@@ -19,7 +19,7 @@ from    ._model                 import DataCleaningModelAccess
 from    ._widget                import WidgetMixin
 from    ..processor             import DataCleaningProcessor, DataCleaning
 
-class GuiDataCleaningProcessor(DataCleaningProcessor, canregister = False):
+class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"
     @classmethod
     def compute(cls, frame, info, cache = None, **cnf):

@@ -95,7 +95,7 @@ class FitBead(NamedTuple): # pylint: disable=missing-docstring
     peaks      : PEAKS_TYPE
     events     : PeakEvents
 
-class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY], transform2beads = True):
+class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]):
     "iterator over peaks grouped by beads"
     level  = Level.bead
     @staticmethod
@@ -115,6 +115,10 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY], transform2beads = Tr
                           view      = PeaksArray,
                           discarded = disc)
         return np.array([i for i, _ in evts], dtype = 'f4'), cast(PeaksArray, evts)
+
+    @classmethod
+    def _transform_ids(cls, sel):
+        return cls._transform_to_bead_ids(sel)
 
     def __distances(self, key: BEADKEY, bead: Sequence[float])->Dict[Optional[str], Distance]:
         fits        = self.config.fit

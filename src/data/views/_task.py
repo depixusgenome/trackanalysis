@@ -27,10 +27,6 @@ class TaskView(TrackView, Generic[Config, Key]):
         self.config: Config         = cast(Config, cnf)
         self.__keys: FrozenSet[Key] = None
 
-    def __init_subclass__(cls, transform2beads = False, **_):
-        if transform2beads:
-            cls._transform_ids = cls._transform_to_bead_ids
-
     @classmethod
     def tasktype(cls) -> Type[Config]:
         "returns the config type"

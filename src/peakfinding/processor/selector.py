@@ -9,7 +9,7 @@ from   functools                  import partial
 import numpy                      as     np
 
 from   model                      import Level, Task
-from   data.views                 import BEADKEY, TaskView, Beads, isellipsis
+from   data.views                 import BEADKEY, TaskView, Beads
 from   control.processor.taskview import TaskViewProcessor
 from   ..selector                 import PeakSelector, Output as PeakOutput, PeaksArray
 
@@ -27,7 +27,7 @@ class PeakSelectorTask(PeakSelector, Task):
         PeakSelector.__init__(self, **kwa)
 
 Output = Tuple[BEADKEY, Iterator[PeakOutput]]
-class PeaksDict(TaskView[PeakSelectorTask,BEADKEY], transform2beads = True):
+class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]):
     """
     * `withmeasure` allows computing whatever one wants on events in a peak. One
     or two functions should be provided:
@@ -127,6 +127,10 @@ class PeaksDict(TaskView[PeakSelectorTask,BEADKEY], transform2beads = True):
     def multiples(arr: PeaksArray) -> np.ndarray:
         "returns an array indicating where single events are"
         return np.array([isinstance(i, (list, np.ndarray)) for i in arr], dtype = 'bool')
+
+    @classmethod
+    def _transform_ids(cls, sel):
+        return cls._transform_to_bead_ids(sel)
 
     @classmethod
     def __measure(cls, singles, multiples, _, info):

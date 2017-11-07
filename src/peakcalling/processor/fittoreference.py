@@ -162,9 +162,13 @@ class FitToReferenceTask(Task):
         "whether this task implies long computations"
         return True
 
-class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY], transform2beads = True):
+class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
     "iterator over peaks grouped by beads"
     level = Level.bead
+    @classmethod
+    def _transform_ids(cls, sel):
+        return cls._transform_to_bead_ids(sel)
+
     def _keys(self, sel:Optional[Sequence], _: bool) -> Iterable:
         if self.config.defaultdata:
             return super()._keys(sel, _)

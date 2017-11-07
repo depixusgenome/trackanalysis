@@ -58,14 +58,10 @@ class Processor(Generic[TaskType]):
             raise TypeError('"task" must have type '+ str(self.tasktype))
         self.task: TaskType = cast(TaskType, task)
 
-    def __init_subclass__(cls, canregister = False, **args):
-        if canregister is False:
-            cls.canregister = staticmethod(lambda: False)
-
     @classmethod
     def canregister(cls):
         "allows discarding some specific processors from automatic registration"
-        if cls.__abstractmethods__:
+        if cls.__abstractmethods__ or cls.__name__.startswith('Gui'):
             return False
         return not isinstance(cls.tasktype, cast(type, TypeVar))
 
