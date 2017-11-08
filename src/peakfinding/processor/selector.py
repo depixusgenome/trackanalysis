@@ -4,7 +4,7 @@
 Deals with tasks & processors for finding peaks
 """
 
-from   typing                     import Iterable, Iterator, Tuple, Optional
+from   typing                     import Iterator, Tuple, Optional
 from   functools                  import partial
 import numpy                      as     np
 
