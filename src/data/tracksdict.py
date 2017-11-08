@@ -146,7 +146,7 @@ class TracksDict(dict):
             fcn = lambda i: tmp.match(str(i if isinstance(i, (str, Path)) else i[0]))
         else:
             grp = False
-            fcn = lambda i: (Path(str(i if isinstance(i, (str, Path)) else i[0])).name
+            fcn = lambda i: (Path(str(i if isinstance(i, (str, Path)) else i[0])).stem
                              if match is None else match)
 
         if not grs:

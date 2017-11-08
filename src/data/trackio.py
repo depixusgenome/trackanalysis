@@ -4,7 +4,8 @@
 "Loading and save tracks"
 import  sys
 from    typing             import (Sequence, Callable, Any, Union, Tuple, Optional,
-                                   Iterator, Dict, cast, overload, TYPE_CHECKING)
+                                   Iterator, Dict, cast, overload, TypeVar,
+                                   TYPE_CHECKING)
 from    itertools          import chain
 from    concurrent.futures import ThreadPoolExecutor
 from    inspect            import signature
@@ -22,6 +23,9 @@ if TYPE_CHECKING:
     # pylint: disable=unused-import
     from data.track      import Track
     from data.tracksdict import TracksDict
+    TDICT_T = TypeVar('TDICT_T', bound = 'TracksDict')
+else:
+    TDICT_T = 'TracksDict'
 
 PATHTYPE  = Union[str, Path]
 PATHTYPES = Union[PATHTYPE,Tuple[PATHTYPE,...]]
@@ -359,45 +363,32 @@ class Handler:
         self.handler = handler
 
     def __call__(self, track = None, beadsonly = False) -> "Track":
-        from .track import Track    # pylint: disable=redefined-outer-name
-
         path = self.path
         if (not isinstance(path, (str, Path))) and len(path) == 1:
             path = path[0]
 
-        res    = dict(lazy   = False,
-                      notall = getattr(track, 'notall', True),
-                      axis   = getattr(track, 'axis',   'Zaxis'))
-        kwargs = self.handler.open(path, **res)
-        res['path'] = path
-        if kwargs is None:
-            res['data'] = {}
-        else:
-            self.__fov(res, kwargs)
-            res.update({i: kwargs.pop(i) for i in ('phases', 'framerate')})
-
-            if beadsonly:
-                data = {i: j for i, j in kwargs.items()
-                        if Track.isbeadname(i) and isinstance(j, np.ndarray)}
-            else:
-                data = {i: j for i, j in kwargs.items()
-                        if isinstance(j, np.ndarray)}
-            res['data'] = data
-
         if track is None:
-            return Track(**res)
+            from .track import Track as _Track
+            track = _Track()
 
-        state = track.__getstate__()
-        state.update(res)
+        kwargs = self.handler.open(path,
+                                   notall = getattr(track, 'notall', True),
+                                   axis   = getattr(track, 'axis',   'Zaxis'))
+        state  = track.__getstate__()
+        self.__fov (state, kwargs)
+        self.__data(state, kwargs, beadsonly)
+
+        state.update(kwargs)
+        state.update(lazy = False, path = path)
         track.__setstate__(state)
         return track
 
     @classmethod
     def todict(cls, track: 'Track') -> Dict[str, Any]:
         "the oposite of __call__"
-        data = dict(track.data)
-        for i in ('phases', 'framerate'):
-            data[i]= getattr(track, i)
+        data = track.__getstate__()
+        data.update(track.data)
+
         data['fov']          = track.fov.image
         data['dimensions']   = track.fov.dim
         data['positions']    = {i: j.position for i, j in track.fov.beads.items()}
@@ -442,7 +433,21 @@ class Handler:
         return res
 
     @staticmethod
+    def __data(state, kwargs, beadsonly):
+        if kwargs is None:
+            data = {}
+        else:
+            data = {i: kwargs.pop(i) for i in tuple(kwargs)
+                    if isinstance(kwargs[i], np.ndarray) and len(kwargs[i].shape) == 1}
+            if beadsonly:
+                data = {i: j for i, j in data if Track.isbeadname(i)}
+        state['data'] = data
+
+    @staticmethod
     def __fov(res, kwargs):
+        if kwargs is None:
+            return
+
         from .track import FoV, Bead
         calib = kwargs.pop('calibrations', {})
         res['fov'] = FoV()
@@ -493,9 +498,9 @@ def savetrack(path: PATHTYPE, track: 'Track') -> 'Track': # pylint: disable=unus
     pass
 
 @overload
-def savetrack(path  : PATHTYPE,             # pylint: disable=unused-argument,function-redefined
-              track : 'TracksDict'          # pylint: disable=unused-argument
-             ) -> 'TracksDict':
+def savetrack(path  : PATHTYPE,     # pylint: disable=unused-argument,function-redefined
+              track : TDICT_T       # pylint: disable=unused-argument
+             ) -> TDICT_T:
     "saves a tracksdict"
     pass
 

@@ -3,34 +3,39 @@
 """
 Adds a dictionnaries to access tracks, experiments, ...
 """
-from   typing               import Tuple, Iterator, List, Type, cast
-import sys
+from   typing               import Tuple, Iterator, List, cast
 import pickle
 
 from   utils                import initdefaults
+from   utils.decoration     import addto
+
 from   model                import Level, Task
+from   model.__scripting__  import Tasks
 
 from   .track               import Track
-from   ..trackio            import savetrack, PATHTYPE
+from   ..trackio            import savetrack, PATHTYPE, Handler
 from   ..tracksdict         import TracksDict as _TracksDict
 
-Tasks: Type = sys.modules['model.__scripting__'].Tasks
+@addto(Handler)
+def __call__(self, track = None, beadsonly = False, __old__ = Handler.__call__) -> Track:
+    if track is None:
+        track = Track()
+    return __old__(self, track, beadsonly)
 
 class TracksDict(_TracksDict):
     """
-    Dictionnary of tracks
+    # Saving
 
-    It can be initialized using list of directories
+    It's possible to save the tracks to a '.pk' format as follows:
 
-        >>> tracks = "/path/to/my/trackfiles/**/with/recursive/search/*.trk"
-        >>> grs    = ("/more/than/a/single/path/**", "/is/possible/**")
-        >>> match  = r".*test045_(\\w\\w\\w)_BNA.*" # select only test 045 and define the key
-        >>> TRACKS = TracksDict(tracks, grs, match)
-        >>> TRACKS['AAA'].cycles                  # access the track
+        >>> tracks.save("/path/to/my/saved/tracks")
 
-    By default, the name of the track file is used as the key. Using the *match*
-    requires defining a group which will be used as the key.
+    The tracks are saved as "/path/to/my/saved/tracks/key.pk" files.
+    Thus, loading them is as simple as:
+
+        >>> TRACKS = TracksDict("/path/to/my/saved/tracks/*.pk")
     """
+    __doc__     = _TracksDict.__doc__ + __doc__
     _TRACK_TYPE = Track
     def __init__(self,          # pylint: disable=too-many-arguments
                  tracks  = None,
@@ -38,9 +43,12 @@ class TracksDict(_TracksDict):
                  match   = None,
                  allaxes = False,
                  tasks   = None,
+                 cleaned = None,
                  **kwa):
         super().__init__(tracks, grs, match, allaxes, **kwa)
-        self.tasks = tasks
+        if cleaned is not None:
+            self.cleaned = cleaned
+        self.tasks   = tasks
 
     def __getitem__(self, key):
         if isinstance(key, list):
@@ -63,6 +71,8 @@ class TracksDict(_TracksDict):
 
     def save(self, path: PATHTYPE) -> 'TracksDict':
         "saves the data to a directory"
+        if self.tasks:
+            raise NotImplementedError("don't know how to save that")
         return savetrack(path, self)
 
     @property
@@ -72,9 +82,19 @@ class TracksDict(_TracksDict):
 
     @cleaned.setter
     def cleaned(self, value):
-        "sets tracks to cleaned"
-        for i in self.values():
-            i.cleaned = value
+        """
+        Sets tracks to cleaned.
+
+        If provided with a string or a list, the corresponding tracks are defined
+        as cleaned, the others as dirty.
+        """
+        if isinstance(value, (str, list)):
+            self.cleaned        = False
+            self[value].cleaned = True
+
+        else:
+            for i in self.values():
+                i.cleaned = value
 
 class ExperimentList(dict):
     "Provides access to keys belonging to a single experiment"
