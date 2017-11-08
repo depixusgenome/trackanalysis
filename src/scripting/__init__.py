@@ -41,6 +41,7 @@ from data                         import Beads, Cycles
 from eventdetection.processor     import ExtremumAlignmentTask, EventDetectionTask
 from peakfinding.processor        import PeakSelectorTask
 from utils.logconfig              import getLogger
+import sequences
 import version
 
 # pylint: disable=wildcard-import, ungrouped-imports
