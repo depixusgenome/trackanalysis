@@ -275,6 +275,7 @@ class PeaksTracksDictDisplay(hvpeakfinding.PeaksTracksDictDisplay, # type: ignor
         if len(txt) < 4:
             ovrs = list(ovrs)
             return hv.Overlay(ovrs+[self._equations(ovrs, ind, txt)])
+        return ovrs
 
     def _to2d(self, plot):
         "converts 1d histograms to 2D"
