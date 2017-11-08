@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u""" Tests data access """
+""" Tests data access """
 from   pathlib      import Path
 from   itertools    import product
 from   typing       import cast # pylint: disable=unused-import
@@ -39,7 +39,7 @@ class _MyItem(ITrackView):
         yield from self.vals.keys()
 
 def test_beaditerkeys():
-    u"tests wether keys are well listed"
+    "tests wether keys are well listed"
     track = data.Track(path = utpath("small_legacy"), beadsonly = False)
     beads = lambda: data.Beads(track = track, data = _MyItem(track.data))
     vals  = {i for i in range(92)} | {'zmag', 't'}
@@ -80,7 +80,7 @@ def test_beaditerkeys():
                  .keys())                               == (2,2,3)
 
 def test_cycles_iterkeys():
-    u"tests wether keys are well listed"
+    "tests wether keys are well listed"
     track = data.Track(path = utpath("big_legacy"), beadsonly = False)
     cycs  = lambda: data.Cycles(track = track, data = _MyItem(track.data))
     cids  = lambda _: {(i,_) for i in range(39)} | {('zmag', _), ('t', _)}
@@ -126,7 +126,7 @@ def test_cycles_iterkeys():
         assert np.array_equal(vals, truth[1206-678:1275-678])
 
 def test_cycles_iterkeys2():
-    u"tests wether keys are well listed"
+    "tests wether keys are well listed"
     track = data.Track(path = utpath("big_legacy"), beadsonly = False)
     beads = track.beads.withcycles(range(5, 15))
     cycles = beads.new(data.Cycles)
@@ -151,7 +151,7 @@ def test_cycles_mixellipsisnumbers():
             == tuple(product(range(5), [3, 5])))
 
 def test_cycles_cancyclefromcycle():
-    u"A cycle can contain a cycle as data"
+    "A cycle can contain a cycle as data"
     track = data.Track(path = utpath("big_legacy"))
     cycs  = data.Cycles(track = track, data = _MyItem(track.data))
     cyc   = data.Cycles(track = track, data = cycs)
@@ -172,7 +172,7 @@ def test_cycles_cancyclefromcycle():
     assert all(x == 1. for x in cyc[0,0])
 
 def test_cycles_lazy():
-    u"tests what happens when using lazy mode"
+    "tests what happens when using lazy mode"
     truth = readtrack(utpath("big_legacy"))[0]
     for _, vals in data.Cycles(track    = lambda _:data.Track(path = utpath("big_legacy")),
                                first    = lambda _:2,
@@ -181,7 +181,7 @@ def test_cycles_lazy():
         assert np.array_equal(vals, truth[1206-678:1275-678])
 
 def test_cycles_nocopy():
-    u"tests that data by default is not copied"
+    "tests that data by default is not copied"
     track = data.Track(path = utpath("big_legacy"))
     vals1 = np.arange(1)
     for _, vals1 in data.Cycles(track   = track,
@@ -202,7 +202,7 @@ def test_cycles_nocopy():
     assert np.array_equal(vals1, vals2)
 
 def test_cycles_copy():
-    u"tests that data can be copied"
+    "tests that data can be copied"
     track = data.Track(path = utpath("big_legacy"))
     vals1 = np.arange(1)
     for _, vals1 in data.Cycles(track   = track,
@@ -274,6 +274,21 @@ def test_scancgr():
     assert pairs    == ((directory/'test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.trk',
                          directory/'CTGT_selection'),)
     assert len(trks) == len(tuple(Path(directory).glob("*.trk"))) - len(pairs)
+
+def test_allleaves():
+    'tests pairing of track files and gr-files in the absence of cgr'
+    trkpath    = str(Path(cast(str, utpath("big_legacy"))).parent/'*.trk')
+    print(trkpath)
+    grpath     =  str(Path(cast(str, utpath("big_grlegacy")))/'*.gr')
+    print(grpath)
+    good,_1,_2 = LegacyGRFilesIO.scan(trkpath,
+                                      grpath,
+                                      cgrdir="",
+                                      allleaves = True)
+    assert len(good)==1
+    trks = [str(path[0]) for path in good]
+    assert utpath("big_legacy") in trks
+
 
 def test_trktopk():
     "tests conversion to pk"
