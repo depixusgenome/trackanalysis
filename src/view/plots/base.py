@@ -109,6 +109,16 @@ class PlotAttrs:
         cls._default(args)
         args['line_width'] = args.pop('size')
 
+    @classmethod
+    def _patch(cls, args):
+        cls._default(args)
+        clr = args.pop('color')
+        if clr:
+            for i in ('line_color', 'fill_color'):
+                args.setdefault(i, clr)
+
+        args['line_width'] = args.pop('size')
+
     _quad = _line
 
     @staticmethod
