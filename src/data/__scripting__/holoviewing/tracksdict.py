@@ -98,8 +98,8 @@ class TracksDictDisplay(BasicDisplay,
 
         if self._reference is not None:
             key = 'bead' if self._overlay == 'bead' else 'key'
-            if self._reference not in kdims[key]:
-                kdims[key].insert(0, self._reference)
+            kdims[key] = [i for i in kdims[key] if i != self._reference]
+            kdims[key].insert(0, self._reference)
 
         display = getattr(self, '_'+self._name, self._default_display)
         fcn     = lambda key, bead, **other: display(itms, key, bead, kdims, **kwa, **other)
