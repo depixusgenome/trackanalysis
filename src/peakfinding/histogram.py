@@ -6,10 +6,14 @@ from    typing import (NamedTuple, Optional, Iterator,
                        Dict)
 from    enum   import Enum
 import  itertools
-from sklearn.mixture            import BayesianGaussianMixture, GaussianMixture
+from    sklearn.mixture            import BayesianGaussianMixture, GaussianMixture
+
 import  numpy  as     np
 from    numpy.lib.stride_tricks import as_strided
-from    scipy.signal            import find_peaks_cwt
+
+from    sklearn.mixture          import BayesianGaussianMixture
+from    scipy.interpolate        import interp1d
+from    scipy.signal             import find_peaks_cwt
 
 from    utils                   import (kwargsdefaults, initdefaults,
                                         NoArgs, asdataarrays, EVENTS_DTYPE)
@@ -259,6 +263,31 @@ class Histogram(PrecisionAlg):
 
         yield (minv, bwidth)
         yield from self.__generate(lenv, kern, items, weight)
+
+class Interpolator:
+    "interpolates histograms"
+    def __init__(self, xaxis, yaxis = None, miny = 1e-3, offset = 1.01, **kwa):
+        if hasattr(xaxis, 'histogram') and yaxis is None:
+            yaxis = xaxis.histogram
+
+        good  = yaxis >= miny
+
+        if hasattr(xaxis, 'binwidth'):
+            xaxis = np.arange(len(yaxis), dtype = 'f4')[good]*xaxis.binwidth+xaxis.minvalue
+        else:
+            xaxis = xaxis[good]
+
+        self._miny   = miny
+        self._offset = offset
+        kwa.setdefault('fill_value',   np.NaN)
+        kwa.setdefault('bounds_error', False)
+        self._interp = interp1d(xaxis, yaxis, assume_sorted = True, **kwa)
+
+    def __call__(self, xvalues: np.ndarray) -> np.ndarray:
+        "interpolates values to the current histogram"
+        reslt = self._interp(xvalues)
+        reslt[reslt <= self._miny*self._offset] = 0.
+        return reslt
 
 class FitMode(Enum):
     "Fit mode for sub-pixel peak finding"

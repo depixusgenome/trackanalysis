@@ -22,13 +22,14 @@ class GuiPeaksDict(PeaksDict):
         self.store[0] = dtl
         yield from self.details2output(dtl)
 
-class GuiPeakSelectorProcessor(PeakSelectorProcessor, canregister = False):
+class GuiPeakSelectorProcessor(PeakSelectorProcessor):
     "gui version of PeakSelectorProcessor"
-    store = None
+    def __init__(self, store: list = None, **kwa) -> None:
+        super().__init__(**kwa)
+        self.store = store
+
     def __call__(self, *args, **kwa):
-        cur       = type(self)(*args, **kwa)
-        cur.store = self.store
-        return cur
+        return type(self)(self.store, *args, **kwa)
 
     def apply(self, toframe = None, **cnf):
         "applies the task to a frame or returns a function that does so"
@@ -55,9 +56,12 @@ class GuiFitToReferenceDict(FitToReferenceDict):
             return res
         return params
 
-class GuiFitToReferenceProcessor(FitToReferenceProcessor, canregister = False):
+class GuiFitToReferenceProcessor(FitToReferenceProcessor):
     "gui fit to reference"
-    model = None
+    def __init__(self, model = None, **kwa):
+        super().__init__(**kwa)
+        self.model = model
+
     def __call__(self, *args, **kwa):
         cur       = type(self)(*args, **kwa)
         cur.model = self.model

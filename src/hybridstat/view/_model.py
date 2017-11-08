@@ -6,7 +6,6 @@ from itertools                  import product
 import pickle
 
 import numpy                    as     np
-from   scipy.interpolate        import interp1d
 
 from sequences.modelaccess      import (SequencePlotModelAccess,
                                         FitParamProp    as _FitParamProp,
@@ -15,16 +14,16 @@ from sequences.modelaccess      import (SequencePlotModelAccess,
 from utils                      import updatecopy
 from control.modelaccess        import PROPS, TaskAccess
 from control.processor          import processors, Processor
-from control.modelaccess        import PROPS, TaskAccess
 
 from model.task                 import RootTask
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
+from peakfinding.histogram      import Interpolator
 from peakfinding.processor      import PeakSelectorTask
 from peakfinding.probabilities  import Probability
 from peakcalling.tohairpin      import Distance
-from peakcalling.processor.fittoreference   import FitData
 from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
                                         FitToReferenceTask, FitBead)
+from peakcalling.processor.fittoreference   import FitData
 
 from ..reporting.batch          import fittohairpintask
 
@@ -71,6 +70,25 @@ class FitToReferenceAccess(TaskAccess):
 
     stretch = property(lambda self: self.params[0])
     bias    = property(lambda self: self.params[1])
+    hmin    = property(lambda self: self.configtask.histmin.get())
+
+    def remove(self):
+        "removes the task"
+        self.__store.update(id = None, cache = {}, reference = None)
+        super().remove()
+
+    def update(self, **_):
+        "removes the task"
+        assert len(_) == 0
+        ident, fitdata = self.__computefitdata()
+        if fitdata is None:
+            return
+
+        if ident == self.__id.get():
+            self.__store.update(id = ident)
+        else:
+            self.__store.update(id = ident, cache = {})
+        super().update(fitdata = fitdata)
 
     @property
     def reference(self) -> Optional[RootTask]:
@@ -80,16 +98,24 @@ class FitToReferenceAccess(TaskAccess):
     @reference.setter
     def reference(self, value:Optional[RootTask]):
         "sets the current reference"
-        if value is self.__ref.get():
-            return
+        if value is not self.__ref.get():
+            return self.remove() if value in (None, self.roottask) else self.update()
 
-        if value is None:
-            self.remove()
-            self.__store.update(id = None, cache = {}, reference = None)
-        else:
-            ident, fitdata = self.__computefitdata()
-            self.update(fitdata = fitdata)
-            self.__store.update(id = ident, cache = {}, reference = value)
+    def resetmodel(self):
+        "adds a bead to the task"
+        ref = self.__ref.get()
+        if self.task is None and ref in (self.roottask, None):
+            return
+        return self.remove() if ref is self.roottask else self.update()
+
+    def refhistogram(self, xaxis):
+        "returns the histogram interpolated to the provided values"
+        task  = self.task
+        ibead = self.bead
+        if task is None or ibead not in task.fitdata:
+            return np.full(len(xaxis), np.NaN, dtype = 'f4')
+
+        return Interpolator(task.fitdata[ibead].data, self.hmin)(xaxis)
 
     def __computefitdata(self):
         ibead = self.bead
@@ -106,40 +132,6 @@ class FitToReferenceAccess(TaskAccess):
                                                copy = True)))
         fits[ibead] = FitData(task.fitalg.frompeaks(peaks[ibead,...]), (1., 0.))
         return ident, fits
-
-    def resetmodel(self):
-        "adds a bead to the task"
-        task = self.task
-        if task is None:
-            return
-
-        ident, fits = self.__computefitdata()
-        if fits is None:
-            return
-
-        self.update(fitdata = fits)
-        if ident == self.__id.get():
-            self.__store.update(id = ident)
-        else:
-            self.__store.update(id = ident, cache = {})
-
-    def refhistogram(self, xaxis):
-        "returns the histogram interpolated to the provided values"
-        task  = self.task
-        ibead = self.bead
-        if task is None or ibead not in task.fitdata:
-            return np.full(len(xaxis), np.NaN, dtype = 'f4')
-
-        data  = task.fitdata[ibead].data
-        good  = data.histogram >= self.configtask.histmin.get()
-        histx = np.arange(len(data), dtype = 'f4')[good]*data.binwidth+data.minvalue
-        histy = data.histogram[good]
-        reslt = interp1d(histx, histy,
-                         fill_value    = np.NaN,
-                         bounds_error  = False,
-                         assume_sorted = True)(xaxis)
-        reslt[reslt <= self.configtask.histmin.get()*1.01] = 0.
-        return reslt
 
 class FitToHairpinAccess(TaskAccess):
     "access to the FitToHairpinTask"
@@ -234,7 +226,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         self.fits : FitBead                 = None
         self.peaks: Dict[str, np.ndarray]   = dict()
         self.estimatedbias                  = 0.
-        self.reference                      = FitToReferenceAccess(self)
+        self.fittoreference                 = FitToReferenceAccess(self)
         self.identification                 = FitToHairpinAccess(self)
 
         cls = type(self)
@@ -294,7 +286,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         if self.peakselection.task is None:
             self.peakselection.update()
 
-        self.reference.resetmodel()
+        self.fittoreference.resetmodel()
         self.identification.resetmodel(self)
         return False
 
@@ -315,7 +307,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
             dico['bases']  = (dico['z']-self.bias)*self.stretch
             return
 
-        self.fits = FitToHairpinProcessor.compute((self.bead, peaks),
+        self.fits = FitToHairpinProcessor.compute((self.bead, peaks), # type: ignore
                                                   **task.config())[1]
 
         for key in product(self.sequences(...), names):
