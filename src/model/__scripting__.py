@@ -15,6 +15,7 @@ from enum                     import Enum
 import anastore
 from utils                    import update
 from utils.decoration         import addto
+from utils.attrdefaults       import toenum
 from control.taskcontrol      import create as _create
 from control.processor        import Processor
 from control.processor.utils  import ActionTask
@@ -34,7 +35,6 @@ if TYPE_CHECKING:
     from data.tracksdict      import TracksDict
 
 assert 'scripting' in sys.modules
-RESET = type('Reset', (), {})
 class Tasks(Enum):
     """
     Possible tasks
@@ -44,12 +44,21 @@ class Tasks(Enum):
         >>> task = Tasks.alignment()
         >>> assert isinstance(task, ExtremumAlignmentTask)
 
-    Attribute values can be set
+    Attribute values can be set:
 
         >>> assert Tasks.peakselector().align is not None         # default value
         >>> assert Tasks.peakselector(align = None).align is None # change default
         >>> assert Tasks.peakselector('align').align is not None  # back to true default
+
+    or:
+
         >>> assert Tasks.peakselector(align = None).align is None # change default
+        >>> assert Tasks.peakselector(align = Tasks.RESET).align is not None  # back to true default
+
+    It's also possible to set sub-fields:
+        >>> assert Tasks.peakselector().group.mincount == 5
+        >>> assert Tasks.peakselector({'group.mincount': 2}).group.mincount == 2
+        >>> assert Tasks.peakselector({'group.mincount': 2}).group.mincount == 2
 
     For example, to create aligned events and change their stretch and bias:
 
@@ -81,6 +90,7 @@ class Tasks(Enum):
     fittoreference = 'fittoreference'
     beadsbyhairpin = 'beadsbyhairpin'
     dataframe      = 'dataframe'
+    RESET          = Ellipsis
 
     __taskorder__  = 'eventdetection', 'peakselector', 'fittohairpin'
     __cleaning__   = 'cleaning', 'alignment'
@@ -182,9 +192,11 @@ class Tasks(Enum):
         call = kwa.pop('call', None)
         if len(args) >= 1 and call is None:
             call, args = args[0], args[1:]
+
         if call is None:
             assert False
             return ActionTask()
+
         if not callable(call):
             raise RuntimeError("Incorrect action")
 
@@ -203,9 +215,23 @@ class Tasks(Enum):
         if Ellipsis in resets:
             resets = tuple(i for i in resets if i is not Ellipsis)
 
-        kwa.update({i: getattr(cls, i) for i, j in kwa.items() if j is RESET})
-        kwa.update({i: getattr(cls, i) for i in resets})
+
+        kwa.update({i: getattr(cls, i) for i, j in kwa.items() if j is self.RESET})
+        kwa.update({i: getattr(cls, i) for i in resets if isinstance(i, str)})
         task = update(deepcopy(cnf), **kwa)
+
+        for key, value in next((i for i in resets if isinstance(i, dict)), {}).items():
+            lst = key.split('.')
+            obj = task
+            for skey in lst[:-1]:
+                obj = getattr(obj, skey)
+
+            deflt = getattr(type(obj), lst[-1])
+            if value is self.RESET:
+                setattr(obj, lst[-1], deepcopy(deflt))
+            else:
+                setattr(obj, lst[-1], toenum(deflt, value))
+
         return getattr(task, '__scripting__', lambda x: task)(kwa)
 
     class _TaskGetter:

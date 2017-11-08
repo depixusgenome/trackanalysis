@@ -47,7 +47,7 @@ class PeaksDisplay(hvdata.CycleDisplay, display = PeaksDict): # type: ignore
     _zero       = True
     _peakstyle  = dict(size = 5, color = 'green')
     _eventstyle = dict(size = 3)
-    _norm       = 'event'
+    _norm       = 'events'
     _precision  = None
     KEYWORDS    = hvdata.CycleDisplay.KEYWORDS | frozenset(locals())
 
