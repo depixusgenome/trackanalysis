@@ -62,6 +62,7 @@ class PeaksDisplay(hvdata.CycleDisplay, display = PeaksDict): # type: ignore
             return hv.Scatter(([], []), **opts)(style = estyle)
 
         pks   = (np.concatenate(det.positions)-params[1])*params[0]
+        pks   = pks[np.concatenate(det.ids) != np.iinfo('i4').max]
         yvals = [hist[i] for i in pks]
         return hv.Scatter((pks, yvals), **opts)(style = estyle)
 

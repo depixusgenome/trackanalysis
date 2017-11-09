@@ -49,7 +49,7 @@ class Detailed:
     peaks       = property(lambda self: self.details.peaks)
     zero        = property(lambda self: next(self.output, [0])[0])
     events      = property(lambda self: self.details.events)
-    ids         = property(lambda self: self.details.id)
+    ids         = property(lambda self: self.details.ids)
 
     @property
     def output(self) -> Iterator[PeakOutput]:
