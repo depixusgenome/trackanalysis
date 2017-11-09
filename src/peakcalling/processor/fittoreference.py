@@ -89,6 +89,15 @@ class FitToReferenceTask(Task):
         info['fitdata'] = info.pop('_fitdata')
         return info
 
+    def __contains__(self, itms):
+        if self.DEFAULTKEY in self.fitdata:
+            return True
+
+        if isinstance(itms, (int, str)):
+            return itms in self.fitdata
+
+        return set(itms).issubset(set(self.fitdata))
+
     def config(self) -> Dict[str,Any]:
         "returns a deepcopy of its dict which can be safely used in generators"
         cnf = super().config()
