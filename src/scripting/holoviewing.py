@@ -3,16 +3,17 @@
 """
 Adds shortcuts for using holoview
 """
-from   abc              import ABC, abstractmethod
-from   itertools        import chain, repeat
+from   abc                  import ABC, abstractmethod
+from   itertools            import chain, repeat
 
-from   copy             import deepcopy
+from   copy                 import deepcopy
 
-import numpy            as     np
-import holoviews        as     hv          # pylint: disable=import-error
-from   IPython          import get_ipython # pylint: disable=import-error
+import numpy                as     np
+import holoviews            as     hv          # pylint: disable=import-error
+from   IPython              import get_ipython # pylint: disable=import-error
 
-from   utils.decoration import addto as _addto, addproperty
+from   utils.decoration     import addto as _addto, addproperty
+from   utils.attrdefaults   import setdefault
 
 def _display_hook(item):
     "displays an item"
@@ -61,10 +62,9 @@ class BasicDisplay(ABC):
     def __init__(self, items, **opts):
         self._items   = items
         for i in self.KEYWORDS:
-            if len(i) >= 2 and i[:2] == '__':
-                continue
-            setattr(self, i, opts.pop(i[1:], getattr(self.__class__, i)))
-        self._opts    = opts
+            if i[:2] != '__':
+                setdefault(self, i[1:], opts, fieldname = i)
+        self._opts = {i: j for i, j in opts.items() if '_'+i not in self.KEYWORDS}
 
     def __init_subclass__(cls, **args):
         for name, itm in args.items():
