@@ -116,15 +116,13 @@ class PeaksDisplay(hvdata.CycleDisplay, display = PeaksDict): # type: ignore
 
         itms = []
         def _do(det):
-            if self._zero:
-                cparams = params[0], params[1]+det.zero
-            else:
-                cparams = params
+            cparams = (params[0], params[1]+det.zero) if self._zero else params
 
             if isinstance(self._labels, str):
                 opts['label'] = self._labels
             elif self._labels is True:
                 opts['label'] = 'histogram'
+
             itms.append(self.__histogram(det, cparams, norm, opts, estyle))
             itms.append(self.__events   (det, cparams, opts, estyle, itms[-1]))
 
@@ -135,6 +133,17 @@ class PeaksDisplay(hvdata.CycleDisplay, display = PeaksDict): # type: ignore
 
             itms.append(self.__peaks    (det, cparams, opts, pstyle, itms[-2]))
             itms.append(self.__errorbars(det, cparams, opts, pstyle, itms[-3]))
+
+
+            if getattr(det, 'params', (1., 0.)) != (1., 0.):
+                tmp     = getattr(det, 'params')
+                cparams = tmp[0]*cparams[0], tmp[0]*tmp[1]+cparams[1]
+            cparams = np.round(cparams, 4)
+            if tuple(cparams) != (1., 0.):
+                itms[-4].dpx_label = (f'{opts["vdims"][0]} = '
+                                      f'{cparams[0]} · ({opts["kdims"][0]} - {cparams[1]})')
+
+        dets = tuple(dets)
         for det in dets:
             _do(det)
         if len(itms) == 0 and never:

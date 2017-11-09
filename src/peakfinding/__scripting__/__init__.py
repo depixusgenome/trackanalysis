@@ -29,7 +29,8 @@ def peaks(self) -> PeaksDict:
 class Detailed:
     "Deals with easy acccess to peaks data"
     def __init__(self, frame, det):
-        self.frame       = frame
+        self.frame  = frame
+        self.params = 1., 0.
         if det is None:
             self.details = PeakSelectorDetails(np.ones(0, dtype = 'f4'),
                                                np.ones(0, dtype = 'f4'),
@@ -50,6 +51,19 @@ class Detailed:
     zero        = property(lambda self: next(self.output, [0])[0])
     events      = property(lambda self: self.details.events)
     ids         = property(lambda self: self.details.ids)
+
+    def setparams(self, params):
+        "sets params and applies it to positions"
+        self.params       = params
+        self.peaks[:]     = (self.peaks-params[1])*params[0]
+        self.positions[:] = [(i-params[1])*params[0] for i in self.positions]
+        for evt in self.events:
+            evt['data'][:] = [(i-params[1])*params[0] for i in evt['data']]
+
+        lst          = list(self.details)
+        lst[2]       = (lst[2]-params[1])*params[0]
+        lst[3]      *= params[0]
+        self.details = type(self.details)(*lst)
 
     @property
     def output(self) -> Iterator[PeakOutput]:

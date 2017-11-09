@@ -105,12 +105,14 @@ class TracksDictDisplay(BasicDisplay,
         fcn     = lambda key, bead, **other: display(itms, key, bead, kdims, **kwa, **other)
         return fcn, kdims
 
-    def _default_display(self, itms, key, bead, _, **kwa):
+    def _default_kargs(self, key, bead, kwa):
         if self._labels is True and self._overlay in ('key', 'bead'):
             kwa.setdefault('labels', str(key) if self._overlay == 'key' else str(bead))
         elif isinstance(self._labels, str):
             kwa.setdefault('labels', self._labels)
 
+    def _default_display(self, itms, key, bead, _, **kwa):
+        self._default_kargs(key, bead, kwa)
         data = getattr(itms[key], self._name, itms[key]).display(**kwa)
         return data.getmethod()(bead)
 
