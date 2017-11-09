@@ -219,7 +219,7 @@ def display(self,   # pylint: disable=too-many-arguments
     yvals = [i                 for _, i in good.values()]
     txt   = [f'{i}'            for i    in good.keys()]
 
-    top   = (hv.Overlay([hv.Image(self.image[::-1], bnd)(plot = dict(colorbar = colorbar)),
+    top   = (hv.Overlay([hv.Image(self.image[::-1], bounds = bnd)(plot = dict(colorbar = colorbar)),
                          hv.Points((xvals, yvals))(style = dict(color = ptcolor))]
                         +[hv.Text(*i)(style = dict(color = txtcolor))
                           for i in zip(xvals, yvals, txt)])
