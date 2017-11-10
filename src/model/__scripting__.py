@@ -134,7 +134,7 @@ class Tasks(Enum):
         return cast(Tuple[Type[Task],...], items[::-1])
 
     @classmethod
-    def defaulttasklist(cls, paths, upto, cleaned:bool):
+    def defaulttasklist(cls, paths, upto, cleaned:bool) -> List[Task]:
         "Returns a default task list depending on the type of raw data"
         tasks = list(cls.__tasklist__) # type: ignore
         if cleaned or (isinstance(paths, (tuple, list)) and len(paths) > 1):
@@ -144,7 +144,7 @@ class Tasks(Enum):
         itms = (tasks if upto is None       else
                 ()    if upto not in tasks  else
                 tasks[:tasks.index(upto)+1])
-        return tuple(cls(i) for i in itms) # type: ignore
+        return [cls(i) for i in itms] # type: ignore
 
     @classmethod
     def tasklist(cls, *tasks, **kwa) -> List[Task]:

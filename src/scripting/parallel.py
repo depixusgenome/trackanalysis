@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Runs tasks in parallel"
 from typing                 import (Union, Sequence, Type, Dict, Generator,
-                                    Callable, Iterator, cast)
+                                    Callable, Iterator, List, cast)
 from concurrent.futures     import ProcessPoolExecutor, ThreadPoolExecutor
 from multiprocessing        import cpu_count
 import pickle
@@ -17,9 +17,18 @@ from data.tracksdict        import TracksDict
 class Parallel:
     "Runs tasks in parallel"
     def __init__(self,
-                 roots     : Union[TracksDict, Sequence[RootTask]],
+                 roots     : Union[TracksDict, Sequence[RootTask]] = None,
                  *tasks    : Task,
                  processors: Dict[Type[Task], Type[Processor]] = None) -> None:
+        self.args: List[bytes] = []
+        if roots is not None:
+            self.extend(roots, *tasks, processors)
+
+    def extend(self,
+               roots     : Union[TracksDict, Sequence[RootTask]],
+               *tasks    : Task,
+               processors: Dict[Type[Task], Type[Processor]] = None) -> 'Parallel':
+        "adds new jobs"
         if not isinstance(roots, TracksDict):
             lroots = list(cast(Iterator[RootTask], roots))
         else:
@@ -34,7 +43,8 @@ class Parallel:
                                     procs[type(i)](i))
                                   )
         main      = [toproc(i) for i in tasks]
-        self.args = [pickle.dumps([toproc(i)]+main) for i in lroots]
+        self.args+= [pickle.dumps([toproc(i)]+main) for i in lroots]
+        return self
 
     def process(self,
                 pool: Union[ProcessPoolExecutor, ThreadPoolExecutor] = None,

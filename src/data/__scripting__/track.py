@@ -87,7 +87,7 @@ def rawprecision(self, ibead):
 @addto(_Track)
 def tasklist(self, *args, beadsonly = True):
     "creates a tasklist"
-    return Tasks.get(self.path, *args, beadsonly = beadsonly)
+    return Tasks.tasklist(self.path, *args, beadsonly = beadsonly)
 
 @addto(_Track)
 def processors(self, *args, copy = True, beadsonly = True):
