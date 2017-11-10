@@ -16,7 +16,7 @@ class CacheItem:
     __slots__ = ('_proc', '_cache')
     _VERSION  = _version()
     def __init__(self,
-                 proc:  Union[CacheItem, Processor],
+                 proc:  Union['CacheItem', Processor],
                  cache: Tuple[int, Any] = (0, None)) -> None:
         self._proc  = cast(Processor,       getattr(proc, '_proc', proc))
         self._cache = cast(Tuple[int, Any], getattr(proc, '_cache', cache))
@@ -72,8 +72,10 @@ class Cache(Iterable[Processor], Sized):
     "Contains the track and task-created data"
     __slots__ = ('_items',)
     def __init__(self, order: Iterable[Union[CacheItem, Processor]] = None) -> None:
-        self._items: List[CacheItem] = ([] if order is None else
-                                        [CacheItem(i) for i in order])
+        if order is None:
+            self._items: List[CacheItem] = []
+        else:
+            self._items = [CacheItem(i) if isinstance(i, Processor) else i for i in order]
 
     def index(self, tsk) -> int:
         "returns the index of the provided task"

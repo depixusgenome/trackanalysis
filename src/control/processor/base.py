@@ -207,7 +207,7 @@ def register(proc: Union[Type[Processor], Iterable[Type[Processor]]],
         if itm is None:
             continue
 
-        if not (force or itm.canregister()):
+        if force or itm.canregister():
             ttypes = itm.tasktype
             if isinstance(ttypes, tuple):
                 cache.update(dict.fromkeys(ttypes, itm))
