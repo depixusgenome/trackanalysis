@@ -50,7 +50,7 @@ class ScriptingView:
 @addto(Tasks, classmethod)
 def save(cls, task):
     "saves the task to the default config"
-    cnf  = scriptapp.control.getGlobal("config").tasks
+    cnf = scriptapp.control.getGlobal("config").tasks
     if isinstance(task, type(cnf.driftpercycle.get())):
         name = 'driftperbead' if task.onbeads else 'driftpercycle'
     else:
@@ -60,6 +60,10 @@ def save(cls, task):
                 break
         else:
             raise TypeError('Unknown task: '+str(task))
+
+    cpy = deepcopy(task)
+    if isinstance(task, type(cnf.fittoreference.get())):
+        cpy.fitdata.clear()
 
     cnf[name].set(deepcopy(task))
     scriptapp.control.writeuserconfig()
