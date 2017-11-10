@@ -45,13 +45,14 @@ class OligoMappingDisplay(_PeaksDisplay, display = PeaksDict): # type: ignore
     * *sequencestyle*, *eventstyle*, *peakstyle* can be used to set the style
     of corresponding graph elements.
     """
-    _zero          = True
-    _sequence      = None
-    _oligos        = None
-    _fit           = True
-    _sequencestyle = dict(color = 'gray')
-    _reftask       = FitToReferenceTask()
-    KEYWORDS       = _PeaksDisplay.KEYWORDS | frozenset(locals())
+    _zero           = True
+    _sequence       = None
+    _oligos         = None
+    _fit            = True
+    _reference: str = None
+    _sequencestyle  = dict(color = 'gray')
+    _reftask        = FitToReferenceTask()
+    KEYWORDS        = _PeaksDisplay.KEYWORDS | frozenset(locals())
     def __init__(self, items, **opts):
         super().__init__(items, **opts)
         if self._bias is not None or None not in (self._sequence, self._oligos):
@@ -77,28 +78,6 @@ class OligoMappingDisplay(_PeaksDisplay, display = PeaksDict): # type: ignore
         if None not in (self._sequence, self._oligos) and self._fit is not True:
             return _ManualHP(self).getredim()
         return super().getredim()
-
-    def dataframe(self):
-        "creates a dataframe for all keys"
-        if self._reference:
-            reftask = cast(FitToReferenceTask, deepcopy(self._reftask))
-            beads   = set(self._base()[1]['bead'])
-            beads  &= set(self._items[self._reference].peaks.keys())
-            beads  -= set(self._reftask.fitdata)
-            reftask.frompeaks(self._items[self._reference].peaks[list(beads)],
-                              update = True)
-            itms    = self._items['~'+self._reference]
-            tsk     = Tasks.peakselector, reftask # type: tuple
-        else:
-            tsk     = tuple()
-            itms    = self._items
-
-        if None not in (self._sequence, self._oligos):
-            tsk    += Tasks.fittohairpin.get(sequence = self._sequence,
-                                             oligos   = self._oligos)
-
-        tsk += (Tasks.dataframe(merge = True),)
-        return parallel(itms, *Tasks.tasklist(*tsk), endaction = 'concat')
 
     def _hpins(self):
         "returns haipin positions"
@@ -147,7 +126,7 @@ class _AutoHP(OligoMappingDisplay):
         key, dist = cache[bead]
 
         tmp = self(stretch = dist.stretch, bias = dist.bias)
-        crv = tmp.elements(self._items[[bead]], group = key)
+        crv = tmp.elements(self._items[[bead]], group = key) # pylint: disable=no-member
 
         hpc  = self.__pins[key]
         data = np.copy(hpc.data)
@@ -296,6 +275,24 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
         kwa['reftask'] = self._reftask
         if bead not in self._reftask:
             self._reftask.frompeaks(self._items[self._reference].peaks[bead,...])
+
+    def dataframe(self):
+        "creates a dataframe for all keys"
+        if self._reference:
+            reftask = cast(FitToReferenceTask, deepcopy(self._reftask))
+            beads   = set(self._base()[1]['bead'])
+            beads  &= set(self._items[self._reference].peaks.keys())
+            beads  -= set(self._reftask.fitdata)
+            reftask.frompeaks(self._items[self._reference].peaks[list(beads)],
+                              update = True)
+            itms    = self._items['~'+self._reference]
+            tsk     = Tasks.peakselector, reftask # type: tuple
+        else:
+            tsk     = tuple()
+            itms    = self._items
+
+        tsk += (Tasks.dataframe(merge = True),)
+        return parallel(itms, *Tasks.tasklist(*tsk), endaction = 'concat')
 
     def getmethod(self):
         "Returns the method used by the dynamic map"

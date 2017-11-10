@@ -3,6 +3,7 @@
 """
 Adds shortcuts for using holoview
 """
+from   typing               import TypeVar
 from   abc                  import ABC, abstractmethod
 from   itertools            import chain, repeat
 
@@ -55,6 +56,7 @@ def addto(*types, addhook = 'auto'):
                     fmt.for_type(cls, _display_hook)
     return _wrap
 
+Self = TypeVar('Self', bound = 'BasicDisplay')
 @displayhook
 class BasicDisplay(ABC):
     "Everything needed for creating a dynamic map display"
@@ -105,7 +107,7 @@ class BasicDisplay(ABC):
         cnf.update({i[1:]: deepcopy(getattr(self, i)) for i in keys})
         return cnf
 
-    def __call__(self, **opts):
+    def __call__(self: Self, **opts) -> Self:
         default = self.__class__(self._items).config()
         config  = {i: j for i, j in self.config().items() if j != default[i]}
         config.update(opts)
