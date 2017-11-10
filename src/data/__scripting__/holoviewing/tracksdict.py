@@ -5,11 +5,16 @@
 Adds shortcuts for using holoview
 """
 import sys
-from   typing                   import List
+from   typing                   import List, Union
 from   copy                     import deepcopy
+from   datetime                 import datetime
+from   pathlib                  import Path
+
+import pandas                   as     pd
+
 from   scripting.holoviewing    import addto, displayhook, addproperty
 from   utils.logconfig          import getLogger
-from   ...views                 import isellipsis
+from   ...views                 import isellipsis, BEADKEY
 from   ...tracksdict            import TracksDict
 from   ..tracksdict             import ExperimentList
 from   .display                 import BasicDisplay
@@ -39,15 +44,15 @@ class TracksDictDisplay(BasicDisplay,
             Thus zooming and spanning is independant.
             * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
     """
-    _beads      = None
-    _keys       = None
-    _name       = None
-    _overlay    = None
-    _reference  = None
-    _refdims    = True
-    _reflayout  = 'left'
-    _labels     = True
-    KEYWORDS    = BasicDisplay.KEYWORDS | frozenset(locals())
+    _beads:     List[BEADKEY]          = None
+    _keys:      List[str]              = None
+    _name:      str                    = None
+    _overlay:   str                    = None
+    _reference: str                    = None
+    _refdims                           = True
+    _reflayout                         = 'left'
+    _labels:    Union[None, bool, str] = True
+    KEYWORDS                           = BasicDisplay.KEYWORDS | frozenset(locals())
     def __getitem__(self, values):
         if isinstance(values, tuple):
             tracks, beads = values
@@ -215,6 +220,25 @@ class TracksDictFovDisplayProperty:
         if layout:
             return hv.Layout([fcn(i) for i in keys]).cols(cols)
         return hv.DynamicMap(fcn, kdims = ['key']).redim.values(key = list(keys))
+
+@addto(TracksDict)         # type: ignore
+def dataframe(self):
+    "Returns a table with some data"
+    keys  = list(self)
+    paths = [i.path for i in self.values()]
+    first = [Path(str(i[0])) if isinstance(i, (tuple, list)) else Path(str(i))
+             for i in paths]
+    cnt   = [len(i) if isinstance(i, (tuple, list)) else 1 for i in paths]
+    dtime = datetime.fromtimestamp
+    cdate = [dtime(i.stat().st_ctime) for i in first]
+    size  = [i.stat().st_size >> 20 for i in first]
+    return pd.DataFrame(dict(key = keys, path = first, pathcount = cnt,
+                             creation = cdate, megabytes = size))
+
+@addto(TracksDict)         # type: ignore
+def display(self):
+    "Returns a table with some data"
+    return hv.Table(self.dataframe(), kdims = 'key')
 
 @addto(TracksDict)         # type: ignore
 def map(self, fcn, kdim = 'oligo', *extra, **kwa):

@@ -11,6 +11,7 @@ import numpy                    as np
 import sequences
 
 from   scripting.holoviewing        import hv
+from   scripting.parallel           import parallel
 from   peakfinding.processor        import PeaksDict    # pylint: disable=unused-import
 from   peakfinding.__scripting__.holoviewing import (PeaksDisplay as _PeaksDisplay,
                                                      PeaksTracksDictDisplay as _PTDDisplay)
@@ -76,6 +77,27 @@ class OligoMappingDisplay(_PeaksDisplay, display = PeaksDict): # type: ignore
         if None not in (self._sequence, self._oligos) and self._fit is not True:
             return _ManualHP(self).getredim()
         return super().getredim()
+
+    def dataframe(self):
+        "creates a dataframe for all keys"
+        if self._reference:
+            reftask = cast(FitToReferenceTask, deepcopy(self._reftask))
+            beads   = set(self._base()[1]['bead'])
+            beads  &= set(self._items[self._reference].peaks.keys())
+            beads  -= set(self._reftask.fitdata)
+            reftask.frompeaks(self._items[self._reference].peaks[list(beads)],
+                              update = True)
+            itms    = self._items['~'+self._reference]
+            tsk     = Tasks.peakselector, reftask # type: tuple
+        else:
+            tsk     = tuple()
+            itms    = self._items
+
+        if None not in (self._sequence, self._oligos):
+            tsk    += Tasks.fittohairpin.get(sequence = self._sequence,
+                                             oligos   = self._oligos)
+
+        return parallel(itms, *Tasks.tasklist(*tsk), endaction = 'concat')
 
     def _hpins(self):
         "returns haipin positions"

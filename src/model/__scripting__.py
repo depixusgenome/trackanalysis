@@ -7,7 +7,7 @@ import sys
 from pathlib                  import Path
 from functools                import partial
 from typing                   import (Type, Tuple, Union, Sequence, Dict,
-                                      cast, TYPE_CHECKING)
+                                      cast, List, TYPE_CHECKING)
 
 from copy                     import deepcopy
 from enum                     import Enum
@@ -26,6 +26,7 @@ from peakfinding.processor    import PeakSelectorTask, PeakCorrelationAlignmentT
 from peakcalling.processor    import (FitToReferenceTask, FitToHairpinTask,
                                       BeadsByHairpinTask)
 from scripting.parallel       import Parallel
+from .level                   import Level
 from .task                    import * # pylint: disable=wildcard-import,unused-wildcard-import
 from .task                    import Task, RootTask, TrackReaderTask, taskorder
 from .task.dataframe          import DataFrameTask
@@ -146,11 +147,10 @@ class Tasks(Enum):
         return tuple(cls(i) for i in itms) # type: ignore
 
     @classmethod
-    def tasklist(cls, *tasks, **kwa):
+    def tasklist(cls, *tasks, **kwa) -> List[Task]:
         "Same as create except that a list may be completed as necessary"
-        lst   = cls.get(*tasks, **kwa)
-        if isinstance(lst, Task):
-            lst = [lst]
+        tmp    = cls.get(*tasks, **kwa)
+        lst    = cast(List[Task], [tmp] if isinstance(tmp, Task) else tmp)
 
         torder = cls.defaulttaskorder()[::-1]
         for i, itm in enumerate(torder[:-1]):

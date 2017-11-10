@@ -1,29 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Updating PeaksDict for scripting purposes"
-from   typing                import List, Iterator, Type
+from   typing                import List, Iterator, cast
 from   functools             import partial
 from   copy                  import deepcopy
-import sys
-import numpy            as     np
-from   scripting.holoviewing import addto, displayhook
+import numpy                 as     np
+
+from   scripting.holoviewing import addto, displayhook, hv
+from   scripting.parallel    import parallel
+from   model.__scripting__   import Tasks
+from   data.__scripting__    import TracksDict # pylint: disable=unused-import
+from   data.__scripting__.holoviewing.trackviews import CycleDisplay as _CycleDisplay
+from   data.__scripting__.holoviewing.tracksdict import TracksDictDisplay
 from   ..probabilities       import Probability
 from   ..processor           import PeaksDict
 from   .                     import Detailed
 
-def _get(name, attr = None):
-    mod = sys.modules[name]
-    return mod if attr is None else getattr(mod, attr)
-
-# pylint: disable=invalid-name
-hv                      = _get('holoviews')
-hvdata                  = _get('data.__scripting__.holoviewing.trackviews')
-TracksDict:        Type = _get('data.__scripting__', 'TracksDict')
-TracksDictDisplay: Type = _get('data.__scripting__.holoviewing.tracksdict',
-                               'TracksDictDisplay')
-
 displayhook(PeaksDict)
-class PeaksDisplay(hvdata.CycleDisplay, display = PeaksDict): # type: ignore
+class PeaksDisplay(_CycleDisplay, display = PeaksDict): # type: ignore
     """
     Displays peaks.
 
@@ -49,7 +43,7 @@ class PeaksDisplay(hvdata.CycleDisplay, display = PeaksDict): # type: ignore
     _eventstyle = dict(size = 3)
     _norm       = 'events'
     _precision  = None
-    KEYWORDS    = hvdata.CycleDisplay.KEYWORDS | frozenset(locals())
+    KEYWORDS    = _CycleDisplay.KEYWORDS | frozenset(locals())
 
     # pylint: disable=too-many-arguments,arguments-differ
     @staticmethod
@@ -212,7 +206,7 @@ class PeaksTracksDictDisplay(TracksDictDisplay, peaks = TracksDict): # type: ign
     "tracksdict display for peaks"
     _overlay    = 'key'
     _reflayout  = 'bottom'
-    _name       = property(lambda _: 'peaks', lambda _1, _2: None) # constant attribute
+    _name       = cast(str, property(lambda _: 'peaks', lambda _1, _2: None))
     def _refindex(self, kdims):
         if self._reference is None:
             return None
@@ -220,7 +214,7 @@ class PeaksTracksDictDisplay(TracksDictDisplay, peaks = TracksDict): # type: ign
             return kdims[self._overlay].index(self._reference)
         return 0
 
-    def _convert(self, kdims, ovrs):
+    def _convert(self, kdims, ovrs): # pylint: disable=arguments-differ
         ind = self._refindex(kdims)
         if self._reference is not None and ind is not None:
             area = next(iter(ovrs[ind])).to(hv.Area)
@@ -228,5 +222,11 @@ class PeaksTracksDictDisplay(TracksDictDisplay, peaks = TracksDict): # type: ign
                                    label = ovrs[ind].label,
                                    group = ovrs[ind].group)
         return ovrs
+
+    def dataframe(self):
+        "creates a dataframe for all keys"
+        return parallel(self._items,
+                        *Tasks.tasklist(Tasks.peakselector),
+                        endaction = 'concat')
 
 __all__: List[str] = []

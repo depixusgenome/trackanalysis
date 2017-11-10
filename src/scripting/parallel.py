@@ -43,7 +43,7 @@ class Parallel:
         if pool is None:
             pool = ProcessPoolExecutor(cpu_count())
 
-        if endaction in (pd.concat, 'concat'):
+        if endaction in (pd.concat, 'concat', 'concatenate'):
             return pd.concat(sum((list(i) for i in pool.map(self.run, self.args)), []))
 
         elif callable(endaction):
@@ -71,6 +71,6 @@ def parallel(roots     : Union[TracksDict, Sequence[RootTask]],
              *tasks    : Task,
              processors: Dict[Type[Task], Type[Processor]]              = None,
              pool      : Union[ProcessPoolExecutor, ThreadPoolExecutor] = None,
-             endaction : Callable                                       = None):
+             endaction : Union[str, Callable]                           = None):
     "Runs tasks in parallel"
     return Parallel(roots, *tasks, processors = processors).process(pool, endaction)

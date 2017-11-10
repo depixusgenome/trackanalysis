@@ -297,7 +297,7 @@ class LegacyGRFilesIO(_TrackIO):
                 grdir = f'/**/{proj}/*{cls.__CGREXT}'
                 part  = partial(fcn, re.compile(rf'\b{proj}\b').search, grdir)
             elif not allleaves:
-                part  = partial(fcn, lambda _: False, grdir)
+                part  = partial(fcn, lambda _: False, '')
             else:
                 grdir = f'/**'
                 part  = partial(fcn, lambda _: True, grdir)
