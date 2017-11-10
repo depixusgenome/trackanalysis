@@ -198,7 +198,7 @@ def display(self, colorbar = True):
         return
 
     bnd = [0, 0] + list(self.image.shape)
-    return (hv.Image(self.image[::-1], bnd, kdims = ['z focus (pixel)', 'profile'])
+    return (hv.Image(self.image[::-1], bounds = bnd, kdims = ['z focus (pixel)', 'profile'])
             (plot = dict(colorbar = colorbar)))
 
 @addto(FoV)         # type: ignore
