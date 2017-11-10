@@ -93,8 +93,10 @@ class FitToReferenceTask(Task):
         if self.DEFAULTKEY in self.fitdata:
             return True
 
-        if isinstance(itms, (int, str)):
+        if isinstance(itms, str):
             return itms in self.fitdata
+        if np.isscalar(itms):
+            return int(itms) in self.fitdata
 
         return set(itms).issubset(set(self.fitdata))
 
