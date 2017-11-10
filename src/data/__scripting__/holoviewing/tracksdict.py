@@ -7,10 +7,6 @@ Adds shortcuts for using holoview
 import sys
 from   typing                   import List, Union
 from   copy                     import deepcopy
-from   datetime                 import datetime
-from   pathlib                  import Path
-
-import pandas                   as     pd
 
 from   scripting.holoviewing    import addto, displayhook, addproperty
 from   utils.logconfig          import getLogger
@@ -106,8 +102,8 @@ class TracksDictDisplay(BasicDisplay,
             kdims[key] = [i for i in kdims[key] if i != self._reference]
             kdims[key].insert(0, self._reference)
 
-        display = getattr(self, '_'+self._name, self._default_display)
-        fcn     = lambda key, bead, **other: display(itms, key, bead, kdims, **kwa, **other)
+        disp = getattr(self, '_'+self._name, self._default_display)
+        fcn  = lambda key, bead, **other: disp(itms, key, bead, kdims, **kwa, **other)
         return fcn, kdims
 
     def _default_kargs(self, key, bead, kwa):
@@ -222,23 +218,9 @@ class TracksDictFovDisplayProperty:
         return hv.DynamicMap(fcn, kdims = ['key']).redim.values(key = list(keys))
 
 @addto(TracksDict)         # type: ignore
-def dataframe(self):
-    "Returns a table with some data"
-    keys  = list(self)
-    paths = [i.path for i in self.values()]
-    first = [Path(str(i[0])) if isinstance(i, (tuple, list)) else Path(str(i))
-             for i in paths]
-    cnt   = [len(i) if isinstance(i, (tuple, list)) else 1 for i in paths]
-    dtime = datetime.fromtimestamp
-    cdate = [dtime(i.stat().st_ctime) for i in first]
-    size  = [i.stat().st_size >> 20 for i in first]
-    return pd.DataFrame(dict(key = keys, path = first, pathcount = cnt,
-                             creation = cdate, megabytes = size))
-
-@addto(TracksDict)         # type: ignore
 def display(self):
     "Returns a table with some data"
-    return hv.Table(self.dataframe(), kdims = 'key')
+    return hv.Table(self.dataframe(), kdims = ['key'])
 
 @addto(TracksDict)         # type: ignore
 def map(self, fcn, kdim = 'oligo', *extra, **kwa):

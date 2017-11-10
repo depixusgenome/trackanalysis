@@ -226,7 +226,7 @@ class PeaksTracksDictDisplay(TracksDictDisplay, peaks = TracksDict): # type: ign
     def dataframe(self):
         "creates a dataframe for all keys"
         return parallel(self._items,
-                        *Tasks.tasklist(Tasks.peakselector),
+                        *Tasks.tasklist(Tasks.peakselector, Tasks.dataframe(merge = True)),
                         endaction = 'concat')
 
 __all__: List[str] = []

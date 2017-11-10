@@ -5,6 +5,7 @@ Adds a dictionnaries to access tracks, experiments, ...
 """
 from   typing               import Tuple, Iterator, List, cast
 import pickle
+import pandas               as     pd
 
 from   utils                import initdefaults
 from   utils.decoration     import addto
@@ -95,6 +96,16 @@ class TracksDict(_TracksDict):
         else:
             for i in self.values():
                 i.cleaned = value
+
+    def dataframe(self):
+        "Returns a table with some data"
+        paths = [i.pathinfo for i in self.values()]
+        frame = dict(key     = list(self),
+                     path    = [i.trackpath for i in paths],
+                     cleaned = [i.cleaned   for i in self.values()],
+                     **{i: [getattr(j, i) for j in paths]
+                        for i in ('pathcount', 'modification', 'megabytes')})
+        return pd.DataFrame(frame).sort_values('modification')
 
 class ExperimentList(dict):
     "Provides access to keys belonging to a single experiment"

@@ -97,6 +97,7 @@ class OligoMappingDisplay(_PeaksDisplay, display = PeaksDict): # type: ignore
             tsk    += Tasks.fittohairpin.get(sequence = self._sequence,
                                              oligos   = self._oligos)
 
+        tsk += (Tasks.dataframe(merge = True),)
         return parallel(itms, *Tasks.tasklist(*tsk), endaction = 'concat')
 
     def _hpins(self):

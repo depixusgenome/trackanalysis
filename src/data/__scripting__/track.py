@@ -9,17 +9,16 @@ We add some methods and change the default behaviour:
 * an *events* property is added
 * a *rawprecision* method is added
 """
-import sys
-from typing                 import Tuple # pylint:disable=unused-import
+from typing                 import List
 from itertools              import product
+from pathlib                import Path
+from datetime               import datetime
 
-from utils.decoration       import addto
+from utils.decoration       import addto, addproperty
 from signalfilter           import PrecisionAlg
+from app.__scripting__      import Tasks, scriptapp
 
 from ..                      import Track as _Track
-
-Tasks     = sys.modules['app.__scripting__'].Tasks     # pylint: disable=invalid-name
-scriptapp = sys.modules['app.__scripting__'].scriptapp # pylint: disable=invalid-name
 
 class Track(_Track):
     "Adding helper functions for simple calls"
@@ -39,6 +38,35 @@ class Track(_Track):
             scriptapp.control.writeuserconfig()
         super().__init__(path = path, **kwa)
         self.cleaned = kwa.get('cleaned', type(self).cleaned)
+
+@addproperty(_Track, 'pathinfo')
+class PathInfo:
+    "Provides access to path information"
+    def __init__(self, trk: 'Track') -> None:
+        self._trk = trk
+
+    @property
+    def paths(self) -> List[Path]:
+        "returns all paths"
+        path = self._trk.path
+        if isinstance(path, str):
+            return [Path(path)]
+        if isinstance(path, Path):
+            return [path]
+        return [Path(str(i)) for i in path]
+
+    @property
+    def trackpath(self) -> Path:
+        "returns all paths"
+        path = self._trk.path
+        return Path(str(path[0])) if isinstance(path, (list, tuple)) else Path(str(path))
+
+    pathcount    = property(lambda self: len(self.paths))
+    stat         = property(lambda self: self.trackpath.stat())
+    size         = property(lambda self: self.stat.st_size)
+    megabytes    = property(lambda self: self.size >> 20)
+    creation     = property(lambda self: datetime.fromtimestamp(self.stat.st_ctime))
+    modification = property(lambda self: datetime.fromtimestamp(self.stat.st_mtime))
 
 @addto(_Track)
 def grfiles(self):
@@ -74,12 +102,14 @@ def apply(self, *args, copy = True, beadsonly = True):
     "returns an iterator over the result of provided tasks"
     return next(iter(self.processors(*args, beadsonly = beadsonly).run(copy = copy)))
 
-@addto(_Track, property)
+@addto(_Track) # type: ignore
+@property
 def cleancycles(self):
     "returns cleaned cycles"
     return self.apply(*Tasks.defaulttasklist(self.path, Tasks.alignment, self.cleaned))[...,...]
 
-@addto(_Track, property)
+@addto(_Track) # type: ignore
+@property
 def measures(self):
     "returns cleaned cycles for phase 5 only"
     phase = scriptapp.control.getGlobal('config').phase.measure.get()
