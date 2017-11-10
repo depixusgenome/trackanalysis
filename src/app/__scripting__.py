@@ -65,7 +65,7 @@ def save(cls, task):
     if isinstance(task, type(cnf.fittoreference.get())):
         cpy.fitdata.clear()
 
-    cnf[name].set(deepcopy(task))
+    cnf[name].set(cpy)
     scriptapp.control.writeuserconfig()
 
 @addto(Tasks, staticmethod)
