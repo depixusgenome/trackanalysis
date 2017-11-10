@@ -386,8 +386,8 @@ class Handler:
     @classmethod
     def todict(cls, track: 'Track') -> Dict[str, Any]:
         "the oposite of __call__"
-        data = track.__getstate__()
-        data.update(track.data)
+        data = dict(track.data) # get the data first because of lazy instantiations
+        data.update(track.__getstate__())
 
         data['fov']          = track.fov.image
         data['dimensions']   = track.fov.dim
