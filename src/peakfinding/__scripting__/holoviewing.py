@@ -140,8 +140,12 @@ class PeaksDisplay(hvdata.CycleDisplay, display = PeaksDict): # type: ignore
                 cparams = tmp[0]*cparams[0], tmp[0]*tmp[1]+cparams[1]
             cparams = np.round(cparams, 4)
             if tuple(cparams) != (1., 0.):
-                itms[-4].dpx_label = (f'{opts["vdims"][0]} = '
-                                      f'{cparams[0]} · ({opts["kdims"][0]} - {cparams[1]})')
+                if cparams[1] < 0.:
+                    itms[-4].dpx_label = (f'{opts["vdims"][0]} = '
+                                          f'{cparams[0]}·({opts["kdims"][0]}+{-cparams[1]})')
+                else:
+                    itms[-4].dpx_label = (f'{opts["vdims"][0]} = '
+                                          f'{cparams[0]}·({opts["kdims"][0]}-{cparams[1]})')
 
         dets = tuple(dets)
         for det in dets:
