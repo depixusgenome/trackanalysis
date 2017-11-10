@@ -60,6 +60,10 @@ class BasicDisplay(ABC):
     "Everything needed for creating a dynamic map display"
     KEYWORDS = frozenset(locals())
     def __init__(self, items, **opts):
+        if isinstance(items, BasicDisplay):
+            opts, kwa   = items.config(minimal = True), opts
+            opts.update(kwa)
+            items       = getattr(items, '_items')
         self._items   = items
         for i in self.KEYWORDS:
             if i[:2] != '__':
@@ -85,14 +89,21 @@ class BasicDisplay(ABC):
     def __rshift__(self, other):
         return self.display() >> (other if isinstance(other, hv.Element) else other.display())
 
-    def config(self, name = ...):
+    def config(self, name = ..., minimal = False):
         "returns the config"
-        cnf = deepcopy(self._opts)
-        cnf.update({i[1:]: deepcopy(j) for i, j in self.__dict__.items()
-                    if (i not in ('_opts', '_items') and
-                        len(i) > 2 and i[0] == '_'   and
-                        i[1].lower() == i[1])})
-        return cnf if name is Ellipsis else cnf[name]
+        if isinstance(name, str):
+            return getattr(self, '_'+name) if hasattr(self, '_'+name) else self._opts[name]
+
+        keys = {i for i in self.__dict__
+                if (i not in ('_opts', '_items') and
+                    len(i) > 2 and i[0] == '_'   and
+                    i[1].lower() == i[1])}
+        if minimal:
+            keys -= {i for i in keys if getattr(self, i) == getattr(self.__class__, i)}
+
+        cnf = deepcopy(self._opts) if self._opts or not minimal else {}
+        cnf.update({i[1:]: deepcopy(getattr(self, i)) for i in keys})
+        return cnf
 
     def __call__(self, **opts):
         default = self.__class__(self._items).config()
