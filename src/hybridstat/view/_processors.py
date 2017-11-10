@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Processors for storing gui data"
-from functools             import partial
-from copy                  import copy
-from data                  import BEADKEY
-from peakfinding.processor import PeakSelectorProcessor, PeaksDict
-from peakcalling.processor import FitToReferenceProcessor, FitToReferenceDict
+from functools                  import partial
+from data                       import BEADKEY
+from control.processor.taskview import TaskViewProcessor
+from peakfinding.processor      import PeakSelectorProcessor, PeaksDict
+from peakcalling.processor      import FitToReferenceTask, FitToReferenceDict
 
 class GuiPeaksDict(PeaksDict):
     "gui version of PeaksDict"
@@ -38,38 +38,27 @@ class GuiPeakSelectorProcessor(PeakSelectorProcessor):
             return partial(self.apply, **cnf)
         return toframe.new(GuiPeaksDict, config = cnf, store = self.store)
 
-class GuiFitToReferenceDict(FitToReferenceDict):
+class CachedFitToReferenceDict(FitToReferenceDict):
     "gui version of FitToReferenceDict"
-    def __init__(self, *_, model = None, **kwa):
+    def __init__(self, *_, cache = None, **kwa):
         super().__init__(**kwa)
-        self.model              = model
-        self.config             = copy(self.config)
-        self.config.defaultdata = True
+        self.cache = cache
 
     def optimize(self, key: BEADKEY, data):
         "computes results for one key"
-        assert key is self.model.bead
-        params = self.model.fittoreference.params
+        if self.cache is None:
+            return super().optimize(key, data)
+
+        params = self.cache.get(key, None)
         if params is None:
-            res = super().optimize(key, data)
-            self.model.fittoreference.params = res
-            return res
+            self.cache[key] = params = super().optimize(key, data)
         return params
 
-class GuiFitToReferenceProcessor(FitToReferenceProcessor):
-    "gui fit to reference"
-    def __init__(self, model = None, **kwa):
-        super().__init__(**kwa)
-        self.model = model
-
-    def __call__(self, *args, **kwa):
-        cur       = type(self)(*args, **kwa)
-        cur.model = self.model
-        return cur
-
-    def apply(self, toframe = None, **cnf):
-        "applies the task to a frame or returns a function that does so"
-        cnf = self.keywords(cnf)
-        if toframe is None:
-            return partial(self.apply, **cnf)
-        return toframe.new(GuiFitToReferenceDict, config = cnf, model = self.model)
+class GuiFitToReferenceProcessor(TaskViewProcessor[FitToReferenceTask,
+                                                   CachedFitToReferenceDict,
+                                                   BEADKEY]):
+    "Changes the Z axis to fit the reference"
+    def run(self, args):
+        "updates the frames"
+        cache = args.data.setCacheDefault(self, dict())
+        args.apply(self.apply(cache = cache, **self.config()))

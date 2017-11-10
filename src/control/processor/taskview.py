@@ -25,12 +25,17 @@ class TaskViewProcessor(Generic[TaskType, TaskDict, Key], Processor[TaskType]):
         return cnf
 
     @classmethod
-    def apply(cls, toframe = None, **cnf):
+    def apply(cls, toframe = None, cache = None, **cnf):
         "applies the task to a frame or returns a function that does so"
         cnf = cls.keywords(cnf)
         if toframe is None:
-            return partial(cls.apply, **cnf)
-        return toframe.new(cls.taskdicttype(), config = cnf)
+            if cache is None:
+                return partial(cls.apply, **cnf)
+            return partial(cls.apply, cache = cache, **cnf)
+
+        if cache is None:
+            return toframe.new(cls.taskdicttype(), config = cnf)
+        return toframe.new(cls.taskdicttype(), config = cnf, cache = cache)
 
     @classmethod
     def compute(cls, key: Key, **kwa):
