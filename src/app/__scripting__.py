@@ -114,8 +114,8 @@ def defaulttasklist(cls, paths, upto, cleaned:bool, __old__ = Tasks.defaulttaskl
     if any(isinstance(i, tpe) for i in tasks):
         return tasks
     if len(tasks) > 0 and isinstance(tasks[0], type(Tasks.cleaning.get())):
-        return tasks[:1]+(inst,)+tasks[1:]
-    return (inst,)+tasks
+        return tasks[:1]+[inst]+tasks[1:]
+    return [inst]+tasks
 
 # pylint: disable=no-member,invalid-name
 scriptapp = default.application(main = ScriptingView, creator = lambda x: x)() # type: ignore
