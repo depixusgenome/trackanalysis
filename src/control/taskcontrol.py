@@ -9,15 +9,16 @@ The controller stores:
 
 It can add/delete/update tasks, emitting the corresponding events
 """
-from typing         import (Union, Iterator, Type, cast, Tuple,
-                            Optional, Any, List, Iterable, Dict, overload,
-                            TYPE_CHECKING)
-from pathlib        import Path
-from functools      import partial
+from typing          import (Union, Iterator, Type, cast, Tuple,
+                             Optional, Any, List, Iterable, Dict, overload,
+                             TYPE_CHECKING)
+from pathlib         import Path
+from functools       import partial
 
-from model.task     import Task, RootTask, TaskIsUniqueError, taskorder, TASK_ORDER
-from .event         import Controller, NoEmission
-from .processor     import Cache, Processor, run as _runprocessors
+from model.task      import Task, RootTask, TaskIsUniqueError, taskorder, TASK_ORDER
+from .event          import Controller, NoEmission
+from .processor      import Cache, Processor, run as _runprocessors
+from .processor.base import register, CACHE_T
 
 if TYPE_CHECKING:
     from data import Track # pylint: disable=unused-import
@@ -135,33 +136,13 @@ class ProcessorController:
     @classmethod
     def register(cls,
                  processor: _M_PROCS_T = None,
-                 cache:     dict       = None,
+                 cache:     CACHE_T    = None,
                  force                 = False,
                 ) -> Dict[Type[Task], Type[Processor]]:
         "registers a task processor"
-        if cache is None:
-            cache = dict()
-
-        if isinstance(processor, Iterable):
-            for proc in processor:
-                cls.register(proc, cache)
-            return cache
-
-        elif processor is None:
-            return cache
-
-        if processor.canregister() or force:
-            if isinstance(processor.tasktype, tuple):
-                cache.update(dict.fromkeys(processor.tasktype, processor))
-            elif processor.tasktype is not None:
-                cache[processor.tasktype] = processor
-
-        for sclass in getattr(processor, '__subclasses__', lambda: ())():
-            cls.register(sclass, cache)
-        return cache
+        return register(processor, force, cache, True)
 
 create   = ProcessorController.create # pylint: disable=invalid-name
-register = ProcessorController.register # pylint: disable=invalid-name
 
 class BaseTaskController(Controller):
     "Data controller class"
@@ -169,7 +150,7 @@ class BaseTaskController(Controller):
         super().__init__(**kwargs)
         self.__items: Dict[RootTask, ProcessorController] = dict()
         self.__procs: Dict[Type[Task], Type[Processor]]   = dict()
-        self.__procs = (ProcessorController.register(kwargs['processors'])
+        self.__procs = (register(kwargs['processors'])
                         if 'processors' in kwargs else None)
 
         self.__openers = kwargs.get("openers", None)
@@ -178,7 +159,7 @@ class BaseTaskController(Controller):
     @property
     def __processors(self):
         if self.__procs is None:
-            self.__procs = ProcessorController.register(Processor)
+            self.__procs = register(Processor)
         return self.__procs
 
     def task(self,
@@ -363,7 +344,7 @@ class TaskController(BaseTaskController):
         cnf    = ctrl.getGlobal('config').tasks
         if getter('procs') is None:
             proc = _import(cnf.processors.get())
-            setter('procs', ProcessorController.register(proc))
+            setter('procs', register(proc))
 
         if getter('openers') is None:
             setter('openers', [_import(itm)(ctrl) for itm in cnf.io.open.get()])

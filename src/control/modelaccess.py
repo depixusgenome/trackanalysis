@@ -4,6 +4,7 @@
 from typing          import (Tuple, Optional, # pylint: disable =unused-import
                              Iterator, List, Union, Any, Callable, Dict,
                              TypeVar)
+from copy            import copy as shallowcopy
 from enum            import Enum
 from functools       import wraps
 
@@ -122,20 +123,17 @@ class TaskPlotModelAccess(PlotModelAccess):
         if track is None:
             return None
 
-        root  = self.roottask
-        tasks = tuple(self._ctrl.tasks(root))
-        for i, task in tuple(enumerate(tasks))[::-1]:
-            if self.checktask(root, task):
-                if len(procs):
-                    cache = ProcessorController.register(Processor)
-                    for proc in procs:
-                        ProcessorController.register(proc, cache, force = True)
+        root = self.roottask
+        for task in tuple(self._ctrl.tasks(root))[::-1]:
+            if not self.checktask(root, task):
+                continue
 
-                    ctrl  = ProcessorController.create(*tasks[:i+1],
-                                                       processors = cache)
-                    ctrl.data.setCacheDefault(0, track)
-                    return ctrl
-                return self._ctrl.processors(root, task)
+            ctrl = self._ctrl.processors(root, task)
+            data = ctrl.data.replace(*procs)
+            if data is not ctrl.data:
+                ctrl      = shallowcopy(ctrl)
+                ctrl.data = data
+            return ctrl
         return None
 
     def runbead(self, *procs):
