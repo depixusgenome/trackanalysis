@@ -50,10 +50,10 @@ CLEAN = TracksDict("../tests/testingcore/100bp_4mer/*.pk", # type: ignore
 CLEAN.cleaned = True
 
 def _test(txt, *itms):
-    fcn = lambda x: '\n'.join(i.strip() for i in str(x).strip().split('\n'))
+    fcn = lambda x: str(x).replace('\n', '').replace(' ', '')
     txt = fcn(txt)
     for itm in itms:
-        assert fcn(itm) == txt
+        assert fcn(itm) == fcn(txt)
 
 _test("""
       :Overlay
@@ -101,38 +101,40 @@ REF  = CLEAN['ref'].apply(Tasks.alignment,       # type: ignore
                           Tasks.peakselector)    # type: ignore
 _test("""
       :Overlay
-         .Curve.I        :Curve   [z]   (events)
-         .Scatter.I      :Scatter   [z]   (events)
-         .Scatter.II     :Scatter   [z]   (events)
-         .Curve.II       :Curve   [z]   (events)
-         .Curve.Sequence :Curve   [z]   (events)
+         .Curve.Histogram   :Curve   [z]   (events)
+         .Scatter.Histogram :Scatter   [z]   (events)
+         .Scatter.Peaks     :Scatter   [z]   (events)
+         .Curve.Peaks       :Curve   [z]   (events)
+         .Curve.Sequence    :Curve   [z]   (events)
       """,
       (REF
-       .display(sequence=HPIN, oligos=REFS, fit = True)
+       .display(sequence=HPIN, oligos=REFS, fit = False)
        .display())[25, 'hairpin 1', 1/8.8e-4, 0.])
 
 _test("""
       :Overlay
-         .Hairpin_1.I    :Curve   [z]   (events)
-         .Hairpin_1.II   :Scatter   [z]   (events)
-         .Hairpin_1.III  :Scatter   [z]   (events)
-         .Hairpin_1.IV   :Curve   [z]   (events)
-         .Curve.Sequence :Curve   [z]   (events)
-         .Text.I         :Text   [z,events]
+         .Hairpin_1.Histogram.I  :Curve   [z]   (events)
+         .Hairpin_1.Histogram.II :Scatter   [z]   (events)
+         .Hairpin_1.Peaks.I      :Scatter   [z]   (events)
+         .Hairpin_1.Peaks.II     :Curve   [z]   (events)
+         .Curve.Sequence         :Curve   [z]   (events)
+         .Text.I                 :Text   [z,events]
       """,
-      REF.display(sequence=HPIN, oligos=REFS).display()[25])
+      REF.display(sequence=HPIN, oligos=REFS, fit = True).display()[25])
 
 DMAP = CLEAN.peaks[['AACG', 'CCTC'], [12, 25]](format = None, reference = 'ref').display()
 _test("""
       :Overlay
-         .Curve.I     :Curve   [z]   (events)
+         .Area.Ref    :Area   [z]   (events)
+         .Curve.Ref   :Curve   [z]   (events)
+         .Scatter.Ref :Scatter   [z]   (events)
          .Scatter.I   :Scatter   [z]   (events)
+         .Curve.I     :Curve   [z]   (events)
+         .Curve.Key   :Curve   [z]   (events)
+         .Scatter.Key :Scatter   [z]   (events)
          .Scatter.II  :Scatter   [z]   (events)
          .Curve.II    :Curve   [z]   (events)
-         .Curve.III   :Curve   [z]   (events)
-         .Scatter.III :Scatter   [z]   (events)
-         .Scatter.IV  :Scatter   [z]   (events)
-         .Curve.IV    :Curve   [z]   (events)
+         .Text.I      :Text   [z,events]
       """, DMAP['AACG',12], DMAP['CCTC',25])
 
 DMAP = CLEAN.peaks[['AACG', 'CCCC'], [12, 25]](format = '1d', reference = 'ref').display()
@@ -151,6 +153,7 @@ _test("""
          .Scatter.CCCC :Scatter   [z]   (events)
          .Scatter.III  :Scatter   [z]   (events)
          .Curve.III    :Curve   [z]   (events)
+         .Text.I       :Text   [z,events]
       """, DMAP[12], DMAP[25])
 
 DMAP = CLEAN.peaks[['AACG', 'CCTC'], [12, 25]](format = '1d', reference = 'ref').display()
@@ -169,6 +172,7 @@ _test("""
          .Scatter.CCTC :Scatter   [z]   (events)
          .Scatter.III  :Scatter   [z]   (events)
          .Curve.III    :Curve   [z]   (events)
+         .Text.I       :Text   [z,events]
       """, DMAP[12], DMAP[25])
 
 DMAP = CLEAN.peaks[['AACG', 'CCCC'], [12, 25]](format = '2d', reference = 'ref').display()

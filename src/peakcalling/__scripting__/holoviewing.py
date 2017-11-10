@@ -11,7 +11,6 @@ import numpy                    as np
 import sequences
 
 from   scripting.holoviewing        import hv
-from   utils                        import DefaultValue
 from   peakfinding.processor        import PeaksDict    # pylint: disable=unused-import
 from   peakfinding.__scripting__.holoviewing import (PeaksDisplay as _PeaksDisplay,
                                                      PeaksTracksDictDisplay as _PTDDisplay)
@@ -45,19 +44,40 @@ class OligoMappingDisplay(_PeaksDisplay, display = PeaksDict): # type: ignore
     * *sequencestyle*, *eventstyle*, *peakstyle* can be used to set the style
     of corresponding graph elements.
     """
-    _zero                                      = True
-    _sequence                                  = None
-    _oligos                                    = None
-    _fit                                       = DefaultValue
-    _sequencestyle                             = dict(color = 'gray')
-    _reftask                                   = FitToReferenceTask()
-    KEYWORDS                                   = _PeaksDisplay.KEYWORDS | frozenset(locals())
+    _zero          = True
+    _sequence      = None
+    _oligos        = None
+    _fit           = True
+    _sequencestyle = dict(color = 'gray')
+    _reftask       = FitToReferenceTask()
+    KEYWORDS       = _PeaksDisplay.KEYWORDS | frozenset(locals())
     def __init__(self, items, **opts):
         super().__init__(items, **opts)
         if self._bias is not None or None not in (self._sequence, self._oligos):
             self._zero = False
 
-    def hpins(self):
+    def elements(self, evts, **opts):
+        "shows overlayed Curve items"
+        if self._reftask and {i for i in evts.keys()} in self._reftask:
+            evts = FitToReferenceProcessor.apply(evts, **self._reftask.config())
+        return super().elements(evts, **opts)
+
+    def getmethod(self):
+        "Returns the method used by the dynamic map"
+        if None not in (self._sequence, self._oligos):
+            if self._fit is True:
+                return _AutoHP(self).run
+            return _ManualHP(self).run
+
+        return super().getmethod()
+
+    def getredim(self):
+        "Returns the keys used by the dynamic map"
+        if None not in (self._sequence, self._oligos) and self._fit is not True:
+            return _ManualHP(self).getredim()
+        return super().getredim()
+
+    def _hpins(self):
         "returns haipin positions"
         opts = deepcopy(self._opts)
         for i, j in self.graphdims().items():
@@ -77,105 +97,212 @@ class OligoMappingDisplay(_PeaksDisplay, display = PeaksDict): # type: ignore
             pks[key] = hv.Curve((xvals, yvals), **opts)(style = self._sequencestyle)
         return pks
 
-    def fitmap(self):
-        "creates a DynamicMap with fitted oligos"
-        pins  = self.hpins()
-        fits  = self._items.new(FitToHairpinDict,
-                                config   = dict(sequence = self._sequence,
-                                                oligos   = self._oligos,
-                                                fit      = self._fit))
+class _AutoHP(OligoMappingDisplay):
+    "creates a DynamicMap with fitted oligos"
+    _labels = True
+    def __init__(self, itms, **kwa):
+        super().__init__(itms, **kwa)
+        if isinstance(itms, OligoMappingDisplay):
+            self.__pins = None
+            self.__fits = None
+            self.__cache: Dict[BEADKEY, Tuple[str, Distance]] = {}
 
-        cache = {} # type: Dict[BEADKEY, Tuple[str, Distance]]
-        def _fcn(bead):
-            if bead not in cache:
-                cache[bead] = min(fits[bead].distances.items(), key = lambda i: i[1][0])
-            key, dist = cache[bead]
+    def run(self, bead):
+        "creates the display"
+        if self.__pins is None:
+            self.__pins = self._hpins()
+            cnf         = dict(sequence = self._sequence,
+                               oligos   = self._oligos,
+                               fit      = self._fit)
+            if self._fit is True:
+                cnf.pop('fit')
+            self.__fits = self._items.new(FitToHairpinDict, config = cnf)
 
-            tmp = self(stretch = dist.stretch, bias = dist.bias)
-            crv = tmp.elements(self._items[[bead]], group = key)
+        cache = self.__cache
+        if bead not in cache:
+            cache[bead] = min(self.__fits[bead].distances.items(), key = lambda i: i[1][0])
+        key, dist = cache[bead]
 
-            hpc  = pins[key]
-            data = np.copy(hpc.data)
-            data[:,1] *= np.nanmax(next(iter(crv)).data[:,1])
+        tmp = self(stretch = dist.stretch, bias = dist.bias)
+        crv = tmp.elements(self._items[[bead]], group = key)
 
-            pos  = lambda x: .8*np.nanmax(x)+.2*np.nanmin(x)
-            if dist.bias < 0:
-                txt  = f'y = {dist.stretch:.1f} (x  + {np.abs(dist.bias) : .4f})'
-            else:
-                txt  = f'y = {dist.stretch:.1f} (x  - {dist.bias : .4f})'
-            text = hv.Text(pos(data[:,0]), pos(data[:,1]), txt,
-                           kdims = hpc.kdims+hpc.vdims)
-            return hv.Overlay(crv+[hpc.clone(data = data), text], group = key)
-        return _fcn
+        hpc  = self.__pins[key]
+        data = np.copy(hpc.data)
+        data[:,1] *= np.nanmax(next(iter(crv)).data[:,1])
 
-    def elements(self, evts, **opts):
-        "shows overlayed Curve items"
-        if self._reftask and {i for i in evts.keys()} in self._reftask:
-            evts = FitToReferenceProcessor.apply(evts, **self._reftask.config())
-        return super().elements(evts, **opts)
+        pos  = lambda x: .8*np.nanmax(x)+.2*np.nanmin(x)
+        pars = np.round(dist.stretch, 1), np.round(dist.bias, 4)
+        if pars[1] < 0:
+            txt  = f'{hpc.vdims[0]} = {pars[0]}·({hpc.kdims[0]}+{-pars[1]})'
+        else:
+            txt  = f'{hpc.vdims[0]} = {pars[0]}·({hpc.kdims[0]}-{pars[1]})'
+        text = hv.Text(pos(data[:,0]), pos(data[:,1]), txt,
+                       kdims = hpc.kdims+hpc.vdims)
+        return hv.Overlay(crv+[hpc.clone(data = data), text], group = key)
 
-    def hpinmap(self):
-        "creates a DynamicMap with oligos to fit"
-        pins = self.hpins()
-        def _clone(itm, stretch, bias):
-            data = np.copy(itm.data)
-            data[:,0] = (data[:,0]-bias)*stretch
-            return itm.clone(data = data)
+class _ManualHP(OligoMappingDisplay):
+    "Fits per HP"
+    _labels = True
+    def __init__(self, itms, **kwa):
+        super().__init__(itms, **kwa)
+        if isinstance(itms, OligoMappingDisplay):
+            self.__cache = [None, (), None, ()]
+            self.__pins  = self._hpins()
 
-        # pylint: disable=dangerous-default-value
-        def _over(bead, sequence, stretch, bias, cache = [None, (), None, ()]):
-            if bead != cache[0]:
-                cache[0] = bead
-                cache[1] = self.elements(self._items[[bead]])
-            clones = [_clone(i, stretch, bias) for i in cache[1]]
+    @staticmethod
+    def __clone(itm, stretch, bias):
+        data = np.copy(itm.data)
+        data[:,0] = (data[:,0]-bias)*stretch
+        return itm.clone(data = data)
 
-            if sequence != cache[2]:
-                hpc        = pins[sequence]
-                data       = np.copy(hpc.data)
-                data[:,1] *= np.nanmax(clones[0].data[:,1])
-                cache[2]   = sequence
-                cache[3]   = [hpc.clone(data = data)]
+    def run(self, bead, sequence, stretch, bias):
+        "creates the display"
+        cache = self.__cache
+        if bead != cache[0]:
+            cache[0] = bead
+            cache[1] = self.elements(self._items[[bead]])
+        fcn    = self.__clone
+        clones = [fcn(i, stretch, bias) for i in cache[1]]
 
-            return hv.Overlay(clones+cache[3])
+        if sequence != cache[2]:
+            hpc        = self.__pins[sequence]
+            data       = np.copy(hpc.data)
+            data[:,1] *= np.nanmax(clones[0].data[:,1])
+            cache[2]   = sequence
+            cache[3]   = [hpc.clone(data = data)]
 
-        return _over
+        return hv.Overlay(clones+cache[3])
+
+    def getredim(self):
+        "Returns the method used by the dynamic map"
+        values = list(_PeaksDisplay.getredim(self))
+        params = tuple((i, getattr(self, '_'+i)) for i in ('stretch', 'bias')
+                       if getattr(self, '_'+i) != getattr(self.__class__, '_'+i))
+        rngs   = Tasks.getconfig().fittohairpin.range.getitems(...) # type: ignore
+
+        pins   = sequences.peaks(self._sequence, self._oligos)
+        if isinstance(pins, np.ndarray):
+            pins = {'hairpin 1': None}
+
+        values.append(('sequence', sorted(dict(pins).keys())))
+        values.extend(params)
+        values.extend((i, slice(*rngs[i])) for i in ('stretch', 'bias')
+                      if i not in (k for k, _ in params))
+        return values
+
+class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
+                             peaks = TracksDict):
+    """
+    A hv.DynamicMap showing peaks
+
+    Attributes are:
+
+    * *format* == '1d': for a given bead, all tracks are overlayed, For a given
+      bead, all tracks are overlayed.  Keywords are:
+
+        * *reference*: the reference is displayed as an area,
+        * *distance*: a *HistogramFit* object (default) or *None*. This objects
+        computes a stretch and bias which is applied to the x-axis of
+        non-reference items.
+
+    * *format* == '2d': for a given bead, all tracks are shown on a 2D
+    histogram. Keywords are:
+
+        * *reference*: the reference is displayed as an area,
+        * *distance*: a *HistogramFit* object (default) or *None*. This objects
+        computes a stretch and bias which is applied to the x-axis of
+        non-reference items.
+
+    * *format* == None: keywords are:
+
+        * *reference*: the reference is removed from the *key* widget and
+        allways displayed to the left independently.
+        * *refdims*: if set to *True*, the reference gets its own dimensions.
+        Thus zooming and spanning is independant.
+        * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
+        * *fit*: add stretch & bias sliders
+    """
+    _format    = "2d"
+    _reftask   = FitToReferenceTask()
+    _refdims   = False
+    _peakstyle = dict(color = 'blue', line_dash = 'dotted')
+    _refstyle  = dict(color = 'gray', line_dash = 'dotted')
+    _logz      = True
+    _loglog    = True
+    _textcolor = 'white'
+    _fit       = False
+    KEYWORDS   = _PTDDisplay.KEYWORDS | frozenset(locals())
+    def __init__(self, items, **opts):
+        super().__init__(items, **opts)
+        if self._format in ('1d', '2d'):
+            self._overlay = 'key'
+        elif 'overlay' not in opts:
+            self._overlay = None
+        if 'reflayout' not in opts:
+            self._reflayout = 'same' if self._format is None else 'bottom'
+
+    def _convert(self, kdims, ovrs):
+        ovrs = super()._convert(kdims, ovrs)
+        ind  = self._refindex(kdims)
+        if ind >= len(ovrs) or len(tuple(ovrs[ind])) == 0:
+            return ovrs
+
+        firsts = [next(iter(i)) for i in ovrs]
+        txt    = [getattr(i, 'dpx_label', None) for i in firsts]
+        txt    = [i for i in txt if i]
+        if len(txt) == 0 or len(txt) > 4:
+            txt = ['']
+        elif len(txt) > 1:
+            txt = [i.label + ': ' + j for i, j in zip(firsts, txt)]
+
+        ovrs  = list(ovrs)
+        first = next(iter(tuple(ovrs[ind])))
+        kdims = first.kdims + first.vdims
+        minv  = [np.nanmin(first.data[:,k]) for k in range(2)]
+        maxv  = [np.nanmax(first.data[:,k]) for k in range(2)]
+
+        ovrs.append(hv.Text(minv[0]*.7+maxv[0]*.3, minv[1]*.3+maxv[1]*.7,
+                            '\n'.join(txt), kdims = kdims))
+        return hv.Overlay(ovrs)
+
+    def _default_kargs(self, key, bead, kwa):
+        super()._default_kargs(key, bead, kwa)
+        if self._reference is None or self._reference == key:
+            return
+
+        kwa['reftask'] = self._reftask
+        if bead not in self._reftask:
+            self._reftask.frompeaks(self._items[self._reference].peaks[bead,...])
 
     def getmethod(self):
         "Returns the method used by the dynamic map"
-        if None not in (self._sequence, self._oligos):
-            return self.hpinmap() if self._fit is True else self.fitmap()
-        return super().getmethod()
+        return (_ManualRef(self).run if self._format is None and self._fit else
+                _2DRef    (self).run if self._format == '2d'               else
+                super().getmethod())
 
     def getredim(self):
-        "Returns the keys used by the dynamic map"
-        values = list(super().getredim())
-        if None not in (self._sequence, self._oligos) and self._fit is True:
-            params = tuple((i, getattr(self, '_'+i)) for i in ('stretch', 'bias')
-                           if getattr(self, '_'+i) != getattr(self.__class__, '_'+i))
-            rngs   = Tasks.getconfig().fittohairpin.range.getitems(...) # type: ignore
+        "Returns the method used by the dynamic map"
+        redim   = super().getredim()
+        if isinstance(redim, dict):
+            redim = list(redim.items())
 
-            pins   = sequences.peaks(self._sequence, self._oligos)
-            if isinstance(pins, np.ndarray):
-                pins = {'hairpin 1': None}
+        if self._format == '2d':
+            redim = [i for i in redim if i[0] != 'key']
 
-            values.append(('sequence', sorted(dict(pins).keys())))
-            values.extend(params)
-            values.extend((i, slice(*rngs[i])) for i in ('stretch', 'bias')
-                          if i not in (k for k, _ in params))
-            return values
-        return values
+        if self._format is None and self._fit:
+            rngs   = Tasks.getconfig().fittoreference.range.getitems(...) # type: ignore
+            redim += [(i, slice(*rngs[i])) for i in ('stretch', 'bias')]
+        return redim
 
-class RefFitsTo2D:
+class _2DRef(PeaksTracksDictDisplay):
     """Converts 1D graphs to a 2D display"""
-    def __init__(self, parent: 'PeaksTracksDictDisplay') -> None:
-        self.__parent: 'PeaksTracksDictDisplay' = parent
-        self.__fcn:    Callable                 = _PTDDisplay.getmethod(parent)
+    def __init__(self, itms, **kwa):
+        super().__init__(itms, **kwa)
+        if isinstance(itms, PeaksTracksDictDisplay):
+            self.__fcn: Callable = _PTDDisplay.getmethod(itms)
 
-    def __getattr__(self, key):
-        return super().__getattribute__(key) if key[:2] == '__' else getattr(self.__parent, key)
-
-    def __call__(self, bead):
-        "converts 1d histograms to 2D"
+    def run(self, bead):
+        "Creates the display"
         plot  = self.__fcn(bead)
         crvs  = [(i[1], j) for i, j in plot.data.items() if i[0] == 'Curve'][::2]
         quad  = self.__quadmesh(crvs)
@@ -224,27 +351,26 @@ class RefFitsTo2D:
         ref  = hv.Curve((np.repeat(sp1.pop(ind), 3), ref2), label = self._reference)
         return ref(style = self._refstyle)
 
-class DynFit:
+class _ManualRef(PeaksTracksDictDisplay):
     """creates a DynamicMap with a reference to fit dynamically"""
-    def __init__(self, parent: 'PeaksTracksDictDisplay') -> None:
-        self.__parent        = parent
-        self.__fcn: Callable = parent(fit     = False,
-                                      reftask = None,
+    def __init__(self, itms, **kwa):
+        super().__init__(itms, **kwa)
+        if isinstance(itms, PeaksTracksDictDisplay):
+            self.__fcn: Callable = itms(fit     = False,
+                                        reftask = None,
+                                        zero    = False).getmethod()
+            self.__cache         = [None, ()]
 
-                                      zero    = False).getmethod()
-        self.__cache         = [None, ()]
-
-    def __getattr__(self, key):
-        return super().__getattribute__(key) if key[:2] == '__' else getattr(self.__parent, key)
-
-    def ___call__(self, key, bead, stretch, bias):
+    def run(self, key, bead, stretch, bias):
+        "Creates the display"
         cache = self.__cache
         if bead != cache[0]:
             cache[0] = bead
             cache[1] = list(self.__fcn(key, bead))
 
         mid    = len(cache[1])//2+1
-        clones = [self.__clone(i, stretch, bias) for i in cache[1][mid:]]
+        fcn    = self.__clone
+        clones = [fcn(i, stretch, bias) for i in cache[1][mid:]]
         return hv.Overlay(cache[1][:mid]+clones)
 
     @staticmethod
@@ -252,113 +378,5 @@ class DynFit:
         data = np.copy(itm.data)
         data[:,0] = (data[:,0]-bias)*stretch
         return itm.clone(data = data)
-
-class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
-                             peaks = TracksDict):
-    """
-    A hv.DynamicMap showing peaks
-
-    Attributes are:
-
-    * *format* == '1d': for a given bead, all tracks are overlayed, For a given
-      bead, all tracks are overlayed.  Keywords are:
-
-        * *reference*: the reference is displayed as an area,
-        * *distance*: a *HistogramFit* object (default) or *None*. This objects
-        computes a stretch and bias which is applied to the x-axis of
-        non-reference items.
-
-    * *format* == '2d': for a given bead, all tracks are shown on a 2D
-    histogram. Keywords are:
-
-        * *reference*: the reference is displayed as an area,
-        * *distance*: a *HistogramFit* object (default) or *None*. This objects
-        computes a stretch and bias which is applied to the x-axis of
-        non-reference items.
-
-    * *format* == None: keywords are:
-
-        * *reference*: the reference is removed from the *key* widget and
-        allways displayed to the left independently.
-        * *refdims*: if set to *True*, the reference gets its own dimensions.
-        Thus zooming and spanning is independant.
-        * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
-        * *fit*: add stretch & bias sliders
-    """
-    _format    = "2d"
-    _reftask   = FitToReferenceTask()
-    _refdims   = False
-    _peakcolor = 'blue'
-    _peakdash  = 'dotted'
-    _refstyle  = dict(color = 'gray', line_dash = 'dotted')
-    _logz      = True
-    _loglog    = True
-    _textcolor = 'white'
-    _fit       = False
-    KEYWORDS   = _PTDDisplay.KEYWORDS | frozenset(locals())
-    def __init__(self, items, **opts):
-        super().__init__(items, **opts)
-        if self._format in ('1d', '2d'):
-            self._overlay = 'key'
-        elif 'overlay' not in opts:
-            self._overlay = None
-        if 'reflayout' not in opts:
-            self._reflayout = 'same' if self._format is None else 'bottom'
-        if self._format == "2d" and 'peakstyle' not in opts:
-            self._peakstyle = dict(color = 'blue', line_dash = 'dotted')
-
-    def _convert(self, kdims, ovrs):
-        ovrs = super()._convert(kdims, ovrs)
-        ind  = self._refindex(kdims)
-        if ind >= len(ovrs) or len(tuple(ovrs[ind])) == 0:
-            return ovrs
-
-        firsts = [next(iter(i)) for i in ovrs]
-        txt    = [getattr(i, 'dpx_label', None) for i in firsts]
-        txt    = [i for i in txt if i]
-        if len(txt) == 0 or len(txt) > 4:
-            return ovrs
-        if len(txt) > 1:
-            txt = [i.label + ': ' + j for i, j in zip(firsts, txt)]
-
-        ovrs  = list(ovrs)
-        first = next(iter(tuple(ovrs[ind])))
-        kdims = first.kdims + first.vdims
-        minv  = [np.nanmin(first.data[:,k]) for k in range(2)]
-        maxv  = [np.nanmax(first.data[:,k]) for k in range(2)]
-
-        ovrs.append(hv.Text(minv[0]*.7+maxv[0]*.3, minv[1]*.3+maxv[1]*.7,
-                            '\n'.join(txt), kdims = kdims))
-        return hv.Overlay(ovrs)
-
-    def _default_kargs(self, key, bead, kwa):
-        super()._default_kargs(key, bead, kwa)
-        if self._reference is None or self._reference == key:
-            return
-
-        if bead not in self._reftask:
-            kwa['reftask'] = self._reftask
-            if bead not in self._reftask:
-                self._reftask.frompeaks(self._items[self._reference].peaks[bead,...])
-
-    def getmethod(self):
-        "Returns the method used by the dynamic map"
-        return (DynFit(self)      if self._format is None and self._fit else
-                RefFitsTo2D(self) if self._format == '2d'               else
-                super().getmethod())
-
-    def getredim(self):
-        "Returns the method used by the dynamic map"
-        redim   = super().getredim()
-        if isinstance(redim, dict):
-            redim = list(redim.items())
-
-        if self._format == '2d':
-            redim = [i for i in redim if i[0] != 'key']
-
-        if self._format is None and self._fit:
-            rngs   = Tasks.getconfig().fittoreference.range.getitems(...) # type: ignore
-            redim += [(i, slice(*rngs[i])) for i in ('stretch', 'bias')]
-        return redim
 
 __all__: List[str] = []
