@@ -3,7 +3,7 @@
 "Controller for most plots and views"
 from typing          import (Tuple, Optional, # pylint: disable =unused-import
                              Iterator, List, Union, Any, Callable, Dict,
-                             TypeVar)
+                             TypeVar, Callable)
 from copy            import copy as shallowcopy
 from enum            import Enum
 from functools       import wraps
@@ -263,11 +263,11 @@ class TaskAccess(TaskPlotModelAccess):
         return next((t for t in self._ctrl.tasks(self.roottask) if self.check(t)), None)
 
     @property
-    def cache(self):
+    def cache(self) -> Callable[[],Any]:
         "returns the processor's cache if it exists"
         task = self.task
         if task is None:
-            return None
+            return lambda: None
         return self._ctrl.cache(self.roottask, task)
 
     def _check(self, task, parent = NoArgs) -> bool:

@@ -291,16 +291,30 @@ class BaseTaskController(Controller):
         self.__items[parent].remove(tsk)
         return dict(controller = self, parent = parent, task = tsk, old = old)
 
+    @overload
+    def clearData(self, # pylint: disable=unused-argument,no-self-use
+                  parent: '_Ellipsis',
+                  task: Task = None) -> dict:
+        "clears all cache"
+
+    @overload
+    def clearData(self, # pylint: disable=unused-argument,no-self-use,function-redefined
+                  parent: RootTask,
+                  task:   Task = None) -> dict:
+        "clears parent cache starting at *task*"
+
     @Controller.emit
-    def clearData(self, parent: Union[None, RootTask, type] = _m_none) -> dict:
+    def clearData(self, parent, task = None) -> dict: # pylint: disable=function-redefined
         "clears all data"
-        if parent is _m_none:
+        if parent is Ellipsis:
             self.__items.clear()
         elif parent not in self.__items:
             raise NoEmission('wrong key')
-        else:
+        elif task is None:
             self.__items[cast(RootTask, parent)].clear()
-        return dict(controller = self, parent = parent)
+        else:
+            self.__items[cast(RootTask, parent)].update(task)
+        return dict(controller = self, parent = parent, task = Task)
 
     def __withopeners(self, task, tasks):
         for obj in self.__openers:

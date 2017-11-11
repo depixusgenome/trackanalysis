@@ -18,12 +18,11 @@ class DataCleaningAccess(TaskAccess):
     @property
     def cache(self):
         "returns the object cache"
-        tmp = super().cache
-        mem = tmp() if callable(tmp) else None
+        mem = super().cache()
         if mem is None:
             return None
 
-        cur = mem.get(self.track, {}).get(self.bead, None)
+        cur = mem.get(self.bead, None)
         return None if cur is None else {i.name: i for i in cur[0]}
 
     def nbadcycles(self, cache = NoArgs) -> int:

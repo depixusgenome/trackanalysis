@@ -272,27 +272,20 @@ def test_subtract():
 def test_processor():
     "test processor"
     # pylint: disable=expression-not-assigned
-    cache = {}
+    cache = {} # type: ignore
     trk   = randtrack().beads
     DataCleaningProcessor.apply(trk, cache = cache)[0]
-    assert len(list(cache.keys())) == 1
-    assert isinstance(next(iter(cache.keys())), Track)
-
-    trkcache = next(iter(cache.values()))
-    assert list(trkcache) == [0]
-    tmp = trkcache[0]
+    assert list(cache) == [0]
+    tmp = cache[0]
     DataCleaningProcessor.apply(trk, cache = cache)[0]
-    assert tmp is next(iter(cache.values()))[0]
+    assert tmp is cache[0]
 
 def test_processor2():
     "test processor"
     proc  = create(utpath("big_all"), DataCleaningTask())
     _     = next(iter(proc.run()))[0]
     cache = proc.data[1].cache()
-    assert len(cache) == 1
-    cache = next(iter(cache.values()))
-    assert len(cache) == 1
-    assert 0 in cache
+    assert list(cache) == [0]
 
 def test_message_creation():
     "test message creation"
