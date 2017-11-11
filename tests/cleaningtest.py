@@ -15,7 +15,7 @@ import cleaning._core           as     cleaningcore # pylint:disable=no-name-in-
 from simulator                  import randtrack, setseed
 from model.task.track           import TrackReaderTask
 from control.taskcontrol        import create
-from data                       import Beads, Track
+from data                       import Beads
 
 def test_constantvalues():
     "test constant values"

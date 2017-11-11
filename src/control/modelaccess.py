@@ -3,7 +3,7 @@
 "Controller for most plots and views"
 from typing          import (Tuple, Optional, # pylint: disable =unused-import
                              Iterator, List, Union, Any, Callable, Dict,
-                             TypeVar, Callable)
+                             TypeVar)
 from copy            import copy as shallowcopy
 from enum            import Enum
 from functools       import wraps

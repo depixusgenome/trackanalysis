@@ -31,23 +31,17 @@ class FitToReferenceAccess(TaskAccess):
     "access to the FitToReferenceTask"
     def __init__(self, ctrl):
         super().__init__(ctrl, FitToReferenceTask)
-        self.__store.defaults           = dict(id = None, cache = {}, reference = None)
+        self.__store.defaults           = dict(id = None, reference = None)
         self.configtask.histmin.default = 1e-3
 
     @staticmethod
-    def _configattributes(kwa):
+    def _configattributes(_):
         return {}
 
     @property
     def __store(self):
         return self.project.fittoreference.gui
 
-    def __setconfig(self, ident, cache, ref):
-        self.__store.update(id        = ident,
-                            cache     = cache,
-                            reference = ref)
-
-    __params = property(lambda self: self.__store.cache)
     __ref    = property(lambda self: self.__store.reference)
     __id     = property(lambda self: self.__store.id)
 
@@ -58,15 +52,11 @@ class FitToReferenceAccess(TaskAccess):
         if tsk is None:
             return None
 
-        ibead = self.bead
-        if ibead not in tsk.fitdata:
+        if self.bead not in tsk.fitdata:
             return 1., 0.
 
-        return self.__params.get().get(ibead, None)
-
-    @params.setter
-    def params(self, vals):
-        self.__params.get()[self.bead] = tuple(vals)
+        mem = self.cache() # pylint: disable=not-callable
+        return None if mem is None else mem.get(self.bead, None)
 
     stretch = property(lambda self: self.params[0])
     bias    = property(lambda self: self.params[1])
@@ -74,7 +64,7 @@ class FitToReferenceAccess(TaskAccess):
 
     def remove(self):
         "removes the task"
-        self.__store.update(id = None, cache = {}, reference = None)
+        self.__store.update(id = None, reference = None)
         super().remove()
 
     def update(self, **_):
@@ -84,11 +74,15 @@ class FitToReferenceAccess(TaskAccess):
         if fitdata is None:
             return
 
-        if ident == self.__id.get():
+        if ident != self.__id.get():
             self.__store.update(id = ident)
+            cache = None
         else:
-            self.__store.update(id = ident, cache = {})
+            cache = self.cache() # pylint: disable=not-callable
+
         super().update(fitdata = fitdata)
+        if cache:
+            self._ctrl.processors(self.roottask).data.setCacheDefault(self.task, cache)
 
     @property
     def reference(self) -> Optional[RootTask]:
