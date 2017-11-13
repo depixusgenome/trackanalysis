@@ -19,7 +19,8 @@ from model.task                 import RootTask
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
 from peakfinding.histogram      import Interpolator
 from peakfinding.processor      import PeakSelectorTask
-from peakfinding.selector       import PeakSelectorDetails
+from peakfinding.selector       import PeakSelectorDetails, Output as PeakOutput
+from peakcalling                import match
 from peakcalling.tohairpin      import Distance
 from peakcalling.processor      import FitToHairpinTask, FitToReferenceTask
 from peakcalling.processor.fittoreference   import FitData
@@ -32,8 +33,9 @@ class FitToReferenceAccess(TaskAccess):
     "access to the FitToReferenceTask"
     def __init__(self, ctrl):
         super().__init__(ctrl, FitToReferenceTask)
-        self.__store.defaults           = dict(id = None, reference = None)
+        self.__store.defaults           = dict(id = None, reference = None, peaks = None)
         self.configtask.histmin.default = 1e-3
+        self.configtask.peakprecision   = 1e-2
 
     @staticmethod
     def _configattributes(_):
@@ -65,21 +67,22 @@ class FitToReferenceAccess(TaskAccess):
 
     def remove(self):
         "removes the task"
-        self.__store.update(id = None, reference = None)
+        self.__store.update(id = None, reference = None, peaks = None)
         super().remove()
 
     def update(self, **_):
         "removes the task"
         assert len(_) == 0
-        ident, fitdata = self.__computefitdata()
+        ident, fitdata, peaks = self.__computefitdata()
         if fitdata is None:
             return
 
         if ident != self.__id.get():
-            self.__store.update(id = ident)
+            self.__store.update(id = ident, peaks = peaks)
             cache = None
         else:
             cache = self.cache() # pylint: disable=not-callable
+            self.__store.update(peaks = peaks)
 
         super().update(fitdata = fitdata)
         if cache:
@@ -112,21 +115,33 @@ class FitToReferenceAccess(TaskAccess):
 
         return Interpolator(task.fitdata[ibead].data, self.hmin)(xaxis)
 
+    def identifiedpeaks(self, peaks):
+        "returns an array of identified peaks"
+        ref = self.__store.peaks.get()
+        arr = np.full(len(peaks), np.NaN, dtype = 'f4')
+        ids = match.compute(ref, peaks, self.configtask.peakprecision.get())
+        arr[ids[:,1]] = ref[ids[:,0]]
+        return arr
+
     def __computefitdata(self):
         ibead = self.bead
         task  = cast(FitToReferenceTask, self.task)
         ident = pickle.dumps(tuple(self._ctrl.tasks(self.reference)))
         if self.__id.get() == ident:
             if ibead in task.fitdata:
-                return None, None
-            fits = dict(task.fitdata)
+                return None, None, None
+            fits  = dict(task.fitdata)
+            peaks = dict(self.__store.peaks.get())
         else:
-            fits = dict()
+            fits  = dict()
+            peaks = dict()
 
-        peaks       = next(iter(self._ctrl.run(self.reference, EventDetectionTask,
-                                               copy = True)))
-        fits[ibead] = FitData(task.fitalg.frompeaks(peaks[ibead,...]), (1., 0.))
-        return ident, fits
+        tmp         = tuple(next(iter(self._ctrl.run(self.reference, PeakSelectorTask,
+                                                     copy = True)))[ibead])
+        res         = cast(PeakOutput, tmp)
+        fits[ibead] = FitData(task.fitalg.frompeaks(((ibead, res),)), (1., 0.))
+        peaks[ibead]= np.array([i for i, _ in peaks], dtype = 'f4')
+        return ident, fits, peaks
 
 class FitToHairpinAccess(TaskAccess):
     "access to the FitToHairpinTask"

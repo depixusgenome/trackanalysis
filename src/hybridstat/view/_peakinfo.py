@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Creating a dictionnary with all peak related stuff"
-from typing                     import Dict, List, Iterable, TYPE_CHECKING, cast
+from typing                     import Dict, List, TYPE_CHECKING, cast
 from abc                        import ABC, abstractmethod
 from itertools                  import product
 from peakcalling.processor      import FitToHairpinTask
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 class PeakInfo(ABC):
     "Creates a peaks info dictionnary"
     @abstractmethod
-    def keys(self, mdl: 'PeaksPlotModelAccess') -> Iterable[str]:
+    def keys(self, mdl: 'PeaksPlotModelAccess') -> List[str]:
         "returns the list of keys"
 
     @abstractmethod
@@ -31,14 +31,30 @@ class PeakInfo(ABC):
 class ZPeakInfo(PeakInfo):
     "All base peak-related info"
     @staticmethod
-    def keys(mdl: 'PeaksPlotModelAccess') -> Iterable[str]:
+    def keys(mdl: 'PeaksPlotModelAccess') -> List[str]:
         "returns the list of keys"
-        return ('z',)
+        return ['z']
 
     @staticmethod
     def values(mdl: 'PeaksPlotModelAccess', peaks):
         "sets current bead peaks and computes the fits"
         return {'z': np.array([i for i, _ in peaks], dtype = 'f4')}
+
+class ReferencePeakInfo(PeakInfo):
+    "All FitToReferenceTask related info"
+    @staticmethod
+    def basekeys() -> List[str]:
+        "base keys"
+
+    def keys(self, mdl: 'PeaksPlotModelAccess') -> List[str]:
+        "returns the list of keys"
+        return [] if mdl.identification.task else ['id', 'distance']
+
+    def values(self, mdl: 'PeaksPlotModelAccess', peaks) -> Dict[str, np.ndarray]:
+        "sets current bead peaks and computes the fits"
+        zvals  = np.array([i for i, _ in peaks], dtype = 'f4')
+        ided   = mdl.fittoreference.identifiedpeaks(zvals)
+        return dict(id = ided, distance = zvals - ided)
 
 class IdentificationPeakInfo(PeakInfo):
     "All FitToHairpinTask related info"
@@ -47,7 +63,7 @@ class IdentificationPeakInfo(PeakInfo):
         "base keys"
         return ['id', 'distance', 'bases', 'orient']
 
-    def keys(self, mdl: 'PeaksPlotModelAccess') -> Iterable[str]:
+    def keys(self, mdl: 'PeaksPlotModelAccess') -> List[str]:
         "returns the list of keys"
         names = self.basekeys()
         return names + [''.join(i) for i in product(mdl.sequences(...), names)]
@@ -89,9 +105,9 @@ class IdentificationPeakInfo(PeakInfo):
 
 class StatsPeakInfo(PeakInfo):
     "All stats related info"
-    def keys(self, mdl: 'PeaksPlotModelAccess') -> Iterable[str]:
+    def keys(self, mdl: 'PeaksPlotModelAccess') -> List[str]:
         "returns the list of keys"
-        return 'duration', 'sigma', 'count', 'skew'
+        return ['duration', 'sigma', 'count', 'skew']
 
     def values(self, mdl: 'PeaksPlotModelAccess', peaks) -> Dict[str, np.ndarray]:
         "sets current bead peaks and computes the fits"
@@ -113,10 +129,10 @@ class StatsPeakInfo(PeakInfo):
 
 def createpeaks(self: 'PeaksPlotModelAccess', peaks) -> Dict[str, np.ndarray]:
     "Creates the peaks data"
-    classes = ZPeakInfo(), IdentificationPeakInfo(), StatsPeakInfo()
+    classes = [ZPeakInfo(), ReferencePeakInfo(), IdentificationPeakInfo(), StatsPeakInfo()]
     dico    = {}
     for i in classes:
         dico.update(i.defaults(self, peaks))
     for i in classes:
-        dico.update(i.values(self, peaks))
+        dico.update(i.values  (self, peaks))
     return dico

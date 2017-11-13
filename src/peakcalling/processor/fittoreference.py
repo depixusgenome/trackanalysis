@@ -116,7 +116,9 @@ class FitToReferenceTask(Task):
                                        FitData(j, (1., 0)))
             self._fitdata = {i: fcn(j) for i, j in cast(Dict, val).items()}
 
-    def frompeaks(self, peaks: PeaksDict, update = False) -> 'FitToReferenceTask':
+    def frompeaks(self,
+                  peaks: Union[PeaksDict, Iterable[Tuple[BEADKEY, PeakOutput]]],
+                  update = False) -> 'FitToReferenceTask':
         "creates fit data for references from a PeaksDict"
         fcn  = self.fitalg.frompeaks
         info = {i: FitData(fcn(j), (1., 0.)) for i, j in peaks}
