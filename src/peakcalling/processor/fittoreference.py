@@ -240,7 +240,8 @@ class FitToReferenceDataFrameFactory(DataFrameFactory[FitToReferenceDict]):
         * *eventcount*
         * *referenceposition*: the peak position in the reference
     """
-    PREC = 5e-6
+    __doc__ += '\n'+PeaksDataFrameFactory.__doc__[PeaksDataFrameFactory.__doc__.find('#')-5:]
+    PREC     = 5e-6
     def __init__(self, task, frame):
         super().__init__(task, frame)
         self.__parent = PeaksDataFrameFactory(task, frame)
