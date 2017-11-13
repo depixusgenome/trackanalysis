@@ -57,7 +57,7 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
 
         >>> DataFrameTask(measures = dict(events = dict(eventstd = 'std')))
     """
-    def __init__(self, task, frame):
+    def __init__(self, task, frame, **kwa):
         super().__init__(task, frame)
 
         tmp   = selectparent(frame, Events)
@@ -68,6 +68,7 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
         self.__ends   = frame.track.phaseduration(..., PHASE.measure)
 
         meas          = dict(task.measures)
+        meas.update(kwa)
         self.__events = meas.pop('events', None)
         if self.__events is True:
             self.__events = dict()
@@ -96,7 +97,7 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
                          + add(callable)
                          + [(cast(str, i), cast(Callable, method(j)))
                             for i, j in add(ismeth)]) # type: List[Tuple[str, Callable]]
-        if len(meas):
+        if any(j is not None for j in meas.values()):
             raise ValueError(f'Unrecognized measures {meas}')
 
     # pylint: disable=arguments-differ

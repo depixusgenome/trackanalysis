@@ -16,7 +16,7 @@ class DataFrameTask(Task):
     level                                      = Level.none
     merge                                      = False
     indexes:   Sequence[str]                   = ['track', 'bead', 'cycle', 'event']
-    measures:  Dict[str, Union[Callable, str]] = {}
+    measures:  Dict[str, Union[bool, Callable, str]] = {}
     transform: List[Callable]                  = None
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):

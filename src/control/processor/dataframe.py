@@ -27,14 +27,15 @@ class DataFrameFactory(Generic[Frame]):
 
     def getfunctions(self) -> Iterator[Tuple[str, Callable]]:
         "returns measures, with string changed to methods from np"
-        return ((i, self.getfunction(j)) for i, j in self.task.measures.items())
+        itr = ((i, self.getfunction(j)) for i, j in self.task.measures.items())
+        return (i for i in itr if i[1])
 
     @staticmethod
     def getfunction(name: Union[Callable, str]) -> Callable:
         "returns measures, with string changed to methods from np"
         if isinstance(name, str):
             return getattr(np, f'nan{name}', getattr(np, name, None))
-        return name
+        return name if callable(name) else None
 
     @staticmethod
     def trackname(track:Track) -> str:
