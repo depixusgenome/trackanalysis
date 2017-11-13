@@ -11,9 +11,10 @@ from utils                  import (initdefaults, asobjarray, asdataarrays, asvi
                                     updatecopy, EVENTS_TYPE, EVENTS_DTYPE, EventsArray)
 from signalfilter           import PrecisionAlg, PRECISION
 from .alignment             import PeakCorrelationAlignment
-from .histogram             import (Histogram,
-                                    PeakFinder,
-                                    ByZeroCrossing)
+from .histogram             import Histogram, ByZeroCrossing, PeakFinder
+                                    #ZeroCrossingPeakFinder, PeakFinder,
+                                    #GroupByPeakAndBase, GroupByPeak)
+
 EventsOutput        = Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]]
 Input               = Union[Iterable[Iterable[np.ndarray]], Sequence[EVENTS_TYPE]]
 Output              = Tuple[float, EventsOutput]
@@ -34,7 +35,8 @@ class PeakSelector(PrecisionAlg):
     histogram          = Histogram(edge = 2)
     align              = PeakCorrelationAlignment()
     finder: PeakFinder = ByZeroCrossing()
-
+    #find : PeakFinder  = ZeroCrossingPeakFinder()
+    #group: GroupByPeak = GroupByPeakAndBase()
     @initdefaults(frozenset(locals()) - {'rawfactor'})
     def __init__(self, **_):
         super().__init__(**_)

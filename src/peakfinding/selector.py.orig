@@ -11,9 +11,16 @@ from utils                  import (initdefaults, asobjarray, asdataarrays, asvi
                                     updatecopy, EVENTS_TYPE, EVENTS_DTYPE, EventsArray)
 from signalfilter           import PrecisionAlg, PRECISION
 from .alignment             import PeakCorrelationAlignment
+<<<<<<< a874f7f3a5b17519297782cd5f80b79834460221
+from .histogram             import Histogram, ByZeroCrossing, PeakFinder
+                                    #ZeroCrossingPeakFinder, PeakFinder,
+                                    #GroupByPeakAndBase, GroupByPeak)
+=======
 from .histogram             import (Histogram,
                                     PeakFinder,
                                     ByZeroCrossing)
+>>>>>>> need bootstrap fro dpgmm fit
+
 EventsOutput        = Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]]
 Input               = Union[Iterable[Iterable[np.ndarray]], Sequence[EVENTS_TYPE]]
 Output              = Tuple[float, EventsOutput]
@@ -34,7 +41,12 @@ class PeakSelector(PrecisionAlg):
     histogram          = Histogram(edge = 2)
     align              = PeakCorrelationAlignment()
     finder: PeakFinder = ByZeroCrossing()
+<<<<<<< a874f7f3a5b17519297782cd5f80b79834460221
+    #find : PeakFinder  = ZeroCrossingPeakFinder()
+    #group: GroupByPeak = GroupByPeakAndBase()
+=======
 
+>>>>>>> need bootstrap fro dpgmm fit
     @initdefaults(frozenset(locals()) - {'rawfactor'})
     def __init__(self, **_):
         super().__init__(**_)
@@ -125,6 +137,7 @@ class PeakSelector(PrecisionAlg):
         else:
             delta  = None
 
+<<<<<<< a874f7f3a5b17519297782cd5f80b79834460221
         histdata = projector.projection(pos, zmeasure = None)
         peaks, ids = self.finder(hist      = histdata,
                                  pos       = pos,
@@ -132,6 +145,27 @@ class PeakSelector(PrecisionAlg):
         print(f"peaks={peaks}")
         print(f"ids={ids}")
         hist, minv, binwidth = histdata
+=======
+        histdata = projector.projection(pos, zmeasure = None) # hist, minv, binwidth
+
+        peaks, ids = self.finder(hist      = histdata,
+                                 pos       = pos,
+                                 precision = precision)
+
+        hist, minv, binwidth = histdata
+        results={'pos':pos,
+                 'hist':hist,
+                 'minv':minv,
+                 'binwidth':binwidth,
+                 'delta':delta,
+                 'peaks': peaks,
+                 'orig':orig,
+                 'ids': ids}
+        pickle.dump(results,
+                    open("/home/david/work/my_scripts/simulations/event_detection/results",
+                         "wb"))
+
+>>>>>>> need bootstrap fro dpgmm fit
         return PeakSelectorDetails(pos, hist, minv, binwidth, delta, peaks, orig, ids)
 
     def details2output(self, dtl:PeakSelectorDetails) -> Iterator[Output]:

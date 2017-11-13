@@ -4,9 +4,15 @@
 from    typing import (NamedTuple, Optional, Iterator,
                        Iterable, Union, Sequence, Callable, Tuple, cast,
                        Dict)
+import pickle
 from    enum   import Enum
 import  itertools
+<<<<<<< 9eab0472d8e735e2d74a1e14c9aee9b901c76ae4
+from sklearn.mixture            import BayesianGaussianMixture
+=======
+
 from sklearn.mixture            import BayesianGaussianMixture, GaussianMixture
+>>>>>>> added ByGaussian mix without Bayesian inference to avoid singularities
 import  numpy  as     np
 from    numpy.lib.stride_tricks import as_strided
 from    scipy.signal            import find_peaks_cwt
@@ -458,7 +464,7 @@ class ByZeroCrossing:
         ids   = self.grouper(peaks     = peaks,
                              elems     = kwa.get("pos"),
                              precision = kwa.get("precision",None))
-        return peaks, ids
+       return peaks, ids
 
 class ByBayesGaussianMix:
     '''
@@ -492,8 +498,8 @@ class ByBayesGaussianMix:
 
         # converge may fail without proper sampling.
         self.dpgmm = BayesianGaussianMixture(**kwa)
-        trpos      = np.matrix(apos).T
-        self.dpgmm.fit(trpos)
+       trpos      = np.matrix(apos).T
+       self.dpgmm.fit(trpos)
         # must change predict to correspond to correct ids
         predict    = self.dpgmm.predict(trpos)
 
@@ -503,6 +509,9 @@ class ByBayesGaussianMix:
                 np.array([self.dpgmm.predict(zpos.reshape(-1,1))
                           for zpos in pos]))
 
+<<<<<<< 9eab0472d8e735e2d74a1e14c9aee9b901c76ae4
+PeakFinder = Union[ByZeroCrossing, ByGaussianMix]
+=======
 class ByGaussianMix:
     '''
     finds peaks and groups events using Gaussian mixture
@@ -512,8 +521,7 @@ class ByGaussianMix:
     cov_type        = 'full'
     peakwidth:float = 1
     gmm             = GaussianMixture()
-    crit:str        = 'bic'
-    mincount        = 5
+    crit:str        = 'aic'
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -528,29 +536,15 @@ class ByGaussianMix:
         'find peaks'
 
         events   = np.hstack(pos)
-        #maxncmps = max(int((max(events)-min(events))/self.peakwidth),1) # find better, smaller
-        maxncmps = len(events)//self.mincount
+        maxncmps = max(int((max(events)-min(events))/self.peakwidth),1) # find better, smaller
         kwargs   = {'covariance_type'  : self.cov_type,
                     'max_iter'         : self.max_iter}
         self.gmm = self.__fit(events.reshape(-1,1),maxncmps,kwargs)
-        peaks, ids =  self.__strip(pos,events.reshape(-1,1),self.gmm)
-        # peaks not ordered
-        return (peaks * slope + bias, ids)
-
-    def __strip(self,pos,evts,gmm):
-        'removes peaks which have fewer than mincount events'
-        predicts = gmm.predict(evts)
-        keep     = [pkid for pkid in range(gmm.n_components) if sum(predicts==pkid)>=self.mincount]
-        kdict    = {val:key for key,val in enumerate(keep)}
-        peaks    = gmm.means_[keep]
-
-        def assign(zpos):
-            'set id'
-            idx=gmm.predict(zpos)[0]
-            return kdict.get(idx,np.iinfo("i4").max)
-
-        vids = np.vectorize(assign)
-        return peaks,np.array([vids(zpos) for zpos in pos])
+        peaks    = self.gmm.means_
+        # peaks are not ordered
+        return (peaks * slope + bias,
+                np.array([self.gmm.predict(zpos.reshape(-1,1))
+                          for zpos in pos]))
 
     def __fit(self,evts,maxcmpts,kwargs):
         '''
@@ -573,3 +567,4 @@ class ByGaussianMix:
         return gmms[np.argmin(values)]
 
 PeakFinder = Union[ByZeroCrossing, ByBayesGaussianMix, ByGaussianMix]
+>>>>>>> added ByGaussian mix without Bayesian inference to avoid singularities
