@@ -4,7 +4,6 @@
 from   typing               import (Iterable, Iterator, Tuple, Union, Sequence,
                                     Callable, cast)
 from   collections          import namedtuple
-import pickle
 import numpy    as              np
 
 from utils                  import (initdefaults, asobjarray, asdataarrays, asview,
@@ -129,8 +128,6 @@ class PeakSelector(PrecisionAlg):
         peaks, ids = self.finder(hist      = histdata,
                                  pos       = pos,
                                  precision = precision)
-        print(f"peaks={peaks}")
-        print(f"ids={ids}")
         hist, minv, binwidth = histdata
         return PeakSelectorDetails(pos, hist, minv, binwidth, delta, peaks, orig, ids)
 
