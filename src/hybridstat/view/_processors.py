@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Processors for storing gui data"
+from typing                     import Dict, Tuple, List, Optional
 from functools                  import partial
 from data                       import BEADKEY
 from control.processor.taskview import TaskViewProcessor
+from peakfinding.selector       import PeakSelectorDetails
 from peakfinding.processor      import PeakSelectorProcessor, PeaksDict
-from peakcalling.processor      import FitToReferenceTask, FitToReferenceDict
+from peakcalling.processor      import FitToReferenceTask, FitToReferenceDict, FitBead
+from sequences.modelaccess      import SequencePlotModelAccess
 
 class GuiPeaksDict(PeaksDict):
     "gui version of PeaksDict"
@@ -17,14 +20,16 @@ class GuiPeaksDict(PeaksDict):
         "Computes values for one bead"
         evts = iter(i for _, i in self.data[ibead,...]) # type: ignore
         prec = self._precision(ibead, precision)
-        dtl  = self.detailed(evts, prec)
+        dtl  = self.config.detailed(evts, prec)
 
-        self.store[0] = dtl
-        yield from self.details2output(dtl)
+        self.store.clear()
+        self.store.append(dtl)
+        yield from self.config.details2output(dtl)
 
+STORE_T = List[PeakSelectorDetails]
 class GuiPeakSelectorProcessor(PeakSelectorProcessor):
     "gui version of PeakSelectorProcessor"
-    def __init__(self, store: list = None, **kwa) -> None:
+    def __init__(self, store: STORE_T = None, **kwa) -> None:
         super().__init__(**kwa)
         self.store = store
 
@@ -38,27 +43,48 @@ class GuiPeakSelectorProcessor(PeakSelectorProcessor):
             return partial(self.apply, **cnf)
         return toframe.new(GuiPeaksDict, config = cnf, store = self.store)
 
-class CachedFitToReferenceDict(FitToReferenceDict):
+CACHE_T = Dict[BEADKEY, Tuple[float, float]]
+class GuiFitToReferenceDict(FitToReferenceDict):
     "gui version of FitToReferenceDict"
     def __init__(self, *_, cache = None, **kwa):
         super().__init__(**kwa)
-        self.cache = cache
+        self.cache: CACHE_T = cache[0] if cache else {}
+        self.store: STORE_T = cache[1] if cache else []
 
     def optimize(self, key: BEADKEY, data):
         "computes results for one key"
-        if self.cache is None:
-            return super().optimize(key, data)
-
         params = self.cache.get(key, None)
         if params is None:
             self.cache[key] = params = super().optimize(key, data)
+
+        if self.store and self.store[0]:
+            self.store[0].transform(params)
         return params
 
 class GuiFitToReferenceProcessor(TaskViewProcessor[FitToReferenceTask,
-                                                   CachedFitToReferenceDict,
+                                                   GuiFitToReferenceDict,
                                                    BEADKEY]):
     "Changes the Z axis to fit the reference"
+    def __init__(self, store: STORE_T = None, **kwa) -> None:
+        super().__init__(**kwa)
+        self.store = store
+
+    def __call__(self, *args, **kwa):
+        return type(self)(self.store, *args, **kwa)
+
     def run(self, args):
         "updates the frames"
         cache = args.data.setCacheDefault(self, dict())
-        args.apply(self.apply(cache = cache, **self.config()))
+        args.apply(self.apply(cache = (cache, self.dtlstore), **self.config()))
+
+def runbead(self) -> Tuple[Optional[FitBead], Optional[PeakSelectorDetails]]:
+    "runs the bead with specific processors"
+    dtlstore = [] # type: List[PeakSelectorDetails]
+    procs    = (GuiPeakSelectorProcessor(dtlstore),
+                GuiFitToReferenceProcessor(dtlstore))
+    fits     = SequencePlotModelAccess.runbead(self, procs)[self.bead]
+    if not dtlstore or len(dtlstore[0].peaks) == 0:
+        return None, None
+    if not self.identification.task:
+        return None, dtlstore[0]
+    return fits, dtlstore[0]

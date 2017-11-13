@@ -136,7 +136,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         colors = [tohex(self.__foundcolor.get()),
                   tohex(self.css.peaks.colors.missing.get())]
 
-        peaks  = dict(self._model.setpeaks(vals))
+        peaks  = dict(self._model.peaks)
         if vals is None or self._model.identification.task is None:
             peaks['color'] = [colors[0]]*len(peaks['id'])
         else:
@@ -152,23 +152,8 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
             peaks['color'] = peaks[self._model.sequencekey+'color']
         return peaks
 
-    def __details(self) -> Optional[PeakSelectorDetails]:
-        if self._model.peakselection.task is None:
-            return None
-
-        dtlstore = [None]
-        _        = (self._model.runbead(GuiPeakSelectorProcessor(dtlstore),
-                                        GuiFitToReferenceProcessor(self._model))
-                    [self._model.bead])
-
-        if not isinstance(dtlstore[0], PeakSelectorDetails):
-            return None
-
-        dtl     = cast(PeakSelectorDetails, dtlstore[0])
-        return None if len(dtl.positions) == 0 else dtl
-
     def __data(self) -> Dict[str, dict]:
-        dtl   = self.__details()
+        dtl   = self._model.runbead()
         data  = {i: np.empty(0, dtype = 'f4') for i in ('z', 'count')}
         if dtl is None:
             return {'': data, 'events': data, 'peaks': self.__peaks(None)}
@@ -176,16 +161,14 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         fit2ref = self._model.fittoreference
         pksel   = cast(PeakSelector, self._model.peakselection.task)
 
-        params  = self._model.fittoreference.params
         maxv    = max(pksel.histogram.kernelarray())
         zvals   = np.arange(len(dtl.histogram), dtype = 'f4')
-        zvals   = (dtl.binwidth*maxv-params[1])*params[0]+dtl.minvalue
 
         data    = dict(z     = zvals,
                        count = dtl.histogram/(maxv*self._model.track.ncycles)*100.,
                        ref   = fit2ref.refhistogram(zvals))
 
-        pos     = (np.concatenate(dtl.positions)-params[1])*params[0]
+        pos     = np.concatenate(dtl.positions)
         events  = dict(z     = pos,
                        count = Interpolator(zvals, data['count'], fit2ref.hmin)(pos))
         return {'': data, 'events': events, 'peaks': self.__peaks(dtl)}

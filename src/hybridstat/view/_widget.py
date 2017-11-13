@@ -7,7 +7,8 @@ import os
 
 import bokeh.core.properties as props
 from bokeh.models               import (DataTable, TableColumn, CustomJS,
-                                        Widget, Div, StringFormatter)
+                                        Widget, Div, StringFormatter, Paragraph,
+                                        Dropdown)
 
 import numpy                    as     np
 
@@ -20,10 +21,55 @@ from excelreports.creation      import writecolumns
 from view.dialog                import FileDialog
 from view.pathinput             import PathInput
 from view.plots                 import DpxNumberFormatter, WidgetCreator
+from view.toolbar               import FileListMixin
 from sequences.view             import (SequenceTicker, SequenceHoverMixin,
                                         OligoListWidget, SequencePathWidget)
 from modaldialog.view           import AdvancedTaskMixin, T_BODY
 from ._model                    import PeaksPlotModelAccess
+
+class ReferenceWidget(WidgetCreator[PeaksPlotModelAccess], FileListMixin):
+    "Dropdown for choosing the reference"
+    def __init__(self, model) -> None:
+        super().__init__(model)
+        FileListMixin.__init__(self)
+        self.__widget: Dropdown  = None
+        self.css.title.reference.default = 'Reference Track'
+
+    def create(self, action) -> List[Widget]:
+        "creates the widget"
+        self.__widget = Dropdown(name  = 'HS:Sequence',
+                                 width = self.css.input.width.get(),
+                                 **self.__data())
+        @action
+        def _py_cb(new):
+            lst  = list(self.files)
+            inew = int(new)
+            if inew >= lst or inew < 0:
+                self._model.fittoreference = None
+            else:
+                self._model.fittoreference = lst[inew][0]
+
+        self.__widget.on_click(_py_cb)
+        return [Paragraph(text = self.css.title.reference.get()), self.__widget]
+
+    def reset(self, resets):
+        "updates the widget"
+        resets[self.__widget].update(**self.__data())
+
+    @property
+    def widget(self):
+        "returns the widget"
+        return self.__widget
+
+    def __data(self) -> dict:
+        lst   = list(self.files)
+        menu  = list(enumerate(i for _, i in lst))
+        menu += [None, (self.css.title.reference.none.get(), -1)]
+
+        key   = self._model.fittoreference.reference
+        return dict(menu  = menu,
+                    label = dict(lst).get(key, menu[-1][0]),
+                    value = -1 if key is None else [i for i, _ in lst].index(key))
 
 class PeaksOligoListWidget(OligoListWidget):
     "deals with oligos"

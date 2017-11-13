@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Model for peaksplot"
-from typing                     import Optional, Dict, Any, Tuple, cast
-from itertools                  import product
+from typing                     import (Optional, Dict, # pylint: disable=unused-import
+                                        List, Tuple, cast)
 import pickle
 
 import numpy                    as     np
@@ -19,13 +19,14 @@ from model.task                 import RootTask
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
 from peakfinding.histogram      import Interpolator
 from peakfinding.processor      import PeakSelectorTask
-from peakfinding.probabilities  import Probability
+from peakfinding.selector       import PeakSelectorDetails
 from peakcalling.tohairpin      import Distance
-from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
-                                        FitToReferenceTask, FitBead)
+from peakcalling.processor      import FitToHairpinTask, FitToReferenceTask
 from peakcalling.processor.fittoreference   import FitData
 
 from ..reporting.batch          import fittohairpintask
+from ._processors               import runbead
+from ._peakinfo                 import createpeaks
 
 class FitToReferenceAccess(TaskAccess):
     "access to the FitToReferenceTask"
@@ -195,7 +196,8 @@ class FitParamProp(_FitParamProp):
             dist = obj.distances.get(obj.sequencekey, None)
             if dist is not None:
                 return getattr(dist, self._key)
-
+            if obj.fittoreference.task:
+                return getattr(obj.fittoreference, self._key)
         return super().__get__(obj, tpe)
 
 class SequenceKeyProp(_SequenceKeyProp):
@@ -217,7 +219,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
 
         self.eventdetection                 = TaskAccess(self, EventDetectionTask)
         self.peakselection                  = TaskAccess(self, PeakSelectorTask)
-        self.fits : FitBead                 = None
+        self.distances : Dict[str, Distance]= dict()
         self.peaks: Dict[str, np.ndarray]   = dict()
         self.estimatedbias                  = 0.
         self.fittoreference                 = FitToReferenceAccess(self)
@@ -241,33 +243,23 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         "returns the default identification task"
         return self.identification.default(self)
 
-    @property
-    def distances(self) -> Dict[str, Distance]:
-        "returns the distances which were computed"
-        return self.fits.distances if self.fits is not None else {}
+    def runbead(self, *_):
+        "runs the bead"
+        tmp, dtl = runbead(self)
 
-    def setpeaks(self, dtl) -> Dict[str, Any]:
-        "sets current bead peaks and computes the fits"
         if dtl is None:
-            self.peaks = dict.fromkeys(('z', 'id', 'distance', 'sigma', 'bases',
-                                        'duration', 'count', 'skew'), [])
-            self.fits  = None
-            return self.peaks
+            self.distances     = {}
+            self.peaks         = createpeaks(self, None)
+            self.estimatedbias = 0.
+            return None
 
-        tsk        = cast(PeakSelectorTask, self.peakselection.task)
-        peaks      = tuple(tsk.details2output(dtl))
-        nan        = lambda: np.full((len(peaks),), np.NaN, dtype = 'f4')
-        self.peaks = dict(z        = np.array([i for i, _ in peaks], dtype = 'f4'),
-                          sigma    = nan(),
-                          skew     = nan(),
-                          duration = nan(),
-                          count    = nan())
+        tsk   = cast(PeakSelectorTask, self.peakselection.task)
+        peaks = tuple(tsk.details2output(cast(PeakSelectorDetails, dtl)))
 
-        self.estimatedbias  = self.peaks['z'][0]
-
-        self.__set_ids_and_distances(peaks)
-        self.__set_probas(peaks)
-        return self.peaks
+        self.distances     = tmp.distances if self.identification.task else None
+        self.peaks         = createpeaks(self, peaks)
+        self.estimatedbias = self.peaks['z'][0]
+        return dtl
 
     def reset(self) -> bool: # type: ignore
         "adds tasks if needed"
@@ -287,53 +279,3 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
     def observe(self):
         "observes the global model"
         self.identification.setobservers(self)
-
-    def __set_ids_and_distances(self, peaks):
-        task  = self.identification.task
-        dico  = self.peaks
-        names = 'bases', 'id', 'distance', 'orient'
-        nan   = np.full((len(peaks),), np.NaN, dtype = 'f4')
-
-        dico.update(**dict.fromkeys(names, nan))
-        dico['orient'] = np.array([' '] * len(nan))
-
-        if task is None:
-            dico['bases']  = (dico['z']-self.bias)*self.stretch
-            return
-
-        self.fits = FitToHairpinProcessor.compute((self.bead, peaks), # type: ignore
-                                                  **task.config())[1]
-
-        for key in product(self.sequences(...), names):
-            dico[''.join(key)] = np.copy(dico[key[1]])
-
-        strori  = self.css.stats.title.orientation.get()
-        alldist = self.distances
-        for key, hyb in self.hybridisations(...).items():
-            if key not in alldist:
-                continue
-
-            dist = alldist[key].stretch, alldist[key].bias
-            tmp  = task.match[key].pair(dico['z'], *dist)['key']
-            good = tmp >= 0
-            ori  = dict(hyb)
-
-            dico[f'{key}bases']          = (dico['z'] - dist[1])*dist[0]
-            dico[f'{key}id']      [good] = tmp[good]
-            dico[f'{key}distance'][good] = (tmp - dico[f'{key}bases'])[good]
-            dico[f'{key}orient']  [good] = [strori[ori.get(int(i+0.01), 2)]
-                                            for i in dico[f'{key}id'][good]]
-        for i in names:
-            dico[i] = dico[self.sequencekey+i]
-
-    def __set_probas(self, peaks):
-        task = self.eventdetection.task
-        prob = Probability(framerate   = self.track.framerate,
-                           minduration = task.events.select.minduration)
-        dur  = self.track.phaseduration(..., task.phase)
-        for i, (_, evts) in enumerate(peaks):
-            val                       = prob(evts, dur)
-            self.peaks['duration'][i] = val.averageduration
-            self.peaks['sigma'][i]    = prob.resolution(evts)
-            self.peaks['count'][i]    = min(100., val.hybridisationrate*100.)
-            self.peaks['skew'][i]     = np.nanmedian(prob.skew(evts))
