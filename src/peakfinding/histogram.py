@@ -469,7 +469,6 @@ class ByGaussianMix:
     max_iter        = 10000
     cov_type        = 'full'
     peakwidth:float = 1
-    gmm             = GaussianMixture()
     crit:str        = 'bic'
     mincount        = 5
     @initdefaults(frozenset(locals()))
@@ -479,18 +478,28 @@ class ByGaussianMix:
     def __call__(self,**kwa):
         pos            = kwa.get("pos",None)
         self.peakwidth = kwa.get("precision",1)
-        _,bias,slope   = kwa.get("hist",(0,0,1))
-        return self.find(pos, bias, slope)
+        hist, bias, slope   = kwa.get("hist",(0,0,1))
+        return self.find(pos, hist, bias, slope)
 
-    def find(self,pos: np.array, bias:float = 0., slope:float = 1.):
+    @staticmethod
+    def find(pos: np.array, hist, bias:float = 0., slope:float = 1.):
         'find peaks'
 
-        events   = np.hstack(pos)
-        maxncmps = len(events)//self.mincount
-        kwargs   = {'covariance_type'  : self.cov_type,
-                    'max_iter'         : self.max_iter}
-        self.gmm = self.__fit(events.reshape(-1,1),maxncmps,kwargs)
-        peaks, ids =  self.__strip(pos,events.reshape(-1,1),self.gmm)
+        # events   = np.hstack(pos)
+        # maxncmps = len(events)//self.mincount
+        ncmps = len(ZeroCrossingPeakFinder()(hist,bias, slope))
+        gmm   = GaussianMixture(n_components = ncmps)
+        trpos = np.matrix(np.hstack(pos)).T
+        gmm.fit(trpos)
+        peaks = gmm.means_
+        ids   = np.array([gmm.predict(zpos.reshape(-1,1))
+                          if zpos.size!=0 else np.array([])
+                          for zpos in pos])
+        # will need to better estimate the number of peaks
+        #kwargs   = {'covariance_type'  : self.cov_type,
+        #            'max_iter'         : self.max_iter}
+        # self.gmm = self.__fit(events.reshape(-1,1),maxncmps,kwargs)
+        # peaks, ids =  self.__strip(pos,events.reshape(-1,1),self.gmm)
         # peaks not ordered
         return (peaks * slope + bias, ids)
 
@@ -529,7 +538,7 @@ class ByGaussianMix:
         values = [getattr(gmm,crit)(evts) for gmm in gmms]
         return gmms[np.argmin(values)]
 
-class ByBayesGaussianMix(ByGaussianMix):
+class ByBayesGaussianMix:
     '''
     finds peaks and groups events using Bayesian Gaussian mixture
     known to have convergence issues for small data sets
@@ -537,30 +546,39 @@ class ByBayesGaussianMix(ByGaussianMix):
     max_iter  = 10000
     cov_type  = 'tied'
     peakwidth = 1
-    dpgmm     = BayesianGaussianMixture()
 
-    def find(self,pos: np.array, bias:float = 0., slope:float = 1.):
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+    def __call__(self,**kwa):
+        pos            = kwa.get("pos",None)
+        self.peakwidth = kwa.get("precision",1)
+        hist, bias, slope   = kwa.get("hist",(0,0,1))
+        return self.find(pos, hist, bias, slope)
+
+    def find(self,pos: np.array,hist, bias:float = 0., slope:float = 1.):
         'find peaks'
         apos       = np.hstack(pos)
         cov        = np.array([[self.peakwidth]])
-        ncmps = max(int((max(apos)-min(apos))/self.peakwidth),1) # find better, smaller
+        ncmps = len(ZeroCrossingPeakFinder()(hist,bias, slope)) # find better
         kwa        = {'n_components'     : ncmps,
                       'covariance_prior' : cov,
                       'covariance_type'  : self.cov_type,
                       'max_iter'         : self.max_iter}
 
         # converge may fail without proper sampling.
-        self.dpgmm = BayesianGaussianMixture(**kwa)
+        dpgmm = BayesianGaussianMixture(**kwa)
         trpos      = np.matrix(apos).T
-        self.dpgmm.fit(trpos)
+        dpgmm.fit(trpos)
         # must change predict to correspond to correct ids
-        predict    = self.dpgmm.predict(trpos)
-
-        peaks      = self.dpgmm.means_[list(set(predict))][:,0]
+        # predict = dpgmm.predict(trpos)
+        peaks   = dpgmm.means_
+        #peaks  = dpgmm.means_[list(set(predict))][:,0]
         # the ids (predict values) must match peaks
         return (peaks * slope + bias,
-                np.array([self.dpgmm.predict(zpos.reshape(-1,1))
-                          if zpos.size!=0 else []
+                np.array([dpgmm.predict(zpos.reshape(-1,1))
+                          if zpos.size!=0 else np.array([])
                           for zpos in pos]))
 
 PeakFinder = Union[ByZeroCrossing, ByBayesGaussianMix, ByGaussianMix]
