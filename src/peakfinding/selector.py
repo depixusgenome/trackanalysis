@@ -10,9 +10,9 @@ from utils                  import (initdefaults, asobjarray, asdataarrays, asvi
                                     updatecopy, EVENTS_TYPE, EVENTS_DTYPE, EventsArray)
 from signalfilter           import PrecisionAlg, PRECISION
 from .alignment             import PeakCorrelationAlignment
-from .histogram             import (Histogram,
-                                    ZeroCrossingPeakFinder, PeakFinder,
-                                    GroupByPeakAndBase, GroupByPeak)
+from .histogram             import Histogram, ByZeroCrossing, PeakFinder
+                                    #ZeroCrossingPeakFinder, PeakFinder,
+                                    #GroupByPeakAndBase, GroupByPeak)
 
 EventsOutput        = Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]]
 Input               = Union[Iterable[Iterable[np.ndarray]], Sequence[EVENTS_TYPE]]
@@ -31,8 +31,9 @@ class PeakSelector(PrecisionAlg):
     rawfactor          = 2.
     histogram          = Histogram(edge = 2)
     align              = PeakCorrelationAlignment()
-    find : PeakFinder  = ZeroCrossingPeakFinder()
-    group: GroupByPeak = GroupByPeakAndBase()
+    finder: PeakFinder = ByZeroCrossing()
+    #find : PeakFinder  = ZeroCrossingPeakFinder()
+    #group: GroupByPeak = GroupByPeakAndBase()
     @initdefaults(frozenset(locals()) - {'rawfactor'})
     def __init__(self, **_):
         super().__init__(**_)
@@ -123,9 +124,13 @@ class PeakSelector(PrecisionAlg):
         else:
             delta  = None
 
-        hist, minv, binwidth = projector.projection(pos, zmeasure = None)
-        peaks = self.find (hist, minv, binwidth)
-        ids   = self.group(peaks, pos, precision = precision)
+        histdata = projector.projection(pos, zmeasure = None)
+        peaks, ids = self.finder(hist      = histdata,
+                                 pos       = pos,
+                                 precision = precision)
+        print(f"peaks={peaks}")
+        print(f"ids={ids}")
+        hist, minv, binwidth = histdata
         return PeakSelectorDetails(pos, hist, minv, binwidth, delta, peaks, orig, ids)
 
     def details2output(self, dtl:PeakSelectorDetails) -> Iterator[Output]:

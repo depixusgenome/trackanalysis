@@ -5,7 +5,6 @@ from    typing import (NamedTuple, Optional, Iterator,
                        Iterable, Union, Sequence, Callable, Tuple, cast)
 from    enum   import Enum
 import  itertools
-
 from sklearn.mixture            import BayesianGaussianMixture
 import  numpy  as     np
 from    numpy.lib.stride_tricks import as_strided
@@ -456,7 +455,7 @@ class ByZeroCrossing:
     def __call__(self,**kwa):
         hist  = kwa.get("hist",(np.array([]),0,1))
         peaks = self.finder(*hist)
-        ids   = self.grouper(peaks     = kwa.get("peaks"),
+        ids   = self.grouper(peaks     = peaks,
                              elems     = kwa.get("pos"),
                              precision = kwa.get("precision",None))
         return peaks, ids
@@ -483,18 +482,19 @@ class ByGaussianMix:
     def find(self,pos: np.array, bias:float = 0., slope:float = 1.):
         'find peaks'
         cov        = np.array([[self.peakwidth]])
-        ncmps      = max(int((max(pos)-min(pos))/self.peakwidth),1) # find better, smaller
+        positions   = list(itertools.chain.from_iterable(pos))
+        ncmps      = max(int((max(positions)-min(positions))/self.peakwidth),1)
         kwa        = {'n_components'     : ncmps,
                       'covariance_prior' : cov,
                       'covariance_type'  : self.cov_type,
                       'max_iter'         : self.max_iter}
         self.dpgmm = BayesianGaussianMixture(**kwa)
-        trpos      = np.matrix(pos).T
+        trpos      = np.matrix(positions).T
         self.dpgmm.fit(trpos)
+        # must change predict to correspond to correct ids
         predict    = self.dpgmm.predict(trpos)
 
         peaks      = self.dpgmm.means_[list(set(predict))][:,0]
         return peaks * slope + bias, predict
-
 
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix]
