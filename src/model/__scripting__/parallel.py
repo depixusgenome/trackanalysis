@@ -8,25 +8,26 @@ from multiprocessing        import cpu_count
 import pickle
 import pandas               as     pd
 
-from model.task.track       import TrackReaderTask, RootTask, Task
 from control.taskcontrol    import register
 from control.processor      import Processor, run as _runprocessors
 from data.views             import TrackView
 from data.tracksdict        import TracksDict
+from ..task.track           import TrackReaderTask, RootTask, Task
+from .tasks                 import Tasks
 
 class Parallel:
     "Runs tasks in parallel"
     def __init__(self,
                  roots     : Union[TracksDict, Sequence[RootTask]] = None,
-                 *tasks    : Task,
+                 *tasks    : Union[Tasks, Task],
                  processors: Dict[Type[Task], Type[Processor]] = None) -> None:
         self.args: List[bytes] = []
         if roots is not None:
-            self.extend(roots, *tasks, processors)
+            self.extend(roots, *tasks, processors = processors)
 
     def extend(self,
                roots     : Union[TracksDict, Sequence[RootTask]],
-               *tasks    : Task,
+               *tasks    : Union[Tasks, Task],
                processors: Dict[Type[Task], Type[Processor]] = None) -> 'Parallel':
         "adds new jobs"
         if not isinstance(roots, TracksDict):
@@ -34,6 +35,8 @@ class Parallel:
         else:
             lroots = [TrackReaderTask(path = i.path, key  = i.key, axis = i.axis.value)
                       for i in cast(TracksDict, roots).values()]
+        if len(lroots) == 0:
+            return self
 
         procs     = (register(Processor if not processors else processors)
                      if not isinstance(processors, dict) else
@@ -42,7 +45,7 @@ class Parallel:
                                    (i if isinstance(i, Processor) else
                                     procs[type(i)](i))
                                   )
-        main      = [toproc(i) for i in tasks]
+        main      = [toproc(i) for i in Tasks.tasklist(*tasks)]
         self.args+= [pickle.dumps([toproc(i)]+main) for i in lroots]
         return self
 

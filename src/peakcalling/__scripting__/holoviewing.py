@@ -11,7 +11,6 @@ import numpy                    as np
 import sequences
 
 from   scripting.holoviewing        import hv
-from   scripting.parallel           import Parallel
 from   peakfinding.processor        import PeaksDict    # pylint: disable=unused-import
 from   peakfinding.__scripting__.holoviewing import (PeaksDisplay as _PeaksDisplay,
                                                      PeaksTracksDictDisplay as _PTDDisplay)
@@ -276,12 +275,9 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
         if bead not in self._reftask:
             self._reftask.frompeaks(self._items[self._reference].peaks[bead,...])
 
-    def dataframe(self, **kwa):
+    def dataframe(self, *tasks, **kwa):
         "creates a dataframe for all keys"
-        tclean  = Tasks.defaulttasklist(None, Tasks.peakselector, True)[1:]
-        tdirty  = Tasks.defaulttasklist(None, Tasks.peakselector, False)[1:]
-
-        if self._reference:
+        if self._reference is not None:
             reftask = cast(FitToReferenceTask, deepcopy(self._reftask))
             beads   = set(self._base()[1]['bead'])
             beads  &= set(self._items[self._reference].peaks.keys())
@@ -289,18 +285,11 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
             reftask.frompeaks(self._items[self._reference].peaks[list(beads)],
                               update = True)
             itms    = self._items['~'+self._reference]
-            tclean += (reftask,)
-            tdirty += (reftask,)
+            tasks   = (reftask,) + tasks
         else:
             itms    = self._items
 
-        dframe  = Tasks.dataframe(merge = True, **kwa)
-
-        cleaned = itms[[i for i, j in itms.items() if j.cleaned]]
-        dirty   = itms[[i for i, j in itms.items() if not j.cleaned]]
-        return (Parallel(cleaned, *tclean, dframe)
-                .extend(dirty, *tdirty, dframe)
-                .process(None, 'concat'))
+        return itms.dataframe(Tasks.peakselector, *tasks,**kwa)
 
     def getmethod(self):
         "Returns the method used by the dynamic map"

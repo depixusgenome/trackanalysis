@@ -3,21 +3,17 @@
 """
 Monkeypatches tasks and provides a simpler access to usual tasks
 """
-import sys
 from pathlib                  import Path
 from functools                import partial
-from typing                   import (Type, Tuple, Union, Sequence, Dict,
-                                      cast, List, TYPE_CHECKING)
+from typing                   import Type, Tuple, List, cast
 
 from copy                     import deepcopy
 from enum                     import Enum
 
 import anastore
 from utils                    import update
-from utils.decoration         import addto
 from utils.attrdefaults       import toenum
 from control.taskcontrol      import create as _create
-from control.processor        import Processor
 from control.processor.utils  import ActionTask
 from cleaning.processor       import DataCleaningTask
 from cordrift.processor       import DriftTask
@@ -25,17 +21,11 @@ from eventdetection.processor import ExtremumAlignmentTask, EventDetectionTask
 from peakfinding.processor    import PeakSelectorTask, PeakCorrelationAlignmentTask
 from peakcalling.processor    import (FitToReferenceTask, FitToHairpinTask,
                                       BeadsByHairpinTask)
-from scripting.parallel       import Parallel
-from .level                   import Level
-from .task                    import * # pylint: disable=wildcard-import,unused-wildcard-import
-from .task                    import Task, RootTask, TrackReaderTask, taskorder
-from .task.dataframe          import DataFrameTask
+from ..level                  import Level
+from ..task                   import (Task, TrackReaderTask, CycleCreatorTask,
+                                      DataSelectionTask)
+from ..task.dataframe         import DataFrameTask
 
-if TYPE_CHECKING:
-    # pylint: disable=unused-import
-    from data.tracksdict      import TracksDict
-
-assert 'scripting' in sys.modules
 class Tasks(Enum):
     """
     Possible tasks
@@ -272,14 +262,3 @@ class Tasks(Enum):
             return cls(arg[0])(**arg[1], **kwa)
 
         raise RuntimeError('arguments are unexpected')
-
-@addto(Parallel)
-def __init__(self,
-             roots     : Union['TracksDict', Sequence[RootTask]],
-             *tasks    : Task,
-             processors: Dict[Type[Task], Type[Processor]] = None,
-             __old__ = Parallel.__init__) -> None:
-    __old__(self, roots, *Tasks.tasklist(*tasks), processors = processors)
-
-__all__ = (('Task', 'Tasks', 'RootTask', 'Level', 'TASK_ORDER', 'taskorder')
-           + tuple(i.__class__.__name__ for i in Tasks.defaults().values()))
