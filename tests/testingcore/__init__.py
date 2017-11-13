@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u""" access to files """
+""" access to files """
 import  json
 import  warnings
 from    typing  import Union, Sequence, Optional, cast
@@ -20,12 +20,12 @@ def _trackreadertask(fpath, beadsonly = True):
     return TrackReaderTask(path = checkpath(fpath).path, beadsonly = beadsonly)
 
 def big_selected():
-    u"returns a TrackReaderTask on 2 GR  files"
+    "returns a TrackReaderTask on 2 GR files"
     return _trackreadertask((Path(cast(str, path("big_legacy"))).parent/"*.trk",
                              path("CTGT_selection")))
 
 def big_all():
-    u"returns a TrackReaderTask on all GR files"
+    "returns a TrackReaderTask on all GR files"
     return _trackreadertask((Path(cast(str, path("big_legacy"))).parent/"*.trk",
                              path("big_grlegacy")))
 
@@ -38,7 +38,7 @@ PATHS = dict(small_pickle   = "small_pickle.pk",
              big_all        = big_all)
 
 def path(name:Optional[str]) -> Union[str, Sequence[str]]:
-    u"returns the path to the data"
+    "returns the path to the data"
     directory = Path("../tests/"+__package__+"/")
     if name is None:
         return str(directory)
@@ -59,7 +59,7 @@ def path(name:Optional[str]) -> Union[str, Sequence[str]]:
             _test(default))
 
 def getmonkey():
-    u"for calling with pudb"
+    "for calling with pudb"
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', category = DeprecationWarning)
         warnings.filterwarnings('ignore', category = PendingDeprecationWarning)
