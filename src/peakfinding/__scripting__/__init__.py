@@ -54,16 +54,8 @@ class Detailed:
 
     def setparams(self, params):
         "sets params and applies it to positions"
-        self.params       = params
-        self.peaks[:]     = (self.peaks-params[1])*params[0]
-        self.positions[:] = [(i-params[1])*params[0] for i in self.positions]
-        for evt in self.events:
-            evt['data'][:] = [(i-params[1])*params[0] for i in evt['data']]
-
-        lst          = list(self.details)
-        lst[2]       = (lst[2]-params[1])*params[0]
-        lst[3]      *= params[0]
-        self.details = type(self.details)(*lst)
+        self.params = params
+        self.details.transform(params)
 
     @property
     def output(self) -> Iterator[PeakOutput]:

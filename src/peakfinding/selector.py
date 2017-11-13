@@ -3,8 +3,7 @@
 "Selects peaks and yields all events related to each peak"
 from   typing               import (Iterable, Iterator, Tuple, Union, Sequence,
                                     Callable, cast)
-from   collections          import namedtuple
-import numpy    as              np
+import numpy                as      np
 
 from utils                  import (initdefaults, asobjarray, asdataarrays, asview,
                                     updatecopy, EVENTS_TYPE, EVENTS_DTYPE, EventsArray)
@@ -16,13 +15,48 @@ from .histogram             import (Histogram,
 EventsOutput        = Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]]
 Input               = Union[Iterable[Iterable[np.ndarray]], Sequence[EVENTS_TYPE]]
 Output              = Tuple[float, EventsOutput]
-PeakSelectorDetails = namedtuple('PeakSelectorDetails',
-                                 ['positions', 'histogram', 'minvalue', 'binwidth',
-                                  'corrections', 'peaks', 'events', 'ids'])
+
+class PeakSelectorDetails: # pylint: disable=too-many-instance-attributes
+    "Information useful to GUI"
+    __slots__ = ('positions', 'histogram', 'minvalue', 'binwidth', 'corrections',
+                 'peaks', 'events', 'ids')
+    def __init__(self,     # pylint: disable=too-many-arguments
+                 positions:   np.ndarray,
+                 histogram:   np.ndarray,
+                 minvalue:    float,
+                 binwidth:    float,
+                 corrections: np.ndarray,
+                 peaks:       np.ndarray,
+                 events:      EventsArray,
+                 ids:         np.ndarray) -> None:
+        self.positions   = positions
+        self.histogram   = histogram
+        self.minvalue    = minvalue
+        self.binwidth    = binwidth
+        self.corrections = corrections
+        self.peaks       = peaks
+        self.events      = events
+        self.ids         = ids
+
+    def __iter__(self):
+        return iter(getattr(self, i) for i in self.__slots__)
+
+    def __getitem__(self, val):
+        return getattr(self, self.__slots__[val])
+
+    def transform(self, params):
+        "sets params and applies it to positions"
+        self.peaks[:]     = (self.peaks-params[1])*params[0]
+        self.positions[:] = [(i-params[1])*params[0] for i in self.positions]
+        for evt in self.events:
+            evt['data'][:] = [(i-params[1])*params[0] for i in evt['data']]
+
+        self.minvalue  = (self.minvalue-params[1])*params[0]
+        self.binwidth *= params[0]
 
 class PeaksArray(EventsArray):
     """Array with metadata."""
-    _discarded = 0
+    _discarded = 0      # type: ignore
     _dtype     = None
 
 class PeakSelector(PrecisionAlg):
@@ -122,17 +156,17 @@ class PeakSelector(PrecisionAlg):
         else:
             delta  = None
 
-        histdata = projector.projection(pos, zmeasure = None)
+        histdata   = projector.projection(pos, zmeasure = None)
         peaks, ids = self.finder(hist      = histdata,
                                  pos       = pos,
                                  precision = precision)
-        hist, minv, binwidth = histdata
-        return PeakSelectorDetails(pos, hist, minv, binwidth, delta, peaks, orig, ids)
+        return PeakSelectorDetails(pos, *histdata, delta, peaks, orig, ids)
 
     def details2output(self, dtl:PeakSelectorDetails) -> Iterator[Output]:
         "yields results from precomputed details"
         for label, peak in enumerate(dtl.peaks):
-            good = tuple(orig[pks == label] for orig, pks in zip(dtl.events, dtl.ids))
+            good = tuple(orig[pks == label]
+                         for orig, pks in zip(dtl.events, dtl.ids)) # type: ignore
             if any(len(i) for i in good):
                 evts = self.__move(good, dtl.corrections, dtl.events.discarded)
                 yield (self.__measure(peak, evts), evts)
