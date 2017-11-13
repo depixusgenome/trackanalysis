@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
-from typing                     import Optional, Dict, cast
+from typing                     import Dict, cast
 
 import bokeh.core.properties as props
 from bokeh                      import layouts
@@ -18,14 +18,10 @@ from view.plots.tasks           import TaskPlotCreator
 from sequences.view             import (SequenceTicker,
                                         SequenceHoverMixin)
 from peakfinding.histogram      import Interpolator
-from peakfinding.selector       import PeakSelectorDetails, PeakSelector
+from peakfinding.selector       import PeakSelector
 
 from ._model                    import PeaksPlotModelAccess
-from ._widget                   import (PeaksSequencePathWidget,
-                                        PeaksStatsWidget, PeakListWidget,
-                                        PeakIDPathWidget, AdvancedWidget,
-                                        PeaksOligoListWidget)
-from ._processors               import GuiFitToReferenceProcessor, GuiPeakSelectorProcessor
+from ._widget                   import createwidgets
 from ._io                       import setupio
 
 class PeaksSequenceHover(Model, SequenceHoverMixin):
@@ -114,14 +110,9 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
 
         self._src: Dict[str, ColumnDataSource] = {}
         self._fig: Figure                      = None
-        self._widgets = dict(seq      = PeaksSequencePathWidget(self._model),
-                             oligos   = PeaksOligoListWidget(self._model),
-                             stats    = PeaksStatsWidget(self._model),
-                             peaks    = PeakListWidget(self._model),
-                             cstrpath = PeakIDPathWidget(self._model),
-                             advanced = AdvancedWidget(self._model))
-        self._ticker  = SequenceTicker()
-        self._hover   = PeaksSequenceHover()
+        self._widgets                          = createwidgets(self._model)
+        self._ticker                           = SequenceTicker()
+        self._hover                            = PeaksSequenceHover()
 
     @property
     def model(self):

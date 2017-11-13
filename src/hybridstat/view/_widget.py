@@ -366,6 +366,7 @@ class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
         (self.__widget if resets is None else resets[self.__widget]).update(value = txt)
 
 class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin):
+
     "access to the modal dialog"
     _TITLE        = 'Hybridstat Configuration'
     _BODY: T_BODY = (('Minimum frame count per event',    '%(_framecount)d'),
@@ -431,3 +432,12 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin):
             return
         self._model.identification.updatedefault('match', window = value)
         self._model.identification.resetmodel(self._model)
+
+def createwidgets(mdl: PeaksPlotModelAccess) -> Dict[str, WidgetCreator]:
+    "returns a dictionnary of widgets"
+    return dict(seq      = PeaksSequencePathWidget(mdl),
+                oligos   = PeaksOligoListWidget(mdl),
+                stats    = PeaksStatsWidget(mdl),
+                peaks    = PeakListWidget(mdl),
+                cstrpath = PeakIDPathWidget(mdl),
+                advanced = AdvancedWidget(mdl))
