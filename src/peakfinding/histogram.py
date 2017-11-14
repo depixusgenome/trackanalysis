@@ -471,6 +471,8 @@ class ByGaussianMix:
     peakwidth:float = 1
     crit:str        = 'bic'
     mincount        = 5
+    varcmpnts       = 0.2
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -481,60 +483,53 @@ class ByGaussianMix:
         hist, bias, slope   = kwa.get("hist",(0,0,1))
         return self.find(pos, hist, bias, slope)
 
-    @staticmethod
-    def find(pos: np.array, hist, bias:float = 0., slope:float = 1.):
+
+    def find(self,pos: np.array, hist, bias:float = 0., slope:float = 1.):
         'find peaks'
 
-        # events   = np.hstack(pos)
-        # maxncmps = len(events)//self.mincount
-        ncmps = len(ZeroCrossingPeakFinder()(hist,bias, slope))
-        gmm   = GaussianMixture(n_components = ncmps)
-        trpos = np.matrix(np.hstack(pos)).T
-        gmm.fit(trpos)
-        peaks = gmm.means_
-        ids   = np.array([gmm.predict(zpos.reshape(-1,1))
-                          if zpos.size!=0 else np.array([])
-                          for zpos in pos])
-        # will need to better estimate the number of peaks
-        #kwargs   = {'covariance_type'  : self.cov_type,
-        #            'max_iter'         : self.max_iter}
-        # self.gmm = self.__fit(events.reshape(-1,1),maxncmps,kwargs)
-        # peaks, ids =  self.__strip(pos,events.reshape(-1,1),self.gmm)
-        # peaks not ordered
-        return (peaks * slope + bias, ids)
+        events   = np.hstack(pos)
+        maxncmps = int(len(ZeroCrossingPeakFinder()(hist,bias, slope))*(1+self.varcmpnts))
+        maxncmps= max(maxncmps,2)
+        mincmps = int(len(ZeroCrossingPeakFinder()(hist,bias, slope))*(1-self.varcmpnts))
+        mincmps = max(mincmps,1)
+        kwargs   = {'covariance_type'  : self.cov_type,
+                    'max_iter'         : self.max_iter}
+        gmm = self.__fit(events.reshape(-1,1),maxncmps,mincmps,kwargs)
+
+        peaks = gmm.means_.reshape(1,-1)[0] * slope + bias
+        ids =  self.__strip(pos,events.reshape(-1,1),gmm)
+        return peaks, ids
 
     def __strip(self,pos,evts,gmm):
         'removes peaks which have fewer than mincount events'
         predicts = gmm.predict(evts)
         keep     = [pkid for pkid in range(gmm.n_components) if sum(predicts==pkid)>=self.mincount]
-        kdict    = {val:key for key,val in enumerate(keep)}
-        peaks    = gmm.means_[keep]
 
         def assign(zpos):
             'set id'
             idx=gmm.predict(zpos)[0]
-            return kdict.get(idx,np.iinfo("i4").max)
+            return idx if idx in keep else np.iinfo("i4").max
 
         vids = np.vectorize(assign)
-        return peaks,np.array([vids(zpos) for zpos in pos])
+        return np.array([vids(zpos) if zpos.size>0 else np.array([]) for zpos in pos])
 
-    def __fit(self,evts,maxcmpts,kwargs):
+    def __fit(self,evts,maxcmpts,mincmpts,kwargs):
         '''
         runs Gaussian Mixture for different components
         returns the one which minimizes crit
         '''
-        gmms = self.__run_gmms(evts,maxcmpts,kwargs)
+        gmms = self.__run_gmms(evts,maxcmpts,mincmpts,kwargs)
         return self.__min_crit(self.crit,evts,gmms)
 
     @staticmethod
-    def __run_gmms(evts:np.array,maxncmps:int,kwargs:Dict):
-        gmms = [GaussianMixture(n_components = ite,**kwargs) for ite in range(1,maxncmps)]
-        for ite in range(maxncmps-1):
+    def __run_gmms(evts:np.array,maxncmps:int,mincmps:int,kwargs:Dict):
+        gmms = [GaussianMixture(n_components = ite,**kwargs) for ite in range(mincmps,maxncmps)]
+        for ite in range(maxncmps-mincmps):
             gmms[ite].fit(evts)
         return gmms
 
     @staticmethod
-    def __min_crit(crit:str,evts:np.array,gmms)->int:
+    def __min_crit(crit:str,evts:np.array,gmms):
         values = [getattr(gmm,crit)(evts) for gmm in gmms]
         return gmms[np.argmin(values)]
 
@@ -543,10 +538,11 @@ class ByBayesGaussianMix:
     finds peaks and groups events using Bayesian Gaussian mixture
     known to have convergence issues for small data sets
     '''
-    max_iter  = 10000
-    cov_type  = 'tied'
-    peakwidth = 1
-
+    max_iter     = 10000
+    cov_type     = 'tied'
+    peakwidth    = 1
+    weight_prior = 1e3
+    wprior_type = "dirichlet_distribution"
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -559,17 +555,18 @@ class ByBayesGaussianMix:
 
     def find(self,pos: np.array,hist, bias:float = 0., slope:float = 1.):
         'find peaks'
-        apos       = np.hstack(pos)
-        cov        = np.array([[self.peakwidth]])
+        apos  = np.hstack(pos)
+        cov   = np.array([[self.peakwidth]])
         ncmps = len(ZeroCrossingPeakFinder()(hist,bias, slope)) # find better
-        kwa        = {'n_components'     : ncmps,
-                      'covariance_prior' : cov,
-                      'covariance_type'  : self.cov_type,
-                      'max_iter'         : self.max_iter}
-
+        kwa   = {'n_components'                    : ncmps,
+                 'covariance_prior'                : cov,
+                 'covariance_type'                 : self.cov_type,
+                 'max_iter'                        : self.max_iter,
+                 'weight_concentration_prior'      : self.weight_prior,
+                 'weight_concentration_prior_type' : self.wprior_type}
         # converge may fail without proper sampling.
         dpgmm = BayesianGaussianMixture(**kwa)
-        trpos      = np.matrix(apos).T
+        trpos = np.matrix(apos).T
         dpgmm.fit(trpos)
         # must change predict to correspond to correct ids
         # predict = dpgmm.predict(trpos)
