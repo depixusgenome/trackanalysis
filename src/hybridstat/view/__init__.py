@@ -23,10 +23,8 @@ class HybridStatView(BokehView):
                         CyclesPlotView(**kwa),
                         PeaksPlotView (**kwa)]
 
-        self._ctrl.getGlobal('css').defaults = dict(responsive  = False,
-                                                    sizing_mode = 'fixed')
-        self._ctrl.getGlobal('css.plot').figure.defaults = dict(responsive  = False,
-                                                                sizing_mode = 'fixed')
+        self._ctrl.getGlobal('css').defaults = dict(sizing_mode = 'fixed')
+        self._ctrl.getGlobal('css.plot').figure.defaults = dict(sizing_mode = 'fixed')
         self._ctrl.getGlobal('css').hybridstat.defaults = dict(width = 500, height = 30)
         titles = self._ctrl.getGlobal('css').hybridstat.title
         for panel in self._panels:

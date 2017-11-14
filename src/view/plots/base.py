@@ -215,8 +215,7 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
                             'input.width'        : 205,
                             'figure.width'       : 800,
                             'figure.height'      : 200,
-                            'figure.sizing_mode' : 'scale_width',
-                            'figure.responsive'  : True}
+                            'figure.sizing_mode' : 'scale_width'}
 
         key = type(self).key()
         for name in 'config', 'project', 'css':
@@ -495,8 +494,7 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
                     break
 
         args.update((translations.get(i, i), j) for i, j in kwa.items())
-        args.pop('sizing_mode' if args.get('responsive', False) else 'responsive',
-                 None)
+        args.pop('sizing_mode', None)
         return args
 
     def _figargs(self, *cssarr, **kwa) -> dict:
@@ -505,7 +503,6 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
                  'xlabel':              'x_axis_label',
                  'ylabel':              'y_axis_label',
                  'figure.sizing_mode':  'sizing_mode',
-                 'figure.responsive':   'responsive',
                  'figure.width':        'plot_width',
                  'figure.height':       'plot_height',
                  'tools':               'tools'}
