@@ -8,18 +8,30 @@ Adds a method for discarding beads with Cleaning warnings
 """
 from   typing                       import (Dict, Optional, Iterator, List,
                                             Set, Tuple, cast)
-from   itertools                    import product
-import numpy                        as     np
-import pandas                       as     pd
-from   utils.decoration             import addproperty
-from   control.processor.dataframe  import DataFrameFactory
-from   data.track                   import Track, BEADKEY, dropbeads
-from   data.tracksdict              import TracksDict
-from   ..processor                  import DataCleaningProcessor, DataCleaningException
+from   itertools                        import product
+import numpy                            as     np
+import pandas                           as     pd
+from   utils.decoration                 import addproperty
+from   control.processor.dataframe      import DataFrameFactory
+from   data.views                       import BEADKEY
+from   data.track                       import dropbeads
+from   data.__scripting__.track         import Track
+from   data.__scripting__.tracksdict    import TracksDict
+from   ..processor                      import (DataCleaningProcessor,
+                                                DataCleaningException)
 
-@addproperty(Track, 'cleaning')
+@addproperty(Track.__base__, 'cleaning')
 class TrackCleaningScript:
-    "Adds means for discarding beads with cleaning warnings"
+    """
+    Provides methods for finding beads with cleaning warnings and possibly discarding them.
+
+    One can do:
+
+    * `track.cleaning.good()`: lists good beads
+    * `track.cleaning.bad()`: lists bad beads
+    * `track.cleaning.messages()`: lists all messages
+    * `track.cleaning.dropbad`: returns a track with only good beads loaded.
+    """
     def __init__(self, track: Track) -> None:
         self.track = track
 
@@ -68,9 +80,24 @@ class TrackCleaningScript:
         "removes bad beads *forever*"
         return dropbeads(self.track, *self.bad(**kwa)) # type: ignore
 
-@addproperty(TracksDict, 'cleaning')
+Track.__doc__ += (
+    """
+    * *cleaning* """+TrackCleaningScript.__doc__.split('\n')[1].strip())
+Track.__base__.__doc__ = Track.__doc__
+
+@addproperty(TracksDict.__base__, 'cleaning')
 class TracksDictCleaningScript:
-    "Adds a method for discarding beads with cleaning warnings"
+    """
+    Adds means for finding beads with cleaning warnings and possibly discarding them.
+
+    One can do:
+
+    * `tracks.cleaning.good()`: lists beads which are good throughout all tracks
+    * `tracks.cleaning.bad()`: lists beads bad at least in one track
+    * `tracks.cleaning.messages()`: lists all messages
+    * `tracks.cleaning.dropbad`: returns a *TracksDict* with tracks with only
+    good beads loaded.
+    """
     def __init__(self, tracks: TracksDict) -> None:
         self.tracks = tracks
 
@@ -106,4 +133,10 @@ class TracksDictCleaningScript:
             cpy[key] = TrackCleaningScript(track).dropbad(**kwa)
         return cpy
 
+TracksDict.__doc__ += (
+    """
+    # Cleaning
+
+    """+TracksDictCleaningScript.__doc__)
+TracksDict.__base__.__doc__ = TracksDict.__doc__
 __all__ : Tuple[str, ...] = ()

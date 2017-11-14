@@ -35,7 +35,18 @@ class Axis(Enum):
         return cls(name)
 
 class Bead:
-    "characteristics of a bead"
+    """
+    Characteristics of a bead
+
+    Attributes are:
+
+    * *image* is one image of the field of view
+    * *dim* are conversion factors from pixel to nm
+    * *beads* is a dictionnary of information per bead:
+
+        * *position* is the bead's (X, Y, Z) position
+        * *image* is the bead's calibration image
+    """
     position: Tuple[float, float, float] = (0., 0., 0.)
     image:    np.ndarray                 = np.zeros(0, dtype = np.uint8)
     @initdefaults(locals())
@@ -45,6 +56,15 @@ class Bead:
 class FoV:
     """
     Data concerning the FoV
+
+    Attributes are:
+
+    * *image* is one image of the field of view
+    * *dim* are conversion factors from pixel to nm
+    * *beads* is a dictionnary of information per bead:
+
+        * *position* is the bead's (X, Y, Z) position
+        * *image* is the bead's calibration image
 
     Dimensions are provided as : (X slope, X bias), (Y slope, Y bias)
     """
@@ -153,7 +173,45 @@ class ResettingProperty(Generic[T]):
 
 @levelprop(Level.project)
 class Track:
-    "Model for track files. This must not contain actual data."
+    """
+    The data from a track file, accessed lazily (only upon request).
+
+    The data can be read as:
+
+    ```python
+    raw = Track(path =  "/path/to/a/file.trk")
+    grs = Track(path =  ("/path/to/a/file.trk",
+                         "/path/to/a/gr/directory",
+                         "/path/to/a/specific/gr"))
+    ```
+
+    The data can then be accessed as follows:
+
+    * for time:     `raw.beads['t']`
+    * for zmag:     `raw.beads['zmag']`
+    * for beads:    `raw.beads[0]` where 0 can be any bead number
+    * for cycles:   `raw.cycles[1,5]` where 1 and 5 can be any bead or cycle number.
+
+    Some slicing is possible:
+
+    * `raw.cycles[:,range(5,10)]` accesses cycles 5 though 10 for all beads.
+    * `raw.cycles[[2,5],...]` accesses all cycles for beads 5 and 5.
+
+    Only data for the Z axis is available. Use the `axis = 'X'` or `axis = 'Y'`
+    options in the constructor to access other data.
+
+    Other attributes are:
+
+    * *framerate* is this experiment's frame rate
+    * *fov* is the field of view data:
+
+        * *image* is one image of the field of view
+        * *dim* are conversion factors from pixel to nm
+        * *beads* is a dictionnary of information per bead:
+
+            * *position* is the bead's (X, Y, Z) position
+            * *image* is the bead's calibration image
+    """
     _framerate                  = 30.
     _fov: FoV                   = None
     _phases                     = np.empty((0,9), dtype = 'i4')

@@ -115,15 +115,16 @@ class TracksDict(_TracksDict):
                             for i in ('pathcount', 'modification', 'megabytes')})
             return pd.DataFrame(frame).sort_values('modification')
 
-        if (len(tasks) == 0 or
-                tasks[0] not in (Tasks.eventdetection, Tasks.peakselector)):
+        try:
+            Tasks(tasks[0])
+        except (IndexError, ValueError) as _:
             raise ValueError('The first task should be either '
                              'event detection or peak selection.')
 
-        cleaned = self[[i for i, j in self.items() if j.cleaned]]
-        dirty   = self[[i for i, j in self.items() if not j.cleaned]]
-        tclean  = Tasks.defaulttasklist(None, tasks[0], True)
-        tdirty  = Tasks.defaulttasklist(None, tasks[0], False)
+        tclean  = [self[[i for i, j in self.items() if j.cleaned]]]
+        tclean += Tasks.defaulttasklist(None, tasks[0], True)
+        tdirty  = [self[[i for i, j in self.items() if not j.cleaned]]]
+        tdirty += Tasks.defaulttasklist(None, tasks[0], False)
 
         transform = ([transform] if callable(transform) else
                      []          if transform is None   else
@@ -133,8 +134,8 @@ class TracksDict(_TracksDict):
         dframe  = Tasks.dataframe(merge = True, measures = kwa, transform = transform)
 
         created = [Tasks.create(i) for i in tasks[1:]]
-        par     = (Parallel(cleaned, *tclean, *created, dframe)
-                   .extend(dirty, *tdirty, *created, dframe))
+        par     = (Parallel(*tclean, *created, dframe)
+                   .extend(*tdirty, *created, dframe))
         return par.process(None, 'concat') if process else par
 
 class ExperimentList(dict):

@@ -21,7 +21,18 @@ from app.__scripting__      import Tasks, scriptapp
 from ..                      import Track as _Track
 
 class Track(_Track):
-    "Adding helper functions for simple calls"
+    """
+
+    * *pathinfo* provides information on the path itself:
+
+        * *paths*: a tuple of paths
+        * *trackpath*: the main path, i.e. not the grs
+        * *size* (*megabytes*) is the size in bytes (megabytes) of *trackpath*
+        * *stat*: stats on the *trackpath*
+        * *modification*: the date oflast modification. This is basically the time of experiment.
+        * *creation*: the creation date. **DISCARD** when using PicoTwist tracks.
+    """
+    __doc__ = _Track.__doc__ + __doc__
     cleaned = False
     def __init__(self, path = None, **kwa):
         cnf = scriptapp.control.getGlobal('css').last.path.trk
@@ -38,6 +49,8 @@ class Track(_Track):
             scriptapp.control.writeuserconfig()
         super().__init__(path = path, **kwa)
         self.cleaned = kwa.get('cleaned', type(self).cleaned)
+
+_Track.__doc__ = Track.__doc__
 
 @addproperty(_Track, 'pathinfo')
 class PathInfo:

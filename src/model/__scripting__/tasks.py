@@ -86,6 +86,16 @@ class Tasks(Enum):
     __taskorder__  = 'eventdetection', 'peakselector', 'fittohairpin'
     __cleaning__   = 'cleaning', 'alignment'
     __tasklist__   = __cleaning__ + __taskorder__
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, Task):
+            value = type(value)
+
+        if isinstance(value, type) and issubclass(value, Task):
+            for i, j in cls.defaults().items():
+                if j.__class__ is value:
+                    return cls(i)
+        super()._missing_(value) # type: ignore
 
     @staticmethod
     def defaults():
@@ -130,7 +140,7 @@ class Tasks(Enum):
         if cleaned or (isinstance(paths, (tuple, list)) and len(paths) > 1):
             tasks = [i for i in tasks if i not in cls.__cleaning__] # type: ignore
 
-        upto = getattr(upto, 'value', upto)
+        upto = cls(upto).value
         itms = (tasks if upto is None       else
                 ()    if upto not in tasks  else
                 tasks[:tasks.index(upto)+1])
