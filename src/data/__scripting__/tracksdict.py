@@ -98,7 +98,7 @@ class TracksDict(_TracksDict):
             for i in self.values():
                 i.cleaned = value
 
-    def dataframe(self, *tasks, transform = None, assign = None, **kwa):
+    def dataframe(self, *tasks, transform = None, assign = None, process = None, **kwa):
         """
         Returns a table with some data
 
