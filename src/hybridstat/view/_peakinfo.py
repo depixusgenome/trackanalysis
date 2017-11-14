@@ -111,7 +111,7 @@ class StatsPeakInfo(PeakInfo):
 
     def values(self, mdl: 'PeaksPlotModelAccess', peaks) -> Dict[str, np.ndarray]:
         "sets current bead peaks and computes the fits"
-        if peaks is None:
+        if len(peaks) == 0:
             return {}
 
         task = mdl.eventdetection.task

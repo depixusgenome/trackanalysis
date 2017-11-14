@@ -201,10 +201,13 @@ def register(proc: Union[Type[Processor], Iterable[Type[Processor]]],
     if cache is None:
         cache = {}
 
-    procs = list(proc) if isinstance(proc, Iterable) else [proc]
+    procs = list(proc) if isinstance(proc, (tuple, list)) else [proc]
     while len(procs):
         itm = procs.pop(0)
-        if itm is None:
+        if isinstance(itm, (list, tuple)):
+            procs = list(itm)+procs
+            continue
+        elif itm is None:
             continue
 
         if force or itm.canregister():

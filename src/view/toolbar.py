@@ -335,8 +335,8 @@ class FileListInput(BeadView, FileListMixin):
         @self._ctrl.observe
         def _onOpenTrack(model = None, **_):
             vals                       = list(self.files)
-            self.__toolbar.currentfile = [i for i, _ in vals].index(model[0])
-            self.__toolbar.filelist    = [i for _, i in vals]
+            self.__toolbar.currentfile = [i for _, i in vals].index(model[0])
+            self.__toolbar.filelist    = [i for i, _ in vals]
 
         def _oncurrentfile_cb(attr, old, new):
             new = int(new)
@@ -348,7 +348,7 @@ class FileListInput(BeadView, FileListMixin):
             if new >= len(lst):
                 _onOpenTrack(model = [track.get()])
             else:
-                track.set(lst[new][0])
+                track.set(lst[new][1])
 
         self.__toolbar.on_change('currentfile', _oncurrentfile_cb)
 

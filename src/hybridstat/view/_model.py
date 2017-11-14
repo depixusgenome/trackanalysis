@@ -33,9 +33,9 @@ class FitToReferenceAccess(TaskAccess):
     "access to the FitToReferenceTask"
     def __init__(self, ctrl):
         super().__init__(ctrl, FitToReferenceTask)
-        self.__store.defaults           = dict(id = None, reference = None, peaks = None)
-        self.configtask.histmin.default = 1e-3
-        self.configtask.peakprecision   = 1e-2
+        self.__store.defaults     = dict(id = None, reference = None, peaks = None)
+        self.configtask.defaults  = dict(histmin       = 1e-3,
+                                         peakprecision = 1e-2)
 
     @staticmethod
     def _configattributes(_):
@@ -119,8 +119,9 @@ class FitToReferenceAccess(TaskAccess):
         "returns an array of identified peaks"
         ref = self.__store.peaks.get()
         arr = np.full(len(peaks), np.NaN, dtype = 'f4')
-        ids = match.compute(ref, peaks, self.configtask.peakprecision.get())
-        arr[ids[:,1]] = ref[ids[:,0]]
+        if len(peaks):
+            ids = match.compute(ref, peaks, self.configtask.peakprecision.get())
+            arr[ids[:,1]] = ref[ids[:,0]]
         return arr
 
     def __computefitdata(self):
@@ -264,7 +265,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
 
         if dtl is None:
             self.distances     = {}
-            self.peaks         = createpeaks(self, None)
+            self.peaks         = createpeaks(self, [])
             self.estimatedbias = 0.
             return None
 

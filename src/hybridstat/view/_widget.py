@@ -47,7 +47,7 @@ class ReferenceWidget(WidgetCreator[PeaksPlotModelAccess], FileListMixin):
             if inew >= lst or inew < 0:
                 self._model.fittoreference = None
             else:
-                self._model.fittoreference = lst[inew][0]
+                self._model.fittoreference = lst[inew][1]
 
         self.__widget.on_click(_py_cb)
         return [Paragraph(text = self.css.title.reference.get()), self.__widget]
@@ -63,13 +63,13 @@ class ReferenceWidget(WidgetCreator[PeaksPlotModelAccess], FileListMixin):
 
     def __data(self) -> dict:
         lst   = list(self.files)
-        menu  = list(enumerate(i for _, i in lst))
+        menu  = list(enumerate(i for i, _ in lst))
         menu += [None, (self.css.title.reference.none.get(), -1)]
 
         key   = self._model.fittoreference.reference
         return dict(menu  = menu,
                     label = dict(lst).get(key, menu[-1][0]),
-                    value = -1 if key is None else [i for i, _ in lst].index(key))
+                    value = -1 if key is None else [i for _, i in lst].index(key))
 
 class PeaksOligoListWidget(OligoListWidget):
     "deals with oligos"
@@ -366,7 +366,6 @@ class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
         (self.__widget if resets is None else resets[self.__widget]).update(value = txt)
 
 class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin):
-
     "access to the modal dialog"
     _TITLE        = 'Hybridstat Configuration'
     _BODY: T_BODY = (('Minimum frame count per event',    '%(_framecount)d'),

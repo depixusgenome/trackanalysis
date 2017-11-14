@@ -218,7 +218,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         rends = []
         for key in ('count', 'reference.count', 'events.count',
                     'peaks.count', 'peaks.duration'):
-            src  = self._src[key.split('.')[-1] if '.' in key else '']
+            src  = self._src.get(key.split('.')[0], self._src[''])
             args = dict(y            = 'z',
                         x            = key.split('.')[-1],
                         source       = src)
