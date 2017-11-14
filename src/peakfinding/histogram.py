@@ -6,14 +6,13 @@ from    typing import (NamedTuple, Optional, Iterator,
                        Dict)
 from    enum   import Enum
 import  itertools
-from    sklearn.mixture            import BayesianGaussianMixture, GaussianMixture
+from    sklearn.mixture         import BayesianGaussianMixture, GaussianMixture
 
 import  numpy  as     np
 from    numpy.lib.stride_tricks import as_strided
 
-from    sklearn.mixture          import BayesianGaussianMixture
-from    scipy.interpolate        import interp1d
-from    scipy.signal             import find_peaks_cwt
+from    scipy.interpolate       import interp1d
+from    scipy.signal            import find_peaks_cwt
 
 from    utils                   import (kwargsdefaults, initdefaults,
                                         NoArgs, asdataarrays, EVENTS_DTYPE)

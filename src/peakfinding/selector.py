@@ -160,7 +160,8 @@ class PeakSelector(PrecisionAlg):
         peaks, ids = self.finder(hist      = histdata,
                                  pos       = pos,
                                  precision = precision)
-        return PeakSelectorDetails(pos, *histdata, delta, peaks, orig, ids)
+        return PeakSelectorDetails(pos, histdata[0], histdata[1], histdata[2],
+                                   delta, peaks, orig, ids)
 
     def details2output(self, dtl:PeakSelectorDetails) -> Iterator[Output]:
         "yields results from precomputed details"
