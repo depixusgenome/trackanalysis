@@ -239,11 +239,21 @@ class FitToReferenceDataFrameFactory(DataFrameFactory[FitToReferenceDict]):
         * *hybridisationrate*
         * *eventcount*
         * *referenceposition*: the peak position in the reference
+
+    One can add *stretch* and *bias* to the list by doing:
+
+        >>> DataFrameTask(stretch = True, bias = True)
     """
-    PREC = 5e-6
+    __doc__ += '\n'+PeaksDataFrameFactory.__doc__[PeaksDataFrameFactory.__doc__.find('#')-5:]
+    PREC     = 5e-6
     def __init__(self, task, frame):
+        get = lambda i: ('stretch' if task.measures.get(i, False) is True else
+                         i         if task.measures.get(i, False)         else
+                         '')
         super().__init__(task, frame)
-        self.__parent = PeaksDataFrameFactory(task, frame)
+        self.__stretch = get('stretch')
+        self.__bias    = get('bias')
+        self.__parent  = PeaksDataFrameFactory(task, frame, stretch = None, bias = None)
         self.__peaks: Dict[BEADKEY, np.ndarray] = {i: self.__getpeaks(j)
                                                    for i, j in frame.config.fitdata.items()}
 
@@ -253,6 +263,10 @@ class FitToReferenceDataFrameFactory(DataFrameFactory[FitToReferenceDict]):
         meas   = self.__parent._run(frame, key, peaks)
         arr    = np.full(len(meas['peakposition']), np.NaN, dtype = 'f4')
         meas['referenceposition'] = arr
+        if self.__stretch:
+            meas[self.__stretch] = np.full(len(arr), peaks.params[0], dtype = 'f4')
+        if self.__bias:
+            meas[self.__bias]    = np.full(len(arr), peaks.params[1], dtype = 'f4')
 
         ref   = self.__peaks[key]
         cur   = np.unique(meas['peakposition'])

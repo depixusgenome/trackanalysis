@@ -3,23 +3,17 @@
 """
 Adds shortcuts for using holoview
 """
-import sys
-from   typing                import List, Type
+from   typing                import List, cast
 from   functools             import partial
 import numpy                 as     np
-from   scripting.holoviewing import addto, addproperty
-from   ..data                import Events
+from   scripting.holoviewing import addto, addproperty, hv
 
-def _get(name, attr = None):
-    mod = sys.modules[name]
-    return mod if attr is None else getattr(mod, attr)
+from   model.__scripting__                          import Tasks
+from   data.__scripting__                           import TracksDict
+from   data.__scripting__.holoviewing.trackviews    import CycleDisplay
+from   data.__scripting__.holoviewing.tracksdict    import TracksDictDisplay
 
-# pylint: disable=invalid-name
-hv                      = _get('holoviews')
-CycleDisplay:      Type = _get('data.__scripting__.holoviewing.trackviews', 'CycleDisplay')
-TracksDict:        Type = _get('data.__scripting__', 'TracksDict')
-TracksDictDisplay: Type = _get('data.__scripting__.holoviewing.tracksdict',
-                               'TracksDictDisplay')
+from   ..data                                       import Events
 
 class EventDisplay(CycleDisplay, display = Events): # type: ignore
     """
@@ -80,6 +74,12 @@ def map(self, fcn, kdim = None, **kwa): # pylint: disable=redefined-builtin,func
         kwa.setdefault(kdim, list(set(i for i, _ in self.keys())))
     return hv.DynamicMap(partial(fcn, self), kdims = list(kwa)).redim.values(**kwa)
 
-addproperty(TracksDict, 'events', name = 'events', prop = TracksDictDisplay)
+@addproperty(TracksDict, 'events')
+class EventTracksDictDisplay(TracksDictDisplay):
+    "tracksdict display for events"
+    _name = cast(str, property(lambda _: 'events', lambda _1, _2: None))
+    def dataframe(self, *tasks, **kwa):
+        "creates a dataframe for all keys"
+        return self._items.dataframe(Tasks.eventdetection, *tasks, **kwa)
 
 __all__: List[str] = []

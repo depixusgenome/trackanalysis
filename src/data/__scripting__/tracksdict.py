@@ -10,8 +10,9 @@ import pandas               as     pd
 from   utils                import initdefaults
 from   utils.decoration     import addto
 
-from   model                import Level, Task
-from   model.__scripting__  import Tasks
+from   model                         import Level, Task
+from   model.__scripting__           import Tasks
+from   model.__scripting__.parallel  import Parallel
 
 from   .track               import Track
 from   ..trackio            import savetrack, PATHTYPE, Handler
@@ -97,15 +98,44 @@ class TracksDict(_TracksDict):
             for i in self.values():
                 i.cleaned = value
 
-    def dataframe(self):
-        "Returns a table with some data"
-        paths = [i.pathinfo for i in self.values()]
-        frame = dict(key     = list(self),
-                     path    = [i.trackpath for i in paths],
-                     cleaned = [i.cleaned   for i in self.values()],
-                     **{i: [getattr(j, i) for j in paths]
-                        for i in ('pathcount', 'modification', 'megabytes')})
-        return pd.DataFrame(frame).sort_values('modification')
+    def dataframe(self, *tasks, transform = None, assign = None, process = True, **kwa):
+        """
+        Returns a table with some data
+
+        If tasks are provided, those tasks are applied before finishing by a DataFrameTask.
+
+        The first task should be either event detection or peak selection.
+        """
+        if len(tasks) == 0:
+            paths = [i.pathinfo for i in self.values()]
+            frame = dict(key     = list(self),
+                         path    = [i.trackpath for i in paths],
+                         cleaned = [i.cleaned   for i in self.values()],
+                         **{i: [getattr(j, i) for j in paths]
+                            for i in ('pathcount', 'modification', 'megabytes')})
+            return pd.DataFrame(frame).sort_values('modification')
+
+        if (len(tasks) == 0 or
+                tasks[0] not in (Tasks.eventdetection, Tasks.peakselector)):
+            raise ValueError('The first task should be either '
+                             'event detection or peak selection.')
+
+        cleaned = self[[i for i, j in self.items() if j.cleaned]]
+        dirty   = self[[i for i, j in self.items() if not j.cleaned]]
+        tclean  = Tasks.defaulttasklist(None, tasks[0], True)
+        tdirty  = Tasks.defaulttasklist(None, tasks[0], False)
+
+        transform = ([transform] if callable(transform) else
+                     []          if transform is None   else
+                     list(transform))
+        if assign is not None:
+            transform.insert(0, lambda x: x.assign(**assign))
+        dframe  = Tasks.dataframe(merge = True, measures = kwa, transform = transform)
+
+        created = [Tasks.create(i) for i in tasks[1:]]
+        par     = (Parallel(cleaned, *tclean, *created, dframe)
+                   .extend(dirty, *tdirty, *created, dframe))
+        return par.process(None, 'concat') if process else par
 
 class ExperimentList(dict):
     "Provides access to keys belonging to a single experiment"

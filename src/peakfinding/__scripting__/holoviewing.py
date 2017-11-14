@@ -7,7 +7,6 @@ from   copy                  import deepcopy
 import numpy                 as     np
 
 from   scripting.holoviewing import addto, displayhook, hv
-from   scripting.parallel    import Parallel
 from   model.__scripting__   import Tasks
 from   data.__scripting__    import TracksDict # pylint: disable=unused-import
 from   data.__scripting__.holoviewing.trackviews import CycleDisplay as _CycleDisplay
@@ -223,16 +222,15 @@ class PeaksTracksDictDisplay(TracksDictDisplay, peaks = TracksDict): # type: ign
                                    group = ovrs[ind].group)
         return ovrs
 
-    def dataframe(self, **kwa):
-        "creates a dataframe for all keys"
-        cleaned = self._items[[i for i, j in self._items.items() if j.cleaned]]
-        dirty   = self._items[[i for i, j in self._items.items() if not j.cleaned]]
-        tclean  = Tasks.defaulttasklist(None, Tasks.peakselector, True)[1:]
-        tdirty  = Tasks.defaulttasklist(None, Tasks.peakselector, False)[1:]
-        dframe  = Tasks.dataframe(merge = True, **kwa)
+    def dataframe(self, *tasks, transform = None, assign = None, **kwa):
+        """
+        Concatenates all dataframes obtained through *track.peaks.dataframe*
 
-        return (Parallel(cleaned, *tclean, dframe)
-                .extend(dirty, *tdirty, dframe)
-                .process(None, 'concat'))
+        See documentation in *track.peaks.dataframe* for other options
+        """
+        return self._items.dataframe(Tasks.peakselector, *tasks,
+                                     transform = transform,
+                                     assign    = assign,
+                                     **kwa)
 
 __all__: List[str] = []

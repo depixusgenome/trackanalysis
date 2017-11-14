@@ -20,7 +20,7 @@ def adddataframe(*classes):
 
     For example, the following code
 
-        >>> track.events.datatable(begin     = lambda x: np.nanmean(x[:5]),
+        >>> track.events.dataframe(begin     = lambda x: np.nanmean(x[:5]),
         ...                        end       = lambda x: np.nanmean(x[-5:])
         ...                        assign    = {'diff': lambda x: x.end.shift(0) - x.begin},
         ...                        transform = lambda x: x.dropna())

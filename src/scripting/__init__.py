@@ -53,7 +53,7 @@ from cleaning.__scripting__       import *
 from eventdetection.__scripting__ import *
 from peakfinding.__scripting__    import *
 from peakcalling.__scripting__    import * # type: ignore
-from .parallel                    import parallel
+from .datadump                    import LazyShelf
 
 LOGS = getLogger(__name__)
 
