@@ -275,8 +275,14 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
         if bead not in self._reftask:
             self._reftask.frompeaks(self._items[self._reference].peaks[bead,...])
 
-    def dataframe(self, *tasks, **kwa):
-        "creates a dataframe for all keys"
+    def dataframe(self, *tasks, transform = None, assign = None, **kwa):
+        """
+        Concatenates all dataframes obtained through *track.peaks.dataframe*
+        with the added bonus that a FitToReferenceTask is added automatically
+        if the attribute *reference* was set.
+
+        See documentation in *track.peaks.dataframe* for other options
+        """
         if self._reference is not None:
             reftask = cast(FitToReferenceTask, deepcopy(self._reftask))
             beads   = set(self._base()[1]['bead'])
@@ -289,7 +295,10 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
         else:
             itms    = self._items
 
-        return itms.dataframe(Tasks.peakselector, *tasks,**kwa)
+        return itms.dataframe(Tasks.peakselector, *tasks,
+                              transform = transform,
+                              assign    = assign,
+                              **kwa)
 
     def getmethod(self):
         "Returns the method used by the dynamic map"

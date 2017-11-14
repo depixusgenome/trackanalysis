@@ -222,8 +222,15 @@ class PeaksTracksDictDisplay(TracksDictDisplay, peaks = TracksDict): # type: ign
                                    group = ovrs[ind].group)
         return ovrs
 
-    def dataframe(self, *tasks, **kwa):
-        "creates a dataframe for all keys"
-        return self._items.dataframe(Tasks.peakselector, *tasks, **kwa)
+    def dataframe(self, *tasks, transform = None, assign = None, **kwa):
+        """
+        Concatenates all dataframes obtained through *track.peaks.dataframe*
+
+        See documentation in *track.peaks.dataframe* for other options
+        """
+        return self._items.dataframe(Tasks.peakselector, *tasks,
+                                     transform = transform,
+                                     assign    = assign,
+                                     **kwa)
 
 __all__: List[str] = []

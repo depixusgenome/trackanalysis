@@ -98,7 +98,7 @@ class TracksDict(_TracksDict):
             for i in self.values():
                 i.cleaned = value
 
-    def dataframe(self, *tasks, **kwa):
+    def dataframe(self, *tasks, transform = None, assign = None, **kwa):
         """
         Returns a table with some data
 
@@ -124,11 +124,18 @@ class TracksDict(_TracksDict):
         dirty   = self[[i for i, j in self.items() if not j.cleaned]]
         tclean  = Tasks.defaulttasklist(None, tasks[0], True)
         tdirty  = Tasks.defaulttasklist(None, tasks[0], False)
-        dframe  = Tasks.dataframe(merge = True, **kwa)
+
+        transform = ([transform] if callable(transform) else
+                     []          if transform is None   else
+                     list(transform))
+        if assign is not None:
+            transform.insert(0, lambda x: x.assign(**assign))
+        dframe  = Tasks.dataframe(merge = True, measures = kwa, transform = transform)
+
         created = [Tasks.create(i) for i in tasks[1:]]
-        return (Parallel(cleaned, *tclean, *created, dframe)
-                .extend(dirty, *tdirty, *created, dframe)
-                .process(None, 'concat'))
+        par     = (Parallel(cleaned, *tclean, *created, dframe)
+                   .extend(dirty, *tdirty, *created, dframe))
+        return par.process(None, 'concat') if process else par
 
 class ExperimentList(dict):
     "Provides access to keys belonging to a single experiment"
