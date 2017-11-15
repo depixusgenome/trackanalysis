@@ -242,7 +242,9 @@ class FitToReferenceDataFrameFactory(DataFrameFactory[FitToReferenceDict]):
 
     One can add *stretch* and *bias* to the list by doing:
 
-        >>> DataFrameTask(stretch = True, bias = True)
+    ```python
+    >>> DataFrameTask(stretch = True, bias = True)
+    ```
     """
     __doc__ += '\n'+PeaksDataFrameFactory.__doc__[PeaksDataFrameFactory.__doc__.find('#')-5:]
     PREC     = 5e-6

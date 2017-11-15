@@ -34,13 +34,17 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
     the first is applied the array of results. Thus it is possible to measure the
     resolution of a peak:
 
-        >>> DataFrameTask(measures = dict(std = ('nanstd', 'nanmean')))
+    ```python
+    >>> DataFrameTask(measures = dict(std = ('nanstd', 'nanmean')))
+    ```
 
     ### Getting one row per event
 
     One can also add information on events using:
 
-        >>> DataFrameTask(measures = dict(events = True))
+    ```python
+    >>> DataFrameTask(measures = dict(events = True))
+    ```
 
     In such a case, added columns are:
 
@@ -51,11 +55,15 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
 
     The following will also measure each event's std:
 
-        >>> DataFrameTask(measures = dict(events = dict(eventstd = np.nanstd)))
+    ```python
+    >>> DataFrameTask(measures = dict(events = dict(eventstd = np.nanstd)))
+    ```
 
     or
 
-        >>> DataFrameTask(measures = dict(events = dict(eventstd = 'std')))
+    ```python
+    >>> DataFrameTask(measures = dict(events = dict(eventstd = 'std')))
+    ```
     """
     def __init__(self, task, frame, **kwa):
         super().__init__(task, frame)

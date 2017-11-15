@@ -19,9 +19,9 @@ class EventsDataFrameFactory(DataFrameFactory[Events]):
 
     It's possible to compute and return values on all events of a cycle using:
 
-        >>> def myfunction(evts: EventsArray) -> np.ndarray:
-            ...
-        >>> DataFrameTask(integral = myfunction)
+    ```python
+    >>> DataFrameTask(integral = lambda x: np.sum(np.concatenate(x['data'])))
+    ```
     """
     def __init__(self, task, frame):
         super().__init__(task, frame)

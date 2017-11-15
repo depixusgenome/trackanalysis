@@ -18,12 +18,14 @@ def adddataframe(*classes):
     It's also possible to transform the pd.DataFrame every iteration or assign
     new values.
 
-    For example, the following code
+    For example, the following code:
 
-        >>> track.events.dataframe(begin     = lambda x: np.nanmean(x[:5]),
-        ...                        end       = lambda x: np.nanmean(x[-5:])
-        ...                        assign    = {'diff': lambda x: x.end.shift(0) - x.begin},
-        ...                        transform = lambda x: x.dropna())
+    ```python
+    >>> track.events.dataframe(begin     = lambda x: np.nanmean(x[:5]),
+    ...                        end       = lambda x: np.nanmean(x[-5:])
+    ...                        assign    = {'diff': lambda x: x.end.shift(0) - x.begin},
+    ...                        transform = lambda x: x.dropna())
+    ```
 
     1. Computes z positions at the begining and the end of an event,
     2. computes the difference in z between 2 consecutive events

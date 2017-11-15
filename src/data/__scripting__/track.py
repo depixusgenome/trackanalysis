@@ -22,15 +22,15 @@ from ..                      import Track as _Track
 
 class Track(_Track):
     """
+    * `pathinfo` provides information on the path itself:
 
-    * *pathinfo* provides information on the path itself:
-
-        * *paths*: a tuple of paths
-        * *trackpath*: the main path, i.e. not the grs
-        * *size* (*megabytes*) is the size in bytes (megabytes) of *trackpath*
-        * *stat*: stats on the *trackpath*
-        * *modification*: the date oflast modification. This is basically the time of experiment.
-        * *creation*: the creation date. **DISCARD** when using PicoTwist tracks.
+        * `paths`: a tuple of paths
+        * `trackpath`: the main path, i.e. not the grs
+        * `size` (*megabytes*) is the size in bytes (megabytes) of *trackpath*
+        * `stat`: stats on the *trackpath*
+        * `modification`: the date oflast modification. This is basically the
+        time of experiment.
+        * `creation`: the creation date. **DISCARD** when using PicoTwist tracks.
     """
     __doc__ = _Track.__doc__ + __doc__
     cleaned = False

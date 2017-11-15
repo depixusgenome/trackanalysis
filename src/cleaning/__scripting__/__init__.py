@@ -30,7 +30,7 @@ class TrackCleaningScript:
     * `track.cleaning.good()`: lists good beads
     * `track.cleaning.bad()`: lists bad beads
     * `track.cleaning.messages()`: lists all messages
-    * `track.cleaning.dropbad`: returns a track with only good beads loaded.
+    * `track.cleaning.dropbad()`: returns a track with only good beads loaded.
     """
     def __init__(self, track: Track) -> None:
         self.track = track
@@ -82,20 +82,19 @@ class TrackCleaningScript:
 
 Track.__doc__ += (
     """
-    * *cleaning* """+TrackCleaningScript.__doc__.split('\n')[1].strip())
-Track.__base__.__doc__ = Track.__doc__
+    * `cleaning` """+TrackCleaningScript.__doc__.split('\n')[1].strip())
+Track.__base__.__doc__ = Track.__doc__ # type: ignore
 
 @addproperty(TracksDict.__base__, 'cleaning')
 class TracksDictCleaningScript:
     """
-    Adds means for finding beads with cleaning warnings and possibly discarding them.
-
-    One can do:
+    Adds means for finding beads with cleaning warnings and possibly discarding
+    them. One can do:
 
     * `tracks.cleaning.good()`: lists beads which are good throughout all tracks
     * `tracks.cleaning.bad()`: lists beads bad at least in one track
     * `tracks.cleaning.messages()`: lists all messages
-    * `tracks.cleaning.dropbad`: returns a *TracksDict* with tracks with only
+    * `tracks.cleaning.dropbad()`: returns a *TracksDict* with tracks with only
     good beads loaded.
     """
     def __init__(self, tracks: TracksDict) -> None:
@@ -138,5 +137,5 @@ TracksDict.__doc__ += (
     # Cleaning
 
     """+TracksDictCleaningScript.__doc__)
-TracksDict.__base__.__doc__ = TracksDict.__doc__
+TracksDict.__base__.__doc__ = TracksDict.__doc__ # type: ignore
 __all__ : Tuple[str, ...] = ()

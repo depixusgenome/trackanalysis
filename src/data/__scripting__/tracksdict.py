@@ -26,16 +26,21 @@ def __call__(self, track = None, beadsonly = False, __old__ = Handler.__call__) 
 
 class TracksDict(_TracksDict):
     """
-    # Saving
+    ## Saving
 
-    It's possible to save the tracks to a '.pk' format as follows:
+    It's possible to save the tracks to a '.pk' which are much faster at
+    loading. To save the files:
 
-        >>> tracks.save("/path/to/my/saved/tracks")
+    ```python
+    >>> tracks.save("/path/to/my/saved/tracks")
+    ```
 
     The tracks are saved as "/path/to/my/saved/tracks/key.pk" files.
     Thus, loading them is as simple as:
 
-        >>> TRACKS = TracksDict("/path/to/my/saved/tracks/*.pk")
+    ```python
+    >>> TRACKS = TracksDict("/path/to/my/saved/tracks/*.pk")
+    ```
     """
     __doc__     = _TracksDict.__doc__ + __doc__
     _TRACK_TYPE = Track

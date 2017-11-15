@@ -18,48 +18,70 @@ TDictType = TypeVar('TDictType', bound = 'TracksDict')
 TrackType = TypeVar('TrackType', bound = 'Track')
 class TracksDict(dict):
     """
-    Dictionnary of tracks
+    This a dictionnary of tracks. It provides *lazy* access to tracks as well
+    as various methods for studying tracks together.
 
-    ### Initialisation
+    ## Initialisation
 
     It can be initialized using list of directories
 
-        >>> tracks = "/path/to/my/trackfiles/**/with/recursive/search/*.trk"
-        >>> grs    = ("/more/than/a/single/path/**", "/is/possible/**")
-        >>> match  = r".*test045_(\\w\\w\\w)_BNA.*" # select only test 045 and define the key
-        >>> TRACKS = TracksDict(tracks, grs, match)
-        >>> TRACKS['AAA'].cycles                  # access the track
+    ```python
+    >>> TRACKS = TracksDict("/media/data/helicon/X/*/*.trk", # the path to .trk files
+    ...                     "~/Seafile/X/*.cgr",             # Optional: the path to .cgr files
+    ...                     #
+    ...                     # Optional: We accept only files with _040_ in the name
+    ...                     # and we take the following 3 letters as the track key
+    ...                     match   = r".*_040_(\\w\\w\\w)_.*")
+    ```
 
-    If the option allleaves = True, the parent directory containing the gr-files is used
-    for pairing gr and trk files.
+    We can now access the tracks as: `TRACKS['AAG']`, supposing the *AAG* oligo
+    was tested.
 
-    pair track
-    By default, the name of the track file is used as the key. Using the *match*
-    requires defining a group which will be used as the key.
+    It's also possible to add specific tracks by providing a `Track` object, a
+    string or a list of strings:
 
-    ### Shortcuts
+    ```python
+    >>> TRACKS['specific'] = "/path/to/specific/track/file.trk"
+    ```
 
-    *TracksDict.beads* returns the beads in common to all tracks in the *TracksDict*.
+    ### Optional arguments:
 
-    ### Slicing
+    * if `allleaves = True`, the parent directory containing the
+    gr-files is used for pairing gr and trk files.
+    * if `match = r".*_040_(\\w\\w\\w)_.*"` is used (or any other regular
+    expression), only *track* file names matching the expression are accepted.
+    There must be one group (the parentheses) which will be used as the access
+    key. By default the track file name is used as a key.
 
-    Providing a list of keys as argument creates a new TracksDict containing
-    only those keys. The same *Track* objects are used.
+    ## Shortcuts
 
-        >>> dico = TracksDict()
-        >>> dico.update(A = "a.trk", B = "b.trk", C = "c.trk")
-        >>> assert dico['A'].path == "a.trk"
+    `TracksDict.beads` returns the beads in common to all tracks in the `TracksDict`.
 
-        >>> fraction = dico[['A']]
-        >>> assert isinstance(fraction, TracksDict)
-        >>> assert set(fraction.keys()) == {'A'}
-        >>> assert fraction['A'] is dico['A']
+    ## Slicing
+
+    Providing a list of keys as argument creates a new `TracksDict` containing
+    only those keys. The same `Track` objects are used.
+
+    ```python
+    >>> dico = TracksDict()
+    >>> dico.update(A = "a.trk", B = "b.trk", C = "c.trk")
+    >>> assert dico['A'].path == "a.trk"
+    ```
+
+    ```python
+    >>> fraction = dico[['A']]
+    >>> assert isinstance(fraction, TracksDict)
+    >>> assert set(fraction.keys()) == {'A'}
+    >>> assert fraction['A'] is dico['A']
+    ```
 
     If within that list, the key "~" appears, then all but the provided
     keys are used:
 
-        >>> assert set(dico['~A'].keys()) == {'B', 'C'}
-        >>> assert set(dico[['~', 'B', 'C'].keys()) == {'A'}
+    ```python
+    >>> assert set(dico['~A'].keys()) == {'B', 'C'}
+    >>> assert set(dico[['~', 'B', 'C'].keys()) == {'A'}
+    ```
 
     Should a key  with "~", then that keye
     only those keys.

@@ -40,12 +40,12 @@ class Bead:
 
     Attributes are:
 
-    * *image* is one image of the field of view
-    * *dim* are conversion factors from pixel to nm
-    * *beads* is a dictionnary of information per bead:
+    * `image` is one image of the field of view
+    * `dim` are conversion factors from pixel to nm
+    * `beads` is a dictionnary of information per bead:
 
-        * *position* is the bead's (X, Y, Z) position
-        * *image* is the bead's calibration image
+        * `position` is the bead's (X, Y, Z) position
+        * `image` is the bead's calibration image
     """
     position: Tuple[float, float, float] = (0., 0., 0.)
     image:    np.ndarray                 = np.zeros(0, dtype = np.uint8)
@@ -59,12 +59,12 @@ class FoV:
 
     Attributes are:
 
-    * *image* is one image of the field of view
-    * *dim* are conversion factors from pixel to nm
-    * *beads* is a dictionnary of information per bead:
+    * `image` is one image of the field of view
+    * `dim` are conversion factors from pixel to nm
+    * `beads` is a dictionnary of information per bead:
 
-        * *position* is the bead's (X, Y, Z) position
-        * *image* is the bead's calibration image
+        * `position` is the bead's (X, Y, Z) position
+        * `image` is the bead's calibration image
 
     Dimensions are provided as : (X slope, X bias), (Y slope, Y bias)
     """
@@ -179,18 +179,18 @@ class Track:
     The data can be read as:
 
     ```python
-    raw = Track(path =  "/path/to/a/file.trk")
-    grs = Track(path =  ("/path/to/a/file.trk",
-                         "/path/to/a/gr/directory",
-                         "/path/to/a/specific/gr"))
+    >>> raw = Track(path =  "/path/to/a/file.trk")
+    >>> grs = Track(path =  ("/path/to/a/file.trk",
+    ...                      "/path/to/a/gr/directory",
+    ...                      "/path/to/a/specific/gr"))
     ```
 
     The data can then be accessed as follows:
 
-    * for time:     `raw.beads['t']`
-    * for zmag:     `raw.beads['zmag']`
-    * for beads:    `raw.beads[0]` where 0 can be any bead number
-    * for cycles:   `raw.cycles[1,5]` where 1 and 5 can be any bead or cycle number.
+    * for the *time* axis: `raw.beads['t']`
+    * for the magnet altitude: `raw.beads['zmag']`
+    * specific beads: `raw.beads[0]` where 0 can be any bead number
+    * specific cycles: `raw.cycles[1,5]` where 1 and 5 can be any bead or cycle number.
 
     Some slicing is possible:
 
@@ -202,15 +202,15 @@ class Track:
 
     Other attributes are:
 
-    * *framerate* is this experiment's frame rate
-    * *fov* is the field of view data:
+    * `framerate` is this experiment's frame rate
+    * `fov` is the field of view data:
 
-        * *image* is one image of the field of view
-        * *dim* are conversion factors from pixel to nm
-        * *beads* is a dictionnary of information per bead:
+        * `image` is one image of the field of view
+        * `dim` are conversion factors from pixel to nm
+        * `beads` is a dictionnary of information per bead:
 
-            * *position* is the bead's (X, Y, Z) position
-            * *image* is the bead's calibration image
+            * `position` is the bead's (X, Y, Z) position
+            * `image` is the bead's calibration image
     """
     _framerate                  = 30.
     _fov: FoV                   = None
