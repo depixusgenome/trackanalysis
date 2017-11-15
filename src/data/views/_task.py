@@ -25,12 +25,19 @@ class TaskView(TrackView, Generic[Config, Key]):
             raise ValueError(f"Could not initialize {self.__class__}")
 
         self.config: Config         = cast(Config, cnf)
+        if 'cache' in kwa:
+            self.cache              = kwa.pop('cache')
         self.__keys: FrozenSet[Key] = None
 
     @classmethod
     def tasktype(cls) -> Type[Config]:
         "returns the config type"
-        return cls.__orig_bases__[0].__args__[0] # type: ignore
+        cur  = cls
+        orig = getattr(cls, '__orig_bases__')
+        while orig is None or orig[0].__args__ is None:
+            cur  = getattr(cur, '__base__')
+            orig = getattr(cur, '__orig_bases__', None)
+        return orig[0].__args__[0]    # type: ignore
 
     def _iter(self, sel:Sequence = None) -> Iterator:
         if sel is None:

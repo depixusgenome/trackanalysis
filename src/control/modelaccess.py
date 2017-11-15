@@ -139,11 +139,10 @@ class TaskPlotModelAccess(PlotModelAccess):
     def runbead(self, *procs):
         "returns a tuple (dataitem, bead) to be displayed"
         ctrl  = self.processors(*procs)
-        ibead = self.bead
         if ctrl is None:
             return None
 
-        return next(iter(ctrl.run(copy = True)))[ibead, ...]
+        return next(iter(ctrl.run(copy = True)))
 
     def observetasks(self, *args, **kwa):
         "observes the provided task"

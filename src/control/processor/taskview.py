@@ -14,10 +14,20 @@ Key      = TypeVar('Key')
 
 class TaskViewProcessor(Generic[TaskType, TaskDict, Key], Processor[TaskType]):
     "Groups beads per hairpin"
+    @staticmethod
+    def createcache(_):
+        "returns a new cache"
+        return False
+
     @classmethod
     def taskdicttype(cls) -> type:
         "returns the taskdicttype"
-        return cls.__orig_bases__[0].__args__[1] # type: ignore
+        cur  = cls
+        orig = getattr(cls, '__orig_bases__')
+        while orig is None or orig[0].__args__ is None:
+            cur  = getattr(cur, '__base__')
+            orig = getattr(cur, '__orig_bases__', None)
+        return orig[0].__args__[1]    # type: ignore
 
     @staticmethod
     def keywords(cnf:Dict[str, Any]) -> Dict[str, Any]:
@@ -28,6 +38,7 @@ class TaskViewProcessor(Generic[TaskType, TaskDict, Key], Processor[TaskType]):
     def apply(cls, toframe = None, cache = None, **cnf):
         "applies the task to a frame or returns a function that does so"
         cnf = cls.keywords(cnf)
+        print(cls, id(cache))
         if toframe is None:
             if cache is None:
                 return partial(cls.apply, **cnf)
@@ -35,6 +46,7 @@ class TaskViewProcessor(Generic[TaskType, TaskDict, Key], Processor[TaskType]):
 
         if cache is None:
             return toframe.new(cls.taskdicttype(), config = cnf)
+        print(cls, id(cache))
         return toframe.new(cls.taskdicttype(), config = cnf, cache = cache)
 
     @classmethod
@@ -45,4 +57,10 @@ class TaskViewProcessor(Generic[TaskType, TaskDict, Key], Processor[TaskType]):
 
     def run(self, args):
         "updates the frames"
-        args.apply(self.apply(**self.config()))
+        cache = self.createcache(args)
+        cnf   = self.config()
+        if cache is not False:
+            cnf['cache'] = cache
+
+        print(self.__class__, id(cache))
+        args.apply(self.apply(**cnf))

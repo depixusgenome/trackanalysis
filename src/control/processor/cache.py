@@ -129,13 +129,13 @@ class Cache(Iterable[Processor], Sized):
         if len(processors) == 0:
             return self
 
-        reg  = register(processors)
+        reg  = register(processors, force = True, recursive = False)
         itms = list(self._items)
         repl = False
         for i, j in enumerate(self):
-            val = reg.get(j.task, None)
+            val = reg.get(type(j.task), None)
             if val is not None:
-                itms[i] = CacheItem(val(j.task), getattr(itms[i], '_cache'))
+                itms[i] = CacheItem(val(task = j.task), getattr(itms[i], '_cache'))
                 repl    = True
         return Cache(itms) if repl else self
 
