@@ -16,11 +16,6 @@ from   data                         import Track
 from   data.__scripting__.dataframe import adddataframe
 from   ..data                       import Events
 
-@addto(Track, property)
-def events(self) -> Events:
-    "returns events in phase 5 only"
-    return self.apply(*Tasks.defaulttasklist(self.path, Tasks.eventdetection, self.cleaned))
-
 _RETURN_TYPE = FrozenSet[Tuple[int, int]]
 class Comparator:
     """
@@ -28,12 +23,14 @@ class Comparator:
 
     Can be used as follows:
 
-        >> evts = Events(...)
-        >> evts.any < 5         # keys such that any event's mean is lower than 5
-        >> evts.all > 5         # keys such that all event means are greater than 5
-        >> evts.median.all > 5  # keys such that all event *medians* are greater than 5
-        >> evts[0].all > 5      # keys such that the first event's *mean* is greater than 5
-        >> evts.any.start > 5   # keys such that there are events starting after 5 frames
+    ```python
+    >> evts = Events(...)
+    >> evts.any < 5         # keys such that any event's mean is lower than 5
+    >> evts.all > 5         # keys such that all event means are greater than 5
+    >> evts.median.all > 5  # keys such that all event *medians* are greater than 5
+    >> evts[0].all > 5      # keys such that the first event's *mean* is greater than 5
+    >> evts.any.start > 5   # keys such that there are events starting after 5 frames
+    ```
 
     In the 4th line, any numpy function name is accepted. The default is nanmean.
 
@@ -116,6 +113,18 @@ class Comparator:
     def __ne__(self, other) -> _RETURN_TYPE: # type: ignore
         cond = self.__cond
         return frozenset(tuple(i for i, j in self.__vals() if cond(k != other for k in j)))
+
+@addto(Track, property)
+def events(self) -> Events:
+    """
+    Returns events in phase 5 only.
+
+    Its possible to select specific cycles depending on user-defined conditions
+    as follows:
+    """
+    return self.apply(*Tasks.defaulttasklist(self.path, Tasks.eventdetection, self.cleaned))
+# pylint: disable=no-member
+Track.events.__doc__ += Comparator.__doc__[Comparator.__doc__.find('follows:')+len('follows:'):]
 
 adddataframe(Events)
 setattr(Events, 'any', property(lambda self: Comparator(self, any), doc = Comparator.__doc__))

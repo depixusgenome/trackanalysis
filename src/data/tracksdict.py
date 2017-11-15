@@ -75,16 +75,13 @@ class TracksDict(dict):
     >>> assert fraction['A'] is dico['A']
     ```
 
-    If within that list, the key "~" appears, then all but the provided
-    keys are used:
+    Should a key start with with "~" (or should "~" appear in a list) then a
+    TracksDict object is created containing all but that key:
 
     ```python
     >>> assert set(dico['~A'].keys()) == {'B', 'C'}
     >>> assert set(dico[['~', 'B', 'C'].keys()) == {'A'}
     ```
-
-    Should a key  with "~", then that keye
-    only those keys.
     """
     _SCAN_OPTS  = ('cgrdir', 'allleaves')
     _NTHREADS   = 4

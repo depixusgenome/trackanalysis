@@ -3,8 +3,7 @@
 """
 Base track file data.
 """
-from    typing      import (Type, Optional, Union, Dict, Tuple, TypeVar,
-                            Generic, cast)
+from    typing      import Type, Optional, Union, Dict, Tuple, cast
 from    copy        import deepcopy, copy as shallowcopy
 from    enum        import Enum
 import  numpy       as     np
@@ -123,8 +122,7 @@ class FoV:
         tpe = iter if hasattr(arr, '__next__') else type(arr)
         return tpe([(sl1*i+int1, sl2*j+int2) for i, j in arr]) # type: ignore
 
-T = TypeVar("T")
-class LazyProperty(Generic[T]):
+class LazyProperty:
     "Checks whether the file was opened prior to returning a value"
     def __init__(self):
         self.__name = ''
@@ -132,7 +130,7 @@ class LazyProperty(Generic[T]):
     def __set_name__(self, _, name):
         self.__name = '_'+name
 
-    def __get__(self, obj: 'Track', _) -> T:
+    def __get__(self, obj: 'Track', _):
         if obj is None:
             return self # type: ignore
 
@@ -141,14 +139,17 @@ class LazyProperty(Generic[T]):
             getattr(obj, 'data') # call property: opens the file
         return getattr(obj, self.__name)
 
-    def __set__(self, obj: 'Track', val) -> T:
+    def __set__(self, obj: 'Track', val):
         if getattr(obj, '_lazy'):
             setattr(obj, '_lazy', False)
             getattr(obj, 'data') # call property: opens the file
         setattr(obj, self.__name, val)
         return getattr(obj, self.__name)
 
-class ResettingProperty(Generic[T]):
+def _prop(cls: type, val: bool):
+    return property(lambda self: self.view(cls, beadsonly = val), doc = cls.__doc__)
+
+class ResettingProperty:
     "Resets all if this attribute is changed"
     def __init__(self):
         self.__name   = ''
@@ -156,12 +157,12 @@ class ResettingProperty(Generic[T]):
     def __set_name__(self, _, name):
         self.__name = '_'+name
 
-    def __get__(self, obj: 'Track', _) -> T:
-        return cast(T, getattr(obj, self.__name) if obj else self)
+    def __get__(self, obj: 'Track', _):
+        return getattr(obj, self.__name) if obj else self
 
-    def __set__(self, obj: 'Track', val) -> T:
+    def __set__(self, obj: 'Track', val):
         setattr(obj, '_lazy', False)
-        setattr(obj, self.__name, cast(T, val))
+        setattr(obj, self.__name, val)
 
         for name in ('_framerate', '_phases', '_fov'):
             setattr(obj, name, deepcopy(getattr((type(obj)), name)))
@@ -244,13 +245,18 @@ class Track:
     def __setstate__(self, values):
         self.__init__(**values)
 
-    phases    = LazyProperty[np.ndarray]()
-    framerate = LazyProperty[float]()
-    fov       = LazyProperty[FoV]()
-    path      = ResettingProperty[Optional[PATHTYPES]]()
-    axis      = ResettingProperty[Axis]()
-    ncycles   = cast(int, property(lambda self: len(self.phases)))
-    nphases   = cast(int, property(lambda self: self.phases.shape[1]))
+    phases     = cast(np.ndarray,          LazyProperty())
+    framerate  = cast(float,               LazyProperty())
+    fov        = cast(FoV,                 LazyProperty())
+    path       = cast(Optional[PATHTYPES], ResettingProperty())
+    axis       = cast(Axis,                ResettingProperty())
+    ncycles    = cast(int,                 property(lambda self: len(self.phases)))
+    nphases    = cast(int,                 property(lambda self: self.phases.shape[1]))
+    beads      = cast(Beads,               _prop(Beads,  False))
+    beadsonly  = cast(Beads,               _prop(Beads,  True))
+    cycles     = cast(Cycles,              _prop(Cycles, False))
+    cyclesonly = cast(Cycles,              _prop(Cycles, True))
+
 
     @property
     def data(self) -> Dict:
@@ -296,26 +302,6 @@ class Track:
         else:
             vect = vect[cid,pid]
         return vect - orig
-
-    @property
-    def beads(self) -> Beads:
-        "returns a helper object for extracting beads"
-        return self.view(Beads, beadsonly = False)
-
-    @property
-    def beadsonly(self) -> Beads:
-        "returns a helper object for extracting beads from *beads* only"
-        return self.view(Beads, beadsonly = True)
-
-    @property
-    def cycles(self) -> Cycles:
-        "returns a helper object for extracting cycles"
-        return self.view(Cycles, beadsonly = False)
-
-    @property
-    def cyclesonly(self) -> Cycles:
-        "returns a helper object for extracting cycles from *beads* only"
-        return self.view(Cycles, beadsonly = True)
 
     def view(self, tpe:Union[Type[TrackView], str], **kwa):
         "Creates a view of the suggested type"

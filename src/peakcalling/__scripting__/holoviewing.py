@@ -245,7 +245,7 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
     def _convert(self, kdims, ovrs):
         ovrs = super()._convert(kdims, ovrs)
         ind  = self._refindex(kdims)
-        if ind >= len(ovrs) or len(tuple(ovrs[ind])) == 0:
+        if ind is None or ind >= len(tuple(ovrs)) or len(tuple(ovrs[ind])) == 0:
             return ovrs
 
         firsts = [next(iter(i)) for i in ovrs]

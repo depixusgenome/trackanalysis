@@ -215,11 +215,13 @@ class PeaksTracksDictDisplay(TracksDictDisplay, peaks = TracksDict): # type: ign
 
     def _convert(self, kdims, ovrs): # pylint: disable=arguments-differ
         ind = self._refindex(kdims)
-        if self._reference is not None and ind is not None:
-            area = next(iter(ovrs[ind])).to(hv.Area)
-            ovrs[ind] = hv.Overlay([area(style = dict(alpha = 0.5))] + list(ovrs[ind]),
-                                   label = ovrs[ind].label,
-                                   group = ovrs[ind].group)
+        if ind is None or ind < 0 or ind >= len(tuple(ovrs)):
+            return ovrs
+
+        area = next(iter(ovrs[ind])).to(hv.Area)
+        ovrs[ind] = hv.Overlay([area(style = dict(alpha = 0.5))] + list(ovrs[ind]),
+                               label = ovrs[ind].label,
+                               group = ovrs[ind].group)
         return ovrs
 
     def dataframe(self, *tasks, transform = None, assign = None, **kwa):

@@ -130,7 +130,8 @@ def measures(self):
 
 def _addprop(name):
     fcn = getattr(_Track, name).fget
-    setattr(Track, name, property(lambda self: fcn(self).withcopy()))
+    setattr(Track, name, property(lambda self: fcn(self).withcopy(),
+                                  doc = getattr(Track, name).__doc__))
 
 for tname in product(('beads', 'cycles'), ('only', '')):
     _addprop(''.join(tname))
