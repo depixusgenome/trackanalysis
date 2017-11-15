@@ -276,19 +276,21 @@ class LegacyGRFilesIO(_TrackIO):
     @classmethod
     def scantrk(cls, trkdirs) -> Dict[str, Path]:
         "scan for track files"
+        if not isinstance(trkdirs, (tuple, list, set, frozenset)):
+            trkdirs = (trkdirs,)
         return {i.stem: i for i in LegacyTrackIO.scan(trkdirs)}
 
     @classmethod
-    def scangrs(cls, grdirs, **opts) -> Dict[str, Path]:
+    def scangrs(cls, grdirs, cgrdir = None, allleaves = False, **_) -> Dict[str, Path]:
         "scan for gr files"
         if not isinstance(grdirs, (tuple, list, set, frozenset)):
             grdirs = (grdirs,)
 
         grdirs   = tuple(str(i) for i in grdirs)
-        projects = opts.get("cgrdir", cls.__GRDIR)
-        allleaves = opts.get('allleaves', False)
-        if isinstance(projects, str):
-            projects = (projects,)
+        projects = ((None,)         if allleaves                else
+                    (cgrdir,)       if isinstance(cgrdir, str)  else
+                    cls.__GRTITLE   if cgrdir is None           else
+                    cgrdir)
 
         res = {}
         fcn = lambda match, grdir, i: (i if match(i) or cls.__CGREXT in i else i + grdir)
@@ -299,13 +301,14 @@ class LegacyGRFilesIO(_TrackIO):
             elif not allleaves:
                 part  = partial(fcn, lambda _: False, '')
             else:
-                grdir = f'/**'
-                part  = partial(fcn, lambda _: True, grdir)
+                grdir = f'/**/*.gr'
+                part  = partial(fcn, lambda _: '*' in _, grdir)
 
             update = cls.__scan(grdirs, part)
             if allleaves:
                 # add check on gr-files
-                res.update({Path(_).parent.stem:_ for _ in update.values()
+                res.update({Path(_).parent.stem: Path(_).parent
+                            for _ in update.values()
                             if cls.__GREXT in _.suffixes})
             else:
                 res.update(update)
@@ -315,7 +318,6 @@ class LegacyGRFilesIO(_TrackIO):
     def scan(cls,
              trkdirs: Union[str, Sequence[str]],
              grdirs:  Union[str, Sequence[str]],
-             matchfcn: Callable[[Path, Path], bool] = None,
              **opts
             ) -> Tuple[Tuple[PATHTYPES,...], Tuple[PATHTYPES,...], Tuple[PATHTYPES,...]]:
         """
@@ -327,31 +329,13 @@ class LegacyGRFilesIO(_TrackIO):
             * gr directories with missing trk files
             * trk files with missing gr directories
         """
-        grdirs  = (grdirs,)  if isinstance(grdirs,  (Path, str)) else grdirs  # type: ignore
-        trkdirs = (trkdirs,) if isinstance(trkdirs, (Path, str)) else trkdirs # type: ignore
-
-        trks    = cls.scantrk(trkdirs)
-        cgrs    = cls.scangrs(grdirs, **opts)
-
-        if matchfcn is None:
-            pairs    = frozenset(trks) & frozenset(cgrs)
-            good     = tuple((trks[i], cgrs[i].parent) for i in pairs)
-            lonegrs  = tuple(cgrs[i].parent for i in frozenset(cgrs) - pairs)
-            lonetrks = tuple(trks[i]        for i in frozenset(trks) - pairs)
-        else:
-            tgood     = []
-            tlonetrks = []
-            for trk in trks.values():
-                key = next((j for j in cgrs.values() if matchfcn(trk, j)), None)
-                if key is None:
-                    tlonetrks.append(trk)
-                else:
-                    tgood.append((trk, key.parent))
-                    cgrs.pop(key.stem)
-            good     = tuple(tgood)
-            lonetrks = tuple(tlonetrks)
-            lonegrs  = tuple(i.parent for i in cgrs.values())
-
+        trks     = cls.scantrk(trkdirs)
+        cgrs     = cls.scangrs(grdirs, **opts)
+        rep      = lambda i: i.parent if i.is_file() else i
+        pairs    = frozenset(trks) & frozenset(cgrs)
+        good     = tuple((trks[i], rep(cgrs[i])) for i in pairs)
+        lonegrs  = tuple(rep(cgrs[i])            for i in frozenset(cgrs) - pairs)
+        lonetrks = tuple(trks[i]                 for i in frozenset(trks) - pairs)
         return good, lonegrs, lonetrks
 
 _CALLERS = _TrackIO.__subclasses__()
@@ -435,7 +419,7 @@ class Handler:
     @staticmethod
     def __data(state, kwargs, beadsonly):
         if kwargs is None:
-            data = {}
+            data = {} # type: Dict[str, Union[float, np.ndarray, str]]
         else:
             data = {i: kwargs.pop(i) for i in tuple(kwargs)
                     if isinstance(kwargs[i], np.ndarray) and len(kwargs[i].shape) == 1}
