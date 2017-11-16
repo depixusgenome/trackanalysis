@@ -58,9 +58,12 @@ from .datadump                    import LazyShelf
 LOGS = getLogger(__name__)
 
 try:
-    LOGS.info(f'version is {version.version()}')
-except TypeError:
-    LOGS.info(f'version is {version.version}')
+    if callable(version.version):
+        LOGS.info(f'version is {version.version()}')
+    else:
+        LOGS.info(f'version is {version.version}')
+except AttributeError:
+    LOGS.info(f'version not defined')
 
 try:
     from .curve                   import * # type: ignore
