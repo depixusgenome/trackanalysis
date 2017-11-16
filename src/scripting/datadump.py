@@ -22,12 +22,19 @@ class LazyShelf(Dict):
         self.path = path
         self.info: Dict[Any, Callable[[], Any]] = dict(*args, **kwa)
 
-    def get(self, key, default = _DEFAULT):
-        "returns the key"
-        val = self.info.get(key) if default is _DEFAULT else self.info.get(key, default)
+    def get(self, key, default = None):
+        "returns the value"
+        val = self.info.get(key, default)
         return val() if isinstance(val, partial) else val
 
-    __getitem__ = get
+    def __contains__(self, key) -> bool:
+        "returns the value"
+        return key in self.info
+
+    def __getitem__(self, key):
+        "returns the value"
+        val = self.info[key]
+        return val() if isinstance(val, partial) else val
 
     def __setitem__(self, key, value):
         self.info[key] = partial(self.__store, key, value) if callable(value) else value
@@ -69,6 +76,11 @@ class LazyShelf(Dict):
         return val
 
     __delitem__ = pop
+
+    def isstored(self, key) -> bool:
+        "returns the value"
+        with shelve.open(self.path) as stream:
+            return key in stream.keys()
 
     def keys(self) -> KeysView:
         "returns keys"
