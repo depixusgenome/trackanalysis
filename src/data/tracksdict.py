@@ -4,7 +4,8 @@
 Adds a dictionnaries to access tracks, experiments, ...
 """
 from typing             import (KeysView, List, Dict, Any, # pylint: disable=unused-import
-                                Iterator, Tuple, TypeVar, Union, Set, Optional, cast)
+                                Iterator, Tuple, TypeVar, Union, Set, Optional,
+                                Sequence, cast)
 from pathlib            import Path
 from concurrent.futures import ThreadPoolExecutor
 from copy               import copy as shallowcopy
@@ -147,18 +148,106 @@ class TracksDict(dict):
 
         return super().__getitem__(key)
 
-    @staticmethod
-    def scangrs(grdirs, **opts) -> Dict[str, Path]:
-        "scan for gr files"
-        return LegacyGRFilesIO.scangrs(grdirs, **opts)
+    scangrs = staticmethod(LegacyGRFilesIO.scangrs)
+    scantrk = staticmethod(LegacyGRFilesIO.scantrk)
 
-    @staticmethod
-    def scantrk(trkdirs) -> Dict[str, Path]:
-        "scan for track files"
-        return LegacyGRFilesIO.scantrk(trkdirs)
+    def scan(self, # pylint: disable=too-many-arguments
+             tracks  : Union[str, Sequence[str]],
+             grs     : Union[None, str, Sequence[str]] = None,
+             cgrdir  : Union[str, Sequence[str]]       = "cgr_dir",
+             match   : str                             = None,
+             allaxes   = False,
+             allleaves = False,
+             **opts) -> KeysView[str]:
+        r"""
+        scans for trks and, if requested, gr files.
 
-    def scan(self, tracks, grs = None, match = None, allaxes = False, **opts) -> KeysView[str]:
-        "scans for trks and grs"
+        ## Scanning for tracks only
+
+        Simply disregard the `grs`, `cgrdir` and `allleaves` keywords.
+
+        ## Matching tracks and gr files using cgr names
+
+        By default, what is scanned for is not gr files but cgr files. These should
+        bear the same name as track files. For example:
+
+            /data/sirius/toto/my_track_name.trk
+
+        matches
+
+            /home/toto/Seafile/my_project/analyzed/cgr_dir/my_track_name.cgr
+
+        The scan could then be configured as:
+
+        ```python
+        >>> tracks = TracksDict().scan("/data/sirius/**/*.trk",
+        ...                            "/home/toto/Seafile/my_project/",
+        ...                            cgrdir = 'cgr_dir')
+        ```
+
+        Note that `cgrdir` can be a list of potential parent directory names containing
+        the cgr files.
+
+        Another option is to provide a regular expression finishing in .cgr. In
+        such a case the `cgrdir` keyword is discarded:
+
+        ```python
+        >>> tracks = TracksDict().scan("/data/sirius/**/*.trk",
+        ...                            "/home/toto/Seafile/my_project/**/*.cgr")
+        ```
+
+        ## Matching tracks and gr files using directory names:
+
+        Should one set `allleaves = True`, then cgr files are disregarded. The parent
+        directory of gr files should then be that of the track file. For example:
+
+            /data/sirius/toto/my_track_name.trk
+
+        matches
+
+            /home/toto/Seafile/my_project/analyzed/my_track_name/*.gr
+
+        The scan could then be configured as:
+
+        ```python
+        >>> tracks = TracksDict().scan("/data/sirius/**/*.trk",
+        ...                            "/home/toto/Seafile/my_project/",
+        ...                            allleaves = True)
+        ```
+
+        When using `allleaves`, the `cgrdir` keyword is discarded.
+
+        ## Finding keys: using the `match` keyword
+
+        By default the track file name is used as the dictionnary key. It's possible
+        to extract a shorter key from the filename using a regular expression:
+
+        Consider files:
+
+            /data/sirius/toto/test_040_FOV1_AAG_toto.trk
+            /home/toto/Seafile/my_project/analyzed/test_040_FOV1_AAG_toto/bead1.gr
+
+        and:
+
+            /data/sirius/toto/test_500_FOV2_CCC_toto.trk
+            /home/toto/Seafile/my_project/analyzed/test_500_FOV2_CCC_toto/bead1.gr
+
+        The following will find the first track and not the second. It will also
+        select 'AAG' as the key:
+
+        ```python
+        >>> tracks = TracksDict().scan("/data/sirius/**/*.trk",
+        ...                            "/home/toto/Seafile/my_project/",
+        ...                            allleaves = True,
+        ...                            match     = r'.*_040_FOV*_(\w\w\w)_.*')
+        ```
+
+        The extracted key is always the 1st group (the parentheses). Please
+        read the `re` module documentation for more information on regular
+        expressions.
+        """
+        opts['cgrdir']    = cgrdir
+        opts['allleaves'] = allleaves
         if isinstance(match, str) or hasattr(match, 'match'):
             grp = True
             tmp = re.compile(match) if isinstance(match, str) else match
@@ -180,13 +269,19 @@ class TracksDict(dict):
         return info.keys()
 
     def update(self, *args,
-               tracks  = None,
-               grs     = None,
-               match   = None,
-               allaxes = False,
+               tracks  : Union[None, str, Sequence[str]] = None,
+               grs     : Union[None, str, Sequence[str]] = None,
+               cgrdir  : Union[None, str, Sequence[str]] = "cgr_dir",
+               match   : str                             = None,
+               allleaves = False,
+               allaxes   = False,
                **kwargs):
-        "adds paths or tracks to self"
-        scan    = {}
+        """
+        Adds paths or tracks to the object as it would a normal directory.
+
+        Using the specified keywords, it's also possible to scan for tracks.
+        """
+        scan = {'cgrdir': cgrdir, 'allleaves': allleaves}
         for i in self._SCAN_OPTS:
             if i in kwargs:
                 scan[i] = kwargs.pop(i)
@@ -198,7 +293,8 @@ class TracksDict(dict):
 
         if tracks is not None:
             assert sum(i is None for i in (tracks, grs)) in (0, 1, 2)
-            self.scan(tracks, grs, match, allaxes, **scan)
+            self.scan(tracks, grs, match = match, allaxes = allaxes, **scan)
+    update.__doc__ += scan.__doc__[scan.__doc__.find('#')-5:] # pylint: disable=no-member
 
     def availablebeads(self, *keys) -> List[BEADKEY]:
         "returns the intersection of all beads in requested tracks (all by default)"
