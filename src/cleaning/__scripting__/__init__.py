@@ -55,25 +55,29 @@ class TrackCleaningScript:
         "returns beads with warnings"
         return [i for i, j in self.process(beads, **kwa).items() if j is not None]
 
-    def messages(self, beads: Sequence[BEADKEY] = None, **kwa) -> pd.DataFrame:
+    def messages(self,
+                 beads: Sequence[BEADKEY] = None,
+                 forceclean                  = False,
+                 **kwa) -> pd.DataFrame:
         "returns beads and warnings where applicable"
         ids   = [] # type: List[int]
         types = [] # type: List[str]
         cycs  = [] # type: List[int]
         msgs  = [] # type: List[str]
 
-        for i, j in self.process(**kwa).items():
-            if j is None:
-                continue
-            itms = j.data()
+        if forceclean or self.track.cleaned is False:
+            for i, j in self.process(**kwa).items():
+                if j is None:
+                    continue
+                itms = j.data()
 
-            cycs .extend([i[0] for i in itms])
-            types.extend([i[1] for i in itms])
-            msgs .extend([i[2] for i in itms])
-            ids.extend((cast(int, i),)*(len(msgs)-len(ids)))
+                cycs .extend([i[0] for i in itms])
+                types.extend([i[1] for i in itms])
+                msgs .extend([i[2] for i in itms])
+                ids.extend((cast(int, i),)*(len(msgs)-len(ids)))
 
         miss = list(set(beads)-set(self.track.beadsonly.keys()))
-        cycs .extend([self.track.nphases]*len(miss))
+        cycs .extend([self.track.ncycles]*len(miss))
         types.extend(['missing']*len(miss))
         msgs .extend([''] *len(miss))
         ids.extend(cast(List[int], miss))
@@ -124,11 +128,14 @@ class TracksDictCleaningScript:
             bad.update({i[0] for i in frame[list(cur)] if fcn(frame, i, **kwa) is None})
         return bad, allb-bad
 
-    def messages(self, beads: Sequence[BEADKEY] = None, **kwa) -> pd.DataFrame:
+    def messages(self,
+                 beads: Sequence[BEADKEY] = None,
+                 forceclean               = False,
+                 **kwa) -> pd.DataFrame:
         "returns beads and warnings where applicable"
         if beads is None:
             beads = self.tracks.availablebeads()
-        return pd.concat([TrackCleaningScript(i).messages(beads, **kwa)
+        return pd.concat([TrackCleaningScript(i).messages(beads, forceclean, **kwa)
                           for i in self.tracks.values()])
 
     def good(self, **kwa) -> List[BEADKEY]:
@@ -153,7 +160,7 @@ TracksDict.__doc__ += (
     """+TracksDictCleaningScript.__doc__)
 TracksDict.__base__.__doc__ = TracksDict.__doc__ # type: ignore
 
-@addto(TracksDict.__base__)
+@addto(TracksDict.__base__)                      # type: ignore
 def basedataframe(self,
                   loadall = False,
                   __old__ = TracksDict.basedataframe
