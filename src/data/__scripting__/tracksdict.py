@@ -5,7 +5,9 @@ Adds a dictionnaries to access tracks, experiments, ...
 """
 from   typing               import Tuple, Iterator, List, cast
 import pickle
+import re
 import pandas               as     pd
+import numpy                as     np
 
 from   utils                import initdefaults
 from   utils.decoration     import addto
@@ -57,6 +59,52 @@ class TracksDict(_TracksDict):
             self.cleaned = cleaned
         self.tasks   = tasks
 
+    def select(self, key):
+        """
+        selects tracks as follows:
+
+        * `key == 'clean'` only cleaned tracks
+        * `key == '~clean'` only uncleaned tracks
+        * '3w1s': 4-mers with 3 weaks and 1 strong
+        * '3w': 3-mers with 3 weaks
+        * ...
+        * normal regular expression: only tracks matching that expression
+        """
+        if key == 'clean':
+            return super().__getitem__([i for i, j in self.items() if i.clean])
+
+        if key == '~clean':
+            return super().__getitem__([i for i, j in self.items() if not i.clean])
+
+        try:
+            if 'w' not in key.lower() and 's' not in key.lower():
+                raise ValueError()
+            int(key.lower().replace('w').replace('s'))
+        except ValueError:
+            reg = re.compile(key) if isinstance(key, str) else key
+            return super().__getitem__([i for i in self if reg.match(i)])
+
+        key = key.lower()
+        if 'w' not in key:
+            tot = int(key.replace('s', ''))
+            cnt = [0, tot]
+
+        elif 's' not in key:
+            tot = int(key.replace('s', ''))
+            cnt = [tot, 0]
+
+        else:
+            cnt = [int(i) for i in key.replace('s', 'w').split('w')]
+            if key.index('s') < key.index('w'):
+                cnt = cnt[::-1]
+
+            tot = sum(cnt)
+
+        fcn = lambda i: (len(i) == tot and
+                         i.count('a') + i.count('t') == cnt[0] and
+                         i.count('c') + i.count('g') == cnt[1])
+        return super().__getitem__([i for i in self if fcn(i.lower())])
+
     def __getitem__(self, key):
         if isinstance(key, list):
             return super().__getitem__(key)
@@ -66,6 +114,18 @@ class TracksDict(_TracksDict):
 
         if isinstance(key, tuple) and all(isinstance(i, (Task, Tasks)) for i in key):
             return self.apply(*key)
+
+        if (callable(getattr(key, 'match', None)) or
+                (key in ('clean', '~clean') and key not in self)):
+            return self.select(key)
+
+        if key not in self and ('w' in key.lower() or 's' in key.lower()):
+            try:
+                int(key.lower().replace('w').replace('s'))
+            except ValueError:
+                pass
+            else:
+                return self.select(key)
 
         trk = super().__getitem__(key)
         return trk.apply(*self.tasks) if self.tasks else trk
@@ -103,23 +163,35 @@ class TracksDict(_TracksDict):
             for i in self.values():
                 i.cleaned = value
 
-    def dataframe(self, *tasks, transform = None, assign = None, process = True, **kwa):
+    def basedataframe(self, loadall = False) -> pd.DataFrame:
+        "Returns a table with some data on the track files"
+        if loadall:
+            beads = [sum(1 for i in j.beadsonly.keys()) for j in self.values()]
+        else:
+            beads = [sum(1 for i in j.beadsonly.keys()) if j.isloaded else np.NaN
+                     for j in self.values()]
+
+        paths = [i.pathinfo for i in self.values()]
+        frame = dict(key     = list(self),
+                     path    = [i.trackpath for i in paths],
+                     cleaned = [i.cleaned   for i in self.values()],
+                     beads   = beads,
+                     **{i: [getattr(j, i) for j in paths]
+                        for i in ('pathcount', 'modification', 'megabytes')})
+        return pd.DataFrame(frame).sort_values('modification')
+
+    def trackdataframe(self, *tasks,
+                       transform = None,
+                       assign    = None,
+                       process   = True,
+                       **kwa) -> pd.DataFrame:
         """
-        Returns a table with some data
+        Tasks are applied to each track, with the last one being a
+        DataFrameTask constructed using all other keywords.
 
-        If tasks are provided, those tasks are applied before finishing by a DataFrameTask.
-
-        The first task should be either event detection or peak selection.
+        **Warning:** the first task should be either event detection or peak
+        selection.
         """
-        if len(tasks) == 0:
-            paths = [i.pathinfo for i in self.values()]
-            frame = dict(key     = list(self),
-                         path    = [i.trackpath for i in paths],
-                         cleaned = [i.cleaned   for i in self.values()],
-                         **{i: [getattr(j, i) for j in paths]
-                            for i in ('pathcount', 'modification', 'megabytes')})
-            return pd.DataFrame(frame).sort_values('modification')
-
         try:
             Tasks(tasks[0])
         except (IndexError, ValueError) as _:
@@ -136,12 +208,41 @@ class TracksDict(_TracksDict):
                      list(transform))
         if assign is not None:
             transform.insert(0, lambda x: x.assign(**assign))
+
+        if Tasks(tasks[-1]) is Tasks.dataframe:
+            transform = tasks[-1].transform + transform
+            tmp, kwa  = kwa, tasks[-1].measures
+            kwa.update(tmp)
+            tasks = tasks[:-1]
+
         dframe  = Tasks.dataframe(merge = True, measures = kwa, transform = transform)
 
         created = [Tasks.create(i) for i in tasks[1:]]
         par     = (Parallel(*tclean, *created, dframe)
                    .extend(*tdirty, *created, dframe))
         return par.process(None, 'concat') if process else par
+
+    def dataframe(self, *tasks,
+                  loadall   = False,
+                  transform = None,
+                  assign    = None,
+                  process   = True,
+                  **kwa):
+        "Returns either `basedataframe` or `trackdataframe`"
+        if len(tasks) == 0:
+            return self.basedataframe(loadall)
+        return self.trackdataframe(*tasks, transform, assign, process, **kwa)
+
+    dataframe.__doc__ =(
+        f"""
+        Returns a dataframe which is either:
+
+        ### Tasks are provided
+        {trackdataframe.__doc__}
+
+        ### Tasks not are provided
+        {basedataframe.__doc__}
+        """)
 
 class ExperimentList(dict):
     "Provides access to keys belonging to a single experiment"
@@ -180,13 +281,6 @@ class ExperimentList(dict):
         return (next((list(i) for i in self.keylist if oligo in i), [oligo])
                 if isinstance(oligo, str) else
                 list(oligo))
-
-    def available(self, *oligos):
-        "returns available oligos"
-        beads = set(self.tracks[oligos[0]].beadsonly.keys())
-        for oligo in oligos[1:]:
-            beads &= set(self.tracks[oligo].beadsonly.keys())
-        return list(beads)
 
 class BeadsDict(dict):
     """

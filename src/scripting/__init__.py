@@ -80,6 +80,7 @@ except ImportError:
 else:
     # type: ignore
     from data.__scripting__.holoviewing           import * # pylint: disable=redefined-builtin
+    from cleaning.__scripting__.holoviewing       import *
     from eventdetection.__scripting__.holoviewing import *
     from peakfinding.__scripting__.holoviewing    import *
     from peakcalling.__scripting__.holoviewing    import *
