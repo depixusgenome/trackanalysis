@@ -486,19 +486,30 @@ class ByGaussianMix:
 
     def find(self,pos: np.array, hist, bias:float = 0., slope:float = 1.):
         'find peaks'
-
         events   = np.hstack(pos)
-        maxncmps = int(len(ZeroCrossingPeakFinder()(hist,bias, slope))*(1+self.varcmpnts))
-        maxncmps= max(maxncmps,2)
-        mincmps = int(len(ZeroCrossingPeakFinder()(hist,bias, slope))*(1-self.varcmpnts))
-        mincmps = max(mincmps,1)
-        kwargs   = {'covariance_type'  : self.cov_type,
-                    'max_iter'         : self.max_iter}
-        gmm = self.__fit(events.reshape(-1,1),maxncmps,mincmps,kwargs)
+        zcnpeaks = len(ZeroCrossingPeakFinder()(hist,bias, slope))
+        kwargs   = {'covariance_type': self.cov_type,
+                    'max_iter' : self.max_iter}
+        gmm      = self.__fit(events.reshape(-1,1),
+                              max(int(zcnpeaks*(1+self.varcmpnts)),2),
+                              max(int(zcnpeaks*(1-self.varcmpnts)),1),
+                              kwargs)
 
-        peaks = gmm.means_.reshape(1,-1)[0] * slope + bias
-        ids =  self.__strip(pos,events.reshape(-1,1),gmm)
-        return peaks, ids
+        peaks    = gmm.means_.reshape(1,-1)[0] * slope + bias
+        ids      = self.__strip(pos,events.reshape(-1,1),gmm)
+
+        # sorting
+        speaks   = sorted([(idx,val) for idx,val in enumerate(peaks)],
+                          key =lambda x:x[1])
+
+        sort     = {idy[0] :idx for idx,idy in enumerate(speaks)}
+        sort[cast(int,np.iinfo("i4").max)] = cast(int,np.iinfo("i4").max)
+        def sorting(idarr):
+            'rename indices to match sorted peaks'
+            if idarr.size>0:
+                return np.array([sort[_] for _ in idarr])
+            return np.array([])
+        return np.sort(peaks), [sorting(idx) for idx in ids]
 
     def __strip(self,pos,evts,gmm):
         'removes peaks which have fewer than mincount events'
@@ -507,7 +518,7 @@ class ByGaussianMix:
 
         def assign(zpos):
             'set id'
-            idx=gmm.predict(zpos)[0]
+            idx = gmm.predict(zpos)[0]
             return idx if idx in keep else np.iinfo("i4").max
 
         vids = np.vectorize(assign)
@@ -568,14 +579,7 @@ class ByBayesGaussianMix:
         dpgmm = BayesianGaussianMixture(**kwa)
         trpos = np.matrix(apos).T
         dpgmm.fit(trpos)
-        # must change predict to correspond to correct ids
-        # predict = dpgmm.predict(trpos)
-        peaks   = dpgmm.means_
-        #peaks  = dpgmm.means_[list(set(predict))][:,0]
-        # the ids (predict values) must match peaks
-        return (peaks * slope + bias,
-                np.array([dpgmm.predict(zpos.reshape(-1,1))
-                          if zpos.size!=0 else np.array([])
-                          for zpos in pos]))
+        # peaks   = dpgmm.means_
+        raise NotImplementedError("find from Bayesian GM must be fixed before use")
 
 PeakFinder = Union[ByZeroCrossing, ByBayesGaussianMix, ByGaussianMix]
