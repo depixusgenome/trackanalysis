@@ -204,6 +204,12 @@ class Track:
     Other attributes are:
 
     * `framerate` is this experiment's frame rate
+    * `phases` is a 2D array with one row per cycle and one column per phase
+    containing the first index value of each cycle and phase.
+    * `path` is the path(s) to the data
+    * `axis` (Є {'X', 'Y', 'Z'}) is the data axis
+    * `ncycles` is the number of cycles
+    * `nphases` is the number of phases
     * `fov` is the field of view data:
 
         * `image` is one image of the field of view
@@ -257,6 +263,11 @@ class Track:
     cycles     = cast(Cycles,              _prop(Cycles, False))
     cyclesonly = cast(Cycles,              _prop(Cycles, True))
 
+
+    @property
+    def isloaded(self) -> bool:
+        "returns whether the data was already acccessed"
+        return self._lazy is False
 
     @property
     def data(self) -> Dict:

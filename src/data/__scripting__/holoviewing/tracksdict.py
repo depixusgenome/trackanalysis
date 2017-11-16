@@ -237,7 +237,7 @@ def map(self, fcn, kdim = 'oligo', *extra, **kwa):
 def oligomap(self:ExperimentList, oligo, fcn, **kwa):
     "returns a hv.DynamicMap with oligos and beads in the kdims"
     oligos = self.allkeys(oligo)
-    beads  = self.available(*oligos)
+    beads  = self.commonbeads(*oligos)
     LOGS.info(f"{oligos}, {beads}")
     return (hv.DynamicMap(fcn, kdims = ['oligo', 'bead'] + list(kwa))
             .redim.values(oligo = oligos, bead = beads, **kwa))
@@ -245,7 +245,7 @@ def oligomap(self:ExperimentList, oligo, fcn, **kwa):
 @addto(ExperimentList)
 def keymap(self:ExperimentList, key, fcn, **kwa):
     "returns a hv.DynamicMap with keys in the kdims"
-    beads  = self.available(*self.convert(key))
+    beads  = self.commonbeads(*self.convert(key))
     LOGS.info(f"{key}, {beads}")
     return (hv.DynamicMap(fcn, kdims = ['bead']+list(kwa))
             .redim.values(bead = beads, **kwa))

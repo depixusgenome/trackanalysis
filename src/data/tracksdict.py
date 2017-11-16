@@ -56,7 +56,11 @@ class TracksDict(dict):
 
     ## Shortcuts
 
-    `TracksDict.beads` returns the beads in common to all tracks in the `TracksDict`.
+    `TracksDict.commonbeads` returns the beads in common to all tracks in
+    the `TracksDict` or to those tracks provided as arguments.
+
+    `TracksDict.commonkeys` returns the tracks in common to all beads in
+    the `TracksDict` or to those beads provided as arguments.
 
     ## Slicing
 
@@ -296,7 +300,7 @@ class TracksDict(dict):
             self.scan(tracks, grs, match = match, allaxes = allaxes, **scan)
     update.__doc__ += scan.__doc__[scan.__doc__.find('#')-5:] # pylint: disable=no-member
 
-    def availablebeads(self, *keys) -> List[BEADKEY]:
+    def commonbeads(self, *keys) -> List[BEADKEY]:
         "returns the intersection of all beads in requested tracks (all by default)"
         if len(keys) == 0:
             keys = tuple(self.keys())
@@ -309,7 +313,19 @@ class TracksDict(dict):
 
         return sorted(beads)
 
-    def availablekeys(self, *abeads) -> List:
+    def availablebeads(self, *keys):
+        "returns available beads for provided oligos"
+        if len(keys) == 0:
+            keys = tuple(self.keys())
+
+        fcn   = lambda key: set(cast(Track, self[key]).beadsonly.keys())
+        beads = set() # type: Set[BEADKEY]
+        with ThreadPoolExecutor(self._NTHREADS) as pool:
+            for cur in pool.map(fcn, keys):
+                beads.update(cur)
+        return sorted(beads)
+
+    def commonkeys(self, *abeads) -> List:
         "returns the intersection of all beads in requested tracks (all by default)"
         if len(abeads) == 0:
             return sorted(super().keys())
