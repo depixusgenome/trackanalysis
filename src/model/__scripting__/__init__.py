@@ -7,4 +7,4 @@ from .parallel                import parallel
 
 from ..task                   import Task, RootTask
 from ..task.order             import TASK_ORDER, taskorder
-locals().update(Tasks.defaults())
+locals().update({type(i).__name__: type(i) for i in Tasks.defaults().values()})

@@ -16,14 +16,69 @@ _m_NONE  = type('_m_NONE', (), {})             # pylint: disable=invalid-name
 
 class Cycles(TrackView, ITrackView):
     """
-    Class for iterating over selected cycles:
+    This object provides a view on all cycles.
 
-    * providing a pair (column name, cycle id) will extract a cycle on
-      this column only.
+    It can be used to iterate over the data, each iteration providing the bead number,
+    the cycle number and the data:
 
-    * providing a pair (column name, all) will extract all cycles for a given bead.
+    ```python
+    >>> for (ibead, icycle), data in track.cycles:
+    ...     assert isinstance(ibead,  int)
+    ...     assert isinstance(icycle, int)
+    ...     assert isinstance(data,   np.array)
+    ```
 
-    * providing with a unique cycle id will extract all columns for that cycle
+    The methods are:
+
+    * `selecting` allows selecting:
+
+        * beads:
+
+            * `track.cycles.selecting(1)` selects bead 1
+            * `track.cycles.selecting([1, 2])` selects bead 1 and 2
+
+        * cycles:
+
+            * `track.cycles.selecting((..., 1))` selects cycle 1 for all beads
+            * `track.cycles.selecting([(1,1), (1,2)])` selects bead 1 cycles 1 and 2
+
+    * `discarding` works as for `selecting`
+
+    * `withphases` allows iterating a range of phases:
+
+            * `track.cycles.withphases(5)` iterates over phase 5  data only
+            * `track.cycles.withphases(3, 5)` iterates over phase 3 & 4 & 5 data
+
+    * `withaction` allows applying a number of transformations to the data. The
+    user must provide a function taking the `Cycles` object as first argument and
+    a tuple `(bead_and_cycle_id, data)`
+    To multiply the data by 1.5, do (one could use a lambda function):
+
+    ```python
+    >>> def myfunction(frame: Cycle,
+    ...                info: Tuple[Tuple[int, int], np.ndarray]
+    ...               ) -> Tuple[Tuple[int, int], np.ndarray]:
+    ...     return info[0], 1.5 * info[1]
+    >>> track.cycles.withaction(myfunction)
+    ```
+
+    * `withsamples` takes a `slice` instance as argument and applies it to the data.
+    To select 1 out of 2 points, do: `track.cycles.withsamples(slice(None, None, 2))
+
+    * `withcopy` takes a boolean as argument and  will make a copy of the data
+    before passing it on. This is the default configuration.
+
+    * `withdata` allows setting data on which to iterate. To be used sparingly.
+
+    *Note* that all methods return the same object which means that they can
+    be chained together. To sum part of phase 5, do:
+
+    ```python
+    >>> (track.cycles
+    ...  .withphases(5)
+    ...  .withsample(slice(10, 100, 2))
+    ...  .withaction(lambda _, i: (i[0], sum(i[1])))
+    ```
     """
     level      = Level.cycle
     first: int = None

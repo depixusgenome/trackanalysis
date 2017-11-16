@@ -3,7 +3,7 @@
 """
 Base track file data.
 """
-from    typing      import Type, Optional, Union, Dict, Tuple, cast
+from    typing      import Type, Optional, Union, Dict, Tuple, Any, cast
 from    copy        import deepcopy, copy as shallowcopy
 from    enum        import Enum
 import  numpy       as     np
@@ -146,9 +146,6 @@ class LazyProperty:
         setattr(obj, self.__name, val)
         return getattr(obj, self.__name)
 
-def _prop(cls: type, val: bool):
-    return property(lambda self: self.view(cls, beadsonly = val), doc = cls.__doc__)
-
 class ResettingProperty:
     "Resets all if this attribute is changed"
     def __init__(self):
@@ -171,6 +168,18 @@ class ResettingProperty:
         getattr(obj, '_rawprecisions').clear()
         setattr(obj, '_lazy', True)
         return getattr(self, self.__name)
+
+class ViewDescriptor:
+    "Access to views"
+    tpe : type           = None
+    args: Dict[str, Any] = dict()
+    def __get__(self, instance, owner):
+        return self if instance is None else instance.view(self.tpe, **self.args)
+
+    def __set_name__(self, _, name):
+        self.tpe  = Cycles if name.startswith('cycles') else Beads
+        self.args = dict(copy = False, beadsonly = 'only' in name)
+        setattr(self, '__doc__', getattr(self.tpe, '__doc__'))
 
 @levelprop(Level.project)
 class Track:
@@ -260,11 +269,10 @@ class Track:
     axis       = cast(Axis,                ResettingProperty())
     ncycles    = cast(int,                 property(lambda self: len(self.phases)))
     nphases    = cast(int,                 property(lambda self: self.phases.shape[1]))
-    beads      = cast(Beads,               _prop(Beads,  False))
-    beadsonly  = cast(Beads,               _prop(Beads,  True))
-    cycles     = cast(Cycles,              _prop(Cycles, False))
-    cyclesonly = cast(Cycles,              _prop(Cycles, True))
-
+    beads      = cast(Beads,               ViewDescriptor())
+    beadsonly  = cast(Beads,               ViewDescriptor())
+    cycles     = cast(Cycles,              ViewDescriptor())
+    cyclesonly = cast(Cycles,              ViewDescriptor())
 
     @property
     def isloaded(self) -> bool:

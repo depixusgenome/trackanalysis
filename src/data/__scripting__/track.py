@@ -10,7 +10,6 @@ We add some methods and change the default behaviour:
 * a *rawprecision* method is added
 """
 from typing                 import List
-from itertools              import product
 from pathlib                import Path
 from datetime               import datetime
 
@@ -128,12 +127,9 @@ def measures(self):
     phase = scriptapp.control.getGlobal('config').phase.measure.get()
     return self.cleancycles.withphases(phase)
 
-def _addprop(name):
-    fcn = getattr(_Track, name).fget
-    setattr(Track, name, property(lambda self: fcn(self).withcopy(),
-                                  doc = getattr(Track, name).__doc__))
-
-for tname in product(('beads', 'cycles'), ('only', '')):
-    _addprop(''.join(tname))
+_Track.cycles    .args['copy'] = True
+_Track.cyclesonly.args['copy'] = True
+_Track.beads     .args['copy'] = True
+_Track.beadsonly .args['copy'] = True
 
 __all__ = ['Track']

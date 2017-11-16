@@ -49,7 +49,7 @@ class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name
 
         if kw.get('samples', None) is not None:
             samples = kw['samples']
-            self.actions.append(partial(self.__samples, samples))
+            self.actions.append(partial(self._f_samples, samples))
 
     copy = staticmethod(_m_copy)    # type: ignore
 
@@ -67,13 +67,15 @@ class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name
         return self
 
     @staticmethod
-    def __samples(samples, _, info):
+    def _f_samples(samples, _, info):
         return info[0], info[1][samples]
 
     def withsamples(self:CSelf, samples) -> CSelf:
         "specifies that only some samples should be taken"
         if samples is not None:
-            self.actions.append(partial(self.__samples, samples))
+            if isinstance(samples, range):
+                samples = slice(samples.start, samples.stop, samples.step) # type: ignore
+            self.actions.append(partial(self._f_samples, samples))
         return self
 
     def withcopy(self:CSelf, cpy:bool = True) -> CSelf:
