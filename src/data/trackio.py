@@ -3,7 +3,7 @@
 # pylint: disable=arguments-differ
 "Loading and save tracks"
 import  sys
-from    typing             import (Sequence, Callable, Any, Union, Tuple, Optional,
+from    typing             import (Sequence, Any, Union, Tuple, Optional,
                                    Iterator, Dict, cast, overload, TypeVar,
                                    TYPE_CHECKING)
 from    itertools          import chain
