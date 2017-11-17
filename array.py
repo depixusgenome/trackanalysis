@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "utils for dealing with arrays"
 from   typing import (Iterable, Optional, # pylint: disable=unused-import
-                      Iterator, Sequence, Tuple, cast)
+                      Iterator, Union, Sequence, Tuple, cast)
 import numpy as np
 
 EVENTS_TYPE  = Tuple[int, np.ndarray]
@@ -15,9 +15,9 @@ class EventsArray(np.ndarray):
     * *discarded*: the number of discarded cycles
     """
     # pylint: disable=unused-argument
-    _discarded = False
-    _dtype     = EVENTS_DTYPE
-    _order     = None
+    _discarded: Union[int,bool] = False
+    _dtype                      = EVENTS_DTYPE
+    _order                      = None
     def __new__(cls, array, **kwa):
         obj  = np.asarray(array,
                           dtype = kwa.get('dtype', cls._dtype),
