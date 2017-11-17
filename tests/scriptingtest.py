@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # pylint: disable=redefined-builtin,wildcard-import,unused-wildcard-import
-# pylint: disable=wrong-import-position,ungrouped-imports
+# pylint: disable=wrong-import-position,ungrouped-imports,no-member
 "Tests interval detection"
 from IPython   import get_ipython # pylint:disable=import-error
 assert get_ipython() is not None
 from scripting import *
+from scripting.jupyter import *
 
 CLASSES = list(get_ipython().display_formatter.formatters['text/html'].type_printers.keys())
 
