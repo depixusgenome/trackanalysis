@@ -25,7 +25,43 @@ _m_INDEX = int, cast(type, np.integer), str, tuple
 
 CSelf = TypeVar('CSelf',  bound = 'TrackViewConfigMixin')
 class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name
-    "Adds methods for configuring a TracksView"
+    """
+    This object provides a view on all {views} as well as *time* and *magnet altitude*.
+    {datadescr}
+
+    ```python{itercode}
+    ```
+
+    ### Configuration Methods
+    {selecting}
+
+    * `discarding` works as for `selecting`
+
+    * `withaction` allows applying a number of transformations to the data. The
+    user must provide a function taking the `Cycles` object as first argument
+    and a tuple `(id, data)`. To multiply the data by 1.5, do (one could use a
+    lambda function):
+
+    ```python{actioncode}
+    ```
+
+    * `withsamples` takes a `slice` instance as argument and applies it to the data.
+    To select 1 out of 2 points, do: `track.{views}.withsamples(slice(None, None, 2))
+
+    * `withcycles` takes a `slice` instance as argument and discards cycles which
+    with ids outside that slice.
+
+    * `withcopy` takes a boolean as argument and  will make a copy of the data
+    before passing it on. This is the default configuration.
+
+    * `withdata` allows setting data on which to iterate. To be used sparingly.
+
+    *Note* that all methods return the same object which means that they can
+    be chained together. For example:
+
+    ```python{chaincode}
+    ```
+    """
     data:      TRACK_VIEW             = None
     selected:  List                   = None
     discarded: List                   = None
@@ -50,6 +86,12 @@ class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name
         if kw.get('samples', None) is not None:
             samples = kw['samples']
             self.actions.append(partial(self._f_samples, samples))
+
+    @staticmethod
+    def __format_doc__(more, **kwa):
+        doc   = TrackViewConfigMixin.__doc__
+        eight = '\n        ', '\n    '
+        return doc.format(**{i: j.replace(*eight) for i, j in kwa.items()}) + more
 
     copy = staticmethod(_m_copy)    # type: ignore
 
