@@ -119,7 +119,7 @@ class Comparator:
 @addto(Track, property)
 def events(self) -> Events:
     "Returns events in phase 5 only"
-    return self.apply(*Tasks.defaulttasklist(self.path, Tasks.eventdetection, self.cleaned))
+    return self.apply(*Tasks.defaulttasklist(self, Tasks.eventdetection))
 # pylint: disable=no-member
 Events.__doc__      += (
     """

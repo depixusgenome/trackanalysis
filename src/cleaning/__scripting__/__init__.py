@@ -19,6 +19,11 @@ from   data.__scripting__.track         import Track
 from   data.__scripting__.tracksdict    import TracksDict
 from   ..processor                      import (DataCleaningProcessor,
                                                 DataCleaningException)
+from   ..beadsubtraction                import BeadSubtractionTask
+
+@addto(BeadSubtractionTask)
+def __scripting_save__(self):
+    self.beads.clear()
 
 @addproperty(Track.__base__, 'cleaning')
 class TrackCleaningScript:

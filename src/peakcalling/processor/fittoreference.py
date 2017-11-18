@@ -77,13 +77,6 @@ class FitToReferenceTask(Task):
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-    def __scripting__(self, kwa) -> 'FitToReferenceTask':
-        if 'peaks' in kwa:
-            self.frompeaks(kwa['peaks'])
-        elif 'events' in kwa:
-            self.fromevents(kwa['events'])
-        return self
-
     def __getstate__(self):
         info = self.__dict__.copy()
         info['fitdata'] = info.pop('_fitdata')

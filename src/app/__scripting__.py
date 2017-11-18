@@ -3,13 +3,15 @@
 """
 Saves stuff from session to session
 """
-from   typing               import Tuple
-from   copy                 import deepcopy
+from   typing              import Tuple
+from   copy                import deepcopy
 
-from   utils.decoration     import addto
-from   view.dialog          import FileDialog
-from   model.__scripting__  import Tasks, Task
-from   .                    import default
+from   utils.decoration    import addto
+from   view.dialog         import FileDialog
+from   data.__scripting__  import Track
+from   model.__scripting__ import Tasks, Task
+from   model.globals       import LocalContext
+from   .                   import default
 
 class ScriptingView:
     "Dummy view for scripting"
@@ -27,6 +29,7 @@ class ScriptingView:
                                  multiple  = True,
                                  title     = "open a gr files")
 
+        self._ctrl.getGlobal("config").path.gui.default              = False
         self._ctrl.getGlobal("config").tasks.order.scripting.default = None
 
         getattr(Tasks, 'setconfig')(self._ctrl)
@@ -62,8 +65,7 @@ def save(cls, task):
             raise TypeError('Unknown task: '+str(task))
 
     cpy = deepcopy(task)
-    if isinstance(task, type(cnf.fittoreference.get())):
-        cpy.fitdata.clear()
+    getattr(cpy, '__scripting_save__', lambda: None)()
 
     cnf[name].set(cpy)
     scriptapp.control.writeuserconfig()
@@ -102,20 +104,47 @@ def defaulttaskorder(cls, __old__ = Tasks.defaulttaskorder) -> Tuple[type, ...]:
     order = cls.getconfig().order.scripting.get(default = None)
     return __old__(order)
 
-@addto(Tasks, classmethod)
-def defaulttasklist(cls, paths, upto, cleaned:bool, __old__ = Tasks.defaulttasklist):
-    "Returns a default task list depending on the type of raw data"
-    tasks = __old__(paths, upto, cleaned)
-    if cls.getconfig().alignment.always.get() is False:
-        return tasks
+@addto(Tasks, staticmethod)
+def __tasklist__(__old__ = Tasks.__tasklist__()):
+    return __old__
 
-    inst = Tasks.alignment.get()
-    tpe  = type(inst)
-    if any(isinstance(i, tpe) for i in tasks):
-        return tasks
-    if len(tasks) > 0 and isinstance(tasks[0], type(Tasks.cleaning.get())):
-        return tasks[:1]+[inst]+tasks[1:]
-    return [inst]+tasks
+@addto(Tasks, classmethod)
+def __cleaning__(cls, __old__ = Tasks.__cleaning__()):
+    return __old__[:-1] if cls.getconfig().alignment.always.get() else __old__
+
+@addto(Tasks)
+def defaulttasklist(obj, upto, cleaned:bool = None, __old__ = Tasks.defaulttasklist):
+    "Returns a default task list depending on the type of raw data"
+    if getattr(obj, 'tasks', None):
+        with LocalContext(scriptapp.control).update(config = getattr(obj, 'tasks')):
+            return __old__(obj, upto, cleaned)
+    return __old__(obj, upto, cleaned)
+
+@addto(Track)
+def __init__(self, *path, __old__ = Track.__init__, **kwa):
+    cnf = scriptapp.control.getGlobal('css').last.path.trk
+    if any(i in (Ellipsis, 'prev', '') for i in path):
+        path = cnf.get()
+
+    gui = None
+    if len(path) == 0 and scriptapp.control.getGlobal('css').path.gui.get():
+        gui = scriptapp.trkdlg.open()
+
+    if path or gui:
+        cnf.set(gui if gui else path[0])
+        scriptapp.control.writeuserconfig()
+    __old__(self, path = (gui if gui else path if path else ''), **kwa)
+
+@addto(Track)
+def grfiles(self):
+    "access to gr files"
+    if not scriptapp.control.getGlobal('css').gui.get():
+        raise AttributeError("Operation not allowed guiven current settings")
+    paths = scriptapp.grdlg.open()
+    if paths is None or len(paths) == 0:
+        return
+    old = self.path
+    self.__init__(path = ((old,) if isinstance(old, str) else old)+paths)
 
 # pylint: disable=no-member,invalid-name
 scriptapp = default.application(main = ScriptingView, creator = lambda x: x)() # type: ignore

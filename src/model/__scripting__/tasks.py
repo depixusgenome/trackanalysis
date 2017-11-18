@@ -69,6 +69,7 @@ class Tasks(Enum):
     """
     action         = 'action'
     cleaning       = 'cleaning'
+    subtraction    = 'subtraction'
     selection      = 'selection'
     alignment      = 'alignment'
     driftperbead   = 'driftperbead'
@@ -83,9 +84,22 @@ class Tasks(Enum):
     dataframe      = 'dataframe'
     RESET          = Ellipsis
 
-    __taskorder__  = 'eventdetection', 'peakselector', 'fittohairpin'
-    __cleaning__   = 'cleaning', 'alignment'
-    __tasklist__   = __cleaning__ + __taskorder__
+    @classmethod
+    def __taskorder__(cls):
+        return cls.eventdetection, cls.peakselector, cls.fittohairpin
+
+    @classmethod
+    def __cleaning__(cls):
+        return cls.subtraction, cls.cleaning, cls.alignment
+
+    @classmethod
+    def __tasklist__(cls):
+        return (cls.selection,) + cls.__cleaning__() + cls.__taskorder__()
+
+    @classmethod
+    def __nodefault__(cls):
+        return cls.selection, cls.subtraction
+
     @classmethod
     def _missing_(cls, value):
         if isinstance(value, Task):
@@ -96,6 +110,10 @@ class Tasks(Enum):
                 if j.__class__ is value:
                     return cls(i)
         super()._missing_(value) # type: ignore
+
+    def tasktype(self) -> type:
+        "returns the task type"
+
 
     @staticmethod
     def defaults():
@@ -129,22 +147,26 @@ class Tasks(Enum):
     def defaulttaskorder(cls, order = None) -> Tuple[Type[Task],...]:
         "returns the default task order"
         if order is None:
-            order =  cls.__taskorder__
+            order =  cls.__taskorder__()
         items = tuple(type(cls(i)()) for i in order[::-1])
         return cast(Tuple[Type[Task],...], items[::-1])
 
     @classmethod
-    def defaulttasklist(cls, paths, upto, cleaned:bool) -> List[Task]:
+    def defaulttasklist(cls, obj, upto, cleaned:bool = None) -> List[Task]:
         "Returns a default task list depending on the type of raw data"
-        tasks = list(cls.__tasklist__) # type: ignore
-        if cleaned or (isinstance(paths, (tuple, list)) and len(paths) > 1):
-            tasks = [i for i in tasks if i not in cls.__cleaning__] # type: ignore
+        tasks = list(cls.__tasklist__()) # type: ignore
+        paths = getattr(obj, 'path', obj)
+        if (getattr(obj, 'cleaned', cleaned)
+                or (isinstance(paths, (tuple, list)) and len(paths) > 1)):
+            tasks = [i for i in tasks if i not in cls.__cleaning__()] # type: ignore
 
-        upto = cls(upto).value
-        itms = (tasks if upto is None       else
-                ()    if upto not in tasks  else
-                tasks[:tasks.index(upto)+1])
-        return [cls(i) for i in itms] # type: ignore
+        upto  = cls(upto)
+        itms  = (tasks if upto is None       else
+                 ()    if upto not in tasks  else
+                 tasks[:tasks.index(upto)+1])
+        nod   = cls.__nodefault__()
+        isdef = lambda i: i is type(i)()
+        return [i() for i in itms if i not in nod or isdef(i)] # type: ignore
 
     @classmethod
     def tasklist(cls, *tasks, **kwa) -> List[Task]:
@@ -232,7 +254,7 @@ class Tasks(Enum):
             else:
                 setattr(obj, lst[-1], toenum(deflt, value))
 
-        return getattr(task, '__scripting__', lambda x: task)(kwa)
+        return task
 
     class _TaskGetter:
         def __get__(self, obj, tpe):
