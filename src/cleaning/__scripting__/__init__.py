@@ -21,9 +21,9 @@ from   ..processor                      import (DataCleaningProcessor,
                                                 DataCleaningException)
 from   ..beadsubtraction                import BeadSubtractionTask
 
-@addto(BeadSubtractionTask)
-def __scripting_save__(self):
-    self.beads.clear()
+@addto(BeadSubtractionTask, staticmethod)
+def __scripting_save__() -> bool:
+    return False
 
 @addproperty(Track.__base__, 'cleaning')
 class TrackCleaningScript:
@@ -70,7 +70,7 @@ class TrackCleaningScript:
         cycs  = [] # type: List[int]
         msgs  = [] # type: List[str]
 
-        if forceclean or self.track.cleaned is False:
+        if forceclean or self.track.cleaned is False: # type: ignore
             for i, j in self.process(**kwa).items():
                 if j is None:
                     continue

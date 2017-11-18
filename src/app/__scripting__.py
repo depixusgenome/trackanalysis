@@ -65,7 +65,8 @@ def save(cls, task):
             raise TypeError('Unknown task: '+str(task))
 
     cpy = deepcopy(task)
-    getattr(cpy, '__scripting_save__', lambda: None)()
+    if getattr(cpy, '__scripting_save__', lambda: True)():
+        return
 
     cnf[name].set(cpy)
     scriptapp.control.writeuserconfig()
