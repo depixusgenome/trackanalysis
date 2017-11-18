@@ -285,10 +285,17 @@ def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
                 if delayed:
                     self.__delayed_init__(*args, **kwargs)
 
-        setattr(__init__, 'KEYS', attrs)
+        setattr(__init__, 'UPDATER', _Updater)
+        setattr(__init__, 'KEYS',    attrs)
         return wraps(fcn)(__init__)
 
     return _wrapper if fcn is None else _wrapper(fcn)
+
+def addattributes(cls, **kwa):
+    "Adds attributes to a class with its `__init__` previously decorated by `@initdefaults`"
+    for i, j in kwa.items():
+        setattr(cls, i, j)
+    cls.__init__.UPDATER.attrs  += ((i, i) for i in kwa)
 
 T = TypeVar('T')
 def fieldnames(obj) -> FrozenSet[str]:
