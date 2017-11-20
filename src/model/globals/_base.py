@@ -56,6 +56,9 @@ class Globals:
 
     def getGlobal(self, key, *args, default = delete):
         "returns values associated to the keys"
+        if key is Ellipsis:
+            return self
+
         if len(args) == 0 or len(args) == 1 and args[0] == '':
             return SingleMapAccess(self.__maps[key], '')
         return self.__maps[key].get(*args, default = default)

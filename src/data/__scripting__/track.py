@@ -16,8 +16,8 @@ from datetime               import datetime
 from utils.decoration       import addto, addproperty
 from utils.attrdefaults     import addattributes
 from model                  import PHASE
+from model.__scripting__    import Tasks
 from signalfilter           import PrecisionAlg
-from app.__scripting__      import Tasks
 
 from ..                      import Track
 

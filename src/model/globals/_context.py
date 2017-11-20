@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Storing global properties"
-from typing      import Dict, Any
+from typing      import Dict, Any, Tuple, List # pylint: disable=unused-import
 from ._access    import BaseGlobalsAccess
 
 ARG_T = Dict[str,Dict[str,Any]]
@@ -11,17 +11,17 @@ class LocalContext:
 
     It is **NOT THREAD SAFE**.
     """
-    def __init__(self, maps, update: ARG_T = None, **kwa) -> None:
+    def __init__(self, parent, update: ARG_T = None, **kwa) -> None:
         self.__save:    ARG_T = {}
         self.__replace: ARG_T = kwa
         self.__update:  ARG_T = {} if update is None else dict(update)
-        self.__parent         = maps
+        self.__parent         = getattr(parent, 'getGlobal', lambda _: parent)(...)
 
     def __maps(self):
         if callable(getattr(self.__parent, 'items', None)):
             return self.__parent.items()
-        for i, j in self.__parent.items():
-            if i[0] == '_' and i[1].lower() != i[1] and i.endswith("__maps"):
+        for i, j in self.__parent.__dict__.items():
+            if i[0] == '_' and i[1].lower() != i[1] and i.endswith("__model"):
                 return j.items()
         raise ValueError("could not find maps")
 
@@ -46,12 +46,19 @@ class LocalContext:
 
     def __enter__(self):
         self.__save = {i: j.maps[0] for i, j in self.__maps()}
+        reps        = [] # type: List[Tuple[list, Dict[str, Any]]]
         for i, j in self.__maps():
             rep = self.__replace.get(i, None)
             if rep is None:
                 rep = dict(j.maps[0])
             rep.update(self.__update.get(i, {}))
-            j.maps[0] = rep
+            missing = set(rep) - set(j.maps[1])
+            if missing:
+                raise KeyError("Following keys have no defaults: "+str(missing))
+            reps.append((j.maps, rep))
+
+        for i, j in reps:
+            i[0] = j
         return self
 
     def __exit__(self, tpe, val, bkt):

@@ -7,12 +7,14 @@ Monkey patches the Track class.
 Adds a method for discarding beads with Cleaning warnings
 """
 from   typing                       import (Dict, Optional, Iterator, List,
-                                            Set, Tuple, Sequence, cast)
+                                            Set, Union, Tuple, Sequence, cast)
 from   itertools                        import product
 import numpy                            as     np
 import pandas                           as     pd
 from   utils.decoration                 import addproperty, addto
 from   control.processor.dataframe      import DataFrameFactory
+from   model.__scripting__              import Tasks
+from   model.__scripting__.track        import LocalTasks
 from   data.views                       import BEADKEY
 from   data.track                       import dropbeads
 from   data.__scripting__.track         import Track
@@ -25,7 +27,31 @@ from   ..beadsubtraction                import BeadSubtractionTask
 def __scripting_save__() -> bool:
     return False
 
-@addproperty(Track.__base__, 'cleaning')
+class BeadSubtractionDescriptor:
+    "A descriptor for adding subtracted beads"
+    NAME    = 'subtraction'
+    __doc__ = Tasks(NAME).__doc__
+
+    def __get__(self, inst, owner) -> Union[Tasks, Tuple[int, ...]]:
+        if inst is None:
+            return Tasks(self.NAME)
+
+        beads = getattr(inst.tasks.get(self.NAME, None), 'beads', [])
+        return tuple(beads)
+
+    def __set__(self, inst, beads: Union[None, Sequence[int]]):
+        if not beads:
+            inst.tasks.pop(self.NAME)
+            return
+        if np.isscalar(beads):
+            lst = [cast(int, beads)]
+        else:
+            lst = list(cast(Sequence[int], beads))
+        inst.tasks[self.NAME] = BeadSubtractionTask(beads = lst)
+
+LocalTasks.subtraction = BeadSubtractionDescriptor()
+
+@addproperty(Track, 'cleaning')
 class TrackCleaningScript:
     """
     Provides methods for finding beads with cleaning warnings and possibly discarding them.
@@ -101,7 +127,6 @@ class TrackCleaningScript:
 Track.__doc__ += (
     """
     * `cleaning` """+TrackCleaningScript.__doc__.split('\n')[1].strip())
-Track.__base__.__doc__ = Track.__doc__ # type: ignore
 
 @addproperty(TracksDict.__base__, 'cleaning')
 class TracksDictCleaningScript:

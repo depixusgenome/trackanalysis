@@ -27,6 +27,7 @@ from   functools import wraps, partial
 from   pathlib   import Path
 
 import pickle                           # pylint: disable=unused-import
+import sys
 import inspect
 import re
 import numpy                 as np
@@ -62,6 +63,8 @@ def _is_jupyter():
     return any(i.endswith("ipykernel/zmqshell.py") for i in _STACK)
 
 def _test():
+    if 'ACCEPT_SCRIPTING' in sys.modules or 'pudb' in sys.modules:
+        return
     stack  = [i for i in _STACK if 'importlib' not in i and i != '<stdin>']
     ends   = "IPython/core/magics/execution.py", "/trackanalysis.py"
     starts = ("<ipython-input",)
