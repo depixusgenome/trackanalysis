@@ -208,14 +208,20 @@ def addto(*types):
     "add method to a class"
     def _wrapper(fcn):
         pots = classmethod, staticmethod, property
-        wrap = next((i for i in pots if i in types), None)
+        prop = next((i for i in pots if i in types), None)
         for tpe in types:
             if tpe in pots:
                 continue
-            if wrap is None:
+
+            if hasattr(fcn, '__module__'):
+                old = getattr(tpe, fcn.__name__, None)
+                if old:
+                    fcn = wraps(old)(fcn)
+
+            if prop is None:
                 setattr(tpe, getattr(fcn, 'fget', fcn).__name__, fcn)
             else:
-                setattr(tpe, fcn.__name__, wrap(fcn))
+                setattr(tpe, fcn.__name__, prop(fcn))
     return _wrapper
 
 def addproperty(other, attr = 'display', prop = None, **args):
