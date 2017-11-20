@@ -98,7 +98,7 @@ def measures(self):
     return self.cleancycles.withphases(PHASE.measure)
 
 addattributes(Track, cleaned = False)
-Track.__doc__   += '* `pathinfo` p'+PathInfo.__doc__[:5]
+Track.__doc__   += '* `pathinfo` p'+PathInfo.__doc__[5:]
 Track.cycles    .args['copy'] = True
 Track.cyclesonly.args['copy'] = True
 Track.beads     .args['copy'] = True

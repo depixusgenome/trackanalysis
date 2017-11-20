@@ -6,7 +6,7 @@ Monkey patches the Track class.
 
 Adds a method for discarding beads with Cleaning warnings
 """
-from   typing                       import (Dict, Optional, Iterator, List,
+from   typing                       import (Dict, Optional, Iterator, List, Any,
                                             Set, Union, Tuple, Sequence, cast)
 from   itertools                        import product
 import numpy                            as     np
@@ -39,24 +39,27 @@ class BeadSubtractionDescriptor:
         beads = getattr(inst.tasks.get(self.NAME, None), 'beads', [])
         return tuple(beads)
 
-    def __set__(self, inst, beads: Union[None, Sequence[int]]):
+    def __set__(self, inst,
+                beads: Union[None, Dict[str,Any], BeadSubtractionTask, Sequence[int]]):
+        tpe = BeadSubtractionTask
+        lst = (beads.get('beads', None)                 if isinstance(beads, dict) else
+               cast(BeadSubtractionTask, beads).beads   if isinstance(beads, tpe)  else
+               [cast(int, beads)]                       if np.isscalar(beads)      else
+               []                                       if beads is None           else
+               cast(Sequence[int], beads))
+
         if not beads:
             inst.tasks.pop(self.NAME)
-            return
-        if np.isscalar(beads):
-            lst = [cast(int, beads)]
         else:
-            lst = list(cast(Sequence[int], beads))
-        inst.tasks[self.NAME] = BeadSubtractionTask(beads = lst)
+            inst.tasks[self.NAME] = BeadSubtractionTask(beads = list(lst))
 
-LocalTasks.subtraction = BeadSubtractionDescriptor()
+LocalTasks.subtraction = BeadSubtractionDescriptor() # type: ignore
 
 @addproperty(Track, 'cleaning')
 class TrackCleaningScript:
     """
-    Provides methods for finding beads with cleaning warnings and possibly discarding them.
-
-    One can do:
+    Provides methods for finding beads with cleaning warnings and possibly
+    discarding them:
 
     * `track.cleaning.good()`: lists good beads
     * `track.cleaning.bad()`: lists bad beads
@@ -126,7 +129,11 @@ class TrackCleaningScript:
 
 Track.__doc__ += (
     """
-    * `cleaning` """+TrackCleaningScript.__doc__.split('\n')[1].strip())
+    * `cleaning` p"""
+    +TrackCleaningScript.__doc__.split('\n')[1].strip()[1:]+"\n"
+    +TrackCleaningScript.__doc__.split('\n')[2]+"\n"
+    +'\n'.join(TrackCleaningScript.__doc__.split('\n')[3:]).replace('\n', '\n    ')
+    )
 
 @addproperty(TracksDict.__base__, 'cleaning')
 class TracksDictCleaningScript:

@@ -45,7 +45,22 @@ class TaskDescriptor:
         self.__doc__ = tsk.tasktype().__doc__
 
 class LocalTasks:
-    "This object allows setting specific tasks in the track"
+    """
+    Allows setting specific configurations per type of tasks. For
+    example:
+
+    ```python
+    >>> track.task.alignment = ExtremumAlignmentTask(outlier = .8)
+    >>> track.task.alignment = {'outlier': .8} # or using a dictionnary
+    ```
+
+    For bead subtraction, it's possible to provides the beads directly:
+
+    ```python
+    >>> track.task.subtraction = 1    # subtracting bead 1 from all beads
+    >>> track.task.subtraction = 1, 2 # subtracting beads 1 and 2 from all beads
+    ```
+    """
     def __init__(self) -> None:
         self.tasks: Dict[str, Any] = {}
 
@@ -74,3 +89,5 @@ class LocalTasks:
     peakselector   = TaskDescriptor()
 
 addattributes(Track, tasks = LocalTasks())
+Track.__doc__ += ("""
+    * `tasks` a""" + LocalTasks.__doc__[6:])
