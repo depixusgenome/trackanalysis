@@ -163,7 +163,6 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         pos     = np.concatenate(dtl.positions)
         events  = dict(z     = pos,
                        count = Interpolator(data['z'], data['count'], fit2ref.hmin)(pos))
-        print(events['count'])
         return {'': data, 'events': events, 'peaks': self.__peaks(dtl)}
 
     def _create(self, doc):
