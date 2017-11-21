@@ -46,7 +46,7 @@ class GuiFitToReferenceDict(FitToReferenceDict):
         if params is None:
             self.cache[0][key] = params = super().optimize(key, data)
 
-        if self.cache[1] and self.cache[1][0]:
+        if self.cache[1] and self.cache[1][0] and params != (1., 0.):
             self.cache[1][0].transform(params)
         return params
 

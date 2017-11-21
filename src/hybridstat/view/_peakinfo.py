@@ -4,6 +4,7 @@
 from typing                     import Dict, List, TYPE_CHECKING, cast
 from abc                        import ABC, abstractmethod
 from itertools                  import product
+from eventdetection.processor   import EventDetectionTask
 from peakcalling.processor      import FitToHairpinTask
 
 import numpy                    as     np
@@ -72,7 +73,7 @@ class IdentificationPeakInfo(PeakInfo):
         dflt = super().defaults(mdl, peaks)
         for i in dflt:
             if i.endswith('orient'):
-                dflt[i]  = np.array([' ' for _ in range(len(dflt[i]))])
+                dflt[i]  = np.full(len(dflt[i]), ' ', dtype = '<U1')
         return dflt
 
     def values(self, mdl: 'PeaksPlotModelAccess', peaks) -> Dict[str, np.ndarray]:
@@ -86,17 +87,22 @@ class IdentificationPeakInfo(PeakInfo):
         dico    = {}
         task    = cast(FitToHairpinTask, mdl.identification.task)
         for key, hyb in mdl.hybridisations(...).items():
-            if key not in alldist:
+            if key not in alldist: # type: ignore
                 continue
 
             dist = alldist[key].stretch, alldist[key].bias
-            tmp  = task.match[key].pair(zvals, *dist)['key']
+            tmp  = task.match[key].pair(zvals, *dist)['key'] # type: ignore
             good = tmp >= 0
             ori  = dict(hyb)
 
-            dico[f'{key}bases']          = (zvals - dist[1])*dist[0]
+            dico[f'{key}bases'] = (zvals - dist[1])*dist[0]
+
+            dico.update({f'{key}{i}': np.full(len(zvals), np.NaN, dtype = 'f4')
+                         for i in ('id', 'distance')})
+
             dico[f'{key}id']      [good] = tmp[good]
             dico[f'{key}distance'][good] = (tmp - dico[f'{key}bases'])[good]
+            dico[f'{key}orient']         = np.full(len(zvals), ' ', dtype = '<U1')
             dico[f'{key}orient']  [good] = [strori[ori.get(int(i+0.01), 2)]
                                             for i in dico[f'{key}id'][good]]
         for i in self.basekeys():
@@ -114,11 +120,11 @@ class StatsPeakInfo(PeakInfo):
         if len(peaks) == 0:
             return {}
 
-        task = mdl.eventdetection.task
+        task = cast(EventDetectionTask, mdl.eventdetection.task)
         prob = Probability(framerate   = mdl.track.framerate,
                            minduration = task.events.select.minduration)
-        dur  = mdl.track.phaseduration(..., task.phase)
-        dico = {} # type: Dict[str, np.ndarray]
+        dur  = mdl.track.phaseduration(..., task.phase) # type: ignore
+        dico = self.defaults(mdl, peaks)
         for i, (_, evts) in enumerate(peaks):
             val                 = prob(evts, dur)
             dico['duration'][i] = val.averageduration

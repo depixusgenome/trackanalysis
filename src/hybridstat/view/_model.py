@@ -19,7 +19,7 @@ from model.task                 import RootTask
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
 from peakfinding.histogram      import Interpolator
 from peakfinding.processor      import PeakSelectorTask
-from peakfinding.selector       import PeakSelectorDetails, Output as PeakOutput
+from peakfinding.selector       import PeakSelectorDetails
 from peakcalling                import match
 from peakcalling.tohairpin      import Distance
 from peakcalling.processor      import FitToHairpinTask, FitToReferenceTask
@@ -119,7 +119,7 @@ class FitToReferenceAccess(TaskAccess):
         "returns an array of identified peaks"
         ref = self.__store.peaks.get()
         arr = np.full(len(peaks), np.NaN, dtype = 'f4')
-        if len(peaks):
+        if ref is not None and len(ref) and len(peaks):
             ids = match.compute(ref, peaks, self.configtask.peakprecision.get())
             arr[ids[:,1]] = ref[ids[:,0]]
         return arr
@@ -139,8 +139,8 @@ class FitToReferenceAccess(TaskAccess):
 
         tmp         = tuple(next(iter(self._ctrl.run(self.reference, PeakSelectorTask,
                                                      copy = True)))[ibead])
-        res         = cast(PeakOutput, tmp)
-        fits[ibead] = FitData(task.fitalg.frompeaks(((ibead, res),)), (1., 0.))
+        res         = task.fitalg.frompeaks(((ibead, tmp),)) # type: ignore
+        fits[ibead] = FitData(res, (1., 0.))
         peaks[ibead]= np.array([i for i, _ in peaks], dtype = 'f4')
         return ident, fits, peaks
 

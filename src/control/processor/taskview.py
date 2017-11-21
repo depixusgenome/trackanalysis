@@ -38,7 +38,6 @@ class TaskViewProcessor(Generic[TaskType, TaskDict, Key], Processor[TaskType]):
     def apply(cls, toframe = None, cache = None, **cnf):
         "applies the task to a frame or returns a function that does so"
         cnf = cls.keywords(cnf)
-        print(cls, id(cache))
         if toframe is None:
             if cache is None:
                 return partial(cls.apply, **cnf)
@@ -46,7 +45,6 @@ class TaskViewProcessor(Generic[TaskType, TaskDict, Key], Processor[TaskType]):
 
         if cache is None:
             return toframe.new(cls.taskdicttype(), config = cnf)
-        print(cls, id(cache))
         return toframe.new(cls.taskdicttype(), config = cnf, cache = cache)
 
     @classmethod
@@ -62,5 +60,4 @@ class TaskViewProcessor(Generic[TaskType, TaskDict, Key], Processor[TaskType]):
         if cache is not False:
             cnf['cache'] = cache
 
-        print(self.__class__, id(cache))
         args.apply(self.apply(**cnf))
