@@ -6,12 +6,14 @@ Adds shortcuts for using holoview
 from   typing               import TypeVar
 from   abc                  import ABC, abstractmethod
 from   itertools            import chain, repeat
-
 from   copy                 import deepcopy
 
+
 import numpy                as     np
+import pandas               as     pd
 import holoviews            as     hv          # pylint: disable=import-error
 from   IPython              import get_ipython # pylint: disable=import-error
+from   IPython.display      import display as _display
 
 from   utils.decoration     import addto as _addto, addproperty
 from   utils.attrdefaults   import setdefault
@@ -19,6 +21,9 @@ from   utils.attrdefaults   import setdefault
 def _display_hook(item):
     "displays an item"
     disp  = item.display()
+    if isinstance(disp, pd.DataFrame):
+        return _display(disp)
+
     shell = get_ipython()
     if shell is not None:
         fmt   = shell.display_formatter.formatters['text/html']
