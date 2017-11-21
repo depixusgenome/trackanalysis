@@ -5,7 +5,7 @@ Creates a tasks property and adds it to the Track
 """
 from   typing             import Dict, Any, Union, cast
 from   utils.attrdefaults import addattributes
-from   data.__scripting__ import Track
+from   data.track         import Track, LazyProperty
 from   .tasks             import Tasks, Task
 
 class TaskDescriptor:
@@ -88,6 +88,8 @@ class LocalTasks:
     eventdetection = TaskDescriptor()
     peakselector   = TaskDescriptor()
 
-addattributes(Track, tasks = LocalTasks())
+Track.tasks = LazyProperty('tasks')
+addattributes(Track, protected = dict(tasks = LocalTasks()))
+
 Track.__doc__ += ("""
     * `tasks` a""" + LocalTasks.__doc__[6:])

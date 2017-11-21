@@ -19,7 +19,7 @@ from model                  import PHASE
 from model.__scripting__    import Tasks
 from signalfilter           import PrecisionAlg
 
-from ..                      import Track
+from ..track                import Track, LazyProperty
 
 @addproperty(Track, 'pathinfo')
 class PathInfo:
@@ -97,7 +97,9 @@ def measures(self):
     "returns cleaned cycles for phase 5 only"
     return self.cleancycles.withphases(PHASE.measure)
 
-addattributes(Track, cleaned = False)
+Track.cleaned = LazyProperty('cleaned')
+addattributes(Track, protected = dict(cleaned = False))
+
 Track.__doc__   += '* `pathinfo` p'+PathInfo.__doc__[5:]
 Track.cycles    .args['copy'] = True
 Track.cyclesonly.args['copy'] = True
