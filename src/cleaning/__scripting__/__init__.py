@@ -73,11 +73,8 @@ class TrackCleaningScript:
                 beads: Sequence[BEADKEY] = None,
                 **kwa) -> Dict[BEADKEY, Optional[DataCleaningException.ErrorMessage]]:
         "returns a dictionnary of cleaning results"
-        if beads:
-            itms = self.track.beadsonly[list(beads)]
-        else:
-            itms = self.track.beadsonly
-        get = lambda x: x if x is None else x.args[0]
+        itms = self.track.beadsonly[list(beads)] if beads else self.track.beadsonly
+        get  = lambda x: x if x is None else x.args[0]
         return {info[0]: get(DataCleaningProcessor.compute(itms, info, **kwa))
                 for info in cast(Iterator, itms)}
 
@@ -110,7 +107,7 @@ class TrackCleaningScript:
                 msgs .extend([i[2] for i in itms])
                 ids.extend((cast(int, i),)*(len(msgs)-len(ids)))
 
-        miss = list(set(beads)-set(self.track.beadsonly.keys()))
+        miss = list(set(beads)-set(self.track.beadsonly.keys())) if beads else []
         cycs .extend([self.track.ncycles]*len(miss))
         types.extend(['missing']*len(miss))
         msgs .extend([''] *len(miss))
