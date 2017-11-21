@@ -3,22 +3,19 @@
 """
 Adds a dictionnaries to access tracks, experiments, ...
 """
-from   typing               import Tuple, Iterator, List, cast
-import pickle
 import re
-import pandas               as     pd
-import numpy                as     np
+import pandas                       as     pd
+import numpy                        as     np
 
-from   utils                import initdefaults
-from   utils.decoration     import addto
+from   utils.decoration             import addto
 
-from   model                         import Level, Task
-from   model.__scripting__           import Tasks
-from   model.__scripting__.parallel  import Parallel
+from   model                        import Task
+from   model.__scripting__          import Tasks
+from   model.__scripting__.parallel import Parallel
 
-from   .track               import Track
-from   ..trackio            import savetrack, PATHTYPE, Handler
-from   ..tracksdict         import TracksDict as _TracksDict
+from   .track                       import Track
+from   ..trackio                    import savetrack, PATHTYPE, Handler
+from   ..tracksdict                 import TracksDict as _TracksDict
 
 @addto(Handler)
 def __call__(self, track = None, beadsonly = False, __old__ = Handler.__call__) -> Track:
@@ -244,76 +241,4 @@ class TracksDict(_TracksDict):
         {basedataframe.__doc__}
         """)
 
-class ExperimentList(dict):
-    "Provides access to keys belonging to a single experiment"
-    tracks : dict                 = TracksDict()
-    keysize: int                  = 3
-    keylist: List[Tuple[str,...]] = []
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        super().__init__()
-
-    def __missing__(self, keys):
-        keys = self.convert(keys)
-        vals = None
-        for key in keys:
-            tmp  = frozenset(self.tracks[key].beadsonly.keys())
-            vals = tmp if vals is None else cast(frozenset, vals) & tmp
-        self.__setitem__(keys, vals)
-        return vals
-
-    def convert(self, keys):
-        "converts keys to a list of keys"
-        if isinstance(keys, str):
-            if self.keysize is not None and len(keys) > self.keysize:
-                keys = tuple(keys[i:i+self.keysize] for i in range(len(keys)-self.keysize+1))
-            else:
-                keys = next(i for i in self.keylist if keys in i)
-        return keys
-
-    def word(self, keys):
-        "converts keys to a word"
-        keys = self.convert(keys)
-        return keys[0]+''.join(i[-1] for i in keys[1:])
-
-    def allkeys(self, oligo):
-        "returns all oligos used by a key"
-        return (next((list(i) for i in self.keylist if oligo in i), [oligo])
-                if isinstance(oligo, str) else
-                list(oligo))
-
-class BeadsDict(dict):
-    """
-    A dictionnary of potentially transformed bead data.
-
-    Keys are combinations of a track key and a bead number.
-    """
-    def __init__(self, tracks, *tasks):
-        super().__init__(self)
-        self.tracks = tracks
-        self.tasks  = tasks
-
-    def __missing__(self, key):
-        trk   = self.tracks[key[0]]
-        if len(key) == 2 and len(self.tasks) == 0:
-            return trk.beads[key[1]]
-
-        tasks = trk.tasklist(*(self.tasks if len(key) == 2 else key[2:]))
-        if len(key) > 2:
-            key = key[0], key[1], pickle.dumps(tasks[1:])
-
-        if key in self:
-            return self[key]
-
-        itm = trk.apply(*tasks[1:])
-        if itm.level in (Level.cycle, Level.event):
-            val = list(itm[key[1],...].values())
-        else:
-            val = itm[key[1]]
-            if isinstance(val, Iterator):
-                val = tuple(val)
-
-        self.__setitem__(key, val)
-        return val
-
-__all__ = ['TracksDict', 'BeadsDict', 'ExperimentList']
+__all__ = ['TracksDict']
