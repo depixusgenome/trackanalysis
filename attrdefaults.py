@@ -291,8 +291,13 @@ def initdefaults(*attrs, roots = ('',), mandatory = False, **kwa):
 
     return _wrapper if fcn is None else _wrapper(fcn)
 
-def addattributes(cls, **kwa):
+def addattributes(cls, *_, protected: Dict[str, Any] = None, **kwa):
     "Adds attributes to a class with its `__init__` previously decorated by `@initdefaults`"
+    if isinstance(protected, dict):
+        for i, j in protected.items():
+            setattr(cls, '_'+i, j)
+        cls.__init__.UPDATER.attrs  += tuple((i, '_'+i) for i in protected)
+
     for i, j in kwa.items():
         setattr(cls, i, j)
     cls.__init__.UPDATER.attrs  += tuple((i, i) for i in kwa)
