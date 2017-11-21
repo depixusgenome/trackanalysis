@@ -113,7 +113,7 @@ class FitToReferenceAccess(TaskAccess):
         if task is None or ibead not in task.fitdata:
             return np.full(len(xaxis), np.NaN, dtype = 'f4')
 
-        return Interpolator(task.fitdata[ibead].data, self.hmin)(xaxis)
+        return Interpolator(task.fitdata[ibead].data, miny = self.hmin)(xaxis)
 
     def identifiedpeaks(self, peaks):
         "returns an array of identified peaks"

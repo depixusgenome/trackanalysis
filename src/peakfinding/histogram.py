@@ -276,6 +276,8 @@ class Interpolator:
         else:
             xaxis = xaxis[good]
 
+        yaxis = yaxis[good]
+
         self._miny   = miny
         self._offset = offset
         kwa.setdefault('fill_value',   np.NaN)

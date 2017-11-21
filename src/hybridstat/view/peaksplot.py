@@ -91,7 +91,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
                              'widgets.border'  : 10}
 
         css = self.css.events
-        css.defaults = {'count'     : PlotAttrs('lightblue', 'circle', 8)}
+        css.defaults = {'count'     : PlotAttrs('lightblue', 'circle', 3)}
 
         css = self.css.reference
         css.defaults = {'count'     : PlotAttrs('lightgray', 'patch')}
@@ -144,10 +144,11 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         return peaks
 
     def __data(self) -> Dict[str, dict]:
-        dtl   = self._model.runbead()
-        data  = {i: np.empty(0, dtype = 'f4') for i in ('z', 'count')}
+        dtl    = self._model.runbead()
+        data   = {i: np.empty(0, dtype = 'f4') for i in ('z', 'count', 'ref')}
+        events = {i: np.empty(0, dtype = 'f4') for i in ('z', 'count')}
         if dtl is None:
-            return {'': data, 'events': data, 'peaks': self.__peaks(None)}
+            return {'': data, 'events': events, 'peaks': self.__peaks(None)}
 
         fit2ref = self._model.fittoreference
         pksel   = cast(PeakSelector, self._model.peakselection.task)
@@ -155,13 +156,14 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         maxv    = max(pksel.histogram.kernelarray())
         zvals   = np.arange(len(dtl.histogram), dtype = 'f4')
 
-        data    = dict(z     = zvals,
+        data    = dict(z     = dtl.binwidth*zvals+dtl.minvalue,
                        count = dtl.histogram/(maxv*self._model.track.ncycles)*100.,
                        ref   = fit2ref.refhistogram(zvals))
 
         pos     = np.concatenate(dtl.positions)
         events  = dict(z     = pos,
-                       count = Interpolator(zvals, data['count'], fit2ref.hmin)(pos))
+                       count = Interpolator(data['z'], data['count'], fit2ref.hmin)(pos))
+        print(events['count'])
         return {'': data, 'events': events, 'peaks': self.__peaks(dtl)}
 
     def _create(self, doc):
@@ -219,7 +221,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         for key in ('count', 'reference.count', 'events.count',
                     'peaks.count', 'peaks.duration'):
             src  = self._src.get(key.split('.')[0], self._src[''])
-            args = dict(y            = 'z',
+            args = dict(y            = 'ref' if key.startswith('ref') else 'z',
                         x            = key.split('.')[-1],
                         source       = src)
             if 'duration' in key:
