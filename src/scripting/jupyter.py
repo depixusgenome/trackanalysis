@@ -51,7 +51,7 @@ _configure_jupyter()
 try:
     import holoviews as hv
 except ImportError:
-    pass
+    raise RuntimeError("Missing holoviews")
 else:
     # type: ignore
     _configure_hv()

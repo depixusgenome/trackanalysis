@@ -79,8 +79,9 @@ def _test():
 if _is_jupyter():
     try:
         from .jupyter import * # type: ignore # pylint: disable=redefined-builtin
-    except ImportError:
-        pass
+    except RuntimeError as exc:
+        if exc.args != ("Missing holoviews",):
+            raise
     else:
         _ISJUP = True
 else:
