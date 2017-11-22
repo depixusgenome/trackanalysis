@@ -73,3 +73,5 @@ class LocalContext:
     config  = property(lambda self: BaseGlobalsAccess(self.__parent, None, 'config'))
     css     = property(lambda self: BaseGlobalsAccess(self.__parent, None, 'css'))
     project = property(lambda self: BaseGlobalsAccess(self.__parent, None, 'project'))
+
+__all__ = ['LocalContext']

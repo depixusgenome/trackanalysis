@@ -189,3 +189,5 @@ class GlobalsAccess(ABC):
     config  = property(lambda self: BaseGlobalsAccess(self.__model, self.__key, 'config'))
     css     = property(lambda self: BaseGlobalsAccess(self.__model, self.__key, 'css'))
     project = property(lambda self: BaseGlobalsAccess(self.__model, self.__key, 'project'))
+
+__all__ = ['GlobalsAccess', 'SingleMapAccess']

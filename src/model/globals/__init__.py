@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint: disable=wildcard-import
 "Storing global properties"
-from ._child    import GlobalsChild, EventPair, EventData, delete
-from ._access   import GlobalsAccess, SingleMapAccess
-from ._base     import Globals
-from ._context  import LocalContext
+from .              import _properties  as     PROPS
+from ._properties   import *
+from ._child        import *
+from ._access       import *
+from ._base         import *
+from ._context      import *

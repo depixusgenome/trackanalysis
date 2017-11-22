@@ -121,3 +121,5 @@ class Globals:
             if len(values) == 0:
                 cnf.pop(root)
         return cnf
+
+__all__ = ['Globals']

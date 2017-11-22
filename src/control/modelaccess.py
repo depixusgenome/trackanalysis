@@ -9,8 +9,7 @@ from functools       import wraps
 
 from signalfilter    import rawprecision
 from model.task      import RootTask, Task, taskorder, TASK_ORDER
-from model.globals   import (ConfigProperty, ConfigRootProperty, BeadProperty,
-                             ProjectRootProperty)
+from model.globals   import PROPS
 from data.track      import Track
 from data.views      import BEADKEY
 from utils           import NoArgs, updatecopy, updatedeepcopy
@@ -82,7 +81,7 @@ class TaskPlotModelAccess(PlotModelAccess):
 
     def clear(self):
         u"updates the model when a new track is loaded"
-        BeadProperty.clear(self)
+        PROPS.BeadProperty.clear(self)
 
     @property
     def roottask(self) -> Optional[RootTask]:
@@ -191,13 +190,6 @@ class TaskPlotModelAccess(PlotModelAccess):
             for attr in key.split('.'):
                 val = getattr(val, attr)
             val.observe(*items, fcn) # pylint: disable=no-member
-
-    class props: # pylint: disable=invalid-name
-        "access to property builders"
-        configroot  = ConfigRootProperty
-        projectroot = ProjectRootProperty
-        config      = ConfigProperty
-        bead        = BeadProperty
 
 class TaskAccess(TaskPlotModelAccess):
     "access to tasks"

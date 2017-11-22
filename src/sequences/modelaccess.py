@@ -7,7 +7,7 @@ from abc                    import abstractmethod
 from collections            import OrderedDict
 
 from utils                  import CachedIO
-from control.modelaccess    import TaskPlotModelAccess
+from control.modelaccess    import TaskPlotModelAccess, PROPS
 from model.globals          import ConfigRootProperty, BeadProperty
 from .                      import read as _readsequence, peaks as _sequencepeaks
 
@@ -21,7 +21,7 @@ def readsequence(path):
     except: # pylint: disable=bare-except
         return dict()
 
-class SequencePathProperty(ConfigRootProperty[Optional[str]]):
+class SequencePathProperty(ConfigRootProperty):
     "access to the sequence path"
     def __init__(self):
         super().__init__('tasks.sequence.path')
@@ -32,8 +32,8 @@ class SequencePathProperty(ConfigRootProperty[Optional[str]]):
 
 class SequencePlotModelAccess(TaskPlotModelAccess):
     "access to the sequence path and the oligo"
-    sequencepath = SequencePathProperty()
-    oligos       = ConfigRootProperty[Optional[Sequence[str]]]('tasks.oligos')
+    sequencepath = cast(Optional[str],           SequencePathProperty())
+    oligos       = cast(Optional[Sequence[str]], PROPS.configroot('tasks.oligos'))
 
     def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
@@ -80,7 +80,7 @@ class SequencePlotModelAccess(TaskPlotModelAccess):
             return False
         return True
 
-class SequenceKeyProp(BeadProperty[Optional[str]]):
+class SequenceKeyProp(BeadProperty):
     "access to the sequence key"
     def __init__(self):
         super().__init__('sequence.key')
@@ -101,7 +101,7 @@ class SequenceKeyProp(BeadProperty[Optional[str]]):
         dseq = dict(readsequence(obj.sequencepath))
         return next(iter(dseq), None) if key not in dseq else key
 
-class FitParamProp(BeadProperty[float]):
+class FitParamProp(BeadProperty):
     "access to bias or stretch"
     def __init__(self, attr):
         super().__init__('base.'+attr)
@@ -113,7 +113,9 @@ class FitParamProp(BeadProperty[float]):
             return getattr(obj, 'estimated'+self._key)
         return cast(float, val)
 
-    def setdefault(self, obj, items:Optional[dict] = None, **kwa):  # type: ignore
+    def setdefault(self, obj, # type: ignore # pylint: disable=arguments-differ
+                   items:Optional[dict] = None,
+                   **kwa):
         "initializes the property stores"
         super().setdefault(obj,
                            (None if self._key == 'bias' else 1./8.8e-4),

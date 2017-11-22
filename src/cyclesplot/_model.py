@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 "access to the model"
 
-from    typing                      import Tuple, Optional
+from    typing                      import Tuple, Optional, cast
 from    utils                       import NoArgs
 from    cordrift.processor          import DriftTask
 from    eventdetection.processor    import (ExtremumAlignmentTask,
                                             EventDetectionTask)
-from    control.modelaccess         import TaskAccess, TaskPlotModelAccess
+from    control.modelaccess         import TaskAccess, PROPS
 from    sequences.modelaccess       import (SequencePlotModelAccess,
                                             SequenceKeyProp, FitParamProp)
 
@@ -43,12 +43,12 @@ class CyclesModelAccess(SequencePlotModelAccess):
     def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
         cls = type(self)
-        cls.binwidth    .setdefault(self, 0.003)
-        cls.minframes   .setdefault(self, 10)
-        cls.stretch     .setdefault(self)       # type: ignore
-        cls.bias        .setdefault(self)       # type: ignore
-        cls.peaks       .setdefault(self, None)
-        cls.sequencekey .setdefault(self, None) # type: ignore
+        cls.binwidth    .setdefault(self, 0.003)    # type: ignore
+        cls.minframes   .setdefault(self, 10)       # type: ignore
+        cls.stretch     .setdefault(self)           # type: ignore
+        cls.bias        .setdefault(self)           # type: ignore
+        cls.peaks       .setdefault(self, None)     # type: ignore
+        cls.sequencekey .setdefault(self, None)     # type: ignore
 
         self.alignment      = TaskAccess(self, ExtremumAlignmentTask)
         self.driftperbead   = TaskAccess(self, DriftTask,
@@ -61,10 +61,9 @@ class CyclesModelAccess(SequencePlotModelAccess):
         self.eventdetection = EventDetectionTaskAccess(self)
         self.estimatedbias  = 0.
 
-    props        = TaskPlotModelAccess.props
-    sequencekey  = SequenceKeyProp()
-    binwidth     = props.config[float]                      ('binwidth')
-    minframes    = props.config[int]                        ('minframes')
-    stretch      = FitParamProp                             ('stretch')
-    bias         = FitParamProp                             ('bias')
-    peaks        = props.bead[Optional[Tuple[float,float]]] ('sequence.peaks') # type: ignore
+    sequencekey  = cast(Optional[str],                SequenceKeyProp())
+    binwidth     = cast(float,                        PROPS.config('binwidth'))
+    minframes    = cast(int,                          PROPS.config('minframes'))
+    peaks        = cast(Optional[Tuple[float,float]], PROPS.bead  ('sequence.peaks'))
+    stretch      = cast(Optional[float],              FitParamProp('stretch'))
+    bias         = cast(Optional[float],              FitParamProp('bias'))

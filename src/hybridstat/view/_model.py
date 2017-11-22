@@ -12,7 +12,7 @@ from sequences.modelaccess      import (SequencePlotModelAccess,
 
 from utils                      import updatecopy
 from control.processor          import processors
-from control.modelaccess        import TaskPlotModelAccess, TaskAccess
+from control.modelaccess        import PROPS, TaskAccess
 
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
 from peakfinding.processor      import PeakSelectorTask
@@ -119,18 +119,17 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         self.identification                 = FitToHairpinAccess(self)
 
         cls = type(self)
-        cls.constraintspath .setdefault(self, None)
-        cls.useparams       .setdefault(self, True)
+        cls.constraintspath .setdefault(self, None) # type: ignore
+        cls.useparams       .setdefault(self, True) # type: ignore
         cls.sequencekey     .setdefault(self, None) # type: ignore
         cls.stretch         .setdefault(self)       # type: ignore
         cls.bias            .setdefault(self)       # type: ignore
 
-    props           = TaskPlotModelAccess.props
-    sequencekey     = SequenceKeyProp()
-    stretch         = FitParamProp('stretch')
-    bias            = FitParamProp('bias')
-    constraintspath = props.projectroot[Optional[str]]('constraints.path')
-    useparams       = props.projectroot[bool]('constraints.useparams')
+    sequencekey     = cast(Optional[str],   SequenceKeyProp())
+    stretch         = cast(Optional[float], FitParamProp('stretch'))
+    bias            = cast(Optional[float], FitParamProp('bias'))
+    constraintspath = cast(Optional[str],   PROPS.projectroot('constraints.path'))
+    useparams       = cast(bool,            PROPS.projectroot('constraints.useparams'))
 
     @property
     def defaultidenfication(self):

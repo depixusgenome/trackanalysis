@@ -116,3 +116,5 @@ class GlobalsChild(ChainMap): # pylint: disable=too-many-ancestors
     def __setstate__(self, info):
         self.__name = info.pop(self.__NAME)
         self.maps[0].update(info)
+
+__all__ = ['GlobalsChild', 'EventPair', 'EventData', 'delete']
