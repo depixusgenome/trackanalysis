@@ -13,7 +13,6 @@ from sequences.modelaccess      import (SequencePlotModelAccess,
 
 from utils                      import updatecopy
 from control.modelaccess        import PROPS, TaskAccess
-from control.processor          import processors, Processor
 
 from model.task                 import RootTask
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
