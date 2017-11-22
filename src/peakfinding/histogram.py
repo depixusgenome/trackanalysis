@@ -464,7 +464,7 @@ class ByZeroCrossing:
 class ByGaussianMix:
     '''
     finds peaks and groups events using Gaussian mixture
-    the number of components is estimated using AIC criteria
+    the number of components is estimated using BIC criteria
     '''
     max_iter        = 10000
     cov_type        = 'full'
@@ -498,7 +498,6 @@ class ByGaussianMix:
         peaks    = gmm.means_.reshape(1,-1)[0] * slope + bias
         ids      = self.__strip(pos,events.reshape(-1,1),gmm)
 
-        # sorting
         speaks   = sorted([(idx,val) for idx,val in enumerate(peaks)],
                           key =lambda x:x[1])
 

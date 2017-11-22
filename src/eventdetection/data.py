@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Finds peak positions on a bead"
+"Finds peak positions on a bead"
 from typing           import (Iterator, Tuple, Union, Sequence,
                               Optional, cast, TYPE_CHECKING)
 from copy             import deepcopy
@@ -14,7 +14,7 @@ from utils            import EVENTS_TYPE, EVENTS_DTYPE, asview, EventsArray
 from .                import EventDetectionConfig
 
 class Events(Cycles, EventDetectionConfig, ITrackView):# pylint:disable=too-many-ancestors
-    u"""
+    """
     Class for iterating over events:
 
     * providing (column name, cycle id, event id) will extract an event on
