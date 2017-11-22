@@ -16,6 +16,7 @@ from utils.attrdefaults       import toenum
 from control.taskcontrol      import create as _create
 from control.processor.utils  import ActionTask
 from cleaning.processor       import DataCleaningTask
+from cleaning.beadsubtraction import BeadSubtractionTask
 from cordrift.processor       import DriftTask
 from eventdetection.processor import ExtremumAlignmentTask, EventDetectionTask
 from peakfinding.processor    import PeakSelectorTask, PeakCorrelationAlignmentTask
@@ -69,6 +70,7 @@ class Tasks(Enum):
     """
     action         = 'action'
     cleaning       = 'cleaning'
+    subtraction    = 'subtraction'
     selection      = 'selection'
     alignment      = 'alignment'
     driftperbead   = 'driftperbead'
@@ -83,24 +85,50 @@ class Tasks(Enum):
     dataframe      = 'dataframe'
     RESET          = Ellipsis
 
-    __taskorder__  = 'eventdetection', 'peakselector', 'fittohairpin'
-    __cleaning__   = 'cleaning', 'alignment'
-    __tasklist__   = __cleaning__ + __taskorder__
+    @classmethod
+    def __taskorder__(cls):
+        return cls.eventdetection, cls.peakselector, cls.fittohairpin
+
+    @classmethod
+    def __base_cleaning__(cls):
+        return cls.subtraction, cls.cleaning, cls.alignment
+
+    @classmethod
+    def __cleaning__(cls):
+        return cls.__base_cleaning__()
+
+    @classmethod
+    def __tasklist__(cls):
+        return (cls.selection,) + cls.__cleaning__() + cls.__taskorder__()
+
+    @classmethod
+    def __nodefault__(cls):
+        return cls.selection, cls.subtraction
+
     @classmethod
     def _missing_(cls, value):
-        if isinstance(value, Task):
+        if isinstance(value, Task) and not isinstance(value, DriftTask):
             value = type(value)
 
-        if isinstance(value, type) and issubclass(value, Task):
-            for i, j in cls.defaults().items():
-                if j.__class__ is value:
-                    return cls(i)
+        if isinstance(value, type):
+            if issubclass(value, DriftTask):
+                raise ValueError("DriftTask must be instantiated to be found be Tasks")
+
+            tsk = next((i for i, j in cls.defaults().items() if j.__class__ is value), None)
+            if tsk:
+                return cls(tsk)
+
+        if isinstance(value, DriftTask):
+            return (Tasks.driftperbead if cast(DriftTask, value).onbeads else
+                    Tasks.driftpercycle)
+
         super()._missing_(value) # type: ignore
 
     @staticmethod
     def defaults():
         "returns default tasks"
         return dict(cleaning       = DataCleaningTask(),
+                    subtraction    = BeadSubtractionTask(),
                     selection      = DataSelectionTask(),
                     alignment      = ExtremumAlignmentTask(),
                     driftperbead   = DriftTask(onbeads = True),
@@ -114,9 +142,13 @@ class Tasks(Enum):
                     beadsbyhairpin = BeadsByHairpinTask(),
                     dataframe      = DataFrameTask())
 
-    def default(self):
+    def default(self) -> Task:
         "returns default tasks"
         return self.defaults()[self.value]
+
+    def tasktype(self) -> Type[Task]:
+        "returns the task type"
+        return type(self.default())
 
     @classmethod
     def create(cls, *args, beadsonly = True, **kwa):
@@ -129,22 +161,26 @@ class Tasks(Enum):
     def defaulttaskorder(cls, order = None) -> Tuple[Type[Task],...]:
         "returns the default task order"
         if order is None:
-            order =  cls.__taskorder__
+            order =  cls.__taskorder__()
         items = tuple(type(cls(i)()) for i in order[::-1])
         return cast(Tuple[Type[Task],...], items[::-1])
 
     @classmethod
-    def defaulttasklist(cls, paths, upto, cleaned:bool) -> List[Task]:
+    def defaulttasklist(cls, obj, upto, cleaned:bool = None) -> List[Task]:
         "Returns a default task list depending on the type of raw data"
-        tasks = list(cls.__tasklist__) # type: ignore
-        if cleaned or (isinstance(paths, (tuple, list)) and len(paths) > 1):
-            tasks = [i for i in tasks if i not in cls.__cleaning__] # type: ignore
+        tasks = list(cls.__tasklist__()) # type: ignore
+        paths = getattr(obj, 'path', obj)
+        if (getattr(obj, 'cleaned', cleaned)
+                or (isinstance(paths, (tuple, list)) and len(paths) > 1)):
+            tasks = [i for i in tasks if i not in cls.__cleaning__()] # type: ignore
 
-        upto = cls(upto).value
-        itms = (tasks if upto is None       else
-                ()    if upto not in tasks  else
-                tasks[:tasks.index(upto)+1])
-        return [cls(i) for i in itms] # type: ignore
+        upto  = cls(upto) if upto is not None and upto is not Ellipsis else Ellipsis
+        itms  = (tasks if upto is Ellipsis  else
+                 ()    if upto not in tasks else
+                 tasks[:tasks.index(upto)+1])
+        nod   = cls.__nodefault__()
+        isdef = lambda i: i == type(i)()
+        return [i() for i in itms if i not in nod or not isdef(i())] # type: ignore
 
     @classmethod
     def tasklist(cls, *tasks, **kwa) -> List[Task]:
@@ -215,8 +251,6 @@ class Tasks(Enum):
         if Ellipsis in resets:
             resets = tuple(i for i in resets if i is not Ellipsis)
 
-
-        kwa.update({i: getattr(cls, i) for i, j in kwa.items() if j is self.RESET})
         kwa.update({i: getattr(cls, i) for i in resets if isinstance(i, str)})
         task = update(deepcopy(cnf), **kwa)
 
@@ -232,7 +266,7 @@ class Tasks(Enum):
             else:
                 setattr(obj, lst[-1], toenum(deflt, value))
 
-        return getattr(task, '__scripting__', lambda x: task)(kwa)
+        return task
 
     class _TaskGetter:
         def __get__(self, obj, tpe):

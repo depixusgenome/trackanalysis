@@ -15,16 +15,24 @@ from .                import EventDetectionConfig
 
 class Events(Cycles, EventDetectionConfig, ITrackView):# pylint:disable=too-many-ancestors
     """
-    Class for iterating over events:
+    This object provides a view on all events per cycle.
 
-    * providing (column name, cycle id, event id) will extract an event on
-      this column only.
+    Events are represented by an `EventArray`. The latter is a named numpy array.
+    The "start" field is the index in phase 5 when the event begins. The "data"
+    field is the event data. There is also a `discarded` attribute which indicates
+    the number of cycles which are filled with missing values:
 
-    * providing (column name, ..., event id) will extract all events for a given bead.
+    ```python
+    >>> for (ibead, icycle), data in events:
+    ...     assert isinstance(ibead, int)
+    ...     assert isinstance(icycle, int)
+    ...     assert all(isinstance(i, int)        for i in data['start'].dtype)
+    ...     assert all(isinstance(i, np.ndarray) for i in data['data'].dtype)
+    ```
 
-    * ...
-
+    It can be configured as a `Cycles` object:
     """
+    __doc__ += '\n'.join(Cycles.__doc__.split('\n'))
     level = Level.event
     first = PHASE.measure
     last  = PHASE.measure

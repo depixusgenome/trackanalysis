@@ -25,8 +25,6 @@ class PeaksArray(EventsArray):
     _discarded = 0
     _dtype     = None
 
-
-
 class PeakSelector(PrecisionAlg):
     "Selects peaks and yields all events related to each peak"
     rawfactor          = 2.

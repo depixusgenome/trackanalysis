@@ -3,7 +3,7 @@
 """
 Base track file data.
 """
-from    typing      import Type, Optional, Union, Dict, Tuple, cast
+from    typing      import Type, Optional, Union, Dict, Tuple, Any, List, cast
 from    copy        import deepcopy, copy as shallowcopy
 from    enum        import Enum
 import  numpy       as     np
@@ -124,30 +124,25 @@ class FoV:
 
 class LazyProperty:
     "Checks whether the file was opened prior to returning a value"
-    def __init__(self):
+    LIST: List[str] = []
+    def __init__(self, name = ''):
         self.__name = ''
+        if name:
+            self.__name = '_'+name
+            self.LIST.append(self.__name)
 
     def __set_name__(self, _, name):
-        self.__name = '_'+name
+        self.__init__(name)
 
-    def __get__(self, obj: 'Track', _):
-        if obj is None:
-            return self # type: ignore
-
-        if getattr(obj, '_lazy'):
-            setattr(obj, '_lazy', False)
-            getattr(obj, 'data') # call property: opens the file
-        return getattr(obj, self.__name)
+    def __get__(self, inst: 'Track', owner):
+        if inst is not None:
+            inst.load()
+        return getattr(owner if inst is None else inst, self.__name)
 
     def __set__(self, obj: 'Track', val):
-        if getattr(obj, '_lazy'):
-            setattr(obj, '_lazy', False)
-            getattr(obj, 'data') # call property: opens the file
+        obj.load()
         setattr(obj, self.__name, val)
         return getattr(obj, self.__name)
-
-def _prop(cls: type, val: bool):
-    return property(lambda self: self.view(cls, beadsonly = val), doc = cls.__doc__)
 
 class ResettingProperty:
     "Resets all if this attribute is changed"
@@ -161,16 +156,22 @@ class ResettingProperty:
         return getattr(obj, self.__name) if obj else self
 
     def __set__(self, obj: 'Track', val):
-        setattr(obj, '_lazy', False)
+        setattr(obj, '_lazy',     False)
         setattr(obj, self.__name, val)
-
-        for name in ('_framerate', '_phases', '_fov'):
-            setattr(obj, name, deepcopy(getattr((type(obj)), name)))
-
-        setattr(obj, '_data', None)
-        getattr(obj, '_rawprecisions').clear()
-        setattr(obj, '_lazy', True)
+        obj.unload()
         return getattr(self, self.__name)
+
+class ViewDescriptor:
+    "Access to views"
+    tpe : type           = None
+    args: Dict[str, Any] = dict()
+    def __get__(self, instance, owner):
+        return self if instance is None else instance.view(self.tpe, **self.args)
+
+    def __set_name__(self, _, name):
+        self.tpe  = Cycles if name.startswith('cycles') else Beads
+        self.args = dict(copy = False, beadsonly = 'only' in name)
+        setattr(self, '__doc__', getattr(self.tpe, '__doc__'))
 
 @levelprop(Level.project)
 class Track:
@@ -204,6 +205,12 @@ class Track:
     Other attributes are:
 
     * `framerate` is this experiment's frame rate
+    * `phases` is a 2D array with one row per cycle and one column per phase
+    containing the first index value of each cycle and phase.
+    * `path` is the path(s) to the data
+    * `axis` (Є {'X', 'Y', 'Z'}) is the data axis
+    * `ncycles` is the number of cycles
+    * `nphases` is the number of phases
     * `fov` is the field of view data:
 
         * `image` is one image of the field of view
@@ -244,6 +251,8 @@ class Track:
 
     def __setstate__(self, values):
         self.__init__(**values)
+        keys = frozenset(self.__getstate__().keys())
+        self.__dict__.update({i: j for i, j in values.items() if i not in keys})
 
     phases     = cast(np.ndarray,          LazyProperty())
     framerate  = cast(float,               LazyProperty())
@@ -252,24 +261,45 @@ class Track:
     axis       = cast(Axis,                ResettingProperty())
     ncycles    = cast(int,                 property(lambda self: len(self.phases)))
     nphases    = cast(int,                 property(lambda self: self.phases.shape[1]))
-    beads      = cast(Beads,               _prop(Beads,  False))
-    beadsonly  = cast(Beads,               _prop(Beads,  True))
-    cycles     = cast(Cycles,              _prop(Cycles, False))
-    cyclesonly = cast(Cycles,              _prop(Cycles, True))
+    beads      = cast(Beads,               ViewDescriptor())
+    beadsonly  = cast(Beads,               ViewDescriptor())
+    cycles     = cast(Cycles,              ViewDescriptor())
+    cyclesonly = cast(Cycles,              ViewDescriptor())
 
+    @property
+    def isloaded(self) -> bool:
+        "returns whether the data was already acccessed"
+        return self._lazy is False
+
+    def load(self):
+        "Loads the data"
+        if self._lazy:
+            if self._data is None and self._path is not None:
+                opentrack(self)
+            self._lazy = False
+
+    def unload(self):
+        "Unloads the data"
+        for name in LazyProperty.LIST:
+            setattr(self, name, deepcopy(getattr(type(self), name)))
+
+        self._rawprecisions.clear()
+        self._data = None
+        self._lazy = True
 
     @property
     def data(self) -> Dict:
         "returns the dataframe with all bead info"
-        if self._data is None and self._path is not None:
-            opentrack(self)
+        self.load()
         return self._data
 
     @data.setter
     def data(self, data: Optional[Dict[BEADKEY, np.ndarray]]):
         "sets the dataframe"
-        self._data = data
-        self._rawprecisions.clear()
+        if data is None:
+            self.unload()
+        else:
+            self._data = data
 
     @staticmethod
     def isbeadname(key) -> bool:

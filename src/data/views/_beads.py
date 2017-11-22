@@ -10,12 +10,40 @@ from   ._view import TrackView, ITrackView, Level
 
 class Beads(TrackView, ITrackView):
     """
-    Class for iterating over beads:
+    ### Slicing Methods
 
-    * providing all: selects all beads
+    One can:
 
-    * providing names or ids: selects only those columns
+    * iterate over a selection of beads:
+
+        * `track.beads[[1, 5]]` to select beads 1 and 5
+        * `track.beads[1:5]` to select beads from 1 to 5
+
+    * iterate over cycles: `track.beads[:,:]` returns a `Cycles` object
     """
+    __doc__ =  TrackView.__format_doc__(__doc__,
+                                        itercode   = """
+        >>> for ibead, data in track.beads:
+        ...     assert isinstance(ibead,  int)
+        ...     assert isinstance(data,   np.array)""",
+                                        actioncode = """
+        >>> def myfunction(frame: Bead, info: Tuple[int, np.ndarray]
+        ...               ) -> Tuple[int, np.ndarray]:
+        ...     return info[0], 1.5 * info[1]
+        >>> track.beads.withaction(myfunction)""",
+                                        chaincode  = """
+        >>> (track.beads
+        ...  .withsample(slice(10, 100, 2))
+        ...  .withaction(lambda _, i: (i[0], sum(i[1])))""",
+                                        datadescr  = """
+        Each iteration returns a the bead number and the data for that bead:""",
+                                        selecting  = """
+        * `selecting` allows selecting specific beads:
+
+            * `track.cycles.selecting(1)` selects bead 1
+            * `track.cycles.selecting([1, 2])` selects bead 1 and 2""",
+                                        views      = "beads")
+
     level         = Level.bead
     cycles: slice = None
     def __init__(self, **kwa):

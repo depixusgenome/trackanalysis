@@ -16,6 +16,9 @@ from   control.processor.dataframe      import DataFrameProcessor
 from   ..toreference                    import HistogramFit, ChiSquareHistogramFit
 from   ..processor                      import (FitToHairpinDict, FitToReferenceDict,
                                                 FitToReferenceTask)
+@addto(FitToReferenceTask)
+def __scripting_save__(self):
+    self.fitdata.clear()
 
 def _fit(self, tpe, sequence, oligos, kwa):
     "computes hairpin fits"
@@ -23,11 +26,10 @@ def _fit(self, tpe, sequence, oligos, kwa):
         kwa['sequence'] = sequence
         kwa['oligos']   = oligos
 
-    tasks = (Tasks.defaulttasklist(self.path, None, self.cleaned)
-             +(getattr(Tasks, tpe)(**kwa),))
-    if len(tasks[-1].distances) == 0:
+    last  = getattr(Tasks, tpe)(**kwa)
+    if not last.distances:
         raise IndexError('No distances found')
-    return self.apply(*tasks)
+    return self.apply(*Tasks.defaulttasklist(self, None), *last)
 
 @addto(Track)
 def fittohairpin(self, sequence = None, oligos = None, **kwa) -> FitToHairpinDict:

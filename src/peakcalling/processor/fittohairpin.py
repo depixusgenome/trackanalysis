@@ -54,10 +54,6 @@ class FitToHairpinTask(Task):
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-    def __scripting__(self, kwa):
-        self.__delayed_init__(kwa)
-        return self
-
     @classmethod
     def isslow(cls) -> bool:
         "whether this task implies long computations"

@@ -19,9 +19,11 @@ from   ..data                       import Events
 _RETURN_TYPE = FrozenSet[Tuple[int, int]]
 class Comparator:
     """
-    Allows selecting event keys which accept provided conditions.
+    This allows selecting cycles which accept provided conditions.
 
-    Can be used as follows:
+    The following will return a set of (bead, cycle) keys which follow the
+    given condition. These keys can be provided in turn to a `Cycles` or an `Events`
+    view to iterate over these keys only:
 
     ```python
     >> evts = Events(...)
@@ -116,15 +118,14 @@ class Comparator:
 
 @addto(Track, property)
 def events(self) -> Events:
-    """
-    Returns events in phase 5 only.
-
-    Its possible to select specific cycles depending on user-defined conditions
-    as follows:
-    """
-    return self.apply(*Tasks.defaulttasklist(self.path, Tasks.eventdetection, self.cleaned))
+    "Returns events in phase 5 only"
+    return self.apply(*Tasks.defaulttasklist(self, Tasks.eventdetection))
 # pylint: disable=no-member
-Track.events.__doc__ += Comparator.__doc__[Comparator.__doc__.find('follows:')+len('follows:'):]
+Events.__doc__      += (
+    """
+    One can also select cycles which accept provided conditions.
+    """+'\n'.join(Comparator.__doc__.split('\n')[2:]))
+Track.events.__doc__ = Events.__doc__
 
 adddataframe(Events)
 setattr(Events, 'any', property(lambda self: Comparator(self, any), doc = Comparator.__doc__))

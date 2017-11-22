@@ -23,7 +23,7 @@ example, the "plot" map will contain items for all plot types. The "plot.bead"
 map only needs specify those default values that should be changed for this type
 of plot.
 """
-from    typing        import Callable, Optional
+from    typing        import Callable, Optional, Dict
 from    functools     import partial
 from    itertools     import product
 import  inspect
@@ -144,19 +144,21 @@ class BaseGlobalsController(Controller):
     Controller class for global values.
     These can be accessed using a main key and secondary keys:
 
-    >> # Get the secondary key 'keypress.pan.x' in 'plot'
-    >> ctrl.getGlobal('plot').keypress.pan.x.low.get()
+    ```python
+    >>> # Get the secondary key 'keypress.pan.x' in 'plot'
+    >>> ctrl.getGlobal('plot').keypress.pan.x.low.get()
 
-    >> # Get the secondary keys 'keypress.pan.x.low' and 'high'
-    >> ctrl.getGlobal('plot').keypress.pan.x.get('low', 'high')
+    >>> # Get the secondary keys 'keypress.pan.x.low' and 'high'
+    >>> ctrl.getGlobal('plot').keypress.pan.x.get('low', 'high')
 
-    >> # Get secondary keys starting with 'keypress.pan.x'
-    >> ctrl.getGlobal('plot').keypress.pan.x.items
+    >>> # Get secondary keys starting with 'keypress.pan.x'
+    >>> ctrl.getGlobal('plot').keypress.pan.x.items
+    ```
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.__model = Globals()
-        self.__maps  = dict()
+        self.__model                                 = Globals()
+        self.__maps: Dict[str, SingleMapController]  = dict()
 
     def addGlobalMap(self, key, *args, **kwargs):
         "adds a map"
@@ -183,6 +185,8 @@ class BaseGlobalsController(Controller):
 
     def getGlobal(self, key, *args, default = delete):
         "returns values associated to the keys"
+        if key is Ellipsis:
+            return self
         if len(args) == 0 or len(args) == 1 and args[0] == '':
             return SingleMapAccessController(self.__maps[key], '')
         return self.__maps[key].get(*args, default = default)

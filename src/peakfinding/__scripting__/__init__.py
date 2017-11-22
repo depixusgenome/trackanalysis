@@ -24,7 +24,7 @@ from ..processor.selector           import PeaksDict, PeakOutput
 @property
 def peaks(self) -> PeaksDict:
     "returns peaks found"
-    return self.apply(*Tasks.defaulttasklist(self.path, Tasks.peakselector, self.cleaned))
+    return self.apply(*Tasks.defaulttasklist(self, Tasks.peakselector))
 
 class Detailed:
     "Deals with easy acccess to peaks data"

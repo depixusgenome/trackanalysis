@@ -16,15 +16,48 @@ _m_NONE  = type('_m_NONE', (), {})             # pylint: disable=invalid-name
 
 class Cycles(TrackView, ITrackView):
     """
-    Class for iterating over selected cycles:
+    ### Slicing Methods
 
-    * providing a pair (column name, cycle id) will extract a cycle on
-      this column only.
+    One can iterate over a selection of cycles and beads:
 
-    * providing a pair (column name, all) will extract all cycles for a given bead.
-
-    * providing with a unique cycle id will extract all columns for that cycle
+        * `track.cycles[[1, 5], [2, 7]]` to beads 1 and 5 and their cycles 2 and 7
+        * `track.cycles[:,:10]` to select all beads and their cycles 0 through 9
+        * `track.cycles[:10,:]` to select beads 0 through 9 and all their cycles
     """
+    __doc__ =  TrackView.__format_doc__(__doc__,
+                                        itercode   = """
+        >>> for (ibead, icycle), data in track.cycles:
+        ...     assert isinstance(ibead,  int)
+        ...     assert isinstance(icycle, int)
+        ...     assert isinstance(data,   np.array)""",
+                                        actioncode = """
+        >>> def myfunction(frame: Cycle,
+        ...                info: Tuple[Tuple[int, int], np.ndarray]
+        ...               ) -> Tuple[Tuple[int, int], np.ndarray]:
+        ...     return info[0], 1.5 * info[1]
+        >>> track.cycles.withaction(myfunction)""",
+                                        chaincode  = """
+        >>> (track.cycles
+        ...  .withphases(5)
+        ...  .withsample(slice(10, 100, 2))
+        ...  .withaction(lambda _, i: (i[0], sum(i[1])))""",
+                                        datadescr  = """
+        Each iteration returns a tuple, indicating the bead number and the cycle
+        number, and the data for that cycle:""",
+                                        selecting  = """
+        * `selecting` allows selecting:
+
+            * beads:
+
+                * `track.cycles.selecting(1)` selects bead 1
+                * `track.cycles.selecting([1, 2])` selects bead 1 and 2
+
+            * cycles:
+
+                * `track.cycles.selecting((..., 1))` selects cycle 1 for all beads
+                * `track.cycles.selecting([(1,1), (1,2)])` selects bead 1 cycles 1 and 2""",
+                                        views      = "cycles")
+
     level      = Level.cycle
     first: int = None
     last:  int = None
