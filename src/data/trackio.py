@@ -398,6 +398,8 @@ class Handler:
                 raise IOError("Could not find path: " + str(paths), "warning")
         else:
             paths = tuple(str(i) for i in paths)
+            if getattr(track,"_axis").name != "Zaxis":
+                raise ValueError(f"Cannot read XY axes with gr files")
             for i in paths:
                 if '*' in i:
                     if next(_glob(i), None) is None:
