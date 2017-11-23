@@ -346,8 +346,10 @@ class Track:
         kwa.setdefault('track',   self)
         return viewtype(**kwa)
 
-def dropbeads(trk, *beads:Tuple[BEADKEY]) -> Track:
+def dropbeads(trk, *beads:BEADKEY) -> Track:
     "returns a track without the given beads"
+    if len(beads) == 1 and isinstance(beads[0], (tuple, list, set, frozenset)):
+        beads = tuple(beads[0])
     cpy           = shallowcopy(trk)
     good          = frozenset(trk.data.keys()) - frozenset(beads)
     cpy.data      = {i: cpy.data[i] for i in good}
@@ -356,3 +358,9 @@ def dropbeads(trk, *beads:Tuple[BEADKEY]) -> Track:
     good          = good & frozenset(cpy.fov.beads)
     cpy.fov.beads = {i: cpy.fov.beads[i] for i in good}
     return cpy
+
+def selectbeads(trk, *beads:BEADKEY) -> Track:
+    "returns a track without the given beads"
+    if len(beads) == 1 and isinstance(beads[0], (tuple, list, set, frozenset)):
+        beads = tuple(beads[0])
+    return dropbeads(set(trk.beadsonly.keys()) - set(beads))
