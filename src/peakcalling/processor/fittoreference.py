@@ -141,9 +141,10 @@ class FitToReferenceTask(Task):
     @defaultdata.setter
     def defaultdata(self, val) -> Optional[FitData]:
         "returns the default data"
+        alg = self.fitalg
         fcn = lambda j: (j if isinstance(j, FitData) else FitData(j, (1., 0)))
-        out = fcn(self.fitalg.frompeaks(val)  if isinstance(val, PeaksDict) else
-                  self.fitalg.fromevents(val) if isinstance(val, Events)    else
+        out = fcn(alg.frompeaks(next(val.values())) if isinstance(val, PeaksDict) else
+                  alg.fromevents(val)               if isinstance(val, Events)    else
                   val)
         self._fitdata[self.DEFAULTKEY] = out
         return out
