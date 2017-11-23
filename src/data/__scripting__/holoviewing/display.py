@@ -4,6 +4,7 @@
 Adds shortcuts for using holoview
 """
 import sys
+from   typing                import List, Union
 from   copy                  import deepcopy
 import numpy                 as     np
 
@@ -14,14 +15,14 @@ hv    = sys.modules['holoviews']  # pylint: disable=invalid-name
 
 class Display(BasicDisplay): # pylint: disable=abstract-method
     "displays the beads or cycles"
-    _kdim    = 'bead'
-    _labels  = None
-    _tpe     = 'curve'
-    _overlay = False
-    _keys    = None
-    _stretch = 1.
-    _bias    = 0.
-    KEYWORDS = BasicDisplay.KEYWORDS | frozenset(locals())
+    _kdim                     = 'bead'
+    _labels: Union[str, bool] = None
+    _tpe                      = 'curve'
+    _overlay                  = False
+    _keys:   List[str]        = None
+    _stretch                  = 1.
+    _bias                     = 0.
+    KEYWORDS                  = BasicDisplay.KEYWORDS | frozenset(locals())
     def __init__(self, items, **opts):
         super().__init__(items, **opts)
         if isinstance(self._tpe, str):

@@ -3,7 +3,7 @@
 """
 Adds shortcuts for using holoview
 """
-from   typing               import TypeVar
+from   typing               import TypeVar, FrozenSet
 from   abc                  import ABC, abstractmethod
 from   itertools            import chain, repeat
 from   copy                 import deepcopy
@@ -65,7 +65,7 @@ Self = TypeVar('Self', bound = 'BasicDisplay')
 @displayhook
 class BasicDisplay(ABC):
     "Everything needed for creating a dynamic map display"
-    KEYWORDS = frozenset(locals())
+    KEYWORDS: FrozenSet[str] = frozenset()
     def __init__(self, items, **opts):
         if isinstance(items, BasicDisplay):
             opts, kwa   = items.config(minimal = True), opts
