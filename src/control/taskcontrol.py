@@ -19,6 +19,7 @@ from model.task      import Task, RootTask, TaskIsUniqueError, taskorder, TASK_O
 from .event          import Controller, NoEmission
 from .processor      import Cache, Processor, run as _runprocessors
 from .processor.base import register, CACHE_T
+from .taskio         import openmodels
 
 if TYPE_CHECKING:
     from data import Track # pylint: disable=unused-import
@@ -248,10 +249,13 @@ class BaseTaskController(Controller):
             task = cast(RootTask, tasks[0])
 
         if not isinstance(task, RootTask):
-            self.__withopeners(cast(PATHTYPES, task), tasks)
-            raise NoEmission()
+            lst = openmodels(self.__openers, task, tasks)
+            for elem in lst[:-1]:
+                ctrl = create(elem, processors = self.__processors)
+                self.__items[cast(RootTask, elem[0])] = ctrl
+            task, tasks  = lst[-1][0], lst[-1]
 
-        if len(tasks) == 0:
+        elif len(tasks) == 0:
             tasks = (task,)
 
         elif tasks[0] is not task:
@@ -316,28 +320,6 @@ class BaseTaskController(Controller):
             self.__items[cast(RootTask, parent)].update(task)
         return dict(controller = self, parent = parent, task = Task)
 
-    def __withopeners(self, task, tasks):
-        for obj in self.__openers:
-            models = obj.open(task, tasks)
-            if models is not None:
-                break
-        else:
-            path = getattr(task, 'path', 'path')
-            if path is None or (isinstance(path, (list, tuple))) and len(path) == 0:
-                msg  = u"Couldn't open track"
-
-            elif isinstance(path, (tuple, list)):
-                msg  = u"Couldn't open: " + Path(str(path[0])).name
-                if len(path):
-                    msg += ", ..."
-            else:
-                msg  = u"Couldn't open: " + Path(str(path)).name
-
-            raise IOError(msg, 'warning')
-
-        for elem in models:
-            self.openTrack(model = elem)
-
 class TaskController(BaseTaskController):
     "Task controller class which knows about globals"
     def __init__(self, **kwa):
@@ -390,14 +372,15 @@ class TaskController(BaseTaskController):
         return len(curr)
 
     def openTrack(self,
-                  task : Union[str, RootTask] = None,
-                  model: Iterable[Task]       = tuple()):
-        if task is None and isinstance(model, dict):
+                  task : Union[str, RootTask, Dict[str,str]] = None,
+                  model: Union[dict, Iterable[Task]]         = tuple()):
+        if isinstance(model, dict):
+            assert task is None
             if len(model.get('tasks', (()))[0]):
                 super().openTrack(model = model.pop("tasks")[0])
-                self.__readconfig( model, dict)
+                self.__readconfig(model)
         else:
-            super().openTrack(task, model)
+            super().openTrack(task, cast(Iterable[Task], model))
 
     def addTask(self, parent:RootTask, task:Task, # pylint: disable=arguments-differ
                 index = _m_none, side = 0):

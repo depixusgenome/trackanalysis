@@ -432,7 +432,7 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
             if isinstance(path, (list, tuple)):
                 path = path[0]
             title = doc.title.split(':')[0]
-            if path is not None and len(path) > 0:
+            if path:
                 title += ':' + Path(path).stem
             doc.title = title
 

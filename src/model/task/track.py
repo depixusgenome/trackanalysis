@@ -17,19 +17,26 @@ PATHTYPE  = Union[_PATHTYPE, Dict[str,_PATHTYPE]]
 
 class TrackReaderTask(RootTask):
     "Class indicating that a track file should be added to memory"
-    def __init__(self,  # pylint: disable=too-many-arguments
-                 path:      PATHTYPE = None,
-                 beadsonly: bool     = False,
-                 copy:      bool     = False,
-                 key:       str      = None,
-                 axis:      str      = 'Z',
-                 **kwa) -> None:
+    path:      PATHTYPE = None
+    beadsonly: bool     = False
+    copy:      bool     = False
+    key:       str      = None
+    axis:      str      = 'Z'
+    def __init__(self, path = None, **kwa) -> None:
         super().__init__(**kwa)
-        self.path      = path
-        self.beadsonly = beadsonly
-        self.copy      = copy
-        self.key       = key
-        self.axis      = axis
+        lst = 'path', 'beadsonly', 'copy', 'key', 'axis'
+        if hasattr(path, 'axis'):
+            # Conversion for Track object
+            kwa, tmp = {i: getattr(path, i) for i in lst}, kwa
+            kwa.update(tmp)
+        else:
+            kwa['path'] = path
+
+        for i in lst:
+            setattr(self, i, kwa.get(i, getattr(self.__class__, i)))
+
+        # making sure the axis is a str
+        self.axis = getattr(self.axis, 'value', self.axis)
 
 class CycleCreatorTask(Task):
     "Task for dividing a bead's data into cycles"
@@ -37,6 +44,10 @@ class CycleCreatorTask(Task):
     levelou    = Level.cycle
     first: int = None
     last:  int = None
+    @initdefaults(('first', 'last'))
+    def __init__(self, **_) -> None:
+        super().__init__()
+
     @classmethod
     def unique(cls):
         "returns class or parent task if must remain unique"
