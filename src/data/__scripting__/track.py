@@ -19,7 +19,8 @@ from model                  import PHASE
 from model.__scripting__    import Tasks
 from signalfilter           import PrecisionAlg
 
-from ..track                import Track, LazyProperty
+from ..track                import Track, LazyProperty, BEADKEY, selectbeads, renamebeads
+from ..tracksdict           import TracksDict
 
 @addproperty(Track, 'pathinfo')
 class PathInfo:
@@ -96,6 +97,20 @@ def cleancycles(self):
 def measures(self):
     "returns cleaned cycles for phase 5 only"
     return self.cleancycles.withphases(PHASE.measure)
+
+@addto(Track)
+def astracksdict(self, *beads:BEADKEY) -> TracksDict:
+    """
+    Converts this to a `TracksDict` object, with one bead per track.
+
+    This can be used to work across beads in a track as one would accross
+    tracks in a `TracksDict`.
+    """
+    if len(beads) == 1 and isinstance(beads[0], (tuple, list, set, frozenset)):
+        beads = tuple(beads[0])
+    if len(beads) == 0:
+        beads = tuple(self.beadsonly.keys())
+    return TracksDict({i: renamebeads(selectbeads(self, i), (i, 0)) for i in beads})
 
 Track.cleaned = LazyProperty('cleaned')
 addattributes(Track, protected = dict(cleaned = False))

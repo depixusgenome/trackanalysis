@@ -348,19 +348,31 @@ class Track:
 
 def dropbeads(trk, *beads:BEADKEY) -> Track:
     "returns a track without the given beads"
+    trk.load()
     if len(beads) == 1 and isinstance(beads[0], (tuple, list, set, frozenset)):
         beads = tuple(beads[0])
     cpy           = shallowcopy(trk)
-    good          = frozenset(trk.data.keys()) - frozenset(beads)
-    cpy.data      = {i: cpy.data[i] for i in good}
+    good          = (frozenset(trk.data.keys()) - frozenset(beads)) | {'t', 'zmag'}
+    cpy.data      = {i: trk.data[i] for i in good}
 
     cpy.fov       = shallowcopy(trk.fov)
-    good          = good & frozenset(cpy.fov.beads)
-    cpy.fov.beads = {i: cpy.fov.beads[i] for i in good}
+    good          = good & frozenset(trk.fov.beads)
+    cpy.fov.beads = {i: trk.fov.beads[i] for i in good}
+    return cpy
+
+def renamebeads(trk, *beads:Tuple[BEADKEY, BEADKEY]) -> Track:
+    "returns a track without the given beads"
+    trk.load()
+    cpy = shallowcopy(trk)
+    rep = dict(beads)
+
+    cpy.data      = {rep.get(i, i): j for i, j in trk.data.items()}
+    cpy.fov       = shallowcopy(trk.fov)
+    cpy.fov.beads = {rep.get(i, i): j for i, j in trk.fov.beads.items()}
     return cpy
 
 def selectbeads(trk, *beads:BEADKEY) -> Track:
     "returns a track without the given beads"
     if len(beads) == 1 and isinstance(beads[0], (tuple, list, set, frozenset)):
         beads = tuple(beads[0])
-    return dropbeads(set(trk.beadsonly.keys()) - set(beads))
+    return dropbeads(trk, *(set(trk.beadsonly.keys()) - set(beads)))
