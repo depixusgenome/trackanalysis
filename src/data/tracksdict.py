@@ -285,6 +285,10 @@ class TracksDict(dict):
 
         Using the specified keywords, it's also possible to scan for tracks.
         """
+        if isinstance(tracks, dict):
+            for i, j in tracks.items():
+                self._set(i, j, allaxes)
+            tracks = grs = cgrdir = match = None
         scan = {'cgrdir': cgrdir, 'allleaves': allleaves}
         for i in self._SCAN_OPTS:
             if i in kwargs:
