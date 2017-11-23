@@ -81,7 +81,7 @@ class BeadProperty:
     def clear(cls, obj):
         "clears the property stores"
         pred = lambda i: isinstance(i, cls)
-        for prop, _ in inspect.getmembers(type(obj), pred):
+        for _, prop in inspect.getmembers(type(obj), pred):
             obj.project[getattr(prop, 'key')].get().clear()
 
     def __get__(self, obj, tpe):
