@@ -265,6 +265,10 @@ class Track:
     beadsonly  = cast(Beads,               ViewDescriptor())
     cycles     = cast(Cycles,              ViewDescriptor())
     cyclesonly = cast(Cycles,              ViewDescriptor())
+    @property
+    def nframes(self) -> int:
+        "returns the number of frames"
+        return len(next(iter(self.data.values()), []))
 
     @property
     def isloaded(self) -> bool:
@@ -312,7 +316,7 @@ class Track:
         if isellipsis(pid):
             ix1, ix2 = 0, -1
         elif isinstance(pid, int):
-            if pid in (-1, phases.shape[1]):
+            if pid in (-1, phases.shape[1]-1):
                 return np.insert(phases[0,1:]-phases[-1,:-1], len(phases), np.iinfo('i4').max)
             else:
                 ix1, ix2 = pid, pid+1

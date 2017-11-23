@@ -27,7 +27,7 @@ class DataFrameFactory(Generic[Frame]):
 
     def getfunctions(self) -> Iterator[Tuple[str, Callable]]:
         "returns measures, with string changed to methods from np"
-        itr = ((i, self.getfunction(j)) for i, j in self.task.measures.items())
+        itr = ((i, self.getfunction(cast(str, j))) for i, j in self.task.measures.items())
         return (i for i in itr if i[1])
 
     @staticmethod

@@ -50,41 +50,20 @@ class Beads(TrackView, ITrackView):
         super().__init__(self, **kwa)
         self.__withcycles(kwa.get('cycles', ...))
 
-    def _keys(self, sel:Optional[Sequence], beadsonly: bool) -> Iterator[BEADKEY]:
-        if isinstance(self.data, Beads):
-            if sel is None:
-                yield from self.data.keys(None, beadsonly)
-            else:
-                yield from (i for i in self.data.keys(None, beadsonly) if i in sel)
-        else:
-            yield from super()._keys(sel, beadsonly)
+    @property
+    def phases(self) -> np.ndarray:
+        "returns the phases, with the 1st value always set to 0"
+        iphas = self.track.phases[self.cycles,:]
+        return iphas - iphas[0, 0]
 
-    def _iter(self, sel = None) -> Iterator[Tuple[BEADKEY, np.ndarray]]:
-        if isinstance(self.data, Beads) and self.cycles is None:
-            beads = cast(Beads, self.data)
-            if sel is None:
-                sel = self.selected
-
-            if sel is None:
-                yield from beads.__iter__() # pylint: disable=no-member
-
-            elif beads.selected:
-                parent = frozenset(beads.keys())
-                sel    = [i for i in shallowcopy(beads).selecting(sel, True).keys()
-                          if i in parent]
-            yield from shallowcopy(beads).selecting(sel, clear = True).__iter__()
-            return
-
-        itr = ((bead, self.data[bead]) for bead in self.keys(sel))
-        if self.cycles is not None:
-            cyc  = self.cycles
-            def _get(arr):
-                ind1 = None if cyc.start is None else self.track.phases[cyc.start,0]
-                ind2 = None if cyc.stop  is None else self.track.phases[cyc.stop, 0]
-                return arr[ind1:ind2]
-            itr = ((bead, _get(arr)) for bead, arr in itr)
-
-        yield from itr
+    @property
+    def nframes(self) -> int:
+        "returns the number of frames"
+        crng = self.cyclerange()
+        if crng.stop < self.track.ncycles:
+            start = self.track.phase(crng.start if crng.start else 0, 0)
+            return self.track.phase(crng.stop+1, 0) - start
+        return self.track.nframes
 
     def __getitem__(self, keys) -> Union['Beads',np.ndarray]:
         if isinstance(keys, tuple):
@@ -123,6 +102,42 @@ class Beads(TrackView, ITrackView):
     def isbead(key) -> bool:
         "returns whether the key is one for a bead"
         return isint(key)
+
+    def _keys(self, sel:Optional[Sequence], beadsonly: bool) -> Iterator[BEADKEY]:
+        if isinstance(self.data, Beads):
+            if sel is None:
+                yield from self.data.keys(None, beadsonly)
+            else:
+                yield from (i for i in self.data.keys(None, beadsonly) if i in sel)
+        else:
+            yield from super()._keys(sel, beadsonly)
+
+    def _iter(self, sel = None) -> Iterator[Tuple[BEADKEY, np.ndarray]]:
+        if isinstance(self.data, Beads) and self.cycles is None:
+            beads = cast(Beads, self.data)
+            if sel is None:
+                sel = self.selected
+
+            if sel is None:
+                yield from beads.__iter__() # pylint: disable=no-member
+
+            elif beads.selected:
+                parent = frozenset(beads.keys())
+                sel    = [i for i in shallowcopy(beads).selecting(sel, True).keys()
+                          if i in parent]
+            yield from shallowcopy(beads).selecting(sel, clear = True).__iter__()
+            return
+
+        itr = ((bead, self.data[bead]) for bead in self.keys(sel))
+        if self.cycles is not None:
+            cyc  = self.cycles
+            def _get(arr):
+                ind1 = None if cyc.start is None else self.track.phases[cyc.start,0]
+                ind2 = None if cyc.stop  is None else self.track.phases[cyc.stop, 0]
+                return arr[ind1:ind2]
+            itr = ((bead, _get(arr)) for bead, arr in itr)
+
+        yield from itr
 
     def __withcycles(self, cyc) -> 'Beads':
         "specifies that only some cycles should be taken"
