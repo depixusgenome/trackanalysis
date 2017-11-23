@@ -374,7 +374,7 @@ class _2DRef(PeaksTracksDictDisplay):
         ind  = 0
         sp2.pop(ind)
         ref2 = (np.zeros((len(sp1[ind]),3))+[0., len(sp1), np.NaN]).ravel()
-        ref  = hv.Curve((np.repeat(sp1.pop(ind), 3), ref2), label = self._reference)
+        ref  = hv.Curve((np.repeat(sp1.pop(ind), 3), ref2), label = f'{self._reference}')
         return ref(style = self._refstyle)
 
 class _ManualRef(PeaksTracksDictDisplay):

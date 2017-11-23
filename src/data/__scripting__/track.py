@@ -15,12 +15,13 @@ from datetime               import datetime
 
 from utils.decoration       import addto, addproperty
 from utils.attrdefaults     import addattributes
-from model                  import PHASE
+from model                  import PHASE, Task
 from model.__scripting__    import Tasks
 from signalfilter           import PrecisionAlg
 
-from ..track                import Track, LazyProperty, BEADKEY, selectbeads, renamebeads
-from ..tracksdict           import TracksDict
+from ..track                import (Track, LazyProperty, BEADKEY,
+                                    selectbeads, renamebeads, dropbeads)
+from .tracksdict            import TracksDict
 
 @addproperty(Track, 'pathinfo')
 class PathInfo:
@@ -111,6 +112,22 @@ def astracksdict(self, *beads:BEADKEY) -> TracksDict:
     if len(beads) == 0:
         beads = tuple(self.beadsonly.keys())
     return TracksDict({i: renamebeads(selectbeads(self, i), (i, 0)) for i in beads})
+
+@addto(Track)
+def __getitem__(self, value):
+    if isinstance(value, (Task, Tasks)):
+        value = (value,)
+
+    if isinstance(value, range):
+        value = set(value) & set(self.data.keys())
+
+    if isinstance(value, (list, set, tuple, frozenset)):
+        if all(isinstance(i, (Task, Tasks)) for i in value):
+            return self.apply(*value)
+        if '~' in value:
+            return dropbeads(self, *(i for i in value if i != '~'))
+
+    return selectbeads(self, value)
 
 Track.cleaned = LazyProperty('cleaned')
 addattributes(Track, protected = dict(cleaned = False))

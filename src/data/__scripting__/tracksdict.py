@@ -13,7 +13,7 @@ from   model                        import Task
 from   model.__scripting__          import Tasks
 from   model.__scripting__.parallel import Parallel
 
-from   .track                       import Track
+from   ..track                      import Track
 from   ..trackio                    import savetrack, PATHTYPE, Handler
 from   ..tracksdict                 import TracksDict as _TracksDict
 
