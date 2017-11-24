@@ -8,12 +8,12 @@ from testingcore    import path
 def test_opengr():
     u"test a .gr file"
     ret = readgr(path("grfile.gr"))
-    assert ret['title'] == ('\\stack{{Bead 0 Z(t) 10}'
-                            +'{\\pt7 Cycles:[3,104] phase(s) [1,2,3,4,5,6,7]}}')
+    assert ret['title'] == (b'\\stack{{Bead 0 Z(t) 10}'
+                            b'{\\pt7 Cycles:[3,104] phase(s) [1,2,3,4,5,6,7]}}')
     assert len(ret) == 101
-    key = ('Bead Cycle 95 phase(s): [1,2,3,4,5,6,7] '
-           +'tracking at xx Hz Acquistion 10 for bead 0 \n'
-           +' Z coordinate l = xx, w = xx, nim = xx\n')
+    key = (b'Bead Cycle 95 phase(s): [1,2,3,4,5,6,7] '
+           b'tracking at xx Hz Acquistion 10 for bead 0 \n'
+           b' Z coordinate l = xx, w = xx, nim = xx\n')
     assert len(ret[key]) == 2
     assert len(ret[key][0]) == 448
     assert len(ret[key][1]) == 448
@@ -55,3 +55,6 @@ def test_opentrack_bugged():
     u"tests opening incorrect or missing trks"
     assert readtrack("does_not_exist.trk") is None
     assert readtrack(path("grfile.gr")) is None
+
+if __name__ == '__main__':
+    test_opengr()

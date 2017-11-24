@@ -36,6 +36,8 @@ namespace legacy
         bool   islost(int i) const;
         void   cycles(int *)            const;
         void   t     (int *)            const;
+        void   status(int *)            const;
+        void   zmagcmd(float *)         const;
         void   zmag  (float *)          const;
         void   rot   (float *)          const;
         void   bead  (size_t, float *)  const;
@@ -43,6 +45,8 @@ namespace legacy
         void   ybead (size_t, float *)  const;
         void   cycles(std::vector<int>    & x) const { x.resize(nphases()*ncycles()); cycles(x.data()); }
         void   t     (std::vector<int>    & x) const { x.resize(nrecs());   t     (x.data()); }
+        void   status(std::vector<int>    & x) const { x.resize(nrecs());   status(x.data()); }
+        void   zmagcmd(std::vector<float>  & x) const { x.resize(nrecs());  zmagcmd(x.data()); }
         void   zmag  (std::vector<float>  & x) const { x.resize(nrecs());   zmag  (x.data()); }
         void   rot   (std::vector<float>  & x) const { x.resize(nrecs());   rot   (x.data()); }
         void   bead  (size_t i, std::vector<float> & x) const
@@ -56,17 +60,22 @@ namespace legacy
         void   destroyfov(int dt, void *& ptr);
         std::map<int, std::tuple<float, float, float>> pos()  const;
 
+        std::vector<std::vector<std::pair<int, float> > > temperatures() const;
+        std::vector<std::pair<int, float>>  vcap        ()  const;
+
         std::vector<int  >  t     ()         const { decltype(t   ())   x; t   (x);     return x; }
+        std::vector<int  >  status()         const { decltype(status()) x; status(x);   return x; }
+        std::vector<float>  zmagcmd()        const { decltype(zmagcmd()) x; zmagcmd(x); return x; }
         std::vector<float>  zmag  ()         const { decltype(zmag())   x; zmag(x);     return x; }
         std::vector<float>  rot   ()         const { decltype(rot ())   x; rot (x);     return x; }
         std::vector<float>  bead  (size_t i) const { decltype(bead(0))  x; bead(i, x);  return x; }
         std::vector<float>  xbead (size_t i) const { decltype(bead(0))  x; xbead(i, x); return x; }
         std::vector<float>  ybead (size_t i) const { decltype(bead(0))  x; ybead(i, x); return x; }
         std::vector<float>  bead  (size_t i, int tpe) const
-        { 
+        {
           decltype(bead(0))  x;
           tpe == 0 ?  bead(i, x): tpe == 1 ? xbead(i, x): ybead(i, x);
-          return x; 
+          return x;
         }
         std::vector<int>    cycles()         const { decltype(cycles()) x; cycles(x);   return x; }
 

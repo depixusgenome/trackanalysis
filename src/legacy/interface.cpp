@@ -95,6 +95,27 @@ namespace legacy
         res["framerate"] = pybind11::cast(rec.camerafrequency());
         res["fov"]       = _readrecfov(rec);
 
+        auto addpairs = [](std::vector<std::pair<int, float>> const & data)
+            {
+                std::vector<int>   ts(data.size());
+                std::vector<float> ys(data.size());
+                for(int i = 0, e = int(data.size()); i < e; ++i)
+                {
+                    ts[i] = data[i].first;
+                    ys[i] = data[i].second;
+                }
+
+                return pybind11::make_tuple(pybind11::array(ts.size(), ts.data()),
+                                            pybind11::array(ys.size(), ys.data()));
+            };
+        
+        auto temp      = rec.temperatures();
+        res["Tservo"]  = addpairs(temp[0]);
+        res["Tsample"] = addpairs(temp[1]);
+        res["Tsink"]   = addpairs(temp[2]);
+        auto vcap      = rec.vcap();
+        res["vcap"]    = addpairs(vcap);
+
         pybind11::dict calib;
         pybind11::dict pos;
         char tmpname[L_tmpnam];

@@ -3,7 +3,7 @@
 # pragma warning( disable : 4996 4244 4267 4305 4800 4477 4003 4267)
 # include <Windows.h>
 # define fseeko64 _fseeki64
-# define ftello64 _ftelli64 
+# define ftello64 _ftelli64
 # undef max
 # undef min
 #endif
@@ -4618,9 +4618,9 @@ namespace legacy
 
     template <typename T>
     void * _read(int nx, int ny, FILE * fp)
-    { 
+    {
         auto table = new T[nx*ny];
-        auto sz = fread(table, sizeof(T), nx*ny, fp); 
+        auto sz = fread(table, sizeof(T), nx*ny, fp);
         sz += 1;
         return (void*) table;
     }
@@ -4851,11 +4851,73 @@ namespace legacy
     void   GenRecord::t     (int  * dt)  const
     { _get(_ptr->imi, 1, -_ptr->imi[0][0], dt); }
 
+    void   GenRecord::zmagcmd(float *dt)  const
+    { _get(_ptr->zmag_cmd, 1.0f, 0.0f, dt); }
+
+    void   GenRecord::status(int *dt)  const
+    { _get(_ptr->status_flag, 1, 0, dt); }
+
     void   GenRecord::zmag  (float *dt)  const
     { _get(_ptr->zmag, 1.0f, 0.0f, dt); }
 
     void   GenRecord::rot   (float *dt)  const
     { _get(_ptr->rot_mag, 1.0f, 0.0f, dt); }
+
+    std::vector<std::pair<int, float>> GenRecord::vcap()  const
+    {
+        if(_ptr == nullptr)
+            return {};
+        std::vector<std::pair<int, float>> data;
+        size_t   psz = size_t(_ptr->page_size);
+        float ** ptr = _ptr->zmag_cmd;
+        int   ** sta = _ptr->status_flag;
+        int   ** imi = _ptr->imi;
+        int      t0  = _ptr->timing_mode == 1 ? _ptr->imi[0][0] : 0;
+
+        for(size_t i = 0, e = nrecs(); i < e; i += psz, ++ptr, ++sta, ++imi)
+            for(size_t k = 0, ke = i+psz > e ? e-i : psz; k < ke; ++k)
+                if(sta[0][k])
+                    data.push_back({imi[0][k] - t0, ptr[0][k]});
+        return data;
+    }
+
+    std::vector<std::vector<std::pair<int, float> > > GenRecord::temperatures() const
+    {
+        if(_ptr == nullptr)
+            return {};
+
+        std::vector<std::vector<std::pair<int, float> > > data(3);
+        size_t  psz  = size_t(_ptr->page_size);
+        char ** ptr  = _ptr->message;
+        int  ** time = _ptr->imi;
+        int     lmi  = 0;
+        char    l_mes[32];
+        int     t0   = _ptr->timing_mode == 1 ? _ptr->imi[0][0] : 0;
+
+        for(size_t i = 0, e = nrecs(); i < e; i += psz, ++ptr, ++time)
+            for(size_t k = 0, ke = i+psz > e ? e-i : psz; k < ke; ++k)
+                if (ptr[0][k] == 0)
+                {
+                    if(lmi > 3 && l_mes[0] == 'T')
+                    {
+                        int ind     = l_mes[1] == '0' ? 0 :
+                                      l_mes[1] == '1' ? 1 :
+                                      l_mes[1] == '2' ? 2 :
+                                      -1;
+                        if(ind != -1)
+                        {
+                            float T = NAN;
+                            sscanf(l_mes + 3, "%f", &T);
+                            data[ind].push_back({time[0][k] - t0, T});
+                        }
+                    }
+
+                    lmi = 0;
+                }
+                else if (lmi < 32)
+                    l_mes[lmi++] = ptr[0][k];
+        return data;
+    }
 
     std::map<int, std::tuple<float, float, float>> GenRecord::pos()  const
     {
