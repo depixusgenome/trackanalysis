@@ -494,7 +494,6 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
                     break
 
         args.update((translations.get(i, i), j) for i, j in kwa.items())
-        args.pop('sizing_mode', None)
         return args
 
     def _figargs(self, *cssarr, **kwa) -> dict:
