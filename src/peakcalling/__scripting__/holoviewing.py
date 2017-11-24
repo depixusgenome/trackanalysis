@@ -271,9 +271,10 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
         if self._reference is None or self._reference == key:
             return
 
-        kwa['reftask'] = self._reftask
-        if bead not in self._reftask:
-            self._reftask.frompeaks(self._items[self._reference].peaks[bead,...])
+        if self._reftask is not None:
+            kwa['reftask'] = self._reftask
+            if bead not in self._reftask:
+                self._reftask.frompeaks(self._items[self._reference].peaks[bead,...])
 
     def dataframe(self, *tasks, transform = None, assign = None, **kwa):
         """
@@ -390,17 +391,18 @@ class _ManualRef(PeaksTracksDictDisplay):
     def run(self, key, bead, stretch, bias):
         "Creates the display"
         cache = self.__cache
-        if bead != cache[0]:
-            cache[0] = bead
+        if (key, bead) != cache[0]:
+            cache[0] = key, bead
             cache[1] = list(self.__fcn(key, bead))
 
-        mid    = len(cache[1])//2+1
-        fcn    = self.__clone
-        clones = [fcn(i, stretch, bias) for i in cache[1][mid:]]
+        mid    = len(cache[1])//2
+        clones = [self.__clone(i, stretch, bias) for i in cache[1][mid:]]
         return hv.Overlay(cache[1][:mid]+clones)
 
     @staticmethod
     def __clone(itm, stretch, bias):
+        if isinstance(itm, hv.Text):
+            return itm.clone(x = (itm.data[0]-bias)*stretch)
         data = np.copy(itm.data)
         data[:,0] = (data[:,0]-bias)*stretch
         return itm.clone(data = data)

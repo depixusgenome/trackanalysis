@@ -6,7 +6,7 @@ Adds shortcuts for using holoview
 """
 import sys
 from   typing                   import List, Union
-from   copy                     import deepcopy
+from   functools                import partial
 
 from   scripting.holoviewing    import addto, displayhook, addproperty
 from   utils.logconfig          import getLogger
@@ -83,37 +83,39 @@ class TracksDictDisplay(BasicDisplay,
         return self
 
     def _base(self):
-        itms  = self._items
-        kwa   = deepcopy(self._opts)
+        kdims = self._default_kdims()
+        return partial(self._default_display, kdims), kdims
 
-        kdims         = dict()
-        keys          = kwa.pop('key')  if 'key'  in kwa else self._keys
-        beads         = kwa.pop('key')  if 'key'  in kwa else self._beads
+    def _default_kdims(self):
+        kdims = dict()
+        keys  = self._keys
+        beads = self._beads
+        itms  = self._items
         if beads is None:
             kdims['key']  = sorted(itms.keys()) if keys is None else keys
             kdims['bead'] = sorted(itms.availablebeads(*kdims['key']))
         else:
             kdims['bead'] = beads
-            kdims['key']  = sorted(itms.availablekeys(*beads)) if keys is None else keys
+            kdims['key']  = sorted(itms.commonkeys(*beads)) if keys is None else keys
 
         if self._reference is not None:
             key = 'bead' if self._overlay == 'bead' else 'key'
             kdims[key] = [i for i in kdims[key] if i != self._reference]
             kdims[key].insert(0, self._reference)
-
-        disp = getattr(self, '_'+self._name, self._default_display)
-        fcn  = lambda key, bead, **other: disp(itms, key, bead, kdims, **kwa, **other)
-        return fcn, kdims
+        return kdims
 
     def _default_kargs(self, key, bead, kwa):
+        if self._opts:
+            tmp, kwa = kwa, dict(self._opts)
+            kwa.update(tmp)
         if self._labels is True and self._overlay in ('key', 'bead'):
             kwa.setdefault('labels', str(key) if self._overlay == 'key' else str(bead))
         elif isinstance(self._labels, str):
             kwa.setdefault('labels', self._labels)
 
-    def _default_display(self, itms, key, bead, _, **kwa):
+    def _default_display(self, _, key, bead, **kwa):
         self._default_kargs(key, bead, kwa)
-        data = getattr(itms[key], self._name, itms[key]).display(**kwa)
+        data = getattr(self._items[key], self._name, self._items[key]).display(**kwa)
         return data.getmethod()(bead)
 
     @staticmethod
@@ -205,13 +207,16 @@ class TracksDictFovDisplayProperty:
             raise KeyError("Could not slice the display")
         return self
 
+    def _run(self, opts, key):
+        return self.tracks[key].fov.display(**opts).relabel(f'{key}')
+
     def display(self, *keys, calib = False, layout = False, cols = 2, **opts):
         "displays measures for a TracksDict"
         if len(keys) == 0:
             keys = self._keys if self._keys else self.tracks.keys()
 
         opts['calib'] = calib
-        fcn           = lambda key: self.tracks[key].fov.display(**opts).relabel(f'{key}')
+        fcn           = partial(self._run, opts)
         if layout:
             return hv.Layout([fcn(i) for i in keys]).cols(cols)
         return hv.DynamicMap(fcn, kdims = ['key']).redim.values(key = list(keys))

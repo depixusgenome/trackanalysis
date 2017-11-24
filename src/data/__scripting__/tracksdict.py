@@ -67,6 +67,9 @@ class TracksDict(_TracksDict):
         * ...
         * normal regular expression: only tracks matching that expression
         """
+        if not isinstance(key, str):
+            return super().__getitem__([key])
+
         if key == 'clean':
             return super().__getitem__([i for i, j in self.items() if i.clean])
 
@@ -76,7 +79,7 @@ class TracksDict(_TracksDict):
         try:
             if 'w' not in key.lower() and 's' not in key.lower():
                 raise ValueError()
-            int(key.lower().replace('w').replace('s'))
+            int(key.lower().replace('w', '').replace('s', ''))
         except ValueError:
             reg = re.compile(key) if isinstance(key, str) else key
             return super().__getitem__([i for i in self if reg.match(i)])
