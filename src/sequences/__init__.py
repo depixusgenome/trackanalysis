@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 "All sequences-related stuff"
 from    typing      import (Sequence, Union,  # pylint: disable=unused-import
-                            Iterator, Tuple, TextIO, Dict, cast)
+                            Iterator, Tuple, TextIO, Dict, Iterable, cast)
 import  pathlib
 import  re
 import  numpy       as np
-from    utils       import fromstream
+from    utils       import fromstream, initdefaults, updatecopy
 
 def _read(stream:TextIO) -> Iterator[Tuple[str,str]]:
     "reads a path and yields pairs (name, sequence)"
@@ -236,3 +236,40 @@ def overlap(ol1:str, ol2:str, minoverlap = None):
     if ol2 in ol1:
         return True
     return any(ol1.endswith(ol2[:i]) or ol1.startswith(ol2[-i:]) for i in rng)
+
+class NonLinearities(Translator):
+    """
+    Computes the non-linearities created by oligos binding to a hairpin
+    """
+    sequence     = None
+    singlestrand = .55  # nm
+    doublestrand = .34  # nm
+    orientation  = None
+    @initdefaults
+    def __init__(self, **_):
+        super().__init__()
+
+    def difference(self, oligos: Union[str, Iterable[str]]):
+        """
+        returns the difference to the a single strand in nm
+        """
+        size  = np.zeros(len(self.sequence), dtype = 'f4')
+        diff  = self.doublestrand - self.singlestrand
+        allo  = (oligos,) if isinstance(oligos, str) else oligos
+        for olig in cast(Iterable[str], allo):
+            pks  = self.peaks(self.sequence, olig)
+            good = pks['position']
+            if self.orientation is not None:
+                good = good[pks['orientation'] == self.orientation]
+            for i in good:
+                size[i:] += diff
+        return size
+
+    def nonlinearities(self, oligos: Union[str, Iterable[str]]):
+        """
+        returns the non-linearities created by the oligos in nm
+        """
+        size   = self.difference(oligos)
+        single = np.arange(len(size), dtype = 'f4') * self.singlestrand
+        double = size+single
+        return double - np.polyval(np.polyfit(single, double, 1), single)
