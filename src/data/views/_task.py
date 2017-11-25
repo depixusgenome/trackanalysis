@@ -13,7 +13,7 @@ Key    = TypeVar('Key')
 
 class TaskView(TrackView, Generic[Config, Key]):
     "iterator over peaks grouped by beads"
-    def __init__(self, *_, config: Union[Config, dict] = None, **kwa) -> None:
+    def __init__(self, *_, config: Union[Config, dict] = None, cache = None, **kwa) -> None:
         assert len(_) == 0
         super().__init__(**kwa)
         ctype = self.tasktype()
@@ -25,8 +25,7 @@ class TaskView(TrackView, Generic[Config, Key]):
             raise ValueError(f"Could not initialize {self.__class__}")
 
         self.config: Config         = cast(Config, cnf)
-        if 'cache' in kwa:
-            self.cache              = kwa.pop('cache')
+        self.cache                  = cache
         self.__keys: FrozenSet[Key] = None
 
     @classmethod
