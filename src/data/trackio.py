@@ -289,7 +289,7 @@ class LegacyGRFilesIO(_TrackIO):
         grdirs   = tuple(str(i) for i in grdirs)
         projects = ((None,)         if allleaves                else
                     (cgrdir,)       if isinstance(cgrdir, str)  else
-                    cls.__GRTITLE   if cgrdir is None           else
+                    (cls.__GRDIR,)  if cgrdir is None           else
                     cgrdir)
 
         res = {}
@@ -377,6 +377,13 @@ class Handler:
         data['dimensions']   = track.fov.dim
         data['positions']    = {i: j.position for i, j in track.fov.beads.items()}
         data['calibrations'] = {i: j.image    for i, j in track.fov.beads.items()}
+
+        sec = track.secondaries.data
+        if sec:
+            vcap = sec.pop('vcap', None)
+            if vcap is not None:
+                data['vcap']  = vcap['index'], vcap['zmag'], vcap['vcap']
+            data.update({i: (j['index'], j['value']) for i, j in sec.items()})
         return data
 
     @classmethod
@@ -423,11 +430,18 @@ class Handler:
         if kwargs is None:
             data = {} # type: Dict[str, Union[float, np.ndarray, str]]
         else:
+            dtpe = np.dtype([('index', 'i4'), ('value', 'f4')])
+            vtpe = [('index', 'f4'), ('zmag',  'f4'), ('vcap',  'f4')]
+            sec  = {i: np.array(list(zip(*kwargs.pop(i))),
+                                dtype = dtpe if i[0] == 'T' else vtpe)
+                    for i in ('vcap', 'Tservo', 'Tsink', 'Tsample') if i in kwargs}
+
             data = {i: kwargs.pop(i) for i in tuple(kwargs)
                     if isinstance(kwargs[i], np.ndarray) and len(kwargs[i].shape) == 1}
             if beadsonly:
                 data = {i: j for i, j in data if Track.isbeadname(i)}
-        state['data'] = data
+        state['data']        = data
+        state['secondaries'] = sec
 
     @staticmethod
     def __fov(res, kwargs):

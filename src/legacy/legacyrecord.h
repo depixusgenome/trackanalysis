@@ -61,7 +61,7 @@ namespace legacy
         std::map<int, std::tuple<float, float, float>> pos()  const;
 
         std::vector<std::vector<std::pair<int, float> > > temperatures() const;
-        std::vector<std::pair<int, float>>  vcap        ()  const;
+        std::vector<std::vector<float>>                   vcap        () const;
 
         std::vector<int  >  t     ()         const { decltype(t   ())   x; t   (x);     return x; }
         std::vector<int  >  status()         const { decltype(status()) x; status(x);   return x; }

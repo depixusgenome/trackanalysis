@@ -4863,22 +4863,46 @@ namespace legacy
     void   GenRecord::rot   (float *dt)  const
     { _get(_ptr->rot_mag, 1.0f, 0.0f, dt); }
 
-    std::vector<std::pair<int, float>> GenRecord::vcap()  const
+    std::vector<std::vector<float>> GenRecord::vcap()  const
     {
         if(_ptr == nullptr)
             return {};
-        std::vector<std::pair<int, float>> data;
+        std::vector<std::vector<float>> data(3);
         size_t   psz = size_t(_ptr->page_size);
         float ** ptr = _ptr->zmag_cmd;
+        float ** zma = _ptr->zmag;
         int   ** sta = _ptr->status_flag;
+        int   ** act = _ptr->action_status;
         int   ** imi = _ptr->imi;
-        int      t0  = _ptr->timing_mode == 1 ? _ptr->imi[0][0] : 0;
+        float    t0  = _ptr->timing_mode == 1 ? float(_ptr->imi[0][0]) : 0.0f;
 
-        for(size_t i = 0, e = nrecs(); i < e; i += psz, ++ptr, ++sta, ++imi)
+#       define PARTS_MOVING   0x000000F0// 0x03F0
+#       define DATA_AVERAGING 0x40000000
+        float    zavg  = 0.f, vavg = 0.f;
+        size_t   cnt   = 0;
+        int      first = 0;
+        for(size_t i = 0, e = nrecs(); i < e; i += psz, ++ptr, ++sta, ++imi, ++act, ++zma)
             for(size_t k = 0, ke = i+psz > e ? e-i : psz; k < ke; ++k)
-#               define PARTS_MOVING        0x000000F0// 0x03F0
-                if((sta[0][k] & PARTS_MOVING) == 0)
-                    data.push_back({imi[0][k] - t0, ptr[0][k]});
+                if(act[0][k] & DATA_AVERAGING)
+                {
+                    if((sta[0][k] & PARTS_MOVING) == 0)
+                    {
+                        if(cnt == 0)
+                            first = imi[0][k];
+                        zavg += zma[0][k]; 
+                        vavg += ptr[0][k]; 
+                        ++cnt;
+                    }
+                } else if(cnt)
+                {
+                    data[0].push_back(.5f*float(imi[0][k] + first)-t0);
+                    data[1].push_back(zavg/cnt);
+                    data[2].push_back(vavg/cnt);
+                    cnt  = 0;
+                    zavg = 0.f;
+                    vavg = 0.f;
+                }
+                
         return data;
     }
 

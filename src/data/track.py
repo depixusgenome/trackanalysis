@@ -18,7 +18,6 @@ DATA         = Dict[BEADKEY, np.ndarray]
 BEADS        = Dict[BEADKEY, 'Bead']
 DIMENSIONS   = Tuple[Tuple[float, float], Tuple[float, float]]
 _PRECISIONS  = Dict[BEADKEY, float]
-_LAZIES      = ('fov',  'framerate', 'data', 'path', 'lazy', 'rawprecisions')
 
 class Axis(Enum):
     "which axis to look at"
@@ -122,44 +121,72 @@ class FoV:
         tpe = iter if hasattr(arr, '__next__') else type(arr)
         return tpe([(sl1*i+int1, sl2*j+int2) for i, j in arr]) # type: ignore
 
+class Secondaries:
+    "Deals with secondary measures"
+    def __init__(self, track):
+        self.__track = track
+
+    data    = property(lambda self: self.__track._secondaries,
+                       doc = "returns all the data")
+    tservo  = cast(np.ndarray, property(lambda self: self.__value("Tservo"),
+                                        doc = "returns the servo temperature"))
+    tsample = cast(np.ndarray, property(lambda self: self.__value("Tsample"),
+                                        doc = "returns the sample temperature"))
+    tsink   = cast(np.ndarray, property(lambda self: self.__value("Tsink"),
+                                        doc = "returns the sink temperature"))
+    vcap    = cast(np.ndarray, property(lambda self: self.data.get("vcap"),
+                                        doc = "returns the magnet position: vcap"))
+    def __value(self, name):
+        val = self.__track._secondaries # pylint: disable=protected-access
+        if val is None or name not in val:
+            return None
+        arr           = np.copy(val[name])
+        arr['index'] -= self.__track.phases[0,0]
+        arr           = arr[arr['index'] >= 0]
+        arr           = arr[arr['index'] < self.__track.nframes]
+        return arr
+
 class LazyProperty:
     "Checks whether the file was opened prior to returning a value"
     LIST: List[str] = []
-    def __init__(self, name = ''):
-        self.__name = ''
+    def __init__(self, name: str = '', tpe: type = None) -> None:
+        self._name = ''
+        self._type = tpe
         if name:
-            self.__name = '_'+name
-            self.LIST.append(self.__name)
+            self._name = '_'+name
+            self.LIST.append(self._name)
 
     def __set_name__(self, _, name):
-        self.__init__(name)
+        self.__init__(name, self._type)
 
     def __get__(self, inst: 'Track', owner):
         if inst is not None:
             inst.load()
-        return getattr(owner if inst is None else inst, self.__name)
+
+        return (self._type(inst) if self._type and inst else
+                getattr(owner if inst is None else inst, self._name))
 
     def __set__(self, obj: 'Track', val):
         obj.load()
-        setattr(obj, self.__name, val)
-        return getattr(obj, self.__name)
+        setattr(obj, self._name, val)
+        return getattr(obj, self._name)
 
 class ResettingProperty:
     "Resets all if this attribute is changed"
     def __init__(self):
-        self.__name   = ''
+        self._name = ''
 
     def __set_name__(self, _, name):
-        self.__name = '_'+name
+        self._name = '_'+name
 
     def __get__(self, obj: 'Track', _):
-        return getattr(obj, self.__name) if obj else self
+        return getattr(obj, self._name) if obj else self
 
     def __set__(self, obj: 'Track', val):
         setattr(obj, '_lazy',     False)
-        setattr(obj, self.__name, val)
+        setattr(obj, self._name, val)
         obj.unload()
-        return getattr(self, self.__name)
+        return getattr(self, self._name)
 
 class ViewDescriptor:
     "Access to views"
@@ -172,6 +199,9 @@ class ViewDescriptor:
         self.tpe  = Cycles if name.startswith('cycles') else Beads
         self.args = dict(copy = False, beadsonly = 'only' in name)
         setattr(self, '__doc__', getattr(self.tpe, '__doc__'))
+
+def _lazies():
+    return ('_data', '_lazy', '_rawprecisions') + tuple(LazyProperty.LIST)
 
 @levelprop(Level.project)
 class Track:
@@ -211,6 +241,13 @@ class Track:
     * `axis` (Є {'X', 'Y', 'Z'}) is the data axis
     * `ncycles` is the number of cycles
     * `nphases` is the number of phases
+    * `secondaries` consists in arrays of sparse measures:
+
+        * `track.secondaries.tservo` is the servo temperature
+        * `track.secondaries.tsample` is the sample temperature
+        * `track.secondaries.tsink` is the heat sink temperature
+        * `track.secondaries.vcap` is a measure of magnet altitude
+
     * `fov` is the field of view data:
 
         * `image` is one image of the field of view
@@ -220,51 +257,39 @@ class Track:
             * `position` is the bead's (X, Y, Z) position
             * `image` is the bead's calibration image
     """
-    _framerate                  = 30.
-    _fov: FoV                   = None
-    _phases                     = np.empty((0,9), dtype = 'i4')
-    _data:          DATA        = None
-    _path:          PATHTYPES   = None
-    _rawprecisions: _PRECISIONS = {}
-    _lazy                       = True
-    _axis                       = Axis.Zaxis
-    key:            str         = None
-    @initdefaults(( 'key'), **{i: '_' for i in _LAZIES + ('phases', 'axis')})
-    def __init__(self, **_) -> None:
-        pass
-
-    def __getstate__(self):
-        info = self.__dict__.copy()
-        for name in _LAZIES:
-            val = info.pop('_'+name)
-            if val !=  getattr(type(self), '_'+name):
-                info[name] = val
-
-        info['axis'] = info.pop('_axis').value
-        val = info.pop('_phases')
-        if len(val) > 0:
-            info['phases'] = val
-
-        if 'path' in info:
-            info.pop('data', None)
-        return info
-
-    def __setstate__(self, values):
-        self.__init__(**values)
-        keys = frozenset(self.__getstate__().keys())
-        self.__dict__.update({i: j for i, j in values.items() if i not in keys})
-
+    key: str   = None
     phases     = cast(np.ndarray,          LazyProperty())
     framerate  = cast(float,               LazyProperty())
     fov        = cast(FoV,                 LazyProperty())
+    secondaries= cast(Secondaries,         LazyProperty(tpe = Secondaries))
     path       = cast(Optional[PATHTYPES], ResettingProperty())
     axis       = cast(Axis,                ResettingProperty())
+    data       = cast(DATA,                property(lambda self: self.getdata(),
+                                                    lambda self, val: self.setdata(val)))
+    @initdefaults('key',
+                  **{i: '_' for i in locals() if i != 'key' and i[0] != '_'})
+    def __init__(self, **_):
+        pass
+
     ncycles    = cast(int,                 property(lambda self: len(self.phases)))
     nphases    = cast(int,                 property(lambda self: self.phases.shape[1]))
     beads      = cast(Beads,               ViewDescriptor())
     beadsonly  = cast(Beads,               ViewDescriptor())
     cycles     = cast(Cycles,              ViewDescriptor())
     cyclesonly = cast(Cycles,              ViewDescriptor())
+
+    def getdata(self) -> DATA:
+        "returns the dataframe with all bead info"
+        self.load()
+        return self._data
+
+    def setdata(self, data: Optional[Dict[BEADKEY, np.ndarray]]):
+        "sets the dataframe"
+        if data is None:
+            self.unload()
+        else:
+            self._data = data
+
     @property
     def nframes(self) -> int:
         "returns the number of frames"
@@ -284,26 +309,8 @@ class Track:
 
     def unload(self):
         "Unloads the data"
-        for name in LazyProperty.LIST:
+        for name in _lazies():
             setattr(self, name, deepcopy(getattr(type(self), name)))
-
-        self._rawprecisions.clear()
-        self._data = None
-        self._lazy = True
-
-    @property
-    def data(self) -> Dict:
-        "returns the dataframe with all bead info"
-        self.load()
-        return self._data
-
-    @data.setter
-    def data(self, data: Optional[Dict[BEADKEY, np.ndarray]]):
-        "sets the dataframe"
-        if data is None:
-            self.unload()
-        else:
-            self._data = data
 
     @staticmethod
     def isbeadname(key) -> bool:
@@ -345,6 +352,42 @@ class Track:
         kwa.setdefault('parents', (self.key,) if self.key else (self.path,))
         kwa.setdefault('track',   self)
         return viewtype(**kwa)
+
+    def __getstate__(self):
+        info = self.__dict__.copy()
+
+        if len(info['_phases']):
+            info['phases'] = info.pop('_phases')
+        info['secondaries'] = getattr(info.pop('_secondaries', None), 'data', None)
+
+        for name in set(_lazies()+('_path', '_axis')) & set(info):
+            val = info.pop(name)
+            if val != getattr(type(self), name):
+                info[name[1:]] = val
+
+        if 'axis' in info:
+            info['axis'] = info.pop('_axis').value
+
+        if 'path' in info:
+            info.pop('data',        None)
+            info.pop('secondaries', None)
+        return info
+
+    def __setstate__(self, values):
+        self.__init__(**values)
+        keys = frozenset(self.__getstate__().keys())
+        self.__dict__.update({i: j for i, j in values.items() if i not in keys})
+
+    _framerate                  = 30.
+    _fov: FoV                   = None
+    _phases                     = np.empty((0,9), dtype = 'i4')
+    _data:          DATA        = None # type: ignore
+    _secondaries:   DATA        = None
+    _path:          PATHTYPES   = None
+    _rawprecisions: _PRECISIONS = {}
+    _lazy                       = True
+    _axis                       = Axis.Zaxis
+
 
 def dropbeads(trk, *beads:BEADKEY) -> Track:
     "returns a track without the given beads"

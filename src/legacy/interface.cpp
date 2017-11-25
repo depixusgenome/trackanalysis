@@ -114,7 +114,9 @@ namespace legacy
         res["Tsample"] = addpairs(temp[1]);
         res["Tsink"]   = addpairs(temp[2]);
         auto vcap      = rec.vcap();
-        res["vcap"]    = addpairs(vcap);
+        res["vcap"]    = pybind11::make_tuple(pybind11::array(vcap[0].size(), vcap[0].data()),
+                                              pybind11::array(vcap[1].size(), vcap[1].data()),
+                                              pybind11::array(vcap[2].size(), vcap[2].data()));
 
         pybind11::dict calib;
         pybind11::dict pos;
