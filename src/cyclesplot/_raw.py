@@ -53,11 +53,13 @@ class RawMixin(ABC):
 
         return dict(t = time.ravel(), z = val.ravel()), val.shape
 
+    _DEFAULT_DATA = ({i: np.array([], dtype = 'f4') for i in ('t', 'z', 'cycle', 'color')},
+                     (1, 0))
+
     def __data(self) -> Tuple[dict, Tuple[int,int]]:
         cycles = self._model.runbead()
         if cycles is None:
-            return ({i: np.array([], dtype = 'f4') for i in ('t', 'z', 'cycle', 'color')},
-                    (1, 0))
+            return self._DEFAULT_DATA
 
         items = list(cycles)
         if len(items) == 0 or not any(len(i) for _, i in items):
@@ -106,9 +108,12 @@ class RawMixin(ABC):
         return shape
 
     def _resetraw(self):
-        data, shape          = self.__data()
-        self._bkmodels[self._rawsource]['data'] = data
-        self._hover.resetraw(self._raw, data, shape, self._bkmodels)
+        data, shape = self._DEFAULT_DATA
+        try:
+            data, shape = self.__data()
+        finally:
+            self._bkmodels[self._rawsource]['data'] = data
+            self._hover.resetraw(self._raw, data, shape, self._bkmodels)
         return shape
 
     if TYPE_CHECKING:

@@ -44,10 +44,13 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess], HistMixin, RawMixin,
         return [self._createwidget(), self._keyedlayout(self._raw, self._hist)]
 
     def _reset(self):
-        shape = self._resetraw()
-        data  = self._bkmodels[self._rawsource]['data']
-        self._resethist(data, shape)
-        self._resetwidget()
+        shape = self._DEFAULT_DATA[1]
+        try:
+            shape = self._resetraw()
+        finally:
+            data  = self._bkmodels[self._rawsource]['data']
+            self._resethist(data, shape)
+            self._resetwidget()
 
     def ismain(self, _):
         WidgetMixin.ismain(self, _)

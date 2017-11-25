@@ -113,12 +113,15 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
         return self._keyedlayout(fig, left = left, bottom = bottom)
 
     def _reset(self):
-        items, nans = GuiDataCleaningProcessor.runbead(self._model)
-        data        = self.__data(items, nans)
-        self._bkmodels[self.__source]['data'] = data
-        self.setbounds(self.__fig.x_range, 'x', data['t'])
-        self.setbounds(self.__fig.y_range, 'y', data['z'])
-        self._resetwidget()
+        items, nans     = None, None
+        try:
+            items, nans = GuiDataCleaningProcessor.runbead(self._model)
+        finally:
+            data        = self.__data(items, nans)
+            self._bkmodels[self.__source]['data'] = data
+            self.setbounds(self.__fig.x_range, 'x', data['t'])
+            self.setbounds(self.__fig.y_range, 'y', data['z'])
+            self._resetwidget()
 
     def __data(self, items, nans) -> Dict[str, np.ndarray]:
         if items is None or len(items) == 0 or not any(len(i) for _, i in items):
