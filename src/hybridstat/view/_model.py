@@ -271,7 +271,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         tsk   = cast(PeakSelectorTask, self.peakselection.task)
         peaks = tuple(tsk.details2output(cast(PeakSelectorDetails, dtl)))
 
-        self.distances     = tmp.distances if self.identification.task else None
+        self.distances     = tmp.distances if self.identification.task else {}
         self.peaks         = createpeaks(self, peaks)
         self.estimatedbias = self.peaks['z'][0]
         return dtl

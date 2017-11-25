@@ -19,7 +19,7 @@ class GuiPeaksDict(PeaksDict):
 
         self.cache.clear()
         self.cache.append(dtl)
-        yield from self.config.details2output(dtl)
+        return tuple(self.config.details2output(dtl))
 
 STORE_T = List[PeakSelectorDetails]
 class GuiPeakSelectorProcessor(PeakSelectorProcessor):
