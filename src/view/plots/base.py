@@ -414,17 +414,17 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
                     with BokehView.computation.type(self._ctrl, calls = self.__doreset):
                         try:
                             self._reset()
-                            return tuple(self._bkmodels.items())
                         finally:
-                            self._bkmodels.clear()
                             self.state = old
                             durations.append(time() - start)
 
-                ret = await threadmethod(_reset)
+                await threadmethod(_reset)
 
                 def _render():
                     start = time()
-                    if ret is not None:
+                    ret   = tuple(self._bkmodels.items())
+                    self._bkmodels.clear()
+                    if ret:
                         with BokehView.computation.type(self._ctrl, calls = self.__doreset):
                             with self.resetting():
                                 self._bkmodels.update(ret)
