@@ -4876,7 +4876,8 @@ namespace legacy
 
         for(size_t i = 0, e = nrecs(); i < e; i += psz, ++ptr, ++sta, ++imi)
             for(size_t k = 0, ke = i+psz > e ? e-i : psz; k < ke; ++k)
-                if(sta[0][k])
+#               define PARTS_MOVING        0x000000F0// 0x03F0
+                if((sta[0][k] & PARTS_MOVING) == 0)
                     data.push_back({imi[0][k] - t0, ptr[0][k]});
         return data;
     }
