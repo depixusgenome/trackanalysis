@@ -7,8 +7,8 @@ from abc                    import abstractmethod
 from collections            import OrderedDict
 
 from utils                  import CachedIO
-from control.modelaccess    import TaskPlotModelAccess, PROPS
-from model.globals          import ConfigRootProperty, BeadProperty
+from control.modelaccess    import TaskPlotModelAccess
+from model.globals          import ConfigRootProperty, BeadProperty, RootTaskProperty
 from .                      import read as _readsequence, peaks as _sequencepeaks
 
 _CACHE = CachedIO(lambda path: OrderedDict(_readsequence(path)), size = 1)
@@ -33,7 +33,7 @@ class SequencePathProperty(ConfigRootProperty):
 class SequencePlotModelAccess(TaskPlotModelAccess):
     "access to the sequence path and the oligo"
     sequencepath = cast(Optional[str],           SequencePathProperty())
-    oligos       = cast(Optional[Sequence[str]], PROPS.configroot('tasks.oligos'))
+    oligos       = cast(Optional[Sequence[str]], RootTaskProperty("tasks.oligos"))
 
     def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
