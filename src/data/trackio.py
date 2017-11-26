@@ -75,11 +75,12 @@ class _TrackIO:
 
 class PickleIO(_TrackIO):
     "checks and opens pickled paths"
-    @staticmethod
+    EXT = '.pk'
+    @classmethod
     @_checktype
-    def check(path:PATHTYPE, **_) -> Optional[PATHTYPE]:
+    def check(cls, path:PATHTYPE, **_) -> Optional[PATHTYPE]:
         "checks the existence of a path"
-        return path if Path(path).suffix == ".pk" else None
+        return path if Path(path).suffix == cls.EXT else None
 
     @staticmethod
     def open(path:PATHTYPE, **_) -> dict:
@@ -116,6 +117,14 @@ class LegacyTrackIO(_TrackIO):
         if not isinstance(trkdirs, (tuple, list, set, frozenset)):
             trkdirs = (trkdirs,)
         trkdirs = tuple(str(i) for i in trkdirs)
+        if all(Path(i).is_dir() for i in trkdirs):
+            for trk in (cls.__TRKEXT, PickleIO.EXT):
+                end = f'/**/*{trk}'
+                lst = [i for i in chain.from_iterable(_glob(str(k)+end) for k in trkdirs)]
+                if len(lst):
+                    yield from iter(lst)
+                    break
+            return
 
         trk = cls.__TRKEXT
         fcn = lambda i: i if '*' in i or i.endswith(trk) else i+'/**/*'+trk
@@ -515,7 +524,7 @@ def savetrack(path  : PATHTYPE,     # pylint: disable=unused-argument,function-r
         root = Path(path)
         root.mkdir(parents=True, exist_ok=True)
 
-        args = [((root/key).with_suffix(".pk"), trk)
+        args = [((root/key).with_suffix(PickleIO.EXT), trk)
                 for key, trk in cast(dict, track).items()]
         new  = shallowcopy(track)
         with ThreadPoolExecutor(N_SAVE_THREADS) as pool:
