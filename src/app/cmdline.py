@@ -164,7 +164,8 @@ def _files(directory, files, bead):
 
     if len(directory):
         def _opentracks(ctrl):
-            ctrl.openTrack(dict(zip(('tracks', 'grs', 'match'), directory)))
+            ctrl.openTrack(dict(zip(('tracks', 'grs', 'match'),
+                                    (i if i else None for i in directory))))
         INITIAL_ORDERS.append(_opentracks)
 
     if len(files):
