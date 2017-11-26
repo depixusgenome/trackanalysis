@@ -49,7 +49,7 @@ button[data-balloon] {
   position: relative;
   cursor: pointer; }
   [data-balloon]:after {
-    filter: alpha(opactiy=0);
+    filter: alpha(opacity=0);
     -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0)";
     -moz-opacity: 0;
     -khtml-opacity: 0;
@@ -78,7 +78,7 @@ button[data-balloon] {
     background-size: 100% auto;
     width: 18px;
     height: 6px;
-    filter: alpha(opactiy=0);
+    filter: alpha(opacity=0);
     -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0)";
     -moz-opacity: 0;
     -khtml-opacity: 0;
@@ -93,7 +93,7 @@ button[data-balloon] {
     position: absolute;
     z-index: 10; }
   [data-balloon]:hover:before, [data-balloon]:hover:after, [data-balloon][data-balloon-visible]:before, [data-balloon][data-balloon-visible]:after {
-    filter: alpha(opactiy=100);
+    filter: alpha(opacity=100);
     -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=100)";
     -moz-opacity: 1;
     -khtml-opacity: 1;
@@ -396,10 +396,15 @@ width: 100%; }
 }
 #dpx-tb-del  { width: 30px; }
 #dpx-tb-quit { float: right; }
+#dpx-tb-flist-btn  { width: 30px; }
 
 #dpx-tb-flist {
     overflow: hidden;
     height:50px;
+}
+
+#dpx-tb-flist:hover #dpx-tb-flist-menu {
+    display: block;
 }
 
 #dpx-tb-flist-menu {
@@ -411,23 +416,19 @@ width: 100%; }
     z-index: 1000;
 }
 
-#dpx-tb-flist-btn  { width: 30px; }
-
-#dpx-tb-flist:hover #dpx-tb-flist-menu {
-    display: block;
-}
-
 #dpx-tb-flist-menu label {
+    float:none;
     padding: 6px 16px;
     text-align: left;
 }
 
-#dpx-tb-flist-menu input {
-  position: relative; bottom: 7px;
-}
-
 #dpx-tb-flist-menu label:hover {
     background-color: lightgray;
+}
+
+#dpx-tb-flist-menu input{
+  position: relative;
+  bottom: 7px;
 }
 
 .dpx-inner { display: inline-block; }
