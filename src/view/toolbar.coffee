@@ -75,10 +75,10 @@ export class DpxToolbarView extends WidgetView
                     active = ' bk-bs-active'
                 else
                     active = ''
-                itm += '<label class="bk-bs-radio-inline"><input'
+                itm += '<label class="bk-bs-radio"><input'
                 if j == @model.currentfile
                     itm += ' checked=true'
-                itm += " type='radio' id='dpx-tb-flist-#{j}'/>"+
+                itm += " type='radio' id='dpx-tb-flist-#{j}' class='dpx-tb-flist-itm'/>"+
                        "#{@model.filelist[j]}</label>"
 
         itm += '</div></div>'
