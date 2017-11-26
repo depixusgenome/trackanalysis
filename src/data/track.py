@@ -186,7 +186,7 @@ class ResettingProperty:
         setattr(obj, '_lazy',     False)
         setattr(obj, self._name, val)
         obj.unload()
-        return getattr(self, self._name)
+        return getattr(obj, self._name)
 
 class ViewDescriptor:
     "Access to views"
