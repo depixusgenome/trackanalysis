@@ -24,7 +24,7 @@ class TrackReaderTask(RootTask):
     axis:      str      = 'Z'
     def __init__(self, path = None, **kwa) -> None:
         super().__init__(**kwa)
-        lst = 'path', 'beadsonly', 'copy', 'key', 'axis'
+        lst = 'path', 'beadsonly', 'key', 'axis'
         if hasattr(path, 'axis'):
             # Conversion for Track object
             kwa, tmp = {i: getattr(path, i) for i in lst}, kwa
@@ -32,7 +32,7 @@ class TrackReaderTask(RootTask):
         else:
             kwa['path'] = path
 
-        for i in lst:
+        for i in lst+('copy',):
             setattr(self, i, kwa.get(i, getattr(self.__class__, i)))
 
         # making sure the axis is a str

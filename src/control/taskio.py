@@ -162,8 +162,7 @@ def openmodels(openers, task, tasks):
         for trk in TracksDict(**cast(dict, task)).values():
             for mdl in openmodels(openers, trk.path, tasks):
                 trk.path = mdl[0].path
-                mdl[0]   = type(mdl[0])(trk)
-                models.append(mdl)
+                models.append((type(mdl[0])(trk, copy = mdl[0].copy),) + mdl[1:])
         if len(models) == 0:
             raise IOError(f"Couldn't open: {task}", 'warning')
         return models
