@@ -305,7 +305,11 @@ class FileListMixin:
         fnames.defaults = {'many': '{Path(files[0]).stem} + ...',
                            'single': '{Path(path).stem}'}
 
-    def _pathname(self, lst):
+    def __pathname(self, task):
+        if task.key:
+            return task.key
+
+        lst = task.path
         cnf = self._ctrl.getGlobal('css').filenames
         if isinstance(lst, (tuple, list)):
             if len(lst) > 1:
@@ -316,10 +320,10 @@ class FileListMixin:
         return eval(f'f"{cnf.single.get()}"', dict(path = lst, Path = Path))
 
     @property
-    def files(self) -> Iterator[Tuple['RootTask', str]]:
+    def files(self) -> Iterator[Tuple[str, 'RootTask']]:
         "returns current roots"
         lst  = [next(i) for i in self._ctrl.tasks(...)]
-        return ((self._pathname(i.path), i) for i in lst)
+        return ((self.__pathname(i), i) for i in lst)
 
 class FileListInput(BeadView, FileListMixin):
     "Selection of opened files"
