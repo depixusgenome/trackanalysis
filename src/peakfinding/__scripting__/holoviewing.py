@@ -235,4 +235,7 @@ class PeaksTracksDictDisplay(TracksDictDisplay, peaks = TracksDict): # type: ign
                                      assign    = assign,
                                      **kwa)
 
+TracksDictDisplay.addtodoc("""
+    * `tracks.peaks` displays peaks per bead and track.""")
+
 __all__: List[str] = []

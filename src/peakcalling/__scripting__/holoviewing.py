@@ -407,4 +407,21 @@ class _ManualRef(PeaksTracksDictDisplay):
         data[:,0] = (data[:,0]-bias)*stretch
         return itm.clone(data = data)
 
+# pylint: disable=bad-continuation
+TracksDict.__doc__ = TracksDict.__doc__.replace("""
+    * `tracks.peaks` displays peaks per bead and track.""",
+    """
+    * `tracks.peaks` allows displaying peaks per bead and track. A number of
+    keywords are available such as `reference` for aligning all tracks versus a
+    reference track, or `fit` for adding stretch and bias sliders. Please check
+    the documentation in `tracks.peaks`. For a quick start, the main
+    possibilities are:
+
+        * `track.peaks(format = '2d') displays all tracks for a given bead on a
+        2D histogram.
+        * `track.peaks(format = '1d') displays all tracks for a given bead on a
+        1D histogram.
+        * `track.peaks(format = None) displays peaks per track and bead individually.
+    """)
+
 __all__: List[str] = []

@@ -12,6 +12,17 @@ from   ...views                 import isellipsis, BEADKEY
 from   ...tracksdict            import TracksDict
 from   .display                 import BasicDisplay
 
+_TDOC = (
+    """
+    ## Displays
+
+    A number of displays are available:
+
+    * `tracks`: displays a table with a number of characteristics per track. It's
+    a simple rendering of the dataframe created through `track.dataframe()`.
+    * `tracks.secondaries.temperatures()` creates a display of track temperatures.
+    * `tracks.secondaries.vcap()` creates a display of vcap versus zmag per track.""")
+
 class TracksDictDisplay(BasicDisplay,
                         cycles      = (TracksDict, dict(name = 'cycles')),
                         cleancycles = (TracksDict, dict(name = 'cleancycles')),
@@ -43,6 +54,16 @@ class TracksDictDisplay(BasicDisplay,
     _reflayout                         = 'left'
     _labels:    Union[None, bool, str] = True
     KEYWORDS                           = BasicDisplay.KEYWORDS | frozenset(locals())
+    @staticmethod
+    def addtodoc(new):
+        "adds display documentation"
+        from ..tracksdict import TracksDict as _TDict
+        doc = _TDict.__doc__
+        if _TDOC not in doc:
+            doc += _TDOC
+        ind = doc.find(_TDOC)+len(_TDOC)
+        _TDict.__doc__ = doc[:ind]+new+doc[ind:]
+
     def __getitem__(self, values):
         if isinstance(values, tuple):
             tracks, beads = values

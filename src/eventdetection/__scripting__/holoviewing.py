@@ -82,4 +82,6 @@ class EventTracksDictDisplay(TracksDictDisplay):
         "creates a dataframe for all keys"
         return self._items.dataframe(Tasks.eventdetection, *tasks, **kwa)
 
+TracksDictDisplay.addtodoc("""
+    * `tracks.events` displays event data per bead and track.""")
 __all__: List[str] = []
