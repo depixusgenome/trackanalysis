@@ -354,23 +354,25 @@ class Track:
         return viewtype(**kwa)
 
     def __getstate__(self):
+        keys = set(_lazies()+('_path', '_axis'))
+
+        test = dict.fromkeys(keys, lambda i, j: j != getattr(type(self), i)) # type: ignore
+        test.update(_phases = lambda i, _: len(i))
+
+        cnv  = dict.fromkeys(keys, lambda i: i)                              # type: ignore
+        cnv.update(_secondaries = lambda i: getattr(i, 'data', None),
+                   _axis        = lambda i: getattr(i, 'value', i)[0])
+
         info = self.__dict__.copy()
+        if info.get('_path', None):
+            info.pop('_data',        None)
+            info.pop('_secondaries', None)
 
-        if len(info['_phases']):
-            info['phases'] = info.pop('_phases')
-        info['secondaries'] = getattr(info.pop('_secondaries', None), 'data', None)
-
-        for name in set(_lazies()+('_path', '_axis')) & set(info):
+        for name in set(cnv) & set(info):
             val = info.pop(name)
-            if val != getattr(type(self), name):
-                info[name[1:]] = val
+            if test[name](name, val):
+                info[name[1:]] = cnv[name](val)
 
-        if 'axis' in info:
-            info['axis'] = info.pop('_axis').value
-
-        if 'path' in info:
-            info.pop('data',        None)
-            info.pop('secondaries', None)
         return info
 
     def __setstate__(self, values):

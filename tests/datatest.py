@@ -289,6 +289,22 @@ def test_allleaves():
     trks = [str(path[0]) for path in good]
     assert utpath("big_legacy") in trks
 
+def test_track_state():
+    "test track state"
+    trk   = data.Track(path = utpath("small_legacy"), axis = 'Y')
+    trk.load()
+    state = trk.__getstate__()
+    assert state.get('axis', None) == 'Y'
+    assert 'phases' in state
+    assert 'path'   in state
+    assert 'secondaries' not in state
+    assert 'data'        not in state
+
+    trk   = data.Track(data = {1: np.arange(5)}, secondaries = {'sec': np.arange(5)})
+    trk.load()
+    state = trk.__getstate__()
+    assert 'secondaries' in state
+    assert 'data'        in state
 
 def test_trktopk():
     "tests conversion to pk"
