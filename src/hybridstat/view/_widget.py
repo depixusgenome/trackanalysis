@@ -33,21 +33,19 @@ class ReferenceWidget(WidgetCreator[PeaksPlotModelAccess], FileListMixin):
         super().__init__(model)
         FileListMixin.__init__(self)
         self.__widget: Dropdown  = None
-        self.css.title.reference.default = 'Reference Track'
+        self.css.title.reference.default      = 'Reference Track'
+        self.css.title.reference.none.default = 'None'
 
-    def create(self, action) -> List[Widget]:
+    def create(self, action, *_) -> List[Widget]:
         "creates the widget"
         self.__widget = Dropdown(name  = 'HS:Sequence',
                                  width = self.css.input.width.get(),
                                  **self.__data())
         @action
         def _py_cb(new):
-            lst  = list(self.files)
             inew = int(new)
-            if inew >= lst or inew < 0:
-                self._model.fittoreference = None
-            else:
-                self._model.fittoreference = lst[inew][1]
+            val  = None if inew < 0 else [i for _, i in self.files][inew]
+            self._model.fittoreference.reference = val
 
         self.__widget.on_click(_py_cb)
         return [Paragraph(text = self.css.title.reference.get()), self.__widget]
@@ -63,13 +61,12 @@ class ReferenceWidget(WidgetCreator[PeaksPlotModelAccess], FileListMixin):
 
     def __data(self) -> dict:
         lst   = list(self.files)
-        menu  = list(enumerate(i for i, _ in lst))
-        menu += [None, (self.css.title.reference.none.get(), -1)]
+        menu  = [(j, str(i)) for i, j in enumerate(i for i, _ in lst)]
+        menu += [None, (self.css.title.reference.none.get(), '-1')]
 
         key   = self._model.fittoreference.reference
-        return dict(menu  = menu,
-                    label = dict(lst).get(key, menu[-1][0]),
-                    value = -1 if key is None else [i for _, i in lst].index(key))
+        index = -1 if key is None else [i for _, i in lst].index(key)
+        return dict(menu  = menu, label = menu[index][0], value = str(index))
 
 class PeaksOligoListWidget(OligoListWidget):
     "deals with oligos"
@@ -187,6 +184,11 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
                                    / ((np.mean(self.values[3]*stretch))**2
                                       * (nfound - 2)))
 
+        def referencedependant(self, mdl):
+            "all sequence dependant stats"
+            self.values[0] = mdl.fittoreference.stretch
+            self.values[1] = mdl.fittoreference.bias
+
         def __call__(self) -> str:
             return ('<table>'
                     + ''.join(self.line.format(i[0], self.__fmt(i[1], j))
@@ -217,6 +219,10 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
             for key in dist:
                 tab.sequencedependant(self._model, dist, key)
                 ret[key] = tab()
+
+        elif self._model.fittoreference.task is not None:
+            tab.referencedependant(self._model)
+            ret[''] = tab()
         return ret
 
 class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
@@ -435,6 +441,7 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin):
 def createwidgets(mdl: PeaksPlotModelAccess) -> Dict[str, WidgetCreator]:
     "returns a dictionnary of widgets"
     return dict(seq      = PeaksSequencePathWidget(mdl),
+                ref      = ReferenceWidget(mdl),
                 oligos   = PeaksOligoListWidget(mdl),
                 stats    = PeaksStatsWidget(mdl),
                 peaks    = PeakListWidget(mdl),

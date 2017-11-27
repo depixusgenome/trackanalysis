@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Model for peaksplot"
 from typing                     import (Optional, Dict, # pylint: disable=unused-import
-                                        List, Tuple, cast)
+                                        List, Tuple, Any, cast)
 import pickle
 
 import numpy                    as     np
@@ -20,6 +20,7 @@ from peakfinding.histogram      import Interpolator
 from peakfinding.processor      import PeakSelectorTask
 from peakfinding.selector       import PeakSelectorDetails
 from peakcalling                import match
+from peakcalling.toreference    import ChiSquareHistogramFit
 from peakcalling.tohairpin      import Distance
 from peakcalling.processor      import FitToHairpinTask, FitToReferenceTask
 from peakcalling.processor.fittoreference   import FitData
@@ -28,24 +29,34 @@ from ..reporting.batch          import fittohairpintask
 from ._processors               import runbead
 from ._peakinfo                 import createpeaks
 
+class _DummyDict:
+    "Empty dictionnary"
+    @staticmethod
+    def get(*_):
+        "returns nothing"
+        return None
+
+    def __contains__(self, _):
+        return False
+
+    def __len__(self):
+        return 0
+
+    def __iter__(self):
+        return iter(())
+
 class FitToReferenceAccess(TaskAccess):
     "access to the FitToReferenceTask"
     def __init__(self, ctrl):
         super().__init__(ctrl, FitToReferenceTask)
-        self.__store.defaults     = dict(id = None, reference = None, peaks = None)
+        self.__store              = self.project.root.tasks.fittoreference.gui
+        self.__store.defaults     = dict(id        = None,
+                                         reference = None,
+                                         fitdata   = _DummyDict(),
+                                         peaks     = _DummyDict())
+
         self.configtask.defaults  = dict(histmin       = 1e-3,
                                          peakprecision = 1e-2)
-
-    @staticmethod
-    def _configattributes(_):
-        return {}
-
-    @property
-    def __store(self):
-        return self.project.fittoreference.gui
-
-    __ref    = property(lambda self: self.__store.reference)
-    __id     = property(lambda self: self.__store.id)
 
     @property
     def params(self) -> Optional[Tuple[float, float]]:
@@ -60,88 +71,102 @@ class FitToReferenceAccess(TaskAccess):
         mem = self.cache() # pylint: disable=not-callable
         return None if mem is None else mem.get(self.bead, None)
 
+    fitalg  = property(lambda self: ChiSquareHistogramFit())
     stretch = property(lambda self: self.params[0])
     bias    = property(lambda self: self.params[1])
     hmin    = property(lambda self: self.configtask.histmin.get())
 
-    def remove(self):
-        "removes the task"
-        self.__store.update(id = None, reference = None, peaks = None)
-        super().remove()
-
     def update(self, **_):
         "removes the task"
         assert len(_) == 0
-        ident, fitdata, peaks = self.__computefitdata()
-        if fitdata is None:
+        newdata, newid = self.__computefitdata()
+        if not newdata:
             return
 
-        if ident != self.__id.get():
-            self.__store.update(id = ident, peaks = peaks)
-            cache = None
-        else:
-            cache = self.cache() # pylint: disable=not-callable
-            self.__store.update(peaks = peaks)
-
-        super().update(fitdata = fitdata)
+        # pylint: disable=not-callable
+        cache = None if newid else self.cache()
+        super().update(fitdata = self.__store.fitdata.get())
         if cache:
             self._ctrl.processors(self.roottask).data.setCacheDefault(self.task, cache)
 
     @property
     def reference(self) -> Optional[RootTask]:
-        "returns the current reference"
+        "returns the root task for the reference data"
         return self.__ref.get()
 
     @reference.setter
-    def reference(self, value:Optional[RootTask]):
-        "sets the current reference"
-        if value is not self.__ref.get():
-            return self.remove() if value in (None, self.roottask) else self.update()
+    def reference(self, val):
+        "sets the root task for the reference data"
+        if val is not self.__ref.get():
+            self.__store.update(id = None, reference = val, fitdata = None, peaks = None)
+
+    def setobservers(self, _):
+        "observes the global model"
+        self.__ref.observe(lambda _: self.resetmodel())
 
     def resetmodel(self):
         "adds a bead to the task"
-        ref = self.__ref.get()
-        if self.task is None and ref in (self.roottask, None):
-            return
-        return self.remove() if ref is self.roottask else self.update()
+        return (self.update() if self.__ref.get() not in (self.roottask, None) else
+                self.remove() if self.task                                     else
+                None)
 
     def refhistogram(self, xaxis):
         "returns the histogram interpolated to the provided values"
-        task  = self.task
-        ibead = self.bead
-        if task is None or ibead not in task.fitdata:
+        data = getattr(self.__fits, 'data', None)
+        if data is None:
             return np.full(len(xaxis), np.NaN, dtype = 'f4')
-
-        return Interpolator(task.fitdata[ibead].data, miny = self.hmin)(xaxis)
+        return Interpolator(data, miny = self.hmin)(xaxis)
 
     def identifiedpeaks(self, peaks):
         "returns an array of identified peaks"
-        ref = self.__store.peaks.get()
+        ref = self.__peaks
         arr = np.full(len(peaks), np.NaN, dtype = 'f4')
-        if ref is not None and len(ref) and len(peaks):
+        if len(peaks) and ref is not None:
             ids = match.compute(ref, peaks, self.configtask.peakprecision.get())
             arr[ids[:,1]] = ref[ids[:,0]]
         return arr
 
-    def __computefitdata(self):
-        ibead = self.bead
-        task  = cast(FitToReferenceTask, self.task)
+    @staticmethod
+    def _configattributes(_):
+        return {}
+
+    __fits   = property(lambda self: self.__store.fitdata.get().get(self.bead, None))
+    __peaks  = property(lambda self: self.__store.peaks.get().get(self.bead, None))
+    __ref    = property(lambda self: self.__store.reference)
+    __id     = property(lambda self: self.__store.id)
+
+    def __computefitdata(self) -> Tuple[bool, bool]:
+        args  = {} # type: Dict[str, Any]
         ident = pickle.dumps(tuple(self._ctrl.tasks(self.reference)))
         if self.__id.get() == ident:
-            if ibead in task.fitdata:
-                return None, None, None
-            fits  = dict(task.fitdata)
-            peaks = dict(self.__store.peaks.get())
+            if self.__peaks is not None:
+                return False, False
         else:
-            fits  = dict()
-            peaks = dict()
+            args['id'] = ident
 
-        tmp         = tuple(next(iter(self._ctrl.run(self.reference, PeakSelectorTask,
-                                                     copy = True)))[ibead])
-        res         = task.fitalg.frompeaks(((ibead, tmp),)) # type: ignore
-        fits[ibead] = FitData(res, (1., 0.))
-        peaks[ibead]= np.array([i for i, _ in peaks], dtype = 'f4')
-        return ident, fits, peaks
+        fits  = self.__store.fitdata.get()
+        if not fits:
+            args['fitdata'] = fits = {}
+
+        peaks  = self.__store.peaks.get()
+        if not peaks:
+            args['peaks'] = peaks = {}
+
+        ibead = self.bead
+        proc  = self._ctrl.run(self.reference, PeakSelectorTask, copy = True)
+        try:
+            tmp  = tuple(next(iter(proc))[ibead])
+        except: # pylint: disable=bare-except
+            peaks[ibead] = np.empty((0,), dtype = 'f4')
+        else:
+            res = self.fitalg.frompeaks(((ibead, tmp),)) # type: ignore
+            if res:
+                fits[ibead] = FitData(res, (1., 0.))
+            peaks[ibead] = np.array([i for i, _ in peaks], dtype = 'f4')
+
+        if args:
+            self.__store.update(**args)
+        return True, 'id' in args
 
 class FitToHairpinAccess(TaskAccess):
     "access to the FitToHairpinTask"
@@ -154,7 +179,7 @@ class FitToHairpinAccess(TaskAccess):
     def setobservers(self, mdl):
         "observes the global model"
         def _observe(_):
-            task = mdl.defaultidenfication
+            task = self.default(mdl)
             if task is None:
                 self.remove()
             else:
@@ -294,3 +319,4 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
     def observe(self):
         "observes the global model"
         self.identification.setobservers(self)
+        self.fittoreference.setobservers(self)
