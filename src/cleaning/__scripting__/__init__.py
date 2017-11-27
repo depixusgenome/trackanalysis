@@ -189,7 +189,7 @@ class TracksDictCleaningScript:
 
 TracksDict.__doc__ += (
     """
-    # Cleaning
+    ## Cleaning
 
     """+TracksDictCleaningScript.__doc__)
 TracksDict.__base__.__doc__ = TracksDict.__doc__ # type: ignore
