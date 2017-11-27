@@ -3,6 +3,7 @@
 "List of processes and cache"
 from typing         import Union, Iterable, Sized, List, Tuple, Any, Iterator, cast
 from utils          import isfunction
+from model.task     import Task
 from .base          import Processor, register
 
 def _version():
@@ -79,9 +80,18 @@ class Cache(Iterable[Processor], Sized):
 
     def index(self, tsk) -> int:
         "returns the index of the provided task"
+        if isinstance(tsk, type) and issubclass(tsk, Task):
+            # pylint: disable=unidiomatic-typecheck
+            good = [i for i, j in enumerate(self._items) if type(j.proc.task) is tsk]
+            if len(good) > 1:
+                raise IndexError("ambiguous: please specify the task instance")
+            elif len(good) == 0:
+                raise IndexError("Missing task")
+            return good[0]
+
         return (0       if tsk is None          else
                 tsk     if isinstance(tsk, int) else
-                next(i for i, opt in enumerate(self._items) if opt.isitem(tsk)))
+                next(i for i, j in enumerate(self._items) if j.isitem(tsk)))
 
     @property
     def model(self):
