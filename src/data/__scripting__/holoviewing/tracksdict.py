@@ -4,18 +4,13 @@
 """
 Adds shortcuts for using holoview
 """
-import sys
 from   typing                   import List, Union
-from   functools                import partial
+from   functools                import partial, wraps
 
-from   scripting.holoviewing    import addto, displayhook, addproperty
-from   utils.logconfig          import getLogger
+from   scripting.holoviewing    import addto, displayhook, addproperty, hv
 from   ...views                 import isellipsis, BEADKEY
 from   ...tracksdict            import TracksDict
 from   .display                 import BasicDisplay
-
-LOGS  = getLogger(__name__)
-hv    = sys.modules['holoviews']  # pylint: disable=invalid-name
 
 class TracksDictDisplay(BasicDisplay,
                         cycles      = (TracksDict, dict(name = 'cycles')),
@@ -172,26 +167,8 @@ class TracksDictDisplay(BasicDisplay,
             return [(i, kdims[i]) for i in ('key', 'bead')]
         return kdims
 
-@displayhook
-@addproperty(TracksDict, 'fov')
-class TracksDictFovDisplayProperty:
-    """
-    A hv.DynamicMap showing measures
-
-    Options are:
-
-        * *overlay* == 'key': for a given bead, all tracks are overlayed
-        The *reference* option can be used to indicate the top-most track.
-        * *overlay* == 'bead': for a given track, all beads are overlayed
-        The *reference* option can be used to indicate the top-most bead.
-        * *overlay* == None:
-
-            * *reference*: the reference is removed from the *key* widget and
-            allways displayed to the left independently.
-            * *refdims*: if set to *True*, the reference gets its own dimensions.
-            Thus zooming and spanning is independant.
-            * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
-    """
+class TracksDictDisplayProperty:
+    "Helper class for display some track property"
     def __init__(self, dico):
         self.tracks = dico
         self._keys  = None
@@ -207,34 +184,70 @@ class TracksDictFovDisplayProperty:
             raise KeyError("Could not slice the display")
         return self
 
-    def _run(self, opts, key):
-        return self.tracks[key].fov.display(**opts).relabel(f'{key}')
+    def _tomap(self, attr, *keys, layout = False, cols = 2, **kwa):
+        mykeys = list(keys       if keys       else
+                      self._keys if self._keys else
+                      self.tracks.keys())
 
-    def display(self, *keys, calib = False, layout = False, cols = 2, **opts):
-        "displays measures for a TracksDict"
-        if len(keys) == 0:
-            keys = self._keys if self._keys else self.tracks.keys()
-
-        opts['calib'] = calib
-        fcn           = partial(self._run, opts)
+        fcn = partial(attr, **kwa) if kwa else attr
         if layout:
-            return hv.Layout([fcn(i) for i in keys]).cols(cols)
-        return hv.DynamicMap(fcn, kdims = ['key']).redim.values(key = list(keys))
+            return hv.Layout([fcn(i) for i in mykeys]).cols(cols)
+        dmap = hv.DynamicMap(fcn, kdims = ['key']).redim.values(key = mykeys)
+        return dmap
+
+    @classmethod
+    def apply(cls, fcn):
+        "creates a method mapping a track display to a hv.DynamicMap"
+        @wraps(fcn)
+        def _wrapped(self, *keys, layout = False, cols = 2, **kwa):
+            cur = partial(fcn, self, **kwa)
+            # pylint: disable=protected-access
+            return self._tomap(cur, *keys, layout = layout, cols = cols)
+        return _wrapped
+
+@displayhook
+@addproperty(TracksDict, 'fov')
+class TracksDictFovDisplayProperty(TracksDictDisplayProperty):
+    """
+    A hv.DynamicMap showing the field of views.
+
+    Options are:
+
+    * *calib* shows the bead calibration files
+    * *layout* uses a layout rather than a dynamic map
+    * *cols* is the number of columns in the layout
+    """
+    @TracksDictDisplayProperty.apply
+    def display(self, key, calib = False, **opts):
+        "displays measures for a TracksDict"
+        return self.tracks[key].fov.display(calib = calib, **opts).relabel(f'{key}')
+    display.__doc__ = __doc__
 
 @addto(TracksDict)         # type: ignore
 def display(self):
     "Returns a table with some data"
     return hv.Table(self.dataframe(), kdims = ['key'])
 
-@addto(TracksDict)         # type: ignore
-def map(self, fcn, kdim = 'oligo', *extra, **kwa):
-    "returns a hv.DynamicMap"
-    if kdim is not None and kdim not in kwa:
-        kwa[kdim] = list(self.keys())
+@addproperty(TracksDict, 'secondaries')
+class TracksDictSecondariesDisplayProperty(TracksDictDisplayProperty):
+    """
+    Allows displaying temperatures or vcap
 
-    if 'bead' not in kwa:
-        kwa['bead'] = self.beads(*kwa.get(kdim, ()))
+    Options are:
 
-    return hv.DynamicMap(fcn, kdims = list(kwa)+list(extra)).redim.values(**kwa)
+    * *layout* uses a layout rather than a dynamic map
+    * *cols* is the number of columns in the layout
+    """
+    @TracksDictDisplayProperty.apply
+    def temperatures(self, key):
+        "displays all temperatures"
+        return self.tracks[key].secondaries.display.temperatures()
+    temperatures.__doc__ = __doc__.replace(' or vcap', '')
+
+    @TracksDictDisplayProperty.apply
+    def vcap(self, key):
+        "displays all zmag versus vcap"
+        return self.tracks[key].secondaries.display.vcap()
+    vcap.__doc__ = __doc__.replace('temperatures or', 'zmag versus')
 
 __all__: List[str] = []

@@ -5,12 +5,10 @@
 Adds shortcuts for using holoview
 """
 from   typing                   import List
-from   functools                import partial
 from   copy                     import deepcopy
 import numpy                    as     np
 
-from   scripting.holoviewing    import addto, displayhook, BasicDisplay, hv
-from   ...track                 import Bead, FoV, Track
+from   scripting.holoviewing    import displayhook, BasicDisplay, hv
 from   ...views                 import Beads, Cycles
 
 displayhook(Beads, Cycles)
@@ -172,62 +170,5 @@ class BeadDisplay(Display, display = Beads):
             return ((self._kdim, list(set([i for i in self._items.keys()
                                            if self._items.isbead(i)]))),)
         return None
-
-@addto(Track, Beads)
-def map(self, fcn, **kwa):
-    "returns a hv.DynamicMap with beads and kwargs in the kdims"
-    kwa.setdefault('bead', list(i for i in self.keys()))
-    return hv.DynamicMap(partial(fcn, self), kdims = list(kwa)).redim.values(**kwa)
-
-@addto(Cycles)      # type: ignore
-def map(self, fcn, kdim = None, **kwa):
-    "returns a hv.DynamicMap with beads or cycles, as well as kwargs in the kdims"
-    if kdim is None:
-        kdim = 'cycle' if ('cycle' in kwa and 'bead' not in kwa) else 'bead'
-
-    if kdim == 'bead':
-        kwa.setdefault(kdim, list(set(i for _, i in self.keys())))
-    elif kdim == 'cycle':
-        kwa.setdefault(kdim, list(set(i for i, _ in self.keys())))
-    return hv.DynamicMap(partial(fcn, self), kdims = list(kwa)).redim.values(**kwa)
-
-@addto(Bead)        # type: ignore
-def display(self, colorbar = True):
-    "displays the bead calibration"
-    if self.image is None:
-        return
-
-    bnd = [0, 0] + list(self.image.shape)
-    return (hv.Image(self.image[::-1], bounds = bnd, kdims = ['z focus (pixel)', 'profile'])
-            (plot = dict(colorbar = colorbar)))
-
-@addto(FoV)         # type: ignore
-def display(self,   # pylint: disable=too-many-arguments
-            beads    = None,
-            calib    = True,
-            colorbar = True,
-            ptcolor  = 'lightblue',
-            txtcolor = 'blue'):
-    """
-    displays the FoV with bead positions as well as calibration images.
-    """
-    bnd = self.bounds()
-    beads = list(self.beads.keys()) if beads is None else list(beads)
-
-    good  = {i: j.position[:2] for i, j in self.beads.items() if i in beads}
-    xvals = [i                 for i, _ in good.values()]
-    yvals = [i                 for _, i in good.values()]
-    txt   = [f'{i}'            for i    in good.keys()]
-
-    top   = (hv.Overlay([hv.Image(self.image[::-1], bounds = bnd)(plot = dict(colorbar = colorbar)),
-                         hv.Points((xvals, yvals))(style = dict(color = ptcolor))]
-                        +[hv.Text(*i)(style = dict(color = txtcolor))
-                          for i in zip(xvals, yvals, txt)])
-             .redim(x = 'x (μm)', y = 'y (μm)'))
-    if not calib:
-        return top
-    bottom = hv.DynamicMap(lambda bead: self.beads[bead].display(colorbar = colorbar),
-                           kdims = ['bead']).redim.values(bead = beads)
-    return (top+bottom).cols(1)
 
 __all__: List[str] = []
