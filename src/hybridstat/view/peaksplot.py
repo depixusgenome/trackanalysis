@@ -258,7 +258,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
 
         mode     = self.defaultsizingmode()
         wbox     = lambda x: layouts.widgetbox(children = x, **mode)
-        left     = sum((wdg[i] for i in ('seq','oligos','cstrpath', 'advanced')), [])
+        left     = sum((wdg[i] for i in ('ref', 'seq','oligos','cstrpath', 'advanced')), [])
         children = [[wbox(left), wbox(wdg['stats'])], [wbox(wdg['peaks'])]]
         return layouts.layout(children = children, **mode)
 
@@ -273,11 +273,11 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
 
 class PeaksPlotView(PlotView[PeaksPlotCreator]):
     "Peaks plot view"
+    TASKS = 'extremumalignment', 'eventdetection', 'peakselector'
     def advanced(self):
         "triggers the advanced dialog"
         self._plotter.advanced()
 
     def ismain(self):
         "Alignment, ... is set-up by default"
-        self._ismain(tasks = ['extremumalignment', 'eventdetection', 'peakselector'],
-                     **setupio(self._plotter.model))
+        self._ismain(tasks = self.TASKS, **setupio(self._plotter.model))

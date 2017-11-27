@@ -28,7 +28,7 @@ LOGS = getLogger(__name__)
 
 class _PeaksIOMixin:
     def __init__(self, ctrl):
-        type(self).__bases__ [1].__init__(self, ctrl)
+        type(self).__bases__ [1].__init__(self, ctrl) # type: ignore
         self.__model = PeaksPlotModelAccess(ctrl)
 
     def open(self, path:Union[str, Tuple[str,...]], model:tuple):
@@ -42,10 +42,10 @@ class _PeaksIOMixin:
                 items[0] += (task,)
         return items
 
-class PeaksConfigTrackIO(_PeaksIOMixin, ConfigTrackIO):
+class PeaksConfigTrackIO(_PeaksIOMixin, ConfigTrackIO): # type: ignore
     "selects the default tasks"
 
-class PeaksConfigGRFilesIO(_PeaksIOMixin, ConfigGrFilesIO):
+class PeaksConfigGRFilesIO(_PeaksIOMixin, ConfigGrFilesIO): # type: ignore
     "selects the default tasks"
 
 FileDialog.DEFAULTS['pkz'] = (u'pickled report', '.pkz')

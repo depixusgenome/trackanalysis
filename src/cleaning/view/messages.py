@@ -190,9 +190,7 @@ class MessagesPlotCreator(TaskPlotCreator[MessagesModelAccess]):
 
 class MessagesView(PlotView[MessagesPlotCreator]):
     "a widget with all discards messages"
+    TASKS = 'datacleaning', 'extremumalignment'
     def ismain(self):
         "Cleaning and alignment, ... are set-up by default"
-        super()._ismain(tasks  = ['datacleaning', 'extremumalignment'],
-                        ioopen = [slice(None, -2),
-                                  'control.taskio.ConfigGrFilesIO',
-                                  'control.taskio.ConfigTrackIO'])
+        super()._ismain(tasks = self.TASKS)

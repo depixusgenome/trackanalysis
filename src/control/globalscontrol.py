@@ -243,8 +243,8 @@ class GlobalsController(BaseGlobalsController):
         cnf.phase.defaults     = PHASE.__dict__
         cnf.tasks.defaults     = {'processors':  'control.processor.Processor',
                                   'io.open':    ('anastore.control.AnaIO',
-                                                 'control.taskio.GrFilesIO',
-                                                 'control.taskio.TrackIO'),
+                                                 'control.taskio.ConfigGrFilesIO',
+                                                 'control.taskio.ConfigTrackIO'),
                                   'io.save':    ('anastore.control.ConfigAnaIO',),
                                   'clear':      True
                                  }

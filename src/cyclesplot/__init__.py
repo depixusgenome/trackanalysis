@@ -66,13 +66,11 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess], HistMixin, RawMixin,
 class CyclesPlotView(PlotView[CyclesPlotCreator]):
     "Cycles plot view"
     APPNAME = 'cyclesplot'
+    TASKS   = 'extremumalignment', 'eventdetection'
     def advanced(self):
         "triggers the advanced dialog"
         self._plotter.advanced()
 
     def ismain(self):
         "Alignment, ... is set-up by default"
-        super()._ismain(tasks  = ['extremumalignment', 'eventdetection'],
-                        ioopen = [slice(None, -2),
-                                  'control.taskio.ConfigGrFilesIO',
-                                  'control.taskio.ConfigTrackIO'])
+        self._ismain(tasks = self.TASKS)

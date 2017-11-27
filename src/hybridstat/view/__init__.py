@@ -10,9 +10,12 @@ from cleaning.view.messages import MessagesView
 from fov                    import FoVPlotView
 from cyclesplot             import CyclesPlotView
 from .peaksplot             import PeaksPlotView
+from ._io                   import setupio
 
 class HybridStatView(BokehView):
     "A view with all plots"
+    TASKS = ((lambda lst: tuple(j for i, j in enumerate(lst) if j not in lst[:i]))
+             (CleaningView.TASKS+PeaksPlotView.TASKS))
     def __init__(self, **kwa):
         "Sets up the controller"
         super().__init__(**kwa)
@@ -51,8 +54,9 @@ class HybridStatView(BokehView):
 
     def ismain(self):
         "Allows setting-up stuff only when the view is the main one"
+        self.__select(CleaningView) .ismain()
         self.__select(PeaksPlotView).ismain()
-        self.__select(CleaningView).ismain()
+        self._ctrl.getGlobal('config').tasks.default = self.TASKS
         def _advanced():
             for panel in self._panels:
                 if self.__state(panel).get() is PlotState.active:
