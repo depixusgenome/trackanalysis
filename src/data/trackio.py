@@ -266,7 +266,10 @@ class LegacyGRFilesIO(_TrackIO):
                 continue
 
             inds = np.int32(vals[0]+.1+starts[cyc]) # type: ignore
-            bead[inds] = vals[1]
+            try:
+                bead[inds] = vals[1]
+            except IndexError:
+                raise IndexError(f"Could not update {path}")
         return beadid
 
     @classmethod
