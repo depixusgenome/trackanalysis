@@ -111,9 +111,13 @@ class FitToReferenceTask(Task):
             self.frompeaks(val)
         elif isinstance(val, Events):
             self.fromevents(val)
+        elif isinstance(val, dict):
+            self._fitdata = val
+            self._fitdata.update({i: FitData(j, (1., 0.)) # type: ignore
+                                  for i, j in val.items()
+                                  if not isinstance(j, FitData)})
         else:
-            fcn           = lambda j: (j if isinstance(j, FitData) else
-                                       FitData(j, (1., 0)))
+            fcn = lambda j: (j if isinstance(j, FitData) else FitData(j, (1., 0)))
             self._fitdata = {i: fcn(j) for i, j in cast(Dict, val).items()}
 
     def frompeaks(self,
@@ -154,10 +158,7 @@ class FitToReferenceTask(Task):
     def getdata(self, key) -> FitData:
         "returns the fitdata"
         val = self._fitdata.get(key, None)
-        out = val if val else self._fitdata.get(self.DEFAULTKEY, None)
-        if out is None:
-            raise KeyError(f"Missing {key}")
-        return out
+        return val if val else self._fitdata.get(self.DEFAULTKEY, None)
 
     @classmethod
     def isslow(cls) -> bool:
@@ -176,6 +177,7 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
             return super()._keys(sel, _)
 
         available = frozenset(self.config.fitdata) - {self.config.DEFAULTKEY}
+        print(self, self.config.defaultdata, available)
         if sel is None:
             return super()._keys(tuple(available), True)
         seq = self._transform_ids(cast(Iterable, sel))
@@ -186,7 +188,9 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
         if len(data) == 0:
             return 1., 0.
 
-        ref           = self.config.getdata(key)
+        ref = self.config.getdata(key)
+        if ref is True:
+            return 1., 0.
         fit           = self.config.fitalg
         stretch, bias = fit.optimize(ref.data, fit.frompeaks(data))[1:]
         if ref.params not in ((1., 0.), None):

@@ -62,14 +62,11 @@ class FitToReferenceAccess(TaskAccess):
     def params(self) -> Optional[Tuple[float, float]]:
         "returns the computed stretch or 1."
         tsk = cast(FitToReferenceTask, self.task)
-        if tsk is None:
-            return None
-
-        if self.bead not in tsk.fitdata:
+        if tsk is None or self.bead not in tsk.fitdata:
             return 1., 0.
 
         mem = self.cache() # pylint: disable=not-callable
-        return None if mem is None else mem.get(self.bead, None)
+        return (1., 0.) if mem is None else mem.get(self.bead, (1., 0.))
 
     fitalg  = property(lambda self: ChiSquareHistogramFit())
     stretch = property(lambda self: self.params[0])
@@ -115,6 +112,8 @@ class FitToReferenceAccess(TaskAccess):
         data = getattr(self.__fits, 'data', None)
         if data is None:
             return np.full(len(xaxis), np.NaN, dtype = 'f4')
+        if isinstance(data, tuple):
+            data = data[0]
         return Interpolator(data, miny = self.hmin)(xaxis)
 
     def identifiedpeaks(self, peaks):
@@ -153,16 +152,14 @@ class FitToReferenceAccess(TaskAccess):
             args['peaks'] = peaks = {}
 
         ibead = self.bead
-        proc  = self._ctrl.run(self.reference, PeakSelectorTask, copy = True)
+        proc  = next(iter(self._ctrl.run(self.reference, PeakSelectorTask, copy = True)))
         try:
-            tmp  = tuple(next(iter(proc))[ibead])
+            pks          = tuple(proc[ibead])
         except: # pylint: disable=bare-except
             peaks[ibead] = np.empty((0,), dtype = 'f4')
         else:
-            res = self.fitalg.frompeaks(((ibead, tmp),)) # type: ignore
-            if res:
-                fits[ibead] = FitData(res, (1., 0.))
-            peaks[ibead] = np.array([i for i, _ in peaks], dtype = 'f4')
+            peaks[ibead] = np.array([i for i, _ in pks], dtype = 'f4')
+            fits [ibead] = FitData(self.fitalg.frompeaks(pks), (1., 0.)) # type: ignore
 
         if args:
             self.__store.update(**args)
@@ -236,8 +233,6 @@ class FitParamProp(_FitParamProp):
             dist = obj.distances.get(obj.sequencekey, None)
             if dist is not None:
                 return getattr(dist, self._key)
-            if obj.fittoreference.task:
-                return getattr(obj.fittoreference, self._key)
         return super().__get__(obj, tpe)
 
 class SequenceKeyProp(_SequenceKeyProp):

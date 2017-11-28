@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 "Processors for storing gui data"
 from typing                     import Dict, Tuple, List, Optional
+from copy                       import copy
+
 from data                       import BEADKEY
 from control.processor.taskview import TaskViewProcessor
 from peakfinding.selector       import PeakSelectorDetails
@@ -26,9 +28,10 @@ class GuiPeakSelectorProcessor(PeakSelectorProcessor):
     "gui version of PeakSelectorProcessor"
     def __init__(self, store, **kwa):
         super().__init__(**kwa)
-        self.store = store
+        self.store              = store
 
-    def __call__(self, *_1, **_2):
+    def __call__(self, **_):
+        self.__init__(self.store, **_)
         return self
 
     def createcache(self, _):
@@ -40,6 +43,11 @@ class GuiPeakSelectorProcessor(PeakSelectorProcessor):
 CACHE_T = Dict[BEADKEY, Tuple[float, float]]
 class GuiFitToReferenceDict(FitToReferenceDict):
     "gui version of FitToReferenceDict"
+    def __init__(self, *args, **kwa):
+        super().__init__(*args, **kwa)
+        self.config             = copy(self.config)
+        self.config.defaultdata = True
+
     def optimize(self, key: BEADKEY, data):
         "computes results for one key"
         params = self.cache[0].get(key, None)
@@ -58,12 +66,14 @@ class GuiFitToReferenceProcessor(TaskViewProcessor[FitToReferenceTask,
         super().__init__(**kwa)
         self.store = store
 
-    def __call__(self, *_1, **_2):
+    def __call__(self, **_):
+        self.__init__(self.store, **_)
         return self
 
-    def createcache(self, _):
+    def createcache(self, args):
         "creates the cache"
-        return {}, self.store
+        cache = args.data.setCacheDefault(self, {})
+        return cache, self.store
 
 def runbead(self) -> Tuple[Optional[FitBead], Optional[PeakSelectorDetails]]:
     "runs the bead with specific processors"
@@ -78,6 +88,4 @@ def runbead(self) -> Tuple[Optional[FitBead], Optional[PeakSelectorDetails]]:
 
     if not dtlstore or len(dtlstore[0].peaks) == 0:
         return None, None
-    if not self.identification.task:
-        return None, dtlstore[0]
-    return fits, dtlstore[0]
+    return (fits if self.identification.task else None), dtlstore[0]
