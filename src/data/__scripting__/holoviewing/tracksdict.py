@@ -6,6 +6,8 @@ Adds shortcuts for using holoview
 """
 from   typing                   import List, Union
 from   functools                import partial, wraps
+from   concurrent.futures       import ProcessPoolExecutor, ThreadPoolExecutor
+from   multiprocessing          import cpu_count
 
 from   scripting.holoviewing    import addto, displayhook, addproperty, hv
 from   ...views                 import isellipsis, BEADKEY
@@ -100,7 +102,7 @@ class TracksDictDisplay(BasicDisplay,
 
     def _base(self):
         kdims = self._default_kdims()
-        return partial(self._default_display, kdims), kdims
+        return self._default_display, kdims
 
     def _default_kdims(self):
         kdims = dict()
@@ -129,10 +131,10 @@ class TracksDictDisplay(BasicDisplay,
         elif isinstance(self._labels, str):
             kwa.setdefault('labels', self._labels)
 
-    def _default_display(self, _, key, bead, **kwa):
+    def _default_display(self, key, bead, dataonly = False, **kwa):
         self._default_kargs(key, bead, kwa)
         data = getattr(self._items[key], self._name, self._items[key]).display(**kwa)
-        return data.getmethod()(bead)
+        return (data, bead) if dataonly else data.getmethod()(bead)
 
     @staticmethod
     def _convert(_, elems):
@@ -142,12 +144,30 @@ class TracksDictDisplay(BasicDisplay,
     def _same(ref, other):
         return [ref, other]
 
+    @staticmethod
+    def _process_pooled_display(data):
+        return data[0].getmethod()(data[1])
+
+
     def _overlayed_method(self, key):
-        fcn, kdims = self._base()
-        if self._overlay == 'bead':
-            crvs = [fcn(key, i, neverempty = True) for i in kdims[self._overlay]]
+        kdims = self._default_kdims()
+        kword = 'key' if self._overlay == 'bead' else 'bead'
+        opts  = kdims[self._overlay]
+        fcn   = partial(self._default_display,
+                        **{kword:        key,
+                           'dataonly':   len(kdims[self._overlay]) > 2,
+                           'neverempty': True})
+
+
+        if len(kdims[self._overlay]) <= 2:
+            crvs = [fcn(i) for i in opts]
         else:
-            crvs = [fcn(i, key, neverempty = True) for i in kdims[self._overlay]]
+            self._items = self._items.freeze()
+            with ThreadPoolExecutor(cpu_count()) as pool:
+                data = list(pool.map(fcn, opts))
+
+            with ProcessPoolExecutor(cpu_count()) as pool:
+                crvs = list(pool.map(self._process_pooled_display, data))
         return hv.Overlay(self._convert(kdims, crvs))
 
     def _reference_method(self, key, bead):

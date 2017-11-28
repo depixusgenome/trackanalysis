@@ -4,6 +4,8 @@
 Adds a dictionnaries to access tracks, experiments, ...
 """
 import re
+from   concurrent.futures           import ThreadPoolExecutor
+from   multiprocessing              import cpu_count
 import pandas                       as     pd
 import numpy                        as     np
 
@@ -22,6 +24,20 @@ def __call__(self, track = None, beadsonly = False, __old__ = Handler.__call__) 
     if track is None:
         track = Track()
     return __old__(self, track, beadsonly)
+
+class FrozenTrack(Track):
+    "Track where the data is also part of the state"
+    def __init__(self, track = None, **kwa):
+        super().__init__(**kwa)
+        if track:
+            self.__dict__.update(track.__dict__)
+
+    def __getstate__(self):
+        self.load()
+        state = super().__getstate__()
+        state.update(data        = dict(self.data),
+                     secondaries = dict(self.secondaries.data))
+        return state
 
 class TracksDict(_TracksDict):
     """
@@ -232,6 +248,16 @@ class TracksDict(_TracksDict):
         if len(tasks) == 0:
             return self.basedataframe(loadall)
         return self.trackdataframe(*tasks, transform, assign, process, **kwa)
+
+    def freeze(self) -> 'TracksDict':
+        "Loads all tracks and adds the data to the track state"
+        cpy = self.__class__()
+        with ThreadPoolExecutor(cpu_count()) as pool:
+            def _create(track):
+                track.load()
+                return FrozenTrack(track)
+            dict.update(cpy, zip(self.keys(), pool.map(_create, self.values())))
+        return cpy
 
     dataframe.__doc__ =(
         f"""
