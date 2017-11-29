@@ -377,7 +377,7 @@ class Track:
 
     def __setstate__(self, values):
         self.__init__(**values)
-        keys = frozenset(self.__getstate__().keys())
+        keys = frozenset(self.__getstate__().keys()) | frozenset(('data', 'secondaries'))
         self.__dict__.update({i: j for i, j in values.items() if i not in keys})
 
     _framerate                  = 30.
