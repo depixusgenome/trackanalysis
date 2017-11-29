@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Creates a histogram from available events"
-from    typing import (NamedTuple, Optional, Iterator,
-                       Iterable, Union, Sequence, Callable, Tuple, cast,
-                       Dict)
-from    enum   import Enum
+from    typing                  import (NamedTuple, Optional, Iterator,
+                                        Iterable, Union, Sequence, Callable, Tuple, cast,
+                                        Dict)
+from    enum                    import Enum
 import  itertools
 from sklearn.mixture            import BayesianGaussianMixture, GaussianMixture
+from sklearn.cluster            import KMeans
+from scipy.stats                import norm, expon
+from scipy.signal               import find_peaks_cwt
 import  numpy  as     np
 from    numpy.lib.stride_tricks import as_strided
-from    scipy.signal            import find_peaks_cwt
 
 from    utils                   import (kwargsdefaults, initdefaults,
                                         NoArgs, asdataarrays, EVENTS_DTYPE)
@@ -460,7 +462,6 @@ class ByZeroCrossing:
                              precision = kwa.get("precision",None))
         return peaks, ids
 
-
 class ByGaussianMix:
     '''
     finds peaks and groups events using Gaussian mixture
@@ -543,42 +544,102 @@ class ByGaussianMix:
         values = [getattr(gmm,crit)(evts) for gmm in gmms]
         return gmms[np.argmin(values)]
 
-class ByBayesGaussianMix:
+
+
+class ByEM:
     '''
-    finds peaks and groups events using Bayesian Gaussian mixture
-    known to have convergence issues for small data sets
+    finds peaks and groups events using Expectation Maximization
+    the number of components is estimated using BIC criteria
     '''
-    max_iter     = 10000
-    cov_type     = 'tied'
-    peakwidth    = 1
-    weight_prior = 1e3
-    wprior_type = "dirichlet_distribution"
+    emiter = 1000
+    params:np.array
+    rates:np.array
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 
-    def __call__(self,**kwa):
-        pos            = kwa.get("pos",None)
-        self.peakwidth = kwa.get("precision",1)
-        hist, bias, slope   = kwa.get("hist",(0,0,1))
-        return self.find(pos, hist, bias, slope)
 
-    def find(self,pos: np.array,hist, bias:float = 0., slope:float = 1.):
-        'find peaks'
-        apos  = np.hstack(pos)
-        cov   = np.array([[self.peakwidth]])
-        ncmps = len(ZeroCrossingPeakFinder()(hist,bias, slope)) # find better
-        kwa   = {'n_components'                    : ncmps,
-                 'covariance_prior'                : cov,
-                 'covariance_type'                 : self.cov_type,
-                 'max_iter'                        : self.max_iter,
-                 'weight_concentration_prior'      : self.weight_prior,
-                 'weight_concentration_prior_type' : self.wprior_type}
-        # converge may fail without proper sampling.
-        dpgmm = BayesianGaussianMixture(**kwa)
-        trpos = np.matrix(apos).T
-        dpgmm.fit(trpos)
-        # peaks   = dpgmm.means_
-        raise NotImplementedError("find from Bayesian GM must be fixed before use")
+    def __call__(self,**kwa):
+        events = kwa.get("events",None) # np.array per cycles
+        hist   = kwa.get("hist",(0,0,1)) # pylint: disable=unused-variable
+        data   = np.array([[np.nanmean(i),len(i)] for i in np.hstack(events)])
+        npeaks = kwa.get("npeaks",2)
+        return self.fitone(data,npeaks) # will need to apply slope and pias to peaks
+
+    @staticmethod
+    def init(data:np.array,nclusters=1)->np.array:
+        'init using KMeans on spatial data'
+        kmean   = KMeans(nclusters)
+        kmean.fit(data[:,:-1])
+        predict = kmean.predict(data[:,:-1])
+        clas    = {idx:np.array([data[_1] for _1,_2 in enumerate(predict) if _2==idx])
+                   for idx in range(nclusters)}
+
+        stds    = np.array([np.nanstd(clas[idx],axis=0) for idx in range(nclusters)])
+        means   = np.array([np.nanmean(clas[idx],axis=0) for idx in range(nclusters)])
+        rates   = np.array([1/nclusters]*nclusters).reshape(-1,1)
+        return rates,np.hstack([means,stds]) # one row per cluster
+
+
+    @classmethod
+    def score(cls,data:np.array,params:np.array)->np.array:
+        'return the score[i,j] array corresponding to pdf(Xi|Zj, theta)'
+        def _score(par):
+            par   = par.reshape(2,-1).T
+            pdfs  = [norm(loc=_[0],scale=_[1]).pdf for _ in par[:-1]]
+            pdfs += [expon(loc=0,scale=par[-1][1]).pdf]
+            return pdfs
+
+        scored=[]
+        for par in params:
+            pdfs=_score(par)
+            score= lambda x:np.sum([pdf(x[idx]) for idx,pdf in enumerate(pdfs)])
+            scored.append([score(arr) for arr in data])
+
+        return np.array(scored)
+
+    @classmethod
+    def emstep(cls,data:np.array,rates:np.array,params:np.array):
+        'E then M steps of EM'
+        score = cls.score(data,params)
+        pz_x  = score*rates # P(Z|X,theta)
+        pz_x  = np.array(pz_x)/np.sum(pz_x,axis=1) # renorm
+        return cls.__maximization(pz_x,data,params)
+
+    @classmethod
+    def __maximization(cls,pz_x:np.array,data:np.array,params:np.array):
+        'returns the next set of parameters'
+        nrates  = np.mean(pz_x,axis=1).reshape(-1,1)
+        # spatial params
+        nmeans  = np.array(np.matrix(pz_x)*data[:,:-1]/np.sum(pz_x,axis=1).reshape(-1,1))
+        center  = np.matrix(data[:,:-1]-nmeans)
+        center  = np.diag(center*center.T).reshape(-1,1)
+        nscales = np.array(np.matrix(pz_x)*center/np.sum(np.matrix(pz_x),axis=1))
+        # temporal params
+        tmeans  = np.array([0]*params.shape[0])
+        tscales = np.sum(pz_x,axis=1).reshape(-1,1)/np.array(np.matrix(pz_x)*data[:,-1])
+        return nrates,np.hstack([nmeans,tmeans,nscales,tscales])
+
+
+    @classmethod
+    def assign(cls,data:np.array,params:np.array)->Dict[int,np.array]:
+        'to each event (row in data) assign a peak (row in params)'
+        # assumes Gaussian distribution for peaks
+        # exponential distribution for durations
+        scored=cls.score(data,params) # scored[i,j] = pdf(Xi,Zj| theta)
+        assigned=[np.argmin(row) for row in scored]
+        return {pid:np.array([row for idx,row in enumerate(data) if assigned[idx]==pid])
+                for pid in range(len(params))}
+
+
+    def fitone(self,data:np.array,npeaks:int):
+        'iterate EM to fit npeaks'
+        # initialize params
+        rates,params = self.init(data,npeaks)
+        for _ in range(self.emiter):
+            LOGS.info(f"it={_}")
+            LOGS.info(f"params={params}")
+            rates,params=self.emstep(data,rates,params)
+
 
 PeakFinder = Union[ByZeroCrossing, ByBayesGaussianMix, ByGaussianMix]
