@@ -3,7 +3,7 @@
 """
 Adds quality control displays
 """
-from   typing                        import List, Dict, cast
+from   typing                        import List, Dict
 from   itertools                     import chain
 
 import numpy                         as     np
@@ -90,19 +90,13 @@ class QualityControl(ItemsDisplay, qc = TracksDict):
 
     def display(self, *beads, **kwa): # pylint: disable=arguments-differ
         """
-        Displays all QC graphs.
-        """
-        return self(**kwa)._display(beads) # pylint:disable=no-member
+        Displays a selection of QC plots:"""
+        return self(**kwa)._display(beads) # pylint:disable=no-member,protected-access
 
     # pylint: disable=no-member
-    display.__doc__ += (f"""
-        Graphs are:
-
-        * `tsample`: {tsample.__doc__}
-        * `vcap`: {vcap.__doc__}
-        * `beadextent`: {beadextent.__doc__}
-        """)
-    __doc__          = display.__doc__
+    display.__doc__ += '\n\n'+'\n'.join(f'    * `{i.__name__}`:{i.__doc__}'
+                                        for i in (tsample, vcap, beadextent))
+    __doc__          = display.__doc__.replace('        ', '    ')
 
     def _beadextent(self, bead):
         act  = lambda _, info: (info[0], np.nanmedian(info[1]))
