@@ -6,7 +6,7 @@ from    typing                  import (NamedTuple, Optional, Iterator,
                                         Dict)
 from    enum                    import Enum
 import  itertools
-from sklearn.mixture            import BayesianGaussianMixture, GaussianMixture
+from sklearn.mixture            import GaussianMixture
 from sklearn.cluster            import KMeans
 from scipy.stats                import norm, expon
 from scipy.signal               import find_peaks_cwt
@@ -544,14 +544,12 @@ class ByGaussianMix:
         values = [getattr(gmm,crit)(evts) for gmm in gmms]
         return gmms[np.argmin(values)]
 
-
-
 class ByEM:
     '''
     finds peaks and groups events using Expectation Maximization
     the number of components is estimated using BIC criteria
     '''
-    emiter = 1000
+    emiter = 100
     params:np.array
     rates:np.array
     @initdefaults(frozenset(locals()))
@@ -583,7 +581,7 @@ class ByEM:
 
     @classmethod
     def score(cls,data:np.array,params:np.array)->np.array:
-        'return the score[i,j] array corresponding to pdf(Xi|Zj, theta)'
+        'return the score[i,j] array corresponding to pdf(Xj|Zi, theta)'
         def _score(par):
             par   = par.reshape(2,-1).T
             pdfs  = [norm(loc=_[0],scale=_[1]).pdf for _ in par[:-1]]
@@ -603,22 +601,27 @@ class ByEM:
         'E then M steps of EM'
         score = cls.score(data,params)
         pz_x  = score*rates # P(Z|X,theta)
-        pz_x  = np.array(pz_x)/np.sum(pz_x,axis=1) # renorm
+        pz_x  = np.array(pz_x)/np.sum(pz_x,axis=0) # renorm over Z
         return cls.__maximization(pz_x,data,params)
 
     @classmethod
     def __maximization(cls,pz_x:np.array,data:np.array,params:np.array):
         'returns the next set of parameters'
+        # should be ok for xyz or z only axes, except for nscales comp
         nrates  = np.mean(pz_x,axis=1).reshape(-1,1)
-        # spatial params
-        nmeans  = np.array(np.matrix(pz_x)*data[:,:-1]/np.sum(pz_x,axis=1).reshape(-1,1))
-        center  = np.matrix(data[:,:-1]-nmeans)
-        center  = np.diag(center*center.T).reshape(-1,1)
-        nscales = np.array(np.matrix(pz_x)*center/np.sum(np.matrix(pz_x),axis=1))
-        # temporal params
-        tmeans  = np.array([0]*params.shape[0])
-        tscales = np.sum(pz_x,axis=1).reshape(-1,1)/np.array(np.matrix(pz_x)*data[:,-1])
-        return nrates,np.hstack([nmeans,tmeans,nscales,tscales])
+        # spatial params on data[:,:-1]
+        nmeans  = np.matrix(pz_x)*data[:,:-1]
+        nmeans /= np.sum(pz_x,axis=1).reshape(-1,1)
+        center = np.hstack([data[:,:-1]-i for i in nmeans]).T
+
+        nscales =np.array([np.matrix(np.array(r)*pz_x[idx,:])*r.T
+                           for idx,r in enumerate(center)]).reshape(-1,1)
+        nscales /= np.sum(pz_x,axis=1).reshape(-1,1)
+        # temporal params on data[:,-1]
+        tmeans  = np.array([0]*params.shape[0]).reshape(-1,1)
+        tscales = np.sum(pz_x,axis=1).reshape(-1,1)
+        tscales/=np.array(np.matrix(pz_x)*data[:,-1].reshape(-1,1))
+        return nrates,np.hstack([np.array(nmeans),tmeans,nscales,1/tscales])
 
 
     @classmethod
@@ -640,6 +643,6 @@ class ByEM:
             LOGS.info(f"it={_}")
             LOGS.info(f"params={params}")
             rates,params=self.emstep(data,rates,params)
+        return rates,params
 
-
-PeakFinder = Union[ByZeroCrossing, ByBayesGaussianMix, ByGaussianMix]
+PeakFinder = Union[ByZeroCrossing, ByGaussianMix]
