@@ -153,12 +153,15 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         fit2ref = self._model.fittoreference
         pksel   = cast(PeakSelector, self._model.peakselection.task)
 
-        maxv    = max(pksel.histogram.kernelarray())
-        zvals   = np.arange(len(dtl.histogram), dtype = 'f4')
+        rho     = 100./(max(pksel.histogram.kernelarray())*self._model.track.ncycles)
+        zvals   = dtl.binwidth*np.arange(len(dtl.histogram), dtype = 'f4')+dtl.minvalue
 
-        data    = dict(z     = dtl.binwidth*zvals+dtl.minvalue,
-                       count = dtl.histogram/(maxv*self._model.track.ncycles)*100.,
-                       ref   = fit2ref.refhistogram(zvals))
+        data    = dict(z     = zvals,
+                       count = dtl.histogram*rho,
+                       ref   = fit2ref.refhistogram(zvals, rho))
+        print("///")
+        print(data['count'][np.isfinite(data['ref'])])
+        print(data['ref'][np.isfinite(data['ref'])])
 
         pos     = np.concatenate(dtl.positions)
         events  = dict(z     = pos,
@@ -220,9 +223,9 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         for key in ('count', 'reference.count', 'events.count',
                     'peaks.count', 'peaks.duration'):
             src  = self._src.get(key.split('.')[0], self._src[''])
-            args = dict(y            = 'ref' if key.startswith('ref') else 'z',
-                        x            = key.split('.')[-1],
-                        source       = src)
+            args = dict(x      = 'ref' if key.startswith('ref') else key.split('.')[-1],
+                        y      = 'z',
+                        source = src)
             if 'duration' in key:
                 args['x_range_name'] = 'duration'
 

@@ -69,6 +69,45 @@ class CacheItem:
     cache   = property(lambda self: self.getCache(), setCache)
     proc    = property(lambda self: self._proc)
 
+REP_T = Tuple[int, Processor, Processor]
+class CacheReplacement:
+    """
+    Context for replacing processors but keeping their cache
+    """
+    def __init__(self, cache: 'Cache', *options: Processor) -> None:
+        self.options:  Tuple[Processor,...] = options
+        self.replaced: List[REP_T]          = []
+        self.cache:    Cache                = cache
+
+    def taskcache(self, task:Task):
+        "returns the task cache"
+        return self.cache.getCache(task)()
+
+    def __enter__(self):
+        if self.cache is None:
+            return
+
+        self.replaced.clear()
+        if len(self.options) == 0:
+            return self.cache
+
+        reg  = register(self.options, force = True, recursive = False)
+        itms = getattr(self.cache, '_items')
+        for i, j in enumerate(self.cache):
+            val = reg.get(type(j.task), None)
+            if val is not None:
+                self.replaced.append(cast(REP_T, (i, val(task = j.task), j)))
+                setattr(itms[i], '_proc', self.replaced[-1][1])
+        return self.cache
+
+    def __exit__(self, *_):
+        if self.cache is None:
+            return
+
+        itms = getattr(self.cache, '_items')
+        for i, _, j in self.replaced:
+            setattr(itms[i], '_proc', j)
+
 class Cache(Iterable[Processor], Sized):
     "Contains the track and task-created data"
     __slots__ = ('_items',)
@@ -131,23 +170,8 @@ class Cache(Iterable[Processor], Sized):
     def keepupto(self, task) -> 'Cache':
         "returns a Cache with tasks up to and including *task*"
         if task is None or task is Ellipsis:
-            return Cache(iter(self._items))
-        return self if task is None else Cache(self._items[:self.index(task)+1])
-
-    def replace(self, *processors):
-        "returns self or a new Cache with new processors if there is any fit"
-        if len(processors) == 0:
-            return self
-
-        reg  = register(processors, force = True, recursive = False)
-        itms = list(self._items)
-        repl = False
-        for i, j in enumerate(self):
-            val = reg.get(type(j.task), None)
-            if val is not None:
-                itms[i] = CacheItem(val(task = j.task), getattr(itms[i], '_cache'))
-                repl    = True
-        return Cache(itms) if repl else self
+            return Cache(self._items)
+        return Cache(self._items[:self.index(task)+1])
 
     remove = pop
 

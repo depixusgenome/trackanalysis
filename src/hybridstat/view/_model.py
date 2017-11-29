@@ -29,31 +29,19 @@ from ..reporting.batch          import fittohairpintask
 from ._processors               import runbead
 from ._peakinfo                 import createpeaks
 
-class _DummyDict:
-    "Empty dictionnary"
-    @staticmethod
-    def get(*_):
-        "returns nothing"
-        return None
-
-    def __contains__(self, _):
-        return False
-
-    def __len__(self):
-        return 0
-
-    def __iter__(self):
-        return iter(())
+_DUMMY = type('_DummyDict', (),
+              dict(get          = lambda *_: None,
+                   __contains__ = lambda _: False,
+                   __len__      = lambda _: 0,
+                   __iter__     = lambda _: iter(())))()
 
 class FitToReferenceAccess(TaskAccess):
     "access to the FitToReferenceTask"
     def __init__(self, ctrl):
         super().__init__(ctrl, FitToReferenceTask)
         self.__store              = self.project.root.tasks.fittoreference.gui
-        self.__store.defaults     = dict(id        = None,
-                                         reference = None,
-                                         fitdata   = _DummyDict(),
-                                         peaks     = _DummyDict())
+        self.__store.defaults     = dict(id      = None,   reference = None,
+                                         fitdata = _DUMMY, peaks     = _DUMMY)
 
         self.configtask.defaults  = dict(histmin       = 1e-3,
                                          peakprecision = 1e-2)
@@ -95,7 +83,8 @@ class FitToReferenceAccess(TaskAccess):
     def reference(self, val):
         "sets the root task for the reference data"
         if val is not self.__ref.get():
-            self.__store.update(id = None, reference = val, fitdata = None, peaks = None)
+            self.__store.update(id      = None,   reference = val,
+                                fitdata = _DUMMY, peaks     = _DUMMY)
 
     def setobservers(self, _):
         "observes the global model"
@@ -107,14 +96,15 @@ class FitToReferenceAccess(TaskAccess):
                 self.remove() if self.task                                     else
                 None)
 
-    def refhistogram(self, xaxis):
+    def refhistogram(self, xaxis, rho):
         "returns the histogram interpolated to the provided values"
         data = getattr(self.__fits, 'data', None)
         if data is None:
             return np.full(len(xaxis), np.NaN, dtype = 'f4')
         if isinstance(data, tuple):
             data = data[0]
-        return Interpolator(data, miny = self.hmin)(xaxis)
+        print(self.hmin, rho)
+        return Interpolator(data, fill_value = 0., miny = self.hmin/rho)(xaxis)*rho
 
     def identifiedpeaks(self, peaks):
         "returns an array of identified peaks"
@@ -278,7 +268,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         "returns the default identification task"
         return self.identification.default(self)
 
-    def runbead(self, *_):
+    def runbead(self):
         "runs the bead"
         tmp, dtl = runbead(self)
 

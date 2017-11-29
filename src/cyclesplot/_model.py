@@ -68,9 +68,9 @@ class CyclesModelAccess(SequencePlotModelAccess):
     stretch      = cast(Optional[float],              FitParamProp('stretch'))
     bias         = cast(Optional[float],              FitParamProp('bias'))
 
-    def runbead(self, *procs):
+    def runbead(self):
         "returns a tuple (dataitem, bead) to be displayed"
-        cycs = super().runbead(*procs)
+        cycs = super().runbead()
         if cycs is None:
             track = self.track
             return None if track is None else track.cycles[self.bead, ...]

@@ -41,20 +41,15 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
     @classmethod
     def runbead(cls, mdl):
         "updates the cache in the gui and returns the nans"
-        ctrl = mdl.processors(cls)
-        if ctrl is None:
-            cycles = None
-        else:
-            cycles = next(iter(ctrl.run(copy = True)))[mdl.bead, ...]
-        items  = None if cycles is None else list(cycles)
+        ctx, items, nans = mdl.runcontext(cls), None, None
+        with ctx as cycles:
+            if cycles is not None:
+                items = list(cycles[mdl.bead, ...])
 
-        tsk    = mdl.cleaning.task
-        if tsk is None:
-            return items, None
+                tsk   = mdl.cleaning.task
+                if tsk is None:
+                    nans = ctx.taskcache(tsk).pop('gui', None)
 
-        cache  = ctrl.data.getCache(tsk)()
-        nans   = cache.pop('gui', None)
-        mdl.processors().data.setCacheDefault(tsk, {}).update(cache)
         return items, nans
 
 class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin):

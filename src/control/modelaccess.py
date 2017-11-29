@@ -1,23 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Controller for most plots and views"
-from typing          import (Tuple, Optional, # pylint: disable =unused-import
-                             Iterator, List, Union, Any, Callable, Dict,
-                             TypeVar)
-from copy            import copy as shallowcopy
-from enum            import Enum
-from functools       import wraps
+from typing             import (Tuple, Optional, # pylint: disable =unused-import
+                                Iterator, List, Union, Any, Callable, Dict,
+                                TypeVar)
+from copy               import copy as shallowcopy
+from enum               import Enum
+from functools          import wraps
 
-from signalfilter    import rawprecision
-from model.task      import RootTask, Task, taskorder, TASK_ORDER
-from model.globals   import PROPS
-from data.track      import Track
-from data.views      import BEADKEY
-from utils           import NoArgs, updatecopy, updatedeepcopy
-from .processor      import Processor
-from .taskcontrol    import ProcessorController
-from .globalscontrol import GlobalsAccess
-from .event          import Controller
+from signalfilter       import rawprecision
+from model.task         import RootTask, Task, taskorder, TASK_ORDER
+from model.globals      import PROPS
+from data.track         import Track
+from data.views         import TrackView
+from data.views         import BEADKEY
+from utils              import NoArgs, updatecopy, updatedeepcopy
+from .processor         import Processor
+from .processor.cache   import CacheReplacement
+from .taskcontrol       import ProcessorController
+from .globalscontrol    import GlobalsAccess
+from .event             import Controller
 
 class PlotState(Enum):
     "plot state"
@@ -43,6 +45,30 @@ class PlotModelAccess(GlobalsAccess):
     def reset() -> bool:
         "resets the model"
         return False
+
+class ProcessorsReplacement(CacheReplacement):
+    """
+    Context for replacing processors but keeping their cache
+    """
+    def __init__(self, ctrl, *options: Processor, copy = None) -> None:
+        if isinstance(ctrl, TaskPlotModelAccess):
+            ctrl = ctrl.processors()
+
+        super().__init__(ctrl.data if ctrl else None, *options)
+        self.ctrl = ctrl
+        self.copy = copy
+
+    def __enter__(self):
+        if self.ctrl is None:
+            return None
+
+        data = super().__enter__()
+        if data is not self.ctrl.data:
+            ctrl      = shallowcopy(self.ctrl)
+            ctrl.data = data
+        else:
+            ctrl = self.ctrl
+        return ctrl if self.copy is None else next(iter(ctrl.run(copy = self.copy)))
 
 class TaskPlotModelAccess(PlotModelAccess):
     "Contains all access to model items likely to be set by user actions"
@@ -117,7 +143,7 @@ class TaskPlotModelAccess(PlotModelAccess):
 
         return root is self.roottask
 
-    def processors(self, *procs) -> Optional[ProcessorController]:
+    def processors(self) -> Optional[ProcessorController]:
         "returns a tuple (dataitem, bead) to be displayed"
         track = self.track
         if track is None:
@@ -128,21 +154,19 @@ class TaskPlotModelAccess(PlotModelAccess):
             if not self.checktask(root, task):
                 continue
 
-            ctrl = self._ctrl.processors(root, task)
-            data = ctrl.data.replace(*procs)
-            if data is not ctrl.data:
-                ctrl      = shallowcopy(ctrl)
-                ctrl.data = data
-            return ctrl
+            return self._ctrl.processors(root, task)
         return None
 
-    def runbead(self, *procs):
-        "returns a tuple (dataitem, bead) to be displayed"
-        ctrl  = self.processors(*procs)
+    def runbead(self) -> Optional[TrackView]:
+        "returns a TrackView to be displayed"
+        ctrl  = self.processors()
         if ctrl is None:
             return None
-
         return next(iter(ctrl.run(copy = True)))
+
+    def runcontext(self, *processors: Processor, copy = True) -> ProcessorsReplacement:
+        "returns a ProcessorsReplacement context from which a trackview can be obtains"
+        return ProcessorsReplacement(self, *processors, copy = copy)
 
     def observetasks(self, *args, **kwa):
         "observes the provided task"

@@ -78,14 +78,9 @@ class GuiFitToReferenceProcessor(TaskViewProcessor[FitToReferenceTask,
 def runbead(self) -> Tuple[Optional[FitBead], Optional[PeakSelectorDetails]]:
     "runs the bead with specific processors"
     dtlstore = [] # type: List[PeakSelectorDetails]
-    procs    = (GuiPeakSelectorProcessor(dtlstore),
-                GuiFitToReferenceProcessor(dtlstore))
-    view     = SequencePlotModelAccess.runbead(self, *procs)
-    if view is None:
-        return None, None
-
-    fits = view[self.bead]
-
-    if not dtlstore or len(dtlstore[0].peaks) == 0:
-        return None, None
-    return (fits if self.identification.task else None), dtlstore[0]
+    procs    = GuiPeakSelectorProcessor(dtlstore), GuiFitToReferenceProcessor(dtlstore)
+    ctx      = SequencePlotModelAccess.runcontext(self, *procs)
+    with ctx as view:
+        fits = None if view is None else view[self.bead]
+    return (fits        if self.identification.task is not None else None,
+            dtlstore[0] if dtlstore and len(dtlstore[0].peaks)  else None)

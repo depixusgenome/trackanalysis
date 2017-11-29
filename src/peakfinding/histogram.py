@@ -265,7 +265,7 @@ class Histogram(PrecisionAlg):
 
 class Interpolator:
     "interpolates histograms"
-    def __init__(self, xaxis, yaxis = None, miny = 1e-3, offset = 1.01, **kwa):
+    def __init__(self, xaxis, yaxis = None, miny = 1e-3, offset = 1.001, **kwa):
         if hasattr(xaxis, 'histogram') and yaxis is None:
             yaxis = xaxis.histogram
 
@@ -286,7 +286,7 @@ class Interpolator:
 
     def __call__(self, xvalues: np.ndarray) -> np.ndarray:
         "interpolates values to the current histogram"
-        reslt = self._interp(xvalues)
+        reslt                                   = self._interp(xvalues)
         reslt[reslt <= self._miny*self._offset] = 0.
         return reslt
 

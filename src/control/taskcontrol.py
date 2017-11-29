@@ -99,7 +99,7 @@ class ProcessorController:
         "Returns a processor for a given root and range"
         ind         = None if tsk is None else self.data.index(tsk)
         other       = type(self)(copy = self.copy)
-        other.model = self.model[:ind]
+        other.model = self.model[:None if ind is None else ind+1]
         other.data  = self.data.keepupto(ind)
         return other
 
