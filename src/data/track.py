@@ -19,6 +19,10 @@ BEADS        = Dict[BEADKEY, 'Bead']
 DIMENSIONS   = Tuple[Tuple[float, float], Tuple[float, float]]
 _PRECISIONS  = Dict[BEADKEY, float]
 
+def _doc(tpe):
+    doc = tpe.__doc__.strip()
+    return doc[0].lower()+doc[1:].replace('\n', '\n    ')+"\n"
+
 class Axis(Enum):
     "which axis to look at"
     Xaxis = 'Xaxis'
@@ -34,16 +38,10 @@ class Axis(Enum):
 
 class Bead:
     """
-    Characteristics of a bead
+    Characteristics of a bead:
 
-    Attributes are:
-
-    * `image` is one image of the field of view
-    * `dim` are conversion factors from pixel to nm
-    * `beads` is a dictionnary of information per bead:
-
-        * `position` is the bead's (X, Y, Z) position
-        * `image` is the bead's calibration image
+    * `position` is the bead's (X, Y, Z) position
+    * `image` is the bead's calibration image
     """
     position: Tuple[float, float, float] = (0., 0., 0.)
     image:    np.ndarray                 = np.zeros(0, dtype = np.uint8)
@@ -53,19 +51,15 @@ class Bead:
 
 class FoV:
     """
-    Data concerning the FoV
-
-    Attributes are:
+    The data concerning the field of view:
 
     * `image` is one image of the field of view
-    * `dim` are conversion factors from pixel to nm
+    * `dim` are conversion factors from pixel to nm in the format:
+    "(X slope, X bias), (Y slope, Y bias)".
     * `beads` is a dictionnary of information per bead:
-
-        * `position` is the bead's (X, Y, Z) position
-        * `image` is the bead's calibration image
-
-    Dimensions are provided as : (X slope, X bias), (Y slope, Y bias)
     """
+    __doc__ = __doc__ + ''.join(f'    {i}\n' for i in Bead.__doc__.split('\n')[-4:])
+
     image                       = np.empty((0,0), dtype = np.uint8)
     beads:         BEADS        = {}
     dim:           DIMENSIONS   = ((1., 0.), (1., 0.))
@@ -122,7 +116,14 @@ class FoV:
         return tpe([(sl1*i+int1, sl2*j+int2) for i, j in arr]) # type: ignore
 
 class Secondaries:
-    "Deals with secondary measures"
+    """
+    Consists in arrays of sparse measures:
+
+    * `track.secondaries.tservo` is the servo temperature
+    * `track.secondaries.tsample` is the sample temperature
+    * `track.secondaries.tsink` is the heat sink temperature
+    * `track.secondaries.vcap` is a measure of magnet altitude
+    """
     def __init__(self, track):
         self.__track = track
 
@@ -152,6 +153,8 @@ class LazyProperty:
     def __init__(self, name: str = '', tpe: type = None) -> None:
         self._name = ''
         self._type = tpe
+        if tpe and getattr(tpe, '__doc__', None):
+            self.__doc__ = tpe.__doc__
         if name:
             self._name = '_'+name
             self.LIST.append(self._name)
@@ -238,25 +241,13 @@ class Track:
     * `phases` is a 2D array with one row per cycle and one column per phase
     containing the first index value of each cycle and phase.
     * `path` is the path(s) to the data
-    * `axis` (Є {'X', 'Y', 'Z'}) is the data axis
+    * `axis` (Є {{'X', 'Y', 'Z'}}) is the data axis
     * `ncycles` is the number of cycles
     * `nphases` is the number of phases
-    * `secondaries` consists in arrays of sparse measures:
-
-        * `track.secondaries.tservo` is the servo temperature
-        * `track.secondaries.tsample` is the sample temperature
-        * `track.secondaries.tsink` is the heat sink temperature
-        * `track.secondaries.vcap` is a measure of magnet altitude
-
-    * `fov` is the field of view data:
-
-        * `image` is one image of the field of view
-        * `dim` are conversion factors from pixel to nm
-        * `beads` is a dictionnary of information per bead:
-
-            * `position` is the bead's (X, Y, Z) position
-            * `image` is the bead's calibration image
+    * `secondaries` {secondaries}
+    * `fov` {fov}
     """
+    __doc__    = __doc__.format(secondaries = _doc(Secondaries), fov = _doc(FoV))
     key: str   = None
     phases     = cast(np.ndarray,          LazyProperty())
     framerate  = cast(float,               LazyProperty())
@@ -377,7 +368,7 @@ class Track:
 
     def __setstate__(self, values):
         self.__init__(**values)
-        keys = frozenset(self.__getstate__().keys())
+        keys = frozenset(self.__getstate__().keys()) | frozenset(('data', 'secondaries'))
         self.__dict__.update({i: j for i, j in values.items() if i not in keys})
 
     _framerate                  = 30.
@@ -389,7 +380,6 @@ class Track:
     _rawprecisions: _PRECISIONS = {}
     _lazy                       = True
     _axis                       = Axis.Zaxis
-
 
 def dropbeads(trk, *beads:BEADKEY) -> Track:
     "returns a track without the given beads"

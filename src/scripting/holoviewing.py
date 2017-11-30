@@ -61,13 +61,14 @@ def addto(*types, addhook = 'auto'):
                     fmt.for_type(cls, _display_hook)
     return _wrap
 
-Self = TypeVar('Self', bound = 'BasicDisplay')
+Self = TypeVar('Self', bound = 'ItemsDisplay')
+
 @displayhook
-class BasicDisplay(ABC):
+class ItemsDisplay(ABC):
     "Everything needed for creating a dynamic map display"
     KEYWORDS: FrozenSet[str] = frozenset()
     def __init__(self, items, **opts):
-        if isinstance(items, BasicDisplay):
+        if isinstance(items, ItemsDisplay):
             opts, kwa   = items.config(minimal = True), opts
             opts.update(kwa)
             items       = getattr(items, '_items')
@@ -118,11 +119,17 @@ class BasicDisplay(ABC):
         config.update(opts)
         return self.__class__(self._items, **config)
 
+    @abstractmethod
+    def display(self, **kwa):
+        "displays hv stuff"
+
     @staticmethod
     def concat(itr):
         "concatenates arrays, appending a NaN"
         return np.concatenate(list(chain.from_iterable(zip(itr, repeat([np.NaN])))))
 
+class BasicDisplay(ItemsDisplay):
+    "Everything needed for creating a dynamic map display"
     def display(self, **kwa):
         "displays the cycles using a dynamic map"
         this = self(**kwa) if kwa else self

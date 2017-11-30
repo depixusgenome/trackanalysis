@@ -60,6 +60,7 @@ else:
     import holoviews.operation  as hvops
     from data.__scripting__.holoviewing           import * # type: ignore
     from cleaning.__scripting__.holoviewing       import * # type: ignore
+    from qualitycontrol.__scripting__.holoviewing import * # type: ignore
     from eventdetection.__scripting__.holoviewing import * # type: ignore
     from peakfinding.__scripting__.holoviewing    import * # type: ignore
     from peakcalling.__scripting__.holoviewing    import * # type: ignore
