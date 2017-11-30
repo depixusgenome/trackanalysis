@@ -16,7 +16,7 @@ from control.modelaccess        import PROPS, TaskAccess
 
 from model.task                 import RootTask
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
-from peakfinding.histogram      import Interpolator
+from peakfinding.histogram      import interpolator
 from peakfinding.processor      import PeakSelectorTask
 from peakfinding.selector       import PeakSelectorDetails
 from peakcalling                import match
@@ -153,7 +153,7 @@ class FitToReferenceAccess(TaskAccess):
         peaks[ibead] = np.array([i for i, _ in pks], dtype = 'f4')
         if len(pks):
             fits [ibead] = FitData(self.fitalg.frompeaks(pks), (1., 0.)) # type: ignore
-            intps[ibead] = Interpolator(dtls, miny = self.hmin, fill_value = 0.)
+            intps[ibead] = interpolator(dtls, miny = self.hmin, fill_value = 0.)
 
         if args:
             self.__store.update(**args)

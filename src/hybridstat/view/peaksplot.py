@@ -17,7 +17,7 @@ from view.plots                 import PlotView, PlotAttrs
 from view.plots.tasks           import TaskPlotCreator
 from sequences.view             import (SequenceTicker,
                                         SequenceHoverMixin)
-from peakfinding.histogram      import Interpolator
+from peakfinding.histogram      import interpolator
 
 from ._model                    import PeaksPlotModelAccess
 from ._widget                   import createwidgets
@@ -93,15 +93,16 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         css.defaults = {'count'   : PlotAttrs('lightblue', 'circle', 3)}
 
         css = self.css.reference
-        css.defaults = {'count'   : PlotAttrs('lightgray', 'patch', alpha = 0.5)}
+        css.defaults = {'count'   : PlotAttrs('bisque', 'patch', alpha = 0.5)}
 
         css = self.css.peaks
         plt = lambda i, j: PlotAttrs(i, j, 15, fill_alpha = 0.5, angle = np.pi/2.)
         css.defaults = {'duration': plt('lightgreen', 'diamond'),
                         'count'   : plt('lightblue',  'triangle')}
 
-        css.colors.missing.default = 'red'
-        css.colors.found.defaults  = {'dark': 'black', 'default': 'white'}
+        css.colors.reference.default  = 'bisque'
+        css.colors.missing  .default  = 'red'
+        css.colors.found    .defaults = {'dark': 'black', 'default': 'gray'}
 
         self.config.defaults = {'tools': 'ypan,ybox_zoom,reset,save,dpxhover,tap'}
 
@@ -125,22 +126,25 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
 
     def __peaks(self, vals = None):
         colors = [tohex(self.__foundcolor.get()),
-                  tohex(self.css.peaks.colors.missing.get())]
+                  tohex(self.css.peaks.colors.missing.get()),
+                  tohex(self.css.peaks.colors.reference.get())]
 
         peaks  = dict(self._model.peaks)
-        if vals is None or self._model.identification.task is None:
-            peaks['color'] = [colors[0]]*len(peaks['id'])
-        else:
+        if vals is not None and self._model.identification.task is not None:
             alldist = self._model.distances
             for key in self._model.sequences(...):
                 if key not in alldist:
                     continue
-                peaks[key+'color'] = np.where(np.isfinite(peaks[key+'id']), *colors)
+                peaks[key+'color'] = np.where(np.isfinite(peaks[key+'id']), *colors[:2])
 
             if self._model.sequencekey not in alldist:
                 self._model.sequencekey = max(tuple(alldist),
                                               key = lambda x: alldist[x].value)
             peaks['color'] = peaks[self._model.sequencekey+'color']
+        elif self._model.fittoreference.referencepeaks is not None:
+            peaks['color'] = np.where(np.isfinite(peaks['id']), colors[2], colors[0])
+        else:
+            peaks['color'] = [colors[0]]*len(peaks['id'])
         return peaks
 
     def __defaults(self):
@@ -163,7 +167,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
 
         pos     = np.concatenate(dtl.positions)
         events  = dict(z     = pos,
-                       count = Interpolator(data['z'], data['count'], fit2ref.hmin)(pos))
+                       count = interpolator(data['z'], data['count'], fit2ref.hmin)(pos))
         return {'': data, 'events': events, 'peaks': self.__peaks(dtl)}
 
     def _create(self, doc):

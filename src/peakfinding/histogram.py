@@ -263,32 +263,30 @@ class Histogram(PrecisionAlg):
         yield (minv, bwidth)
         yield from self.__generate(lenv, kern, items, weight)
 
-class Interpolator:
+def interpolator(xaxis, yaxis = None, miny = 1e-3, **kwa):
     "interpolates histograms"
-    def __init__(self, xaxis, yaxis = None, miny = 1e-3, offset = 1.001, **kwa):
-        if hasattr(xaxis, 'histogram') and yaxis is None:
-            yaxis = xaxis.histogram
+    if hasattr(xaxis, 'histogram') and yaxis is None:
+        yaxis = xaxis.histogram
 
-        good  = yaxis >= miny
+    if hasattr(xaxis, 'binwidth'):
+        xaxis = np.arange(len(yaxis), dtype = 'f4')*xaxis.binwidth+xaxis.minvalue
 
-        if hasattr(xaxis, 'binwidth'):
-            xaxis = np.arange(len(yaxis), dtype = 'f4')[good]*xaxis.binwidth+xaxis.minvalue
-        else:
-            xaxis = xaxis[good]
+    yaxis = np.copy(yaxis)
+    tmp   = np.isfinite(yaxis)
+    yaxis = yaxis[tmp]
+    xaxis = xaxis[tmp]
 
-        yaxis = yaxis[good]
+    yaxis[yaxis < miny] = 0.
 
-        self._miny   = miny
-        self._offset = offset
-        kwa.setdefault('fill_value',   np.NaN)
-        kwa.setdefault('bounds_error', False)
-        self._interp = interp1d(xaxis, yaxis, assume_sorted = True, **kwa)
+    tmp   = np.nonzero(np.abs(np.diff(yaxis)) > miny*1e-2)[0]
+    good  = np.union1d(tmp, tmp+1)
 
-    def __call__(self, xvalues: np.ndarray) -> np.ndarray:
-        "interpolates values to the current histogram"
-        reslt                                   = self._interp(xvalues)
-        reslt[reslt <= self._miny*self._offset] = 0.
-        return reslt
+    yaxis = yaxis[good]
+    xaxis = xaxis[good]
+
+    kwa.setdefault('fill_value',   np.NaN)
+    kwa.setdefault('bounds_error', False)
+    return interp1d(xaxis, yaxis, assume_sorted = True, **kwa)
 
 class FitMode(Enum):
     "Fit mode for sub-pixel peak finding"
