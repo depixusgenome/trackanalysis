@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "List of processes and cache"
-from typing         import Union, Iterable, Sized, List, Tuple, Any, Iterator, cast
+from typing         import (Union, Iterable, Sized, List, Tuple, Any, Iterator,
+                            Type, cast)
 from utils          import isfunction
 from model.task     import Task
 from .base          import Processor, register
@@ -74,10 +75,10 @@ class CacheReplacement:
     """
     Context for replacing processors but keeping their cache
     """
-    def __init__(self, cache: 'Cache', *options: Processor) -> None:
-        self.options:  Tuple[Processor,...] = options
-        self.replaced: List[REP_T]          = []
-        self.cache:    Cache                = cache
+    def __init__(self, cache: 'Cache', *options: Type[Processor]) -> None:
+        self.options:  Tuple[Type[Processor],...] = options
+        self.replaced: List[REP_T]                = []
+        self.cache:    Cache                      = cache
 
     def taskcache(self, task:Task):
         "returns the task cache"
@@ -166,14 +167,13 @@ class Cache(Iterable[Processor], Sized):
         ind = self.index(ide)
         self.delCache(ind)
         self._items.pop(ind)
+    remove = pop
 
     def keepupto(self, task) -> 'Cache':
         "returns a Cache with tasks up to and including *task*"
         if task is None or task is Ellipsis:
             return Cache(self._items)
         return Cache(self._items[:self.index(task)+1])
-
-    remove = pop
 
     def getCache(self, ide):
         "access to processor's cache"
