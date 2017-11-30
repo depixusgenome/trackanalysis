@@ -18,8 +18,16 @@ namespace legacy
 
         void _open(legacy::GenRecord & rec, std::string name)
         {
-            pybind11::gil_scoped_release lock;
-            rec.open(name);
+            try
+            {
+                pybind11::gil_scoped_release lock;
+                rec.open(name);
+            }
+            catch(TrackIOException const & exc)
+            {
+                PyErr_SetString(PyExc_IOError, exc.what());
+                throw pybind11::error_already_set();
+            }
         }
     }
     pybind11::object _readim(std::string name, bool all = true);
