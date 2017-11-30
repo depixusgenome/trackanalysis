@@ -214,8 +214,8 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
                             'toolbar_sticky'     : False,
                             'input.width'        : 205,
                             'figure.width'       : 800,
-                            'figure.height'      : 200,
-                            'figure.sizing_mode' : 'scale_width'}
+                            'figure.height'      : 200}
+            css.figure.sizing_mode.default = 'scale_width'
 
         key = type(self).key()
         for name in 'config', 'project', 'css':
