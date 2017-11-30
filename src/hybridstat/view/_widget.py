@@ -112,7 +112,7 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
         css.defaults = {'title.format': '{}',
                         'title.openhairpin': u' & open hairpin',
                         'title.orientation': u'-+ ',
-                        'lines': [['css:title.stretch', '.1f'],
+                        'lines': [['css:title.stretch', '.3f'],
                                   ['css:title.bias',    '.4f'],
                                   [u'σ[HF] (µm)',       '.4f'],
                                   [u'σ[Peaks] (µm)',    '.4f'],

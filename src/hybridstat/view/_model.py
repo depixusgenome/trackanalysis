@@ -98,16 +98,16 @@ class FitToReferenceAccess(TaskAccess):
                 self.remove() if self.task                                     else
                 None)
 
-    def refhistogram(self, xaxis, _):
+    def refhistogram(self, xaxis):
         "returns the histogram interpolated to the provided values"
-        intp = self.__store.interpolator.get(self.bead, None)
+        intp = self.__store.interpolator.get().get(self.bead, None)
         return np.full(len(xaxis), np.NaN, dtype = 'f4') if intp is None else intp(xaxis)
 
     def identifiedpeaks(self, peaks):
         "returns an array of identified peaks"
         ref = self.__peaks
         arr = np.full(len(peaks), np.NaN, dtype = 'f4')
-        if len(peaks) and ref is not None:
+        if len(peaks) and ref is not None and len(ref):
             ids = match.compute(ref, peaks, self.configtask.peakprecision.get())
             arr[ids[:,1]] = ref[ids[:,0]]
         return arr
@@ -116,7 +116,7 @@ class FitToReferenceAccess(TaskAccess):
     def _configattributes(_):
         return {}
 
-    __peaks  = property(lambda self: self.__store.peaks.get().get(self.bead, None))
+    __peaks  = property(lambda self: self.__store.peaks.get().get(self.bead, ()))
 
     def __computefitdata(self) -> Tuple[bool, bool]:
         args  = {} # type: Dict[str, Any]
@@ -135,15 +135,21 @@ class FitToReferenceAccess(TaskAccess):
         if not peaks:
             args['peaks'] = peaks = {}
 
-        intps  = self.__store.intps.get()
+        intps  = self.__store.interpolator.get()
         if not intps:
             args['interpolator'] = intps = {}
 
-        ibead        = self.bead
-        pks, dtls    = runrefbead(self._ctrl, self.reference, ibead)
-        peaks[ibead] = pks
-        fits [ibead] = FitData(self.fitalg.frompeaks(pks), (1., 0.)) # type: ignore
-        intps[ibead] = Interpolator(dtls, self.hmin, fill_value = 0.)
+        ibead = self.bead
+        try:
+            pks, dtls = runrefbead(self._ctrl, self.reference, ibead)
+        except Exception as exc: # pylint: disable=broad-except
+            self.config.message.set(exc)
+            pks       = ()
+
+        peaks[ibead] = np.array([i for i, _ in pks], dtype = 'f4')
+        if len(pks):
+            fits [ibead] = FitData(self.fitalg.frompeaks(pks), (1., 0.)) # type: ignore
+            intps[ibead] = Interpolator(dtls, miny = self.hmin, fill_value = 0.)
 
         if args:
             self.__store.update(**args)

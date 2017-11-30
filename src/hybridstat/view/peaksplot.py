@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
-from typing                     import Dict, cast
+from typing                     import Dict
 
 import bokeh.core.properties as props
 from bokeh                      import layouts
@@ -18,7 +18,6 @@ from view.plots.tasks           import TaskPlotCreator
 from sequences.view             import (SequenceTicker,
                                         SequenceHoverMixin)
 from peakfinding.histogram      import Interpolator
-from peakfinding.selector       import PeakSelector
 
 from ._model                    import PeaksPlotModelAccess
 from ._widget                   import createwidgets
@@ -91,14 +90,15 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
                              'widgets.border'  : 10}
 
         css = self.css.events
-        css.defaults = {'count'     : PlotAttrs('lightblue', 'circle', 3)}
+        css.defaults = {'count'   : PlotAttrs('lightblue', 'circle', 3)}
 
         css = self.css.reference
-        css.defaults = {'count'     : PlotAttrs('lightgray', 'patch')}
+        css.defaults = {'count'   : PlotAttrs('lightgray', 'patch', alpha = 0.5)}
 
         css = self.css.peaks
-        css.defaults = {'duration'  : PlotAttrs('lightgreen', 'diamond', 10),
-                        'count'     : PlotAttrs('lightblue',  'square',  10)}
+        plt = lambda i, j: PlotAttrs(i, j, 15, fill_alpha = 0.5, angle = np.pi/2.)
+        css.defaults = {'duration': plt('lightgreen', 'diamond'),
+                        'count'   : plt('lightblue',  'triangle')}
 
         css.colors.missing.default = 'red'
         css.colors.found.defaults  = {'dark': 'black', 'default': 'white'}
@@ -143,25 +143,23 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
             peaks['color'] = peaks[self._model.sequencekey+'color']
         return peaks
 
+    def __defaults(self):
+        empty = lambda *cols: {i: np.empty(0, dtype = 'f4') for i in cols}
+        return {'':        empty('z', 'count', 'ref'),
+                'events' : empty('z', 'count'),
+                'peaks':   self.__peaks(None)}
+
     def __data(self) -> Dict[str, dict]:
-        dtl    = self._model.runbead()
-        data   = {i: np.empty(0, dtype = 'f4') for i in ('z', 'count', 'ref')}
-        events = {i: np.empty(0, dtype = 'f4') for i in ('z', 'count')}
+        dtl = self._model.runbead()
         if dtl is None:
-            return {'': data, 'events': events, 'peaks': self.__peaks(None)}
+            return self.__defaults()
 
         fit2ref = self._model.fittoreference
-        pksel   = cast(PeakSelector, self._model.peakselection.task)
-
-        rho     = 100./(max(pksel.histogram.kernelarray())*self._model.track.ncycles)
         zvals   = dtl.binwidth*np.arange(len(dtl.histogram), dtype = 'f4')+dtl.minvalue
 
         data    = dict(z     = zvals,
-                       count = dtl.histogram*rho,
-                       ref   = fit2ref.refhistogram(zvals, rho))
-        print("///")
-        print(data['count'][np.isfinite(data['ref'])])
-        print(data['ref'][np.isfinite(data['ref'])])
+                       count = dtl.histogram,
+                       ref   = fit2ref.refhistogram(zvals))
 
         pos     = np.concatenate(dtl.positions)
         events  = dict(z     = pos,
@@ -187,20 +185,26 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         self._widgets['advanced'].ismain(_)
 
     def _reset(self):
-        dicos = self.__data()
-        for i, j in dicos.items():
-            self._bkmodels[self._src[i]].update(data = j, column_names = list(j.keys()))
+        dicos = None
+        try:
+            dicos = self.__data()
+        finally:
+            if dicos is None:
+                dicos = self.__defaults()
 
-        self._hover .reset(self._bkmodels)
-        self._ticker.reset(self._bkmodels)
-        for widget in self._widgets.values():
-            widget.reset(self._bkmodels)
+            for i, j in dicos.items():
+                self._bkmodels[self._src[i]].update(data = j, column_names = list(j.keys()))
 
-        data = dicos['']
-        if len(data['z']) > 2:
-            self.setbounds(self._fig.y_range, 'y', (data['z'][0], data['z'][-1]))
-        else:
-            self.setbounds(self._fig.y_range, 'y', (0., 1.))
+            self._hover .reset(self._bkmodels)
+            self._ticker.reset(self._bkmodels)
+            for widget in self._widgets.values():
+                widget.reset(self._bkmodels)
+
+            data = dicos['']
+            if len(data['z']) > 2:
+                self.setbounds(self._fig.y_range, 'y', (data['z'][0], data['z'][-1]))
+            else:
+                self.setbounds(self._fig.y_range, 'y', (0., 1.))
 
     def __create_fig(self):
         self._fig = figure(**self._figargs(y_range = Range1d(start = 0., end = 1.),
@@ -220,7 +224,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
 
         css   = self.css
         rends = []
-        for key in ('count', 'reference.count', 'events.count',
+        for key in ('reference.count', 'count', 'events.count',
                     'peaks.count', 'peaks.duration'):
             src  = self._src.get(key.split('.')[0], self._src[''])
             args = dict(x      = 'ref' if key.startswith('ref') else key.split('.')[-1],
