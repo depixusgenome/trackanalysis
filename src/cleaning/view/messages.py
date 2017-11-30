@@ -37,13 +37,14 @@ class MessagesModelAccess(TaskPlotModelAccess):
         default = dict.fromkeys(('type', 'message', 'bead', 'cycles'), []) # type: Dict[str, List]
         tsk     = self.cleaning.task
         if tsk is not None:
-            ctrl = self.processors(GuiDataCleaningProcessor)
-            if ctrl is not None:
-                for _ in next(iter(ctrl.run(copy = True))):
-                    pass
+            ctx = self.runcontext(GuiDataCleaningProcessor)
+            with ctx as view:
+                if view is not None:
+                    for _ in view:
+                        pass
 
-                mem = ctrl.data.getCache(tsk)().pop('messages', None)
-                if mem is not None:
+                mem = ctx.taskcache(tsk).pop('messages', None)
+                if mem:
                     default = dict(bead    = [i[0] for i in mem],
                                    cycles  = [i[1] for i in mem],
                                    type    = [i[2] for i in mem],
