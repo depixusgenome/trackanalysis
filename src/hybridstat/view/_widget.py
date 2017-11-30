@@ -170,9 +170,8 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
                 nrem   = sum(i in remove for i in mdl.peaks[key+'id'])
             else:
                 nrem   = 0
-            nfound    = np.isfinite(mdl.peaks[key+'id']).sum()-nrem
-            npks      = len(task.match[key].hybridisations)
-            self.values[8] = '{}/{}'.format(nfound, npks)
+            nfound         = np.isfinite(mdl.peaks[key+'id']).sum()-nrem
+            self.values[8] = f'{nfound}/{len(task.match[key].hybridisations)}'
             if nrem == 2:
                 self.values[8] += self.openhp
 
@@ -180,21 +179,23 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
 
             if nfound > 2:
                 stretch         = dist[key].stretch
-                self.values[10] = (np.nanstd(mdl.peaks[key+'distance'])
+                self.values[10] = (np.nansum(mdl.peaks[key+'distance']**2)
                                    / ((np.mean(self.values[3]*stretch))**2
                                       * (nfound - 2)))
 
         def referencedependant(self, mdl):
             "all sequence dependant stats"
             fittoref       = mdl.fittoreference
+            if fittoref.referencepeaks is None:
+                return
+
             self.values[0] = fittoref.stretch
             self.values[1] = fittoref.bias
 
-            nfound    = np.isfinite(mdl.peaks['id']).sum()
-            npks      = fittoref.ref
-            self.values[8] = '{}/{}'.format(nfound, npks)
-            if nrem == 2:
-                self.values[10] = (np.nanstd(mdl.peaks['distance'])
+            nfound          = np.isfinite(mdl.peaks['id']).sum()
+            self.values[8]  = f'{nfound}/{len(fittoref.referencepeaks)}'
+            if nfound > 2:
+                self.values[10] = (np.nansum((mdl.peaks['distance'])**2)
                                    / ((np.mean(self.values[3]))**2
                                       * (nfound - 2)))
 
@@ -392,7 +393,7 @@ class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
             txt = str(Path(path).resolve())
         (self.__widget if resets is None else resets[self.__widget]).update(value = txt)
 
-class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin):
+class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # type: ignore
     "access to the modal dialog"
     _TITLE        = 'Hybridstat Configuration'
     _BODY: T_BODY = (('Minimum frame count per event',    '%(_framecount)d'),
@@ -414,7 +415,8 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin):
         "resets the wiget when a new file is opened, ..."
         AdvancedTaskMixin.reset(resets)
 
-    def create(self, action, _) -> List[Widget]: # pylint: disable=arguments-differ
+    def create(self, action, _   # type: ignore # pylint: disable=arguments-differ
+              ) -> List[Widget]:
         "creates the widget"
         return AdvancedTaskMixin.create(self, action)
 

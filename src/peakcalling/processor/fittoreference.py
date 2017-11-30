@@ -189,7 +189,7 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
             return 1., 0.
 
         ref = self.config.getdata(key)
-        if ref is True:
+        if ref is True or ref.data is True:
             return 1., 0.
         fit           = self.config.fitalg
         stretch, bias = fit.optimize(ref.data, fit.frompeaks(data))[1:]
