@@ -68,7 +68,8 @@ def orders():
 
 def addload(*names):
     "adds a dyn load to the inital orders"
-    orders().dyn_loads.extend(names)
+    loads = orders().dyn_loads
+    loads.extend([i for i in names if i not in loads])
 
 class DummyDoc:
     "dummy document used for scripting"

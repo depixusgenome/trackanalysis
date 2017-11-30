@@ -5,7 +5,10 @@ require('python', pytest = '3.0.4', rtime  = False)
 def build(bld):
     name  = builder.appname()
     pysrc = bld.path.ant_glob('**/*.py')
+    cfe   = bld.path.ant_glob('**/*.coffee')
+
     builder.checkpy  (bld, 'tests', pysrc)
     builder.copyfiles(bld, builder.appname(), pysrc)
+    builder.copyfiles(bld, builder.appname(), cfe)
 
 make()

@@ -24,6 +24,7 @@ with warnings.catch_warnings():
 
 # pylint: disable=wrong-import-position
 from tornado.ioloop        import IOLoop
+from view.static           import ROUTE
 from view.keypress         import KeyPressManager
 from utils.logconfig       import getLogger
 
@@ -33,87 +34,8 @@ class DpxTestLoaded(Model):
     """
     This starts tests once flexx/browser window has finished loading
     """
-    __implementation__ = """
-        import *        as $    from "jquery"
-        import *        as p    from "core/properties"
-        import {Model}          from "model"
-        import {DOMView}        from "core/dom_view"
-
-        export class DpxTestLoadedView extends DOMView
-            className: "dpx-test"
-            initialize: (options) ->
-                super(options)
-                @connect(@model.properties.event_cnt.change, () => @model._press())
-                @connect(@model.properties.value_cnt.change, () => @model._change())
-
-        export class DpxTestLoaded extends Model
-            default_view: DpxTestLoadedView
-            type: "DpxTestLoaded"
-            constructor : (attributes, options) ->
-                super(attributes, options)
-                $((e) => @done = 1)
-
-                self = @
-
-                oldlog       = console.log
-                console.log  = () -> self._tostr(oldlog, 'debug', arguments)
-
-                oldinfo      = console.info
-                console.info = () -> self._tostr(oldinfo, 'info', arguments)
-
-                oldwarn      = console.warn
-                console.warn = () -> self._tostr(oldwarn, 'warn', arguments)
-
-            _tostr: (old, name, args) ->
-                str = ""
-                for i in args
-                    str = str + " " + i
-                @[name] = ""
-                @[name] = str
-
-                old.apply(console, args)
-
-            _create_evt: (name) ->
-                evt = $.Event(name)
-                evt.altKey   = @event.alt
-                evt.shiftKey = @event.shift
-                evt.ctrlKey  = @event.ctrl
-                evt.metaKey  = @event.meta
-                evt.key      = @event.key
-
-                return evt
-
-            _press: () ->
-                if @model?
-                    @model.dokeydown?(@_create_evt('keydown'))
-                    @model.dokeyup?(@_create_evt('keyup'))
-
-            _change: () ->
-                if @model?
-                    mdl = @model
-                    for i in @attrs
-                        mdl = mdl[i]
-
-                    mdl[@attr] = @value
-                    if @attrs.length == 0
-                        @model.properties[@attr].change.emit()
-                    else
-                        @model.properties[@attrs[0]].change.emit()
-
-            @define {
-                done:  [p.Number, 0]
-                event: [p.Any,   {}]
-                event_cnt: [p.Int, 0]
-                model: [p.Any,   {}]
-                attrs: [p.Array, []]
-                attr : [p.String, '']
-                value: [p.Any,   {}]
-                value_cnt: [p.Int, 0]
-                debug: [p.String, '']
-                warn: [p.String, '']
-                info: [p.String, '']
-            }
-                         """
+    __javascript__     = ROUTE+"/jquery.min.js"
+    __implementation__ = 'bokehtesting.coffee'
     done        = props.Int(0)
     event       = props.Dict(props.String, props.Any)
     event_cnt   = props.Int(0)
@@ -272,16 +194,19 @@ class _ManagedServerLoop:
         return app, getattr(self.__import(mod), fcn)
 
     def __buildserver(self, kwa):
-        kwa['io_loop'] = IOLoop()
-        kwa['io_loop'].make_current()
+        io_loop = IOLoop()
+        io_loop.make_current()
 
         app, launch = self.__getlauncher()
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', '.*inspect.getargspec().*')
             import app.launcher as _launcher
+            from   app.scripting import addload
+            addload("view.static", "modaldialog")
             old, _launcher.CAN_LOAD_JS = _launcher.CAN_LOAD_JS, False
+            assert len(kwa) == 0 # not handled anymore
             try:
-                server = launch(app, server = kwa)
+                server = launch(app, **kwa)
             finally:
                 _launcher.CAN_LOAD_JS = old
 
@@ -299,6 +224,7 @@ class _ManagedServerLoop:
             if getattr(self.loading, 'done', False):
                 self.loop.call_later(2., self.loop.stop)
             else:
+                LOGS.debug("waiting")
                 self.loop.call_later(0.5, _start)
         _start()
 

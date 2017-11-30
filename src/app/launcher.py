@@ -29,6 +29,7 @@ def _serverkwargs(kwa):
     kwargs['generate_session_ids'] = True
     kwargs['use_index']            = True
     kwargs['redirect_root']        = True
+    LOGS.debug(f"dynamic loads: {orders().dynloads()}")
     for mdl in orders().dynloads():
         getattr(sys.modules.get(mdl, None), 'server', lambda x: None)(kwargs)
     return kwargs
