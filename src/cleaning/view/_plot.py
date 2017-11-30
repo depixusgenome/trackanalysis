@@ -47,7 +47,7 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
                 items = list(cycles[mdl.bead, ...])
 
                 tsk   = mdl.cleaning.task
-                if tsk is None:
+                if tsk is not None:
                     nans = ctx.taskcache(tsk).pop('gui', None)
 
         return items, nans
