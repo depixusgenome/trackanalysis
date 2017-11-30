@@ -68,6 +68,7 @@ class DpxTestLoaded(Model):
                    key   = val)
         self.model = model
         self.event = evt
+        LOGS.debug(f"pressing: {key}")
         self.event_cnt += 1
 
     def change(self, model:Model, attrs: Union[str, Sequence[str]], value: Any):
@@ -76,6 +77,7 @@ class DpxTestLoaded(Model):
         self.attrs = list(attrs)[:-1] if isinstance(attrs, (tuple, list)) else []
         self.attr  = attrs[-1]        if isinstance(attrs, (tuple, list)) else attrs
         self.value = value
+        LOGS.debug(f"changing: {attrs} = {value}")
         self.value_cnt += 1
 
 class WidgetAccess:
@@ -222,6 +224,7 @@ class _ManagedServerLoop:
         def _start():
             "Waiting for the document to load"
             if getattr(self.loading, 'done', False):
+                LOGS.debug("done waiting")
                 self.loop.call_later(2., self.loop.stop)
             else:
                 LOGS.debug("waiting")
@@ -247,10 +250,15 @@ class _ManagedServerLoop:
         "send command to the view"
         if andstop:
             def _cmd():
+                LOGS.debug(f"running: {fcn.__name__}(*{args}, **{kwargs}")
                 fcn(*args, **kwargs)
+                LOGS.debug(f"done running and waiting {andwaiting}")
                 self.loop.call_later(andwaiting, self.loop.stop)
         else:
-            _cmd = lambda: fcn(*args, **kwargs)
+            def _cmd():
+                LOGS.debug(f"running: {fcn.__name__}(*{args}, **{kwargs}")
+                fcn(*args, **kwargs)
+                LOGS.debug(f"done running and not stopping")
         self.doc.add_next_tick_callback(_cmd)
         if not self.loop._running: # pylint: disable=protected-access
             self.loop.start()

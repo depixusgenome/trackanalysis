@@ -4,10 +4,6 @@ import {DOMView}        from "core/dom_view"
 
 export class DpxTestLoadedView extends DOMView
     className: "dpx-test"
-    connect_signals: () ->
-        super()
-        @connect(@model.properties.event_cnt.change, () => @model._press())
-        @connect(@model.properties.value_cnt.change, () => @model._change())
 
 export class DpxTestLoaded extends Model
     default_view: DpxTestLoadedView
@@ -26,6 +22,12 @@ export class DpxTestLoaded extends Model
 
         oldwarn      = console.warn
         console.warn = () -> self._tostr(oldwarn, 'warn', arguments)
+
+    connect_signals: () ->
+        super()
+        console.log("DpxTestLoadedView connect_signals")
+        @connect(@properties.event_cnt.change, @_press)
+        @connect(@properties.value_cnt.change, @_change)
 
     _tostr: (old, name, args) ->
         old.apply(console, args)
@@ -47,11 +49,15 @@ export class DpxTestLoaded extends Model
         return evt
 
     _press: () ->
+        console.debug("pressed key: ", @event.ctrl, @event.key)
         if @model?
             @model.dokeydown?(@_create_evt('keydown'))
             @model.dokeyup?(@_create_evt('keyup'))
+        else
+            console.log("pressed key but there's no model")
 
     _change: () ->
+        console.debug("changed attribute: ", @attrs, @value)
         if @model?
             mdl = @model
             for i in @attrs
@@ -62,6 +68,8 @@ export class DpxTestLoaded extends Model
                 @model.properties[@attr].change.emit()
             else
                 @model.properties[@attrs[0]].change.emit()
+        else
+            console.log("changed key but there's no model")
 
     @define {
         done:  [p.Number, 0]
