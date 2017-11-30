@@ -26,7 +26,7 @@ from peakcalling.processor      import FitToHairpinTask, FitToReferenceTask
 from peakcalling.processor.fittoreference   import FitData
 
 from ..reporting.batch          import fittohairpintask
-from ._processors               import runbead
+from ._processors               import runbead, runrefbead
 from ._peakinfo                 import createpeaks
 
 _DUMMY = type('_DummyDict', (),
@@ -37,14 +37,15 @@ _DUMMY = type('_DummyDict', (),
 
 class FitToReferenceAccess(TaskAccess):
     "access to the FitToReferenceTask"
+    __DEFAULTS = dict(id           = None,   reference = None,
+                      fitdata      = _DUMMY, peaks     = _DUMMY,
+                      interpolator = _DUMMY)
     def __init__(self, ctrl):
         super().__init__(ctrl, FitToReferenceTask)
-        self.__store              = self.project.root.tasks.fittoreference.gui
-        self.__store.defaults     = dict(id      = None,   reference = None,
-                                         fitdata = _DUMMY, peaks     = _DUMMY)
+        self.__store             = self.project.root.tasks.fittoreference.gui
+        self.__store.defaults    = self.__DEFAULTS
 
-        self.configtask.defaults  = dict(histmin       = 1e-3,
-                                         peakprecision = 1e-2)
+        self.configtask.defaults = dict(histmin = 1e-4, peakprecision = 1e-2)
 
     @property
     def params(self) -> Optional[Tuple[float, float]]:
@@ -77,34 +78,30 @@ class FitToReferenceAccess(TaskAccess):
     @property
     def reference(self) -> Optional[RootTask]:
         "returns the root task for the reference data"
-        return self.__ref.get()
+        return self.__store.reference.get()
 
     @reference.setter
     def reference(self, val):
         "sets the root task for the reference data"
-        if val is not self.__ref.get():
-            self.__store.update(id      = None,   reference = val,
-                                fitdata = _DUMMY, peaks     = _DUMMY)
+        if val is not self.reference:
+            info = dict(self.__DEFAULTS)
+            info['reference'] = val
+            self.__store.update(**info)
 
     def setobservers(self, _):
         "observes the global model"
-        self.__ref.observe(lambda _: self.resetmodel())
+        self.__store.reference.observe(lambda _: self.resetmodel())
 
     def resetmodel(self):
         "adds a bead to the task"
-        return (self.update() if self.__ref.get() not in (self.roottask, None) else
+        return (self.update() if self.reference not in (self.roottask, None) else
                 self.remove() if self.task                                     else
                 None)
 
-    def refhistogram(self, xaxis, rho):
+    def refhistogram(self, xaxis, _):
         "returns the histogram interpolated to the provided values"
-        data = getattr(self.__fits, 'data', None)
-        if data is None:
-            return np.full(len(xaxis), np.NaN, dtype = 'f4')
-        if isinstance(data, tuple):
-            data = data[0]
-        print(self.hmin, rho)
-        return Interpolator(data, fill_value = 0., miny = self.hmin/rho)(xaxis)*rho
+        intp = self.__store.interpolator.get(self.bead, None)
+        return np.full(len(xaxis), np.NaN, dtype = 'f4') if intp is None else intp(xaxis)
 
     def identifiedpeaks(self, peaks):
         "returns an array of identified peaks"
@@ -119,15 +116,12 @@ class FitToReferenceAccess(TaskAccess):
     def _configattributes(_):
         return {}
 
-    __fits   = property(lambda self: self.__store.fitdata.get().get(self.bead, None))
     __peaks  = property(lambda self: self.__store.peaks.get().get(self.bead, None))
-    __ref    = property(lambda self: self.__store.reference)
-    __id     = property(lambda self: self.__store.id)
 
     def __computefitdata(self) -> Tuple[bool, bool]:
         args  = {} # type: Dict[str, Any]
         ident = pickle.dumps(tuple(self._ctrl.tasks(self.reference)))
-        if self.__id.get() == ident:
+        if self.__store.id.get() == ident:
             if self.__peaks is not None:
                 return False, False
         else:
@@ -141,15 +135,15 @@ class FitToReferenceAccess(TaskAccess):
         if not peaks:
             args['peaks'] = peaks = {}
 
-        ibead = self.bead
-        proc  = next(iter(self._ctrl.run(self.reference, PeakSelectorTask, copy = True)))
-        try:
-            pks          = tuple(proc[ibead])
-        except: # pylint: disable=bare-except
-            peaks[ibead] = np.empty((0,), dtype = 'f4')
-        else:
-            peaks[ibead] = np.array([i for i, _ in pks], dtype = 'f4')
-            fits [ibead] = FitData(self.fitalg.frompeaks(pks), (1., 0.)) # type: ignore
+        intps  = self.__store.intps.get()
+        if not intps:
+            args['interpolator'] = intps = {}
+
+        ibead        = self.bead
+        pks, dtls    = runrefbead(self._ctrl, self.reference, ibead)
+        peaks[ibead] = pks
+        fits [ibead] = FitData(self.fitalg.frompeaks(pks), (1., 0.)) # type: ignore
+        intps[ibead] = Interpolator(dtls, self.hmin, fill_value = 0.)
 
         if args:
             self.__store.update(**args)

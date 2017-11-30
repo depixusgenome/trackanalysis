@@ -46,7 +46,7 @@ class PlotModelAccess(GlobalsAccess):
         "resets the model"
         return False
 
-class ProcessorsReplacement(CacheReplacement):
+class ReplaceProcessors(CacheReplacement):
     """
     Context for replacing processors but keeping their cache
     """
@@ -164,9 +164,9 @@ class TaskPlotModelAccess(PlotModelAccess):
             return None
         return next(iter(ctrl.run(copy = True)))
 
-    def runcontext(self, *processors: Processor, copy = True) -> ProcessorsReplacement:
-        "returns a ProcessorsReplacement context from which a trackview can be obtains"
-        return ProcessorsReplacement(self, *processors, copy = copy)
+    def runcontext(self, *processors: Processor, copy = True) -> ReplaceProcessors:
+        "returns a ReplaceProcessors context from which a trackview can be obtains"
+        return ReplaceProcessors(self, *processors, copy = copy)
 
     def observetasks(self, *args, **kwa):
         "observes the provided task"

@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Processors for storing gui data"
-from typing                     import Dict, Tuple, List, Optional
-from copy                       import copy
+from   typing                     import Dict, Tuple, List, Optional
+from   copy                       import copy
+import numpy                      as     np
 
-from data                       import BEADKEY
-from control.processor.taskview import TaskViewProcessor
-from peakfinding.selector       import PeakSelectorDetails
-from peakfinding.processor      import PeakSelectorProcessor, PeaksDict
-from peakcalling.processor      import FitToReferenceTask, FitToReferenceDict, FitBead
-from sequences.modelaccess      import SequencePlotModelAccess
+from   data                       import BEADKEY
+from   control.processor.taskview import TaskViewProcessor
+from   control.modelaccess        import ReplaceProcessors
+from   model.task                 import RootTask
+from   peakfinding.selector       import PeakSelectorDetails
+from   peakfinding.processor      import PeakSelectorProcessor, PeakSelectorTask, PeaksDict
+from   peakcalling.processor      import FitToReferenceTask, FitToReferenceDict, FitBead
+from   sequences.modelaccess      import SequencePlotModelAccess
 
 class GuiPeaksDict(PeaksDict):
     "gui version of PeaksDict"
@@ -84,3 +87,19 @@ def runbead(self) -> Tuple[Optional[FitBead], Optional[PeakSelectorDetails]]:
         fits = None if view is None else view[self.bead]
     return (fits        if self.identification.task is not None else None,
             dtlstore[0] if dtlstore and len(dtlstore[0].peaks)  else None)
+
+def runrefbead(self, ref: RootTask, bead: BEADKEY
+              ) -> Tuple[Optional[np.ndarray], Optional[PeakSelectorDetails]]:
+    "runs the reference bead with specific processors"
+    dtlstore = [] # type: List[PeakSelectorDetails]
+    proc     = GuiPeakSelectorProcessor(dtlstore)
+    with ReplaceProcessors(self.processors(ref, PeakSelectorTask), proc) as view:
+        try:
+            pks = np.array([i for i, _ in view[bead]], dtype = 'f4')
+        except: # pylint: disable=bare-except
+            pks = np.empty((0,), dtype = 'f4')
+
+    if dtlstore:
+        rho = max(self.task(ref, PeakSelectorTask).histogram.kernelarray())
+        dtlstore[0].histogram *= 100./(self.track(ref).ncycles*rho)
+    return pks, (dtlstore[0] if dtlstore else None)
