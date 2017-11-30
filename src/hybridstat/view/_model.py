@@ -105,7 +105,7 @@ class FitToReferenceAccess(TaskAccess):
 
     def identifiedpeaks(self, peaks):
         "returns an array of identified peaks"
-        ref = self.__peaks
+        ref = self.referencepeaks
         arr = np.full(len(peaks), np.NaN, dtype = 'f4')
         if len(peaks) and ref is not None and len(ref):
             ids = match.compute(ref, peaks, self.configtask.peakprecision.get())
@@ -116,13 +116,17 @@ class FitToReferenceAccess(TaskAccess):
     def _configattributes(_):
         return {}
 
-    __peaks  = property(lambda self: self.__store.peaks.get().get(self.bead, ()))
+    @property
+    def referencepeaks(self) -> Optional[np.ndarray]:
+        "returns reference peaks"
+        pks = self.__store.peaks.get().get(self.bead, None)
+        return None if pks is None or len(pks) == 0 else pks
 
     def __computefitdata(self) -> Tuple[bool, bool]:
         args  = {} # type: Dict[str, Any]
         ident = pickle.dumps(tuple(self._ctrl.tasks(self.reference)))
         if self.__store.id.get() == ident:
-            if self.__peaks is not None:
+            if self.referencepeaks is not None:
                 return False, False
         else:
             args['id'] = ident

@@ -186,8 +186,17 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
 
         def referencedependant(self, mdl):
             "all sequence dependant stats"
-            self.values[0] = mdl.fittoreference.stretch
-            self.values[1] = mdl.fittoreference.bias
+            fittoref       = mdl.fittoreference
+            self.values[0] = fittoref.stretch
+            self.values[1] = fittoref.bias
+
+            nfound    = np.isfinite(mdl.peaks['id']).sum()
+            npks      = fittoref.ref
+            self.values[8] = '{}/{}'.format(nfound, npks)
+            if nrem == 2:
+                self.values[10] = (np.nanstd(mdl.peaks['distance'])
+                                   / ((np.mean(self.values[3]))**2
+                                      * (nfound - 2)))
 
         def __call__(self) -> str:
             return ('<table>'
@@ -235,6 +244,7 @@ class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
                                               'warning')
         css               = self.css.peaks.columns
         css.width.default = 60
+        css.refid.default = '0.0000'
         css.default       = [['z',        'css:ylabel',    '0.0000'],
                              ['bases',    u'Z (base)',     '0.0'],
                              ['id',       u'Id',           '0'],
@@ -245,9 +255,7 @@ class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
                              ['sigma',    u'σ (µm)',       '0.0000'],
                              ['skew',     u'skew',         '0.00']]
 
-    def create(self, _, src) -> List[Widget]: # pylint: disable=arguments-differ
-        "creates the widget"
-        width = self.css.peaks.columns.width.get()
+    def __cols(self):
         get   = lambda i: self.css[i[4:]].get() if i.startswith('css:') else i
         fmt   = lambda i: (StringFormatter(text_align = 'center',
                                            font_style = 'bold') if i == '' else
@@ -257,6 +265,19 @@ class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
                                  formatter  = fmt(i[2]))
                      for i in self.css.peaks.columns.get())
 
+        cnf   = self.css.peaks
+        isref = (self._model.fittoreference.task is not None and
+                 self._model.identification.task is None)
+        for name in ('id', 'distance'):
+            ind = next(i for i, j in enumerate(cnf.columns.get()) if j[0] == name)
+            fmt = cnf.columns.refid.get() if isref else cnf.columns.get()[ind][-1]
+            cols[ind].formatter.format = fmt
+        return cols
+
+    def create(self, _, src) -> List[Widget]: # type: ignore # pylint: disable=arguments-differ
+        "creates the widget"
+        width = self.css.peaks.columns.width.get()
+        cols  = self.__cols()
         self.__widget = DataTable(source      = src,
                                   columns     = cols,
                                   editable    = False,
@@ -273,7 +294,7 @@ class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
         height = self.css.peaks.height.get()
         if height == self.__widget.height:
             height = height+1
-        resets[self.__widget].update(height = height)
+        resets[self.__widget].update(height = height, columns = self.__cols())
 
 class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
     "Selects an id file"
