@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint: disable=too-many-ancestors
 "Updating PeaksDict for oligo mapping purposes"
 from   typing                   import (List, Type, # pylint: disable=unused-import
                                         Sequence, Tuple, cast, Dict, Optional,
