@@ -1,3 +1,18 @@
+# tag cycles_v4.8
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+### Peaks
+
+Added a *Reference* dropdown button for selecting a track as reference. For all
+other tracks, the *z* axis is scaled to the reference's for each bead
+independently such that as many peaks from the *reference* match the peaks in
+the current track.
+
+Added some information on the peaks graph:
+
+* The *blue* dots along the *blue* line are the positions of events found.
+* The areas colored in *bisque* is the reference's peaks, should there be a reference.
+
 # tag cycles_v4.7
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
