@@ -290,12 +290,7 @@ class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
 
     def reset(self, resets):
         "resets the wiget when a new file is opened"
-        # bug in bokeh 0.12.9: table update is incorrect unless the number
-        # of rows is fixed
-        height = self.css.peaks.height.get()
-        if height == self.__widget.height:
-            height = height+1
-        resets[self.__widget].update(height = height, columns = self.__cols())
+        resets[self.__widget].update(columns = self.__cols())
 
 class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
     "Selects an id file"

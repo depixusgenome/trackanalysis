@@ -65,13 +65,6 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
         data = self.__data()
         itm.update(data = data)
 
-        # bug in bokeh 0.12.9: table update is incorrect unless the number
-        # of rows is fixed
-        width = self.__config.columns.width.get()*len(data)
-        if width == self.__widget.width:
-            width = width+1
-        resets[self.__widget].update(width = width)
-
     def __data(self) -> dict:
         cache = self._model.cleaning.cache
         if cache is None or len(cache) == 0:

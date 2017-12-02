@@ -9,9 +9,9 @@ class Modal extends DOMView
     keyControl: true
     showViewOnRender: true
 
-    constructor: ->
+    constructor: (options={}) ->
+      super(options)
       @args = Array::slice.apply(arguments)
-      DOMView::constructor.apply(this, @args)
 
       # get all options
       @setUIElements()

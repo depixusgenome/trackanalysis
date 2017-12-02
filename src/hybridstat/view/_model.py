@@ -101,7 +101,11 @@ class FitToReferenceAccess(TaskAccess):
     def refhistogram(self, xaxis):
         "returns the histogram interpolated to the provided values"
         intp = self.__store.interpolator.get().get(self.bead, None)
-        return np.full(len(xaxis), np.NaN, dtype = 'f4') if intp is None else intp(xaxis)
+        vals = np.full(len(xaxis), np.NaN, dtype = 'f4') if intp is None else intp(xaxis)
+        if len(vals):
+            # dealing with a visual bug: extremes should always be set to 0.
+            vals[[0,-1]] = 0.
+        return vals
 
     def identifiedpeaks(self, peaks):
         "returns an array of identified peaks"

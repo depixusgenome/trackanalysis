@@ -401,6 +401,7 @@ width: 100%; }
 #dpx-tb-flist {
     overflow: hidden;
     height:50px;
+    z-index:500;
 }
 
 #dpx-tb-flist:hover #dpx-tb-flist-menu {
