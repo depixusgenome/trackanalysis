@@ -151,6 +151,29 @@ def test_peaksplot(bokehaction):
         assert found[0] == out
         assert Path(out).exists()
 
+def test_reference(bokehaction):
+    "test peaksplot"
+    with bokehaction.launch('hybridstat.view.peaksplot.PeaksPlotView',
+                            'app.toolbar') as server:
+        server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
+
+        server.load('100bp_4mer/ref.pk',  andstop = False)
+        ref = server.ctrl.getGlobal("project").track.get()
+
+        server.load('100bp_4mer/AACG.pk', andstop = False)
+
+        store = server.ctrl.getGlobal("project").tasks.fittoreference.gui
+        assert server.widget['HS:reference'].value == '-1'
+        assert store.reference.get() is None
+
+        server.change("HS:reference", 'value', "0")
+        assert server.widget['HS:reference'].value == '0'
+        assert store.reference.get() is ref
+
+        server.load('hairpins.fasta', andpress = False)
+        server.change('Cycles:Oligos', 'value', 'ctgt')
+        server.wait()
+
 def test_hybridstat(bokehaction):
     "test hybridstat"
     with bokehaction.launch('hybridstat.view', 'app.toolbar') as server:
@@ -169,4 +192,4 @@ def test_hybridstat(bokehaction):
         server.change('Hybridstat:Tabs', 'active', 2)
 
 if __name__ == '__main__':
-    test_peaksplot(bokehaction(None))
+    test_reference(bokehaction(None))

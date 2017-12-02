@@ -38,7 +38,7 @@ class ReferenceWidget(WidgetCreator[PeaksPlotModelAccess], FileListMixin):
 
     def create(self, action, *_) -> List[Widget]:
         "creates the widget"
-        self.__widget = Dropdown(name  = 'HS:Sequence',
+        self.__widget = Dropdown(name  = 'HS:reference',
                                  width = self.css.input.width.get(),
                                  **self.__data())
         @action
