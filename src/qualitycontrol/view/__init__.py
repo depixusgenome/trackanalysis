@@ -3,16 +3,19 @@
 "View module showing all messages concerning discarded beads"
 from    typing              import List, Dict, Set, cast
 from    copy                import deepcopy
+import  numpy               as     np
 
 from    bokeh.models        import (ColumnDataSource, DataTable, TableColumn,
-                                    Widget, StringFormatter, Div)
-from    bokeh.layouts       import widgetbox
+                                    Widget, StringFormatter, Div, Range1d)
+from    bokeh.plotting      import Figure, figure
+from    bokeh.layouts       import widgetbox, row, column
 
 from    data                import BEADKEY
-from    view.plots          import DpxNumberFormatter, WidgetCreator, PlotView
+from    view.plots          import (DpxNumberFormatter, WidgetCreator, PlotView,
+                                    PlotAttrs)
 from    view.plots.tasks    import TaskPlotCreator
 from    control.modelaccess import TaskPlotModelAccess, TaskAccess
-from    ..processor         import DataCleaningTask, DataCleaningProcessor
+from    cleaning.processor  import DataCleaningTask, DataCleaningProcessor
 
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"
@@ -163,35 +166,119 @@ class MessagesListWidget(WidgetCreator[MessagesModelAccess]):
             msgs['type']   = [trans.get(i, i)           for i in msgs['type']]
         return {i: list(j) for i, j in msgs.items()}
 
-class MessagesPlotCreator(TaskPlotCreator[MessagesModelAccess]):
+class TemperaturePlotCreator(TaskPlotCreator[MessagesModelAccess]):
+    "Shows temperature temporal series"
+    def __init__(self, *args):
+        super().__init__(*args)
+        name = self.__class__.__name__.replace('PlotCreator', '')
+        self.css.defaults = {'temperatures'    : PlotAttrs('lightblue', 'line', 1),
+                             'median'          : 'dotted',
+                             'pop10'           : [2, 8],
+                             'pop90'           : [2, 8],
+                             'figure.width'    : 400,
+                             'figure.height'   : 150,
+                             'ylabel'          : f'T {name[1:].lower()} (°C)',
+                             'xlabel'          : 'Cycles'}
+
+        self._src: ColumnDataSource = {}
+        self._fig: Figure           = None
+
+    def _create(self, _):
+        "returns the figure"
+        self._fig = figure(**self._figargs(y_range = Range1d(start = 0., end = 20.),
+                                           x_range = Range1d(start = 0., end = 1e2),
+                                           name    = 'Temperatures:fig'))
+        self._src = ColumnDataSource(self.__data())
+
+        args = dict(y = 'temperatures', x = 'cycles', source = self._src)
+        self.css.temperatures.addto(self._fig, **args)
+        for pop in ('pop10', 'median', 'pop90'):
+            args.update(y = pop, line_dash = self.css[pop].get())
+            self.css.temperatures.addto(self._fig, **args)
+
+        self.fixreset(self._fig.x_range)
+        self.fixreset(self._fig.y_range)
+        return self._fig
+
+    def _reset(self):
+        data = self.__data()
+        self._bkmodels[self._src]['data'] = data
+
+        self.setbounds(self._fig.x_range, 'x', (0., getattr(self._model.track, 'ncycles', 1)))
+
+        xvals = data['temperatures'][np.isfinite(data['temperatures'])]
+        xrng  = (np.min(xvals), np.max(xvals)) if len(xvals) else (0., 30.)
+        self.setbounds(self._fig.y_range, 'y', xrng)
+
+    @staticmethod
+    def __defaults():
+        cols  = 'temperatures', 'cycles', 'median', 'pop10', 'pop90'
+        return {i: np.empty(0, dtype = 'f4') for i in cols}
+
+    def __data(self) -> Dict[str, np.ndarray]:
+        track    = self._model.track
+        if track is None or track.secondaries is None:
+            return self.__defaults()
+
+        name = self.__class__.__name__.lower().replace('plotcreator', '')
+        vals  = getattr(track.secondaries, name, None)
+        if vals is None or len(vals) == 0:
+            return self.__defaults()
+
+        cycle = np.nanmean(np.diff(track.phases[:,0]))
+        pops  = np.percentile(vals['value'], [10, 50, 90])
+        return dict(temperatures = vals['value'],
+                    cycles       = (vals['index'])/cycle,
+                    pop10        = np.full(len(vals), pops[0], dtype = 'f4'),
+                    median       = np.full(len(vals), pops[1], dtype = 'f4'),
+                    pop90        = np.full(len(vals), pops[2], dtype = 'f4'))
+
+class TSamplePlotCreator(TemperaturePlotCreator):
+    "Shows temperature temporal series"
+
+class TSinkPlotCreator(TemperaturePlotCreator):
+    "Shows temperature temporal series"
+
+class TServoPlotCreator(TemperaturePlotCreator):
+    "Shows temperature temporal series"
+
+class QualityControlPlotCreator(TaskPlotCreator[MessagesModelAccess]):
     "Creates plots for discard list"
     _RESET = frozenset()         # type: frozenset
     def __init__(self, *args):
         super().__init__(*args)
         self._widgets = dict(messages = MessagesListWidget(self._model),
                              summary  = SummaryWidget(self._model))
+        self._plots   = dict(tsample  = TSamplePlotCreator(self._ctrl),
+                             tsink    = TSinkPlotCreator(self._ctrl),
+                             tservo   = TServoPlotCreator(self._ctrl))
 
     def observe(self):
         "observes the model"
         super().observe()
         for widget in self._widgets.values():
             widget.observe()
+        for plot   in self._plots.values():
+            plot.observe()
 
-    def _create(self, _):
+    def _create(self, doc):
         "returns the figure"
-        act   = self.action
-        order = 'summary', 'messages'
-        get   = lambda i: self._widgets[i].create(act)
-        lst   = sum((get(i) for i in order), [])
-        return widgetbox(lst)
+        act     = self.action
+        get     = lambda i: self._widgets[i].create(act)
+        widgets = sum((get(i) for i in ('summary', 'messages')), [])
+        plots   = [self._plots[i].create(doc) for i in ('tsample', 'tsink', 'tservo')]
+
+        mode    = self.defaultsizingmode()
+        return row(column(*plots), widgetbox(widgets, **mode))
 
     def _reset(self):
         for widget in self._widgets.values():
             widget.reset(self._bkmodels)
 
-class MessagesView(PlotView[MessagesPlotCreator]):
+class QualityControlView(PlotView[QualityControlPlotCreator]):
     "a widget with all discards messages"
-    TASKS = 'datacleaning', 'extremumalignment'
+    TASKS       = 'datacleaning', 'extremumalignment'
+    PANEL_NAME  = 'Quality Control'
     def ismain(self):
         "Cleaning and alignment, ... are set-up by default"
         super()._ismain(tasks = self.TASKS)

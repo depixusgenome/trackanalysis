@@ -231,7 +231,12 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
     @classmethod
     def modeltype(cls) -> Type[ModelType]:
         "the model class object"
-        return cls.__orig_bases__[0].__args__[0] # type: ignore
+        cur  = cls
+        orig = getattr(cls, '__orig_bases__')
+        while orig is None or orig[0].__args__ is None:
+            cur  = getattr(cur, '__base__')
+            orig = getattr(cur, '__orig_bases__', None)
+        return orig[0].__args__[0]    # type: ignore
 
     state = cast(PlotState,
                  property(lambda self:    self.project.state.get(),

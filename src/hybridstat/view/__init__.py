@@ -6,7 +6,7 @@ from bokeh                  import layouts
 from view.base              import BokehView
 from view.plots             import PlotState
 from cleaning.view          import CleaningView
-from cleaning.view.messages import MessagesView
+from qualitycontrol.view    import QualityControlView
 from fov                    import FoVPlotView
 from cyclesplot             import CyclesPlotView
 from .peaksplot             import PeaksPlotView
@@ -20,18 +20,18 @@ class HybridStatView(BokehView):
         "Sets up the controller"
         super().__init__(**kwa)
         self._tabs   = None
-        self._panels = [FoVPlotView   (**kwa),
-                        MessagesView  (**kwa),
-                        CleaningView  (**kwa),
-                        CyclesPlotView(**kwa),
-                        PeaksPlotView (**kwa)]
+        self._panels = [FoVPlotView         (**kwa),
+                        QualityControlView  (**kwa),
+                        CleaningView        (**kwa),
+                        CyclesPlotView      (**kwa),
+                        PeaksPlotView       (**kwa)]
 
         self._ctrl.getGlobal('css.plot').figure.defaults = dict(sizing_mode = 'fixed')
         self._ctrl.getGlobal('css').hybridstat.defaults  = dict(width = 500, height = 30)
         titles = self._ctrl.getGlobal('css').hybridstat.title
         for panel in self._panels:
             key                         = self.__key(panel)
-            titles[key].default         = key.capitalize()
+            titles[key].default         = getattr(panel, 'PANEL_NAME', key.capitalize())
             self.__state(panel).default = PlotState.disabled
         titles['fov'].default           = 'FoV'
 
