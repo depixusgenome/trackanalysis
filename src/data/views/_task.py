@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Makes TrackViews for specific tasks easier"
-from typing     import (Generic, TypeVar, Type, Union, Optional,
-                        Iterable, Sequence, Iterator, FrozenSet, cast)
-from abc        import abstractmethod
-import numpy    as     np
+from typing             import (Generic, TypeVar, Type, Union, Optional,
+                                Iterable, Sequence, Iterator, FrozenSet, cast)
+from abc                import abstractmethod
+import numpy            as     np
 
-from ._view     import TrackView, isellipsis
+from utils.inspection   import templateattribute
+from ._view             import TrackView, isellipsis
 
 Config = TypeVar('Config')
 Key    = TypeVar('Key')
@@ -31,12 +32,7 @@ class TaskView(TrackView, Generic[Config, Key]):
     @classmethod
     def tasktype(cls) -> Type[Config]:
         "returns the config type"
-        cur  = cls
-        orig = getattr(cls, '__orig_bases__')
-        while orig is None or orig[0].__args__ is None:
-            cur  = getattr(cur, '__base__')
-            orig = getattr(cur, '__orig_bases__', None)
-        return orig[0].__args__[0]    # type: ignore
+        return cast(Type[Config], templateattribute(cls, 0))
 
     def _iter(self, sel:Sequence = None) -> Iterator:
         if sel is None:

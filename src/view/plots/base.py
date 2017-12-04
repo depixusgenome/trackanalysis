@@ -18,6 +18,7 @@ from    bokeh.models            import (Range1d, RadioButtonGroup, Model,
                                         Paragraph, Widget, GlyphRenderer, CustomJS)
 
 from    utils.logconfig         import getLogger
+from    utils.inspection        import templateattribute
 from    control.modelaccess     import GlobalsAccess, PlotModelAccess, PlotState
 from    ..base                  import (BokehView, threadmethod, spawn,
                                         defaultsizingmode as _defaultsizingmode,
@@ -119,6 +120,16 @@ class PlotAttrs:
 
         args['line_width'] = args.pop('size')
 
+    @classmethod
+    def _vbar(cls, args):
+        cls._default(args)
+        clr = args.pop('color')
+        if clr:
+            for i in ('line_color', 'fill_color'):
+                args.setdefault(i, clr)
+
+        args['line_width'] = args.pop('size')
+
     _quad = _line
 
     @staticmethod
@@ -192,7 +203,7 @@ class GroupWidget(WidgetCreator[ModelType]):
     def _data(self) -> dict:
         "returns  a dict of updated widget attributes"
 
-class PlotCreator(Generic[ModelType], GlobalsAccess):
+class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many-public-methods
     "Base plotter class"
     _RESET  = frozenset(('bead',))
     _CLEAR  = frozenset(('track',))
@@ -231,12 +242,7 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
     @classmethod
     def modeltype(cls) -> Type[ModelType]:
         "the model class object"
-        cur  = cls
-        orig = getattr(cls, '__orig_bases__')
-        while orig is None or orig[0].__args__ is None:
-            cur  = getattr(cur, '__base__')
-            orig = getattr(cur, '__orig_bases__', None)
-        return orig[0].__args__[0]    # type: ignore
+        return cast(Type[ModelType], templateattribute(cls, 0))
 
     state = cast(PlotState,
                  property(lambda self:    self.project.state.get(),
@@ -259,6 +265,17 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
         test   = lambda *_1, **_2: self.state is PlotState.active
         action = BokehView.action.type(self._ctrl, test = test)
         return action if fcn is None else action(fcn)
+
+    def delegatereset(self, bkmodels):
+        "Stops on_change events for a time"
+        oldbk           = self._bkmodels
+        self._bkmodels  = bkmodels
+        old, self.state = self.state, PlotState.resetting
+        try:
+            self._reset()
+        finally:
+            self._bkmodels = oldbk
+            self.state     = old
 
     @contextmanager
     def resetting(self):
@@ -578,7 +595,7 @@ class PlotView(Generic[PlotType], BokehView):
     @classmethod
     def plottype(cls) -> Type[PlotCreator]:
         "the model class object"
-        return cls.__orig_bases__[0].__args__[0] # type: ignore
+        return cast(Type[PlotCreator], templateattribute(cls, 0))
 
     @property
     def plotter(self):

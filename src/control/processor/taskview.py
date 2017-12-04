@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Makes TaskView Dicts easier"
-from typing     import Generic, TypeVar, Dict, Any
-from functools  import partial
+from typing             import Generic, TypeVar, Dict, Any
+from functools          import partial
 
-from data.views import TaskView
-from model.task import Task
-from .base      import Processor
+from utils.inspection   import templateattribute
+from data.views         import TaskView
+from model.task         import Task
+from .base              import Processor
+
 
 TaskType = TypeVar('TaskType', bound = Task)
 TaskDict = TypeVar('TaskDict', bound = TaskView)
@@ -22,12 +24,7 @@ class TaskViewProcessor(Generic[TaskType, TaskDict, Key], Processor[TaskType]):
     @classmethod
     def taskdicttype(cls) -> type:
         "returns the taskdicttype"
-        cur  = cls
-        orig = getattr(cls, '__orig_bases__')
-        while orig is None or orig[0].__args__ is None:
-            cur  = getattr(cur, '__base__')
-            orig = getattr(cur, '__orig_bases__', None)
-        return orig[0].__args__[1]    # type: ignore
+        return templateattribute(cls, 1)
 
     @staticmethod
     def keywords(cnf:Dict[str, Any]) -> Dict[str, Any]:
