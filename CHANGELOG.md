@@ -12,19 +12,18 @@ previously in a *Messages* tab.
 On the left are 4 plots:
 
 1. The normalized bead extensions are displayed as a function of the cycle number.
-
-   Normalized bead extensions consist in  the difference between median values for
-   phase 3 and phase 1 normalized to their median, independently for each bead.
-   These values should be around zero with a deviation less than twice the σ[HF].
-   The information for this first plot is displayed as:
-   
-   * Circles indicate the normalized extension for a given bead and cycle.
-   * Bars at each cycle indicate population percentiles 25% and 75%.
-   * A line within each bar indicates the median for that cycle.
-
 2. The sample's temperature is displayed as a function of the cycle number.
 3. The heat sink's temperature is displayed as a function of the cycle number.
 4. The Peltiers' temperature is displayed as a function of the cycle number.
+
+Normalized bead extensions consist in  the difference between median values for
+phase 3 and phase 1 normalized to their median, independently for each bead.
+These values should be around zero with a deviation less than twice the σ[HF].
+The information for this first plot is displayed as:
+
+* Circles indicate the normalized extension for a given bead and cycle.
+* Bars at each cycle indicate population percentiles 25% and 75%.
+* A line within each bar indicates the median for that cycle.
 
 For all four plots, median value as well as the first and last decile are
 displayed was horizontal dashed lines.  Should the the range from the first to
