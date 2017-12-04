@@ -249,7 +249,8 @@ class TracksDict(_TracksDict):
         "Returns either `basedataframe` or `trackdataframe`"
         if len(tasks) == 0:
             return self.basedataframe(loadall)
-        return self.trackdataframe(*tasks, transform, assign, process, **kwa)
+        kwa.update(transform = transform, assign = assign, process = process)
+        return self.trackdataframe(*tasks, **kwa)
 
     def freeze(self) -> 'TracksDict':
         "Loads all tracks and adds the data to the track state"
