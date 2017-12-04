@@ -30,20 +30,28 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
                                                         line_dash = [4]),
                              'figure.width' : 700,
                              'figure.height': 150,
+                             'outline.width': 7,
+                             'outline.color': 'red',
+                             'outline.alpha': .5,
                              'ylabel'       : self._xlabel(),
                              'xlabel'       : 'Cycles'}
 
         self.config.tools.default             = 'pan,box_zoom,reset,save'
         self.config.lines.percentiles.default = [10, 50, 90]
-        self.config.yspan.default             = [1, 99], 0.05
+        self.config.yspan.default             = [5, 95], 0.3
+        self.config.warningthreshold.default  = 0.3
         self._src: ColumnDataSource           = {}
         self._fig: Figure                     = None
 
     def _create(self, _):
         "returns the figure"
-        self._fig = figure(**self._figargs(y_range = Range1d(start = 0., end = 20.),
-                                           x_range = Range1d(start = 0., end = 1e2),
-                                           name    = self.__class__.__name__))
+        args = self._figargs(y_range            = Range1d(start = 0., end = 20.),
+                             x_range            = Range1d(start = 0., end = 1e2),
+                             outline_line_width = self.css.outline.width.get(),
+                             outline_line_color = self.css.outline.color.get(),
+                             outline_line_alpha = 0.,
+                             name               = self.__class__.__name__)
+        self._fig = figure(**args)
         self._src = [ColumnDataSource(i) for i in self._data()]
 
         self.css.measures.addto(self._fig, y = 'measures', x = 'cycles', source = self._src[0])
@@ -64,13 +72,15 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         xvals = data[0]['measures'][np.isfinite(data[0]['measures'])]
         xrng  = (np.min(xvals), np.max(xvals)) if len(xvals) else (0., 30.)
         self.setbounds(self._fig.y_range, 'y', xrng)
-
-        if len(xrng):
+        if len(xvals):
             perc, factor = self.config.yspan.get()
             span         = np.percentile(xvals, perc)
             span         = (span[0]-(span[1]-span[0])*factor,
                             span[1]+(span[1]-span[0])*factor)
             self._bkmodels[self._fig.y_range].update(start = span[0], end = span[1])
+
+        alpha = self.css.outline.alpha.get() if self._warn(data) else 0.
+        self._bkmodels[self._fig]['outline_line_alpha'] = alpha
 
     @staticmethod
     def _defaults() -> Tuple[Dict[str, np.ndarray], ...]:
@@ -112,6 +122,11 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         name = cls.__name__.replace('PlotCreator', '')
         return f'T {name[1:].lower()} (°C)'
 
+    def _warn(self, data):
+        thr = self.config.warningthreshold.get()
+        return (False if thr is None or len(data[1]['pop10']) == 0 else
+                (data[1]['pop90'][0] - data[1]['pop10'][0]) > thr)
+
 class TSamplePlotCreator(DriftControlPlotCreator):
     "Shows TSample temperature temporal series"
 
@@ -125,10 +140,11 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
     "Shows bead extension temporal series"
     def __init__(self, *args):
         super().__init__(*args)
-        self.css.measures.default    = PlotAttrs('lightblue', 'circle', 1, alpha = .75)
+        self.css.measures.default    = PlotAttrs('lightblue', 'circle', 2, alpha = .75)
         self.css.ybars.default       = PlotAttrs('lightblue', 'vbar', 1, alpha = .75)
         self.css.ymed.default        = PlotAttrs('lightblue', 'vbar', 1, fill_alpha = 0.)
         self.css.ybars.width.default = .8
+        self.config.warningthreshold.default  = 1.5e-2
         self.config.ybars.percentiles.default = [25, 75]
 
     def _create(self, _):
@@ -139,7 +155,7 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
 
         # set first of glyphs
         rends         = list(fig.renderers)
-        fig.renderers = rends[:-6] + rends[-2:] + rends[-5:-2]
+        fig.renderers = rends[:-6] + rends[-2:] + rends[-6:-2]
         return fig
 
     @classmethod
