@@ -18,6 +18,7 @@ from   model.__scripting__.parallel import Parallel
 from   ..track                      import Track
 from   ..trackio                    import savetrack, PATHTYPE, Handler
 from   ..tracksdict                 import TracksDict as _TracksDict
+from   ..views                      import isellipsis
 
 @addto(Handler)
 def __call__(self, track = None, beadsonly = False, __old__ = Handler.__call__) -> Track:
@@ -57,7 +58,8 @@ class TracksDict(_TracksDict):
     >>> TRACKS = TracksDict("/path/to/my/saved/tracks/*.pk")
     ```
     """
-    __doc__     = _TracksDict.__doc__ + __doc__
+    if __doc__:
+        __doc__ = _TracksDict.__doc__ + __doc__
     _TRACK_TYPE = Track
     def __init__(self,          # pylint: disable=too-many-arguments
                  tracks  = None,
@@ -122,7 +124,7 @@ class TracksDict(_TracksDict):
         return super().__getitem__([i for i in self if fcn(i.lower())])
 
     def __getitem__(self, key):
-        if isinstance(key, list):
+        if isinstance(key, list) or isellipsis(key):
             return super().__getitem__(key)
 
         if isinstance(key, (Task, Tasks)):

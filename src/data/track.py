@@ -20,8 +20,10 @@ DIMENSIONS   = Tuple[Tuple[float, float], Tuple[float, float]]
 _PRECISIONS  = Dict[BEADKEY, float]
 
 def _doc(tpe):
-    doc = tpe.__doc__.strip()
-    return doc[0].lower()+doc[1:].replace('\n', '\n    ')+"\n"
+    if tpe.__doc__:
+        doc = tpe.__doc__.strip()
+        return doc[0].lower()+doc[1:].replace('\n', '\n    ')+"\n"
+    return None
 
 class Axis(Enum):
     "which axis to look at"
@@ -58,7 +60,8 @@ class FoV:
     "(X slope, X bias), (Y slope, Y bias)".
     * `beads` is a dictionnary of information per bead:
     """
-    __doc__ = __doc__ + ''.join(f'    {i}\n' for i in Bead.__doc__.split('\n')[-4:])
+    if __doc__:
+        __doc__ += ''.join(f'    {i}\n' for i in Bead.__doc__.split('\n')[-4:])
 
     image                       = np.empty((0,0), dtype = np.uint8)
     beads:         BEADS        = {}
@@ -201,7 +204,7 @@ class ViewDescriptor:
     def __set_name__(self, _, name):
         self.tpe  = Cycles if name.startswith('cycles') else Beads
         self.args = dict(copy = False, beadsonly = 'only' in name)
-        setattr(self, '__doc__', getattr(self.tpe, '__doc__'))
+        setattr(self, '__doc__', getattr(self.tpe, '__doc__', None))
 
 def _lazies():
     return ('_data', '_lazy', '_rawprecisions') + tuple(LazyProperty.LIST)
@@ -247,7 +250,8 @@ class Track:
     * `secondaries` {secondaries}
     * `fov` {fov}
     """
-    __doc__    = __doc__.format(secondaries = _doc(Secondaries), fov = _doc(FoV))
+    if __doc__:
+        __doc__= __doc__.format(secondaries = _doc(Secondaries), fov = _doc(FoV))
     key: str   = None
     phases     = cast(np.ndarray,          LazyProperty())
     framerate  = cast(float,               LazyProperty())

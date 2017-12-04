@@ -32,7 +32,8 @@ class Events(Cycles, EventDetectionConfig, ITrackView):# pylint:disable=too-many
 
     It can be configured as a `Cycles` object:
     """
-    __doc__ += '\n'.join(Cycles.__doc__.split('\n'))
+    if __doc__:
+        __doc__ += '\n'.join(Cycles.__doc__.split('\n'))
     level = Level.event
     first = PHASE.measure
     last  = PHASE.measure

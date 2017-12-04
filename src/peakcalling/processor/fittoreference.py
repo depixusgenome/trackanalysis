@@ -235,7 +235,8 @@ class FitToReferenceDataFrameFactory(DataFrameFactory[FitToReferenceDict]):
     >>> DataFrameTask(stretch = True, bias = True)
     ```
     """
-    __doc__ += '\n'+PeaksDataFrameFactory.__doc__[PeaksDataFrameFactory.__doc__.find('#')-5:]
+    if __doc__:
+        __doc__ += '\n'+PeaksDataFrameFactory.__doc__[PeaksDataFrameFactory.__doc__.find('#')-5:]
     PREC     = 5e-6
     def __init__(self, task, frame):
         get = lambda i: (i  if task.measures.get(i, False) is True else
