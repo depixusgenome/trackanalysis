@@ -29,15 +29,15 @@ def __scripting_save__() -> bool:
 
 class BeadSubtractionDescriptor:
     "A descriptor for adding subtracted beads"
-    NAME    = 'subtraction'
-    __doc__ = Tasks(NAME).__doc__
+    NAME    = Tasks(BeadSubtractionTask).value
+    __doc__ = BeadSubtractionTask.__doc__
 
-    def __get__(self, inst, owner) -> Union[Tasks, Tuple[int, ...]]:
-        if inst is None:
-            return Tasks(self.NAME)
+    def __get__(self, inst, owner
+               ) -> Union['BeadSubtractionDescriptor', Optional[BeadSubtractionTask]]:
+        return self if inst is None else inst.tasks.get(self.NAME, None)
 
-        beads = getattr(inst.tasks.get(self.NAME, None), 'beads', [])
-        return tuple(beads)
+    def __delete__(self, inst):
+        inst.tasks.pop(self.NAME, None)
 
     def __set__(self, inst,
                 beads: Union[None, Dict[str,Any], BeadSubtractionTask, Sequence[int]]):
@@ -49,7 +49,7 @@ class BeadSubtractionDescriptor:
                cast(Sequence[int], beads))
 
         if not beads:
-            inst.tasks.pop(self.NAME)
+            inst.tasks.pop(self.NAME, None)
         else:
             inst.tasks[self.NAME] = BeadSubtractionTask(beads = list(lst))
 
