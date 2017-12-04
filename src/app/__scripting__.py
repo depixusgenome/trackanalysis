@@ -124,8 +124,25 @@ def __cleaning__(cls):
     return ret
 
 def localcontext(**kwa) -> LocalContext:
-    "Allows changing globals locally"
+    """
+    Isolates the configuration for a period of time.
+
+    It is **NOT THREAD SAFE**.
+
+    For example:
+
+    ```python
+    >>> with localcontext():
+    ...     # change tasks as wanted
+    ...     Tasks.peakselector(align = None)
+    ...     assert Tasks.peakselector.get().align is None
+
+    >>> # changes within the localcontext have been discarded
+    >>> assert Tasks.peakselector.get().align is not None
+    ```
+    """
     return LocalContext(scriptapp.control, **kwa)
+localcontext.__doc__ = LocalContext.__doc__
 
 @addto(Tasks)
 def defaulttasklist(obj, upto, cleaned:bool = None, __old__ = Tasks.defaulttasklist):
