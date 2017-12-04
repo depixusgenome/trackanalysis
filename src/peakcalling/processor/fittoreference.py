@@ -177,7 +177,6 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
             return super()._keys(sel, _)
 
         available = frozenset(self.config.fitdata) - {self.config.DEFAULTKEY}
-        print(self, self.config.defaultdata, available)
         if sel is None:
             return super()._keys(tuple(available), True)
         seq = self._transform_ids(cast(Iterable, sel))

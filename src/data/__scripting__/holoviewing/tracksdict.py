@@ -124,8 +124,11 @@ class TracksDictDisplay(BasicDisplay,
 
     def _default_kargs(self, key, bead, kwa):
         if self._opts:
-            tmp, kwa = kwa, dict(self._opts)
+            tmp = dict(self._opts)
+            tmp.update(kwa)
+            kwa.clear()
             kwa.update(tmp)
+
         if self._labels is True and self._overlay in ('key', 'bead'):
             kwa.setdefault('labels', str(key) if self._overlay == 'key' else str(bead))
         elif isinstance(self._labels, str):
