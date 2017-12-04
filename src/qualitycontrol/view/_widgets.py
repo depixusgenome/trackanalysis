@@ -16,10 +16,20 @@ class SummaryWidget(WidgetCreator[QualityControlModelAccess]):
     def __init__(self, model:QualityControlModelAccess) -> None:
         super().__init__(model)
         self.__widget: Div = None
+        self.css.text.default = (("<div class='dpx-span'>"
+                                  "<div><p>Cycles:</p><p>Beads:</p><p>Bad:</p></div>"
+                                  "<div style='text-align:center;'>"
+                                  "<p><b>{ncycles}</b></p>"
+                                  "<p><b>{nbeads}</b> = "
+                                  "<b>{ngood}</b> good + <b>{nbad}</b> bad</p>"
+                                  "<p>{listbad}</p>"
+                                  "</div>"
+                                  "</div>").replace("<p>", "<p style='margin: 0px;'>")
+                                 +"<p></p>")
 
     def create(self, _):
         "creates the widget"
-        self.__widget = Div()
+        self.__widget = Div(text = self.__text())
         return [self.__widget]
 
     def reset(self, resets):
@@ -29,22 +39,14 @@ class SummaryWidget(WidgetCreator[QualityControlModelAccess]):
         itm.update(text = txt)
 
     def __text(self):
-        track = self._model.track
-        if track is None:
-            return ''
-
-        nbeads = sum(1 for i in track.beadsonly.keys())
-        beads  = sorted(self._model.badbeads())
-        txt    = ("<div class='dpx-span'><div>"
-                  "<p>Number of cycles:</p>"
-                  "<p>Number of beads:</p>"
-                  "<p>Bad beads:</p>"
-                  "</div><div>"
-                  f"<p>{track.ncycles}</p>"
-                  f"<p>{nbeads}</p>"
-                  f"<p>{len(beads)}=[{', '.join(str(i) for i in beads)}]</p>"
-                  "</div></div>")
-        return txt
+        track  = self._model.track
+        nbeads = 0  if track is None else sum(1 for i in track.beadsonly.keys())
+        bad    = [] if track is None else sorted(self._model.badbeads())
+        return self.css.text.format(ncycles = 0 if track is None else track.ncycles,
+                                    nbeads  = nbeads,
+                                    ngood   = nbeads - len(bad),
+                                    nbad    = len(bad),
+                                    listbad = ', '.join(str(i) for i in bad))
 
 class MessagesListWidget(WidgetCreator[QualityControlModelAccess]):
     "Table containing stats per peaks"
