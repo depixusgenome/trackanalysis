@@ -50,11 +50,11 @@ class TrackIO(TaskIO):
         if len(model):
             raise NotImplementedError()
 
-        if isinstance(path, (list, tuple)) and len(path) == 1:
-            path = cast(str, path[0])
-        if not isinstance(path, (str, Path)):
+        if isinstance(path, dict):
             return
 
+        if isinstance(path, (list, tuple)) and len(path) == 1:
+            path = cast(str, path[0])
         LOGS.info('%s loading %s', type(self).__name__, path)
         return [(TrackReaderTask(path = topath(path)),)]
 
@@ -172,7 +172,7 @@ def openmodels(openers, task, tasks):
         if models is not None:
             return models
 
-    path = getattr(task, 'path', 'path')
+    path = getattr(task, 'path', task)
     if path is None or (isinstance(path, (list, tuple))) and len(path) == 0:
         msg  = "Couldn't open track"
 
