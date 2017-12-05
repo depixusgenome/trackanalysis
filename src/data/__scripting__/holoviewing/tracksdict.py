@@ -7,7 +7,6 @@ Adds shortcuts for using holoview
 from   typing                   import List, Union
 from   functools                import partial, wraps
 from   concurrent.futures       import ProcessPoolExecutor, ThreadPoolExecutor
-from   multiprocessing          import cpu_count
 
 from   scripting.holoviewing    import addto, displayhook, addproperty, hv
 from   ...views                 import isellipsis, BEADKEY
@@ -166,10 +165,10 @@ class TracksDictDisplay(BasicDisplay,
             crvs = [fcn(i) for i in opts]
         else:
             self._items = self._items.freeze()
-            with ThreadPoolExecutor(cpu_count()) as pool:
+            with ThreadPoolExecutor() as pool:
                 data = list(pool.map(fcn, opts))
 
-            with ProcessPoolExecutor(cpu_count()) as pool:
+            with ProcessPoolExecutor() as pool:
                 crvs = list(pool.map(self._process_pooled_display, data))
         return hv.Overlay(self._convert(kdims, crvs))
 
@@ -270,7 +269,7 @@ class TracksDictFovDisplayProperty(TracksDictDisplayProperty):
 @addto(TracksDict)         # type: ignore
 def display(self):
     "Returns a table with some data"
-    return hv.Table(self.dataframe(), kdims = ['key'])
+    return hv.Table(self.dataframe().fillna(""), kdims = ['key'])
 
 @addproperty(TracksDict, 'secondaries')
 class TracksDictSecondariesDisplayProperty(TracksDictDisplayProperty):

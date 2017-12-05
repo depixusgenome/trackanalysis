@@ -6,7 +6,6 @@ from   typing                   import (List, Type, # pylint: disable=unused-imp
                                         Sequence, Tuple, cast, Dict, Optional,
                                         Callable)
 from   concurrent.futures       import ProcessPoolExecutor
-from   multiprocessing          import cpu_count
 from   copy                     import deepcopy
 from   scipy.interpolate        import interp1d
 import numpy                    as np
@@ -297,7 +296,7 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
         data    = dict(reftask.fitdata)
 
         if len(beads) > 2:
-            with ProcessPoolExecutor(cpu_count()) as pool:
+            with ProcessPoolExecutor() as pool:
                 ref  = self._items[self._reference].peaks
                 lst  = [(reftask.fitalg, ref, i) for i in beads]
                 data.update({i: j for i, j in pool.map(self._frompeaksfcn, lst)

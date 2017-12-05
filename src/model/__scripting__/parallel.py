@@ -4,7 +4,6 @@
 from typing                 import (Union, Sequence, Type, Dict, Generator,
                                     Callable, Iterator, List, cast)
 from concurrent.futures     import ProcessPoolExecutor, ThreadPoolExecutor
-from multiprocessing        import cpu_count
 import pickle
 import pandas               as     pd
 
@@ -54,7 +53,7 @@ class Parallel:
                 endaction: Union[str, Callable] = None):
         "processes the parallel task"
         if pool is None:
-            pool = ProcessPoolExecutor(cpu_count())
+            pool = ProcessPoolExecutor()
 
         if endaction in (pd.concat, 'concat', 'concatenate'):
             return pd.concat(sum((list(i) for i in pool.map(self.run, self.args)), []))

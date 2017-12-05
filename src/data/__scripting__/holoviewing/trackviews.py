@@ -47,7 +47,7 @@ class Display(BasicDisplay): # pylint: disable=abstract-method
         opts.update(self._opts)
         cdims = {i: opts[i] for i in ('kdims', 'vdims') if i in opts}
         tdims = (cdims['kdims']+opts.get('vdims', []))[:2]
-        return hv.Overlay([hv.Text(0.5, .9, args[0], kdims = tdims),
+        return hv.Overlay([hv.Text(0.5, .9, str(args[0]), kdims = tdims),
                            self._tpe(([0., np.NaN, 1.],[0., np.NaN, 1.]),
                                      **cdims)])
 

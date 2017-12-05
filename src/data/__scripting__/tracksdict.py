@@ -4,8 +4,6 @@
 Adds a dictionnaries to access tracks, experiments, ...
 """
 import re
-from   concurrent.futures           import ThreadPoolExecutor
-from   multiprocessing              import cpu_count
 import pandas                       as     pd
 import numpy                        as     np
 
@@ -184,15 +182,15 @@ class TracksDict(_TracksDict):
     def basedataframe(self, loadall = False) -> pd.DataFrame:
         "Returns a table with some data on the track files"
         if loadall:
-            beads = [sum(1 for i in j.beadsonly.keys()) for j in self.values()]
-        else:
-            beads = [sum(1 for i in j.beadsonly.keys()) if j.isloaded else np.NaN
-                     for j in self.values()]
+            self.load()
+        beads   = [sum(1 for i in j.beadsonly.keys()) if j.isloaded else np.NaN
+                   for j in self.values()]
+        cleaned = [i.cleaned if i.isloaded else np.NaN for i in self.values()]
 
         paths = [i.pathinfo for i in self.values()]
         frame = dict(key     = list(self),
                      path    = [i.trackpath for i in paths],
-                     cleaned = [i.cleaned   for i in self.values()],
+                     cleaned = cleaned,
                      beads   = beads,
                      **{i: [getattr(j, i) for j in paths]
                         for i in ('pathcount', 'modification', 'megabytes')})
@@ -254,12 +252,9 @@ class TracksDict(_TracksDict):
 
     def freeze(self) -> 'TracksDict':
         "Loads all tracks and adds the data to the track state"
+        self.load()
         cpy = self.__class__()
-        with ThreadPoolExecutor(cpu_count()) as pool:
-            def _create(track):
-                track.load()
-                return FrozenTrack(track)
-            dict.update(cpy, zip(self.keys(), pool.map(_create, self.values())))
+        dict.update(cpy, {i: FrozenTrack(j) for i, j in self.items()})
         return cpy
 
     dataframe.__doc__ =(
