@@ -11,9 +11,9 @@ from   copy                 import deepcopy
 
 import numpy                as     np
 import pandas               as     pd
-import holoviews            as     hv          # pylint: disable=import-error
-from   IPython              import get_ipython # pylint: disable=import-error
-from   IPython.display      import display as _display
+import holoviews            as     hv                   # pylint: disable=import-error
+from   IPython              import get_ipython          # pylint: disable=import-error
+from   IPython.display      import display as _display  # pylint: disable=import-error
 
 from   utils.decoration     import addto as _addto, addproperty
 from   utils.attrdefaults   import setdefault

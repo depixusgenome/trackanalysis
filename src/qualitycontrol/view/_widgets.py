@@ -11,21 +11,32 @@ from    bokeh               import layouts
 from    view.plots          import DpxNumberFormatter, WidgetCreator
 from    ._model             import QualityControlModelAccess
 
+_TEXT = """
+<div class='dpx-span'>
+    <div><p style='margin: 0px; width:100px;'><b>Cycles:</b></p></div>
+    <div><p style='margin: 0px;'>{ncycles}</p></div>
+</div>
+<div class='dpx-span'>
+    <div><p style='margin: 0px; width:100px;'><b>Beads:</b></p></div>
+    <div><p style='margin: 0px;'>{nbeads} = {ngood} good + {nbad} bad</p></div>
+</div>
+<div class='dpx-span'>
+    <div><p style='margin: 0px; width: 100px;'><b>Bad Beads:</b></p></div>
+    <div><p style='margin: 0px;'>{listbad}</p></div>
+</div>
+<div class='dpx-span'>
+    <div><p style='margin: 0px; width: 100px'><b>Fixed Beads:</b></p></div>
+    <div><p style='margin: 0px;'>{listfixed}</p></div>
+</div>
+<p></p>
+""".strip().replace("    ", "").replace("\n", "")
+
 class SummaryWidget(WidgetCreator[QualityControlModelAccess]):
     "summary info on the track"
     def __init__(self, model:QualityControlModelAccess) -> None:
         super().__init__(model)
         self.__widget: Div = None
-        self.css.text.default = (("<div class='dpx-span'>"
-                                  "<div><p>Cycles:</p><p>Beads:</p><p>Bad:</p></div>"
-                                  "<div style='text-align:center;'>"
-                                  "<p><b>{ncycles}</b></p>"
-                                  "<p><b>{nbeads}</b> = "
-                                  "<b>{ngood}</b> good + <b>{nbad}</b> bad</p>"
-                                  "<p>{listbad}</p>"
-                                  "</div>"
-                                  "</div>").replace("<p>", "<p style='margin: 0px;'>")
-                                 +"<p></p>")
+        self.css.text.default = _TEXT
 
     def create(self, _):
         "creates the widget"
@@ -41,12 +52,14 @@ class SummaryWidget(WidgetCreator[QualityControlModelAccess]):
     def __text(self):
         track  = self._model.track
         nbeads = 0  if track is None else sum(1 for i in track.beadsonly.keys())
-        bad    = [] if track is None else sorted(self._model.badbeads())
-        return self.css.text.format(ncycles = 0 if track is None else track.ncycles,
-                                    nbeads  = nbeads,
-                                    ngood   = nbeads - len(bad),
-                                    nbad    = len(bad),
-                                    listbad = ', '.join(str(i) for i in bad))
+        bad    = sorted(self._model.badbeads())
+        fixed  = sorted(self._model.fixedbeads())
+        return self.css.text.format(ncycles   = 0 if track is None else track.ncycles,
+                                    nbeads    = nbeads,
+                                    ngood     = nbeads - len(bad),
+                                    nbad      = len(bad),
+                                    listbad   = ', '.join(str(i) for i in bad),
+                                    listfixed = ', '.join(str(i) for i in fixed))
 
 class MessagesListWidget(WidgetCreator[QualityControlModelAccess]):
     "Table containing stats per peaks"

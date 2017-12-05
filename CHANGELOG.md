@@ -1,13 +1,18 @@
 # tag cycles_v4.8
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
+### Field of View
+
+Fixed beads are displayed in brown. A bead is detected as fixed if its extension
+is less than 0.5 µm on *all* cycles.
+
 ### Quality Control
 
 A tab has been added providing some quality control indicators.
 
 On the right is the list of messages issued from cleaning the beads. This was
-previously in a *Messages* tab.
-
+previously in a *Messages* tab. The summary has been worked on, now providing a
+list of fixed beads: beads with an extension less than 0.5 µm for *all* cycles.
 
 On the left are 4 plots:
 

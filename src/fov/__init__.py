@@ -13,15 +13,15 @@ from signalfilter           import rawprecision
 from view.plots.tasks       import TaskPlotCreator, TaskPlotModelAccess
 from view.plots             import PlotAttrs, PlotView
 from view.colors            import getcolors, setcolors
-from cleaning.view.messages import MessagesModelAccess
+from qualitycontrol.view    import QualityControlModelAccess
 
-class FoVPlotCreator(TaskPlotCreator[MessagesModelAccess]):
+class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
     "Plots a default bead and its FoV"
     def __init__(self,  ctrl:Controller) -> None:
         "sets up this plotter's info"
         super().__init__(ctrl)
         self.css.defaults = {'beads':   PlotAttrs('color', 'circle', alpha = .5),
-                             'text':    PlotAttrs('color',  'text'),
+                             'text':    PlotAttrs('color',  'text', text_font_style= 'bold'),
                              'image':   PlotAttrs('Greys256', 'image', x = 0, y = 0),
                              'current': PlotAttrs('blue', 'circle', 10),
                              'radius'       : 1.,
@@ -30,7 +30,9 @@ class FoVPlotCreator(TaskPlotCreator[MessagesModelAccess]):
                              'ylabel'       : u'Y (μm)',
                              'xlabel'       : u'X (μm)',
                             }
-        setcolors(self, good = 'palegreen', bad = 'orange', discarded = 'red')
+        setcolors(self,
+                  good = 'palegreen', fixed     = 'chocolate',
+                  bad  = 'orange',    discarded = 'red')
         self.css.calib.defaults = {'image'  : PlotAttrs('Greys256', 'image'),
                                    'start'  : 1./16.,
                                    'size'   : 6./16}
@@ -202,20 +204,26 @@ class FoVPlotCreator(TaskPlotCreator[MessagesModelAccess]):
             return dict(data = dict.fromkeys(('x', 'y', 'text', 'color', 'ttips'), []))
 
         hexes = getcolors(self)
-        clrs  = hexes['good'], hexes['bad'], hexes['discarded']
+        clrs  = hexes['good'], hexes['fixed'], hexes['bad'], hexes['discarded']
         disc  = set(self._bdctrl.discarded)
-        bad   = self._model.badbeads() - disc
+        fixed = self._model.fixedbeads() - disc
+        bad   = self._model.badbeads() - disc - fixed
         ttips = self.__tooltips()
 
         items = fov.beads
         data  = dict(x     = [i.position[0]  for i in items.values()],
                      y     = [i.position[1]  for i in items.values()],
                      text  = [f'{i}'         for i in items.keys()],
-                     color = [clrs[2 if i in disc else
-                                   1 if i in bad  else
+                     color = [clrs[3 if i in disc  else
+                                   2 if i in bad   else
+                                   1 if i in fixed else
                                    0] for i in items.keys()],
                      ttips = [ttips[i] for i in items.keys()])
         return dict(data = data)
 
 class FoVPlotView(PlotView[FoVPlotCreator]):
     "FoV plot view"
+    TASKS = ('datacleaning',)
+    def ismain(self):
+        "Cleaning is set up by default"
+        self._ismain(tasks = self.TASKS)

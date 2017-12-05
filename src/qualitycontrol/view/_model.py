@@ -46,7 +46,19 @@ class QualityControlModelAccess(TaskPlotModelAccess):
 
     def badbeads(self) -> Set[BEADKEY]:
         "returns bead ids with messages"
+        if self.track is None:
+            return set()
         return set(self.messages()['bead'])
+
+    def fixedbeads(self) -> Set[BEADKEY]:
+        "returns bead ids with extent == all cycles"
+        if self.track is None:
+            return set()
+
+        ncycles = self.track.ncycles
+        msg     = self.messages()
+        return set(bead for bead, tpe, cnt in zip(msg['bead'], msg['type'], msg['cycles'])
+                   if tpe == 'extent' and cnt >= ncycles)
 
     def messages(self) -> Dict[str, List]:
         "returns beads and warnings where applicable"
