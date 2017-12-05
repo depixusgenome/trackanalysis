@@ -320,15 +320,16 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
 
         if isinstance(arr, np.ndarray):
             if all(np.isnan(i) for i in arr):
-                return OrderedDict()
-
-            vmin  = np.nanmin(arr)
-            vmax  = np.nanmax(arr)
+                vmin = 0.
+                vmax = 1.
+            else:
+                vmin = np.nanmin(arr)
+                vmax = np.nanmax(arr)
         else:
             vmin  = min(arr)
             vmax  = max(arr)
 
-        delta = (vmax-vmin)*over*.5
+        delta = max(1e-5, (vmax-vmin))*over*.5
         vmin -= delta
         vmax += delta
 
