@@ -104,7 +104,8 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
         key    = mdl.sequencekey if mdl.sequencekey is not None and len(mdl.oligos) else 'NONE'
         majors = {}
         minors = {}
-        resets[fig.right[-1]].update(axis_label_standoff = self.__standoff.get())
+        axis   = next(i for i in fig.right if isinstance(i, LinearAxis))
+        resets[axis].update(axis_label_standoff = self.__standoff.get())
         if key == 'NONE':
             resets[fig.ygrid[0]].update(self.__defaults)
         else:

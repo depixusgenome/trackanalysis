@@ -21,11 +21,6 @@ from    ..processor             import DataCleaningProcessor, DataCleaning
 
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"
-    @staticmethod
-    def canregister():
-        "allows discarding some specific processors from automatic registration"
-        return False
-
     @classmethod
     def compute(cls, frame, info, cache = None, **cnf):
         "returns the result of the beadselection"
@@ -43,23 +38,18 @@ class GuiDataCleaningProcessor(DataCleaningProcessor):
         return (np.asarray(i, dtype = 'bool')
                 for i in mdl.track.cycles.withdata({0:nans}).values())
 
-    @staticmethod
-    def runbead(mdl):
+    @classmethod
+    def runbead(cls, mdl):
         "updates the cache in the gui and returns the nans"
-        ctrl = mdl.processors(GuiDataCleaningProcessor)
-        if ctrl is None:
-            cycles = None
-        else:
-            cycles = next(iter(ctrl.run(copy = True)))[mdl.bead, ...]
-        items  = None if cycles is None else list(cycles)
+        ctx, items, nans = mdl.runcontext(cls), None, None
+        with ctx as cycles:
+            if cycles is not None:
+                items = list(cycles[mdl.bead, ...])
 
-        tsk    = mdl.cleaning.task
-        if tsk is None:
-            return items, None
+                tsk   = mdl.cleaning.task
+                if tsk is not None:
+                    nans = ctx.taskcache(tsk).pop('gui', None)
 
-        cache  = ctrl.data.getCache(tsk)()
-        nans   = cache.pop('gui', None)
-        mdl.processors().data.setCacheDefault(tsk, {}).update(cache)
         return items, nans
 
 class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin):
@@ -118,12 +108,15 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
         return self._keyedlayout(fig, left = left, bottom = bottom)
 
     def _reset(self):
-        items, nans = GuiDataCleaningProcessor.runbead(self._model)
-        data        = self.__data(items, nans)
-        self._bkmodels[self.__source]['data'] = data
-        self.setbounds(self.__fig.x_range, 'x', data['t'])
-        self.setbounds(self.__fig.y_range, 'y', data['z'])
-        self._resetwidget()
+        items, nans     = None, None
+        try:
+            items, nans = GuiDataCleaningProcessor.runbead(self._model)
+        finally:
+            data        = self.__data(items, nans)
+            self._bkmodels[self.__source]['data'] = data
+            self.setbounds(self.__fig.x_range, 'x', data['t'])
+            self.setbounds(self.__fig.y_range, 'y', data['z'])
+            self._resetwidget()
 
     def __data(self, items, nans) -> Dict[str, np.ndarray]:
         if items is None or len(items) == 0 or not any(len(i) for _, i in items):
@@ -163,9 +156,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
 
 class CleaningView(PlotView[CleaningPlotCreator]):
     "Peaks plot view"
+    TASKS = 'datacleaning', 'extremumalignment'
     def ismain(self):
         "Cleaning and alignment, ... are set-up by default"
-        super()._ismain(tasks  = ['datacleaning', 'extremumalignment'],
-                        ioopen = [slice(None, -2),
-                                  'control.taskio.ConfigGrFilesIO',
-                                  'control.taskio.ConfigTrackIO'])
+        self._ismain(tasks  = self.TASKS)

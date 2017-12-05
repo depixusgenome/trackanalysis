@@ -7,7 +7,8 @@ import os
 
 import bokeh.core.properties as props
 from bokeh.models               import (DataTable, TableColumn, CustomJS,
-                                        Widget, Div, StringFormatter)
+                                        Widget, Div, StringFormatter, Paragraph,
+                                        Dropdown)
 
 import numpy                    as     np
 
@@ -20,10 +21,52 @@ from excelreports.creation      import writecolumns
 from view.dialog                import FileDialog
 from view.pathinput             import PathInput
 from view.plots                 import DpxNumberFormatter, WidgetCreator
+from view.toolbar               import FileListMixin
 from sequences.view             import (SequenceTicker, SequenceHoverMixin,
                                         OligoListWidget, SequencePathWidget)
 from modaldialog.view           import AdvancedTaskMixin, T_BODY
 from ._model                    import PeaksPlotModelAccess
+
+class ReferenceWidget(WidgetCreator[PeaksPlotModelAccess], FileListMixin):
+    "Dropdown for choosing the reference"
+    def __init__(self, model) -> None:
+        super().__init__(model)
+        FileListMixin.__init__(self)
+        self.__widget: Dropdown  = None
+        self.css.title.reference.default      = 'Reference Track'
+        self.css.title.reference.none.default = 'None'
+
+    def create(self, action, *_) -> List[Widget]:
+        "creates the widget"
+        self.__widget = Dropdown(name  = 'HS:reference',
+                                 width = self.css.input.width.get(),
+                                 **self.__data())
+        @action
+        def _py_cb(new):
+            inew = int(new)
+            val  = None if inew < 0 else [i for _, i in self.files][inew]
+            self._model.fittoreference.reference = val
+
+        self.__widget.on_click(_py_cb)
+        return [Paragraph(text = self.css.title.reference.get()), self.__widget]
+
+    def reset(self, resets):
+        "updates the widget"
+        resets[self.__widget].update(**self.__data())
+
+    @property
+    def widget(self):
+        "returns the widget"
+        return self.__widget
+
+    def __data(self) -> dict:
+        lst   = list(self.files)
+        menu  = [(j, str(i)) for i, j in enumerate(i for i, _ in lst)]
+        menu += [None, (self.css.title.reference.none.get(), '-1')]
+
+        key   = self._model.fittoreference.reference
+        index = -1 if key is None else [i for _, i in lst].index(key)
+        return dict(menu  = menu, label = menu[index][0], value = str(index))
 
 class PeaksOligoListWidget(OligoListWidget):
     "deals with oligos"
@@ -69,7 +112,7 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
         css.defaults = {'title.format': '{}',
                         'title.openhairpin': u' & open hairpin',
                         'title.orientation': u'-+ ',
-                        'lines': [['css:title.stretch', '.1f'],
+                        'lines': [['css:title.stretch', '.3f'],
                                   ['css:title.bias',    '.4f'],
                                   [u'σ[HF] (µm)',       '.4f'],
                                   [u'σ[Peaks] (µm)',    '.4f'],
@@ -127,9 +170,8 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
                 nrem   = sum(i in remove for i in mdl.peaks[key+'id'])
             else:
                 nrem   = 0
-            nfound    = np.isfinite(mdl.peaks[key+'id']).sum()-nrem
-            npks      = len(task.match[key].hybridisations)
-            self.values[8] = '{}/{}'.format(nfound, npks)
+            nfound         = np.isfinite(mdl.peaks[key+'id']).sum()-nrem
+            self.values[8] = f'{nfound}/{len(task.match[key].hybridisations)}'
             if nrem == 2:
                 self.values[8] += self.openhp
 
@@ -137,8 +179,24 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
 
             if nfound > 2:
                 stretch         = dist[key].stretch
-                self.values[10] = (np.nanstd(mdl.peaks[key+'distance'])
+                self.values[10] = (np.nansum(mdl.peaks[key+'distance']**2)
                                    / ((np.mean(self.values[3]*stretch))**2
+                                      * (nfound - 2)))
+
+        def referencedependant(self, mdl):
+            "all sequence dependant stats"
+            fittoref       = mdl.fittoreference
+            if fittoref.referencepeaks is None:
+                return
+
+            self.values[0] = fittoref.stretch
+            self.values[1] = fittoref.bias
+
+            nfound          = np.isfinite(mdl.peaks['id']).sum()
+            self.values[8]  = f'{nfound}/{len(fittoref.referencepeaks)}'
+            if nfound > 2:
+                self.values[10] = (np.nansum((mdl.peaks['distance'])**2)
+                                   / ((np.mean(self.values[3]))**2
                                       * (nfound - 2)))
 
         def __call__(self) -> str:
@@ -171,6 +229,10 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
             for key in dist:
                 tab.sequencedependant(self._model, dist, key)
                 ret[key] = tab()
+
+        elif self._model.fittoreference.task is not None:
+            tab.referencedependant(self._model)
+            ret[''] = tab()
         return ret
 
 class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
@@ -183,6 +245,7 @@ class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
                                               'warning')
         css               = self.css.peaks.columns
         css.width.default = 60
+        css.refid.default = '0.0000'
         css.default       = [['z',        'css:ylabel',    '0.0000'],
                              ['bases',    u'Z (base)',     '0.0'],
                              ['id',       u'Id',           '0'],
@@ -193,9 +256,7 @@ class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
                              ['sigma',    u'σ (µm)',       '0.0000'],
                              ['skew',     u'skew',         '0.00']]
 
-    def create(self, _, src) -> List[Widget]: # pylint: disable=arguments-differ
-        "creates the widget"
-        width = self.css.peaks.columns.width.get()
+    def __cols(self):
         get   = lambda i: self.css[i[4:]].get() if i.startswith('css:') else i
         fmt   = lambda i: (StringFormatter(text_align = 'center',
                                            font_style = 'bold') if i == '' else
@@ -205,6 +266,19 @@ class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
                                  formatter  = fmt(i[2]))
                      for i in self.css.peaks.columns.get())
 
+        cnf   = self.css.peaks
+        isref = (self._model.fittoreference.task is not None and
+                 self._model.identification.task is None)
+        for name in ('id', 'distance'):
+            ind = next(i for i, j in enumerate(cnf.columns.get()) if j[0] == name)
+            fmt = cnf.columns.refid.get() if isref else cnf.columns.get()[ind][-1]
+            cols[ind].formatter.format = fmt
+        return cols
+
+    def create(self, _, src) -> List[Widget]: # type: ignore # pylint: disable=arguments-differ
+        "creates the widget"
+        width = self.css.peaks.columns.width.get()
+        cols  = self.__cols()
         self.__widget = DataTable(source      = src,
                                   columns     = cols,
                                   editable    = False,
@@ -216,12 +290,7 @@ class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
 
     def reset(self, resets):
         "resets the wiget when a new file is opened"
-        # bug in bokeh 0.12.9: table update is incorrect unless the number
-        # of rows is fixed
-        height = self.css.peaks.height.get()
-        if height == self.__widget.height:
-            height = height+1
-        resets[self.__widget].update(height = height)
+        resets[self.__widget].update(columns = self.__cols())
 
 class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
     "Selects an id file"
@@ -319,7 +388,7 @@ class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
             txt = str(Path(path).resolve())
         (self.__widget if resets is None else resets[self.__widget]).update(value = txt)
 
-class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin):
+class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # type: ignore
     "access to the modal dialog"
     _TITLE        = 'Hybridstat Configuration'
     _BODY: T_BODY = (('Minimum frame count per event',    '%(_framecount)d'),
@@ -341,7 +410,8 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin):
         "resets the wiget when a new file is opened, ..."
         AdvancedTaskMixin.reset(resets)
 
-    def create(self, action, _) -> List[Widget]: # pylint: disable=arguments-differ
+    def create(self, action, _   # type: ignore # pylint: disable=arguments-differ
+              ) -> List[Widget]:
         "creates the widget"
         return AdvancedTaskMixin.create(self, action)
 
@@ -385,3 +455,13 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin):
             return
         self._model.identification.updatedefault('match', window = value)
         self._model.identification.resetmodel(self._model)
+
+def createwidgets(mdl: PeaksPlotModelAccess) -> Dict[str, WidgetCreator]:
+    "returns a dictionnary of widgets"
+    return dict(seq      = PeaksSequencePathWidget(mdl),
+                ref      = ReferenceWidget(mdl),
+                oligos   = PeaksOligoListWidget(mdl),
+                stats    = PeaksStatsWidget(mdl),
+                peaks    = PeakListWidget(mdl),
+                cstrpath = PeakIDPathWidget(mdl),
+                advanced = AdvancedWidget(mdl))

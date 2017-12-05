@@ -309,7 +309,7 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
         "returns the result of the beadselection"
         tested = False
         if cache is not None:
-            val, discard = cache.get(frame.track, {}).get(info[0], ('', False))
+            val, discard = cache.get(info[0], ('', False))
             if discard:
                 return DataCleaningException.create(val, cnf, cls.tasktype)
             tested       = val != ''
@@ -334,7 +334,7 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
                 discard = False
 
         if not (tested or cache is None):
-            cache.setdefault(frame.track, {})[info[0]] = val, discard
+            cache[info[0]] = val, discard
         return DataCleaningException.create(val, cnf, cls.tasktype) if discard else None
 
     @classmethod
@@ -344,5 +344,5 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
 
     def run(self, args):
         "updates the frames"
-        cache   = args.data.setCacheDefault(self, dict())
+        cache = args.data.setCacheDefault(self, dict())
         return args.apply(partial(self.apply, cache = cache, **self.config()))

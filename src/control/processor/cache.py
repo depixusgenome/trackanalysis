@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "List of processes and cache"
-from typing         import Union, Iterable, Sized, List, Tuple, Any, Iterator
+from typing         import (Union, Iterable, Sized, List, Tuple, Any, Iterator,
+                            Type, cast)
 from utils          import isfunction
-from .base          import Processor
+from model.task     import Task
+from .base          import Processor, register
 
 def _version():
     i = 0
@@ -15,9 +17,11 @@ class CacheItem:
     "Holds cache and its version"
     __slots__ = ('_proc', '_cache')
     _VERSION  = _version()
-    def __init__(self, proc):
-        self._proc:  Processor       = proc
-        self._cache: Tuple[int, Any] = (0, None)
+    def __init__(self,
+                 proc:  Union['CacheItem', Processor],
+                 cache: Tuple[int, Any] = (0, None)) -> None:
+        self._proc  = cast(Processor,       getattr(proc, '_proc', proc))
+        self._cache = cast(Tuple[int, Any], getattr(proc, '_cache', cache))
 
     def __getstate__(self):
         return {'proc': (type(self._proc), self._proc.task)}
@@ -66,21 +70,68 @@ class CacheItem:
     cache   = property(lambda self: self.getCache(), setCache)
     proc    = property(lambda self: self._proc)
 
+REP_T = Tuple[int, Processor, Processor]
+class CacheReplacement:
+    """
+    Context for replacing processors but keeping their cache
+    """
+    def __init__(self, cache: 'Cache', *options: Type[Processor]) -> None:
+        self.options:  Tuple[Type[Processor],...] = options
+        self.replaced: List[REP_T]                = []
+        self.cache:    Cache                      = cache
+
+    def taskcache(self, task:Task):
+        "returns the task cache"
+        return self.cache.getCache(task)()
+
+    def __enter__(self):
+        if self.cache is None:
+            return
+
+        self.replaced.clear()
+        if len(self.options) == 0:
+            return self.cache
+
+        reg  = register(self.options, force = True, recursive = False)
+        itms = getattr(self.cache, '_items')
+        for i, j in enumerate(self.cache):
+            val = reg.get(type(j.task), None)
+            if val is not None:
+                self.replaced.append(cast(REP_T, (i, val(task = j.task), j)))
+                setattr(itms[i], '_proc', self.replaced[-1][1])
+        return self.cache
+
+    def __exit__(self, *_):
+        if self.cache is None:
+            return
+
+        itms = getattr(self.cache, '_items')
+        for i, _, j in self.replaced:
+            setattr(itms[i], '_proc', j)
+
 class Cache(Iterable[Processor], Sized):
     "Contains the track and task-created data"
     __slots__ = ('_items',)
     def __init__(self, order: Iterable[Union[CacheItem, Processor]] = None) -> None:
-        if order is not None:
-            itms = [CacheItem(i) if isinstance(i, Processor) else i for i in order]
+        if order is None:
+            self._items: List[CacheItem] = []
         else:
-            itms = []
-        self._items: List[CacheItem] = itms
+            self._items = [CacheItem(i) if isinstance(i, Processor) else i for i in order]
 
     def index(self, tsk) -> int:
         "returns the index of the provided task"
+        if isinstance(tsk, type) and issubclass(tsk, Task):
+            # pylint: disable=unidiomatic-typecheck
+            good = [i for i, j in enumerate(self._items) if type(j.proc.task) is tsk]
+            if len(good) > 1:
+                raise IndexError("ambiguous: please specify the task instance")
+            elif len(good) == 0:
+                raise IndexError("Missing task")
+            return good[0]
+
         return (0       if tsk is None          else
                 tsk     if isinstance(tsk, int) else
-                next(i for i, opt in enumerate(self._items) if opt.isitem(tsk)))
+                next(i for i, j in enumerate(self._items) if j.isitem(tsk)))
 
     @property
     def model(self):
@@ -116,14 +167,13 @@ class Cache(Iterable[Processor], Sized):
         ind = self.index(ide)
         self.delCache(ind)
         self._items.pop(ind)
+    remove = pop
 
     def keepupto(self, task) -> 'Cache':
         "returns a Cache with tasks up to and including *task*"
-        if task is None:
-            return Cache(list(self._items))
-        return self if task is None else Cache(self._items[:self.index(task)+1])
-
-    remove = pop
+        if task is None or task is Ellipsis:
+            return Cache(self._items)
+        return Cache(self._items[:self.index(task)+1])
 
     def getCache(self, ide):
         "access to processor's cache"

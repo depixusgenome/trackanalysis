@@ -8,7 +8,7 @@ from   typing                           import (Optional, # pylint: disable=unus
 import numpy                            as     np
 
 from   utils                            import initdefaults
-from   data.views                       import TaskView, BEADKEY, isellipsis
+from   data.views                       import TaskView, BEADKEY
 from   model.task                       import Task, Level
 from   control.processor.taskview       import TaskViewProcessor
 from   eventdetection.data              import Events
@@ -111,12 +111,18 @@ class FitToReferenceTask(Task):
             self.frompeaks(val)
         elif isinstance(val, Events):
             self.fromevents(val)
+        elif isinstance(val, dict):
+            self._fitdata = val
+            self._fitdata.update({i: FitData(j, (1., 0.)) # type: ignore
+                                  for i, j in val.items()
+                                  if not isinstance(j, FitData)})
         else:
-            fcn           = lambda j: (j if isinstance(j, FitData) else
-                                       FitData(j, (1., 0)))
+            fcn = lambda j: (j if isinstance(j, FitData) else FitData(j, (1., 0)))
             self._fitdata = {i: fcn(j) for i, j in cast(Dict, val).items()}
 
-    def frompeaks(self, peaks: PeaksDict, update = False) -> 'FitToReferenceTask':
+    def frompeaks(self,
+                  peaks: Union[PeaksDict, Iterable[Tuple[BEADKEY, PeakOutput]]],
+                  update = False) -> 'FitToReferenceTask':
         "creates fit data for references from a PeaksDict"
         fcn  = self.fitalg.frompeaks
         info = {i: FitData(fcn(j), (1., 0.)) for i, j in peaks}
@@ -152,10 +158,7 @@ class FitToReferenceTask(Task):
     def getdata(self, key) -> FitData:
         "returns the fitdata"
         val = self._fitdata.get(key, None)
-        out = val if val else self._fitdata.get(self.DEFAULTKEY, None)
-        if out is None:
-            raise KeyError(f"Missing {key}")
-        return out
+        return val if val else self._fitdata.get(self.DEFAULTKEY, None)
 
     @classmethod
     def isslow(cls) -> bool:
@@ -165,22 +168,9 @@ class FitToReferenceTask(Task):
 class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
     "iterator over peaks grouped by beads"
     level = Level.bead
-    @staticmethod
-    def _transform_ids(sel: Iterable) -> Iterator[BEADKEY]:
-        for i in sel:
-            if isinstance(i, tuple):
-                if len(i) == 0:
-                    continue
-                elif len(i) == 2 and not isellipsis(i[1]):
-                    raise NotImplementedError()
-                elif len(i) > 2 :
-                    raise KeyError(f"Unknown key {i} in FitToReferenceDict")
-                if np.isscalar(i[0]):
-                    yield i[0]
-                else:
-                    yield from i[0]
-            else:
-                yield i
+    @classmethod
+    def _transform_ids(cls, sel):
+        return cls._transform_to_bead_ids(sel)
 
     def _keys(self, sel:Optional[Sequence], _: bool) -> Iterable:
         if self.config.defaultdata:
@@ -192,22 +182,27 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
         seq = self._transform_ids(cast(Iterable, sel))
         return super()._keys([i for i in seq if i in available], True)
 
+    def optimize(self, key: BEADKEY, data: FitToRefArray):
+        "returns stretch & bias"
+        if len(data) == 0:
+            return 1., 0.
+
+        ref = self.config.getdata(key)
+        if ref is True or ref.data is True:
+            return 1., 0.
+        fit           = self.config.fitalg
+        stretch, bias = fit.optimize(ref.data, fit.frompeaks(data))[1:]
+        if ref.params not in ((1., 0.), None):
+            return stretch/ref.params[0], bias-ref.params[1]*ref.params[0]/stretch
+        return stretch, bias
+
     def compute(self, key: BEADKEY) -> np.ndarray:
         "Action applied to the frame"
-        fit  = self.config.fitalg
         data = FitToRefArray(list(cast(Iterator[PeakOutput], self.data[key])))
         if len(data):
             data.discarded = getattr(data[0][1], 'discarded', 0)
 
-        if key not in self.config.fitdata:
-            raise KeyError(f"Missing reference id {key} in {self}")
-
-        ref           = self.config.getdata(key)
-        stretch, bias = fit.optimize(ref.data, fit.frompeaks(data))[1:]
-        if ref.params not in ((1., 0.), None):
-            stretch, bias = (stretch/ref.params[0],
-                             bias-ref.params[1]*ref.params[0]/stretch)
-
+        stretch, bias    = self.optimize(key, data)
         data.params      = stretch, bias
         data['peaks'][:] = (data['peaks']-bias)*stretch
 
@@ -240,7 +235,8 @@ class FitToReferenceDataFrameFactory(DataFrameFactory[FitToReferenceDict]):
     >>> DataFrameTask(stretch = True, bias = True)
     ```
     """
-    __doc__ += '\n'+PeaksDataFrameFactory.__doc__[PeaksDataFrameFactory.__doc__.find('#')-5:]
+    if __doc__:
+        __doc__ += '\n'+PeaksDataFrameFactory.__doc__[PeaksDataFrameFactory.__doc__.find('#')-5:]
     PREC     = 5e-6
     def __init__(self, task, frame):
         get = lambda i: (i  if task.measures.get(i, False) is True else

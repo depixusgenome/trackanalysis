@@ -90,8 +90,10 @@ class TrackViewConfigMixin(Iterable): # pylint: disable=invalid-name
     @staticmethod
     def __format_doc__(more, **kwa):
         doc   = TrackViewConfigMixin.__doc__
-        eight = '\n        ', '\n    '
-        return doc.format(**{i: j.replace(*eight) for i, j in kwa.items()}) + more
+        if doc:
+            eight = '\n        ', '\n    '
+            return doc.format(**{i: j.replace(*eight) for i, j in kwa.items()}) + more
+        return None
 
     copy = staticmethod(_m_copy)    # type: ignore
 

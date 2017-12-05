@@ -94,10 +94,7 @@ def defaultsizingmode(self, kwa:dict = None, **kwargs) -> dict:
     css = getattr(self, 'css', None)
     if css is None:
         css = getattr(self, '_ctrl').getGlobal("css")
-    if css.responsive.get():
-        kwa['sizing_mode'] = 'scale_width'
-    else:
-        kwa['sizing_mode'] = css.sizing_mode.get()
+    kwa['sizing_mode'] = css.sizing_mode.get()
     return kwa
 
 class BokehView(View):
@@ -111,7 +108,7 @@ class BokehView(View):
             BokehView.__CTRL.add(id(self._ctrl))
             css.button.defaults = {'width': 90, 'height': 20}
             css.input .defaults = {'width': 90, 'height': 20}
-            css.defaults        = {'responsive': True, 'sizing_mode': 'scale_width'}
+            css.defaults        = {'sizing_mode': 'fixed'}
 
             dark = { 'attrs': { 'Figure': { 'background_fill_color': '#2F2F2F',
                                             'border_fill_color': '#2F2F2F',

@@ -45,7 +45,7 @@ class ReferenceFit(ABC):
         raise TypeError(f"This method should not be invoked when using {self.__class__}")
 
     @abstractmethod
-    def frompeaks(self, peaks:PeaksDict, firstpeak = 0):
+    def frompeaks(self, peaks: Union[np.ndarray, PeaksDict], firstpeak = 0):
         "creates a histogram from a list of events"
         raise TypeError(f"This method should not be invoked when using {self.__class__}")
 
@@ -72,8 +72,10 @@ class HistogramFit(GriddedOptimization, ReferenceFit):
         "returns the precision"
         return self.histogram.getprecision(*args, **kwargs)
 
-    def frompeaks(self, peaks, firstpeak = 0):
+    def frompeaks(self, peaks:Union[np.ndarray, PeaksDict], firstpeak = 0):
         "creates a histogram from a list of peaks with their count"
+        if isinstance(peaks, PeaksDict):
+            peaks = tuple(next(iter(peaks))[1])
         if str(getattr(peaks, 'dtype', ' '))[0] != 'f':
             peaks = np.array([(i, Probability.resolution(j)) for i, j in peaks])
         peaks = peaks[firstpeak:,:]
@@ -219,8 +221,10 @@ class CorrectedHistogramFit(HistogramFit):
     window       = 1.5e-2
     firstregpeak = 1
 
-    def frompeaks(self, peaks, firstpeak = 0):
+    def frompeaks(self, peaks:Union[np.ndarray, PeaksDict], firstpeak = 0):
         "creates a histogram from a list of peaks with their count"
+        if isinstance(peaks, PeaksDict):
+            peaks = tuple(next(iter(peaks))[1])
         if str(getattr(peaks, 'dtype', ' '))[0] != 'f':
             peaks = np.array([(i, Probability.resolution(j)) for i, j in peaks])
         else:
@@ -314,8 +318,10 @@ class HairpinFitAlg(ReferenceFit):
         "find best stretch & bias to fit right against left"
         return aleft.optimize(aright)
 
-    def frompeaks(self, peaks:PeaksDict, firstpeak = 0):
+    def frompeaks(self, peaks:Union[np.ndarray, PeaksDict], firstpeak = 0):
         "returns the list of peaks"
+        if isinstance(peaks, PeaksDict):
+            peaks = tuple(next(iter(peaks))[1])
         return [i for i, _ in peaks][firstpeak:]
 
     def fromevents(self, evts:Events):

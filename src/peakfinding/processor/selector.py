@@ -4,12 +4,12 @@
 Deals with tasks & processors for finding peaks
 """
 
-from   typing                     import Iterable, Iterator, Tuple, Optional
+from   typing                     import Iterator, Tuple, Optional
 from   functools                  import partial
 import numpy                      as     np
 
 from   model                      import Level, Task
-from   data.views                 import BEADKEY, TaskView, Beads, isellipsis
+from   data.views                 import BEADKEY, TaskView, Beads
 from   control.processor.taskview import TaskViewProcessor
 from   ..selector                 import PeakSelector, Output as PeakOutput, PeaksArray
 
@@ -129,6 +129,10 @@ class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]):
         return np.array([isinstance(i, (list, np.ndarray)) for i in arr], dtype = 'bool')
 
     @classmethod
+    def _transform_ids(cls, sel):
+        return cls._transform_to_bead_ids(sel)
+
+    @classmethod
     def __measure(cls, singles, multiples, _, info):
         return info[0], ((i, cls.__array2measure(singles, multiples, j)) for i, j in info[1])
 
@@ -163,23 +167,6 @@ class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]):
         if isinstance(self.data, self.__class__):
             return (i for i in self.data.keys() if Beads.isbead(i))
         return (i for i, _ in self.data.keys() if Beads.isbead(i))
-
-    @staticmethod
-    def _transform_ids(sel: Iterable) -> Iterator[BEADKEY]:
-        for i in sel:
-            if isinstance(i, tuple):
-                if len(i) == 0:
-                    continue
-                elif len(i) == 2 and not isellipsis(i[1]):
-                    raise NotImplementedError()
-                elif len(i) > 2 :
-                    raise KeyError(f"Unknown key {i} in PeaksDict")
-                if np.isscalar(i[0]):
-                    yield i[0]
-                else:
-                    yield from i[0]
-            else:
-                yield i
 
     def _precision(self, ibead: int, precision: Optional[float]):
         return self.config.getprecision(precision, getattr(self.data, 'track', None), ibead)

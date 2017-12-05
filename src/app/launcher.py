@@ -29,6 +29,7 @@ def _serverkwargs(kwa):
     kwargs['generate_session_ids'] = True
     kwargs['use_index']            = True
     kwargs['redirect_root']        = True
+    LOGS.debug(f"dynamic loads: {orders().dynloads()}")
     for mdl in orders().dynloads():
         getattr(sys.modules.get(mdl, None), 'server', lambda x: None)(kwargs)
     return kwargs
@@ -77,10 +78,10 @@ class _FunctionHandler(FunctionHandler):
 def _monkeypatch(view):
     output = view.MainControl.APPNAME.lower() + '.js'
     if Path(output).exists() and CAN_LOAD_JS:
-        LOGS.debug('monkeypatching bokeh compiler with '+output)
         def _bundle():
+            LOGS.info('monkeypatching bokeh compiler with '+output)
             return ''.join(open(output, encoding = 'utf-8'))
-        import bokeh.embed      as embed
+        import bokeh.embed.util as embed
         embed.bundle_all_models = _bundle
 
 def _serve(view, **kwa):

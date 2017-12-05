@@ -22,7 +22,7 @@ class PeakProbabilityTask(Task):
 class PeakProbabilityProcessor(Processor[PeakProbabilityTask]):
     "Computes probabilities for each peak"
     @staticmethod
-    def __action(minduration, framerate, frame, info):
+    def _action(minduration, framerate, frame, info):
         rate = frame.track.framerate if framerate is None else framerate
         prob = Probability(minduration = minduration, framerate = rate)
         ends = frame.track.phaseduration(..., PHASE.measure)
@@ -39,7 +39,7 @@ class PeakProbabilityProcessor(Processor[PeakProbabilityTask]):
             frame       = EventDetectionConfig() if tmp is None else tmp
             minduration = frame.events.select.minduration
 
-        return toframe.withaction(partial(cls.__action, minduration, framerate))
+        return toframe.withaction(partial(cls._action, minduration, framerate))
 
     def run(self, args):
         "updates frames"

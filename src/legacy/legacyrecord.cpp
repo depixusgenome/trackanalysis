@@ -946,9 +946,9 @@ namespace legacy
             if (cor == 0)
             {
                 fp = fopen(g_r->fullname, "rb");
-
                 if (fp == NULL)
                 {
+                    throw TrackIOException("Could not open file: check path and rights");
                     return NULL;
                 }
 
@@ -1094,6 +1094,7 @@ namespace legacy
 
                 if (fp == NULL)
                 {
+                    throw TrackIOException("Could not open file: check path and rights");
                     return NULL;
                 }
 
@@ -1323,6 +1324,7 @@ namespace legacy
 
                 if (fp == NULL)
                 {
+                    throw TrackIOException("Could not open file: check path and rights");
                     return NULL;
                 }
 
@@ -1547,6 +1549,7 @@ namespace legacy
 
                 if (fp == NULL)
                 {
+                    throw TrackIOException("Could not open file: check path and rights");
                     return NULL;
                 }
 
@@ -1772,6 +1775,7 @@ namespace legacy
 
                 if (fp == NULL)
                 {
+                    throw TrackIOException("Could not open file: check path and rights");
                     return NULL;
                 }
 
@@ -1937,6 +1941,7 @@ namespace legacy
 
                 if (fp == NULL)
                 {
+                    throw TrackIOException("Could not open file: check path and rights");
                     return NULL;
                 }
 
@@ -3386,7 +3391,10 @@ namespace legacy
 
             fp = fopen(fullname, "rb+");
             if (fp == NULL)
+            {
+                throw TrackIOException("Could not open file: check path and rights");
                 return NULL;
+            }
 
             if (fseeko64(fp, 0, SEEK_END) != 0)
                 return NULL;

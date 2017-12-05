@@ -6,12 +6,15 @@ from    typing                  import (NamedTuple, Optional, Iterator,
                                         Dict)
 from    enum                    import Enum
 import  itertools
-from sklearn.mixture            import GaussianMixture
+from    sklearn.mixture         import GaussianMixture
 from sklearn.cluster            import KMeans
-from scipy.stats                import norm, expon
-from scipy.signal               import find_peaks_cwt
+
 import  numpy  as     np
 from    numpy.lib.stride_tricks import as_strided
+
+from    scipy.interpolate       import interp1d
+from    scipy.signal            import find_peaks_cwt
+from    scipy.stats             import norm, expon
 
 from    utils                   import (kwargsdefaults, initdefaults,
                                         NoArgs, asdataarrays, EVENTS_DTYPE)
@@ -261,6 +264,31 @@ class Histogram(PrecisionAlg):
 
         yield (minv, bwidth)
         yield from self.__generate(lenv, kern, items, weight)
+
+def interpolator(xaxis, yaxis = None, miny = 1e-3, **kwa):
+    "interpolates histograms"
+    if hasattr(xaxis, 'histogram') and yaxis is None:
+        yaxis = xaxis.histogram
+
+    if hasattr(xaxis, 'binwidth'):
+        xaxis = np.arange(len(yaxis), dtype = 'f4')*xaxis.binwidth+xaxis.minvalue
+
+    yaxis = np.copy(yaxis)
+    tmp   = np.isfinite(yaxis)
+    yaxis = yaxis[tmp]
+    xaxis = xaxis[tmp]
+
+    yaxis[yaxis < miny] = 0.
+
+    tmp   = np.nonzero(np.abs(np.diff(yaxis)) > miny*1e-2)[0]
+    good  = np.union1d(tmp, tmp+1)
+
+    yaxis = yaxis[good]
+    xaxis = xaxis[good]
+
+    kwa.setdefault('fill_value',   np.NaN)
+    kwa.setdefault('bounds_error', False)
+    return interp1d(xaxis, yaxis, assume_sorted = True, **kwa)
 
 class FitMode(Enum):
     "Fit mode for sub-pixel peak finding"

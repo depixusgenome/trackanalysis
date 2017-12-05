@@ -116,6 +116,10 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]):
                           discarded = disc)
         return np.array([i for i, _ in evts], dtype = 'f4'), cast(PeaksArray, evts)
 
+    @classmethod
+    def _transform_ids(cls, sel):
+        return cls._transform_to_bead_ids(sel)
+
     def __distances(self, key: BEADKEY, bead: Sequence[float])->Dict[Optional[str], Distance]:
         fits        = self.config.fit
         constraints = self.config.constraints

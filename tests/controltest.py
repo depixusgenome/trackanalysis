@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Test control"
-# pylint: disable=import-error
+# pylint: disable=import-error,missing-docstring
 from    pathlib                 import Path
 import  tempfile
 import  numpy
@@ -10,6 +10,7 @@ from    control.globalscontrol  import GlobalsController
 from    control.event           import Event, EmitPolicy
 from    control.taskcontrol     import TaskController
 from    control.processor       import Processor, Cache, Runner
+from    control.processor.cache import CacheReplacement
 from    data.views              import Cycles, Beads, TrackView
 import  model.task           as tasks
 
@@ -445,5 +446,46 @@ def test_globals(): # pylint: disable=too-many-statements
     with pytest.raises(KeyError):
         ctrl.getGlobal("toto").tutu.get()
 
+def test_replacement():
+    "test replacement"
+    class Task1(tasks.Task):
+        level = tasks.Level.none
+
+    class Task2(tasks.Task):
+        level = tasks.Level.none
+
+    class Task3(tasks.Task):
+        level = tasks.Level.none
+
+    lst = []
+    class Proc1(Processor[Task1]):
+        run = staticmethod(lambda _: lst.append('1'))
+
+    class Proc1B(Processor[Task1]):
+        run = staticmethod(lambda _: lst.append('1b'))
+
+    class Proc2(Processor[Task2]):
+        run = staticmethod(lambda _: lst.append('2'))
+
+    class Proc3(Processor[Task3]):
+        run = staticmethod(lambda _: lst.append('3'))
+
+    def _test(good, *order):
+        cache = Cache(list(order))
+        lst.clear()
+        Runner(cache)()
+        assert ''.join(lst) == good
+        with CacheReplacement(cache, Proc1B):
+            lst.clear()
+            Runner(cache)()
+            assert ''.join(lst) == good.replace('1', '1b')
+        lst.clear()
+        Runner(cache)()
+        assert ''.join(lst) == good
+
+    _test('123', Proc1(), Proc2(), Proc3())
+    _test('213', Proc2(), Proc1(), Proc3())
+    _test('231', Proc2(), Proc3(), Proc1())
+
 if __name__ == '__main__':
-    test_globals()
+    test_replacement()

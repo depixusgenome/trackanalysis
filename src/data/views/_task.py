@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Makes TrackViews for specific tasks easier"
-from typing import (Generic, TypeVar, Type, Union, Optional,
-                    Iterable, Sequence, Iterator, FrozenSet, cast)
-from abc    import abstractmethod
-from ._view import TrackView
+from typing             import (Generic, TypeVar, Type, Union, Optional,
+                                Iterable, Sequence, Iterator, FrozenSet, cast)
+from abc                import abstractmethod
+import numpy            as     np
+
+from utils.inspection   import templateattribute
+from ._view             import TrackView, isellipsis
 
 Config = TypeVar('Config')
 Key    = TypeVar('Key')
 
 class TaskView(TrackView, Generic[Config, Key]):
     "iterator over peaks grouped by beads"
-    def __init__(self, *_, config: Union[Config, dict] = None, **kwa) -> None:
+    def __init__(self, *_, config: Union[Config, dict] = None, cache = None, **kwa) -> None:
         assert len(_) == 0
         super().__init__(**kwa)
         ctype = self.tasktype()
@@ -23,12 +26,13 @@ class TaskView(TrackView, Generic[Config, Key]):
             raise ValueError(f"Could not initialize {self.__class__}")
 
         self.config: Config         = cast(Config, cnf)
+        self.cache                  = cache
         self.__keys: FrozenSet[Key] = None
 
     @classmethod
     def tasktype(cls) -> Type[Config]:
         "returns the config type"
-        return cls.__orig_bases__[0].__args__[0] # type: ignore
+        return cast(Type[Config], templateattribute(cls, 0))
 
     def _iter(self, sel:Sequence = None) -> Iterator:
         if sel is None:
@@ -59,6 +63,23 @@ class TaskView(TrackView, Generic[Config, Key]):
     @staticmethod
     def _transform_ids(sel: Iterable) -> Iterator[Key]:
         return cast(Iterator[Key], iter(sel))
+
+    @classmethod
+    def _transform_to_bead_ids(cls, sel: Iterable) -> Iterator[Key]:
+        for i in sel:
+            if isinstance(i, tuple):
+                if len(i) == 0:
+                    continue
+                elif len(i) == 2 and not isellipsis(i[1]):
+                    raise NotImplementedError()
+                elif len(i) > 2 :
+                    raise KeyError(f"Unknown key {i} in {cls}")
+                if np.isscalar(i[0]):
+                    yield i[0]
+                else:
+                    yield from i[0]
+            else:
+                yield i
 
     @abstractmethod
     def compute(self, key: Key):

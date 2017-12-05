@@ -1,3 +1,47 @@
+# tag cycles_v4.8
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+### Quality Control
+
+A tab has been added providing some quality control indicators.
+
+On the right is the list of messages issued from cleaning the beads. This was
+previously in a *Messages* tab.
+
+
+On the left are 4 plots:
+
+1. The normalized bead extensions are displayed as a function of the cycle number.
+2. The sample's temperature is displayed as a function of the cycle number.
+3. The heat sink's temperature is displayed as a function of the cycle number.
+4. The Peltiers' temperature is displayed as a function of the cycle number.
+
+Normalized bead extensions consist in  the difference between median values for
+phase 3 and phase 1 normalized to their median, independently for each bead.
+These values should be around zero with a deviation less than twice the σ[HF].
+The information for this first plot is displayed as:
+
+* Circles indicate the normalized extension for a given bead and cycle.
+* Bars at each cycle indicate population percentiles 25% and 75%.
+* A line within each bar indicates the median for that cycle.
+
+For all four plots, median value as well as the first and last decile are
+displayed was horizontal dashed lines.  Should the the range from the first to
+the last decile exceed 0.2°C (first three plots) or 15 nm (last plot), **that
+plot will be circled in red**.
+
+### Peaks
+
+Added a *Reference* dropdown button for selecting a track as reference. For all
+other tracks, the *z* axis is scaled to the reference's for each bead
+independently such that as many peaks from the *reference* match the peaks in
+the current track.
+
+Added some information on the peaks graph:
+
+* The *blue* dots along the *blue* line are the positions of events found.
+* The areas colored in *bisque* is the reference's peaks, should there be a reference.
+
 # tag cycles_v4.7
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 

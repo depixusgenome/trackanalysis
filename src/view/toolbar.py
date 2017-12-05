@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Toolbar"
-from typing               import Callable, TYPE_CHECKING
+from typing               import Callable, TYPE_CHECKING, Iterator, Tuple, Any
 from pathlib              import Path
 
 import bokeh.core.properties   as props
@@ -16,6 +16,8 @@ from utils.gui            import parseints
 from .dialog              import FileDialog
 from .base                import BokehView, threadmethod, spawn, Action
 from .static              import ROUTE
+if TYPE_CHECKING:
+    from model.task import RootTask # pylint: disable=unused-import
 
 STORAGE = 'open', 'save'
 class TrackFileDialog(FileDialog):
@@ -294,16 +296,20 @@ class RejectedBeadsInput(BeadView):
         self._ctrl.getGlobal('project').track.observe(_onproject)
         self.__toolbar = toolbar
 
-class FileListInput(BeadView):
+class FileListMixin:
     "Selection of opened files"
-    def __init__(self, **kwa):
-        super().__init__(**kwa)
-        self.__toolbar = None
+    def __init__(self):
+        if TYPE_CHECKING:
+            self._ctrl: Any = None
         fnames = self._ctrl.getGlobal('css').filenames
         fnames.defaults = {'many': '{Path(files[0]).stem} + ...',
                            'single': '{Path(path).stem}'}
 
-    def _pathname(self, lst):
+    def __pathname(self, task):
+        if task.key:
+            return task.key
+
+        lst = task.path
         cnf = self._ctrl.getGlobal('css').filenames
         if isinstance(lst, (tuple, list)):
             if len(lst) > 1:
@@ -313,15 +319,28 @@ class FileListInput(BeadView):
         # pylint: disable=eval-used
         return eval(f'f"{cnf.single.get()}"', dict(path = lst, Path = Path))
 
+    @property
+    def files(self) -> Iterator[Tuple[str, 'RootTask']]:
+        "returns current roots"
+        lst  = [next(i) for i in self._ctrl.tasks(...)]
+        return ((self.__pathname(i), i) for i in lst)
+
+class FileListInput(BeadView, FileListMixin):
+    "Selection of opened files"
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+        FileListMixin.__init__(self)
+        self.__toolbar = None
+
     def setup(self, tbar):
         "sets-up the gui"
         self.__toolbar = tbar
 
         @self._ctrl.observe
         def _onOpenTrack(model = None, **_):
-            lst  = [next(i) for i in self._ctrl.tasks(...)]
-            self.__toolbar.currentfile = lst.index(model[0])
-            self.__toolbar.filelist    = [self._pathname(i.path) for i in lst]
+            vals                       = list(self.files)
+            self.__toolbar.currentfile = [i for _, i in vals].index(model[0])
+            self.__toolbar.filelist    = [i for i, _ in vals]
 
         def _oncurrentfile_cb(attr, old, new):
             new = int(new)
@@ -329,11 +348,11 @@ class FileListInput(BeadView):
                 return
 
             track = self._ctrl.getGlobal("project").track
-            lst   = [next(i) for i in self._ctrl.tasks(...)]
+            lst   = list(self.files)
             if new >= len(lst):
                 _onOpenTrack(model = [track.get()])
             else:
-                track.set(lst[new])
+                track.set(lst[new][1])
 
         self.__toolbar.on_change('currentfile', _oncurrentfile_cb)
 
@@ -417,7 +436,7 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
             if isinstance(path, (list, tuple)):
                 path = path[0]
             title = doc.title.split(':')[0]
-            if path is not None and len(path) > 0:
+            if path:
                 title += ':' + Path(path).stem
             doc.title = title
 

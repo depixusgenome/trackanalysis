@@ -5,7 +5,7 @@ from    abc             import abstractmethod
 from    functools       import wraps, partial
 from    itertools       import chain
 from    typing          import (TYPE_CHECKING, TypeVar, Generic, Tuple, Callable, Iterable,
-                                Dict, Any, Iterator, Union, cast)
+                                Dict, Any, Iterator, Union, cast, Type)
 
 import  model.task      as     _tasks
 from    model.level     import Level
@@ -61,7 +61,7 @@ class Processor(Generic[TaskType]):
     @classmethod
     def canregister(cls):
         "allows discarding some specific processors from automatic registration"
-        if cls.__abstractmethods__:
+        if cls.__abstractmethods__ or cls.__name__.startswith('Gui'):
             return False
         return not isinstance(cls.tasktype, cast(type, TypeVar))
 
@@ -191,6 +191,35 @@ class Processor(Generic[TaskType]):
     def run(self, args:'Runner'):
         "updates the frames"
         raise NotImplementedError()
+
+CACHE_T = Dict[Type[_tasks.Task], Type[Processor]]
+def register(proc: Union[Type[Processor], Iterable[Type[Processor]]],
+             force          = False,
+             cache: CACHE_T = None,
+             recursive      = True) -> CACHE_T:
+    "returns a register for a given processor"
+    if cache is None:
+        cache = {}
+
+    procs = list(proc) if isinstance(proc, (tuple, list)) else [proc]
+    while len(procs):
+        itm = procs.pop(0)
+        if isinstance(itm, (list, tuple)):
+            procs = list(itm)+procs
+            continue
+        elif itm is None:
+            continue
+
+        if force or itm.canregister():
+            ttypes = itm.tasktype
+            if isinstance(ttypes, tuple):
+                cache.update(dict.fromkeys(ttypes, itm))
+            elif ttypes is not None:
+                cache[ttypes] = itm
+
+        if recursive and hasattr(itm, '__subclasses__'):
+            procs.extend(itm.__subclasses__())
+    return cache
 
 class ProtocolProcessor(Processor[TaskType]):
     "A processor that can deal with any task having the __processor__ attribute"

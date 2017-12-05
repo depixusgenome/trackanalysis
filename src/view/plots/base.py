@@ -18,6 +18,7 @@ from    bokeh.models            import (Range1d, RadioButtonGroup, Model,
                                         Paragraph, Widget, GlyphRenderer, CustomJS)
 
 from    utils.logconfig         import getLogger
+from    utils.inspection        import templateattribute
 from    control.modelaccess     import GlobalsAccess, PlotModelAccess, PlotState
 from    ..base                  import (BokehView, threadmethod, spawn,
                                         defaultsizingmode as _defaultsizingmode,
@@ -109,6 +110,26 @@ class PlotAttrs:
         cls._default(args)
         args['line_width'] = args.pop('size')
 
+    @classmethod
+    def _patch(cls, args):
+        cls._default(args)
+        clr = args.pop('color')
+        if clr:
+            for i in ('line_color', 'fill_color'):
+                args.setdefault(i, clr)
+
+        args['line_width'] = args.pop('size')
+
+    @classmethod
+    def _vbar(cls, args):
+        cls._default(args)
+        clr = args.pop('color')
+        if clr:
+            for i in ('line_color', 'fill_color'):
+                args.setdefault(i, clr)
+
+        args['line_width'] = args.pop('size')
+
     _quad = _line
 
     @staticmethod
@@ -182,7 +203,7 @@ class GroupWidget(WidgetCreator[ModelType]):
     def _data(self) -> dict:
         "returns  a dict of updated widget attributes"
 
-class PlotCreator(Generic[ModelType], GlobalsAccess):
+class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many-public-methods
     "Base plotter class"
     _RESET  = frozenset(('bead',))
     _CLEAR  = frozenset(('track',))
@@ -204,9 +225,8 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
                             'toolbar_sticky'     : False,
                             'input.width'        : 205,
                             'figure.width'       : 800,
-                            'figure.height'      : 200,
-                            'figure.sizing_mode' : 'scale_width',
-                            'figure.responsive'  : True}
+                            'figure.height'      : 200}
+            css.figure.sizing_mode.default = 'scale_width'
 
         key = type(self).key()
         for name in 'config', 'project', 'css':
@@ -222,7 +242,7 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
     @classmethod
     def modeltype(cls) -> Type[ModelType]:
         "the model class object"
-        return cls.__orig_bases__[0].__args__[0] # type: ignore
+        return cast(Type[ModelType], templateattribute(cls, 0))
 
     state = cast(PlotState,
                  property(lambda self:    self.project.state.get(),
@@ -245,6 +265,17 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
         test   = lambda *_1, **_2: self.state is PlotState.active
         action = BokehView.action.type(self._ctrl, test = test)
         return action if fcn is None else action(fcn)
+
+    def delegatereset(self, bkmodels):
+        "Stops on_change events for a time"
+        oldbk           = self._bkmodels
+        self._bkmodels  = bkmodels
+        old, self.state = self.state, PlotState.resetting
+        try:
+            self._reset()
+        finally:
+            self._bkmodels = oldbk
+            self.state     = old
 
     @contextmanager
     def resetting(self):
@@ -405,17 +436,17 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
                     with BokehView.computation.type(self._ctrl, calls = self.__doreset):
                         try:
                             self._reset()
-                            return tuple(self._bkmodels.items())
                         finally:
-                            self._bkmodels.clear()
                             self.state = old
                             durations.append(time() - start)
 
-                ret = await threadmethod(_reset)
+                await threadmethod(_reset)
 
                 def _render():
                     start = time()
-                    if ret is not None:
+                    ret   = tuple(self._bkmodels.items())
+                    self._bkmodels.clear()
+                    if ret:
                         with BokehView.computation.type(self._ctrl, calls = self.__doreset):
                             with self.resetting():
                                 self._bkmodels.update(ret)
@@ -485,8 +516,6 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
                     break
 
         args.update((translations.get(i, i), j) for i, j in kwa.items())
-        args.pop('sizing_mode' if args.get('responsive', False) else 'responsive',
-                 None)
         return args
 
     def _figargs(self, *cssarr, **kwa) -> dict:
@@ -495,7 +524,6 @@ class PlotCreator(Generic[ModelType], GlobalsAccess):
                  'xlabel':              'x_axis_label',
                  'ylabel':              'y_axis_label',
                  'figure.sizing_mode':  'sizing_mode',
-                 'figure.responsive':   'responsive',
                  'figure.width':        'plot_width',
                  'figure.height':       'plot_height',
                  'tools':               'tools'}
@@ -567,7 +595,7 @@ class PlotView(Generic[PlotType], BokehView):
     @classmethod
     def plottype(cls) -> Type[PlotCreator]:
         "the model class object"
-        return cls.__orig_bases__[0].__args__[0] # type: ignore
+        return cast(Type[PlotCreator], templateattribute(cls, 0))
 
     @property
     def plotter(self):

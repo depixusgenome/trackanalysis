@@ -157,18 +157,27 @@ def _debug(raiseerr, singlethread):
         from app.scripting import orders
         orders().default_config = _cnf
 
-def _files(files, bead):
+def _files(directory, files, bead):
     def _started(_, start = time()):
         LOGS.info("done loading in %d seconds", time()-start)
     INITIAL_ORDERS.append(_started)
+
+    if len(directory):
+        def _opentracks(ctrl):
+            ctrl.openTrack(dict(zip(('tracks', 'grs', 'match'),
+                                    (i if i else None for i in directory))))
+        INITIAL_ORDERS.append(_opentracks)
 
     if len(files):
         def _open(ctrl):
             ctrl.getGlobal('css').last.path.open.set(files[0])
             ctrl.openTrack(files)
-            if bead is not None:
-                ctrl.getGlobal("project").bead.set(bead)
         INITIAL_ORDERS.append(_open)
+
+    if len(files) or len(directory) and  bead is not None:
+        def _setbead(ctrl):
+            ctrl.getGlobal("project").bead.set(bead)
+        INITIAL_ORDERS.append(_setbead)
 
 def _launch(view, app, desktop, kwa):
     viewcls = _from_path(view)
@@ -209,6 +218,10 @@ def _version(ctx, _, value):
               expose_value = False, is_eager = True)
 @click.argument('view')
 @click.argument('files', nargs = -1, type = click.Path())
+@click.option("--tracks",
+              type       = str,
+              nargs      = 3,
+              help       = 'track path, gr path and match')
 @click.option('-b', "--bead",
               type       = int,
               default    = None,
@@ -228,7 +241,7 @@ def _version(ctx, _, value):
               flag_value = True,
               default    = False,
               help       = '[DEBUG] Runs plots in single thread')
-def main(view, files, bead,  # pylint: disable=too-many-arguments
+def main(view, files, tracks, bead,  # pylint: disable=too-many-arguments
          gui, port, raiseerr, singlethread):
     "Launches an view"
     _debug(raiseerr, singlethread)
@@ -236,7 +249,7 @@ def main(view, files, bead,  # pylint: disable=too-many-arguments
 
     kwargs = dict(port = _port(port), apponly = False)
 
-    _files(files, bead)
+    _files(tracks, files, bead)
     server = _launch(view, 'app.toolbar', gui == 'firefox', kwargs)
 
     if gui == 'chrome':

@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint: disable=too-many-ancestors
 "Updating PeaksDict for oligo mapping purposes"
 from   typing                   import (List, Type, # pylint: disable=unused-import
                                         Sequence, Tuple, cast, Dict, Optional,
                                         Callable)
+from   concurrent.futures       import ProcessPoolExecutor
+from   multiprocessing          import cpu_count
 from   copy                     import deepcopy
 from   scipy.interpolate        import interp1d
 import numpy                    as np
@@ -17,6 +20,7 @@ from   peakfinding.__scripting__.holoviewing import (PeaksDisplay as _PeaksDispl
 
 
 from   model.__scripting__          import Tasks
+from   cleaning.processor           import DataCleaningException
 from   data.__scripting__           import TracksDict   # pylint: disable=unused-import
 from   ..processor.fittoreference   import (FitToReferenceProcessor,
                                             FitToReferenceTask)
@@ -276,6 +280,39 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
             if bead not in self._reftask:
                 self._reftask.frompeaks(self._items[self._reference].peaks[bead,...])
 
+    @staticmethod
+    def _frompeaksfcn(args):
+        alg, refpeaks, bead = args
+        try:
+            return (bead, alg.frompeaks(refpeaks[bead]))
+        except DataCleaningException:
+            return None, None
+
+    def _setupref(self):
+        reftask = cast(FitToReferenceTask, deepcopy(self._reftask))
+        beads   = set(self._base()[1]['bead'])
+        beads  &= set(self._items[self._reference].peaks.keys())
+        beads  -= set(self._reftask.fitdata)
+
+        data    = dict(reftask.fitdata)
+
+        if len(beads) > 2:
+            with ProcessPoolExecutor(cpu_count()) as pool:
+                ref  = self._items[self._reference].peaks
+                lst  = [(reftask.fitalg, ref, i) for i in beads]
+                data.update({i: j for i, j in pool.map(self._frompeaksfcn, lst)
+                             if j is not None})
+        else:
+            ref  = self._items[self._reference].peaks
+            for bead in beads:
+                try:
+                    data[bead] = reftask.fitalg.frompeaks(ref[bead])
+                except DataCleaningException:
+                    continue
+
+        reftask.fitdata = data
+        return reftask
+
     def dataframe(self, *tasks, transform = None, assign = None, **kwa):
         """
         Concatenates all dataframes obtained through *track.peaks.dataframe*
@@ -285,12 +322,7 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
         See documentation in *track.peaks.dataframe* for other options
         """
         if self._reference is not None:
-            reftask = cast(FitToReferenceTask, deepcopy(self._reftask))
-            beads   = set(self._base()[1]['bead'])
-            beads  &= set(self._items[self._reference].peaks.keys())
-            beads  -= set(self._reftask.fitdata)
-            reftask.frompeaks(self._items[self._reference].peaks[list(beads)],
-                              update = True)
+            reftask = self._setupref()
             itms    = self._items['~'+self._reference]
             tasks   = (reftask,) + tasks
         else:

@@ -49,8 +49,8 @@ class BeadSubtractionTask(SignalAverage, Task):
 class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
     "Processor for subtracting beads"
     @staticmethod
-    def __action(task, cache, frame, info):
-        key = info[1] if isinstance(info[0], tuple) else None
+    def _action(task, cache, frame, info):
+        key = info[0][1] if isinstance(info[0], tuple) else None
         sub = None if cache is None else cache.get(key, None)
         if sub is None:
             if key is None:
@@ -63,15 +63,15 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
         return info
 
     @classmethod
-    def __run(cls, task, cache, frame):
+    def _run(cls, task, cache, frame):
         frame = frame.new().discarding(task.beads)
-        return frame.withaction(partial(cls.__action, task, cache))
+        return frame.withaction(partial(cls._action, task, cache))
 
     @classmethod
     def apply(cls, toframe = None, cache = None, **kwa):
         "applies the subtraction to the frame"
         task = cls.tasktype(**kwa) # pylint: disable=not-callable
-        fcn  = partial(cls.__run, task, cache)
+        fcn  = partial(cls._run, task, cache)
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
@@ -79,7 +79,7 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
         cache = args.data.setCacheDefault(self, {})
         args.apply(self.apply(cache =  cache, **self.config()))
 
-    def beads(self, _, selected: Iterable[int]) -> Iterable[int]:
+    def beads(self, _, selected: Iterable[int]) -> Iterable[int]: # type: ignore
         "Beads selected/discarded by the task"
         sub = self.task.beads
         return (i for i in selected if i not in sub)

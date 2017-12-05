@@ -302,7 +302,8 @@ class TracksDict(dict):
         if tracks is not None:
             assert sum(i is None for i in (tracks, grs)) in (0, 1, 2)
             self.scan(tracks, grs, match = match, allaxes = allaxes, **scan)
-    update.__doc__ += scan.__doc__[scan.__doc__.find('#')-5:] # pylint: disable=no-member
+    if getattr(update, '__doc__', None):
+        update.__doc__ += scan.__doc__[scan.__doc__.find('#')-5:] # pylint: disable=no-member
 
     def commonbeads(self, *keys) -> List[BEADKEY]:
         "returns the intersection of all beads in requested tracks (all by default)"

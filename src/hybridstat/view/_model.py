@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Model for peaksplot"
-from typing                     import Optional, Dict, Any, cast
-from itertools                  import product
+from typing                     import (Optional, Dict, # pylint: disable=unused-import
+                                        List, Tuple, Any, cast)
+import pickle
 
 import numpy                    as     np
 
@@ -11,17 +12,156 @@ from sequences.modelaccess      import (SequencePlotModelAccess,
                                         SequenceKeyProp as _SequenceKeyProp)
 
 from utils                      import updatecopy
-from control.processor          import processors
 from control.modelaccess        import PROPS, TaskAccess
 
+from model.task                 import RootTask
 from eventdetection.processor   import EventDetectionTask, ExtremumAlignmentTask
+from peakfinding.histogram      import interpolator
 from peakfinding.processor      import PeakSelectorTask
-from peakfinding.probabilities  import Probability
+from peakfinding.selector       import PeakSelectorDetails
+from peakcalling                import match
+from peakcalling.toreference    import ChiSquareHistogramFit
 from peakcalling.tohairpin      import Distance
-from peakcalling.processor      import (FitToHairpinTask, FitToHairpinProcessor,
-                                        FitBead)
+from peakcalling.processor      import FitToHairpinTask, FitToReferenceTask
+from peakcalling.processor.fittoreference   import FitData
 
 from ..reporting.batch          import fittohairpintask
+from ._processors               import runbead, runrefbead
+from ._peakinfo                 import createpeaks
+
+_DUMMY = type('_DummyDict', (),
+              dict(get          = lambda *_: None,
+                   __contains__ = lambda _: False,
+                   __len__      = lambda _: 0,
+                   __iter__     = lambda _: iter(())))()
+
+class FitToReferenceAccess(TaskAccess):
+    "access to the FitToReferenceTask"
+    __DEFAULTS = dict(id           = None,   reference = None,
+                      fitdata      = _DUMMY, peaks     = _DUMMY,
+                      interpolator = _DUMMY)
+    def __init__(self, ctrl):
+        super().__init__(ctrl, FitToReferenceTask)
+        self.__store             = self.project.root.tasks.fittoreference.gui
+        self.__store.defaults    = self.__DEFAULTS
+
+        self.configtask.defaults = dict(histmin = 1e-4, peakprecision = 1e-2)
+
+    @property
+    def params(self) -> Optional[Tuple[float, float]]:
+        "returns the computed stretch or 1."
+        tsk = cast(FitToReferenceTask, self.task)
+        if tsk is None or self.bead not in tsk.fitdata:
+            return 1., 0.
+
+        mem = self.cache() # pylint: disable=not-callable
+        return (1., 0.) if mem is None else mem.get(self.bead, (1., 0.))
+
+    fitalg  = property(lambda self: ChiSquareHistogramFit())
+    stretch = property(lambda self: self.params[0])
+    bias    = property(lambda self: self.params[1])
+    hmin    = property(lambda self: self.configtask.histmin.get())
+
+    def update(self, **_):
+        "removes the task"
+        assert len(_) == 0
+        newdata, newid = self.__computefitdata()
+        if not newdata:
+            return
+
+        # pylint: disable=not-callable
+        cache = None if newid else self.cache()
+        super().update(fitdata = self.__store.fitdata.get())
+        if cache:
+            self._ctrl.processors(self.roottask).data.setCacheDefault(self.task, cache)
+
+    @property
+    def reference(self) -> Optional[RootTask]:
+        "returns the root task for the reference data"
+        return self.__store.reference.get()
+
+    @reference.setter
+    def reference(self, val):
+        "sets the root task for the reference data"
+        if val is not self.reference:
+            info = dict(self.__DEFAULTS)
+            info['reference'] = val
+            self.__store.update(**info)
+
+    def setobservers(self, _):
+        "observes the global model"
+        self.__store.reference.observe(lambda _: self.resetmodel())
+
+    def resetmodel(self):
+        "adds a bead to the task"
+        return (self.update() if self.reference not in (self.roottask, None) else
+                self.remove() if self.task                                     else
+                None)
+
+    def refhistogram(self, xaxis):
+        "returns the histogram interpolated to the provided values"
+        intp = self.__store.interpolator.get().get(self.bead, None)
+        vals = np.full(len(xaxis), np.NaN, dtype = 'f4') if intp is None else intp(xaxis)
+        if len(vals):
+            # dealing with a visual bug: extremes should always be set to 0.
+            vals[[0,-1]] = 0.
+        return vals
+
+    def identifiedpeaks(self, peaks):
+        "returns an array of identified peaks"
+        ref = self.referencepeaks
+        arr = np.full(len(peaks), np.NaN, dtype = 'f4')
+        if len(peaks) and ref is not None and len(ref):
+            ids = match.compute(ref, peaks, self.configtask.peakprecision.get())
+            arr[ids[:,1]] = ref[ids[:,0]]
+        return arr
+
+    @staticmethod
+    def _configattributes(_):
+        return {}
+
+    @property
+    def referencepeaks(self) -> Optional[np.ndarray]:
+        "returns reference peaks"
+        pks = self.__store.peaks.get().get(self.bead, None)
+        return None if pks is None or len(pks) == 0 else pks
+
+    def __computefitdata(self) -> Tuple[bool, bool]:
+        args  = {} # type: Dict[str, Any]
+        ident = pickle.dumps(tuple(self._ctrl.tasks(self.reference)))
+        if self.__store.id.get() == ident:
+            if self.referencepeaks is not None:
+                return False, False
+        else:
+            args['id'] = ident
+
+        fits  = self.__store.fitdata.get()
+        if not fits:
+            args['fitdata'] = fits = {}
+
+        peaks  = self.__store.peaks.get()
+        if not peaks:
+            args['peaks'] = peaks = {}
+
+        intps  = self.__store.interpolator.get()
+        if not intps:
+            args['interpolator'] = intps = {}
+
+        ibead = self.bead
+        try:
+            pks, dtls = runrefbead(self._ctrl, self.reference, ibead)
+        except Exception as exc: # pylint: disable=broad-except
+            self.config.message.set(exc)
+            pks       = ()
+
+        peaks[ibead] = np.array([i for i, _ in pks], dtype = 'f4')
+        if len(pks):
+            fits [ibead] = FitData(self.fitalg.frompeaks(pks), (1., 0.)) # type: ignore
+            intps[ibead] = interpolator(dtls, miny = self.hmin, fill_value = 0.)
+
+        if args:
+            self.__store.update(**args)
+        return True, 'id' in args
 
 class FitToHairpinAccess(TaskAccess):
     "access to the FitToHairpinTask"
@@ -34,7 +174,7 @@ class FitToHairpinAccess(TaskAccess):
     def setobservers(self, mdl):
         "observes the global model"
         def _observe(_):
-            task = mdl.defaultidenfication
+            task = self.default(mdl)
             if task is None:
                 self.remove()
             else:
@@ -91,7 +231,6 @@ class FitParamProp(_FitParamProp):
             dist = obj.distances.get(obj.sequencekey, None)
             if dist is not None:
                 return getattr(dist, self._key)
-
         return super().__get__(obj, tpe)
 
 class SequenceKeyProp(_SequenceKeyProp):
@@ -113,9 +252,10 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
 
         self.eventdetection                 = TaskAccess(self, EventDetectionTask)
         self.peakselection                  = TaskAccess(self, PeakSelectorTask)
-        self.fits : FitBead                 = None
+        self.distances : Dict[str, Distance]= dict()
         self.peaks: Dict[str, np.ndarray]   = dict()
         self.estimatedbias                  = 0.
+        self.fittoreference                 = FitToReferenceAccess(self)
         self.identification                 = FitToHairpinAccess(self)
 
         cls = type(self)
@@ -136,49 +276,23 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         "returns the default identification task"
         return self.identification.default(self)
 
-    @property
-    def distances(self) -> Dict[str, Distance]:
-        "returns the distances which were computed"
-        return self.fits.distances if self.fits is not None else {}
+    def runbead(self):
+        "runs the bead"
+        tmp, dtl = runbead(self)
 
-    def setpeaks(self, dtl) -> Dict[str, Any]:
-        "sets current bead peaks and computes the fits"
         if dtl is None:
-            self.peaks = dict.fromkeys(('z', 'id', 'distance', 'sigma', 'bases',
-                                        'duration', 'count', 'skew'), [])
-            self.fits  = None
-            return self.peaks
-
-        tsk        = cast(PeakSelectorTask, self.peakselection.task)
-        peaks      = tuple(tsk.details2output(dtl))
-        nan        = lambda: np.full((len(peaks),), np.NaN, dtype = 'f4')
-        self.peaks = dict(z        = np.array([i for i, _ in peaks], dtype = 'f4'),
-                          sigma    = nan(),
-                          skew     = nan(),
-                          duration = nan(),
-                          count    = nan())
-
-        self.estimatedbias  = self.peaks['z'][0]
-
-        self.__set_ids_and_distances(peaks)
-        self.__set_probas(peaks)
-        return self.peaks
-
-    def runbead(self, *_):
-        "returns a tuple (dataitem, bead) to be displayed"
-        if self.track is None or self.checkbead(False):
+            self.distances     = {}
+            self.peaks         = createpeaks(self, [])
+            self.estimatedbias = 0.
             return None
 
-        root  = self.roottask
-        ibead = self.bead
-        task  = self.eventdetection.task
-        if task is None:
-            task  = self.config.tasks.eventdetection.get()
-            ind   = self.eventdetection.index
-            beads = next(iter(self._ctrl.run(root, ind-1, copy = True)))
-            proc  = next(processors(task)) # type: ignore
-            return proc.apply(beads, **task.config())[ibead, ...]
-        return next(iter(self._ctrl.run(root, task, copy = True)))[ibead, ...]
+        tsk   = cast(PeakSelectorTask, self.peakselection.task)
+        peaks = tuple(tsk.details2output(cast(PeakSelectorDetails, dtl)))
+
+        self.distances     = tmp.distances if self.identification.task else {}
+        self.peaks         = createpeaks(self, peaks)
+        self.estimatedbias = self.peaks['z'][0]
+        return dtl
 
     def reset(self) -> bool: # type: ignore
         "adds tasks if needed"
@@ -191,59 +305,11 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         if self.peakselection.task is None:
             self.peakselection.update()
 
+        self.fittoreference.resetmodel()
         self.identification.resetmodel(self)
         return False
 
     def observe(self):
         "observes the global model"
         self.identification.setobservers(self)
-
-    def __set_ids_and_distances(self, peaks):
-        task  = self.identification.task
-        dico  = self.peaks
-        names = 'bases', 'id', 'distance', 'orient'
-        nan   = np.full((len(peaks),), np.NaN, dtype = 'f4')
-
-        dico.update(**dict.fromkeys(names, nan))
-        dico['orient'] = np.array([' '] * len(nan))
-
-        if task is None:
-            dico['bases']  = (dico['z']-self.bias)*self.stretch
-            return
-
-        self.fits = FitToHairpinProcessor.compute((self.bead, peaks),
-                                                  **task.config())[1]
-
-        for key in product(self.sequences(...), names):
-            dico[''.join(key)] = np.copy(dico[key[1]])
-
-        strori  = self.css.stats.title.orientation.get()
-        alldist = self.distances
-        for key, hyb in self.hybridisations(...).items():
-            if key not in alldist:
-                continue
-
-            dist = alldist[key].stretch, alldist[key].bias
-            tmp  = task.match[key].pair(dico['z'], *dist)['key']
-            good = tmp >= 0
-            ori  = dict(hyb)
-
-            dico[f'{key}bases']          = (dico['z'] - dist[1])*dist[0]
-            dico[f'{key}id']      [good] = tmp[good]
-            dico[f'{key}distance'][good] = (tmp - dico[f'{key}bases'])[good]
-            dico[f'{key}orient']  [good] = [strori[ori.get(int(i+0.01), 2)]
-                                            for i in dico[f'{key}id'][good]]
-        for i in names:
-            dico[i] = dico[self.sequencekey+i]
-
-    def __set_probas(self, peaks):
-        task = self.eventdetection.task
-        prob = Probability(framerate   = self.track.framerate,
-                           minduration = task.events.select.minduration)
-        dur  = self.track.phaseduration(..., task.phase)
-        for i, (_, evts) in enumerate(peaks):
-            val                       = prob(evts, dur)
-            self.peaks['duration'][i] = val.averageduration
-            self.peaks['sigma'][i]    = prob.resolution(evts)
-            self.peaks['count'][i]    = min(100., val.hybridisationrate*100.)
-            self.peaks['skew'][i]     = np.nanmedian(prob.skew(evts))
+        self.fittoreference.setobservers(self)

@@ -33,40 +33,53 @@ class Tasks(Enum):
 
     These can be created as follows:
 
-        >>> task = Tasks.alignment()
-        >>> assert isinstance(task, ExtremumAlignmentTask)
+    ```python
+    >>> task = Tasks.alignment()
+    >>> assert isinstance(task, ExtremumAlignmentTask)
+    ```
 
     Attribute values can be set:
 
-        >>> assert Tasks.peakselector().align is not None         # default value
-        >>> assert Tasks.peakselector(align = None).align is None # change default
-        >>> assert Tasks.peakselector('align').align is not None  # back to true default
+    ```python
+    >>> assert Tasks.peakselector().align is not None         # default value
+    >>> assert Tasks.peakselector(align = None).align is None # change default
+    >>> assert Tasks.peakselector('align').align is not None  # back to true default
+    ```
 
     or:
 
-        >>> assert Tasks.peakselector(align = None).align is None # change default
-        >>> assert Tasks.peakselector(align = Tasks.RESET).align is not None  # back to true default
+    ```python
+    >>> assert Tasks.peakselector(align = None).align is None # change default
+    >>> assert Tasks.peakselector(align = Tasks.RESET).align is not None  # back to true default
+    ```
 
     It's also possible to set sub-fields:
-        >>> assert Tasks.peakselector().group.mincount == 5
-        >>> assert Tasks.peakselector({'group.mincount': 2}).group.mincount == 2
-        >>> assert Tasks.peakselector({'group.mincount': 2}).group.mincount == 2
+
+    ```python
+    >>> assert Tasks.peakselector().group.mincount == 5
+    >>> assert Tasks.peakselector({'group.mincount': 2}).group.mincount == 2
+    >>> assert Tasks.peakselector({'group.mincount': 2}).group.mincount == 2
+    ```
 
     For example, to create aligned events and change their stretch and bias:
 
-        >>> def fcn(stretch, bias, info):
-        ...     info['data'][:] = [(i-bias)*stretch for i in info['data']]
-        >>> Tasks.apply("my path to data",
-        ...             Tasks.alignment, Tasks.eventdetection,
-        ...             lambda i: fcn(2., .5, i),
-        ...             Tasks.peakalignment)
+    ```python
+    >>> def fcn(stretch, bias, info):
+    ...     info['data'][:] = [(i-bias)*stretch for i in info['data']]
+    >>> Tasks.apply("my path to data",
+    ...             Tasks.alignment, Tasks.eventdetection,
+    ...             lambda i: fcn(2., .5, i),
+    ...             Tasks.peakalignment)
+    ```
 
     or:
 
-        >>> Tasks.apply("my path to data",
-        ...             Tasks.alignment, Tasks.eventdetection,
-        ...             Task.action(fcn, 2., .5),
-        ...             Tasks.peakalignment)
+    ```python
+    >>> Tasks.apply("my path to data",
+    ...             Tasks.alignment, Tasks.eventdetection,
+    ...             Task.action(fcn, 2., .5),
+    ...             Tasks.peakalignment)
+    ```
     """
     action         = 'action'
     cleaning       = 'cleaning'

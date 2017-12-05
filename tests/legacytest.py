@@ -53,7 +53,10 @@ def test_opentrack_small():
 
 def test_opentrack_bugged():
     u"tests opening incorrect or missing trks"
-    assert readtrack("does_not_exist.trk") is None
+    try:
+        readtrack("does_not_exist.trk")
+    except OSError:
+        pass
     assert readtrack(path("grfile.gr")) is None
 
 if __name__ == '__main__':

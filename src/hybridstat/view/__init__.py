@@ -6,32 +6,32 @@ from bokeh                  import layouts
 from view.base              import BokehView
 from view.plots             import PlotState
 from cleaning.view          import CleaningView
-from cleaning.view.messages import MessagesView
+from qualitycontrol.view    import QualityControlView
 from fov                    import FoVPlotView
 from cyclesplot             import CyclesPlotView
 from .peaksplot             import PeaksPlotView
+from ._io                   import setupio
 
 class HybridStatView(BokehView):
     "A view with all plots"
+    TASKS = ((lambda lst: tuple(j for i, j in enumerate(lst) if j not in lst[:i]))
+             (CleaningView.TASKS+PeaksPlotView.TASKS))
     def __init__(self, **kwa):
         "Sets up the controller"
         super().__init__(**kwa)
         self._tabs   = None
-        self._panels = [FoVPlotView   (**kwa),
-                        MessagesView  (**kwa),
-                        CleaningView  (**kwa),
-                        CyclesPlotView(**kwa),
-                        PeaksPlotView (**kwa)]
+        self._panels = [FoVPlotView         (**kwa),
+                        QualityControlView  (**kwa),
+                        CleaningView        (**kwa),
+                        CyclesPlotView      (**kwa),
+                        PeaksPlotView       (**kwa)]
 
-        self._ctrl.getGlobal('css').defaults = dict(responsive  = False,
-                                                    sizing_mode = 'fixed')
-        self._ctrl.getGlobal('css.plot').figure.defaults = dict(responsive  = False,
-                                                                sizing_mode = 'fixed')
-        self._ctrl.getGlobal('css').hybridstat.defaults = dict(width = 500, height = 30)
+        self._ctrl.getGlobal('css.plot').figure.defaults = dict(sizing_mode = 'fixed')
+        self._ctrl.getGlobal('css').hybridstat.defaults  = dict(width = 500, height = 30)
         titles = self._ctrl.getGlobal('css').hybridstat.title
         for panel in self._panels:
             key                         = self.__key(panel)
-            titles[key].default         = key.capitalize()
+            titles[key].default         = getattr(panel, 'PANEL_NAME', key.capitalize())
             self.__state(panel).default = PlotState.disabled
         titles['fov'].default           = 'FoV'
 
@@ -53,8 +53,9 @@ class HybridStatView(BokehView):
 
     def ismain(self):
         "Allows setting-up stuff only when the view is the main one"
+        self.__select(CleaningView) .ismain()
         self.__select(PeaksPlotView).ismain()
-        self.__select(CleaningView).ismain()
+        self._ctrl.getGlobal('config').tasks.default = self.TASKS
         def _advanced():
             for panel in self._panels:
                 if self.__state(panel).get() is PlotState.active:

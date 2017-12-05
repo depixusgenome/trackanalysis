@@ -61,46 +61,98 @@ class ConfigProperty:
         return obj.config[self.key].set(val)
 
 class BeadProperty:
-    "a property which links to the config and the project"
+    "a property which links to the config and the project as a function of bead"
     OBSERVERS = 'config', 'project'
     _NONE     = type('_NONE', (), {})
-
     def __init__(self, key:str) -> None:
-        self.key = key
+        self.key      = key
+
+    def __prj(self, obj):
+        return obj.project[self.key]
+
+    def __cnf(self, obj):
+        return obj.config[self.key]
 
     def setdefault(self, obj, value, items:dict = None, **kwa):
         "initializes the property stores"
         if items is not None:
             kwa.update(**items)
-        obj.project[self.key].default = None
-        obj.project[self.key].set({})
-        obj.config[self.key].default  = value
-        obj.config[self.key].defaults = kwa
+        prj = self.__prj(obj)
+        prj.default = None
+        prj.set({})
+        cnf = self.__cnf(obj)
+        cnf.default  = value
+        cnf.defaults = kwa
 
     @classmethod
     def clear(cls, obj):
         "clears the property stores"
         pred = lambda i: isinstance(i, cls)
-        for prop, _ in inspect.getmembers(type(obj), pred):
+        for _, prop in inspect.getmembers(type(obj), pred):
             obj.project[getattr(prop, 'key')].get().clear()
 
     def __get__(self, obj, tpe):
         if obj is None:
             return self # type: ignore
-        value = obj.project[self.key].get().get(obj.bead, self._NONE)
+        value = self.__prj(obj).get().get(obj.bead, self._NONE)
         if value is not self._NONE:
             return value
-        return obj.config[self.key].get()
+        return self.__cnf(obj).get()
 
     def __set__(self, obj, val):
-        cache = dict(obj.project[self.key].get())
-        if val == obj.config[self.key].get():
+        prj   = self.__prj(obj)
+
+        cache = dict(prj.get())
+        if val == self.__cnf(obj).get():
             cache.pop(obj.bead, None)
         else:
             cache[obj.bead] = val
 
-        obj.project[self.key].set(cache)
+        prj.set(cache)
         return val
+
+class RootTaskProperty:
+    "a property which links to the config and the project as a function of the root task"
+    OBSERVERS = 'config.root', 'project.root'
+    def __init__(self, key):
+        self.key = key
+
+    def __prj(self, obj):
+        return obj.project.root[self.key]
+
+    def __cnf(self, obj):
+        return obj.config.root[self.key]
+
+    def setdefault(self, obj, value, items:dict = None, **kwa):
+        "initializes the property stores"
+        if items is not None:
+            kwa.update(**items)
+        prj         = self.__prj(obj)
+        prj.default = None
+        prj.set({})
+
+        cnf          = self.__cnf(obj)
+        cnf.default  = value
+        cnf.defaults = kwa
+
+        def _set(pair):
+            if pair.value == value:
+                prj.get().pop(obj.roottask, None)
+            else:
+                prj.get()[obj.roottask] = pair.value
+        cnf.observe(_set)
+
+    def __get__(self, inst, owner):
+        if inst is None:
+            return self
+
+        value = self.__prj(inst).get().get(inst.roottask, None)
+        if value is None:
+            value = self.__cnf(inst).get()
+        return value
+
+    def __set__(self, inst, val):
+        self.__cnf(inst).set(val)
 
 def configroot(name: str) -> ConfigRootProperty:
     "returns a prop"
@@ -118,4 +170,5 @@ def bead(name: str) -> BeadProperty:
     "returns a prop"
     return BeadProperty(name)
 
-__all__ = ['ConfigRootProperty', 'ProjectRootProperty', 'ConfigProperty', 'BeadProperty']
+__all__ = ['ConfigRootProperty', 'ProjectRootProperty',
+           'ConfigProperty', 'BeadProperty', 'RootTaskProperty']

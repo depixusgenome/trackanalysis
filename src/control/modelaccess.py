@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Controller for most plots and views"
-from typing          import (Tuple, Optional, # pylint: disable =unused-import
-                             Iterator, List, Union, Any, Callable, Dict,
-                             TypeVar)
-from enum            import Enum
-from functools       import wraps
+from typing             import (Tuple, Optional, # pylint: disable =unused-import
+                                Iterator, List, Union, Any, Callable, Dict,
+                                TypeVar)
+from copy               import copy as shallowcopy
+from enum               import Enum
+from functools          import wraps
 
-from signalfilter    import rawprecision
-from model.task      import RootTask, Task, taskorder, TASK_ORDER
-from model.globals   import PROPS
-from data.track      import Track
-from data.views      import BEADKEY
-from utils           import NoArgs, updatecopy, updatedeepcopy
-from .processor      import Processor
-from .taskcontrol    import ProcessorController
-from .globalscontrol import GlobalsAccess
-from .event          import Controller
+from signalfilter       import rawprecision
+from model.task         import RootTask, Task, taskorder, TASK_ORDER
+from model.globals      import PROPS
+from data.track         import Track
+from data.views         import TrackView
+from data.views         import BEADKEY
+from utils              import NoArgs, updatecopy, updatedeepcopy
+from .processor         import Processor
+from .processor.cache   import CacheReplacement
+from .taskcontrol       import ProcessorController
+from .globalscontrol    import GlobalsAccess
+from .event             import Controller
 
 class PlotState(Enum):
     "plot state"
@@ -42,6 +45,30 @@ class PlotModelAccess(GlobalsAccess):
     def reset() -> bool:
         "resets the model"
         return False
+
+class ReplaceProcessors(CacheReplacement):
+    """
+    Context for replacing processors but keeping their cache
+    """
+    def __init__(self, ctrl, *options: Processor, copy = None) -> None:
+        if isinstance(ctrl, TaskPlotModelAccess):
+            ctrl = ctrl.processors()
+
+        super().__init__(ctrl.data if ctrl else None, *options)
+        self.ctrl = ctrl
+        self.copy = copy
+
+    def __enter__(self):
+        if self.ctrl is None:
+            return None
+
+        data = super().__enter__()
+        if data is not self.ctrl.data:
+            ctrl      = shallowcopy(self.ctrl)
+            ctrl.data = data
+        else:
+            ctrl = self.ctrl
+        return ctrl if self.copy is None else next(iter(ctrl.run(copy = self.copy)))
 
 class TaskPlotModelAccess(PlotModelAccess):
     "Contains all access to model items likely to be set by user actions"
@@ -116,37 +143,30 @@ class TaskPlotModelAccess(PlotModelAccess):
 
         return root is self.roottask
 
-    def processors(self, *procs) -> Optional[ProcessorController]:
+    def processors(self) -> Optional[ProcessorController]:
         "returns a tuple (dataitem, bead) to be displayed"
         track = self.track
         if track is None:
             return None
 
-        root  = self.roottask
-        tasks = tuple(self._ctrl.tasks(root))
-        for i, task in tuple(enumerate(tasks))[::-1]:
-            if self.checktask(root, task):
-                if len(procs):
-                    cache = ProcessorController.register(Processor)
-                    for proc in procs:
-                        ProcessorController.register(proc, cache, force = True)
+        root = self.roottask
+        for task in tuple(self._ctrl.tasks(root))[::-1]:
+            if not self.checktask(root, task):
+                continue
 
-                    ctrl  = ProcessorController.create(*tasks[:i+1],
-                                                       processors = cache)
-                    ctrl.data.setCacheDefault(0, track)
-                    return ctrl
-                return self._ctrl.processors(root, task)
+            return self._ctrl.processors(root, task)
         return None
 
-    def runbead(self, *procs):
-        "returns a tuple (dataitem, bead) to be displayed"
-        ctrl  = self.processors(*procs)
-        ibead = self.bead
+    def runbead(self) -> Optional[TrackView]:
+        "returns a TrackView to be displayed"
+        ctrl  = self.processors()
         if ctrl is None:
-            track = self.track
-            return None if track is None else track.cycles[ibead,...]
+            return None
+        return next(iter(ctrl.run(copy = True)))
 
-        return next(iter(ctrl.run(copy = True)))[ibead, ...]
+    def runcontext(self, *processors: Processor, copy = True) -> ReplaceProcessors:
+        "returns a ReplaceProcessors context from which a trackview can be obtains"
+        return ReplaceProcessors(self, *processors, copy = copy)
 
     def observetasks(self, *args, **kwa):
         "observes the provided task"
@@ -266,11 +286,11 @@ class TaskAccess(TaskPlotModelAccess):
         return next((t for t in self._ctrl.tasks(self.roottask) if self.check(t)), None)
 
     @property
-    def cache(self):
+    def cache(self) -> Callable[[],Any]:
         "returns the processor's cache if it exists"
         task = self.task
         if task is None:
-            return None
+            return lambda: None
         return self._ctrl.cache(self.roottask, task)
 
     def _check(self, task, parent = NoArgs) -> bool:

@@ -7,9 +7,8 @@ from functools          import partial
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing    import cpu_count
 from copy               import copy as shallowcopy
-from typing             import (Callable,   # pylint: disable=unused-import
-                                Iterable, Tuple, Dict, Any, Sequence, Union,
-                                Optional, Iterator, cast)
+from typing             import (Iterable, Tuple, Dict, Any, Union, Optional,
+                                Iterator, cast)
 import pickle
 
 import numpy            as     np
@@ -21,6 +20,36 @@ from .base              import Processor
 from .cache             import Cache
 
 DATA_TYPE = Union[Cache, Iterable[Processor], bytes]
+class RunnerUtils:
+    "Methods used by the runner, set outside so as to be picklable"
+    @staticmethod
+    def regroup(cols, _ = None):
+        "regroups elements with a same key into an numpy.ndarray"
+        data = dict() # type: Dict[Any, np.ndarray]
+        for col in cols:
+            data.setdefault(col.parents[-1], []).append(col)
+        for key in data:
+            data[key] = np.array(data[key])
+        return data
+
+    @classmethod
+    def collapse(cls, gen):
+        """
+        Collapses items from *gen* into a series of *TrackView*s
+        each of which contain sequential items with similar parents
+        """
+        for key, grp in groupby(gen, key = lambda frame: frame.parents[:-1]):
+            yield TrackView(data = partial(cls.regroup, tuple(grp)), parents = key)
+
+    @staticmethod
+    def expand(level:Level, gen):
+        "Transforms *gen* into *TrackView*s, one per item in gen"
+        yield from (createTrackView(level,
+                                    track   = frame.track,
+                                    data    = frame[[key]],
+                                    parents = frame.parents+(key,))
+                    for frame in gen for key in frame.keys())
+
 class Runner:
     "Arguments used for iterating"
     __slots__ = ('data', 'pool', 'level', 'gen')
@@ -71,19 +100,7 @@ class Runner:
         "returns the model"
         return iter(i.task for i in self.data)
 
-    @staticmethod
-    def regroup(grp) -> 'Callable':
-        "regroups elements with a same key into an numpy.ndarray"
-        def _regroup(cols = tuple(grp)):
-            data = dict() # type: Dict[Any, np.ndarray]
-            for col in cols:
-                data.setdefault(col.parents[-1], []).append(col)
-            for key in data:
-                data[key] = np.array(data[key])
-            return data
-        return _regroup
-
-    def tolevel(self, curr: 'Optional[Tuple[Level,Level]]'):
+    def tolevel(self, curr: Optional[Tuple[Level,Level]]):
         "Changes a generator to fit the processor's level"
         if curr in (None, Level.none):
             return
@@ -95,27 +112,11 @@ class Runner:
             self.level = curr[1]
             return
 
-        def collapse(gen):
-            """
-            Collapses items from *gen* into a series of *TrackView*s
-            each of which contain sequential items with similar parents
-            """
-            for key, grp in groupby(gen, key = lambda frame: frame.parents[:-1]):
-                yield TrackView(data = self.regroup(grp), parents = key)
-
-        def expand(level:Level, gen):
-            "Transforms *gen* into *TrackView*s, one per item in gen"
-            yield from (createTrackView(level,
-                                        track   = frame.track,
-                                        data    = frame[[key]],
-                                        parents = frame.parents+(key,))
-                        for frame in gen for key in frame.keys())
-
         inp = curr[0]
         while old is not inp:
             asc = old.value < inp.value
             old = Level (old.value+(1 if asc else -1))
-            gen = expand(old, gen)    if asc else collapse(gen)
+            gen = RunnerUtils.expand(old, gen) if asc else RunnerUtils.collapse(gen)
         self.gen   = gen
         self.level = curr[1]
 
@@ -131,7 +132,6 @@ class Runner:
             cls.__check(fcn)
         except MemoryError as exc:
             raise cls.__exception(fcn) from exc
-
 
     def apply(self, fcn, *_, levels = None):
         "Applies a function to generator's output"
@@ -238,9 +238,8 @@ def pooledinput(pool, pickled, frame) -> dict:
             for proc in args.data:
                 if not proc.task.disabled:
                     proc.run(args)
-            gen  = tuple(i.freeze()
-                         for i in args.gen
-                         if i.parents == frame.parents[:len(i.parents)])
+            gen  = tuple(i.freeze() for i in args.gen
+                         if i.parents == frame.parents[:len(cast(tuple, i.parents))])
             cnf  = dict(gen = gen, level = args.level, data = list(data[ind:]))
 
         cnf.update(nproc = pool.nworkers, parents = frame.parents) # type: ignore

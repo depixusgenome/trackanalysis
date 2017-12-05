@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
-from typing                     import Tuple
+from typing                     import Dict
 
 import bokeh.core.properties as props
 from bokeh                      import layouts
@@ -17,12 +17,10 @@ from view.plots                 import PlotView, PlotAttrs
 from view.plots.tasks           import TaskPlotCreator
 from sequences.view             import (SequenceTicker,
                                         SequenceHoverMixin)
+from peakfinding.histogram      import interpolator
 
 from ._model                    import PeaksPlotModelAccess
-from ._widget                   import (PeaksSequencePathWidget,
-                                        PeaksStatsWidget, PeakListWidget,
-                                        PeakIDPathWidget, AdvancedWidget,
-                                        PeaksOligoListWidget)
+from ._widget                   import createwidgets
 from ._io                       import setupio
 
 class PeaksSequenceHover(Model, SequenceHoverMixin):
@@ -91,28 +89,31 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
                              'xlabel'          : u'Rate (%)',
                              'widgets.border'  : 10}
 
+        css = self.css.events
+        css.defaults = {'count'   : PlotAttrs('lightblue', 'circle', 3)}
+
+        css = self.css.reference
+        css.defaults = {'count'   : PlotAttrs('bisque', 'patch', alpha = 0.5)}
+
         css = self.css.peaks
-        css.defaults = {'duration'  : PlotAttrs('lightgreen', 'diamond', 10),
-                        'count'     : PlotAttrs('lightblue',  'square',  10)}
-        css.colors.missing.default = 'red'
-        css.colors.found.defaults  = {'dark': 'black', 'default': 'white'}
+        plt = lambda i, j: PlotAttrs(i, j, 15, fill_alpha = 0.5, angle = np.pi/2.)
+        css.defaults = {'duration': plt('lightgreen', 'diamond'),
+                        'count'   : plt('lightblue',  'triangle')}
+
+        css.colors.reference.default  = 'bisque'
+        css.colors.missing  .default  = 'red'
+        css.colors.found    .defaults = {'dark': 'black', 'default': 'gray'}
 
         self.config.defaults = {'tools': 'ypan,ybox_zoom,reset,save,dpxhover,tap'}
 
         PeaksSequenceHover.defaultconfig(self)
         SequenceTicker.defaultconfig(self)
 
-        self._histsrc: ColumnDataSource = None
-        self._peaksrc: ColumnDataSource = None
-        self._fig:     Figure           = None
-        self._widgets = dict(seq      = PeaksSequencePathWidget(self._model),
-                             oligos   = PeaksOligoListWidget(self._model),
-                             stats    = PeaksStatsWidget(self._model),
-                             peaks    = PeakListWidget(self._model),
-                             cstrpath = PeakIDPathWidget(self._model),
-                             advanced = AdvancedWidget(self._model))
-        self._ticker  = SequenceTicker()
-        self._hover   = PeaksSequenceHover()
+        self._src: Dict[str, ColumnDataSource] = {}
+        self._fig: Figure                      = None
+        self._widgets                          = createwidgets(self._model)
+        self._ticker                           = SequenceTicker()
+        self._hover                            = PeaksSequenceHover()
 
     @property
     def model(self):
@@ -125,46 +126,49 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
 
     def __peaks(self, vals = None):
         colors = [tohex(self.__foundcolor.get()),
-                  tohex(self.css.peaks.colors.missing.get())]
+                  tohex(self.css.peaks.colors.missing.get()),
+                  tohex(self.css.peaks.colors.reference.get())]
 
-        peaks  = dict(self._model.setpeaks(vals))
-        if vals is None or self._model.identification.task is None:
-            peaks['color'] = [colors[0]]*len(peaks['id'])
-        else:
+        peaks  = dict(self._model.peaks)
+        if vals is not None and self._model.identification.task is not None:
             alldist = self._model.distances
             for key in self._model.sequences(...):
                 if key not in alldist:
                     continue
-                peaks[key+'color'] = np.where(np.isfinite(peaks[key+'id']), *colors)
+                peaks[key+'color'] = np.where(np.isfinite(peaks[key+'id']), *colors[:2])
 
             if self._model.sequencekey not in alldist:
                 self._model.sequencekey = max(tuple(alldist),
                                               key = lambda x: alldist[x].value)
             peaks['color'] = peaks[self._model.sequencekey+'color']
+        elif self._model.fittoreference.referencepeaks is not None:
+            peaks['color'] = np.where(np.isfinite(peaks['id']), colors[2], colors[0])
+        else:
+            peaks['color'] = [colors[0]]*len(peaks['id'])
         return peaks
 
-    def __data(self) -> Tuple[dict, dict]:
-        cycles = self._model.runbead()
-        data   = {i: np.empty(0, dtype = 'f4') for i in ('z', 'count')}
-        if cycles is None:
-            return data, self.__peaks(None)
+    def __defaults(self):
+        empty = lambda *cols: {i: np.empty(0, dtype = 'f4') for i in cols}
+        return {'':        empty('z', 'count', 'ref'),
+                'events' : empty('z', 'count'),
+                'peaks':   self.__peaks(None)}
 
-        items = tuple(i for _, i in cycles)
-        if len(items) == 0 or not any(len(i) for i in items):
-            return data, self.__peaks(None)
+    def __data(self) -> Dict[str, dict]:
+        dtl = self._model.runbead()
+        if dtl is None:
+            return self.__defaults()
 
-        peaks = self._model.peakselection.task
-        if peaks is None:
-            return data, self.__peaks(None)
+        fit2ref = self._model.fittoreference
+        zvals   = dtl.binwidth*np.arange(len(dtl.histogram), dtype = 'f4')+dtl.minvalue
 
-        track = self._model.track
-        dtl   = peaks.detailed(items, (track, self._model.bead))
+        data    = dict(z     = zvals,
+                       count = dtl.histogram,
+                       ref   = fit2ref.refhistogram(zvals))
 
-        maxv  = max(peaks.histogram.kernelarray())
-        data  = dict(z     = (dtl.binwidth*np.arange(len(dtl.histogram), dtype = 'f4')
-                              +dtl.minvalue),
-                     count = dtl.histogram/(maxv*track.ncycles)*100.)
-        return data, self.__peaks(dtl)
+        pos     = np.concatenate(dtl.positions)
+        events  = dict(z     = pos,
+                       count = interpolator(data['z'], data['count'], fit2ref.hmin)(pos))
+        return {'': data, 'events': events, 'peaks': self.__peaks(dtl)}
 
     def _create(self, doc):
         "returns the figure"
@@ -185,18 +189,26 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         self._widgets['advanced'].ismain(_)
 
     def _reset(self):
-        data, peaks = self.__data()
-        self._bkmodels[self._peaksrc].update(data = peaks, column_names = list(peaks.keys()))
-        self._bkmodels[self._histsrc].update(data = data)
-        self._hover .reset(self._bkmodels)
-        self._ticker.reset(self._bkmodels)
-        for widget in self._widgets.values():
-            widget.reset(self._bkmodels)
+        dicos = None
+        try:
+            dicos = self.__data()
+        finally:
+            if dicos is None:
+                dicos = self.__defaults()
 
-        if len(data['z']) > 2:
-            self.setbounds(self._fig.y_range, 'y', (data['z'][0], data['z'][-1]))
-        else:
-            self.setbounds(self._fig.y_range, 'y', (0., 1.))
+            for i, j in dicos.items():
+                self._bkmodels[self._src[i]].update(data = j, column_names = list(j.keys()))
+
+            self._hover .reset(self._bkmodels)
+            self._ticker.reset(self._bkmodels)
+            for widget in self._widgets.values():
+                widget.reset(self._bkmodels)
+
+            data = dicos['']
+            if len(data['z']) > 2:
+                self.setbounds(self._fig.y_range, 'y', (data['z'][0], data['z'][-1]))
+            else:
+                self.setbounds(self._fig.y_range, 'y', (0., 1.))
 
     def __create_fig(self):
         self._fig = figure(**self._figargs(y_range = Range1d(start = 0., end = 1.),
@@ -212,15 +224,16 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         self._addcallbacks(self._fig)
 
     def __add_curves(self):
-        self._histsrc, self._peaksrc = (ColumnDataSource(i) for i in self.__data())
+        self._src = {i: ColumnDataSource(j) for i, j in self.__data().items()}
 
         css   = self.css
         rends = []
-        for key in ('count', 'peaks.count', 'peaks.duration'):
-            src = self._peaksrc if 'peaks' in key else self._histsrc
-            args= dict(y            = 'z',
-                       x            = key.split('.')[-1],
-                       source       = src)
+        for key in ('reference.count', 'count', 'events.count',
+                    'peaks.count', 'peaks.duration'):
+            src  = self._src.get(key.split('.')[0], self._src[''])
+            args = dict(x      = 'ref' if key.startswith('ref') else key.split('.')[-1],
+                        y      = 'z',
+                        source = src)
             if 'duration' in key:
                 args['x_range_name'] = 'duration'
 
@@ -239,11 +252,11 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         self._hover.create(self._fig, self._model, self)
         doc.add_root(self._hover)
         self._ticker.create(self._fig, self._model, self)
-        self._hover.jsslaveaxes(self._fig, self._peaksrc)
+        self._hover.jsslaveaxes(self._fig, self._src['peaks'])
 
     def __setup_widgets(self, doc):
         action  = self.action
-        wdg     = {i: j.create(action, self._peaksrc) for i, j in self._widgets.items()}
+        wdg     = {i: j.create(action, self._src['peaks']) for i, j in self._widgets.items()}
         enableOnTrack(self, self._fig, wdg)
         self._widgets['cstrpath'].listentofile(doc, action)
 
@@ -256,7 +269,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
 
         mode     = self.defaultsizingmode()
         wbox     = lambda x: layouts.widgetbox(children = x, **mode)
-        left     = sum((wdg[i] for i in ('seq','oligos','cstrpath', 'advanced')), [])
+        left     = sum((wdg[i] for i in ('ref', 'seq','oligos','cstrpath', 'advanced')), [])
         children = [[wbox(left), wbox(wdg['stats'])], [wbox(wdg['peaks'])]]
         return layouts.layout(children = children, **mode)
 
@@ -271,11 +284,11 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
 
 class PeaksPlotView(PlotView[PeaksPlotCreator]):
     "Peaks plot view"
+    TASKS = 'extremumalignment', 'eventdetection', 'peakselector'
     def advanced(self):
         "triggers the advanced dialog"
         self._plotter.advanced()
 
     def ismain(self):
         "Alignment, ... is set-up by default"
-        self._ismain(tasks = ['extremumalignment', 'eventdetection', 'peakselector'],
-                     **setupio(self._plotter.model))
+        self._ismain(tasks = self.TASKS, **setupio(self._plotter.model))

@@ -8,11 +8,12 @@ from .base                  import PlotCreator
 TModelType = TypeVar('TModelType', bound = TaskPlotModelAccess)
 class TaskPlotCreator(PlotCreator[TModelType]):
     "Base plotter for tracks"
-    def __init__(self, *args, **kwa):
-        super().__init__(*args, **kwa)
-        self._ctrl.getGlobal("project").bead.default = None
+    def __init__(self, ctrl, *_) -> None:
+        super().__init__(ctrl)
         css = self._ctrl.getGlobal('css.plot').title
-        css.defaults = {'stretch': u'Stretch (base/µm)', 'bias': u'Bias (µm)'}
+        if css.stretch.get(default = None) is None:
+            self._ctrl.getGlobal("project").bead.default = None
+            css.defaults = {'stretch': u'Stretch (base/µm)', 'bias': u'Bias (µm)'}
 
     def observe(self):
         "sets-up model observers"

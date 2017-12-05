@@ -12,6 +12,7 @@ TASK_ORDER = ['model.task.RootTask',
               'cordrift.processor.DriftTask',
               'eventdetection.processor.EventDetectionTask',
               'peakfinding.processor.PeakSelectorTask',
+              'peakcalling.processor.FitToReferenceTask',
               'peakcalling.processor.FitToHairpinTask',
              ]
 

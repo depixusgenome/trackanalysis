@@ -3,7 +3,7 @@
 """
 Creates a tasks property and adds it to the Track
 """
-from   typing             import Dict, Any, Union, cast
+from   typing             import Dict, Any, Union, Optional, cast
 from   utils.attrdefaults import addattributes
 from   data.track         import Track, LazyProperty
 from   .tasks             import Tasks, Task
@@ -14,10 +14,11 @@ class TaskDescriptor:
         self.name: str = None
         self.__doc__   = ''
 
-    def __get__(self, instance, owner) -> Union[Tasks, Task]:
-        if instance is None:
-            return Tasks(self.name)
-        return instance.tasks.get(self.name, None)
+    def __get__(self, instance, owner) -> Union['TaskDescriptor', Optional[Task]]:
+        return self if instance is None else instance.tasks.get(self.name, None)
+
+    def __delete__(self, instance):
+        instance.tasks.pop(self.name, None)
 
     def __set__(self, instance, value: Union[Dict[str, Any], bool, Task]):
         if not value:
