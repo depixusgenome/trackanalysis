@@ -556,7 +556,6 @@ class ByEM:
     def __init__(self, **_):
         pass
 
-
     def __call__(self,**kwa):
         events = kwa.get("events",None) # np.array per cycles
         hist   = kwa.get("hist",(0,0,1)) # pylint: disable=unused-variable
@@ -635,13 +634,22 @@ class ByEM:
                 for pid in range(len(params))}
 
 
+    @classmethod
+    def llikelihood(cls,data:np.array,rates:np.array,params:np.array)->float:
+        'returns loglikelihood'
+        score = cls.score(data,params) # p(Xj|Zi)
+        # rates, p(Zi)
+        return np.sum(np.log(rates.T*np.matrix(score)))
+
     def fitone(self,data:np.array,npeaks:int):
         'iterate EM to fit npeaks'
         # initialize params
         rates,params = self.init(data,npeaks)
+        llikelihood = self.llikelihood(data,rates,params)
         for _ in range(self.emiter):
             LOGS.info(f"it={_}")
             LOGS.info(f"params={params}")
+            LOGS.info(f"ll={llikelihood}")
             rates,params=self.emstep(data,rates,params)
         return rates,params
 
