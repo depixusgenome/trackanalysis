@@ -33,20 +33,21 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         setcolors(self,
                   good = 'palegreen', fixed     = 'chocolate',
                   bad  = 'orange',    discarded = 'red')
-        self.css.calib.defaults = {'image'  : PlotAttrs('Greys256', 'image'),
-                                   'start'  : 1./16.,
-                                   'size'   : 6./16}
-        self.css.tooltip.default = '<table>@ttips{safe}</table>'
-        self.css.tooltip.type.defaults    = {'extent'     : 'Δz',
-                                             'hfsigma'    : 'σ[HF]',
-                                             'population' : '% good'}
-        self.css.tooltip.row.default = ('<tr>'
-                                        +'<td>{cycle}</td><td>cycle{plural} with:</td>'
-                                        +'<td>{type}</td><td>{message}</td>'
-                                        +'</tr>')
-        self.css.tooltip.good.default = ('<tr><td><td>'
-                                         +'<td>σ[HF] =</td><td>{:.4f}</td>'
-                                         +'</tr>')
+        self.css.thumbnail.default     = 128
+        self.css.calib.defaults        = {'image'  : PlotAttrs('Greys256', 'image'),
+                                          'start'  : 1./16.,
+                                          'size'   : 6./16}
+        self.css.tooltip.default       = '<table>@ttips{safe}</table>'
+        self.css.tooltip.type.defaults = {'extent'     : 'Δz',
+                                          'hfsigma'    : 'σ[HF]',
+                                          'population' : '% good'}
+        self.css.tooltip.row.default   = ('<tr>'
+                                          +'<td>{cycle}</td><td>cycle{plural} with:</td>'
+                                          +'<td>{type}</td><td>{message}</td>'
+                                          +'</tr>')
+        self.css.tooltip.good.default  = ('<tr><td><td>'
+                                          +'<td>σ[HF] =</td><td>{:.4f}</td>'
+                                          +'</tr>')
         self.config.plot.fov.tools.default       = 'pan,box_zoom,tap,save,hover'
         self.config.plot.fov.calib.tools.default = 'pan,box_zoom,save'
         self._fig:         Figure           = None
@@ -131,11 +132,11 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         bead  = self._model.bead
         img   = np.zeros((10, 10))
         dist  = (0, 0, 0, 0)
-        if (fov is not None
-                and bead in fov.beads
-                and fov.beads[bead].image.size):
+        if fov is not None and bead in fov.beads:
             bead  = fov.beads[bead]
-            img   = bead.image
+            img   = (bead.image if bead.image.size else
+                     bead.thumbnail(self.css.thumbnail.get(), fov))
+
             pos   = bead.position
             rng   = (max(fov.size()),)*2
             start = self.css.calib.start.get()

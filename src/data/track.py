@@ -51,6 +51,12 @@ class Bead:
     def __init__(self, **_):
         pass
 
+    def thumbnail(self, size, fov):
+        "extracts a thumbnail around the bead position"
+        pos  = fov.topixel(np.array(list(self.position[:2])))
+        ind  = np.int32(np.round(pos))-size//2 # type: ignore
+        return fov.image[ind[1]:ind[1]+size,ind[0]:ind[0]+size]
+
 class FoV:
     """
     The data concerning the field of view:
