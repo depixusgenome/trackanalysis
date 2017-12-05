@@ -89,7 +89,7 @@ class TracksDict(dict):
     ```
     """
     _SCAN_OPTS  = ('cgrdir', 'allleaves')
-    _NTHREADS   = 4
+    _NTHREADS   = None
     _TRACK_TYPE = Track
     def __init__(self,          # pylint: disable=too-many-arguments
                  tracks  = None,
@@ -344,3 +344,12 @@ class TracksDict(dict):
                     keys.append(key)
 
         return sorted(keys)
+
+    def load(self) -> 'TracksDict':
+        "Loads all the data"
+        unloaded = [i for i in self.values() if not i.isloaded]
+        if len(unloaded):
+            with ThreadPoolExecutor(self._NTHREADS) as pool:
+                for _ in pool.map(Track.load, unloaded):
+                    pass
+        return self
