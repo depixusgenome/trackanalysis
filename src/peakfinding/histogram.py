@@ -6,9 +6,9 @@ from    typing                  import (NamedTuple, Optional, Iterator,
                                         Dict)
 from    enum                    import Enum
 import  itertools
+import pickle
 from    sklearn.mixture         import GaussianMixture
 from sklearn.cluster            import KMeans
-
 import  numpy  as     np
 from    numpy.lib.stride_tricks import as_strided
 
@@ -512,7 +512,6 @@ class ByGaussianMix:
         hist, bias, slope   = kwa.get("hist",(0,0,1))
         return self.find(pos, hist, bias, slope)
 
-
     def find(self,pos: np.array, hist, bias:float = 0., slope:float = 1.):
         'find peaks'
         events   = np.hstack(pos)
@@ -572,24 +571,66 @@ class ByGaussianMix:
         values = [getattr(gmm,crit)(evts) for gmm in gmms]
         return gmms[np.argmin(values)]
 
+# needs fixing, problem: decreasing llikeli
 class ByEM:
     '''
     finds peaks and groups events using Expectation Maximization
     the number of components is estimated using BIC criteria
+    tests to add:
+    test params from init
+    for r in param:
+    try r.reshape(2,-1) (see cls.scorex)
     '''
-    emiter = 100
+    emiter = 10
+    tol    = 1e-2
+    mincount:int= 5
     params:np.array
     rates:np.array
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 
     def __call__(self,**kwa):
+        pickle.dump(kwa,open("kwa.pk","wb"))
         events = kwa.get("events",None) # np.array per cycles
-        hist   = kwa.get("hist",(0,0,1)) # pylint: disable=unused-variable
+        # include kwa.get("precision",1)
+        _, bias, slope  = kwa.get("hist",(0,0,1))
+        npeaks = len(ZeroCrossingPeakFinder()(*kwa.get("hist",(0,0,1))))
+        return self.find(events, bias, slope, npeaks)
+
+    def find(self, events, bias, slope, npeaks:int):
+        'find peaks'
         data   = np.array([[np.nanmean(i),len(i)] for i in np.hstack(events)])
-        npeaks = kwa.get("npeaks",2)
-        return self.fitone(data,npeaks) # will need to apply slope and pias to peaks
+        params = self.fitone(data,npeaks)[1]
+        # 1D
+        peaks  = params.T[0,:]
+        order  = [_1[0] for _1 in sorted([_ for _ in enumerate(peaks)],
+                                         key = lambda x:x[1])]
+
+        peaks, ids = self.__strip(params[order,:],data,events)
+        return peaks * slope + bias , ids
+
+    def __strip(self, params, data, events):
+        '''
+        removes peaks which have fewer than mincount events
+        and assign events to most likely peaks
+        '''
+        predicts = np.array([np.argmax(_) for _ in self.score(data,params).T])
+        lowcount = [pkid for pkid in range(params.shape[0]) if np.sum(predicts==pkid)<self.mincount]
+        pos = np.array([ np.array([[np.nanmean(evt),len(evt)] for evt in cyc])
+                         if cyc.size>0 else np.array([]) for cyc in events])
+
+        ids = np.array([self.__predict(zpos,params) for zpos in pos])
+        ids[np.isin(ids,lowcount)]=np.iinfo("i4").max # unassigned events
+        return params.T[0,:],ids
+
+    @classmethod
+    def __predict(cls, data:np.array, params:np.array):
+        if data.size==0:
+            return np.array([])
+        ids = np.array([np.argmax(_) for _ in cls.score(data,params).T])
+        return ids
 
     @staticmethod
     def init(data:np.array,nclusters=1)->np.array:
@@ -617,8 +658,8 @@ class ByEM:
 
         scored=[]
         for par in params:
-            pdfs=_score(par)
-            score= lambda x:np.sum([pdf(x[idx]) for idx,pdf in enumerate(pdfs)])
+            pdfs  = _score(par)
+            score = lambda x:np.sum([pdf(x[idx]) for idx,pdf in enumerate(pdfs)])
             scored.append([score(arr) for arr in data])
 
         return np.array(scored)
@@ -634,7 +675,6 @@ class ByEM:
     @classmethod
     def __maximization(cls,pz_x:np.array,data:np.array,params:np.array):
         'returns the next set of parameters'
-        # should be ok for xyz or z only axes, except for nscales comp
         nrates  = np.mean(pz_x,axis=1).reshape(-1,1)
         # spatial params on data[:,:-1]
         nmeans  = np.matrix(pz_x)*data[:,:-1]
@@ -650,17 +690,14 @@ class ByEM:
         tscales/=np.array(np.matrix(pz_x)*data[:,-1].reshape(-1,1))
         return nrates,np.hstack([np.array(nmeans),tmeans,nscales,1/tscales])
 
-
     @classmethod
     def assign(cls,data:np.array,params:np.array)->Dict[int,np.array]:
         'to each event (row in data) assign a peak (row in params)'
-        # assumes Gaussian distribution for peaks
-        # exponential distribution for durations
+        # Gaussian distribution for position, exponential for duration
         scored=cls.score(data,params) # scored[i,j] = pdf(Xi,Zj| theta)
         assigned=[np.argmin(row) for row in scored]
         return {pid:np.array([row for idx,row in enumerate(data) if assigned[idx]==pid])
                 for pid in range(len(params))}
-
 
     @classmethod
     def llikelihood(cls,data:np.array,rates:np.array,params:np.array)->float:
@@ -671,14 +708,14 @@ class ByEM:
 
     def fitone(self,data:np.array,npeaks:int):
         'iterate EM to fit npeaks'
-        # initialize params
         rates,params = self.init(data,npeaks)
         llikelihood = self.llikelihood(data,rates,params)
         for _ in range(self.emiter):
-            LOGS.info(f"it={_}")
-            LOGS.info(f"params={params}")
+            #LOGS.info(f"it={_}")
+            #LOGS.info(f"params={params}")
             LOGS.info(f"ll={llikelihood}")
             rates,params=self.emstep(data,rates,params)
+            llikelihood = self.llikelihood(data,rates,params)
         return rates,params
 
-PeakFinder = Union[ByZeroCrossing, ByGaussianMix]
+PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]

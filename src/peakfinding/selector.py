@@ -157,7 +157,8 @@ class PeakSelector(PrecisionAlg):
             delta  = None
 
         histdata   = projector.projection(pos, zmeasure = None)
-        peaks, ids = self.finder(hist      = histdata,
+        peaks, ids = self.finder(events    = events,
+                                 hist      = histdata,
                                  pos       = pos,
                                  precision = precision)
         return PeakSelectorDetails(pos, histdata[0], histdata[1], histdata[2],
