@@ -11,8 +11,7 @@ from   numpy.testing    import assert_equal
 from   legacy           import readtrack   # pylint: disable=import-error,no-name-in-module
 import data
 from   data.views       import ITrackView
-from   data.trackio     import (LegacyGRFilesIO, savetrack,
-                                PickleIO, LegacyTrackIO, LegacyGRFilesIO)
+from   data.trackio     import LegacyGRFilesIO, savetrack, PickleIO, LegacyTrackIO
 from   data.track       import FoV
 from   data.tracksdict  import TracksDict
 from   testingcore      import path as utpath

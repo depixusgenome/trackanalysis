@@ -96,7 +96,7 @@ def test_peaksplot(bokehaction):
         krow = next(iter(server.doc.select(dict(type = DpxKeyedRow))))
         def _press(val, *truth):
             server.press(val, krow)
-            assert vals == approx(truth, rel = 1e-2)
+            assert vals == approx(truth, abs = 2e-2)
 
         fig = server.widget['Peaks:fig']()
         for _ in range(5):
@@ -150,6 +150,12 @@ def test_peaksplot(bokehaction):
         server.wait()
         assert found[0] == out
         assert Path(out).exists()
+        assert server.ctrl.getGlobal("project").constraints.path.get() is not None
+
+        server.cmd((lambda: setattr(server.widget['Peaks:IDPath'], 'value', "")),
+                   andstop = False)
+        server.wait()
+        assert server.ctrl.getGlobal("project").constraints.path.get() is None
 
 def test_reference(bokehaction):
     "test peaksplot"
@@ -192,4 +198,4 @@ def test_hybridstat(bokehaction):
         server.change('Hybridstat:Tabs', 'active', 2)
 
 if __name__ == '__main__':
-    test_reference(bokehaction(None))
+    test_peaksplot(bokehaction(None))

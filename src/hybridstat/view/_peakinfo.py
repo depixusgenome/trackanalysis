@@ -105,8 +105,10 @@ class IdentificationPeakInfo(PeakInfo):
             dico[f'{key}orient']         = np.full(len(zvals), ' ', dtype = '<U1')
             dico[f'{key}orient']  [good] = [strori[ori.get(int(i+0.01), 2)]
                                             for i in dico[f'{key}id'][good]]
-        for i in self.basekeys():
-            dico[i] = dico[mdl.sequencekey+i]
+
+        if mdl.sequencekey in mdl.distances:
+            for i in self.basekeys():
+                dico[i] = dico[mdl.sequencekey+i]
         return dico
 
 class StatsPeakInfo(PeakInfo):
