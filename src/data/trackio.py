@@ -6,18 +6,18 @@ import  sys
 from    typing             import (Sequence, Any, Union, Tuple, Optional,
                                    Iterator, Dict, cast, overload, TypeVar,
                                    TYPE_CHECKING)
+from    abc                import ABC, abstractmethod
 from    itertools          import chain
 from    concurrent.futures import ThreadPoolExecutor
-from    inspect            import signature
 from    copy               import copy as shallowcopy
+from    functools          import partial
+from    pathlib            import Path
 import  pickle
 import  re
-from    functools   import wraps, partial
-from    pathlib     import Path
-import  numpy       as     np
+import  numpy              as     np
 
 # pylint: disable=import-error,no-name-in-module
-from    legacy      import readtrack, readgr, fov as readfov
+from    legacy             import readtrack, readgr, fov as readfov
 
 if TYPE_CHECKING:
     # pylint: disable=unused-import
@@ -42,48 +42,36 @@ def _glob(path:str):
         return Path(str(root.parent)).glob(root.name+path[ind:])
     return Path(root).glob(path[ind:])
 
-def _checktype(fcn):
-    sig = signature(fcn)
-    tpe = tuple(i for i in sig.parameters.values()
-                if i.kind is not i.VAR_KEYWORD)[-1].annotation
-    if tpe is sig.empty:
-        tpe = Any
-    elif tpe == Tuple[PATHTYPE,...]:
-        tpe = tuple
-    else:
-        tpe = getattr(tpe, '__union_params__', tpe)
-        if str(getattr(tpe, '__origin__', tpe)) == 'typing.Union':
-            tpe = getattr(tpe, '__args__', tpe)
-
-    @wraps(fcn)
-    def _wrapper(*args):
-        if tpe is Any or isinstance(args[-1], tpe):
-            return fcn(*args)
-        return None
-    return _wrapper
-
-class _TrackIO:
-    @staticmethod
-    def check(path, **_):
+class _TrackIO(ABC):
+    @classmethod
+    @abstractmethod
+    def check(cls, path:PATHTYPES, **_) -> Optional[PATHTYPES]:
         "checks the existence of a path"
-        raise NotImplementedError()
 
     @staticmethod
-    def open(path, **_):
+    def checkpath(path:PATHTYPES, ext:str) -> Optional[PATHTYPES]:
+        "checks the existence of a path"
+        if isinstance(path, (tuple, list, set, frozenset)) and len(path) == 1:
+            path = path[0]
+        if isinstance(path, (str, Path)):
+            return path if Path(path).suffix == ext else None
+        return None
+
+    @classmethod
+    @abstractmethod
+    def open(cls, path:PATHTYPE, **_) -> Dict[Union[str, int], Any]:
         "opens a track file"
-        raise NotImplementedError()
 
 class PickleIO(_TrackIO):
     "checks and opens pickled paths"
     EXT = '.pk'
     @classmethod
-    @_checktype
-    def check(cls, path:PATHTYPE, **_) -> Optional[PATHTYPE]:
+    def check(cls, path:PATHTYPES, **_) -> Optional[PATHTYPES]:
         "checks the existence of a path"
-        return path if Path(path).suffix == cls.EXT else None
+        return cls.checkpath(path, cls.EXT)
 
     @staticmethod
-    def open(path:PATHTYPE, **_) -> dict:
+    def open(path:PATHTYPE, **_) -> Dict[Union[str, int], Any]:
         "opens a track file"
         with open(path, 'rb') as stream:
             return pickle.load(stream)
@@ -99,10 +87,9 @@ class LegacyTrackIO(_TrackIO):
     "checks and opens legacy track paths"
     __TRKEXT = '.trk'
     @classmethod
-    @_checktype
-    def check(cls, path:PATHTYPE, **_) -> Optional[PATHTYPE]: # type: ignore
+    def check(cls, path:PATHTYPES, **_) -> Optional[PATHTYPES]:
         "checks the existence of a path"
-        return path if Path(path).suffix == cls.__TRKEXT else None
+        return cls.checkpath(path, cls.__TRKEXT)
 
     @staticmethod
     def open(path:PATHTYPE, **kwa) -> dict:
@@ -140,32 +127,29 @@ class LegacyGRFilesIO(_TrackIO):
                           r"(?:[^\d]|\d(?!,))*(?P<phases>[\d, ]*?)\].*?}}")
     __GRTITLE = re.compile(r"Bead Cycle (?P<id>\d+) p.*")
     @classmethod
-    @_checktype
-    def check(cls, # type: ignore
-              apaths:Tuple[PATHTYPE,...],
-              **kwa) -> Optional[Tuple[PATHTYPE,...]]:
+    def check(cls, path:PATHTYPES, **kwa) -> Optional[PATHTYPES]:
         "checks the existence of paths"
-        if len(apaths) < 2:
+        if not isinstance(path, (list, tuple, set, frozenset)) or len(path) < 2:
             return None
 
-        paths = tuple(Path(i) for i in apaths)
-        if sum(1 for i in paths if i.suffix == cls.__TRKEXT) != 1:
+        allpaths = tuple(Path(i) for i in cast(Tuple[PATHTYPE,...], path))
+        if sum(1 for i in allpaths if i.suffix == cls.__TRKEXT) != 1:
             return None
 
-        if len(paths) == 2 and any(i.is_dir() for i in paths):
-            paths = cls.__findgrs(paths, kwa)
-            fname = str(paths[0])
+        if len(allpaths) == 2 and any(i.is_dir() for i in allpaths):
+            allpaths = cls.__findgrs(allpaths, kwa)
+            fname    = str(allpaths[0])
             if '*' in fname:
-                return cls.__findtrk(fname, paths[1])
+                return cls.__findtrk(fname, allpaths[1])
 
-            elif not paths[0].exists():
-                raise IOError("Could not find path: " + str(paths[0]), "warning")
+            elif not allpaths[0].exists():
+                raise IOError("Could not find path: " + str(allpaths[0]), "warning")
 
-            return paths
+            return allpaths
 
         else:
-            trk = next(i for i in paths if i.suffix == cls.__TRKEXT)
-            grs = tuple(i for i in paths if i.suffix  == '.gr')
+            trk = next(i for i in allpaths if i.suffix == cls.__TRKEXT)
+            grs = tuple(i for i in allpaths if i.suffix  == '.gr')
             if len(grs) == 0:
                 return None
 
@@ -351,7 +335,7 @@ _CALLERS = _TrackIO.__subclasses__()
 
 class Handler:
     "A handler for opening the provided path"
-    def __init__(self, path: str, handler: Any) -> None:
+    def __init__(self, path: PATHTYPES, handler: Any) -> None:
         self.path    = path
         self.handler = handler
 

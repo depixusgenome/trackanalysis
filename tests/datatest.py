@@ -11,7 +11,8 @@ from   numpy.testing    import assert_equal
 from   legacy           import readtrack   # pylint: disable=import-error,no-name-in-module
 import data
 from   data.views       import ITrackView
-from   data.trackio     import LegacyGRFilesIO, savetrack
+from   data.trackio     import (LegacyGRFilesIO, savetrack,
+                                PickleIO, LegacyTrackIO, LegacyGRFilesIO)
 from   data.track       import FoV
 from   data.tracksdict  import TracksDict
 from   testingcore      import path as utpath
@@ -345,5 +346,23 @@ def test_trktopk():
     assert new['i'].path == (Path(fname)/"i").with_suffix(".pk")
     assert (Path(fname)/"i").with_suffix(".pk").exists()
 
+def test_io_recognition():
+    "tests that the right IO class recognizes its paths"
+    files = dict(pickles = ((utpath("100bp_4mer/ref.pk"),), utpath("100bp_4mer/ref.pk"),),
+                 tracks  = ((utpath("small_legacy"),), utpath("small_legacy"),),
+                 grs     = ((utpath("big_legacy"), utpath("CTGT_selection")),
+                            (utpath("big_legacy"), utpath("CTGT_selection")+"/Z(t)bd0track10.gr")),
+                 none    = (utpath("CTGT_selection"),
+                            utpath("CTGT_selection")+"/Z(t)bd0track10.gr",
+                            (utpath("CTGT_selection")+"/Z(t)bd0track10.gr"),))
+
+    types = dict(pickles = PickleIO,
+                 tracks  = LegacyTrackIO,
+                 grs     = LegacyGRFilesIO)
+    for tpename, tpe  in types.items():
+        for fname, paths in files.items():
+            for path in paths:
+                assert (tpe.check(path) is None) is (tpename != fname)
+
 if __name__ == '__main__':
-    test_cycles_iterkeys()
+    test_io_recognition()
