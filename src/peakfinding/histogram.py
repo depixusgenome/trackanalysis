@@ -6,7 +6,6 @@ from    typing                  import (NamedTuple, Optional, Iterator,
                                         Dict)
 from    enum                    import Enum
 import  itertools
-import pickle
 from    sklearn.mixture         import GaussianMixture
 from sklearn.cluster            import KMeans
 import  numpy  as     np
@@ -14,7 +13,6 @@ from    numpy.lib.stride_tricks import as_strided
 
 from    scipy.interpolate       import interp1d
 from    scipy.signal            import find_peaks_cwt
-from    scipy.stats             import norm, expon
 
 from    utils                   import (kwargsdefaults, initdefaults,
                                         NoArgs, asdataarrays, EVENTS_DTYPE)
@@ -569,6 +567,7 @@ class ByGaussianMix:
         return gmms[np.argmin(values)]
 
 # needs fixing, problem: decreasing llikeli
+# check the mean and scale in exponential dist
 class ByEM:
     '''
     finds peaks and groups events using Expectation Maximization
@@ -589,7 +588,6 @@ class ByEM:
         pass
 
     def __call__(self,**kwa):
-        pickle.dump(kwa,open("kwa.pk","wb"))
         events = kwa.get("events",None) # np.array per cycles
         # include kwa.get("precision",1)
         _, bias, slope  = kwa.get("hist",(0,0,1))
@@ -600,18 +598,14 @@ class ByEM:
         'find peaks'
         data   = np.array([[np.nanmean(i),len(i)] for i in np.hstack(events)])
         params = self.fitone(data,npeaks)[1]
-        # 1D
-        peaks  = params.T[0,:]
-        order  = [_1[0] for _1 in sorted([_ for _ in enumerate(peaks)],
-                                         key = lambda x:x[1])]
-
+        order  = np.argsort(params.T[0,:])
         peaks, ids = self.__strip(params[order,:],data,events)
         return peaks * slope + bias , ids
 
     def __strip(self, params, data, events):
         '''
         removes peaks which have fewer than mincount events
-        and assign events to most likely peaks
+        then assigns events to most likely peaks
         '''
         predicts = np.array([np.argmax(_) for _ in self.score(data,params).T])
         lowcount = [pkid for pkid in range(params.shape[0]) if np.sum(predicts==pkid)<self.mincount]
@@ -620,7 +614,7 @@ class ByEM:
 
         ids = np.array([self.__predict(zpos,params) for zpos in pos])
         ids[np.isin(ids,lowcount)]=np.iinfo("i4").max # unassigned events
-        return params.T[0,:],ids
+        return params.T[0,:], ids
 
     @classmethod
     def __predict(cls, data:np.array, params:np.array):
@@ -630,61 +624,87 @@ class ByEM:
         return ids
 
     @staticmethod
-    def init(data:np.array,nclusters=1)->np.array:
+    def init(data:np.array,npeaks=1)->np.array:
         'init using KMeans on spatial data'
-        kmean   = KMeans(nclusters)
+        kmean   = KMeans(npeaks)
         kmean.fit(data[:,:-1])
         predict = kmean.predict(data[:,:-1])
+
         clas    = {idx:np.array([data[_1] for _1,_2 in enumerate(predict) if _2==idx])
-                   for idx in range(nclusters)}
+                   for idx in range(npeaks)}
 
-        stds    = np.array([np.nanstd(clas[idx],axis=0) for idx in range(nclusters)])
-        means   = np.array([np.nanmean(clas[idx],axis=0) for idx in range(nclusters)])
-        rates   = np.array([1/nclusters]*nclusters).reshape(-1,1)
-        return rates,np.hstack([means,stds]) # one row per cluster
+        scales  = np.array([np.nanstd(clas[idx],axis=0) for idx in range(npeaks)])
+        means   = np.array([np.nanmean(clas[idx],axis=0) for idx in range(npeaks)])
+        rates   = 1/npeaks*np.array([1]*npeaks).reshape(-1,1)
+        return rates, np.hstack([means, scales])
 
+    @staticmethod
+    def __normlpdf(loc, scale, pos):
+        'log pdf of Gaussian dist'
+        return -np.log(scale)-0.5*((pos-loc)/scale)**2
 
+    @staticmethod
+    def __normpdf(loc, scale, pos):
+        'pdf of Gaussian dist'
+        return np.exp(-0.5*((pos-loc)/scale)**2)/(np.sqrt(2*np.pi)*scale)
+
+    @staticmethod
+    def __explpdf(loc, scale, pos):
+        'log pdf of exponential dist'
+        return -np.log(scale)+(loc-pos)/scale
+
+    @staticmethod
+    def __exppdf(loc, scale, pos):
+        'log pdf of exponential dist'
+        return 0 if loc<pos else np.exp((loc-pos)/scale)/scale
+
+    @classmethod
+    def pdf(cls, args:np.ndarray)->float:
+        '''
+        args : np.array([[xloc,xscale,xpos],
+                         [yloc,yscale,ypos],
+                         [zloc,zscale,zpos],
+                         [tloc,tscale,tpos]])
+        '''
+        return np.prod([cls.__normpdf(*par) for par in args[:-1]])*cls.__normpdf(*args[-1])
+
+    # needs pytest
     @classmethod
     def score(cls,data:np.array,params:np.array)->np.array:
         'return the score[i,j] array corresponding to pdf(Xj|Zi, theta)'
-        def _score(par):
-            par   = par.reshape(2,-1).T
-            pdfs  = [norm(loc=_[0],scale=_[1]).pdf for _ in par[:-1]]
-            pdfs += [expon(loc=0,scale=par[-1][1]).pdf]
-            return pdfs
+        mid = params.shape[1]//2
+        locscale = np.array([list(zip(r[:mid],r[mid:])) for r in params])
+        pdf = map(lambda x:cls.pdf(np.hstack([x[0],x[1].reshape(-1,1)])),
+                  itertools.product(locscale,data))
 
-        scored=[]
-        for par in params:
-            pdfs  = _score(par)
-            score = lambda x:np.sum([pdf(x[idx]) for idx,pdf in enumerate(pdfs)])
-            scored.append([score(arr) for arr in data])
-
-        return np.array(scored)
+        return np.array(list(pdf)).reshape(len(params),-1)
 
     @classmethod
     def emstep(cls,data:np.array,rates:np.array,params:np.array):
-        'E then M steps of EM'
+        'Expectation then Maximization steps of EM'
         score = cls.score(data,params)
         pz_x  = score*rates # P(Z|X,theta)
         pz_x  = np.array(pz_x)/np.sum(pz_x,axis=0) # renorm over Z
-        return cls.__maximization(pz_x,data,params)
+        return cls.maximization(pz_x,data,params)
 
+    # to rewrite
     @classmethod
-    def __maximization(cls,pz_x:np.array,data:np.array,params:np.array):
+    def maximization(cls,pz_x:np.array,data:np.array,params:np.array):
         'returns the next set of parameters'
-        nrates  = np.mean(pz_x,axis=1).reshape(-1,1)
+        nrates    = np.mean(pz_x,axis=1).reshape(-1,1)
         # spatial params on data[:,:-1]
-        nmeans  = np.matrix(pz_x)*data[:,:-1]
-        nmeans /= np.sum(pz_x,axis=1).reshape(-1,1)
-        center = np.hstack([data[:,:-1]-i for i in nmeans]).T
+        nmeans    = np.matrix(pz_x)*data[:,:-1]
+        nmeans   /= np.sum(pz_x,axis=1).reshape(-1,1)
+        center    = np.hstack([data[:,:-1]-i for i in nmeans]).T
 
-        nscales =np.array([np.matrix(np.array(r)*pz_x[idx,:])*r.T
-                           for idx,r in enumerate(center)]).reshape(-1,1)
-        nscales /= np.sum(pz_x,axis=1).reshape(-1,1)
+        nscales   = np.array([np.matrix(np.array(r)*pz_x[idx,:])*r.T
+                              for idx,r in enumerate(center)]).reshape(-1,1)
+        nscales  /= np.sum(pz_x,axis=1).reshape(-1,1)
         # temporal params on data[:,-1]
-        tmeans  = np.array([0]*params.shape[0]).reshape(-1,1)
-        tscales = np.sum(pz_x,axis=1).reshape(-1,1)
-        tscales/=np.array(np.matrix(pz_x)*data[:,-1].reshape(-1,1))
+        tmeans    = np.array([0]*params.shape[0]).reshape(-1,1)
+
+        tscales   = np.sum(pz_x,axis=1).reshape(-1,1)
+        tscales  /= np.array(np.matrix(pz_x)*data[:,-1].reshape(-1,1))
         return nrates,np.hstack([np.array(nmeans),tmeans,nscales,1/tscales])
 
     @classmethod
