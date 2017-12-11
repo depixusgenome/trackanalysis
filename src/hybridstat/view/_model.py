@@ -3,6 +3,7 @@
 "Model for peaksplot"
 from typing                     import (Optional, Dict, # pylint: disable=unused-import
                                         List, Tuple, Any, cast)
+from   copy                     import deepcopy
 import pickle
 
 import numpy                    as     np
@@ -168,8 +169,9 @@ class FitToHairpinAccess(TaskAccess):
     def __init__(self, ctrl):
         super().__init__(ctrl, FitToHairpinTask)
         self.__defaults = self.config.root.tasks.fittohairpin
-        self.__defaults.defaults = {'fit':   FitToHairpinTask.DEFAULT_FIT(),
-                                    'match': FitToHairpinTask.DEFAULT_MATCH()}
+        self.__defaults.defaults = {'fit':         FitToHairpinTask.DEFAULT_FIT(),
+                                    'match':       FitToHairpinTask.DEFAULT_MATCH(),
+                                    'constraints': deepcopy(FitToHairpinTask.DEFAULT_CONSTRAINTS)}
 
     def setobservers(self, mdl):
         "observes the global model"
@@ -211,9 +213,10 @@ class FitToHairpinAccess(TaskAccess):
 
         dist = self.__defaults.fit.get()
         pid  = self.__defaults.match.get()
+        cstr = self.__defaults.constraints.get()
         return fittohairpintask(mdl.sequencepath,    ols,
                                 mdl.constraintspath, mdl.useparams,
-                                fit = dist, match = pid)
+                                constraints = cstr, fit = dist, match = pid)
 
     def resetmodel(self, mdl):
         "resets the model"

@@ -81,6 +81,7 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
         1 - R(X, Y)/sqrt(R(X, X) R(Y, Y))
     """
     precision = 15.
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         HairpinFitter.__init__(self, **kwa)
         GriddedOptimization.__init__(self, **kwa)

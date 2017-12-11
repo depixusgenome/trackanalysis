@@ -82,7 +82,7 @@ class BeadsByHairpinProcessor(Processor[BeadsByHairpinTask]):
 
     @classmethod
     def _unpooled(cls, cnf, frame):
-        vals       = {i: cnf[i] for i in set(cnf) & {'fit', 'constrainst', 'match'}}
+        vals       = {i: cnf[i] for i in set(cnf) & {'fit', 'constraints', 'match'}}
         frame.data = {i.key: i for i in cls.compute(frame.data, **vals)}
         return []
 
