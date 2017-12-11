@@ -103,15 +103,24 @@ class PeaksStatsDiv(Div): # pylint: disable = too-many-ancestors
     data               = props.Dict(props.String, props.String)
     __implementation__ = "peakstats.coffee"
 
+_LINE = """
+    <div>
+        <div class='dpx-span'>
+            <div><p style='margin: 0px; width:120px;'><b>{}</b></p></div>
+            <div><p style='margin: 0px;'>{}</p></div>
+        </div>
+    </div>
+    """.strip().replace("    ", "").replace("\n", "")
 class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
     "Table containing stats per peaks"
     def __init__(self, model:PeaksPlotModelAccess) -> None:
         super().__init__(model)
         self.__widget: PeaksStatsDiv = None
         css = self.css.stats
-        css.defaults = {'title.format': '{}',
+        css.defaults = {'title.line': _LINE,
                         'title.openhairpin': u' & open hairpin',
                         'title.orientation': u'-+ ',
+                        'style': {'padding-top': '40px'},
                         'lines': [['css:title.stretch', '.3f'],
                                   ['css:title.bias',    '.4f'],
                                   [u'σ[HF] (µm)',       '.4f'],
@@ -126,7 +135,7 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
 
     def create(self, *_) -> List[Widget]: # pylint: disable=arguments-differ
         "creates the widget"
-        self.__widget = PeaksStatsDiv()
+        self.__widget = PeaksStatsDiv(style = self.css.stats.style.get())
         self.reset(None)
         return [self.__widget]
 
@@ -142,8 +151,9 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
             get         = lambda i: css[i[4:]].get() if i.startswith('css:') else i
             self.titles = [(get(i[0]), i[1]) for i in css.stats.lines.get()]
             self.values = ['']*len(self.titles) # type: List
-            self.line   = '<tr><td>'+css.stats.title.format.get()+'</td><td>{}</td></tr>'
+            self.line   = css.stats.title.line.get()
             self.openhp = css.stats.title.openhairpin.get()
+
 
         def trackdependant(self, mdl):
             "all track dependant stats"
@@ -200,10 +210,8 @@ class PeaksStatsWidget(WidgetCreator[PeaksPlotModelAccess]):
                                       * (nfound - 2)))
 
         def __call__(self) -> str:
-            return ('<table>'
-                    + ''.join(self.line.format(i[0], self.__fmt(i[1], j))
-                              for i, j in zip(self.titles, self.values))
-                    +'</table>')
+            return ''.join(self.line.format(i[0], self.__fmt(i[1], j))
+                           for i, j in zip(self.titles, self.values))
 
         @staticmethod
         def __fmt(fmt, val):
