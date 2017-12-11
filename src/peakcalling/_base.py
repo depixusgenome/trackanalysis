@@ -152,7 +152,9 @@ def chisquare(ref       : np.ndarray, # pylint: disable=too-many-arguments
               symmetry  : Symmetry,
               window    : float,
               stretch   : float,
-              bias      : float):
+              bias      : float,
+              stretchcstr: tuple = None,
+              biascstr:    tuple = None):
     """
     We use the GaussianProductFit results to match exp then estimate
     the best Χ² fit between matched exp, adding their count as well.
@@ -164,13 +166,23 @@ def chisquare(ref       : np.ndarray, # pylint: disable=too-many-arguments
             return pairs[1:]
         return pairs
 
+    def _fit(pairs):
+        params   = np.polyfit(exp[pairs[:,1]], ref[pairs[:,0]], 1)
+        if stretchcstr and (stretchcstr[0] > params[0] or stretchcstr[1] < params[0]):
+            return None, []
+        if biascstr and (biascstr[0] > params[1] or biascstr[1] < params[1]):
+            return None, []
+        return params, _pairs(params)
+
     pairs = _pairs((stretch, bias))
     if len(pairs) > 1:
-        params   = np.polyfit(exp[pairs[:,1]], ref[pairs[:,0]], 1)
-        newpairs = _pairs(params)
+        params, newpairs  = _fit(pairs)
         if len(newpairs) > len(pairs):
-            params = np.polyfit(exp[newpairs[:,1]], ref[newpairs[:,0]], 1)
-            pairs  = _pairs(params)
+            params, newpairs = _fit(newpairs)
+        if params:
+            pairs  = newpairs
+        else:
+            params = stretch, bias
 
         dist  = ((params[0]*exp[pairs[:,1]]+params[1] - ref[pairs[:,0]])**2).sum()
         dist /= window**2
