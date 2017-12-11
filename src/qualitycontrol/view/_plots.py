@@ -75,8 +75,8 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         if len(xvals):
             perc, factor = self.config.yspan.get()
             span         = np.percentile(xvals, perc)
-            span         = (span[0]-(span[1]-span[0])*factor,
-                            span[1]+(span[1]-span[0])*factor)
+            delta        = max(1e-5, span[1]-span[0])
+            span         = span[0]-delta*factor, span[1]+delta*factor
             self._bkmodels[self._fig.y_range].update(start = span[0], end = span[1])
 
         alpha = self.css.outline.alpha.get() if self._warn(data) else 0.

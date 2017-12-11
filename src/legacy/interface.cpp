@@ -86,11 +86,9 @@ namespace legacy
                                       tpe[0] == 'X' || tpe[0] == 'x' ? 1 : 2;
 
         auto calibpos = rec.pos();
-        auto sdi      = rec.sdi();
-            
         for(size_t ibead = size_t(0), ebead = rec.nbeads(); ibead < ebead; ++ibead)
             if((notall == false || !rec.islost(int(ibead)))
-                && (sdi || calibpos.find(ibead) != calibpos.end()))
+                && (calibpos.find(ibead) != calibpos.end()))
                 add(ibead, [&]() { return rec.bead(ibead, axis); });
 
         add("t",    [&]() { return rec.t(); });
@@ -130,16 +128,21 @@ namespace legacy
         pybind11::dict pos;
         char tmpname[L_tmpnam];
         std::string fname = std::tmpnam(tmpname);
+        auto        sdi   = rec.sdi();
         for(auto const & val: calibpos)
         {
             pos[pybind11::int_(val.first)] = pybind11::make_tuple(std::get<0>(val.second),
                                                                   std::get<1>(val.second),
                                                                   std::get<2>(val.second));
-            rec.readcalib(val.first, fname);
-            calib[pybind11::int_(val.first)] = _readim(fname, false);
+            if(!sdi)
+            {
+                rec.readcalib(val.first, fname);
+                calib[pybind11::int_(val.first)] = _readim(fname, false);
+            }
         }
 
-        res["calibrations"] = calib;
+        if(!sdi)
+            res["calibrations"] = calib;
         res["positions"] = pos;
 
         auto dim = rec.dimensions();

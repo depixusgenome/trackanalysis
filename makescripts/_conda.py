@@ -165,14 +165,14 @@ class _CondaApp(BuildContext):
             self.__zip_files(path, out, zips)
 
         self.__move_files([i for i in mods if i not in zips], out, path, dll)
-        if Path("CHANGELOG.md").exists():
-            copy2("CHANGELOG.md", path/"CHANGELOG.md")
 
         final = Path(".")/wafbuilder.git.version()
         if final.exists():
             rmtree(str(final))
         wafbuilder.os.rename(str(out), str(final))
         self.__copy_gif(final)
+        if Path("CHANGELOG.md").exists():
+            copy2("CHANGELOG.md", final/"CHANGELOG.md")
         rmtree(str(path))
 
     def build_app(self):

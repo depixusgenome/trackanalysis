@@ -357,6 +357,7 @@ class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
             path = self.__widget.value.strip()
             if path == '':
                 self._model.constraintspath = None
+                return
 
             elif not Path(path).exists():
                 if not path.endswith(".xlsx"):

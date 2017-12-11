@@ -59,7 +59,8 @@ class Beads(TrackView, ITrackView):
     @property
     def nframes(self) -> int:
         "returns the number of frames"
-        crng = self.cyclerange()
+        # mypy does not expect ranges to have attributes
+        crng = cast(slice, self.cyclerange())
         if crng.stop < self.track.ncycles:
             start = self.track.phase(crng.start if crng.start else 0, 0)
             return self.track.phase(crng.stop+1, 0) - start

@@ -4954,22 +4954,48 @@ namespace legacy
 
     std::map<int, std::tuple<float, float, float>> GenRecord::pos()  const
     {
-        std::smatch val;
-        std::string flt = "[-+]?(?:\\d+(?:[.,]\\d*)?|[.,]\\d+)(?:[eE][-+]?\\d+)?";
-        std::string tmp = "^Bead(\\d+) xcb ("+flt+") ycb ("+flt+") zcb ("+flt+") .*";
-        std::regex  patt(tmp.c_str());
-
-        std::ifstream stream(_name.c_str(), std::ios_base::in | std::ios_base::binary);
-
         decltype(this->pos()) res;
-        std::string           line;
-        while(std::getline(stream, line))
-            if(std::regex_match(line, val, patt) && val.size() == 5)
-	      res[std::stoi(val[1])] = std::make_tuple(std::stof(val[2]),
-						       std::stof(val[3]),
-						       std::stof(val[4])
-						       );
-        stream.close();
+        if(_ptr == nullptr)
+            ;
+        else if(_ptr->SDI_mode)
+        {
+            size_t psz = size_t(_ptr->page_size);
+            size_t e   = this->nrecs();
+            auto   avg = [&](auto ** ptr)
+                {
+                    double cnt = 0;
+                    double out = 0.;
+                    for(size_t i = 0; i < e; i += psz, ++ptr)
+                        for(size_t k = 0, ke = i+psz > e ? e-i : psz; k < ke; ++k)
+                            if(std::isfinite(ptr[0][k]))
+                            {
+                                out = out *(cnt/(cnt+1)) + ptr[0][k]/(cnt+1);
+                                ++cnt;
+                            }
+                    return float(out);
+                };
+
+            for(size_t ibead = size_t(0), ebead = _ptr->n_bead; ibead < ebead; ++ibead)
+                res[ibead] = std::make_tuple(avg(_ptr->b_r[ibead]->x)*_ptr->dx+_ptr->ax,
+                                             avg(_ptr->b_r[ibead]->y)*_ptr->dy+_ptr->ay,
+                                             avg(_ptr->b_r[ibead]->z)*_ptr->z_cor);
+        } else {
+            std::smatch val;
+            std::string flt = "[-+]?(?:\\d+(?:[.,]\\d*)?|[.,]\\d+)(?:[eE][-+]?\\d+)?";
+            std::string tmp = "^Bead(\\d+) xcb ("+flt+") ycb ("+flt+") zcb ("+flt+") .*";
+            std::regex  patt(tmp.c_str());
+
+            std::ifstream stream(_name.c_str(), std::ios_base::in | std::ios_base::binary);
+
+            std::string           line;
+            while(std::getline(stream, line))
+                if(std::regex_match(line, val, patt) && val.size() == 5)
+              res[std::stoi(val[1])] = std::make_tuple(std::stof(val[2]),
+                                   std::stof(val[3]),
+                                   std::stof(val[4])
+                                   );
+            stream.close();
+        }
         return res;
     }
 

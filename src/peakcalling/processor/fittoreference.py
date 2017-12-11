@@ -114,7 +114,7 @@ class FitToReferenceTask(Task):
         elif isinstance(val, dict):
             self._fitdata = val
             self._fitdata.update({i: FitData(j, (1., 0.)) # type: ignore
-                                  for i, j in val.items()
+                                  for i, j in cast(dict, val.items())
                                   if not isinstance(j, FitData)})
         else:
             fcn = lambda j: (j if isinstance(j, FitData) else FitData(j, (1., 0)))
@@ -125,7 +125,7 @@ class FitToReferenceTask(Task):
                   update = False) -> 'FitToReferenceTask':
         "creates fit data for references from a PeaksDict"
         fcn  = self.fitalg.frompeaks
-        info = {i: FitData(fcn(j), (1., 0.)) for i, j in peaks}
+        info = {i: FitData(fcn(j), (1., 0.)) for i, j in cast(PeaksDict, peaks)}
         if update:
             self._fitdata.update(info)
         else:

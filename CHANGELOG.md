@@ -1,3 +1,8 @@
+# tag cycles_v4.9
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+SDI track files can now be displayed as efficiently as Picotwist files
+
 # tag cycles_v4.8
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
