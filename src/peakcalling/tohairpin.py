@@ -197,21 +197,19 @@ class PeakGridFit(HairpinFitter):
     def optimize(self, peaks:np.ndarray) -> Distance:
         "computes stretch and bias for potential pairings"
         peaks = np.asarray(peaks)
-        if len(peaks) < 2:
+        ref   = self.expectedpeaks
+        if len(peaks) < 2 or len(ref) == 0:
             return self.DEFAULT
 
         rng   = lambda val: ((val.center if val.center else 0.) - val.size,
                              (val.center if val.center else 0.) + val.size)
         args  = rng(self.stretch)+rng(self.bias)
         centr = sum(args[:2])*.5, sum(args[2:])*.5
-        if len(peaks) < 2:
-            return Distance(DEFAULT_BEST, *centr)
 
         delta = peaks[0] if self.bias.center is None else 0.
         if delta != 0.:
             peaks = peaks - delta
 
-        ref   = self.expectedpeaks
         itr   = tuple(i for i in _match.PeakIterator(ref, peaks, *args)) + (centr,)
         args  = ref, peaks, False, self.symmetry, self.window
         minv  = min(chisquare(*args, stretch, -stretch*bias) for stretch, bias in itr)
