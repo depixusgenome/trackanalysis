@@ -281,20 +281,21 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
 
     def runbead(self):
         "runs the bead"
-        tmp, dtl = runbead(self)
+        dtl = None
+        try:
+            tmp, dtl = runbead(self)
+        finally:
+            if dtl is None:
+                self.distances     = {}
+                self.peaks         = createpeaks(self, [])
+                self.estimatedbias = 0.
+            else:
+                tsk   = cast(PeakSelectorTask, self.peakselection.task)
+                peaks = tuple(tsk.details2output(cast(PeakSelectorDetails, dtl)))
 
-        if dtl is None:
-            self.distances     = {}
-            self.peaks         = createpeaks(self, [])
-            self.estimatedbias = 0.
-            return None
-
-        tsk   = cast(PeakSelectorTask, self.peakselection.task)
-        peaks = tuple(tsk.details2output(cast(PeakSelectorDetails, dtl)))
-
-        self.distances     = tmp.distances if self.identification.task else {}
-        self.peaks         = createpeaks(self, peaks)
-        self.estimatedbias = self.peaks['z'][0]
+                self.distances     = tmp.distances if self.identification.task else {}
+                self.peaks         = createpeaks(self, peaks)
+                self.estimatedbias = self.peaks['z'][0]
         return dtl
 
     def reset(self) -> bool: # type: ignore

@@ -86,7 +86,7 @@ def runbead(self) -> Tuple[Optional[FitBead], Optional[PeakSelectorDetails]]:
     procs    = GuiPeakSelectorProcessor(dtlstore), GuiFitToReferenceProcessor(dtlstore)
     ctx      = SequencePlotModelAccess.runcontext(self, *procs)
     with ctx as view:
-        fits = None if view is None else view[self.bead]
+        fits = None if view is None or self.bead not in view.keys() else view[self.bead]
 
     return (fits        if self.identification.task is not None else None,
             dtlstore[0] if dtlstore and len(dtlstore[0].peaks)  else None)
