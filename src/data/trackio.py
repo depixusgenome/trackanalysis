@@ -85,11 +85,11 @@ class PickleIO(_TrackIO):
 
 class LegacyTrackIO(_TrackIO):
     "checks and opens legacy track paths"
-    __TRKEXT = '.trk'
+    TRKEXT = '.trk'
     @classmethod
     def check(cls, path:PATHTYPES, **_) -> Optional[PATHTYPES]:
         "checks the existence of a path"
-        return cls.checkpath(path, cls.__TRKEXT)
+        return cls.checkpath(path, cls.TRKEXT)
 
     @staticmethod
     def open(path:PATHTYPE, **kwa) -> dict:
@@ -105,7 +105,7 @@ class LegacyTrackIO(_TrackIO):
             trkdirs = (trkdirs,)
         trkdirs = tuple(str(i) for i in trkdirs)
         if all(Path(i).is_dir() for i in trkdirs):
-            for trk in (cls.__TRKEXT, PickleIO.EXT):
+            for trk in (cls.TRKEXT, PickleIO.EXT):
                 end = f'/**/*{trk}'
                 lst = [i for i in chain.from_iterable(_glob(str(k)+end) for k in trkdirs)]
                 if len(lst):
@@ -113,18 +113,18 @@ class LegacyTrackIO(_TrackIO):
                     break
             return
 
-        trk = cls.__TRKEXT
+        trk = cls.TRKEXT
         fcn = lambda i: i if '*' in i or i.endswith(trk) else i+'/**/*'+trk
         yield from (i for i in chain.from_iterable(_glob(fcn(str(k))) for k in trkdirs))
 
 class LegacyGRFilesIO(_TrackIO):
     "checks and opens legacy GR files"
-    __TRKEXT = '.trk'
-    __GREXT  = '.gr'
-    __CGREXT = '.cgr'
-    __GRDIR  = 'cgr_project'
-    __TITLE  = re.compile(r"\\stack{{Bead (?P<id>\d+) Z.*?phase\(s\)"
-                          r"(?:[^\d]|\d(?!,))*(?P<phases>[\d, ]*?)\].*?}}")
+    TRKEXT    = '.trk'
+    GREXT     = '.gr'
+    CGREXT    = '.cgr'
+    __GRDIR   = 'cgr_project'
+    __TITLE   = re.compile(r"\\stack{{Bead (?P<id>\d+) Z.*?phase\(s\)"
+                           r"(?:[^\d]|\d(?!,))*(?P<phases>[\d, ]*?)\].*?}}")
     __GRTITLE = re.compile(r"Bead Cycle (?P<id>\d+) p.*")
     @classmethod
     def check(cls, path:PATHTYPES, **kwa) -> Optional[PATHTYPES]:
@@ -133,8 +133,14 @@ class LegacyGRFilesIO(_TrackIO):
             return None
 
         allpaths = tuple(Path(i) for i in cast(Tuple[PATHTYPE,...], path))
-        if sum(1 for i in allpaths if i.suffix == cls.__TRKEXT) != 1:
+        if sum(1 for i in allpaths if i.suffix == cls.TRKEXT) != 1:
             return None
+
+        if any(i.suffix == cls.CGREXT for i in allpaths):
+            if len(allpaths) == 2:
+                allpaths = tuple(i if i.suffix == cls.TRKEXT else i.parent for i in allpaths)
+            else:
+                allpaths = tuple(i for i in allpaths if i.suffix != cls.CGREXT)
 
         if len(allpaths) == 2 and any(i.is_dir() for i in allpaths):
             allpaths = cls.__findgrs(allpaths, kwa)
@@ -148,8 +154,8 @@ class LegacyGRFilesIO(_TrackIO):
             return allpaths
 
         else:
-            trk = next(i for i in allpaths if i.suffix == cls.__TRKEXT)
-            grs = tuple(i for i in allpaths if i.suffix  == '.gr')
+            trk = next(i for i in allpaths if i.suffix == cls.TRKEXT)
+            grs = tuple(i for i in allpaths if i.suffix  == cls.GREXT)
             if len(grs) == 0:
                 return None
 
@@ -188,7 +194,7 @@ class LegacyGRFilesIO(_TrackIO):
     @classmethod
     def __findgrs(cls, paths, opts):
         grdir  = opts.get('cgrdir', cls.__GRDIR)
-        ext    = cls.__GREXT, cls.__CGREXT
+        ext    = (cls.GREXT,)
         err    = lambda j: IOError(j+'\n -'+ '\n -'.join(str(i) for i in paths), 'warning')
         hasgr  = lambda i: (i.is_dir()
                             and (i.name == grdir
@@ -216,12 +222,12 @@ class LegacyGRFilesIO(_TrackIO):
 
     @classmethod
     def __findtrk(cls, fname:str, grs:PATHTYPE) -> Tuple[PATHTYPE,PATHTYPE]:
-        cgr  = next((i for i in Path(grs).iterdir() if i.suffix == cls.__CGREXT),
+        cgr  = next((i for i in Path(grs).iterdir() if i.suffix == cls.CGREXT),
                     None)
         if cgr is None:
-            raise IOError(f"No {cls.__CGREXT} files in directory\n- {grs}", "warning")
+            raise IOError(f"No {cls.CGREXT} files in directory\n- {grs}", "warning")
 
-        pot = cgr.with_suffix(cls.__TRKEXT).name
+        pot = cgr.with_suffix(cls.TRKEXT).name
         trk = next((i for i in _glob(fname) if i.name == pot), None)
         if trk is None:
             raise IOError(f"Could not find {pot} in {fname}", "warning")
@@ -286,10 +292,10 @@ class LegacyGRFilesIO(_TrackIO):
                     cgrdir)
 
         res = {}
-        fcn = lambda match, grdir, i: (i if match(i) or cls.__CGREXT in i else i + grdir)
+        fcn = lambda match, grdir, i: (i if match(i) or cls.CGREXT in i else i + grdir)
         for proj in projects:
             if proj:
-                grdir = f'/**/{proj}/*{cls.__CGREXT}'
+                grdir = f'/**/{proj}/*{cls.CGREXT}'
                 part  = partial(fcn, re.compile(rf'\b{proj}\b').search, grdir)
             elif not allleaves:
                 part  = partial(fcn, lambda _: False, '')
@@ -302,7 +308,7 @@ class LegacyGRFilesIO(_TrackIO):
                 # add check on gr-files
                 res.update({Path(_).parent.stem: Path(_).parent
                             for _ in update.values()
-                            if cls.__GREXT in _.suffixes})
+                            if cls.GREXT in _.suffixes})
             else:
                 res.update(update)
         return res

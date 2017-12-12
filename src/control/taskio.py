@@ -79,6 +79,7 @@ class ConfigTrackIO(TrackIO):
 class _GrFilesIOMixin:
     "Adds an alignment to the tracks per default"
     EXT: Tuple[str, ...] = TrackIO.EXT+('gr',)
+    CGR                  = '.cgr'
     def __init__(self, ctrl):
         self._track = None
         fcn         = lambda itm: setattr(self, '_track', itm.value)
@@ -92,6 +93,13 @@ class _GrFilesIOMixin:
         trail = topath(path)
         trks  = tuple(i for i in trail if i.suffix[1:] in TrackIO.EXT)
         grs   = tuple(i for i in trail if i.suffix[1:] == self.EXT[-1] or i.is_dir())
+        if any(i.suffix == self.CGR for i in trail):
+            if len(grs) == 0:
+                grs   = tuple(set(i.parent for i in trail if i.suffix == self.CGR))
+                trail = trks + grs
+            else:
+                trail = tuple(i for i in trail if i.suffix != self.CGR)
+
         if len(trks) + len(grs) < len(trail) or len(trks) > 1 or len(grs) < 1:
             return None
 
