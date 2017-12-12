@@ -3,6 +3,7 @@
 "Model for peaksplot"
 from typing                     import (Optional, Dict, # pylint: disable=unused-import
                                         List, Tuple, Any, cast)
+from   copy                     import deepcopy
 import pickle
 
 import numpy                    as     np
@@ -168,8 +169,9 @@ class FitToHairpinAccess(TaskAccess):
     def __init__(self, ctrl):
         super().__init__(ctrl, FitToHairpinTask)
         self.__defaults = self.config.root.tasks.fittohairpin
-        self.__defaults.defaults = {'fit':   FitToHairpinTask.DEFAULT_FIT(),
-                                    'match': FitToHairpinTask.DEFAULT_MATCH()}
+        self.__defaults.defaults = {'fit':         FitToHairpinTask.DEFAULT_FIT(),
+                                    'match':       FitToHairpinTask.DEFAULT_MATCH(),
+                                    'constraints': deepcopy(FitToHairpinTask.DEFAULT_CONSTRAINTS)}
 
     def setobservers(self, mdl):
         "observes the global model"
@@ -211,9 +213,10 @@ class FitToHairpinAccess(TaskAccess):
 
         dist = self.__defaults.fit.get()
         pid  = self.__defaults.match.get()
+        cstr = self.__defaults.constraints.get()
         return fittohairpintask(mdl.sequencepath,    ols,
                                 mdl.constraintspath, mdl.useparams,
-                                fit = dist, match = pid)
+                                constraints = cstr, fit = dist, match = pid)
 
     def resetmodel(self, mdl):
         "resets the model"
@@ -278,20 +281,21 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
 
     def runbead(self):
         "runs the bead"
-        tmp, dtl = runbead(self)
+        dtl = None
+        try:
+            tmp, dtl = runbead(self)
+        finally:
+            if dtl is None:
+                self.distances     = {}
+                self.peaks         = createpeaks(self, [])
+                self.estimatedbias = 0.
+            else:
+                tsk   = cast(PeakSelectorTask, self.peakselection.task)
+                peaks = tuple(tsk.details2output(cast(PeakSelectorDetails, dtl)))
 
-        if dtl is None:
-            self.distances     = {}
-            self.peaks         = createpeaks(self, [])
-            self.estimatedbias = 0.
-            return None
-
-        tsk   = cast(PeakSelectorTask, self.peakselection.task)
-        peaks = tuple(tsk.details2output(cast(PeakSelectorDetails, dtl)))
-
-        self.distances     = tmp.distances if self.identification.task else {}
-        self.peaks         = createpeaks(self, peaks)
-        self.estimatedbias = self.peaks['z'][0]
+                self.distances     = tmp.distances if self.identification.task else {}
+                self.peaks         = createpeaks(self, peaks)
+                self.estimatedbias = self.peaks['z'][0]
         return dtl
 
     def reset(self) -> bool: # type: ignore

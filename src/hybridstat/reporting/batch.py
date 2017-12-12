@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Batch creator for hybridstat tasks"
-from typing                         import Optional, Iterator, Union, Sequence, cast
+from typing                         import Optional, Dict, Iterator, Union, Sequence, cast
 from copy                           import deepcopy
 from pathlib                        import Path
 import re
@@ -19,49 +19,51 @@ from peakcalling.processor          import (BeadsByHairpinTask, # pylint: disabl
 from .processor                     import HybridstatExcelTask
 from .identification                import readparams
 
-def readconstraints(idtask   : FitToHairpinTask,
-                    idpath   : Union[Path, str, None],
-                    useparams: bool = True) -> FitToHairpinTask:
+def readconstraints(idtask      : FitToHairpinTask,
+                    idpath      : Union[Path, str, None],
+                    useparams   : bool  = True,
+                    constraints : Dict[str, Range] = None) -> FitToHairpinTask :
     "adds constraints to an identification task"
     cstrs              = {} # type: Constraints
     idtask.constraints = cstrs
     if idpath is None or not Path(idpath).exists():
         return idtask
 
-    deflt = FitToHairpinTask.DEFAULT_FIT()
+    deflt = dict(FitToHairpinTask.DEFAULT_CONSTRAINTS)
+    deflt.update(constraints if constraints else {})
     for item in readparams(cast(str, idpath)):
         cstrs[item[0]] = DistanceConstraint(item[1], {})
         if len(item) == 2 or not useparams:
             continue
 
-        rngs = idtask.fit.get(item[1], deflt)
         if item[2] is not None:
-            stretch = Range(item[2], rngs.stretch[-1]*.1, rngs.stretch[-1])
-            cstrs[item[0]].constraints['stretch'] = stretch
+            cstrs[item[0]].constraints['stretch'] = Range(item[2], *deflt['stretch'][1:3])
 
         if item[3] is not None:
-            bias = Range(item[3], rngs.bias   [-1]*.1, rngs.bias[-1])
-            cstrs[item[0]].constraints['bias'] = bias
+            cstrs[item[0]].constraints['bias'] = Range(item[3], *deflt['bias'][1:3])
     return idtask
 
-def fittohairpintask(seqpath    : Union[Path, str],
-                     oligos     : Union[Sequence[str], str],
-                     idpath     : Union[None,Path,str] = None,
-                     useparams  : bool                 = True,
+def fittohairpintask(seqpath     : Union[Path, str],
+                     oligos      : Union[Sequence[str], str],
+                     idpath      : Union[None,Path,str] = None,
+                     useparams   : bool                 = True,
+                     constraints : Dict[str, Range]     = None,
                      **kwa) -> FitToHairpinTask:
     "creates and identification task from paths"
     task = FitToHairpinTask.read(seqpath, oligos, **kwa)
     if len(task.fit) == 0:
         raise IOError("Could not find any sequence in "+str(seqpath))
-    return readconstraints(task, idpath, useparams)
+    return readconstraints(task, idpath, useparams, constraints)
 
-def beadsbyhairpintask(seqpath    : Union[Path, str],
-                       oligos     : Union[Sequence[str], str],
-                       idpath     : Union[None,Path,str] = None,
-                       useparams  : bool = True) -> BeadsByHairpinTask:
+def beadsbyhairpintask(seqpath     : Union[Path, str],
+                       oligos      : Union[Sequence[str], str],
+                       idpath      : Union[None,Path,str] = None,
+                       useparams   : bool                 = True,
+                       constraints : Dict[str, Range]     = None,
+                       **kwa) -> BeadsByHairpinTask:
     "creates and identification task from paths"
-    tsk = fittohairpintask(seqpath, oligos, idpath, useparams)
-    return BeadsByHairpinTask(**tsk.config())
+    task = fittohairpintask(seqpath, oligos, idpath, useparams, constraints, **kwa)
+    return BeadsByHairpinTask(**task.config())
 
 class HybridstatTemplate(PeakFindingBatchTemplate):
     "Template of tasks to run"

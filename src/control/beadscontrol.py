@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Deals with bead selection"
-from typing             import Optional, Iterator, Iterable
+from typing             import Optional, Iterator, Iterable, cast
 from model.task         import RootTask, DataSelectionTask
 
 class BeadController:
@@ -72,11 +72,10 @@ class BeadController:
             last  = None
             for i in self.availablebeads:
                 if i > value:
-                    value = last
                     break
                 last = i
-            else:
-                return
+
+            value = bead if last is None else last
 
         if value != bead:
             self.project.bead.set(value)
@@ -98,7 +97,7 @@ class DataSelectionBeadController(BeadController):
     def discarded(self) -> Iterable[int]:
         "returns beads discarded by the DataSelectionTask"
         tsk = self.task
-        return () if tsk is None else tsk.discarded
+        return cast(Iterable[int], tuple()) if tsk is None else tsk.discarded
 
     @discarded.setter
     def discarded(self, vals: Iterable[int]):

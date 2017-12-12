@@ -1,34 +1,33 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Hybridstat excel reporting processor"
-from   typing               import (Sequence,       # pylint: disable=unused-import
-                                    Dict, Iterator, Union, Optional, Any)
+from   typing               import Sequence, Dict, Optional
 from   pathlib              import Path
+from   functools            import partial
 import pickle
 
-from utils                      import initdefaults
-from model                      import Task, Level
-from control.processor          import Processor
-from anastore                   import dumps
-from excelreports.creation      import fileobj
+from utils                  import initdefaults
+from model                  import Task, Level
+from control.processor      import Processor
+from anastore               import dumps
+from excelreports.creation  import fileobj
 
-from eventdetection             import EventDetectionConfig
-from peakcalling.processor      import FitToHairpinTask
-from data.views                 import TrackView, BEADKEY # pylint: disable=unused-import
+from eventdetection         import EventDetectionConfig
+from peakcalling.processor  import FitToHairpinTask
+from data.views             import TrackView, BEADKEY
 
-from ._base                     import ReporterInfo
-from ._summary                  import SummarySheet
-from ._peaks                    import PeaksSheet
-
+from ._base                 import ReporterInfo
+from ._summary              import SummarySheet
+from ._peaks                import PeaksSheet
 
 class HybridstatExcelTask(Task):
     "Reporter for Hybridstat"
     level       = Level.peak
     path        = ""
-    oligos      = []    # type: Sequence[str]
-    sequences   = {}    # type: Dict[str,str]
-    knownbeads  = None  # type: Optional[Sequence[BEADKEY]]
-    minduration = None  # type: Optional[int]
+    oligos      : Sequence[str]               = []
+    sequences   : Dict[str,str]               = {}
+    knownbeads  : Optional[Sequence[BEADKEY]] = None
+    minduration : Optional[int]               = None
 
     @initdefaults(frozenset(locals()) - {'level'},
                   model = lambda self, i: self.frommodel(i))
@@ -67,18 +66,24 @@ class HybridstatExcelTask(Task):
 class HybridstatExcelProcessor(Processor[HybridstatExcelTask]):
     "Reporter for Hybridstat"
     @staticmethod
-    def apply(toframe = None, model = None, **kwa):
+    def _save(path, cnf, kwa, frame):
+        run(path, cnf, track = frame.track, groups = frame, **kwa)
+        return frame
+
+    @classmethod
+    def _apply(cls, path, cnf, kwa, frame):
+        return frame.new(TrackView).withdata(partial(cls._save, path, cnf, kwa))
+
+    @classmethod
+    def apply(cls, toframe = None, model = None, **kwa):
         "applies the task to a frame or returns a function that does so"
         path = kwa.pop('path')
         cnf  = ''
         if model is not None:
             cnf = dumps(list(model), indent = 4, ensure_ascii = False, sort_keys = True)
 
-        def _save(frame):
-            run(path, cnf, track = frame.track, groups = frame, **kwa)
-            return frame
-        fcn = lambda frame: frame.new(TrackView).withdata(_save)
-        return fcn if toframe is None else fcn(toframe)
+        return (partial(cls._apply, path, cnf, kwa) if toframe is None else
+                cls._apply(path, cnf, kwa, toframe))
 
     def run(self, args):
         "updates frames"
@@ -91,7 +96,7 @@ def run(path:str, config:str = '', **kwa):
         with open(path, 'wb') as book:
             pickle.dump(self, book)
     else:
-        with fileobj(path) as book:
+        with fileobj(path) as book: # type: ignore
             summ = SummarySheet(book, self)
 
             summ.info(config)

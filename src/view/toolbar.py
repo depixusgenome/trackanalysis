@@ -236,11 +236,15 @@ class BeadInput(BeadView):
             self.__toolbar.bead = self._bdctrl.bead
 
         def _onproject(_ = None):
-            bead = self._bdctrl.bead
-            if bead not in self._bdctrl.availablebeads:
-                self._bdctrl.bead = bead+1
-                if self._bdctrl.bead == bead:
+            bead  = self._bdctrl.bead
+            avail = set(self._bdctrl.availablebeads)
+            if bead not in avail:
+                if any(i > bead for i in avail):
+                    self._bdctrl.bead = bead+1
+                elif any(i < bead for i in avail):
                     self._bdctrl.bead = bead-1
+                else:
+                    self.__toolbar.bead = bead
             else:
                 self.__toolbar.bead = bead
 
@@ -274,19 +278,21 @@ class RejectedBeadsInput(BeadView):
 
         def _onaccepted_cb(attr, old, new):
             beads = set(self._bdctrl.allbeads) - parseints(new)
-            with self.action:
-                self._bdctrl.discarded = beads
+            if (not toolbar.seltype) and beads != set(self._bdctrl.discarded):
+                with self.action:
+                    self._bdctrl.discarded = beads
 
         def _ondiscarded_cb(attr, old, new):
             beads = parseints(new)
-            with self.action:
-                self._bdctrl.discarded = beads
+            if toolbar.seltype and beads != set(self._bdctrl.discarded):
+                with self.action:
+                    self._bdctrl.discarded = beads
 
         def _onproject():
             disc = set(self._bdctrl.discarded)
             acc  = set(self._bdctrl.allbeads) - disc
-            self.__toolbar.accepted  = ', '.join(str(i) for i in sorted(acc))
-            self.__toolbar.discarded = ', '.join(str(i) for i in sorted(disc))
+            self.__toolbar.update(accepted  = ', '.join(str(i) for i in sorted(acc)),
+                                  discarded = ', '.join(str(i) for i in sorted(disc)))
 
         self._keys.addKeyPress(('keypress.delbead', _ondiscard_currentbead))
         toolbar.on_change('currentbead',            _ondiscard_currentbead_cb)

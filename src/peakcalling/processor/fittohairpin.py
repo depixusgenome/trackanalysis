@@ -19,6 +19,7 @@ from   peakfinding.selector        import Output as PeakFindingOutput, PeaksArra
 from   peakfinding.processor       import PeaksDict
 from   ..tohairpin                 import (HairpinFitter, PeakGridFit, Distance,
                                            PeakMatching, PEAKS_TYPE)
+from   .._base                     import Range
 
 class DistanceConstraint(NamedTuple): # pylint: disable=missing-docstring
     hairpin     : str
@@ -36,6 +37,8 @@ class FitToHairpinTask(Task):
     match       : Matchers    = dict()
     DEFAULT_FIT               = PeakGridFit
     DEFAULT_MATCH             = PeakMatching
+    DEFAULT_CONSTRAINTS       = dict(stretch = Range(None, 0.1,  10.),
+                                     bias    = Range(None, 1e-4, 3e-3))
 
     def __delayed_init__(self, kwa):
         if not isinstance(self.fit, dict):
@@ -127,7 +130,8 @@ class FitToHairpinDict(TaskView[FitToHairpinTask, BEADKEY]):
         if cstr is not None:
             hpin = fits.get(cstr[0], None)
             if hpin is not None:
-                return {cstr[0]: updatecopy(hpin, **cstr[1]).optimize(bead)}
+                hpin = updatecopy(hpin, **cstr[1])
+                return {cstr[0]: hpin.optimize(bead)}
 
         if len(bead) > 0:
             return {name: calc.optimize(bead) for name, calc in fits.items()}

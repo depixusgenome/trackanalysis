@@ -81,6 +81,7 @@ class GaussianProductFit(HairpinFitter, GriddedOptimization):
         1 - R(X, Y)/sqrt(R(X, X) R(Y, Y))
     """
     precision = 15.
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         HairpinFitter.__init__(self, **kwa)
         GriddedOptimization.__init__(self, **kwa)
@@ -150,7 +151,12 @@ class ChiSquareFit(GaussianProductFit):
     def _optimalvalue(self, hpin: np.ndarray, peaks: np.ndarray, # type: ignore
                       stretch:float, bias:float, **_):
         sym = Symmetry.both if self.symmetry is Symmetry.both else Symmetry.left
-        return chisquare(hpin, peaks, self.firstpeak, sym, self.window, stretch, bias)
+        rng = lambda val: ((val.center if val.center else 0.) - val.size,
+                           (val.center if val.center else 0.) + val.size)
+        scstr = rng(self.stretch)
+        bcstr = rng(self.bias)
+        return chisquare(hpin, peaks, self.firstpeak, sym, self.window,
+                         stretch, bias, scstr, bcstr)
 
     def _value(self, hpin: np.ndarray, peaks: np.ndarray, # type: ignore
                stretch:float, bias:float, **_):
@@ -197,24 +203,23 @@ class PeakGridFit(HairpinFitter):
     def optimize(self, peaks:np.ndarray) -> Distance:
         "computes stretch and bias for potential pairings"
         peaks = np.asarray(peaks)
-        if len(peaks) < 2:
+        ref   = self.expectedpeaks
+        if len(peaks) < 2 or len(ref) == 0:
             return self.DEFAULT
 
         rng   = lambda val: ((val.center if val.center else 0.) - val.size,
                              (val.center if val.center else 0.) + val.size)
         args  = rng(self.stretch)+rng(self.bias)
         centr = sum(args[:2])*.5, sum(args[2:])*.5
-        if len(peaks) < 2:
-            return Distance(DEFAULT_BEST, *centr)
 
         delta = peaks[0] if self.bias.center is None else 0.
         if delta != 0.:
             peaks = peaks - delta
 
-        ref   = self.expectedpeaks
         itr   = tuple(i for i in _match.PeakIterator(ref, peaks, *args)) + (centr,)
-        args  = ref, peaks, False, self.symmetry, self.window
-        minv  = min(chisquare(*args, stretch, -stretch*bias) for stretch, bias in itr)
+        first = ref, peaks, False, self.symmetry, self.window
+        last  = args[:2], args[2:]
+        minv  = min(chisquare(*first, stretch, -stretch*bias, *last) for stretch, bias in itr)
 
         return Distance(minv[0], minv[1], delta-minv[2]/minv[1])
 
