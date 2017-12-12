@@ -322,7 +322,7 @@ def _update(cpy: Optional[Callable[[T], T]], obj:T, always:bool, **attrs) -> T:
         obj = cpy(obj)
 
     if len(fields):
-        for name in fieldnames(obj) & frozenset(attrs):
+        for name in fields:
             val = attrs[name]
             if val is not NoArgs:
                 setattr(obj, name, val)
