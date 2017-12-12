@@ -492,8 +492,8 @@ class ByGaussianMix:
     '''
     max_iter        = 10000
     cov_type        = 'full'
-    peakwidth:float = 1
-    crit:str        = 'bic'
+    peakwidth       = 1
+    crit            = 'bic'
     mincount        = 5
     varcmpnts       = 0.2
 
@@ -513,6 +513,7 @@ class ByGaussianMix:
         zcnpeaks = len(ZeroCrossingPeakFinder()(hist,bias, slope))
         kwargs   = {'covariance_type': self.cov_type,
                     'max_iter' : self.max_iter}
+        # needs better estimation
         gmm      = self.__fit(events.reshape(-1,1),
                               max(int(zcnpeaks*(1+self.varcmpnts)),2),
                               max(int(zcnpeaks*(1-self.varcmpnts)),1),
@@ -566,7 +567,8 @@ class ByGaussianMix:
         values = [getattr(gmm,crit)(evts) for gmm in gmms]
         return gmms[np.argmin(values)]
 
-# needs fixing, problem: decreasing llikeli
+# problem: decreasing llikeli
+# set data as instance attribute
 class ByEM:
     '''
     finds peaks and groups events using Expectation Maximization
@@ -581,7 +583,7 @@ class ByEM:
     mincount = 5
     tol      = 1e-1 # loglikelihood tolerance
     params:np.array
-    rates:np.array
+    rates :np.array
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -589,7 +591,6 @@ class ByEM:
 
     def __call__(self,**kwa):
         events = kwa.get("events",None) # np.array per cycles
-        # include kwa.get("precision",1)
         _, bias, slope  = kwa.get("hist",(0,0,1))
         npeaks = len(ZeroCrossingPeakFinder()(*kwa.get("hist",(0,0,1))))
         return self.find(events, bias, slope, npeaks)
@@ -708,12 +709,15 @@ class ByEM:
         return nrates,np.hstack([np.array(nmeans),tmeans,nscales,tscales])
 
     @classmethod
-    def assign(cls,data:np.array,params:np.array)->Dict[int,np.array]:
+    def assign(cls,data:np.array,params:np.array)->Dict[int,Tuple[int, ...]]:
         'to each event (row in data) assign a peak (row in params)'
         # Gaussian distribution for position, exponential for duration
         score    = cls.score(data,params).T # score[j,i] = pdf(Xi|Zj, theta)
         assigned = sorted([(np.argmax(row),idx) for idx,row in enumerate(score)])
-        return {key: [i[1] for i in grp] for key,grp in itertools.groupby(assigned,lambda x:x[0])}
+        out : Dict[int,Tuple[int, ...]] = {_:tuple() for _ in range(len(params))}
+        out.update({key: tuple(i[1] for i in grp)
+                    for key,grp in itertools.groupby(assigned,lambda x:x[0])})
+        return out
 
     @classmethod
     def llikelihood(cls,data:np.array,rates:np.array,params:np.array)->float:
@@ -726,6 +730,7 @@ class ByEM:
         rates,params = self.init(data,npeaks)
         llikelihood  = self.llikelihood(data,rates,params)
         prevll       = llikelihood
+        # recursive call
         for _ in range(self.emiter):
             rates,params = self.emstep(data,rates,params)
             llikelihood  = self.llikelihood(data,rates,params)
@@ -734,6 +739,22 @@ class ByEM:
             else:
                 break
 
+            if any(self.assign(data,params).values())<self.mincount:
+                break
+        return rates,params
+
+
+    def fit(self,data:np.array,maxpeaks:int):
+        'maxpeaks instead of npeaks'
+        # must deal with merging peaks
+        pass
+
+    def __fit(self,data,rates,params,llike):
+        rates,params = self.emstep(data,rates,params)
+        nextll  = self.llikelihood(data,rates,params)
+        minevts = map(len,self.assign(data,params).values())
+        if abs(nextll-llike)>self.tol and minevts>self.mincount:
+            return self.fit(data,rates,params,nextll)
         return rates,params
 
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]
