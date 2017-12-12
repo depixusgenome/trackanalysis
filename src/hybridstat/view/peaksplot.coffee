@@ -42,9 +42,13 @@
             if stats.data[menu.value]?
                 stats.text = stats.data[menu.value]
 
-            if menu.value+'id' in peaks.source.column_names
-                for key in ['id', 'bases', 'distance', 'orient', 'color']
-                    peaks.source.data[key] = peaks.source.data[menu.value+key]
+            emit = False
+            for key in ['id', 'bases', 'distance', 'orient', 'color']
+                col = peaks.source.data[menu.value+key]
+                if col?
+                    peaks.source.data[key] = col
+                    emit                   = True
+            if emit
                 peaks.source.change.emit()
 
             if menu.value in @stretches
