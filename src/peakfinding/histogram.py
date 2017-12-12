@@ -711,10 +711,9 @@ class ByEM:
     def assign(cls,data:np.array,params:np.array)->Dict[int,np.array]:
         'to each event (row in data) assign a peak (row in params)'
         # Gaussian distribution for position, exponential for duration
-        scored   = cls.score(data,params) # scored[i,j] = pdf(Xi,Zj| theta)
-        assigned = [np.argmin(row) for row in scored]
-        return {pid:np.array([row for idx,row in enumerate(data) if assigned[idx]==pid])
-                for pid in range(len(params))}
+        score    = cls.score(data,params).T # score[j,i] = pdf(Xi|Zj, theta)
+        assigned = sorted([(np.argmax(row),idx) for idx,row in enumerate(score)])
+        return {key: [i[1] for i in grp] for key,grp in itertools.groupby(assigned,lambda x:x[0])}
 
     @classmethod
     def llikelihood(cls,data:np.array,rates:np.array,params:np.array)->float:
