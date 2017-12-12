@@ -43,10 +43,6 @@ class ZPeakInfo(PeakInfo):
 
 class ReferencePeakInfo(PeakInfo):
     "All FitToReferenceTask related info"
-    @staticmethod
-    def basekeys() -> List[str]:
-        "base keys"
-
     def keys(self, mdl: 'PeaksPlotModelAccess') -> List[str]:
         "returns the list of keys"
         return [] if mdl.identification.task else ['id', 'distance']
