@@ -168,9 +168,11 @@ def chisquare(ref       : np.ndarray, # pylint: disable=too-many-arguments
 
     def _fit(pairs):
         params   = np.polyfit(exp[pairs[:,1]], ref[pairs[:,0]], 1)
-        if stretchcstr and (stretchcstr[0] > params[0] or stretchcstr[1] < params[0]):
+        if (stretchcstr is not None
+                and (stretchcstr[0] > params[0] or stretchcstr[1] < params[0])):
             return None, []
-        if biascstr and (biascstr[0] > params[1] or biascstr[1] < params[1]):
+        if (biascstr is not None
+                and (biascstr[0] > params[1] or biascstr[1] < params[1])):
             return None, []
         return params, _pairs(params)
 
@@ -179,7 +181,7 @@ def chisquare(ref       : np.ndarray, # pylint: disable=too-many-arguments
         params, newpairs  = _fit(pairs)
         if len(newpairs) > len(pairs):
             params, newpairs = _fit(newpairs)
-        if params:
+        if params is not None:
             pairs  = newpairs
         else:
             params = stretch, bias
