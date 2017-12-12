@@ -567,7 +567,6 @@ class ByGaussianMix:
         return gmms[np.argmin(values)]
 
 # needs fixing, problem: decreasing llikeli
-# check the mean and scale in exponential dist
 class ByEM:
     '''
     finds peaks and groups events using Expectation Maximization
@@ -726,10 +725,16 @@ class ByEM:
     def fitone(self,data:np.array,npeaks:int):
         'iterate EM to fit npeaks'
         rates,params = self.init(data,npeaks)
-        # llikelihood = self.llikelihood(data,rates,params)
+        llikelihood  = self.llikelihood(data,rates,params)
+        prevll       = llikelihood
         for _ in range(self.emiter):
-            rates,params=self.emstep(data,rates,params)
-            # llikelihood = self.llikelihood(data,rates,params)
+            rates,params = self.emstep(data,rates,params)
+            llikelihood  = self.llikelihood(data,rates,params)
+            if abs(llikelihood-prevll) > self.tol:
+                prevll = llikelihood
+            else:
+                break
+
         return rates,params
 
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]
