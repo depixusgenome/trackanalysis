@@ -5,8 +5,8 @@ from typing import Iterable, Iterator, Type
 from .base  import Task
 
 TASK_ORDER = ['model.task.RootTask',
-              'model.task.DataSelectionTask',
               'cleaning.beadsubtraction.BeadSubtractionTask',
+              'model.task.DataSelectionTask',
               'cleaning.processor.DataCleaningTask',
               'eventdetection.processor.ExtremumAlignmentTask',
               'cordrift.processor.DriftTask',
