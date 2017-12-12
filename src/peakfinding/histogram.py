@@ -577,9 +577,10 @@ class ByEM:
     for r in param:
     try r.reshape(2,-1) (see cls.scorex)
     '''
-    emiter = 10
-    tol    = 1e-2
-    mincount:int= 5
+    emiter   = 10
+    tol      = 1e-2
+    mincount = 5
+    tol      = 1e-1 # loglikelihood tolerance
     params:np.array
     rates:np.array
 
@@ -668,14 +669,14 @@ class ByEM:
         '''
         return np.prod([cls.__normpdf(*par) for par in args[:-1]])*cls.__normpdf(*args[-1])
 
-    # needs pytest
+    # ok, needs pytest
     @classmethod
     def score(cls,data:np.array,params:np.array)->np.array:
         'return the score[i,j] array corresponding to pdf(Xj|Zi, theta)'
-        mid = params.shape[1]//2
+        mid      = params.shape[1]//2
         locscale = np.array([list(zip(r[:mid],r[mid:])) for r in params])
-        pdf = map(lambda x:cls.pdf(np.hstack([x[0],x[1].reshape(-1,1)])),
-                  itertools.product(locscale,data))
+        pdf      = map(lambda x:cls.pdf(np.hstack([x[0],x[1].reshape(-1,1)])),
+                       itertools.product(locscale,data))
 
         return np.array(list(pdf)).reshape(len(params),-1)
 
@@ -683,11 +684,11 @@ class ByEM:
     def emstep(cls,data:np.array,rates:np.array,params:np.array):
         'Expectation then Maximization steps of EM'
         score = cls.score(data,params)
-        pz_x  = score*rates # P(Z|X,theta)
+        pz_x  = score*rates # P(Z,X|theta) prop P(Z|X,theta)
         pz_x  = np.array(pz_x)/np.sum(pz_x,axis=0) # renorm over Z
         return cls.maximization(pz_x,data,params)
 
-    # to rewrite
+    # to clean
     @classmethod
     def maximization(cls,pz_x:np.array,data:np.array,params:np.array):
         'returns the next set of parameters'
@@ -703,16 +704,16 @@ class ByEM:
         # temporal params on data[:,-1]
         tmeans    = np.array([0]*params.shape[0]).reshape(-1,1)
 
-        tscales   = np.sum(pz_x,axis=1).reshape(-1,1)
-        tscales  /= np.array(np.matrix(pz_x)*data[:,-1].reshape(-1,1))
-        return nrates,np.hstack([np.array(nmeans),tmeans,nscales,1/tscales])
+        tscales   = np.array(np.matrix(pz_x)*data[:,-1].reshape(-1,1))
+        tscales  /= np.sum(pz_x,axis=1).reshape(-1,1)
+        return nrates,np.hstack([np.array(nmeans),tmeans,nscales,tscales])
 
     @classmethod
     def assign(cls,data:np.array,params:np.array)->Dict[int,np.array]:
         'to each event (row in data) assign a peak (row in params)'
         # Gaussian distribution for position, exponential for duration
-        scored=cls.score(data,params) # scored[i,j] = pdf(Xi,Zj| theta)
-        assigned=[np.argmin(row) for row in scored]
+        scored   = cls.score(data,params) # scored[i,j] = pdf(Xi,Zj| theta)
+        assigned = [np.argmin(row) for row in scored]
         return {pid:np.array([row for idx,row in enumerate(data) if assigned[idx]==pid])
                 for pid in range(len(params))}
 
@@ -720,19 +721,15 @@ class ByEM:
     def llikelihood(cls,data:np.array,rates:np.array,params:np.array)->float:
         'returns loglikelihood'
         score = cls.score(data,params) # p(Xj|Zi)
-        # rates, p(Zi)
-        return np.sum(np.log(rates.T*np.matrix(score)))
+        return np.sum(np.log(np.sum(rates*score,axis=0)))
 
     def fitone(self,data:np.array,npeaks:int):
         'iterate EM to fit npeaks'
         rates,params = self.init(data,npeaks)
-        llikelihood = self.llikelihood(data,rates,params)
+        # llikelihood = self.llikelihood(data,rates,params)
         for _ in range(self.emiter):
-            #LOGS.info(f"it={_}")
-            #LOGS.info(f"params={params}")
-            LOGS.info(f"ll={llikelihood}")
             rates,params=self.emstep(data,rates,params)
-            llikelihood = self.llikelihood(data,rates,params)
+            # llikelihood = self.llikelihood(data,rates,params)
         return rates,params
 
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]
