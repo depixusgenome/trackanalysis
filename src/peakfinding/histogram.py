@@ -582,8 +582,8 @@ class ByEM:
     tol      = 1e-2
     mincount = 5
     tol      = 1e-1 # loglikelihood tolerance
-    params:np.array
-    rates :np.array
+    params : np.ndarray
+    rates  : np.ndarray
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -639,6 +639,7 @@ class ByEM:
         rates   = 1/npeaks*np.array([1]*npeaks).reshape(-1,1)
         return rates, np.hstack([means, scales])
 
+    # not pytested
     @staticmethod
     def __normlpdf(loc, scale, pos):
         'log pdf of Gaussian dist'
@@ -649,6 +650,7 @@ class ByEM:
         'pdf of Gaussian dist'
         return np.exp(-0.5*((pos-loc)/scale)**2)/(np.sqrt(2*np.pi)*scale)
 
+    # not pytested
     @staticmethod
     def __explpdf(loc, scale, pos):
         'log pdf of exponential dist'
@@ -657,7 +659,7 @@ class ByEM:
     @staticmethod
     def __exppdf(loc, scale, pos):
         'log pdf of exponential dist'
-        return 0 if loc<pos else np.exp((loc-pos)/scale)/scale
+        return 0 if loc>pos else np.exp((loc-pos)/scale)/scale
 
     @classmethod
     def pdf(cls, args:np.ndarray)->float:
@@ -667,7 +669,7 @@ class ByEM:
                          [zloc,zscale,zpos],
                          [tloc,tscale,tpos]])
         '''
-        return np.prod([cls.__normpdf(*par) for par in args[:-1]])*cls.__normpdf(*args[-1])
+        return np.prod([cls.__normpdf(*par) for par in args[:-1]])*cls.__exppdf(*args[-1])
 
     # ok, needs pytest
     @classmethod
@@ -746,15 +748,15 @@ class ByEM:
 
     def fit(self,data:np.array,maxpeaks:int):
         'maxpeaks instead of npeaks'
-        # must deal with merging peaks
         pass
 
-    def __fit(self,data,rates,params,llike):
+    def recursivefit(self,data,rates,params,llike):
+        'calls it self until convergence is achieved'
         rates,params = self.emstep(data,rates,params)
         nextll  = self.llikelihood(data,rates,params)
-        minevts = map(len,self.assign(data,params).values())
+        minevts = min(map(len,self.assign(data,params).values()))
         if abs(nextll-llike)>self.tol and minevts>self.mincount:
-            return self.fit(data,rates,params,nextll)
+            return self.recursivefit(data,rates,params,nextll)
         return rates,params
 
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]
