@@ -342,8 +342,8 @@ class FileListInput(BeadView, FileListMixin):
         "sets-up the gui"
         self.__toolbar = tbar
 
-        @self._ctrl.observe
-        def _onOpenTrack(model = None, **_):
+        @self._ctrl.observe("opentrack", "closetrack")
+        def _setfilelist(model = None, **_):
             vals                       = list(self.files)
             self.__toolbar.currentfile = [i for _, i in vals].index(model[0])
             self.__toolbar.filelist    = [i for i, _ in vals]
@@ -356,7 +356,7 @@ class FileListInput(BeadView, FileListMixin):
             track = self._ctrl.getGlobal("project").track
             lst   = list(self.files)
             if new >= len(lst):
-                _onOpenTrack(model = [track.get()])
+                _setfilelist(model = [track.get()])
             else:
                 track.set(lst[new][1])
 
