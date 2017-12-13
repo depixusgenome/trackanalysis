@@ -37,13 +37,15 @@ PATHS = dict(small_pickle   = "small_pickle.pk",
              big_selected   = big_selected,
              big_all        = big_all)
 
-def path(name:Optional[str]) -> Union[str, Sequence[str]]:
+def path(name: Union[None, Sequence[str], str]) -> Union[str, Sequence[str]]:
     "returns the path to the data"
+    if isinstance(name, (tuple, list)):
+        return tuple(path(i) for i in name) # type: ignore
     directory = Path("../tests/"+__package__+"/")
     if name is None:
         return str(directory)
 
-    default = PATHS.get(name.lower().strip(), name)
+    default = PATHS.get(str(name).lower().strip(), name)
     if callable(default):
         return default()
 
