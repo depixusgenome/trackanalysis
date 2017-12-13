@@ -183,19 +183,16 @@ def test_reference(bokehaction):
 def test_hybridstat(bokehaction):
     "test hybridstat"
     with bokehaction.launch('hybridstat.view', 'app.toolbar') as server:
-        server.change('Hybridstat:Tabs', 'active', 0)
-        server.change('Hybridstat:Tabs', 'active', 1)
-        server.change('Hybridstat:Tabs', 'active', 2)
+        server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
+        for i in range(len(server.widget['Hybridstat:Tabs'].tabs)):
+            server.change('Hybridstat:Tabs', 'active', i)
 
-        server.change('Hybridstat:Tabs', 'active', 1)
-        server.load('big_legacy')
+        server.change('Hybridstat:Tabs', 'active', 2)
+        server.load('big_legacy', andstop = False)
 
-        server.change('Hybridstat:Tabs', 'active', 0)
-        server.change('Hybridstat:Tabs', 'active', 1)
-        server.change('Hybridstat:Tabs', 'active', 2)
-        server.change('Hybridstat:Tabs', 'active', 0)
-        server.change('Hybridstat:Tabs', 'active', 1)
-        server.change('Hybridstat:Tabs', 'active', 2)
+        for i in range(len(server.widget['Hybridstat:Tabs'].tabs)):
+            server.change('Hybridstat:Tabs', 'active', i)
+            server.wait()
 
 if __name__ == '__main__':
-    test_peaksplot(bokehaction(None))
+    test_hybridstat(bokehaction(None))
