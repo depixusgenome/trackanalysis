@@ -18,12 +18,16 @@ def test_toolbar(bokehaction):
             assert curr.get('track', default = None) is None
             assert curr.get('task',  default = None) is None
 
-        def _checkopen():
+        def _checkpath(name):
             track = curr.track.get()
             assert not tbar.frozen
-            assert track.path  == server.path('small_legacy')
+            assert str(track.path[0]) == server.path(name)
+
+        def _checkopen():
+            _checkpath('small_legacy')
+            track = curr.track.get()
             assert track       is curr.task.get()
-            assert ctrl.getGlobal('css').last.path.trk.get() == track.path
+            assert ctrl.getGlobal('css').last.path.trk.get() == str(track.path[0])
 
         _checknone()
         server.load('small_legacy')
@@ -32,6 +36,38 @@ def test_toolbar(bokehaction):
         _checknone()
         server.press('Control-y')
         _checkopen()
+
+        server.load('big_legacy')
+        assert len(curr.track.get().path) == 1
+        _checkpath('big_legacy')
+
+        track = curr.track.get()
+        def _reset():
+            server.press('Control-z')
+            server.cmd(lambda: curr.track.set(track))
+            assert len(curr.track.get().path) == 1
+            _checkpath('big_legacy')
+
+        server.load('CTGT_selection')
+        assert len(curr.track.get().path) == 2
+        assert str(curr.track.get().path[1]) == server.path('CTGT_selection')
+        _checkpath('big_legacy')
+
+        _reset()
+
+        server.load('CTGT_selection/test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.cgr')
+        assert len(curr.track.get().path) == 2
+        assert str(curr.track.get().path[1]) == server.path('CTGT_selection')
+        _checkpath('big_legacy')
+
+        _reset()
+
+        server.load(('CTGT_selection/test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.cgr',
+                     'CTGT_selection/Z(t)bd0track10.gr'))
+        assert len(curr.track.get().path) == 2
+        assert str(curr.track.get().path[1]) == server.path('CTGT_selection/Z(t)bd0track10.gr')
+        _checkpath('big_legacy')
+
         server.quit()
 
 def test_beadtoolbar(bokehaction):
@@ -98,4 +134,4 @@ def test_beadplot(bokehaction):
         server.press('Ctrl-z')
 
 if __name__ == '__main__':
-    test_beadtoolbar(bokehaction(None))
+    test_toolbar(bokehaction(None))

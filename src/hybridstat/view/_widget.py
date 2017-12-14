@@ -425,7 +425,7 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # 
         return AdvancedTaskMixin.create(self, action)
 
     _framecount = AdvancedTaskMixin.attr('eventdetection.events.select.minlength')
-    _eventcount = AdvancedTaskMixin.attr('peakselection.group.mincount')
+    _eventcount = AdvancedTaskMixin.attr('peakselection.finder.grouper.mincount')
     _align5     = AdvancedTaskMixin.none('peakselection.align')
     _precision  = AdvancedTaskMixin.attr('peakselection.precision')
 

@@ -51,20 +51,15 @@ class SequencePlotModelAccess(TaskPlotModelAccess):
     def hybridisations(self, sequence = ...):
         "returns the peaks"
         seqs = self.sequences(...)
-        if len(seqs) == 0:
-            return None
+        if len(seqs) != 0:
+            ols = self.oligos
+            if ols is not None and len(ols):
+                if sequence is Ellipsis:
+                    return {i: _sequencepeaks(j, ols) for i, j in seqs.items()}
 
-        ols = self.oligos
-        if ols is None or len(ols) == 0:
-            return None
-
-        if sequence is Ellipsis:
-            return {i: _sequencepeaks(j, ols) for i, j in seqs.items()}
-
-        key = sequence if sequence is not None else self.sequencekey
-        if key is None:
-            return None
-        return _sequencepeaks(seqs[key], ols)
+                key = sequence if sequence is not None else self.sequencekey
+                return None if key is None else _sequencepeaks(seqs[key], ols)
+        return {} if sequence is Ellipsis else None
 
     @property
     @abstractmethod

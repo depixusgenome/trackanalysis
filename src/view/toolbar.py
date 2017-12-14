@@ -147,7 +147,7 @@ class MessagesInput(BokehView):
                             busy    = u'Please wait ...',
                             width   = 350)
 
-    def setup(self, toolbar, doc):
+    def setup(self, toolbar: DpxToolbar, doc):
         "sets-up the gui"
         ctrl  = self._ctrl
 
@@ -224,9 +224,9 @@ class BeadInput(BeadView):
         cnf = self._ctrl.getGlobal('config')
         cnf.keypress.defaults = {'beadup'   : 'PageUp',
                                  'beaddown' : 'PageDown'}
-        self.__toolbar = None
+        self.__toolbar: DpxToolbar = None
 
-    def setup(self, toolbar):
+    def setup(self, toolbar: DpxToolbar):
         "adds items to doc"
         self.__toolbar  = toolbar
 
@@ -261,10 +261,10 @@ class RejectedBeadsInput(BeadView):
     "Text dealing with rejected beads"
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.__toolbar = None
+        self.__toolbar: DpxToolbar = None
         self._ctrl.getGlobal('config').keypress.defaults = {'delbead': 'Shift-Delete'}
 
-    def setup(self, toolbar):
+    def setup(self, toolbar: DpxToolbar):
         "sets-up the gui"
         def _ondiscard_currentbead(*_):
             bead = self._bdctrl.bead
@@ -336,17 +336,23 @@ class FileListInput(BeadView, FileListMixin):
     def __init__(self, **kwa):
         super().__init__(**kwa)
         FileListMixin.__init__(self)
-        self.__toolbar = None
+        self.__toolbar: DpxToolbar = None
 
-    def setup(self, tbar):
+    def setup(self, tbar: DpxToolbar):
         "sets-up the gui"
         self.__toolbar = tbar
 
-        @self._ctrl.observe
-        def _onOpenTrack(model = None, **_):
-            vals                       = list(self.files)
-            self.__toolbar.currentfile = [i for _, i in vals].index(model[0])
-            self.__toolbar.filelist    = [i for i, _ in vals]
+        @self._ctrl.observe("opentrack", "closetrack")
+        def _setfilelist(model = None, **_):
+            vals  = list(self.files)
+            mdls  = [i for _, i in vals]
+            if model[0] in mdls:
+                index = mdls.index(model[0])
+            else:
+                cur   = self._ctrl.getGlobal('project').track.get()
+                index = mdls.index(cur) if cur in mdls else 0
+
+            self.__toolbar.update(currentfile = index, filelist = [i for i, _ in vals])
 
         def _oncurrentfile_cb(attr, old, new):
             new = int(new)
@@ -356,7 +362,7 @@ class FileListInput(BeadView, FileListMixin):
             track = self._ctrl.getGlobal("project").track
             lst   = list(self.files)
             if new >= len(lst):
-                _onOpenTrack(model = [track.get()])
+                _setfilelist(model = [track.get()])
             else:
                 track.set(lst[new][1])
 

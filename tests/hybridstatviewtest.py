@@ -183,19 +183,30 @@ def test_reference(bokehaction):
 def test_hybridstat(bokehaction):
     "test hybridstat"
     with bokehaction.launch('hybridstat.view', 'app.toolbar') as server:
-        server.change('Hybridstat:Tabs', 'active', 0)
-        server.change('Hybridstat:Tabs', 'active', 1)
-        server.change('Hybridstat:Tabs', 'active', 2)
+        server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
 
-        server.change('Hybridstat:Tabs', 'active', 1)
-        server.load('big_legacy')
+        tabs        = server.widget['Hybridstat:Tabs']
+        indcleaning = next(i for i, j in enumerate(tabs.tabs) if j.title == 'Cleaning')
+        indcyc      = next(i for i, j in enumerate(tabs.tabs) if j.title == 'Cycles')
+        for i in range(len(tabs.tabs)):
+            server.change('Hybridstat:Tabs', 'active', i)
 
-        server.change('Hybridstat:Tabs', 'active', 0)
-        server.change('Hybridstat:Tabs', 'active', 1)
-        server.change('Hybridstat:Tabs', 'active', 2)
-        server.change('Hybridstat:Tabs', 'active', 0)
-        server.change('Hybridstat:Tabs', 'active', 1)
-        server.change('Hybridstat:Tabs', 'active', 2)
+        server.change('Hybridstat:Tabs', 'active', indcleaning)
+        server.load('big_legacy', andstop = False)
+
+        for i in range(len(server.widget['Hybridstat:Tabs'].tabs)):
+            server.change('Hybridstat:Tabs', 'active', i)
+            server.wait()
+
+        server.change('Hybridstat:Tabs', 'active', indcleaning)
+        server.change('Cleaning:Filter', 'subtracted', "38")
+        server.wait()
+
+        server.change('Main:toolbar', 'discarded', '38')
+        server.wait()
+
+        server.change('Hybridstat:Tabs', 'active', indcyc)
+        server.wait()
 
 if __name__ == '__main__':
-    test_peaksplot(bokehaction(None))
+    test_hybridstat(bokehaction(None))

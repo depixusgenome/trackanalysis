@@ -241,7 +241,7 @@ class _ManagedServerLoop:
         self.__warnings.__exit__(*_)
 
     @staticmethod
-    def path(path:str) -> str:
+    def path(path: Union[Sequence[str], str]) -> Union[str, Sequence[str]]:
         "returns the path to testing data"
         from testingcore import path as _testpath
         return _testpath(path)
@@ -275,7 +275,7 @@ class _ManagedServerLoop:
 
         self.cmd(_quit, andstop = False)
 
-    def load(self, path:str, andpress = True, **kwa):
+    def load(self, path: Union[Sequence[str], str], andpress = True, **kwa):
         "loads a path"
         import view.dialog  # pylint: disable=import-error
         def _tkopen(*_1, **_2):
