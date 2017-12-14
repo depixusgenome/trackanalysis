@@ -625,18 +625,19 @@ class ByEM:
         return ids
 
     @staticmethod
-    def init(data:np.array,npeaks=1)->np.array:
+    def init(data:np.ndarray,npeaks=1)->np.ndarray:
         'init using KMeans on spatial data'
-        kmean   = KMeans(npeaks)
+        kmean       = KMeans(npeaks)
         kmean.fit(data[:,:-1])
-        predict = kmean.predict(data[:,:-1])
+        predict     = kmean.predict(data[:,:-1])
 
-        clas    = {idx:np.array([data[_1] for _1,_2 in enumerate(predict) if _2==idx])
-                   for idx in range(npeaks)}
+        clas        = {idx:np.array([data[_1] for _1,_2 in enumerate(predict) if _2==idx])
+                       for idx in range(npeaks)}
 
-        scales  = np.array([np.nanstd(clas[idx],axis=0) for idx in range(npeaks)])
-        means   = np.array([np.nanmean(clas[idx],axis=0) for idx in range(npeaks)])
-        rates   = 1/npeaks*np.array([1]*npeaks).reshape(-1,1)
+        scales      = np.array([np.nanstd(clas[idx],axis=0) for idx in range(npeaks)])
+        means       = np.array([np.nanmean(clas[idx],axis=0) for idx in range(npeaks)])
+        means[:,-1] = 0
+        rates       = 1/npeaks*np.array([1]*npeaks).reshape(-1,1)
         return rates, np.hstack([means, scales])
 
     # not pytested
@@ -671,9 +672,8 @@ class ByEM:
         '''
         return np.prod([cls.__normpdf(*par) for par in args[:-1]])*cls.__exppdf(*args[-1])
 
-    # ok, needs pytest
     @classmethod
-    def score(cls,data:np.array,params:np.array)->np.array:
+    def score(cls,data:np.ndarray,params:np.ndarray)->np.ndarray:
         'return the score[i,j] array corresponding to pdf(Xj|Zi, theta)'
         mid      = params.shape[1]//2
         locscale = np.array([list(zip(r[:mid],r[mid:])) for r in params])
@@ -683,32 +683,35 @@ class ByEM:
         return np.array(list(pdf)).reshape(len(params),-1)
 
     @classmethod
-    def emstep(cls,data:np.array,rates:np.array,params:np.array):
+    def emstep(cls,data:np.ndarray,rates:np.ndarray,params:np.ndarray):
         'Expectation then Maximization steps of EM'
         score = cls.score(data,params)
         pz_x  = score*rates # P(Z,X|theta) prop P(Z|X,theta)
         pz_x  = np.array(pz_x)/np.sum(pz_x,axis=0) # renorm over Z
         return cls.maximization(pz_x,data,params)
 
-    # to clean
+    # to pytest, to clean
     @classmethod
-    def maximization(cls,pz_x:np.array,data:np.array,params:np.array):
+    def maximization(cls,pz_x:np.ndarray,data:np.ndarray,params:np.ndarray):
         'returns the next set of parameters'
         nrates    = np.mean(pz_x,axis=1).reshape(-1,1)
         # spatial params on data[:,:-1]
-        nmeans    = np.matrix(pz_x)*data[:,:-1]
+        nmeans    = np.array(np.matrix(pz_x)*data[:,:-1])
         nmeans   /= np.sum(pz_x,axis=1).reshape(-1,1)
-        center    = np.hstack([data[:,:-1]-i for i in nmeans]).T
 
-        nscales   = np.array([np.matrix(np.array(r)*pz_x[idx,:])*r.T
+        center    = (data[:,:-1].T - nmeans)**2 # each row corresponds to a param
+        nscales   = np.array([np.matrix(pz_x[idx,:])*r.reshape(-1,1)
                               for idx,r in enumerate(center)]).reshape(-1,1)
-        nscales  /= np.sum(pz_x,axis=1).reshape(-1,1)
+
+        nscales   /= np.sum(pz_x,axis=1).reshape(-1,1) # estimation of variance! not std
+        nscales    = np.sqrt(nscales)
+
         # temporal params on data[:,-1]
         tmeans    = np.array([0]*params.shape[0]).reshape(-1,1)
 
         tscales   = np.array(np.matrix(pz_x)*data[:,-1].reshape(-1,1))
         tscales  /= np.sum(pz_x,axis=1).reshape(-1,1)
-        return nrates,np.hstack([np.array(nmeans),tmeans,nscales,tscales])
+        return nrates,np.hstack([nmeans,tmeans,nscales,tscales])
 
     @classmethod
     def assign(cls,data:np.array,params:np.array)->Dict[int,Tuple[int, ...]]:
