@@ -3,6 +3,7 @@
 """
 Provides displays on good and bad beads
 """
+from   typing                   import List
 from   itertools                import product
 import pandas                   as     pd
 import numpy                    as     np
@@ -119,3 +120,5 @@ TracksDictCleaningScript.__doc__ += (
     beads versus tracks where colored squares indicates the number of bad beads
     per track.
     """)
+
+__all__: List[str] = []

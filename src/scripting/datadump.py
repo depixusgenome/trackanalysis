@@ -124,3 +124,5 @@ class LazyShelf(Dict):
                 stream[key]    = val
                 self.info[key] = val
         return val
+
+__all__ = ["LazyShelf"]

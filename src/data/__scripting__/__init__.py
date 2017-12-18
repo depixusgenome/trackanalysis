@@ -4,7 +4,8 @@
 Monkey patches the Track & TrackViews classes as well as provide dictionnaries
 for collecting tracks and experiments.
 """
-# pylint: disable=wildcard-import
-from .tracksdict            import *
-from .track                 import *
-from .trackviews            import * # pylint: disable=redefined-builtin
+from typing                 import List
+from .tracksdict            import TracksDict
+from .track                 import Track
+from .trackviews            import * # pylint: disable=redefined-builtin,wildcard-import
+__all__: List[str] = ['TracksDict', 'Track']

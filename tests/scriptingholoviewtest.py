@@ -3,10 +3,11 @@
 # pylint: disable=redefined-builtin,wildcard-import,unused-wildcard-import
 # pylint: disable=wrong-import-position,ungrouped-imports,no-member
 "Tests interval detection"
-from IPython   import get_ipython # pylint:disable=import-error
-assert get_ipython() is not None
+import sys
+from   typing  import TYPE_CHECKING
+sys.modules['ACCEPT_SCRIPTING'] = 'jupyter'
 from scripting import *
-from scripting.jupyter import *
+from IPython   import get_ipython # pylint:disable=import-error
 
 CLASSES = list(get_ipython().display_formatter.formatters['text/html'].type_printers.keys())
 
@@ -15,6 +16,10 @@ from data.track                                 import Bead, FoV
 from data.__scripting__.holoviewing.tracksdict  import TracksDictFovDisplayProperty
 from peakfinding.processor.selector             import PeaksDict
 from scripting.holoviewing                      import BasicDisplay
+
+if TYPE_CHECKING:
+    from model.__scripting__                        import Tasks
+    from data.__scripting__.holoviewing.tracksdict  import TracksDict
 
 assert Beads                         in  CLASSES
 assert Cycles                        in  CLASSES
