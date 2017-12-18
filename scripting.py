@@ -114,5 +114,13 @@ def importjupyter(locs, *names):
     else:
         test()
 
+def run(locs, scripting, holoviewing):
+    "imports all modules"
+    from .logconfig  import getLogger
+    import version
+    importlibs   (locs, *scripting)
+    importjupyter(locs, *holoviewing)
+    getLogger("").info(f'{version.version()}{" for jupyter" if ISJUP else ""}')
+
 __all__ = tuple(i for i in locals()
                 if i not in {'isjupyter', 'test', 'importlibs', 'importjupyter', 'ISJUP'})

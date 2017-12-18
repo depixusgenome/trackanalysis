@@ -15,7 +15,7 @@ else:
     import bokeh.util.logconfig # pylint: disable=unused-import
 
 PREFIX = 'DEPIXUS_'
-LOGGER = 'trackanalysis'
+LOGGER = 'depixus'
 
 def getLogger(arg = None):
     "the root logger"
