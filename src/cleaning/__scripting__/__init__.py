@@ -65,6 +65,8 @@ class TrackCleaningScript:
     * `track.cleaning.bad()`: lists bad beads
     * `track.cleaning.messages()`: lists all messages
     * `track.cleaning.dropbad()`: returns a track with only good beads loaded.
+    * `track.cleaning.concatenate(othertrack)`: returns a track combining the 2 tracks
+                                                used when an experiment is resumed
     """
     def __init__(self, track: Track) -> None:
         self.track = track
@@ -123,6 +125,20 @@ class TrackCleaningScript:
     def dropbad(self, **kwa) -> Track:
         "removes bad beads *forever*"
         return dropbeads(self.track, *self.bad(**kwa)) # type: ignore
+
+    def concatenate(self, track:Track)-> Track:
+        "returns concatenated track"
+        commons = set(self.track.data.keys()) & set(track.data.keys()) - {'t'}
+        shift = self.track.data["t"][-1] - track.data["t"][0] +1
+        phases = np.vstack([self.track.phases,track.phases+shift])
+        data = {i: np.hstack([self.track.data[i],track.data[i]]) for i in commons}
+        data["t"]= np.hstack([self.track.data["t"],track.data['t']+shift])
+        return Track(data=data,
+                     phases=phases,
+                     fov=self.track.fov,
+                     framerate= self.track.framerate)
+
+
 
 Track.__doc__ += (
     """
