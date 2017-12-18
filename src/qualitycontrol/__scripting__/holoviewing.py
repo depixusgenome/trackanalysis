@@ -9,7 +9,7 @@ from   itertools                     import chain
 import numpy                         as     np
 import pandas                        as     pd
 
-from   scripting.holoviewing         import hv, ItemsDisplay
+from   utils.holoviewing             import hv, ItemsDisplay
 from   model.level                   import PHASE
 from   data.views                    import isellipsis
 from   data.__scripting__.tracksdict import TracksDict # pylint: disable=unused-import

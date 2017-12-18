@@ -3,13 +3,13 @@
 """
 Provides displays on good and bad beads
 """
-from   typing                   import List
-from   itertools                import product
-import pandas                   as     pd
-import numpy                    as     np
+from   typing            import List
+from   itertools         import product
+import pandas            as     pd
+import numpy             as     np
 
-from   scripting.holoviewing    import hv, addproperty, addto, displayhook
-from   .                        import TrackCleaningScript, TracksDictCleaningScript
+from   utils.holoviewing import hv, addproperty, addto, displayhook
+from   .                 import TrackCleaningScript, TracksDictCleaningScript
 
 @addto(TrackCleaningScript)
 def display(self):

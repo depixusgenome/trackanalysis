@@ -3,10 +3,10 @@
 """
 Adds shortcuts for using holoview
 """
-from   typing                import List, cast
-from   functools             import partial
-import numpy                 as     np
-from   scripting.holoviewing import addto, addproperty, hv
+from   typing            import List, cast
+from   functools         import partial
+import numpy             as     np
+from   utils.holoviewing import addto, addproperty, hv
 
 from   model.__scripting__                          import Tasks
 from   data.__scripting__                           import TracksDict

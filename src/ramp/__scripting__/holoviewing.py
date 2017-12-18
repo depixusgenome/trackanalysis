@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Adds shortcuts for using holoview"
-import sys
-import numpy                    as np
-from   scripting.holoviewing    import BasicDisplay
-from   data.track               import Track, isellipsis # pylint: disable=unused-import
-
-hv = sys.modules['holoviews']  # pylint: disable=invalid-name
+import numpy             as     np
+from   utils.holoviewing import hv, BasicDisplay
+from   data.track        import Track, isellipsis # pylint: disable=unused-import
 
 class RampDisplay(BasicDisplay, ramp = Track):
     """

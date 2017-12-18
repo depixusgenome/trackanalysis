@@ -22,25 +22,20 @@ We add some methods and change the default behaviour:
         * a *rawprecision* method is added
         * *with...* methods return an updated copy
 """
-import version
 from   utils.scripting              import *
-import utils.scripting              as     _scripting
-
-from   utils.logconfig              import getLogger
 from   eventdetection.processor     import ExtremumAlignmentTask, EventDetectionTask
 from   peakfinding.processor        import PeakSelectorTask
 import sequences
 
-_scripting.importlibs(locals(),
-                      "signalfilter", "scripting.datadump",
-                      *(f"{i}.__scripting__" for i in
-                        ("model", "app", "data", "cleaning", "eventdetection",
-                         "peakfinding", "peakcalling")))
+def _run(locs):
+    from utils.scripting import run as scr
+    mods = "model", "app", "data", "cleaning", "eventdetection", "peakfinding", "peakcalling"
+    hvs  = ("data", "cleaning", "eventdetection", "peakfinding", "peakcalling",
+            "qualitycontrol", "ramp")
+    scr(locals(),
+        scripting   = (("signalfilter", "utils.datadump")
+                       + tuple(f"{i}.__scripting__" for i in mods)),
+        holoviewing = (f"{i}.__scripting__.holoviewing" for i in hvs))
 
-_scripting.importjupyter(locals(),
-                         *(f"{i}.__scripting__.holoviewing" for i in
-                           ("data", "cleaning", "qualitycontrol", "eventdetection",
-                            "peakfinding", "peakcalling", "ramp")))
-
-getLogger(__name__).info(f'{version.version()}{" for jupyter" if _scripting.ISJUP else ""}')
-del _scripting, getLogger
+    locs.pop('_run', None)
+_run(locals())

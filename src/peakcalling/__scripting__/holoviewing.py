@@ -12,7 +12,7 @@ import numpy                    as np
 
 import sequences
 
-from   scripting.holoviewing        import hv
+from   utils.holoviewing            import hv
 from   peakfinding.processor        import PeaksDict    # pylint: disable=unused-import
 from   peakfinding.__scripting__.holoviewing import (PeaksDisplay as _PeaksDisplay,
                                                      PeaksTracksDictDisplay as _PTDDisplay)

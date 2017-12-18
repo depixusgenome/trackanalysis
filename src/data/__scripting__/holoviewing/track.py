@@ -4,11 +4,11 @@
 """
 Adds shortcuts for using holoview
 """
-from   typing                   import List
-import pandas                   as     pd
+from   typing            import List
+import pandas            as     pd
 
-from   scripting.holoviewing    import addto, hv, addproperty
-from   ...track                 import Bead, FoV, Secondaries
+from   utils.holoviewing import addto, hv, addproperty
+from   ...track          import Bead, FoV, Secondaries
 
 @addto(Bead)        # type: ignore
 def display(self, colorbar = True):

@@ -6,7 +6,7 @@ from   functools             import partial
 from   copy                  import deepcopy
 import numpy                 as     np
 
-from   scripting.holoviewing import addto, displayhook, hv
+from   utils.holoviewing     import addto, displayhook, hv
 from   model.__scripting__   import Tasks
 from   data.__scripting__    import TracksDict # pylint: disable=unused-import
 from   data.__scripting__.holoviewing.trackviews import CycleDisplay as _CycleDisplay

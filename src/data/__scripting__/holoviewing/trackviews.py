@@ -4,12 +4,12 @@
 """
 Adds shortcuts for using holoview
 """
-from   typing                   import List
-from   copy                     import deepcopy
-import numpy                    as     np
+from   typing            import List
+from   copy              import deepcopy
+import numpy             as     np
 
-from   scripting.holoviewing    import displayhook, BasicDisplay, hv
-from   ...views                 import Beads, Cycles
+from   utils.holoviewing import displayhook, BasicDisplay, hv
+from   ...views          import Beads, Cycles
 
 displayhook(Beads, Cycles)
 

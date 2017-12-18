@@ -3,15 +3,12 @@
 """
 Adds shortcuts for using holoview
 """
-import sys
-from   typing                import List, Union
-from   copy                  import deepcopy
-import numpy                 as     np
+from   typing            import List, Union
+from   copy              import deepcopy
+import numpy             as     np
 
-from   scripting.holoviewing import BasicDisplay
-from   ...                   import Beads
-
-hv    = sys.modules['holoviews']  # pylint: disable=invalid-name
+from   utils.holoviewing import BasicDisplay, hv
+from   ...               import Beads
 
 class Display(BasicDisplay): # pylint: disable=abstract-method
     "displays the beads or cycles"
