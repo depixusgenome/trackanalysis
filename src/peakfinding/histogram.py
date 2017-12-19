@@ -598,7 +598,7 @@ class ByEM:
     def find(self, events, bias, slope, npeaks:int):
         'find peaks'
         data   = np.array([[np.nanmean(i),len(i)] for i in np.hstack(events)])
-        params = self.fitone(data,npeaks)[1]
+        params = self.fit(data,npeaks)[1]
         order  = np.argsort(params.T[0,:])
         peaks, ids = self.__strip(params[order,:],data,events)
         return peaks * slope + bias , ids
@@ -640,7 +640,6 @@ class ByEM:
         rates       = 1/npeaks*np.array([1]*npeaks).reshape(-1,1)
         return rates, np.hstack([means, scales])
 
-    # not pytested
     @staticmethod
     def __normlpdf(loc, scale, pos):
         'log pdf of Gaussian dist'
@@ -651,7 +650,6 @@ class ByEM:
         'pdf of Gaussian dist'
         return np.exp(-0.5*((pos-loc)/scale)**2)/(np.sqrt(2*np.pi)*scale)
 
-    # not pytested
     @staticmethod
     def __explpdf(loc, scale, pos):
         'log pdf of exponential dist'
@@ -730,12 +728,11 @@ class ByEM:
         score = cls.score(data,params) # p(Xj|Zi)
         return np.sum(np.log(np.sum(rates*score,axis=0)))
 
-    def fitone(self,data:np.array,npeaks:int):
+    def fit(self,data:np.array,npeaks:int):
         'iterate EM to fit npeaks'
         rates,params = self.init(data,npeaks)
         llikelihood  = self.llikelihood(data,rates,params)
         prevll       = llikelihood
-        # recursive call
         for _ in range(self.emiter):
             rates,params = self.emstep(data,rates,params)
             llikelihood  = self.llikelihood(data,rates,params)
@@ -743,23 +740,23 @@ class ByEM:
                 prevll = llikelihood
             else:
                 break
-
             if any(self.assign(data,params).values())<self.mincount:
                 break
         return rates,params
 
+    # def fit(self,data:np.array,maxpeaks:int):
+    #     'maxpeaks instead of npeaks'
+    #     rates,params = self.init(data,maxpeaks)
+    #     llike = self.llikelihood(data,rates,params)
+    #     return self.recursivefit(data,rates,params,llike)
 
-    def fit(self,data:np.array,maxpeaks:int):
-        'maxpeaks instead of npeaks'
-        pass
-
-    def recursivefit(self,data,rates,params,llike):
-        'calls it self until convergence is achieved'
-        rates,params = self.emstep(data,rates,params)
-        nextll  = self.llikelihood(data,rates,params)
-        minevts = min(map(len,self.assign(data,params).values()))
-        if abs(nextll-llike)>self.tol and minevts>self.mincount:
-            return self.recursivefit(data,rates,params,nextll)
-        return rates,params
+    # def recursivefit(self,data,rates,params,llike):
+    #     'calls it self until convergence is achieved'
+    #     rates,params = self.emstep(data,rates,params)
+    #     nextll  = self.llikelihood(data,rates,params)
+    #     minevts = min(map(len,self.assign(data,params).values()))
+    #     if abs(nextll-llike)>self.tol and minevts>self.mincount:
+    #         return self.recursivefit(data,rates,params,nextll)
+    #     return rates,params
 
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]
