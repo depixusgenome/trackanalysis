@@ -507,7 +507,7 @@ class ByGaussianMix:
         hist, bias, slope   = kwa.get("hist",(0,0,1))
         return self.find(pos, hist, bias, slope)
 
-    def find(self,pos: np.array, hist, bias:float = 0., slope:float = 1.):
+    def find(self,pos: np.ndarray, hist, bias:float = 0., slope:float = 1.):
         'find peaks'
         events   = np.hstack(pos)
         zcnpeaks = len(ZeroCrossingPeakFinder()(hist,bias, slope))
@@ -556,14 +556,14 @@ class ByGaussianMix:
         return self.__min_crit(self.crit,evts,gmms)
 
     @staticmethod
-    def __run_gmms(evts:np.array,maxncmps:int,mincmps:int,kwargs:Dict):
+    def __run_gmms(evts:np.ndarray,maxncmps:int,mincmps:int,kwargs:Dict):
         gmms = [GaussianMixture(n_components = ite,**kwargs) for ite in range(mincmps,maxncmps)]
         for ite in range(maxncmps-mincmps):
             gmms[ite].fit(evts)
         return gmms
 
     @staticmethod
-    def __min_crit(crit:str,evts:np.array,gmms):
+    def __min_crit(crit:str,evts:np.ndarray,gmms):
         values = [getattr(gmm,crit)(evts) for gmm in gmms]
         return gmms[np.argmin(values)]
 
@@ -590,7 +590,7 @@ class ByEM:
         pass
 
     def __call__(self,**kwa):
-        events = kwa.get("events",None) # np.array per cycles
+        events = kwa.get("events",None) # np.ndarray per cycles
         _, bias, slope  = kwa.get("hist",(0,0,1))
         npeaks = len(ZeroCrossingPeakFinder()(*kwa.get("hist",(0,0,1))))
         return self.find(events, bias, slope, npeaks)
@@ -618,7 +618,7 @@ class ByEM:
         return params.T[0,:], ids
 
     @classmethod
-    def __predict(cls, data:np.array, params:np.array):
+    def __predict(cls, data:np.ndarray, params:np.ndarray):
         if data.size==0:
             return np.array([])
         ids = np.array([np.argmax(_) for _ in cls.score(data,params).T])
@@ -712,7 +712,7 @@ class ByEM:
         return nrates,np.hstack([nmeans,tmeans,nscales,tscales])
 
     @classmethod
-    def assign(cls,data:np.array,params:np.array)->Dict[int,Tuple[int, ...]]:
+    def assign(cls,data:np.ndarray,params:np.ndarray)->Dict[int,Tuple[int, ...]]:
         'to each event (row in data) assign a peak (row in params)'
         # Gaussian distribution for position, exponential for duration
         score    = cls.score(data,params).T # score[j,i] = pdf(Xi|Zj, theta)
@@ -723,16 +723,14 @@ class ByEM:
         return out
 
     @classmethod
-    def llikelihood(cls,data:np.array,rates:np.array,params:np.array)->float:
+    def llikelihood(cls,data:np.ndarray,rates:np.ndarray,params:np.ndarray)->float:
         'returns loglikelihood'
         score = cls.score(data,params) # p(Xj|Zi)
         return np.sum(np.log(np.sum(rates*score,axis=0)))
 
-    def fit(self,data:np.array,npeaks:int):
-        'iterate EM to fit npeaks'
-        rates,params = self.init(data,npeaks)
-        llikelihood  = self.llikelihood(data,rates,params)
-        prevll       = llikelihood
+    # to pytest
+    def __fit(self,data,rates,params,prevll:Optional[float] = None):
+        prevll = self.llikelihood(data,rates,params) if prevll is None else prevll
         for _ in range(self.emiter):
             rates,params = self.emstep(data,rates,params)
             llikelihood  = self.llikelihood(data,rates,params)
@@ -744,19 +742,23 @@ class ByEM:
                 break
         return rates,params
 
-    # def fit(self,data:np.array,maxpeaks:int):
-    #     'maxpeaks instead of npeaks'
-    #     rates,params = self.init(data,maxpeaks)
-    #     llike = self.llikelihood(data,rates,params)
-    #     return self.recursivefit(data,rates,params,llike)
+    # to pytest
+    def fit(self,data:np.ndarray,npeaks:int):
+        'iterate EM to fit npeaks'
+        rates,params = self.init(data,npeaks)
+        return self.__fit(data,rates,params,prevll=None)
 
-    # def recursivefit(self,data,rates,params,llike):
-    #     'calls it self until convergence is achieved'
-    #     rates,params = self.emstep(data,rates,params)
-    #     nextll  = self.llikelihood(data,rates,params)
-    #     minevts = min(map(len,self.assign(data,params).values()))
-    #     if abs(nextll-llike)>self.tol and minevts>self.mincount:
-    #         return self.recursivefit(data,rates,params,nextll)
-    #     return rates,params
+    # to pytest
+    def frommaxtomin(self,data:np.ndarray,maxpeaks:int):
+        'fits max number of peaks and removes them until llikelihood increases'
+        rates,params = self.fit(data,maxpeaks)
+        llikeli = self.llikelihood(data,rates,params)
+        while rates:
+            keep = np.arange(rates.shape[0])!=np.argmin(rates)
+            nrates, nparams = self.__fit(data,rates[keep],params[keep])
+            nllikeli = self.llikelihood(data,nrates,nparams)
+            if nllikeli<llikeli:
+                return rates,params
+            rates, params = nrates,nparams
 
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]
