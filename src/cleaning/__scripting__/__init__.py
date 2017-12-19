@@ -128,15 +128,15 @@ class TrackCleaningScript:
 
     def concatenate(self, track:Track)-> Track:
         "returns concatenated track"
-        commons = set(self.track.data.keys()) & set(track.data.keys()) - {'t'}
-        shift = self.track.data["t"][-1] - track.data["t"][0] +1
-        phases = np.vstack([self.track.phases,track.phases+shift])
-        data = {i: np.hstack([self.track.data[i],track.data[i]]) for i in commons}
-        data["t"]= np.hstack([self.track.data["t"],track.data['t']+shift])
-        return Track(data=data,
-                     phases=phases,
-                     fov=self.track.fov,
-                     framerate= self.track.framerate)
+        commons   = set(self.track.data.keys()) & set(track.data.keys()) - {'t'}
+        shift     = self.track.data["t"][-1] - track.data["t"][0] +1
+        phases    = np.vstack([self.track.phases,track.phases+shift])
+        data      = {i: np.hstack([self.track.data[i],track.data[i]]) for i in commons}
+        data["t"] = np.hstack([self.track.data["t"],track.data['t']+shift])
+        return Track(data      = data,
+                     phases    = phases,
+                     fov       = self.track.fov,
+                     framerate = self.track.framerate)
 
 
 
