@@ -20,7 +20,8 @@ from model.__scripting__    import Tasks
 from signalfilter           import PrecisionAlg
 
 from ..track                import (Track, LazyProperty, BEADKEY,
-                                    selectbeads, renamebeads, dropbeads)
+                                    selectbeads, renamebeads, dropbeads,
+                                    concatenatetracks)
 from .tracksdict            import TracksDict
 
 @addproperty(Track, 'pathinfo')
@@ -98,6 +99,15 @@ def cleancycles(self):
 def measures(self):
     "returns cleaned cycles for phase 5 only"
     return self.cleancycles.withphases(PHASE.measure)
+
+@addto(Track) # type: ignore
+def concatenate(self,other:Track):
+    """
+    Stacks the information in the tracks.
+
+    This can be used to resume the recording an interrupted experiment
+    """
+    return concatenatetracks(self,other)
 
 @addto(Track)
 def astracksdict(self, *beads:BEADKEY) -> TracksDict:

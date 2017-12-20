@@ -6,7 +6,9 @@
 import sys
 sys.modules['ACCEPT_SCRIPTING'] = True
 from scripting              import Track, Tasks, localcontext
+import numpy                as np
 from data                   import Cycles
+from data.track             import dropbeads
 from eventdetection.data    import Events
 from peakfinding.processor  import PeaksDict
 from testingcore            import path as utpath
@@ -53,3 +55,18 @@ def test_track():
     track.cleaned = False
     assert ([Tasks(i) for i in Tasks.defaulttasklist(track, Tasks.alignment)]
             == [Tasks.subtraction, Tasks.cleaning, Tasks.alignment])
+
+def test_concatenate():
+    'test whether two Track stack properly'
+    trk1 = Track(path = utpath("small_legacy"))
+    trk2 = dropbeads(Track(path = utpath("small_legacy")),0)
+    size1, size2 = trk1.data["t"].size, trk2.data["t"].size
+    trk  = trk1.concatenate(trk2)
+
+    assert set(trk.data.keys())==(set(trk1.data.keys())|set(trk2.data.keys()))
+    assert all((trk.data["t"][1:]-trk.data["t"][:-1])==1)
+    assert all(np.isnan(trk.data[0][-size2:]))
+    assert all(~np.isnan(trk.data[0][:size1]))
+
+    assert trk.phases[:len(trk1)]==trk1.phases
+    assert trk.phases[len(trk1):]==trk2.phases+trk1.data["t"][-1]-trk2.data["t"][-1]+1
