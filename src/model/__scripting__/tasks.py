@@ -13,7 +13,8 @@ from enum                     import Enum
 import anastore
 from utils                    import update
 from utils.attrdefaults       import toenum
-from control.taskcontrol      import create as _create
+from data.views               import TrackView
+from control.taskcontrol      import create as _create, ProcessorController
 from control.processor.utils  import ActionTask
 from cleaning.processor       import DataCleaningTask
 from cleaning.beadsubtraction import BeadSubtractionTask
@@ -198,6 +199,12 @@ class Tasks(Enum):
     @classmethod
     def tasklist(cls, *tasks, **kwa) -> List[Task]:
         "Same as create except that a list may be completed as necessary"
+        if len(tasks) == 1 and isinstance(tasks[0], (str, Path)):
+            mdl = anastore.load(tasks[0])
+            if mdl is None:
+                raise ValueError("Could not load model")
+            return mdl
+
         tmp    = cls.get(*tasks, **kwa)
         lst    = cast(List[Task], [tmp] if isinstance(tmp, Task) else tmp)
 
@@ -216,16 +223,17 @@ class Tasks(Enum):
         return lst
 
     @classmethod
-    def processors(cls, *args, copy = True, beadsonly = True):
+    def processors(cls, *args, copy = True, beadsonly = True) -> ProcessorController:
         "returns an iterator over the result of provided tasks"
-        procs      = _create(cls.tasklist(*args, beadsonly = beadsonly))
+        procs      = _create(*cls.tasklist(*args, beadsonly = beadsonly))
         procs.copy = copy
         return procs
 
     @classmethod
-    def apply(cls, *args, copy = True, beadsonly = True):
+    def apply(cls, *args, copy = True, beadsonly = True, pool = None) -> TrackView:
         "returns an iterator over the result of provided tasks"
-        return next(iter(cls.processors(*args, beadsonly = beadsonly).run(copy = copy)))
+        procs = cls.processors(*args, beadsonly = beadsonly)
+        return next(iter(procs.run(copy = copy, pool = pool)))
 
     def dumps(self, **kwa):
         "returns the json configuration"

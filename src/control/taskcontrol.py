@@ -104,9 +104,7 @@ class ProcessorController:
         return other
 
     @classmethod
-    def create(cls,
-               *models   : Tuple[Task, ...],
-               processors: Union[Dict,_M_PROCS_T,None] = Processor
+    def create(cls, *models : Task, processors: Union[Dict,_M_PROCS_T,None] = Processor
               ) -> 'ProcessorController':
         "creates a task pair for this model"
         tasks = [] # type: List[Task]

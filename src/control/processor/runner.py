@@ -62,6 +62,10 @@ class Runner:
                  level: Level               = Level(0),
                  **_
                 ) -> None:
+        if isinstance(task, ProcessPoolExecutor):
+            assert pool is None
+            task, pool = None, task
+
         data = (Cache(list(pickle.loads(data))) if isinstance(data, bytes) else
                 data                            if isinstance(data, Cache) else
                 Cache(list(data))).keepupto(task)
@@ -249,14 +253,21 @@ def pooledinput(pool, pickled, frame) -> dict:
         return res
 
 def run(data:  DATA_TYPE, # pylint: disable=too-many-arguments
-        task:  Task                = None,
-        copy                       = False,
-        pool:  ProcessPoolExecutor = None,
-        start: Iterator[TrackView] = None,
-        level: Level               = Level(0)):
+        task:  Task                             = None,
+        copy                                    = False,
+        pool:  Union[ProcessPoolExecutor, bool] = None,
+        start: Iterator[TrackView]              = None,
+        level: Level                            = Level(0)):
     """
     Iterates through the list up to and including *task*.
     Iterates through all if *task* is None
     """
-    runner = Runner(data, task = task, pool = pool, start = start, level = level)
-    return runner(copy = copy)
+    retrun = pool is True
+    apool  = ProcessPoolExecutor() if pool is True else cast(ProcessPoolExecutor, pool)
+
+    runner = Runner(data, task = task, pool = apool, start = start, level = level)
+    out    = runner(copy = copy)
+    if retrun:
+        with apool:
+            out = tuple(out)
+    return out
