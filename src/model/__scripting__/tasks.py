@@ -6,6 +6,7 @@ Monkeypatches tasks and provides a simpler access to usual tasks
 from pathlib                  import Path
 from functools                import partial
 from typing                   import Type, Tuple, List, cast
+from concurrent.futures       import ProcessPoolExecutor
 
 from copy                     import deepcopy
 from enum                     import Enum
@@ -30,7 +31,9 @@ from ..task.dataframe         import DataFrameTask
 
 class Tasks(Enum):
     """
-    Possible tasks
+    Most available tasks can be created using this class:
+
+    ### Task Creation
 
     These can be created as follows:
 
@@ -62,6 +65,18 @@ class Tasks(Enum):
     >>> assert Tasks.peakselector({'group.mincount': 2}).group.mincount == 2
     ```
 
+    ### Creating a List of Tasks
+
+    A method `Tasks.apply` allows creating a list of tasks. The first argument
+    can be a path to the data or even a '.ana' file. In the latter case, no other
+    arguments are accepted.
+
+    Other arguments allow creating other tasks. The arguments are either:
+
+    * a `Tasks` enum value,
+    * a `Task` instance
+    * a callable, in which case an `ActionTask` is created.
+
     For example, to create aligned events and change their stretch and bias:
 
     ```python
@@ -81,6 +96,9 @@ class Tasks(Enum):
     ...             Task.action(fcn, 2., .5),
     ...             Tasks.peakalignment)
     ```
+
+    The keyword `pool` allows providing a specific `ProcessPoolExecutor`. If provided with
+    `pool == True`, the `ProcessPoolExecutor` instance is created and used.
     """
     action         = 'action'
     cleaning       = 'cleaning'
@@ -233,7 +251,15 @@ class Tasks(Enum):
     def apply(cls, *args, copy = True, beadsonly = True, pool = None) -> TrackView:
         "returns an iterator over the result of provided tasks"
         procs = cls.processors(*args, beadsonly = beadsonly)
-        return next(iter(procs.run(copy = copy, pool = pool)))
+        ret   = isinstance(pool, bool)
+        if ret:
+            pool = ProcessPoolExecutor()
+
+        out = next(iter(procs.run(copy = copy, pool = pool)))
+        if ret:
+            with pool:
+                out = tuple(out)
+        return out
 
     def dumps(self, **kwa):
         "returns the json configuration"
