@@ -5,7 +5,7 @@
 "Tests interval detection"
 import sys
 sys.modules['ACCEPT_SCRIPTING'] = True
-from scripting              import Track, Tasks, localcontext
+from scripting              import Track, Tasks, localcontext #pylint: disable=no-name-in-module
 import numpy                as np
 from data                   import Cycles
 from data.track             import dropbeads
