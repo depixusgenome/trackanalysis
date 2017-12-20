@@ -437,6 +437,12 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
                     with BokehView.computation.type(self._ctrl, calls = self.__doreset):
                         try:
                             self._reset()
+                        except Exception as exc: # pylint: disable=broad-except
+                            args = getattr(exc, 'args', tuple())
+                            if len(args) == 2 and args[1] == "warning":
+                                self._ctrl.getGlobal('project').message.set(exc)
+                            else:
+                                raise
                         finally:
                             self.state = old
                             durations.append(time() - start)
