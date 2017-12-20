@@ -15,7 +15,7 @@ from   peakfinding.__scripting__        import Detailed
 from   control.processor.dataframe      import DataFrameProcessor
 from   ..toreference                    import HistogramFit, ChiSquareHistogramFit
 from   ..processor                      import (FitToHairpinDict, FitToReferenceDict,
-                                                FitToReferenceTask)
+                                                FitToReferenceTask, FitToHairpinTask)
 @addto(FitToReferenceTask)
 def __scripting_save__(self):
     self.fitdata.clear()
@@ -80,4 +80,5 @@ def detailed(self, ibead, precision: float = None) -> Union[Iterator[Detailed], 
     return dtl
 
 adddataframe(FitToHairpinDict, FitToReferenceDict)
-__all__: List[str] = ['HistogramFit', 'ChiSquareHistogramFit']
+__all__: List[str] = ['HistogramFit', 'ChiSquareHistogramFit', 'FitToReferenceTask',
+                      'FitToHairpinTask']

@@ -22,21 +22,13 @@ We add some methods and change the default behaviour:
         * a *rawprecision* method is added
         * *with...* methods return an updated copy
 """
-from   utils.scripting              import *
-from   eventdetection.processor     import ExtremumAlignmentTask, EventDetectionTask
-from   peakfinding.processor        import PeakSelectorTask
-import sequences
-import anastore
-
-def _run(locs):
-    from utils.scripting import run as scr
-    mods = "model", "app", "data", "cleaning", "eventdetection", "peakfinding", "peakcalling"
-    hvs  = ("data", "cleaning", "eventdetection", "peakfinding", "peakcalling",
-            "qualitycontrol", "ramp")
-    scr(locals(),
-        scripting   = (("signalfilter", "utils.datadump")
-                       + tuple(f"{i}.__scripting__" for i in mods)),
-        holoviewing = (f"{i}.__scripting__.holoviewing" for i in hvs))
-
-    locs.pop('_run', None)
-_run(locals())
+from utils.scripting import run
+run(locals(),
+    direct  = ('sequences', 'anastore'),
+    star    = ("signalfilter", "utils.datadump", "utils.scripting",
+               *(f"{i}.__scripting__" for i in ("model", "app", "data", "cleaning",
+                                                "eventdetection", "peakfinding",
+                                                "peakcalling"))),
+    jupyter = (f"{i}.__scripting__.holoviewing"
+               for i in ("data", "cleaning", "eventdetection", "peakfinding", "peakcalling",
+                         "qualitycontrol", "ramp")))

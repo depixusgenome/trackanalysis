@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Simpler PeaksDict detection: merging and selecting the sections in the signal detected as flat"
-from   typing                       import (Union, Iterator, Iterable,
-                                            Tuple, List, cast)
+from   typing                       import Union, Iterator, Iterable, Tuple, List, cast
 from   copy                         import copy as shallowcopy
 
 import pandas                       as     pd
@@ -19,6 +18,8 @@ from data.__scripting__.dataframe   import adddataframe
 from ..selector                     import PeakSelectorDetails
 from ..probabilities                import Probability
 from ..processor.selector           import PeaksDict, PeakOutput
+from ..processor                    import (PeakSelectorTask, PeakCorrelationAlignmentTask,
+                                            PeakProbabilityTask)
 
 @addto(Track) # type: ignore
 @property
@@ -117,4 +118,5 @@ def detailed(self, ibead, precision: float = None) -> Union[Iterator[Detailed], 
     return Detailed(self, self.config.detailed(evts, prec))
 
 adddataframe(PeaksDict)
-__all__: List[str] = []
+
+__all__: List[str] = ['PeakSelectorTask', 'PeakCorrelationAlignmentTask', 'PeakProbabilityTask']

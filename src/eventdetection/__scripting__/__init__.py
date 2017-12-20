@@ -3,8 +3,7 @@
 """
 Adds shortcuts for using Events
 """
-from   typing                       import (Tuple, Callable, FrozenSet,
-                                            List, cast)
+from   typing                       import Tuple, Callable, FrozenSet, List, cast
 from   copy                         import copy as shallowcopy
 import numpy                        as     np
 import pandas                       as     pd
@@ -14,6 +13,9 @@ from   control.processor.dataframe  import DataFrameProcessor
 from   model.__scripting__          import Tasks
 from   data                         import Track
 from   data.__scripting__.dataframe import adddataframe
+from   ..processor                  import (ExtremumAlignmentTask,
+                                            BiasRemovalTask,
+                                            EventDetectionTask)
 from   ..data                       import Events
 
 _RETURN_TYPE = FrozenSet[Tuple[int, int]]
@@ -131,4 +133,4 @@ adddataframe(Events)
 setattr(Events, 'any', property(lambda self: Comparator(self, any), doc = Comparator.__doc__))
 setattr(Events, 'all', property(lambda self: Comparator(self, all), doc = Comparator.__doc__))
 
-__all__: List[str] = []
+__all__: List[str] = ['ExtremumAlignmentTask', 'BiasRemovalTask', 'EventDetectionTask']
