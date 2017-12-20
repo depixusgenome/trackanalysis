@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Track Analysis conversion from json'able items."
+from    typing      import cast
+from    importlib   import import_module
+
 import  numpy       as     np
 
 from    ._utils     import isjsonable, CNT, TPE, STATE
@@ -33,14 +36,14 @@ class _TypeIO(_ItemIO):
     def loadclass(name:str) -> type:
         "loads and returns a class"
         elems = name.split('.')
-        cur   = ''
-        cls   = __import__(elems[0])
+        cur   = elems[0]
+        cls   = import_module(cur)
         for i in elems[1:]:
-            if not hasattr(cls, i):
-                cur += '.'+i
-                __import__(cur)
-            cls = getattr(cls, i)
-        return cls
+            cur += '.' + i
+            cls  = getattr(cls, i, _CONTINUE)
+            if cls is _CONTINUE:
+                cls  = import_module(cur)
+        return cast(type, cls)
 
 class _ListIO(_ItemIO):
     @staticmethod

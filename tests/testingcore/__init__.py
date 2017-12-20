@@ -37,7 +37,7 @@ PATHS = dict(small_pickle   = "small_pickle.pk",
              big_selected   = big_selected,
              big_all        = big_all)
 
-def path(name: Union[None, Sequence[str], str]) -> Union[str, Sequence[str]]:
+def path(name: Union[None, Sequence[str], str] = "") -> Union[str, Sequence[str]]:
     "returns the path to the data"
     if isinstance(name, (tuple, list)):
         return tuple(path(i) for i in name) # type: ignore

@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"Testing anastore"
+from   typing           import cast
 import sys
 import numpy
 
 import anastore
 from anastore._patches  import (modifyclasses, # pylint: disable=protected-access
                                 TPE, DELETE, RESET)
+from testingcore        import path as _utpath, Path
 from model.task.track   import TrackReaderTask, CycleCreatorTask
 from model.task.tagging import TaggingTask
 
@@ -112,6 +114,10 @@ def test_modifyclass():
                   'toto', dict(newname = lambda x: x*2))
     assert val == [{'a': {TPE: 'toto', 'newname': 2}}]
 
+def test_file():
+    "tests a ana file"
+    for i in Path(cast(str, _utpath())).glob("*.ana"):
+        anastore.load(i)
+
 if __name__ == '__main__':
-    from _pytest.monkeypatch import MonkeyPatch
-    test_storetasks(MonkeyPatch())
+    test_file()

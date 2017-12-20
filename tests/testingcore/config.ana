@@ -1,0 +1,180 @@
+[
+    {
+        "version": 2
+    },
+    [
+        {
+            "path": {
+                "∈": [
+                    "/media/data/sdi_alpha/Andreas/ssHP6_2nd_sequencing/DPX ANALYSE/CGT_1nM/Test_CGT-1nM_OR3_20nM_020_046_ssHP6_ABB6_1mMMg_FOV1_bis.trk"
+                ],
+                "≡": "t"
+            },
+            "≡": "model.task.track.TrackReaderTask"
+        },
+        {
+            "beads": [
+                52
+            ],
+            "≡": "cleaning.beadsubtraction.BeadSubtractionTask"
+        },
+        {
+            "discarded": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                21,
+                22,
+                23,
+                24,
+                25,
+                26,
+                27,
+                28,
+                29,
+                30,
+                31,
+                32,
+                33,
+                34,
+                35,
+                36,
+                37,
+                38,
+                39,
+                40,
+                41,
+                42,
+                43,
+                44,
+                45,
+                46,
+                47,
+                48,
+                49,
+                50,
+                51,
+                53,
+                54,
+                55,
+                56,
+                57,
+                58,
+                59,
+                60,
+                61,
+                62,
+                63,
+                64,
+                65
+            ],
+            "≡": "model.task.track.DataSelectionTask"
+        },
+        {
+            "maxabsvalue": 1.6,
+            "minpopulation": 60,
+            "≡": "cleaning.processor.DataCleaningTask"
+        },
+        {
+            "exceptions": [
+                {
+                    "∈": "cleaning.processor.DataCleaningException",
+                    "≡": "τ"
+                }
+            ],
+            "≡": "model.task.utils.ExceptionCatchingTask"
+        },
+        {
+            "≡": "eventdetection.processor.ExtremumAlignmentTask"
+        },
+        {
+            "events": {
+                "select": {
+                    "minlength": 15,
+                    "≡": "eventdetection.merging.EventSelector"
+                },
+                "≡": "eventdetection.detection.EventDetector"
+            },
+            "≡": "eventdetection.processor.EventDetectionTask"
+        },
+        {
+            "finder": {
+                "grouper": {
+                    "mincount": 2,
+                    "≡": "peakfinding.histogram.GroupByPeakAndBase"
+                },
+                "≡": "peakfinding.histogram.ByZeroCrossing"
+            },
+            "≡": "peakfinding.processor.selector.PeakSelectorTask"
+        },
+        {
+            "fit": {
+                "[full_ssHP6.txt.xdna]  - 582 bp": {
+                    "peaks": {
+                        "∈": [
+                            0,
+                            92,
+                            198,
+                            269,
+                            436,
+                            534,
+                            582
+                        ],
+                        "≡": "npint32"
+                    },
+                    "≡": "peakcalling.tohairpin.PeakGridFit"
+                }
+            },
+            "match": {
+                "[full_ssHP6.txt.xdna]  - 582 bp": {
+                    "peaks": {
+                        "∈": [
+                            0,
+                            92,
+                            198,
+                            269,
+                            436,
+                            534,
+                            582
+                        ],
+                        "≡": "npint32"
+                    },
+                    "≡": "peakcalling.tohairpin.PeakMatching"
+                }
+            },
+            "≡": "peakcalling.processor.beadsbyhairpin.BeadsByHairpinTask"
+        },
+        {
+            "knownbeads": {
+                "∈": [],
+                "≡": "t"
+            },
+            "minduration": 0.0,
+            "oligos": [
+                "ctattctagag"
+            ],
+            "path": "/home/pol/Downloads/Test_CGT-1nM_OR3_20nM_020_046_ssHP6_ABB6_1mMMg_FOV1_bis.xlsx",
+            "sequences": {
+                "[full_ssHP6.txt.xdna]  - 582 bp": "TGTGTCTTTTGGTCTTTCTGGTGCTCTTCgaatGGAGACCAGCTCAGGCCTTAGAGTCAAGACGCATCCTCGCTGATGACCctattctagagTTGtcaCTGATGTCGCCTTCTGCCGAACTACTACCGCAGCCGCCTACGCCCTGAGGCTTGTCCACACTACCCTACTGCTGATGCTCGCCTTtatActattctagagACAAGCATCCCTCAAGTTCCTGTCaCTCCGCAACACTCTACCGCCGCCCTACCGACTACCctattctagagAACTACTACTACAGgcagtgcaACCGCTCACGACCTGCCACGACCTCCGCTGACCTCCACGACCTGCCACGCTCCTGCCGCTCCACGACCTGCTCCACGCCGACCTGCTCACGACCTGCTCAGCGCcagcGCCTGCTACAACATCCACCTCTACGCctattctagagTGAACCTACGAGGACCAtGTCGCTTCGCATCCCAACAGTCCAAGTCTACTACTCTCCAAGCCCTCCCGCTACCAACGAACCCGAAGGctattctagagATGCCGCCCGCTTGCGGAGCCGAGGACGTCTCAgcttGCACTGAGAtt"
+            },
+            "≡": "hybridstat.reporting.processor.HybridstatExcelTask"
+        }
+    ]
+]
