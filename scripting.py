@@ -89,9 +89,10 @@ def importlibs(locs, *names):
     "imports the relative jupyter package"
     import importlib
     for name in names:
-        args = name if isinstance(name, tuple) else (name,)
-        mod  = importlib.import_module(*args) # type: ignore
-        locs.update({i: getattr(mod, i) for i in getattr(mod, '__all__')})
+        args = name if isinstance(name, tuple) else (name,) # type: tuple
+        mod  = importlib.import_module(*args[:2])           # type: ignore
+        allv = getattr(mod, '__all__') if len(args) < 3 else args[2]
+        locs.update({i: getattr(mod, i) for i in allv})
 
 def importjupyter(locs, *names):
     "imports the relative jupyter package"
@@ -114,13 +115,20 @@ def importjupyter(locs, *names):
     else:
         test()
 
-def run(locs, scripting, holoviewing):
+def run(locs, direct, star, jupyter):
     "imports all modules"
     from .logconfig  import getLogger
     import version
-    importlibs   (locs, *scripting)
-    importjupyter(locs, *holoviewing)
+    import importlib
+    locs.update({i: importlib.import_module(i) for i in direct})
+    importlibs   (locs, *star)
+    importjupyter(locs, *jupyter)
+
+    if getattr(locs.get('run', None), '__module__', None) == __name__:
+        locs.pop('run')
+
     getLogger("").info(f'{version.version()}{" for jupyter" if ISJUP else ""}')
 
 __all__ = tuple(i for i in locals()
-                if i not in {'isjupyter', 'test', 'importlibs', 'importjupyter', 'ISJUP'})
+                if (i not in {'isjupyter', 'run', 'test', 'importlibs', 'importjupyter', 'ISJUP'}
+                    and i[0] != '_'))
