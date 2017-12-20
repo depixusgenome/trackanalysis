@@ -72,4 +72,3 @@ def test_concatenate():
     assert_allclose(trk.phases[:len(trk1.phases)],trk1.phases)
     assert_allclose(trk.phases[len(trk1.phases):],
                     trk2.phases+trk1.data["t"][-1]-trk2.data["t"][0]+1)
-
