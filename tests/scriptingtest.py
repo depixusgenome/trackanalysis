@@ -7,11 +7,12 @@ import sys
 sys.modules['ACCEPT_SCRIPTING'] = True
 from scripting              import Track, Tasks, localcontext #pylint: disable=no-name-in-module
 import numpy                as np
-from data                   import Cycles
-from data.track             import dropbeads
-from eventdetection.data    import Events
-from peakfinding.processor  import PeaksDict
-from testingcore            import path as utpath
+from numpy.testing         import assert_allclose
+from data                  import Cycles
+from data.track            import dropbeads
+from eventdetection.data   import Events
+from peakfinding.processor import PeaksDict
+from testingcore           import path as utpath
 
 def test_track():
     "test scripting enhanced track"
@@ -68,5 +69,7 @@ def test_concatenate():
     assert all(np.isnan(trk.data[0][-size2:]))
     assert all(~np.isnan(trk.data[0][:size1]))
 
-    assert trk.phases[:len(trk1)]==trk1.phases
-    assert trk.phases[len(trk1):]==trk2.phases+trk1.data["t"][-1]-trk2.data["t"][-1]+1
+    assert_allclose(trk.phases[:len(trk1.phases)],trk1.phases)
+    assert_allclose(trk.phases[len(trk1.phases):],
+                    trk2.phases+trk1.data["t"][-1]-trk2.data["t"][0]+1)
+
