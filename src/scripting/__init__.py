@@ -26,6 +26,7 @@ from   utils.scripting              import *
 from   eventdetection.processor     import ExtremumAlignmentTask, EventDetectionTask
 from   peakfinding.processor        import PeakSelectorTask
 import sequences
+import anastore
 
 def _run(locs):
     from utils.scripting import run as scr

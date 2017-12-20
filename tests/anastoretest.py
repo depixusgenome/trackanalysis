@@ -6,6 +6,7 @@ import sys
 import numpy
 
 import anastore
+import anastore.api
 from anastore._patches  import (modifyclasses, # pylint: disable=protected-access
                                 TPE, DELETE, RESET)
 from testingcore        import path as _utpath, Path
@@ -56,7 +57,7 @@ def test_storetasks(monkeypatch):
     for _ in range(5):
         patch.patch(_vers(_))
 
-    monkeypatch.setattr(anastore, '__TASKS__', patch)
+    monkeypatch.setattr(anastore.api, '__TASKS__', patch)
     dumped = anastore.dumps(tasks)
     assert dumped[:len('[{"version": 5},')] == '[{"version": 5},'
 
@@ -117,7 +118,8 @@ def test_modifyclass():
 def test_file():
     "tests a ana file"
     for i in Path(cast(str, _utpath())).glob("*.ana"):
-        anastore.load(i)
+        assert anastore.load(i) is not None
+    assert anastore.load(_utpath("reportv2.xlsx"), fromxlsx = True) is not None
 
 if __name__ == '__main__':
     test_file()
