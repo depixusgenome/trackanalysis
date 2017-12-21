@@ -488,11 +488,11 @@ def opentrack(track, beadsonly = False):
 
 N_SAVE_THREADS = 4
 def _savetrack(args):
-    PickleIO.save(args[0], args[1])
-    new = type(args[1]).__new__(type(args[1])) # type: ignore
-    new.__dict__.update(shallowcopy(args[1].__dict__))
-    setattr(new, '_path', args[0])
-    return new
+    PickleIO.save(args[1], args[2])
+    new = type(args[2]).__new__(type(args[2])) # type: ignore
+    new.__dict__.update(shallowcopy(args[2].__dict__))
+    setattr(new, '_path', args[1])
+    return args[0], new
 
 @overload
 def savetrack(path: PATHTYPE, track: 'Track') -> 'Track': # pylint: disable=unused-argument
@@ -517,11 +517,11 @@ def savetrack(path  : PATHTYPE,     # pylint: disable=unused-argument,function-r
         root = Path(path)
         root.mkdir(parents=True, exist_ok=True)
 
-        args = [((root/key).with_suffix(PickleIO.EXT), trk)
+        args = [(key, (root/key).with_suffix(PickleIO.EXT), trk)
                 for key, trk in cast(dict, track).items()]
         new  = shallowcopy(track)
         with ThreadPoolExecutor(N_SAVE_THREADS) as pool:
-            new.update({i.key: i for i in pool.map(_savetrack, args)})
+            new.update({i: j for i, j in pool.map(_savetrack, args)})
         return new
 
     return _savetrack((path, track))
