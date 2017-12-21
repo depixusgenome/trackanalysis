@@ -23,17 +23,11 @@ class TrackView(TrackViewConfigMixin, ITrackView):
         super().__init__(**kw)
 
     def _keys(self, sel:Optional[Sequence], beadsonly: bool) -> Iterable:
-        isbead = self.isbead
-        if sel is None and beadsonly is False:
-            yield from iter(self.data.keys())
-        elif sel is None and beadsonly is True:
-            yield from iter(i for i in self.data.keys() if isbead(i))
-        else:
-            keys = frozenset(self.data.keys())
-            if beadsonly:
-                yield from (i for i in sel if i in keys and isbead(i))
-            else:
-                yield from (i for i in sel if i in keys)
+        itr    = iter(self.data.keys())
+        if sel is not None:
+            keys = frozenset(itr)
+            itr  = (i for i in sel if i in keys)
+        yield from ((i for i in itr if self.isbead(i)) if beadsonly else itr)
 
     def _iter(self, sel = None) -> Iterator[Tuple[Any,Any]]:
         if sel is None:
