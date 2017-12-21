@@ -8,7 +8,6 @@ Adds a method for discarding beads with Cleaning warnings
 """
 from   typing                       import (Dict, Optional, Iterator, List, Any,
                                             Set, Union, Tuple, Sequence, cast)
-from   itertools                        import product
 import numpy                            as     np
 import pandas                           as     pd
 from   utils.decoration                 import addproperty, addto
