@@ -39,7 +39,7 @@ class SignalAverage:
 
 class BeadSubtractionTask(SignalAverage, Task):
     "Task for subtracting beads"
-    level                = Level.none
+    level            = Level.none
     beads: List[int] = []
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **kwa):
@@ -59,8 +59,9 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
                 sub = task([frame.data[i, key] for i in task.beads])
             cache[key] = sub
 
-        info[1][:len(sub)] -= sub[:len(info[1])]
-        return info
+        out             = np.copy(info[1])
+        out[:len(sub)] -= sub[:len(out)]
+        return info[0], out
 
     @classmethod
     def _run(cls, task, cache, frame):
