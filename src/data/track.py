@@ -439,7 +439,7 @@ def concatenatetracks(trk1:Track, trk2:Track)-> Track:
         if val in trk1.data.keys():
             values[idx,:trk1.data["t"].size]=trk1.data[val]
         if val in trk2.data.keys():
-            values[idx,-trk1.data["t"].size:]=trk2.data[val]
+            values[idx,trk1.data["t"].size:]=trk2.data[val]
 
     data      = {j:values[i] for i,j in enumerate(beads)}
     data['t'] = time
