@@ -753,12 +753,17 @@ class ByEM:
         'fits max number of peaks and removes them until llikelihood increases'
         rates,params = self.fit(data,maxpeaks)
         llikeli = self.llikelihood(data,rates,params)
-        while rates:
+        print(f"llikeli={llikeli}")
+        while rates.size>2:
+            print(f"rates.size={rates.size}")
             keep = np.arange(rates.shape[0])!=np.argmin(rates)
             nrates, nparams = self.__fit(data,rates[keep],params[keep])
             nllikeli = self.llikelihood(data,nrates,nparams)
+            print(f"llikeli,nllikeli={llikeli,nllikeli}")
+
             if nllikeli<llikeli:
                 return rates,params
-            rates, params = nrates,nparams
+            rates, params, llikeli = nrates,nparams, nllikeli
+        return rates,params
 
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]
