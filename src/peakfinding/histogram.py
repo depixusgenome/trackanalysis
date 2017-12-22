@@ -567,7 +567,11 @@ class ByGaussianMix:
         values = [getattr(gmm,crit)(evts) for gmm in gmms]
         return gmms[np.argmin(values)]
 
-# problem: decreasing llikeli
+class COVTYPE(Enum):
+    'defines constraints on covariance'
+    ANY  = 1
+    TIED = 2
+
 # set data as instance attribute
 class ByEM:
     '''
@@ -582,8 +586,9 @@ class ByEM:
     tol      = 1e-2
     mincount = 5
     tol      = 1e-1 # loglikelihood tolerance
-    params : np.ndarray
-    rates  : np.ndarray
+    covtype  = COVTYPE.ANY
+    params  : np.ndarray
+    rates   : np.ndarray
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -617,6 +622,14 @@ class ByEM:
         ids[np.isin(ids,lowcount)]=np.iinfo("i4").max # unassigned events
         return params.T[0,:], ids
 
+    # to clean, to test
+    def nparams(self,params):
+        'returns the number of estimated params'
+        if self.covtype is COVTYPE.TIED:
+            dim = cast(int,params.size/(2*params.shape[0]))-1
+            return params.shape[0]*(dim+2)+dim
+        return params.size
+
     @classmethod
     def __predict(cls, data:np.ndarray, params:np.ndarray):
         if data.size==0:
@@ -624,6 +637,7 @@ class ByEM:
         ids = np.array([np.argmax(_) for _ in cls.score(data,params).T])
         return ids
 
+    # to pytest
     @staticmethod
     def init(data:np.ndarray,npeaks=1)->np.ndarray:
         'init using KMeans on spatial data'
@@ -680,13 +694,16 @@ class ByEM:
 
         return np.array(list(pdf)).reshape(len(params),-1)
 
-    @classmethod
-    def emstep(cls,data:np.ndarray,rates:np.ndarray,params:np.ndarray):
+    def emstep(self,data:np.ndarray,rates:np.ndarray,params:np.ndarray):
         'Expectation then Maximization steps of EM'
-        score = cls.score(data,params)
+        score = self.score(data,params)
         pz_x  = score*rates # P(Z,X|theta) prop P(Z|X,theta)
         pz_x  = np.array(pz_x)/np.sum(pz_x,axis=0) # renorm over Z
-        return cls.maximization(pz_x,data,params)
+        rates, params = self.maximization(pz_x,data,params)
+        if self.covtype is COVTYPE.TIED:
+            mid = params.shape[1]//2
+            params[:,mid:-1]=np.mean(params[:,mid:-1],axis=0)
+        return rates, params
 
     # to pytest, to clean
     @classmethod
@@ -722,6 +739,16 @@ class ByEM:
                     for key,grp in itertools.groupby(assigned,lambda x:x[0])})
         return out
 
+    def bic(self,data:np.ndarray,rates:np.ndarray,params:np.ndarray)->float:
+        'returns bic value'
+        llikeli = self.llikelihood(data,rates,params)
+        # number of params rates + params assuming tmean is 0
+        return -2*llikeli + self.nparams(params) *np.log(0.5*data.shape[0]/np.pi)
+
+    def aic(self,data:np.ndarray,rates:np.ndarray,params:np.ndarray)->float:
+        'returns bic value'
+        return 2*self.nparams(params) -2*self.llikelihood(data,rates,params)
+
     @classmethod
     def llikelihood(cls,data:np.ndarray,rates:np.ndarray,params:np.ndarray)->float:
         'returns loglikelihood'
@@ -729,7 +756,11 @@ class ByEM:
         return np.sum(np.log(np.sum(rates*score,axis=0)))
 
     # to pytest
-    def __fit(self,data,rates,params,prevll:Optional[float] = None):
+    def __fit(self,
+              data,
+              rates,
+              params,
+              prevll:Optional[float] = None):
         prevll = self.llikelihood(data,rates,params) if prevll is None else prevll
         for _ in range(self.emiter):
             rates,params = self.emstep(data,rates,params)
@@ -742,28 +773,27 @@ class ByEM:
                 break
         return rates,params
 
-    # to pytest
     def fit(self,data:np.ndarray,npeaks:int):
         'iterate EM to fit npeaks'
         rates,params = self.init(data,npeaks)
         return self.__fit(data,rates,params,prevll=None)
 
-    # to pytest
-    def frommaxtomin(self,data:np.ndarray,maxpeaks:int):
-        'fits max number of peaks and removes them until llikelihood increases'
-        rates,params = self.fit(data,maxpeaks)
-        llikeli = self.llikelihood(data,rates,params)
-        print(f"llikeli={llikeli}")
-        while rates.size>2:
-            print(f"rates.size={rates.size}")
-            keep = np.arange(rates.shape[0])!=np.argmin(rates)
-            nrates, nparams = self.__fit(data,rates[keep],params[keep])
-            nllikeli = self.llikelihood(data,nrates,nparams)
-            print(f"llikeli,nllikeli={llikeli,nllikeli}")
+    # # to pytest
+    # def frommaxtomin(self,data:np.ndarray,maxpeaks:int):
+    #     'fits max number of peaks and removes them until llikelihood increases'
+    #     rates,params = self.fit(data,maxpeaks)
+    #     llikeli = self.llikelihood(data,rates,params)
+    #     print(f"llikeli={llikeli}")
+    #     while rates.size>2:
+    #         print(f"rates.size={rates.size}")
+    #         keep = np.arange(rates.shape[0])!=np.argmin(rates)
+    #         nrates, nparams = self.__fit(data,rates[keep],params[keep])
+    #         nllikeli = self.llikelihood(data,nrates,nparams)
+    #         print(f"llikeli,nllikeli={llikeli,nllikeli}")
 
-            if nllikeli<llikeli:
-                return rates,params
-            rates, params, llikeli = nrates,nparams, nllikeli
-        return rates,params
+    #         if nllikeli<llikeli:
+    #             return rates,params
+    #         rates, params, llikeli = nrates,nparams, nllikeli
+    #     return rates,params
 
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]
