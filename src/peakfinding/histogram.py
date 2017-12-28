@@ -705,7 +705,7 @@ class ByEM:
             params[:,mid:-1]=np.mean(params[:,mid:-1],axis=0)
         return self.score(data,params), rates, params
 
-    # to pytest, to clean
+    # to pytest, to extend to x,y,z
     @classmethod
     def maximization(cls,pz_x:np.ndarray,data:np.ndarray,params:np.ndarray):
         'returns the next set of parameters'
