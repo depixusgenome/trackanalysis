@@ -622,12 +622,12 @@ class ByEM:
         ids[np.isin(ids,lowcount)]=np.iinfo("i4").max # unassigned events
         return params.T[0,:], ids
 
-    # to clean, to test
+    # to test
     def nparams(self,params):
         'returns the number of estimated params'
         if self.covtype is COVTYPE.TIED:
-            dim = cast(int,params.size/(2*params.shape[0]))-1
-            return params.shape[0]*(dim+2)+dim
+            dim = params.shape[1]//2-1
+            return params.size-dim*(params.shape[0]-1)
         return params.size
 
     @classmethod
@@ -718,8 +718,8 @@ class ByEM:
         nscales   = np.array([np.matrix(pz_x[idx,:])*r.reshape(-1,1)
                               for idx,r in enumerate(center)]).reshape(-1,1)
 
-        nscales   /= np.sum(pz_x,axis=1).reshape(-1,1) # estimation of variance! not std
-        nscales    = np.sqrt(nscales)
+        nscales  /= np.sum(pz_x,axis=1).reshape(-1,1) # estimation of variance! not std
+        nscales   = np.sqrt(nscales)
 
         # temporal params on data[:,-1]
         tmeans    = np.array([0]*params.shape[0]).reshape(-1,1)
@@ -778,22 +778,38 @@ class ByEM:
         rates,params = self.init(data,npeaks)
         return self.__fit(data,rates,params,prevll=None)
 
-    # # to pytest
-    # def frommaxtomin(self,data:np.ndarray,maxpeaks:int):
-    #     'fits max number of peaks and removes them until llikelihood increases'
-    #     rates,params = self.fit(data,maxpeaks)
-    #     llikeli = self.llikelihood(data,rates,params)
-    #     print(f"llikeli={llikeli}")
-    #     while rates.size>2:
-    #         print(f"rates.size={rates.size}")
-    #         keep = np.arange(rates.shape[0])!=np.argmin(rates)
-    #         nrates, nparams = self.__fit(data,rates[keep],params[keep])
-    #         nllikeli = self.llikelihood(data,nrates,nparams)
-    #         print(f"llikeli,nllikeli={llikeli,nllikeli}")
+    # pytest
+    @staticmethod
+    def maxinit(data:np.ndarray,mincount):
+        'initialise using maximal number of peaks'
+        if data.shape[0]<mincount:
+            raise ValueError("Not enough data")
 
-    #         if nllikeli<llikeli:
-    #             return rates,params
-    #         rates, params, llikeli = nrates,nparams, nllikeli
-    #     return rates,params
+        bins = sorted(data[:,0])[::mincount]
+        if (data.shape[0]-1)%mincount:
+            bins.append(max(data[:,0]))
+
+        sort  = lambda i:i[0]
+        ids   = sorted(zip(np.digitize(data[:,0],bins),data),key=sort)
+        means = tuple(np.mean([j[1] for j in grp],axis=0)
+                      for i,grp in itertools.groupby(ids,key=sort))
+        stds  = tuple(np.std([j[1] for j in grp],axis=0)
+                      for i,grp in itertools.groupby(ids,key=sort))
+        return 1/len(bins)*np.ones((len(bins),1)),np.hstack([means,stds])
+
+    # to pytest
+    def fitpeaks(self,data:np.ndarray):
+        'starts with maximal number of peaks and reduces'
+        # group by self.mincount, call maxinit
+        rates, params = self.maxinit(data,self.mincount)
+        params[params.shape[1]//2-1,:] = 0 # tmeans to 0
+        # for loop
+        rates, params = self.emstep(data,rates,params)
+        assigned = self.assign(data,params)# ->Dict[int,Tuple[int, ...]]
+        keep = [k for k,v in assigned.items() if len(v)>=self.mincount]
+        rates,params=rates[keep],params[keep]
+        # pop peaks which fail self.mincount
+        # ..make emstep
+        return rates,params
 
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]
