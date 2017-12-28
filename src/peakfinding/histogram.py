@@ -778,46 +778,4 @@ class ByEM:
         rates,params = self.init(data,npeaks)
         return self.__fit(data,rates,params,prevll=None)
 
-    # pytest
-    @staticmethod
-    def maxinit(data:np.ndarray,mincount):
-        'initialise using maximal number of peaks'
-        if data.shape[0]<mincount:
-            raise ValueError("Not enough data")
-
-        bins  = sorted(data[:,0])[::mincount]
-        if data.shape[0]%mincount:
-            bins.pop()
-
-        sort  = lambda i:i[0]
-        ids   = sorted(zip(np.digitize(data[:,0],bins),data),key=sort)
-        means = tuple(np.mean([j[1] for j in grp],axis=0)
-                      for i,grp in itertools.groupby(ids,key=sort))
-        stds  = tuple(np.std([j[1] for j in grp],axis=0)
-                      for i,grp in itertools.groupby(ids,key=sort))
-        return 1/len(bins)*np.ones((len(bins),1)),np.hstack([means,stds])
-
-    # # to pytest
-    # def fitpeaks(self,data:np.ndarray):
-    #     'starts with maximal number of peaks and reduces'
-    #     # group by self.mincount, call maxinit
-    #     rates, params = self.maxinit(data,self.mincount)
-    #     params[:,params.shape[1]//2-1] = 0 # tmeans to 0
-    #     arates,aparams=[],[]
-    #     # if llikelihood does not vary much (convergence) then return
-    #     for _ in range(self.emiter):
-    #         score, rates, params = self.emstep(data,rates,params)
-    #         assigned = self.assign(score)
-    #         keep = [k for k,v in assigned.items() if len(v)>=self.mincount]
-    #         rates,params=rates[keep],params[keep]
-
-    #         arates.append(rates)
-    #         aparams.append(params)
-    #         #scores.append((self.aic(data,rates,params),
-    #         #               self.bic(data,rates,params),
-    #         #               self.llikelihood(data,rates,params)))
-    #     # pop peaks which fail self.mincount
-    #     # ..make emstep
-    #     return arates,aparams
-
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]
