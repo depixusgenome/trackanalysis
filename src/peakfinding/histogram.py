@@ -582,7 +582,7 @@ class ByEM:
     for r in param:
     try r.reshape(2,-1) (see cls.scorex)
     '''
-    emiter   = 10
+    emiter   = 100
     tol      = 1e-2
     mincount = 5
     tol      = 1e-1 # loglikelihood tolerance
@@ -703,7 +703,7 @@ class ByEM:
         if self.covtype is COVTYPE.TIED:
             mid = params.shape[1]//2
             params[:,mid:-1]=np.mean(params[:,mid:-1],axis=0)
-        return rates, params
+        return self.score(data,params), rates, params
 
     # to pytest, to clean
     @classmethod
@@ -728,31 +728,31 @@ class ByEM:
         tscales  /= np.sum(pz_x,axis=1).reshape(-1,1)
         return nrates,np.hstack([nmeans,tmeans,nscales,tscales])
 
+    # pytest
     @classmethod
-    def assign(cls,data:np.ndarray,params:np.ndarray)->Dict[int,Tuple[int, ...]]:
-        'to each event (row in data) assign a peak (row in params)'
+    def assign(cls,score:np.ndarray)->Dict[int,Tuple[int, ...]]:
+        'to each event (row in data) assigns a peak (row in params)'
         # Gaussian distribution for position, exponential for duration
-        score    = cls.score(data,params).T # score[j,i] = pdf(Xi|Zj, theta)
-        assigned = sorted([(np.argmax(row),idx) for idx,row in enumerate(score)])
-        out : Dict[int,Tuple[int, ...]] = {_:tuple() for _ in range(len(params))}
+        # score[j,i] = pdf(Xi|Zj, theta)
+        assigned = sorted([(np.argmax(row),idx) for idx,row in enumerate(score.T)])
+        out : Dict[int,Tuple[int, ...]] = {_:tuple() for _ in range(score.shape[0])}
         out.update({key: tuple(i[1] for i in grp)
                     for key,grp in itertools.groupby(assigned,lambda x:x[0])})
         return out
 
-    def bic(self,data:np.ndarray,rates:np.ndarray,params:np.ndarray)->float:
+    def bic(self,score:np.ndarray,rates:np.ndarray,params:np.ndarray)->float:
         'returns bic value'
-        llikeli = self.llikelihood(data,rates,params)
+        llikeli = self.llikelihood(score,rates)
         # number of params rates + params assuming tmean is 0
-        return -2*llikeli + self.nparams(params) *np.log(0.5*data.shape[0]/np.pi)
+        return -2*llikeli + self.nparams(params) *np.log(0.5*score.shape[1]/np.pi)
 
-    def aic(self,data:np.ndarray,rates:np.ndarray,params:np.ndarray)->float:
+    def aic(self,score:np.ndarray,rates:np.ndarray,params:np.ndarray)->float:
         'returns bic value'
-        return 2*self.nparams(params) -2*self.llikelihood(data,rates,params)
+        return 2*self.nparams(params) -2*self.llikelihood(score,rates)
 
     @classmethod
-    def llikelihood(cls,data:np.ndarray,rates:np.ndarray,params:np.ndarray)->float:
+    def llikelihood(cls,score:np.ndarray,rates:np.ndarray)->float:
         'returns loglikelihood'
-        score = cls.score(data,params) # p(Xj|Zi)
         return np.sum(np.log(np.sum(rates*score,axis=0)))
 
     # to pytest
@@ -761,20 +761,20 @@ class ByEM:
               rates,
               params,
               prevll:Optional[float] = None):
-        prevll = self.llikelihood(data,rates,params) if prevll is None else prevll
+        prevll = self.llikelihood(self.score(data,params),rates) if prevll is None else prevll
         for _ in range(self.emiter):
-            rates,params = self.emstep(data,rates,params)
-            llikelihood  = self.llikelihood(data,rates,params)
+            score, rates, params = self.emstep(data,rates,params)
+            llikelihood  = self.llikelihood(score,rates)
             if abs(llikelihood-prevll) > self.tol:
                 prevll = llikelihood
             else:
                 break
-            if any(self.assign(data,params).values())<self.mincount:
+            if any(self.assign(score).values())<self.mincount:
                 break
         return rates,params
 
     def fit(self,data:np.ndarray,npeaks:int):
-        'iterate EM to fit npeaks'
+        'iterate EM to fit a given number of peaks'
         rates,params = self.init(data,npeaks)
         return self.__fit(data,rates,params,prevll=None)
 
@@ -785,9 +785,9 @@ class ByEM:
         if data.shape[0]<mincount:
             raise ValueError("Not enough data")
 
-        bins = sorted(data[:,0])[::mincount]
-        if (data.shape[0]-1)%mincount:
-            bins.append(max(data[:,0]))
+        bins  = sorted(data[:,0])[::mincount]
+        if data.shape[0]%mincount:
+            bins.pop()
 
         sort  = lambda i:i[0]
         ids   = sorted(zip(np.digitize(data[:,0],bins),data),key=sort)
@@ -797,19 +797,27 @@ class ByEM:
                       for i,grp in itertools.groupby(ids,key=sort))
         return 1/len(bins)*np.ones((len(bins),1)),np.hstack([means,stds])
 
-    # to pytest
-    def fitpeaks(self,data:np.ndarray):
-        'starts with maximal number of peaks and reduces'
-        # group by self.mincount, call maxinit
-        rates, params = self.maxinit(data,self.mincount)
-        params[params.shape[1]//2-1,:] = 0 # tmeans to 0
-        # for loop
-        rates, params = self.emstep(data,rates,params)
-        assigned = self.assign(data,params)# ->Dict[int,Tuple[int, ...]]
-        keep = [k for k,v in assigned.items() if len(v)>=self.mincount]
-        rates,params=rates[keep],params[keep]
-        # pop peaks which fail self.mincount
-        # ..make emstep
-        return rates,params
+    # # to pytest
+    # def fitpeaks(self,data:np.ndarray):
+    #     'starts with maximal number of peaks and reduces'
+    #     # group by self.mincount, call maxinit
+    #     rates, params = self.maxinit(data,self.mincount)
+    #     params[:,params.shape[1]//2-1] = 0 # tmeans to 0
+    #     arates,aparams=[],[]
+    #     # if llikelihood does not vary much (convergence) then return
+    #     for _ in range(self.emiter):
+    #         score, rates, params = self.emstep(data,rates,params)
+    #         assigned = self.assign(score)
+    #         keep = [k for k,v in assigned.items() if len(v)>=self.mincount]
+    #         rates,params=rates[keep],params[keep]
+
+    #         arates.append(rates)
+    #         aparams.append(params)
+    #         #scores.append((self.aic(data,rates,params),
+    #         #               self.bic(data,rates,params),
+    #         #               self.llikelihood(data,rates,params)))
+    #     # pop peaks which fail self.mincount
+    #     # ..make emstep
+    #     return arates,aparams
 
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]
