@@ -6,11 +6,11 @@ from    typing                  import (NamedTuple, Optional, Iterator,
                                         Dict)
 from    enum                    import Enum
 import  itertools
-from    sklearn.mixture         import GaussianMixture
+from functools                  import partial
+from sklearn.mixture            import GaussianMixture
 from sklearn.cluster            import KMeans
 import  numpy  as     np
 from    numpy.lib.stride_tricks import as_strided
-
 from    scipy.interpolate       import interp1d
 from    scipy.signal            import find_peaks_cwt
 
@@ -672,26 +672,52 @@ class ByEM:
     @staticmethod
     def __exppdf(loc, scale, pos):
         'log pdf of exponential dist'
-        return 0 if loc>pos else np.exp((loc-pos)/scale)/scale
+        return 0 if loc>pos else float(np.exp((loc-pos)/scale)/scale)
 
     @classmethod
-    def pdf(cls, args:np.ndarray)->float:
+    def pdf(cls,*args): #args:np.ndarray)->float:
         '''
         args : np.array([[xloc,xscale,xpos],
                          [yloc,yscale,ypos],
                          [zloc,zscale,zpos],
                          [tloc,tscale,tpos]])
         '''
-        return np.prod([cls.__normpdf(*par) for par in args[:-1]])*cls.__exppdf(*args[-1])
+        # before
+        #return np.prod([cls.__normpdf(*par) for par in args[:-1]])*cls.__exppdf(*args[-1])
+        param, datum=args[0]
+        return cls.mvnormpdf(*param[0],datum[:-1])*cls.__exppdf(*param[1],datum[-1])
+
+    # @classmethod
+    # def score(cls,data:np.ndarray,params)->np.ndarray:# to fix
+    #     'return the score[i,j] array corresponding to pdf(Xj|Zi, theta)'
+    #     mid      = params.shape[1]//2
+    #     locscale = np.array([list(zip(r[:mid],r[mid:])) for r in params])
+    #     pdf      = map(lambda x:cls.pdf(np.hstack([x[0],x[1].reshape(-1,1)])),
+    #                    itertools.product(locscale,data))
+
+    #     return np.array(list(pdf)).reshape(len(params),-1)
+
+    # pytest
+    @classmethod
+    def mvnormlpdf(cls,mean,cov,pos):
+        'proportional to log normal pdf of multivariate distribution'
+        cent = pos-mean
+        return -0.5*(np.log(np.linalg.det(cov))-cent.T*np.linalg.inv(cov)*cent)
+
+    # pytest
+    @classmethod
+    def mvnormpdf(cls,mean,cov,pos):
+        'proportional to normal pdf of multivariate distribution'
+        if len(pos)==1:
+            return float(cls.__normpdf(mean, cov, pos))
+        cent   = np.matrix(pos-mean)
+        return np.exp(-0.5*float(cent*np.linalg.inv(cov)*cent.T))/\
+            np.sqrt(float(np.linalg.det(cov)))
 
     @classmethod
-    def score(cls,data:np.ndarray,params:np.ndarray)->np.ndarray:
+    def score(cls,data:np.ndarray,params)->np.ndarray: # to fix
         'return the score[i,j] array corresponding to pdf(Xj|Zi, theta)'
-        mid      = params.shape[1]//2
-        locscale = np.array([list(zip(r[:mid],r[mid:])) for r in params])
-        pdf      = map(lambda x:cls.pdf(np.hstack([x[0],x[1].reshape(-1,1)])),
-                       itertools.product(locscale,data))
-
+        pdf = map(cls.pdf,itertools.product(params,data))
         return np.array(list(pdf)).reshape(len(params),-1)
 
     def emstep(self,data:np.ndarray,rates:np.ndarray,params:np.ndarray):
@@ -699,34 +725,55 @@ class ByEM:
         score = self.score(data,params)
         pz_x  = score*rates # P(Z,X|theta) prop P(Z|X,theta)
         pz_x  = np.array(pz_x)/np.sum(pz_x,axis=0) # renorm over Z
-        rates, params = self.maximization(pz_x,data,params)
-        if self.covtype is COVTYPE.TIED:
-            mid = params.shape[1]//2
-            params[:,mid:-1]=np.mean(params[:,mid:-1],axis=0)
+        rates, params = self.maximization(pz_x,data)
+        # if self.covtype is COVTYPE.TIED:# to fix
+        #     mid = params.shape[1]//2
+        #     params[:,mid:-1]=np.mean(params[:,mid:-1],axis=0)
         return self.score(data,params), rates, params
 
     # to pytest, to extend to x,y,z
+    # @classmethod
+    # def maximization(cls,pz_x:np.ndarray,data:np.ndarray,params:np.ndarray):
+    #     'returns the next set of parameters'
+    #     nrates    = np.mean(pz_x,axis=1).reshape(-1,1)
+    #     # spatial params on data[:,:-1]
+    #     nmeans    = np.array(np.matrix(pz_x)*data[:,:-1])
+    #     nmeans   /= np.sum(pz_x,axis=1).reshape(-1,1)
+
+    #     center    = (data[:,:-1].T - nmeans)**2 # each row corresponds to a param
+    #     nscales   = np.array([np.matrix(pz_x[idx,:])*r.reshape(-1,1)
+    #                           for idx,r in enumerate(center)]).reshape(-1,1)
+
+    #     nscales  /= np.sum(pz_x,axis=1).reshape(-1,1) # estimation of variance! not std
+    #     nscales   = np.sqrt(nscales)
+
+    #     # temporal params on data[:,-1]
+    #     tmeans    = np.array([0]*params.shape[0]).reshape(-1,1)
+
+    #     tscales   = np.array(np.matrix(pz_x)*data[:,-1].reshape(-1,1))
+    #     tscales  /= np.sum(pz_x,axis=1).reshape(-1,1)
+    #     return nrates,np.hstack([nmeans,tmeans,nscales,tscales])
+
     @classmethod
-    def maximization(cls,pz_x:np.ndarray,data:np.ndarray,params:np.ndarray):
+    def __maximizeparam(cls,data,proba):
+        'maximizes a parameter'
+        nmeans = np.array(np.matrix(proba)*data[:,:-1]).ravel()
+        ncov   = np.cov(data[:,:-1].T,aweights = proba ,ddof=0)
+        # temporal params on data[:,-1], tmean is 0
+        tscale = float(np.matrix(proba)*data[:,-1])
+
+        return [(nmeans,ncov),(0.,tscale)]
+
+    # to pytest, to extend to x,y,z
+    @classmethod
+    def maximization(cls,pz_x:np.ndarray,data:np.ndarray):
         'returns the next set of parameters'
-        nrates    = np.mean(pz_x,axis=1).reshape(-1,1)
-        # spatial params on data[:,:-1]
-        nmeans    = np.array(np.matrix(pz_x)*data[:,:-1])
-        nmeans   /= np.sum(pz_x,axis=1).reshape(-1,1)
 
-        center    = (data[:,:-1].T - nmeans)**2 # each row corresponds to a param
-        nscales   = np.array([np.matrix(pz_x[idx,:])*r.reshape(-1,1)
-                              for idx,r in enumerate(center)]).reshape(-1,1)
+        nrates   = np.mean(pz_x,axis=1).reshape(-1,1)
 
-        nscales  /= np.sum(pz_x,axis=1).reshape(-1,1) # estimation of variance! not std
-        nscales   = np.sqrt(nscales)
-
-        # temporal params on data[:,-1]
-        tmeans    = np.array([0]*params.shape[0]).reshape(-1,1)
-
-        tscales   = np.array(np.matrix(pz_x)*data[:,-1].reshape(-1,1))
-        tscales  /= np.sum(pz_x,axis=1).reshape(-1,1)
-        return nrates,np.hstack([nmeans,tmeans,nscales,tscales])
+        npz_x    = pz_x/np.sum(pz_x,axis=1).reshape(-1,1)
+        maximize = partial(cls.__maximizeparam,data)
+        return nrates, list(map(maximize,npz_x)) # type: ignore
 
     # pytest
     @classmethod
