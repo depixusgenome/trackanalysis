@@ -641,18 +641,17 @@ class ByEM:
     @staticmethod
     def init(data:np.ndarray,npeaks=1)->np.ndarray:
         'init using KMeans on spatial data'
-        kmean       = KMeans(npeaks)
+        kmean   = KMeans(npeaks)
         kmean.fit(data[:,:-1])
-        predict     = kmean.predict(data[:,:-1])
+        predict = kmean.predict(data[:,:-1])
 
-        clas        = {idx:np.array([data[_1] for _1,_2 in enumerate(predict) if _2==idx])
-                       for idx in range(npeaks)}
+        clas    = {idx:np.array([data[_1] for _1,_2 in enumerate(predict) if _2==idx])
+                   for idx in range(npeaks)}
 
-        scales      = np.array([np.nanstd(clas[idx],axis=0) for idx in range(npeaks)])
-        means       = np.array([np.nanmean(clas[idx],axis=0) for idx in range(npeaks)])
-        means[:,-1] = 0
-        rates       = 1/npeaks*np.array([1]*npeaks).reshape(-1,1)
-        return rates, np.hstack([means, scales])
+        params  = [[(np.nanmean(clas[idx][:,:-1],axis=0),np.nanstd(clas[idx][:,:-1],axis=0)),
+                    (0,np.nanstd(clas[idx][:,-1]))] for idx in range(npeaks)]
+        rates   = 1/npeaks*np.ones((npeaks,1))
+        return rates, params
 
     @staticmethod
     def __normlpdf(loc, scale, pos):
@@ -760,7 +759,7 @@ class ByEM:
         nmeans = np.array(np.matrix(proba)*data[:,:-1]).ravel()
         ncov   = np.cov(data[:,:-1].T,aweights = proba ,ddof=0)
         # temporal params on data[:,-1], tmean is 0
-        tscale = float(np.matrix(proba)*data[:,-1])
+        tscale = np.sum(proba*data[:,-1])
 
         return [(nmeans,ncov),(0.,tscale)]
 
