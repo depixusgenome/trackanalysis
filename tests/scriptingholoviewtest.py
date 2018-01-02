@@ -15,7 +15,7 @@ from data.views                                 import Beads, Cycles
 from data.track                                 import Bead, FoV
 from data.__scripting__.holoviewing.tracksdict  import TracksDictFovDisplayProperty
 from peakfinding.processor.selector             import PeaksDict
-from scripting.holoviewing                      import BasicDisplay
+from utils.holoviewing                          import BasicDisplay
 
 if TYPE_CHECKING:
     from model.__scripting__                        import Tasks
