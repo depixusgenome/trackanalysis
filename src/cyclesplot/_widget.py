@@ -161,12 +161,18 @@ class DriftWidget(GroupWidget[CyclesModelAccess]):
 
 class AdvancedWidget(_Widget[CyclesModelAccess], AdvancedWidgetMixin): # type: ignore
     "access to the modal dialog"
-    _TITLE = 'Cycles Plot Configuration'
-    _BODY: Tuple[Tuple[str,str],...]  = (('Histogram bin width',         '%(binwidth).3f'),
-                                         ('Minimum frames per position', '%(minframes)d'))
     def __init__(self, model:CyclesModelAccess) -> None:
         super().__init__(model)
         AdvancedWidgetMixin.__init__(self)
+
+    @staticmethod
+    def _title() -> str:
+        return 'Cycles Plot Configuration'
+
+    @staticmethod
+    def _body() -> Tuple[Tuple[str,str],...]:
+        return (('Histogram bin width',         '%(binwidth).3f'),
+                ('Minimum frames per position', '%(minframes)d'))
 
     def _args(self, **kwa):
         return super()._args(model = self._model, **kwa)

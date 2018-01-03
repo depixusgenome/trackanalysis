@@ -202,10 +202,11 @@ class FitToHairpinAccess(TaskAccess):
                 cnf.get())
         cnf.set(updatecopy(inst, **kwa))
 
-    def default(self, mdl):
+    def default(self, mdl, usr = True):
         "returns the default identification task"
         if isinstance(mdl, str):
-            return self.__defaults[mdl].get()
+            tmp = self.__defaults[mdl]
+            return tmp.get() if usr else tmp.getdefault()
 
         ols = mdl.oligos
         if ols is None or len(ols) == 0 or len(mdl.sequences(...)) == 0:

@@ -397,18 +397,50 @@ class PeakIDPathWidget(WidgetCreator[PeaksPlotModelAccess]):
             txt = str(Path(path).resolve())
         (self.__widget if resets is None else resets[self.__widget]).update(value = txt)
 
+class _IdAccessor:
+    def __init__(self, name, getter, setter):
+        self._name = name
+        self._fget = getter
+        self._fset = setter
+
+    def getdefault(self, inst):
+        "returns the default value"
+        return self._fget(getattr(inst, '_model').identification.default(self._name, False))
+
+    def __get__(self, inst, owner):
+        if inst is None:
+            return self
+
+        return self._fget(getattr(inst, '_model').identification.default(self._name))
+
+    def __set__(self, inst, value):
+        if value == self.__get__(inst, inst.__class__):
+            return
+
+        mdl = getattr(inst, '_model')
+        val = self._fset(value)
+        if isinstance(val, dict):
+            mdl.identification.updatedefault(self._name, **val)
+        else:
+            mdl.identification.updatedefault(self._name, *val)
+        mdl.identification.resetmodel(mdl)
+
 class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # type: ignore
     "access to the modal dialog"
-    _TITLE        = 'Hybridstat Configuration'
-    _BODY: T_BODY = (('Minimum frame count per event',    '%(_framecount)d'),
-                     ('Minimum event count per peak',     '%(_eventcount)d'),
-                     ('Align cycles using peaks',         '%(_align5)b'),
-                     ('Peak kernel size (blank ⇒ auto)',  '%(_precision)of'),
-                     ('Exhaustive fit algorithm',         '%(_fittype)b'),
-                     ('Use a theoretical peak 0 in fits', '%(_peak0)b'),
-                     ('Max distance to theoretical peak', '%(_dist2theo)d'),
+    @staticmethod
+    def _title() -> str:
+        return 'Hybridstat Configuration'
 
-                    )
+    @staticmethod
+    def _body() -> T_BODY:
+        return (('Minimum frame count per event',    '%(_framecount)d'),
+                ('Minimum event count per peak',     '%(_eventcount)d'),
+                ('Align cycles using peaks',         '%(_align5)b'),
+                ('Peak kernel size (blank ⇒ auto)',  '%(_precision)of'),
+                ('Exhaustive fit algorithm',         '%(_fittype)b'),
+                ('Use a theoretical peak 0 in fits', '%(_peak0)b'),
+                ('Max distance to theoretical peak', '%(_dist2theo)d'),
+               )
 
     def __init__(self, model:PeaksPlotModelAccess) -> None:
         super().__init__(model)
@@ -428,42 +460,11 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # 
     _eventcount = AdvancedTaskMixin.attr('peakselection.finder.grouper.mincount')
     _align5     = AdvancedTaskMixin.none('peakselection.align')
     _precision  = AdvancedTaskMixin.attr('peakselection.precision')
-
-    @property
-    def _peak0(self) -> bool:
-        return self._model.identification.default('fit').firstpeak
-
-    @_peak0.setter
-    def _peak0(self, value):
-        if value == self._peak0:
-            return
-
-        self._model.identification.updatedefault('fit', firstpeak = value)
-        self._model.identification.resetmodel(self._model)
-
-    @property
-    def _fittype(self) -> bool:
-        return isinstance(self._model.identification.default('fit'), PeakGridFit)
-
-    @_fittype.setter
-    def _fittype(self, value):
-        if value == self._fittype:
-            return
-
-        inst = (ChiSquareFit, PeakGridFit)[value]()
-        self._model.identification.updatedefault('fit', inst)
-        self._model.identification.resetmodel(self._model)
-
-    @property
-    def _dist2theo(self) -> int:
-        return self._model.identification.default('match').window
-
-    @_dist2theo.setter
-    def _dist2theo(self, value:int):
-        if value == self._dist2theo:
-            return
-        self._model.identification.updatedefault('match', window = value)
-        self._model.identification.resetmodel(self._model)
+    _peak0      = _IdAccessor('fit', lambda i: i.firstpeak, lambda i: {'firstpeak': i})
+    _fittype    = _IdAccessor('fit',
+                              lambda i: isinstance(i, PeakGridFit),
+                              lambda i: ((ChiSquareFit, PeakGridFit)[i](),))
+    _dist2theo  = _IdAccessor('match', lambda i: i.window, lambda i: {'window': i})
 
 def createwidgets(mdl: PeaksPlotModelAccess) -> Dict[str, WidgetCreator]:
     "returns a dictionnary of widgets"
