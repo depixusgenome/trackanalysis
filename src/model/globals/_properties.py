@@ -9,6 +9,10 @@ class ConfigRootProperty:
     def __init__(self, key:str) -> None:
         self.key = key
 
+    def getdefault(self, obj):
+        "returns the default value"
+        return obj.config.root[self.key].getdefault()
+
     def setdefault(self, obj, value, items:dict = None, **kwa):
         "initializes the property stores"
         if items is not None:
@@ -28,6 +32,10 @@ class ProjectRootProperty:
     def __init__(self, key:str) -> None:
         self.key = key
 
+    def getdefault(self, obj):
+        "returns the default value"
+        return obj.project.root[self.key].getdefault()
+
     def setdefault(self, obj, value, items:dict = None, **kwa):
         "initializes the property stores"
         if items is not None:
@@ -46,6 +54,10 @@ class ConfigProperty:
     OBSERVERS = ('config',)
     def __init__(self, key:str) -> None:
         self.key = key
+
+    def getdefault(self, obj):
+        "returns the default value"
+        return obj.config[self.key].getdefault()
 
     def setdefault(self, obj, value, items:dict = None, **kwa):
         "initializes the property stores"
@@ -72,6 +84,10 @@ class BeadProperty:
 
     def __cnf(self, obj):
         return obj.config[self.key]
+
+    def getdefault(self, obj):
+        "returns the default value"
+        return self.__cnf(obj).getdefault()
 
     def setdefault(self, obj, value, items:dict = None, **kwa):
         "initializes the property stores"
@@ -122,6 +138,10 @@ class RootTaskProperty:
 
     def __cnf(self, obj):
         return obj.config.root[self.key]
+
+    def getdefault(self, obj):
+        "returns the default value"
+        return self.__cnf(obj).getdefault()
 
     def setdefault(self, obj, value, items:dict = None, **kwa):
         "initializes the property stores"

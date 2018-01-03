@@ -14,7 +14,7 @@ class SingleMapAccess:
     items    = property(lambda self:        self._map.items(self._base),
                         lambda self, val:   self.update(**val),
                         lambda self:        self._map.pop(*self.items))
-    default  = property(None,
+    default  = property(lambda self:        self.getdefault(),
                         lambda self, val:   self.setdefault(val))
     defaults = property(None,
                         lambda self, val:   self.setdefaults(**val))
@@ -65,6 +65,12 @@ class SingleMapAccess:
         else:
             kwargs.update(args)
         return iter((self._key+i, j) for i, j in kwargs.items())
+
+    def getdefault(self, *keys):
+        "Calls default using the current base key"
+        if len(keys) == 0:
+            return self._map.getdefault(self._base)
+        return self._map.getdefault(*(self._key+i for i in keys))
 
     def setdefault(self, arg):
         "Calls update using the current base key"

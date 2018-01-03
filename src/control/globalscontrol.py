@@ -55,6 +55,10 @@ class SingleMapController(Controller):
         super().__init__(**kwargs)
         self.__items = mdl # type: GlobalsChild
 
+    def getdefault(self, *keys):
+        "returns the default value associated to the keys"
+        return self.__items.getdefault(*keys)
+
     def setdefaults(self, *args, version = None, **kwargs):
         "adds defaults to the config"
         self.__items.setdefaults(*args, version = version, **kwargs)

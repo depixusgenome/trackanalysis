@@ -32,6 +32,12 @@ class GlobalsChild(ChainMap): # pylint: disable=too-many-ancestors
         super().__init__(*maps)
         self.__name = name
 
+    def getdefault(self, *keys):
+        "returns the default value associated to the keys"
+        if len(keys) == 1:
+            return self.maps[1].__getitem__(keys[0])
+        return iter(self.maps[1].__getitem__(key) for key in keys)
+
     def setdefaults(self, *args, version = None, **kwargs):
         "adds defaults to the config"
         self.maps[1 if version is None else version].update(**_tokwargs(args, kwargs))
