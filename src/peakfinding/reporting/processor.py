@@ -10,7 +10,6 @@ from utils                      import initdefaults
 from model                      import Task, Level
 from control.processor          import Processor
 from control.processor.runner   import pooledinput, pooldump
-from anastore                   import dumps
 from excelreports.creation      import fileobj
 
 from eventdetection             import EventDetectionConfig
@@ -65,7 +64,7 @@ class PeakFindingExcelProcessor(Processor[PeakFindingExcelTask]):
         pick = pooldump(data)
         data = data.append(cls(**kwa))
         path = kwa.pop('path')
-        cnf  = dumps(list(data.model), indent = 4, ensure_ascii = False, sort_keys = True)
+        cnf  = list(data.model)
 
         def _save(frame):
             if pool is None:
@@ -82,7 +81,7 @@ class PeakFindingExcelProcessor(Processor[PeakFindingExcelTask]):
         "updates frames"
         args.apply(self.apply(**args.poolkwargs(self.task), **self.config()))
 
-def run(path:str, config:str = '', **kwa):
+def run(path:str, config = '', **kwa):
     u"Creates a report."
     self = ReporterInfo(**kwa)
     if str(path).endswith('.pkz'):

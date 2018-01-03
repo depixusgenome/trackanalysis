@@ -3,15 +3,15 @@
 """
 Creates the summary sheet
 """
-from   typing               import Tuple
-import numpy as np
+from   typing                import Tuple
+import numpy                 as     np
+from   xlsxwriter.utility    import xl_col_to_name
 
 import version
-
-from xlsxwriter.utility     import xl_col_to_name
-from excelreports.creation  import column_method, sheet_class
-from ..probabilities        import Probability
-from ._base                 import BEADKEY, PeakOutput, Reporter
+from   anastore              import dumps
+from   excelreports.creation import column_method, sheet_class
+from ..probabilities         import Probability
+from ._base                  import BEADKEY, PeakOutput, Reporter
 
 class SigmaPeaks:
     "Creates the formula for σ[Peaks]"
@@ -105,24 +105,40 @@ class SummarySheet(Reporter):
         "Iterates through sheet's base objects and their hierarchy"
         return iter(self.config.beads)
 
-    def info(self, cnf = ''):
+    def _info(self, cnf = ''):
         "create header"
         nbeads = len(self.config.beads)
         def _avg(fcn):
-            vals = (fcn(*i) for i in self.iterate())
-            return np.median([i for i in vals if i is not None])
+            itr  = (fcn(*i) for i in self.iterate())
+            vals = [i for i in itr if i is not None]
+            return np.median(vals) if vals else None
+
+        if isinstance(cnf, list):
+            strcf = dumps(cnf, indent = 4, ensure_ascii = False, sort_keys = True)
+            beads = next((i.beads
+                          for i in cnf if i.__class__.__name__ == 'BeadSubtractionTask'),
+                         [])
+            sub   = ('∅' if len(beads) == 0 else beads[0] if len(beads) ==1 else
+                     ''.join(str(i) for i in beads))
+        else:
+            strcf = cnf
+            sub   = '?'
 
         # pylint: disable=no-member
-        items = ([("Cycle Count:",      self.config.track.ncycles),
-                  ("Bead Count",        nbeads)],
-                 [("σ[HF] (µm):",       _avg(self._uncert)),
-                  ("Events per Cycle:", _avg(self._evts)),
-                  ("Down Time Φ₅ (s):", _avg(self._downtime))],
-                 [("GIT Version:",      version.version()),
-                  ("GIT Hash:",         version.lasthash()),
-                  ("GIT Date:",         version.hashdate()),
-                  ("Config:",           cnf)])
+        return ([("Cycle Count:", self.config.track.ncycles),
+                 ("Bead Count",   nbeads),
+                 ("Subtracted",   sub)],
+                [("σ[HF] (µm):",       _avg(self._uncert)),
+                 ("Events per Cycle:", _avg(self._evts)),
+                 ("Down Time Φ₅ (s):", _avg(self._downtime))],
+                [("GIT Version:",      version.version()),
+                 ("GIT Hash:",         version.lasthash()),
+                 ("GIT Date:",         version.hashdate()),
+                 ("Config:",           strcf)])
 
+    def info(self, cnf = ''):
+        "create header"
+        items  = self._info(cnf)
         maxlen = max(len(i) for i in items)
         for lst in items:
             if len(lst) < maxlen:

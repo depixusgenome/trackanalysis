@@ -3,15 +3,15 @@
 """
 Creates the summary sheet
 """
-from typing                     import Optional
-import numpy as np
+from   typing                     import Optional
+import numpy                      as     np
+from   xlsxwriter.utility         import xl_col_to_name
 
 import version
-
-from xlsxwriter.utility         import xl_col_to_name
-from peakfinding.probabilities  import Probability
-from excelreports.creation      import column_method, sheet_class
-from ._base                     import Bead, Reporter, Group
+from   anastore                   import dumps
+from   peakfinding.probabilities  import Probability
+from   excelreports.creation      import column_method, sheet_class
+from   ._base                     import Bead, Reporter, Group
 
 class SigmaPeaks:
     "Creates the formula for σ[Peaks]"
@@ -247,17 +247,29 @@ class SummarySheet(Reporter):
             good = [i for i in vals if i is not None]
             return None if len(good) == 0 else np.median(good)
 
+        if isinstance(cnf, list):
+            strcf = dumps(cnf, indent = 4, ensure_ascii = False, sort_keys = True)
+            beads = next((i.beads
+                          for i in cnf if i.__class__.__name__ == 'BeadSubtractionTask'),
+                         [])
+            sub   = ('∅' if len(beads) == 0 else beads[0] if len(beads) ==1 else
+                     ''.join(str(i) for i in beads))
+        else:
+            strcf = cnf
+            sub   = ''
+
         # pylint: disable=no-member
-        items = ([("Oligos:",           ', '.join(self.config.oligos)),
-                  ("Cycle Count:",     self.config.track.ncycles),
-                  ("Bead Count",        nbeads)],
+        items = ([("Oligos:",      ', '.join(self.config.oligos)),
+                  ("Cycle Count:", self.config.track.ncycles),
+                  ("Bead Count",   nbeads),
+                  ("Subtracted",   sub)],
                  [("σ[HF] (µm):",       _avg(self._uncert)),
                   ("Events per Cycle:", _avg(self._evts)),
                   ("Down Time Φ₅ (s):", _avg(self._downtime))],
                  [("GIT Version:",      version.version()),
                   ("GIT Hash:",         version.lasthash()),
                   ("GIT Date:",         version.hashdate()),
-                  ("Config:",           cnf)])
+                  ("Config:",           strcf)])
 
         maxlen = max(len(i) for i in items)
         for lst in items:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"Creates excel of csv files for reporting any type of data"
+"Creates excel of csv files for reporting any type of data"
 from typing                 import (Sequence, Iterator, Union, TypeVar,
                                     Callable, Optional, cast, IO)
 from pathlib                import Path
@@ -8,6 +8,7 @@ from contextlib             import closing, contextmanager
 from abc                    import ABCMeta, abstractmethod
 from inspect                import getmembers
 from xlsxwriter             import Workbook
+from xlsxwriter.worksheet   import Worksheet
 from xlsxwriter.chart       import Chart
 
 Column    = TypeVar('Column', bound = Callable)
@@ -24,36 +25,42 @@ class _ColumnMethod(object):
     def __init__(self):
         self._index = 0
 
-    def __call__(self, name: str, other = None, **kwargs):
-        ind          = self._index+1
-        self._index += 1
+    _NAMES = dict(name    = (_CNAME,    lambda _: None),
+                  doc     = (_CCOMMENT, lambda i: i.__doc__),
+                  index   = (_CORDER,   lambda _: None),
+                  units   = (_CUNITS,   lambda _: None),
+                  cond    = (_CCOND,    lambda _: None),
+                  fmt     = (_CFMT,     lambda _: None),
+                  exclude = (_CEXCLUDE, lambda _: (lambda _: False)))
 
+    def __call__(self, name: Union[type, str], other = None, **items):
+        self._index   += 1
+        items['name']  = name
+        items['index'] = self._index+1
         def _deco(fcn_):
-            fcn = getattr(fcn_, '__func__', fcn_)
-            setattr(fcn, _CNAME,    name)
-            setattr(fcn, _CCOMMENT, fcn.__doc__)
-            setattr(fcn, _CUNITS,   kwargs.get('units', None))
-            setattr(fcn, _CORDER,   ind)
-            setattr(fcn, _CCOND,    kwargs.get('cond', None))
-            setattr(fcn, _CFMT,     kwargs.get('fmt',  None))
+            kwargs = dict(items)
+            fcn    = getattr(fcn_, '__func__', fcn_)
+            if isinstance(name, type):
+                old = getattr(name, fcn.__name__)
+                old = getattr(old, '__func__', old)
+                kwargs.pop('name')
+                for i, (j,_) in self._NAMES.items():
+                    kwargs.setdefault(i, getattr(old, j))
 
-            exclude = kwargs.get('exclude', None)
-            if exclude is None:
-                setattr(fcn, _CEXCLUDE, lambda _: False)
-            else:
-                setattr(fcn, _CEXCLUDE, exclude)
+            for i, (j, k) in self._NAMES.items():
+                setattr(fcn, j, kwargs[i] if i in kwargs else k(fcn))
             return fcn
 
         if other is not None:
             return _deco(other)
         return _deco
 
-def column_method(name:str, other = None, _functor = _ColumnMethod(), **kwargs):
-    u"decorator for signaling that a method is responsible for a column of data"
+def column_method(name: Union[type, str], other = None, _functor = _ColumnMethod(), **kwargs):
+    "decorator for signaling that a method is responsible for a column of data"
     return _functor(name, other, **kwargs)
 
 def sheet_class(name: str, other = None, **kwargs):
-    u"Defines the method as a column"
+    "Defines the method as a column"
     def _deco(fcn):
         fcn.sheet_name = name
         for title, value in kwargs.items():
@@ -66,7 +73,7 @@ def sheet_class(name: str, other = None, **kwargs):
 
 class _BaseReporter(metaclass=ABCMeta):
     def comments(self, fcn: Callable[['_BaseReporter'], str]) -> Optional[str]:
-        u"returns column comments"
+        "returns column comments"
         comments = getattr(fcn, _CCOMMENT, None)
         if callable(comments):
             comments = cast(str, comments(self))
@@ -85,18 +92,18 @@ class _BaseReporter(metaclass=ABCMeta):
 
     @staticmethod
     def columnname(col: Column):
-        u"returns attribute _CNAME or None"
+        "returns attribute _CNAME or None"
         return getattr(col, _CNAME, None)
 
     def columns(self) -> Columns:
-        u"list of columns in table"
+        "list of columns in table"
         tmp  = iter(obj for _, obj in getmembers(self) if hasattr(obj, _CNAME))
         tmp  = iter(obj for obj in tmp if not getattr(obj, _CEXCLUDE, lambda _: False)(self))
         cols = cast(Columns, list(tmp))
         return sorted(cols, key = lambda x: getattr(x, _CORDER, None))
 
     def columnindex(self, *elems) -> Iterator[int]:
-        u"returns a column index"
+        "returns a column index"
         tmp   = iter(obj for _, obj in getmembers(self) if hasattr(obj, _CNAME))
         tmp   = iter(obj for obj in tmp if not getattr(obj, _CEXCLUDE, lambda _: False)(self))
         cols  = sorted(list(tmp), key = lambda x: getattr(x, _CORDER, None))
@@ -108,23 +115,25 @@ class _BaseReporter(metaclass=ABCMeta):
 
     @abstractmethod
     def iterate(self):
-        u"Iterates through sheet's base objects and their hierarchy"
+        "Iterates through sheet's base objects and their hierarchy"
 
     @abstractmethod
     def header(self, data:Sequence):
-        u"creates the header"
+        "creates the header"
 
     @abstractmethod
     def table(self):
-        u"creates the table"
+        "creates the table"
 
 class CsvReporter(_BaseReporter):
-    u"All generic methods for creating a CSV report"
+    "All generic methods for creating a CSV report"
     _TEXT_HEADER     = '#### '
     _TEXT_FORMAT     = '{: <16}\t'
     _TEXT_SEPARATOR  = '\t'
     _TABLE_FORMAT    = '{: <16};\t'
     _TABLE_SEPARATOR = ';\t'
+    book:  Union[IO, Workbook]
+    sheet: Union[Worksheet,str]
     def __init__(self, filename):
         if not hasattr(self, 'sheet_name'):
             self.sheet_name = None                     # type: Optional[str]
@@ -134,7 +143,7 @@ class CsvReporter(_BaseReporter):
         else:
             self.book      = filename
             self._tablerow = 0
-        self.sheet = self.sheet_name # type: Union[Worksheet,str]
+        self.sheet         = self.sheet_name
 
     def _printtext(self, *args):
         args = tuple('' if x is None else x for x in args)
@@ -147,14 +156,14 @@ class CsvReporter(_BaseReporter):
         print(args, sep = self._TABLE_SEPARATOR, file = self.book)
 
     def header(self, data:Sequence):
-        u"creates the header"
+        "creates the header"
         self._printtext('')
         for line in data:
             self._printtext(*line)
         self._printtext()
 
     def table(self):
-        u"creates the table"
+        "creates the table"
         def _title(fcn):
             return getattr(fcn, _CNAME, '')
 
@@ -178,18 +187,20 @@ class CsvReporter(_BaseReporter):
 
     @abstractmethod
     def iterate(self):
-        u"Iterates through sheet's base objects and their hierarchy"
+        "Iterates through sheet's base objects and their hierarchy"
 
 class XlsReporter(_BaseReporter):
-    u"All generic methods for creating an XLS report"
+    "All generic methods for creating an XLS report"
     _INT_FMT  = "0"
     _REAL_FMT = "0.00"
     _MARKED   = dict(bg_color='gray')
+    book:  Union[IO, Workbook]
+    sheet: Union[Worksheet, str]
     def __init__(self, arg):
         if isinstance(arg, XlsReporter):
             rep            = cast(XlsReporter, arg)
             self.book      = rep.book                      # type: Workbook
-            self.fmt       = rep.fmt
+            self.fmt: str  = rep.fmt
             self._tablerow = getattr(rep, '_tablerow', 0)  # type: int
         else:
             self.book = arg                                # type: Workbook
@@ -214,16 +225,16 @@ class XlsReporter(_BaseReporter):
             self.sheet = self.book.add_worksheet(self.sheet_name)
 
     def header(self, data:Sequence):
-        u"creates the header"
+        "creates the header"
         for irow, line in enumerate(data):
             for icol, cell in enumerate(line):
-                self.sheet.write(irow, icol, cell)
+                cast(Worksheet, self.sheet).write(irow, icol, cell)
 
     def _getfmt(self, mark:bool, fmt):
         return fmt if not mark else self.fmt[getattr(fmt, 'num_format', 'marked')]
 
     def table(self):
-        u"creates the table"
+        "creates the table"
         def _write_titles():
             for i, fcn in enumerate(self.columns()):
                 comment = self.comments(fcn)
@@ -296,20 +307,20 @@ class XlsReporter(_BaseReporter):
         _write_cond(irow)
 
     def tablerow(self):
-        u"start row of the table"
+        "start row of the table"
         return self._tablerow
 
     @abstractmethod
     def iterate(self):
-        u"Iterates through sheet's base objects and their hierarchy"
+        "Iterates through sheet's base objects and their hierarchy"
 
     @staticmethod
     def linemark(_) -> bool:
-        u"returns a function returning an optional line format"
+        "returns a function returning an optional line format"
         return False
 
 class Reporter(XlsReporter, CsvReporter):
-    u"Model independant class"
+    "Model independant class"
     def __init__(self, arg):
         if isinstance(arg, Workbook) or (isinstance(arg, Reporter) and arg.isxlsx()):
             XlsReporter.__init__(self, arg)
@@ -317,11 +328,11 @@ class Reporter(XlsReporter, CsvReporter):
             CsvReporter.__init__(self, arg)
 
     def isxlsx(self):
-        u"whether the file is an xls file or not"
+        "whether the file is an xls file or not"
         return isinstance(self.book, Workbook)
 
     def header(self, data:Sequence):
-        u"creates header"
+        "creates header"
         if self.isxlsx():
             XlsReporter.header(self, data)
         else:
@@ -329,7 +340,7 @@ class Reporter(XlsReporter, CsvReporter):
         self._tablerow += len(data)+1
 
     def table(self):
-        u"creates table"
+        "creates table"
         if self.isxlsx():
             XlsReporter.table(self)
         else:
@@ -337,13 +348,13 @@ class Reporter(XlsReporter, CsvReporter):
 
     @abstractmethod
     def iterate(self):
-        u"Iterates through sheet's base objects and their hierarchy"
+        "Iterates through sheet's base objects and their hierarchy"
 
 FILENAME = Union[Path, str]
 FILEOBJ  = Union[IO,Workbook]
 @contextmanager
 def fileobj(fname:FILENAME) -> Iterator[FILEOBJ]:
-    u"Context manager for opening xlsx or text file"
+    "Context manager for opening xlsx or text file"
     if Path(str(fname)).suffix in ('.xlsx', '.xls'):
         with closing(Workbook(str(fname), {'nan_inf_to_errors': True})) as book:
             yield book
@@ -352,7 +363,7 @@ def fileobj(fname:FILENAME) -> Iterator[FILEOBJ]:
             yield stream
 
 def writecolumns(filename, sheetname, items):
-    u"Writes columns to an excel/csv file"
+    "Writes columns to an excel/csv file"
 
     def _get(lst):
         return lambda i: lst[i] if len(lst) > i else None
@@ -360,12 +371,12 @@ def writecolumns(filename, sheetname, items):
     cols = list(column_method(name)(_get(lst)) for name, lst in items)
 
     def iterate(_):
-        u"Iterates through sheet's base objects and their hierarchy"
+        "Iterates through sheet's base objects and their hierarchy"
         for i in range(max(len(lst) for _, lst in items)):
             yield (i,)
 
     def columns(_):
-        u"list of columns in table"
+        "list of columns in table"
         return cols
 
     sheet = type("Sheet", (Reporter,),

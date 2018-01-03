@@ -141,9 +141,6 @@ class ConfigXlsxIO(TaskIO):
                                  PeakFindingExcelTask(model     = model,
                                                       **xlscnf))
 
-        for itm in cache.run():
-            tuple(itm)
-
         error = [None] # type: List[Optional[Exception]]
         def _process():
             try:

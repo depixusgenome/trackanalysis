@@ -9,7 +9,6 @@ import pickle
 from utils                  import initdefaults
 from model                  import Task, Level
 from control.processor      import Processor
-from anastore               import dumps
 from excelreports.creation  import fileobj
 
 from eventdetection         import EventDetectionConfig
@@ -78,10 +77,7 @@ class HybridstatExcelProcessor(Processor[HybridstatExcelTask]):
     def apply(cls, toframe = None, model = None, **kwa):
         "applies the task to a frame or returns a function that does so"
         path = kwa.pop('path')
-        cnf  = ''
-        if model is not None:
-            cnf = dumps(list(model), indent = 4, ensure_ascii = False, sort_keys = True)
-
+        cnf  = '' if model is None else list(model)
         return (partial(cls._apply, path, cnf, kwa) if toframe is None else
                 cls._apply(path, cnf, kwa, toframe))
 
@@ -89,7 +85,7 @@ class HybridstatExcelProcessor(Processor[HybridstatExcelTask]):
         "updates frames"
         args.apply(self.apply(model = args.data.model, **self.config()))
 
-def run(path:str, config:str = '', **kwa):
+def run(path:str, config = '', **kwa):
     "Creates a report."
     self = ReporterInfo(**kwa)
     if str(path).endswith('.pkz'):
