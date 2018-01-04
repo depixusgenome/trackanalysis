@@ -1,3 +1,11 @@
+# tag cycles_v4.10
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+In advanced configuration menus, the default value is indicated if ever the
+value is different.
+
+Subtracted beads are now displayed explicitly in xlsx reports.
+
 # tag cycles_v4.9
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
