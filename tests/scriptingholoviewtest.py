@@ -15,7 +15,7 @@ from data.views                                 import Beads, Cycles
 from data.track                                 import Bead, FoV
 from data.__scripting__.holoviewing.tracksdict  import TracksDictFovDisplayProperty
 from peakfinding.processor.selector             import PeaksDict
-from utils.holoviewing                          import BasicDisplay
+from utils.holoviewing                          import ItemsDisplay
 
 if TYPE_CHECKING:
     from model.__scripting__                        import Tasks
@@ -26,7 +26,7 @@ assert Cycles                        in  CLASSES
 assert Bead                          in  CLASSES
 assert FoV                           in  CLASSES
 assert PeaksDict                     in  CLASSES
-assert BasicDisplay                  in  CLASSES
+assert ItemsDisplay                  in  CLASSES
 assert TracksDictFovDisplayProperty  in  CLASSES
 
 HPIN   = ("gtcttttggtctttctggtgctcttcgaatAGCCTTCCAGCTGATATCTTCATAATAACCTATTACATATAAGCTTCAGG"
