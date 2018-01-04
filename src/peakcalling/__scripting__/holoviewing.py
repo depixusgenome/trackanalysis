@@ -12,7 +12,7 @@ import numpy                    as np
 
 import sequences
 
-from   utils.holoviewing            import hv
+from   utils.holoviewing            import hv, addproperty, displayhook
 from   peakfinding.processor        import PeaksDict    # pylint: disable=unused-import
 from   peakfinding.__scripting__.holoviewing import (PeaksDisplay as _PeaksDisplay,
                                                      PeaksTracksDictDisplay as _PTDDisplay)
@@ -22,9 +22,13 @@ from   model.__scripting__          import Tasks
 from   cleaning.processor           import DataCleaningException
 from   data.__scripting__           import TracksDict   # pylint: disable=unused-import
 from   ..processor.fittoreference   import (FitToReferenceProcessor,
-                                            FitToReferenceTask)
+                                            FitToReferenceTask,
+                                            FitToReferenceDict)
 from   ..processor.fittohairpin     import (BEADKEY,    # pylint: disable=unused-import
                                             FitToHairpinDict, Distance)
+
+displayhook(FitToReferenceDict)
+addproperty(FitToReferenceDict, 'display', _PeaksDisplay)
 
 class OligoMappingDisplay(_PeaksDisplay, display = PeaksDict): # type: ignore
     """
