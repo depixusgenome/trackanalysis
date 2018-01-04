@@ -648,7 +648,8 @@ class ByEM:
         clas    = {idx:np.array([data[_1] for _1,_2 in enumerate(predict) if _2==idx])
                    for idx in range(npeaks)}
 
-        params  = [[(np.nanmean(clas[idx][:,:-1],axis=0),np.nanstd(clas[idx][:,:-1],axis=0)),
+        params  = [[(np.nanmean(clas[idx][:,:-1],axis=0),
+                     np.cov(clas[idx][:,:-1].T)),
                     (0,np.nanstd(clas[idx][:,-1]))] for idx in range(npeaks)]
         rates   = 1/npeaks*np.ones((npeaks,1))
         return rates, params
@@ -686,16 +687,6 @@ class ByEM:
         param, datum=args[0]
         return cls.mvnormpdf(*param[0],datum[:-1])*cls.__exppdf(*param[1],datum[-1])
 
-    # @classmethod
-    # def score(cls,data:np.ndarray,params)->np.ndarray:# to fix
-    #     'return the score[i,j] array corresponding to pdf(Xj|Zi, theta)'
-    #     mid      = params.shape[1]//2
-    #     locscale = np.array([list(zip(r[:mid],r[mid:])) for r in params])
-    #     pdf      = map(lambda x:cls.pdf(np.hstack([x[0],x[1].reshape(-1,1)])),
-    #                    itertools.product(locscale,data))
-
-    #     return np.array(list(pdf)).reshape(len(params),-1)
-
     # pytest
     @classmethod
     def mvnormlpdf(cls,mean,cov,pos):
@@ -729,29 +720,6 @@ class ByEM:
         #     mid = params.shape[1]//2
         #     params[:,mid:-1]=np.mean(params[:,mid:-1],axis=0)
         return self.score(data,params), rates, params
-
-    # to pytest, to extend to x,y,z
-    # @classmethod
-    # def maximization(cls,pz_x:np.ndarray,data:np.ndarray,params:np.ndarray):
-    #     'returns the next set of parameters'
-    #     nrates    = np.mean(pz_x,axis=1).reshape(-1,1)
-    #     # spatial params on data[:,:-1]
-    #     nmeans    = np.array(np.matrix(pz_x)*data[:,:-1])
-    #     nmeans   /= np.sum(pz_x,axis=1).reshape(-1,1)
-
-    #     center    = (data[:,:-1].T - nmeans)**2 # each row corresponds to a param
-    #     nscales   = np.array([np.matrix(pz_x[idx,:])*r.reshape(-1,1)
-    #                           for idx,r in enumerate(center)]).reshape(-1,1)
-
-    #     nscales  /= np.sum(pz_x,axis=1).reshape(-1,1) # estimation of variance! not std
-    #     nscales   = np.sqrt(nscales)
-
-    #     # temporal params on data[:,-1]
-    #     tmeans    = np.array([0]*params.shape[0]).reshape(-1,1)
-
-    #     tscales   = np.array(np.matrix(pz_x)*data[:,-1].reshape(-1,1))
-    #     tscales  /= np.sum(pz_x,axis=1).reshape(-1,1)
-    #     return nrates,np.hstack([nmeans,tmeans,nscales,tscales])
 
     @classmethod
     def __maximizeparam(cls,data,proba):
