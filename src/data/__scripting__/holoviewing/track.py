@@ -5,6 +5,7 @@
 Adds shortcuts for using holoview
 """
 from   typing            import List
+import numpy             as     np
 import pandas            as     pd
 
 from   utils.holoviewing import addto, hv, addproperty
@@ -13,11 +14,9 @@ from   ...track          import Bead, FoV, Secondaries
 @addto(Bead)        # type: ignore
 def display(self, colorbar = True):
     "displays the bead calibration"
-    if self.image is None:
-        return
-
-    bnd = [0, 0] + list(self.image.shape)
-    return (hv.Image(self.image[::-1], bounds = bnd, kdims = ['z focus (pixel)', 'profile'])
+    img = np.ones((64,64)) if self.image is None or self.image.size == 0 else self.image
+    bnd = [0, 0] + list(img.shape)
+    return (hv.Image(img[::-1], bounds = bnd, kdims = ['z focus (pixel)', 'profile'])
             (plot = dict(colorbar = colorbar)))
 
 @addto(FoV)         # type: ignore
@@ -30,7 +29,7 @@ def display(self,   # pylint: disable=too-many-arguments
     """
     displays the FoV with bead positions as well as calibration images.
     """
-    bnd = self.bounds()
+    bnd   = self.bounds()
     beads = list(self.beads.keys()) if beads is None else list(beads)
 
     good  = {i: j.position[:2] for i, j in self.beads.items() if i in beads}
