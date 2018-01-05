@@ -6,8 +6,10 @@ Adds shortcuts for using holoview
 """
 from   typing            import List
 from   copy              import deepcopy
+import pandas            as     pd
 import numpy             as     np
 
+from   model.level       import PHASE
 from   utils.holoviewing import displayhook, BasicDisplay, hv
 from   ...views          import Beads, Cycles
 
@@ -151,11 +153,28 @@ class BeadDisplay(Display, display = Beads):
     if 3 or less beads are shown.
     * *tpe*: can be scatter or curve.
     * *overlay*: if *False*, all data is concatenated into one array.
+    * *area*: Areas are used instead of curves, 1 measure per cycle.
     """
+    _area    = False
+    _phases  = PHASE.relax, PHASE.pull
+    KEYWORDS = Display.KEYWORDS | frozenset(locals())
     def _perbead(self, bead):
-        return self._run(self._items[[bead]])
+        crv = self._run(self._items[[bead]])
+        if self._area:
+            cyc   = (self._items[...,...]
+                     .withdata({0: tuple(crv)[-1].data[:,1]})
+                     .withaction(lambda _, i: (i[0], np.nanmedian(i[1]))))
+            ylow  = np.array(list(cyc.withphases(self._phases[0]).values()), dtype = 'f4')
+            yhigh = np.array(list(cyc.withphases(self._phases[1]).values()), dtype = 'f4')
+            xvals = np.arange(len(ylow), dtype = 'f4')
+            frame = pd.DataFrame(dict(frames = xvals, zlow = ylow, zhigh = yhigh))
+            return tuple(crv)[0].redim(z="zhigh") * hv.Area(frame, "frames", ["zhigh", "zlow"])
+        return crv
 
     def _perall(self):
+        if self._area:
+            keys = self._keys if self._keys else self._items.beadsonly.keys()
+            return hv.Overlay([self._perbead(i) for i in keys])
         return self._run(self._items)
 
     def getmethod(self):
@@ -170,5 +189,4 @@ class BeadDisplay(Display, display = Beads):
             return ((self._kdim, list(set([i for i in self._items.keys()
                                            if self._items.isbead(i)]))),)
         return None
-
 __all__: List[str] = []

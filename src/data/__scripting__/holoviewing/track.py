@@ -6,10 +6,9 @@ Adds shortcuts for using holoview
 """
 from   typing            import List
 import numpy             as     np
-import pandas            as     pd
 
-from   utils.holoviewing import addto, hv, addproperty
-from   ...track          import Bead, FoV, Secondaries
+from   utils.holoviewing import addto, hv
+from   ...track          import Bead, FoV
 
 @addto(Bead)        # type: ignore
 def display(self, colorbar = True):
@@ -49,24 +48,5 @@ def display(self,   # pylint: disable=too-many-arguments
     bottom = hv.DynamicMap(lambda bead: self.beads[bead].display(colorbar = colorbar),
                            kdims = ['bead']).redim.values(bead = beads)
     return (top+bottom).cols(1)
-
-@addproperty(Secondaries) # type: ignore
-class SecondariesDisplay:
-    "Displays temperatures or vcap"
-    def __init__(self, val):
-        self.sec = val
-
-    def temperatures(self):
-        "displays the bead calibration"
-        get = lambda i, j: getattr(self.sec, i)[j]
-        fcn = lambda i, j: hv.Curve((get(i, 'index'), get(i, 'value')),
-                                    'image id', '°C', label = j)
-        return fcn('tservo', 'T° Servo')*fcn('tsink', 'T° Sink')*fcn('tsample', 'T° Sample')
-
-    def vcap(self):
-        "displays the bead calibration"
-        vca   = self.sec.vcap
-        frame = pd.DataFrame({'image': vca['index'], 'zmag': vca['zmag'], 'vcap': vca['vcap']})
-        return hv.Scatter(frame, 'zmag', ['vcap', 'image'])
 
 __all__: List[str] = []

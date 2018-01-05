@@ -92,7 +92,13 @@ def apply(self, *args, copy = True, beadsonly = True):
 @property
 def cleancycles(self):
     "returns cleaned cycles"
-    return self.apply(*Tasks.defaulttasklist(self, Tasks.alignment))[...,...]
+    return self.cleanbeads[...,...]
+
+@addto(Track) # type: ignore
+@property
+def cleanbeads(self):
+    "returns cleaned beads"
+    return self.apply(*Tasks.defaulttasklist(self, Tasks.alignment))
 
 @addto(Track) # type: ignore
 @property
