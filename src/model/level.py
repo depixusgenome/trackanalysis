@@ -18,10 +18,11 @@ class Level(Enum):
 
 class Phase:
     "Class containing default phases"
-    initial = 1 # type: int
-    pull    = 3 # type: int
-    measure = 5 # type: int
-    count   = 8 # type: int
+    initial = 1
+    pull    = 3
+    measure = 5
+    relax   = 7
+    count   = 8
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass

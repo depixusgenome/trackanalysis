@@ -3,7 +3,7 @@
 """
 Adds quality control displays
 """
-from   typing                        import List, Dict
+from   typing                        import List, Dict, FrozenSet
 from   itertools                     import chain
 
 import numpy                         as     np
@@ -12,9 +12,82 @@ import pandas                        as     pd
 from   utils.holoviewing             import hv, ItemsDisplay
 from   model.level                   import PHASE
 from   data.views                    import isellipsis
-from   data.__scripting__.tracksdict import TracksDict # pylint: disable=unused-import
+from   data.track                    import Secondaries, Track  # pylint: disable=unused-import
+from   data.__scripting__.tracksdict import TracksDict          # pylint: disable=unused-import
+from   ..computations                import extensions
 
-class QualityControl(ItemsDisplay, qc = TracksDict):
+class SecondariesDisplay(ItemsDisplay, display = Secondaries):
+    "Displays temperatures or vcap"
+    def temperatures(self):
+        "displays the temperatures"
+        get = lambda i, j: getattr(self._items, i)[j]
+        fcn = lambda i, j: hv.Curve((get(i, 'index'), get(i, 'value')),
+                                    'image id', '°C', label = j)
+        return fcn('tservo', 'T° Servo')*fcn('tsink', 'T° Sink')*fcn('tsample', 'T° Sample')
+
+    def vcap(self):
+        "displays the bead calibration"
+        vca   = self._items.vcap
+        frame = pd.DataFrame({'image': vca['index'], 'zmag': vca['zmag'], 'vcap': vca['vcap']})
+        return hv.Scatter(frame, 'zmag', ['vcap', 'image'])
+
+    def display(self, **_):
+        return (self.temperatures()+self.vcap()).columns(1)
+
+class TrackQualityControlDisplay(ItemsDisplay, qc = Track):
+    """
+    Adds items that should be qc'ed.
+    """
+    _extensionrange = (1, 99)
+    _beads          = None
+    _phases         = PHASE.relax, PHASE.pull
+    KEYWORDS: FrozenSet[str] = ItemsDisplay.KEYWORDS | frozenset(list(locals()))
+
+    def __getitem__(self, vals):
+        self._beads = None if isellipsis(vals) else [vals] if np.isscalar(vals) else list(vals)
+        return self
+
+    def temperatures(self):
+        "displays the temperatures"
+        length = np.nanmean(np.diff(self._items.phases[:,0]))
+        get = lambda i, j: getattr(self._items.secondaries, i)[j]
+        fcn = lambda i, j: hv.Curve((get(i, 'index')/length, get(i, 'value')),
+                                    'cycle', '°C', label = j)
+        return (fcn('tservo', 'T° Servo')
+                *fcn('tsink', 'T° Sink')
+                *fcn('tsample', 'T° Sample'))
+
+    def vcap(self):
+        "displays the bead calibration"
+        length = np.nanmean(np.diff(self._items.phases[:,0]))
+        vca    = self._items.secondaries.vcap
+        frame  = pd.DataFrame({'cycle': vca['index']/length,
+                               'zmag' : vca['zmag'],
+                               'vcap' : vca['vcap']})
+        return hv.Scatter(frame, 'zmag', ['vcap', 'image'])
+
+    def beadextent(self):
+        "displays cycle extensions"
+        beads  = self._items.cleanbeads[self._beads if self._beads else
+                                        list(self._items.cleaning.good())]
+        vals   = extensions(beads, *self._phases)
+        ids    = np.ones(self._items.ncycles, dtype = "i4")
+        dframe = pd.DataFrame(dict(cycle     = np.concatenate(vals[0]),
+                                   extension = np.concatenate(vals[1])*1e3,
+                                   bead      = np.concatenate([ids*i for i in beads.keys()])))
+        rng    = tuple(np.nanpercentile(dframe.extension, self._extensionrange))
+        return (hv.BoxWhisker(dframe, "cycle", ["extension"])
+                .redim(extension = hv.Dimension('extension', unit = 'nm'))
+                .redim.range(extension = rng)
+                (style = dict(box_color='lightblue')))
+
+    def display(self, **_):
+        "Displays qc items"
+        return (self.beadextent()
+                +self.temperatures()
+                +self.vcap()).columns(1)
+
+class TracksDictQualityControlDisplay(ItemsDisplay, qc = TracksDict):
     """
     Adds items that should be qc'ed.
     """

@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Provides plots for temperatures and bead extensions"
-from    typing              import Dict, Optional, Tuple
-import  warnings
-import  numpy               as     np
+import warnings
+from   typing            import Dict, Optional, Tuple, cast
 
-from    bokeh.models        import ColumnDataSource, Range1d
-from    bokeh.plotting      import Figure, figure
-from    bokeh               import layouts
+import numpy             as     np
+from   bokeh             import layouts
+from   bokeh.models      import ColumnDataSource, Range1d
+from   bokeh.plotting    import Figure, figure
 
-from    data                import Cycles
-from    model.level         import PHASE
-from    view.plots          import PlotAttrs
-from    view.plots.tasks    import TaskPlotCreator
-from    cleaning.processor  import DataCleaningException
-from    ._model             import QualityControlModelAccess
+from   data              import Beads, Track
+from   model.level       import PHASE
+from   view.plots        import PlotAttrs
+from   view.plots.tasks  import TaskPlotCreator
+
+from   ..computations    import extensions
+from   ._model           import QualityControlModelAccess
+
 
 class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
     "Shows temperature temporal series"
@@ -39,6 +41,7 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         self.config.tools.default             = 'pan,box_zoom,reset,save'
         self.config.lines.percentiles.default = [10, 50, 90]
         self.config.yspan.default             = [5, 95], 0.3
+        self.config.phases.default            = PHASE.initial, PHASE.pull
         self.config.warningthreshold.default  = 0.3
         self._src: ColumnDataSource           = {}
         self._fig: Figure                     = None
@@ -108,7 +111,7 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
                      pop90    = np.full(2, pops[2], dtype = 'f4')))
 
     @classmethod
-    def _measures(cls, track) -> Optional[np.ndarray]:
+    def _measures(cls, track: Track) -> Optional[np.ndarray]:
         name  = cls.__name__.replace('PlotCreator', '').lower()
         vals  = getattr(track.secondaries, name, None)
         if vals is None or not len(vals):
@@ -181,37 +184,11 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
                     bottom = bars[0,:])
         return data + (new,)
 
-    def _measures(self, track) -> Optional[np.ndarray]: # type: ignore
+    def _measures(self, track: Track) -> Optional[np.ndarray]: # type: ignore
         beads = self._model.runbead()
-        if beads is None:
-            return None
-
-        cycles = Cycles(track = track).withaction(lambda _, i: (i[0], np.nanmedian(i[1])))
-        dtype  = np.dtype('i4, f4')
-
-        cnt    = []
-        cyc    = []
-        for ibead in beads.keys():
-            try:
-                data = beads[ibead]
-            except DataCleaningException:
-                continue
-
-            ext = np.full(track.ncycles, np.NaN, dtype = 'f4')
-            cnt.append(ext)
-            cyc.append(np.arange(len(ext)))
-
-            cycles.withdata({0: data}).withphases(PHASE.initial)
-            tmp             = np.array([(i[1], j) for i, j in cycles], dtype = dtype)
-            ext[tmp['f0']]  = tmp['f1']
-
-            cycles.withphases(PHASE.pull)
-            tmp             = np.array([(i[1], j) for i, j in cycles], dtype = dtype)
-            ext[tmp['f0']] -= tmp['f1']
-
-            ext[:]         -= np.nanmedian(ext)
-
-        return (np.concatenate(cyc), np.concatenate(cnt)) if len(cnt) else None
+        if beads is not None:
+            cyc, cnt = extensions(cast(Beads, beads), *self.config.phases.get())
+            return (np.concatenate(cyc), np.concatenate(cnt)) if len(cnt) else None
 
     @staticmethod
     def _xlabel() -> str:
