@@ -6,10 +6,17 @@ will be expanded to include different methods
 """
 import numpy as np
 from numpy.testing import assert_allclose
-import scipy.stats as stats
+from scipy.stats import expon, norm
 from peakfinding.histogram import ByEM
 
 EMFITTER = ByEM()
+
+
+def test_byeminit():
+    'init should not return small pz_x values'
+    # test extreme cases
+    # data = np.hstack([norm(loc=0,scale=0.1).rvs(size=100),10])
+    pass
 
 def test_byemscore():
     'tests the score method'
@@ -52,8 +59,8 @@ def test_assign():
 def test_byemstep():
     'test the expectation and maximization step of ByEM'
     rstate=np.random.RandomState(2)
-    data = np.vstack([np.hstack([stats.norm(loc=i,scale=0.1).rvs((1000,1),random_state=rstate), # pylint: disable=unused-variable
-                                 stats.expon(loc=0,scale=0.1).rvs((1000,1),random_state=rstate)])
+    data = np.vstack([np.hstack([norm(loc=i,scale=0.1).rvs((1000,1),random_state=rstate), # pylint: disable=unused-variable
+                                 expon(loc=0,scale=0.1).rvs((1000,1),random_state=rstate)])
                       for i in range(0,10,2)])
     byem=ByEM(emiter=1) # pylint: disable=unused-variable
     # byem.fit(data,5)

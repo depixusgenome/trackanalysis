@@ -569,8 +569,8 @@ class ByGaussianMix:
 
 class COVTYPE(Enum):
     'defines constraints on covariance'
-    ANY  = 1
-    TIED = 2
+    ANY  = "any"
+    TIED = "tied"
 
 # set data as instance attribute
 class ByEM:
@@ -648,8 +648,9 @@ class ByEM:
         clas    = {idx:np.array([data[_1] for _1,_2 in enumerate(predict) if _2==idx])
                    for idx in range(npeaks)}
 
+        # cov is overestimated by factor 10 to avoid pz_x too low for first guess
         params  = [[(np.nanmean(clas[idx][:,:-1],axis=0),
-                     np.cov(clas[idx][:,:-1].T)),
+                     10*np.cov(clas[idx][:,:-1].T)),
                     (0,np.nanstd(clas[idx][:,-1]))] for idx in range(npeaks)]
         rates   = 1/npeaks*np.ones((npeaks,1))
         return rates, params
@@ -716,31 +717,28 @@ class ByEM:
         pz_x  = score*rates # P(Z,X|theta) prop P(Z|X,theta)
         pz_x  = np.array(pz_x)/np.sum(pz_x,axis=0) # renorm over Z
         rates, params = self.maximization(pz_x,data)
-        # if self.covtype is COVTYPE.TIED:# to fix
-        #     mid = params.shape[1]//2
-        #     params[:,mid:-1]=np.mean(params[:,mid:-1],axis=0)
         return self.score(data,params), rates, params
 
-    @classmethod
-    def __maximizeparam(cls,data,proba):
+    @staticmethod
+    def __maximizeparam(data,proba):
         'maximizes a parameter'
         nmeans = np.array(np.matrix(proba)*data[:,:-1]).ravel()
         ncov   = np.cov(data[:,:-1].T,aweights = proba ,ddof=0)
         # temporal params on data[:,-1], tmean is 0
         tscale = np.sum(proba*data[:,-1])
-
         return [(nmeans,ncov),(0.,tscale)]
 
-    # to pytest, to extend to x,y,z
-    @classmethod
-    def maximization(cls,pz_x:np.ndarray,data:np.ndarray):
+    # to pytest
+    def maximization(self,pz_x:np.ndarray,data:np.ndarray):
         'returns the next set of parameters'
-
         nrates   = np.mean(pz_x,axis=1).reshape(-1,1)
-
         npz_x    = pz_x/np.sum(pz_x,axis=1).reshape(-1,1)
-        maximize = partial(cls.__maximizeparam,data)
-        return nrates, list(map(maximize,npz_x)) # type: ignore
+        maximize = partial(self.__maximizeparam,data)
+        params   = np.array(list(map(maximize,npz_x))) # type: ignore
+        if self.covtype is COVTYPE.TIED:
+            meancov = np.mean((i[0][1] for i in params),axis=0)
+            params[:,0,1] = meancov
+        return nrates, params # type: ignore
 
     # pytest
     @classmethod
