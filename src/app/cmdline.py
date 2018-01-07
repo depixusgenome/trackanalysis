@@ -21,7 +21,7 @@ _add_sys_paths()
 
 
 # pylint: disable=wrong-import-position
-import utils.warnings   #  pylint: disable=unused-import
+import utils.warningsconfig   #  pylint: disable=unused-import
 from utils.logconfig    import getLogger
 from bokeh.resources    import DEFAULT_SERVER_PORT
 from app.scripting      import INITIAL_ORDERS
