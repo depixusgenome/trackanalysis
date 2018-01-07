@@ -8,10 +8,9 @@ from   typing             import List, Union
 from   functools          import partial, wraps
 from   concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
-from   utils.holoviewing  import addto, displayhook, addproperty, hv
+from   utils.holoviewing  import addto, displayhook, addproperty, hv, BasicDisplay
 from   ...views           import isellipsis, BEADKEY
 from   ...tracksdict      import TracksDict
-from   .display           import BasicDisplay
 
 _TDOC = (
     """
