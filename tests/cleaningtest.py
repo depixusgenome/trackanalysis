@@ -10,7 +10,8 @@ from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-imp
 from cleaning.processor         import (DataCleaning, DataCleaningTask,
                                         DataCleaningProcessor, LocalNaNPopulation,
                                         DerivateIslands, DataCleaningException)
-from cleaning.beadsubtraction   import BeadSubtractionTask, BeadSubtractionProcessor
+from cleaning.beadsubtraction   import (BeadSubtractionProcessor,
+                                        MedianBeadSubtractionProcessor)
 import cleaning._core           as     cleaningcore # pylint:disable=no-name-in-module
 from simulator                  import randtrack, setseed
 from model.task.track           import TrackReaderTask
@@ -248,17 +249,15 @@ def test_cleaning_localpop():
 
 def test_subtract():
     "tests subtractions"
-    assert_allclose(BeadSubtractionTask()([np.arange(5)]),   np.arange(5))
-    assert_allclose(BeadSubtractionTask()([np.arange(5)]*5), np.arange(5))
-    assert_allclose(BeadSubtractionTask()([np.arange(5), np.ones(5)]),
-                    np.arange(5)*.5+.5)
-
-    assert_allclose(BeadSubtractionTask()([np.arange(6), np.ones(5)]),
-                    list(np.arange(5)*.5+.5)+[5])
+    agg = BeadSubtractionProcessor.aggregate
+    assert_allclose(agg([np.arange(5)]),             np.arange(5))
+    assert_allclose(agg([np.arange(5)]*5),           np.arange(5))
+    assert_allclose(agg([np.arange(5), np.ones(5)]), np.arange(5)*.5+.5)
+    assert_allclose(agg([np.arange(6), np.ones(5)]), list(np.arange(5)*.5+.5)+[5])
 
     tmp = Beads(data = {0: np.arange(5), 1: np.ones(5),
                         2: np.zeros(5),  3: np.arange(5)*1.})
-    cache = {}
+    cache: dict = {}
     frame = BeadSubtractionProcessor.apply(tmp, cache, beads = [0, 1])
     assert set(frame.keys()) == {2, 3}
     assert_allclose(frame[2], -.5*np.arange(5)-.5)
@@ -266,8 +265,17 @@ def test_subtract():
 
     ca0 = cache[None]
     res = frame[3]
-    assert res is frame.data[3] # pylint: disable=unsubscriptable-object
+    assert res is not frame.data[3] # pylint: disable=unsubscriptable-object
     assert ca0 is cache[None]
+
+def test_subtract_med():
+    "tests subtractions"
+    allv = (None, None)
+    agg  = MedianBeadSubtractionProcessor.aggregate
+    assert_allclose(agg([np.arange(5)]*5, allv),           np.arange(5))
+    assert_allclose(agg([np.arange(5), np.ones(5)], allv), np.arange(5)*.5+.5)
+    assert_allclose(agg([np.arange(5)]+[np.ones(5)]*2, allv), np.ones(5)*4./3.)
+    assert_allclose(agg([np.arange(6), np.ones(5)], allv), list(np.arange(5)*.5+.5)+[4.25])
 
 def test_processor():
     "test processor"
@@ -324,4 +332,4 @@ def test_view_messages(bokehaction):
         server.load('big_legacy', andstop = False)
 
 if __name__ == '__main__':
-    test_message_creation()
+    test_subtract()
