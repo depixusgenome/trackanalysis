@@ -82,6 +82,11 @@ class BeadSubtractionTask(Task):
     beads:  List[int] = []
     agg:    AGG_TYPE  = SubtractMedianSignal()
     level             = Level.none
+    def __delayed_init__(self, _):
+        if isinstance(self.agg, str):
+            self.agg = (SubtractMedianSignal if 'med' in self.agg.lower() else
+                        SubtractAverageSignal)()
+
     @initdefaults(frozenset(locals()) - {'level'})
     def __init__(self, **kwa):
         super().__init__(**kwa)

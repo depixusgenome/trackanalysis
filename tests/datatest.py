@@ -3,16 +3,16 @@
 """ Tests data access """
 from   pathlib      import Path
 from   itertools    import product
-from   typing       import cast # pylint: disable=unused-import
+from   typing       import cast, Iterable
 import tempfile
 import numpy as np
-from   numpy.testing    import assert_equal
+from   numpy.testing    import assert_equal, assert_allclose
 
 from   legacy           import readtrack   # pylint: disable=import-error,no-name-in-module
 import data
 from   data.views       import ITrackView
 from   data.trackio     import LegacyGRFilesIO, savetrack, PickleIO, LegacyTrackIO
-from   data.track       import FoV
+from   data.track       import FoV, concatenatetracks, selectcycles, dropbeads, Track
 from   data.tracksdict  import TracksDict
 from   testingcore      import path as utpath
 
@@ -347,21 +347,54 @@ def test_trktopk():
 
 def test_io_recognition():
     "tests that the right IO class recognizes its paths"
-    files = dict(pickles = ((utpath("100bp_4mer/ref.pk"),), utpath("100bp_4mer/ref.pk"),),
-                 tracks  = ((utpath("small_legacy"),), utpath("small_legacy"),),
-                 grs     = ((utpath("big_legacy"), utpath("CTGT_selection")),
-                            (utpath("big_legacy"), utpath("CTGT_selection")+"/Z(t)bd0track10.gr")),
-                 none    = (utpath("CTGT_selection"),
-                            utpath("CTGT_selection")+"/Z(t)bd0track10.gr",
-                            (utpath("CTGT_selection")+"/Z(t)bd0track10.gr"),))
+    get   = lambda i: str(utpath(i))
+    files = dict(pickles = ((get("100bp_4mer/ref.pk"),), get("100bp_4mer/ref.pk"),),
+                 tracks  = ((get("small_legacy"),), get("small_legacy"),),
+                 grs     = ((get("big_legacy"), get("CTGT_selection")),
+                            (get("big_legacy"), get("CTGT_selection")+"/Z(t)bd0track10.gr")),
+                 none    = (get("CTGT_selection"),
+                            get("CTGT_selection")+"/Z(t)bd0track10.gr",
+                            (get("CTGT_selection")+"/Z(t)bd0track10.gr"),))
 
     types = dict(pickles = PickleIO,
                  tracks  = LegacyTrackIO,
                  grs     = LegacyGRFilesIO)
     for tpename, tpe  in types.items():
         for fname, paths in files.items():
-            for path in paths:
+            for path in cast(Iterable, paths):
                 assert (tpe.check(path) is None) is (tpename != fname)
 
+def test_selectcycles():
+    'test whether two Track stack properly'
+    trk = Track(path = utpath("big_legacy"))
+
+    other = selectcycles(trk, range(5))
+    assert other.ncycles == 5
+    assert set(other.beads.keys()) == set(trk.beads.keys())
+    assert other.path is None
+    assert_allclose(other.phases, trk.phases[:5,:])
+    assert_allclose(other.beads['t'], trk.beads['t'][:trk.phases[5,0]-trk.phases[0,0]])
+
+    other = selectcycles(trk, [2, 4, 10])
+    assert other.ncycles == 3
+    assert set(other.beads.keys()) == set(trk.beads.keys())
+    assert other.path is None
+    assert_allclose(other.phases, trk.phases[[2, 4, 10],:])
+
+def test_concatenate():
+    'test whether two Track stack properly'
+    trk1 = Track(path = utpath("small_legacy"))
+    trk2 = dropbeads(Track(path = utpath("small_legacy")),0)
+    size1, size2 = trk1.data["t"].size, trk2.data["t"].size
+    trk  = concatenatetracks(trk1, trk2)
+
+    assert set(trk.data.keys())==(set(trk1.data.keys())|set(trk2.data.keys()))
+    assert all((trk.data["t"][1:]-trk.data["t"][:-1])==1)
+    assert all(np.isnan(trk.data[0][-size2:]))
+    assert all(~np.isnan(trk.data[0][:size1]))
+
+    assert_allclose(trk.phases[:len(trk1.phases)],trk1.phases)
+    assert_allclose(trk.phases[len(trk1.phases):],
+                    trk2.phases+trk1.data["t"][-1]-trk2.data["t"][0]+1)
 if __name__ == '__main__':
-    test_io_recognition()
+    test_selectcycles()

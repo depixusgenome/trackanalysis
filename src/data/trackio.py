@@ -524,4 +524,4 @@ def savetrack(path  : PATHTYPE,     # pylint: disable=unused-argument,function-r
             new.update({i: j for i, j in pool.map(_savetrack, args)})
         return new
 
-    return _savetrack((path, track))
+    return _savetrack((None, path, track))[1]

@@ -164,11 +164,11 @@ def __init__(self, *path: Union[str, Path], __old__ = Track.__init__, **kwa):
             path = cast(tuple, kwa.pop('path'))
 
     cnf = scriptapp.control.getGlobal('css').last.path.trk
-    if any(i in (Ellipsis, 'prev', '') for i in path):
+    if path is not None and any(i in (Ellipsis, 'prev', '') for i in path):
         path = cnf.get()
 
     gui = None
-    if len(path) == 0:
+    if path is not None and len(path) == 0:
         gui = scriptapp.opentrack()
         if isinstance(gui, AttributeError):
             gui = None

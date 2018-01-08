@@ -9,20 +9,24 @@ We add some methods and change the default behaviour:
 * an *events* property is added
 * a *rawprecision* method is added
 """
-from typing                 import List
-from pathlib                import Path
-from datetime               import datetime
+from   typing               import List
+from   pathlib              import Path
+from   datetime             import datetime
+from   functools            import partial
 
-from utils.decoration       import addto, addproperty
-from utils.attrdefaults     import addattributes
-from model                  import PHASE, Task
-from model.__scripting__    import Tasks
-from signalfilter           import PrecisionAlg
+import numpy                as     np
 
-from ..track                import (Track, LazyProperty, BEADKEY,
-                                    selectbeads, renamebeads, dropbeads,
-                                    concatenatetracks)
-from .tracksdict            import TracksDict
+from   utils.decoration     import addto, addproperty
+from   utils.attrdefaults   import addattributes
+from   model                import PHASE, Task
+from   model.__scripting__  import Tasks
+from   signalfilter         import PrecisionAlg
+
+from   ..trackio            import savetrack
+from   ..track              import Track, LazyProperty, BEADKEY, isellipsis
+from   ..trackops           import (selectbeads, dropbeads, selectcycles,
+                                    concatenatetracks, renamebeads)
+from   .tracksdict          import TracksDict
 
 @addproperty(Track, 'pathinfo')
 class PathInfo:
@@ -106,14 +110,75 @@ def measures(self):
     "returns cleaned cycles for phase 5 only"
     return self.cleancycles.withphases(PHASE.measure)
 
-@addto(Track) # type: ignore
-def concatenate(self,other:Track):
+@addproperty(Track, 'op')
+class TrackOperations:
     """
-    Stacks the information in the tracks.
+    A number of helper functions for selecting/discarding beads and cycles or
+    concatenating files:
 
-    This can be used to resume the recording an interrupted experiment
+        * `track.op.save("path")` saves the track
+        * `track.op.concatenate(track2, track3)` concatenates 3 experiments
+        * `track.op + track2` concatenates 2 experiments
+        * `del track.op[[1,3]]` deletes beads 1 and 3
+        * `track.op.beads[[1,3]]` returns track with only beads 1 and 3
+        * `track.op.beads[[1,3], [1,5]]` returns track with only beads 1 and 3, cycles 1 and 5
+        * `track.op.beads[:, 1:5]` returns track with all beads 1 and cycles 1 to 5
     """
-    return concatenatetracks(self,other)
+    def __init__(self, trk):
+        self._trk = trk
+
+    class _Add:
+        def __init__(self, fcn):
+            self._fcn    = fcn
+            self.__doc__ = fcn.__doc__
+
+        def __get__(self, instance, owner):
+            return self._fcn if instance is None else partial(self._fcn, instance)
+
+    concatenate  = _Add(concatenatetracks)
+    save         = _Add(savetrack)
+    rename       = _Add(renamebeads)
+
+    def __add__(self, other):
+        return self.concatenate(getattr(other, '_trk', other))
+
+    def drop(self, *beads: BEADKEY) -> Track:
+        """
+        Drops beads
+        """
+        return self.__delitem__(list(beads))
+
+    def __delitem__(self, beads) -> Track:
+        if isinstance(beads, list):
+            return dropbeads(self._trk, *beads)
+        if np.isscalar(beads):
+            return dropbeads(self._trk, beads)
+        raise NotImplementedError()
+
+    def __getitem__(self, beads) -> Track:
+        if isinstance(beads, list):
+            return selectbeads(self._trk, *beads)
+
+        if np.isscalar(beads):
+            return selectbeads(self._trk, beads)
+
+        if isinstance(beads, tuple):
+            if len(beads) != 2:
+                raise KeyError("Key should be a (beads, cycles) tuple")
+            trk = self._trk if isellipsis(beads[0]) else self.__getitem__(beads[0])
+            return trk      if isellipsis(beads[1]) else selectcycles(trk, beads[1])
+        raise NotImplementedError()
+
+    def select(self, beads = None, cycles = None) -> Track:
+        """
+        Selects beads and cycles
+        """
+        return self.__getitem__((beads, cycles))
+
+    def __setitem__(self, key: BEADKEY, val: BEADKEY) -> Track:
+        if isinstance(key, (list, tuple)):
+            return renamebeads(self._trk, *zip(key, val))
+        return renamebeads(self._trk, (key, val))
 
 @addto(Track)
 def astracksdict(self, *beads:BEADKEY) -> TracksDict:
@@ -148,7 +213,8 @@ def __getitem__(self, value):
 Track.cleaned = LazyProperty('cleaned')
 addattributes(Track, protected = dict(cleaned = False))
 
-Track.__doc__   += '* `pathinfo` p'+PathInfo.__doc__[5:]
+Track.__doc__   += '* `op` a'+TrackOperations.__doc__[6:]
+Track.__doc__   += '\n    * `pathinfo` p'+PathInfo.__doc__[6:]
 Track.cycles    .args['copy'] = True
 Track.cyclesonly.args['copy'] = True
 Track.beads     .args['copy'] = True

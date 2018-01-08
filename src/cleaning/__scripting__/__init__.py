@@ -16,7 +16,7 @@ from   control.processor.dataframe      import DataFrameFactory
 from   model.__scripting__              import Tasks
 from   model.__scripting__.track        import LocalTasks
 from   data.views                       import BEADKEY
-from   data.track                       import dropbeads
+from   data.trackops                    import dropbeads
 from   data.__scripting__.track         import Track
 from   data.__scripting__.tracksdict    import TracksDict
 from   ..processor                      import (DataCleaningProcessor,
