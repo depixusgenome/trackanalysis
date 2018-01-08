@@ -10,8 +10,8 @@ from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-imp
 from cleaning.processor         import (DataCleaning, DataCleaningTask,
                                         DataCleaningProcessor, LocalNaNPopulation,
                                         DerivateIslands, DataCleaningException)
-from cleaning.beadsubtraction   import (BeadSubtractionProcessor,
-                                        MedianBeadSubtractionProcessor)
+from cleaning.beadsubtraction   import (SubtractAverageSignal, SubtractMedianSignal,
+                                        BeadSubtractionProcessor)
 import cleaning._core           as     cleaningcore # pylint:disable=no-name-in-module
 from simulator                  import randtrack, setseed
 from model.task.track           import TrackReaderTask
@@ -249,7 +249,7 @@ def test_cleaning_localpop():
 
 def test_subtract():
     "tests subtractions"
-    agg = BeadSubtractionProcessor.aggregate
+    agg = SubtractAverageSignal.apply
     assert_allclose(agg([np.arange(5)]),             np.arange(5))
     assert_allclose(agg([np.arange(5)]*5),           np.arange(5))
     assert_allclose(agg([np.arange(5), np.ones(5)]), np.arange(5)*.5+.5)
@@ -258,7 +258,9 @@ def test_subtract():
     tmp = Beads(data = {0: np.arange(5), 1: np.ones(5),
                         2: np.zeros(5),  3: np.arange(5)*1.})
     cache: dict = {}
-    frame = BeadSubtractionProcessor.apply(tmp, cache, beads = [0, 1])
+    frame = BeadSubtractionProcessor.apply(tmp, cache,
+                                           beads = [0, 1],
+                                           agg   = SubtractAverageSignal())
     assert set(frame.keys()) == {2, 3}
     assert_allclose(frame[2], -.5*np.arange(5)-.5)
     assert_allclose(cache[None],  .5*np.arange(5)+.5)
@@ -271,7 +273,7 @@ def test_subtract():
 def test_subtract_med():
     "tests subtractions"
     allv = (None, None)
-    agg  = MedianBeadSubtractionProcessor.aggregate
+    agg  = SubtractMedianSignal.apply
     assert_allclose(agg([np.arange(5)]*5, allv),           np.arange(5))
     assert_allclose(agg([np.arange(5), np.ones(5)], allv), np.arange(5)*.5+.5)
     assert_allclose(agg([np.arange(5)]+[np.ones(5)]*2, allv), np.ones(5)*4./3.)

@@ -50,8 +50,10 @@ class BeadSubtractionDescriptor:
 
         if not beads:
             inst.tasks.pop(self.NAME, None)
+        elif isinstance(beads, dict):
+            inst.tasks[self.NAME] = BeadSubtractionTask(**beads)
         else:
-            inst.tasks[self.NAME] = BeadSubtractionTask(beads = list(lst))
+            inst.tasks.setdefault(self.NAME, BeadSubtractionTask()).beads = list(lst)
 
 LocalTasks.subtraction = BeadSubtractionDescriptor() # type: ignore
 
