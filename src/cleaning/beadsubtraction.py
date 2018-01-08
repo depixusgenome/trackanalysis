@@ -9,7 +9,7 @@ import warnings
 import numpy                        as     np
 
 from   control.processor            import Processor
-from   data.views                   import Cycles
+from   data.views                   import Cycles, Beads
 from   model                        import Task, Level, PHASE
 from   signalfilter.noisereduction  import Filter
 from   utils                        import initdefaults
@@ -127,27 +127,30 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
         sub = self.task.beads
         return (i for i in selected if i not in sub)
 
-    def signal(self, frame, key = None) -> np.ndarray:
-        "returns the signal"
-        task = self.task
+    def signal(self, frame: Union[Beads, Cycles], key = None) -> np.ndarray:
+        "returns the signal to subtract from beads"
+        task  = self.task
+
+        tuple(frame.keys()) # unlazyfy # type: ignore
         data = frame.data
-        if len(task.beads) == 1:
+        if len(task.beads) == 0:
+            sub = 0.
+
+        elif len(task.beads) == 1:
             sub = np.copy(data[task.beads[0]])
 
         elif isinstance(task.agg, SubtractAverageSignal):
             itr  = task.beads if key is None else zip(task.beads, repeat(key))
             sub  = task.agg.apply([data[i] for i in cast(Iterable, itr)])
 
-        elif key is None:
+        elif isinstance(frame, Beads):
             pha = frame.track.phases[:,task.agg.phase:task.agg.phase+1]
             cyc = frame.new(Cycles).withdata({i: data[i] for i in task.beads})
             itr = [task.agg.apply([cyc[i,j] for i in task.beads], pha[j,:])
                    for j in frame.cyclerange()]
 
-            sub = np.concatenate(itr, dtype = 'f4')
+            sub = np.concatenate(itr)
         else:
             raise NotImplementedError()
 
-        if task.filter:
-            sub = task.filter(sub)
-        return sub
+        return task.filter(sub) if task.filter else sub
