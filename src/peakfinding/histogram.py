@@ -572,6 +572,7 @@ class COVTYPE(Enum):
     ANY  = "any"
     TIED = "tied"
 
+
 # set data as instance attribute
 class ByEM:
     '''
@@ -587,6 +588,7 @@ class ByEM:
     mincount = 5
     tol      = 1e-1 # loglikelihood tolerance
     covtype  = COVTYPE.ANY
+    init     = "k-means++"
     params  : np.ndarray
     rates   : np.ndarray
 
@@ -638,10 +640,9 @@ class ByEM:
         return ids
 
     # to pytest
-    @staticmethod
-    def init(data:np.ndarray,npeaks=1)->np.ndarray:
+    def initialize(self,data:np.ndarray,npeaks=1)->np.ndarray:
         'init using KMeans on spatial data'
-        kmean   = KMeans(npeaks)
+        kmean   = KMeans(npeaks,init=self.init)
         kmean.fit(data[:,:-1])
         predict = kmean.predict(data[:,:-1])
 
@@ -787,7 +788,7 @@ class ByEM:
 
     def fit(self,data:np.ndarray,npeaks:int):
         'iterate EM to fit a given number of peaks'
-        rates,params = self.init(data,npeaks)
+        rates,params = self.initialize(data,npeaks)
         return self.__fit(data,rates,params,prevll=None)
 
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]
