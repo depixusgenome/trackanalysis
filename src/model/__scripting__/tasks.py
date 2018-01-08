@@ -16,6 +16,7 @@ from utils                    import update
 from utils.attrdefaults       import toenum
 from data.views               import TrackView
 from control.taskcontrol      import create as _create, ProcessorController
+from control.processor.base   import Processor, register
 from control.processor.utils  import ActionTask
 from cleaning.processor       import DataCleaningTask
 from cleaning.beadsubtraction import BeadSubtractionTask
@@ -287,6 +288,11 @@ class Tasks(Enum):
             call = partial(call, *args, **kwa)
         return ActionTask(call = call)
 
+    def processor(self, *resets, **kwa) -> Processor:
+        "Returns the default processor for this task"
+        task  = self(*resets, **kwa)
+        return register(None)[type(task)](task = task)
+
     def __call__(self, *resets, **kwa)-> Task:
         fcn     = getattr(self, '_default_'+self.value, None)
         if fcn is not None:
@@ -299,7 +305,10 @@ class Tasks(Enum):
             resets = tuple(i for i in resets if i is not Ellipsis)
 
         kwa.update({i: getattr(cls, i) for i in resets if isinstance(i, str)})
-        task = update(deepcopy(cnf), **kwa)
+
+        state = cnf.__getstate__() if hasattr(cnf, '__getstate__') else deepcopy(cnf.__dict__)
+        state.update(**kwa)
+        task  = cnf.__class__(**state)
 
         for key, value in next((i for i in resets if isinstance(i, dict)), {}).items():
             lst = key.split('.')

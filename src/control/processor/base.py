@@ -193,7 +193,7 @@ class Processor(Generic[TaskType]):
         raise NotImplementedError()
 
 CACHE_T = Dict[Type[_tasks.Task], Type[Processor]]
-def register(proc: Union[Type[Processor], Iterable[Type[Processor]]],
+def register(proc: Union[None, Type[Processor], Iterable[Type[Processor]]],
              force          = False,
              cache: CACHE_T = None,
              recursive      = True) -> CACHE_T:
@@ -201,7 +201,9 @@ def register(proc: Union[Type[Processor], Iterable[Type[Processor]]],
     if cache is None:
         cache = {}
 
-    procs = list(proc) if isinstance(proc, (tuple, list)) else [proc]
+    procs = (list(proc) if isinstance(proc, (tuple, list)) else
+             [proc]     if proc                            else
+             [Processor])
     while len(procs):
         itm = procs.pop(0)
         if isinstance(itm, (list, tuple)):
