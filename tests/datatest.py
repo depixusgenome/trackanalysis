@@ -12,7 +12,8 @@ from   legacy           import readtrack   # pylint: disable=import-error,no-nam
 import data
 from   data.views       import ITrackView
 from   data.trackio     import LegacyGRFilesIO, savetrack, PickleIO, LegacyTrackIO
-from   data.track       import FoV, concatenatetracks, selectcycles, dropbeads, Track
+from   data.track       import FoV, Track
+from   data.trackops    import concatenatetracks, selectcycles, dropbeads
 from   data.tracksdict  import TracksDict
 from   testingcore      import path as utpath
 
@@ -372,14 +373,20 @@ def test_selectcycles():
     assert other.ncycles == 5
     assert set(other.beads.keys()) == set(trk.beads.keys())
     assert other.path is None
-    assert_allclose(other.phases, trk.phases[:5,:])
+    assert_allclose(other.phases, trk.phases[:5,:]-trk.phases[0,0])
     assert_allclose(other.beads['t'], trk.beads['t'][:trk.phases[5,0]-trk.phases[0,0]])
 
     other = selectcycles(trk, [2, 4, 10])
     assert other.ncycles == 3
     assert set(other.beads.keys()) == set(trk.beads.keys())
     assert other.path is None
-    assert_allclose(other.phases, trk.phases[[2, 4, 10],:])
+    assert_allclose(other.phases[0,:], trk.phases[2,:]-trk.phases[2,0])
+
+    other = selectcycles(trk, slice(None, None, 2))
+    assert other.ncycles == trk.ncycles//2
+    assert set(other.beads.keys()) == set(trk.beads.keys())
+    assert other.path is None
+    assert_allclose(other.phases[0,:], trk.phases[0,:]-trk.phases[0,0])
 
 def test_concatenate():
     'test whether two Track stack properly'
