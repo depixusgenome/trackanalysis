@@ -685,7 +685,7 @@ class ByEM:
         '''
         # before
         #return np.prod([cls.__normpdf(*par) for par in args[:-1]])*cls.__exppdf(*args[-1])
-        param, datum=args[0]
+        param, datum = args[0]
         return cls.mvnormpdf(*param[0],datum[:-1])*cls.__exppdf(*param[1],datum[-1])
 
     # pytest
@@ -736,9 +736,9 @@ class ByEM:
         maximize = partial(self.__maximizeparam,data)
         params   = np.array(list(map(maximize,npz_x))) # type: ignore
         if self.covtype is COVTYPE.TIED:
-            meancov = np.mean((i[0][1] for i in params),axis=0)
+            meancov = np.mean(params[:,0,1],axis=0)
             params[:,0,1] = meancov
-        return nrates, params # type: ignore
+        return nrates, params
 
     # pytest
     @classmethod
