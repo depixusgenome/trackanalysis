@@ -588,7 +588,6 @@ class ByEM:
     mincount = 5
     tol      = 1e-1 # loglikelihood tolerance
     covtype  = COVTYPE.ANY
-    init     = "k-means++"
     params  : np.ndarray
     rates   : np.ndarray
 
@@ -639,32 +638,46 @@ class ByEM:
         ids = np.array([np.argmax(_) for _ in cls.score(data,params).T])
         return ids
 
+    @staticmethod
+    def altinitialize(data:np.ndarray,npeaks=1)->np.ndarray:
+        'alternative initializer'
+        bins = sorted(data[:,:-1].ravel())[::data.shape[0]//npeaks]
+        digi = np.digitize(data[:,:-1].ravel(),bins)
+
+        clas = {idx:np.array([data[_1] for _1,_2 in enumerate(digi) if _2==idx])
+                for idx in range(1,npeaks+1)}
+        params  = [[(np.nanmean(clas[idx][:,:-1],axis=0),
+                     np.cov(clas[idx][:,:-1].T)),
+                    (0,np.nanstd(clas[idx][:,-1]))] for idx in range(1,npeaks+1)]
+        return 1/npeaks*np.ones((npeaks,1)) , params
+
     # to pytest
-    def initialize(self,data:np.ndarray,npeaks=1)->np.ndarray:
+    @staticmethod
+    def initialize(data:np.ndarray,npeaks=1)->np.ndarray:
         'init using KMeans on spatial data'
-        kmean   = KMeans(npeaks,init=self.init)
+        kmean   = KMeans(npeaks)
         kmean.fit(data[:,:-1])
         predict = kmean.predict(data[:,:-1])
 
         clas    = {idx:np.array([data[_1] for _1,_2 in enumerate(predict) if _2==idx])
                    for idx in range(npeaks)}
 
-        # cov is overestimated by factor 10 to avoid pz_x too low for first guess
+        # cov can be overestimated to forbid pz_x too low
         params  = [[(np.nanmean(clas[idx][:,:-1],axis=0),
-                     10*np.cov(clas[idx][:,:-1].T)),
+                     np.cov(clas[idx][:,:-1].T)),
                     (0,np.nanstd(clas[idx][:,-1]))] for idx in range(npeaks)]
         rates   = 1/npeaks*np.ones((npeaks,1))
         return rates, params
 
     @staticmethod
-    def __normlpdf(loc, scale, pos):
+    def __normlpdf(loc, cov, pos):
         'log pdf of Gaussian dist'
-        return -np.log(scale)-0.5*((pos-loc)/scale)**2
+        return -0.5*np.log(cov)-0.5*((pos-loc)**2/cov)
 
     @staticmethod
-    def __normpdf(loc, scale, pos):
+    def __normpdf(loc, cov, pos):
         'pdf of Gaussian dist'
-        return np.exp(-0.5*((pos-loc)/scale)**2)/(np.sqrt(2*np.pi)*scale)
+        return np.exp(-0.5*((pos-loc)**2/cov))/(np.sqrt(2*np.pi*cov))
 
     @staticmethod
     def __explpdf(loc, scale, pos):
@@ -684,8 +697,6 @@ class ByEM:
                          [zloc,zscale,zpos],
                          [tloc,tscale,tpos]])
         '''
-        # before
-        #return np.prod([cls.__normpdf(*par) for par in args[:-1]])*cls.__exppdf(*args[-1])
         param, datum = args[0]
         return cls.mvnormpdf(*param[0],datum[:-1])*cls.__exppdf(*param[1],datum[-1])
 
@@ -702,7 +713,7 @@ class ByEM:
         'proportional to normal pdf of multivariate distribution'
         if len(pos)==1:
             return float(cls.__normpdf(mean, cov, pos))
-        cent   = np.matrix(pos-mean)
+        cent = np.matrix(pos-mean)
         return np.exp(-0.5*float(cent*np.linalg.inv(cov)*cent.T))/\
             np.sqrt(float(np.linalg.det(cov)))
 
@@ -788,7 +799,7 @@ class ByEM:
 
     def fit(self,data:np.ndarray,npeaks:int):
         'iterate EM to fit a given number of peaks'
-        rates,params = self.initialize(data,npeaks)
+        rates, params = self.initialize(data,npeaks)
         return self.__fit(data,rates,params,prevll=None)
 
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]

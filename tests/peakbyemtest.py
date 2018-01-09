@@ -21,7 +21,7 @@ def test_byeminit():
 def test_byemscore():
     'tests the score method'
     data   = np.array([[0,0],[10,0],[0,1]])
-    params = [[(0,1),(0,1)],[(10,0.1),(0,2)],[(5,10),(0,1)],[(0,10),(0.5,1)]]
+    params = [[(0,1),(0,1)],[(10,0.1**2),(0,2)],[(5,100),(0,1)],[(0,100),(0.5,1)]]
     score  = EMFITTER.score(data,params)
     assert_allclose(score,np.array([[0.3989,0,0.1468],
                                     [0,1.995,0],
