@@ -9,10 +9,11 @@ We add some methods and change the default behaviour:
 * an *events* property is added
 * a *rawprecision* method is added
 """
-from   typing               import List
-from   pathlib              import Path
+from   copy                 import copy  as shallowcopy
 from   datetime             import datetime
 from   functools            import partial
+from   pathlib              import Path
+from   typing               import List
 
 import numpy                as     np
 
@@ -166,7 +167,8 @@ class TrackOperations:
             if len(beads) != 2:
                 raise KeyError("Key should be a (beads, cycles) tuple")
             trk = self._trk if isellipsis(beads[0]) else self.__getitem__(beads[0])
-            return trk      if isellipsis(beads[1]) else selectcycles(trk, beads[1])
+            trk = trk      if isellipsis(beads[1]) else selectcycles(trk, beads[1])
+            return shallowcopy(self._trk) if trk is self._trk else trk
         raise NotImplementedError()
 
     def select(self, beads = None, cycles = None) -> Track:
