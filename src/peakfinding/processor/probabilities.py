@@ -25,7 +25,7 @@ class PeakProbabilityProcessor(Processor[PeakProbabilityTask]):
     def _action(minduration, framerate, frame, info):
         rate = frame.track.framerate if framerate is None else framerate
         prob = Probability(minduration = minduration, framerate = rate)
-        ends = frame.track.phaseduration(..., PHASE.measure)
+        ends = frame.track.phase.duration(..., PHASE.measure)
         return info[0], iter((i[0], prob(i[1], ends)) for i in info[1])
 
     @classmethod

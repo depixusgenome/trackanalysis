@@ -121,7 +121,7 @@ class StatsPeakInfo(PeakInfo):
         task = cast(EventDetectionTask, mdl.eventdetection.task)
         prob = Probability(framerate   = mdl.track.framerate,
                            minduration = task.events.select.minduration)
-        dur  = mdl.track.phaseduration(..., task.phase) # type: ignore
+        dur  = mdl.track.phase.duration(..., task.phase) # type: ignore
         dico = self.defaults(mdl, peaks)
         for i, (_, evts) in enumerate(peaks):
             val                 = prob(evts, dur)

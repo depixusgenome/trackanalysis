@@ -73,7 +73,7 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
         frate = frame.track.framerate
 
         self.__prob   = Probability(minduration = mdur, framerate = frate)
-        self.__ends   = frame.track.phaseduration(..., PHASE.measure)
+        self.__ends   = frame.track.phase.duration(..., PHASE.measure)
 
         meas          = dict(task.measures)
         meas.update(kwa)

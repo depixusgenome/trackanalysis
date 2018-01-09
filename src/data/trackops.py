@@ -46,31 +46,8 @@ def selectcycles(trk:Track, indexes:Union[slice, range, List[int]])-> Track:
     """
     Returns a track with only a limited number of cycles
     """
-    if isinstance(indexes, (slice, range)):
-        cycs = slice(0               if indexes.start is None else indexes.start,
-                     len(trk.phases) if indexes.stop  is None else indexes.stop,
-                     1               if indexes.step  is None else indexes.step)
-    else:
-        cycs = np.array(indexes, dtype = 'i4')
-
-    phases = trk.phases[cycs]
-
-    first  = phases[:,0]
-    if isinstance(cycs, slice):
-        last = trk.phases[cycs.start+1:cycs.stop+1:cycs.step,0]
-    else:
-        tmp  = cycs+1
-        last = trk.phases[tmp[tmp < len(trk.phases)],0]
-    if len(last) < len(first):
-        np.append(last, trk.nframes)
-
-    phases = (np.insert(np.cumsum(np.diff(np.hstack([phases, last[:,None]]))), 0, 0)
-              [:-1].reshape((-1, phases.shape[1])))
-
-    inds   = np.concatenate([np.arange(j, dtype = 'i4')+i for i, j in zip(first, last-first)])
-    inds  -= trk.phases[0, 0]
-
-    track = trk.__getstate__()
+    inds, phases = trk.phase.cut(indexes)
+    track        = trk.__getstate__()
     track.update(data   = {i: j[inds] for i, j in trk.beads},
                  phases = phases,
                  path   = None)

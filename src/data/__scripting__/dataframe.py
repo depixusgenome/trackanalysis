@@ -41,7 +41,7 @@ def dataframe(self): # pylint: disable=function-redefined
     last   = self.track.nphases  if self.last is None else self.last+1
     if last > 7:
         raise NotImplementedError("keep last phase < 7")
-    durs   = np.array([self.track.phaseduration(..., i) for i in range(first, last)],
+    durs   = np.array([self.track.phase.duration(..., i) for i in range(first, last)],
                       dtype = 'i4').T
     starts = np.cumsum([0]+ [np.max(i) for i in durs.T])
 

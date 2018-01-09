@@ -85,7 +85,7 @@ class TrackInfo:
             self.path          = track.path
             self.framerate     = track.framerate
             self.ncycles       = track.ncycles
-            self.durations     = track.phaseduration(..., PHASE.measure)
+            self.durations     = track.phase.duration(..., PHASE.measure)
             self.uncertainties = dict(rawprecision(track, ...))
 
 class ReporterInfo:

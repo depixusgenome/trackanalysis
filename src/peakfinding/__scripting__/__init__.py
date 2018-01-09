@@ -80,7 +80,7 @@ class Detailed:
                 raise ValueError('Could not find a minduration')
         minduration = evts.events.select.minduration
 
-        ends        = trk.phaseduration(..., PHASE.measure)
+        ends        = trk.phase.duration(..., PHASE.measure)
         prob        = Probability(minduration = minduration,
                                   framerate   = trk.framerate)
         return iter((i[0], prob(i[1], ends)) for i in self.output)

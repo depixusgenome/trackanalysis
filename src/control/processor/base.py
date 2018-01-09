@@ -200,7 +200,6 @@ def register(proc: Union[None, Type[Processor], Iterable[Type[Processor]]],
     "returns a register for a given processor"
     if cache is None:
         cache = {}
-
     procs = (list(proc) if isinstance(proc, (tuple, list)) else
              [proc]     if proc                            else
              [Processor])

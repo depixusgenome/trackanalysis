@@ -3,7 +3,8 @@
 """
 Base track file data.
 """
-from    typing      import Type, Optional, Union, Dict, Tuple, Any, List, cast
+from    typing      import (Type, Optional, Union, Dict, Tuple, Any, List,
+                            Sequence, cast)
 from    copy        import deepcopy
 from    enum        import Enum
 import  numpy       as     np
@@ -13,7 +14,9 @@ from    model       import levelprop, Level
 from   .views       import Beads, Cycles, BEADKEY, isellipsis, TrackView
 from   .trackio     import opentrack, PATHTYPES
 
-IDTYPE       = Union[None, int, slice] # missing Ellipsys as mypy won't accept it
+IDTYPE       = Union[None, int, range] # missing Ellipsys as mypy won't accept it
+PIDTYPE      = Union[IDTYPE, slice, Sequence[int]]
+
 DATA         = Dict[BEADKEY, np.ndarray]
 BEADS        = Dict[BEADKEY, 'Bead']
 DIMENSIONS   = Tuple[Tuple[float, float], Tuple[float, float]]
@@ -215,6 +218,100 @@ class ViewDescriptor:
 def _lazies():
     return ('_data', '_lazy', '_rawprecisions') + tuple(LazyProperty.LIST)
 
+class PhaseManipulator:
+    """
+    Helper class for manipulating phases.
+    """
+    def __init__(self, track):
+        self._track = track
+
+    def cut(self, cid:PIDTYPE = None) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Returns a selection of phases, *reindexed* to zero, with a list of
+        frame ids corresponding to theses phases.
+
+        This can be used to create a track containing a fraction of the original data.
+        """
+        trk = self._track
+        if isellipsis(cid):
+            cycs = slice(None, None)
+
+        if isinstance(cid, (slice, range)):
+            cycs = slice(0               if cid.start is None else cid.start,
+                         len(trk.phases) if cid.stop  is None else cid.stop,
+                         1               if cid.step  is None else cid.step)
+        else:
+            cycs = np.array(cid, dtype = 'i4')
+
+        phases = trk.phases[cycs]
+        first  = phases[:,0]
+        if isinstance(cycs, slice):
+            last = trk.phases[cycs.start+1:cycs.stop+1:cycs.step,0]
+        else:
+            tmp  = cycs+1
+            last = trk.phases[tmp[tmp < len(trk.phases)],0]
+        if len(last) < len(first):
+            np.append(last, trk.nframes)
+
+        inds   = np.concatenate([np.arange(j, dtype = 'i4')+i for i, j in zip(first, last-first)])
+        inds  -= self._track.phases[0, 0]
+        phases = (np.insert(np.cumsum(np.diff(np.hstack([phases, last[:,None]]))), 0, 0)
+                  [:-1].reshape((-1, phases.shape[1])))
+        return inds, phases
+
+    def duration(self, cid:PIDTYPE = None, pid:IDTYPE = None) -> Union[np.ndarray, int]:
+        """
+        Returns the duration of a phase per cycle.
+        """
+        if isinstance(pid, (tuple, list, np.ndarray)):
+            return np.vstack([self.__duration(cid, i) for i in cast(list, pid)]).T
+        return self.__duration(cid, pid)
+
+    def select(self, cid:PIDTYPE = None, pid:PIDTYPE = None) -> Union[np.ndarray, int]:
+        """
+        Returns the start time of the cycle and phase.
+
+        If pid >= nphases, the end time of cycles is returned.
+        if pid is a sequence of ints, a table is returned.
+        """
+        if isinstance(pid, (tuple, list, np.ndarray)):
+            return np.vstack([self.__select(cid, i) for i in cast(list, pid)]).T
+        return self.__select(cid, pid)
+
+    nframes  = cast(int, property(lambda self: self._track.nframes))
+    ncycles  = cast(int, property(lambda self: self._track.ncycles))
+    nphases  = cast(int, property(lambda self: self._track.nphases))
+    __doc__ += f"   * `cut`: {cut.__doc__.strip()}\n"
+    __doc__ += f"   * `duration`: {duration.__doc__.strip()}\n"
+    __doc__ += f"   * `select`: {select.__doc__.strip()}\n"
+
+    def __duration(self, cid:PIDTYPE = None, pid:IDTYPE = None) -> Union[np.ndarray, int]:
+        phases = self._track.phases
+        pid    = (range(pid, None if pid == -1 else pid+1) if isinstance(pid, int) else
+                  range(phases.shape[1])                   if isellipsis(pid)      else
+                  range(pid.start, pid.stop))
+
+        start = 0 if pid.start is None else pid.start
+        if pid.stop == start:
+            return np.zeros(len(phases), dtype = 'i4')[cid]
+        return self.select(cid, pid.stop) - self.select(cid, pid.start)
+
+    def __select(self, cid:PIDTYPE = None, pid:PIDTYPE = None) -> Union[np.ndarray, int]:
+        phases = self._track.phases
+        ells   = isellipsis(cid), isellipsis(pid)
+        if np.isscalar(pid) and pid >= self._track.nphases:
+            if np.isscalar(cid):
+                return (self._track.nframes if cid >= self._track.ncycles-1 else
+                        phases[1+cast(int, cid),0]-phases[0,0])
+
+            tmp = np.append(phases[1:,0]-phases[0,0], self._track.nframes)
+            return tmp[None if ells[0] else cid]
+
+        return (phases        if all(ells) else
+                phases[:,pid] if ells[0]   else
+                phases[cid,:] if ells[1]   else
+                phases[cid,pid]) - phases[0,0]
+
 @levelprop(Level.project)
 class Track:
     """
@@ -278,6 +375,7 @@ class Track:
     beadsonly  = cast(Beads,               ViewDescriptor())
     cycles     = cast(Cycles,              ViewDescriptor())
     cyclesonly = cast(Cycles,              ViewDescriptor())
+    phase      = property(PhaseManipulator, doc = PhaseManipulator.__doc__)
 
     def getdata(self) -> DATA:
         "returns the dataframe with all bead info"
@@ -317,33 +415,6 @@ class Track:
     def isbeadname(key) -> bool:
         "returns whether a column name is a bead's"
         return isinstance(key, int)
-
-    def phaseduration(self, cid:IDTYPE, pid:IDTYPE) -> Union[int, np.ndarray]:
-        "returns the duration of the cycle and phase"
-        phases = self.phases
-        if isellipsis(pid):
-            ix1, ix2 = 0, -1
-        elif isinstance(pid, int):
-            if pid in (-1, phases.shape[1]-1):
-                return np.insert(phases[0,1:]-phases[-1,:-1], len(phases), np.iinfo('i4').max)
-            else:
-                ix1, ix2 = pid, pid+1
-        return phases[cid,ix2]-phases[cid,ix1]
-
-    def phase(self, cid:IDTYPE = None, pid:IDTYPE = None) -> Union[np.ndarray, int]:
-        "returns the starttime of the cycle and phase"
-        vect = self.phases
-        orig = vect[0,0]
-        ells = isellipsis(cid), isellipsis(pid)
-        if all(ells):
-            pass
-        elif ells[0]:
-            vect = vect[:,pid]
-        elif ells[1]:
-            vect = vect[cid,:]
-        else:
-            vect = vect[cid,pid]
-        return vect - orig
 
     def view(self, tpe:Union[Type[TrackView], str], **kwa):
         "Creates a view of the suggested type"

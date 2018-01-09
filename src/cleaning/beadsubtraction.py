@@ -53,14 +53,21 @@ class SubtractMedianSignal:
     3. The average bias is added to the result
     """
     phase = PHASE.measure
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
     @staticmethod
     def apply(signals, meanrange):
         "Aggregates signals"
         assert len(signals) > 1
         rng     = slice(*meanrange)
         offsets = np.array([np.nanmedian(i[rng]) for i in signals], dtype = 'f4')
-        tmp     = np.full((len(signals), max(len(i) for i in signals)), np.NaN, dtype = 'f4')
 
+        if not np.any(np.isfinite(offsets)):
+            return np.full(max(len(i) for i in signals), np.NaN, dtype = 'f4')
+
+        tmp = np.full((len(signals), max(len(i) for i in signals)), np.NaN, dtype = 'f4')
         for i, j, k in zip(tmp, signals, offsets):
             i[:len(j)] = j-k
 
@@ -70,7 +77,6 @@ class SubtractMedianSignal:
                                     message  = '.*All-NaN slice encountered.*')
             res = np.nanmedian(tmp, axis = 0)
 
-        if np.any(np.isfinite(offsets)):
             res += np.nanmean(offsets)
         return res
 
@@ -131,7 +137,7 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
         "returns the signal to subtract from beads"
         task  = self.task
 
-        tuple(frame.keys()) # unlazyfy # type: ignore
+        next(iter(frame.keys())) # unlazyfy # type: ignore
         data = frame.data
         if len(task.beads) == 0:
             sub = 0.
@@ -144,7 +150,8 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
             sub  = task.agg.apply([data[i] for i in cast(Iterable, itr)])
 
         elif isinstance(frame, Beads):
-            pha = frame.track.phases[:,task.agg.phase:task.agg.phase+1]
+            pha = frame.track.phase.select(..., (0, task.agg.phase, task.agg.phase+1))
+            pha = pha[:,1:]-pha[:,:1]
             cyc = frame.new(Cycles).withdata({i: data[i] for i in task.beads})
             itr = [task.agg.apply([cyc[i,j] for i in task.beads], pha[j,:])
                    for j in frame.cyclerange()]

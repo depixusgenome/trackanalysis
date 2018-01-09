@@ -91,7 +91,7 @@ class Cycles(TrackView, ITrackView):
             return
 
         isbead = self.track.beads.isbead
-        for thisid in sel:
+        for thisid in sel: # pylint: disable=too-many-nested-blocks
             if isellipsis(thisid):
                 yield from ((col, cid) for col in beads for cid in allcycles)
 
@@ -121,7 +121,7 @@ class Cycles(TrackView, ITrackView):
             return
 
         keys = list(self.data.keys())
-        for thisid in sel:
+        for thisid in sel: # pylint: disable=too-many-nested-blocks
             if isellipsis(thisid):
                 yield from keys
             elif np.isscalar(thisid):
@@ -151,24 +151,15 @@ class Cycles(TrackView, ITrackView):
             yield from self.__keysfrombeads(sel, beadsonly)
 
     def __iterfrombeads(self, sel = None):
-        ncycles = self.track.ncycles
-        nphases = self.track.nphases
-        phase   = self.track.phase
-
-        first   = 0       if self.first is None else self.first
-        last    = nphases if self.last  is None else self.last+1
-
+        first   = 0                  if self.first is None else self.first
+        last    = self.track.nphases if self.last  is None else self.last+1
+        phase   = self.track.phase.select(..., (first, last))
         data    = {} # type: Dict[BEADKEY, np.ndarray]
         def _getdata(bid:int, cid:int):
             bead = data.get(bid, None)
             if bead is None:
                 data[bid] = bead = self.data[bid]
-
-            ind1 = phase(cid, first)
-            ind2 = (phase(cid, last) if last  < nphases else
-                    (phase(cid+1, 0) if cid+1 < ncycles else None))
-
-            return (bid, cid), bead[ind1:ind2]
+            return (bid, cid), bead[phase[cid,0]:phase[cid,1]]
 
         yield from (_getdata(bid, cid) for bid, cid in self.keys(sel))
 
@@ -240,10 +231,10 @@ class Cycles(TrackView, ITrackView):
         if isfunction(self.track):
             self.track = cast(Callable, self.track)()
 
-        first = self.track.phase(..., 0 if self.first is None else self.first)
+        first = self.track.phase.select(..., 0 if self.first is None else self.first)
         if self.last is None or self.last == self.track.nphases-1:
             return np.max(np.diff(first))
-        last = self.track.phase(..., self.last+1)
+        last = self.track.phase.select(..., self.last+1)
         return np.max(last - first)
 
     @staticmethod
