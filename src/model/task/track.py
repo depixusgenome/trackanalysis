@@ -53,6 +53,17 @@ class CycleCreatorTask(Task):
         "returns class or parent task if must remain unique"
         return cls
 
+class CycleSamplingTask(Task):
+    """
+    Transforms the track so as to select only a fraction of cycles.
+    This must be applied just after the root task for it to be meaningful
+    """
+    cycles: Union[Sequence[int], slice] = None
+    level                               = Level.bead
+    @initdefaults(frozenset(locals()) - {'level'})
+    def __init__(self, **_) -> None:
+        super().__init__()
+
 class DataSelectionTask(Task):
     "selects some part of the data"
     level                                  = Level.none

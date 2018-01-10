@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Processors apply tasks to a data flow"
-from    functools       import partial
-from    typing          import TYPE_CHECKING, Iterable, cast
+from    functools        import partial
+from    typing           import TYPE_CHECKING, Iterable, Union, Sequence, cast
 
-import  model.task      as     _tasks
-from    model.level     import Level
-from    data.track      import Track
-from    data.tracksdict import TracksDict
-from    .base           import Processor
+import  model.task.track as     _tasks
+from    model.level      import Level
+from    data.track       import Track
+from    data.trackops    import selectcycles
+from    data.tracksdict  import TracksDict
+from    .base            import Processor
 
 if TYPE_CHECKING:
     from .runner    import Runner # pylint: disable=unused-import
@@ -36,7 +37,7 @@ class TrackReaderProcessor(Processor[_tasks.TrackReaderTask]):
             args.apply(self.__get(attr, task.copy, trk), levels = self.levels)
 
     @staticmethod
-    def beads(cache, _) -> Iterable[int]:
+    def beads(cache, selected: Iterable[int]) -> Iterable[int]: # pylint: disable=unused-argument
         "Beads selected/discarded by the task"
         return cache.beadsonly.keys()
 
@@ -51,6 +52,19 @@ class CycleCreatorProcessor(Processor[_tasks.CycleCreatorTask]):
     def run(self, args:'Runner'):
         "iterates through beads and yields cycles"
         args.apply(self.apply(**self.config()), levels = self.levels)
+
+class CycleSamplingProcessor(Processor[_tasks.CycleSamplingTask]):
+    "Generates output from a _tasks.CycleSamplingTask"
+    @classmethod
+    def apply(cls, toframe = None, cycles: Union[Sequence[int], slice] = None):
+        "applies the task to a frame or returns a function that does so"
+        if toframe is None:
+            return partial(cls.apply, cycles = cycles)
+        return toframe.withdata(partial(selectcycles, toframe.track, cycles))
+
+    def run(self, args:'Runner'):
+        "iterates through beads and yields cycles"
+        args.apply(self.apply(**self.config()))
 
 class DataSelectionProcessor(Processor[_tasks.DataSelectionTask]):
     "Generates output from a DataSelectionTask"
