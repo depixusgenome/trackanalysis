@@ -28,6 +28,7 @@ from peakcalling.processor    import (FitToReferenceTask, FitToHairpinTask,
 from ..level                  import Level
 from ..task                   import (Task, TrackReaderTask, CycleCreatorTask,
                                       DataSelectionTask)
+from ..task.track             import CycleSamplingTask
 from ..task.dataframe         import DataFrameTask
 
 class Tasks(Enum):
@@ -102,6 +103,7 @@ class Tasks(Enum):
     `pool == True`, the `ProcessPoolExecutor` instance is created and used.
     """
     action         = 'action'
+    cyclesampling  = 'cyclesampling'
     cleaning       = 'cleaning'
     subtraction    = 'subtraction'
     selection      = 'selection'
@@ -132,11 +134,11 @@ class Tasks(Enum):
 
     @classmethod
     def __tasklist__(cls):
-        return (cls.selection,) + cls.__cleaning__() + cls.__taskorder__()
+        return (cls.cyclesampling, cls.selection,) + cls.__cleaning__() + cls.__taskorder__()
 
     @classmethod
     def __nodefault__(cls):
-        return cls.selection, cls.subtraction
+        return cls.cyclesampling, cls.selection, cls.subtraction
 
     @classmethod
     def _missing_(cls, value):
@@ -161,6 +163,7 @@ class Tasks(Enum):
     def defaults():
         "returns default tasks"
         return dict(cleaning       = DataCleaningTask(),
+                    cyclessampling = CycleSamplingTask(),
                     subtraction    = BeadSubtractionTask(),
                     selection      = DataSelectionTask(),
                     alignment      = ExtremumAlignmentTask(),

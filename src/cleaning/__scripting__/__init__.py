@@ -29,7 +29,7 @@ def __scripting_save__() -> bool:
 
 class BeadSubtractionDescriptor:
     "A descriptor for adding subtracted beads"
-    NAME    = Tasks(BeadSubtractionTask).value
+    NAME    = Tasks(BeadSubtractionTask).name
     __doc__ = BeadSubtractionTask.__doc__
 
     def __get__(self, inst, owner

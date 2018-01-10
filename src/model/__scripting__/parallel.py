@@ -32,7 +32,7 @@ class Parallel:
         if not isinstance(roots, TracksDict):
             lroots = list(cast(Iterator[RootTask], roots))
         else:
-            lroots = [TrackReaderTask(path = i.path, key  = i.key, axis = i.axis.value)
+            lroots = [TrackReaderTask(path = i.path, key  = i.key, axis = i.axis.name)
                       for i in cast(TracksDict, roots).values()]
         if len(lroots) == 0:
             return self

@@ -3,7 +3,9 @@
 """
 Creates a tasks property and adds it to the Track
 """
+from   copy               import copy as shallowcopy
 from   typing             import Dict, Any, Union, Optional, cast
+
 from   utils.attrdefaults import addattributes
 from   data.track         import Track, LazyProperty
 from   .tasks             import Tasks, Task
@@ -31,7 +33,7 @@ class TaskDescriptor:
             tsk = Tasks(self.name)(**value)
         else:
             try:
-                tpe = Tasks(value).value
+                tpe = Tasks(value).name
             except ValueError as exc:
                 raise ValueError("Could not create task") from exc
             if tpe != self.name:
@@ -42,7 +44,7 @@ class TaskDescriptor:
 
     def __set_name__(self, _, name):
         tsk          = Tasks(name)
-        self.name    = tsk.value
+        self.name    = tsk.name
         self.__doc__ = tsk.tasktype().__doc__
 
 class LocalTasks:
@@ -92,6 +94,25 @@ class LocalTasks:
 
 Track.tasks = LazyProperty('tasks')
 addattributes(Track, protected = dict(tasks = LocalTasks()))
+
+def localtasks(self: Track, *args, **kwa) -> Track:
+    """
+    Creates a copy of the current track, defining the local tasks specifically.
+
+    ```python
+    >>> track = Track(path = "...")
+    >>> assert track.localtasks(subtraction = 1).tasks.subtraction.beads == [1]
+    >>> assert track.subtraction.beads is None
+    ```
+    """
+    cpy = shallowcopy(self)
+    for i in args:
+        setattr(cpy.tasks, Tasks(i).name, i) # type: ignore
+
+    for i, j in kwa:
+        setattr(cpy.tasks, i, j) # type: ignore
+    return cpy
+Track.localtasks = localtasks
 
 Track.__doc__ += ("""
     * `tasks` a""" + LocalTasks.__doc__[6:])

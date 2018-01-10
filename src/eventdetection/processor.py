@@ -243,7 +243,7 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
         "applies the task to a frame or returns a function that does so"
         assert cls._get(kwa, 'percentile') <= 50.
         mode   = cls._get(kwa, 'phase')
-        action = getattr(cls, '_apply_'+mode.value)
+        action = getattr(cls, '_apply_'+mode.name)
 
         def _apply(frame):
             return frame.withaction(partial(action, kwa), beadsonly = True)

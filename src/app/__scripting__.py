@@ -65,7 +65,7 @@ def save(cls, task: Task):
     "saves the task to the default config"
     cpy = deepcopy(task)
     if getattr(cpy, '__scripting_save__', lambda: True)():
-        cls.getconfig()[cls(task).value].set(cpy)
+        cls.getconfig()[cls(task).name].set(cpy)
         scriptapp.writeuserconfig()
 
 @addto(Tasks, staticmethod)
@@ -87,15 +87,23 @@ def setconfig(cls, cnf):
                               'cleaning.tasks':   None}
 
 @addto(Tasks)
+def let(self, *resets, **kwa) -> Task:
+    """
+    Same as Tasks.__call__ but saves the configuration as the default
+    """
+    res = self(*resets, **kwa)
+    self.save(res)
+    return res
+
+@addto(Tasks)
 def __call__(self, *resets, __old__ = Tasks.__call__, **kwa) -> Task:
     if Ellipsis in resets:
         cnf = self.default()
     else:
-        cnf = self.getconfig()[self.value].get(default = None)
+        cnf = self.getconfig()[self.name].get(default = None)
     if cnf is None:
         return __old__(self, *resets, **kwa)
     res = __old__(self, *resets, current = cnf, **kwa)
-    self.save(res)
     return res
 
 @addto(Tasks, classmethod)

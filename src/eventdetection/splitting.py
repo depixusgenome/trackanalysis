@@ -329,7 +329,7 @@ class MultiGradeAggregation(Enum):
 
     def apply(self, left, right):
         "applies the strategy"
-        return getattr(self.__class__, '_apply_'+self.value)(left, right)
+        return getattr(self.__class__, '_apply_'+self.name)(left, right)
 
 class MultiGradeItem(NamedTuple): # pylint: disable=missing-docstring
     detector: GradedSplitDetector
