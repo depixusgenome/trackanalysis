@@ -1,18 +1,39 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint: disable=missing-docstring,function-redefined,unused-argument
 """
 Operations on tracks
 """
 from    copy        import copy as shallowcopy
-from    typing      import Union, Tuple, List
+from    typing      import Union, Tuple, List, Optional, overload
 
 import  numpy       as     np
 
 from   .track       import Track
+from   .tracksdict  import TracksDict
 from   .views       import BEADKEY
 
+TRACKS = Union[Track, TracksDict]
+
+def _applytodict(fcn, trk, args, kwa) -> Optional[TracksDict]:
+    cpy = shallowcopy(trk)
+    for i, j in cpy.items():
+        cpy[i] = fcn(j, *args, **kwa)
+    return cpy
+
+@overload
 def dropbeads(trk:Track, *beads:BEADKEY) -> Track:
+    pass
+
+@overload
+def dropbeads(trk:TracksDict, *beads:BEADKEY) -> TracksDict:
+    pass
+
+def dropbeads(trk:TRACKS, *beads:BEADKEY) -> TRACKS:
     "returns a track without the given beads"
+    if isinstance(trk, TracksDict):
+        return _applytodict(dropbeads, trk, beads, {})
+
     trk.load()
     if len(beads) == 1 and isinstance(beads[0], (tuple, list, set, frozenset)):
         beads = tuple(beads[0])
@@ -25,8 +46,19 @@ def dropbeads(trk:Track, *beads:BEADKEY) -> Track:
     cpy.fov.beads = {i: trk.fov.beads[i] for i in good}
     return cpy
 
+@overload
 def renamebeads(trk:Track, *beads:Tuple[BEADKEY, BEADKEY]) -> Track:
+    pass
+
+@overload
+def renamebeads(trk:TracksDict, *beads:Tuple[BEADKEY, BEADKEY]) -> TracksDict:
+    pass
+
+def renamebeads(trk:TRACKS, *beads:Tuple[BEADKEY, BEADKEY]) -> TRACKS:
     "returns a track without the given beads"
+    if isinstance(trk, TracksDict):
+        return _applytodict(renamebeads, trk, beads, {})
+
     trk.load()
     cpy = shallowcopy(trk)
     rep = dict(beads)
@@ -36,24 +68,46 @@ def renamebeads(trk:Track, *beads:Tuple[BEADKEY, BEADKEY]) -> Track:
     cpy.fov.beads = {rep.get(i, i): j for i, j in trk.fov.beads.items()}
     return cpy
 
+@overload
 def selectbeads(trk:Track, *beads:BEADKEY) -> Track:
+    pass
+
+@overload
+def selectbeads(trk:TracksDict, *beads:BEADKEY) -> TracksDict:
+    pass
+
+def selectbeads(trk:TRACKS, *beads:BEADKEY) -> TRACKS:
     "returns a track without the given beads"
+    if isinstance(trk, TracksDict):
+        return _applytodict(selectbeads, trk, beads, {})
+
     if len(beads) == 1 and isinstance(beads[0], (tuple, list, set, frozenset)):
         beads = tuple(beads[0])
     return dropbeads(trk, *(set(trk.beadsonly.keys()) - set(beads)))
 
+@overload
 def selectcycles(trk:Track, indexes:Union[slice, range, List[int]])-> Track:
+    pass
+
+@overload
+def selectcycles(trk:TracksDict, indexes:Union[slice, range, List[int]])-> TracksDict:
+    pass
+
+def selectcycles(trk:TRACKS, indexes:Union[slice, range, List[int]])-> TRACKS:
     """
     Returns a track with only a limited number of cycles
     """
+    if isinstance(trk, TracksDict):
+        return _applytodict(selectcycles, trk, indexes, {})
+
     inds, phases = trk.phase.cut(indexes)
     track        = trk.__getstate__()
     track.update(data   = {i: j[inds] for i, j in trk.beads},
-                 phases = phases,
-                 path   = None)
+                 phases = phases)
+
     return  Track(**track)
 
-def concatenatetracks(trk:Track, *tracks:Track)-> Track:
+def concatenatetracks(trk:TRACKS, *tracks:TRACKS)-> TRACKS:
     """
     Concatenates two Tracks into a single one
 

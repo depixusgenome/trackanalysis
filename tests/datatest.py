@@ -372,20 +372,17 @@ def test_selectcycles():
     other = selectcycles(trk, range(5))
     assert other.ncycles == 5
     assert set(other.beads.keys()) == set(trk.beads.keys())
-    assert other.path is None
     assert_allclose(other.phases, trk.phases[:5,:]-trk.phases[0,0])
     assert_allclose(other.beads['t'], trk.beads['t'][:trk.phases[5,0]-trk.phases[0,0]])
 
     other = selectcycles(trk, [2, 4, 10])
     assert other.ncycles == 3
     assert set(other.beads.keys()) == set(trk.beads.keys())
-    assert other.path is None
     assert_allclose(other.phases[0,:], trk.phases[2,:]-trk.phases[2,0])
 
     other = selectcycles(trk, slice(None, None, 2))
     assert other.ncycles == trk.ncycles//2
     assert set(other.beads.keys()) == set(trk.beads.keys())
-    assert other.path is None
     assert_allclose(other.phases[0,:], trk.phases[0,:]-trk.phases[0,0])
 
 def test_concatenate():
