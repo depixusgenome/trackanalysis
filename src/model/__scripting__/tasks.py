@@ -163,7 +163,7 @@ class Tasks(Enum):
     def defaults():
         "returns default tasks"
         return dict(cleaning       = DataCleaningTask(),
-                    cyclessampling = CycleSamplingTask(),
+                    cyclesampling  = CycleSamplingTask(),
                     subtraction    = BeadSubtractionTask(),
                     selection      = DataSelectionTask(),
                     alignment      = ExtremumAlignmentTask(),

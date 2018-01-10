@@ -436,7 +436,7 @@ class Track:
                    _axis        = lambda i: getattr(i, 'value', i)[0])
 
         info = self.__dict__.copy()
-        if info.get('_path', None):
+        if self._lazydata_:
             info.pop('_data',        None)
             info.pop('_secondaries', None)
 
@@ -451,6 +451,20 @@ class Track:
         self.__init__(**values)
         keys = frozenset(self.__getstate__().keys()) | frozenset(('data', 'secondaries'))
         self.__dict__.update({i: j for i, j in values.items() if i not in keys})
+
+    @property
+    def _lazydata_(self):
+        """
+        Used internally to discard the data from __getstate__, or not
+        """
+        return self.__dict__.get('_lazydata_', self.path is not None)
+
+    @_lazydata_.setter
+    def _lazydata_(self, val):
+        if val is None:
+            self.__dict__.pop('_lazydata_', None)
+        else:
+            self.__dict__['_lazydata_'] = val
 
     _framerate                  = 30.
     _fov: FoV                   = None

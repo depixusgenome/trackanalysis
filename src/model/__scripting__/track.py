@@ -109,7 +109,7 @@ def localtasks(self: Track, *args, **kwa) -> Track:
     for i in args:
         setattr(cpy.tasks, Tasks(i).name, i) # type: ignore
 
-    for i, j in kwa:
+    for i, j in kwa.items():
         setattr(cpy.tasks, i, j) # type: ignore
     return cpy
 Track.localtasks = localtasks

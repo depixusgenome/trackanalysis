@@ -105,7 +105,9 @@ def selectcycles(trk:TRACKS, indexes:Union[slice, range, List[int]])-> TRACKS:
     track.update(data   = {i: j[inds] for i, j in trk.beads},
                  phases = phases)
 
-    return  Track(**track)
+    trk = Track(**track)
+    trk._lazydata_ = False # type: ignore # pylint: disable=protected-access
+    return trk
 
 def concatenatetracks(trk:TRACKS, *tracks:TRACKS)-> TRACKS:
     """
