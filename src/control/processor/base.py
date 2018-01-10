@@ -89,7 +89,7 @@ class Processor(Generic[TaskType]):
         return self.task.isslow()
 
     @staticmethod
-    def beads(_, selected: Iterable[int]) -> Iterable[int]:
+    def beads(cache, selected: Iterable[int]) -> Iterable[int]: # pylint: disable=unused-argument
         "Beads selected/discarded by the task"
         return selected
 
