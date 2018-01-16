@@ -639,35 +639,38 @@ class ByEM:
         return ids
 
     @staticmethod
-    def altinitialize(data:np.ndarray,npeaks=1)->np.ndarray:
-        'alternative initializer'
-        bins = sorted(data[:,:-1].ravel())[::data.shape[0]//npeaks]
-        digi = np.digitize(data[:,:-1].ravel(),bins)
+    def initialize(data:np.ndarray,maxbins:int=1)->np.ndarray:
+        'initialize using density'
+        mincount  = 5
+        bins      = np.histogram(data[:,0],bins=maxbins)[1]
+        bins[-1] += 0.1
+        digi      = np.digitize(data[:,:-1].ravel(),bins)
+        clas      = {idx:np.array([data[_1] for _1,_2 in enumerate(digi) if _2==idx])
+                     for idx in set(digi)}
+        params    = np.array([[(np.nanmean(clas[idx][:,:-1],axis=0),
+                                1e3*np.cov(clas[idx][:,:-1].T)
+                                if len(clas[idx])>mincount else 0),
+                               (0,np.nanstd(clas[idx][:,-1]))] for idx in set(digi)])
+        params[:,0,1][params[:,0,1]==0]=np.mean(params[:,0,1],axis=0)
+        params[:,1,1][params[:,1,1]==0]=np.mean(params[:,1,1],axis=0)
+        return 1/len(params)*np.ones((len(params),1)) , params
 
-        clas = {idx:np.array([data[_1] for _1,_2 in enumerate(digi) if _2==idx])
-                for idx in range(1,npeaks+1)}
-        params  = [[(np.nanmean(clas[idx][:,:-1],axis=0),
-                     np.cov(clas[idx][:,:-1].T)),
-                    (0,np.nanstd(clas[idx][:,-1]))] for idx in range(1,npeaks+1)]
-        return 1/npeaks*np.ones((npeaks,1)) , params
+    # @staticmethod
+    # def initialize(data:np.ndarray,npeaks=1)->np.ndarray:
+    #     'init using KMeans on spatial data'
+    #     kmean   = KMeans(npeaks)
+    #     kmean.fit(data[:,:-1])
+    #     predict = kmean.predict(data[:,:-1])
 
-    # to pytest
-    @staticmethod
-    def initialize(data:np.ndarray,npeaks=1)->np.ndarray:
-        'init using KMeans on spatial data'
-        kmean   = KMeans(npeaks)
-        kmean.fit(data[:,:-1])
-        predict = kmean.predict(data[:,:-1])
+    #     clas    = {idx:np.array([data[_1] for _1,_2 in enumerate(predict) if _2==idx])
+    #                for idx in range(npeaks)}
 
-        clas    = {idx:np.array([data[_1] for _1,_2 in enumerate(predict) if _2==idx])
-                   for idx in range(npeaks)}
-
-        # cov can be overestimated to forbid pz_x too low
-        params  = [[(np.nanmean(clas[idx][:,:-1],axis=0),
-                     np.cov(clas[idx][:,:-1].T)),
-                    (0,np.nanstd(clas[idx][:,-1]))] for idx in range(npeaks)]
-        rates   = 1/npeaks*np.ones((npeaks,1))
-        return rates, params
+    #     # cov can be overestimated to forbid pz_x too low
+    #     params  = np.array([[(np.nanmean(clas[idx][:,:-1],axis=0),
+    #                           np.cov(clas[idx][:,:-1].T)),
+    #                          (0,np.nanstd(clas[idx][:,-1]))] for idx in range(npeaks)])
+    #     rates   = 1/npeaks*np.ones((npeaks,1))
+    #     return rates, params
 
     @staticmethod
     def __normlpdf(loc, cov, pos):
@@ -771,7 +774,7 @@ class ByEM:
         return -2*llikeli + self.nparams(params) *np.log(0.5*score.shape[1]/np.pi)
 
     def aic(self,score:np.ndarray,rates:np.ndarray,params:np.ndarray)->float:
-        'returns bic value'
+        'returns aic value'
         return 2*self.nparams(params) -2*self.llikelihood(score,rates)
 
     @classmethod
