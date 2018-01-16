@@ -8,7 +8,7 @@ from    enum                    import Enum
 import  itertools
 from functools                  import partial
 from sklearn.mixture            import GaussianMixture
-from sklearn.cluster            import KMeans
+#from sklearn.cluster            import KMeans
 import  numpy  as     np
 from    numpy.lib.stride_tricks import as_strided
 from    scipy.interpolate       import interp1d
@@ -596,18 +596,20 @@ class ByEM:
         pass
 
     def __call__(self,**kwa):
-        events = kwa.get("events",None) # np.ndarray per cycles
-        _, bias, slope  = kwa.get("hist",(0,0,1))
-        npeaks = len(ZeroCrossingPeakFinder()(*kwa.get("hist",(0,0,1))))
-        return self.find(events, bias, slope, npeaks)
 
-    def find(self, events, bias, slope, npeaks:int):
-        'find peaks'
-        data   = np.array([[np.nanmean(i),len(i)] for i in np.hstack(events)])
-        params = self.fit(data,npeaks)[1]
-        order  = np.argsort(params.T[0,:])
-        peaks, ids = self.__strip(params[order,:],data,events)
-        return peaks * slope + bias , ids
+        pass
+        # events = kwa.get("events",None) # np.ndarray per cycles
+        # _, bias, slope  = kwa.get("hist",(0,0,1))
+        # npeaks = len(ZeroCrossingPeakFinder()(*kwa.get("hist",(0,0,1))))
+        # return self.find(events, bias, slope, npeaks)
+
+    # def find(self, events, bias, slope, npeaks:int):
+    #     'find peaks'
+    #     data   = np.array([[np.nanmean(i),len(i)] for i in np.hstack(events)])
+    #     params = self.fit(data,npeaks)[1]
+    #     order  = np.argsort(params.T[0,:])
+    #     peaks, ids = self.__strip(params[order,:],data,events)
+    #     return peaks * slope + bias , ids
 
     def __strip(self, params, data, events):
         '''
@@ -655,22 +657,6 @@ class ByEM:
         params[:,1,1][params[:,1,1]==0]=np.mean(params[:,1,1],axis=0)
         return 1/len(params)*np.ones((len(params),1)) , params
 
-    # @staticmethod
-    # def initialize(data:np.ndarray,npeaks=1)->np.ndarray:
-    #     'init using KMeans on spatial data'
-    #     kmean   = KMeans(npeaks)
-    #     kmean.fit(data[:,:-1])
-    #     predict = kmean.predict(data[:,:-1])
-
-    #     clas    = {idx:np.array([data[_1] for _1,_2 in enumerate(predict) if _2==idx])
-    #                for idx in range(npeaks)}
-
-    #     # cov can be overestimated to forbid pz_x too low
-    #     params  = np.array([[(np.nanmean(clas[idx][:,:-1],axis=0),
-    #                           np.cov(clas[idx][:,:-1].T)),
-    #                          (0,np.nanstd(clas[idx][:,-1]))] for idx in range(npeaks)])
-    #     rates   = 1/npeaks*np.ones((npeaks,1))
-    #     return rates, params
 
     @staticmethod
     def __normlpdf(loc, cov, pos):
@@ -783,11 +769,12 @@ class ByEM:
         return np.sum(np.log(np.sum(rates*score,axis=0)))
 
     # to pytest
-    def __fit(self,
-              data,
-              rates,
-              params,
-              prevll:Optional[float] = None):
+    def fit(self,
+            data,
+            rates,
+            params,
+            prevll:Optional[float] = None):
+        'fit a given set of params'
         prevll = self.llikelihood(self.score(data,params),rates) if prevll is None else prevll
         for _ in range(self.emiter):
             score, rates, params = self.emstep(data,rates,params)
@@ -798,11 +785,22 @@ class ByEM:
                 break
             if any(self.assign(score).values())<self.mincount:
                 break
-        return rates,params
+        return score, rates, params
 
-    def fit(self,data:np.ndarray,npeaks:int):
-        'iterate EM to fit a given number of peaks'
-        rates, params = self.initialize(data,npeaks)
-        return self.__fit(data,rates,params,prevll=None)
+    def fitalg(self,data:np.ndarray,maxpeaks:int):
+        '''
+        calls initialization with maximal number of peaks
+        runs fits until convergence
+        remove peaks assigned to less than mincount
+        then removes the least likely peak, converge
+        and repeats
+        '''
+
+        rates, params = self.initialize(data,maxpeaks)
+        score, rates, params = self.fit(data,rates,params,prevll=None)
+        assign = self.assign(score)
+        keep = [k for k,v in assign.items() if len(v)>self.mincount]
+        rates, params = rates[keep], params[keep]
+        # can cut down the computation by removing peaks too close
 
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]
