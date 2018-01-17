@@ -584,13 +584,13 @@ class ByEM:
     try r.reshape(2,-1) (see cls.scorex)
     '''
     emiter   = 100
-    tol      = 1e-2
     mincount = 5
-    tol      = 1e-1 # loglikelihood tolerance
+    tol      = 0.5  # loglikelihood tolerance
+    decimals = 4    # rounding values
     covtype  = COVTYPE.ANY
     params  : np.ndarray
     rates   : np.ndarray
-
+    minpeaks = 1
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -768,7 +768,7 @@ class ByEM:
         'returns loglikelihood'
         return np.sum(np.log(np.sum(rates*score,axis=0)))
 
-    # to pytest
+    # to pytest, to clean
     def fit(self,
             data,
             rates,
@@ -779,15 +779,26 @@ class ByEM:
         for _ in range(self.emiter):
             score, rates, params = self.emstep(data,rates,params)
             llikelihood  = self.llikelihood(score,rates)
-            if abs(llikelihood-prevll) > self.tol:
-                prevll = llikelihood
-            else:
+            if abs(llikelihood-prevll) < self.tol:
                 break
-            if any(self.assign(score).values())<self.mincount:
-                break
+            prevll = llikelihood
+            # following removes too many peaks
+            # keep = [k for k,v in self.assign(score).items() if len(v)>=self.mincount]
+            # rates,params=rates[keep],params[keep]
+            # score = self.score(data,params)
+            # if any(self.assign(score).values())<self.mincount: # here is the mistake
+            #     break
         return score, rates, params
 
-    def fitalg(self,data:np.ndarray,maxpeaks:int):
+    @classmethod
+    def __rmduplicates(cls,params,rates):
+        'remove close peaks, using z. wille extend to x and y'
+        rounded    = enumerate(zip(np.round(np.hstack(params[:,0,0]),decimals=cls.decimals),rates))
+        sortedinfo = sorted(((*val,idx) for idx,val in rounded),key=lambda x:(x[0],-x[1]))
+        return list(map(lambda x:next(x[1])[-1],itertools.groupby(sortedinfo,key=lambda x:x[0])))
+
+
+    def fitalg(self,data:np.ndarray,maxpeaks:int,minpeaks:int = 1):
         '''
         calls initialization with maximal number of peaks
         runs fits until convergence
@@ -795,12 +806,29 @@ class ByEM:
         then removes the least likely peak, converge
         and repeats
         '''
-
         rates, params = self.initialize(data,maxpeaks)
         score, rates, params = self.fit(data,rates,params,prevll=None)
-        assign = self.assign(score)
-        keep = [k for k,v in assign.items() if len(v)>self.mincount]
+
+        # remove peaks that are too close after the first fit
+        keep = self.__rmduplicates(params,rates)
+        score,rates,params=score[keep],rates[keep],params[keep]
+
+        assign = np.array(list(map(len,self.assign(score).values())))
         rates, params = rates[keep], params[keep]
-        # can cut down the computation by removing peaks too close
+
+        allscores,allrates,allparams=[], [], [] # will be removed
+        while any(assign<self.mincount) or len(rates)>minpeaks:
+            asort = rates.ravel().argsort()
+            rates,params = rates[asort][1:],params[asort][1:]
+            score, rates, params = self.fit(data,rates,params,prevll=None)
+            keep = self.__rmduplicates(params,rates)
+            # update scores, rates and params
+            score,rates,params = self.emstep(data,rates[keep],params[keep])
+            assign = np.array(list(map(len,self.assign(score).values())))
+            if not any(assign<self.mincount):
+                allscores.append(score)
+                allrates.append(rates)
+                allparams.append(params)
+        return allscores,allrates,allparams
 
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]
