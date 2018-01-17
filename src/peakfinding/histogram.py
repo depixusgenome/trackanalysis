@@ -588,6 +588,7 @@ class ByEM:
     tol      = 0.5  # loglikelihood tolerance
     decimals = 4    # rounding values
     covtype  = COVTYPE.ANY
+    deltabic = 2    # significant increase in bic
     params  : np.ndarray
     rates   : np.ndarray
     minpeaks = 1
@@ -596,24 +597,22 @@ class ByEM:
         pass
 
     def __call__(self,**kwa):
+        events = kwa.get("events",None) # np.ndarray per cycles
+        _, bias, slope  = kwa.get("hist",(0,0,1))
+        npeaks = len(ZeroCrossingPeakFinder()(*kwa.get("hist",(0,0,1))))
+        return self.find(events, bias, slope, npeaks)
 
-        pass
-        # events = kwa.get("events",None) # np.ndarray per cycles
-        # _, bias, slope  = kwa.get("hist",(0,0,1))
-        # npeaks = len(ZeroCrossingPeakFinder()(*kwa.get("hist",(0,0,1))))
-        # return self.find(events, bias, slope, npeaks)
-
-    # def find(self, events, bias, slope, npeaks:int):
-    #     'find peaks'
-    #     data   = np.array([[np.nanmean(i),len(i)] for i in np.hstack(events)])
-    #     params = self.fit(data,npeaks)[1]
-    #     order  = np.argsort(params.T[0,:])
-    #     peaks, ids = self.__strip(params[order,:],data,events)
-    #     return peaks * slope + bias , ids
+    def find(self, events, bias, slope, npeaks:int):
+        'find peaks'
+        data   = np.array([[np.nanmean(i),len(i)] for i in np.hstack(events)])
+        params = self.fitdata(data,npeaks)
+        peaks  = np.hstack(params[:,0,0])
+        order  = np.argsort(params.T[0,:]) # params[:,0,0]
+        peaks, ids = self.__strip(params[order,:],data,events)
+        return peaks * slope + bias , ids
 
     def __strip(self, params, data, events):
         '''
-        removes peaks which have fewer than mincount events
         then assigns events to most likely peaks
         '''
         predicts = np.array([np.argmax(_) for _ in self.score(data,params).T])
@@ -798,7 +797,7 @@ class ByEM:
         return list(map(lambda x:next(x[1])[-1],itertools.groupby(sortedinfo,key=lambda x:x[0])))
 
 
-    def fitalg(self,data:np.ndarray,maxpeaks:int,minpeaks:int = 1):
+    def fitdata(self,data:np.ndarray,maxpeaks:int,minpeaks:int = 1):
         '''
         calls initialization with maximal number of peaks
         runs fits until convergence
@@ -809,15 +808,15 @@ class ByEM:
         rates, params = self.initialize(data,maxpeaks)
         score, rates, params = self.fit(data,rates,params,prevll=None)
 
-        # remove peaks that are too close after the first fit
+        # remove peaks that are too close after fitting
         keep = self.__rmduplicates(params,rates)
-        score,rates,params=score[keep],rates[keep],params[keep]
+        score,rates,params = self.emstep(data,rates[keep],params[keep])
 
         assign = np.array(list(map(len,self.assign(score).values())))
-        rates, params = rates[keep], params[keep]
-
-        allscores,allrates,allparams=[], [], [] # will be removed
+        bic = None
         while any(assign<self.mincount) or len(rates)>minpeaks:
+            prevbic=bic
+            prevparams = params
             asort = rates.ravel().argsort()
             rates,params = rates[asort][1:],params[asort][1:]
             score, rates, params = self.fit(data,rates,params,prevll=None)
@@ -826,9 +825,10 @@ class ByEM:
             score,rates,params = self.emstep(data,rates[keep],params[keep])
             assign = np.array(list(map(len,self.assign(score).values())))
             if not any(assign<self.mincount):
-                allscores.append(score)
-                allrates.append(rates)
-                allparams.append(params)
-        return allscores,allrates,allparams
+                bic = self.bic(score,rates,params)
+                finished = False if prevbic is None else bic-prevbic>self.deltabic
+                if finished :
+                    return prevparams
+        return params
 
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]
