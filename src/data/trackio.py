@@ -340,7 +340,7 @@ class LegacyGRFilesIO(_TrackIO):
         lonetrks = tuple(trks[i]                 for i in frozenset(trks) - pairs)
         return good, lonegrs, lonetrks
 
-_CALLERS = _TrackIO.__subclasses__()
+_CALLERS = _TrackIO.__subclasses__
 
 class Handler:
     "A handler for opening the provided path"
@@ -417,7 +417,7 @@ class Handler:
                 elif not Path(i).exists():
                     raise IOError("Could not find path: " + i, "warning")
 
-        for caller in _CALLERS:
+        for caller in _CALLERS():
             tmp = caller.check(paths, **opts)
             if tmp is not None:
                 res = cls(tmp, caller)

@@ -5,7 +5,9 @@ Creates a tasks property and adds it to the Track
 """
 from   copy               import copy as shallowcopy
 from   typing             import Dict, Any, Union, Optional, cast
+from   pathlib            import Path
 
+import anastore
 from   utils.attrdefaults import addattributes
 from   data.track         import Track, LazyProperty
 from   .tasks             import Tasks, Task
@@ -83,6 +85,16 @@ class LocalTasks:
             cnf['tasks.scripting.cleaning.tasks'] = tuple(cleaning)
         return cnf
 
+    def load(self, path: Union[str, Path, list]):
+        """
+        loads local tasks from file path
+        """
+        mdl    = (path if isinstance(path, list) else
+                  anastore.load(str(path))['tasks'][0])
+        for i in mdl:
+            if hasattr(self, Tasks(i).name) and Tasks(i)() != i:
+                setattr(self, Tasks(i).name, i)
+
     cleaning       = TaskDescriptor()
     subtraction    = TaskDescriptor()
     selection      = TaskDescriptor()
@@ -95,7 +107,7 @@ class LocalTasks:
 Track.tasks = LazyProperty('tasks')
 addattributes(Track, protected = dict(tasks = LocalTasks()))
 
-def localtasks(self: Track, *args, **kwa) -> Track:
+def localtasks(self: Track, *args, force = True, **kwa) -> Track:
     """
     Creates a copy of the current track, defining the local tasks specifically.
 
@@ -107,7 +119,8 @@ def localtasks(self: Track, *args, **kwa) -> Track:
     """
     cpy = shallowcopy(self)
     for i in args:
-        setattr(cpy.tasks, Tasks(i).name, i) # type: ignore
+        if force or (isinstance(i, Task) and i != Tasks(i)()):
+            setattr(cpy.tasks, Tasks(i).name, i) # type: ignore
 
     for i, j in kwa.items():
         setattr(cpy.tasks, i, j) # type: ignore
