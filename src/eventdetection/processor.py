@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Processors apply tasks to a data flow"
+import warnings
 from   typing             import Optional, NamedTuple # pylint: disable=unused-import
 from   functools          import partial
 from   enum               import Enum
@@ -46,6 +47,8 @@ class ExtremumAlignmentTask(Task):
             * |phase 3 - phase 1| < 'outlier' x median
             * |phase 1 - phase 5| < 'delta'
 
+        After alignment, cycles with |phase 7| < median + 'minrelax' are discarded.
+
         * *phase* = 'measure': alignment is performed on phase 5. If outliers
         are found on phase 5:
 
@@ -77,6 +80,7 @@ class ExtremumAlignmentTask(Task):
     pull       = .1
     opening    = .5
     delta      = .2
+    minrelax   = .1
     delete     = True
 
     @initdefaults(frozenset(locals()) - {'level'})
@@ -94,9 +98,13 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
                 phases            = frame.track.phases[frame.cycles,:]
                 self.cycles.track = updatecopy(frame.track, phases = phases)
 
+        def values(self, phase):
+            "aligns a phase"
+            return self.cycles.withphases(phase).values()
+
         def bias(self, phase, window, edge, percentile):
             "aligns a phase"
-            vals  = np.array(list(self.cycles.withphases(phase).values()), dtype = 'O')
+            vals  = np.array(list(self.values(phase)), dtype = 'O')
             if edge is not None:
                 align = PhaseEdgeAlignment(window     = window,
                                            edge       = edge,
@@ -108,7 +116,7 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
 
         def translate(self, delete, bias):
             "translates data according to provided biases"
-            for val, delta in zip(self.cycles.withphases(...).values(), bias):
+            for val, delta in zip(self.values(...), bias):
                 if np.isfinite(delta):
                     val += delta
                 elif delete:
@@ -145,6 +153,7 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
             if len(bad):
                 bias[bad] = args.initial[bad]
 
+        cls.__filter_on_relax(args, kwa, bias)
         return args.cycles.translate(cls._get(kwa, 'delete'), bias)
 
     @classmethod
@@ -211,6 +220,22 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
             deltas /= rho
             deltas[np.isnan(deltas)] = 0.
         return deltas
+
+    @classmethod
+    def __filter_on_relax(cls, args, kwa, bias):
+        minv =  cls._get(kwa, 'minrelax')
+        if minv is None:
+            return
+
+        vals = list(args.cycles.values(PHASE.relax))
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category = RuntimeWarning,
+                                    message = '.*All-NaN slice encountered.*')
+            relax = np.array([np.nanmedian(i) for i in vals], dtype = 'f4') + bias
+
+            warnings.filterwarnings('ignore', category = RuntimeWarning,
+                                    message = '.*invalid value encountered in less.*')
+            bias[relax < np.nanmedian(relax)-minv] = np.NaN
 
     @classmethod
     def __less(cls, array, kwa, name):
