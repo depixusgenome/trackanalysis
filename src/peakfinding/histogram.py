@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Creates a histogram from available events"
-from    typing                  import (NamedTuple, Optional, Iterator,
-                                        Iterable, Union, Sequence, Callable, Tuple, cast,
-                                        Dict)
-from    enum                    import Enum
-import  itertools
-from functools                  import partial
-from sklearn.mixture            import GaussianMixture
-#from sklearn.cluster            import KMeans
-import  numpy  as     np
-from    numpy.lib.stride_tricks import as_strided
-from    scipy.interpolate       import interp1d
-from    scipy.signal            import find_peaks_cwt
+import itertools
+import pickle
+from enum import Enum
+from functools import partial
+from typing import (Callable, Dict, Iterable, Iterator, NamedTuple, Optional,
+                    Sequence, Tuple, Union, cast)
 
-from    utils                   import (kwargsdefaults, initdefaults,
-                                        NoArgs, asdataarrays, EVENTS_DTYPE)
-from    utils.logconfig         import getLogger
-from    signalfilter            import PrecisionAlg
-from    signalfilter.convolve   import KernelConvolution
+#from sklearn.cluster            import KMeans
+import numpy as np
+from numpy.lib.stride_tricks import as_strided
+from scipy.interpolate import interp1d
+from scipy.signal import find_peaks_cwt
+from sklearn.mixture import GaussianMixture
+
+from signalfilter import PrecisionAlg
+from signalfilter.convolve import KernelConvolution
+from utils import (EVENTS_DTYPE, NoArgs, asdataarrays, initdefaults,
+                   kwargsdefaults)
+from utils.logconfig import getLogger
 
 LOGS       = getLogger(__name__)
 
@@ -478,6 +479,8 @@ class ByZeroCrossing:
     def __init__(self, **kwa):
         pass
     def __call__(self,**kwa):
+        pickle.dump(kwa,open("kwa.pk","wb"))
+
         hist  = kwa.get("hist",(np.array([]),0,1))
         peaks = self.finder(*hist)
         ids   = self.grouper(peaks     = peaks,
@@ -573,21 +576,16 @@ class COVTYPE(Enum):
     TIED = "tied"
 
 
-# set data as instance attribute
 class ByEM:
     '''
     finds peaks and groups events using Expectation Maximization
     the number of components is estimated using BIC criteria
-    tests to add:
-    test params from init
-    for r in param:
-    try r.reshape(2,-1) (see cls.scorex)
     '''
     emiter   = 100
     mincount = 5
     tol      = 0.5  # loglikelihood tolerance
     decimals = 4    # rounding values
-    covtype  = COVTYPE.ANY
+    covtype  = COVTYPE.TIED
     deltabic = 2    # significant increase in bic
     params  : np.ndarray
     rates   : np.ndarray
@@ -597,32 +595,37 @@ class ByEM:
         pass
 
     def __call__(self,**kwa):
-        events = kwa.get("events",None) # np.ndarray per cycles
         _, bias, slope  = kwa.get("hist",(0,0,1))
-        npeaks = len(ZeroCrossingPeakFinder()(*kwa.get("hist",(0,0,1))))
-        return self.find(events, bias, slope, npeaks)
+        return self.find(kwa.get("pos",None), bias, slope, kwa["precision"])
 
-    def find(self, events, bias, slope, npeaks:int):
-        'find peaks'
-        data   = np.array([[np.nanmean(i),len(i)] for i in np.hstack(events)])
-        params = self.fitdata(data,npeaks)
-        peaks  = np.hstack(params[:,0,0])
-        order  = np.argsort(params.T[0,:]) # params[:,0,0]
-        peaks, ids = self.__strip(params[order,:],data,events)
+    def find(self, events, bias, slope, precision=None):
+        'find peaks along z axis'
+        data       = np.array([[np.nanmean(i),len(i)] for i in events if len(i)])
+        maxpeaks   = (max(data[:,0]) - min(data[:,0])) // precision
+        params     = self.fitdata(data,maxpeaks)[-1]
+        asort      = np.argsort(params[:,0,0])
+        peaks, ids = self.__strip(params[asort],events)
         return peaks * slope + bias , ids
 
-    def __strip(self, params, data, events):
+    def __strip(self, params, events):
         '''
         then assigns events to most likely peaks
         '''
-        predicts = np.array([np.argmax(_) for _ in self.score(data,params).T])
-        lowcount = [pkid for pkid in range(params.shape[0]) if np.sum(predicts==pkid)<self.mincount]
         pos = np.array([ np.array([[np.nanmean(evt),len(evt)] for evt in cyc])
                          if cyc.size>0 else np.array([]) for cyc in events])
 
-        ids = np.array([self.__predict(zpos,params) for zpos in pos])
-        ids[np.isin(ids,lowcount)]=np.iinfo("i4").max # unassigned events
-        return params.T[0,:], ids
+        predict = partial(self.__predict,params)
+        ids     = np.array(list(map(predict,pos)))
+        #ids[np.isin(ids,lowcount)]=np.iinfo("i4").max # unassigned events
+        return params[:,0,0], ids
+
+    @classmethod
+    def __predict(cls, params:np.ndarray, data:np.ndarray):
+        if data.size==0:
+            return np.array([])
+        score = cls.score(data,params).T
+        ids   = [np.argmax(_) if max(_)>1e-4 else np.iinfo("i4").max for _ in score]
+        return np.array(ids)
 
     # to test
     def nparams(self,params):
@@ -632,12 +635,6 @@ class ByEM:
             return params.size-dim*(params.shape[0]-1)
         return params.size
 
-    @classmethod
-    def __predict(cls, data:np.ndarray, params:np.ndarray):
-        if data.size==0:
-            return np.array([])
-        ids = np.array([np.argmax(_) for _ in cls.score(data,params).T])
-        return ids
 
     @staticmethod
     def initialize(data:np.ndarray,maxbins:int=1)->np.ndarray:
@@ -706,7 +703,7 @@ class ByEM:
             np.sqrt(float(np.linalg.det(cov)))
 
     @classmethod
-    def score(cls,data:np.ndarray,params)->np.ndarray: # to fix
+    def score(cls,data:np.ndarray,params)->np.ndarray:
         'return the score[i,j] array corresponding to pdf(Xj|Zi, theta)'
         pdf = map(cls.pdf,itertools.product(params,data))
         return np.array(list(pdf)).reshape(len(params),-1)
@@ -767,17 +764,13 @@ class ByEM:
         'returns loglikelihood'
         return np.sum(np.log(np.sum(rates*score,axis=0)))
 
-    # to pytest, to clean
-    def fit(self,
-            data,
-            rates,
-            params,
-            prevll:Optional[float] = None):
+    # to pytest
+    def fit(self,data,rates,params,prevll:Optional[float] = None):
         'fit a given set of params'
         prevll = self.llikelihood(self.score(data,params),rates) if prevll is None else prevll
         for _ in range(self.emiter):
-            score, rates, params = self.emstep(data,rates,params)
-            llikelihood  = self.llikelihood(score,rates)
+            score,rates,params = self.emstep(data,rates,params)
+            llikelihood        = self.llikelihood(score,rates)
             if abs(llikelihood-prevll) < self.tol:
                 break
             prevll = llikelihood
@@ -799,28 +792,28 @@ class ByEM:
         then removes the least likely peak, converge
         and repeats
         '''
-        rates, params = self.initialize(data,maxpeaks)
-        score, rates, params = self.fit(data,rates,params,prevll=None)
+        rates,params       = self.initialize(data,maxpeaks)
+        score,rates,params = self.fit(data,rates,params,prevll=None)
 
         # remove peaks that are too close after fitting, and update
-        keep = self.__rmduplicates(params,rates)
+        keep               = self.__rmduplicates(params,rates)
         score,rates,params = self.emstep(data,rates[keep],params[keep])
 
         assign = np.array(list(map(len,self.assign(score).values())))
-        bic = None
+        bic    = None
         while any(assign<self.mincount) or len(rates)>minpeaks:
-            prevbic=bic
-            prevparams = params
-            asort = rates.ravel().argsort()
-            score, rates, params = self.fit(data,rates[asort][1:],params[asort][1:],prevll=None)
-            keep = self.__rmduplicates(params,rates)
+            prevbic            = bic
+            prev               = score,rates,params
+            asort              = rates.ravel().argsort()
+            score,rates,params = self.fit(data,rates[asort][1:],params[asort][1:],prevll=None)
+            keep               = self.__rmduplicates(params,rates)
             score,rates,params = self.emstep(data,rates[keep],params[keep])
-            assign = np.array(list(map(len,self.assign(score).values())))
+            assign             = np.array(list(map(len,self.assign(score).values())))
             if not any(assign<self.mincount):
-                bic = self.bic(score,rates,params)
+                bic      = self.bic(score,rates,params)
                 finished = False if prevbic is None else bic-prevbic>self.deltabic
                 if finished :
-                    return prevparams
-        return params
+                    return prev
+        return score,rates,params
 
 PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]
