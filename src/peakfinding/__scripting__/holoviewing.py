@@ -168,6 +168,7 @@ class PeaksDisplay(_CycleDisplay, display = PeaksDict): # type: ignore
                                            if self._items.isbead(i)]))),)
         return None
 
+displayhook(PeaksDict)
 class DetailedDisplay(PeaksDisplay, display = Detailed): # type: ignore
     """
     Displays peaks.
@@ -191,7 +192,7 @@ class DetailedDisplay(PeaksDisplay, display = Detailed): # type: ignore
 
     def _perall(self, **opts):
         "Returns the method used by the dynamic map"
-        return self.detailed(self._items, **opts)
+        return hv.Overlay(self.detailed(self._items, **opts))
 
     display = _perall
 

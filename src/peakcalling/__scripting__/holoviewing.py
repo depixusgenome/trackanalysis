@@ -365,7 +365,7 @@ class _2DRef(PeaksTracksDictDisplay):
 
     def run(self, bead):
         "Creates the display"
-        plot  = self.__fcn(bead)
+        plot  = self.__fcn(bead) if np.isscalar(bead) else bead
         crvs  = [(i[1], j) for i, j in plot.data.items() if i[0] == 'Curve'][::2]
         quad  = self.__quadmesh(crvs)
         text  = self.__quadmeshtext(crvs)
