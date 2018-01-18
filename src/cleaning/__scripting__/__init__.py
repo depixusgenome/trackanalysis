@@ -92,6 +92,14 @@ class TrackCleaningScript:
         "returns beads with warnings"
         return [i for i, j in self.process(beads, **kwa).items() if j is not None]
 
+    @property
+    def fixed(self) -> List[int]:
+        "a list of potential fixed beads"
+        data    = self.messages()
+        data    = data[data.types  == 'extent']
+        data    = data[data.cycles >= self.track.ncycles]
+        return list(data.reset_index().bead.unique())
+
     def messages(self,
                  beads: Sequence[BEADKEY] = None,
                  forceclean                  = False,
