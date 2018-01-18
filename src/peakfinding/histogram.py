@@ -781,12 +781,6 @@ class ByEM:
             if abs(llikelihood-prevll) < self.tol:
                 break
             prevll = llikelihood
-            # following removes too many peaks
-            # keep = [k for k,v in self.assign(score).items() if len(v)>=self.mincount]
-            # rates,params=rates[keep],params[keep]
-            # score = self.score(data,params)
-            # if any(self.assign(score).values())<self.mincount: # here is the mistake
-            #     break
         return score, rates, params
 
     @classmethod
@@ -808,7 +802,7 @@ class ByEM:
         rates, params = self.initialize(data,maxpeaks)
         score, rates, params = self.fit(data,rates,params,prevll=None)
 
-        # remove peaks that are too close after fitting
+        # remove peaks that are too close after fitting, and update
         keep = self.__rmduplicates(params,rates)
         score,rates,params = self.emstep(data,rates[keep],params[keep])
 
@@ -818,10 +812,8 @@ class ByEM:
             prevbic=bic
             prevparams = params
             asort = rates.ravel().argsort()
-            rates,params = rates[asort][1:],params[asort][1:]
-            score, rates, params = self.fit(data,rates,params,prevll=None)
+            score, rates, params = self.fit(data,rates[asort][1:],params[asort][1:],prevll=None)
             keep = self.__rmduplicates(params,rates)
-            # update scores, rates and params
             score,rates,params = self.emstep(data,rates[keep],params[keep])
             assign = np.array(list(map(len,self.assign(score).values())))
             if not any(assign<self.mincount):
