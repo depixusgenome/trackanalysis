@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 "Creates a histogram from available events"
 import itertools
-import pickle
 from enum import Enum
 from functools import partial
 from typing import (Callable, Dict, Iterable, Iterator, NamedTuple, Optional,
@@ -479,8 +478,6 @@ class ByZeroCrossing:
     def __init__(self, **kwa):
         pass
     def __call__(self,**kwa):
-        pickle.dump(kwa,open("kwa.pk","wb"))
-
         hist  = kwa.get("hist",(np.array([]),0,1))
         peaks = self.finder(*hist)
         ids   = self.grouper(peaks     = peaks,
@@ -505,11 +502,12 @@ class ByGaussianMix:
         pass
 
     def __call__(self,**kwa):
-        pos            = kwa.get("pos",None)
-        self.peakwidth = kwa.get("precision",1)
-        hist, bias, slope   = kwa.get("hist",(0,0,1))
+        pos               = kwa.get("pos",None)
+        self.peakwidth    = kwa.get("precision",1)
+        hist, bias, slope = kwa.get("hist",(0,0,1))
         return self.find(pos, hist, bias, slope)
 
+    # needs cleaning
     def find(self,pos: np.ndarray, hist, bias:float = 0., slope:float = 1.):
         'find peaks'
         events   = np.hstack(pos)
@@ -596,12 +594,14 @@ class ByEM:
 
     def __call__(self,**kwa):
         _, bias, slope  = kwa.get("hist",(0,0,1))
-        return self.find(kwa.get("pos",None), bias, slope, kwa["precision"])
+        return self.find(kwa.get("events",None), bias, slope, kwa["precision"])
 
     def find(self, events, bias, slope, precision=None):
         'find peaks along z axis'
-        data       = np.array([[np.nanmean(i),len(i)] for i in events if len(i)])
-        maxpeaks   = (max(data[:,0]) - min(data[:,0])) // precision
+        data       = np.array([[np.nanmean(evt),len(evt)]
+                               for cycle in events
+                               for evt in cycle])
+        maxpeaks   = int((max(data[:,0])-min(data[:,0]))//precision)
         params     = self.fitdata(data,maxpeaks)[-1]
         asort      = np.argsort(params[:,0,0])
         peaks, ids = self.__strip(params[asort],events)
