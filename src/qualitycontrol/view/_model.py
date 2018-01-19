@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View module showing all messages concerning discarded beads"
-from    typing              import List, Dict, Set
+from   typing               import List, Dict, Set
+import numpy                as     np
 
-from    data                import BEADKEY
-from    control.modelaccess import TaskPlotModelAccess, TaskAccess
-from    cleaning.processor  import DataCleaningTask, DataCleaningProcessor
+from   data                 import BEADKEY
+from   control.modelaccess  import TaskPlotModelAccess, TaskAccess
+from   cleaning.processor   import DataCleaningTask, DataCleaningProcessor
 
 class GuiDataCleaningProcessor(DataCleaningProcessor):
     "gui data cleaning processor"
@@ -22,6 +23,7 @@ class QualityControlModelAccess(TaskPlotModelAccess):
     def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
         self.cleaning   = TaskAccess(self, DataCleaningTask)
+        self.config.root.fixedbead.minextent.default = 0.15
         self.__messages = self.project.messages
         self.__messages.setdefault(None)
 
@@ -52,13 +54,20 @@ class QualityControlModelAccess(TaskPlotModelAccess):
 
     def fixedbeads(self) -> Set[BEADKEY]:
         "returns bead ids with extent == all cycles"
-        if self.track is None:
+        cache   = self.cleaning.cache() # pylint: disable=not-callable
+        if cache is None:
             return set()
 
-        ncycles = self.track.ncycles
-        msg     = self.messages()
-        return set(bead for bead, tpe, cnt in zip(msg['bead'], msg['type'], msg['cycles'])
-                   if tpe == 'extent' and cnt >= ncycles)
+        minext  = self.config.root.fixedbead.minextent.get()
+        def _compute(itm):
+            arr   = next((i.values for i in itm if i.name == 'extent'), None)
+            if arr is None:
+                return False
+
+            valid = np.isfinite(arr)
+            return np.sum(arr[valid] < minext) == np.sum(valid)
+
+        return set(i for i, (j, _) in cache.items() if _compute(j))
 
     def messages(self) -> Dict[str, List]:
         "returns beads and warnings where applicable"

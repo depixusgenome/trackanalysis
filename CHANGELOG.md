@@ -1,3 +1,10 @@
+# tag cycles_v4.11
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+## Quality Control
+
+Fixed beads are beads having all their cycle extension at less than 0.15.
+
 # tag cycles_v4.10
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
