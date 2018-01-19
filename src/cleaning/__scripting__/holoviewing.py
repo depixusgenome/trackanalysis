@@ -3,18 +3,29 @@
 """
 Provides displays on good and bad beads
 """
-from   typing            import List
-from   itertools         import product
-import pandas            as     pd
-import numpy             as     np
+from   typing               import List
+from   itertools            import product
+import pandas               as     pd
+import numpy                as     np
 
-from   utils.holoviewing import hv, addproperty, addto, displayhook
-from   .                 import TrackCleaningScript, TracksDictCleaningScript
+from   utils.holoviewing    import hv, addproperty, addto, displayhook, ItemsDisplay
+from   model.__scripting__  import Tasks
+from   .                    import TrackCleaningScript, TracksDictCleaningScript
 
-@addto(TrackCleaningScript)
-def display(self):
-    "returns a table of cleaning messages"
-    return self.messages()
+@addproperty(TrackCleaningScript)
+class TrackCleaningDisplay(ItemsDisplay):
+    """
+    Display the messages or fixed beads
+    """
+    def display(self, **_):
+        "returns a table of cleaning messages"
+        return self._items.messages()
+
+    def fixed(self, **kwa):
+        "displays aligned cycles for fixed beads only"
+        beads = self._items.fixed(**kwa)
+        return self._items.track.apply(Tasks.alignment)[beads,...]
+
 TrackCleaningScript.__doc__ += (
     """
     In **jupyter**, this object automatically displays the list messages.
