@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Creates a histogram from available events"
+import pickle
 import itertools
 from enum import Enum
 from functools import partial
@@ -584,7 +585,8 @@ class ByEM:
     tol      = 0.5  # loglikelihood tolerance
     decimals = 4    # rounding values
     covtype  = COVTYPE.TIED
-    deltabic = 2    # significant increase in bic
+    deltabic = 1    # significant increase in bic
+    floaterr = 1e-10
     params  : np.ndarray
     rates   : np.ndarray
     minpeaks = 1
@@ -594,6 +596,7 @@ class ByEM:
 
     def __call__(self,**kwa):
         _, bias, slope  = kwa.get("hist",(0,0,1))
+        # pickle.dump(kwa,open("kwa.pk","wb"))
         return self.find(kwa.get("events",None), bias, slope, kwa["precision"])
 
     def find(self, events, bias, slope, precision=None):
@@ -651,6 +654,10 @@ class ByEM:
                                (0,np.nanstd(clas[idx][:,-1]))] for idx in set(digi)])
         params[:,0,1][params[:,0,1]==0]=np.mean(params[:,0,1],axis=0)
         params[:,1,1][params[:,1,1]==0]=np.mean(params[:,1,1],axis=0)
+
+        pickle.dump(data,open("idata.dbg","wb"))
+        pickle.dump(1/len(params)*np.ones((len(params),1)),open("irates.dbg","wb"))
+        pickle.dump(params,open("iparams.dbg","wb"))
         return 1/len(params)*np.ones((len(params),1)) , params
 
 
@@ -728,12 +735,22 @@ class ByEM:
     # to pytest
     def maximization(self,pz_x:np.ndarray,data:np.ndarray):
         'returns the next set of parameters'
+        # sanitize pz_x
+        # pz_x[pz_x<self.floaterr] = 0.0 # 1e-300
+        # sain                     = np.sum(pz_x,axis=1)>self.floaterr
+        # pz_x                     = pz_x[sain] # may remove parameters
+
+
+        npz_x    = pz_x/np.sum(pz_x,axis=1).reshape(-1,1) # np.sum(pz_x,axis=1).reshape(-1,1)
+
         nrates   = np.mean(pz_x,axis=1).reshape(-1,1)
-        npz_x    = pz_x/np.sum(pz_x,axis=1).reshape(-1,1)
         maximize = partial(self.__maximizeparam,data)
         params   = np.array(list(map(maximize,npz_x))) # type: ignore
+        # pickle.dump(data,open("data.dbg","wb"))
+        # pickle.dump(pz_x,open("pz_x.dbg","wb"))
+        # pickle.dump(params,open("params.dbg","wb"))
         if self.covtype is COVTYPE.TIED:
-            meancov = np.mean(params[:,0,1],axis=0)
+            meancov       = np.mean(params[:,0,1],axis=0)
             params[:,0,1] = meancov
         return nrates, params
 
@@ -769,6 +786,7 @@ class ByEM:
         'fit a given set of params'
         prevll = self.llikelihood(self.score(data,params),rates) if prevll is None else prevll
         for _ in range(self.emiter):
+            print(f"emiter={_}")
             score,rates,params = self.emstep(data,rates,params)
             llikelihood        = self.llikelihood(score,rates)
             if abs(llikelihood-prevll) < self.tol:
