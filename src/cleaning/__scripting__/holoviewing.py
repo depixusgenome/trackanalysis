@@ -8,7 +8,7 @@ from   itertools            import product
 import pandas               as     pd
 import numpy                as     np
 
-from   utils.holoviewing    import hv, addproperty, addto, displayhook, ItemsDisplay
+from   utils.holoviewing    import hv, addproperty, displayhook, ItemsDisplay
 from   model.__scripting__  import Tasks
 from   .                    import TrackCleaningScript, TracksDictCleaningScript
 
