@@ -24,13 +24,15 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
         super().__init__(model)
         self.__widget: DataTable  = None
         css                       = self.__config
-        css.lines.order.default   = ('extent', 'hfsigma', 'population', 'aberrant', 'good')
+        css.lines.order.default   = ('extent', 'hfsigma', 'population', 'aberrant',
+                                     'saturation', 'good')
         css.columns.width.default = 65
         css.height.default        = 500
-        css.columns.default       = [['cycle',       u'Cycle',   '0'],
-                                     ['population', u'% good',   '0.'],
-                                     ['hfsigma',    'σ[HF]',     '0.0000'],
-                                     ['extent',     u'Δz',       '0.0'],
+        css.columns.default       = [['cycle',      u'Cycle',     '0'],
+                                     ['population', u'% good',    '0.'],
+                                     ['hfsigma',    u'σ[HF]',     '0.0000'],
+                                     ['extent',     u'Δz',        '0.0'],
+                                     ['saturation', u'Non-closing', ''],
                                      ['discarded',  u'Discarded', '']]
 
     @property
@@ -72,10 +74,17 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
         names = set(i[0] for i in self.__config.columns.get()) & set(cache)
         bad   = self._model.cleaning.nbadcycles(cache)
         order = self._model.cleaning.sorted(self.__config.lines.order.get(), cache)
-        info                    = {i: cache[i].values[order] for i in names}
-        info['discarded']       = np.zeros(len(order), dtype = 'U1')
-        info['discarded'][:bad] = '✗'
-        info['cycle']           = order
+        info  = {i: cache[i].values[order] for i in names}
+
+        info['saturation'] = np.zeros(len(order), dtype = 'U1')
+        info['discarded']  = np.zeros(len(order), dtype = 'U1')
+        if len(cache['saturation'].max):
+            info['saturation'][cache['saturation'].max] = '✗'
+            info['discarded'][:]                        = '✗'
+        else:
+            info['discarded'][:bad]                     = '✗'
+
+        info['cycle'] = order
         return info
 
 class DpxCleaning(Widget):
@@ -94,6 +103,7 @@ class DpxCleaning(Widget):
     minhfsigma         = props.Float(DataCleaningTask.minhfsigma)
     maxhfsigma         = props.Float(DataCleaningTask.maxhfsigma)
     minextent          = props.Float(DataCleaningTask.minextent)
+    maxsaturated       = props.Float(DataCleaningTask.maxsaturated)
 
 class CleaningFilterWidget(WidgetCreator[DataCleaningModelAccess]):
     "All inputs for cleaning"
@@ -110,7 +120,8 @@ class CleaningFilterWidget(WidgetCreator[DataCleaningModelAccess]):
             self._model.cleaning.update(**{attr: new})
 
         for name in ('maxabsvalue', 'maxderivate', 'minpopulation',
-                     'minhfsigma',  'maxhfsigma',  'minextent'):
+                     'minhfsigma',  'maxhfsigma',  'minextent',
+                     'maxsaturated'):
             self.__widget.on_change(name, _on_cb)
 
         @action

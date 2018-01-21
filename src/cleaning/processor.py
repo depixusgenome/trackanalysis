@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "Selecting beads"
 
+import  warnings
 from    typing                  import (Optional, NamedTuple, Dict, Any, List,
                                         Tuple, Type)
 from    abc                     import ABC, abstractmethod
@@ -100,7 +101,19 @@ class DerivateIslands(NaNDensity):
             if (np.abs(vals[1:-1]-vals[:-2]*.5-vals[2:]*.5) > mder).sum() >= cnt:
                 cur[:] = np.NaN
 
-class DataCleaning:
+_ZERO = np.zeros(0, dtype = 'i4')
+class DataCleaningRule:
+    "Base for cleaning"
+    def _test(self, name, test:list) -> Partial:
+        test = np.asarray(test, 'f4')
+        low  = np.nonzero(test <= getattr(self, 'min'+name))[0]
+        if hasattr(self, 'max'+name):
+            high = np.nonzero(test >= getattr(self, 'max'+name))[0]
+        else:
+            high = _ZERO
+        return Partial(name, low, high, test)
+
+class AberrantValuesRule:
     "bead selection"
     mindeltavalue                = 1e-6
     mindeltarange                = 3
@@ -108,59 +121,11 @@ class DataCleaning:
                                     DerivateIslands()]
     maxabsvalue                  = 5.
     maxderivate                  = .6
-    minpopulation                = 80.
-    minhfsigma                   = 1e-4
-    maxhfsigma                   = 1e-2
-    minextent                    = .5
-    __ZERO                       = np.zeros(0, dtype = 'i4')
-
-    CYCLES                       = 'hfsigma', 'extent', 'population'
-
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 
-    def __test(self, name, test:list) -> Partial:
-        test = np.asarray(test, 'f4')
-        low  = np.nonzero(test <= getattr(self, 'min'+name))[0]
-        if hasattr(self, 'max'+name):
-            high = np.nonzero(test >= getattr(self, 'max'+name))[0]
-        else:
-            high = self.__ZERO
-        return Partial(name, low, high, test)
-
-    @staticmethod
-    def badcycles(stats) -> np.ndarray:
-        "returns all bad cycles"
-        bad = np.empty(0, dtype = 'i4')
-        if stats is None:
-            return bad
-        for stat in stats.values() if isinstance(stats, dict) else stats:
-            bad = np.union1d(bad, stat.min)
-            bad = np.union1d(bad, stat.max)
-        return bad
-
-    def hfsigma(self, cycs: np.ndarray) -> Partial:
-        "computes noisy cycles"
-        return self.__test('hfsigma', [nanhfsigma(i) for i in cycs])
-
-    def extent(self, cycs: np.ndarray) -> Partial:
-        "computes too short or too long cycles"
-        maxv = np.finfo('f4').max
-        test = [np.nanmax(i)-np.nanmin(i) if any(np.isfinite(i)) else maxv for i in cycs]
-        return self.__test('extent', test)
-
-    def population(self, cycs: np.ndarray) -> Partial:
-        "computes too short or too long cycles"
-        test = [ 0. if len(i) == 0 else np.isfinite(i).sum()/len(i)*100. for i in cycs]
-        return self.__test('population', test)
-
-    def localpopulation(self, bead:np.ndarray):
-        "Removes values which have too few good neighbours"
-        for itm in self.nandensity:
-            itm.apply(bead)
-
-    def aberrant(self, bead:np.ndarray, clip = False) -> bool:
+    def aberrant(self, bead:np.ndarray, clip = False):
         """
         Removes aberrant values.
 
@@ -184,6 +149,112 @@ class DataCleaning:
         _cleaningclip(self, clip, np.nanmedian(bead), bead)
         _cleaningcst(self, bead)
         self.localpopulation(bead)
+
+    def localpopulation(self, bead:np.ndarray):
+        "Removes values which have too few good neighbours"
+        for itm in self.nandensity:
+            itm.apply(bead)
+
+class HFSigmaRule(DataCleaningRule):
+    """
+    Remove cycles with too low or too high a variability
+    """
+    minhfsigma                   = 1e-4
+    maxhfsigma                   = 1e-2
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__()
+
+    def hfsigma(self, cycs: np.ndarray) -> Partial:
+        "computes noisy cycles"
+        return self._test('hfsigma', [nanhfsigma(i) for i in cycs])
+
+class MinPopulationRule(DataCleaningRule):
+    """
+    Remove cycles with too few good points
+    """
+    minpopulation                = 80.
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__()
+
+    def population(self, cycs: np.ndarray) -> Partial:
+        "computes too short or too long cycles"
+        test = [ 0. if len(i) == 0 else np.isfinite(i).sum()/len(i)*100. for i in cycs]
+        return self._test('population', test)
+
+class MinExtentRule(DataCleaningRule):
+    """
+    Remove cycles which don't open
+    """
+    minextent                    = .5
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__()
+
+    def extent(self, cycs: np.ndarray) -> Partial:
+        "computes too short or too long cycles"
+        maxv = np.finfo('f4').max
+        test = [np.nanmax(i)-np.nanmin(i) if any(np.isfinite(i)) else maxv for i in cycs]
+        return self._test('extent', test)
+
+class SaturationRule:
+    """
+    Remove beads which don't have enough cycles ending at zero
+    """
+    maxdisttozero = .015
+    maxsaturated  = 90.
+    satwindow     = 10
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+    def saturation(self, initials, measures) -> Partial:
+        """
+        Remove beads which don't have enough cycles ending at zero
+        """
+        if len(initials) != len(measures):
+            raise RuntimeError("There should be as many phase 1 as phase 5")
+
+        window   = self.satwindow
+        med      = np.nanmedian
+        itr      = zip(initials, measures)
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category = RuntimeWarning,
+                                    message = '.*All-NaN slice encountered.*')
+            deltas   = np.array([med(j[window:])-med(i) for i, j in itr], dtype = 'f4')
+
+        fin      = np.isfinite(deltas)
+        low      = np.zeros(len(deltas), dtype = 'bool')
+        low[fin] = deltas[fin] > self.maxdisttozero
+        if low.sum() > fin.sum()*(1e-2*self.maxsaturated):
+            return Partial('saturation', _ZERO, np.nonzero(low)[0], deltas)
+        return Partial('saturation', _ZERO, _ZERO, deltas)
+
+class DataCleaning(AberrantValuesRule,
+                   HFSigmaRule,
+                   MinPopulationRule,
+                   MinExtentRule,
+                   SaturationRule):
+    "bead selection"
+    CYCLES  = 'hfsigma', 'extent', 'population'
+    def __init__(self, **_):
+        for base in DataCleaning.__bases__:
+            base.__init__(self, **_) # type: ignore
+
+    @staticmethod
+    def badcycles(stats) -> np.ndarray:
+        "returns all bad cycles"
+        bad = np.empty(0, dtype = 'i4')
+        if stats is None:
+            return bad
+        for stat in stats.values() if isinstance(stats, dict) else stats:
+            bad = np.union1d(bad, stat.min)
+            bad = np.union1d(bad, stat.max)
+        return bad
+
+    def aberrant(self, bead:np.ndarray, clip = False) -> bool:
+        super().aberrant(bead, clip)
         return np.isfinite(bead).sum() <= len(bead) * self.minpopulation * 1e-2
 
 class PostAlignmentDataCleaning:
@@ -223,12 +294,13 @@ class PostAlignmentDataCleaning:
             good[good > thr[1]] = np.NaN
         bead[fin] = good
 
-class DataCleaningTask(DataCleaning, Task):
+class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
     "bead selection task"
     level            = Level.bead
     hfsigmaphases    = PHASE.measure, PHASE.measure
     populationphases = PHASE.measure, PHASE.measure
     extentphases     = PHASE.initial, PHASE.measure
+    saturationphases = PHASE.initial, PHASE.measure
     @initdefaults
     def __init__(self, **kwa):
         super().__init__(**kwa)
@@ -304,12 +376,23 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
             cycs = tuple(frame.withphases(*cls.__get(name+'phases', cnf)).values())
             yield getattr(sel, name)(cycs)
 
+        init = list(frame.withphases(cls.__get('saturationphases', cnf)[0]).values())
+        meas = list(frame.withphases(cls.__get('saturationphases', cnf)[1]).values())
+        yield sel.saturation(init, meas)
+
     @classmethod
     def _compute(cls, cnf, frame, info):
         res = cls.compute(frame, info, **cnf)
         if res is None:
             return info
         raise res
+
+    @classmethod
+    def saturation(cls, cycs, **cnf):
+        "return the saturation count"
+        initials = list(cycs.withphases(PHASE.initial).values())
+        measures = list(cycs.withphases(PHASE.measure).values())
+        return cls.tasktype(**cnf).saturation(initials, measures)
 
     @classmethod
     def compute(cls, frame, info, cache = None, **cnf) -> Optional[DataCleaningException]:
@@ -336,9 +419,7 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
 
                 if not tested:
                     minpop  = 1.-cls.__get('minpopulation', cnf)*1e-2
-                    discard = not tested and np.isnan(info[1]).sum() > len(info[1]) * minpop
-            elif not tested:
-                discard = False
+                    discard = np.isnan(info[1]).sum() > len(info[1]) * minpop
 
         if not (tested or cache is None):
             cache[info[0]] = val, discard

@@ -33,7 +33,9 @@ export class DpxCleaningView extends WidgetView
                  dbal+'Closed-hairpin cycles are deleted'+pos,
                  dbal+'Values with a high derivate are deleted'+pos,
                  dbal+'Underpopulated cycles are deleted'+pos,
-                 dbal+'Constant or noisy cycles are deleted'+pos]
+                 dbal+'Constant or noisy cycles are deleted'+pos,
+                 dbal+'Enough cycles should reach 0 or the bead is discarded'+pos]
+
 
         html = "<div><div class='dpx-span'>"+
                    "<p #{ttips[0]}>Subtracted</p>"+
@@ -50,8 +52,13 @@ export class DpxCleaningView extends WidgetView
                         "<p #{ttips[6]}>≤ σ[HF] ≤</p></div>"+
                    "<div>#{@mk_inp("maxderivate")}"+
                         "#{@mk_inp("minpopulation", 100, 0.1)}"+
-                        "#{@mk_inp("maxhfsigma", 0.05,  0.001)}</diV>"+
+                        "#{@mk_inp("maxhfsigma", 0.05,  0.001)}</div>"+
+               "</div></div>"+
+               "<div><div class='dpx-span'>"+
+                   "<p #{ttips[7]}>Non-closing cycles (%) ≤</p>"+
+                   "#{@mk_inp("maxsaturated", 100.0, 1.0)}"+
                "</div></div>"
+
 
         @el.innerHTML = html
         elem = $(@el)
@@ -64,7 +71,7 @@ export class DpxCleaningView extends WidgetView
         return @
 
     cl_inputs: ['maxabsvalue', 'maxderivate', 'minpopulation', 'minhfsigma',
-                'maxhfsigma', 'minextent']
+                'maxhfsigma', 'minextent', 'maxsaturated']
 
     mk_inp: (name, maxv = 100, dv = 0.1) ->
         disabled = if @model.frozen then ' disabled=true' else ''
@@ -114,4 +121,5 @@ export class DpxCleaning extends Widget
         minhfsigma: [p.Number, 1e-4],
         maxhfsigma: [p.Number, 1e-2],
         minextent: [p.Number, .5]
+        maxsaturated: [p.Number, 90],
     }

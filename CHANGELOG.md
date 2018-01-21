@@ -1,9 +1,14 @@
 # tag cycles_v4.11
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
-## Quality Control
+### Quality Control
 
-Fixed beads are beads having all their cycle extension at less than 0.15.
+Redefined fixed beads as having all their cycle extension at less than 0.15.
+
+### Cleaning
+
+When too many cycles (> 90%) never reach 0 before the end of phase 5, the bead is
+discarded
 
 # tag cycles_v4.10
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>

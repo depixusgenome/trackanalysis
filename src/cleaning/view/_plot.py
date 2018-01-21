@@ -68,9 +68,11 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
                   hfsigma    = 'gold',
                   extent     = 'orange',
                   population = 'hotpink',
+                  saturation = 'chocolate',
                   aberrant   = 'red')
 
-        cnf.colors.order.default  = ('aberrant', 'hfsigma', 'extent', 'population', 'good')
+        cnf.colors.order.default  = ('aberrant', 'hfsigma', 'extent', 'population',
+                                     'saturation', 'good')
         self.css.widgets.width.default = 400
         self.css.figure.defaults  = dict(width    = 600,
                                          height   = 800,
