@@ -202,7 +202,6 @@ class SaturationRule:
     * a hairpin structure keeps the hairpin from closing. Such structures should be
     detectable in ramp files.
     * an oligo is blocking the loop.
-
     """
     maxdisttozero = .015
     maxsaturation  = 90.
