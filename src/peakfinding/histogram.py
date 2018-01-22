@@ -8,6 +8,7 @@ from functools import partial
 from typing import (Callable, Dict, Iterable, Iterator, NamedTuple, Optional,
                     Sequence, Tuple, Union, cast)
 
+#import numba
 #from sklearn.cluster            import KMeans
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
@@ -575,7 +576,7 @@ class COVTYPE(Enum):
     TIED = "tied"
 
 
-class ByEM:
+class ByEM: # pylint: disable=too-many-public-methods
     '''
     finds peaks and groups events using Expectation Maximization
     the number of components is estimated using BIC criteria
@@ -590,12 +591,15 @@ class ByEM:
     params  : np.ndarray
     rates   : np.ndarray
     minpeaks = 1
+    #zonly    = False
+    #initfromzc = True
+    kwa : Dict = {}
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 
     def __call__(self,**kwa):
-        _, bias, slope  = kwa.get("hist",(0,0,1))
+        _, bias, slope = kwa.get("hist",(0,0,1))
         # pickle.dump(kwa,open("kwa.pk","wb"))
         return self.find(kwa.get("events",None), bias, slope, kwa["precision"])
 
@@ -604,6 +608,10 @@ class ByEM:
         data       = np.array([[np.nanmean(evt),len(evt)]
                                for cycle in events
                                for evt in cycle])
+
+        # if self.zonly:
+        #     data[:,-1] = 1 # fails because of the covariance
+
         maxpeaks   = int((max(data[:,0])-min(data[:,0]))//precision)
         params     = self.fitdata(data,maxpeaks)[-1]
         asort      = np.argsort(params[:,0,0])
@@ -622,11 +630,10 @@ class ByEM:
         #ids[np.isin(ids,lowcount)]=np.iinfo("i4").max # unassigned events
         return params[:,0,0], ids
 
-    @classmethod
-    def __predict(cls, params:np.ndarray, data:np.ndarray):
+    def __predict(self, params:np.ndarray, data:np.ndarray):
         if data.size==0:
             return np.array([])
-        score = cls.score(data,params).T
+        score = self.score(data,params).T
         ids   = [np.argmax(_) if max(_)>1e-4 else np.iinfo("i4").max for _ in score]
         return np.array(ids)
 
@@ -638,26 +645,24 @@ class ByEM:
             return params.size-dim*(params.shape[0]-1)
         return params.size
 
-
-    @staticmethod
-    def initialize(data:np.ndarray,maxbins:int=1)->np.ndarray:
+    def initialize(self,data:np.ndarray,maxbins:int=1)->np.ndarray:
         'initialize using density'
-        mincount  = 5
         bins      = np.histogram(data[:,0],bins=maxbins)[1]
         bins[-1] += 0.1
         digi      = np.digitize(data[:,:-1].ravel(),bins)
         clas      = {idx:np.array([data[_1] for _1,_2 in enumerate(digi) if _2==idx])
                      for idx in set(digi)}
+        # params    = np.array([[(np.nanmean(clas[idx][:,:-1],axis=0),
+        #                         np.cov(clas[idx][:,:-1].T) # 1e3
+        #                         if len(clas[idx])>self.mincount else 0),
+        #                        (0,np.nanstd(clas[idx][:,-1]))] for idx in set(digi)])
         params    = np.array([[(np.nanmean(clas[idx][:,:-1],axis=0),
-                                1e3*np.cov(clas[idx][:,:-1].T)
-                                if len(clas[idx])>mincount else 0),
-                               (0,np.nanstd(clas[idx][:,-1]))] for idx in set(digi)])
+                                np.cov(clas[idx][:,:-1].T)),
+                               (0,np.nanstd(clas[idx][:,-1]))] for idx in set(digi)
+                              if len(clas[idx])>self.mincount])
         params[:,0,1][params[:,0,1]==0]=np.mean(params[:,0,1],axis=0)
         params[:,1,1][params[:,1,1]==0]=np.mean(params[:,1,1],axis=0)
 
-        pickle.dump(data,open("idata.dbg","wb"))
-        pickle.dump(1/len(params)*np.ones((len(params),1)),open("irates.dbg","wb"))
-        pickle.dump(params,open("iparams.dbg","wb"))
         return 1/len(params)*np.ones((len(params),1)) , params
 
 
@@ -709,11 +714,12 @@ class ByEM:
         return np.exp(-0.5*float(cent*np.linalg.inv(cov)*cent.T))/\
             np.sqrt(float(np.linalg.det(cov)))
 
-    @classmethod
-    def score(cls,data:np.ndarray,params)->np.ndarray:
+    def score(self,data:np.ndarray,params)->np.ndarray:
         'return the score[i,j] array corresponding to pdf(Xj|Zi, theta)'
-        pdf = map(cls.pdf,itertools.product(params,data))
-        return np.array(list(pdf)).reshape(len(params),-1)
+        pdf = map(self.pdf,itertools.product(params,data))
+        # adding a small constant (i.e. uniform distribution) to avoid dividing by zero
+        # when renormalizing pz_x
+        return np.array(list(pdf)).reshape(len(params),-1)+ 10*self.floaterr
 
     def emstep(self,data:np.ndarray,rates:np.ndarray,params:np.ndarray):
         'Expectation then Maximization steps of EM'
@@ -735,20 +741,19 @@ class ByEM:
     # to pytest
     def maximization(self,pz_x:np.ndarray,data:np.ndarray):
         'returns the next set of parameters'
-        # sanitize pz_x
-        # pz_x[pz_x<self.floaterr] = 0.0 # 1e-300
-        # sain                     = np.sum(pz_x,axis=1)>self.floaterr
-        # pz_x                     = pz_x[sain] # may remove parameters
+        # # sanitize pz_x
+        # pz_x[pz_x<self.floaterr] = 0.0
+        # sain = np.sum(pz_x,axis=1)>self.floaterr
+        # pz_x = pz_x[sain] # removes parameters
 
-
-        npz_x    = pz_x/np.sum(pz_x,axis=1).reshape(-1,1) # np.sum(pz_x,axis=1).reshape(-1,1)
+        npz_x = pz_x/np.sum(pz_x,axis=1).reshape(-1,1)
 
         nrates   = np.mean(pz_x,axis=1).reshape(-1,1)
         maximize = partial(self.__maximizeparam,data)
         params   = np.array(list(map(maximize,npz_x))) # type: ignore
-        # pickle.dump(data,open("data.dbg","wb"))
-        # pickle.dump(pz_x,open("pz_x.dbg","wb"))
-        # pickle.dump(params,open("params.dbg","wb"))
+        pickle.dump(data,open("data.dbg","wb"))
+        pickle.dump(pz_x,open("pz_x.dbg","wb"))
+        pickle.dump(params,open("params.dbg","wb"))
         if self.covtype is COVTYPE.TIED:
             meancov       = np.mean(params[:,0,1],axis=0)
             params[:,0,1] = meancov
@@ -801,6 +806,27 @@ class ByEM:
         sortedinfo = sorted(((*val,idx) for idx,val in rounded),key=lambda x:(x[0],-x[1]))
         return list(map(lambda x:next(x[1])[-1],itertools.groupby(sortedinfo,key=lambda x:x[0])))
 
+    def fullrecord(self,data:np.ndarray,maxpeaks:int,minpeaks:int = 1):
+        '''
+        for debugging pruposes
+        '''
+        results = []
+        rates,params       = self.initialize(data,maxpeaks)
+        score,rates,params = self.fit(data,rates,params,prevll=None)
+        results.append((score,rates,params))
+        # remove peaks that are too close after fitting, and update
+        keep               = self.__rmduplicates(params,rates)
+        score,rates,params = self.emstep(data,rates[keep],params[keep])
+
+        assign = np.array(list(map(len,self.assign(score).values())))
+        while any(assign<self.mincount) or len(rates)>minpeaks:
+            asort              = rates.ravel().argsort()
+            score,rates,params = self.fit(data,rates[asort][1:],params[asort][1:],prevll=None)
+            keep               = self.__rmduplicates(params,rates)
+            score,rates,params = self.emstep(data,rates[keep],params[keep])
+            results.append((score,rates,params))
+            assign             = np.array(list(map(len,self.assign(score).values())))
+        return results
 
     def fitdata(self,data:np.ndarray,maxpeaks:int,minpeaks:int = 1):
         '''
@@ -819,10 +845,14 @@ class ByEM:
 
         assign = np.array(list(map(len,self.assign(score).values())))
         bic    = None
+        counter = -1 # dbg
         while any(assign<self.mincount) or len(rates)>minpeaks:
+            counter+=1 # dbg
+            print(f"counter={counter}")
             prevbic            = bic
             prev               = score,rates,params
             asort              = rates.ravel().argsort()
+            pickle.dump((data,rates[asort][1:],params[asort][1:]),open(f"todebug{counter}.pk","wb"))
             score,rates,params = self.fit(data,rates[asort][1:],params[asort][1:],prevll=None)
             keep               = self.__rmduplicates(params,rates)
             score,rates,params = self.emstep(data,rates[keep],params[keep])
