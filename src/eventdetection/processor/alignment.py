@@ -10,11 +10,7 @@ import numpy              as     np
 from   utils              import initdefaults, updatecopy
 from   model              import Task, Level, PHASE
 from   control.processor  import Processor
-
-from   .dataframe         import EventsDataFrameFactory # pylint: disable=unused-import
-from   .data              import Events
-from   .alignment         import ExtremumAlignment, PhaseEdgeAlignment
-from   .                  import EventDetectionConfig
+from   ..alignment        import ExtremumAlignment, PhaseEdgeAlignment
 
 class AlignmentTactic(Enum):
     "possible alignments"
@@ -277,67 +273,3 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
     def run(self, args):
         "updates frames"
         args.apply(self.apply(**self.config()))
-
-class BiasRemovalTask(Task):
-    "removes the bias from the whole bead"
-    level       = Level.bead
-    phase       = PHASE.measure
-    length      = 10
-    zeropos     = 5.
-    zerodelta   = 1e-2
-    binsize     = 1e-3
-
-class BiasRemovalProcessor(Processor[BiasRemovalTask]):
-    "removes the bias from the whole bead"
-    @staticmethod
-    def beadaction(task, frame, info):
-        "removes the bias"
-        cycles = (frame.new(data = dict((info,)))
-                  [info[0],...]
-                  .withphases(task.phase))
-        vals   = np.concatenate([i[-task.length:] for i in cycles.values()])
-        vals   = vals[np.isfinite(vals)]
-        zero   = np.percentile(vals, task.zeropos)
-        vals   = vals[np.abs(vals-zero) < task.zerodelta]
-
-        hist, bins  = np.histogram(vals,
-                                   int(task.zerodelta/task.binsize+0.5),
-                                   (zero-task.zerodelta, zero+task.zerodelta))
-        bias        = bins[np.argmax(hist):][:2].mean()
-        info[1][:] -= bias
-        return info
-
-    @classmethod
-    def apply(cls, toframe = None, **cnf):
-        "applies the task to a frame or returns a function that does so"
-        if toframe is None:
-            return cls.apply
-        task = cls.tasktype(**cnf) # pylint: disable=not-callable
-        return toframe.withaction(partial(cls.beadaction, task))
-
-    def run(self, args):
-        "updates frames"
-        args.apply(self.apply(**self.config()))
-
-class EventDetectionTask(EventDetectionConfig, Task):
-    "Config for an event detection"
-    levelin = Level.bead
-    levelou = Level.event
-    phase   = PHASE.measure
-    @initdefaults('phase')
-    def __init__(self, **kw) -> None:
-        EventDetectionConfig.__init__(self, **kw)
-        Task.__init__(self)
-
-class EventDetectionProcessor(Processor[EventDetectionTask]):
-    "Generates output from a _tasks."
-    @classmethod
-    def apply(cls, toframe, **kwa):
-        "applies the task to a frame or returns a function that does so"
-        kwa['first'] = kwa['last'] = kwa.pop('phase')
-        fcn = lambda frame: frame.new(Events, **kwa)
-        return fcn if toframe is None else fcn(toframe)
-
-    def run(self, args):
-        "iterates through beads and yields cycle events"
-        args.apply(self.apply(None, **self.task.config()), levels = self.levels)
