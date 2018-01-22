@@ -104,4 +104,4 @@ class PrecisionAlg(ABC):
     @staticmethod
     def rawprecision(track, ibead, first = None, last = None):
         "Obtain the raw precision for a given bead"
-        return getattr(track, 'track').rawprecision(ibead, first, last)
+        return getattr(track, 'track', track).rawprecision(ibead, first, last)
