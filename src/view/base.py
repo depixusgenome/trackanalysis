@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "basic view module"
 from typing               import Callable, Set, TYPE_CHECKING # pylint: disable=unused-import
-from abc                  import ABC
+from abc                  import ABC, abstractmethod
 from concurrent.futures   import ThreadPoolExecutor
 
 from bokeh.document       import Document
@@ -13,13 +13,28 @@ from bokeh.layouts        import layout
 from tornado.ioloop             import IOLoop
 from tornado.platform.asyncio   import to_tornado_future
 
-from control        import Controller
 from control.action import ActionDescriptor, Computation, Action
 
 if TYPE_CHECKING:
     from .keypress import KeyPressManager
 
 SINGLE_THREAD = False
+
+class MainControllerProtocol(ABC):
+    """
+    Defines the methods available to all views
+    """
+    @abstractmethod
+    def observe(self, *args, **kwa):
+        "observes events"
+
+    @abstractmethod
+    def emit(self, *args, **kwa):
+        "emits events"
+
+    @abstractmethod
+    def getGlobal(self, name):
+        "gets gobal variables"
 
 class View(ABC):
     "Classes to be passed a controller"
@@ -28,7 +43,7 @@ class View(ABC):
     ISAPP  = False
     def __init__(self, **kwargs):
         "initializes the gui"
-        self._ctrl: Controller  = kwargs['ctrl']
+        self._ctrl: MainControllerProtocol  = kwargs['ctrl']
 
     def observe(self):
         "whatever needs to be initialized"
@@ -178,8 +193,8 @@ class BokehView(View):
     def button(self, fcn:Callable, title:str, prefix = 'keypress', **kwa):
         "creates and connects a button"
         kwa.setdefault('label',  title.capitalize())
-        kwa.setdefault('width',  self._ctrl.getGlobal('css', 'button.width'))
-        kwa.setdefault('height', self._ctrl.getGlobal('css', 'button.height'))
+        kwa.setdefault('width',  self._ctrl.getGlobal('css').button.width)
+        kwa.setdefault('height', self._ctrl.getGlobal('css').button.height)
 
         btn = Button(**kwa)
         btn.on_click(fcn)
