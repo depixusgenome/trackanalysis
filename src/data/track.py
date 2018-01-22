@@ -367,7 +367,7 @@ class Track:
     @initdefaults('key',
                   **{i: '_' for i in locals() if i != 'key' and i[0] != '_'})
     def __init__(self, **_):
-        pass
+        self._rawprecisions: _PRECISIONS = {}
 
     ncycles    = cast(int,                 property(lambda self: len(self.phases)))
     nphases    = cast(int,                 property(lambda self: self.phases.shape[1]))
@@ -471,8 +471,8 @@ class Track:
     _phases                     = np.empty((0,9), dtype = 'i4')
     _data:          DATA        = None # type: ignore
     _secondaries:   DATA        = None
+    _rawprecisions              = {}
     _path:          PATHTYPES   = None
-    _rawprecisions: _PRECISIONS = {}
     _lazy                       = True
     _axis                       = Axis.Zaxis
 
