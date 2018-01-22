@@ -7,8 +7,20 @@ Redefined fixed beads as having all their cycle extension at less than 0.15.
 
 ### Cleaning
 
+#### More robust computation of the bead precision (σ[HF])
+
+The precision is now the median of the σ[HF] measured on each cycle between phases
+1 and 5 included. We thus get rid of noisy and non-representative phases as well as
+improving the robustness of the measure.
+
+#### Too few cycles reach 0 in phase 5
 When too many cycles (> 90%) never reach 0 before the end of phase 5, the bead is
-discarded
+discarded. Such a case arises when:
+
+* the hairpin never closes: the force is too high,
+* a hairpin structure keeps the hairpin from closing. Such structures should be
+detectable in ramp files.
+* an oligo is blocking the loop.
 
 # tag cycles_v4.10
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>

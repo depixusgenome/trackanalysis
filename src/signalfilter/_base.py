@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 "Signal Analysis: filters for removing noise"
 # pylint: disable=no-name-in-module,import-error
-from typing         import Union, Iterator, Tuple, Sequence, cast
+from typing         import (Union, Iterator, Iterable, Tuple, Sequence, Optional,
+                            overload, cast, TYPE_CHECKING)
 from abc            import ABC
 from itertools      import chain
 
@@ -11,7 +12,10 @@ import numpy as np
 from utils          import initdefaults
 from ._core.stats   import hfsigma      # pylint: disable=import-error
 
-def nanhfsigma(arr: np.ndarray):
+if TYPE_CHECKING:
+    from data import Track, TrackView   # pylint: disable=unused-import
+
+def nanhfsigma(arr: np.ndarray, ranges = None):
     "hfsigma which takes care of nans"
     arr = arr.ravel()
     if len(arr) == 0:
@@ -19,7 +23,11 @@ def nanhfsigma(arr: np.ndarray):
 
     if not np.isscalar(arr[0]):
         arr = np.float32(arr) # type: ignore
-    return hfsigma(arr[~np.isnan(arr)])
+
+    fin = np.isfinite(arr)
+    if ranges is None:
+        return hfsigma(arr[fin])
+    return np.nanmedian([hfsigma(arr[i:j][fin[i:j]]) for i, j in ranges])
 
 BEADKEY   = Union[str,int]
 DATATYPE  = Union[Sequence[Sequence[np.ndarray]],
@@ -55,7 +63,7 @@ class PrecisionAlg(ABC):
             return float(precision)
 
         if beadid is not None:
-            return cast(float, self.rawprecision(data, beadid))*self.rawfactor
+            return cast(float, self.rawprecision(data, beadid))*self.rawfactor # type: ignore
 
         if isinstance(data, (float, int)):
             return float(data)
@@ -79,26 +87,21 @@ class PrecisionAlg(ABC):
 
         raise AttributeError('Could not extract precision: no data or set value')
 
-    @classmethod
-    def rawprecision(cls, track, ibead) -> Union[float, Iterator[Tuple[int, float]]]:
+    # pylint: disable=unused-argument,function-redefined
+    @overload
+    @staticmethod
+    def rawprecision(track:Union['TrackView', 'Track'], ibead: int) -> float:
         "Obtain the raw precision for a given bead"
-        track = getattr(track, 'track', track)
-        cache = getattr(track, '_rawprecisions')
-        val   = cache.get(ibead, None)
+        return 0.
 
-        if val is None:
-            if np.isscalar(ibead):
-                beads        = track.beads
-                cache[ibead] = val = nanhfsigma(beads[ibead])
-            else:
-                if ibead is None or ibead is Ellipsis:
-                    beads = track.beadsonly
-                    ibead = set(beads.keys())
-                else:
-                    beads = track.beads
-                    ibead = set(ibead)
+    @overload
+    @staticmethod
+    def rawprecision(track:Union['TrackView', 'Track'],
+                     ibead: Optional[Iterable[int]]
+                    ) -> Iterator[Tuple[int,float]]:
+        "Obtain the raw precision for a number of beads"
 
-                if len(ibead-set(cache)) > 0:
-                    cache.update((i, nanhfsigma(beads[i])) for i in ibead-set(cache))
-                val = iter((i, cache[i]) for i in ibead)
-        return val
+    @staticmethod
+    def rawprecision(track, ibead, first = None, last = None):
+        "Obtain the raw precision for a given bead"
+        return getattr(track, 'track').rawprecision(ibead, first, last)

@@ -153,7 +153,7 @@ class HFSigmaRule(DataCleaningRule):
     Remove cycles with too low or too high a variability
     """
     minhfsigma                   = 1e-4
-    maxhfsigma                   = 1e-2
+    maxhfsigma                   = 3e-3
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__()
@@ -193,7 +193,16 @@ class MinExtentRule(DataCleaningRule):
 
 class SaturationRule:
     """
-    Remove beads which don't have enough cycles ending at zero
+    Remove beads which don't have enough cycles ending at zero.
+
+    When too many cycles (> 90%) never reach 0 before the end of phase 5, the bead is
+    discarded. Such a case arises when:
+
+    * the hairpin never closes: the force is too high,
+    * a hairpin structure keeps the hairpin from closing. Such structures should be
+    detectable in ramp files.
+    * an oligo is blocking the loop.
+
     """
     maxdisttozero = .015
     maxsaturation  = 90.

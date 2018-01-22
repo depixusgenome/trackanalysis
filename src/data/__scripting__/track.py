@@ -7,7 +7,6 @@ We add some methods and change the default behaviour:
 
 * *__init__* takes *path* as it's first positional argument
 * an *events* property is added
-* a *rawprecision* method is added
 """
 from   copy                 import copy  as shallowcopy
 from   datetime             import datetime
@@ -21,7 +20,6 @@ from   utils.decoration     import addto, addproperty
 from   utils.attrdefaults   import addattributes
 from   model                import PHASE, Task
 from   model.__scripting__  import Tasks
-from   signalfilter         import PrecisionAlg
 
 from   ..trackio            import savetrack
 from   ..track              import Track, LazyProperty, BEADKEY, isellipsis
@@ -67,13 +65,6 @@ class PathInfo:
     megabytes    = property(lambda self: self.size >> 20)
     creation     = property(lambda self: datetime.fromtimestamp(self.stat.st_ctime))
     modification = property(lambda self: datetime.fromtimestamp(self.stat.st_mtime))
-
-@addto(Track)
-def rawprecision(self, ibead):
-    "the raw precision for a given bead"
-    if isinstance(ibead, (tuple, list)):
-        ibead = next(i for i in ibead if isinstance(i, int))
-    return PrecisionAlg.rawprecision(self, ibead)
 
 @addto(Track)
 def tasklist(self, *args, beadsonly = True):

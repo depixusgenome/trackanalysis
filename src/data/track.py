@@ -4,13 +4,13 @@
 Base track file data.
 """
 from    typing      import (Type, Optional, Union, Dict, Tuple, Any, List,
-                            Sequence, cast)
+                            Sequence, Iterator, Iterable, overload, cast)
 from    copy        import deepcopy
 from    enum        import Enum
 import  numpy       as     np
 
 from    utils       import initdefaults
-from    model       import levelprop, Level
+from    model       import levelprop, Level, PHASE
 from   .views       import Beads, Cycles, BEADKEY, isellipsis, TrackView
 from   .trackio     import opentrack, PATHTYPES
 
@@ -475,3 +475,41 @@ class Track:
     _rawprecisions: _PRECISIONS = {}
     _lazy                       = True
     _axis                       = Axis.Zaxis
+
+    # pylint: disable=unused-argument,function-redefined,no-self-use
+    @overload
+    def rawprecision(self, ibead: int) -> float:
+        "Obtain the raw precision for a given bead"
+        return 0.
+
+    @overload
+    def rawprecision(self, ibead: Optional[Iterable[int]]) -> Iterator[Tuple[int,float]]:
+        "Obtain the raw precision for a number of beads"
+
+    def rawprecision(self, ibead, first = None, last = None):
+        "Obtain the raw precision for a given bead"
+        cache = self._rawprecisions
+        val   = cache.get(ibead, None)
+
+        if val is None:
+            from signalfilter import nanhfsigma
+            first  = (self.phases[:,PHASE.initial if first is None else first]
+                      - self.phases[0,0])
+            last   = (self.phases[:,PHASE.measure+1 if last is None else last]
+                      - self.phases[0,0])
+            if np.isscalar(ibead):
+                beads        = self.beads
+                cache[ibead] = val = nanhfsigma(beads[ibead], zip(first, last))
+            else:
+                if ibead is None or ibead is Ellipsis:
+                    beads = self.beadsonly
+                    ibead = set(beads.keys())
+                else:
+                    beads = self.beads
+                    ibead = set(ibead)
+
+                if len(ibead-set(cache)) > 0:
+                    cache.update((i, nanhfsigma(beads[i], zip(first, last)))
+                                 for i in ibead-set(cache))
+                val = iter((i, cache[i]) for i in ibead)
+        return val
