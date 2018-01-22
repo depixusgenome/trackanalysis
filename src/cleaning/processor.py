@@ -105,11 +105,11 @@ class DataCleaningErrorMessage:
         stats = {i.name: i  for i in stats}
         get   = lambda i, j: (len(getattr(stats[i], j)),
                               cnf.get(j+i, getattr(tasktype, j+i)))
-        msg   = ('%d cycles: non-closing'    % len(stats['saturation'].max),
-                 '%d cycles: %%good < %.0f%%'% get('population', 'min'),
-                 '%d cycles: σ[HF] < %.4f'   % get('hfsigma',    'min'),
-                 '%d cycles: σ[HF] > %.4f'   % get('hfsigma',    'max'),
-                 '%d cycles: Δz < %.2f'      % get('extent',     'min'))
+        msg   = ('%d cycles: non-closing > %.0f%%' % get('saturation', 'max'),
+                 '%d cycles: %%good < %.0f%%'      % get('population', 'min'),
+                 '%d cycles: σ[HF] < %.4f'         % get('hfsigma',    'min'),
+                 '%d cycles: σ[HF] > %.4f'         % get('hfsigma',    'max'),
+                 '%d cycles: Δz < %.2f'            % get('extent',     'min'))
 
         return '\n'.join(i for i in msg if i[0] != '0')
 

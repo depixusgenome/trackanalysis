@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Toolbar"
+import time
 from typing               import Callable, TYPE_CHECKING, Iterator, Tuple, Any
 from pathlib              import Path
 
@@ -8,14 +9,16 @@ import bokeh.core.properties   as props
 
 from bokeh                import layouts
 from bokeh.models         import Widget
-from bokeh.io             import curdoc
 
+from utils.gui            import parseints
+from utils.logconfig      import getLogger
 from control.taskio       import TaskIO
 from control.beadscontrol import DataSelectionBeadController
-from utils.gui            import parseints
 from .dialog              import FileDialog
 from .base                import BokehView, threadmethod, spawn, Action
 from .static              import ROUTE
+LOGS  = getLogger(__name__)
+
 if TYPE_CHECKING:
     from model.task import RootTask # pylint: disable=unused-import
 
@@ -145,7 +148,11 @@ class MessagesInput(BokehView):
                             warning = '<p style="%s color:blue;">{}</p>' % siz,
                             error   = '<p style="%s color:red;"> {}</p>' % siz,
                             busy    = u'Please wait ...',
+                            period  = 50,
                             width   = 350)
+        msg.timeout.defaults = dict(normal  = 1000,
+                                    error   = 50000,
+                                    warning = 50000)
 
     def setup(self, toolbar: DpxToolbar, doc):
         "sets-up the gui"
@@ -169,19 +176,30 @@ class MessagesInput(BokehView):
                 msg.set(busy)
 
         def _observer(recursive = None, value = None, catcherror = None, **_):
-            if not recursive:
-                if value is None:
-                    if busy == msg.get():
-                        msg.set(None)
-                else:
-                    msg.set(value)
-                    catcherror[0] = catch.get()
+            if not recursive and value is not None:
+                msg.set(value)
+                catcherror[0] = catch.get()
         ctrl.observe("stopaction", "stopcomputation", _observer)
 
-        templ = ctrl.getGlobal('css').message.getdict(..., fullnames = False)
+        templ      = ctrl.getGlobal('css').message.getdict(..., fullnames = False)
+        timeout    = ctrl.getGlobal('css').message.timeout.getdict(..., fullnames = False)
+        last: list = [None, None, timeout['normal']]
+        def _setmsg():
+            if last[0] is None:
+                return
+            if last[0] != '':
+                toolbar.message = last[0]
+                last[0] = ''
+                last[1] = time.time()+last[2]*1e-3
+
+            elif last[1] < time.time():
+                last[0]         = None
+                toolbar.message = ''
+        doc.add_periodic_callback(_setmsg, ctrl.getGlobal('css').message.period.get())
+
         def _settext(text):
             if text.value is None:
-                val = ''
+                return
             elif isinstance(text.value, Exception):
                 args = getattr(text.value, 'args', tuple())
                 if len(args) == 1:
@@ -190,19 +208,19 @@ class MessagesInput(BokehView):
                     args = text.value,         'error'
                 elif args[1] not in templ:
                     args = str(args), 'error'
-
-                val = templ[args[1]].format(str(args[0]))
             else:
-                val = templ[text.value[1]].format(text.value[0])
-            if curdoc() is doc:
-                try:
-                    toolbar.message = val
-                    return
-                except RuntimeError:
-                    pass
+                args = text.value
 
-            fcn = lambda: setattr(toolbar, 'message', val)
-            doc.add_next_tick_callback(fcn)
+            last[0] = templ[str(args[1])].format(str(args[0])
+                                                 .replace('<', '&lt')
+                                                 .replace('>', '&gt'))
+            print('----> ',last[0])
+            last[1] = time.time()
+            last[2] = timeout.get(args[1], timeout['normal'])
+            if args[1] == 'error':
+                LOGS.error(str(args[0]))
+            elif args[1] == 'warning':
+                LOGS.warning(str(args[0]))
 
         ctrl.getGlobal('project').message.observe(_settext)
 
