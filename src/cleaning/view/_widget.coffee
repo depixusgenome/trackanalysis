@@ -56,7 +56,7 @@ export class DpxCleaningView extends WidgetView
                "</div></div>"+
                "<div><div class='dpx-span'>"+
                    "<p #{ttips[7]}>Non-closing cycles (%) ≤</p>"+
-                   "#{@mk_inp("maxsaturated", 100.0, 1.0)}"+
+                   "#{@mk_inp("maxsaturation", 100.0, 1.0)}"+
                "</div></div>"
 
 
@@ -71,7 +71,7 @@ export class DpxCleaningView extends WidgetView
         return @
 
     cl_inputs: ['maxabsvalue', 'maxderivate', 'minpopulation', 'minhfsigma',
-                'maxhfsigma', 'minextent', 'maxsaturated']
+                'maxhfsigma', 'minextent', 'maxsaturation']
 
     mk_inp: (name, maxv = 100, dv = 0.1) ->
         disabled = if @model.frozen then ' disabled=true' else ''
@@ -121,5 +121,5 @@ export class DpxCleaning extends Widget
         minhfsigma: [p.Number, 1e-4],
         maxhfsigma: [p.Number, 1e-2],
         minextent: [p.Number, .5]
-        maxsaturated: [p.Number, 90],
+        maxsaturation: [p.Number, 90],
     }

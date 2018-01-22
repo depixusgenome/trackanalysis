@@ -70,7 +70,8 @@ class MessagesListWidget(WidgetCreator[QualityControlModelAccess]):
         css.height.default   = 500
         css.type.defaults    = {'extent'     : 'Δz',
                                 'hfsigma'    : 'σ[HF]',
-                                'population' : '% good'}
+                                'population' : '% good',
+                                'saturation' : 'non-closing'}
         css.columns.default  = [['bead',    u'Bead',    '0', 65],
                                 ['type',    u'Type',    '',  65],
                                 ['cycles',  u'Cycles',  '0', 65],
