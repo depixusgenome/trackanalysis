@@ -127,7 +127,7 @@ class Action:
     def __exit__(self, tpe, val, bkt):
         assert val is None or isinstance(val, Exception)
         self._CNT[0] -= 1
-        errvalue = [self._ctrl.getGlobal('config').catcherror.get()]
+        errvalue = [self._ctrl.globals.config.catcherror.get()]
         try:
             self._ctrl.handle(self._STOPEVT,
                               args = {'type':       tpe,

@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Updates app manager so as to deal with controllers"
-from typing     import TYPE_CHECKING
 from pathlib    import Path
 
 import sys
-import appdirs
 
 from flexx.webruntime           import launch as _flexxlaunch
 from flexx.webruntime.common    import StreamReader
@@ -18,6 +16,7 @@ from bokeh.resources            import DEFAULT_SERVER_PORT
 from utils.logconfig            import getLogger, logToFile
 from utils.gui                  import MetaMixin # pylint: disable=unused-import
 from .scripting                 import orders
+from .maincontrol               import MainControl as _MainControl
 
 LOGS        = getLogger(__name__)
 CAN_LOAD_JS = True
@@ -125,79 +124,24 @@ def _launch(view, **kwa):
 def _create(main, controls, views): # pylint: disable=unused-argument
     "Creates a main view"
 
-    class Main(*(main,)+views):
+    class Main(*(main,)+views): # type: ignore
         "The main view"
-        class MainControl(metaclass   = MetaMixin,
-                          mixins      = controls,
-                          selectfirst = True):
+        class MainControl(_MainControl):
             """
             Main controller: contains all sub-controllers.
             These share a common dictionnary of handlers
             """
-            ISAPP    = False
             APPNAME  = next((i.APPNAME for i in (main,)+views if hasattr(i, 'APPNAME')),
                             'Track Analysis')
-            def __init__(self, **kwa):
-                self.topview = kwa['topview']
-
-            if TYPE_CHECKING:
-                def _yieldovermixins(self, *_1, **_2):
-                    pass
-                def _callmixins(self, *_1, **_2):
-                    pass
-
-            def __undos__(self):
-                "yields all undoable user actions"
-                yield from self._yieldovermixins('__undos__')
-
-            @classmethod
-            def configpath(cls, version, stem = None) -> Path:
-                "returns the path to the config file"
-                fname = ('autosave' if stem is None else stem)+'.txt'
-                return cls.apppath()/str(version)/fname
-
-            def readuserconfig(self):
-                """
-                reads the config: first the stuff saved automatically, then
-                anything the user wishes to impose.
-                """
-                ctrl = self.globalscontroller # pylint: disable=no-member
-                ctrl.readconfig(self.configpath)
-                ctrl.readconfig(self.configpath, lambda i: self.configpath(i, 'userconfig'))
-                orders().config(self)
-
-            def writeuserconfig(self, name = None, saveall = False, **kwa):
-                "writes the config"
-                kwa['saveall'] = saveall
-                ctrl = self.globalscontroller # pylint: disable=no-member
-                ctrl.writeconfig(lambda i: self.configpath(i, name), **kwa)
-
-            def setup(self):
-                "writes the config"
-                self._callmixins("setup", self)
-
-            def close(self):
-                "remove controller"
-                self.writeuserconfig()
-                self._callmixins("close")
-
-            @classmethod
-            def apppath(cls) -> Path:
-                "returns the path to local appdata directory"
-                name = cls.APPNAME.replace(' ', '_').lower()
-                return Path(appdirs.user_config_dir('depixus', 'depixus', name))
 
         def __init__(self):
             "sets up the controller, then initializes the view"
-            ctrl = self.MainControl(handlers = dict(), topview = self)
+            ctrl = self.MainControl(self)
             keys = getattr(self, 'KeyPressManager', lambda **_: None)(ctrl = ctrl)
             main.__init__(self, ctrl = ctrl, keys = keys)
             main.ismain(self)
 
-            ctrl.writeuserconfig('defaults',   index = 1, saveall   = True)
-            ctrl.writeuserconfig('userconfig', index = 0, overwrite = False)
-            ctrl.readuserconfig()
-            ctrl.setup()
+            ctrl.startup()
             main.observe(self)
             for cls in views:
                 cls.observe(self)
@@ -220,7 +164,7 @@ def getclass(string):
             __import__(string)
             return None
 
-        return getattr(__import__(mod, fromlist = (attr,)), attr)
+        return getattr(__import__(mod, fromlist = (attr,)), attr) # type: ignore
     return string
 
 def setup(locs,

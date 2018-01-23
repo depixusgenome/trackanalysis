@@ -17,11 +17,6 @@ class UndoController(Controller):
     def __undos__(cls):
         yield from cls.__UNDOS
 
-    @classmethod
-    def registerundos(cls, *undos):
-        'registers new undos'
-        cls.__UNDOS |= frozenset(undos)
-
     def __apply(self):
         items = self.__model.pop(self.__isundoing)
         if len(items) > 0:

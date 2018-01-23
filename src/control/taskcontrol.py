@@ -335,7 +335,7 @@ class TaskController(BaseTaskController):
 
         getter = lambda x:    getattr(self, '_BaseTaskController__'+x)
         setter = lambda x, y: setattr(self, '_BaseTaskController__'+x, y)
-        cnf    = ctrl.getGlobal('config').tasks
+        cnf    = ctrl.globals.config.tasks
         if getter('procs') is None:
             proc = _import(cnf.processors.get())
             setter('procs', register(proc))
@@ -346,13 +346,13 @@ class TaskController(BaseTaskController):
         if getter('savers') is None:
             setter('savers', [_import(itm)(ctrl) for itm in cnf.io.save.get()])
 
-        self.__order         = ctrl.getGlobal("config").tasks.order
+        self.__order         = ctrl.globals.config.tasks.order
         self.__order.default = list(TASK_ORDER)
 
         def _clear(itm):
-            if ctrl.getGlobal('config').tasks.clear.get(default = True):
+            if ctrl.globals.config.tasks.clear.get(default = True):
                 ctrl.clearData(itm.old)
-        ctrl.getGlobal('project').track.observe(_clear)
+        ctrl.globals.project.track.observe(_clear)
 
         self.__readconfig = ctrl.readconfig
 

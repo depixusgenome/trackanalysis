@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"controls keypress actions"
-from typing                 import Callable, Optional # pylint: disable=unused-import
+from typing                 import Callable, Optional, Dict
 from bokeh.core.properties  import String, Int, List
 from bokeh.model            import Model
 from control.action         import Action
+from control.event          import Controller
 
 class DpxKeyEvent(Model):
     u"controls keypress actions"
@@ -15,8 +16,8 @@ class DpxKeyEvent(Model):
 
     def __init__(self, **kwargs):
         super().__init__()
-        self._keys = kwargs.pop('keys', dict()) # type: Dict[str,Callable]
-        self._ctrl = kwargs.pop('ctrl', None)   # type: Optional[Controller]
+        self._keys: Dict[str,Callable]    = kwargs.pop('keys', dict())
+        self._ctrl: Optional[Controller]  = kwargs.pop('ctrl', None)
 
     def close(self):
         u"Removes the controller"
@@ -25,12 +26,12 @@ class DpxKeyEvent(Model):
         self._ctrl = None
 
     def _setkeys(self):
-        items     = self._ctrl.getGlobal('config')
+        items     = self._ctrl.globals.config
         self.keys = [items[name].get() for name in self._keys]
 
     def onKeyPress(self):
         u"Method to be connected to the gui"
-        items = self._ctrl.getGlobal('config')
+        items = self._ctrl.globals.config
         for name, fcn in self._keys.items():
             if self.value == items[name].get():
                 with Action(self, calls = name):
@@ -51,7 +52,7 @@ class DpxKeyEvent(Model):
         else:
             kwargs.update(args)
 
-        if not all(isinstance(i, Callable) for i in kwargs.values()) :
+        if not all(callable(i) for i in kwargs.values()) :
             raise TypeError("keypress values should be callable: "+str(kwargs))
         self._keys.update(kwargs)
         self._setkeys()

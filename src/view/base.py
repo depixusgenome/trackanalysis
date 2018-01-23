@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "basic view module"
 from typing               import Callable, Set, TYPE_CHECKING # pylint: disable=unused-import
-from abc                  import ABC, abstractmethod
+from abc                  import ABC
 from concurrent.futures   import ThreadPoolExecutor
 
 from bokeh.document       import Document
@@ -20,22 +20,6 @@ if TYPE_CHECKING:
 
 SINGLE_THREAD = False
 
-class MainControllerProtocol(ABC):
-    """
-    Defines the methods available to all views
-    """
-    @abstractmethod
-    def observe(self, *args, **kwa):
-        "observes events"
-
-    @abstractmethod
-    def emit(self, *args, **kwa):
-        "emits events"
-
-    @abstractmethod
-    def getGlobal(self, name):
-        "gets gobal variables"
-
 class View(ABC):
     "Classes to be passed a controller"
     action      = ActionDescriptor(Action)
@@ -43,7 +27,7 @@ class View(ABC):
     ISAPP  = False
     def __init__(self, **kwargs):
         "initializes the gui"
-        self._ctrl: MainControllerProtocol  = kwargs['ctrl']
+        self._ctrl = kwargs['ctrl']
 
     def observe(self):
         "whatever needs to be initialized"
@@ -84,7 +68,7 @@ def enableOnTrack(ctrl, *aitms):
                     ite.frozen   = val
                 else:
                     ite.disabled = val
-    getattr(ctrl, '_ctrl', ctrl).getGlobal("project").observe(_onproject)
+    getattr(ctrl, '_ctrl', ctrl).globals.project.observe(_onproject)
 
 POOL = ThreadPoolExecutor(1)
 async def threadmethod(fcn, *args, pool = None, **kwa):
@@ -108,7 +92,7 @@ def defaultsizingmode(self, kwa:dict = None, **kwargs) -> dict:
 
     css = getattr(self, 'css', None)
     if css is None:
-        css = getattr(self, '_ctrl').getGlobal("css")
+        css = getattr(self, '_ctrl').globals.css
     kwa['sizing_mode'] = css.sizing_mode.get()
     return kwa
 
@@ -118,7 +102,7 @@ class BokehView(View):
     def __init__(self, **kwargs):
         "initializes the gui"
         super().__init__(**kwargs)
-        css = self._ctrl.getGlobal('css')
+        css = self._ctrl.globals.css
         if id(self._ctrl) not in BokehView.__CTRL:
             BokehView.__CTRL.add(id(self._ctrl))
             css.button.defaults = {'width': 90, 'height': 20}
@@ -165,9 +149,9 @@ class BokehView(View):
 
     def addtodoc(self, doc):
         "Adds one's self to doc"
-        theme = self._ctrl.getGlobal('css').theme.get(default = None)
+        theme = self._ctrl.globals.css.theme.get(default = None)
         if isinstance(theme, str):
-            theme = self._ctrl.getGlobal('css').theme[theme].get(default = None)
+            theme = self._ctrl.globals.css.theme[theme].get(default = None)
         if theme is not None:
             doc.theme = Theme(json = theme)
 
@@ -193,8 +177,8 @@ class BokehView(View):
     def button(self, fcn:Callable, title:str, prefix = 'keypress', **kwa):
         "creates and connects a button"
         kwa.setdefault('label',  title.capitalize())
-        kwa.setdefault('width',  self._ctrl.getGlobal('css').button.width)
-        kwa.setdefault('height', self._ctrl.getGlobal('css').button.height)
+        kwa.setdefault('width',  self._ctrl.globals.css.button.width)
+        kwa.setdefault('height', self._ctrl.globals.css.button.height)
 
         btn = Button(**kwa)
         btn.on_click(fcn)
