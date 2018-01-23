@@ -40,7 +40,8 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         self.css.tooltip.default       = '<table>@ttips{safe}</table>'
         self.css.tooltip.type.defaults = {'extent'     : 'Δz',
                                           'hfsigma'    : 'σ[HF]',
-                                          'population' : '% good'}
+                                          'population' : '% good',
+                                          'saturation' : 'non-closing'}
         self.css.tooltip.row.default   = ('<tr>'
                                           +'<td>{cycle}</td><td>cycle{plural} with:</td>'
                                           +'<td>{type}</td><td>{message}</td>'
