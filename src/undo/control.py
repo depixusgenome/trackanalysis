@@ -29,12 +29,12 @@ class UndoController(Controller):
                 fcn()
 
     @Controller.emit
-    def clearUndos(self) -> None:
+    def clearundos(self) -> None:
         'Removes the controller'
         self.__model.clear()
 
     @Controller.emit
-    def appendUndos(self, lst) -> dict:
+    def appendundos(self, lst) -> dict:
         'Adds to the undos'
         if len(lst):
             self.__model.append(self.__isundoing, lst)
