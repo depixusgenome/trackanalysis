@@ -152,8 +152,8 @@ class HFSigmaRule(DataCleaningRule):
     """
     Remove cycles with too low or too high a variability
     """
-    minhfsigma                   = 1e-4
-    maxhfsigma                   = 3e-3
+    minhfsigma = 1e-4
+    maxhfsigma = 1e-2
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__()
