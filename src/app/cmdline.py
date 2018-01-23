@@ -164,14 +164,14 @@ def _files(directory, files, bead):
 
     if len(directory):
         def _opentracks(ctrl):
-            ctrl.openTrack(dict(zip(('tracks', 'grs', 'match'),
-                                    (i if i else None for i in directory))))
+            ctrl.tasks.opentrack(dict(zip(('tracks', 'grs', 'match'),
+                                          (i if i else None for i in directory))))
         INITIAL_ORDERS.append(_opentracks)
 
     if len(files):
         def _open(ctrl):
             ctrl.globals.css.last.path.open.set(files[0])
-            ctrl.openTrack(files)
+            ctrl.tasks.opentrack(files)
         INITIAL_ORDERS.append(_open)
 
     if len(files) or len(directory) and  bead is not None:
@@ -193,9 +193,9 @@ def _launch(view, app, desktop, kwa):
     if '.' in app and 'A' <= app[app.rfind('.')+1] <= 'Z':
         mod  = app[:app.rfind('.')]
         attr = app[app.rfind('.')+1:]
-        launchmod = getattr(__import__(mod, fromlist = (attr,)), attr)
+        launchmod = getattr(__import__(mod, fromlist = [attr]), attr)
     else:
-        launchmod = __import__(app, fromlist = (('serve', 'launch')[desktop],))
+        launchmod = __import__(app, fromlist = [('serve', 'launch')[desktop]])
 
     launch = getattr(launchmod, ('serve', 'launch')[desktop])
     return launch(viewcls, **kwa)

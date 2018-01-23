@@ -58,7 +58,7 @@ class TrackFileDialog(FileDialog):
             def _fcn():
                 with Action(self.__ctrl):
                     self.__store(paths, True) # pylint: disable=not-callable
-                    self.__ctrl.openTrack(paths)
+                    self.__ctrl.tasks.opentrack(paths)
             self.__doc.add_next_tick_callback(_fcn)
 
 class SaveFileDialog(FileDialog):
@@ -113,7 +113,7 @@ class SaveFileDialog(FileDialog):
             def _fcn():
                 with Action(self.__ctrl):
                     self.__store(paths, False) # pylint: disable=not-callable
-                    self.__ctrl.saveTrack(paths)
+                    self.__ctrl.tasks.savetrack(paths)
             self.__doc.add_next_tick_callback(_fcn)
 
 class DpxToolbar(Widget):
@@ -359,7 +359,7 @@ class FileListMixin:
     @property
     def files(self) -> Iterator[Tuple[str, 'RootTask']]:
         "returns current roots"
-        lst  = [next(i) for i in self._ctrl.tasks(...)]
+        lst  = [next(i) for i in self._ctrl.tasks.tasklist(...)]
         return ((self.__pathname(i), i) for i in lst)
 
 class FileListInput(BeadView, FileListMixin):

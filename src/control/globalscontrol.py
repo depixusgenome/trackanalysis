@@ -161,39 +161,44 @@ class BaseGlobalsController(Controller):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.__model                                 = Globals()
-        self.__maps: Dict[str, SingleMapController]  = dict()
+        self._model                                 = Globals()
+        self._maps: Dict[str, SingleMapController]  = dict()
+
+    @property
+    def globals(self):
+        "return self"
+        return self
 
     def addGlobalMap(self, key, *args, **kwargs):
         "adds a map"
-        val  = getattr(self.__model.addGlobalMap(key, *args, **kwargs), '_map')
-        self.__maps[key] = SingleMapController(val, handlers = self._handlers)
-        return SingleMapAccessController(self.__maps[key], '')
+        val  = getattr(self._model.addGlobalMap(key, *args, **kwargs), '_map')
+        self._maps[key] = SingleMapController(val, handlers = self._handlers)
+        return SingleMapAccessController(self._maps[key], '')
 
     def removeGlobalMap(self, key):
         "removes a map"
-        self.__maps.pop(key)
-        self.__model.removeGlobalMap(key)
+        self._maps.pop(key)
+        self._model.removeGlobalMap(key)
 
     def setGlobalDefaults(self, key, **kwargs):
         "sets default values to the map"
-        self.__maps[key].setdefaults(**kwargs)
+        self._maps[key].setdefaults(**kwargs)
 
     def updateGlobal(self, key, *args, **kwargs) -> dict:
         "updates view information"
-        return self.__maps[key].update(*args, **kwargs)
+        return self._maps[key].update(*args, **kwargs)
 
     def deleteGlobal(self, key, *args):
         "removes view information"
-        return self.__maps[key].pop(*args)
+        return self._maps[key].pop(*args)
 
     def getGlobal(self, key, *args, default = delete):
         "returns values associated to the keys"
         if key is Ellipsis:
             return self
         if len(args) == 0 or len(args) == 1 and args[0] == '':
-            return SingleMapAccessController(self.__maps[key], '')
-        return self.__maps[key].get(*args, default = default)
+            return SingleMapAccessController(self._maps[key], '')
+        return self._maps[key].get(*args, default = default)
 
     def writeconfig(self, configpath: Callable,
                     patchname = 'config',
@@ -207,24 +212,24 @@ class BaseGlobalsController(Controller):
         written again. Notwithstanding version patches, this is a no-change operation.
         """
         if patchname is dict:
-            return self.__model.writeconfig(configpath, dict, index, **kwa)
+            return self._model.writeconfig(configpath, dict, index, **kwa)
 
-        self.__model.writeconfig(configpath, anastore, patchname,
-                                 index, overwrite, **kwa)
+        self._model.writeconfig(configpath, anastore, patchname,
+                                index, overwrite, **kwa)
 
     def readconfig(self, configpath, patchname = 'config'):
         "Sets-up the user preferences"
         if patchname is dict:
-            cnf = self.__model.readconfig(configpath, patchname)
+            cnf = self._model.readconfig(configpath, patchname)
         else:
-            cnf = self.__model.readconfig(configpath, anastore, patchname)
+            cnf = self._model.readconfig(configpath, anastore, patchname)
 
         if cnf is None or len(cnf) == 0:
             return
 
         with Action(self):
             for root, values in cnf.items():
-                self.__maps[root].update(values)
+                self._maps[root].update(values)
 
 class GlobalsController(BaseGlobalsController):
     """
@@ -236,7 +241,7 @@ class GlobalsController(BaseGlobalsController):
             self.addGlobalMap(name+suff)
 
         self.project.message.default = ''
-        self.plot.delayed.default = False
+        self.plotproject.delayed.default = False
         self.css.defaults = {'indent': 4, 'ensure_ascii': False, 'sort_keys': True}
 
         cnf = self.config
@@ -266,11 +271,11 @@ class GlobalsController(BaseGlobalsController):
         written again. Notwithstanding version patches, this is a no-change operation.
         """
         if patchname is dict:
-            return self.__model.writeconfig(configpath, dict, index, **kwa)
+            return self._model.writeconfig(configpath, dict, index, **kwa)
 
         css = self.css.config.getdict(..., fullnames = False)
-        self.__model.writeconfig(configpath, anastore, patchname,
-                                 index, overwrite, **kwa, **css)
+        self._model.writeconfig(configpath, anastore, patchname,
+                                index, overwrite, **kwa, **css)
 
     @property
     def css(self) -> SingleMapAccessController:
@@ -288,9 +293,14 @@ class GlobalsController(BaseGlobalsController):
         return self.getGlobal("project")
 
     @property
-    def plot(self) -> SingleMapAccessController:
+    def plotproject(self) -> SingleMapAccessController:
         "retur the global plot project config"
         return self.getGlobal("project.plot")
+
+    @property
+    def plotcss(self) -> SingleMapAccessController:
+        "retur the global plot project config"
+        return self.getGlobal("css.plot")
 
     def __undos__(self):
         "yields all undoable user actions"
@@ -298,6 +308,6 @@ class GlobalsController(BaseGlobalsController):
             vals = {i: j.old for i, j in items.items()}
             if len(vals):
                 return partial(self.updateGlobal, items.name, **vals)
-        maps = self._BaseGlobalsController__maps # pylint: disable=protected-access,no-member
+        maps = self._maps
         yield tuple('globals.' + i for i in maps
                     if not i.startswith('project')) + (_onglobals,)

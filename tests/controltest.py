@@ -165,7 +165,7 @@ def test_task_mutations():
 
 
     read = tasks.TrackReaderTask(path = utpath("small_legacy"))
-    ctrl.openTrack(read)
+    ctrl.opentrack(read)
     assert len(events['opentrack']) == 1
     assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,),)
 
@@ -173,15 +173,15 @@ def test_task_mutations():
     dum1  = _DummyTask1()
     dum2  = _DummyTask2()
 
-    ctrl.addTask(read, dum0)
+    ctrl.addtask(read, dum0)
     assert len(events['addtask']) == 1
     assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,dum0),)
 
-    ctrl.addTask(read, dum1)
+    ctrl.addtask(read, dum1)
     assert len(events['addtask']) == 2
     assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,dum0,dum1),)
 
-    ctrl.addTask(read, dum2)
+    ctrl.addtask(read, dum2)
     assert len(events['addtask']) == 3
     assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,dum0,dum1,dum2),)
 
@@ -212,7 +212,7 @@ def test_task_mutations():
     assert ctrl.cache(read, dum1)() is None
     assert ctrl.cache(read, dum2)() == [2]
 
-    ctrl.updateTask(read, dum1, toto = 2)
+    ctrl.updatetask(read, dum1, toto = 2)
     assert len(events['updatetask']) == 1
     assert dum1.toto                 == 2
     assert ctrl.cache(read, dum0)()  == [0]
@@ -222,12 +222,12 @@ def test_task_mutations():
     tuple(ctrl.run(read, dum2))
     assert ctrl.cache(read, dum2)() == [2]
 
-    ctrl.removeTask(read, dum1)
+    ctrl.removetask(read, dum1)
     assert len(events['removetask'])                  == 1
     assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,dum0,dum2),)
     assert ctrl.cache(read, dum2)()                   is None
 
-    ctrl.closeTrack(read)
+    ctrl.closetrack(read)
     assert len(events['closetrack'])                  == 1
     assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == tuple()
 
@@ -300,7 +300,7 @@ def test_task_cache():
     ctrl = TaskController()
     read = tasks.TrackReaderTask(path = utpath("small_legacy"))
     tb   = TBeads()
-    ctrl.openTrack(read, (read, tb))
+    ctrl.opentrack(read, (read, tb))
 
     assert ctrl.cache(read, tb)() is None
     ctrl.run(read, tb)
@@ -319,7 +319,7 @@ def test_task_cache():
     tuple(ctrl.run(read, tb))
     assert len(calls) == sz
 
-    ctrl.updateTask(read, tb, dummy = 1)
+    ctrl.updatetask(read, tb, dummy = 1)
     assert ctrl.cache(read, tb)() is None
     v1 = next(iter(next(ctrl.run(read, tb))))[1]
     v2 = next(iter(ctrl.run(read, read)[0]))[1]
@@ -354,7 +354,7 @@ def test_task_expandandcollapse():
     read = tasks.TrackReaderTask(path = utpath("small_pickle"))
     tb   = TBeads()
     tc   = TCycle()
-    ctrl.openTrack(read, (read, tc, tb))
+    ctrl.opentrack(read, (read, tc, tb))
 
     frames = tuple(ctrl.run(read,read))
     assert frozenset(type(fra) for fra in frames) == frozenset((Beads,))

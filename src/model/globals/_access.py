@@ -165,15 +165,18 @@ class BaseGlobalsAccess:
         self._name = name
         self._key  = key
 
+    def _global(self, name):
+        return getattr(self._ctrl, 'globals').getGlobal(name)
+
     def __getattr__(self, key):
         if key[0] == '_':
             return super().__getattribute__(key)
         if key == 'root':
-            return self._ctrl.getGlobal(self._name)
+            return self._global(self._name)
         if key == 'plot':
-            return self._ctrl.getGlobal(self._name+'.plot')
+            return self._global(self._name+'.plot')
 
-        ctrl = self._ctrl.getGlobal(self._name+self._key)
+        ctrl = self._global(self._name+self._key)
         return getattr(ctrl, key)
 
     __getitem__ = __getattr__
@@ -181,7 +184,7 @@ class BaseGlobalsAccess:
     def __setattr__(self, key, val):
         if key[0] == '_':
             return super().__setattr__(key, val)
-        ctrl = self._ctrl.getGlobal(self._name+self._key)
+        ctrl = self._global(self._name+self._key)
         return setattr(ctrl, key, val)
 
     __setitem__ = __setattr__

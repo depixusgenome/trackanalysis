@@ -18,16 +18,16 @@ class BeadController:
     def allbeads(self) -> Iterator[int]:
         "returns all beads"
         root = self.roottask
-        return iter(()) if root is None else self._ctrl.track(root).beadsonly.keys()
+        return iter(()) if root is None else self._ctrl.tasks.track(root).beadsonly.keys()
 
     @property
     def availablebeads(self) -> Iterable[int]:
         "returns available beads"
-        if self._ctrl.track(self.roottask) is None:
+        if self._ctrl.tasks.track(self.roottask) is None:
             return iter(tuple())
 
         selected = None
-        procs    = self._ctrl.processors(self.roottask)
+        procs    = self._ctrl.tasks.processors(self.roottask)
         if procs is None:
             return iter(tuple())
 
@@ -91,7 +91,7 @@ class DataSelectionBeadController(BeadController):
     @property
     def task(self) -> Optional[DataSelectionTask]:
         "returns the current DataSelectionTask"
-        return self._ctrl.task(self.roottask, DataSelectionTask)
+        return self._ctrl.tasks.task(self.roottask, DataSelectionTask)
 
     @property
     def discarded(self) -> Iterable[int]:
@@ -112,9 +112,9 @@ class DataSelectionBeadController(BeadController):
 
         if tsk is None:
             tsk = DataSelectionTask(discarded = list(vals))
-            self._ctrl.addTask(root, tsk, index = 'auto')
+            self._ctrl.tasks.addtask(root, tsk, index = 'auto')
 
         elif len(vals) == 0:
-            self._ctrl.removeTask(root, tsk)
+            self._ctrl.tasks.removetask(root, tsk)
         else:
-            self._ctrl.updateTask(root, tsk, discarded = list(vals))
+            self._ctrl.tasks.updatetask(root, tsk, discarded = list(vals))

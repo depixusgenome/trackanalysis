@@ -14,8 +14,8 @@ class UndoView(View):
 
         if 'keys' in kwa:
             kwa['keys'].addKeyPress('keypress',
-                                    undo = self._ctrl.undo,
-                                    redo = self._ctrl.redo)
+                                    undo = self._ctrl.undos.undo,
+                                    redo = self._ctrl.undos.redo)
 
         self._ctrl.observe('applicationstarted', self.__observe)
 
@@ -31,7 +31,7 @@ class UndoView(View):
                 if val is None:
                     return
 
-                self.__curr[0].appendundos(val)
+                self.__curr[0].append(val)
             return _wrap
 
         undos = tuple(self._ctrl.__undos__())

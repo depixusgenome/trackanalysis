@@ -150,7 +150,7 @@ class TaskPlotModelAccess(PlotModelAccess):
             return None
 
         root = self.roottask
-        for task in tuple(self._ctrl.tasks.tasks(root))[::-1]:
+        for task in tuple(self._ctrl.tasks.tasklist(root))[::-1]:
             if not self.checktask(root, task):
                 continue
 
@@ -162,7 +162,7 @@ class TaskPlotModelAccess(PlotModelAccess):
         ctrl  = self.processors()
         if ctrl is None:
             return None
-        return next(iter(ctrl.run(copy = True)))
+        return next(iter(ctrl.tasks.run(copy = True)))
 
     def runcontext(self, *processors: Processor, copy = True) -> ReplaceProcessors:
         "returns a ReplaceProcessors context from which a trackview can be obtains"
@@ -269,7 +269,7 @@ class TaskAccess(TaskPlotModelAccess):
     @property
     def _task(self) -> Optional[Task]:
         "returns the task if it exists"
-        return next((t for t in self._ctrl.tasks.tasks(self.roottask) if self._check(t)), None)
+        return next((t for t in self._ctrl.tasks.tasklist(self.roottask) if self._check(t)), None)
 
     @property
     def task(self) -> Optional[Task]:
@@ -283,7 +283,7 @@ class TaskAccess(TaskPlotModelAccess):
         task = self.task
         if task is None:
             return None
-        return next((t for t in self._ctrl.tasks.tasks(self.roottask) if self.check(t)), None)
+        return next((t for t in self._ctrl.tasks.tasklist(self.roottask) if self.check(t)), None)
 
     @property
     def cache(self) -> Callable[[],Any]:

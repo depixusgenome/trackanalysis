@@ -17,11 +17,11 @@ class GlobalsView(View):
 
         # pylint: disable=unused-variable
         def _onCloseTrack(model = None, **_):
-            tasks = ('track',)
+            tasks: tuple = ('track',)
             if cnf.track.value is model[0]:
                 tasks += ('task',)
 
-            inst = next(ctrl.tasks(...), None)
+            inst = next(ctrl.tasks.tasklist(...), None)
             if inst is not None:
                 inst = next(iter(inst), None)
 

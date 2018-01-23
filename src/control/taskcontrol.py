@@ -147,26 +147,31 @@ class BaseTaskController(Controller):
     "Data controller class"
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.__items: Dict[RootTask, ProcessorController] = dict()
-        self.__procs: Dict[Type[Task], Type[Processor]]   = dict()
-        self.__procs = (register(kwargs['processors'])
-                        if 'processors' in kwargs else None)
+        self._items: Dict[RootTask, ProcessorController] = dict()
+        self._procs: Dict[Type[Task], Type[Processor]]   = dict()
+        self._procs   = (register(kwargs['processors'])
+                         if 'processors' in kwargs else None)
 
-        self.__openers = kwargs.get("openers", None)
-        self.__savers  = kwargs.get("savers",  None)
+        self._openers = kwargs.get("openers", None)
+        self._savers  = kwargs.get("savers",  None)
+
+    @property
+    def tasks(self):
+        "return self"
+        return self
 
     @property
     def __processors(self):
-        if self.__procs is None:
-            self.__procs = register(Processor)
-        return self.__procs
+        if self._procs is None:
+            self._procs = register(Processor)
+        return self._procs
 
     def task(self,
              parent : Optional[RootTask],
              task   : Union[Type[Task], int],
              noemission = False) -> Task:
         "returns a task"
-        ctrl = ProcessorController() if parent is None else self.__items[parent]
+        ctrl = ProcessorController() if parent is None else self._items[parent]
         return ctrl.task(task, noemission = noemission)
 
     @overload
@@ -186,56 +191,56 @@ class BaseTaskController(Controller):
     def track(self, parent): # pylint: disable=function-redefined
         "returns the root cache, i;e. the track"
         if parent is Ellipsis:
-            return (i.data[0].cache() for i in self.__items.values())
+            return (i.data[0].cache() for i in self._items.values())
 
-        if parent not in self.__items:
+        if parent not in self._items:
             return None
-        track = self.__items[parent].data[0].cache()
+        track = self._items[parent].data[0].cache()
         if track is None:
-            self.__items[parent].run(parent) # create cache if needed
-            track = self.__items[parent].data[0].cache()
+            self._items[parent].run(parent) # create cache if needed
+            track = self._items[parent].data[0].cache()
         return track
 
-    def tasks(self, parent: Union[None, '_Ellipsis', RootTask]
-             ) -> Union[Iterator[Iterator[Task]], Iterator[Task]]:
+    def tasklist(self, parent: Union[None, '_Ellipsis', RootTask]
+                ) -> Union[Iterator[Iterator[Task]], Iterator[Task]]:
         "Returns tasks associated to one or each root"
         if parent is None:
             return iter(tuple())
         if parent is Ellipsis:
-            return iter(iter(tsk for tsk in itm.model) for itm in self.__items.values())
-        return iter(tsk for tsk in self.__items[cast(RootTask, parent)].model)
+            return iter(iter(tsk for tsk in itm.model) for itm in self._items.values())
+        return iter(tsk for tsk in self._items[cast(RootTask, parent)].model)
 
     def cache(self, parent:RootTask, tsk:Optional[Task]):
         "Returns the cache for a given task"
-        return self.__items[parent].data.getCache(tsk)
+        return self._items[parent].data.getCache(tsk)
 
     def run(self, parent:RootTask, tsk:Task, copy = False, pool = None):
         """
         Iterates through the list up to and including *tsk*.
         Iterates through all if *tsk* is None
         """
-        if parent not in self.__items:
+        if parent not in self._items:
             return None
-        return self.__items[parent].run(tsk, copy = copy, pool = pool)
+        return self._items[parent].run(tsk, copy = copy, pool = pool)
 
     def processors(self, parent:RootTask, tsk:Task = None) -> Optional[ProcessorController]:
         "Returns a processor for a given root and range"
-        ctrl = self.__items.get(parent, None)
+        ctrl = self._items.get(parent, None)
         return None if ctrl is None else ctrl.keepupto(tsk)
 
     @Controller.emit
-    def saveTrack(self, path: str) -> None:
+    def savetrack(self, path: str) -> None:
         "saves the current model"
-        items = [item.model for item in self.__items.values()]
+        items = [item.model for item in self._items.values()]
         ext   = path[path.rfind('.')+1:]
-        for obj in self.__savers:
+        for obj in self._savers:
             if ext in obj.EXT and obj.save(path, items):
                 break
         else:
             raise IOError("Could not save: %s" % str(Path(path).name), 'warning')
 
     @Controller.emit
-    def openTrack(self,
+    def opentrack(self,
                   task : Union[PATHTYPES, RootTask] = None,
                   model: Iterable[Task]             = tuple()) -> dict:
         "opens a new file"
@@ -247,10 +252,10 @@ class BaseTaskController(Controller):
             task = cast(RootTask, tasks[0])
 
         if not isinstance(task, RootTask):
-            lst = openmodels(self.__openers, task, tasks)
+            lst = openmodels(self._openers, task, tasks)
             for elem in lst[:-1]:
                 ctrl = create(elem, processors = self.__processors)
-                self.__items[cast(RootTask, elem[0])] = ctrl
+                self._items[cast(RootTask, elem[0])] = ctrl
             task, tasks  = lst[-1][0], lst[-1]
 
         elif len(tasks) == 0:
@@ -259,63 +264,63 @@ class BaseTaskController(Controller):
         elif tasks[0] is not task:
             raise ValueError("model[0] ≠ root")
 
-        ctrl = create(tasks, processors = self.__processors)
-        self.__items[cast(RootTask, task)] = ctrl
+        ctrl = create(*tasks, processors = self.__processors)
+        self._items[cast(RootTask, task)] = ctrl
         return dict(controller = self, model = tasks)
 
     @Controller.emit
-    def closeTrack(self, task:RootTask) -> dict:
+    def closetrack(self, task:RootTask) -> dict:
         "opens a new file"
-        old = tuple(self.__items[task].model)
-        del self.__items[task]
+        old = tuple(self._items[task].model)
+        del self._items[task]
         return dict(controller = self, task = task, model = old)
 
     @Controller.emit
-    def addTask(self, parent:RootTask, task:Task, index = _m_none) -> dict:
+    def addtask(self, parent:RootTask, task:Task, index = _m_none) -> dict:
         "opens a new file"
-        old = tuple(self.__items[parent].model)
-        self.__items[parent].add(task, self.__processors[type(task)], index = index)
+        old = tuple(self._items[parent].model)
+        self._items[parent].add(task, self.__processors[type(task)], index = index)
         return dict(controller = self, parent = parent, task = task, old = old)
 
     @Controller.emit
-    def updateTask(self, parent:RootTask, task:Union[Type[Task],int], **kwargs) -> dict:
+    def updatetask(self, parent:RootTask, task:Union[Type[Task],int], **kwargs) -> dict:
         "updates a task"
         tsk = self.task(parent, task, noemission = True)
         old = Controller.updateModel(tsk, **kwargs)
-        self.__items[parent].update(tsk)
+        self._items[parent].update(tsk)
         return dict(controller = self, parent = parent, task = tsk, old = old)
 
     @Controller.emit
-    def removeTask(self, parent:RootTask, task:Union[Type[Task],int]) -> dict:
+    def removetask(self, parent:RootTask, task:Union[Type[Task],int]) -> dict:
         "removes a task"
         tsk = self.task(parent, task, noemission = True)
-        old = tuple(self.__items[parent].model)
-        self.__items[parent].remove(tsk)
+        old = tuple(self._items[parent].model)
+        self._items[parent].remove(tsk)
         return dict(controller = self, parent = parent, task = tsk, old = old)
 
     @overload
-    def clearData(self, # pylint: disable=unused-argument,no-self-use
+    def cleardata(self, # pylint: disable=unused-argument,no-self-use
                   parent: '_Ellipsis',
                   task: Task = None) -> dict:
         "clears all cache"
 
     @overload
-    def clearData(self, # pylint: disable=unused-argument,no-self-use,function-redefined
+    def cleardata(self, # pylint: disable=unused-argument,no-self-use,function-redefined
                   parent: RootTask,
                   task:   Task = None) -> dict:
         "clears parent cache starting at *task*"
 
     @Controller.emit
-    def clearData(self, parent, task = None) -> dict: # pylint: disable=function-redefined
+    def cleardata(self, parent, task = None) -> dict: # pylint: disable=function-redefined
         "clears all data"
         if parent is Ellipsis:
-            self.__items.clear()
-        elif parent not in self.__items:
+            self._items.clear()
+        elif parent not in self._items:
             raise NoEmission('wrong key')
         elif task is None:
-            self.__items[cast(RootTask, parent)].clear()
+            self._items[cast(RootTask, parent)].clear()
         else:
-            self.__items[cast(RootTask, parent)].update(task)
+            self._items[cast(RootTask, parent)].update(task)
         return dict(controller = self, parent = parent, task = Task)
 
 class TaskController(BaseTaskController):
@@ -333,8 +338,8 @@ class TaskController(BaseTaskController):
             modname, clsname = name[:name.rfind('.')], name[name.rfind('.')+1:]
             return getattr(__import__(modname, fromlist = [clsname]), clsname)
 
-        getter = lambda x:    getattr(self, '_BaseTaskController__'+x)
-        setter = lambda x, y: setattr(self, '_BaseTaskController__'+x, y)
+        getter = lambda x:    getattr(self, '_'+x)
+        setter = lambda x, y: setattr(self, '_'+x, y)
         cnf    = ctrl.globals.config.tasks
         if getter('procs') is None:
             proc = _import(cnf.processors.get())
@@ -351,10 +356,10 @@ class TaskController(BaseTaskController):
 
         def _clear(itm):
             if ctrl.globals.config.tasks.clear.get(default = True):
-                ctrl.clearData(itm.old)
+                ctrl.tasks.cleardata(itm.old)
         ctrl.globals.project.track.observe(_clear)
 
-        self.__readconfig = ctrl.readconfig
+        self.__readconfig = ctrl.globals.readconfig
 
     def defaulttaskindex(self, parent:RootTask, task:Type[Task], side = 0) -> int:
         "returns the default task index"
@@ -363,47 +368,47 @@ class TaskController(BaseTaskController):
         order    = tuple(taskorder(self.__order.get()))
         previous = order[:order.index(task)+side]
 
-        curr     = tuple(cast(Iterator[Task], self.tasks(parent)))
+        curr     = tuple(cast(Iterator[Task], self.tasklist(parent)))
         for i, tsk in enumerate(curr[1:]):
             if not isinstance(tsk, previous):
                 return i+1
         return len(curr)
 
-    def openTrack(self,
+    def opentrack(self,
                   task : Union[str, RootTask, Dict[str,str]] = None,
                   model: Union[dict, Iterable[Task]]         = tuple()):
         if isinstance(model, dict):
             assert task is None
             if len(model.get('tasks', (()))[0]):
-                super().openTrack(model = model.pop("tasks")[0])
+                super().opentrack(model = model.pop("tasks")[0])
                 self.__readconfig(model)
         else:
-            super().openTrack(task, cast(Iterable[Task], model))
+            super().opentrack(task, cast(Iterable[Task], model))
 
-    def addTask(self, parent:RootTask, task:Task, # pylint: disable=arguments-differ
+    def addtask(self, parent:RootTask, task:Task, # pylint: disable=arguments-differ
                 index = _m_none, side = 0):
         "opens a new file"
         if index == 'auto':
             index = self.defaulttaskindex(parent, cast(Type[Task], task), side)
-        return super().addTask(parent, task, index)
+        return super().addtask(parent, task, index)
 
     @staticmethod
     def __undos__():
         "yields all undoable user actions"
         # pylint: disable=unused-variable
-        def _onOpenTrack (controller = None, model = None, **_2):
-            return partial(controller.closeTrack, model[0])
+        def _onopentrack (controller = None, model = None, **_2):
+            return partial(controller.closetrack, model[0])
 
-        def _onCloseTrack(controller = None, model = None, **_2):
-            return partial(controller.openTrack, model[0], model)
+        def _onclosetrack(controller = None, model = None, **_2):
+            return partial(controller.opentrack, model[0], model)
 
-        def _onAddTask   (controller = None, parent = None, task = None, **_2):
-            return partial(controller.removeTask, parent, task)
+        def _onaddtask   (controller = None, parent = None, task = None, **_2):
+            return partial(controller.removetask, parent, task)
 
-        def _onUpdateTask(controller = None, parent = None, task = None, old = None, **_):
-            return partial(controller.updateTask, parent, task, **old)
+        def _onupdatetask(controller = None, parent = None, task = None, old = None, **_):
+            return partial(controller.updatetask, parent, task, **old)
 
-        def _onRemoveTask(controller = None, parent = None, task = None, old = None, **_):
-            return partial(controller.addTask, parent, task, old.index(task))
+        def _onremovetask(controller = None, parent = None, task = None, old = None, **_):
+            return partial(controller.addtask, parent, task, old.index(task))
 
         yield from (fcn for name, fcn in locals().items() if name[:3] == '_on')

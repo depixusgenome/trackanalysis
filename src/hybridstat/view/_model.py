@@ -74,7 +74,7 @@ class FitToReferenceAccess(TaskAccess):
         cache = None if newid else self.cache()
         super().update(fitdata = self.__store.fitdata.get())
         if cache:
-            self._ctrl.processors(self.roottask).data.setCacheDefault(self.task, cache)
+            self._ctrl.tasks.processors(self.roottask).data.setCacheDefault(self.task, cache)
 
     @property
     def reference(self) -> Optional[RootTask]:
@@ -129,7 +129,7 @@ class FitToReferenceAccess(TaskAccess):
 
     def __computefitdata(self) -> Tuple[bool, bool]:
         args  = {} # type: Dict[str, Any]
-        ident = pickle.dumps(tuple(self._ctrl.tasks(self.reference)))
+        ident = pickle.dumps(tuple(self._ctrl.tasls.tasks(self.reference)))
         if self.__store.id.get() == ident:
             if self.referencepeaks is not None:
                 return False, False

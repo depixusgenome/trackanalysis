@@ -31,6 +31,10 @@ class MainControl:
         "observe an event"
         return self.tasks.observe(*args, **kwa)
 
+    def handle(self, *args, **kwa):
+        "handle an event"
+        return self.tasks.handle(*args, **kwa)
+
     @classmethod
     def configpath(cls, version, stem = None) -> Path:
         "returns the path to the config file"

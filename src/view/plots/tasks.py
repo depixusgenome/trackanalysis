@@ -10,7 +10,7 @@ class TaskPlotCreator(PlotCreator[TModelType]):
     "Base plotter for tracks"
     def __init__(self, ctrl, *_) -> None:
         super().__init__(ctrl)
-        css = self._ctrl.globals.css.plot.title
+        css = self._ctrl.globals.plotcss.title
         if css.stretch.get(default = None) is None:
             self._ctrl.globals.project.bead.default = None
             css.defaults = {'stretch': u'Stretch (base/µm)', 'bias': u'Bias (µm)'}
