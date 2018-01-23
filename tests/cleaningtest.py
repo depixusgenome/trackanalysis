@@ -7,9 +7,10 @@ from   numpy.testing            import assert_equal, assert_allclose
 
 from testingcore                import path as utpath
 from testingcore.bokehtesting   import bokehaction  # pylint: disable=unused-import
-from cleaning.processor         import (DataCleaning, DataCleaningTask,
-                                        DataCleaningProcessor, LocalNaNPopulation,
-                                        DerivateIslands, DataCleaningException)
+from cleaning.processor         import (DataCleaningTask, DataCleaningException,
+                                        DataCleaningProcessor)
+from cleaning.datacleaning      import (DataCleaning, LocalNaNPopulation,
+                                        DerivateIslands)
 from cleaning.beadsubtraction   import (SubtractAverageSignal, SubtractMedianSignal,
                                         BeadSubtractionProcessor)
 import cleaning._core           as     cleaningcore # pylint:disable=no-name-in-module
