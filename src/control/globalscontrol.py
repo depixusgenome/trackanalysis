@@ -209,8 +209,9 @@ class BaseGlobalsController(Controller):
         if patchname is dict:
             return self.__model.writeconfig(configpath, dict, index, **kwa)
 
+        css = self.getGlobal('css').config.getdict(..., fullnames = False)
         self.__model.writeconfig(configpath, anastore, patchname,
-                                 index, overwrite, **kwa)
+                                 index, overwrite, **kwa, **css)
 
     def readconfig(self, configpath, patchname = 'config'):
         "Sets-up the user preferences"
@@ -235,11 +236,13 @@ class GlobalsController(BaseGlobalsController):
         for suff, name in product(('', '.plot'), ('project', 'css', 'config')):
             self.addGlobalMap(name+suff)
 
-        self.project.message.default = ''
-        self.plot.delayed.default = False
-        self.css.defaults = {'indent': 4, 'ensure_ascii': False, 'sort_keys': True}
+        self.getGlobal('project').message.default = ''
+        self.getGlobal('project.plot').delayed.default = False
 
-        cnf = self.config
+        css = self.getGlobal('css')
+        css.config.defaults = {'indent': 4, 'ensure_ascii': False, 'sort_keys': True}
+
+        cnf = self.getGlobal('config')
         cnf.catcherror.default = False
         cnf.phase.defaults     = PHASE.__dict__
         cnf.tasks.defaults     = {'processors':  'control.processor.Processor',
@@ -253,44 +256,6 @@ class GlobalsController(BaseGlobalsController):
     def access(self, key: Optional[str] = None) -> GlobalsAccess:
         "returns a GlobalsAccess to a given map"
         return GlobalsAccess(self, key)
-
-    def writeconfig(self, configpath: Callable,
-                    patchname = 'config',
-                    index     = 0,
-                    overwrite = True,
-                    ** kwa):
-        """
-        Writes up the user preferences.
-
-        If *overwrite* is *False*, the preferences are first read from file, then
-        written again. Notwithstanding version patches, this is a no-change operation.
-        """
-        if patchname is dict:
-            return self.__model.writeconfig(configpath, dict, index, **kwa)
-
-        css = self.css.config.getdict(..., fullnames = False)
-        self.__model.writeconfig(configpath, anastore, patchname,
-                                 index, overwrite, **kwa, **css)
-
-    @property
-    def css(self) -> SingleMapAccessController:
-        "return the global css"
-        return self.getGlobal("css")
-
-    @property
-    def config(self) -> SingleMapAccessController:
-        "return the global config"
-        return self.getGlobal("config")
-
-    @property
-    def project(self) -> SingleMapAccessController:
-        "return the global project config"
-        return self.getGlobal("project")
-
-    @property
-    def plot(self) -> SingleMapAccessController:
-        "retur the global plot project config"
-        return self.getGlobal("project.plot")
 
     def __undos__(self):
         "yields all undoable user actions"

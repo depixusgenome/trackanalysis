@@ -3,7 +3,7 @@
 "Different file dialogs."
 import sys
 from pathlib            import Path
-from typing             import List, Optional, Callable, Dict, Tuple
+from typing             import List, Optional, Callable, Dict # pylint: disable=unused-import
 from tkinter            import Tk as _Tk
 from tkinter.filedialog import (askopenfilename   as _tkopen,
                                 asksaveasfilename as _tksave)
@@ -31,13 +31,13 @@ class FileDialog:
     _KFT  = 'filetypes'
     _KEXT = 'defaultextension'
     def __init__(self, **kwa):
-        self.defaultextension: Optional[str]  = kwa.get('defaultextension',None)
-        self.filetypes       : Optional[str]  = kwa.get('filetypes',       None)
-        self.initialdir      : Optional[str]  = kwa.get('initialdir',      None)
-        self.initialfile     : Optional[str]  = kwa.get('initialfile',     None)
-        self.multiple        : Optional[bool] = kwa.get('multiple',        None)
-        self.title           : Optional[str]  = kwa.get('title',           None)
-        self.config          : Tuple[Callable, Callable] = None
+        self.defaultextension = kwa.get('defaultextension',None)  # type: Optional[str]
+        self.filetypes        = kwa.get('filetypes',       None)  # type: Optional[str]
+        self.initialdir       = kwa.get('initialdir',      None)  # type: Optional[str]
+        self.initialfile      = kwa.get('initialfile',     None)  # type: Optional[str]
+        self.multiple         = kwa.get('multiple',        None)  # type: Optional[bool]
+        self.title            = kwa.get('title',           None)  # type: Optional[str]
+        self.config           = None   # type: Tuple[Callable, Callable]
 
         ctrl = kwa.get('config', None)  # type: ignore
         if hasattr(ctrl, 'getGlobal'):
@@ -54,12 +54,12 @@ class FileDialog:
     @staticmethod
     def globals(ctrl):
         "returns access to globals"
-        return ctrl.globals.css.last.path
+        return ctrl.getGlobal('css').last.path
 
     @staticmethod
     def storedpaths(ctrl, name, exts) -> List[Path]:
         "returns a stored path"
-        cnf = ctrl.globals.css.last.path
+        cnf = ctrl.getGlobal('css').last.path
         fcn = lambda i: cnf[i].get(default = None)
 
         pot = [fcn(i.replace('.', '')) for _, i in exts]
@@ -104,7 +104,7 @@ class FileDialog:
         cnf    = cls.globals(ctrl)
         exists = cls.exists
         def _defaultpath(rets, bcheck: bool = True):
-            vals: Dict[str, str] = {}
+            vals  = {} # type: Dict[str, str]
             itr   = (rets,) if isinstance(rets, str) else rets
             first = None
             for ret in itr:

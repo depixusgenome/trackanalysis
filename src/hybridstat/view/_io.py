@@ -58,8 +58,8 @@ class ConfigXlsxIO(TaskIO):
     def __init__(self, ctrl):
         super().__init__(ctrl)
         self.__model = PeaksPlotModelAccess(ctrl)
-        self.__msg   = ctrl.globals.project.message
-        self.__css   = ctrl.globals.css.title.hybridstatreport
+        self.__msg   = ctrl.getGlobal('project').message
+        self.__css   = ctrl.getGlobal('css').title.hybridstatreport
 
     @staticmethod
     def setup(ctrl):

@@ -215,7 +215,7 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
 
     def __init__(self, ctrl, *_) -> None:
         "sets up this plotter's info"
-        css = ctrl.globals.css.plot
+        css = ctrl.getGlobal("css.plot")
         if css.ylabel.get(default = None) is None:
             css.defaults = {'ylabel'             : u'Z (μm)',
                             'yrightlabel'        : u'Base number',
@@ -440,7 +440,7 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
                         except Exception as exc: # pylint: disable=broad-except
                             args = getattr(exc, 'args', tuple())
                             if len(args) == 2 and args[1] == "warning":
-                                self._ctrl.globals.project.message.set(exc)
+                                self._ctrl.getGlobal('project').message.set(exc)
                             else:
                                 raise
                         finally:
@@ -590,7 +590,7 @@ class PlotView(Generic[PlotType], BokehView):
                     'y.low'   : meta+'ArrowDown',
                     'y.high'  : meta+'ArrowUp'}
 
-        plt = self._ctrl.globals.config.plot
+        plt = self._ctrl.getGlobal('config.plot')
         plt.tools              .default  ='xpan,box_zoom,reset,save'
         plt.boundary.overshoot .default  =.001
         plt.keypress.reset     .default  ='Shift- '
@@ -613,7 +613,7 @@ class PlotView(Generic[PlotType], BokehView):
         "Set-up things if this view is the main one"
         self._plotter.ismain(self._keys)
 
-        cnf = self._ctrl.globals.config.tasks
+        cnf = self._ctrl.getGlobal('config').tasks
         if tasks is not None:
             cnf.default = tasks
 

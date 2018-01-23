@@ -12,7 +12,7 @@ class BeadController:
     @property
     def project(self):
         "returns globals for the project"
-        return self._ctrl.globals.project
+        return self._ctrl.getGlobal("project")
 
     @property
     def allbeads(self) -> Iterator[int]:

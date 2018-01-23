@@ -151,8 +151,8 @@ def _debug(raiseerr, singlethread):
 
     if raiseerr:
         def _cnf(ctrl):
-            ctrl.globals.config.catcherror.default         = False
-            ctrl.globals.config.catcherror.toolbar.default = False
+            ctrl.getGlobal('config').catcherror.default         = False
+            ctrl.getGlobal('config').catcherror.toolbar.default = False
 
         from app.scripting import orders
         orders().default_config = _cnf
@@ -170,13 +170,13 @@ def _files(directory, files, bead):
 
     if len(files):
         def _open(ctrl):
-            ctrl.globals.css.last.path.open.set(files[0])
+            ctrl.getGlobal('css').last.path.open.set(files[0])
             ctrl.openTrack(files)
         INITIAL_ORDERS.append(_open)
 
     if len(files) or len(directory) and  bead is not None:
         def _setbead(ctrl):
-            ctrl.globals.project.bead.set(bead)
+            ctrl.getGlobal("project").bead.set(bead)
         INITIAL_ORDERS.append(_setbead)
 
 def _launch(view, app, desktop, kwa):

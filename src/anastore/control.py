@@ -41,9 +41,9 @@ class ConfigAnaIO(AnaIO):
     def __init__(self, ctrl, *_):
         super().__init__(ctrl, *_)
         self._ctrl         = ctrl
-        self._css          = ctrl.globals.css.anastore
+        self._css          = ctrl.getGlobal('css').anastore
         self._css.defaults = {'indent': 4, 'ensure_ascii': False, 'sort_keys': True}
-        self._curr         = ctrl.globals.project.track.get
+        self._curr         = ctrl.getGlobal('project').track.get
 
     def save(self, path:str, models):
         u"closes an ana file"

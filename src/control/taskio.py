@@ -62,7 +62,7 @@ class ConfigTrackIO(TrackIO):
     "Adds an alignment to the tracks per default"
     def __init__(self, ctrl, *_):
         super().__init__(ctrl, *_)
-        self._ctrl = ctrl.globals.config.tasks
+        self._ctrl = ctrl.getGlobal('config').tasks
 
     def open(self, path:OPEN_T, model:tuple):
         "opens a track file and adds a alignment"
@@ -83,7 +83,7 @@ class _GrFilesIOMixin:
     def __init__(self, ctrl):
         self._track = None
         fcn         = lambda itm: setattr(self, '_track', itm.value)
-        ctrl.globals.project.track.observe(fcn)
+        ctrl.getGlobal('project').track.observe(fcn)
 
     def _open(self, path:OPEN_T, _):
         "opens a track file and adds a alignment"
@@ -127,7 +127,7 @@ def currentmodelonly(cls):
     "Adapts a class such that only the current model is saved"
     def __init__(self, ctrl, *_):
         cls.__init__(self, ctrl, *_)
-        self.currentmodel = ctrl.globals.project.track.get
+        self.currentmodel = ctrl.getGlobal('project').track.get
 
     def save(self, path:str, models):
         u"saves a file"
