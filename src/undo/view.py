@@ -9,8 +9,9 @@ class UndoView(View):
     def __init__(self, **kwa): # pylint: disable=too-many-locals
         super().__init__(**kwa)
         self.__curr = [None]
-        self._ctrl.globals.config.keypress.defaults = {'undo'     : "Control-z",
-                                                       'redo'     : "Control-y"}
+        cnf = self._ctrl.getGlobal('config')
+        cnf.keypress.defaults = {'undo'     : "Control-z",
+                                 'redo'     : "Control-y"}
 
         if 'keys' in kwa:
             kwa['keys'].addKeyPress('keypress',
@@ -31,7 +32,7 @@ class UndoView(View):
                 if val is None:
                     return
 
-                self.__curr[0].appendundos(val)
+                self.__curr[0].append(val)
             return _wrap
 
         undos = tuple(self._ctrl.__undos__())
@@ -58,7 +59,7 @@ class UndoView(View):
         def _onstopaction(recursive = None, **_):
             assert recursive is not None
             if not recursive:
-                self._ctrl.undos.appendundos(self.__curr[0])
+                self._ctrl.appendUndos(self.__curr[0])
                 self.__curr[0] = None
 
         @self._ctrl.observe

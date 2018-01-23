@@ -30,18 +30,18 @@ class ScriptingView:
                                  multiple  = True,
                                  title     = "open a gr files")
 
-        self._ctrl.globals.config.scripting.defaults = dict(gui = False, save = False)
+        self._ctrl.getGlobal("config").scripting.defaults = dict(gui = False, save = False)
         getattr(Tasks, 'setconfig')(self._ctrl)
 
     def opentrack(self, tpe = 'track'):
         "opens a gui to obtain a track"
-        if self._ctrl.globals.config.scripting.gui.get():
+        if self._ctrl.getGlobal('config').scripting.gui.get():
             return (self.trkdlg if tpe == 'track' else self.grdlg).open()
         return AttributeError("Operation not allowed guiven current settings")
 
     def writeuserconfig(self):
         "writes the config to disk"
-        if self._ctrl.globals.config.scripting.save.get():
+        if self._ctrl.getGlobal('config').scripting.save.get():
             self._ctrl.writeuserconfig()
 
     def observe(self):
@@ -71,12 +71,12 @@ def save(cls, task: Task):
 @addto(Tasks, staticmethod)
 def getconfig():
     "returns the config accessor"
-    return scriptapp.control.globals.config.tasks
+    return scriptapp.control.getGlobal('config').tasks
 
 @addto(Tasks, classmethod)
 def setconfig(cls, cnf):
     "add default values to the config"
-    cnf          = cnf.globals.config.tasks
+    cnf          = cnf.getGlobal('config').tasks
     cnf.defaults = cls.defaults()
     cnf.fittohairpin.range.defaults = dict(stretch = (900., 1400.),
                                            bias    = (-.25, .25))
@@ -171,7 +171,7 @@ def __init__(self, *path: Union[str, Path], __old__ = Track.__init__, **kwa):
         else:
             path = cast(tuple, kwa.pop('path'))
 
-    cnf = scriptapp.control.globals.css.last.path.trk
+    cnf = scriptapp.control.getGlobal('css').last.path.trk
     if path is not None and any(i in (Ellipsis, 'prev', '') for i in path):
         path = cnf.get()
 

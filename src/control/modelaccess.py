@@ -123,7 +123,7 @@ class TaskPlotModelAccess(PlotModelAccess):
     @property
     def track(self) -> Optional[Track]:
         "returns the current track"
-        return self._ctrl.tasks.track(self.roottask)
+        return self._ctrl.track(self.roottask)
 
     def impacts(self, root:RootTask, task:Task) -> bool:
         "returns whether changing this tasks affects the model output"
@@ -150,11 +150,11 @@ class TaskPlotModelAccess(PlotModelAccess):
             return None
 
         root = self.roottask
-        for task in tuple(self._ctrl.tasks.tasks(root))[::-1]:
+        for task in tuple(self._ctrl.tasks(root))[::-1]:
             if not self.checktask(root, task):
                 continue
 
-            return self._ctrl.tasks.processors(root, task)
+            return self._ctrl.processors(root, task)
         return None
 
     def runbead(self) -> Optional[TrackView]:
@@ -239,9 +239,9 @@ class TaskAccess(TaskPlotModelAccess):
         task = self.task
         if task is not None:
             if self.permanent:
-                return self._ctrl.tasks.updatetask(self.roottask, task, disabled = True)
+                return self._ctrl.updateTask(self.roottask, task, disabled = True)
             else:
-                self._ctrl.tasks.removetask(self.roottask, task)
+                self._ctrl.removeTask(self.roottask, task)
 
             kwa = self._configattributes({'disabled': True})
             if len(kwa):
@@ -257,9 +257,9 @@ class TaskAccess(TaskPlotModelAccess):
         kwa.setdefault('disabled', False)
         if task is None:
             item = updatedeepcopy(cnf.get(), **kwa)
-            self._ctrl.tasks.addtask(root, item, index = self.index)
+            self._ctrl.addTask(root, item, index = self.index)
         else:
-            self._ctrl.tasks.updatetask(root, task, **kwa)
+            self._ctrl.updateTask(root, task, **kwa)
 
         kwa = self._configattributes(kwa)
         if len(kwa):
@@ -269,7 +269,7 @@ class TaskAccess(TaskPlotModelAccess):
     @property
     def _task(self) -> Optional[Task]:
         "returns the task if it exists"
-        return next((t for t in self._ctrl.tasks.tasks(self.roottask) if self._check(t)), None)
+        return next((t for t in self._ctrl.tasks(self.roottask) if self._check(t)), None)
 
     @property
     def task(self) -> Optional[Task]:
@@ -283,7 +283,7 @@ class TaskAccess(TaskPlotModelAccess):
         task = self.task
         if task is None:
             return None
-        return next((t for t in self._ctrl.tasks.tasks(self.roottask) if self.check(t)), None)
+        return next((t for t in self._ctrl.tasks(self.roottask) if self.check(t)), None)
 
     @property
     def cache(self) -> Callable[[],Any]:
@@ -291,7 +291,7 @@ class TaskAccess(TaskPlotModelAccess):
         task = self.task
         if task is None:
             return lambda: None
-        return self._ctrl.tasks.cache(self.roottask, task)
+        return self._ctrl.cache(self.roottask, task)
 
     def _check(self, task, parent = NoArgs) -> bool:
         "wether this controller deals with this task"
@@ -306,7 +306,7 @@ class TaskAccess(TaskPlotModelAccess):
     @property
     def index(self) -> Optional[Task]:
         "returns the index the new task should have"
-        return self._ctrl.tasks.defaulttaskindex(self.roottask, self.tasktype, self.side)
+        return self._ctrl.defaulttaskindex(self.roottask, self.tasktype, self.side)
 
     def observe(self, *args, **kwa):
         "observes the provided task"
