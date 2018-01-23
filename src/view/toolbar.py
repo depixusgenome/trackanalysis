@@ -9,6 +9,7 @@ import bokeh.core.properties   as props
 
 from bokeh                import layouts
 from bokeh.models         import Widget
+from bokeh.io             import curdoc
 
 from utils.gui            import parseints
 from utils.logconfig      import getLogger
@@ -165,7 +166,7 @@ class MessagesInput(BokehView):
         @ctrl.observe
         def _onstartaction(recursive = None):      # pylint: disable=unused-variable
             if not recursive:
-                msg.set(busy)
+                _settext(busy)
 
         @ctrl.observe
         def _onstartcomputation(recursive = None): # pylint: disable=unused-variable
@@ -173,24 +174,27 @@ class MessagesInput(BokehView):
                 return
             val = msg.get()
             if val is None or (isinstance(val, tuple) and val[1] == 'normal'):
-                msg.set(busy)
+                _settext(busy)
 
         def _observer(recursive = None, value = None, catcherror = None, **_):
             if not recursive and value is not None:
+                LOGS.info('stop')
                 msg.set(value)
                 catcherror[0] = catch.get()
         ctrl.observe("stopaction", "stopcomputation", _observer)
 
         templ      = ctrl.getGlobal('css').message.getdict(..., fullnames = False)
         timeout    = ctrl.getGlobal('css').message.timeout.getdict(..., fullnames = False)
+        timeout    = {i: j*1e-3 for i, j in timeout.items()}
         last: list = [None, None, timeout['normal']]
         def _setmsg():
             if last[0] is None:
                 return
+
             if last[0] != '':
                 toolbar.message = last[0]
                 last[0] = ''
-                last[1] = time.time()+last[2]*1e-3
+                last[1] = time.time()+last[2]
 
             elif last[1] < time.time():
                 last[0]         = None
@@ -198,29 +202,37 @@ class MessagesInput(BokehView):
         doc.add_periodic_callback(_setmsg, ctrl.getGlobal('css').message.period.get())
 
         def _settext(text):
-            if text.value is None:
+            text = getattr(text, 'value', text)
+            if text is None:
                 return
-            elif isinstance(text.value, Exception):
-                args = getattr(text.value, 'args', tuple())
+            elif isinstance(text, Exception):
+                args = getattr(text, 'args', tuple())
                 if len(args) == 1:
-                    args = text.value.args[0], 'error'
+                    args = args[0], 'error'
                 elif len(args) != 2:
-                    args = text.value,         'error'
+                    args = text,    'error'
                 elif args[1] not in templ:
                     args = str(args), 'error'
             else:
-                args = text.value
+                args = text
 
-            last[0] = templ[str(args[1])].format(str(args[0])
-                                                 .replace('<', '&lt')
-                                                 .replace('>', '&gt'))
-            print('----> ',last[0])
-            last[1] = time.time()
-            last[2] = timeout.get(args[1], timeout['normal'])
+            val = templ[str(args[1])].format(str(args[0])
+                                             .replace('<', '&lt')
+                                             .replace('>', '&gt'))
             if args[1] == 'error':
                 LOGS.error(str(args[0]))
             elif args[1] == 'warning':
                 LOGS.warning(str(args[0]))
+
+            last[0] = val
+            last[1] = time.time()+timeout.get(args[1], timeout['normal'])
+            last[2] = timeout.get(args[1], timeout['normal'])
+            if curdoc() is doc:
+                try:
+                    toolbar.message = val
+                    return
+                except RuntimeError:
+                    pass
 
         ctrl.getGlobal('project').message.observe(_settext)
 
