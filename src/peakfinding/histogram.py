@@ -609,7 +609,7 @@ class ByEM: # pylint: disable=too-many-public-methods
                                for evt in cycle])
 
         maxpeaks   = int((max(data[:,0])-min(data[:,0]))//precision)
-        params     = self.fitdata(data,maxpeaks)[-1]
+        params     = self.fullsearch(data,maxpeaks)[-1] #self.fitdata(data,maxpeaks)[-1]
         asort      = np.argsort(params[:,0,0])
         peaks, ids = self.__strip(params[asort],events)
         return peaks * slope + bias , ids
@@ -800,7 +800,7 @@ class ByEM: # pylint: disable=too-many-public-methods
         sortedinfo = sorted(((*val,idx) for idx,val in rounded),key=lambda x:(x[0],-x[1]))
         return list(map(lambda x:next(x[1])[-1],itertools.groupby(sortedinfo,key=lambda x:x[0])))
 
-    def fullrecord(self,data:np.ndarray,maxpeaks:int,minpeaks:int = 1):
+    def fullrecord(self,data:np.ndarray,maxpeaks:int):
         '''
         for debugging pruposes
         '''
@@ -814,7 +814,7 @@ class ByEM: # pylint: disable=too-many-public-methods
         score,rates,params = self.emstep(data,rates,params)
 
         assign = np.array(list(map(len,self.assign(score).values())))
-        while any(assign<self.mincount) or len(rates)>minpeaks:
+        while any(assign<self.mincount) or len(rates)>self.minpeaks:
             asort              = rates.ravel().argsort()
             score,rates,params = self.fit(data,rates[asort][1:],params[asort][1:],prevll=None)
             #keep               = self.__rmduplicates(params,rates)
@@ -823,7 +823,30 @@ class ByEM: # pylint: disable=too-many-public-methods
             assign             = np.array(list(map(len,self.assign(score).values())))
         return results
 
-    def fitdata(self,data:np.ndarray,maxpeaks:int,minpeaks:int = 1):
+    def fullsearch(self,data,maxpeaks:int):
+        '''
+        returns the parameters corresponding to minimal bic,
+        not first local minimum
+        '''
+        rates,params       = self.initialize(data,maxpeaks)
+        score,rates,params = self.fit(data,rates,params,prevll=None)
+
+        assign = np.array(list(map(len,self.assign(score).values())))
+        bic    = None
+        while any(assign<self.mincount) or len(rates)>self.minpeaks:
+            minbic             = bic
+            result             = score,rates,params
+            asort              = rates.ravel().argsort()
+            score,rates,params = self.fit(data,rates[asort][1:],params[asort][1:],prevll=None)
+            assign             = np.array(list(map(len,self.assign(score).values())))
+            if not any(assign<self.mincount):
+                bic = self.bic(score,rates,params)
+                if bic < minbic:
+                    minbic=bic
+                    result=score,rates,params
+        return result
+
+    def fitdata(self,data:np.ndarray,maxpeaks:int):
         '''
         calls initialization with maximal number of peaks
         runs fits until convergence
@@ -837,13 +860,12 @@ class ByEM: # pylint: disable=too-many-public-methods
         assign = np.array(list(map(len,self.assign(score).values())))
         bic    = None
         counter = -1 # dbg
-        while any(assign<self.mincount) or len(rates)>minpeaks:
+        while any(assign<self.mincount) or len(rates)>self.minpeaks:
             counter+=1 # dbg
             print(f"counter={counter}")
             prevbic            = bic
             prev               = score,rates,params
             asort              = rates.ravel().argsort()
-            #pickle.dump((data,rates[asort][1:],params[asort][1:]),open(f"todebug{counter}.pk","wb"))
             score,rates,params = self.fit(data,rates[asort][1:],params[asort][1:],prevll=None)
             assign             = np.array(list(map(len,self.assign(score).values())))
             if not any(assign<self.mincount):
