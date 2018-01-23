@@ -153,9 +153,11 @@ class BeadDisplay(Display, display = Beads):
     if 3 or less beads are shown.
     * *tpe*: can be scatter or curve.
     * *overlay*: if *False*, all data is concatenated into one array.
-    * *area*: Areas are used instead of curves, 1 measure per cycle.
+    * *area*: Areas are used instead of curves, 1 measure per cycle. If astime
+    is true, the x axis is time.
     """
     _area    = False
+    _astime  = None
     _phases  = PHASE.relax, PHASE.pull
     KEYWORDS = Display.KEYWORDS | frozenset(locals())
     def _perbead(self, bead):
@@ -166,9 +168,19 @@ class BeadDisplay(Display, display = Beads):
                      .withaction(lambda _, i: (i[0], np.nanmedian(i[1]))))
             ylow  = np.array(list(cyc.withphases(self._phases[0]).values()), dtype = 'f4')
             yhigh = np.array(list(cyc.withphases(self._phases[1]).values()), dtype = 'f4')
-            xvals = np.arange(len(ylow), dtype = 'f4')
-            frame = pd.DataFrame(dict(frames = xvals, zlow = ylow, zhigh = yhigh))
-            return tuple(crv)[0].redim(z="zhigh") * hv.Area(frame, "frames", ["zhigh", "zlow"])
+            if self._astime:
+                xvals = self._items.track.phase.select(..., 0)/self._items.track.framerate
+                dur   = hv.Dimension("duration", unit = self._astime)
+                if self._astime == 'h':
+                    xvals /= 3600.
+                elif self._astime == 'd':
+                    xvals /= 86400.
+                frame = pd.DataFrame(dict(duration = xvals, zlow = ylow, z = yhigh))
+            else:
+                xvals = np.arange(len(ylow), dtype = 'f4')
+                frame = pd.DataFrame(dict(cycles = xvals, zlow = ylow, z = yhigh))
+                dur   = 'cycles'
+            return hv.Area(frame, dur, ["z", "zlow"])*tuple(crv)[0]
         return crv
 
     def _perall(self):
