@@ -12,7 +12,7 @@ class GlobalsView(View):
 
     def __ontask(self):
         ctrl         = self._ctrl
-        cnf          = self._ctrl.getGlobal('project')
+        cnf          = self._ctrl.globals.project
         cnf.defaults = dict.fromkeys(('track', 'task', 'bead'), None)
 
         # pylint: disable=unused-variable

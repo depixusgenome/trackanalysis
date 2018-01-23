@@ -26,9 +26,9 @@ class HybridStatView(BokehView):
                         CyclesPlotView      (**kwa),
                         PeaksPlotView       (**kwa)]
 
-        self._ctrl.getGlobal('css.plot').figure.defaults = dict(sizing_mode = 'fixed')
-        self._ctrl.getGlobal('css').hybridstat.defaults  = dict(width = 500, height = 30)
-        titles = self._ctrl.getGlobal('css').hybridstat.title
+        self._ctrl.globals.css.plot.figure.defaults = dict(sizing_mode = 'fixed')
+        self._ctrl.globals.css.hybridstat.defaults  = dict(width = 500, height = 30)
+        titles = self._ctrl.globals.css.hybridstat.title
         for panel in self._panels:
             key                         = self.__key(panel)
             titles[key].default         = getattr(panel, 'PANEL_NAME', key.capitalize())
@@ -55,7 +55,7 @@ class HybridStatView(BokehView):
         "Allows setting-up stuff only when the view is the main one"
         self.__select(CleaningView) .ismain()
         self.__select(PeaksPlotView).ismain()
-        self._ctrl.getGlobal('config').tasks.default = self.TASKS
+        self._ctrl.globals.config.tasks.default = self.TASKS
         def _advanced():
             for panel in self._panels:
                 if self.__state(panel).get() is PlotState.active:
@@ -65,7 +65,7 @@ class HybridStatView(BokehView):
 
     def getroots(self, doc):
         "returns object root"
-        titles = self._ctrl.getGlobal('css').hybridstat.title
+        titles = self._ctrl.globals.css.hybridstat.title
         mode   = self.defaultsizingmode()
         def _panel(view):
             ret = view.getroots(doc)
@@ -88,7 +88,7 @@ class HybridStatView(BokehView):
         for panel in self._panels[ind+1:]:
             self.__state(panel, PlotState.disabled)
 
-        mode.update(self._ctrl.getGlobal('css').hybridstat.getitems('width', 'height'))
+        mode.update(self._ctrl.globals.css.hybridstat.getitems('width', 'height'))
         tabs = Tabs(tabs   = [_panel(panel) for panel in self._panels],
                     active = ind,
                     name   = 'Hybridstat:Tabs',

@@ -39,7 +39,7 @@ class TrackFileDialog(FileDialog):
             assert bopen
 
             pot = self.storedpaths(ctrl, STORAGE[0], ext)
-            if ctrl.getGlobal('project').track.get(default = None) is None:
+            if ctrl.globals.project.track.get(default = None) is None:
                 pot = [i for i in pot if i.suffix != '.gr']
             return self.firstexistingpath(pot)
         self.config    = _defaultpath, None
@@ -49,7 +49,7 @@ class TrackFileDialog(FileDialog):
         self.__doc = doc
         assert doc is not None
         self.filetypes = '*|'+TaskIO.extensions(self.__ctrl, 'openers')
-        self.title     = self.__ctrl.getGlobal('css').title.open.dialog.get()
+        self.title     = self.__ctrl.globals.css.title.open.dialog.get()
 
     async def run(self):
         "runs the dialog"
@@ -104,7 +104,7 @@ class SaveFileDialog(FileDialog):
         "sets the document"
         self.__doc = doc
         self.filetypes = TaskIO.extensions(self.__ctrl, 'savers')
-        self.title     = self.__ctrl.getGlobal('css').title.save.dialog.get()
+        self.title     = self.__ctrl.globals.css.title.save.dialog.get()
 
     async def run(self):
         "runs the dialog"
@@ -142,8 +142,8 @@ class MessagesInput(BokehView):
     def __init__(self, **kwargs):
         "initializes globals"
         super().__init__(**kwargs)
-        self._ctrl.getGlobal('project').message.default = None
-        msg = self._ctrl.getGlobal('css').message
+        self._ctrl.globals.project.message.default = None
+        msg = self._ctrl.globals.css.message
         siz = 'heigth: 28px; margin-top: 0px;'
         msg.defaults = dict(normal  = '<p style="%s">{}</p>' % siz,
                             warning = '<p style="%s color:blue;">{}</p>' % siz,
@@ -159,9 +159,9 @@ class MessagesInput(BokehView):
         "sets-up the gui"
         ctrl  = self._ctrl
 
-        msg   = ctrl.getGlobal('project').message
-        busy  = ctrl.getGlobal('css').message.busy.get(), 'normal'
-        catch = ctrl.getGlobal('config').catcherror.toolbar
+        msg   = ctrl.globals.project.message
+        busy  = ctrl.globals.css.message.busy.get(), 'normal'
+        catch = ctrl.globals.config.catcherror.toolbar
 
         @ctrl.observe
         def _onstartaction(recursive = None):      # pylint: disable=unused-variable
@@ -183,9 +183,10 @@ class MessagesInput(BokehView):
                 catcherror[0] = catch.get()
         ctrl.observe("stopaction", "stopcomputation", _observer)
 
-        templ      = ctrl.getGlobal('css').message.getdict(..., fullnames = False)
-        timeout    = ctrl.getGlobal('css').message.timeout.getdict(..., fullnames = False)
+        templ      = ctrl.globals.css.message.getdict(..., fullnames = False)
+        timeout    = ctrl.globals.css.message.timeout.getdict(..., fullnames = False)
         timeout    = {i: j*1e-3 for i, j in timeout.items()}
+
         last: list = [None, None, timeout['normal']]
         def _setmsg():
             if last[0] is None:
@@ -199,7 +200,7 @@ class MessagesInput(BokehView):
             elif last[1] < time.time():
                 last[0]         = None
                 toolbar.message = ''
-        doc.add_periodic_callback(_setmsg, ctrl.getGlobal('css').message.period.get())
+        doc.add_periodic_callback(_setmsg, ctrl.globals.css.message.period.get())
 
         def _settext(text):
             text = getattr(text, 'value', text)
@@ -234,7 +235,7 @@ class MessagesInput(BokehView):
                 except RuntimeError:
                     pass
 
-        ctrl.getGlobal('project').message.observe(_settext)
+        ctrl.globals.project.message.observe(_settext)
 
 class BeadView(BokehView):
     "Widget for controlling the current beads"
@@ -251,7 +252,7 @@ class BeadInput(BeadView):
     def __init__(self, **kwa):
         "Sets up the controller"
         super().__init__(**kwa)
-        cnf = self._ctrl.getGlobal('config')
+        cnf = self._ctrl.globals.config
         cnf.keypress.defaults = {'beadup'   : 'PageUp',
                                  'beaddown' : 'PageDown'}
         self.__toolbar: DpxToolbar = None
@@ -279,7 +280,7 @@ class BeadInput(BeadView):
                 self.__toolbar.bead = bead
 
         toolbar.on_change('bead', _onchange_cb)
-        self._ctrl.getGlobal('project').observe('track', 'bead', _onproject)
+        self._ctrl.globals.project.observe('track', 'bead', _onproject)
         self._ctrl.observe("updatetask", "addtask", "removetask", lambda **_: _onproject())
 
         self._keys.addKeyPress(('keypress.beadup',
@@ -292,7 +293,7 @@ class RejectedBeadsInput(BeadView):
     def __init__(self, **kwa):
         super().__init__(**kwa)
         self.__toolbar: DpxToolbar = None
-        self._ctrl.getGlobal('config').keypress.defaults = {'delbead': 'Shift-Delete'}
+        self._ctrl.globals.config.keypress.defaults = {'delbead': 'Shift-Delete'}
 
     def setup(self, toolbar: DpxToolbar):
         "sets-up the gui"
@@ -329,7 +330,7 @@ class RejectedBeadsInput(BeadView):
         toolbar.on_change('discarded',              _ondiscarded_cb)
         toolbar.on_change('accepted',               _onaccepted_cb)
         self._ctrl.observe("updatetask", "addtask", "removetask", lambda **_: _onproject())
-        self._ctrl.getGlobal('project').track.observe(_onproject)
+        self._ctrl.globals.project.track.observe(_onproject)
         self.__toolbar = toolbar
 
 class FileListMixin:
@@ -337,7 +338,7 @@ class FileListMixin:
     def __init__(self):
         if TYPE_CHECKING:
             self._ctrl: Any = None
-        fnames = self._ctrl.getGlobal('css').filenames
+        fnames = self._ctrl.globals.css.filenames
         fnames.defaults = {'many': '{Path(files[0]).stem} + ...',
                            'single': '{Path(path).stem}'}
 
@@ -346,7 +347,7 @@ class FileListMixin:
             return task.key
 
         lst = task.path
-        cnf = self._ctrl.getGlobal('css').filenames
+        cnf = self._ctrl.globals.css.filenames
         if isinstance(lst, (tuple, list)):
             if len(lst) > 1:
                 # pylint: disable=eval-used
@@ -379,7 +380,7 @@ class FileListInput(BeadView, FileListMixin):
             if model[0] in mdls:
                 index = mdls.index(model[0])
             else:
-                cur   = self._ctrl.getGlobal('project').track.get()
+                cur   = self._ctrl.globals.project.track.get()
                 index = mdls.index(cur) if cur in mdls else 0
 
             self.__toolbar.update(currentfile = index, filelist = [i for i, _ in vals])
@@ -389,7 +390,7 @@ class FileListInput(BeadView, FileListMixin):
             if new == -1:
                 return
 
-            track = self._ctrl.getGlobal("project").track
+            track = self._ctrl.globals.project.track
             lst   = list(self.files)
             if new >= len(lst):
                 _setfilelist(model = [track.get()])
@@ -403,12 +404,12 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
     def __init__(self, **kwa):
         "Sets up the controller"
         super().__init__(**kwa)
-        css          = self._ctrl.getGlobal('css').title
+        css          = self._ctrl.globals.css.title
         css.defaults = {'open': u'Open', 'save': u'Save', 'quit': u'Quit',
                         'open.dialog': u'Open a track or analysis file',
                         'save.dialog': u'Save an analysis file'}
 
-        cnf = self._ctrl.getGlobal('config')
+        cnf = self._ctrl.globals.config
         cnf.catcherror.toolbar.default = True
         cnf.keypress.defaults = {'open':    "Control-o",
                                  'save':    "Control-s",
@@ -458,7 +459,7 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         def _onproject(items):
             if 'track' in items:
                 self.__toolbar.frozen = items['track'].value is items.empty
-        self._ctrl.getGlobal("project").observe(_onproject)
+        self._ctrl.globals.project.observe(_onproject)
         mods = self.defaultsizingmode(height = 30)
         return layouts.row([layouts.widgetbox(self.__toolbar, **mods)], **mods)
 
@@ -482,4 +483,4 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
                 title += ':' + Path(path).stem
             doc.title = title
 
-        self._ctrl.getGlobal("project").track.observe(_title)
+        self._ctrl.globals.project.track.observe(_title)
