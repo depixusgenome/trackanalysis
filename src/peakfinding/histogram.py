@@ -592,7 +592,7 @@ class ByEM: # pylint: disable=too-many-public-methods
     rates   : np.ndarray
     minpeaks = 1
     #zonly    = False
-    #initfromzc = True
+    covmap : Callable = np.vectorize(lambda x : float(x)) # pylint:disable=unnecessary-lambda
     kwa : Dict = {}
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -600,7 +600,6 @@ class ByEM: # pylint: disable=too-many-public-methods
 
     def __call__(self,**kwa):
         _, bias, slope = kwa.get("hist",(0,0,1))
-        # pickle.dump(kwa,open("kwa.pk","wb"))
         return self.find(kwa.get("events",None), bias, slope, kwa["precision"])
 
     def find(self, events, bias, slope, precision=None):
@@ -608,9 +607,6 @@ class ByEM: # pylint: disable=too-many-public-methods
         data       = np.array([[np.nanmean(evt),len(evt)]
                                for cycle in events
                                for evt in cycle])
-
-        # if self.zonly:
-        #     data[:,-1] = 1 # fails because of the covariance
 
         maxpeaks   = int((max(data[:,0])-min(data[:,0]))//precision)
         params     = self.fitdata(data,maxpeaks)[-1]
@@ -627,7 +623,6 @@ class ByEM: # pylint: disable=too-many-public-methods
 
         predict = partial(self.__predict,params)
         ids     = np.array(list(map(predict,pos)))
-        #ids[np.isin(ids,lowcount)]=np.iinfo("i4").max # unassigned events
         return params[:,0,0], ids
 
     def __predict(self, params:np.ndarray, data:np.ndarray):
@@ -687,7 +682,7 @@ class ByEM: # pylint: disable=too-many-public-methods
         return 0 if loc>pos else float(np.exp((loc-pos)/scale)/scale)
 
     @classmethod
-    def pdf(cls,*args): #args:np.ndarray)->float:
+    def pdf(cls,*args):
         '''
         args : np.array([[xloc,xscale,xpos],
                          [yloc,yscale,ypos],
@@ -717,8 +712,8 @@ class ByEM: # pylint: disable=too-many-public-methods
     def score(self,data:np.ndarray,params)->np.ndarray:
         'return the score[i,j] array corresponding to pdf(Xj|Zi, theta)'
         pdf = map(self.pdf,itertools.product(params,data))
-        # adding a small constant (i.e. uniform distribution) to avoid dividing by zero
-        # when renormalizing pz_x
+        # adding a small constant (i.e. uniform distribution)
+        # -> avoids singularities
         return np.array(list(pdf)).reshape(len(params),-1)+ 10*self.floaterr
 
     def emstep(self,data:np.ndarray,rates:np.ndarray,params:np.ndarray):
@@ -729,14 +724,13 @@ class ByEM: # pylint: disable=too-many-public-methods
         rates, params = self.maximization(pz_x,data)
         return self.score(data,params), rates, params
 
-    @staticmethod
-    def __maximizeparam(data,proba):
+    def __maximizeparam(self,data,proba):
         'maximizes a parameter'
         nmeans = np.array(np.matrix(proba)*data[:,:-1]).ravel()
         ncov   = np.cov(data[:,:-1].T,aweights = proba ,ddof=0)
         # temporal params on data[:,-1], tmean is 0
         tscale = np.sum(proba*data[:,-1])
-        return [(nmeans,ncov),(0.,tscale)]
+        return [(nmeans,self.covmap(ncov)),(0.,tscale)]
 
     # to pytest
     def maximization(self,pz_x:np.ndarray,data:np.ndarray):
@@ -815,15 +809,16 @@ class ByEM: # pylint: disable=too-many-public-methods
         score,rates,params = self.fit(data,rates,params,prevll=None)
         results.append((score,rates,params))
         # remove peaks that are too close after fitting, and update
-        keep               = self.__rmduplicates(params,rates)
-        score,rates,params = self.emstep(data,rates[keep],params[keep])
+        #keep               = self.__rmduplicates(params,rates)
+        #score,rates,params = self.emstep(data,rates[keep],params[keep])
+        score,rates,params = self.emstep(data,rates,params)
 
         assign = np.array(list(map(len,self.assign(score).values())))
         while any(assign<self.mincount) or len(rates)>minpeaks:
             asort              = rates.ravel().argsort()
             score,rates,params = self.fit(data,rates[asort][1:],params[asort][1:],prevll=None)
-            keep               = self.__rmduplicates(params,rates)
-            score,rates,params = self.emstep(data,rates[keep],params[keep])
+            #keep               = self.__rmduplicates(params,rates)
+            score,rates,params = self.emstep(data,rates,params)
             results.append((score,rates,params))
             assign             = np.array(list(map(len,self.assign(score).values())))
         return results
@@ -839,10 +834,6 @@ class ByEM: # pylint: disable=too-many-public-methods
         rates,params       = self.initialize(data,maxpeaks)
         score,rates,params = self.fit(data,rates,params,prevll=None)
 
-        # remove peaks that are too close after fitting, and update
-        keep               = self.__rmduplicates(params,rates)
-        score,rates,params = self.emstep(data,rates[keep],params[keep])
-
         assign = np.array(list(map(len,self.assign(score).values())))
         bic    = None
         counter = -1 # dbg
@@ -852,10 +843,8 @@ class ByEM: # pylint: disable=too-many-public-methods
             prevbic            = bic
             prev               = score,rates,params
             asort              = rates.ravel().argsort()
-            pickle.dump((data,rates[asort][1:],params[asort][1:]),open(f"todebug{counter}.pk","wb"))
+            #pickle.dump((data,rates[asort][1:],params[asort][1:]),open(f"todebug{counter}.pk","wb"))
             score,rates,params = self.fit(data,rates[asort][1:],params[asort][1:],prevll=None)
-            keep               = self.__rmduplicates(params,rates)
-            score,rates,params = self.emstep(data,rates[keep],params[keep])
             assign             = np.array(list(map(len,self.assign(score).values())))
             if not any(assign<self.mincount):
                 bic      = self.bic(score,rates,params)
