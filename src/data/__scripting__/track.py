@@ -125,7 +125,9 @@ class TrackOperations:
             self.__doc__ = fcn.__doc__
 
         def __get__(self, instance, owner):
-            return self._fcn if instance is None else partial(self._fcn, instance._trk)
+            if instance is None:
+                return self._fcn
+            return partial(self._fcn, getattr(instance, '_trk'))
 
     concatenate  = _Add(concatenatetracks)
     save         = _Add(savetrack)
