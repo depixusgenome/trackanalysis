@@ -227,8 +227,19 @@ class Tasks(Enum):
                 raise ValueError("Could not load model")
             return mdl
 
-        tmp    = cls.get(*tasks, **kwa)
-        lst    = cast(List[Task], [tmp] if isinstance(tmp, Task) else tmp)
+        if Ellipsis in tasks:
+            if Ellipsis is not tasks[1]:
+                raise NotImplementedError("... must be second place in Tasks.tasklist")
+            first = cls.get(tasks[0], **kwa)
+            tmp   = cls.get(*tasks[2:], **kwa)
+            last  = cast(List[Task], [tmp] if isinstance(tmp, Task) else tmp)
+            sec   = Tasks(last[0])
+            if sec not in cls.__tasklist__():
+                raise RuntimeError("First task after ... must be part of Tasks.defaulttasklist")
+            lst = [first] + list(cls.defaulttasklist(tasks[0], sec))[:-1] + last
+        else:
+            tmp = cls.get(*tasks, **kwa)
+            lst = cast(List[Task], [tmp] if isinstance(tmp, Task) else tmp)
 
         torder = cls.defaulttaskorder()[::-1]
         for i, itm in enumerate(torder[:-1]):
@@ -240,8 +251,7 @@ class Tasks(Enum):
             while ival > 0 and getattr(lst[ival-1], 'level', None) is Level.none:
                 ival -= 1
             if ival == 0 or not isinstance(lst[ival-1], torder[i+1]):
-                name = torder[i+1].__name__.lower().replace('task', '')
-                lst.insert(ind, cls.get(name, **kwa))
+                lst.insert(ind, cls._missing_(torder[i+1])(**kwa))
         return lst
 
     @classmethod

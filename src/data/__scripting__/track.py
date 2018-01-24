@@ -81,7 +81,20 @@ def processors(self, *args, copy = True, beadsonly = True):
 
 @addto(Track)
 def apply(self, *args, copy = True, beadsonly = True):
-    "returns an iterator over the result of provided tasks"
+    """
+    Return an iterator over the result of provided tasks.
+
+    The first argument can be an Ellipsis in which case:
+
+    * the second argument must be any task from `Tasks.__tasklist__`,
+    * tasks from `Tasks.defaulttasklist` will be inserted in front of the latter.
+
+    This behaviour is most similar to what is obtained using shortcuts such as
+    `track.cleancycles`.
+
+    If no Ellipsis is introduced, the list of tasks is completed using the reduced
+    list in `Tasks.defaulttaskorder`. This list does not include any cleaning task.
+    """
     return next(iter(self.processors(*args, beadsonly = beadsonly).run(copy = copy)))
 
 @addto(Track) # type: ignore
