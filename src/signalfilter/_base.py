@@ -10,13 +10,12 @@ from itertools      import chain
 import numpy as np
 
 from utils          import initdefaults
-from ._core.stats   import hfsigma      # pylint: disable=import-error
+from ._core.stats   import hfsigma, mediandeviation # pylint: disable=import-error
 
 if TYPE_CHECKING:
     from data import Track, TrackView   # pylint: disable=unused-import
 
-def nanhfsigma(arr: np.ndarray, ranges = None):
-    "hfsigma which takes care of nans"
+def _nanfcn(arr:np.ndarray, ranges, fcn):
     arr = arr.ravel()
     if len(arr) == 0:
         return
@@ -26,8 +25,18 @@ def nanhfsigma(arr: np.ndarray, ranges = None):
 
     fin = np.isfinite(arr)
     if ranges is None:
-        return hfsigma(arr[fin])
-    return np.nanmedian([hfsigma(arr[i:j][fin[i:j]]) for i, j in ranges])
+        return fcn(arr[fin])
+    return np.nanmedian([fcn(arr[i:j][fin[i:j]]) for i, j in ranges])
+
+def nanhfsigma(arr: np.ndarray, ranges = None):
+    "hfsigma which takes care of nans."
+    return _nanfcn(arr, ranges, hfsigma)
+nanhfsigma.__doc__ += "\n\n"+hfsigma.__doc__ # pylint: disable=no-member
+
+def nanmediandeviation(arr: np.ndarray, ranges = None):
+    "mediandeviation which takes care of nans."
+    return _nanfcn(arr, ranges, mediandeviation)
+nanmediandeviation.__doc__ += "\n\n"+mediandeviation.__doc__ # pylint:disable=no-member
 
 BEADKEY   = Union[str,int]
 DATATYPE  = Union[Sequence[Sequence[np.ndarray]],

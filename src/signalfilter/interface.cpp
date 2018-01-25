@@ -363,17 +363,25 @@ namespace samples { namespace normal {
 namespace signalfilter { namespace stats {
     void pymodule(pybind11::module & mod)
     {
-        auto smod  = mod.def_submodule("stats");
+        auto smod       = mod.def_submodule("stats");
+        auto doc = R"_(Return the median of the absolute value of the
+pointwise derivate of the signal. The median
+itself is estimated using the P² quantile estimator
+algorithm.)_";
+
         smod.def("hfsigma", [](pybind11::array_t<float> & inp)
-                            { return hfsigma(inp.size(), inp.data()); });
+                            { return hfsigma(inp.size(), inp.data()); }, doc);
         smod.def("hfsigma", [](pybind11::array_t<double> & inp)
                             { return hfsigma(inp.size(), inp.data()); });
 #       ifdef _MSC_VER
 #           pragma warning ( push )
 #           pragma warning ( disable : 4244 )
 #       endif
+        auto doc2 = R"_(Return the median of the absolute value of the
+distance to the median for each point.)_";
         smod.def("mediandeviation", [](pybind11::array_t<float> & inp)
-                            { return mediandeviation(inp.size(), inp.data()); });
+                            { return mediandeviation(inp.size(), inp.data()); },
+                            doc2);
         smod.def("mediandeviation", [](pybind11::array_t<double> & inp)
                             { return mediandeviation(inp.size(), inp.data()); });
 #       ifdef _MSC_VER
