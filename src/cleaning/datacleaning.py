@@ -107,7 +107,20 @@ class DataCleaningRule:
         return Partial(name, low, high, test)
 
 class AberrantValuesRule:
-    "bead selection"
+    """
+    Removes aberrant values.
+
+    A value at position *n* is aberrant if any:
+
+    * |z[n] - median(z)| > maxabsvalue
+    * |(z[n+1]-z[n-1])/2-z[n]| > maxderivate
+    * |z[I-mindeltarange+1] - z[I-mindeltarange+2] | < mindeltavalue
+      && ...
+      && |z[I-mindeltarange+1] - z[I]|               < mindeltavalue
+      && n ∈ [I-mindeltarange+2, I]
+    * #{z[I-nanwindow//2:I+nanwindow//2] is nan} < nanratio*nanwindow
+
+    """
     mindeltavalue                = 1e-6
     mindeltarange                = 3
     nandensity: List[NaNDensity] = [LocalNaNPopulation(window = 16, ratio = 50),
@@ -122,20 +135,10 @@ class AberrantValuesRule:
         """
         Removes aberrant values.
 
-        A value at position *n* is aberrant if any:
-
-        * |z[n] - median(z)| > maxabsvalue
-        * |(z[n+1]-z[n-1])/2-z[n]| > maxderivate
-        * |z[I-mindeltarange+1] - z[I-mindeltarange+2] | < mindeltavalue
-          && ...
-          && |z[I-mindeltarange+1] - z[I]|               < mindeltavalue
-          && n ∈ [I-mindeltarange+2, I]
-        * #{z[I-nanwindow//2:I+nanwindow//2] is nan} < nanratio*nanwindow
-
         Aberrant values are replaced by:
 
-        * *NaN* if *clip* is true,
-        * *maxabsvalue ± median*, whichever is closest, if *clip* is false.
+        * `NaN` if `clip` is true,
+        * `maxabsvalue ± median`, whichever is closest, if `clip` is false.
 
         returns: *True* if the number of remaining values is too low
         """
@@ -150,7 +153,21 @@ class AberrantValuesRule:
 
 class HFSigmaRule(DataCleaningRule):
     """
-    Remove cycles with too low or too high a variability
+    Remove cycles with too low or too high a variability.
+
+    The variability is measured as the median of the absolute value of the
+    pointwise derivate of the signal. The median itself is estimated using the
+    P² quantile estimator algorithm.
+
+    Too low a variability is a sign that the tracking algorithm has failed to
+    compute a new value and resorted to using a previous one.
+
+    Too high a variability is likely due to high brownian motion amplified by a
+    rocking motion of a bead due to the combination of 2 factors:
+
+    1. The bead has a prefered magnetisation axis. This creates a prefered
+    horisontal plane and thus a prefered vertical axis.
+    2. The hairpin is attached off-center from the vertical axis of the bead.
     """
     minhfsigma = 1e-4
     maxhfsigma = 1e-2
@@ -159,12 +176,17 @@ class HFSigmaRule(DataCleaningRule):
         super().__init__()
 
     def hfsigma(self, cycs: np.ndarray) -> Partial:
-        "computes noisy cycles"
+        """
+        Remove cycles with too low or too high a variability
+        """
         return self._test('hfsigma', [nanhfsigma(i) for i in cycs])
 
 class MinPopulationRule(DataCleaningRule):
     """
-    Remove cycles with too few good points
+    Remove cycles with too few good points.
+
+    Good points are ones which have not been declared aberrant and which have
+    a finite value.
     """
     minpopulation                = 80.
     @initdefaults(frozenset(locals()))
@@ -178,7 +200,10 @@ class MinPopulationRule(DataCleaningRule):
 
 class MinExtentRule(DataCleaningRule):
     """
-    Remove cycles which don't open
+    Remove cycles which don't open.
+
+    That the bead hasn't opened is extracted directly from too low a z range between
+    the phases `PHASE.initial` and `PHASE.pull`.
     """
     minextent                    = .5
     @initdefaults(frozenset(locals()))
@@ -237,7 +262,25 @@ class DataCleaning(AberrantValuesRule,
                    MinPopulationRule,
                    MinExtentRule,
                    SaturationRule):
-    "bead selection"
+    """
+    Remove specific points, cycles or even the whole bead depending on a number
+    of criteria implemented in aptly named methods:
+
+    # `aberrant`
+    {}
+
+    # `hfsigma`
+    {}
+
+    # `population`
+    {}
+
+    # `extent`
+    {}
+
+    # `saturation`
+    {}
+    """
     CYCLES  = 'hfsigma', 'extent', 'population'
     def __init__(self, **_):
         for base in DataCleaning.__bases__:
@@ -257,3 +300,5 @@ class DataCleaning(AberrantValuesRule,
     def aberrant(self, bead:np.ndarray, clip = False) -> bool:
         super().aberrant(bead, clip)
         return np.isfinite(bead).sum() <= len(bead) * self.minpopulation * 1e-2
+
+DataCleaning.__doc__ = DataCleaning.__doc__.format(*(i.__doc__ for i in DataCleaning.__bases__))

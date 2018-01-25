@@ -14,7 +14,17 @@ from    control.processor       import Processor
 from    .datacleaning           import DataCleaning
 
 class PostAlignmentDataCleaning:
-    "bead selection"
+    """
+    Remove incorrect points or cycles after the cycles have been aligned
+
+    # `aberrant`
+    Removes aberrant values.
+
+    A value at position *n* is aberrant if any:
+
+        *  z[n] < percentile(z, percentiles[0]) - percentilerange
+        *  z[n] > percentile(z, percentiles[1]) + percentilerange
+    """
     percentiles       = 5., 95.
     percentilerange   = .1
     @initdefaults(frozenset(locals()))
@@ -24,11 +34,6 @@ class PostAlignmentDataCleaning:
     def aberrant(self, bead:np.ndarray, clip = False):
         """
         Removes aberrant values.
-
-        A value at position *n* is aberrant if any:
-
-            *  z[n] < percentile(z, percentiles[0]) - percentilerange
-            *  z[n] > percentile(z, percentiles[1]) + percentilerange
 
         Aberrant values are replaced by:
 
@@ -51,7 +56,8 @@ class PostAlignmentDataCleaning:
         bead[fin] = good
 
 class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
-    "bead selection task"
+    "Task for removing incorrect points or cycles or even the whole bead"
+    __doc__          = DataCleaning.__doc__
     level            = Level.bead
     hfsigmaphases    = PHASE.measure, PHASE.measure
     populationphases = PHASE.measure, PHASE.measure
@@ -122,7 +128,7 @@ class DataCleaningException(Exception):
                    'warning')
 
 class DataCleaningProcessor(Processor[DataCleaningTask]):
-    "Processor for bead selection"
+    "Processor for cleaning the data"
     @classmethod
     def __get(cls, name, cnf):
         return cnf.get(name, getattr(cls.tasktype, name))
