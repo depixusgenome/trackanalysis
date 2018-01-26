@@ -26,32 +26,32 @@ class ExtremumAlignmentTask(Task):
 
     Alignment modes are:
 
-        * *phase* = 'onlyinitial': alignment on phase 1
-        * *phase* = 'onlypull': alignment on phase 3
-        * *phase* = 'initial': alignment is performed phase 1. Outliers are
-        then re-aligned on phase 3. Outliers are defined as:
+        * *phase* = 'onlyinitial': alignment on `PHASE.initial`
+        * *phase* = 'onlypull': alignment on `PHASE.pull`
+        * *phase* = 'initial': alignment is performed `PHASE.initial`. Outliers are
+        then re-aligned on `PHASE.pull`. Outliers are defined as:
 
-            * |phase 3 - median(phase 3)| > 'pull'
-            * at least one of the extension between phase 1 and 3 or 3 and 5
+            * |`PHASE.pull` - median(`PHASE.pull`)| > 'pull'
+            * at least one of the extension between `PHASE.initial` and 3 or 3 and 5
             are such that: (extension > median(extension) x 'opening')
-            that between phase 1 and 3 or 3 and 5.
+            that between `PHASE.initial` and 3 or 3 and 5.
 
-        * *phase* = 'pull': alignment is performed phase 3. Outliers are
-        then re-aligned on phase 1. Outliers satisfy all conditions:
+        * *phase* = 'pull': alignment is performed `PHASE.pull`. Outliers are
+        then re-aligned on `PHASE.initial`. Outliers satisfy all conditions:
 
-            * |phase 3 - phase 5| < 'outlier' x median
-            * |phase 3 - phase 1| < 'outlier' x median
-            * |phase 1 - phase 5| < 'delta'
+            * |`PHASE.pull`    - `PHASE.measure`| < 'outlier' x median
+            * |`PHASE.pull`    - `PHASE.initial`| < 'outlier' x median
+            * |`PHASE.initial` - `PHASE.measure`| < 'delta'
 
         After alignment, cycles with |phase 7| < median + 'minrelax' are discarded.
 
-        * *phase* = 'measure': alignment is performed on phase 5. If outliers
-        are found on phase 5:
+        * *phase* = 'measure': alignment is performed on `PHASE.measure`. If outliers
+        are found on `PHASE.measure`:
 
             * if more than 'fiveratio' cycles are further than 'pull' from the
             median, a *phase* = None alignment is returned.
-            * otherwise outliers are aligned on phase 1. Finally phase 3
-            outliers are re-aligned on phase 3.
+            * otherwise outliers are aligned on `PHASE.initial`. Finally `PHASE.pull`
+            outliers are re-aligned on `PHASE.pull`.
 
     In any case, cycles that could not be aligned are removed.
 
@@ -64,7 +64,7 @@ class ExtremumAlignmentTask(Task):
         simply to align on a given side (EdgeAlignment).
         * *phase:* Whether to align a specific phase or on the best.
         * *opening:* This factor is used to determine cycles mis-aligned on *phase*.
-        * *pull:* maximum absolute distance from the median phase 3 value.
+        * *pull:* maximum absolute distance from the median `PHASE.pull` value.
     """
     level      = Level.bead
     window     = 15

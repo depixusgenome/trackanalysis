@@ -142,7 +142,7 @@ class TrackOperations:
 
 @extend(Track)
 class _TrackMixin:
-    __doc__  = ('* `op` a'+TrackOperations.__doc__[6:]
+    __doc__  = ('    * `op` a'+TrackOperations.__doc__[6:]
                 +'\n    * `pathinfo` p'+PathInfo.__doc__[6:])
     cleaned = LazyProperty('cleaned')
     def tasklist(self, *args, beadsonly = True):
@@ -185,7 +185,7 @@ class _TrackMixin:
 
     @property
     def measures(self):
-        "Returns cleaned cycles for phase 5 only"
+        "Return cleaned cycles for `PHASE.measure` only"
         return self.cleancycles.withphases(PHASE.measure)
 
     for prop in cleanbeads, cleancycles, measures:
