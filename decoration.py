@@ -204,6 +204,21 @@ def cachedio(fcn):
     "Caches io output"
     return wraps(fcn)(CachedIO(fcn).__call__)
 
+def extend(base):
+    """
+    Can be used to extend a class.
+
+    This is equivalent to creating methods and decorating each with the `addto` function.
+    """
+    def _wrapper(cls):
+        for name, value in cls.__dict__.items():
+            if name not in ('__module__', '__dict__', '__weakref__', '__doc__'):
+                setattr(base, name, value)
+        if cls.__doc__:
+            base.__doc__ += '\n'+cls.__doc__
+        return cls
+    return _wrapper
+
 def addto(*types):
     "add method to a class"
     def _wrapper(fcn):
