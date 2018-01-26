@@ -12,16 +12,17 @@ from   copy                 import copy  as shallowcopy
 from   datetime             import datetime
 from   functools            import partial
 from   pathlib              import Path
-from   typing               import List
+from   typing               import List, cast
 
 import numpy                as     np
 
-from   utils.decoration     import addto, addproperty
+from   utils.decoration     import addproperty, extend
 from   utils.attrdefaults   import addattributes
 from   model                import PHASE, Task
 from   model.__scripting__  import Tasks
 
 from   ..trackio            import savetrack
+from   ..views              import TrackView, Cycles, Beads
 from   ..track              import Track, LazyProperty, BEADKEY, isellipsis
 from   ..trackops           import (selectbeads, dropbeads, selectcycles,
                                     concatenatetracks, renamebeads)
@@ -65,55 +66,6 @@ class PathInfo:
     megabytes    = property(lambda self: self.size >> 20)
     creation     = property(lambda self: datetime.fromtimestamp(self.stat.st_ctime))
     modification = property(lambda self: datetime.fromtimestamp(self.stat.st_mtime))
-
-@addto(Track)
-def tasklist(self, *args, beadsonly = True):
-    "creates a tasklist"
-    return Tasks.tasklist(self.path, *args, beadsonly = beadsonly)
-
-@addto(Track)
-def processors(self, *args, copy = True, beadsonly = True):
-    "returns an iterator over the result of provided tasks"
-    procs = Tasks.processors(self.path, *args, beadsonly = beadsonly)
-    procs.data.setCacheDefault(0, self)
-    procs.copy = copy
-    return procs
-
-@addto(Track)
-def apply(self, *args, copy = True, beadsonly = True):
-    """
-    Return an iterator over the result of provided tasks.
-
-    The first argument can be an Ellipsis in which case:
-
-    * the second argument must be any task from `Tasks.__tasklist__`,
-    * tasks from `Tasks.defaulttasklist` will be inserted in front of the latter.
-
-    This behaviour is most similar to what is obtained using shortcuts such as
-    `track.cleancycles`.
-
-    If no Ellipsis is introduced, the list of tasks is completed using the reduced
-    list in `Tasks.defaulttaskorder`. This list does not include any cleaning task.
-    """
-    return next(iter(self.processors(*args, beadsonly = beadsonly).run(copy = copy)))
-
-@addto(Track) # type: ignore
-@property
-def cleancycles(self):
-    "returns cleaned cycles"
-    return self.cleanbeads[...,...]
-
-@addto(Track) # type: ignore
-@property
-def cleanbeads(self):
-    "returns cleaned beads"
-    return self.apply(*Tasks.defaulttasklist(self, Tasks.alignment))
-
-@addto(Track) # type: ignore
-@property
-def measures(self):
-    "returns cleaned cycles for phase 5 only"
-    return self.cleancycles.withphases(PHASE.measure)
 
 @addproperty(Track, 'op')
 class TrackOperations:
@@ -188,41 +140,88 @@ class TrackOperations:
             return renamebeads(self._trk, *zip(key, val))
         return renamebeads(self._trk, (key, val))
 
-@addto(Track)
-def astracksdict(self, *beads:BEADKEY) -> TracksDict:
-    """
-    Converts this to a `TracksDict` object, with one bead per track.
+@extend(Track)
+class _TrackMixin:
+    __doc__  = ('* `op` a'+TrackOperations.__doc__[6:]
+                +'\n    * `pathinfo` p'+PathInfo.__doc__[6:])
+    cleaned = LazyProperty('cleaned')
+    def tasklist(self, *args, beadsonly = True):
+        "creates a tasklist"
+        return Tasks.tasklist(self.path, *args, beadsonly = beadsonly)
 
-    This can be used to work across beads in a track as one would accross
-    tracks in a `TracksDict`.
-    """
-    if len(beads) == 1 and isinstance(beads[0], (tuple, list, set, frozenset)):
-        beads = tuple(beads[0])
-    if len(beads) == 0:
-        beads = tuple(self.beadsonly.keys())
-    return TracksDict({i: renamebeads(selectbeads(self, i), (i, 0)) for i in beads})
+    def processors(self, *args, copy = True, beadsonly = True):
+        "returns an iterator over the result of provided tasks"
+        procs = Tasks.processors(self.path, *args, beadsonly = beadsonly)
+        procs.data.setCacheDefault(0, self)
+        procs.copy = copy
+        return procs
 
-@addto(Track)
-def __getitem__(self, value):
-    if isinstance(value, (Task, Tasks)):
-        value = (value,)
+    def apply(self, *args, copy = True, beadsonly = True) -> TrackView:
+        """
+        Return an iterator over the result of provided tasks.
 
-    if isinstance(value, range):
-        value = set(value) & set(self.data.keys())
+        The first argument can be an Ellipsis in which case:
 
-    if isinstance(value, (list, set, tuple, frozenset)):
-        if all(isinstance(i, (Task, Tasks)) for i in value):
-            return self.apply(*value)
-        if '~' in value:
-            return dropbeads(self, *(i for i in value if i != '~'))
+        * the second argument must be any task from `Tasks.__tasklist__`,
+        * tasks from `Tasks.defaulttasklist` will be inserted in front of the latter.
 
-    return selectbeads(self, value)
+        This behaviour is most similar to what is obtained using shortcuts such as
+        `track.cleancycles`.
 
-Track.cleaned = LazyProperty('cleaned')
+        If no Ellipsis is introduced, the list of tasks is completed using the reduced
+        list in `Tasks.defaulttaskorder`. This list does not include any cleaning task.
+        """
+        return next(iter(self.processors(*args, beadsonly = beadsonly).run(copy = copy)))
+
+    @property
+    def cleanbeads(self) -> Beads:
+        "Return cleaned beads"
+        return cast(Beads, self.apply(*Tasks.defaulttasklist(self, Tasks.alignment)))
+
+    @property
+    def cleancycles(self) -> Cycles:
+        "Return cleaned cycles"
+        return cast(Cycles, self.cleanbeads[...,...])
+
+    @property
+    def measures(self):
+        "Returns cleaned cycles for phase 5 only"
+        return self.cleancycles.withphases(PHASE.measure)
+
+    for prop in cleanbeads, cleancycles, measures:
+        setattr(prop, '__doc__', getattr(prop, '__doc__') + f"\n{Tasks.__cleaning__.__doc__}")
+        del prop
+
+    def astracksdict(self, *beads:BEADKEY) -> TracksDict:
+        """
+        Converts this to a `TracksDict` object, with one bead per track.
+
+        This can be used to work across beads in a track as one would accross
+        tracks in a `TracksDict`.
+        """
+        if len(beads) == 1 and isinstance(beads[0], (tuple, list, set, frozenset)):
+            beads = tuple(beads[0])
+        if len(beads) == 0:
+            beads = tuple(self.beadsonly.keys()) # type: ignore
+        fcn = lambda i: renamebeads(selectbeads(cast(self, Task), i), (i, 0)) # type: ignore
+        return TracksDict({i: fcn(i) for i in beads})
+
+    def __getitem__(self, value):
+        if isinstance(value, (Task, Tasks)):
+            value = (value,)
+
+        if isinstance(value, range):
+            value = set(value) & set(self.data.keys())
+
+        if isinstance(value, (list, set, tuple, frozenset)):
+            if all(isinstance(i, (Task, Tasks)) for i in value):
+                return self.apply(*value)
+            if '~' in value:
+                return dropbeads(self, *(i for i in value if i != '~'))
+
+        return selectbeads(self, value)
+
 addattributes(Track, protected = dict(cleaned = False))
-
-Track.__doc__   += '* `op` a'+TrackOperations.__doc__[6:]
-Track.__doc__   += '\n    * `pathinfo` p'+PathInfo.__doc__[6:]
 Track.cycles    .args['copy'] = True
 Track.cyclesonly.args['copy'] = True
 Track.beads     .args['copy'] = True

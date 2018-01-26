@@ -122,6 +122,18 @@ class Tasks(Enum):
 
     @classmethod
     def __taskorder__(cls):
+        """
+        The task order consists in:
+
+        * `Tasks.eventdetection`: flat events are detected in `PHASE.measure`
+        and returned per cycle.
+
+        * `Tasks.peakselector`: events are grouped per peak. The list of peaks
+        is returned per bead.
+
+        * `Tasks.fittohairpin`: the z-axis is aligned with theoretical positions
+        using a rigid transformation.
+        """
         return cls.eventdetection, cls.peakselector, cls.fittohairpin
 
     @classmethod
@@ -130,6 +142,19 @@ class Tasks(Enum):
 
     @classmethod
     def __cleaning__(cls):
+        """
+        Cleaning consists in the following tasks:
+
+        * `Tasks.subtraction`: if one or more fixed beads has been indicated,
+        subtracts from the current bead the median signal per frame of the
+        fixed beads.
+
+        * `Tasks.cleaning`: aberrant values and cycles are discarded using the
+        the rules defined in the `cleaning.processor.DataCleaningTask` task.
+
+        * `Tasks.alignment`: The cycles are aligned using the algorithm defined
+        in the `eventdetection.processor.alignment.ExtremumAlignmentTask` task.
+        """
         return cls.__base_cleaning__()
 
     @classmethod
