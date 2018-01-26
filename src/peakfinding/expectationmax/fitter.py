@@ -3,10 +3,9 @@
 "Creates a histogram from available events"
 
 import itertools
-import pickle
 from enum import Enum
 from functools import partial
-from typing import Callable, Dict, Optional, Tuple, Union
+from typing import Callable, Dict, Optional, Tuple
 
 import numba as nb
 import numpy as np
@@ -14,7 +13,7 @@ import numpy as np
 from utils import initdefaults
 from utils.logconfig import getLogger
 
-from .aotutils import exppdf, normpdf
+from .aotutils import * # pylint: disable=wildcard-import
 
 LOGS = getLogger(__name__)
 
@@ -57,12 +56,9 @@ class EmPeakFitter: # pylint: disable=too-many-public-methods
         data       = np.array([[np.nanmean(evt),len(evt)]
                                for cycle in events
                                for evt in cycle])
-        pickle.dump(self.kwa,open("kwa.dbg","wb"))
-        pickle.dump(data,open("data.dbg","wb"))
         # if self.spaceonly:
         #     data[:,-1]=1
         maxpeaks   = int((max(data[:,0])-min(data[:,0]))//precision)
-        print("maxpeaks=",maxpeaks)
         search     = self.fullsearch(data,maxpeaks) #self.fitdata(data,maxpeaks)[-1]
         params     = search[-1]
         asort      = np.argsort(params[:,0,0])
@@ -115,13 +111,6 @@ class EmPeakFitter: # pylint: disable=too-many-public-methods
         params[:,0,1] = self.covmap(params[:,0,1])
         return 1/len(params)*np.ones((len(params),1)) , params
 
-    @staticmethod
-    def __normpdf(loc, cov, pos):
-        'pdf of Gaussian dist'
-        return normpdf(float(loc), float(cov), float(pos))
-
-
-
     @classmethod
     def pdf(cls,*args):
         '''
@@ -131,18 +120,19 @@ class EmPeakFitter: # pylint: disable=too-many-public-methods
                          [tloc,tscale,tpos]])
         '''
         param, datum = args[0]
-        return cls.mvnormpdf(*param[0],datum[:-1])*exppdf(*param[1],datum[-1])
+        return cls.spatialpdf(*param[0],datum[:-1])*exppdf(*param[1],datum[-1])
 
 
     # pytest
     @classmethod
-    def mvnormpdf(cls,mean,cov,pos):
+    def spatialpdf(cls,mean,cov,pos):
         'proportional to normal pdf of multivariate distribution'
         if len(pos)==1:
-            return float(cls.__normpdf(mean, cov, pos))
-        cent = np.matrix(pos-mean)
-        return np.exp(-0.5*float(cent*np.linalg.inv(cov)*cent.T))/\
-            np.sqrt(float(np.linalg.det(cov)))
+            return float(normpdf(float(mean), float(cov), float(pos)))
+        # cent = np.matrix(pos-mean)
+        # return np.exp(-0.5*float(cent*np.linalg.inv(cov)*cent.T))/\
+        #     np.sqrt(float(np.linalg.det(cov)))
+        return mvnormpdf
 
     @nb.jit
     def score(self,data:np.ndarray,params)->np.ndarray:
@@ -178,11 +168,6 @@ class EmPeakFitter: # pylint: disable=too-many-public-methods
     @nb.jit
     def maximization(self,pz_x:np.ndarray,data:np.ndarray):
         'returns the next set of parameters'
-        # # sanitize pz_x
-        # pz_x[pz_x<self.floaterr] = 0.0
-        # sain = np.sum(pz_x,axis=1)>self.floaterr
-        # pz_x = pz_x[sain] # removes parameters
-
         npz_x = pz_x/np.sum(pz_x,axis=1).reshape(-1,1)
 
         nrates   = np.mean(pz_x,axis=1).reshape(-1,1)
@@ -218,7 +203,7 @@ class EmPeakFitter: # pylint: disable=too-many-public-methods
     @classmethod
     def llikelihood(cls,score:np.ndarray,rates:np.ndarray)->float:
         'returns loglikelihood'
-        return np.sum(np.log(np.sum(rates*score,axis=0)))
+        return llikelihood(score,rates)
 
     # to pytest
     def fit(self,data,rates,params,prevll:Optional[float] = None):
@@ -226,10 +211,10 @@ class EmPeakFitter: # pylint: disable=too-many-public-methods
         prevll = self.llikelihood(self.score(data,params),rates) if prevll is None else prevll
         for _ in range(self.emiter):
             score,rates,params = self.emstep(data,rates,params)
-            llikelihood        = self.llikelihood(score,rates)
-            if abs(llikelihood-prevll) < self.tol:
+            llikeli            = self.llikelihood(score,rates)
+            if abs(llikeli-prevll) < self.tol:
                 break
-            prevll = llikelihood
+            prevll = llikeli
         return score, rates, params
 
     @classmethod
@@ -315,5 +300,3 @@ class EmPeakFitter: # pylint: disable=too-many-public-methods
                 if finished :
                     return prev
         return score,rates,params
-
-PeakFinder = Union[ByZeroCrossing, ByGaussianMix, ByEM]

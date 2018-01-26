@@ -3,4 +3,4 @@
 
 'initializer for expectation maximization'
 
-from .finder import EmPeakFitter
+from .fitter import EmPeakFitter
