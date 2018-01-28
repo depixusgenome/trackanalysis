@@ -347,7 +347,9 @@ namespace peakcalling
                     "reference"_a,  "experiment"_a,
                     "minstretch"_a = .01,   "maxstretch"_a = 10.,
                     "minbias"_a    = -10.,  "maxbias"_a    = 10.,
-                    "indexes"_a    = false);
+                    "indexes"_a    = false,
+                    pybind11::keep_alive<1,2>(),
+                    pybind11::keep_alive<1,3>());
             cls.def("__next__", &Iterator::next);
             cls.def("__iter__", [](pybind11::object & self) { return self; });
         }

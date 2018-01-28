@@ -15,9 +15,9 @@ from simulator.processor        import ByPeaksEventSimulatorTask
 from eventdetection.processor   import EventDetectionTask
 from peakfinding.processor      import PeakSelectorTask
 from peakfinding.histogram      import HistogramData
-from peakcalling                import cost, match
+from peakcalling                import cost, match, Range
 from peakcalling.tohairpin      import (PeakMatching, GaussianProductFit,
-                                        ChiSquareFit, PeakGridFit)
+                                        ChiSquareFit, PeakGridFit, EdgePeaksGridFit)
 from peakcalling.toreference    import HistogramFit, ChiSquareHistogramFit
 from peakcalling.processor      import (BeadsByHairpinProcessor, BeadsByHairpinTask,
                                         DistanceConstraint, FitToReferenceTask)
@@ -48,7 +48,8 @@ def test_toref_frompeaks():
 
 def test_ref_peaksgrid():
     "tests peaks grid with a single read"
-    fit = PeakGridFit(firstpeak = True, lastpeak = True)
+    bias    = Range(0, 60.*8.8e-4, 60.*8.8e-4)
+    fit     = PeakGridFit(firstpeak = True, lastpeak = True, bias = bias)
     for i in product([.96, 1., 1.04], [-.05, 0., .05]):
         arr1 = np.array([.1, .5,  1.])
         arr2 = np.array([.1, .5,  1.])/i[0]+i[1]
@@ -68,7 +69,8 @@ def test_ref_peaksgrid():
 
 def test_ref_peaksgrid_2D():
     "tests peaks grid with a top and a bottom fraction read"
-    fit = PeakGridFit(firstpeak = True, lastpeak = True)
+    bias = Range(0, 60.*8.8e-4, 60.*8.8e-4)
+    fit  = EdgePeaksGridFit(firstpeak = True, lastpeak = True, bias = bias)
     for i in product([.96, 1., 1.04], [-.05, 0., .05]):
         seq  = np.array([.01, .02,  .035, .7, .85, .95])
         arr2 = seq/i[0]+i[1]
@@ -106,15 +108,15 @@ def test_toref_controller():
     beads = tuple(i for i in pair.run())[0][0]
     assert set(beads.index.names) == {'track', 'bead'}
     assert set(beads.columns)     == {'peakposition',      'averageduration',
-                                      'hybridizationrate', 'eventcount',
+                                      'hybridisationrate', 'eventcount',
                                       'referenceposition', 'std1', 'std2', 'std3'}
 
     pair  = create(root, tsk, DataFrameTask(measures = dict(events = True)))
     beads = tuple(i for i in pair.run())[0][0]
     assert set(beads.index.names) == {'track', 'bead', 'cycle'}
     assert set(beads.columns)     == {'peakposition',      'averageduration',
-                                      'hybridizationrate', 'eventcount',
-                                      'referenceposition', 'mean', 'length', 'start'}
+                                      'hybridisationrate', 'eventcount',
+                                      'referenceposition', 'avg', 'length', 'start'}
 
 def test_cost_value():
     u"Tests peakcalling.cost.compute"
@@ -253,19 +255,20 @@ def test_control():
         beads = tuple(i for i in pair.run(pool = pool))[0]
         assert tuple(beads.keys()) == ('hp100',)
 
-def test_peaksgrid():
+def test_peakiterator():
     "tests peaks iterator"
-    vals = list(match.PeakIterator([1., 2., 5.], [1., 2.], 0., 10., -10., 10.))
+    ref, exp = np.array([1., 2., 5.], dtype = 'f4'), np.array([1., 2.], dtype = 'f4')
+    vals = list(match.PeakIterator(ref, exp, 0., 10., -10., 10.))
     assert_allclose([i for i, _ in vals], [1., 4., 3.], rtol = 1e-3)
     assert_allclose([i for _, i in vals], [0., .75, 1./3.], rtol = 1e-3)
 
-    vals = list(match.PeakIterator([1., 2., 5.], [1., 2.], 1.1, 10., -10., 10.))
+    vals = list(match.PeakIterator(ref, exp, 1.1, 10., -10., 10.))
     assert_allclose([i for i, _ in vals], [4., 3.], rtol = 1e-3)
     assert_allclose([i for _, i in vals], [.75, 1./3.], rtol = 1e-3)
 
-    vals = list(match.PeakIterator([1., 2., 5.], [1., 2.], 0., 10., -10., .5))
+    vals = list(match.PeakIterator(ref, exp, 0., 10., -10., .5))
     assert_allclose([i for i, _ in vals], [1., 3.], rtol = 1e-3)
     assert_allclose([i for _, i in vals], [0., 1./3.], rtol = 1e-3)
 
 if __name__ == '__main__':
-    test_ref_peaksgrid_2D()
+    test_peakiterator()

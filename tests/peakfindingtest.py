@@ -237,7 +237,7 @@ def test_precision():
     assert_allclose(peaks, [0., .1, .2, .3, .4, .5, .6], rtol = 1e-3, atol = 1e-3)
 
     truth = np.sum(sim >= 5, 0)/100.
-    exp   = np.array([i.hybridizationrate for _, i in vals[1:]])
+    exp   = np.array([i.hybridisationrate for _, i in vals[1:]])
     assert_allclose(exp, truth, rtol = 1e-3, atol = 1e-3)
 
     truth = [np.mean(i[i>=5]) for i in sim.T]
