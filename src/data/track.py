@@ -281,9 +281,10 @@ class PhaseManipulator:
     nframes  = cast(int, property(lambda self: self._track.nframes))
     ncycles  = cast(int, property(lambda self: self._track.ncycles))
     nphases  = cast(int, property(lambda self: self._track.nphases))
-    __doc__ += f"   * `cut`: {cut.__doc__.strip()}\n"
-    __doc__ += f"   * `duration`: {duration.__doc__.strip()}\n"
-    __doc__ += f"   * `select`: {select.__doc__.strip()}\n"
+    if __doc__:
+        __doc__ += f"   * `cut`: {cut.__doc__.strip()}\n"
+        __doc__ += f"   * `duration`: {duration.__doc__.strip()}\n"
+        __doc__ += f"   * `select`: {select.__doc__.strip()}\n"
 
     def __duration(self, cid:PIDTYPE = None, pid:IDTYPE = None) -> Union[np.ndarray, int]:
         phases = self._track.phases
