@@ -301,4 +301,5 @@ class DataCleaning(AberrantValuesRule,
         super().aberrant(bead, clip)
         return np.isfinite(bead).sum() <= len(bead) * self.minpopulation * 1e-2
 
-DataCleaning.__doc__ = DataCleaning.__doc__.format(*(i.__doc__ for i in DataCleaning.__bases__))
+if DataCleaning.__doc__:
+    DataCleaning.__doc__ = DataCleaning.__doc__.format(*(i.__doc__ for i in DataCleaning.__bases__))

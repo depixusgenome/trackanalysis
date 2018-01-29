@@ -31,12 +31,14 @@ def _nanfcn(arr:np.ndarray, ranges, fcn):
 def nanhfsigma(arr: np.ndarray, ranges = None):
     "hfsigma which takes care of nans."
     return _nanfcn(arr, ranges, hfsigma)
-nanhfsigma.__doc__ += "\n\n"+hfsigma.__doc__ # pylint: disable=no-member
+if nanhfsigma.__doc__:
+    nanhfsigma.__doc__ += "\n\n"+hfsigma.__doc__ # pylint: disable=no-member
 
 def nanmediandeviation(arr: np.ndarray, ranges = None):
     "mediandeviation which takes care of nans."
     return _nanfcn(arr, ranges, mediandeviation)
-nanmediandeviation.__doc__ += "\n\n"+mediandeviation.__doc__ # pylint:disable=no-member
+if nanmediandeviation.__doc__:
+    nanmediandeviation.__doc__ += "\n\n"+mediandeviation.__doc__ # pylint:disable=no-member
 
 BEADKEY   = Union[str,int]
 DATATYPE  = Union[Sequence[Sequence[np.ndarray]],
