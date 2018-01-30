@@ -5,7 +5,6 @@
 from typing         import (Union, Iterator, Iterable, Tuple, Sequence, Optional,
                             overload, cast, TYPE_CHECKING)
 from abc            import ABC
-from itertools      import chain
 
 import numpy as np
 
@@ -16,7 +15,7 @@ if TYPE_CHECKING:
     from data import Track, TrackView   # pylint: disable=unused-import
 
 def _nanfcn(arr:np.ndarray, ranges, fcn):
-    arr = arr.ravel()
+    arr = np.asarray(arr).ravel()
     if len(arr) == 0:
         return
 
@@ -31,13 +30,13 @@ def _nanfcn(arr:np.ndarray, ranges, fcn):
 def nanhfsigma(arr: np.ndarray, ranges = None):
     "hfsigma which takes care of nans."
     return _nanfcn(arr, ranges, hfsigma)
-if nanhfsigma.__doc__:
+if getattr(nanhfsigma, '__doc__', None):
     nanhfsigma.__doc__ += "\n\n"+hfsigma.__doc__ # pylint: disable=no-member
 
 def nanmediandeviation(arr: np.ndarray, ranges = None):
     "mediandeviation which takes care of nans."
     return _nanfcn(arr, ranges, mediandeviation)
-if nanmediandeviation.__doc__:
+if getattr(nanmediandeviation, '__doc__', None):
     nanmediandeviation.__doc__ += "\n\n"+mediandeviation.__doc__ # pylint:disable=no-member
 
 BEADKEY   = Union[str,int]
@@ -89,7 +88,8 @@ class PrecisionAlg(ABC):
                 first = next((i for i in data if len(i)), None)
                 if first is not None:
                     if isinstance(first, (Sequence, np.ndarray)):
-                        ret = np.median(tuple(nanhfsigma(chain(*i)) for i in data if len(i)))
+                        ret = np.median(tuple(nanhfsigma(np.concatenate(list(i)))
+                                              for i in data if len(i)))
                     else:
                         ret = np.median(tuple(nanhfsigma(i) for i in data if len(i)))
                     return ret*self.rawfactor
