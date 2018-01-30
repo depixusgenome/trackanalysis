@@ -99,13 +99,12 @@ def importjupyter(locs, *names):
     if _isjupyter():
         try:
             import holoviews as hv
+            import holoviews.operation  as hvops
         except ImportError:
             return
 
         global ISJUP # pylint: disable=global-statement
-        ISJUP = True
-
-        import holoviews.operation  as hvops
+        ISJUP         = True
         locs['hv']    = hv
         locs['hvops'] = hvops
 
