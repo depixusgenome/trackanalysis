@@ -31,4 +31,4 @@ run(locals(),
                                                 "peakcalling"))),
     jupyter = (f"{i}.__scripting__.holoviewing"
                for i in ("data", "cleaning", "eventdetection", "peakfinding", "peakcalling",
-                         "qualitycontrol", "ramp")))
+                         "qualitycontrol", "ramp", "model")))

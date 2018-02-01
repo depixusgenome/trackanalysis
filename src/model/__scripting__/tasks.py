@@ -5,7 +5,7 @@ Monkeypatches tasks and provides a simpler access to usual tasks
 """
 from pathlib                  import Path
 from functools                import partial
-from typing                   import Type, Tuple, List, cast
+from typing                   import Type, Tuple, List, Callable, cast
 from concurrent.futures       import ProcessPoolExecutor
 
 from copy                     import deepcopy
@@ -30,6 +30,81 @@ from ..task                   import (Task, TrackReaderTask, CycleCreatorTask,
                                       DataSelectionTask)
 from ..task.track             import CycleSamplingTask
 from ..task.dataframe         import DataFrameTask
+
+class _DOCHelper(Enum):
+    # pylint: disable=bad-continuation
+    cyclesampling  = ("transforms a track into one containing only a selection of cycle.",)
+    action         = (
+        "a Callable[[TrackView, Tuple[KEY, DATA]], Tuple[KEY, Any]]",
+        " which transforms each input indivually"
+        )
+    subtraction    = (
+        "if one or more fixed beads has been indicated,",
+        "subtracts from the current bead the median signal per frame of the",
+        "fixed beads.")
+    cleaning       = (
+        "aberrant values and cycles are discarded using the",
+        "the rules defined in the `cleaning.processor.DataCleaningTask` task.")
+    selection      = ("allows selecting/discarding specific beads and or cycles",)
+    alignment      = (
+        "the cycles are aligned using the algorithm defined",
+        "in the `eventdetection.processor.alignment.ExtremumAlignmentTask` task.")
+    driftperbead   = (
+        "recomputes an *average fixed bead* cycle from all cycles in a bead",
+        "and subtracts it from all cycles in the bead"
+        )
+    driftpercycle  = (
+        "recomputes an *average fixed bead* from all beads",
+        "and subtracts it from all cycles in the bead"
+        )
+    cycles         = ("returns a Cycles view",)
+    eventdetection = (
+        "flat events are detected in `PHASE.measure`",
+        "and returned per cycle.")
+    peakalignment  = ("Aligns cycles using events in `PHASE.measure`",)
+    peakselector   = (
+        "events are grouped per peak. The list of peaks",
+        "is returned per bead.")
+    fittohairpin   = (
+        "the z-axis is aligned with theoretical positions",
+        "using a rigid transformation.")
+    fittoreference = (
+        "transforms the z-axis to fit the extension from the same bead in",
+        "another experiment."
+        )
+    beadsbyhairpin = ("beads identified as the same hairpin are grouped together",)
+    dataframe      = ("transforms the whole frame to a `pandas.DataFrame`",)
+
+    def tostring(self) -> str:
+        "returns the doc as a single string"
+        return ' '.join(self.value)
+
+    @classmethod
+    def todoc(cls, *args:str, indent = 4) -> str:
+        "return a string concatenating the docs from provided arguments"
+        if len(args) == 0:
+            args = tuple(cls.__members__.keys())
+        string = ' '*indent+'* `Tasks.{key}`: {value}\n'
+        space  = ' '*(indent*2)
+        return '\n'+''.join(string.format(key   = i,
+                                          value = space.join(getattr(cls, i).value))
+                            for i in args)
+
+    @classmethod
+    def add(cls, *args:str, indent = 4, header = None) -> Callable[[Callable], Callable]:
+        "decorator for adding doc"
+        doc = cls.todoc(*args, indent = indent)
+        if header:
+            doc = header+ "\n\n" + doc
+
+        def _wrapper(fcn):
+            if hasattr(fcn, '__doc__'):
+                if getattr(fcn, '__doc__'):
+                    fcn.__doc__ += doc
+                else:
+                    fcn.__doc__ = doc
+            return fcn
+        return _wrapper
 
 class Tasks(Enum):
     """
@@ -102,10 +177,10 @@ class Tasks(Enum):
     The keyword `pool` allows providing a specific `ProcessPoolExecutor`. If provided with
     `pool == True`, the `ProcessPoolExecutor` instance is created and used.
     """
-    action         = 'action'
     cyclesampling  = 'cyclesampling'
-    cleaning       = 'cleaning'
+    action         = 'action'
     subtraction    = 'subtraction'
+    cleaning       = 'cleaning'
     selection      = 'selection'
     alignment      = 'alignment'
     driftperbead   = 'driftperbead'
@@ -118,22 +193,17 @@ class Tasks(Enum):
     fittoreference = 'fittoreference'
     beadsbyhairpin = 'beadsbyhairpin'
     dataframe      = 'dataframe'
-    RESET          = Ellipsis
+
+    def __repr__(self):
+        tpe = self.tasktype()
+        return (f'<{str(self)}> ↔ {tpe.__module__}.{tpe.__qualname__}\n\n    '
+                +'\n    '.join(getattr(_DOCHelper, self.name).value)
+                +'\n')
 
     @classmethod
+    @_DOCHelper.add('eventdetection', 'peakselector', 'fittohairpin',
+                    header = "The task order consists in:")
     def __taskorder__(cls):
-        """
-        The task order consists in:
-
-        * `Tasks.eventdetection`: flat events are detected in `PHASE.measure`
-        and returned per cycle.
-
-        * `Tasks.peakselector`: events are grouped per peak. The list of peaks
-        is returned per bead.
-
-        * `Tasks.fittohairpin`: the z-axis is aligned with theoretical positions
-        using a rigid transformation.
-        """
         return cls.eventdetection, cls.peakselector, cls.fittohairpin
 
     @classmethod
@@ -141,20 +211,9 @@ class Tasks(Enum):
         return cls.subtraction, cls.cleaning, cls.alignment
 
     @classmethod
+    @_DOCHelper.add('subtraction', 'cleaning', 'alignment',
+                    header = "Cleaning consists in the following tasks:")
     def __cleaning__(cls):
-        """
-        Cleaning consists in the following tasks:
-
-        * `Tasks.subtraction`: if one or more fixed beads has been indicated,
-        subtracts from the current bead the median signal per frame of the
-        fixed beads.
-
-        * `Tasks.cleaning`: aberrant values and cycles are discarded using the
-        the rules defined in the `cleaning.processor.DataCleaningTask` task.
-
-        * `Tasks.alignment`: The cycles are aligned using the algorithm defined
-        in the `eventdetection.processor.alignment.ExtremumAlignmentTask` task.
-        """
         return cls.__base_cleaning__()
 
     @classmethod
@@ -205,7 +264,7 @@ class Tasks(Enum):
 
     def default(self) -> Task:
         "returns default tasks"
-        return self.defaults()[self.value]
+        return self.defaults()[self.name]
 
     def tasktype(self) -> Type[Task]:
         "returns the task type"
@@ -220,7 +279,11 @@ class Tasks(Enum):
 
     @classmethod
     def defaulttaskorder(cls, order = None) -> Tuple[Type[Task],...]:
-        "returns the default task order"
+        """
+        Creates a list of tasks in the default order.
+
+        This order is defined in `Tasks.__taskorder__()`.
+        """
         if order is None:
             order =  cls.__taskorder__()
         items = tuple(type(cls(i)()) for i in order[::-1])
@@ -228,7 +291,16 @@ class Tasks(Enum):
 
     @classmethod
     def defaulttasklist(cls, obj, upto, cleaned:bool = None) -> List[Task]:
-        "Returns a default task list depending on the type of raw data"
+        """
+        Returns a default task list depending on the type of raw data.
+
+        The list is computed:
+
+        1. using tasks in `Tasks.__tasklist__()`
+        2. adding tasks in `Tasks.__cleaning__()` *unless* the track is *clean*.
+        3. keep only those tasks in `Tasks.__nodefault__()` which don't have
+        only default values for their attributes.
+        """
         tasks = list(cls.__tasklist__()) # type: ignore
         paths = getattr(obj, 'path', obj)
         if (getattr(obj, 'cleaned', cleaned)
@@ -244,8 +316,9 @@ class Tasks(Enum):
         return [i() for i in itms if i not in nod or not isdef(i())] # type: ignore
 
     @classmethod
+    @_DOCHelper.add(header = "These can be:")
     def tasklist(cls, *tasks, **kwa) -> List[Task]:
-        "Same as create except that a list may be completed as necessary"
+        "Return as create except that a list may be completed as necessary"
         if len(tasks) == 1 and isinstance(tasks[0], (str, Path)):
             mdl = anastore.load(tasks[0])
             if mdl is None:
@@ -280,15 +353,17 @@ class Tasks(Enum):
         return lst
 
     @classmethod
+    @_DOCHelper.add(header = "These can be:")
     def processors(cls, *args, copy = True, beadsonly = True) -> ProcessorController:
-        "returns an iterator over the result of provided tasks"
+        "Return a `ProcessorController` containing selected tasks."
         procs      = _create(*cls.tasklist(*args, beadsonly = beadsonly))
         procs.copy = copy
         return procs
 
     @classmethod
+    @_DOCHelper.add(header = "These can be:")
     def apply(cls, *args, copy = True, beadsonly = True, pool = None) -> TrackView:
-        "returns an iterator over the result of provided tasks"
+        "Return an iterator over the result of selected tasks."
         procs = cls.processors(*args, beadsonly = beadsonly)
         ret   = isinstance(pool, bool)
         if ret:
@@ -332,7 +407,7 @@ class Tasks(Enum):
         return register(None)[type(task)](task = task)
 
     def __call__(self, *resets, **kwa)-> Task:
-        fcn     = getattr(self, '_default_'+self.value, None)
+        fcn     = getattr(self, '_default_'+self.name, None)
         if fcn is not None:
             return fcn(*resets, **kwa)
 
@@ -400,3 +475,5 @@ class Tasks(Enum):
             return cls(arg[0])(**arg[1], **kwa)
 
         raise RuntimeError('arguments are unexpected')
+
+setattr(Tasks, 'RESET', Ellipsis)
