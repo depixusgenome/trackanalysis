@@ -9,7 +9,20 @@ from .splitting    import SplitDetector, MultiGradeSplitDetector
 from .merging      import MultiMerger, EventMerger, EventSelector
 
 class EventDetector(PrecisionAlg):
-    "detects, mergers and selects intervals"
+    """
+    Detect, merge and select flat intervals in `PHASE.measure`
+
+    # Attributes
+
+    * `split`: splits the data into too many intervals. This is based on a grade
+    computed for each frame indicating the likelihood that an event is finished.
+    See `eventdetection.splitting` for the available grades.
+
+    * `merge`: merges the previous intervals when the difference between their
+    population is not statistically relevant.
+
+    * `select`: possibly clips events and discards those too small.
+    """
     split: SplitDetector = MultiGradeSplitDetector()
     merge: EventMerger   = MultiMerger()
     select               = EventSelector()

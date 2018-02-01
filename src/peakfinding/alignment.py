@@ -18,9 +18,9 @@ class PeakCorrelationAlignment:
     all cycles. This repeated multiple times with the latter histogram taking
     prior biases into account.
 
-    Biases are furthermore centered at zero around their median
+    Biases are furthermore centered at zero around their median.
 
-    Attributes:
+    # Attributes
 
     * *actions*:   a list of aligment actions with their options
     * *subpixel*:  algorithm for subpixel precision on the correlation peaks

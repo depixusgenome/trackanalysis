@@ -11,7 +11,20 @@ from ..data             import Events
 from ..                 import EventDetectionConfig
 
 class EventDetectionTask(EventDetectionConfig, Task):
-    "Config for an event detection"
+    """
+    # Returned Values
+
+    Events are returned in array with one entry per cycle. Each cycle entry consists
+    in a list of events. Each event consists in a pair:
+
+    1. the event start frame position in the `PHASE.measure`: events at the begining
+    of the phase have a start position of zero.
+
+    2. The slice of 'X', 'Y' or 'Z' data relevant to the event.
+    """
+    if __doc__:
+        __doc__ = getattr(EventDetectionConfig, '__doc__') + __doc__
+
     levelin = Level.bead
     levelou = Level.event
     phase   = PHASE.measure

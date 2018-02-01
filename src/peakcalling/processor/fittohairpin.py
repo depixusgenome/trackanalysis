@@ -30,7 +30,38 @@ Constraints = Dict[BEADKEY, DistanceConstraint]
 Matchers    = Dict[str,     PeakMatching]
 
 class FitToHairpinTask(Task):
-    "Fits a bead to all hairpins"
+    """
+    Fits a bead to all provided hairpins.
+
+    # Attributes
+
+    * `fit`: a dictionnary of specific `HairpinFitter` to use for a bead.
+    `DEFAULT_FIT` is used when none is provided for a given bead.
+
+    * `constraints`: a dictionnary of specific constraints to apply for a bead.
+    `DEFAULT_CONSTRAINTS` is used when none are provided for a given bead.
+
+    * `match`: a dictionnary of specific `PeakMatching` to use for a bead.
+    `DEFAULT_MATCH` is used when none is provided for a given bead.
+
+    See `peakcalling.tohairpin` for the various available `HairpinFitter`.
+
+    # Returned values:
+
+    Values are returned per bead  in a `FitBead` object:
+
+    * `key`: the bead number
+
+    * `silhouette`: an indicator of how far above the best fit is to its
+    others.  A value close to 1 indictes that the bead is identified
+    unambiguously with a single hairpin sequence.
+
+    * `distances`: one `Distance` item per hairpin sequence. The hairpin with
+    the lowest `Distance.value` is the likeliest fit.
+
+    * `peaks      : the peak position in nm together with the hairpin peak it's affected to.
+    * `events     : peak events as out of an `Events` view.
+    """
     level                     = Level.peak
     fit         : Fitters     = dict()
     constraints : Constraints = dict()

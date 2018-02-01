@@ -14,7 +14,18 @@ from   control.processor.taskview import TaskViewProcessor
 from   ..selector                 import PeakSelector, Output as PeakOutput, PeaksArray
 
 class PeakSelectorTask(PeakSelector, Task):
-    "Groups events per peak"
+    """
+    # Returned Values
+
+    One pair per peak:
+
+    1. the peak position: an average of event positions in the peak.
+    2. events in the peak: an array with one entry per cycle, each cycle entry
+    consisting in the events relevant the the cycle and the peak together.
+    """
+    if __doc__:
+        __doc__ = getattr(PeakSelector, '__doc__') + __doc__
+
     levelin = Level.event
     levelou = Level.peak
     @classmethod

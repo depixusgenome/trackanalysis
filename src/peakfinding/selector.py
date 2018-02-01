@@ -60,11 +60,29 @@ class PeaksArray(EventsArray):
     _dtype     = None
 
 class PeakSelector(PrecisionAlg):
-    "Selects peaks and yields all events related to each peak"
+    """
+    Find binding positions and selects relevant events.
+
+    # Attributes
+
+    * `histogram`: algorithm for projecting all events onto the z axis. Multiple
+    events in a single neighborhood create peaks. These are the binding positions.
+    * `align`: algorithm for aligning cycles so as to minimize peak widths in the histogram.
+    * `finder`: algorithm for extracting binding positions from the histogram of
+    *aligned* events.
+    """
+
     rawfactor          = 2.
     histogram          = Histogram(edge = 2)
     align              = PeakCorrelationAlignment()
     finder: PeakFinder = ByZeroCrossing()
+
+    if __doc__:
+        __doc__ += "\n    # Default algorithms\n"
+        __doc__ += f"\n    ## `{type(align).__module__}.{type(align).__qualname__}`\n"
+        __doc__ += type(align).__doc__.replace("\n    #", "\n    ##")
+        __doc__ += f"\n    ## `{type(finder).__module__}.{type(finder).__qualname__}`\n"
+        __doc__ += type(finder).__doc__.replace("\n    #", "\n    ##")
 
     @initdefaults(frozenset(locals()) - {'rawfactor'})
     def __init__(self, **_):

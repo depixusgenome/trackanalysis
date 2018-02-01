@@ -13,14 +13,20 @@ from   data.views           import BEADKEY  # pylint: disable=unused-import
 from   ..alignment          import PeakCorrelationAlignment
 
 class PeakCorrelationAlignmentTask(PeakCorrelationAlignment, Task):
-    "Aligns cycles using peaks"
-    level = Level.event
+    """
+    Aligns cycles by minimizing the peak widths in a histogram of all peaks.
+    """
+    if __doc__:
+        __doc__ += getattr(PeakCorrelationAlignment, '__doc__')
+    level   = Level.event
     def __init__(self, **kwa):
         Task.__init__(self)
         super().__init__(**kwa)
 
 class PeakCorrelationAlignmentProcessor(Processor[PeakCorrelationAlignmentTask]):
-    "Groups events per peak"
+    """
+    Aligns cycles by minimizing the peak widths in a histogram of all peaks.
+    """
     @classmethod
     def isslow(cls) -> bool:
         "whether this task implies long computations"
