@@ -7,9 +7,9 @@ will be expanded to include different methods
 import numpy as np
 from numpy.testing import assert_allclose
 from scipy.stats import expon, norm
-from peakfinding.histogram import ByEM
+from peakfinding.expectationmax import EmPeakFitter
 
-EMFITTER = ByEM()
+EMFITTER = EmPeakFitter()
 
 
 def test_byeminit():
@@ -18,7 +18,7 @@ def test_byeminit():
     # data = np.hstack([norm(loc=0,scale=0.1).rvs(size=100),10])
     pass
 
-def test_byemscore():
+def test_ztscore():
     'tests the score method'
     data   = np.array([[0,0],[10,0],[0,1]])
     params = [[(0,1),(0,1)],[(10,0.1**2),(0,2)],[(5,100),(0,1)],[(0,100),(0.5,1)]]
@@ -30,7 +30,8 @@ def test_byemscore():
                     rtol=1e-2,
                     atol=1e-2)
 
-    # add test for (x,y,z,t)
+def test_xyztscore():
+    'add test for (x,y,z,t)'
     data   = np.array([[0,0,0,1],[-1,0,0,1],[1,0,0,1],[0,1,0,1],[1,0,-1,1]])
 
     params = [[(np.array(3*[0]),np.diag(3*[1])),(0,1)],
@@ -57,12 +58,12 @@ def test_assign():
     assert {0:(1,),1:(2,),2:(0,)}==EMFITTER.assign(score)
 
 def test_byemstep():
-    'test the expectation and maximization step of ByEM'
+    'test the expectation and maximization step of EmPeakFitter'
     rstate=np.random.RandomState(2)
     data = np.vstack([np.hstack([norm(loc=i,scale=0.1).rvs((1000,1),random_state=rstate), # pylint: disable=unused-variable
                                  expon(loc=0,scale=0.1).rvs((1000,1),random_state=rstate)])
                       for i in range(0,10,2)])
-    byem=ByEM(emiter=1) # pylint: disable=unused-variable
+    byem=EmPeakFitter(emiter=1) # pylint: disable=unused-variable
     # byem.fit(data,5)
     # [[(array([-0.01037411]), array(0.010754432724043382)),
     #   (0.0, 0.088473963060729632)],

@@ -13,7 +13,8 @@ import numpy as np
 from utils import initdefaults
 from utils.logconfig import getLogger
 
-from .aotutils import * # pylint: disable=wildcard-import
+from ..histogram import ZeroCrossingPeakFinder
+from .aotutils import exppdf, normpdf  # pylint:disable=no-name-in-module
 
 LOGS = getLogger(__name__)
 
@@ -91,9 +92,13 @@ class EmPeakFitter: # pylint: disable=too-many-public-methods
             return params.size-dim*(params.shape[0]-1)
         return params.size
 
-    def initfromzc(self): # to implement
+    # to clean
+    def initfromzc(self,data): # to implement
         'find the parameters in z coordinates based on ZeroCrossing algorithm'
-        pass
+        # required as the convergence is very slow for EM
+        npeaks = len(ZeroCrossingPeakFinder()(*self.kwa.get("hist",(0,0,1))))
+
+        return self.initialize(data,maxbins=2*npeaks)
 
     def initialize(self,data:np.ndarray,maxbins:int=1)->np.ndarray:
         'initialize using density'
@@ -122,6 +127,12 @@ class EmPeakFitter: # pylint: disable=too-many-public-methods
         param, datum = args[0]
         return cls.spatialpdf(*param[0],datum[:-1])*exppdf(*param[1],datum[-1])
 
+    @staticmethod
+    def mvnormpdf(mean,cov,pos):
+        'multivariate normal'
+        cent = pos-mean
+        num  = np.dot(np.dot(cent,np.linalg.inv(cov)),cent.T)
+        return np.exp(-0.5*num)/np.sqrt(float(np.linalg.det(cov)))
 
     # pytest
     @classmethod
@@ -132,17 +143,24 @@ class EmPeakFitter: # pylint: disable=too-many-public-methods
         # cent = np.matrix(pos-mean)
         # return np.exp(-0.5*float(cent*np.linalg.inv(cov)*cent.T))/\
         #     np.sqrt(float(np.linalg.det(cov)))
-        return mvnormpdf
+        return cls.mvnormpdf(mean,cov,pos)
 
-    @nb.jit
+    # to clean
     def score(self,data:np.ndarray,params)->np.ndarray:
         'return the score[i,j] array corresponding to pdf(Xj|Zi, theta)'
         # use bin n data to reduce computation
-        # segregate according to space data only on 2*std
-        pdf = map(self.pdf,itertools.product(params,data)) # long
-        # adding a small constant (i.e. uniform distribution)
-        # -> avoids singularities
-        return np.array(list(pdf)).reshape(len(params),-1)+ 10*self.floaterr
+        score = np.ones((len(params),data.shape[0]))*10*self.floaterr
+        pairs = [(row,col)
+                 for row,i in enumerate(params[:,0])
+                 for col in np.argwhere((data[:,0]-i[0])**2<100*i[1]).ravel()]
+        for row,col in pairs:
+            score[row,col]+=self.pdf((params[row],data[col]))
+        return score
+
+        #pdf = map(self.pdf,itertools.product(params,data)) # long
+        # # adding a small constant (i.e. uniform distribution)
+        # # -> avoids singularities
+        #return np.array(list(pdf)).reshape(len(params),-1)+ 10*self.floaterr
 
     @nb.jit
     def emstep(self,data:np.ndarray,rates:np.ndarray,params:np.ndarray):
@@ -203,7 +221,7 @@ class EmPeakFitter: # pylint: disable=too-many-public-methods
     @classmethod
     def llikelihood(cls,score:np.ndarray,rates:np.ndarray)->float:
         'returns loglikelihood'
-        return llikelihood(score,rates)
+        return np.sum(np.log(np.sum(rates*score,axis=0)))
 
     # to pytest
     def fit(self,data,rates,params,prevll:Optional[float] = None):

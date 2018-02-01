@@ -23,16 +23,19 @@ def exppdf(loc, scale, pos):
     return 0 if loc>pos else float(np.exp((loc-pos)/scale)/scale)
 
 
-@NBCC.export("llikelihood","f4(f4[:,:],f4[:,:])")
-def llikelihood(score,rates):
-    'returns loglikelihood'
-    return np.sum(np.log(np.sum(rates*score,axis=0)))
+# np.sum not supported yet?
+# @NBCC.export("llikelihood","f4(f4[:,:],f4[:,:])")
+# def llikelihood(score,rates):
+#     'returns loglikelihood'
+#     return np.sum(np.log(np.sum(rates*score,axis=0)))
 
-@NBCC.export("mvnormpdf","f4(f4[:],f4[:,:],f4[:])")
-def mvnormpdf(mean,cov,pos):
-    'multivariate normal'
-    cent = pos-mean
-    return np.exp(-0.5*float(cent*np.linalg.inv(cov)*cent.T))/np.sqrt(float(np.linalg.det(cov)))
+# returns singular to machine precision
+# @NBCC.export("mvnormpdf","f4(f4[:],f4[:,:],f4[:])")
+# def mvnormpdf(mean,cov,pos):
+#     'multivariate normal'
+#     cent = pos-mean
+#     num  = np.dot(np.dot(cent,np.linalg.inv(cov)),cent.T)
+#     return np.exp(-0.5*num)/np.sqrt(float(np.linalg.det(cov)))
 
 if __name__=="__main__":
     NBCC.compile()
