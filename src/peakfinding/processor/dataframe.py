@@ -13,18 +13,19 @@ from   eventdetection.data         import Events, EventDetectionConfig
 from   ..probabilities             import Probability
 from   .selector                   import PeaksDict
 
+@DataFrameFactory.adddoc
 class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
     """
-    converts to a pandas dataframe.
+    Transform a `PeaksDict` to one or more `pandas.DataFrame`.
 
-    Columns are:
+    # Default Columns
 
     * *peakposition*
     * *averageduration*
     * *hybridisationrate*
     * *eventcount*
 
-    ### Aggregated values
+    # Aggregated Values
 
     If a *numpy* function or function name is provided in the measures, then it
     is applied to the concatenation of all event data.
@@ -38,7 +39,7 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
     >>> DataFrameTask(measures = dict(std = ('nanstd', 'nanmean')))
     ```
 
-    ### Getting one row per event
+    # Getting one row per event
 
     One can also add information on events using:
 

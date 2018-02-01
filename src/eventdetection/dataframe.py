@@ -6,16 +6,19 @@ import numpy  as np
 from   control.processor.dataframe import DataFrameFactory
 from   .data                       import Events, EventsArray
 
+@DataFrameFactory.adddoc
 class EventsDataFrameFactory(DataFrameFactory[Events]):
     """
-    converts to a pandas dataframe.
+    Transform an `Events` to one or more `pandas.DataFrame`.
 
-    Default columns are:
+    # Default Columns
 
-        * *event*: event number in the cycle
-        * *start*: event start position in phase 5
-        * *length*: event length
-        * *avg*: event average position
+    * *event*: event number in the cycle
+    * *start*: event start position in phase 5
+    * *length*: event length
+    * *avg*: event average position
+
+    # Other
 
     It's possible to compute and return values on all events of a cycle using:
 

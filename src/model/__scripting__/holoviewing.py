@@ -5,18 +5,25 @@
 Add hv stuff
 """
 from IPython         import get_ipython
-from IPython.display import HTML, Markdown, display as _display
+from IPython.display import Markdown, display as _display
 from .tasks          import Tasks, _DOCHelper # pylint: disable=protected-access
 
 def display(self):
     "displays helpful doc"
     tpe = self.tasktype()
-    _display(HTML(f'<H3> {str(self)}</H3>'
-                  +f'<p>Its task is {tpe.__module__}.{tpe.__qualname__}</p>'
-                  +'<H4>Description</H4>'
-                  +'<p>'+' '.join(getattr(_DOCHelper, self.name).value)+'</p>'
-                  +'<H4>Task documentation</H4>'))
-    _display(Markdown(tpe.__doc__))
+    des = ' '.join(getattr(_DOCHelper, self.name).value)
+    doc = f"""
+          # {str(self)}
+          Its task is `{tpe.__module__}.{tpe.__qualname__}`
+
+          ## Description
+          {des.capitalize()}
+
+          ## `{tpe.__qualname__}` Documentation
+          """.replace('\n          ', '\n').strip()+'\n'
+    doc += tpe.__doc__.replace('\n    ', '\n').replace('\n#', '\n###')
+    print(doc)
+    _display(Markdown(doc.strip()))
     return _display()
 
 del Tasks.__repr__

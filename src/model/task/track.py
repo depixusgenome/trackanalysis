@@ -16,7 +16,17 @@ _PATHTYPE = Union[str, Path, Tuple[Union[str,Path],...]]
 PATHTYPE  = Union[_PATHTYPE, Dict[str,_PATHTYPE]]
 
 class TrackReaderTask(RootTask):
-    "Class indicating that a track file should be added to memory"
+    """
+    Reads a track file to memory
+
+    # Attributes
+
+    * `path`: is the path to a track file and its optional secondary files
+    * `beadsonly`: beads only should be iterated over, not 't' or 'zmag'.
+    * `copy`: only a copy of the data should be iterated over.
+    * `key`: a name by which to call the track. Defaults to the filename.
+    * `axis`: which axis to load, It can be "X" "Y" or "Z"
+    """
     path:      PATHTYPE = None
     beadsonly: bool     = False
     copy:      bool     = False
@@ -39,7 +49,7 @@ class TrackReaderTask(RootTask):
         self.axis = getattr(self.axis, 'value', self.axis)
 
 class CycleCreatorTask(Task):
-    "Task for dividing a bead's data into cycles"
+    "Iterate over cycles and beads"
     levelin    = Level.bead
     levelou    = Level.cycle
     first: int = None
@@ -55,8 +65,13 @@ class CycleCreatorTask(Task):
 
 class CycleSamplingTask(Task):
     """
-    Transforms the track so as to select only a fraction of cycles.
+    Replace the track with a new one containing only selected cycles.
+
     This must be applied just after the root task for it to be meaningful
+
+    # Attributes
+
+    * `cycles`: a slice or list of cycles to select.
     """
     cycles: Union[Sequence[int], slice] = None
     level                               = Level.bead
@@ -65,7 +80,21 @@ class CycleSamplingTask(Task):
         super().__init__()
 
 class DataSelectionTask(Task):
-    "selects some part of the data"
+    """
+    Select some part of the data.
+
+    # Attributes
+
+    Some attributes are only relevant to `Beads` or to `Cycles` as indicated.
+
+    * `beadsonly`: iterate over beads only, not 't' or 'zmag'.
+    * `samples`: a slice indicating which frames to select.
+    * `phases`: interval of phases to select (`Cycles`).
+    * `selected`: the beads (`Beads`) or beads and cycles (`Cycles`) to be selected.
+    * `selected`: the beads (`Beads`) or beads and cycles (`Cycles`) to be selected.
+    * `discarded`: the beads (`Beads`) or beads and cycles (`Cycles`) to be discarded.
+    * `cycles`: the cycles to select (`Beads`).
+    """
     level                                  = Level.none
     beadsonly: bool                        = None
     samples:   Union[Sequence[int], slice] = None

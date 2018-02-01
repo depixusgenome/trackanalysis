@@ -176,8 +176,19 @@ class FitToHairpinProcessor(TaskViewProcessor[FitToHairpinTask, FitToHairpinDict
                    match       = {} if not match       else match)
         return cnf
 
+@DataFrameFactory.adddoc
 class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
-    "converts to a pandas dataframe."
+    """
+    Transform a `FitToHairpinDict` to one or more `pandas.DataFrame`.
+
+    The dataframe contains one row per event selected in a peak.
+
+    # Default Columns
+
+    * *peak*: the peak position in nm to which the event belongs
+    * the peak position in base number for each hairpin provided. The name of
+    the column is that of the hairpin.
+    """
     # pylint: disable=arguments-differ
     @staticmethod
     def _run(_1, _2, res:FitBead) -> Dict[str, np.ndarray]: # type: ignore

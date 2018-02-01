@@ -217,17 +217,20 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
 class FitToReferenceProcessor(TaskViewProcessor[FitToReferenceTask, FitToReferenceDict, BEADKEY]):
     "Changes the Z axis to fit the reference"
 
+@DataFrameFactory.adddoc
 class FitToReferenceDataFrameFactory(DataFrameFactory[FitToReferenceDict]):
     """
-    converts to a pandas dataframe.
+    Transform a `FitToReferenceDict` to one or more `pandas.DataFrame`.
 
-    Columns are:
+    # Default Columns
 
-        * *peakposition*
-        * *averageduration*
-        * *hybridisationrate*
-        * *eventcount*
-        * *referenceposition*: the peak position in the reference
+    * *peakposition*
+    * *averageduration*
+    * *hybridisationrate*
+    * *eventcount*
+    * *referenceposition*: the peak position in the reference
+
+    # Other
 
     One can add *stretch* and *bias* to the list by doing:
 
@@ -236,7 +239,8 @@ class FitToReferenceDataFrameFactory(DataFrameFactory[FitToReferenceDict]):
     ```
     """
     if __doc__:
-        __doc__ += '\n'+PeaksDataFrameFactory.__doc__[PeaksDataFrameFactory.__doc__.find('#')-5:]
+        __doc__ += ('\n'+PeaksDataFrameFactory.__doc__
+                    [PeaksDataFrameFactory.__doc__.find('# Agg')-5:])
     PREC     = 5e-6
     def __init__(self, task, frame):
         get = lambda i: (i  if task.measures.get(i, False) is True else

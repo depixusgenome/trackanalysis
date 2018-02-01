@@ -20,6 +20,19 @@ class DataFrameFactory(Generic[Frame]):
     def __init__(self, task: DataFrameTask, _: TrackView) -> None:
         self.task  = task
 
+    @staticmethod
+    def adddoc(newcls):
+        "Adds the doc to the task"
+        if not getattr(newcls, '__doc__', None):
+            return
+
+        tpe = newcls.frametype()
+        doc = '\n'.join((newcls.__doc__).split('\n')[2:]).replace('#', '##')
+        DataFrameTask.__doc__ += f'\n    # For `{tpe.__module__}.{tpe.__qualname__}`\n'
+        DataFrameTask.__doc__ += doc
+
+        return newcls
+
     @classmethod
     def frametype(cls)-> Type[Frame]:
         "returns the frame type"

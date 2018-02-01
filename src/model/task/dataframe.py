@@ -12,7 +12,17 @@ from   ..level  import Level
 from   .base    import Task
 
 class DataFrameTask(Task):
-    "Task for creating dataframes"
+    """
+    Transform a `TrackView` to one or more `pandas.DataFrame`.
+
+    # Attributes
+
+    * `merge`: whether to return one dataframe per element or a single one per view.
+    * `indexes`: the columns to use as indexes. This list may be over-complete
+    depending on the level the task is applied to.
+    * `measures`: the name of a column and the function for creating its values.
+    * `transform`: actions to be performed on the finalized dataframe.
+    """
     level                                      = Level.none
     merge                                      = False
     indexes:   Sequence[str]                   = ['track', 'bead', 'cycle', 'event']
