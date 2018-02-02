@@ -127,6 +127,20 @@ def run(locs, direct, star, jupyter):
         locs.pop('run')
 
     getLogger("").info(f'{version.version()}{" for jupyter" if ISJUP else ""}')
+    if 'TUTORIAL' in locs:
+        if _isjupyter():
+            def tutorial():
+                "clues for the beginner"
+                from IPython.display import display, Markdown
+                display(Markdown(locs['TUTORIAL']))
+            locs['tutorial'] = tutorial
+        else:
+            def tutorial():
+                "clues for the beginner"
+                print(locs['TUTORIAL'])
+            locs['tutorial'] = tutorial()
+
+        getLogger("").info('Beginners can start by typing: tutorial()')
 
 __all__ = tuple(i for i in locals()
                 if (i not in {'isjupyter', 'run', 'test', 'importlibs', 'importjupyter', 'ISJUP'}
