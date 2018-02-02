@@ -1,7 +1,10 @@
 # Project Goals
 
 * User-friendly, platform agnostic data analysis tools.
-* Batch *and* GUI modes must both function.
+* Scripting, batch *and* GUI modes must both function. Computations whatever the
+mode should be a single piece of code.
+* The documentation should be in the code. The class and function documentation
+is user-oriented. Comments are for the developpers. 
 
 # Installing
 
@@ -10,7 +13,7 @@ The first step is to install boost libraries, either using the linux distributio
 Clone the git repository and it's submodules, then set up the 
 environment and build:
 
-```
+```shell
 git clone http:\\GIT-REPO
 git submodule update --init --recursive
 
@@ -33,9 +36,72 @@ The *configure* and *setup* steps are every time new dependencies
 are added. The *build* step is required any time sources are
 changed.
 
+## Known problems
+
+### As of 2018-01-01
+
+#### pyembed error
+
+The default python installed by conda might not be compatible with compiling
+native code (*pybind11*) modules. The solution is to look for and install a
+version of python as follows:
+
+```shell
+conda search -f python -c conda-forge
+```
+
+It spits out a list of values such as:
+
+    ...
+    python                     3.6.3                hefd0734_2  defaults       
+    python                     3.6.4                         0  conda-forge    
+    python                     3.6.4                hc3d631a_0  defaults       
+    python                     3.6.4                hc3d631a_1  defaults 
+
+The *undocumented* tags in the 3rd column are the relevant piece of information.
+Choose a tag from *conda-forge* (4th column). The tag always seems to be an integer.
+Its value doesn't seem to matter.
+
+#### boost library & linux
+
+The default boost libraries are installed using the linux application installer
+(*apt*,...). On a debian installation, the commandline is
+
+```shell
+sudo apt install libboost-all-dev
+```
+
+For non superusers, an option is to install boost from conda-forge. This
+requires providing the boost paths to `python waf configure` as well as executing
+the previous `ln -s` commands.
+
+
+Neither installations are not fully *waf* compatible. The latter expects a
+different name for libraries. The following command line is needed:
+
+```shell
+sudo ln -s /usr/lib/x86_64-linux-gnu/libboost_math_tr1l.so.1.62.0 /usr/lib/x86_64-linux-gnu/libboost_math_tr1l.so.1.62.so
+```
+
+For a conda-forge installation, the `sudo` is not needed and the paths need to
+be adapted.
+
+In both cases, the boost version (1.62 in the above example) should be adapted
+the one on your system.
+
 # Architecture
 
 The global architecture principle is *Model-View-Controller*.
+
+## Documentation
+
+Public classes and functions must provide a *user-oriented* description. Comments
+are for developpers only. The format is markdown. It should include:
+
+    1. A one liner description.
+    2. A detailed explanation which can be divided into sections.
+    3. For classes: and `# Attributes` section containing a list of the
+    instance's public attributes.
 
 ## The model
 
@@ -75,6 +141,19 @@ all controllers used by it. As such they must have distinctive names for their m
 This is also true for views.
 
 Undos are *always* implemented: see src/view/undo.py
+
+## Scripting mode
+
+A scripting mode is available. The code is available in `__scripting__` sub-modules.
+It should provide easier means for accessing the data, extracting information and
+displaying results. **This is just sugar**. Any real computations should be in the
+parent modules.
+
+Displays rely on *holoviews* which can only be used within *jupyter*. This is why
+displays are coded into `__scripting__.holoviewing` sub-modules.
+
+To invoke the scripting mode, add `from scripting import *` to the start of your
+script or jupyter file.
 
 # Ramp Treatment
 
