@@ -4,6 +4,7 @@
 #include<math.h>
 #include<pybind11/pybind11.h>
 #include<pybind11/numpy.h>
+#include<pybind11/stl.h>
 #include<boost/numeric/ublas/matrix.hpp>
 #include<boost/numeric/ublas/matrix_proxy.hpp>
 #include<boost/numeric/ublas/vector_proxy.hpp>
@@ -16,7 +17,8 @@ double exppdf(double loc,double scale,double pos);
 
 namespace py=pybind11;
 namespace blas=boost::numeric::ublas;
-using ndarray = py::array_t<double, py::array::c_style>;
 
-typedef blas::matrix<double> matrix;
+using ndarray = py::array_t<double, py::array::c_style>;
+using  matrix = blas::matrix<double>;
+
 #endif
