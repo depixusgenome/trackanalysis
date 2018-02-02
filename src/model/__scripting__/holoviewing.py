@@ -22,7 +22,6 @@ def display(self):
           ## `{tpe.__qualname__}` Documentation
           """.replace('\n          ', '\n').strip()+'\n'
     doc += tpe.__doc__.replace('\n    ', '\n').replace('\n#', '\n###')
-    print(doc)
     _display(Markdown(doc.strip()))
     return _display()
 

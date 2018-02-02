@@ -85,7 +85,7 @@ class Histogram(PrecisionAlg):
               and str(aevents.dtype)[0] == 'f'):    # type: ignore
             events = np.array(aevents, dtype = 'f4')[None].T[None]
         else:
-            events = asdataarrays(aevents)
+            events = asdataarrays(aevents) # type: ignore
             if events is None:
                 return np.empty((0,), dtype = 'f4'), np.inf, 0.
 
@@ -392,11 +392,11 @@ class GroupByPeak:
     """
     Groups events by peak position.
 
-    Attributes:
+    # Attributes
 
-        * *mincount:* Peaks with fewer events are discarded.
-        * *window:*   The maximum distance of an event to the peak position, in
-        units of precision.
+    * *mincount:* Peaks with fewer events are discarded.
+    * *window:*   The maximum distance of an event to the peak position, in
+    units of precision.
     """
     window       = 3
     mincount     = 5
@@ -449,10 +449,10 @@ class GroupByPeakAndBase(GroupByPeak):
     """
     Groups events by peak position, making sure the baseline peak is kept
 
-    Attributes:
+    # Attributes
 
-        * *baserange:* the range starting from the very left where the baseline
-        peak should be, in µm.
+    * *baserange:* the range starting from the very left where the baseline
+    peak should be, in µm.
     """
     baserange = .1
     @initdefaults(frozenset(locals()))
@@ -474,9 +474,6 @@ class ByZeroCrossing:
     """
     Finds peaks with a minimum *half*width and threshold
     """
-    subpixel         = SubPixelPeakPosition()
-    peakwidth        = 1
-    threshold: float = getattr(np.finfo('f4'), 'resolution')
     finder           = ZeroCrossingPeakFinder()
     grouper          = GroupByPeakAndBase()
     @initdefaults(frozenset(locals()), subpixel = 'update')
