@@ -126,6 +126,7 @@ def run(locs, direct, star, jupyter):
     if getattr(locs.get('run', None), '__module__', None) == __name__:
         locs.pop('run')
 
+    # pylint: disable=no-member
     getLogger("").info(f'{version.version()}{" for jupyter" if ISJUP else ""}')
     if 'TUTORIAL' in locs:
         if _isjupyter():
@@ -138,7 +139,7 @@ def run(locs, direct, star, jupyter):
             def tutorial():
                 "clues for the beginner"
                 print(locs['TUTORIAL'])
-            locs['tutorial'] = tutorial()
+            locs['tutorial'] = tutorial
 
         getLogger("").info('Beginners can start by typing: tutorial()')
 
