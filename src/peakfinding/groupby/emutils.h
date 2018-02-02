@@ -2,7 +2,6 @@
 #define EMUTILS_H
 #include<iostream>
 #include<math.h>
-#include<vector>
 #include<pybind11/pybind11.h>
 #include<pybind11/numpy.h>
 #include<boost/numeric/ublas/matrix.hpp>
@@ -19,4 +18,5 @@ namespace py=pybind11;
 namespace blas=boost::numeric::ublas;
 using ndarray = py::array_t<double, py::array::c_style>;
 
+typedef blas::matrix<double> matrix;
 #endif
