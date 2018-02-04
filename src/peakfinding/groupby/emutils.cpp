@@ -42,18 +42,6 @@ matrix arraytomatrix(ndarray arr){
   return ret;
 }
 
-// matrix scoreparams(ndarray params, ndarray data){
-//   // translate from python to C++
-//   // apply scoreparam for each element in cparams,cdata
-//   blas::matrix<double> score(infopar.shape[0],infodat.shape[0],0);
-//   for (ssize_t r=0;r<infopar.shape[0];++r){
-//     for (ssize_t col=0;col<infodat.shape[0];++col){
-//       score(r,col) = scoreparam(blas::row(cparams,r),row(cdata,col));
-//     }
-//   }
-//   return score;
-// }
-
 matrix scoreparams(matrix data, matrix params){
   // apply scoreparam for each element in cparams,cdata
   matrix score(params.size1(),data.size1(),0);
@@ -81,20 +69,46 @@ struct OutputMaximization{
 //   tscale = np.sum(proba*data[:,-1])
 //   return [(nmeans,self.covmap(ncov)),(0.,tscale)]
   
-matrix maximizeparam(const matrix &data,blas::vector proba){
+matrix maximizeparam(const matrix &data,matrix pz_x){
   // or (const matrix &data , matrix pz_x)
   // maximizes (all) parameters to reduce data manipulations 
   // proba is a row of npz_x
-  matrix spatialdata = blas::subrange(data,0,data.size1(),0,data.size2()-1);
-  matrix spdata_t = blas::trans(spatialdata);
-  matrix wdata = blas::prod(pz_x,data); // weighted
-  matrix wspdata = blas::subrange(wdata,0,data.size1(),0,data.size2()-1);
+  const unsigned DCOLS = data.size2();
+  const unsigned DROWS = data.size1();
+  auto	sdata	 = blas::subrange(data,0,DROWS,0,DCOLS-1);
+  auto	spdata_t = blas::trans(spatialdata);
 
+  // new spatial means are rows of wspdata; // ok
+  auto wspdata = blas::prod(pz_x,sdata);
+  // new mean of time is zero; // ok
   // general covariance, currently restricting to diagonal terms
-  matrix cov = blas::prod(spdata_t,wspdata); // extract submatrix
 
-  matrix newparams(pz_x.size1(),,0);
-  return;
+  //auto cov = blas::prod(spdata_t,wspdata);// wrong ncov, must be estimated row of pz_x per row
+
+  // spatial cov is the diagonal of cov
+
+  auto tdata  = blas::column(data,DCOLS-1);
+  const unsigned NPCOLS = 2*DCOLS-1;
+  matrix newparams(pz_x.size1(),NPCOLS+1,0);
+  // the new duration scale is the sum of the element product of row * data[:,-1]
+  blas::vector<double> row, prod;
+  blas::vector<double> ones(DROWS,1.);
+  for (unsigned it=0u,nrows=pz_x.size1();it<nrows;++it){
+    row	 = blas::row(pz_x,it);
+    prod = blas::element_prod(row,tdata);
+    newparams(it,NPCOLS) = blas::inner_prod(prod,ones);// sum of prod
+    // to continue from here
+    // ncov must be computed here
+    // need to add the spatial means and covariance a row at a time
+    for (unsigned dim=0,maxdim=DCOLS;dim<maxdim;++dim){
+      newparams(it,2*dim)   = wspdata(it,dim);	//mean
+      // restricting cov to single value
+      newparams(it,2*dim+1) = cov();	//cov
+    }
+  }
+  // stack correctly the results
+  // space mean, space cov, duration mean, duration cov
+  return newparams;
 }
 
 // def maximization(self,pz_x:np.ndarray,data:np.ndarray):
@@ -124,7 +138,7 @@ OutputMaximization maximization(const matrix &data, matrix pz_x){
     for (unsigned c=0, ncols=pz_x.size2();c<ncols;++c){
       npz_x(r,c)/=norm(r);
     }
-    nrates(r,1)=norm(r); // better way?
+    nrates(r,1)=norm(r);
   }
   nrates/=pz_x.size2();
   
@@ -146,7 +160,6 @@ void emstep(const matrix &data, matrix &rates, matrix &params){
     norm+=blas::row(pz_x,r);
 
   // renormalize probability per peak
-  // yes, could do better
   for (unsigned r=0u, nrows=pz_x.size1(); r<nrows;++r){ 
     for (unsigned c=0u, ncols=pz_x.size2();c<ncols;++c){
       pz_x(r,c)/=norm(c);
