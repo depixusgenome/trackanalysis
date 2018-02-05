@@ -90,38 +90,36 @@ matrix maximizeparam(const matrix &data,matrix pz_x){
   auto tdata  = blas::column(data,DCOLS-1);
   const unsigned NPCOLS = 2*DCOLS-1;
   matrix newparams(pz_x.size1(),NPCOLS+1,0);
+  matrix ncov(DCOLS-1,DCOLS-1);
+  //blas::vector<double> tmpwdata(DROWS);
+  matrix tmpwdata(,0);
+  matrix diagproba(DCOLS,DCOLS,0);
   // the new duration scale is the sum of the element product of row * data[:,-1]
   blas::vector<double> row, prod;
   blas::vector<double> ones(DROWS,1.);
   for (unsigned it=0u,nrows=pz_x.size1();it<nrows;++it){
-    row	 = blas::row(pz_x,it);
+    row	 = blas::row(pz_x,it); // if changed to diagonal matrix
+    for (dite=0;dite<DCOLS;++dite)
+      diagproba(dite,dite)=row(dite);
+
     prod = blas::element_prod(row,tdata);
-    newparams(it,NPCOLS) = blas::inner_prod(prod,ones);// sum of prod
-    // to continue from here
+    newparams(it,NPCOLS) = blas::inner_prod(prod,ones); // duration scale 
     // ncov must be computed here
+    tmpwdata = blas::prod(diagproba,spdata);
+    ncov     = blas::prod(spdata_t,tmpwdata);
     // need to add the spatial means and covariance a row at a time
     for (unsigned dim=0,maxdim=DCOLS;dim<maxdim;++dim){
+
       newparams(it,2*dim)   = wspdata(it,dim);	//mean
       // restricting cov to single value
       newparams(it,2*dim+1) = cov();	//cov
     }
   }
+  
   // stack correctly the results
   // space mean, space cov, duration mean, duration cov
   return newparams;
 }
-
-// def maximization(self,pz_x:np.ndarray,data:np.ndarray):
-//         'returns the next set of parameters'
-// npz_x = pz_x/np.sum(pz_x,axis=1).reshape(-1,1)
-
-//   nrates   = np.mean(pz_x,axis=1).reshape(-1,1)
-//   maximize = partial(self.__maximizeparam,data)
-//   params   = np.array(list(map(maximize,npz_x))) # type: ignore
-//   if self.covtype is COVTYPE.TIED:
-//   meancov       = np.mean(params[:,0,1],axis=0)
-// 	params[:,0,1] = meancov
-// 	return nrates, params
 
 // should be ok mod some optimizations
 OutputMaximization maximization(const matrix &data, matrix pz_x){
