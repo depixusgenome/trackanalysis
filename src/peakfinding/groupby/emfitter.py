@@ -7,12 +7,11 @@ from enum import Enum
 from functools import partial
 from typing import Callable, Dict, Optional, Tuple
 
-import numba as nb
 import numpy as np
 
 from utils import initdefaults
 from utils.logconfig import getLogger
-from .aotutils import exppdf, normpdf
+from ._core import exppdf, normpdf # pylint: disable=import-error
 
 
 LOGS = getLogger(__name__)
@@ -161,7 +160,6 @@ class ByEM: # pylint: disable=too-many-public-methods
         # # -> avoids singularities
         #return np.array(list(pdf)).reshape(len(params),-1)+ 10*self.floaterr
 
-    @nb.jit
     def emstep(self,data:np.ndarray,rates:np.ndarray,params:np.ndarray):
         'Expectation then Maximization steps of EM'
         score = self.score(data,params)
@@ -170,7 +168,6 @@ class ByEM: # pylint: disable=too-many-public-methods
         rates, params = self.maximization(pz_x,data)
         return self.score(data,params), rates, params
 
-    @nb.jit
     def __maximizeparam(self,data,proba):
         'maximizes a parameter'
         nmeans = np.array(np.matrix(proba)*data[:,:-1]).ravel()
@@ -182,7 +179,6 @@ class ByEM: # pylint: disable=too-many-public-methods
         return [(nmeans,self.covmap(ncov)),(0.,tscale)]
 
     # to pytest
-    @nb.jit
     def maximization(self,pz_x:np.ndarray,data:np.ndarray):
         'returns the next set of parameters'
         npz_x = pz_x/np.sum(pz_x,axis=1).reshape(-1,1)

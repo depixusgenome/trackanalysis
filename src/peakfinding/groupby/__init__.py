@@ -4,9 +4,10 @@
 'initializer for expectation maximization'
 from typing import Union
 
-from .emfitter          import ByEM
-from .gaussianfitter    import ByGaussianMix
-from .histogramfitter   import ZeroCrossingPeakFinder, SubPixelPeakPosition, ByHistogram
+from ._core           import exppdf, normpdf
+from .emfitter        import ByEM
+from .gaussianfitter  import ByGaussianMix
+from .histogramfitter import ZeroCrossingPeakFinder, SubPixelPeakPosition, ByHistogram
 
 
 PeakFinder= Union[ByHistogram,ByGaussianMix,ByEM]
