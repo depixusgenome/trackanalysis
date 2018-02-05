@@ -2,5 +2,11 @@
 # -*- coding: utf-8 -*-
 
 'initializer for expectation maximization'
+from typing import Union
 
-from .fitter import EmPeakFitter
+from .emfitter          import ByEM
+from .gaussianfitter    import ByGaussianMix
+from .histogramfitter   import ZeroCrossingPeakFinder, SubPixelPeakPosition, ByHistogram
+
+
+PeakFinder= Union[ByHistogram,ByGaussianMix,ByEM]

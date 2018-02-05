@@ -200,7 +200,7 @@ class GroupByPeakAndBase(PeakFlagger):
             cnts[imin] = self.mincount # make sure peak is accepted
         return tags, cnts
 
-class GroupByHistogram: # old name ByZeroCrossing
+class ByHistogram:
     """
     Finds peaks with a minimum *half*width and threshold
     """

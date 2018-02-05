@@ -9,9 +9,8 @@ from utils                  import (initdefaults, asobjarray, asdataarrays, asvi
                                     updatecopy, EVENTS_TYPE, EVENTS_DTYPE, EventsArray)
 from signalfilter           import PrecisionAlg, PRECISION
 from .alignment             import PeakCorrelationAlignment
-from .histogram             import (Histogram,
-                                    PeakFinder,
-                                    ByZeroCrossing)
+from .histogram             import Histogram
+from .groupby               import (ByHistogram,PeakFinder)
 EventsOutput        = Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]]
 Input               = Union[Iterable[Iterable[np.ndarray]], Sequence[EVENTS_TYPE]]
 Output              = Tuple[float, EventsOutput]
@@ -75,7 +74,7 @@ class PeakSelector(PrecisionAlg):
     rawfactor          = 2.
     histogram          = Histogram(edge = 2)
     align              = PeakCorrelationAlignment()
-    finder: PeakFinder = ByZeroCrossing()
+    finder: PeakFinder = ByHistogram()
 
     if __doc__:
         __doc__ += "\n    # Default algorithms\n"

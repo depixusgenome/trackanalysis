@@ -9,7 +9,7 @@ from sklearn.mixture import GaussianMixture
 from utils import initdefaults
 from utils.logconfig import getLogger
 
-from byhistogram import ZeroCrossingPeakFinder
+from .histogramfitter import ZeroCrossingPeakFinder
 
 LOGS       = getLogger(__name__)
 
@@ -100,4 +100,3 @@ class ByGaussianMix:
     def __min_crit(crit:str,evts:np.ndarray,gmms):
         values = [getattr(gmm,crit)(evts) for gmm in gmms]
         return gmms[np.argmin(values)]
-

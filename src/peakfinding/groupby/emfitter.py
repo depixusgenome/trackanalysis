@@ -12,9 +12,8 @@ import numpy as np
 
 from utils import initdefaults
 from utils.logconfig import getLogger
+from .aotutils import exppdf, normpdf
 
-from ..histogram import ZeroCrossingPeakFinder
-from .aotutils import exppdf, normpdf  # pylint:disable=no-name-in-module
 
 LOGS = getLogger(__name__)
 
@@ -24,7 +23,7 @@ class COVTYPE(Enum):
     TIED = "tied"
 
 
-class EmPeakFitter: # pylint: disable=too-many-public-methods
+class ByEM: # pylint: disable=too-many-public-methods
     '''
     finds peaks and groups events using Expectation Maximization
     the number of components is estimated using BIC criteria
