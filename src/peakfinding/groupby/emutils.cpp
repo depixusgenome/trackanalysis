@@ -6,14 +6,17 @@
   investigate use of ndarray from start to finish
 */
 
+// should be ok
 double normpdf(double loc,double var,double pos){
   return exp(-0.5*(pow(pos-loc,2)/var))/(sqrt(2*PI*var));
 }
 
+// should be ok
 double exppdf(double loc,double scale,double pos){
   return loc>pos?0:exp((loc-pos)/scale)/scale;
 }
 
+// should be ok
 double pdfparam(blas::vector<double> param,blas::vector<double> datum){
   double pdf = 1.;
   for (uint it=0;
@@ -25,12 +28,14 @@ double pdfparam(blas::vector<double> param,blas::vector<double> datum){
   return pdf*exppdf(param[param.size()-2],param[param.size()-1],datum[datum.size()-1]);
 }
 
+// should be ok
 double scoreparam(blas::vector<double> param, blas::vector<double> datum){
   if (pow(datum(0)-param(0),2)>2*param(1))
     return PRECISION;
   return pdfparam(param,datum);
 }
 
+// should be ok
 matrix arraytomatrix(ndarray arr){
   auto vals = arr.unchecked<2>();
   matrix ret(vals.shape(0),vals.shape(1));
@@ -42,6 +47,7 @@ matrix arraytomatrix(ndarray arr){
   return ret;
 }
 
+// should be ok
 matrix scoreparams(matrix data, matrix params){
   // apply scoreparam for each element in cparams,cdata
   matrix score(params.size1(),data.size1(),0);
@@ -59,15 +65,6 @@ struct OutputMaximization{
   matrix rates;
   matrix params;
 };
-
-
-
-// def __maximizeparam(self,data,proba):
-//           'maximizes a parameter'
-//   nmeans = np.array(np.matrix(proba)*data[:,:-1]).ravel()
-//   ncov   = np.cov(data[:,:-1].T,aweights = proba ,ddof=0)
-//   tscale = np.sum(proba*data[:,-1])
-//   return [(nmeans,self.covmap(ncov)),(0.,tscale)]
   
 matrix maximizeparam(const matrix &data,matrix pz_x){
   // or (const matrix &data , matrix pz_x)
@@ -75,11 +72,11 @@ matrix maximizeparam(const matrix &data,matrix pz_x){
   // proba is a row of npz_x
   const unsigned DCOLS = data.size2();
   const unsigned DROWS = data.size1();
-  auto	sdata	 = blas::subrange(data,0,DROWS,0,DCOLS-1);
-  auto	spdata_t = blas::trans(spatialdata);
+  auto	spdata	 = blas::subrange(data,0,DROWS,0,DCOLS-1);
+  auto	spdata_t = blas::trans(spdata);
 
   // new spatial means are rows of wspdata; // ok
-  auto wspdata = blas::prod(pz_x,sdata);
+  auto wspdata = blas::prod(pz_x,spdata); // new mean values
   // new mean of time is zero; // ok
   // general covariance, currently restricting to diagonal terms
 
@@ -92,31 +89,29 @@ matrix maximizeparam(const matrix &data,matrix pz_x){
   matrix newparams(pz_x.size1(),NPCOLS+1,0);
   matrix ncov(DCOLS-1,DCOLS-1);
   //blas::vector<double> tmpwdata(DROWS);
-  matrix tmpwdata(,0);
+  matrix tmpwdata(DCOLS,DCOLS-1,0);
   matrix diagproba(DCOLS,DCOLS,0);
   // the new duration scale is the sum of the element product of row * data[:,-1]
   blas::vector<double> row, prod;
   blas::vector<double> ones(DROWS,1.);
   for (unsigned it=0u,nrows=pz_x.size1();it<nrows;++it){
-    row	 = blas::row(pz_x,it); // if changed to diagonal matrix
-    for (dite=0;dite<DCOLS;++dite)
+    row = blas::row(pz_x,it);
+    for (unsigned dite=0;dite<DCOLS;++dite)
       diagproba(dite,dite)=row(dite);
 
     prod = blas::element_prod(row,tdata);
     newparams(it,NPCOLS) = blas::inner_prod(prod,ones); // duration scale 
-    // ncov must be computed here
+    // computing new covariance matrix
     tmpwdata = blas::prod(diagproba,spdata);
     ncov     = blas::prod(spdata_t,tmpwdata);
     // need to add the spatial means and covariance a row at a time
     for (unsigned dim=0,maxdim=DCOLS;dim<maxdim;++dim){
-
-      newparams(it,2*dim)   = wspdata(it,dim);	//mean
+      newparams(it,2*dim)   = wspdata(it,dim);	// mean
       // restricting cov to single value
-      newparams(it,2*dim+1) = cov();	//cov
+      newparams(it,2*dim+1) = ncov(dim,dim)>PRECISION?ncov(dim,dim):PRECISION;	// cov
     }
   }
   
-  // stack correctly the results
   // space mean, space cov, duration mean, duration cov
   return newparams;
 }
@@ -150,9 +145,9 @@ OutputMaximization maximization(const matrix &data, matrix pz_x){
 void emstep(const matrix &data, matrix &rates, matrix &params){
   //Expectation then Maximization steps of EM
   auto score = scoreparams(data,params);
-  auto ones  = blas::matrix(1,score.size2());
-  auto bigrates = blas::prod(rates,ones); // rates duplicated
-  auto pz_x = blas::element_prod(score,bigrates); // to check
+  auto ones  = matrix(1,score.size2(),1.); // check this
+  auto bigrates = blas::prod(rates,ones); // duplicating rates 
+  matrix pz_x = blas::element_prod(score,bigrates); // to check
   auto norm = blas::row(pz_x,0);
   for (unsigned r=1; r<pz_x.size1();++r)
     norm+=blas::row(pz_x,r);
@@ -164,7 +159,7 @@ void emstep(const matrix &data, matrix &rates, matrix &params){
     }
   }
 
-  maximized = maximization(data,pz_x);
+  OutputMaximization maximized = maximization(data,pz_x);
   rates	    = maximized.rates;
   params    = maximized.params;
 
@@ -172,37 +167,39 @@ void emstep(const matrix &data, matrix &rates, matrix &params){
 }
 
 // should be ok mod some optimizations
-std::list<ndarray> emrunnner(ndarray data, ndarray params,ssize_t nsteps){
+std::list<ndarray> emrunnner(ndarray pydata, ndarray pyrates, ndarray pyparams,ssize_t nsteps){
   // convert to matrices, run n times, return
-  auto infopar = params.request();
-  auto infodat = data.request();
-  auto cparams = arraytomatrix(params);
-  auto cdata   = arraytomatrix(data);
-  OutputEm emcall;
+  auto	infopar = pyparams.request();
+  auto	infodat = pydata.request();
+  auto	params	= arraytomatrix(pyparams);
+  auto	rates	= arraytomatrix(pyrates);
+  auto	data	= arraytomatrix(pydata);
   for (ssize_t it=0;it<nsteps;++it){
-    emcall = emstep(data,rates,params);
+    emstep(data,rates,params);
   }
   // back to numpy array
-  ndarray pyparams({params.size1(),params.size2()},
-		   {params.size2()*sizeof(double),sizeof(double)},
-		   &(params.data[0]));
-  ndarray pyrates({rates.size1(),rates.size2()},
+  ndarray outparams({params.size1(),params.size2()},
+		    {params.size2()*sizeof(double),sizeof(double)},
+		    &(params.data()[0]));
+  ndarray outrates({rates.size1(),rates.size2()},
 		   {rates.size2()*sizeof(double),sizeof(double)},
-		   &(rates.data[0]));
+		   &(rates.data()[0]));
 
   // updated score to match with rates & params
   auto score = scoreparams(data,params);
-  ndarray pyscore({score.size1(),score.size2()},
+  ndarray outscore({score.size1(),score.size2()},
 		   {score.size2()*sizeof(double),sizeof(double)},
-		   &(score.data[0]));
+		   &(score.data()[0]));
 
-  std::list output;
-  output.push_back(pyscore,pyrates,pyparams);
+  std::list<ndarray> output;
+  output.push_back(outscore);
+  output.push_back(outrates);
+  output.push_back(outparams);
   return output;
 }
 
-// correct call to implement within wafbuilder
-// needs wrapping of functions into the associated namespace
+correct call to implement within wafbuilder
+needs wrapping of functions into the associated namespace
 namespace utils {
   void pymodule(pybind11::module & mod)
   {
