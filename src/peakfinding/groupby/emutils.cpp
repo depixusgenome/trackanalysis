@@ -38,17 +38,6 @@ namespace peakfinding{
 	return pdfparam(param,datum);
 	}
 	
-	// matrix arraytomatrix(const ndarray arr){
-	//     auto vals = arr.unchecked<2>();
-	//     matrix ret(vals.shape(0),vals.shape(1));
-	//     for (ssize_t row=0;row<vals.shape(0);row++){
-	// 	for (ssize_t col=0;col<vals.shape(1);col++){
-	// 	    ret(row,col)=*vals.data(row,col);
-	// 	}
-	//     }
-	//     return ret;
-	// }
-	
 	matrix scoreparams(const matrix &data,const matrix &params){
 	    // apply scoreparam for each element in cparams,cdata
 	    matrix score(params.size1(),data.size1(),0);
@@ -141,15 +130,15 @@ namespace peakfinding{
 	    auto ones  = matrix(1,score.size2(),1.); // check this
 	    auto bigrates = blas::prod(rates,ones); // duplicating rates 
 	    matrix pz_x = blas::element_prod(score,bigrates);
-	    auto norm = blas::row(pz_x,0u);
+	    auto norm = blas::row(pz_x,0);
 	    for (unsigned r=1; r<pz_x.size1();++r)
-		norm+=blas::row(pz_x,r);
+	    	norm+=blas::row(pz_x,r);
 	    
 	    // renormalize probability per peak
 	    for (unsigned r=0u, nrows=pz_x.size1(); r<nrows;++r){ 
-		for (unsigned c=0u, ncols=pz_x.size2();c<ncols;++c){
-		    pz_x(r,c)/=norm(c);
-		}
+	    	for (unsigned c=0u, ncols=pz_x.size2();c<ncols;++c){
+	    	    pz_x(r,c)/=norm(c);
+	    	}
 	    }
 	    
 	    MaximizedOutput maximized = maximization(data,pz_x);
@@ -157,16 +146,5 @@ namespace peakfinding{
 	    params = maximized.params;
 	    return;
 	}
-	
     }
 }
-
-// PYBIND11_MODULE(emutils, mod) {
-//     mod.doc() = "utilitaries functions in C++";
-//     mod.def("emrunner",[](ndarray &data,ndarray &rates,ndarray &params,unsigned &nsteps)
-// 	    {return emutils::emrunner(data,rates,params,nsteps);},"Runs Expectation Maximization N times");
-//     mod.def("normpdf",[](double loc,double var, double pos){return emutils::normpdf(loc,var,pos);},
-// 	    "compute pdf of normal distribution");
-//     mod.def("exppdf",[](double loc,double scale, double pos){return emutils::exppdf(loc,scale,pos);},
-// 	    "compute pdf of exponential distribution");
-// }

@@ -1,4 +1,3 @@
-require('cxx', ('boost_math', 'boost_numeric', 'boost_numeric_ublas'), 1.58, False)
 require('python', numpy = '1.13.3')
 make(use = ['BOOST'])
 

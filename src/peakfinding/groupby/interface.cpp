@@ -1,6 +1,6 @@
 #include<pybind11/pybind11.h>
 #include<pybind11/numpy.h>
-//#include<pybind11/stl.h>
+#include<pybind11/stl.h>
 #include"emutils.h"
 
 /*
@@ -23,7 +23,8 @@ namespace peakfinding{
 	}
 
 	struct OutputPy{ndarray score,rates,params;};
-	
+
+	// error in linking? here
 	OutputPy emrunner(ndarray pydata, ndarray pyrates, ndarray pyparams,unsigned nsteps){
 	    // convert to matrices, run n times, return
 	    auto    infopar = pyparams.request();
@@ -31,9 +32,14 @@ namespace peakfinding{
 	    auto    params  = arraytomatrix(pyparams);
 	    auto    rates   = arraytomatrix(pyrates);
 	    auto    data    = arraytomatrix(pydata);
-	    for (ssize_t it=0;it<nsteps;++it){
-		emstep(data,rates,params);
+
+	    for (unsigned it=0;it<nsteps;++it){ // problem here 
+	    	emstep(data,rates,params);
 	    }
+
+	    // for (unsigned it=0;it<10;++it)
+	    // 	emstep(data,rates,params);
+	    
 	    // updated score to match with rates & params
 	    auto    score = scoreparams(data,params);
 	    // back to numpy array
@@ -53,14 +59,21 @@ namespace peakfinding{
 	    output.params = outparams;
 	    return output;
 	}
+
 	void pymodule(py::module &mod){
 	    auto doc = R"_(Runs Expectation Maximization N times)_";
-	    mod.def("emrunner",[](ndarray &data,ndarray &rates,ndarray &params,unsigned &nsteps)
-		    {return emrunner(data,rates,params,nsteps);},doc);
+	    mod.def("emrunner",[](ndarray data,ndarray rates,ndarray params,unsigned nsteps)
+	     	    {return emrunner(data,rates,params,nsteps);},doc);
 	    mod.def("normpdf",[](double loc,double var, double pos){return normpdf(loc,var,pos);},
 		    R"_(compute pdf of normal distribution)_");
 	    mod.def("exppdf",[](double loc,double scale, double pos){return exppdf(loc,scale,pos);},
 		    R"_(compute pdf of exponential distribution)_");
+
+	    pybind11::class_<OutputPy>(mod, "OutEM")
+		.def(pybind11::init<>())
+		.def_readwrite("score", &OutputPy::score)
+		.def_readwrite("rates", &OutputPy::rates)
+		.def_readwrite("params", &OutputPy::params);
 	}
     }
     
@@ -68,14 +81,3 @@ namespace peakfinding{
 	emutils::pymodule(mod);
     }
 }
-
-
-// PYBIND11_MODULE(emutils, mod) {
-//     mod.doc() = "utilitaries functions in C++";
-//     mod.def("emrunner",[](ndarray &data,ndarray &rates,ndarray &params,unsigned &nsteps)
-// 	    {return emutils::emrunner(data,rates,params,nsteps);},"Runs Expectation Maximization N times");
-//     mod.def("normpdf",[](double loc,double var, double pos){return emutils::normpdf(loc,var,pos);},
-// 	    "compute pdf of normal distribution");
-//     mod.def("exppdf",[](double loc,double scale, double pos){return emutils::exppdf(loc,scale,pos);},
-// 	    "compute pdf of exponential distribution");
-// }
