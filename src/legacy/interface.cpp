@@ -12,7 +12,6 @@ namespace legacy
         {
             std::vector<size_t> strides(2);
             strides = { shape[1]*sizeof(T), sizeof(T) };
-            std::vector<T> dt(shape[1]*shape[2]);
             return pybind11::array(shape, strides, (T*) ptr);
         }
 

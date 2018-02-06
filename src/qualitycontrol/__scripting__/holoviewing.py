@@ -64,7 +64,7 @@ class TrackQualityControlDisplay(ItemsDisplay, qc = Track):
         frame  = pd.DataFrame({'cycle': vca['index']/length,
                                'zmag' : vca['zmag'],
                                'vcap' : vca['vcap']})
-        return hv.Scatter(frame, 'zmag', ['vcap', 'image'])
+        return hv.Scatter(frame, 'zmag', ['vcap', 'cycle'])
 
     def beadextent(self):
         "displays cycle extensions"
