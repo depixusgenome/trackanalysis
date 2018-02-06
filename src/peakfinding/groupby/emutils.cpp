@@ -124,7 +124,7 @@ namespace peakfinding{
 	    return output;
 	}
 	
-	void emstep(const matrix &data, matrix &rates, matrix &params){
+	void emstep(matrix &data, matrix &rates, matrix &params){
 	    //Expectation then Maximization steps of EM
 	    auto score = scoreparams(data,params);
 	    auto ones  = matrix(1,score.size2(),1.); // check this

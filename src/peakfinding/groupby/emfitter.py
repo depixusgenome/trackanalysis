@@ -230,6 +230,13 @@ class ByEM: # pylint: disable=too-many-public-methods
             prevll = llikeli
         return score, rates, params
 
+    def cfit(self,data,rates,params):
+        'fitting using c calls'
+        tofloat=np.vectorize(float)
+        paramsmat=np.vstack(tofloat(params)).reshape(-1,4)
+        out = _core.emrunner(data,rates,paramsmat)
+        return out.score, out.rates, out.params
+
     @classmethod
     def __rmduplicates(cls,params,rates):
         '''

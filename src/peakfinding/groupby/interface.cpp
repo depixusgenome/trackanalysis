@@ -24,34 +24,30 @@ namespace peakfinding{
 
 	struct OutputPy{ndarray score,rates,params;};
 
-	// error in linking? here
 	OutputPy emrunner(ndarray pydata, ndarray pyrates, ndarray pyparams,unsigned nsteps){
 	    // convert to matrices, run n times, return
 	    auto    infopar = pyparams.request();
 	    auto    infodat = pydata.request();
-	    auto    params  = arraytomatrix(pyparams);
-	    auto    rates   = arraytomatrix(pyrates);
-	    auto    data    = arraytomatrix(pydata);
-
-	    for (unsigned it=0;it<nsteps;++it){ // problem here 
-	    	emstep(data,rates,params);
-	    }
-
-	    // for (unsigned it=0;it<10;++it)
+	    matrix    params  = arraytomatrix(pyparams);
+	    matrix    rates   = arraytomatrix(pyrates);
+	    matrix    data    = arraytomatrix(pydata);
+	    
+	    // for (unsigned it=0;it<nsteps;++it) // problem here 
 	    // 	emstep(data,rates,params);
+	    emstep(data,rates,params); // problem here too
 	    
 	    // updated score to match with rates & params
 	    auto    score = scoreparams(data,params);
 	    // back to numpy array
 	    ndarray outparams({params.size1(),params.size2()},
-			      {params.size2()*sizeof(double),sizeof(double)},
-			      &(params.data()[0]));
+	    		      {params.size2()*sizeof(double),sizeof(double)},
+	    		      &(params.data()[0]));
 	    ndarray outrates({rates.size1(),rates.size2()},
-			     {rates.size2()*sizeof(double),sizeof(double)},
-			     &(rates.data()[0]));
+	    		     {rates.size2()*sizeof(double),sizeof(double)},
+	    		     &(rates.data()[0]));
 	    ndarray outscore({score.size1(),score.size2()},
-			     {score.size2()*sizeof(double),sizeof(double)},
-			     &(score.data()[0]));
+	    		     {score.size2()*sizeof(double),sizeof(double)},
+	    		     &(score.data()[0]));
 
 	    OutputPy        output;
 	    output.score  = outscore;
@@ -69,7 +65,7 @@ namespace peakfinding{
 	    mod.def("exppdf",[](double loc,double scale, double pos){return exppdf(loc,scale,pos);},
 		    R"_(compute pdf of exponential distribution)_");
 
-	    pybind11::class_<OutputPy>(mod, "OutEM")
+	    pybind11::class_<OutputPy>(mod, "OutputPy")
 		.def(pybind11::init<>())
 		.def_readwrite("score", &OutputPy::score)
 		.def_readwrite("rates", &OutputPy::rates)
