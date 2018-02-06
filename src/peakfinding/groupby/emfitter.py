@@ -11,7 +11,7 @@ import numpy as np
 
 from utils import initdefaults
 from utils.logconfig import getLogger
-from ._core import exppdf, normpdf # pylint: disable=import-error
+from .._core import exppdf, normpdf # pylint: disable=import-error
 
 
 LOGS = getLogger(__name__)
