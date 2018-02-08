@@ -2,14 +2,14 @@
 # -*- coding: utf-8 -*-
 "Cycle alignment: define an absolute zero common to all cycles"
 from   typing                  import (Union, Optional, # pylint: disable=unused-import
-                                        Sequence, Iterable, Iterator,
-                                        cast)
+                                       Sequence, Iterable, Iterator,
+                                       cast)
 
 import numpy  as     np
 from   numpy.lib.stride_tricks import as_strided
 
 from   utils                   import (initdefaults, updatecopy, kwargsdefaults,
-                                        asobjarray, EVENTS_DTYPE)
+                                       asobjarray, EVENTS_DTYPE)
 from   .histogram              import Histogram
 from   .groupby                import  SubPixelPeakPosition
 
