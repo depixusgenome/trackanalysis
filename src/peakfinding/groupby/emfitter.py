@@ -11,7 +11,7 @@ import numpy as np
 
 from utils import initdefaults
 from utils.logconfig import getLogger
-from .._core import exppdf, normpdf # pylint: disable=import-error
+from .._core import exppdf, normpdf, emrunner # pylint: disable=import-error
 
 
 LOGS = getLogger(__name__)
@@ -91,12 +91,12 @@ class ByEM: # pylint: disable=too-many-public-methods
         return params.size
 
     # to clean
-    def initfromzc(self,data): # to implement
-        'find the parameters in z coordinates based on ZeroCrossing algorithm'
-        # required as the convergence is very slow for EM
-        npeaks = len(ZeroCrossingPeakFinder()(*self.kwa.get("hist",(0,0,1))))
+    # def initfromzc(self,data): # to implement
+    #     'find the parameters in z coordinates based on ZeroCrossing algorithm'
+    #     # required as the convergence is very slow for EM
+    #     npeaks = len(ZeroCrossingPeakFinder()(*self.kwa.get("hist",(0,0,1))))
 
-        return self.initialize(data,maxbins=2*npeaks)
+    #     return self.initialize(data,maxbins=2*npeaks)
 
     def initialize(self,data:np.ndarray,maxbins:int=1)->np.ndarray:
         'initialize using density'
@@ -232,9 +232,9 @@ class ByEM: # pylint: disable=too-many-public-methods
 
     def cfit(self,data,rates,params):
         'fitting using c calls'
-        tofloat=np.vectorize(float)
-        paramsmat=np.vstack(tofloat(params)).reshape(-1,4)
-        out = _core.emrunner(data,rates,paramsmat)
+        tofloat   = np.vectorize(float)
+        paramsmat = np.vstack(tofloat(params)).reshape(-1,4)
+        out       = emrunner(data,rates,paramsmat,self.emiter)
         return out.score, out.rates, out.params
 
     @classmethod

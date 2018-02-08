@@ -63,9 +63,6 @@ namespace peakfinding{
 	    auto wspdata = blas::prod(pz_x,spdata); // new mean values
 	    // new mean of time is zero; // ok
 	    // general covariance, currently restricting to diagonal terms
-	    
-	    //auto cov = blas::prod(spdata_t,wspdata);// wrong ncov, must be estimated row of pz_x per row
-	    
 	    // spatial cov is the diagonal of cov
 	    
 	    auto tdata  = blas::column(data,DCOLS-1);
@@ -102,7 +99,6 @@ namespace peakfinding{
 	
 	MaximizedOutput maximization(const matrix &data, matrix pz_x){
 	    // returns next iteration of rates, params
-	    
 	    // normalize according to data in npz_x
 	    auto norm = blas::column(pz_x,0);
 	    for (unsigned c=1; c<pz_x.size2();++c)

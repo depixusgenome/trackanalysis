@@ -32,9 +32,8 @@ namespace peakfinding{
 	    matrix    rates   = arraytomatrix(pyrates);
 	    matrix    data    = arraytomatrix(pydata);
 	    
-	    // for (unsigned it=0;it<nsteps;++it) // problem here 
-	    // 	emstep(data,rates,params);
-	    emstep(data,rates,params); // problem here too
+	    for (unsigned it=0;it<nsteps;++it)
+	    	emstep(data,rates,params);
 	    
 	    // updated score to match with rates & params
 	    auto    score = scoreparams(data,params);
