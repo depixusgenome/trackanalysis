@@ -4,8 +4,9 @@
 /*
   collection of functions too costly for python
   implementing the EM step in c++ for speed up
-  could be further optimized...
-  investigate use of ndarray from start to finish
+  needs to replace expression with diagproba
+  needs to set upper and lower limits on covariances
+  -> needs to define a configuration class to regroup params such as lower upper covariance
 */
 
 namespace peakfinding{
@@ -23,47 +24,44 @@ namespace peakfinding{
 	
 	double pdfparam(blas::vector<double> param,blas::vector<double> datum){
 	    double pdf = 1.;
-	    for (uint it=0;
-		 it<param.size()-2;
-		 it+=2)
-		{
-		    pdf *= normpdf(param(it),param(it+1),datum[0]); // datum[0] to change
-		}
+	    for (uint it=0;it<param.size()-2;it+=2){
+		pdf *= normpdf(param(it),param(it+1),datum[0]); // datum[0] to change
+	    }
 	    return pdf*exppdf(param[param.size()-2],param[param.size()-1],datum[datum.size()-1]);
 	}
 	
 	double scoreparam(blas::vector<double> param, blas::vector<double> datum){
-	    if (pow(datum(0)-param(0),2)>2*param(1))
-		return PRECISION;
-	return pdfparam(param,datum);
+	    // if (pow(datum(0)-param(0),2)>2*param(1))
+	    // 	return PRECISION;
+	    return pdfparam(param,datum);
 	}
 	
 	matrix scoreparams(const matrix &data,const matrix &params){
 	    // apply scoreparam for each element in cparams,cdata
 	    matrix score(params.size1(),data.size1(),0);
 	    for (unsigned r=0,nrows=params.size1();r<nrows;++r){
-		for (unsigned col=0,ncols=params.size1();col<ncols;++col){
+		for (unsigned col=0,ncols=data.size1();col<ncols;++col){
 		    score(r,col) = scoreparam(blas::row(params,r),row(data,col));
 		}
 	    }
+	    matrix tmp(params.size1(),data.size1(),10*PRECISION);
+	    score+=tmp;
 	    return score;
 	}
 	
-	
-	matrix maximizeparam(const matrix &data,matrix pz_x){
-	    // or (const matrix &data , matrix pz_x)
+
+	// must change creation of diagproba to row * matrix
+	matrix maximizeparam(const matrix &data,matrix pz_x,double uppercov,double lowercov){
 	    // maximizes (all) parameters to reduce data manipulations 
 	    // proba is a row of npz_x
 	    const unsigned DCOLS = data.size2();
 	    const unsigned DROWS = data.size1();
-	    auto	spdata	 = blas::subrange(data,0,DROWS,0,DCOLS-1);
-	    auto	spdata_t = blas::trans(spdata);
-	    
+	    auto spdata 	 = blas::subrange(data,0,DROWS,0,DCOLS-1);
+	    auto spdata_t        = blas::trans(spdata);
+
 	    // new spatial means are rows of wspdata; // ok
 	    auto wspdata = blas::prod(pz_x,spdata); // new mean values
 	    // new mean of time is zero; // ok
-	    // general covariance, currently restricting to diagonal terms
-	    // spatial cov is the diagonal of cov
 	    
 	    auto tdata  = blas::column(data,DCOLS-1);
 	    const unsigned NPCOLS = 2*DCOLS-1;
@@ -71,13 +69,13 @@ namespace peakfinding{
 	    matrix ncov(DCOLS-1,DCOLS-1);
 	    //blas::vector<double> tmpwdata(DROWS);
 	    matrix tmpwdata(DCOLS,DCOLS-1,0);
-	    matrix diagproba(DCOLS,DCOLS,0);
+	    matrix diagproba(DROWS,DROWS,0);
 	    // the new duration scale is the sum of the element product of row * data[:,-1]
 	    blas::vector<double> row, prod;
 	    blas::vector<double> ones(DROWS,1.);
 	    for (unsigned it=0u,nrows=pz_x.size1();it<nrows;++it){
 		row = blas::row(pz_x,it);
-		for (unsigned dite=0;dite<DCOLS;++dite)
+		for (unsigned dite=0;dite<DROWS;++dite)
 		    diagproba(dite,dite)=row(dite);
 		
 		prod = blas::element_prod(row,tdata);
@@ -85,62 +83,82 @@ namespace peakfinding{
 		// computing new covariance matrix
 		tmpwdata = blas::prod(diagproba,spdata);
 		ncov     = blas::prod(spdata_t,tmpwdata);
-	    // need to add the spatial means and covariance a row at a time
-		for (unsigned dim=0,maxdim=DCOLS;dim<maxdim;++dim){
+		// need to add the spatial means and covariance a row at a time
+		for (unsigned dim=0,maxdim=DCOLS-1;dim<maxdim;++dim){
 		    newparams(it,2*dim)   = wspdata(it,dim);	// mean
-		    // restricting cov to single value
-		    newparams(it,2*dim+1) = ncov(dim,dim)>PRECISION?ncov(dim,dim):PRECISION;	// cov
+		    if (ncov(dim,dim)>uppercov){
+			newparams(it,2*dim+1)=uppercov;
+		    }
+		    else if(ncov(dim,dim)<lowercov){
+			newparams(it,2*dim+1)=lowercov;
+		    }
+		    else{
+			newparams(it,2*dim+1) = ncov(dim,dim);
+		    }
 		}
+		
 	    }
-	    
-	// space mean, space cov, duration mean, duration cov
+
+	    // space mean, space cov, duration mean, duration cov
 	    return newparams;
 	}
 	
-	MaximizedOutput maximization(const matrix &data, matrix pz_x){
+	MaximizedOutput maximization(const matrix &data,
+				     matrix pz_x,
+				     double uppercov,
+				     double lowercov){
 	    // returns next iteration of rates, params
 	    // normalize according to data in npz_x
 	    auto norm = blas::column(pz_x,0);
 	    for (unsigned c=1; c<pz_x.size2();++c)
-	    norm+=blas::column(pz_x,c);
+	    	norm+=blas::column(pz_x,c);
 	    matrix npz_x(pz_x);
 	    
-	    matrix nrates(pz_x.size1(),1);
-	    for (unsigned r=0, nrows=pz_x.size1();r<nrows;++r){
-		for (unsigned c=0, ncols=pz_x.size2();c<ncols;++c){
-		    npz_x(r,c)/=norm(r);
-		}
-		nrates(r,1)=norm(r);
+	    matrix nrates(pz_x.size1(),1,1.);
+	    for (unsigned r=0u, nrows=pz_x.size1();r<nrows;++r){
+	    	for (unsigned c=0u, ncols=pz_x.size2();c<ncols;++c){
+	    	    npz_x(r,c)/=norm(r);
+	    	}
+	    	nrates(r,0)=norm(r);
 	    }
 	    nrates/=pz_x.size2();
-	    
+	    std::cout<<"pz_x"<<pz_x<<std::endl;
+	    std::cout<<"nrates"<<nrates<<std::endl;
 	    MaximizedOutput output;
 	    output.rates  = nrates;
-	    output.params = maximizeparam(data,npz_x);
+	    output.params = maximizeparam(data,npz_x,uppercov,lowercov);
 	    return output;
 	}
 	
-	void emstep(matrix &data, matrix &rates, matrix &params){
+	void emstep(matrix &data, matrix &rates, matrix &params,
+		    double uppercov,
+		    double lowercov){
+	    //void emstep(matrix data, matrix rates, matrix params){
 	    //Expectation then Maximization steps of EM
 	    auto score = scoreparams(data,params);
-	    auto ones  = matrix(1,score.size2(),1.); // check this
-	    auto bigrates = blas::prod(rates,ones); // duplicating rates 
+	    std::cout<<"score"<<score<<std::endl;
+	    auto ones  = matrix(1,score.size2(),1.);
+	    auto bigrates = blas::prod(rates,ones);// can be optimized
 	    matrix pz_x = blas::element_prod(score,bigrates);
-	    auto norm = blas::row(pz_x,0);
-	    for (unsigned r=1; r<pz_x.size1();++r)
+	    std::cout<<"score*rates"<<pz_x<<std::endl;
+	    blas::vector<double> norm(pz_x.size2(),0.);
+	    for (unsigned r=0u, nrows=pz_x.size1();r<nrows;++r)
 	    	norm+=blas::row(pz_x,r);
-	    
+
+	    std::cout<<"norm"<<norm<<std::endl;
 	    // renormalize probability per peak
 	    for (unsigned r=0u, nrows=pz_x.size1(); r<nrows;++r){ 
 	    	for (unsigned c=0u, ncols=pz_x.size2();c<ncols;++c){
 	    	    pz_x(r,c)/=norm(c);
 	    	}
 	    }
-	    
-	    MaximizedOutput maximized = maximization(data,pz_x);
+	    std::cout<<"ps_x renorm"<<pz_x<<std::endl;
+	    // ok up to here
+	    MaximizedOutput maximized = maximization(data,pz_x,uppercov,lowercov);
 	    rates  = maximized.rates;
 	    params = maximized.params;
 	    return;
 	}
+	
     }
 }

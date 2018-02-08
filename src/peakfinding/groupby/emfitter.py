@@ -230,11 +230,11 @@ class ByEM: # pylint: disable=too-many-public-methods
             prevll = llikeli
         return score, rates, params
 
-    def cfit(self,data,rates,params):
+    def cfit(self,data,rates,params,bounds=(0.004**2,0.001**2)):
         'fitting using c calls'
         tofloat   = np.vectorize(float)
         paramsmat = np.vstack(tofloat(params)).reshape(-1,4)
-        out       = emrunner(data,rates,paramsmat,self.emiter)
+        out       = emrunner(data,rates,paramsmat,self.emiter,bounds[0],bounds[1])
         return out.score, out.rates, out.params
 
     @classmethod
@@ -247,6 +247,14 @@ class ByEM: # pylint: disable=too-many-public-methods
         rounded    = enumerate(zip(np.round(np.hstack(params[:,0,0]),decimals=cls.decimals),rates))
         sortedinfo = sorted(((*val,idx) for idx,val in rounded),key=lambda x:(x[0],-x[1]))
         return list(map(lambda x:next(x[1])[-1],itertools.groupby(sortedinfo,key=lambda x:x[0])))
+
+    def search(self,data:np.ndarray,npeaks:int): # alternative to fit
+        '''
+        start with a number of peaks
+        '''
+        # add a peak between two already existing peaks.
+        # compute the the bic. if it is better, keep it, otherwise reject it
+        pass
 
     def fullrecord(self,data:np.ndarray,maxpeaks:int):
         '''

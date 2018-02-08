@@ -13,14 +13,14 @@ namespace peakfinding{
 namespace emutils{
 namespace blas=boost::numeric::ublas;
 using  matrix = blas::matrix<double>;
-struct MaximizedOutput{matrix rates,params,score;};
+struct MaximizedOutput{matrix rates,params;};
 double normpdf(double loc,double var,double pos);
 double exppdf(double loc,double scale,double pos);
 double pdfparam(blas::vector<double> ,blas::vector<double>);
-void   emstep(matrix&, matrix&, matrix&);
+void   emstep(matrix&, matrix&, matrix&,double,double);
 double scoreparam(blas::vector<double> ,blas::vector<double>);
 matrix scoreparams(const matrix &, const matrix &);
-matrix maximizeparam(const matrix&, matrix);
-MaximizedOutput maximization(const matrix&, matrix);
+matrix maximizeparam(const matrix &, matrix,double,double);
+MaximizedOutput maximization(const matrix &, matrix,double,double);
 }}
 #endif
