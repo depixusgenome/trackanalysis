@@ -82,7 +82,8 @@ namespace peakfinding{
 		newparams(it,NPCOLS) = blas::inner_prod(prod,ones); // duration scale 
 		// computing new covariance matrix
 		tmpwdata = blas::prod(diagproba,spdata);
-		ncov     = blas::prod(spdata_t,tmpwdata);
+		// to correct the following line
+		ncov     = blas::prod(spdata_t,tmpwdata); // need to center the data
 		// need to add the spatial means and covariance a row at a time
 		for (unsigned dim=0,maxdim=DCOLS-1;dim<maxdim;++dim){
 		    newparams(it,2*dim)   = wspdata(it,dim);	// mean
@@ -109,8 +110,8 @@ namespace peakfinding{
 				     double lowercov){
 	    // returns next iteration of rates, params
 	    // normalize according to data in npz_x
-	    auto norm = blas::column(pz_x,0);
-	    for (unsigned c=1; c<pz_x.size2();++c)
+	    blas::vector<double> norm(pz_x.size1(),0.);
+	    for (unsigned c=0; c<pz_x.size2();++c)
 	    	norm+=blas::column(pz_x,c);
 	    matrix npz_x(pz_x);
 	    
@@ -122,8 +123,6 @@ namespace peakfinding{
 	    	nrates(r,0)=norm(r);
 	    }
 	    nrates/=pz_x.size2();
-	    std::cout<<"pz_x"<<pz_x<<std::endl;
-	    std::cout<<"nrates"<<nrates<<std::endl;
 	    MaximizedOutput output;
 	    output.rates  = nrates;
 	    output.params = maximizeparam(data,npz_x,uppercov,lowercov);
@@ -136,23 +135,19 @@ namespace peakfinding{
 	    //void emstep(matrix data, matrix rates, matrix params){
 	    //Expectation then Maximization steps of EM
 	    auto score = scoreparams(data,params);
-	    std::cout<<"score"<<score<<std::endl;
 	    auto ones  = matrix(1,score.size2(),1.);
 	    auto bigrates = blas::prod(rates,ones);// can be optimized
 	    matrix pz_x = blas::element_prod(score,bigrates);
-	    std::cout<<"score*rates"<<pz_x<<std::endl;
 	    blas::vector<double> norm(pz_x.size2(),0.);
 	    for (unsigned r=0u, nrows=pz_x.size1();r<nrows;++r)
 	    	norm+=blas::row(pz_x,r);
 
-	    std::cout<<"norm"<<norm<<std::endl;
 	    // renormalize probability per peak
 	    for (unsigned r=0u, nrows=pz_x.size1(); r<nrows;++r){ 
 	    	for (unsigned c=0u, ncols=pz_x.size2();c<ncols;++c){
 	    	    pz_x(r,c)/=norm(c);
 	    	}
 	    }
-	    std::cout<<"ps_x renorm"<<pz_x<<std::endl;
 	    // ok up to here
 	    MaximizedOutput maximized = maximization(data,pz_x,uppercov,lowercov);
 	    rates  = maximized.rates;

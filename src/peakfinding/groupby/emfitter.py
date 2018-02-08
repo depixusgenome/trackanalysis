@@ -106,7 +106,7 @@ class ByEM: # pylint: disable=too-many-public-methods
         clas      = {idx:np.array([data[_1] for _1,_2 in enumerate(digi) if _2==idx])
                      for idx in set(digi)}
         params    = np.array([[(np.nanmean(clas[idx][:,:-1],axis=0),
-                                np.cov(clas[idx][:,:-1].T)
+                                np.cov(clas[idx][:,:-1].T) # to correct
                                 if len(clas[idx])>self.mincount else 0),
                                (0,np.nanstd(clas[idx][:,-1]))] for idx in set(digi)])
         params[:,0,1][params[:,0,1]==0]=np.mean(params[:,0,1],axis=0)
@@ -171,7 +171,7 @@ class ByEM: # pylint: disable=too-many-public-methods
     def __maximizeparam(self,data,proba):
         'maximizes a parameter'
         nmeans = np.array(np.matrix(proba)*data[:,:-1]).ravel()
-        ncov   = np.cov(data[:,:-1].T,aweights = proba ,ddof=0)
+        ncov   = np.cov(data[:,:-1].T,aweights = proba ,ddof=0) # to correct
         # temporal params on data[:,-1], tmean is 0
         # if self.spaceonly:
         #     return [(nmeans,self.covmap(ncov)),(0.,10)]
@@ -273,6 +273,29 @@ class ByEM: # pylint: disable=too-many-public-methods
         while len(rates)>self.minpeaks:
             asort              = rates.ravel().argsort()
             score,rates,params = self.fit(data,rates[asort][1:],params[asort][1:],prevll=None)
+            # keep               = self.__rmduplicates(params,rates)
+            # score,rates,params = self.emstep(data,rates,params)
+            results.append((score,rates,params))
+            #assign             = np.array(list(map(len,self.assign(score).values())))
+        return results
+
+    def fullcrecord(self,data:np.ndarray,maxpeaks:int,bounds=(0.005**2,0.001**2)):
+        '''
+        for debugging purposes
+        '''
+        results = []
+        rates,params       = self.initialize(data,maxpeaks)
+        score,rates,params = self.cfit(data,rates,params,bounds)
+        results.append((score,rates,params))
+        # remove peaks that are too close after fitting, and update
+        # keep               = self.__rmduplicates(params,rates)
+        # score,rates,params = self.emstep(data,rates[keep],params[keep])
+        score,rates,params = self.emstep(data,rates,params)
+
+        #assign = np.array(list(map(len,self.assign(score).values())))
+        while len(rates)>self.minpeaks:
+            asort              = rates.ravel().argsort()
+            score,rates,params = self.cfit(data,rates[asort][1:],params[asort][1:],bounds)
             # keep               = self.__rmduplicates(params,rates)
             # score,rates,params = self.emstep(data,rates,params)
             results.append((score,rates,params))
