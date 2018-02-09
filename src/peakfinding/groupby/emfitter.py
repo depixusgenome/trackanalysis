@@ -290,7 +290,6 @@ class ByEM: # pylint: disable=too-many-public-methods
         # remove peaks that are too close after fitting, and update
         # keep               = self.__rmduplicates(params,rates)
         # score,rates,params = self.emstep(data,rates[keep],params[keep])
-        score,rates,params = self.emstep(data,rates,params)
 
         #assign = np.array(list(map(len,self.assign(score).values())))
         while len(rates)>self.minpeaks:

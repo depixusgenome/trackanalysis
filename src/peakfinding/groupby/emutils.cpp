@@ -6,7 +6,9 @@
   implementing the EM step in c++ for speed up
   needs to replace expression with diagproba
   needs to set upper and lower limits on covariances
-  -> needs to define a configuration class to regroup params such as lower upper covariance
+  needs to define a configuration class to regroup params such as:
+  -> lower & upper covariance
+  -> with or without time
 */
 
 namespace peakfinding{
@@ -49,7 +51,8 @@ namespace peakfinding{
 	    return score;
 	}
 	
-
+	// to clean
+	// this function can be improved
 	// must change creation of diagproba to row * matrix
 	matrix maximizeparam(const matrix &data,matrix pz_x,double uppercov,double lowercov){
 	    // maximizes (all) parameters to reduce data manipulations 
@@ -67,12 +70,16 @@ namespace peakfinding{
 	    const unsigned NPCOLS = 2*DCOLS-1;
 	    matrix newparams(pz_x.size1(),NPCOLS+1,0);
 	    matrix ncov(DCOLS-1,DCOLS-1);
-	    //blas::vector<double> tmpwdata(DROWS);
 	    matrix tmpwdata(DCOLS,DCOLS-1,0);
 	    matrix diagproba(DROWS,DROWS,0);
 	    // the new duration scale is the sum of the element product of row * data[:,-1]
 	    blas::vector<double> row, prod;
 	    blas::vector<double> ones(DROWS,1.);
+	    matrix tmpcenter(DROWS,DCOLS-1); // center wspdata on parameter mean
+	    matrix ONEROWS(DROWS,1,1.);
+	    matrix centered(spdata.size1(),spdata.size2(),0.);
+	    matrix centered_t(spdata.size2(),spdata.size1(),0.); // transposed
+	    matrix wcentered(spdata.size1(),spdata.size2(),0.); // weighted
 	    for (unsigned it=0u,nrows=pz_x.size1();it<nrows;++it){
 		row = blas::row(pz_x,it);
 		for (unsigned dite=0;dite<DROWS;++dite)
@@ -81,9 +88,12 @@ namespace peakfinding{
 		prod = blas::element_prod(row,tdata);
 		newparams(it,NPCOLS) = blas::inner_prod(prod,ones); // duration scale 
 		// computing new covariance matrix
-		tmpwdata = blas::prod(diagproba,spdata);
-		// to correct the following line
-		ncov     = blas::prod(spdata_t,tmpwdata); // need to center the data
+		// centering data
+		tmpcenter  = blas::prod(ONEROWS,blas::subrange(wspdata,it,it+1,0,DCOLS-1));
+		centered   = spdata-tmpcenter;
+		centered_t = blas::trans(centered);
+		wcentered  = blas::prod(diagproba,centered);
+		ncov	   = blas::prod(centered_t,wcentered);
 		// need to add the spatial means and covariance a row at a time
 		for (unsigned dim=0,maxdim=DCOLS-1;dim<maxdim;++dim){
 		    newparams(it,2*dim)   = wspdata(it,dim);	// mean
@@ -94,12 +104,31 @@ namespace peakfinding{
 			newparams(it,2*dim+1)=lowercov;
 		    }
 		    else{
-			newparams(it,2*dim+1) = ncov(dim,dim);
+			newparams(it,2*dim+1)=ncov(dim,dim);
 		    }
 		}
 		
 	    }
 
+	    // after testing it is advised to leave some flexibility for peaks
+	    // need to check that the mean is correctly done
+	    // if config.tied == true
+	    // matrix meancov(1,DCOLS-1,0.);
+	    // matrix estcovs(DROWS,DCOLS-1);
+	    // estcovs = blas::subslice(newparams,0,1,DROWS,1,2,DCOLS-1);
+	    // for (unsigned row=0u,nrows=pz_x.size1();row<nrows;++row){
+	    // 	for (unsigned col=0u,ncols=DCOLS-1;col<ncols;++col){
+	    // 	    meancov(0,col)+=estcovs(row,col);
+	    // 	}
+	    // }
+	    // meancov/=(double)pz_x.size1();
+	    // // replace covariance by mean values
+	    // for (unsigned row=0u,nrows=pz_x.size1();row<nrows;++row){
+	    // 	for (unsigned col=0u,ncols=DCOLS-1;col<ncols;++col){
+	    // 	    newparams(row,2*col+1)=meancov(0,col);
+	    // 	}
+	    // }	    
+	    
 	    // space mean, space cov, duration mean, duration cov
 	    return newparams;
 	}
@@ -148,7 +177,6 @@ namespace peakfinding{
 	    	    pz_x(r,c)/=norm(c);
 	    	}
 	    }
-	    // ok up to here
 	    MaximizedOutput maximized = maximization(data,pz_x,uppercov,lowercov);
 	    rates  = maximized.rates;
 	    params = maximized.params;
