@@ -6,6 +6,7 @@ import  numpy as np
 from    numpy.testing   import assert_allclose
 from    simulator       import (TrackSimulator, randpeaks, randbead, randevents,
                                 randbypeakevents)
+import simulator.bindings as _bind
 
 def test_track_simulator():
     u"testing raw data simulation"
@@ -84,5 +85,37 @@ def test_bypeaksevents_simulator():
                 continue
             assert np.abs(k-i).sum() < 1e-3
 
+def test_bindings():
+    "test bindings"
+    exp  = _bind.Experiment(sigma = None, ncycles = 100, rateon = 1., rateoff = 100.)
+    vals = _bind.poissonevents(exp, seed = 0)
+    assert vals.shape == (100, len(exp.bindings))
+    assert np.all(np.cumsum(vals, axis = 1) <= exp.duration)
+
+    exp  = _bind.Experiment(sigma = None, ncycles = 100, rateon = 1., rateoff = 0.)
+    vals = _bind.poissonevents(exp, seed = 0)
+    assert vals.shape == (100, len(exp.bindings))
+    assert np.all(np.cumsum(vals, axis = 1) <= exp.duration)
+    assert np.all(np.cumsum(vals, axis = 1) > 0)
+
+    exp  = _bind.Experiment(sigma = None, ncycles = 100, rateon = 0.)
+    bead = _bind.tobead(exp)
+    assert bead.shape == (100, np.sum(exp.phases))
+
+    exp  = _bind.Experiment(sigma = None, ncycles = 100, rateon = 1.)
+    trks = _bind.totrack(exp, nbeads = 2)
+    assert set(trks) == {'framerate', 'key', 'data', 'events', 'phases'}
+    assert set(trks['data']) == {0, 1}
+
+    exp  = _bind.Experiment(sigma = 3e-3,
+                            ncycles = 100,
+                            rateon = .8,
+                            rateoff = 10,
+                            thermaldrift = True,
+                            baseline = True,)
+    trks = _bind.totrack(exp, nbeads = 2)
+    assert set(trks) == {'framerate', 'key', 'data', 'events', 'phases'}
+    assert set(trks['data']) == {0, 1}
+
 if __name__ == '__main__':
-    test_track_simulator()
+    test_bindings()
