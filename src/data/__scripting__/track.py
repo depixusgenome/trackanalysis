@@ -65,7 +65,13 @@ class PathInfo:
     size         = property(lambda self: self.stat.st_size)
     megabytes    = property(lambda self: self.size >> 20)
     creation     = property(lambda self: datetime.fromtimestamp(self.stat.st_ctime))
-    modification = property(lambda self: datetime.fromtimestamp(self.stat.st_mtime))
+    @property
+    def modification(self):
+        "return the modification date of the **original** track file."
+        out = (getattr(self._trk, '_modificationdate')
+               if hasattr(self._trk, '_modificationdate') else
+               self.stat.st_mtime)
+        return datetime.fromtimestamp(out)
 
 @addproperty(Track, 'op')
 class TrackOperations:

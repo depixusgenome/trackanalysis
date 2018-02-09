@@ -380,6 +380,15 @@ class Handler:
         data['positions']    = {i: j.position for i, j in track.fov.beads.items()}
         data['calibrations'] = {i: j.image    for i, j in track.fov.beads.items()}
 
+        # add a modification date as the original one is needed
+        if hasattr(track, '_modificationdate'):
+            data['_modificationdate'] = getattr(track, '_modificationdate')
+        elif track.path:
+            path = (Path(str(track.path[0]))
+                    if isinstance(track.path, (list, tuple)) else
+                    Path(str(track.path)))
+            data['_modificationdate'] = path.stat().st_mtime
+
         sec = track.secondaries.data
         if sec:
             vcap = sec.pop('vcap', None)
