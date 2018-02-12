@@ -275,13 +275,21 @@ class CorrectedHistogramFit(HistogramFit):
 
         first = min((self._optimize(left, right, kwa, i) for i in self.grid),
                     default = (DEFAULT_BEST, 1., 0.))
-
-        sec   = chisquare(left.peaks[self.firstregpeak:], right.peaks,
-                          False, self.symmetry, self.window,
-                          first[1], -first[1]*first[2])
-
-        ret   = sec[0], sec[1], -sec[2]/sec[1]
+        ret   = self._chisquarecomputation(left, right, first)
         return Distance(ret[0], ret[1], ret[2]+right.minv-left.minv/ret[1])
+
+    def _chisquarecomputation(self, left, right, params):
+        stre = (self.stretch.center - self.stretch.size,
+                self.stretch.center + self.stretch.size)
+        if self.bias.center is not None:
+            bias = (self.bias.center - self.bias.size,
+                    self.bias.center + self.bias.size)
+        else:
+            bias = None
+        res = chisquare(left.peaks[self.firstregpeak:], right.peaks,
+                        False, self.symmetry, self.window, params[1], -params[1]*params[2],
+                        stretchcstr = stre, biascstr = bias)
+        return res[0], res[1], -res[2]/res[1]
 
 class ChiSquareHistogramFit(CorrectedHistogramFit):
     """
@@ -302,9 +310,7 @@ class ChiSquareHistogramFit(CorrectedHistogramFit):
     def _optimize(self, left: ChiSquareData, right: ChiSquareData,      # type: ignore
                   kwa, params):
         tmp = super()._optimize(left, right, kwa, params)
-        res = chisquare(left.peaks[self.firstregpeak:], right.peaks,
-                        False, self.symmetry, self.window, tmp[1], -tmp[1]*tmp[2])
-        return res[0], res[1], -res[2]/res[1]
+        return self._chisquarecomputation(left, right, tmp)
 
     def _cost_function(self, left: ChiSquareData, right: ChiSquareData, # type: ignore
                        stretch: float, bias: float):
