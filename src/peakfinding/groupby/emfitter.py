@@ -12,7 +12,7 @@ import numpy as np
 from utils import initdefaults
 from utils.logconfig import getLogger
 from .._core import exppdf, normpdf, emrunner # pylint: disable=import-error
-
+from .histogramfitter import ByHistogram # pylint: disable=unused-import
 
 LOGS = getLogger(__name__)
 
@@ -55,10 +55,8 @@ class ByEM: # pylint: disable=too-many-public-methods
         data       = np.array([[np.nanmean(evt),len(evt)]
                                for cycle in events
                                for evt in cycle])
-        # if self.spaceonly:
-        #     data[:,-1]=1
         maxpeaks   = int((max(data[:,0])-min(data[:,0]))//precision)
-        search     = self.fullsearch(data,maxpeaks) #self.fitdata(data,maxpeaks)[-1]
+        search     = self.fullsearch(data,maxpeaks)
         params     = search[-1]
         asort      = np.argsort(params[:,0,0])
         peaks, ids = self.__strip(params[asort],events)
@@ -89,14 +87,6 @@ class ByEM: # pylint: disable=too-many-public-methods
             dim = params.shape[1]//2-1
             return params.size-dim*(params.shape[0]-1)
         return params.size
-
-    # to clean
-    # def initfromzc(self,data): # to implement
-    #     'find the parameters in z coordinates based on ZeroCrossing algorithm'
-    #     # required as the convergence is very slow for EM
-    #     npeaks = len(ZeroCrossingPeakFinder()(*self.kwa.get("hist",(0,0,1))))
-
-    #     return self.initialize(data,maxbins=2*npeaks)
 
     def initialize(self,data:np.ndarray,maxbins:int=1)->np.ndarray:
         'initialize using density'
@@ -138,12 +128,8 @@ class ByEM: # pylint: disable=too-many-public-methods
         'proportional to normal pdf of multivariate distribution'
         if len(pos)==1:
             return float(normpdf(float(mean), float(cov), float(pos)))
-        # cent = np.matrix(pos-mean)
-        # return np.exp(-0.5*float(cent*np.linalg.inv(cov)*cent.T))/\
-        #     np.sqrt(float(np.linalg.det(cov)))
         return cls.mvnormpdf(mean,cov,pos)
 
-    # to clean
     def score(self,data:np.ndarray,params)->np.ndarray:
         'return the score[i,j] array corresponding to pdf(Xj|Zi, theta)'
         # use bin n data to reduce computation
@@ -154,11 +140,6 @@ class ByEM: # pylint: disable=too-many-public-methods
         for row,col in pairs:
             score[row,col]+=self.pdf((params[row],data[col]))
         return score
-
-        #pdf = map(self.pdf,itertools.product(params,data)) # long
-        # # adding a small constant (i.e. uniform distribution)
-        # # -> avoids singularities
-        #return np.array(list(pdf)).reshape(len(params),-1)+ 10*self.floaterr
 
     def emstep(self,data:np.ndarray,rates:np.ndarray,params:np.ndarray):
         'Expectation then Maximization steps of EM'
@@ -171,12 +152,10 @@ class ByEM: # pylint: disable=too-many-public-methods
     def __maximizeparam(self,data,proba):
         'maximizes a parameter'
         nmeans = np.array(np.matrix(proba)*data[:,:-1]).ravel()
-        ncov   = np.cov(data[:,:-1].T,aweights = proba ,ddof=0) # to correct
-        # temporal params on data[:,-1], tmean is 0
-        # if self.spaceonly:
-        #     return [(nmeans,self.covmap(ncov)),(0.,10)]
-        tscale = np.sum(proba*data[:,-1])
-        return [(nmeans,self.covmap(ncov)),(0.,tscale)]
+        return
+        # ncov   = np.cov(data[:,:-1].T,aweights = proba ,ddof=0) # WRONG: need to center
+        # tscale = np.sum(proba*data[:,-1])
+        # return [(nmeans,self.covmap(ncov)),(0.,tscale)]
 
     # to pytest
     def maximization(self,pz_x:np.ndarray,data:np.ndarray):
@@ -248,13 +227,47 @@ class ByEM: # pylint: disable=too-many-public-methods
         sortedinfo = sorted(((*val,idx) for idx,val in rounded),key=lambda x:(x[0],-x[1]))
         return list(map(lambda x:next(x[1])[-1],itertools.groupby(sortedinfo,key=lambda x:x[0])))
 
-    def search(self,data:np.ndarray,npeaks:int): # alternative to fit
+    def checkparam(self,data,params,bounds):
         '''
-        start with a number of peaks
+        checks whether the addition of a new peak is worth
         '''
-        # add a peak between two already existing peaks.
-        # compute the the bic. if it is better, keep it, otherwise reject it
-        pass
+        nrates = np.ones((len(params),1))/len(params)
+
+        nfit = self.cfit(data,nrates,params,bounds)
+        print("nfit={nfit}")
+        return self.bic(*nfit),nfit[-1]
+
+    # def frompeakstoparams():
+    #     pass
+
+    def addpeaks(self,data,rates,params,bounds=(0.005**2,0.001**2)):
+        '''
+        iteratively splits each peaks in 2 until adding more peaks does not improve the bic
+        '''
+        visited = set([])
+        delta = np.array([0.005]*params.shape[1],dtype="f4") # in microns
+        delta[-2:] = 0.0
+
+        score, rates, params = self.cfit(data,rates,params,bounds)
+        bic1 = self.bic(score,rates,params)
+
+        while True:
+            for idx in range(len(params)):
+                nparams         = np.vstack([params[:idx+1],params[idx:]])
+                nparams[idx]   -= delta
+                nparams[idx+1] += delta
+                bic2, nparams   = self.checkparam(data,nparams,bounds)
+                visited.update({idx})
+                if bic2<bic1:
+                    params  = np.array(nparams,copy=True)
+                    bic1    = bic2
+                    visited.remove(idx)
+                    visited = set(i+1 if i>idx else i for i in visited)
+
+            if len(visited)==params.shape[0]:
+                break
+
+        return params
 
     def fullrecord(self,data:np.ndarray,maxpeaks:int):
         '''
