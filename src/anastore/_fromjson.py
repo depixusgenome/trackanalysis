@@ -25,7 +25,7 @@ class _ItemIO:
     _CONTENTS = {cls.__name__[0]: cls for cls in (set,frozenset,tuple,dict)}
     @classmethod
     def check(cls, val):
-        "returns wether this class deals with val"
+        "returns whether this class deals with val"
         return isinstance(val, dict) and val.get(TPE, None) in cls._CONTENTS
 
     @classmethod
@@ -38,7 +38,7 @@ class _ItemIO:
 class _TypeIO(_ItemIO):
     @staticmethod
     def check(val):
-        "returns wether this class deals with val"
+        "returns whether this class deals with val"
         return isinstance(val, dict) and val.get(TPE, None) == 'τ'
 
     @classmethod
@@ -48,7 +48,7 @@ class _TypeIO(_ItemIO):
 class _ListIO(_ItemIO):
     @staticmethod
     def check(val):
-        "returns wether this class deals with val"
+        "returns whether this class deals with val"
         return isinstance(val, list)
 
     @staticmethod
@@ -59,7 +59,7 @@ class _ListIO(_ItemIO):
 class _DictIO(_ItemIO):
     @staticmethod
     def check(val):
-        "returns wether this class deals with val"
+        "returns whether this class deals with val"
         return isinstance(val, dict) and TPE not in val
 
     @staticmethod
@@ -70,7 +70,7 @@ class _DictIO(_ItemIO):
 class _NDArrayIO(_ItemIO):
     @staticmethod
     def check(val):
-        "returns wether this class deals with val"
+        "returns whether this class deals with val"
         return isinstance(val, dict) and val.get(TPE, None).startswith('np')
 
     @staticmethod
@@ -84,12 +84,12 @@ class _NDArrayIO(_ItemIO):
 class _NPFunction(_ItemIO):
     @staticmethod
     def check(val):
-        "returns wether this class deals with val"
+        "returns whether this class deals with val"
         return isinstance(val, str) and val.startswith(TPE)
 
     @staticmethod
     def run(val, runner):
-        "returns thishe dict to be dumped"
+        "returns the dict to be dumped"
         return getattr(np, val[1:])
 
 class Runner:
