@@ -218,7 +218,9 @@ class Tasks(Enum):
 
     @classmethod
     def __tasklist__(cls):
-        return (cls.cyclesampling, cls.selection,) + cls.__cleaning__() + cls.__taskorder__()
+        cleaning = cls.__cleaning__()
+        assert cleaning[0] is cls.subtraction
+        return (cls.cyclesampling, cleaning[0], cls.selection) + cleaning[1:] + cls.__taskorder__()
 
     @classmethod
     def __nodefault__(cls):
