@@ -141,34 +141,33 @@ class ByEM: # pylint: disable=too-many-public-methods
             score[row,col]+=self.pdf((params[row],data[col]))
         return score
 
-    def emstep(self,data:np.ndarray,rates:np.ndarray,params:np.ndarray):
-        'Expectation then Maximization steps of EM'
-        score = self.score(data,params)
-        pz_x  = score*rates # P(Z,X|theta) prop P(Z|X,theta)
-        pz_x  = np.array(pz_x)/np.sum(pz_x,axis=0) # renorm over Z
-        rates, params = self.maximization(pz_x,data)
-        return self.score(data,params), rates, params
+    # def emstep(self,data:np.ndarray,rates:np.ndarray,params:np.ndarray):
+    #     'Expectation then Maximization steps of EM'
+    #     score = self.score(data,params)
+    #     pz_x  = score*rates # P(Z,X|theta) prop P(Z|X,theta)
+    #     pz_x  = np.array(pz_x)/np.sum(pz_x,axis=0) # renorm over Z
+    #     rates, params = self.maximization(pz_x,data)
+    #     return self.score(data,params), rates, params
 
-    def __maximizeparam(self,data,proba):
-        'maximizes a parameter'
-        nmeans = np.array(np.matrix(proba)*data[:,:-1]).ravel()
-        return
-        # ncov   = np.cov(data[:,:-1].T,aweights = proba ,ddof=0) # WRONG: need to center
-        # tscale = np.sum(proba*data[:,-1])
-        # return [(nmeans,self.covmap(ncov)),(0.,tscale)]
+    # def __maximizeparam(self,data,proba):
+    #     'maximizes a parameter'
+    #     nmeans = np.array(np.matrix(proba)*data[:,:-1]).ravel()
+    #     ncov   = np.cov(data[:,:-1].T,aweights = proba ,ddof=0) # WRONG: need to center
+    #     tscale = np.sum(proba*data[:,-1])
+    #     return [(nmeans,self.covmap(ncov)),(0.,tscale)]
 
     # to pytest
-    def maximization(self,pz_x:np.ndarray,data:np.ndarray):
-        'returns the next set of parameters'
-        npz_x = pz_x/np.sum(pz_x,axis=1).reshape(-1,1)
+    # def maximization(self,pz_x:np.ndarray,data:np.ndarray):
+    #     'returns the next set of parameters'
+    #     npz_x = pz_x/np.sum(pz_x,axis=1).reshape(-1,1)
 
-        nrates   = np.mean(pz_x,axis=1).reshape(-1,1)
-        maximize = partial(self.__maximizeparam,data)
-        params   = np.array(list(map(maximize,npz_x))) # type: ignore
-        if self.covtype is COVTYPE.TIED:
-            meancov       = np.mean(params[:,0,1],axis=0)
-            params[:,0,1] = meancov
-        return nrates, params
+    #     nrates   = np.mean(pz_x,axis=1).reshape(-1,1)
+    #     maximize = partial(self.__maximizeparam,data)
+    #     params   = np.array(list(map(maximize,npz_x))) # type: ignore
+    #     if self.covtype is COVTYPE.TIED:
+    #         meancov       = np.mean(params[:,0,1],axis=0)
+    #         params[:,0,1] = meancov
+    #     return nrates, params
 
     # pytest
     @classmethod
@@ -197,17 +196,17 @@ class ByEM: # pylint: disable=too-many-public-methods
         'returns loglikelihood'
         return np.sum(np.log(np.sum(rates*score,axis=0)))
 
-    # to pytest
-    def fit(self,data,rates,params,prevll:Optional[float] = None):
-        'fit a given set of params'
-        prevll = self.llikelihood(self.score(data,params),rates) if prevll is None else prevll
-        for _ in range(self.emiter):
-            score,rates,params = self.emstep(data,rates,params)
-            llikeli            = self.llikelihood(score,rates)
-            if abs(llikeli-prevll) < self.tol:
-                break
-            prevll = llikeli
-        return score, rates, params
+    # # to pytest
+    # def fit(self,data,rates,params,prevll:Optional[float] = None):
+    #     'fit a given set of params'
+    #     prevll = self.llikelihood(self.score(data,params),rates) if prevll is None else prevll
+    #     for _ in range(self.emiter):
+    #         score,rates,params = self.emstep(data,rates,params)
+    #         llikeli            = self.llikelihood(score,rates)
+    #         if abs(llikeli-prevll) < self.tol:
+    #             break
+    #         prevll = llikeli
+    #     return score, rates, params
 
     def cfit(self,data,rates,params,bounds=(0.004**2,0.001**2)):
         'fitting using c calls'
@@ -234,7 +233,6 @@ class ByEM: # pylint: disable=too-many-public-methods
         nrates = np.ones((len(params),1))/len(params)
 
         nfit = self.cfit(data,nrates,params,bounds)
-        print("nfit={nfit}")
         return self.bic(*nfit),nfit[-1]
 
     # def frompeakstoparams():
@@ -269,30 +267,30 @@ class ByEM: # pylint: disable=too-many-public-methods
 
         return params
 
-    def fullrecord(self,data:np.ndarray,maxpeaks:int):
-        '''
-        for debugging purposes
-        '''
-        results = []
-        rates,params       = self.initialize(data,maxpeaks)
-        score,rates,params = self.fit(data,rates,params,prevll=None)
-        results.append((score,rates,params))
-        # remove peaks that are too close after fitting, and update
-        # keep               = self.__rmduplicates(params,rates)
-        # score,rates,params = self.emstep(data,rates[keep],params[keep])
-        score,rates,params = self.emstep(data,rates,params)
+    # def fullrecord(self,data:np.ndarray,maxpeaks:int):
+    #     '''
+    #     for debugging purposes
+    #     '''
+    #     results = []
+    #     rates,params       = self.initialize(data,maxpeaks)
+    #     score,rates,params = self.fit(data,rates,params,prevll=None)
+    #     results.append((score,rates,params))
+    #     # remove peaks that are too close after fitting, and update
+    #     # keep               = self.__rmduplicates(params,rates)
+    #     # score,rates,params = self.emstep(data,rates[keep],params[keep])
+    #     score,rates,params = self.emstep(data,rates,params)
 
-        #assign = np.array(list(map(len,self.assign(score).values())))
-        while len(rates)>self.minpeaks:
-            asort              = rates.ravel().argsort()
-            score,rates,params = self.fit(data,rates[asort][1:],params[asort][1:],prevll=None)
-            # keep               = self.__rmduplicates(params,rates)
-            # score,rates,params = self.emstep(data,rates,params)
-            results.append((score,rates,params))
-            #assign             = np.array(list(map(len,self.assign(score).values())))
-        return results
+    #     #assign = np.array(list(map(len,self.assign(score).values())))
+    #     while len(rates)>self.minpeaks:
+    #         asort              = rates.ravel().argsort()
+    #         score,rates,params = self.fit(data,rates[asort][1:],params[asort][1:],prevll=None)
+    #         # keep               = self.__rmduplicates(params,rates)
+    #         # score,rates,params = self.emstep(data,rates,params)
+    #         results.append((score,rates,params))
+    #         #assign             = np.array(list(map(len,self.assign(score).values())))
+    #     return results
 
-    def fullcrecord(self,data:np.ndarray,maxpeaks:int,bounds=(0.005**2,0.001**2)):
+    def fullrecord(self,data:np.ndarray,maxpeaks:int,bounds=(0.005**2,0.001**2)):
         '''
         for debugging purposes
         '''
@@ -314,52 +312,52 @@ class ByEM: # pylint: disable=too-many-public-methods
             #assign             = np.array(list(map(len,self.assign(score).values())))
         return results
 
-    def fullsearch(self,data,maxpeaks:int):
-        '''
-        returns the parameters corresponding to minimal bic,
-        not first local minimum
-        '''
-        rates,params       = self.initialize(data,maxpeaks)
-        score,rates,params = self.fit(data,rates,params,prevll=None)
-        result             = score,rates,params
+    # def fullsearch(self,data,maxpeaks:int):
+    #     '''
+    #     returns the parameters corresponding to minimal bic,
+    #     not first local minimum
+    #     '''
+    #     rates,params       = self.initialize(data,maxpeaks)
+    #     score,rates,params = self.fit(data,rates,params,prevll=None)
+    #     result             = score,rates,params
 
-        assign = np.array(list(map(len,self.assign(score).values())))
-        bic    = None
-        while any(assign<self.mincount) or len(rates)>self.minpeaks:
-            minbic             = bic
-            asort              = rates.ravel().argsort()
-            score,rates,params = self.fit(data,rates[asort][1:],params[asort][1:],prevll=None)
-            assign             = np.array(list(map(len,self.assign(score).values())))
-            if not any(assign<self.mincount):
-                bic    = self.bic(score,rates,params)
-                minbic = bic if minbic is None else minbic
-                if bic<=minbic:
-                    minbic = bic
-                    result = score,rates,params
-        return result
+    #     assign = np.array(list(map(len,self.assign(score).values())))
+    #     bic    = None
+    #     while any(assign<self.mincount) or len(rates)>self.minpeaks:
+    #         minbic             = bic
+    #         asort              = rates.ravel().argsort()
+    #         score,rates,params = self.fit(data,rates[asort][1:],params[asort][1:],prevll=None)
+    #         assign             = np.array(list(map(len,self.assign(score).values())))
+    #         if not any(assign<self.mincount):
+    #             bic    = self.bic(score,rates,params)
+    #             minbic = bic if minbic is None else minbic
+    #             if bic<=minbic:
+    #                 minbic = bic
+    #                 result = score,rates,params
+    #     return result
 
-    def fitdata(self,data:np.ndarray,maxpeaks:int):
-        '''
-        calls initialization with maximal number of peaks
-        runs fits until convergence
-        remove peaks assigned to less than mincount
-        then removes the least likely peak, converge
-        and repeats
-        '''
-        rates,params       = self.initialize(data,maxpeaks)
-        score,rates,params = self.fit(data,rates,params,prevll=None)
+    # def fitdata(self,data:np.ndarray,maxpeaks:int):
+    #     '''
+    #     calls initialization with maximal number of peaks
+    #     runs fits until convergence
+    #     remove peaks assigned to less than mincount
+    #     then removes the least likely peak, converge
+    #     and repeats
+    #     '''
+    #     rates,params       = self.initialize(data,maxpeaks)
+    #     score,rates,params = self.fit(data,rates,params,prevll=None)
 
-        assign = np.array(list(map(len,self.assign(score).values())))
-        bic    = None
-        while any(assign<self.mincount) or len(rates)>self.minpeaks:
-            prevbic            = bic
-            prev               = score,rates,params
-            asort              = rates.ravel().argsort()
-            score,rates,params = self.fit(data,rates[asort][1:],params[asort][1:],prevll=None)
-            assign             = np.array(list(map(len,self.assign(score).values())))
-            if not any(assign<self.mincount):
-                bic      = self.bic(score,rates,params)
-                finished = False if prevbic is None else bic-prevbic>self.deltabic
-                if finished :
-                    return prev
-        return score,rates,params
+    #     assign = np.array(list(map(len,self.assign(score).values())))
+    #     bic    = None
+    #     while any(assign<self.mincount) or len(rates)>self.minpeaks:
+    #         prevbic            = bic
+    #         prev               = score,rates,params
+    #         asort              = rates.ravel().argsort()
+    #         score,rates,params = self.fit(data,rates[asort][1:],params[asort][1:],prevll=None)
+    #         assign             = np.array(list(map(len,self.assign(score).values())))
+    #         if not any(assign<self.mincount):
+    #             bic      = self.bic(score,rates,params)
+    #             finished = False if prevbic is None else bic-prevbic>self.deltabic
+    #             if finished :
+    #                 return prev
+    #     return score,rates,params
