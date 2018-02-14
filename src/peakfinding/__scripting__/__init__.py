@@ -7,13 +7,14 @@ from   copy                         import copy as shallowcopy
 import pandas                       as     pd
 import numpy                        as     np
 
-from utils.decoration               import addto
+from utils.decoration               import addto, addproperty
 from control.processor.dataframe    import DataFrameProcessor
 from eventdetection                 import EventDetectionConfig
 from eventdetection.data            import Events
 from model                          import PHASE
 from model.__scripting__            import Tasks
 from data                           import Track
+from data.tracksdict                import TracksDict
 from data.__scripting__.dataframe   import adddataframe
 from ..selector                     import PeakSelectorDetails
 from ..probabilities                import Probability
@@ -116,6 +117,23 @@ def detailed(self, ibead, precision: float = None) -> Union[Iterator[Detailed], 
         return self.data.detailed(ibead, precision) # type: ignore
     evts = iter(i for _, i in self.data[ibead,...])
     return Detailed(self, self.config.detailed(evts, prec))
+
+@addproperty(TracksDict, 'peaks')
+class PeaksTracksDict:
+    "Add dataframe method to tracksdict"
+    def __init__(self, track):
+        self._items = track
+
+    def dataframe(self, *tasks, transform = None, assign = None, **kwa):
+        """
+        Concatenates all dataframes obtained through *track.peaks.dataframe*
+
+        See documentation in *track.peaks.dataframe* for other options
+        """
+        return self._items.dataframe(Tasks.peakselector, *tasks,
+                                     transform = transform,
+                                     assign    = assign,
+                                     **kwa)
 
 adddataframe(PeaksDict)
 

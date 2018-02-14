@@ -8,10 +8,11 @@ from   copy                         import copy as shallowcopy
 import numpy                        as     np
 import pandas                       as     pd
 
-from   utils.decoration             import addto
+from   utils.decoration             import addto, addproperty
 from   control.processor.dataframe  import DataFrameProcessor
 from   model.__scripting__          import Tasks
 from   data                         import Track
+from   data.tracksdict              import TracksDict
 from   data.__scripting__.dataframe import adddataframe
 from   ..processor                  import (ExtremumAlignmentTask,
                                             BiasRemovalTask,
@@ -128,6 +129,16 @@ Events.__doc__      += (
     One can also select cycles which accept provided conditions.
     """+'\n'.join(Comparator.__doc__.split('\n')[2:]))
 Track.events.__doc__ = Events.__doc__
+
+@addproperty(TracksDict, 'events')
+class EventTracksDict:
+    "creates a dataframe for all keys"
+    def __init__(self, track):
+        self._items = track
+
+    def dataframe(self, *tasks, **kwa):
+        "creates a dataframe for all keys"
+        return self._items.dataframe(Tasks.eventdetection, *tasks, **kwa)
 
 adddataframe(Events)
 setattr(Events, 'any', property(lambda self: Comparator(self, any), doc = Comparator.__doc__))
