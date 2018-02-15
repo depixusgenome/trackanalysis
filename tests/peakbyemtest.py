@@ -7,9 +7,9 @@ will be expanded to include different methods
 import numpy as np
 from numpy.testing import assert_allclose
 from scipy.stats import expon, norm
-from peakfinding.expectationmax import EmPeakFitter
+from peakfinding.groupby import ByEM
 
-EMFITTER = EmPeakFitter()
+EMFITTER = ByEM()
 
 
 def test_byeminit():
@@ -21,7 +21,7 @@ def test_byeminit():
 def test_ztscore():
     'tests the score method'
     data   = np.array([[0,0],[10,0],[0,1]])
-    params = [[(0,1),(0,1)],[(10,0.1**2),(0,2)],[(5,100),(0,1)],[(0,100),(0.5,1)]]
+    params = np.array([[0,1,0,1],[10.,0.1**2,0,2],[5,100,0,1],[0,100,0.5,1]])
     score  = EMFITTER.score(data,params)
     assert_allclose(score,np.array([[0.3989,0,0.1468],
                                     [0,1.995,0],
@@ -34,14 +34,12 @@ def test_xyztscore():
     'add test for (x,y,z,t)'
     data   = np.array([[0,0,0,1],[-1,0,0,1],[1,0,0,1],[0,1,0,1],[1,0,-1,1]])
 
-    params = [[(np.array(3*[0]),np.diag(3*[1])),(0,1)],
-              [(np.arange(3)+1,np.diag(3*[10])),(4,10)],
-              [(np.array([10,-20,30]),np.diag(3*[.1])),(0,0.1)]]
+    params = np.array([[0.,1,0,1,0,1,0,1],[1,10.,2,10.,3,10.,4,10],[10,0.1,-20,0.1,30,0.1,0,0.1]])
     score  = EMFITTER.score(data,params)
-    assert_allclose((2*np.pi)**(3/2)*\
-                    np.array([[0.023358,0.01416735,0.01416735,0.01416735,0.00859293],
-                              [0.,0.,0.,0.,0.],
-                              [0.,0.,0.,0.,0.]]),score,rtol=1e-5)
+    floaterr=1e-9
+    assert_allclose(floaterr+np.array([[0.023358,0.01416735,0.01416735,0.01416735,0.00859293],
+                                       [0.,0.,0.,0.,0.],
+                                       [0.,0.,0.,0.,0.]]),score,rtol=1e-5)
 
     # to add more tests
     #pdf = lambda d,p: norm(loc=p[0],scale=p[4]).pdf(d[0])*norm(loc=p[1],scale=p[5]).pdf(d[1])
@@ -51,7 +49,7 @@ def test_xyztscore():
 def test_assign():
     'check that events are correctly assigned'
     data   = np.array([[0,0],[10,0],[0,1]])
-    params = np.array([[(0,1),(0,1)],[(10,1),(0,1)],[(0,1),(1,1)]])
+    params = np.array([[0,1,0,1],[10,1,0,1],[0,1,1,1]])
     score  = EMFITTER.score(data,params)
     assert {0:(0,),1:(1,),2:(2,)}==EMFITTER.assign(score)
     score  = EMFITTER.score(data,params[[1,2,0]])
@@ -63,7 +61,8 @@ def test_byemstep():
     data = np.vstack([np.hstack([norm(loc=i,scale=0.1).rvs((1000,1),random_state=rstate), # pylint: disable=unused-variable
                                  expon(loc=0,scale=0.1).rvs((1000,1),random_state=rstate)])
                       for i in range(0,10,2)])
-    byem=EmPeakFitter(emiter=1) # pylint: disable=unused-variable
+
+    byem=ByEM(emiter=1) # pylint: disable=unused-variable
     # byem.fit(data,5)
     # [[(array([-0.01037411]), array(0.010754432724043382)),
     #   (0.0, 0.088473963060729632)],
