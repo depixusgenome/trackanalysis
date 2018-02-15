@@ -1,32 +1,39 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"""
+"""
 Patch mechanism
+
+# Modifying classes: function `modifyclasses`
+{}
+
+# Modifying keys: function `modifykeys`
+{}
+
 """
 from typing  import Callable, List # pylint: disable=unused-import
 import re
 from ._utils import TPE
 
 class Patches:
-    u"This must contain json patches up to the app's versions number"
+    "This must contain json patches up to the app's versions number"
     def __init__(self, *patches):
         self._patches = list(patches) # type: List[Callable]
 
     def patch(self, fcn: Callable):
-        u"registers a patch"
+        "registers a patch"
         self._patches.append(fcn)
 
     @property
     def version(self):
-        u"The current version: this is independant of the git tag"
+        "The current version: this is independant of the git tag"
         return len(self._patches)
 
     def dumps(self, info):
-        u"adds the version to json"
+        "adds the version to json"
         return [{'version': self.version}, info]
 
     def loads(self, info):
-        u"updates json to current version"
+        "updates json to current version"
         vers = info[0]['version']
         data = info[1]
 
@@ -39,17 +46,11 @@ class Patches:
             raise IOError("Anastore file version is too high", "warning")
         return data
 
-class _Delete(Exception):
-    "Used for deleting classes or attributes"
-    pass
+class DELETE(Exception):
+    "Delete classes or attributes"
 
-DELETE = _Delete
-
-class _Reset(_Delete):
-    "Used for resetting classes or attributes"
-    pass
-
-RESET = _Reset
+class RESET(DELETE):
+    "Reset classes or attributes"
 
 def modifyclasses(data, *args):
     """
@@ -57,28 +58,29 @@ def modifyclasses(data, *args):
 
     The arguments should be a flat list of pairs:
 
-        >>> modifyclasses(data,
-        ...               "modulename1.classname1", dict(attr1 = lambda val: val*2),
-        ...               "modulename2.classname2", dict(attr2 = lambda val: val/2,
-        ...                                              attr3 = Reset,
-        ...                                              __name__ = 'newmod.newcls'),
-        ...               "modulename2.classname2", dict(attr4 = 'newname'),
-        ...               "modulename3.classname3", _Delete,
-        ...               "*.classname4", dict(__call__ = specific)) # using regex
+    ```python
+    modifyclasses(data,
+                  "modulename1.classname1", dict(attr1 = lambda val: val*2),
+                  "modulename2.classname2", dict(attr2 = lambda val: val/2,
+                                                 attr3 = Reset,
+                                                 __name__ = 'newmod.newcls'),
+                  "modulename2.classname2", dict(attr4 = 'newname'),
+                  "modulename3.classname3", DELETE,
+                  "*.classname4", dict(__call__ = specific)) # using regex
+    ```
 
-
-    Use *DELETE* to remove a class or attribute. Use *RESET* to reset an
+    Use `DELETE` to remove a class or attribute. Use `RESET` to reset an
     attribute to it's - possibly new - default value. In practice, using
-    *DELETE* has the same effect as *Reset*: the key is removed from the
+    `DELETE` has the same effect as `RESET`: the key is removed from the
     dictionnary.
 
     A same class can have multiple dictionnaries, allowing incremental changes.
 
     **Note**: If a default value has changed, do not set to the new value.
-    Return or raise *RESET*.
+    Return or raise `RESET`.
 
     **Note**: If a value should be set to default, do not set it.  Return or
-    raise *RESET*.
+    raise `RESET`.
 
     It's also possible to update the whole dictionary by adding a *__call__* key.
     In such a case, its value should accept a single argument: the dictionnary.
@@ -91,7 +93,7 @@ def modifyclasses(data, *args):
             if isinstance(val, (dict, list)):
                 try:
                     _scan(val)
-                except _Delete:
+                except DELETE:
                     itm.pop(cnt-i-1)
 
     def _dict_scan(itm):
@@ -102,10 +104,10 @@ def modifyclasses(data, *args):
                 if patt.match(cls) is None:
                     continue
 
-                if cur is _Delete:
-                    raise _Delete()
+                if cur is DELETE:
+                    raise DELETE()
 
-                if cur is _Reset:
+                if cur is RESET:
                     itm.clear()
                     itm[TPE] = cls
                     return
@@ -116,7 +118,7 @@ def modifyclasses(data, *args):
             if isinstance(val, (dict, list)):
                 try:
                     _scan(val)
-                except _Delete:
+                except DELETE:
                     itm.pop(key)
 
         yield from good
@@ -131,9 +133,10 @@ def modifyclasses(data, *args):
             assert isinstance(fcn, str)
             itm[TPE] = fcn
 
+        # pylint: disable=too-many-nested-blocks
         for key in frozenset(itm) & frozenset(cur):
             fcn = cur[key]
-            if fcn is _Delete or fcn is _Reset:
+            if fcn is DELETE or fcn is RESET:
                 itm.pop(key)
 
             elif isinstance(fcn, str):
@@ -142,10 +145,10 @@ def modifyclasses(data, *args):
             elif callable(fcn):
                 try:
                     val = fcn(itm[key])
-                except _Delete:
+                except DELETE:
                     itm.pop(key)
                 else:
-                    if val is _Delete or val is _Reset:
+                    if val is DELETE or val is RESET:
                         itm.pop(key)
                     else:
                         itm[key] = val
@@ -166,13 +169,14 @@ def modifykeys(data, *args, **kwa):
     """
     Finds a specific key and modifies its value.
 
-        >>> data["key1"] = dict(key2 = 1)
-        >>> modifykey(data,  "key1", "key2", lambda val: val*2)
-        >>> assert data["key1"]["key2"] = 2
+    ```python
+    data["key1"] = dict(key2 = 1)
+    modifykey(data,  "key1", "key2", lambda val: val*2)
+    assert data["key1"]["key2"] = 2
 
-        >>> data = {}
-        >>> modifykey(data,  "key1", "key2", lambda val: val*2)
-
+    data = {}
+    modifykey(data,  "key1", "key2", lambda val: val*2)
+    ```
     """
     for key in args[:None if len(kwa) else -2]:
         if ((isinstance(data, dict) and key in data)
@@ -186,3 +190,6 @@ def modifykeys(data, *args, **kwa):
     else:
         for key, val in kwa.items():
             data[key] =  val(data[key])
+
+if locals().get('__doc__', None):
+    locals()['__doc__'] = locals()['__doc__'].format(modifyclasses.__doc__, modifykeys.__doc__)

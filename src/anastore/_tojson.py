@@ -7,7 +7,7 @@ from    pathlib import Path
 from    pickle  import dumps as _dumps
 import  numpy   as     np
 
-from    ._utils import isjsonable, CNT, TPE, STATE
+from    ._utils import isjsonable, CNT, TPE, STATE, STAR
 
 class _ItemIO(metaclass=ABCMeta):
     @staticmethod
@@ -29,7 +29,7 @@ class _TypeIO(_ItemIO):
     @staticmethod
     def run(val, runner):
         "returns the dict to be dumped"
-        return {TPE: 'τ', CNT: val.__module__+'.'+val.__name__}
+        return {TPE: 'τ', CNT: f"{val.__module__}.{val.__qualname__}"}
 
 class _ContainerIO(_ItemIO):
     @staticmethod
@@ -40,7 +40,11 @@ class _ContainerIO(_ItemIO):
     @staticmethod
     def run(val, runner):
         "returns the dict to be dumped"
-        return {TPE: type(val).__name__[0], CNT: runner(list(val))}
+        tpe  = type(val)
+        if tpe in (set, frozenset, tuple):
+            return {TPE: tpe.__name__[0], CNT: runner(list(val))}
+        name =  f"{tpe.__module__}.{tpe.__qualname__}"
+        return {TPE: tpe.__base__.__name__[0], STAR: name, CNT: runner(list(val))}
 
 class _ListIO(_ItemIO):
     @staticmethod
@@ -156,7 +160,8 @@ class Runner:
             for name, val in attrs:
                 dico[name] = self(val)
 
-        dico[TPE] = item.__class__.__module__+'.'+item.__class__.__qualname__
+        tpe       = item.__class__
+        dico[TPE] = f"{tpe.__module__}.{tpe.__qualname__}"
         return dico
 
     def _isdefault(self, tpe, name, val) -> bool:

@@ -1,16 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"""
-Patches for tasks and configs.
-
-Please check the *modifyclasses* documentation.
-
-
-**Note**: If a default value has changed, do not set to the new value.  Return
-or raise *RESET*.
-
-**Note**: If a value should be set to default, do not set it.  Return or raise
-*RESET*.
+"""
+Default patches for tasks and configs
 """
 from ._patches  import Patches, modifyclasses, RESET
 

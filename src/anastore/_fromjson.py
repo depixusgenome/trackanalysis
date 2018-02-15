@@ -6,9 +6,20 @@ from    importlib   import import_module
 
 import  numpy       as     np
 
-from    ._utils     import isjsonable, CNT, TPE, STATE
+from    ._utils     import isjsonable, CNT, STAR, STATE, TPE
 
 _CONTINUE = type('_CONTINUE', tuple(), dict())
+def _loadclass(name:str) -> type:
+    "loads and returns a class"
+    elems = name.split('.')
+    cur   = elems[0]
+    cls   = import_module(cur)
+    for i in elems[1:]:
+        cur += '.' + i
+        cls  = getattr(cls, i, _CONTINUE)
+        if cls is _CONTINUE:
+            cls  = import_module(cur)
+    return cast(type, cls)
 
 class _ItemIO:
     _CONTENTS = {cls.__name__[0]: cls for cls in (set,frozenset,tuple,dict)}
@@ -20,6 +31,8 @@ class _ItemIO:
     @classmethod
     def run(cls, val, runner):
         "returns the loaded item"
+        if STAR in val:
+            return _loadclass(val[STAR])(*runner(val[CNT]))
         return cls._CONTENTS[val[TPE]](runner(val[CNT]))
 
 class _TypeIO(_ItemIO):
@@ -30,20 +43,7 @@ class _TypeIO(_ItemIO):
 
     @classmethod
     def run(cls, val, runner):
-        return cls.loadclass(val[CNT])
-
-    @staticmethod
-    def loadclass(name:str) -> type:
-        "loads and returns a class"
-        elems = name.split('.')
-        cur   = elems[0]
-        cls   = import_module(cur)
-        for i in elems[1:]:
-            cur += '.' + i
-            cls  = getattr(cls, i, _CONTINUE)
-            if cls is _CONTINUE:
-                cls  = import_module(cur)
-        return cast(type, cls)
+        return _loadclass(val[CNT])
 
 class _ListIO(_ItemIO):
     @staticmethod
@@ -113,7 +113,7 @@ class Runner:
 
     @staticmethod
     def __create_obj(item):
-        cls = _TypeIO.loadclass(item)
+        cls = _loadclass(item)
 
         if hasattr(cls, '__getnewargs_ex__'):
             i, j = cls.__getnewargs_ex__()              # type: ignore
