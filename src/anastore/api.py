@@ -14,6 +14,8 @@ import io
 from ._fromjson import Runner as _InputRunner
 from ._tojson   import Runner as _OutputRunner
 from ._default  import __TASKS__, __CONFIGS__
+from ._patches  import modifyclasses, modifykeys, DELETE, RESET # pylint: disable=unused-import
+from ._utils    import TPE, CNT # pylint: disable=unused-import
 
 def _apply(info, patch, patchfcn, inout):
     if patch == 'tasks':
