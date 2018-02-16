@@ -81,6 +81,13 @@ class TrackCleaningScript:
         "returns a dictionnary of cleaning results"
         itms = self.track.beadsonly[list(beads)] if beads else self.track.beadsonly
         get  = lambda x: x if x is None else x.args[0]
+
+        dfltask = self.track.tasks.cleaning  # type: ignore
+        if dfltask:
+            # use the default settings for this track
+            dflt = dfltask.config()
+            dflt.update(kwa)
+            kwa  = dflt
         return {info[0]: get(DataCleaningProcessor.compute(itms, info, **kwa))
                 for info in cast(Iterator, itms)}
 
