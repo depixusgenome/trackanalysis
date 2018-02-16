@@ -34,6 +34,7 @@ PATHS = dict(small_pickle   = "small_pickle.pk",
              big_legacy     = "test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec.trk",
              big_grlegacy   = "test035_5HPs_mix_CTGT--4xAc_5nM_25C_10sec",
              ramp_legacy    = "ramp_5HPs_mix.trk",
+             smallemdata    = "smallemdata.pk",
              big_selected   = big_selected,
              big_all        = big_all)
 

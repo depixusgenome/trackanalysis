@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Tests histogram  creation and analysis"
-from pathlib                    import Path
-from tempfile                   import mktemp, gettempdir
+from pathlib                     import Path
+from tempfile                    import mktemp, gettempdir
 import numpy  as np
 from numpy.testing               import assert_equal, assert_allclose
 

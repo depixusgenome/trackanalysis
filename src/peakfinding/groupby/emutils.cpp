@@ -5,10 +5,6 @@
   collection of functions too costly for python
   implementing the EM step in c++ for speed up
   needs to replace expression with diagproba
-  needs to set upper and lower limits on covariances
-  needs to define a configuration class to regroup params such as:
-  -> lower & upper covariance
-  -> with or without time
 */
 
 namespace peakfinding{
@@ -59,9 +55,9 @@ namespace peakfinding{
 	    auto spdata 	 = blas::subrange(data,0,DROWS,0,DCOLS-1);
 	    auto spdata_t        = blas::trans(spdata);
 
-	    // new spatial means are rows of wspdata; // ok
+	    // new spatial means are rows of wspdata;
 	    auto wspdata = blas::prod(pz_x,spdata); // new mean values
-	    // new mean of time is zero; // ok
+	    // new mean of time is zero;
 	    
 	    auto tdata  = blas::column(data,DCOLS-1);
 	    const unsigned NPCOLS = 2*DCOLS-1;
@@ -139,7 +135,6 @@ namespace peakfinding{
 	void emstep(matrix &data, matrix &rates, matrix &params,
 		    double uppercov,
 		    double lowercov){
-	    //void emstep(matrix data, matrix rates, matrix params){
 	    //Expectation then Maximization steps of EM
 	    auto score = scoreparams(data,params);
 	    auto ones  = matrix(1,score.size2(),1.);
