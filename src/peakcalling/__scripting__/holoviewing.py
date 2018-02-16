@@ -237,7 +237,7 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
     _refstyle  = dict(color = 'gray', line_dash = 'dotted')
     _logz      = True
     _loglog    = True
-    _textcolor = 'white'
+    _textcolor = 'green'
     _fit       = False
     KEYWORDS   = _PTDDisplay.KEYWORDS | frozenset(locals())
     def __init__(self, items, **opts):
@@ -403,7 +403,7 @@ class _2DRef(PeaksTracksDictDisplay):
 
     def __quadmeshtext(self, crvs):
         color = self._textcolor
-        return hv.Overlay([hv.Text(0., i+.5, j)(style = dict(text_color=color))
+        return hv.Overlay([hv.Text(0.01, i+.5, j)(style = dict(text_color=color))
                            for i, (j, _) in enumerate(crvs)])
 
     def __quadmeshref(self, sp1, sp2):
