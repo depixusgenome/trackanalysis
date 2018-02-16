@@ -4,10 +4,14 @@
 'initializer for expectation maximization'
 from typing import Union
 
-from .._core           import exppdf, normpdf # pylint:disable=import-error
+from .._core          import exppdf, normpdf # pylint:disable=import-error
 from .emfitter        import ByEM
 from .gaussianfitter  import ByGaussianMix
-from .histogramfitter import ZeroCrossingPeakFinder, SubPixelPeakPosition, ByHistogram
+from .histogramfitter import (ZeroCrossingPeakFinder,
+                              SubPixelPeakPosition,
+                              ByHistogram,
+                              PeakFlagger,
+                              CWTPeakFinder)
 
 
 PeakFinder= Union[ByHistogram,ByGaussianMix,ByEM]

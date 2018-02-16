@@ -68,7 +68,7 @@ class SubPixelPeakPosition:
             inds = np.int32(np.rint(vals))      # type: ignore
         return (vals[0] if np.isscalar(ainds) else vals) * rho + bias
 
-class CWTPeakFinder: # move to different class
+class CWTPeakFinder:
     "Finds peaks using scipy's find_peaks_cwt. See the latter's documentation"
     subpixel                               = SubPixelPeakPosition()
     widths:        Sequence[int]           = np.arange(5, 11)

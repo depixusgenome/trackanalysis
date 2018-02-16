@@ -36,7 +36,7 @@ def test_xyztscore():
 
     params = np.array([[0.,1,0,1,0,1,0,1],[1,10.,2,10.,3,10.,4,10],[10,0.1,-20,0.1,30,0.1,0,0.1]])
     score  = EMFITTER.score(data,params)
-    floaterr=1e-9
+    floaterr=1e-8
     assert_allclose(floaterr+np.array([[0.023358,0.01416735,0.01416735,0.01416735,0.00859293],
                                        [0.,0.,0.,0.,0.],
                                        [0.,0.,0.,0.,0.]]),score,rtol=1e-5)

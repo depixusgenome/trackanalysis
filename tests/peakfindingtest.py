@@ -15,8 +15,8 @@ from simulator.processor         import EventSimulatorTask, TrackSimulatorTask
 from eventdetection.processor    import EventDetectionTask
 from peakfinding.selector        import PeakSelector, EVENTS_DTYPE
 from peakfinding.processor       import PeakSelectorTask, PeakProbabilityTask
-from peakfinding.histogram       import (Histogram, CWTPeakFinder,
-                                         ZeroCrossingPeakFinder, GroupByPeak)
+from peakfinding.histogram       import Histogram
+from peakfinding.groupby         import CWTPeakFinder,ZeroCrossingPeakFinder, PeakFlagger
 from peakfinding.alignment       import PeakCorrelationAlignment
 from peakfinding.reporting.batch import computereporters
 from testingcore                 import path as utfilepath
@@ -127,7 +127,7 @@ def test_peakgroupby():
               [15.]]
 
     peaks = [1., 2., 10., 20.]
-    res   = GroupByPeak(window = 1, mincount = 5)(peaks, events)
+    res   = PeakFlagger(window = 1, mincount = 5)(peaks, events)
 
     inf   = np.iinfo('i4').max
     assert_equal([len(i) for i in res], [4]*5+[1])
@@ -139,7 +139,7 @@ def test_peakgroupby():
              np.array([1.185, 1.794, 9.708, 19.396], dtype='f4'),
              np.array([1.159, 2.116, 9.692, 19.343], dtype='f4'),
              np.array([1.054, 1.928, 9.941, 19.806], dtype='f4')]
-    ret   = GroupByPeak(window = 10, mincount = 5)(peaks, elems)
+    ret   = PeakFlagger(window = 10, mincount = 5)(peaks, elems)
     for i in ret:
         assert all(i == np.array([0, 0, 1, 2]))
 
