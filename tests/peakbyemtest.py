@@ -4,19 +4,16 @@
 Tests for detection of peaks
 will be expanded to include different methods
 """
+import pickle
+
 import numpy as np
-from numpy.testing import assert_allclose
-from scipy.stats import expon, norm
+from numpy.testing       import assert_allclose
+
 from peakfinding.groupby import ByEM
+from testingcore         import path as utfilepath
 
 EMFITTER = ByEM()
-
-
-def test_byeminit():
-    'init should not return small pz_x values'
-    # test extreme cases
-    # data = np.hstack([norm(loc=0,scale=0.1).rvs(size=100),10])
-    pass
+DATA     = pickle.load(open(utfilepath('smallemdata'),"rb"))
 
 def test_ztscore():
     'tests the score method'
@@ -55,26 +52,16 @@ def test_assign():
     score  = EMFITTER.score(data,params[[1,2,0]])
     assert {0:(1,),1:(2,),2:(0,)}==EMFITTER.assign(score)
 
-def test_byemstep():
-    'test the expectation and maximization step of EmPeakFitter'
-    rstate=np.random.RandomState(2)
-    data = np.vstack([np.hstack([norm(loc=i,scale=0.1).rvs((1000,1),random_state=rstate), # pylint: disable=unused-variable
-                                 expon(loc=0,scale=0.1).rvs((1000,1),random_state=rstate)])
-                      for i in range(0,10,2)])
-
-    byem=ByEM(emiter=1) # pylint: disable=unused-variable
-    # byem.fit(data,5)
-    # [[(array([-0.01037411]), array(0.010754432724043382)),
-    #   (0.0, 0.088473963060729632)],
-    #  [(array([ 5.99171057]), array(0.009344976709039427)),
-    #   (0.0, 0.071020222705922273)],
-    #  [(array([ 1.98797809]), array(0.008596847258001587)),
-    #   (0.0, 0.099100349275130326)],
-    #  [(array([ 7.99110602]), array(0.00906913159811023)),
-    #   (0.0, 0.098698632507821488)],
-    #  [(array([ 4.01190038]), array(0.00950468262348866)),
-    #   (0.0, 0.098265426016101332)]])
-
-    # for x,y,z and t
-    rstate=np.random.RandomState(2)
-    # ...
+def test_emstep():
+    'tests emstep on 2 distinct peaks'
+    params = np.array([[0,10,0.,1.5e+01],
+                       [0,11,0.,8.8e+01]])
+    rates           = 0.5*np.ones((2,1))
+    EMFITTER.emiter = 100
+    _,rates,params  = EMFITTER.cfit(DATA,rates,params)
+    assert_allclose(params,np.array([[6.099034e-02,1.401e-06,0.,3.75365918e+01],
+                                     [7.441417e-02,1.00e-06,0.,1.15579996e+02]]),
+                    rtol=1e-4)
+    # ratio of events assigned to each of the 2 peaks
+    assert_allclose(rates,np.array([[0.45054946],
+                                    [0.54945054]]))
