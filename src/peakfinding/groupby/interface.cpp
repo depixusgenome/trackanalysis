@@ -60,6 +60,19 @@ namespace peakfinding{
 	    return output;
 	}
 
+	ndarray pyscore(ndarray pydata,ndarray pyparams){
+	    auto    infopar	= pyparams.request();
+	    auto    infodat	= pydata.request();
+	    matrix    params	= arraytomatrix(pyparams);
+	    matrix    data	= arraytomatrix(pydata);
+	    auto    score = scoreparams(data,params);
+	    ndarray outscore({score.size1(),score.size2()},
+	    		     {score.size2()*sizeof(double),sizeof(double)},
+	    		     &(score.data()[0]));
+
+	    return outscore;
+	}
+
 	void pymodule(py::module &mod){
 	    auto doc = R"_(Runs Expectation Maximization N times)_";
 	    mod.def("emrunner",[](ndarray data,ndarray rates,ndarray params,unsigned nsteps,double upper,double lower)
@@ -68,6 +81,8 @@ namespace peakfinding{
 		    R"_(compute pdf of normal distribution)_");
 	    mod.def("exppdf",[](double loc,double scale, double pos){return exppdf(loc,scale,pos);},
 		    R"_(compute pdf of exponential distribution)_");
+	    mod.def("emscore",[](ndarray data,ndarray params){return pyscore(data,params);},
+		    R"_(returns score matrix)_");
 
 	    pybind11::class_<OutputPy>(mod, "OutputPy")
 		.def(pybind11::init<>())

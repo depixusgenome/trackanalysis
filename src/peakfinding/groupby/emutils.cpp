@@ -13,7 +13,7 @@
 
 namespace peakfinding{
     namespace emutils{
-	double PRECISION = 1e-10;
+	double PRECISION = 1e-9;
 	double PI=3.14159;
 	
 	double normpdf(double loc,double var,double pos){
@@ -27,14 +27,12 @@ namespace peakfinding{
 	double pdfparam(blas::vector<double> param,blas::vector<double> datum){
 	    double pdf = 1.;
 	    for (uint it=0;it<param.size()-2;it+=2){
-		pdf *= normpdf(param(it),param(it+1),datum[0]); // datum[0] to change
+		pdf *= normpdf(param(it),param(it+1),datum[it/2]); // datum[0] to change
 	    }
 	    return pdf*exppdf(param[param.size()-2],param[param.size()-1],datum[datum.size()-1]);
 	}
 	
 	double scoreparam(blas::vector<double> param, blas::vector<double> datum){
-	    // if (pow(datum(0)-param(0),2)>2*param(1))
-	    // 	return PRECISION;
 	    return pdfparam(param,datum);
 	}
 	
@@ -51,7 +49,6 @@ namespace peakfinding{
 	    return score;
 	}
 	
-	// to clean
 	// this function can be improved
 	// must change creation of diagproba to row * matrix
 	matrix maximizeparam(const matrix &data,matrix pz_x,double uppercov,double lowercov){
@@ -111,25 +108,6 @@ namespace peakfinding{
 	    }
 
 	    // after testing it is advised to leave some flexibility for peaks
-	    // need to check that the mean is correctly done
-	    // if config.tied == true
-	    // matrix meancov(1,DCOLS-1,0.);
-	    // matrix estcovs(DROWS,DCOLS-1);
-	    // estcovs = blas::subslice(newparams,0,1,DROWS,1,2,DCOLS-1);
-	    // for (unsigned row=0u,nrows=pz_x.size1();row<nrows;++row){
-	    // 	for (unsigned col=0u,ncols=DCOLS-1;col<ncols;++col){
-	    // 	    meancov(0,col)+=estcovs(row,col);
-	    // 	}
-	    // }
-	    // meancov/=(double)pz_x.size1();
-	    // // replace covariance by mean values
-	    // for (unsigned row=0u,nrows=pz_x.size1();row<nrows;++row){
-	    // 	for (unsigned col=0u,ncols=DCOLS-1;col<ncols;++col){
-	    // 	    newparams(row,2*col+1)=meancov(0,col);
-	    // 	}
-	    // }	    
-	    
-	    // space mean, space cov, duration mean, duration cov
 	    return newparams;
 	}
 	

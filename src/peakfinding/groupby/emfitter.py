@@ -3,24 +3,18 @@
 "Creates a histogram from available events"
 
 import itertools
-from enum import Enum
+from itertools import chain
 from functools import partial
-from typing import Callable, Dict, Tuple
+from typing    import Dict, Tuple
 
 import numpy as np
 
-from utils import initdefaults
-from utils.logconfig import getLogger
-from .._core import exppdf, normpdf, emrunner # pylint: disable=import-error
-from .histogramfitter import ByHistogram # pylint: disable=unused-import
+from utils            import initdefaults
+from utils.logconfig  import getLogger
+from .._core          import emrunner, emscore # pylint: disable = import-error
+from .histogramfitter import ByHistogram # pylint: disable               = unused-import
 
 LOGS = getLogger(__name__)
-
-class COVTYPE(Enum):
-    'defines constraints on covariance'
-    ANY  = "any"
-    TIED = "tied"
-
 
 class ByEM: # pylint: disable=too-many-public-methods
     '''
@@ -31,14 +25,10 @@ class ByEM: # pylint: disable=too-many-public-methods
     mincount = 5
     tol      = 0.5  # loglikelihood tolerance
     decimals = 4    # rounding values
-    covtype  = COVTYPE.TIED
-    deltabic = 1    # significant increase in bic
     floaterr = 1e-10
     params  : np.ndarray
     rates   : np.ndarray
     minpeaks  = 1
-    spaceonly = False
-    covmap : Callable = np.vectorize(lambda x : float(x)) # pylint:disable=unnecessary-lambda
     kwa : Dict = {}
 
     @initdefaults(frozenset(locals()))
@@ -48,19 +38,20 @@ class ByEM: # pylint: disable=too-many-public-methods
     def __call__(self,**kwa):
         _, bias, slope = kwa.get("hist",(0,0,1))
         self.kwa = kwa
-        return self.find(kwa.get("events",None), bias, slope, kwa["precision"])
+        return bias,slope #self.find(kwa.get("events",None), bias, slope, kwa["precision"])
 
-    def find(self, events, bias, slope, precision=None):
-        'find peaks along z axis'
-        data       = np.array([[np.nanmean(evt),len(evt)]
-                               for cycle in events
-                               for evt in cycle])
-        maxpeaks   = int((max(data[:,0])-min(data[:,0]))//precision)
-        search     = self.search()
-        params     = search[-1]
-        asort      = np.argsort(params[:,0,0])
-        peaks, ids = self.__strip(params[asort],events)
-        return peaks * slope + bias , ids
+    # to keep
+    # def find(self, events, bias, slope, precision=None):
+    #     'find peaks along z axis'
+    #     data       = np.array([[np.nanmean(evt),len(evt)]
+    #                            for cycle in events
+    #                            for evt in cycle])
+    #     maxpeaks   = int((max(data[:,0])-min(data[:,0]))//precision)
+    #     #search     = self.search()
+    #     #params     = search[-1]
+    #     asort      = np.argsort(params[:,0,0])
+    #     peaks, ids = self.__strip(params[asort],events)
+    #     return peaks * slope + bias , ids
 
     def __strip(self, params, events):
         '''
@@ -80,14 +71,6 @@ class ByEM: # pylint: disable=too-many-public-methods
         ids   = [np.argmax(_) if max(_)>1e-4 else np.iinfo("i4").max for _ in score]
         return np.array(ids)
 
-    # to test
-    def nparams(self,params):
-        'returns the number of estimated params'
-        if self.covtype is COVTYPE.TIED:
-            dim = params.shape[1]//2-1
-            return params.size-dim*(params.shape[0]-1)
-        return params.size
-
     def initialize(self,data:np.ndarray,maxbins:int=1)->np.ndarray:
         'initialize using density'
         bins      = np.histogram(data[:,0],bins=maxbins)[1]
@@ -95,53 +78,22 @@ class ByEM: # pylint: disable=too-many-public-methods
         digi      = np.digitize(data[:,:-1].ravel(),bins)
         clas      = {idx:np.array([data[_1] for _1,_2 in enumerate(digi) if _2==idx])
                      for idx in set(digi)}
-        params    = np.array([[(np.nanmean(clas[idx][:,:-1],axis=0),
-                                np.cov(clas[idx][:,:-1].T) # to correct
-                                if len(clas[idx])>self.mincount else 0),
-                               (0,np.nanstd(clas[idx][:,-1]))] for idx in set(digi)])
-        params[:,0,1][params[:,0,1]==0]=np.mean(params[:,0,1],axis=0)
-        params[:,1,1][params[:,1,1]==0]=np.mean(params[:,1,1],axis=0)
-        params[:,0,1] = self.covmap(params[:,0,1])
+        params = np.vstack([list(chain.from_iterable(zip(np.nanmean(clas[idx],axis=0),
+                                                         np.nanvar(clas[idx],axis=0))))
+                            for idx in set(digi)
+                            if len(clas[idx])>self.mincount])
+        params[:,-2] = 0.
+        params[:,-1] = [np.nanstd(clas[idx][-1])
+                        for idx in set(digi)
+                        if len(clas[idx])>self.mincount]
+
         return 1/len(params)*np.ones((len(params),1)) , params
 
-    @classmethod
-    def pdf(cls,*args):
-        '''
-        args : np.array([[xloc,xscale,xpos],
-                         [yloc,yscale,ypos],
-                         [zloc,zscale,zpos],
-                         [tloc,tscale,tpos]])
-        '''
-        param, datum = args[0]
-        return cls.spatialpdf(*param[0],datum[:-1])*exppdf(*param[1],datum[-1])
-
     @staticmethod
-    def mvnormpdf(mean,cov,pos):
-        'multivariate normal'
-        cent = pos-mean
-        num  = np.dot(np.dot(cent,np.linalg.inv(cov)),cent.T)
-        return np.exp(-0.5*num)/np.sqrt(float(np.linalg.det(cov)))
-
-    # pytest
-    @classmethod
-    def spatialpdf(cls,mean,cov,pos):
-        'proportional to normal pdf of multivariate distribution'
-        if len(pos)==1:
-            return float(normpdf(float(mean), float(cov), float(pos)))
-        return cls.mvnormpdf(mean,cov,pos)
-
-    def score(self,data:np.ndarray,params)->np.ndarray:
+    def score(data:np.ndarray,params:np.ndarray)->np.ndarray:
         'return the score[i,j] array corresponding to pdf(Xj|Zi, theta)'
-        # use bin n data to reduce computation
-        score = np.ones((len(params),data.shape[0]))*10*self.floaterr
-        pairs = [(row,col)
-                 for row,i in enumerate(params[:,0])
-                 for col in np.argwhere((data[:,0]-i[0])**2<100*i[1]).ravel()]
-        for row,col in pairs:
-            score[row,col]+=self.pdf((params[row],data[col]))
-        return score
+        return emscore(data,params)
 
-    # pytest
     @classmethod
     def assign(cls,score:np.ndarray)->Dict[int,Tuple[int, ...]]:
         'to each event (row in data) assigns a peak (row in params)'
@@ -156,23 +108,20 @@ class ByEM: # pylint: disable=too-many-public-methods
     def bic(self,score:np.ndarray,rates:np.ndarray,params:np.ndarray)->float:
         'returns bic value'
         llikeli = self.llikelihood(score,rates)
-        # number of params rates + params assuming tmean is 0
-        return -2*llikeli + self.nparams(params) *np.log(0.5*score.shape[1]/np.pi)
+        return -2*llikeli + params.size *np.log(0.5*score.shape[1]/np.pi)
 
     def aic(self,score:np.ndarray,rates:np.ndarray,params:np.ndarray)->float:
         'returns aic value'
-        return 2*self.nparams(params) -2*self.llikelihood(score,rates)
+        return 2*params.size -2*self.llikelihood(score,rates)
 
     @classmethod
     def llikelihood(cls,score:np.ndarray,rates:np.ndarray)->float:
         'returns loglikelihood'
         return np.sum(np.log(np.sum(rates*score,axis=0)))
 
-    def cfit(self,data,rates,params,bounds=(0.004**2,0.001**2)):
+    def cfit(self,data,rates,params,bounds=(10**2,0.001**2)):
         'fitting using c calls'
-        tofloat   = np.vectorize(float)
-        paramsmat = np.vstack(tofloat(params)).reshape(-1,4)
-        out       = emrunner(data,rates,paramsmat,self.emiter,bounds[0],bounds[1])
+        out = emrunner(data,rates,params,self.emiter,bounds[0],bounds[1])
         return out.score, out.rates, out.params
 
     @classmethod
@@ -186,68 +135,21 @@ class ByEM: # pylint: disable=too-many-public-methods
         sortedinfo = sorted(((*val,idx) for idx,val in rounded),key=lambda x:(x[0],-x[1]))
         return list(map(lambda x:next(x[1])[-1],itertools.groupby(sortedinfo,key=lambda x:x[0])))
 
-    def checkparam(self,data,params,bounds):
-        '''
-        checks whether the addition of a new peak is worth
-        '''
-        nrates = np.ones((len(params),1))/len(params)
-
-        nfit = self.cfit(data,nrates,params,bounds)
-        return self.bic(*nfit),nfit[-1]
-
-    # def frompeakstoparams():
-    #     pass
-    @staticmethod
-    def search():
-        pass
-
-    def addpeaks(self,data,rates,params,bounds=(0.005**2,0.001**2)):
-        '''
-        iteratively splits each peaks in 2 until adding more peaks does not improve the bic
-        '''
-        visited = set([])
-        delta = np.array([0.005]*params.shape[1],dtype="f4") # in microns
+    def splitter(self,data,rates,params,upper_bound=0.005**2):
+        'splits the peaks with great Z variance'
+        delta = np.array([0.001]*params.shape[1]) # in microns
         delta[-2:] = 0.0
-
-        score, rates, params = self.cfit(data,rates,params,bounds)
-        bic1 = self.bic(score,rates,params)
-
-        while True:
-            for idx in range(len(params)):
-                nparams         = np.vstack([params[:idx+1],params[idx:]])
-                nparams[idx]   -= delta
-                nparams[idx+1] += delta
-                bic2, nparams   = self.checkparam(data,nparams,bounds)
-                visited.update({idx})
-                if bic2<bic1:
-                    params  = np.array(nparams,copy=True)
-                    bic1    = bic2
-                    visited.remove(idx)
-                    visited = set(i+1 if i>idx else i for i in visited)
-
-            if len(visited)==params.shape[0]:
-                break
-
-        return params
-
-    def fullrecord(self,data:np.ndarray,maxpeaks:int,bounds=(0.005**2,0.001**2)):
-        '''
-        for debugging purposes
-        '''
-        results = []
-        rates,params       = self.initialize(data,maxpeaks)
-        score,rates,params = self.cfit(data,rates,params,bounds)
-        results.append((score,rates,params))
-        # remove peaks that are too close after fitting, and update
-        # keep               = self.__rmduplicates(params,rates)
-        # score,rates,params = self.emstep(data,rates[keep],params[keep])
-
-        #assign = np.array(list(map(len,self.assign(score).values())))
-        while len(rates)>self.minpeaks:
-            asort              = rates.ravel().argsort()
-            score,rates,params = self.cfit(data,rates[asort][1:],params[asort][1:],bounds)
-            # keep               = self.__rmduplicates(params,rates)
-            # score,rates,params = self.emstep(data,rates,params)
-            results.append((score,rates,params))
-            #assign             = np.array(list(map(len,self.assign(score).values())))
-        return results
+        delta[range(1,2,len(delta))] = 0.0 # no delta in cov
+        score, rates, params = self.cfit(data,rates,params)
+        while any(params[:,1]>upper_bound):
+            idx = np.argmax(params[:,1])
+            # split the one with highest covariance
+            nparams         = np.vstack([params[:idx+1],params[idx:]])
+            nparams[idx]   -= delta
+            nparams[idx+1] += delta
+            nrates = np.vstack([rates[:idx+1],rates[idx:]])
+            nrates[idx:idx+2] /=2
+            # could be improved by reducing the number of peaks (and associated data)
+            # to optimized during emstep
+            score, rates, params = self.cfit(data,nrates,nparams)
+        return score,rates,params
