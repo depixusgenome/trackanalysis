@@ -15,7 +15,7 @@ from   utils.decoration                 import addproperty, addto
 from   control.processor.dataframe      import DataFrameFactory
 from   model.__scripting__              import Tasks
 from   model.__scripting__.track        import LocalTasks
-from   data.views                       import BEADKEY
+from   data.views                       import BEADKEY, Beads
 from   data.trackops                    import dropbeads
 from   data.__scripting__.track         import Track
 from   data.__scripting__.tracksdict    import TracksDict
@@ -69,8 +69,8 @@ class TrackCleaningScript:
     * `track.cleaning.bad()`: lists bad beads
     * `track.cleaning.messages()`: lists all messages
     * `track.cleaning.dropbad()`: returns a track with only good beads loaded.
-    * `track.cleaning.concatenate(othertrack)`: returns a track combining the 2 tracks
-                                                used when an experiment is resumed
+    * `track.cleaning.concatenate(othertrack)`: returns a track combining the 2
+    tracks used when an experiment is resumed.
     """
     def __init__(self, track: Track) -> None:
         self.track = track
@@ -148,6 +148,54 @@ class TrackCleaningScript:
         "removes bad beads *forever*"
         return dropbeads(self.track, *self.bad(**kwa)) # type: ignore
 
+@addproperty(TrackCleaningScript, 'data')
+class TrackCleaningScriptData:
+    """
+    Provides access to certain classes of beads:
+
+    * `track.cleaning.data.fixed`: `Beads` for fixed beads only
+    * `track.cleaning.data.subtraction`: `Beads` for subtraction beads only. The
+    resulting subtracted bead is displayed with id -1.
+    * `track.cleaning.data.bad`: `Beads` for bad beads only
+    * `track.cleaning.data.good`: `Beads` for good beads only
+    """
+    def __init__(self, itm):
+        self.track = itm.track
+
+    def fixed(self, **kwa) -> Beads:
+        "displays aligned cycles for fixed beads only"
+        beads = self.track.cleaning.fixed(**kwa)
+        return self.track.apply(Tasks.alignment)[beads,...]
+
+    def bad(self, **kwa) -> Beads:
+        "displays aligned cycles for bad beads only"
+        beads = self.track.cleaning.bad(**kwa)
+        return self.track.apply(Tasks.alignment)[beads,...]
+
+    def good(self, **kwa) -> Beads:
+        "displays aligned cycles for good beads only"
+        beads = self.track.cleaning.good(**kwa)
+        return self.track.apply(Tasks.alignment)[beads,...]
+
+    def subtraction(self) -> Optional[Beads]:
+        "displays aligned cycles for subtracted beads only"
+        task  = self.track.tasks.subtraction
+        beads = getattr(task, 'beads', None)
+        if not beads:
+            return None
+
+        proc     = Tasks.subtraction.processor(**task.config())
+        data     = {i: self.track.data[i] for i in beads}
+        data[-1] = proc.signal(self.track.beads) # type: ignore
+        return self.track.apply(Tasks.alignment).withdata(data)
+
+TrackCleaningScript.__doc__ = (
+    TrackCleaningScript.__doc__[:-5]
+    +"""
+    * `track.cleaning.data` p"""
+    +TrackCleaningScriptData.__doc__.split('\n')[1].strip()[1:]+"\n"
+    +'\n   '.join(TrackCleaningScriptData.__doc__.split('\n')[2:]).replace('\n', '\n    ')
+    )
 Track.__doc__ += (
     """
     * `cleaning` p"""

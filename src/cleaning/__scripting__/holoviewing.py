@@ -9,7 +9,6 @@ import pandas               as     pd
 import numpy                as     np
 
 from   utils.holoviewing    import hv, addproperty, displayhook, ItemsDisplay
-from   model.__scripting__  import Tasks
 from   .                    import TrackCleaningScript, TracksDictCleaningScript
 
 @addproperty(TrackCleaningScript)
@@ -20,11 +19,6 @@ class TrackCleaningDisplay(ItemsDisplay):
     def display(self, **_):
         "returns a table of cleaning messages"
         return self._items.messages()
-
-    def fixed(self, **kwa):
-        "displays aligned cycles for fixed beads only"
-        beads = self._items.fixed(**kwa)
-        return self._items.track.apply(Tasks.alignment)[beads,...]
 
 TrackCleaningScript.__doc__ += (
     """
