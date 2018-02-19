@@ -163,7 +163,7 @@ actually requested.
     >>>             yield Cycles(data = {(0,0): rand(100) })
     >>>         args.apply(_generator)
 """
-from .base      import Processor, processors
+from .base      import Processor, ProcessorException, processors
 from .cache     import Cache
 from .runner    import Runner, run
 from .track     import TrackReaderProcessor, CycleCreatorProcessor, DataSelectionProcessor

@@ -10,7 +10,7 @@ import  numpy                   as     np
 from    utils                   import initdefaults
 from    model                   import Task, Level, PHASE
 from    data.views              import BEADKEY
-from    control.processor       import Processor
+from    control.processor       import Processor, ProcessorException
 from    .datacleaning           import DataCleaning
 
 class PostAlignmentDataCleaning:
@@ -119,13 +119,16 @@ class DataCleaningErrorMessage:
 
         return '\n'.join(i for i in msg if i[0] != '0')
 
-class DataCleaningException(Exception):
+class DataCleaningException(ProcessorException):
     "Exception thrown when a bead is not selected"
     @classmethod
     def create(cls, stats, cnf, tasktype, beadid, parents): # pylint: disable=too-many-arguments
         "creates the exception"
         return cls(DataCleaningErrorMessage(stats, cnf, tasktype, beadid, parents),
                    'warning')
+
+    def __str__(self):
+        return f"{self.args[0].parents}: {self.args[0].beadid}\n{self.args[0]}"
 
 class DataCleaningProcessor(Processor[DataCleaningTask]):
     "Processor for cleaning the data"

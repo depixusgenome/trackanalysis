@@ -5,7 +5,7 @@ Monkeypatches tasks and provides a simpler access to usual tasks
 """
 from pathlib                  import Path
 from functools                import partial
-from typing                   import Type, Tuple, List, Callable, cast
+from typing                   import Type, Tuple, List, Callable, Dict, Any, cast
 from concurrent.futures       import ProcessPoolExecutor
 
 from copy                     import deepcopy
@@ -13,6 +13,7 @@ from enum                     import Enum
 
 import anastore
 from utils                    import update
+from utils.decoration         import addto
 from utils.attrdefaults       import toenum
 from data.views               import TrackView
 from control.taskcontrol      import create as _create, ProcessorController
@@ -477,5 +478,14 @@ class Tasks(Enum):
             return cls(arg[0])(**arg[1], **kwa)
 
         raise RuntimeError('arguments are unexpected')
+
+@addto(Task)
+def nondefaults(self) -> Dict[str, Any]:
+    """
+    Return non default attributes
+    """
+    out = eval(anastore.dumps(self))[1] # pylint: disable=eval-used
+    out.pop(anastore.TPE)
+    return out
 
 setattr(Tasks, 'RESET', Ellipsis)

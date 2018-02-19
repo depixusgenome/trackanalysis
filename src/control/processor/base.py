@@ -13,6 +13,11 @@ from    model.level     import Level
 if TYPE_CHECKING:
     from .runner    import Runner # pylint: disable=unused-import
 
+class ProcessorException(Exception):
+    """
+    All exceptions related to a problem with the data should derive from this
+    """
+
 class TaskTypeDescriptor:
     """
     Dynamically finds all Task subclasses implementing
