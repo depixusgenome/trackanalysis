@@ -103,7 +103,7 @@ class DataFrameProcessor(Processor[DataFrameTask]):
     def apply(cls, toframe = None, **cnf):
         "applies the task to a frame or returns a function that does so"
         task = cast(DataFrameTask, cls.tasktype(**cnf)) # pylint: disable=not-callable
-        fcn  = partial(cls.__merge if task.merge else cls.__apply, task)
+        fcn  = partial(cls._merge if task.merge else cls._apply, task)
         return fcn if toframe is None else fcn(toframe)
 
     def run(self, args):
@@ -111,8 +111,8 @@ class DataFrameProcessor(Processor[DataFrameTask]):
         args.apply(self.apply(**self.config()))
 
     @classmethod
-    def __merge(cls, task, frame):
-        return pd.concat([i for _, i in cls.__apply(task, frame)])
+    def _merge(cls, task, frame):
+        return pd.concat([i for _, i in cls._apply(task, frame)])
 
     @staticmethod
     def __iter_subclasses() -> Iterator[type]:
@@ -132,7 +132,7 @@ class DataFrameProcessor(Processor[DataFrameTask]):
         return next((i for i in cls.__iter_subclasses() if frame is i.frametype()), None)
 
     @classmethod
-    def __apply(cls, task, frame):
+    def _apply(cls, task, frame):
         sub = cls.factory(frame)
         if sub is not None:
             return frame.withaction(sub(task, frame).dataframe)

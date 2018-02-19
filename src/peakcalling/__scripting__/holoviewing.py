@@ -377,8 +377,11 @@ class _2DRef(PeaksTracksDictDisplay):
         if self._reference is not None:
             ref = self.__quadmeshref(sp1, sp2)
 
-        pks = hv.Curve((np.repeat(np.concatenate(sp1), 3), np.concatenate(sp2)),
-                       label = 'peaks')(style = self._peakstyle)
+        if len(sp1):
+            pks = hv.Curve((np.repeat(np.concatenate(sp1), 3), np.concatenate(sp2)),
+                           label = 'peaks')(style = self._peakstyle)
+        else:
+            pks = hv.Curve(([], []), label = 'peaks')(style = self._peakstyle)
         if self._reference is not None:
             return (quad*ref*pks*text).redim(x = 'z', y = 'key', z ='events')
         return (quad*pks*text).redim(x = 'z', y = 'key', z ='events')
