@@ -223,15 +223,14 @@ class TracksDictCleaningScript:
                 beads: Sequence[BEADKEY] = None,
                 **kwa) -> Tuple[Set[BEADKEY], Set[BEADKEY]]:
         "returns beads without warnings"
-        kwa['beads'] = beads
         good: Set[BEADKEY] = set(self.tracks.commonbeads())
-        bad : Set[BEADKEY] = set(self.tracks.availablebeads()) - good
-        fcn  = DataCleaningProcessor.compute
+        bad : Set[BEADKEY] = (set(self.tracks.availablebeads()) - good)
+        cur:  Set[BEADKEY] = (bad | good) if beads is None else set(beads)
         for track in self.tracks.values():
-            frame  = track.beadsonly
-            cur    = set(frame.keys())-bad
-            bad.update({i[0] for i in frame[list(cur)] if fcn(frame, i, **kwa) is None})
-        return bad, good-bad
+            tmp = (set(track.beadsonly.keys())-bad) & cur
+            if tmp:
+                bad.update(track.cleaning.bad(tmp,**kwa))
+        return bad & cur, (good-bad) & cur
 
     def messages(self,
                  beads: Sequence[BEADKEY] = None,
