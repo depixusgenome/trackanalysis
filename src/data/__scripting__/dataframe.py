@@ -6,7 +6,7 @@ from   copy                        import copy as shallowcopy
 import pandas                      as     pd
 import numpy                       as     np
 from   utils.decoration            import addto
-from   control.processor.dataframe import DataFrameProcessor
+from   control.processor.dataframe import SafeDataFrameProcessor
 from   ..views                     import Cycles, Beads
 
 @addto(Beads)
@@ -92,10 +92,10 @@ def adddataframe(*classes):
         if assign is not None:
             transform.insert(0, lambda x: x.assign(**assign))
 
-        return DataFrameProcessor.apply(shallowcopy(self),
-                                        transform = transform,
-                                        measures  = kwa,
-                                        merge     = merge)
+        return SafeDataFrameProcessor.apply(shallowcopy(self),
+                                            transform = transform,
+                                            measures  = kwa,
+                                            merge     = merge)
 
-    dataframe.__doc__ = DataFrameProcessor.factory(classes[0]).__doc__+doc
+    dataframe.__doc__ = SafeDataFrameProcessor.factory(classes[0]).__doc__+doc
     classes[0].dataframe = dataframe

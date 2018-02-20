@@ -198,7 +198,7 @@ class Processor(Generic[TaskType]):
         raise NotImplementedError()
 
 CACHE_T = Dict[Type[_tasks.Task], Type[Processor]]
-def register(proc: Union[None, Type[Processor], Iterable[Type[Processor]]],
+def register(proc: Union[None, Type[Processor], Iterable[Type[Processor]]] = None,
              force          = False,
              cache: CACHE_T = None,
              recursive      = True) -> CACHE_T:

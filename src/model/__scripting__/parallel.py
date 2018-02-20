@@ -27,7 +27,7 @@ class Parallel:
 
     def extend(self,
                roots     : Union[TracksDict, Sequence[RootTask], Sequence[Track]],
-               *tasks    : Union[Tasks, Task],
+               *tasks    : Union[Tasks, Task, Processor],
                processors: Dict[Type[Task], Type[Processor]] = None) -> 'Parallel':
         "adds new jobs"
         lroots = [i if isinstance(i, RootTask) else
@@ -55,7 +55,13 @@ class Parallel:
             pool = ProcessPoolExecutor()
 
         if endaction in (pd.concat, 'concat', 'concatenate'):
-            return pd.concat(sum((list(i) for i in pool.map(self.run, self.args)), []))
+            lst: List[pd.DataFrame] = []
+            for i in pool.map(self.run, self.args):
+                if isinstance(i, (list, tuple)):
+                    lst.extend(j for j in i if j is not None)
+                elif i is not None:
+                    lst.append(i)
+            return pd.concat(lst)
 
         elif callable(endaction):
             return [cast(Callable, endaction)(i) for i in pool.map(self.run, self.args)]

@@ -11,10 +11,11 @@ import numpy                        as     np
 
 from   utils.decoration             import addto, addproperty
 from   utils.attrdefaults           import setdefault, deepcopy
-
 from   model                        import Task
 from   model.__scripting__          import Tasks
 from   model.__scripting__.parallel import Parallel
+from   control.processor.dataframe  import SafeDataFrameProcessor
+from   control.processor.base       import register
 
 from   ..track                      import Track
 from   ..views                      import BEADKEY
@@ -237,11 +238,11 @@ class TracksDict(_TracksDict):
 
         dframe  = Tasks.dataframe(merge = True, measures = kwa, transform = transform)
         created = [Tasks.create(i) for i in tasks[1:]]
-
+        procs   = register(SafeDataFrameProcessor, cache = register(), recursive = False)
         par     = Parallel()
         for j in self.values():
             par.extend([j], *Tasks.defaulttasklist(j, tasks[0], j.cleaned),
-                       *created, dframe)
+                       *created, dframe, processors = procs)
         return par.process(None, 'concat') if process else par
 
     def dataframe(self, *tasks,

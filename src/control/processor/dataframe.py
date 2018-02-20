@@ -12,7 +12,7 @@ import  numpy                   as     np
 from    model.task.dataframe    import DataFrameTask
 from    data.track              import Track
 from    data.views              import TrackView
-from    .base                   import Processor
+from    .base                   import Processor, ProcessorException
 
 Frame = TypeVar('Frame', bound = TrackView)
 class DataFrameFactory(Generic[Frame]):
@@ -57,9 +57,7 @@ class DataFrameFactory(Generic[Frame]):
             return track.key
 
         path = track.path
-        if isinstance(path, (str, Path)):
-            return str(Path(path).name)
-        return str(Path(path[0]).name)
+        return Path(path if isinstance(path, (str, Path)) else path[0]).stem
 
     @classmethod
     def indexcolumns(cls, cnt, key = None, frame = None) -> Dict[str, np.ndarray]:
@@ -97,8 +95,13 @@ class DataFrameFactory(Generic[Frame]):
     def _run(self, frame, key, values) -> Dict[str, np.ndarray]:
         raise NotImplementedError()
 
-class DataFrameProcessor(Processor[DataFrameTask]):
-    "Generates pd.DataFrames"
+class SafeDataFrameProcessor(Processor[DataFrameTask]):
+    """
+    Generates pd.DataFrames
+
+    If frames are merged, computations raising a `ProcessorException` are silently
+    discarded.
+    """
     @classmethod
     def apply(cls, toframe = None, **cnf):
         "applies the task to a frame or returns a function that does so"
@@ -112,7 +115,14 @@ class DataFrameProcessor(Processor[DataFrameTask]):
 
     @classmethod
     def _merge(cls, task, frame):
-        return pd.concat([i for _, i in cls._apply(task, frame)])
+        frame = cls._apply(task, frame)
+        lst   = []
+        for i in frame.keys():
+            try:
+                lst.append(frame[i])
+            except ProcessorException:
+                continue
+        return pd.concat(lst) if lst else None
 
     @staticmethod
     def __iter_subclasses() -> Iterator[type]:
@@ -137,3 +147,13 @@ class DataFrameProcessor(Processor[DataFrameTask]):
         if sub is not None:
             return frame.withaction(sub(task, frame).dataframe)
         raise RuntimeError(f'Could not process {type(frame)} into a pd.DataFrame')
+
+class DataFrameProcessor(SafeDataFrameProcessor):
+    """
+    Generates pd.DataFrames
+
+    Exceptions are *not* silently ignored.
+    """
+    @classmethod
+    def _merge(cls, task, frame):
+        return pd.concat([i for _, i in cls._apply(task, frame)])
