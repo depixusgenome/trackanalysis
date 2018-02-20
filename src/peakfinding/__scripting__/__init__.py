@@ -16,6 +16,7 @@ from model.__scripting__            import Tasks
 from data                           import Track
 from data.tracksdict                import TracksDict
 from data.__scripting__.dataframe   import adddataframe
+from data.__scripting__.tracksdict  import TracksDictOperator
 from ..selector                     import PeakSelectorDetails
 from ..probabilities                import Probability
 from ..processor.selector           import PeaksDict, PeakOutput
@@ -118,11 +119,19 @@ def detailed(self, ibead, precision: float = None) -> Union[Iterator[Detailed], 
     evts = iter(i for _, i in self.data[ibead,...])
     return Detailed(self, self.config.detailed(evts, prec))
 
-@addproperty(TracksDict, 'peaks')
-class PeaksTracksDict:
+class PeaksTracksDictOperator(TracksDictOperator, peaks = TracksDict):
     "Add dataframe method to tracksdict"
-    def __init__(self, track):
-        self._items = track
+    def _dictview(self) -> TracksDict:
+        """
+        Return the cloned TracksDict corresponding to the current selected items
+        """
+        tracks = self._items[self._keys] if self._keys else self._items
+        if self._beads:
+            tracks = tracks.clone()
+            sel    = Tasks.selection(selected = list(self._beads))
+            for i in tracks.values():
+                i.tasks.selection = sel
+        return tracks
 
     def dataframe(self, *tasks, transform = None, assign = None, **kwa):
         """
@@ -130,10 +139,10 @@ class PeaksTracksDict:
 
         See documentation in *track.peaks.dataframe* for other options
         """
-        return self._items.dataframe(Tasks.peakselector, *tasks,
-                                     transform = transform,
-                                     assign    = assign,
-                                     **kwa)
+        return self._dictview().dataframe(Tasks.peakselector, *tasks,
+                                          transform = transform,
+                                          assign    = assign,
+                                          **kwa)
 
 adddataframe(PeaksDict)
 

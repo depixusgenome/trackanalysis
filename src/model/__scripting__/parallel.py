@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Runs tasks in parallel"
 from typing                 import (Union, Sequence, Type, Dict, Generator,
-                                    Callable, Iterator, List, cast)
+                                    Callable, List, cast)
 from concurrent.futures     import ProcessPoolExecutor, ThreadPoolExecutor
 import pickle
 import pandas               as     pd
@@ -11,6 +11,7 @@ from control.taskcontrol    import register
 from control.processor      import Processor, run as _runprocessors
 from data.views             import TrackView
 from data.tracksdict        import TracksDict
+from data.track             import Track
 from ..task.track           import TrackReaderTask, RootTask, Task
 from .tasks                 import Tasks
 
@@ -25,15 +26,13 @@ class Parallel:
             self.extend(roots, *tasks, processors = processors)
 
     def extend(self,
-               roots     : Union[TracksDict, Sequence[RootTask]],
+               roots     : Union[TracksDict, Sequence[RootTask], Sequence[Track]],
                *tasks    : Union[Tasks, Task],
                processors: Dict[Type[Task], Type[Processor]] = None) -> 'Parallel':
         "adds new jobs"
-        if not isinstance(roots, TracksDict):
-            lroots = list(cast(Iterator[RootTask], roots))
-        else:
-            lroots = [TrackReaderTask(path = i.path, key  = i.key, axis = i.axis.name)
-                      for i in cast(TracksDict, roots).values()]
+        lroots = [i if isinstance(i, RootTask) else
+                  TrackReaderTask(path = i.path, key  = i.key, axis = i.axis.name)
+                  for i in getattr(roots, 'values', lambda: roots)()]
         if len(lroots) == 0:
             return self
 

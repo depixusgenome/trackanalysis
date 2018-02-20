@@ -26,6 +26,7 @@ from   ..processor.fittoreference   import (FitToReferenceProcessor,
                                             FitToReferenceDict)
 from   ..processor.fittohairpin     import (BEADKEY,    # pylint: disable=unused-import
                                             FitToHairpinDict, Distance)
+from   .                            import PeaksTracksDictOperator
 
 displayhook(FitToReferenceDict)
 addproperty(FitToReferenceDict, 'display', _PeaksDisplay)
@@ -325,16 +326,10 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
         See documentation in *track.peaks.dataframe* for other options
         """
         if self._reference is not None:
-            reftask = self._setupref()
-            itms    = self._items['~'+self._reference]
-            tasks   = (reftask,) + tasks
-        else:
-            itms    = self._items
+            tasks = (self._setupref(),) + tasks
 
-        return itms.dataframe(Tasks.peakselector, *tasks,
-                              transform = transform,
-                              assign    = assign,
-                              **kwa)
+        kwa.update(transform = transform, assign = assign)
+        return PeaksTracksDictOperator(self).dataframe(*tasks, **kwa)
 
     def getmethod(self):
         "Returns the method used by the dynamic map"
