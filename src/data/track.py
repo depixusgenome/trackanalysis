@@ -198,7 +198,6 @@ class ResettingProperty:
         return getattr(obj, self._name) if obj else self
 
     def __set__(self, obj: 'Track', val):
-        setattr(obj, '_lazy',     False)
         setattr(obj, self._name, val)
         obj.unload()
         return getattr(obj, self._name)
@@ -216,7 +215,7 @@ class ViewDescriptor:
         setattr(self, '__doc__', getattr(self.tpe, '__doc__', None))
 
 def _lazies():
-    return ('_data', '_lazy', '_rawprecisions') + tuple(LazyProperty.LIST)
+    return ('_data', '_rawprecisions') + tuple(LazyProperty.LIST)
 
 class PhaseManipulator:
     """
@@ -398,14 +397,12 @@ class Track:
     @property
     def isloaded(self) -> bool:
         "returns whether the data was already acccessed"
-        return self._lazy is False
+        return self._data is not None
 
     def load(self):
         "Loads the data"
-        if self._lazy:
-            if self._data is None and self._path is not None:
-                opentrack(self)
-            self._lazy = False
+        if self._data is None and self._path is not None:
+            opentrack(self)
 
     def unload(self):
         "Unloads the data"
@@ -430,22 +427,22 @@ class Track:
         keys = set(_lazies()+('_path', '_axis'))
 
         test = dict.fromkeys(keys, lambda i, j: j != getattr(type(self), i)) # type: ignore
-        test.update(_phases = lambda i, _: len(i))
+        test.update(_phases = lambda _, i: len(i),
+                    key     = lambda _, i: i is not None)
 
-        cnv  = dict.fromkeys(keys, lambda i: i)                              # type: ignore
+        cnv  = dict.fromkeys(keys | {'key'}, lambda i: i)  # type: ignore
         cnv.update(_secondaries = lambda i: getattr(i, 'data', None),
                    _axis        = lambda i: getattr(i, 'value', i)[0])
 
         info = self.__dict__.copy()
         if self._lazydata_:
-            info.pop('_data',        None)
-            info.pop('_secondaries', None)
+            for i in ('_data', '_secondaries', '_fov'):
+                info.pop(i, None)
 
         for name in set(cnv) & set(info):
             val = info.pop(name)
             if test[name](name, val):
-                info[name[1:]] = cnv[name](val)
-
+                info[name[1:] if name[0] == '_' else name] = cnv[name](val)
         return info
 
     def __setstate__(self, values):
@@ -474,7 +471,6 @@ class Track:
     _secondaries:   DATA        = None
     _rawprecisions              = {}
     _path:          PATHTYPES   = None
-    _lazy                       = True
     _axis                       = Axis.Zaxis
 
     # pylint: disable=unused-argument,function-redefined,no-self-use

@@ -70,6 +70,13 @@ class LocalTasks:
     def __init__(self) -> None:
         self.tasks: Dict[str, Any] = {}
 
+    def __eq__(self, obj):
+        if obj.__class__ is not self.__class__:
+            return False
+        if set(obj.tasks) != set(self.tasks):
+            return False
+        return all(j == obj.tasks[i] for i, j in self.tasks.items())
+
     def config(self) -> Dict[str, Any]:
         "returns a dictionnary of changes to the current globals"
         cnf      = {'tasks.'+i: j for i, j in self.tasks.items()}

@@ -365,7 +365,7 @@ class Handler:
         self.__data(state, kwargs, beadsonly)
 
         state.update(kwargs)
-        state.update(lazy = False, path = path)
+        state.update(path = path)
         track.__setstate__(state)
         return track
 
