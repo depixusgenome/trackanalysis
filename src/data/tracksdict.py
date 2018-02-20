@@ -17,6 +17,17 @@ from .trackio import LegacyGRFilesIO, LegacyTrackIO, PATHTYPES
 
 TDictType = TypeVar('TDictType', bound = 'TracksDict')
 TrackType = TypeVar('TrackType', bound = 'Track')
+def _leastcommonkeys(itr):
+    info = dict(itr)
+    keys = {i: i.split('_') for i in info.keys()}
+    common = None
+    for i in keys.values():
+        common = set(i) if common is None else set(i) & common
+    keys = {i:'_'.join(k for k in j if k not in common) for i, j in keys.items()}
+    if '' in keys.values():
+        keys[next(i for i, j in keys.items() if j == '')] = 'ref'
+    return {keys[i]: j for i, j in info.items()}
+
 class TracksDict(dict):
     """
     This a dictionnary of tracks. It provides *lazy* access to tracks as well
@@ -267,7 +278,11 @@ class TracksDict(dict):
         else:
             itr = ((fcn(i), i) for i in LegacyGRFilesIO.scan(tracks, grs, **opts)[0])
 
-        info = dict((i.group(1), j) for i, j in itr if i) if grp else dict(itr)
+        if grp:
+            info = dict((i.group(1), j) for i, j in itr if i)
+        else:
+            info = _leastcommonkeys(itr)
+
         for i, j in info.items():
             self._set(i, j, allaxes)
         return info.keys()
