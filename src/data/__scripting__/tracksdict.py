@@ -4,17 +4,22 @@
 Adds a dictionnaries to access tracks, experiments, ...
 """
 import re
+from   typing                       import List, FrozenSet, TypeVar, cast
+from   functools                    import partial
 import pandas                       as     pd
 import numpy                        as     np
 
-from   utils.decoration             import addto
+from   utils.decoration             import addto, addproperty
+from   utils.attrdefaults           import setdefault, deepcopy
 
 from   model                        import Task
 from   model.__scripting__          import Tasks
 from   model.__scripting__.parallel import Parallel
 
 from   ..track                      import Track
+from   ..views                      import BEADKEY
 from   ..trackio                    import savetrack, PATHTYPE, Handler
+from   ..trackops                   import clone
 from   ..tracksdict                 import TracksDict as _TracksDict
 from   ..views                      import isellipsis
 
@@ -179,6 +184,10 @@ class TracksDict(_TracksDict):
             for i in self.values():
                 i.cleaned = value
 
+    def clone(self) -> 'TracksDict':
+        "clone the tracks and return a new tracksdict"
+        return cast(TracksDict, clone(self))
+
     def basedataframe(self, loadall = False) -> pd.DataFrame:
         "Returns a table with some data on the track files"
         if loadall:
@@ -214,16 +223,11 @@ class TracksDict(_TracksDict):
             raise ValueError('The first task should be either '
                              'event detection or peak selection.')
 
-        tclean  = [self[[i for i, j in self.items() if j.cleaned]]]
-        tclean += Tasks.defaulttasklist(None, tasks[0], True)
-        tdirty  = [self[[i for i, j in self.items() if not j.cleaned]]]
-        tdirty += Tasks.defaulttasklist(None, tasks[0], False)
-
         transform = ([transform] if callable(transform) else
                      []          if transform is None   else
                      list(transform))
         if assign is not None:
-            transform.insert(0, lambda x: x.assign(**assign))
+            transform.insert(0, partial(pd.DataFrame.assign, **assign))
 
         if Tasks(tasks[-1]) is Tasks.dataframe:
             transform = tasks[-1].transform + transform
@@ -232,10 +236,12 @@ class TracksDict(_TracksDict):
             tasks = tasks[:-1]
 
         dframe  = Tasks.dataframe(merge = True, measures = kwa, transform = transform)
-
         created = [Tasks.create(i) for i in tasks[1:]]
-        par     = (Parallel(*tclean, *created, dframe)
-                   .extend(*tdirty, *created, dframe))
+
+        par     = Parallel()
+        for j in self.values():
+            par.extend([j], *Tasks.defaulttasklist(j, tasks[0], j.cleaned),
+                       *created, dframe)
         return par.process(None, 'concat') if process else par
 
     def dataframe(self, *tasks,
@@ -267,5 +273,86 @@ class TracksDict(_TracksDict):
         ### Tasks not are provided
         {basedataframe.__doc__}
         """)
+
+Self = TypeVar('Self', bound = 'TracksDictOperator')
+class TracksDictOperator:
+    """
+    Allows applying operations to a specific portion of the tracksdict
+    """
+    _beads:     List[BEADKEY] = None
+    _keys:      List[str]     = None
+    _reference: str           = None
+    _items:     TracksDict    = None
+    KEYWORDS: FrozenSet[str] = frozenset(locals()) - {'_items'}
+    def __init__(self, items, **opts):
+        if all(hasattr(items, i) for i in ('_beads', '_keys', '_reference', '_items')):
+            opts, kwa   = items.config(minimal = True), opts
+            opts.update(kwa)
+            items       = getattr(items, '_items')
+        self._items   = items
+        for i in self.KEYWORDS:
+            if i[:2] != '__':
+                setdefault(self, i[1:], opts, fieldname = i)
+
+    def __init_subclass__(cls, **args):
+        for name, itm in args.items():
+            if isinstance(itm, tuple):
+                addproperty(itm[0], name, cls, **itm[1])
+            else:
+                addproperty(itm, name, cls)
+
+    def config(self, name = ..., minimal = False):
+        "returns the config"
+        if isinstance(name, str):
+            return getattr(self, '_'+name)
+
+        keys = {i for i in self.__dict__
+                if (i != '_items' and
+                    len(i) > 2 and i[0] == '_'   and
+                    i[1].lower() == i[1])}
+        if minimal:
+            keys -= {i for i in keys if getattr(self, i) == getattr(self.__class__, i)}
+
+        return {i[1:]: deepcopy(getattr(self, i)) for i in keys}
+
+    def __call__(self: Self, **opts) -> Self:
+        default = self.__class__(self._items).config()
+        config  = {i: j for i, j in self.config().items() if j != default[i]}
+        config.update(opts)
+        return self.__class__(self._items, **config)
+
+    def __getitem__(self, values):
+        if isinstance(values, tuple):
+            tracks, beads = values
+            if not isinstance(tracks, list) and tracks in self._items:
+                tracks = [tracks]
+
+            if isinstance(tracks, list) and isinstance(beads, int):
+                beads = [beads]
+            elif (isinstance(beads, list)
+                  and not isinstance(tracks, list)
+                  and not isellipsis(tracks)):
+                tracks = [tracks]
+
+            self._keys  = None     if isellipsis(tracks) else list(tracks)
+            self._beads = (None    if isellipsis(beads)  else
+                           [beads] if isinstance(beads, (int, str)) else
+                           list(beads))
+
+        elif isinstance(values, list):
+            if all(i in self._items for i in values):
+                self._keys = None if isellipsis(values) else values
+            else:
+                self._beads = None if isellipsis(values) else values
+
+        elif isellipsis(values):
+            self._keys  = None
+            self._beads = None
+
+        elif values in self._items:
+            self._keys  = [values]
+        else:
+            raise KeyError("Could not slice the operator")
+        return self
 
 __all__ = ['TracksDict']

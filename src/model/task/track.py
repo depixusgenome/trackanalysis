@@ -46,7 +46,7 @@ class TrackReaderTask(RootTask):
             setattr(self, i, kwa.get(i, getattr(self.__class__, i)))
 
         # making sure the axis is a str
-        self.axis = getattr(self.axis, 'value', self.axis)
+        self.axis = getattr(self.axis, 'name', self.axis)
 
 class CycleCreatorTask(Task):
     "Iterate over cycles and beads"

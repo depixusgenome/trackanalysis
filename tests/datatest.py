@@ -13,7 +13,7 @@ import data
 from   data.views       import ITrackView
 from   data.trackio     import LegacyGRFilesIO, savetrack, PickleIO, LegacyTrackIO
 from   data.track       import FoV, Track
-from   data.trackops    import concatenatetracks, selectcycles, dropbeads
+from   data.trackops    import concatenatetracks, selectcycles, dropbeads, clone
 from   data.tracksdict  import TracksDict
 from   testingcore      import path as utpath
 
@@ -400,5 +400,25 @@ def test_concatenate():
     assert_allclose(trk.phases[:len(trk1.phases)],trk1.phases)
     assert_allclose(trk.phases[len(trk1.phases):],
                     trk2.phases+trk1.data["t"][-1]-trk2.data["t"][0]+1)
+
+def test_clone():
+    'test whether two Track stack properly'
+    # pylint: disable=protected-access
+    trk1 = Track(path = utpath("small_legacy"))
+    trk2 = clone(trk1)
+    assert not trk1.isloaded
+    assert not trk2.isloaded
+
+    trk1.load()
+    trk2 = clone(trk1)
+    assert trk1.isloaded
+    assert trk2.isloaded
+    assert trk1._data is not trk2._data
+    assert trk1._secondaries is not trk2._secondaries
+    assert trk1._fov is not trk2._fov
+    assert all(i is j for i, j in zip(trk1.data.values(), trk2.data.values()))
+    assert all(i is j for i, j in zip(trk1._secondaries.values(), trk2._secondaries.values()))
+    assert trk1.fov.image is trk2.fov.image
+
 if __name__ == '__main__':
-    test_selectcycles()
+    test_clone()

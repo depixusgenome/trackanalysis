@@ -4,8 +4,8 @@
 """
 Operations on tracks
 """
-from    copy        import copy as shallowcopy
-from    typing      import Union, Tuple, List, Optional, overload
+from    copy        import copy as shallowcopy, deepcopy
+from    typing      import Union, Tuple, List, Optional, TypeVar, cast
 
 import  numpy       as     np
 
@@ -13,21 +13,13 @@ from   .track       import Track
 from   .tracksdict  import TracksDict
 from   .views       import BEADKEY
 
-TRACKS = Union[Track, TracksDict]
+TRACKS = TypeVar('TRACKS', Track, TracksDict)
 
 def _applytodict(fcn, trk, args, kwa) -> Optional[TracksDict]:
     cpy = shallowcopy(trk)
     for i, j in cpy.items():
         cpy[i] = fcn(j, *args, **kwa)
     return cpy
-
-@overload
-def dropbeads(trk:Track, *beads:BEADKEY) -> Track:
-    pass
-
-@overload
-def dropbeads(trk:TracksDict, *beads:BEADKEY) -> TracksDict:
-    pass
 
 def dropbeads(trk:TRACKS, *beads:BEADKEY) -> TRACKS:
     "returns a track without the given beads"
@@ -46,14 +38,6 @@ def dropbeads(trk:TRACKS, *beads:BEADKEY) -> TRACKS:
     cpy.fov.beads = {i: trk.fov.beads[i] for i in good}
     return cpy
 
-@overload
-def renamebeads(trk:Track, *beads:Tuple[BEADKEY, BEADKEY]) -> Track:
-    pass
-
-@overload
-def renamebeads(trk:TracksDict, *beads:Tuple[BEADKEY, BEADKEY]) -> TracksDict:
-    pass
-
 def renamebeads(trk:TRACKS, *beads:Tuple[BEADKEY, BEADKEY]) -> TRACKS:
     "returns a track without the given beads"
     if isinstance(trk, TracksDict):
@@ -68,14 +52,6 @@ def renamebeads(trk:TRACKS, *beads:Tuple[BEADKEY, BEADKEY]) -> TRACKS:
     cpy.fov.beads = {rep.get(i, i): j for i, j in trk.fov.beads.items()}
     return cpy
 
-@overload
-def selectbeads(trk:Track, *beads:BEADKEY) -> Track:
-    pass
-
-@overload
-def selectbeads(trk:TracksDict, *beads:BEADKEY) -> TracksDict:
-    pass
-
 def selectbeads(trk:TRACKS, *beads:BEADKEY) -> TRACKS:
     "returns a track without the given beads"
     if isinstance(trk, TracksDict):
@@ -84,14 +60,6 @@ def selectbeads(trk:TRACKS, *beads:BEADKEY) -> TRACKS:
     if len(beads) == 1 and isinstance(beads[0], (tuple, list, set, frozenset)):
         beads = tuple(beads[0])
     return dropbeads(trk, *(set(trk.beadsonly.keys()) - set(beads)))
-
-@overload
-def selectcycles(trk:Track, indexes:Union[slice, range, List[int]])-> Track:
-    pass
-
-@overload
-def selectcycles(trk:TracksDict, indexes:Union[slice, range, List[int]])-> TracksDict:
-    pass
 
 def selectcycles(trk:TRACKS, indexes:Union[slice, range, List[int]])-> TRACKS:
     """
@@ -142,3 +110,20 @@ def concatenatetracks(trk:TRACKS, *tracks:TRACKS)-> TRACKS:
     for other in tracks:
         trk = _concatenate(trk, other)
     return trk
+
+def clone(trk:TRACKS)-> TRACKS:
+    """
+    Deeper shallow copy of the track.
+
+    The track containers are copied but the numpy arrays are the same.
+    """
+    if isinstance(trk, Track):
+        track = cast(Track, trk)
+        state = track.__getstate__()
+        state.pop('fov', None)
+        state = deepcopy(state)
+        for i in ('data', 'secondaries', 'fov'):
+            state[i] = shallowcopy(getattr(track, f'_{i}'))
+        return type(track)(**state)
+
+    return type(trk)({i: clone(j) for i, j in cast(TracksDict, trk).items()})

@@ -25,7 +25,7 @@ from   ..trackio            import savetrack
 from   ..views              import TrackView, Cycles, Beads
 from   ..track              import Track, LazyProperty, BEADKEY, isellipsis
 from   ..trackops           import (selectbeads, dropbeads, selectcycles,
-                                    concatenatetracks, renamebeads)
+                                    concatenatetracks, renamebeads, clone)
 from   .tracksdict          import TracksDict
 
 @addproperty(Track, 'pathinfo')
@@ -103,6 +103,7 @@ class TrackOperations:
     concatenate  = _Add(concatenatetracks)
     save         = _Add(savetrack)
     rename       = _Add(renamebeads)
+    clone        = _Add(clone)
 
     def __add__(self, other):
         return self.concatenate(getattr(other, '_trk', other))
@@ -226,6 +227,7 @@ class _TrackMixin:
                 return dropbeads(self, *(i for i in value if i != '~'))
 
         return selectbeads(self, value)
+
 
 addattributes(Track, protected = dict(cleaned = False))
 Track.cycles    .args['copy'] = True
