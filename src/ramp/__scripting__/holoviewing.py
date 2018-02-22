@@ -30,7 +30,6 @@ class RampDisplay(BasicDisplay, ramp = Track):
     _alignmentlength = 5
     _stretch         = 1.
     _bias            = 0.
-    _legend          = 'left'
 
     def __getitem__(self, values):
         if isinstance(values, int):
@@ -45,6 +44,7 @@ class RampDisplay(BasicDisplay, ramp = Track):
             self._cycles = (None     if isellipsis(cycles)      else
                             [cycles] if isinstance(cycles, int) else
                             cycles)
+        return self
 
     def getmethod(self): # pylint: disable=too-many-arguments
         if self._cycles is None:
@@ -64,6 +64,9 @@ class RampDisplay(BasicDisplay, ramp = Track):
         else:
             imax  = None
 
+        def _concat(itms, order):
+            return np.concatenate([itms[i] if j else [np.NaN] for i in order for j in range(2)])
+
         def _show(bead):
             data = {i[1]: j for i, j in items[bead,cycles]}
             if imax:
@@ -73,20 +76,12 @@ class RampDisplay(BasicDisplay, ramp = Track):
             for j in data.values():
                 j[:] = (j-zero-self._bias)*self._stretch
 
-            return hv.Overlay([hv.Curve((zmag[i], data[i]),
-                                        label = f'cycle {i}',
-                                        kdims = ['zmag'],
-                                        vdims = ['z'])
-                               for i in data])
+            return hv.Curve((_concat(zmag, data), _concat(data, data)),
+                            kdims = ['zmag'], vdims = ['z'])
         return _show
 
     def getredim(self):
         beads = self._items.beadsonly.keys() if self._beads is None else self._beads
         return (('beads', list(beads)),)
-
-    def display(self, **opts):
-        return (super().display(**opts)
-                (plot = (dict(legend_position = self._legend) if self._legend else
-                         dict(show_legend     = False))))
 
 __all__ = [] # type: list
