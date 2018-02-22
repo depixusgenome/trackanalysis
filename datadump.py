@@ -3,6 +3,7 @@
 "Creates a dataframe"
 from   typing    import Dict, Callable, Any, Iterator, Tuple, KeysView
 from   functools import partial
+import re
 import shelve
 
 class _DEFAULT:
@@ -38,6 +39,47 @@ class LazyShelf(Dict):
 
     def __setitem__(self, key, value):
         self.info[key] = partial(self.__store, key, value) if callable(value) else value
+
+    def __call__(self, name = None):
+        """
+        Decorator for storing a new item.
+
+        The key name is either specified in the decorator or parsed from the
+        function name. The regex `^_(compute)*_*` is stripped from the function name.
+
+        ```python
+        SHELF = LazyShelf("/tmp")
+
+        @SHELF
+        def _compute_mykey():
+            pass
+        assert 'mykey' in SHELF
+
+        @SHELF
+        def _mykey2():
+            pass
+        assert 'mykey2' in SHELF
+
+        @SHELF
+        def mykey3():
+            pass
+        assert 'mykey3' in SHELF
+
+        @SHELF('mykey4')
+        def whatever():
+            pass
+        assert 'mykey4' in SHELF
+        ```
+        """
+        if isinstance(name, str):
+            def _wrapper(fcn):
+                self[name] = fcn
+                return fcn
+            return _wrapper
+
+        match = re.match('^_*(?:compute)*_*(.*)', name.__name__)
+        self[match.group(1) if match else name.__name__] = name
+        return name
 
     def set(self, key, value = _DEFAULT, force = False, *args, **kwa):
         "sets and returns the value"
