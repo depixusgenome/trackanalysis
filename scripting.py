@@ -44,7 +44,7 @@ def test():
     traceback.print_stack()
     assert False, stack[-1]
 
-def _configure_hv(hvmod):
+def _configure_hv(hvmod, locs):
     # pylint: disable=import-error,bare-except,unused-import,unused-variable
     exts = []
     try:
@@ -65,8 +65,18 @@ def _configure_hv(hvmod):
         del warnings
 
         try:
-            from IPython import get_ipython
+            import holoviews  as     hv
+            from   IPython    import get_ipython
             get_ipython().magic('output size=150')
+
+            opts  = locs.get("HV_OPTS", {})
+            width = opts.get("width", 700)
+            bcolor= opts.get("box_color", "lightblue")
+            for i in opts.get("elements", ('Curve', 'Scatter', 'Points', 'BoxWhisker')):
+                string = f"{i} [width={width}] {{+framewise}}"
+                if i == 'BoxWhisker':
+                    string = string.replace("]",  f"] (box_color='{bcolor}') ")
+                hv.opts(string)
         except:
             pass
 
@@ -108,7 +118,7 @@ def importjupyter(locs, *names):
         locs['hv']    = hv
         locs['hvops'] = hvops
 
-        _configure_hv(hv)
+        _configure_hv(hv, locs)
         _configure_jupyter()
         importlibs(locs, *names)
     else:
