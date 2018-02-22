@@ -77,6 +77,7 @@ def _configure_hv(hvmod, locs):
                 if i == 'BoxWhisker':
                     string = string.replace("]",  f"] (box_color='{bcolor}') ")
                 hv.opts(string)
+            hv.opts(f'Table[width={width}]')
         except:
             pass
 
