@@ -49,8 +49,8 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         self.css.tooltip.good.default  = ('<tr><td><td>'
                                           +'<td>σ[HF] =</td><td>{:.4f}</td>'
                                           +'</tr>')
-        self.config.plot.fov.tools.default       = 'pan,box_zoom,tap,save,hover'
-        self.config.plot.fov.calib.tools.default = 'pan,box_zoom,save'
+        self.css.tools.default       = 'pan,box_zoom,tap,save,hover'
+        self.css.tools.calib.default = 'pan,box_zoom,save'
         self._fig:         Figure           = None
         self._beadssource: ColumnDataSource = None
         self._cursource:   ColumnDataSource = None
@@ -68,7 +68,7 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         self._fig = figure(**self._figargs(name    = 'FoV:Fig',
                                            x_range = Range1d(0, 1),
                                            y_range = Range1d(0, 1),
-                                           tools   = self.config.plot.fov.tools.get()))
+                                           tools   = self.css.tools.get()))
 
         self._imgsource   = ColumnDataSource(data = dict(image = [np.zeros((10, 10))],
                                                          dw    = [1], dh = [1]))

@@ -26,7 +26,7 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess], HistMixin, RawMixin,
         WidgetMixin    .__init__(self)
 
         DpxHoverModel.defaultconfig(self)
-        self.config.tools.default  = 'ypan,ybox_zoom,reset,save,dpxhover'
+        self.css.tools.default  = 'ypan,ybox_zoom,reset,save,dpxhover'
         self._hover: DpxHoverModel = None
 
         if TYPE_CHECKING:

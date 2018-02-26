@@ -38,7 +38,7 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
                              'ylabel'       : self._xlabel(),
                              'xlabel'       : 'Cycles'}
 
-        self.config.tools.default             = 'pan,box_zoom,reset,save'
+        self.css.tools.default                = 'pan,box_zoom,reset,save'
         self.config.lines.percentiles.default = [10, 50, 90]
         self.config.yspan.default             = [5, 95], 0.3
         self.config.phases.default            = PHASE.initial, PHASE.pull

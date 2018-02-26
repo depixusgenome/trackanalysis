@@ -591,12 +591,13 @@ class PlotView(Generic[PlotType], BokehView):
                     'y.high'  : meta+'ArrowUp'}
 
         plt = self._ctrl.globals.config.plot
-        plt.tools              .default  ='xpan,box_zoom,reset,save'
         plt.boundary.overshoot .default  =.001
         plt.keypress.reset     .default  ='Shift- '
         plt.keypress.pan       .defaults = _gesture('Alt-')
         plt.keypress.zoom      .defaults = _gesture('Shift-')
 
+        plt = self._ctrl.globals.css.plot
+        plt.tools              .default  ='xpan,box_zoom,reset,save'
         self._plotter = self.plottype()(self._ctrl)
 
     @classmethod

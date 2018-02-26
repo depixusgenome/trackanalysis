@@ -104,7 +104,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
         css.colors.missing  .default  = 'red'
         css.colors.found    .defaults = {'dark': 'black', 'default': 'gray'}
 
-        self.config.defaults = {'tools': 'ypan,ybox_zoom,reset,save,dpxhover,tap'}
+        self.css.tools.default        = 'ypan,ybox_zoom,reset,save,dpxhover,tap'
 
         PeaksSequenceHover.defaultconfig(self)
         SequenceTicker.defaultconfig(self)

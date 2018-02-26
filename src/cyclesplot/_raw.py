@@ -27,7 +27,7 @@ class RawMixin(ABC):
                              'figure.height': 450}
         self._rawsource: ColumnDataSource = None
         self._raw:       Figure           = None
-        self.config.tools.raw.default     = 'tap,ypan,ybox_zoom,reset,save,dpxhover'
+        self.css.tools.raw.default   = 'tap,ypan,ybox_zoom,reset,save,dpxhover'
 
     @staticmethod
     def __normal_data(items):
@@ -90,8 +90,7 @@ class RawMixin(ABC):
 
     def _createraw(self):
         css             = self.css
-        tools           = self.config.tools.raw.get()
-        self._raw       = figure(**self._figargs(tools   = tools,
+        self._raw       = figure(**self._figargs(tools   = css.tools.raw.get(),
                                                  y_range = Range1d,
                                                  name    = 'Cycles:Raw'))
         raw, shape      = self.__data()
