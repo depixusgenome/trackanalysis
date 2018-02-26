@@ -20,8 +20,8 @@ class DpxKeyedRow(Row): # pylint: disable=too-many-ancestors
     panrate            = props.Float()
     __implementation__ = 'keyedrow.coffee'
     def __init__(self, plotter, fig, **kwa):
-        vals = ('.'.join(i) for i in product(('pan', 'zoom'), ('x', 'y'), ('low', 'high')))
-        cnf   = plotter.config.keypress
+        vals  = ('.'.join(i) for i in product(('pan', 'zoom'), ('x', 'y'), ('low', 'high')))
+        cnf   = plotter.css.keypress
 
         keys  = dict((cnf[key].get(), key) for key in vals)
         keys[cnf.reset.get()] = 'reset'

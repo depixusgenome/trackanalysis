@@ -316,7 +316,7 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
 
     def newbounds(self, rng, axis, arr) -> dict:
         "Sets the range boundaries"
-        over  = self.config.boundary.overshoot.get()
+        over  = self.css.boundary.overshoot.get()
 
         if isinstance(arr, np.ndarray):
             if all(np.isnan(i) for i in arr):
@@ -590,13 +590,11 @@ class PlotView(Generic[PlotType], BokehView):
                     'y.low'   : meta+'ArrowDown',
                     'y.high'  : meta+'ArrowUp'}
 
-        plt = self._ctrl.globals.config.plot
+        plt = self._ctrl.globals.css.plot
         plt.boundary.overshoot .default  =.001
         plt.keypress.reset     .default  ='Shift- '
         plt.keypress.pan       .defaults = _gesture('Alt-')
         plt.keypress.zoom      .defaults = _gesture('Shift-')
-
-        plt = self._ctrl.globals.css.plot
         plt.tools              .default  ='xpan,box_zoom,reset,save'
         self._plotter = self.plottype()(self._ctrl)
 

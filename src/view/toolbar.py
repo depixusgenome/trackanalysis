@@ -252,7 +252,7 @@ class BeadInput(BeadView):
     def __init__(self, **kwa):
         "Sets up the controller"
         super().__init__(**kwa)
-        cnf = self._ctrl.globals.config
+        cnf = self._ctrl.globals.css
         cnf.keypress.defaults = {'beadup'   : 'PageUp',
                                  'beaddown' : 'PageDown'}
         self.__toolbar: DpxToolbar = None
@@ -293,7 +293,7 @@ class RejectedBeadsInput(BeadView):
     def __init__(self, **kwa):
         super().__init__(**kwa)
         self.__toolbar: DpxToolbar = None
-        self._ctrl.globals.config.keypress.defaults = {'delbead': 'Shift-Delete'}
+        self._ctrl.globals.css.keypress.defaults = {'delbead': 'Shift-Delete'}
 
     def setup(self, toolbar: DpxToolbar):
         "sets-up the gui"
@@ -408,13 +408,14 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         css.defaults = {'open': u'Open', 'save': u'Save', 'quit': u'Quit',
                         'open.dialog': u'Open a track or analysis file',
                         'save.dialog': u'Save an analysis file'}
+        css          = self._ctrl.globals.css.keypress
+        css.defaults = {'open':    "Control-o",
+                        'save':    "Control-s",
+                        'delbead': 'Shift-Delete',
+                        'quit':    "Control-q"}
 
         cnf = self._ctrl.globals.config
         cnf.catcherror.toolbar.default = True
-        cnf.keypress.defaults = {'open':    "Control-o",
-                                 'save':    "Control-s",
-                                 'delbead': 'Shift-Delete',
-                                 'quit':    "Control-q"}
 
         self.__bead     = BeadInput(**kwa)
         self.__rejected = RejectedBeadsInput(**kwa)

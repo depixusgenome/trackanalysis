@@ -19,7 +19,7 @@ class AdvancedWidgetMixin(ABC):
         self.__widget: Button   = None
         self.__doc:    Document = None
         self.__action: type     = None
-        self.config.root.keypress.advanced.default = 'Alt-a'
+        self.css.root.keypress.advanced.default = 'Alt-a'
         self.css.dialog.defaults = dict(title  = self._title(),
                                         button = 'Advanced',
                                         body   = tuple(i for i, _ in self._body()))

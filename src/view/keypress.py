@@ -16,8 +16,11 @@ class DpxKeyEvent(Model):
 
     def __init__(self, **kwargs):
         super().__init__()
-        self._keys: Dict[str,Callable]    = kwargs.pop('keys', dict())
-        self._ctrl: Optional[Controller]  = kwargs.pop('ctrl', None)
+        self._ctrl: Optional[Controller] = kwargs.pop('ctrl', None)
+        self._keys: Dict[str,Callable]   = kwargs.pop('keys', dict())
+
+    def __item(self, name):
+        return getattr(self._ctrl, 'globals', self._ctrl).css[name].get()
 
     def close(self):
         u"Removes the controller"
@@ -26,17 +29,13 @@ class DpxKeyEvent(Model):
         self._ctrl = None
 
     def _setkeys(self):
-        items     = self._ctrl.globals.config
-        self.keys = [items[name].get() for name in self._keys]
+        self.keys = [self.__item(name) for name in self._keys]
 
     def onKeyPress(self):
         u"Method to be connected to the gui"
-        items = self._ctrl.globals.config
-        for name, fcn in self._keys.items():
-            if self.value == items[name].get():
-                with Action(self, calls = name):
-                    fcn()
-                break
+        name, fcn = tuple(self._keys.items())[self.keys.index(self.value)]
+        with Action(self._ctrl, calls = name):
+            fcn()
 
     def addKeyPress(self, *args, **kwargs):
         u"""
