@@ -3,6 +3,7 @@
 "The main controller"
 from   pathlib                 import Path
 import appdirs
+from   control.event           import EmitPolicy
 from   control.taskcontrol     import TaskController
 from   control.globalscontrol  import GlobalsController
 from   undo.control            import UndoController
@@ -21,6 +22,8 @@ class MainControl:
         self.globals = GlobalsController(handlers = hdl)
         self.tasks   = TaskController(handlers = hdl)
         self.undos   = UndoController(handlers = hdl)
+
+    emitpolicy = EmitPolicy
 
     def __undos__(self):
         yield from self.tasks.__undos__()

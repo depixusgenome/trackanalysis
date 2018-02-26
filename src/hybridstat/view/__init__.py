@@ -26,8 +26,8 @@ class HybridStatView(BokehView):
                         CyclesPlotView      (**kwa),
                         PeaksPlotView       (**kwa)]
 
-        self._ctrl.globals.plotcss.figure.defaults = dict(sizing_mode = 'fixed')
-        self._ctrl.globals.css.hybridstat.defaults = dict(width = 500, height = 30)
+        self._ctrl.globals.css.plot.figure.defaults = dict(sizing_mode = 'fixed')
+        self._ctrl.globals.css.hybridstat.defaults  = dict(width = 500, height = 30)
         titles = self._ctrl.globals.css.hybridstat.title
         for panel in self._panels:
             key                         = self.__key(panel)
@@ -99,7 +99,7 @@ class HybridStatView(BokehView):
             self._panels[old].activate(False)
             self._panels[new].activate(True)
             self._ctrl.handle('undoaction',
-                              self._ctrl.outastuple,
+                              self._ctrl.emitpolicy.outastuple,
                               (lambda: setattr(self._tabs, 'active', old),))
         tabs.on_change('active', _py_cb)
         self._tabs = tabs

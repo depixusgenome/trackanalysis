@@ -166,7 +166,7 @@ class BaseGlobalsAccess:
         self._key  = key
 
     def _global(self, name):
-        return getattr(self._ctrl, 'globals').getGlobal(name)
+        return getattr(self._ctrl, 'globals', self._ctrl).getGlobal(name)
 
     def __getattr__(self, key):
         if key[0] == '_':
@@ -199,4 +199,4 @@ class GlobalsAccess(ABC):
     css     = property(lambda self: BaseGlobalsAccess(self.__model, self.__key, 'css'))
     project = property(lambda self: BaseGlobalsAccess(self.__model, self.__key, 'project'))
 
-__all__ = ['GlobalsAccess', 'SingleMapAccess']
+__all__ = ['GlobalsAccess', 'SingleMapAccess', 'BaseGlobalsAccess']

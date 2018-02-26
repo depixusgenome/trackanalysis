@@ -167,7 +167,7 @@ def test_task_mutations():
     read = tasks.TrackReaderTask(path = utpath("small_legacy"))
     ctrl.opentrack(read)
     assert len(events['opentrack']) == 1
-    assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,),)
+    assert tuple(tuple(ite) for ite in ctrl.tasklist(...)) == ((read,),)
 
     dum0  = _DummyTask0()
     dum1  = _DummyTask1()
@@ -175,15 +175,15 @@ def test_task_mutations():
 
     ctrl.addtask(read, dum0)
     assert len(events['addtask']) == 1
-    assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,dum0),)
+    assert tuple(tuple(ite) for ite in ctrl.tasklist(...)) == ((read,dum0),)
 
     ctrl.addtask(read, dum1)
     assert len(events['addtask']) == 2
-    assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,dum0,dum1),)
+    assert tuple(tuple(ite) for ite in ctrl.tasklist(...)) == ((read,dum0,dum1),)
 
     ctrl.addtask(read, dum2)
     assert len(events['addtask']) == 3
-    assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,dum0,dum1,dum2),)
+    assert tuple(tuple(ite) for ite in ctrl.tasklist(...)) == ((read,dum0,dum1,dum2),)
 
     assert ctrl.cache(read, dum0)() is None
     assert ctrl.cache(read, dum1)() is None
@@ -224,12 +224,12 @@ def test_task_mutations():
 
     ctrl.removetask(read, dum1)
     assert len(events['removetask'])                  == 1
-    assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == ((read,dum0,dum2),)
+    assert tuple(tuple(ite) for ite in ctrl.tasklist(...)) == ((read,dum0,dum2),)
     assert ctrl.cache(read, dum2)()                   is None
 
     ctrl.closetrack(read)
     assert len(events['closetrack'])                  == 1
-    assert tuple(tuple(ite) for ite in ctrl.tasks(...)) == tuple()
+    assert tuple(tuple(ite) for ite in ctrl.tasklist(...)) == tuple()
 
 def test_task_closure():
     "testing that closures don't include too many side-effects"

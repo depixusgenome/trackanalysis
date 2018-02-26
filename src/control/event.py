@@ -65,11 +65,7 @@ _COMPLETIONS = Dict[Callable, Set[Callable]]
 _HANDLERS    = Dict[str, Union[Set[Callable], _COMPLETIONS]]
 class Event:
     "Event handler class"
-    outasdict   = EmitPolicy.outasdict
-    outastuple  = EmitPolicy.outastuple
-    inputs      = EmitPolicy.inputs
-    nothing     = EmitPolicy.nothing
-    annotations = EmitPolicy.annotations
+    emitpolicy  = EmitPolicy
     __SIMPLE    = cast(Callable, re.compile(r'^(\w|\.)+$',   re.IGNORECASE).match)
     __EM_NAME   = re.compile(r'^_?(\w+)',     re.IGNORECASE).match
     __OBS_NAME  = re.compile(r'^_?on_?(\w+)', re.IGNORECASE).match

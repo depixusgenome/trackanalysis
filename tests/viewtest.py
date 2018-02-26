@@ -12,7 +12,7 @@ def test_toolbar(bokehaction):
     with bokehaction.launch('view.toolbar.BeadToolbar', 'app.default') as server:
         tbar = server.widget['Main:toolbar']
         ctrl = server.ctrl
-        curr = ctrl.getGlobal('project')
+        curr = ctrl.globals.project
         def _checknone():
             assert tbar.frozen
             assert curr.get('track', default = None) is None
@@ -27,7 +27,7 @@ def test_toolbar(bokehaction):
             _checkpath('small_legacy')
             track = curr.track.get()
             assert track       is curr.task.get()
-            assert ctrl.getGlobal('css').last.path.trk.get() == str(track.path[0])
+            assert ctrl.globals.css.last.path.trk.get() == str(track.path[0])
 
         _checknone()
         server.load('small_legacy')

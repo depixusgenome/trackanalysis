@@ -60,8 +60,8 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
         WidgetMixin.__init__(self)
         cnf = self.css
         cnf.plot.figure.height.default = self.css.plot.figure.width.get()//2
-        cnf.plot.figure.defaults  = {'width': 500, 'height': 800}
-        cnf.points.default  = PlotAttrs('color',  'circle', 1, alpha   = .5)
+        cnf.plot.figure.defaults       = {'width': 500, 'height': 800}
+        cnf.points.default             = PlotAttrs('color',  'circle', 1, alpha   = .5)
 
         setcolors(self,
                   good       = 'blue',

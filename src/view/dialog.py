@@ -40,7 +40,7 @@ class FileDialog:
         self.config          : Tuple[Callable, Callable] = None
 
         ctrl = kwa.get('config', None)  # type: ignore
-        if hasattr(ctrl, 'getGlobal'):
+        if hasattr(ctrl, 'globals'):
             self.globals(ctrl).defaults = dict.fromkeys(self.DEFAULTS, None)
 
         if isinstance(ctrl, (tuple, list)):

@@ -162,7 +162,7 @@ class TaskPlotModelAccess(PlotModelAccess):
         ctrl  = self.processors()
         if ctrl is None:
             return None
-        return next(iter(ctrl.tasks.run(copy = True)))
+        return next(iter(ctrl.run(copy = True)))
 
     def runcontext(self, *processors: Processor, copy = True) -> ReplaceProcessors:
         "returns a ReplaceProcessors context from which a trackview can be obtains"

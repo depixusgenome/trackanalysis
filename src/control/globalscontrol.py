@@ -31,7 +31,7 @@ import  inspect
 import  anastore
 
 from    model.globals import (GlobalsChild, GlobalsAccess, SingleMapAccess,
-                              EventData, delete, Globals)
+                              EventData, delete, Globals, BaseGlobalsAccess)
 from    model.level   import PHASE
 from    .event        import Controller
 from    .action       import Action
@@ -71,7 +71,7 @@ class SingleMapController(Controller):
         "updates keys or raises NoEmission"
         ret = self.__items.update(*args, **kwargs)
         if ret is not None:
-            return self.handle("globals."+ret.name, self.outastuple, (ret,))
+            return self.handle("globals."+ret.name, self.emitpolicy.outastuple, (ret,))
         return ret
 
     def pop(self, *args):
@@ -240,9 +240,8 @@ class GlobalsController(BaseGlobalsController):
         for suff, name in product(('', '.plot'), ('project', 'css', 'config')):
             self.addGlobalMap(name+suff)
 
-        self.project.message.default = ''
-        self.plotproject.delayed.default = False
-        self.css.defaults = {'indent': 4, 'ensure_ascii': False, 'sort_keys': True}
+        self.project.defaults  = {'message': ''}
+        self.css.defaults      = {'indent': 4, 'ensure_ascii': False, 'sort_keys': True}
 
         cnf = self.config
         cnf.catcherror.default = False
@@ -277,30 +276,9 @@ class GlobalsController(BaseGlobalsController):
         self._model.writeconfig(configpath, anastore, patchname,
                                 index, overwrite, **kwa, **css)
 
-    @property
-    def css(self) -> SingleMapAccessController:
-        "return the global css"
-        return self.getGlobal("css")
-
-    @property
-    def config(self) -> SingleMapAccessController:
-        "return the global config"
-        return self.getGlobal("config")
-
-    @property
-    def project(self) -> SingleMapAccessController:
-        "return the global project config"
-        return self.getGlobal("project")
-
-    @property
-    def plotproject(self) -> SingleMapAccessController:
-        "retur the global plot project config"
-        return self.getGlobal("project.plot")
-
-    @property
-    def plotcss(self) -> SingleMapAccessController:
-        "retur the global plot project config"
-        return self.getGlobal("css.plot")
+    config  = property(lambda self: BaseGlobalsAccess(self, '', 'config'))
+    css     = property(lambda self: BaseGlobalsAccess(self, '', 'css'))
+    project = property(lambda self: BaseGlobalsAccess(self, '', 'project'))
 
     def __undos__(self):
         "yields all undoable user actions"

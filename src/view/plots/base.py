@@ -215,7 +215,7 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
 
     def __init__(self, ctrl, *_) -> None:
         "sets up this plotter's info"
-        css = ctrl.globals.plotcss
+        css = ctrl.globals.css.plot
         if css.ylabel.get(default = None) is None:
             css.defaults = {'ylabel'             : u'Z (μm)',
                             'yrightlabel'        : u'Base number',

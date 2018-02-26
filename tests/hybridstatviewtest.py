@@ -150,12 +150,12 @@ def test_peaksplot(bokehaction):
         server.wait()
         assert found[0] == out
         assert Path(out).exists()
-        assert server.ctrl.getGlobal("project").constraints.path.get() is not None
+        assert server.ctrl.globals.project.constraints.path.get() is not None
 
         server.cmd((lambda: setattr(server.widget['Peaks:IDPath'], 'value', "")),
                    andstop = False)
         server.wait()
-        assert server.ctrl.getGlobal("project").constraints.path.get() is None
+        assert server.ctrl.globals.project.constraints.path.get() is None
 
 def test_reference(bokehaction):
     "test peaksplot"
@@ -164,11 +164,11 @@ def test_reference(bokehaction):
         server.ctrl.observe("rendered", lambda *_1, **_2: server.wait())
 
         server.load('100bp_4mer/ref.pk',  andstop = False)
-        ref = server.ctrl.getGlobal("project").track.get()
+        ref = server.ctrl.globals.project.track.get()
 
         server.load('100bp_4mer/AACG.pk', andstop = False)
 
-        store = server.ctrl.getGlobal("project").tasks.fittoreference.gui
+        store = server.ctrl.globals.project.tasks.fittoreference.gui
         assert server.widget['HS:reference'].value == '-1'
         assert store.reference.get() is None
 
