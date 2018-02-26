@@ -59,7 +59,7 @@ class Action:
 
     def __init__(self, ctrl = None, calls = None, test = None) -> None:
         self._ctrl  = getattr(ctrl, '_ctrl', ctrl)
-        assert hasattr(self._ctrl, 'handle')
+        assert hasattr(self._ctrl, 'handle'), f"{ctrl} has not handle method"
         self._test  = test
         if calls is not None:
             self._calls = _Calls(calls)
@@ -125,7 +125,7 @@ class Action:
         return _wrap_normal
 
     def __exit__(self, tpe, val, bkt):
-        assert val is None or isinstance(val, Exception)
+        assert val is None or isinstance(val, Exception), f"{val} should be None or Exception"
         self._CNT[0] -= 1
         errvalue = [self._ctrl.globals.config.catcherror.get()]
         try:
