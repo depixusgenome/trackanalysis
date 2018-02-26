@@ -240,8 +240,8 @@ class GlobalsController(BaseGlobalsController):
         for suff, name in product(('', '.plot'), ('project', 'css', 'config')):
             self.addGlobalMap(name+suff)
 
-        self.project.defaults  = {'message': ''}
-        self.css.defaults      = {'indent': 4, 'ensure_ascii': False, 'sort_keys': True}
+        self.project.defaults    = {'message': ''}
+        self.css.config.defaults = {'indent': 4, 'ensure_ascii': False, 'sort_keys': True}
 
         cnf = self.config
         cnf.catcherror.default = False
