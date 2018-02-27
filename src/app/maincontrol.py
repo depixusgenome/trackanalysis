@@ -25,7 +25,7 @@ class SuperController:
     def __init__(self, view):
         self.topview = view
         hdl: dict    = dict()
-        self.globals = GlobalsController(handlers = hdl)
+        self.globals = self.__newglobals(handlers = hdl)
         self.tasks   = TaskController(handlers = hdl)
         self.undos   = UndoController(handlers = hdl)
 
@@ -50,14 +50,34 @@ class SuperController:
         fname = ('autosave' if stem is None else stem)+'.txt'
         return cls.apppath()/str(version)/fname
 
+    @classmethod
+    def __newglobals(cls, **kwa) -> GlobalsController:
+        "create new globals control"
+        glob  = GlobalsController(**kwa)
+        glob.css.appsize.default = [1200, 1000]
+        glob.css.appname.default = cls.APPNAME.capitalize()
+        return glob
+
+    @classmethod
+    def setupglobals(cls, glob = None):
+        """
+        reads the config: first the stuff saved automatically, then
+        anything the user wishes to impose.
+        """
+        if glob is None:
+            glob = cls.__newglobals()
+
+        cpath = cls.configpath
+        glob.readconfig(cpath)
+        glob.readconfig(lambda i: cpath(i, 'userconfig'))
+        return glob
+
     def readuserconfig(self):
         """
         reads the config: first the stuff saved automatically, then
         anything the user wishes to impose.
         """
-        ctrl = self.globals
-        ctrl.readconfig(self.configpath)
-        ctrl.readconfig(self.configpath, lambda i: self.configpath(i, 'userconfig'))
+        self.setupglobals(self.globals)
         orders().config(self)
 
     def writeuserconfig(self, name = None, saveall = False, **kwa):
@@ -133,9 +153,10 @@ def createview(main, controls, views):
         @classmethod
         def launchkwargs(cls, **kwa) -> Dict[str, Any]:
             "updates kwargs used for launching the application"
-            appname = getattr(cls.MainControl, 'APPNAME', 'track analysis')
-            kwa.setdefault("title",  appname.capitalize())
-            kwa.setdefault("size",  (1200, 1000))
+            css = cls.MainControl.setupglobals().css
+            print(css.appname.get(), css.appsize.get())
+            kwa.setdefault("title",  css.appname.get())
+            kwa.setdefault("size",   css.appsize.get())
             return kwa
 
     logToFile(str(Main.MainControl.apppath()/"logs.txt"))
