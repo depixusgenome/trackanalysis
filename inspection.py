@@ -3,7 +3,7 @@
 # pylint: disable=invalid-name
 u"utils for inspecting objects and frames"
 import inspect
-from   typing    import cast
+from   typing    import Optional, cast
 from   types     import LambdaType, FunctionType, MethodType
 from   functools import partial
 
@@ -37,3 +37,15 @@ def ismethod(fcn) -> bool:
 def getlocals(ind) -> dict:
     u"returns the locals from a higher frame"
     return  inspect.stack()[ind+1][0].f_locals
+
+def getclass(string:str) -> Optional[type]:
+    "returns the class indicated by the string"
+    if isinstance(string, str):
+        mod  = string[:string.rfind('.')]
+        attr = string[string.rfind('.')+1:]
+        if attr[0] != attr[0].upper():
+            __import__(string)
+            return None
+
+        return getattr(__import__(mod, fromlist = (attr,)), attr) # type: ignore
+    return string
