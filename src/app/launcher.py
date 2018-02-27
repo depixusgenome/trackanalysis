@@ -6,7 +6,6 @@ from typing     import Dict, Any
 
 import sys
 
-from flexx.webruntime           import launch as _flexxlaunch
 from bokeh.application          import Application
 from bokeh.application.handlers import FunctionHandler
 from bokeh.server.server        import Server
@@ -28,7 +27,6 @@ class _FunctionHandler(FunctionHandler):
         self.view            = view
         super().__init__(self.__start)
 
-
     def on_session_created(self, session_context):
         LOGS.debug('started session')
 
@@ -42,7 +40,6 @@ class _FunctionHandler(FunctionHandler):
             if len(server.get_sessions()) == 0:
                 LOGS.info('no more sessions -> stopping server')
                 server.stop()
-
 
     @classmethod
     def serveapplication(cls, view, **kwa):
@@ -61,11 +58,12 @@ class _FunctionHandler(FunctionHandler):
     @classmethod
     def launchflexx(cls, view, **kwa):
         "Launches a bokeh server"
+        from flexx.webruntime           import launch as _flexxlaunch
         port = kwa.get('port', str(DEFAULT_SERVER_PORT))
         if isinstance(view, Server):
             server = view
         else:
-            server = cls.serveapplication(view, **kwa.pop('server'), port = port)
+            server = cls.serveapplication(view, **kwa.pop('server', {}), port = port)
 
         cls.__monkeypatch_flexx(server)
         view.MainControl.FLEXXAPP = _flexxlaunch('http://localhost:{}/'.format(port), **kwa)
