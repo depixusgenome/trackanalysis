@@ -1,57 +1,56 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Creates a histogram from available events"
-
 import itertools
-from itertools import chain
+import pickle
 from functools import partial
-from typing    import Dict, Tuple
+from typing import Dict, Tuple
 
 import numpy as np
 
-from utils            import initdefaults
-from utils.logconfig  import getLogger
-from .._core          import emrunner, emscore # pylint: disable = import-error
-from .histogramfitter import ByHistogram # pylint: disable               = unused-import
+from utils import initdefaults
+from utils.logconfig import getLogger
+
+from .._core import emrunner, emscore  # pylint: disable = import-error
+from .histogramfitter import ByHistogram  # pylint: disable = unused-import
 
 LOGS = getLogger(__name__)
 
-class ByEM: # pylint: disable=too-many-public-methods
+# create abstract class with different fitting algorithms
+
+class ByEM:
     '''
     finds peaks and groups events using Expectation Maximization
     the number of components is estimated using BIC criteria
     '''
-    emiter   = 100
-    mincount = 5
-    tol      = 0.5  # loglikelihood tolerance
-    decimals = 4    # rounding values
-    floaterr = 1e-10
-    params  : np.ndarray
-    rates   : np.ndarray
-    minpeaks  = 1
-    kwa : Dict = {}
-
+    emiter     = 100
+    mincount   = 5
+    tol        = 0.5  # loglikelihood tolerance
+    decimals   = 4    # rounding values
+    floaterr   = 1e-10
+    minpeaks   = 1
+    upperbound = 0.005**2 # in microns**2
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 
     def __call__(self,**kwa):
+        pickle.dump(kwa,open("kwargs.dbg","wb"))
         _, bias, slope = kwa.get("hist",(0,0,1))
-        self.kwa = kwa
-        return bias,slope #self.find(kwa.get("events",None), bias, slope, kwa["precision"])
+        return self.find(kwa.get("events",None), bias, slope) #, kwa["precision"]) # use precision
 
-    # to keep
-    # def find(self, events, bias, slope, precision=None):
-    #     'find peaks along z axis'
-    #     data       = np.array([[np.nanmean(evt),len(evt)]
-    #                            for cycle in events
-    #                            for evt in cycle])
-    #     maxpeaks   = int((max(data[:,0])-min(data[:,0]))//precision)
-    #     #search     = self.search()
-    #     #params     = search[-1]
-    #     asort      = np.argsort(params[:,0,0])
-    #     peaks, ids = self.__strip(params[asort],events)
-    #     return peaks * slope + bias , ids
+    def find(self, events, bias, slope): #, precision=None):
+        'find peaks along z axis'
+        data         = np.array([[np.nanmean(evt),len(evt)]
+                                 for cycle in events
+                                 for evt in cycle])
+        rates,params = self.initialize(data,maxbins=1)
+        rates,params = self.splitter(data,rates,params,upperbound=self.upperbound)[-2:]
+        keep         = rates.ravel()*data.shape[0]>self.mincount
+        rates,params = rates[keep],params[keep]
+        asort        = np.argsort(params[:,0])
+        peaks, ids   = self.__strip(params[asort],events)
+        return peaks * slope + bias , ids
 
     def __strip(self, params, events):
         '''
@@ -59,18 +58,18 @@ class ByEM: # pylint: disable=too-many-public-methods
         '''
         pos = np.array([ np.array([[np.nanmean(evt),len(evt)] for evt in cyc])
                          if cyc.size>0 else np.array([]) for cyc in events])
-
         predict = partial(self.__predict,params)
         ids     = np.array(list(map(predict,pos)))
-        return params[:,0,0], ids
+        return params[:,0], ids
 
     def __predict(self, params:np.ndarray, data:np.ndarray):
+        'return ids'
         if data.size==0:
             return np.array([])
         score = self.score(data,params).T
-        ids   = [np.argmax(_) if max(_)>1e-4 else np.iinfo("i4").max for _ in score]
-        return np.array(ids)
+        return np.array([np.argmax(_) if max(_)>1e-4 else np.iinfo("i4").max for _ in score])
 
+    # check for duplicated code
     def initialize(self,data:np.ndarray,maxbins:int=1)->np.ndarray:
         'initialize using density'
         bins      = np.histogram(data[:,0],bins=maxbins)[1]
@@ -78,8 +77,8 @@ class ByEM: # pylint: disable=too-many-public-methods
         digi      = np.digitize(data[:,:-1].ravel(),bins)
         clas      = {idx:np.array([data[_1] for _1,_2 in enumerate(digi) if _2==idx])
                      for idx in set(digi)}
-        params = np.vstack([list(chain.from_iterable(zip(np.nanmean(clas[idx],axis=0),
-                                                         np.nanvar(clas[idx],axis=0))))
+        params = np.vstack([list(itertools.chain.from_iterable(zip(np.nanmean(clas[idx],axis=0),
+                                                                   np.nanvar(clas[idx],axis=0))))
                             for idx in set(digi)
                             if len(clas[idx])>self.mincount])
         params[:,-2] = 0.
@@ -87,7 +86,7 @@ class ByEM: # pylint: disable=too-many-public-methods
                         for idx in set(digi)
                         if len(clas[idx])>self.mincount]
 
-        return 1/len(params)*np.ones((len(params),1)) , params
+        return 1/len(params)*np.ones((len(params),1)), params
 
     @staticmethod
     def score(data:np.ndarray,params:np.ndarray)->np.ndarray:
@@ -119,9 +118,10 @@ class ByEM: # pylint: disable=too-many-public-methods
         'returns loglikelihood'
         return np.sum(np.log(np.sum(rates*score,axis=0)))
 
-    def cfit(self,data,rates,params,bounds=(10**2,0.001**2)):
+    @staticmethod
+    def cfit(data,rates,params,emiter,bounds=(10**2,0.001**2)):
         'fitting using c calls'
-        out = emrunner(data,rates,params,self.emiter,bounds[0],bounds[1])
+        out = emrunner(data,rates,params,emiter,bounds[0],bounds[1])
         return out.score, out.rates, out.params
 
     @classmethod
@@ -135,13 +135,16 @@ class ByEM: # pylint: disable=too-many-public-methods
         sortedinfo = sorted(((*val,idx) for idx,val in rounded),key=lambda x:(x[0],-x[1]))
         return list(map(lambda x:next(x[1])[-1],itertools.groupby(sortedinfo,key=lambda x:x[0])))
 
-    def splitter(self,data,rates,params,upper_bound=0.005**2):
+    def splitter(self,data,rates,params,upperbound=0.005**2):
         'splits the peaks with great Z variance'
         delta = np.array([0.001]*params.shape[1]) # in microns
         delta[-2:] = 0.0
         delta[range(1,2,len(delta))] = 0.0 # no delta in cov
-        score, rates, params = self.cfit(data,rates,params)
-        while any(params[:,1]>upper_bound):
+        score, rates, params = self.cfit(data,rates,params,self.emiter)
+        # if the number of events in rates is too low, skip this
+        # while np.logical_and(any(params[:,1]>upperbound),
+        # rates.ravel()*data.shape[0]>self.mincount):
+        while any(params[:,1]>upperbound):
             idx = np.argmax(params[:,1])
             # split the one with highest covariance
             nparams         = np.vstack([params[:idx+1],params[idx:]])
@@ -151,5 +154,5 @@ class ByEM: # pylint: disable=too-many-public-methods
             nrates[idx:idx+2] /=2
             # could be improved by reducing the number of peaks (and associated data)
             # to optimized during emstep
-            score, rates, params = self.cfit(data,nrates,nparams)
+            score, rates, params = self.cfit(data,nrates,nparams,self.emiter)
         return score,rates,params
