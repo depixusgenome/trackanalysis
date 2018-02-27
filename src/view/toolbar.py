@@ -430,7 +430,7 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         assert doc is not None
         self._doc = doc
 
-        self.__toolbar  = DpxToolbar(hasquit = self._ctrl.ISAPP)
+        self.__toolbar  = DpxToolbar(hasquit = getattr(self._ctrl, 'FLEXXAPP', None) is not None)
 
         def _onbtn_cb(attr, old, new):
             if attr == 'open':

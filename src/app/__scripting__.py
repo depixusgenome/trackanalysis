@@ -17,7 +17,6 @@ from   .                   import default
 class ScriptingView:
     "Dummy view for scripting"
     APPNAME = 'Scripting'
-    ISAPP   = False
     def __init__(self, **kwa):
         self._ctrl  = kwa['ctrl']
         self.trkdlg = FileDialog(filetypes = 'trk|*',

@@ -24,7 +24,6 @@ class View(ABC):
     "Classes to be passed a controller"
     action      = ActionDescriptor(Action)
     computation = ActionDescriptor(Computation)
-    ISAPP  = False
     def __init__(self, **kwargs):
         "initializes the gui"
         self._ctrl = kwargs['ctrl']

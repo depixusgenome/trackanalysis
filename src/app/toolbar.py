@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Updates app manager so as to deal with controllers and toolbar"
-from .launcher      import setup, getclass
-from .default       import VIEWS, CONTROLS
+from typing           import cast
+from utils.inspection import getclass
+from .launcher        import setup
+from .default         import VIEWS, CONTROLS
 
 class WithToolbar:
     "Creates an app with a toolbar"
@@ -15,7 +17,7 @@ class WithToolbar:
             from view.toolbar import BeadToolbar
             tbar = BeadToolbar
         else:
-            tbar = getclass(self.tbar)
+            tbar = cast(type, getclass(self.tbar))
 
         from bokeh.layouts  import layout, column
         from view           import BokehView

@@ -2,63 +2,32 @@
 # -*- coding: utf-8 -*-
 "Updates app manager so as to deal with controllers"
 from pathlib    import Path
+from typing     import Dict, Any
 
 import sys
 
 from flexx.webruntime           import launch as _flexxlaunch
-from flexx.webruntime.common    import StreamReader
-from bokeh.server.server        import Server
 from bokeh.application          import Application
 from bokeh.application.handlers import FunctionHandler
+from bokeh.server.server        import Server
 from bokeh.settings             import settings
 from bokeh.resources            import DEFAULT_SERVER_PORT
 
-from utils.logconfig            import getLogger, logToFile
-from utils.gui                  import MetaMixin # pylint: disable=unused-import
+from utils.logconfig            import getLogger
 from .scripting                 import orders
-from .maincontrol               import MainControl as _MainControl
+from .maincontrol               import createview
 
 LOGS        = getLogger(__name__)
 CAN_LOAD_JS = True
-
-def _serverkwargs(kwa):
-    kwargs                         = dict(kwa)
-    kwargs['sign_sessions']        = settings.sign_sessions()
-    kwargs['secret_key']           = settings.secret_key_bytes()
-    kwargs['generate_session_ids'] = True
-    kwargs['use_index']            = True
-    kwargs['redirect_root']        = True
-    LOGS.debug(f"dynamic loads: {orders().dynloads()}")
-    for mdl in orders().dynloads():
-        getattr(sys.modules.get(mdl, None), 'server', lambda x: None)(kwargs)
-    return kwargs
-
-def _title(view) -> str:
-    appname   = getattr(view.MainControl, 'APPNAME', 'track analysis')
-    return appname.capitalize()
-
-def _stop(self, wait=True, __old__ = Server.stop):
-    if not getattr(self, '_stopped', False):
-        __old__(self, wait)
-    self.io_loop.stop()
-Server.stop = _stop
-del _stop
 
 class _FunctionHandler(FunctionHandler):
     def __init__(self, view, stop = False):
         self.__gotone        = False
         self.server          = None
         self.stoponnosession = stop
+        self.view            = view
+        super().__init__(self.__start)
 
-        def _onloaded():
-            if self.__gotone is False:
-                self.__gotone = True
-                LOGS.debug("GUI loaded")
-
-        def _start(doc):
-            doc.title = _title(view)
-            orders().run(view, doc, _onloaded)
-        super().__init__(_start)
 
     def on_session_created(self, session_context):
         LOGS.debug('started session')
@@ -74,98 +43,80 @@ class _FunctionHandler(FunctionHandler):
                 LOGS.info('no more sessions -> stopping server')
                 server.stop()
 
-def _monkeypatch(view):
-    output = view.MainControl.APPNAME.lower() + '.js'
-    if Path(output).exists() and CAN_LOAD_JS:
-        def _bundle():
-            LOGS.info('monkeypatching bokeh compiler with '+output)
-            return ''.join(open(output, encoding = 'utf-8'))
-        import bokeh.embed.util as embed
-        embed.bundle_all_models = _bundle
 
-def _serve(view, **kwa):
-    "Launches a bokeh server"
-    fcn    = _FunctionHandler(view)
-    _monkeypatch(view)
-    server = Server(Application(fcn), **_serverkwargs(kwa))
-    fcn.server = server
-    server.MainView    = view
-    server.appfunction = fcn
-    return server
+    @classmethod
+    def serveapplication(cls, view, **kwa):
+        "Launches a bokeh server"
+        # monkeypatch the js production: it's been done once & saved during compilation
+        cls.__monkeypatch_bokeh(view)
+        cls.__server_kwargs(kwa)
 
-def _launch(view, **kwa):
-    "Launches a bokeh server"
-    if isinstance(view, Server):
-        server = view
-    else:
-        skwa = kwa.pop('server', {})
-        skwa.setdefault('port', kwa.get('port', DEFAULT_SERVER_PORT))
-        server = _serve(view, **skwa)
+        fcn                = cls(view)
+        server             = Server(Application(fcn), **kwa)
+        fcn.server         = server
+        server.MainView    = view
+        server.appfunction = fcn
+        return server
 
-    def run(self, __old__ = StreamReader.run):
-        "Stop the stream reader"
-        __old__(self)
-        server.stop()
-    StreamReader.run = run
+    @classmethod
+    def launchflexx(cls, view, **kwa):
+        "Launches a bokeh server"
+        port = kwa.get('port', str(DEFAULT_SERVER_PORT))
+        if isinstance(view, Server):
+            server = view
+        else:
+            server = cls.serveapplication(view, **kwa.pop('server'), port = port)
 
-    port  = kwa.get('port', str(DEFAULT_SERVER_PORT))
-    rtime = _flexxlaunch('http://localhost:{}/'.format(port), **kwa)
-    def close(self, __old__ = view.MainControl.close):
-        "closes the application"
-        top, self.topview = self.topview, None
-        if top is not None:
+        cls.__monkeypatch_flexx(server)
+        view.MainControl.FLEXXAPP = _flexxlaunch('http://localhost:{}/'.format(port), **kwa)
+        return server
+
+    @staticmethod
+    def __monkeypatch_flexx(server):
+        from flexx.webruntime.common    import StreamReader
+        def run(self, __old__ = StreamReader.run):
+            "Stop the stream reader"
             __old__(self)
-            top.close()
-            rtime.close()
-    view.MainControl.ISAPP = True
-    view.MainControl.close = close
-    return server
+            server.stop()
+        StreamReader.run = run
 
-def _create(main, controls, views): # pylint: disable=unused-argument
-    "Creates a main view"
+    @staticmethod
+    def __monkeypatch_bokeh(view):
+        output = view.APPNAME.lower() + '.js'
+        if Path(output).exists() and CAN_LOAD_JS:
+            def _bundle():
+                LOGS.info('monkeypatching bokeh compiler with '+output)
+                return ''.join(open(output, encoding = 'utf-8'))
+            import bokeh.embed.util as embed
+            embed.bundle_all_models = _bundle
 
-    class Main(*(main,)+views): # type: ignore
-        "The main view"
-        class MainControl(_MainControl):
-            """
-            Main controller: contains all sub-controllers.
-            These share a common dictionnary of handlers
-            """
-            APPNAME  = next((i.APPNAME for i in (main,)+views if hasattr(i, 'APPNAME')),
-                            'Track Analysis')
+        def _stop(self, wait=True, __old__ = Server.stop):
+            if not getattr(self, '_stopped', False):
+                __old__(self, wait)
+            self.io_loop.stop()
+        Server.stop = _stop
 
-        def __init__(self):
-            "sets up the controller, then initializes the view"
-            ctrl = self.MainControl(self)
-            keys = getattr(self, 'KeyPressManager', lambda **_: None)(ctrl = ctrl)
-            main.__init__(self, ctrl = ctrl, keys = keys)
-            main.ismain(self)
+    @staticmethod
+    def __server_kwargs(kwa)-> Dict[str, Any]:
+        kwa.setdefault('sign_sessions',        settings.sign_sessions())
+        kwa.setdefault('secret_key',           settings.secret_key_bytes())
+        kwa.setdefault('generate_session_ids', True)
+        kwa.setdefault('use_index',            True)
+        kwa.setdefault('redirect_root',        True)
+        kwa.setdefault('port',                 DEFAULT_SERVER_PORT)
+        LOGS.debug(f"dynamic loads: {orders().dynloads()}")
+        for mdl in orders().dynloads():
+            getattr(sys.modules.get(mdl, None), 'server', lambda x: None)(kwa)
+        return kwa
 
-            ctrl.startup()
-            main.observe(self)
-            for cls in views:
-                cls.observe(self)
+    def __onloaded(self):
+        if self.__gotone is False:
+            self.__gotone = True
+            LOGS.debug("GUI loaded")
 
-        def addtodoc(self, doc):
-            "Adds one's self to doc"
-            for mdl in orders().dynloads():
-                getattr(sys.modules.get(mdl, None), 'document', lambda x: None)(doc)
-            super().addtodoc(doc)
-
-    logToFile(str(Main.MainControl.apppath()/"logs.txt"))
-    return Main
-
-def getclass(string):
-    "returns the class indicated by the string"
-    if isinstance(string, str):
-        mod  = string[:string.rfind('.')]
-        attr = string[string.rfind('.')+1:]
-        if attr[0] != attr[0].upper():
-            __import__(string)
-            return None
-
-        return getattr(__import__(mod, fromlist = (attr,)), attr) # type: ignore
-    return string
+    def __start(self, doc):
+        doc.title = self.view.launchkwargs()['title']
+        orders().run(self.view, doc, self.__onloaded)
 
 def setup(locs,
           mainview        = None,
@@ -179,9 +130,7 @@ def setup(locs,
                     views    = defaultviews,
                     creator  = creator):
         "Creates a main view"
-        controls = tuple(getclass(i) for i in controls if getclass(i) is not None)
-        views    = tuple(getclass(i) for i in views)
-        return _create(creator(main), controls, views)
+        return createview(creator(main), controls, views)
 
     def serve(main     = mainview,
               controls = defaultcontrols,
@@ -193,7 +142,7 @@ def setup(locs,
         app = application(main, controls, views, creator)
         if apponly:
             return app
-        return _serve(app, **kwa)
+        return _FunctionHandler.serveapplication(app, **kwa)
 
     def launch(main     = mainview,
                controls = defaultcontrols,
@@ -205,9 +154,7 @@ def setup(locs,
         app = application(main, controls, views, creator)
         if apponly:
             return app
-        kwa.setdefault("title", _title(app))
-        kwa.setdefault("size",  (1200, 1000))
-        return _launch(app, **kwa)
+        return _FunctionHandler.launchflexx(app, **app.launchkwargs(**kwa))
 
     locs.setdefault('application',  application)
     locs.setdefault('serve',        serve)
