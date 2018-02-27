@@ -280,6 +280,37 @@ class DataCleaning(AberrantValuesRule,
 
     # `saturation`
     {}
+    # `pseudo code cleaning`
+    Beads(trk) = set of all beads of the track trk <br>
+    Cycles(bd) = set of all cycles in bead bd <br>
+    Points(cy) = set of all points in cycle cy <br>
+    <br>
+    For a track trk, cleaning proceeds as follows:
+    * for bd in Beads(trk):
+        * for cy in Cycles(bd):
+            * evaluate criteria for cy:
+                1. extent < 0.5
+                2. hfsigma < 0.0001
+                3. hfsigma > 0.01
+                4. population (not aberrant Points(cy)/Points(cy)) > 80%
+            * if 1. or 2. or 3. or 4. are FALSE:
+                * remove cy from Cycles(bd)
+            * else:
+                * keep cy in Cycles(bd)
+        * endfor
+        * evaluate criteria for bd:
+            5. population (Cycles(bd)/initial Cycles(bd)) > 80%
+            6. saturation (Cycles(bd)) < 90%
+        * if 5. or 6. are FALSE:
+            * bd is bad
+        *else:
+            * bd is good
+        *endif
+     *endfor
+        * else
+            * other
+        *endif
+    * endfor
     """
     CYCLES  = 'hfsigma', 'extent', 'population'
     def __init__(self, **_):
