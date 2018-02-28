@@ -303,13 +303,9 @@ class DataCleaning(AberrantValuesRule,
             6. saturation (Cycles(bd)) < 90%
         * if 5. or 6. are FALSE:
             * bd is bad
-        *else:
+        * else:
             * bd is good
-        *endif
-     *endfor
-        * else
-            * other
-        *endif
+        * endif
     * endfor
     """
     CYCLES  = 'hfsigma', 'extent', 'population'
