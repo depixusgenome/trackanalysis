@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Creates a histogram from available events"
 from enum import Enum
-from typing import (Callable, Iterable, NamedTuple, Optional,
+from typing import (Callable, Iterable, Optional,
                     Sequence, Union, cast)
 
 import numpy as np
