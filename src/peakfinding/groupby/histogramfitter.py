@@ -15,11 +15,6 @@ from utils.logconfig import getLogger
 
 LOGS       = getLogger(__name__)
 
-class HistogramData(NamedTuple): # pylint: disable=missing-docstring
-    histogram:  np.ndarray
-    minvalue:   float
-    binwidth:   float
-
 class FitMode(Enum):
     "Fit mode for sub-pixel peak finding"
     quadratic = 'quadratic'
