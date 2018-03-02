@@ -1,14 +1,29 @@
-#!/usr/bin/env
-#python3
+#!/usr/bin/env python3
 
-# -*- coding: utf-8 
-#-*-
+# -*- coding: utf-8 -*-
 
-#Auxiliary function resumeTracksQuality: outputs a summary of good, bad, and total number of beads
-import pandas as pd
-import numpy as np
+import pandas               as pd
+import numpy                as np
 from matplotlib.ticker import MultipleLocator
-import matplotlib.pyplot as plt
+import matplotlib.pyplot    as plt
+import holoviews            as hv
+import seaborn              as sns
+from math import pi
+
+from bokeh.io import show
+from bokeh.models import (
+    ColumnDataSource,
+    HoverTool,
+    LinearColorMapper,
+    BasicTicker,
+    PrintfTickFormatter,
+    ColorBar,
+)
+from bokeh.plotting import figure
+
+import sankey
+
+
 
 def resumeTracksQuality(tracks):
     """
@@ -240,6 +255,15 @@ def barBeadsByType(df_typeerror_single,ordertracks):
 #Create a dataframe fit to holoviews with nested categories. Columns are [bead track typeOfError nbErrors]
 #one row correspond to one beads, in one specific track, that has nbErrors of the specific typeOfError
 def dfCleaningMessages(tracks,orderbeads,ordertracks=None):
+    """
+    (tracks,list,list) -> pandas df
+    Input: track or DictTrack, list of beads order, list of tracks order
+    Output: pandas df with columns Index, NbErrors, bead, track, typeOfError.
+    Create a dataframe for holoviews with nested categories. One row correspond to one bead, in one specific track that has nbErrors of the specific typeOfError.
+    Example: 
+    dfCleaningMessages(track,order_beads_normal_single)
+    dfCleaningMessages(tracks,order_beads_normal,order_tracks_chrono)
+    """
     try:
         tracks.keys()
         is_dict=True
@@ -298,20 +322,28 @@ def dfCleaningMessages(tracks,orderbeads,ordertracks=None):
 #y-axis represents the number of errors (per type of error) for that bead 
 #in the specific track
 def barBeads(tracks,df_dfGoodBadBeads,dfmsg,ordertracks,orderbeads):
+    """
+    (tracks,output dfGoodBadBeads,output dfCleaningMessages,list,list) -> holoviews bar chart
+    Input: track or DictTrack, output of dfGoodBadBeads, output of dfCleaningMessages, list of tracks order, list of beads order
+    Output: holoviews bar chart per bead. The y-axis represents the number of errors (per type of error) for that bead in the corresponding track
+    Example: 
+    barBeads(track,df_dfGoodBadBeads_single,dfmsg_single,order_tracks_chrono_single,order_beads_normal_single)
+    """
     try:
         tracks.keys()
         is_dict=True
     except AttributeError:
         is_dict = False
-    %%output size = 300
-    %%opts Bars [category_index=2 stack_index=0 group_index=1 legend_position='top' legend_cols=7 color_by=['stack'] tools=['hover']] 
-    %%opts Bars.Stacked [stack_index='typeOfError'  ]  
-    # %%opts Bars.Grouped [group_index='typeOfError'  ] 
-    # %%opts Bars.Stacked (color=Cycle(values=["#B22222","#8B008B","#C71585", "#FF4500","#FF7F50"]))
-    #    %%
-    %%opts Bars (color=Cycle(values=["#B22222","#8B008B","#C71585", "#FF4500","#FF7F50"]))
 
-    %%opts Bars.Stacked (color=Cycle(values=["#B22222","#8B008B","#C71585", "#FF4500","#FF7F50"]))
+    #%%output size = 300
+    #%%opts Bars [category_index=2 stack_index=0 group_index=1 legend_position='top' legend_cols=7 color_by=['stack'] tools=['hover']] 
+    ###%%opts Bars.Stacked [stack_index='typeOfError'  ]  
+    ### %%opts Bars.Grouped [group_index='typeOfError'  ] 
+    ### %%opts Bars.Stacked (color=Cycle(values=["#B22222","#8B008B","#C71585", "#FF4500","#FF7F50"]))
+    #    %%
+    #%%opts Bars (color=Cycle(values=["#B22222","#8B008B","#C71585", "#FF4500","#FF7F50"]))
+
+    #%%opts Bars.Stacked (color=Cycle(values=["#B22222","#8B008B","#C71585", "#FF4500","#FF7F50"]))
 
     ordertracks = np.asarray(ordertracks)
     orderbeads = np.asarray(orderbeads)
@@ -366,3 +398,282 @@ def barBeads(tracks,df_dfGoodBadBeads,dfmsg,ordertracks,orderbeads):
     mybeads = [float(i) for i in orderbeads]
     return dmap.redim.values(bead = mybeads).redim(NbErrors = "Count") #sorted by badfirst
 
+
+#Function heatmapBeadsByType that outputs seaborn heatmap with the number of good beads per track, and bad goods by type of error
+def heatmapBeadsByType(df_resumeBeadsQuality,ordertracks,pc=True, order = 'chrono'):
+    """
+    (output resumeBeadsQuality, list, bool, str) -> seaborn heatmap
+    Input: df_resumeBeadsQuality is the output of the function resumeBeadsQuality, list of tracks order, percentage True or False, order 'chrono' for chronological and 'best' for from best to worst
+    Output: 2 seaborn heatmaps side to side. Columns are types of Error and rows are tracks. Each cell presents the percentage of appearance of the specific error at the specific track
+    Example:
+    heatmapBeadsByType(df_resumeBeadsQuality,order_tracks_chrono)
+    """
+    
+    df_resumeBeadsQuality = df_resumeBeadsQuality[['bead','track',
+                                        'extent<0.5','hfsigma<0.0001',
+                                        'hfsigma>0.01','sat>90%','pop<80%']]
+    df_resumeBeadsQuality = df_resumeBeadsQuality.assign(mostCommonError = df_resumeBeadsQuality.set_index(['bead','track']).idxmax(axis=1).values)
+    df_resumeBeadsQuality = df_resumeBeadsQuality.assign(mostCommonError = np.where(df_resumeBeadsQuality.set_index(['bead','track']).max(axis=1)==0, 'noError', df_resumeBeadsQuality['mostCommonError']))
+    if pc:
+        data_discarded = pd.crosstab(df_resumeBeadsQuality['track'], 
+                                     df_resumeBeadsQuality['mostCommonError'], normalize='index')*100
+    else:
+        data_discarded = pd.crosstab(df_resumeBeadsQuality['track'],
+                                     df_resumeBeadsQuality['mostCommonError'])
+
+#data_discarded = data_discarded.sort_values(['noError'],ascending=False)
+    
+    data_discarded = data_discarded.loc[ordertracks]
+ #   data_discarded = data_discarded.sort_values(['noError'],ascending=False)
+
+    fig, ax =plt.subplots(ncols=2)
+    fig.set_size_inches(16, 18)
+    myfmt = '.1f' if pc else '.0f'
+    prefix_title = '%' if pc else '#'
+    noError_beads = sns.heatmap(data_discarded[['noError']],
+                                annot=True,
+                                fmt=myfmt,
+                                cmap='Greens',
+                                vmin = 0,
+                                vmax = 100,
+                                linewidths=0.5,
+                                ax=ax[0],
+                                square=True)
+    noError_beads.set_yticklabels(noError_beads.get_yticklabels(),rotation=0)
+    noError_beads.set_xticklabels(['No Error'])
+    noError_beads.set_xticklabels(noError_beads.get_xticklabels(),rotation=30)
+    total_beads = len(df_resumeBeadsQuality['bead'].unique())
+    ax[0].set_title(prefix_title+' of Beads with no Errors (Total {:.0f} beads)'.format(total_beads))
+    ax[0].set_xlabel('')
+    ax[0].set_ylabel('Tracks ('+['chronological' if order=='chrono' else 'best-to-worst'][0]+' order)')
+    data_discarded.pop('noError')
+    error_beads = sns.heatmap(data_discarded,
+                                annot=True,
+                                fmt=myfmt,
+                                vmin = 0,
+                                vmax = 100,
+                                cmap='Reds',
+                                linewidths=0.5,
+                                ax=ax[1])
+    error_beads.set_xticklabels(error_beads.get_xticklabels(),rotation=30)
+    error_beads.set_xticklabels([r'$\Delta z$ too small',
+                                r'$\sigma[HF]$ too low',
+                                r'$\sigma[HF]$ too high',
+                                r'not enough points/cycles',
+                                r'non-closing'])
+    error_beads.set_xticks([0,1,2,2.5,4])
+    error_beads.set_yticklabels(error_beads.get_yticklabels(),rotation=0)
+
+    ax[1].set_title(prefix_title+' of Beads by most common error (Total {:.0f} beads)'.format(total_beads))
+    ax[1].set_xlabel('')
+    ax[1].set_ylabel('Tracks ('+['chronological' if order=='chrono' else 'best-to-worst'][0]+' order)')
+    plt.tight_layout()
+    return ax
+
+
+#Function heatmapGoodBad that outputs bokeh heatmap with the status the beads per track (Good or Bad beads)
+def heatmapGoodBad(df_dfGoodBadBeads,ordertracks):
+    """
+    (output dfGoodBadBeads, list) -> bokeh heatmap
+    Input: df_resumeBeadsQuality is the output of the function resumeBeadsQuality, list of tracks order, percentage True or False, order 'chrono' for chronological and 'best' for from best to worst
+    Output: bokeh heatmap with the quality of the beads per track 
+    Example:
+    heatmapBeadsByType(df_resumeBeadsQuality,order_tracks_chrono)
+    """
+    df_dfGoodBadBeads['bead'] = df_dfGoodBadBeads['bead'].astype(str)
+    df_dfGoodBadBeads = df_dfGoodBadBeads.set_index('bead')
+    df_dfGoodBadBeads.columns.name = 'track'
+    df_dfGoodBadBeads=df_dfGoodBadBeads.transpose()
+
+    plotbeads = list(df_dfGoodBadBeads.columns)
+    plottracks = ordertracks #list(df_dfGoodBadBeads.index) #this is order_tracks_chrono if we used that as the order before, otherwise it is best to worst
+
+    # reshape to 1D array 
+    df = pd.DataFrame(df_dfGoodBadBeads.stack(), columns=['quality']).reset_index()
+
+    # colormap
+    colors = [ "#8B0000","#006400"] #[ "#550b1d","#75968f"] #
+    mapper = LinearColorMapper(palette=colors, low=df.quality.min(), high=df.quality.max())
+    source = ColumnDataSource(df)
+
+    TOOLS = "hover,save,pan,box_zoom,reset,wheel_zoom"
+
+    p = figure(title="Bead quality",
+                x_range=plottracks,
+                y_range=plotbeads,
+                x_axis_location="above",
+                plot_width=1000,
+                plot_height=1500,
+                tools=TOOLS,
+                toolbar_location='below')
+    p.grid.grid_line_color = None
+    p.axis.axis_line_color = None
+    p.axis.major_tick_line_color = None
+    p.axis.major_label_text_font_size = "10pt"
+    p.axis.major_label_standoff = 5
+    p.axis.axis_label_standoff = 10
+    p.xaxis.major_label_orientation = pi / 3
+
+    p.rect(x="track", y="bead", width=1, height=1,
+    source=source,
+    fill_color={'field': 'quality', 'transform': mapper},
+    line_color=None)
+
+    color_bar = ColorBar(color_mapper=mapper,
+                         major_label_text_font_size="9pt",
+                         ticker=BasicTicker(desired_num_ticks=len(colors)),
+                         formatter=PrintfTickFormatter(format="%s"),
+                         label_standoff=10,
+                         border_line_color=None,
+                         location=(1, 0),
+                         major_label_overrides={0:'Bad Beads',0.5:'',1:'Good Beads'},
+                         major_tick_out=20)
+
+    p.add_layout(color_bar, 'right')
+
+    p.select_one(HoverTool).tooltips = [
+    ('Bead/Track', '@bead @track'),
+    ('Quality', '@quality'),
+    ]
+    return p
+
+
+#Function heatmapGoodBadDetailed that outputs bokeh heatmap with the status the beads per track, bad beads by most Common Error
+def heatmapGoodBadDetailed(df_state_beads,ordertracks,orderbeads):
+    """
+    (output resumeBeadsQuality, list,list) -> bokeh heatmap
+    Input: df_resumeBeadsQuality is the output of the function resumeBeadsQuality, list of tracks order
+    Output: bokeh heatmap with the status of the beads per track
+    Example:
+    heatmapGoodBadDetailed(df_resumeBeadsQuality,order_tracks_chrono,order_beads_best)
+    """
+
+    orderbeads = np.asarray(orderbeads)
+    df_state_beads = df_state_beads.assign(mostCommonError =df_state_beads.set_index(['bead','track']).idxmax(axis=1).values)
+    df_state_beads = df_state_beads.assign(mostCommonError = np.where(df_state_beads.set_index(['bead','track']).max(axis=1)==0,
+                        'noError',
+                        df_state_beads['mostCommonError']))
+    df_state_beads = df_state_beads[['bead','track', 'mostCommonError']]
+
+    plotbeads = orderbeads # df_state_beads['bead'].unique()
+    plottracks = ordertracks # if order=='chrono' else order_tracks_best
+    aux = pd.DataFrame('', index=plottracks, columns=plotbeads)
+
+    for bd in plotbeads:
+        for trk in plottracks:
+            aux.loc[trk][bd] = df_state_beads[(df_state_beads['bead']==bd) & (df_state_beads['track']==trk)].mostCommonError.values[0]
+
+    # reshape to 1D array 
+    df = pd.DataFrame(aux.stack(), columns=['typeError']).reset_index()
+
+    df['typeError'] = np.where(df['typeError']=='noError',int(0),df['typeError'])
+    df['typeError'] = np.where(df['typeError']=='extent<0.5',int(1),df['typeError'])
+    df['typeError'] = np.where(df['typeError']=='hfsigma<0.0001',int(2),df['typeError'])
+    df['typeError'] = np.where(df['typeError']=='hfsigma>0.01',int(3),df['typeError'])
+    df['typeError'] = np.where(df['typeError']=='pop<80%',int(4),df['typeError'])
+    df['typeError'] = np.where(df['typeError']=='sat>90%',int(5),df['typeError'])
+
+    df.columns = ['track','bead','typeError']
+    df['typeError'] = df['typeError'].apply(pd.to_numeric,errors='coerce') 
+
+# colormap
+    colors = [ "#006400","#B22222","#8B008B","#C71585", "#FF4500","#FF7F50"] #
+
+    mapper = LinearColorMapper(palette=colors, low=df.typeError.min(), high=df.typeError.max())
+
+    #source = ColumnDataSource(df)
+    source=df
+    df['bead'] = df['bead'].astype(str)
+
+    TOOLS = "hover,save,pan,box_zoom,reset,wheel_zoom"
+
+    plotbeads = plotbeads.astype(str) #change to string for the figure
+
+    p = figure( plot_width=1000,
+                plot_height=1500,
+                title="Bead Status",
+                x_range=plottracks,
+                y_range=plotbeads,
+                x_axis_location="above",
+                tools=TOOLS,
+                toolbar_location='below')
+
+    p.grid.grid_line_color = None
+    p.axis.axis_line_color = None
+    p.axis.major_tick_line_color = None
+    p.axis.major_label_text_font_size = "12pt"
+    p.axis.major_label_standoff = 5
+    p.axis.axis_label_standoff = 10
+    p.xaxis.major_label_orientation = pi / 3
+
+    p.rect(x="track", y="bead", width=1, height=1, source=df,
+    fill_color={'field': 'typeError', 'transform': mapper},
+    line_color=None)
+
+    color_bar = ColorBar(color_mapper=mapper, major_label_text_font_size="13pt",
+    ticker=BasicTicker(desired_num_ticks=len(colors)),
+    formatter=PrintfTickFormatter(format="%s"),
+    label_standoff=20, border_line_color=None, location=(1, 0),
+    major_label_overrides={0:'noError',
+                           1:'extent<0.5',
+                           2:'hfsigma<0.0001',
+                           3:'hfsigma>0.01',
+                           4:'pop<80%',
+                           5:'sat<90%'}, major_tick_out=20)
+
+    p.add_layout(color_bar, 'right')
+
+    p.select_one(HoverTool).tooltips = [
+    ('Bead/Track', '@bead @track'),
+    ('Type of Error', '@typeError'),
+    ]
+    return p
+
+
+#Function flowBeads that outputs a flow diagram between two tracks showing the proportion
+#of the beads classified by their status (their mostCommonError)
+def flowBeads(df_sankey,first_track = None,last_track=None):
+    #pd.options.display.max_rows=8
+    #%matplotlib inline
+#https://github.com/anazalea/pySankey
+#test_sankey = aux.set_index('index')
+    if first_track==None:
+        first_track = df_sankey.columns[0]
+    if last_track==None:
+        last_track = df_sankey.columns[-1]
+
+    df_sankey = df_sankey[[first_track, last_track]]
+
+#colors3 = [ "#006400","#B22222","#8B008B","#C71585", "#FF4500","#FF7F50"] #
+
+    colorDict =  {'noError':'#006400',
+                  'extent<0.5':'#B22222',
+                  'hfsigma<0.0001':'#8B008B',
+                  'hfsigma>0.01':'#C71585',
+                  'sat>90%':'#FF4500', 
+                  'pop<80%':'#FF7F50' 
+                  }
+
+    df_sankey.reset_index()
+    df_sankey = df_sankey.reset_index()[[first_track,last_track]]
+    df_sankey
+    sankey.sankey(df_sankey[first_track],df_sankey[last_track],
+                  aspect=20,
+                  colorDict=colorDict,
+                  fontsize=12,
+                  leftLabels=['pop<80%',
+                              'sat>90%',
+                              'hfsigma>0.01',
+                              'hfsigma<0.0001',
+                              'extent<0.5',
+                              'noError'],
+                  rightLabels=['pop<80%',
+                               'sat>90%',
+                               'hfsigma>0.01',
+                               'hfsigma<0.0001',
+                               'extent<0.5',
+                               'noError'])
+    plt.gcf().set_size_inches(12,12)
+    plt.title('Track '+first_track+ r'$\longrightarrow$ Track '+last_track)
+    #plt.savefig('sankey.png',bbox_inches='tight',dpi=150)
+    return plt
