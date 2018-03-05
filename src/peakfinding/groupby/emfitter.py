@@ -23,7 +23,7 @@ class ByEM:
     finds peaks and groups events using Expectation Maximization
     the number of components is estimated using BIC criteria
     '''
-    emiter     = 100
+    emiter     = 1000
     mincount   = 5
     tol        = 0.5  # loglikelihood tolerance
     decimals   = 4    # rounding values
