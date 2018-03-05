@@ -6,7 +6,10 @@
 # include <nlopt.hpp>
 # pragma warning( pop )
 #else
+# pragma GCC diagnostic push
+# pragma GCC diagnostic ignored "-Wswitch-enum"
 # include <nlopt.hpp>
+# pragma GCC diagnostic pop
 #endif
 #include <pybind11/pybind11.h>
 #include "peakcalling/optimize.h"

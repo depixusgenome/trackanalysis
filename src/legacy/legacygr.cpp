@@ -1629,7 +1629,17 @@ namespace legacy { namespace {
                     if (check == 0)
                         push_bin_float_error_z(op, i_f[cur_i_f].filename, offset, n_item, Y_AXIS);
                 }
-
+                else
+                {
+                    if (argc >= 2)
+                    {
+                        argc--;
+                        argv++;
+                        if (check == 0)
+                            op->title = Mystrdupre(op->title, argv[0]);
+                    }
+                }
+                break;
 
             case 'l':       /* label for plot */
                 if ( strncmp(argv[0], "lxp", 3) == 0 )
