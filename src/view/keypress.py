@@ -72,5 +72,3 @@ class DpxKeyEvent(Model):
         self.on_change("count", lambda attr, old, value: self.onKeyPress())
         doc.add_root(self)
         return self,
-
-KeyPressManager = DpxKeyEvent

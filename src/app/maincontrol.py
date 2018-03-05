@@ -10,6 +10,7 @@ import appdirs
 from   control.event           import EmitPolicy
 from   control.taskcontrol     import TaskController
 from   control.globalscontrol  import GlobalsController
+from   view.keypress           import DpxKeyEvent
 from   undo.control            import UndoController
 from   utils.inspection        import getclass
 from   utils.logconfig         import logToFile
@@ -124,7 +125,8 @@ def createview(main, controls, views):
                    'Track Analysis')
     class Main(*(main,)+views): # type: ignore
         "The main view"
-        APPNAME = appname
+        APPNAME         = appname
+        KeyPressManager = DpxKeyEvent
         class MainControl(SuperController):
             """
             Main controller: contains all sub-controllers.
@@ -135,7 +137,7 @@ def createview(main, controls, views):
         def __init__(self):
             "sets up the controller, then initializes the view"
             ctrl = self.MainControl(self)
-            keys = getattr(self, 'KeyPressManager', lambda **_: None)(ctrl = ctrl)
+            keys = self.KeyPressManager(ctrl = ctrl) if self.KeyPressManager else None
             main.__init__(self, ctrl = ctrl, keys = keys)
             main.ismain(self)
 

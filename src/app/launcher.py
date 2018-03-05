@@ -122,7 +122,36 @@ def setup(locs,
           defaultcontrols = tuple(),
           defaultviews    = tuple(),
          ):
-    "Sets up launch and serve functions for a given app context"
+    """
+    Populates a module with launch and serve functions for a given app context.
+
+    The context is created as follows, say in module `app.mycontext`:
+
+    ```python
+    #!/usr/bin/env python3
+    # -*- coding: utf-8 -*-
+    "Updates app manager so as to deal with controllers"
+    from .launcher  import setup
+
+    VIEWS       = ('undo.UndoView', 'view.globalsview.GlobalsView',)
+    CONTROLS    = ('control.taskcontrol.TaskController',
+                   'control.globalscontrol.GlobalsController',
+                   'anastore.control',
+                   'undo.UndoController')
+
+    setup(locals(), defaultcontrols = CONTROLS, defaultviews = VIEWS)
+    ```
+
+    To launch an `flexx` window displayong `myview.MyView`:
+
+    ```python
+    from app.mycontext import launch
+    launch("myview.MyView")
+    ```
+
+    See `app.toolbar` for an example which sets-up a toolbar above any view provided
+    as a argument.
+    """
     def application(main     = mainview,
                     controls = defaultcontrols,
                     views    = defaultviews,

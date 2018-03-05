@@ -16,7 +16,7 @@ from tornado.platform.asyncio   import to_tornado_future
 from control.action import ActionDescriptor, Computation, Action
 
 if TYPE_CHECKING:
-    from .keypress import KeyPressManager
+    from .keypress import DpxKeyEvent # pylint: disable=unused-import
 
 SINGLE_THREAD = False
 
@@ -123,7 +123,7 @@ class BokehView(View):
             css.theme.basic.default = {}
             css.theme.default       = 'dark'
 
-        self._keys: KeyPressManager = kwargs.get('keys', None)
+        self._keys: 'DpxKeyEvent'   = kwargs.get('keys', None)
         self._doc:  Document        = None
 
     def close(self):

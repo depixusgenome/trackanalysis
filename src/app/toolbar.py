@@ -15,17 +15,15 @@ class WithToolbar:
     def __call__(self, main):
         if self.tbar is None:
             from view.toolbar import BeadToolbar
-            tbar = BeadToolbar
+            tbar = cast(type, BeadToolbar)
         else:
             tbar = cast(type, getclass(self.tbar))
 
         from bokeh.layouts  import layout, column
         from view           import BokehView
-        from view.keypress  import DpxKeyEvent
         class ViewWithToolbar(BokehView):
             "A view with the toolbar on top"
             APPNAME = getattr(main, 'APPNAME', main.__name__.lower().replace('view', ''))
-            KeyPressManager = DpxKeyEvent
             def __init__(self, **kwa):
                 self._bar      = tbar(**kwa)
                 self._mainview = main(**kwa)
