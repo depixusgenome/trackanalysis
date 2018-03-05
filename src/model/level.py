@@ -41,11 +41,12 @@ class Phase:
     * `relax`: phase 7 is used to remove probes from the hairpin.  The magnet
     is then at its farthest point (5 pN of force).
     """
-    initial = 1
-    pull    = 3
-    measure = 5
-    relax   = 7
-    count   = 8
+    initial  = 1
+    pull     = 3
+    rampdown = 4
+    measure  = 5
+    relax    = 7
+    count    = 8
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
