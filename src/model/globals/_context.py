@@ -15,15 +15,14 @@ class LocalContext:
         self.__save:    ARG_T = {}
         self.__replace: ARG_T = kwa
         self.__update:  ARG_T = {} if update is None else dict(update)
+
+        parent                = getattr(parent, 'globals', parent)
         self.__parent         = getattr(parent, 'getGlobal', lambda _: parent)(...)
 
     def __maps(self):
         if callable(getattr(self.__parent, 'items', None)):
             return self.__parent.items()
-        for i, j in self.__parent.__dict__.items():
-            if i[0] == '_' and i[1].lower() != i[1] and i.endswith("__model"):
-                return j.items()
-        raise ValueError("could not find maps")
+        return getattr(self.__parent, '_model').items()
 
     @staticmethod
     def __apply(first, second, args, kwa):

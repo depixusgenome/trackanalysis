@@ -25,7 +25,7 @@ with warnings.catch_warnings():
 # pylint: disable=wrong-import-position
 from tornado.ioloop        import IOLoop
 from view.static           import ROUTE
-from view.keypress         import KeyPressManager
+from view.keypress         import DpxKeyEvent
 from utils.logconfig       import getLogger
 
 LOGS = getLogger()
@@ -300,11 +300,11 @@ class _ManagedServerLoop:
         "press one key in python server"
         if src is None:
             for root in self.doc.roots:
-                if isinstance(root, KeyPressManager):
+                if isinstance(root, DpxKeyEvent):
                     self.cmd(self.loading.press, key, root, **kwa)
                     break
             else:
-                raise KeyError("Missing KeyPressManager in doc.roots")
+                raise KeyError("Missing DpxKeyEvent in doc.roots")
         else:
             self.cmd(self.loading.press, key, src, **kwa)
 
