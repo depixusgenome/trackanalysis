@@ -245,6 +245,7 @@ class TrackSimulator:
                       phases    = self.phases,
                       framerate = self.framerate,
                       key       = 'tracksimulator')
+        setattr(track,"_lazyfy_",False)
         sim   = {}
         for i in range(nbeads):
             track.data[i] = self()
