@@ -29,41 +29,59 @@ def resumeTracksQuality(tracks):
     """
     (DictTracks/Track) -> pandas dataframe
      Input: DictTracks or Tracks object. 
-     Output: a dataframe with the summary of good, bad, and total number of beads
+     Output: a dataframe with the summary of good, bad, missing and total number of beads
+    The output dataframe has the track (or tracks) as index and 4 columns indicating good, bad, missing and total number of beads
+    Example:
+    >>> resumeTracksQuality(tracks)
     """
+    #identify if we have a single track or dict tracks
     try:
         tracks.keys()
         is_dict = True
     except AttributeError:
         is_dict = False 
-
+    #loop to fill the list with the results for single or dict tracks
     results = list()                            
     if is_dict:
         for key,val in tracks.items():
-            tot = len(list(val.beadsonly.keys()))
+            #print(key,set(tracks.availablebeads())-set(val.beads.keys()))
+            #print('good',list(val.cleaning.good()))
+            #print('bad',list(val.cleaning.bad()))
+            missing = len(set(tracks.availablebeads())-set(val.beads.keys()) ) 
+
+            #print(missing)
+            tot = len(list(tracks.availablebeads()) )#len(list(val.beadsonly.keys()))
             good = len(list(val.cleaning.good()))
             bad = len(list(val.cleaning.bad()))
             results.append({'Track': key,
                             'Total': tot,
                             'Good': good,
-                            'Bad': bad})
-        results = pd.DataFrame(results,columns=['Track','Good','Bad','Total'])
+                            'Bad': bad,
+                            'Missing':missing})
+        results = pd.DataFrame(results,columns=['Track',
+                                                'Good',
+                                                'Bad',
+                                                'Missing',
+                                                'Total'])
         results.set_index('Track',inplace=True)
     else:
         results.append({'Track': tracks.key,
                         'Total' : len(list(tracks.beadsonly.keys())),
                         'Good' : len(list(tracks.cleaning.good())),
-                        'Bad': len(list(tracks.cleaning.bad())) })
-        results = pd.DataFrame(results,columns=['Track','Good','Bad','Total'])
+                        'Bad':  len(list(tracks.cleaning.bad())) })
+        results = pd.DataFrame(results,columns=['Track',
+                                                'Good',
+                                                'Bad',
+                                                'Total'])
         results.set_index('Track',inplace=True)
     return results
 
-#Auxiliary function dfGoodBadBeads: outputs a dataframe with of 0's and 1's. The columns are the tracks, rows the beads
+
 def dfGoodBadBeads(tracks):
     """
     (DictTracks/Track,list) -> pandas dataframe
     Input: Track or DictTracks object
-    Output: Dataframe with the 'state' of the bead. The cell [bd,trk] is 0 if the bead bd is bad in track trk. The value of the cell is 1 if the bead is good.
+    Output: Dataframe with the quality of the bead. The cell [bd,trk] is 0 if the bead bd is bad in track trk. The value of the cell is 1 if the bead is good.
      Example:
      dfGoodBadBeads(tracks)
      """
@@ -99,13 +117,24 @@ def dfGoodBadBeads(tracks):
     df_good_bad = df_good_bad[cols]
     return df_good_bad
 
+def ismissing(bead,tracks,track_name):
+    """
+    (int,Dict Track,str)-> bool
+    Input: bead is the label of the bead, tracks is a Dict Track object, track_name is a string contanining the name of the track
+    Output: True if bead is missing in track, False otherwise
+    Example:
+    if 'GTC' belongs to tracks, we want to test if the bead 1 is missing or not from track GTC
+    >>>(1,tracks,'GTC')
+    True
+    """
+    return bead in set(tracks.availablebeads())-set(tracks[track_name].beads.keys())
 
 #Auxiliary function resumeBeadsQuality: outputs a dataframe with the # of errors for each bead, for each type of error
 def resumeBeadsQuality(tracks,ordertracks=None):
     """
     (DictTracks or single Track,list of str) -> pandas dataframe
     Input: DictTracks or Track object and a list of the order of tracks (only necessary for DictTrack) 
-    Output: dataframe of status of bead per track. The cell [bd,trk] is 0 if the bead bd is bad in track trk. The value of the cell is 1 if the bead is good.
+    Output: dataframe of frequence of errors per bead per track. The line bd/trk has 5 corresponding columns representing the 5 types of errors that can be detected for a bead. If the bead is missing all errors are set to NaN 
     Example:
     resumeBeadsQuality(track)
     resumeBeadsQuality(tracks,order_tracks_chrono)
@@ -131,13 +160,24 @@ def resumeBeadsQuality(tracks,ordertracks=None):
         for bd in all_beads:   
             tmp = dfmsg[dfmsg['bead']==bd]
             for tr in ordertracks:
-                dict_aux = {'bead':bd,
-                            'track':tr,
-                            'extent<0.5':0 if tmp[(tmp['key']==tr) & (tmp['message']== '< 0.50' )]['cycles'].empty else tmp[(tmp['key']==tr) & (tmp['message']== '< 0.50' )]['cycles'].values[0] ,
-                             'hfsigma<0.0001':0 if tmp[(tmp['key']==tr) & (tmp['message']== '< 0.0001' )]['cycles'].empty else tmp[(tmp['key']==tr) & (tmp['message']== '< 0.0001' )]['cycles'].values[0] ,
-                             'hfsigma>0.01':0 if tmp[(tmp['key']==tr) & (tmp['message']== '> 0.0100' )]['cycles'].empty else tmp[(tmp['key']==tr) & (tmp['message']== '> 0.0100' )]['cycles'].values[0] ,
-                             'pop<80%':0 if tmp[(tmp['key']==tr) & (tmp['message']== '< 80%' )]['cycles'].empty else tmp[(tmp['key']==tr) & (tmp['message']== '< 80%' )]['cycles'].values[0] ,
-                             'sat>90%':0 if tmp[(tmp['key']==tr) & (tmp['message']== '> 90%' )]['cycles'].empty else tmp[(tmp['key']==tr) & (tmp['message']== '> 90%' )]['cycles'].values[0] }
+                #check if bd is missing in tr and set values to None
+                if ismissing(bd,tracks,tr):
+                    dict_aux = {'bead': bd,
+                                'track': tr,
+                                'extent<0.5': None,
+                                'hfsigma<0.0001': None,
+                                'hfsigma>0.01': None,
+                                'pop<80%': None,
+                                'sat>90%': None}
+                else:
+                 #fill the dictionary of results for the non missing beads
+                    dict_aux = {'bead':bd,
+                                'track':tr,
+                                'extent<0.5':0 if tmp[(tmp['key']==tr) & (tmp['message']== '< 0.50' )]['cycles'].empty else tmp[(tmp['key']==tr) & (tmp['message']== '< 0.50' )]['cycles'].values[0] ,
+                                'hfsigma<0.0001':0 if tmp[(tmp['key']==tr) & (tmp['message']== '< 0.0001' )]['cycles'].empty else tmp[(tmp['key']==tr) & (tmp['message']== '< 0.0001' )]['cycles'].values[0] ,
+                                'hfsigma>0.01':0 if tmp[(tmp['key']==tr) & (tmp['message']== '> 0.0100' )]['cycles'].empty else tmp[(tmp['key']==tr) & (tmp['message']== '> 0.0100' )]['cycles'].values[0] ,
+                                'pop<80%':0 if tmp[(tmp['key']==tr) & (tmp['message']== '< 80%' )]['cycles'].empty else tmp[(tmp['key']==tr) & (tmp['message']== '< 80%' )]['cycles'].values[0] ,
+                                'sat>90%':0 if tmp[(tmp['key']==tr) & (tmp['message']== '> 90%' )]['cycles'].empty else tmp[(tmp['key']==tr) & (tmp['message']== '> 90%' )]['cycles'].values[0] }
                 msg.append(dict_aux)
     else:
         for bd in all_beads:   
@@ -400,13 +440,13 @@ def barBeads(tracks,df_dfGoodBadBeads,dfmsg,ordertracks,orderbeads):
 
 
 #Function heatmapBeadsByType that outputs seaborn heatmap with the number of good beads per track, and bad goods by type of error
-def heatmapBeadsByType(df_resumeBeadsQuality,ordertracks,pc=True, order = 'chrono'):
+def heatmapBeadsByStatus(df_resumeBeadsQuality,ordertracks,pc=True, order = 'chrono'):
     """
     (output resumeBeadsQuality, list, bool, str) -> seaborn heatmap
     Input: df_resumeBeadsQuality is the output of the function resumeBeadsQuality, list of tracks order, percentage True or False, order 'chrono' for chronological and 'best' for from best to worst
     Output: 2 seaborn heatmaps side to side. Columns are types of Error and rows are tracks. Each cell presents the percentage of appearance of the specific error at the specific track
     Example:
-    heatmapBeadsByType(df_resumeBeadsQuality,order_tracks_chrono)
+    heatmapBeadsByStatus(df_resumeBeadsQuality,order_tracks_chrono)
     """
     
     df_resumeBeadsQuality = df_resumeBeadsQuality[['bead','track',
@@ -414,14 +454,16 @@ def heatmapBeadsByType(df_resumeBeadsQuality,ordertracks,pc=True, order = 'chron
                                         'hfsigma>0.01','sat>90%','pop<80%']]
     df_resumeBeadsQuality = df_resumeBeadsQuality.assign(mostCommonError = df_resumeBeadsQuality.set_index(['bead','track']).idxmax(axis=1).values)
     df_resumeBeadsQuality = df_resumeBeadsQuality.assign(mostCommonError = np.where(df_resumeBeadsQuality.set_index(['bead','track']).max(axis=1)==0, 'noError', df_resumeBeadsQuality['mostCommonError']))
+    df_resumeBeadsQuality['mostCommonError'] = df_resumeBeadsQuality['mostCommonError'].fillna('missing')
     if pc:
         data_discarded = pd.crosstab(df_resumeBeadsQuality['track'], 
                                      df_resumeBeadsQuality['mostCommonError'], normalize='index')*100
     else:
         data_discarded = pd.crosstab(df_resumeBeadsQuality['track'],
                                      df_resumeBeadsQuality['mostCommonError'])
-
-#data_discarded = data_discarded.sort_values(['noError'],ascending=False)
+    errors = ['extent<0.5','hfsigma<0.0001','hfsigma>0.01','sat>90%','pop<80%','missing','noError']
+    data_discarded = data_discarded.reindex(columns = errors,
+                                                       fill_value=0)
     
     data_discarded = data_discarded.loc[ordertracks]
  #   data_discarded = data_discarded.sort_values(['noError'],ascending=False)
@@ -443,9 +485,9 @@ def heatmapBeadsByType(df_resumeBeadsQuality,ordertracks,pc=True, order = 'chron
     noError_beads.set_xticklabels(['No Error'])
     noError_beads.set_xticklabels(noError_beads.get_xticklabels(),rotation=30)
     total_beads = len(df_resumeBeadsQuality['bead'].unique())
-    ax[0].set_title(prefix_title+' of Beads with no Errors (Total {:.0f} beads)'.format(total_beads))
+    ax[0].set_title(prefix_title+' of Beads Status = No Error (Total {:.0f} beads)'.format(total_beads))
     ax[0].set_xlabel('')
-    ax[0].set_ylabel('Tracks ('+['chronological' if order=='chrono' else 'best-to-worst'][0]+' order)')
+    ax[0].set_ylabel('Tracks ('+['chronological' if order=='chrono' else 'best-to-worst'][0]+' order top-to-bottom)')
     data_discarded.pop('noError')
     error_beads = sns.heatmap(data_discarded,
                                 annot=True,
@@ -460,13 +502,14 @@ def heatmapBeadsByType(df_resumeBeadsQuality,ordertracks,pc=True, order = 'chron
                                 r'$\sigma[HF]$ too low',
                                 r'$\sigma[HF]$ too high',
                                 r'not enough points/cycles',
-                                r'non-closing'])
-    error_beads.set_xticks([0,1,2,2.5,4])
+                                r'non-closing',
+                                r'missing'])
+    error_beads.set_xticks([0,1,2,2.7,4.2,5.2])
     error_beads.set_yticklabels(error_beads.get_yticklabels(),rotation=0)
 
-    ax[1].set_title(prefix_title+' of Beads by most common error (Total {:.0f} beads)'.format(total_beads))
+    ax[1].set_title(prefix_title+' of Beads by Status (Total {:.0f} beads)'.format(total_beads))
     ax[1].set_xlabel('')
-    ax[1].set_ylabel('Tracks ('+['chronological' if order=='chrono' else 'best-to-worst'][0]+' order)')
+    ax[1].set_ylabel('Tracks ('+['chronological' if order=='chrono' else 'best-to-worst'][0]+' order top-to-bottom)')
     plt.tight_layout()
     return ax
 
@@ -493,7 +536,7 @@ def heatmapGoodBad(df_dfGoodBadBeads,ordertracks):
 
     # colormap
     colors = [ "#8B0000","#006400"] #[ "#550b1d","#75968f"] #
-    mapper = LinearColorMapper(palette=colors, low=df.quality.min(), high=df.quality.max())
+    mapper = LinearColorMapper(palette=colors,  low=df.quality.min(), high=df.quality.max())
     source = ColumnDataSource(df)
 
     TOOLS = "hover,save,pan,box_zoom,reset,wheel_zoom"
@@ -538,7 +581,6 @@ def heatmapGoodBad(df_dfGoodBadBeads,ordertracks):
     return p
 
 
-#Function heatmapGoodBadDetailed that outputs bokeh heatmap with the status the beads per track, bad beads by most Common Error
 def heatmapGoodBadDetailed(df_state_beads,ordertracks,orderbeads):
     """
     (output resumeBeadsQuality, list,list) -> bokeh heatmap
@@ -579,7 +621,7 @@ def heatmapGoodBadDetailed(df_state_beads,ordertracks,orderbeads):
 # colormap
     colors = [ "#006400","#B22222","#8B008B","#C71585", "#FF4500","#FF7F50"] #
 
-    mapper = LinearColorMapper(palette=colors, low=df.typeError.min(), high=df.typeError.max())
+    mapper = LinearColorMapper(palette=colors, low=0,high=5) #low=df.typeError.min(), high=df.typeError.max())
 
     #source = ColumnDataSource(df)
     source=df
@@ -619,7 +661,7 @@ def heatmapGoodBadDetailed(df_state_beads,ordertracks,orderbeads):
                            2:'hfsigma<0.0001',
                            3:'hfsigma>0.01',
                            4:'pop<80%',
-                           5:'sat<90%'}, major_tick_out=20)
+                           5:'sat>90%'}, major_tick_out=20)
 
     p.add_layout(color_bar, 'right')
 
@@ -637,6 +679,7 @@ def flowBeads(df_sankey,first_track = None,last_track=None):
     #%matplotlib inline
 #https://github.com/anazalea/pySankey
 #test_sankey = aux.set_index('index')
+    df_sankey = df_sankey.fillna('missing')
     if first_track==None:
         first_track = df_sankey.columns[0]
     if last_track==None:
@@ -651,8 +694,8 @@ def flowBeads(df_sankey,first_track = None,last_track=None):
                   'hfsigma<0.0001':'#8B008B',
                   'hfsigma>0.01':'#C71585',
                   'sat>90%':'#FF4500', 
-                  'pop<80%':'#FF7F50' 
-                  }
+                  'pop<80%':'#FF7F50', 
+                  'missing':'#00BFFF'}
 
     df_sankey.reset_index()
     df_sankey = df_sankey.reset_index()[[first_track,last_track]]
@@ -666,12 +709,14 @@ def flowBeads(df_sankey,first_track = None,last_track=None):
                               'hfsigma>0.01',
                               'hfsigma<0.0001',
                               'extent<0.5',
+                              'missing',
                               'noError'],
                   rightLabels=['pop<80%',
                                'sat>90%',
                                'hfsigma>0.01',
                                'hfsigma<0.0001',
                                'extent<0.5',
+                               'missing',
                                'noError'])
     plt.gcf().set_size_inches(12,12)
     plt.title('Track '+first_track+ r'$\longrightarrow$ Track '+last_track)
