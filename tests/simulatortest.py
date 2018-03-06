@@ -87,34 +87,44 @@ def test_bypeaksevents_simulator():
 
 def test_bindings():
     "test bindings"
-    exp  = _bind.Experiment(sigma = None, ncycles = 100, rateon = 1., rateoff = 100.)
+    exp  = _bind.Experiment(brownianmotion = None, ncycles = 100, onrates = 1., offrates = 100.)
     vals = _bind.poissonevents(exp, seed = 0)
     assert vals.shape == (100, len(exp.bindings))
     assert np.all(np.cumsum(vals, axis = 1) <= exp.duration)
 
-    exp  = _bind.Experiment(sigma = None, ncycles = 100, rateon = 1., rateoff = 0.)
+    exp  = _bind.Experiment(brownianmotion = None, ncycles = 100, onrates = 1., offrates = 0.)
     vals = _bind.poissonevents(exp, seed = 0)
     assert vals.shape == (100, len(exp.bindings))
     assert np.all(np.cumsum(vals, axis = 1) <= exp.duration)
     assert np.all(np.cumsum(vals, axis = 1) > 0)
 
-    exp  = _bind.Experiment(sigma = None, ncycles = 100, rateon = 0.)
-    bead = _bind.tobead(exp)
+    exp  = _bind.Experiment(brownianmotion = None, ncycles = 100, onrates = 0.)
+    bead = _bind.eventstobead(exp)
     assert bead.shape == (100, np.sum(exp.phases))
 
-    exp  = _bind.Experiment(sigma = None, ncycles = 100, rateon = 1.)
+    exp  = _bind.Experiment(brownianmotion = None, ncycles = 100, onrates = 1.)
     trks = _bind.totrack(exp, nbeads = 2)
-    assert set(trks) == {'framerate', 'key', 'data', 'events', 'phases'}
+    assert set(trks) == {'framerate', 'key', 'data', 'truth', 'phases'}
     assert set(trks['data']) == {0, 1}
 
-    exp  = _bind.Experiment(sigma = 3e-3,
+    exp  = _bind.Experiment(brownianmotion = 3e-3,
                             ncycles = 100,
-                            rateon = .8,
-                            rateoff = 10,
+                            onrates = .8,
+                            offrates = 10,
                             thermaldrift = True,
                             baseline = True,)
     trks = _bind.totrack(exp, nbeads = 2)
-    assert set(trks) == {'framerate', 'key', 'data', 'events', 'phases'}
+    assert set(trks) == {'framerate', 'key', 'data', 'truth', 'phases'}
+    assert set(trks['data']) == {0, 1}
+
+    exp  = _bind.Experiment(brownianmotion = None,
+                            ncycles = 100,
+                            onrates = .3,
+                            offrates = 10,
+                            thermaldrift = None,
+                            baseline = None,)
+    trks = _bind.totrack(exp, nbeads = 2)
+    assert set(trks) == {'framerate', 'key', 'data', 'truth', 'phases'}
     assert set(trks['data']) == {0, 1}
 
 if __name__ == '__main__':
