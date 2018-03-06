@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 "Creates a histogram from available events"
 import itertools
-import pickle
 from functools import partial
 from typing import Dict, Tuple
 
@@ -35,7 +34,6 @@ class ByEM:
         pass
 
     def __call__(self,**kwa):
-        pickle.dump(kwa,open("kwargs.dbg","wb"))
         _, bias, slope = kwa.get("hist",(0,0,1))
         return self.find(kwa.get("events",None), bias, slope) #, kwa["precision"]) # use precision
 
