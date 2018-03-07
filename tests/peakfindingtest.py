@@ -9,12 +9,16 @@ from numpy.testing               import assert_equal, assert_allclose
 import pandas as pd
 
 from model.task.dataframe        import DataFrameTask
+from model.task.track            import InMemoryTrackTask
 from control.taskcontrol         import create
+from data                        import Track
 from simulator                   import randpeaks
 from simulator.processor         import EventSimulatorTask, TrackSimulatorTask
+from simulator.bindings          import Experiment
 from eventdetection.processor    import EventDetectionTask
 from peakfinding.selector        import PeakSelector, EVENTS_DTYPE
-from peakfinding.processor       import PeakSelectorTask, PeakProbabilityTask
+from peakfinding.processor       import (PeakSelectorTask, PeakProbabilityTask,
+                                         SingleStrandTask, SingleStrandProcessor)
 from peakfinding.histogram       import Histogram
 from peakfinding.groupby         import CWTPeakFinder,ZeroCrossingPeakFinder, PeakFlagger
 from peakfinding.alignment       import PeakCorrelationAlignment
@@ -266,5 +270,22 @@ def test_dataframe():
     assert 'cycle' in data.index.names
     assert 'peakposition' in data
 
+def test_singlestrandpeak():
+    "test single strand peak"
+    data  = Experiment(baseline = None, thermaldrift = None).track(seed = 1)
+    track = Track(**data)
+    lst   = (InMemoryTrackTask(track), EventDetectionTask(),
+             PeakSelectorTask(),       SingleStrandTask())
+    peaks = next(create(*lst[:-1]).run())
+    proc  = SingleStrandProcessor()
+    ncl   = proc.nonclosingramps(peaks, 0)
+    truth = np.where(data['truth'][0].strandclosing.duration
+                     >= track.phase.duration(..., range(5)))[0]
+    assert set(ncl) == set(truth)
+
+    out1  = [i for i, _ in next(create(*lst).run())[0]]
+    out2  = [i for i, _ in next(create(*lst[:-1]).run())[0]]
+    assert out1 == out2[:-1]
+
 if __name__ == '__main__':
-    test_dataframe()
+    test_singlestrandpeak()

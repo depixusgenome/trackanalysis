@@ -23,7 +23,8 @@ from cleaning.processor       import DataCleaningTask
 from cleaning.beadsubtraction import BeadSubtractionTask
 from cordrift.processor       import DriftTask
 from eventdetection.processor import ExtremumAlignmentTask, EventDetectionTask
-from peakfinding.processor    import PeakSelectorTask, PeakCorrelationAlignmentTask
+from peakfinding.processor    import (PeakSelectorTask, PeakCorrelationAlignmentTask,
+                                      SingleStrandTask)
 from peakcalling.processor    import (FitToReferenceTask, FitToHairpinTask,
                                       BeadsByHairpinTask)
 from ..level                  import Level
@@ -66,6 +67,9 @@ class _DOCHelper(Enum):
     peakselector   = (
         "events are grouped per peak. The list of peaks",
         "is returned per bead.")
+    singlestrand   = (
+        "The single-strand peak is detected (using the closing patterns in",
+        "the `PHASE.rampdown`) and removed from the list of peaks")
     fittohairpin   = (
         "the z-axis is aligned with theoretical positions",
         "using a rigid transformation.")
@@ -190,6 +194,7 @@ class Tasks(Enum):
     eventdetection = 'eventdetection'
     peakalignment  = 'peakalignment'
     peakselector   = 'peakselector'
+    singlestrand   = 'singlestrand'
     fittohairpin   = 'fittohairpin'
     fittoreference = 'fittoreference'
     beadsbyhairpin = 'beadsbyhairpin'
@@ -260,6 +265,7 @@ class Tasks(Enum):
                     eventdetection = EventDetectionTask(),
                     peakalignment  = PeakCorrelationAlignmentTask(),
                     peakselector   = PeakSelectorTask(),
+                    singlestrand   = SingleStrandTask(),
                     fittoreference = FitToReferenceTask(),
                     fittohairpin   = FitToHairpinTask(),
                     beadsbyhairpin = BeadsByHairpinTask(),
