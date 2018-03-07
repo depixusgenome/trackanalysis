@@ -15,6 +15,16 @@ from .base          import Task, RootTask
 _PATHTYPE = Union[str, Path, Tuple[Union[str,Path],...]]
 PATHTYPE  = Union[_PATHTYPE, Dict[str,_PATHTYPE]]
 
+class InMemoryTrackTask(RootTask):
+    """
+    directly the track file.
+
+    Please don't use outside tests.
+    """
+    def __init__(self, track, **kwa) -> None:
+        super().__init__(**kwa)
+        self.track = track
+
 class TrackReaderTask(RootTask):
     """
     Reads a track file to memory

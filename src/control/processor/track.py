@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Processors apply tasks to a data flow"
+from    copy             import deepcopy
 from    functools        import partial
 from    typing           import TYPE_CHECKING, Iterable, Union, Sequence, cast
 
@@ -13,6 +14,19 @@ from    .base            import Processor
 
 if TYPE_CHECKING:
     from .runner    import Runner # pylint: disable=unused-import
+
+class InMemoryTrackProcessor(Processor[_tasks.InMemoryTrackTask]):
+    "Generates output from a _tasks.InMemoryTrackProcessor"
+    def run(self, args:'Runner'):
+        "updates frames"
+        task = cast(_tasks.InMemoryTrackTask, self.task)
+        trk  = args.data.setCacheDefault(self, deepcopy(task.track))
+        args.apply((trk.beads,), levels = self.levels)
+
+    @staticmethod
+    def beads(cache, selected: Iterable[int]) -> Iterable[int]: # pylint: disable=unused-argument
+        "Beads selected/discarded by the task"
+        return cache.beadsonly.keys()
 
 class TrackReaderProcessor(Processor[_tasks.TrackReaderTask]):
     "Generates output from a _tasks.CycleCreatorTask"
