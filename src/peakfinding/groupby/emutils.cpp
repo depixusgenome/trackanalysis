@@ -131,12 +131,31 @@ namespace peakfinding{
 	    output.params = maximizeparam(data,npz_x,uppercov,lowercov);
 	    return output;
 	}
+
+	matrix getpz_x(const matrix& score,const  matrix& rates){
+	    auto ones = matrix(1,score.size2(),1.);
+	    auto bigrates  = blas::prod(rates,ones);
+	    matrix pz_x = blas::element_prod(score,bigrates);
+	    blas::vector<double> norm(pz_x.size2(),0.);
+	    for (unsigned r=0u, nrows=pz_x.size1();r<nrows;++r)
+	    	norm+=blas::row(pz_x,r);
+
+	    // renormalize probability per peak
+	    for (unsigned r=0u, nrows=pz_x.size1(); r<nrows;++r){ 
+	    	for (unsigned c=0u, ncols=pz_x.size2();c<ncols;++c){
+	    	    pz_x(r,c)/=norm(c);
+	    	}
+	    }
+	    
+	    return pz_x;
+	}
 	
 	void emstep(matrix &data, matrix &rates, matrix &params,
 		    double uppercov,
 		    double lowercov){
-	    //Expectation then Maximization steps of EM
+	    // Expectation then Maximization steps of EM
 	    auto score = scoreparams(data,params);
+	    /*
 	    auto ones  = matrix(1,score.size2(),1.);
 	    auto bigrates = blas::prod(rates,ones);// can be optimized
 	    matrix pz_x = blas::element_prod(score,bigrates);
@@ -150,6 +169,8 @@ namespace peakfinding{
 	    	    pz_x(r,c)/=norm(c);
 	    	}
 	    }
+	    */
+	    matrix pz_x = getpz_x(score,rates);	    
 	    MaximizedOutput maximized = maximization(data,pz_x,uppercov,lowercov);
 	    rates  = maximized.rates;
 	    params = maximized.params;
