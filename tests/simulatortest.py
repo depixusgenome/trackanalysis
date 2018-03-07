@@ -88,22 +88,22 @@ def test_bypeaksevents_simulator():
 def test_bindings():
     "test bindings"
     exp  = _bind.Experiment(brownianmotion = None, ncycles = 100, onrates = 1., offrates = 100.)
-    vals = _bind.poissonevents(exp, seed = 0)
+    vals = exp.events(seed = 0)
     assert vals.shape == (100, len(exp.bindings))
-    assert np.all(np.cumsum(vals, axis = 1) <= exp.duration)
+    assert np.all(np.cumsum(vals, axis = 1) <= exp.phases['measure'])
 
     exp  = _bind.Experiment(brownianmotion = None, ncycles = 100, onrates = 1., offrates = 0.)
-    vals = _bind.poissonevents(exp, seed = 0)
+    vals = exp.events(seed = 0)
     assert vals.shape == (100, len(exp.bindings))
-    assert np.all(np.cumsum(vals, axis = 1) <= exp.duration)
+    assert np.all(np.cumsum(vals, axis = 1) <= exp.phases['measure'])
     assert np.all(np.cumsum(vals, axis = 1) > 0)
 
     exp  = _bind.Experiment(brownianmotion = None, ncycles = 100, onrates = 0.)
-    bead = _bind.eventstobead(exp)
-    assert bead.shape == (100, np.sum(exp.phases))
+    bead = exp.bead(seed = 0)[1]
+    assert bead.size == 100*np.sum(exp.phases)
 
     exp  = _bind.Experiment(brownianmotion = None, ncycles = 100, onrates = 1.)
-    trks = _bind.totrack(exp, nbeads = 2)
+    trks = exp.track(nbeads = 2, seed = 0)
     assert set(trks) == {'framerate', 'key', 'data', 'truth', 'phases'}
     assert set(trks['data']) == {0, 1}
 
@@ -113,7 +113,7 @@ def test_bindings():
                             offrates = 10,
                             thermaldrift = True,
                             baseline = True,)
-    trks = _bind.totrack(exp, nbeads = 2)
+    trks = exp.track(nbeads = 2, seed = 0)
     assert set(trks) == {'framerate', 'key', 'data', 'truth', 'phases'}
     assert set(trks['data']) == {0, 1}
 
@@ -123,7 +123,7 @@ def test_bindings():
                             offrates = 10,
                             thermaldrift = None,
                             baseline = None,)
-    trks = _bind.totrack(exp, nbeads = 2)
+    trks = exp.track(nbeads = 2, seed = 0)
     assert set(trks) == {'framerate', 'key', 'data', 'truth', 'phases'}
     assert set(trks['data']) == {0, 1}
 

@@ -3,8 +3,8 @@
 "Simulates binding events"
 from copy   import copy
 from enum   import Enum
-from typing import (Dict, Any, FrozenSet, Optional, List,
-                    Union, Iterable, Sequence, NamedTuple, cast)
+from typing import (Dict, Any, FrozenSet, Optional, List, Union, Iterable,
+                    Sequence, NamedTuple, Tuple, cast)
 
 import numpy  as np
 
@@ -25,13 +25,18 @@ class Object:
         """
         return frozenset([i for i in locs if i[0] not in ('_', i[0].upper())])
 
-    def __init__(self, **args):
+    def __init__(self, firstarg = None, **args):
+        if isinstance(firstarg, self.__class__):
+            itms = dict(firstarg.__dict__)
+            itms.update(args)
+            args = itms
+
         for i in self._ARGS & set(args):
             setattr(self, i, args[i])
         for i in self._ARGS - set(args):
             setattr(self, i, copy(getattr(self.__class__, i)))
 
-class Phase(Object):
+class Phase(Sequence[int]):
     """
     Phase names in a cycle. Labeled phases are characterized by a stable magnet
     height.  Each of them is preceeded and followed by a phase where the magnet
@@ -47,16 +52,45 @@ class Phase(Object):
     * `relax`: phase 7 is used to remove probes from the hairpin.  The magnet
     is then at its farthest point (5 pN of force).
     """
-    toinitial= 0
-    initial  = 1
-    rampup   = 2
-    pull     = 3
-    rampdown = 4
-    measure  = 5
-    torelax  = 6
-    relax    = 7
-    count    = 8
-    _ARGS    = Object.args(locals())
+    toinitial = 0
+    initial   = 1
+    rampup    = 2
+    pull      = 3
+    rampdown  = 4
+    measure   = 5
+    torelax   = 6
+    relax     = 7
+    length    = 8
+    durations = [5, 20, 5, 20, 60, 400, 5, 20]
+    def __init__(self, durations = None, **_):
+        super().__init__()
+        self.durations = (copy(self.__class__.durations) if durations is None else
+                          durations)
+
+    def __getitem__(self, i):
+        if isinstance(i, (list, np.ndarray)):
+            return [self[j] for j in i]
+        if isinstance(i, str):
+            return self.durations[getattr(self, i)]
+        return self.durations[i]
+
+    def __setitem__(self, i, j):
+        if isinstance(i, str):
+            i = getattr(self, i)
+        self.durations[i] = j
+
+    def __iter__(self):
+        return iter(self.durations)
+
+    def __len__(self):
+        return len(self.durations)
+
+    def indexes(self, *names) -> np.ndarray:
+        "return the phase indexes from phase 0"
+        inds = np.cumsum(np.insert(self.durations, 0, 0))
+        if len(names) == 0:
+            return inds
+        return inds[[getattr(self, i) for i in names]]
 
 class Nature(Enum):
     """
@@ -67,12 +101,27 @@ class Nature(Enum):
     singlestrand = 'singlestrand'
     spurious     = 'spurious'
 
+class _EnumDescriptor:
+    __slots__ = ('name', 'default')
+    def __init__(self, default: Enum) -> None:
+        self.name    = None
+        self.default = default
+
+    def __set_name__(self, _, name):
+        self.name = name[:-1]
+
+    def __get__(self, inst, owner) -> str:
+        return inst.__dict__[self.name] if inst is not None else self.default.name
+
+    def __set__(self, inst, value: Union[Enum, str]):
+        inst.__dict__[self.name] = type(self.default)(value).name
+
 class Binding(Object):
     """
     A binding's characteristics
     """
     position: float
-    nature          = Nature.probe
+    nature          = cast(str, _EnumDescriptor(Nature.probe))
     onrate  : float = 1.
     offrate : float = 0.
     _ARGS  = Object.args(set(locals()) | {'position'})
@@ -88,7 +137,7 @@ class ThermalDrift:
     def __call__(self, cnf:'Experiment', bead, _ = None):
         if None in (self.tscale, self.zscale):
             return
-        inds = cnf.phaseindexes('rampup', 'rampdown', 'torelax', 'count')
+        inds = cnf.phases.indexes('rampup', 'rampdown', 'torelax', 'length')
         size = inds[1]-inds[0]
 
         driftup    = np.exp((np.arange(size)-size+1)/self.tscale)
@@ -148,7 +197,7 @@ class StrandClosing(Object):
                  base: np.ndarray,
                  seed: RAND_STATE = None) -> StrandClosingTruth:
         rnd    = randstate(seed)
-        inds   = cnf.phaseindexes('rampdown', 'measure')
+        inds   = cnf.phases.indexes('rampdown', 'measure')
         frames = self.start + np.int32(rnd.poisson(self.mean, cnf.ncycles))+inds[0]
 
         delta  = base[:,inds[1]]-base[:,inds[1]-1]
@@ -198,7 +247,7 @@ class BrownianMotion(Object):
             brown = noise(0., self.sigma, events.shape)
         else:
             brown   = np.zeros(events.shape, dtype = 'f4')
-            inds    = cnf.phaseindexes('initial', 'pull', 'measure', 'relax', 'count')
+            inds    = cnf.phases.indexes('initial', 'pull', 'measure', 'relax', 'length')
             size    = cnf.ncycles
 
             brown[:,:inds[0]]        += noise(0., self.phasesigma(7), (size, inds[0]))
@@ -211,13 +260,16 @@ class BrownianMotion(Object):
             brown = np.cumsum(brown, axis = 1)
         events += brown
 
-class _RateDescriptor:
-    __slots__ = ('name',)
-    def __init__(self):
-        self.name = None
+class _BindingAttribute:
+    __slots__        = ('name', 'dtype')
+    NAMES: List[str] = []
+    def __init__(self, dtype = 'f4'):
+        self.name  = None
+        self.dtype = np.dtype(dtype)
 
     def __set_name__(self, _, name):
         self.name = name[:-1]
+        self.NAMES.append(self.name)
 
     def __get__(self, inst, owner):
         name = self.name
@@ -226,10 +278,17 @@ class _RateDescriptor:
 
     def __set__(self, inst, val):
         if np.isscalar(val):
-            val = np.full(len(inst.bindings), val, dtype = 'f4')
+            val = np.full(len(inst.bindings), val, dtype = self.dtype)
         name = self.name
         for bind, itm in zip(inst.bindings, val):
             setattr(bind, name, itm)
+
+    @classmethod
+    def update(cls, inst, kwa):
+        "set attributes"
+        for i in cls.NAMES:
+            if i in kwa:
+                setattr(inst, i, kwa[i])
 
 class _BehaviourDescriptor:
     __slots__ = ('name', 'default')
@@ -253,9 +312,10 @@ class _BehaviourDescriptor:
                                     val)
 
 class _BindingsDescriptor:
-    def __init__(self, default: Iterable[Union[float, Binding]]) -> None:
+    def __init__(self) -> None:
         self.name    = None
-        self.default = list(default)
+        self.default = [Binding(1., nature = 'singlestrand', onrate = .2, offrate = 30),
+                        .8, .5, .2, .1]
 
     def __set_name__(self, _, name):
         self.name = name
@@ -273,6 +333,32 @@ class _BindingsDescriptor:
     def __set__(self, inst, val: Iterable[Union[Binding, Dict[str, Any], float]]):
         inst.__dict__[self.name] = [self.create(i) for i in val]
 
+class _SingleStrandBinding:
+    SINGLE_STRAND_FACTOR  = 1.1
+    def __get__(self, inst, owner):
+        "return the single strand binding"
+        if inst is None:
+            return self
+
+        name = Nature.singlestrand.name
+        val  = next((i for i in inst.bindings if i.nature == name), None)
+        if val is None:
+            return Binding(max(inst.positions)*self.SINGLE_STRAND_FACTOR,
+                           onrate   = 0.,
+                           offrate  = 0.,
+                           nature   = Nature.singlestrand)
+        return val
+
+    def __set__(self, inst, value):
+        "set the single strand binding"
+        val = _BindingsDescriptor.create(value)
+        ind = next((i for i, j in enumerate(inst.bindings) if j.nature == Nature.singlestrand),
+                   None)
+        if ind is not None:
+            inst.bindings.insert(0, val)
+        else:
+            inst.bindings[ind] = val
+
 class BeadTruth(NamedTuple): # pylint: disable=missing-docstring
     strandclosing: Optional[StrandClosingTruth]
     events:        np.ndarray
@@ -285,184 +371,154 @@ class Experiment(Object):
 
     # Attributes
 
-    * *ncycles*: number of cycles
+    * `ncycles` length of cycles
+    * `bindings` list of bindings, their position and nature
+    * `pullfactor` is the amount by which a binding position is increased in `phase.pull`
+    * `phases` is the names and durations of phases
+    * `brownianmotion` adds gaussian noise to the data unless set to None
+    * `strandclosing` simulates the strand closing during `phase.rampdown`
+    * `baseline` adds long term (>> frame) noise (as opposed to `brownianmotion`)
+    * `thermaldrift` add cycle-periodic noise.
 
-    * *durartion*: max duration of phase 5
+    # Properties
+
+    Bindings attributes can be accessed as arrays.
     """
-    ncycles                = 100
-    bindings               = cast(List[Binding], _BindingsDescriptor([1., .8, .5, .2, .1]))
-    extensionfactor        = 1.1
-    phases                 = [5, 20, 5, 20, 60, 400, 5, 20]
-    protocol               = Phase()
-    brownianmotion         = cast(BrownianMotion, _BehaviourDescriptor(BrownianMotion))
-    baseline               = cast(Baseline,       _BehaviourDescriptor(Baseline))
-    thermaldrift           = cast(ThermalDrift,   _BehaviourDescriptor(ThermalDrift))
-    strandclosing          = cast(StrandClosing,  _BehaviourDescriptor(StrandClosing))
-    _ARGS                  = Object.args(locals())
+    ncycles        = 100
+    bindings       = cast(List[Binding], _BindingsDescriptor())
+    pullfactor     = 1.1
+    phases         = Phase()
+    brownianmotion = cast(BrownianMotion, _BehaviourDescriptor(BrownianMotion))
+    strandclosing  = cast(StrandClosing,  _BehaviourDescriptor(StrandClosing))
+    baseline       = cast(Baseline,       _BehaviourDescriptor(Baseline))
+    thermaldrift   = cast(ThermalDrift,   _BehaviourDescriptor(ThermalDrift))
+    _ARGS          = Object.args(locals())
 
-    onrates                = cast(Sequence[Optional[float]], _RateDescriptor())
-    offrates               = cast(Sequence[Optional[float]], _RateDescriptor())
-    positions              = cast(Sequence[float],           _RateDescriptor())
+    positions      = cast(Sequence[float],           _BindingAttribute())
+    onrates        = cast(Sequence[Optional[float]], _BindingAttribute())
+    offrates       = cast(Sequence[Optional[float]], _BindingAttribute())
+    nature         = cast(Sequence[str],             _BindingAttribute('<U16'))
+    singlestrand   = cast(Binding,                   _SingleStrandBinding())
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        for i in ('positions', 'onrates', 'offrates'):
-            if i in kwa:
-                setattr(self, i, kwa[i])
+        _BindingAttribute.update(self, kwa)
 
     def setup(self, **kwa):
         "reset *all* attributes"
         self.__init__(**kwa)
 
-    def phaseindexes(self, *names) -> np.ndarray:
-        "return the phase indexes from phase 0"
-        inds = np.cumsum(np.insert(self.phases, 0, 0))
-        if len(names) == 0:
-            return inds
-        prot = self.protocol.__dict__
-        return inds[[prot[i] for i in names]]
+    def events(self, seed: RAND_STATE = None) -> np.ndarray:
+        """
+        Creates events using provided positions, rates and durations.
+        """
+        rnd   = randstate(seed)
+        shape = (self.ncycles, len(self.positions))
+        ron   = rnd.rand(*shape) < self.onrates
 
-    def phasez(self, val)-> float:
+        vals  = np.asarray(self.offrates)
+        roff  = np.empty(shape, dtype = 'f4')
+        if np.any(vals <= 0.):
+            roff[:,vals <= 0.] = self.phases['measure']//(len(self.positions)+1)
+        if np.any(vals > 0.):
+            good         = vals > 0.
+            roff[:,good] = rnd.poisson(vals[good], size = (shape[0], np.sum(good)))
+
+        roff[~ron] = 0.
+        roff[np.cumsum(roff, axis = 1) > self.phases['measure']] = 0.
+        return roff
+
+    def bead(self,
+             evts:  np.ndarray = None,
+             drift: np.ndarray = None,
+             base:  np.ndarray = None,
+             seed:  RAND_STATE = None
+            ) -> Tuple[BeadTruth, np.ndarray]:
+        """
+        create one bead data
+        """
+        rnd  = randstate(seed)
+        if evts is None:
+            evts = self.events(rnd)
+        bead = self.__beadstructure(evts)
+
+        if self.strandclosing:
+            closing = self.strandclosing(self, bead, rnd)
+        else:
+            closing = None
+
+        if self.brownianmotion:
+            self.brownianmotion(self, bead, rnd)
+
+        base  = (base                               if base is not None           else
+                 self.baseline(self, rnd)             if callable(self.baseline)     else
+                 np.zeros(bead.size, dtype = 'f4'))
+
+        if drift is None and callable(self.thermaldrift):
+            base  = np.copy(base)
+            drift = self.thermaldrift(self, base, rnd)
+
+        if base is not None:
+            bead.ravel()[:] += base
+
+        return BeadTruth(closing, evts, base, drift), bead.ravel()
+
+    def track(self, nbeads: int = 1, seed: RAND_STATE = None, **kwa) -> Dict[str, Any]:
+        """
+        creates a track
+        """
+        rnd    = randstate(seed)
+
+        base   = (self.baseline    (self, rnd)       if callable(self.baseline) else
+                  np.zeros(self.ncycles*self.phases.indexes('length')[0], dtype = 'f4'))
+        drift  = self.thermaldrift(self, base, rnd) if callable(self.baseline) else None
+
+        itms   = [self.bead(None, drift, base, rnd) for i in range(nbeads)]
+        ends   = np.repeat([self.phases], self.ncycles, axis = 0).cumsum()
+        phases = np.insert(ends, 0, 0)[:-1].reshape((self.ncycles, len(self.phases)))
+
+        kwa.setdefault('framerate', 30.)
+        kwa.setdefault('key',      'sim')
+        kwa.update(data   = dict((i, j[1]) for i, j in enumerate(itms)),
+                   truth  = dict((i, j[0]) for i, j in enumerate(itms)),
+                   phases = phases)
+        return kwa
+
+    def __beadstructure(self, events: np.ndarray = None) -> np.ndarray:
+        """
+        create bead data from events.
+
+        This does not include any type of noise
+        """
+        inds    = self.phases.indexes()
+        base    = np.zeros((self.ncycles, inds[-1]), dtype = 'f4')
+
+        for i in (self.phases.initial, self.phases.pull, self.phases.relax):
+            base[:,inds[i]:inds[i+1]] = self.__phasez(i)
+
+        def _lin(first, sec, phase):
+            size = self.phases[phase]
+            return ((sec-first)*(np.arange(size)/(size+1)+1./(size+1.))[:,None] + first).T
+
+        base[:,inds[0]:inds[1]] = _lin(self.__phasez(7),  base[:, inds[1]], 0)
+        base[:,inds[2]:inds[3]] = _lin(base[:,inds[2]-1], base[:, inds[3]], 2)
+        base[:,inds[4]:inds[5]] = _lin(base[:,inds[4]-1], self.__phasez(4), 4)
+        base[:,inds[6]:inds[7]] = _lin(base[:,inds[6]-1], base[:, inds[7]], 6)
+
+        if events is not None and len(self.positions):
+            pos = self.positions
+            for vect, evts in zip(base[:, inds[5]:inds[6]], np.cumsum(np.int32(events), axis = 1)):
+                vect[:evts[0]] = pos[0]
+                for i, j in enumerate(pos[1:]):
+                    vect[evts[i]:evts[i+1]] = j
+
+        return base
+
+    def __phasez(self, val)-> float:
         "phase 3 extension"
         if val == 1:
             return 0.
         if val == 3:
-            return self.singlestrandbinding.position*self.extensionfactor
+            return self.singlestrand.position*self.pullfactor
         if val == 4:
-            return self.singlestrandbinding.position
+            return self.singlestrand.position
         return -.1
-
-    @property
-    def duration(self)-> int:
-        "phase 5 duration"
-        return self.phases[5]
-
-    @property
-    def singlestrandbinding(self):
-        "return the single strand binding"
-        val = next((i for i in self.bindings if i.nature == Nature.singlestrand),
-                   None)
-        if val is None:
-            return Binding(max(self.positions),
-                           onrate   = 0.,
-                           offrate  = 0.,
-                           nature   = Nature.singlestrand)
-        return val
-
-    @singlestrandbinding.setter
-    def singlestrandbinding(self, value):
-        "set the single strand binding"
-        val = _BindingsDescriptor.create(value)
-        ind = next((i for i, j in enumerate(self.bindings) if j.nature == Nature.singlestrand),
-                   None)
-        if ind is not None:
-            self.bindings += [val]
-        else:
-            self.bindings[ind] = val
-
-    @property
-    def nature(self) -> np.ndarray:
-        """
-        Return nature of bindings
-        """
-        return [i.nature for i in self.bindings]
-
-def poissonevents(cnf: Experiment, seed: RAND_STATE = None) -> np.ndarray:
-    """
-    Creates events using provided positions, rates and durations.
-    """
-    rnd   = randstate(seed)
-    shape = (cnf.ncycles, len(cnf.positions))
-    ron   = rnd.rand(*shape) < cnf.onrates
-
-    vals  = np.asarray(cnf.offrates)
-    roff  = np.empty(shape, dtype = 'f4')
-    if np.any(vals <= 0.):
-        roff[:,vals <= 0.] = cnf.duration//(len(cnf.positions)+1)
-    if np.any(vals > 0.):
-        good         = vals > 0.
-        roff[:,good] = rnd.poisson(vals[good], size = (shape[0], np.sum(good)))
-
-    roff[~ron] = 0.
-    roff[np.cumsum(roff, axis = 1) > cnf.duration] = 0.
-    return roff
-
-def eventstobead(cnf: Experiment, events: np.ndarray = None) -> np.ndarray:
-    """
-    create bead data from events.
-
-    This does not include any type of noise
-    """
-    inds    = cnf.phaseindexes()
-    base    = np.zeros((cnf.ncycles, inds[-1]), dtype = 'f4')
-
-    for i in (cnf.protocol.initial, cnf.protocol.pull, cnf.protocol.relax):
-        base[:,inds[i]:inds[i+1]] = cnf.phasez(i)
-
-    def _lin(first, sec, phase):
-        size = cnf.phases[phase]
-        return ((sec-first)*(np.arange(size)/(size+1)+1./(size+1.))[:,None] + first).T
-
-    base[:,inds[0]:inds[1]] = _lin(cnf.phasez(7),     base[:, inds[1]], 0)
-    base[:,inds[2]:inds[3]] = _lin(base[:,inds[2]-1], base[:, inds[3]], 2)
-    base[:,inds[4]:inds[5]] = _lin(base[:,inds[4]-1], cnf.phasez(cnf.protocol.rampdown), 4)
-    base[:,inds[6]:inds[7]] = _lin(base[:,inds[6]-1], base[:, inds[7]], 6)
-
-    if events is not None and len(cnf.positions):
-        pos = cnf.positions
-        for vect, evts in zip(base[:, inds[5]:inds[6]], np.cumsum(np.int32(events), axis = 1)):
-            vect[:evts[0]] = pos[0]
-            for i, j in enumerate(pos[1:]):
-                vect[evts[i]:evts[i+1]] = j
-
-    return base
-
-def createbead(cnf: Experiment, evts = None, drift = None, base = None, seed: RAND_STATE = None):
-    """
-    create one bead data
-    """
-    rnd  = randstate(seed)
-    if evts is None:
-        evts = poissonevents(cnf, rnd)
-    bead = eventstobead(cnf, evts)
-
-    if cnf.strandclosing:
-        closing = cnf.strandclosing(cnf, bead, rnd)
-    else:
-        closing = None
-
-    if cnf.brownianmotion:
-        cnf.brownianmotion(cnf, bead, rnd)
-
-    base  = (base                               if base is not None           else
-             cnf.baseline(cnf, rnd)             if callable(cnf.baseline)     else
-             np.zeros(bead.size, dtype = 'f4'))
-
-    if drift is None and callable(cnf.thermaldrift):
-        base  = np.copy(base)
-        drift = cnf.thermaldrift(cnf, base, rnd)
-
-    if base is not None:
-        bead.ravel()[:] += base
-
-    return BeadTruth(closing, evts, base, drift), bead.ravel()
-
-def totrack(cnf: Experiment, nbeads: int = 1, seed: RAND_STATE = None, **kwa) -> Dict[str, Any]:
-    """
-    creates a track
-    """
-    rnd    = randstate(seed)
-
-    base   = (cnf.baseline    (cnf, rnd)       if callable(cnf.baseline) else
-              np.zeros(cnf.ncycles*cnf.phaseindexes('count')[0], dtype = 'f4'))
-    drift  = cnf.thermaldrift(cnf, base, rnd) if callable(cnf.baseline) else None
-
-    itms   = [createbead(cnf, None, drift, base, rnd) for i in range(nbeads)]
-    ends   = np.repeat([list(cnf.phases)], cnf.ncycles, axis = 0).cumsum()
-    phases = np.insert(ends, 0, 0)[:-1].reshape((cnf.ncycles, len(cnf.phases)))
-
-    kwa.setdefault('framerate', 30.)
-    kwa.setdefault('key',      'sim')
-    kwa.update(data   = dict((i, j[1]) for i, j in enumerate(itms)),
-               truth  = dict((i, j[0]) for i, j in enumerate(itms)),
-               phases = phases)
-    return kwa
