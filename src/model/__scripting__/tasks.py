@@ -200,57 +200,6 @@ class Tasks(Enum):
     beadsbyhairpin = 'beadsbyhairpin'
     dataframe      = 'dataframe'
 
-    def __repr__(self):
-        tpe = self.tasktype()
-        return (f'<{str(self)}> ↔ {tpe.__module__}.{tpe.__qualname__}\n\n    '
-                +'\n    '.join(getattr(_DOCHelper, self.name).value)
-                +'\n')
-
-    @classmethod
-    @_DOCHelper.add('eventdetection', 'peakselector', 'fittohairpin',
-                    header = "The task order consists in:")
-    def __taskorder__(cls):
-        return cls.eventdetection, cls.peakselector, cls.fittohairpin
-
-    @classmethod
-    def __base_cleaning__(cls):
-        return cls.subtraction, cls.cleaning, cls.alignment
-
-    @classmethod
-    @_DOCHelper.add('subtraction', 'cleaning', 'alignment',
-                    header = "Cleaning consists in the following tasks:")
-    def __cleaning__(cls):
-        return cls.__base_cleaning__()
-
-    @classmethod
-    def __tasklist__(cls):
-        cleaning = cls.__cleaning__()
-        assert cleaning[0] is cls.subtraction
-        return (cls.cyclesampling, cleaning[0], cls.selection) + cleaning[1:] + cls.__taskorder__()
-
-    @classmethod
-    def __nodefault__(cls):
-        return cls.cyclesampling, cls.selection, cls.subtraction
-
-    @classmethod
-    def _missing_(cls, value):
-        if isinstance(value, Task) and not isinstance(value, DriftTask):
-            value = type(value)
-
-        if isinstance(value, type):
-            if issubclass(value, DriftTask):
-                raise ValueError("DriftTask must be instantiated to be found be Tasks")
-
-            tsk = next((i for i, j in cls.defaults().items() if j.__class__ is value), None)
-            if tsk:
-                return cls(tsk)
-
-        if isinstance(value, DriftTask):
-            return (Tasks.driftperbead if cast(DriftTask, value).onbeads else
-                    Tasks.driftpercycle)
-
-        super()._missing_(value) # type: ignore
-
     @staticmethod
     def defaults():
         "returns default tasks"
@@ -277,6 +226,8 @@ class Tasks(Enum):
 
     def tasktype(self) -> Type[Task]:
         "returns the task type"
+        if self.name == 'action':
+            return ActionTask
         return type(self.default())
 
     @classmethod
@@ -369,20 +320,6 @@ class Tasks(Enum):
         procs.copy = copy
         return procs
 
-    @classmethod
-    @_DOCHelper.add(header = "These can be:")
-    def apply(cls, *args, copy = True, beadsonly = True, pool = None) -> TrackView:
-        "Return an iterator over the result of selected tasks."
-        procs = cls.processors(*args, beadsonly = beadsonly)
-        ret   = isinstance(pool, bool)
-        if ret:
-            pool = ProcessPoolExecutor()
-
-        out = next(iter(procs.run(copy = copy, pool = pool)))
-        if ret:
-            with pool:
-                out = tuple(out)
-        return out
 
     def dumps(self, **kwa):
         "returns the json configuration"
@@ -393,27 +330,11 @@ class Tasks(Enum):
         kwa.setdefault('patch', None)
         return anastore.dumps(self, **kwa)
 
-    @staticmethod
-    def _default_action(*args, **kwa):
-        call = kwa.pop('call', None)
-        if len(args) >= 1 and call is None:
-            call, args = args[0], args[1:]
-
-        if call is None:
-            assert False
-            return ActionTask()
-
-        if not callable(call):
-            raise RuntimeError("Incorrect action")
-
-        if len(args) > 0 or len(kwa):
-            call = partial(call, *args, **kwa)
-        return ActionTask(call = call)
-
     def processor(self, *resets, **kwa) -> Processor:
         "Returns the default processor for this task"
         task  = self(*resets, **kwa)
         return register(None)[type(task)](task = task)
+
 
     def __call__(self, *resets, **kwa)-> Task:
         fcn     = getattr(self, '_default_'+self.name, None)
@@ -451,6 +372,102 @@ class Tasks(Enum):
             return tpe.create if obj is None else obj
 
     get = _TaskGetter()
+
+    class _TaskApply:
+        def __get__(self, obj, tpe):
+            # pylint: disable=protected-access
+            return tpe._apply_cls if obj is None else obj._apply_self
+    apply = _TaskApply()
+
+    def _apply_self(self, toframe: TrackView = None, *resets, **kwa) -> TrackView:
+        """
+        Applies the task to the frame
+        """
+        return self.processor(*resets, **kwa).apply(toframe) # type: ignore
+
+    @classmethod
+    @_DOCHelper.add(header = "These can be:")
+    def _apply_cls(cls, *args, copy = True, beadsonly = True, pool = None) -> TrackView:
+        "Return an iterator over the result of selected tasks."
+        procs = cls.processors(*args, beadsonly = beadsonly)
+        ret   = isinstance(pool, bool)
+        if ret:
+            pool = ProcessPoolExecutor()
+
+        out = next(iter(procs.run(copy = copy, pool = pool)))
+        if ret:
+            with pool:
+                out = tuple(out)
+        return out
+
+    @staticmethod
+    def _default_action(*args, **kwa):
+        call = kwa.pop('call', None)
+        if len(args) >= 1 and call is None:
+            call, args = args[0], args[1:]
+
+        if call is None:
+            assert False
+            return ActionTask()
+
+        if not callable(call):
+            raise RuntimeError("Incorrect action")
+
+        if len(args) > 0 or len(kwa):
+            call = partial(call, *args, **kwa)
+        return ActionTask(call = call)
+
+    def __repr__(self):
+        tpe = self.tasktype()
+        return (f'<{str(self)}> ↔ {tpe.__module__}.{tpe.__qualname__}\n\n    '
+                +'\n    '.join(getattr(_DOCHelper, self.name).value)
+                +'\n')
+
+    @classmethod
+    @_DOCHelper.add('eventdetection', 'peakselector', 'fittohairpin',
+                    header = "The task order consists in:")
+    def __taskorder__(cls):
+        return cls.eventdetection, cls.peakselector, cls.fittohairpin
+
+    @classmethod
+    def __base_cleaning__(cls):
+        return cls.subtraction, cls.cleaning, cls.alignment
+
+    @classmethod
+    @_DOCHelper.add('subtraction', 'cleaning', 'alignment',
+                    header = "Cleaning consists in the following tasks:")
+    def __cleaning__(cls):
+        return cls.__base_cleaning__()
+
+    @classmethod
+    def __tasklist__(cls):
+        cleaning = cls.__cleaning__()
+        assert cleaning[0] is cls.subtraction
+        return (cls.cyclesampling, cleaning[0], cls.selection) + cleaning[1:] + cls.__taskorder__()
+
+    @classmethod
+    def __nodefault__(cls):
+        return cls.cyclesampling, cls.selection, cls.subtraction
+
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, Task) and not isinstance(value, DriftTask):
+            value = type(value)
+
+        if isinstance(value, type):
+            if issubclass(value, DriftTask):
+                raise ValueError("DriftTask must be instantiated to be found be Tasks")
+
+            tsk = next((i for i, j in cls.defaults().items() if j.__class__ is value), None)
+            if tsk:
+                return cls(tsk)
+
+        if isinstance(value, DriftTask):
+            return (Tasks.driftperbead if cast(DriftTask, value).onbeads else
+                    Tasks.driftpercycle)
+
+        super()._missing_(value) # type: ignore
+
 
     @classmethod
     def __create(cls, arg, kwa, beadsonly): # pylint: disable=too-many-return-statements
