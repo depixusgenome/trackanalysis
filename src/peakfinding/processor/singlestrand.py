@@ -3,7 +3,6 @@
 """
 Find the peak corresponding to a single strand DNA
 """
-
 from   typing             import List, TYPE_CHECKING, Sequence, Tuple, cast
 from   functools          import partial
 
@@ -50,13 +49,21 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
     _DTYPE    = np.dtype([('peaks', 'f4'), ('events', 'O')])
     def nonclosingramps(self, frame:'PeaksDict', beadid:BEADKEY) -> List[int]:
         "return the cycle indexes for which `PHASE.rampdown` has no break"
-        delta = self.task.delta
-        return [i[1] for i, j in self.__ramp(frame, beadid) if np.all(np.diff(j) > delta)]
+        delta   = self.task.delta
+        def _greater(arr):
+            arr = np.diff(arr)
+            arr = arr[np.isfinite(arr)]
+            return len(arr) and np.all(arr > delta)
+        return [i[1] for i, j in self.__ramp(frame, beadid) if _greater(j)]
 
     def closingramps(self, frame:'PeaksDict', beadid:BEADKEY) -> List[int]:
         "return the cycle indexes for which `PHASE.rampdown` has a break"
-        delta = self.task.delta
-        return [i[1] for i, j in self.__ramp(frame, beadid) if np.any(np.diff(j) <= delta)]
+        delta  = self.task.delta
+        def _lesser(arr):
+            arr = np.diff(arr)
+            arr = arr[np.isfinite(arr)]
+            return len(arr) and np.any(arr <= delta)
+        return [i[1] for i, j in self.__ramp(frame, beadid) if _lesser(j)]
 
     def nonclosingevents(self, cycles:List[int], peaks: Sequence['PeakOutput']) -> List[List[int]]:
         """
@@ -71,7 +78,8 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
         def _good(evt):
             return (evt is not None
                     and (evt if isinstance(evt, types) else evt[0])[0] < start)
-        return [[i for i in cycles if _good(peak[i])] for _, peak in peaks]
+        out = [[i for i in cycles if _good(peak[i])] for _, peak in peaks]
+        return out
 
     def singlestrandpeakindex(self,
                               frame: 'PeaksDict',
