@@ -40,6 +40,9 @@ class _PeaksDictMixin:
         this = cast(PeaksDict, self)
 
         if isinstance(data, TracksDict):
+            if axis is not None:
+                axis = Axis(axis)
+
             if this.track.key in data:
                 data = cast(Track, data[this.track.key])
             elif axis is not None:
@@ -51,7 +54,7 @@ class _PeaksDictMixin:
             data = Track(path = this.track.path, axis = data)
 
         if isinstance(data, Track):
-            data = data.apply(Tasks.alignment)[...,...] # type: ignore
+            data = data.cycles # type: ignore
 
         return this.withaction(partial(self._swap, cast(Cycles, data).withphases(PHASE.measure)))
 
@@ -74,7 +77,7 @@ class _PeaksDictMixin:
             if isinstance(evt, (tuple, np.void)):
                 evts[i] = (evt[0], arr[evt[0]:evt[0] + len(evt[1])])
             elif evt is not None:
-                evts[i] = [(k, arr[k:k+len(l)]) for k, l in evt]
+                evts[i][:] = [(k, arr[k:k+len(l)]) for k, l in evt]
         return evts
 
     @staticmethod

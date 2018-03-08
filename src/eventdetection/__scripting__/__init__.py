@@ -135,10 +135,10 @@ class _EventsMixin:
              axis: Union[str, Axis] = None) -> Events:
         "Returns indexes or values in data at the same key and index"
         this = cast(Events, self)
-        if axis is not None:
-            axis = Axis(axis)
-
         if isinstance(data, TracksDict):
+            if axis is not None:
+                axis = Axis(axis)
+
             if this.track.key in data:
                 data = cast(Track, data[this.track.key])
             elif axis is not None:
@@ -150,7 +150,7 @@ class _EventsMixin:
             data = Track(path = this.track.path, axis = Axis(data))
 
         if isinstance(data, Track):
-            data = data.apply(Tasks.alignment)[...,...] # type: ignore
+            data = data.cycles # type: ignore
 
         return this.withaction(partial(self._swap, cast(Cycles, data).withphases(PHASE.measure)))
 
