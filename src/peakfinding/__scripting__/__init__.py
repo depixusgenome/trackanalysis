@@ -3,17 +3,19 @@
 "Simpler PeaksDict detection: merging and selecting the sections in the signal detected as flat"
 from   typing                       import Union, Iterator, Iterable, Tuple, List, cast
 from   copy                         import copy as shallowcopy
+from   functools                    import partial
 
 import pandas                       as     pd
 import numpy                        as     np
 
-from utils.decoration               import addto, addproperty
+from utils.decoration               import addto, addproperty, extend
 from control.processor.dataframe    import DataFrameProcessor
 from eventdetection                 import EventDetectionConfig
 from eventdetection.data            import Events
 from model                          import PHASE
 from model.__scripting__            import Tasks
-from data                           import Track
+from data.track                     import Track, Axis
+from data.views                     import Cycles
 from data.tracksdict                import TracksDict
 from data.__scripting__.dataframe   import adddataframe
 from data.__scripting__.tracksdict  import TracksDictOperator
@@ -28,6 +30,90 @@ from ..processor                    import (PeakSelectorTask, PeakCorrelationAli
 def peaks(self) -> PeaksDict:
     "returns peaks found"
     return self.apply(*Tasks.defaulttasklist(self, Tasks.peakselector))
+
+@extend(PeaksDict)
+class _PeaksDictMixin:
+    def swap(self,
+             data: Union[Track, TracksDict, Cycles, str, Axis] = None,
+             axis: Union[str, Axis] = None) -> PeaksDict:
+        "Returns indexes or values in data at the same key and index"
+        this = cast(PeaksDict, self)
+
+        if isinstance(data, TracksDict):
+            if this.track.key in data:
+                data = cast(Track, data[this.track.key])
+            elif axis is not None:
+                data = cast(Track, data[Axis(axis).name[0]+this.track.key])
+            else:
+                raise KeyError("Unknown data")
+
+        if isinstance(data, (str, Axis)):
+            data = Track(path = this.track.path, axis = data)
+
+        if isinstance(data, Track):
+            data = data.apply(Tasks.alignment)[...,...] # type: ignore
+
+        return this.withaction(partial(self._swap, cast(Cycles, data).withphases(PHASE.measure)))
+
+    def concatenated(self, alltogether = True) -> PeaksDict:
+        """
+        Add a method that returns a cycle vector, with NaN values where no
+        events is defined.
+        """
+        fcn = self._concatenate_all if alltogether else self._concatenate_iter
+        return cast(PeaksDict, self).withaction(fcn)
+
+    @classmethod
+    def _swap(cls, data, _, info):
+        tmp    = data[info[0]]
+        return info[0], [(i, cls._swap_evts(tmp, j)) for i, j in info[1]]
+
+    @staticmethod
+    def _swap_evts(arr, evts):
+        for i, evt in enumerate(evts):
+            if isinstance(evt, (tuple, np.void)):
+                evts[i] = (evt[0], arr[evt[0]:evt[0] + len(evt[1])])
+            elif evt is not None:
+                evts[i] = [(k, arr[k:k+len(l)]) for k, l in evt]
+        return evts
+
+    @staticmethod
+    def _concatenate_peak(lens, arr, evts):
+        if arr is None:
+            arr = np.full(lens[-1], np.NaN, dtype = 'f4')
+
+        for i, cycle in zip(lens, evts):
+            if isinstance(cycle, (tuple, np.void)):
+                cycle = (cycle,)
+            if cycle is not None:
+                for start, data in cycle:
+                    arr[i+start:i+start+len(data)] = data
+        return arr
+
+    @classmethod
+    def _concatenate_all(cls, frame, info):
+        info = info[0], list(info[1])
+        if len(info[1]) == 0 or not Track.isbeadname(info[0]):
+            return info
+
+        lens = np.insert((frame.track.phase.duration(..., PHASE.measure)+1).cumsum(),
+                         0, 0)
+        out  = None
+        for _, i in info[1]:
+            out = cls._concatenate_peak(lens, out, i)
+        return info[0], out
+
+    @classmethod
+    def _concatenate_iter(cls, frame, info):
+        assert False
+        info = info[0], list(info[1])
+        if len(info[1]) == 0 or not Track.isbeadname(info[0]):
+            return info
+
+        lens = np.insert((frame.track.phase.duration(..., PHASE.measure)+1).cumsum(),
+                         0, 0)
+        out  = ((i, cls._concatenate_peak(lens, None, j)) for i, j in info[1])
+        return info[0], out
 
 class Detailed:
     "Deals with easy acccess to peaks data"

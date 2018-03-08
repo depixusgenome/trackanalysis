@@ -3,16 +3,20 @@
 """
 Adds shortcuts for using Events
 """
-from   typing                       import Tuple, Callable, FrozenSet, List, cast
+from   typing                       import Tuple, Callable, FrozenSet, List, Union, cast
 from   copy                         import copy as shallowcopy
+from   functools                    import partial
+
 import numpy                        as     np
 import pandas                       as     pd
 
-from   utils.decoration             import addto, addproperty
+from   utils.decoration             import addto, addproperty, extend
 from   control.processor.dataframe  import DataFrameProcessor
+from   model.level                  import PHASE
 from   model.__scripting__          import Tasks
-from   data                         import Track
+from   data.track                   import Track, Axis
 from   data.tracksdict              import TracksDict
+from   data.views                   import Cycles
 from   data.__scripting__.dataframe import adddataframe
 from   ..processor                  import (ExtremumAlignmentTask,
                                             BiasRemovalTask,
@@ -119,15 +123,80 @@ class Comparator:
         cond = self.__cond
         return frozenset(tuple(i for i, j in self.__vals() if cond(k != other for k in j)))
 
+@extend(Events)
+class _EventsMixin:
+    """
+    One can also select cycles which accept provided conditions.
+    """
+    __doc__ = __doc__ + '\n'.join(Comparator.__doc__.split('\n')[2:])
+
+    def swap(self,
+             data: Union[Track, TracksDict, Cycles, str, Axis] = None,
+             axis: Union[str, Axis] = None) -> Events:
+        "Returns indexes or values in data at the same key and index"
+        this = cast(Events, self)
+        if axis is not None:
+            axis = Axis(axis)
+
+        if isinstance(data, TracksDict):
+            if this.track.key in data:
+                data = cast(Track, data[this.track.key])
+            elif axis is not None:
+                data = cast(Track, data[Axis(axis).name[0]+this.track.key])
+            else:
+                raise KeyError("Unknown data")
+
+        if isinstance(data, (str, Axis)):
+            data = Track(path = this.track.path, axis = Axis(data))
+
+        if isinstance(data, Track):
+            data = data.apply(Tasks.alignment)[...,...] # type: ignore
+
+        return this.withaction(partial(self._swap, cast(Cycles, data).withphases(PHASE.measure)))
+
+    def index(self) -> Events:
+        "Returns indexes at the same key and positions"
+        return cast(Events, self).withaction(self._index)
+
+    def concatenated(self):
+        """
+        Add a method that returns a cycle vector, with NaN values where no
+        events is defined.
+        """
+        return cast(Events, self).withaction(self._concatenate)
+
+    any  = property(lambda self: Comparator(self, any), doc = Comparator.__doc__)
+    all  = property(lambda self: Comparator(self, all), doc = Comparator.__doc__)
+
+    @staticmethod
+    def _index(_, info):
+        info[1]['data'] = [range(i,i+len(j)) for i, j in info[1]]
+        return info
+
+    @staticmethod
+    def _swap(data, _, info):
+        tmp             = data[info[0]]
+        info[1]['data'] = [tmp[i:i+len(j)] for i, j in info[1]]
+        return info
+
+    @staticmethod
+    def _concatenate(frame, info):
+        if len(info[1]) == 0 or not Track.isbeadname(info[0][0]):
+            return info
+
+        size = frame.track.phase.duration(info[0][1], PHASE.measure)
+        arr  = np.full(size, np.NaN, dtype = 'f4')
+        for i, j in info[1]:
+            arr[i:i+len(j)] = j
+        return info[0], arr
+
+adddataframe(Events)
+
 @addto(Track, property)
 def events(self) -> Events:
     "Returns events in phase 5 only"
     return self.apply(*Tasks.defaulttasklist(self, Tasks.eventdetection))
 # pylint: disable=no-member
-Events.__doc__      += (
-    """
-    One can also select cycles which accept provided conditions.
-    """+'\n'.join(Comparator.__doc__.split('\n')[2:]))
 Track.events.__doc__ = Events.__doc__
 
 @addproperty(TracksDict, 'events')
@@ -139,9 +208,5 @@ class EventTracksDict:
     def dataframe(self, *tasks, **kwa):
         "creates a dataframe for all keys"
         return self._items.dataframe(Tasks.eventdetection, *tasks, **kwa)
-
-adddataframe(Events)
-setattr(Events, 'any', property(lambda self: Comparator(self, any), doc = Comparator.__doc__))
-setattr(Events, 'all', property(lambda self: Comparator(self, all), doc = Comparator.__doc__))
 
 __all__: List[str] = ['ExtremumAlignmentTask', 'BiasRemovalTask', 'EventDetectionTask']

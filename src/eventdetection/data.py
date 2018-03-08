@@ -4,11 +4,10 @@
 from typing           import (Iterator, Tuple, Union, Sequence,
                               Optional, cast, TYPE_CHECKING)
 from copy             import deepcopy
-from functools        import wraps, partial
+from functools        import wraps
 import numpy          as     np
 
 from model            import PHASE, Level
-from data.track       import Track
 from data.views       import ITrackView, Cycles, CYCLEKEY
 from utils            import EVENTS_TYPE, EVENTS_DTYPE, asview, EventsArray
 from .                import EventDetectionConfig
@@ -85,25 +84,6 @@ class Events(Cycles, EventDetectionConfig, ITrackView):# pylint:disable=too-many
                                        for i, j in evts(fdt, precision = val)])
             yield (key, gen)
 
-    def swap(self, data: Union[Track, Cycles] = None) -> 'Events':
-        "Returns indexes or values in data at the same key and index"
-        data = getattr(data, 'cycles', data)
-        return self.withaction(partial(self.__swap, data))
-
-    def index(self) -> 'Events':
-        "Returns indexes at the same key and positions"
-        return self.withaction(self.__index)
-
-    @staticmethod
-    def __index(_, info):
-        info[1]['data'] = [range(i,i+len(j)) for i, j in info[1]]
-        return info
-
-    @staticmethod
-    def __swap(data, _, info):
-        tmp             = data[info[0]]
-        info[1]['data'] = [tmp[i:i+len(j)] for i, j in info[1]]
-        return info
 
     if TYPE_CHECKING:
         # pylint: disable=useless-super-delegation
