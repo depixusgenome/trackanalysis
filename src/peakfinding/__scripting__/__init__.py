@@ -100,18 +100,17 @@ class _PeaksDictMixin:
     @staticmethod
     def _array2slice(evts):
         for i, evt in enumerate(evts):
-            evts[i][:] = [slice(k, k+len(l)) for k, l in evt]
+            evts[i] = np.array([slice(k, k+len(l)) for k, l in evt], dtype = 'O')
         return evts
 
     @classmethod
     def _swap(cls, data, _, info):
-        tmp    = data[info[0]]
-        return info[0], [(i, cls._swap_evts(tmp, j)) for i, j in info[1]]
+        return info[0], ((i, cls._swap_evts(info[0], data, j)) for i, j in info[1])
 
     @staticmethod
-    def _swap_evts(arr, evts):
+    def _swap_evts(bead, cycles, evts):
         for i, evt in enumerate(evts):
-            evts[i][:] = [(k, arr[k:k+len(l)]) for k, l in evt]
+            evts[i][:] = [(k, cycles[bead,i][k:k+len(l)]) for k, l in evt]
         return evts
 
     @staticmethod
@@ -139,7 +138,6 @@ class _PeaksDictMixin:
 
     @classmethod
     def _concatenate_iter(cls, frame, info):
-        assert False
         info = info[0], list(info[1])
         if len(info[1]) == 0 or not Track.isbeadname(info[0]):
             return info
