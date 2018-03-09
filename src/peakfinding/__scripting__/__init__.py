@@ -125,10 +125,6 @@ class _PeaksDictMixin:
 
     @classmethod
     def _concatenate_all(cls, frame, info):
-        info = info[0], list(info[1])
-        if len(info[1]) == 0 or not Track.isbeadname(info[0]):
-            return info
-
         lens = np.insert((frame.track.phase.duration(..., PHASE.measure)+1).cumsum(),
                          0, 0)
         out  = None
@@ -138,10 +134,6 @@ class _PeaksDictMixin:
 
     @classmethod
     def _concatenate_iter(cls, frame, info):
-        info = info[0], list(info[1])
-        if len(info[1]) == 0 or not Track.isbeadname(info[0]):
-            return info
-
         lens = np.insert((frame.track.phase.duration(..., PHASE.measure)+1).cumsum(),
                          0, 0)
         out  = ((i, cls._concatenate_peak(lens, None, j)) for i, j in info[1])
