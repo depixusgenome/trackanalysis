@@ -164,7 +164,7 @@ class Baseline:
     knee  = 30./1e3
     alpha = 1.
     def __call__(self, cnf: 'Experiment', seed = None):
-        size    = cnf.ncycles * np.sum(cnf.phases)
+        size    = cnf.ncycles * np.sum(cnf.phases)+1
         #generate white noise in time domain
         #shaping in freq domain
         fft     = getattr(np, 'fft')
@@ -179,8 +179,10 @@ class Baseline:
         signal[good] *= np.abs((tmp[good]/self.knee)**(-self.alpha))
 
         # discard high-freq amplitudes
-        signal[tmp>self.knee]  = 0.
-        return fft.irfft(signal)
+        signal[tmp>self.knee] = 0.
+        out                   = fft.irfft(signal)
+        assert len(out) >= size
+        return out[:size-1]
 
 class StrandClosingTruth(NamedTuple): # pylint: disable=missing-docstring
     duration: np.ndarray
@@ -277,7 +279,7 @@ class _BindingAttribute:
                      (getattr(i, name) for i in inst.bindings))
 
     def __set__(self, inst, val):
-        if np.isscalar(val):
+        if np.isscalar(val) or isinstance(val, str):
             val = np.full(len(inst.bindings), val, dtype = self.dtype)
         name = self.name
         for bind, itm in zip(inst.bindings, val):
