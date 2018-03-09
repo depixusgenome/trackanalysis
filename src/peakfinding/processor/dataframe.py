@@ -115,7 +115,7 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
         meas   = {} # type: Dict[str,np.ndarray]
         if self.__events:
             self.__eventmeasure(meas, peaks)
-            counts = np.array([sum(j is not None for j in i) for _, i in peaks])
+            counts = np.array([sum(len(j) > 0 for j in i) for _, i in peaks])
         else:
             counts = np.ones(len(peaks), dtype = 'i4')
 
@@ -142,9 +142,7 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
     def __npmeasure(self, meas, peaks, counts):
         curr = [[] for _ in self.__np] # type: List[List[np.ndarray]]
         for cnt, (_, pks) in zip(counts, peaks):
-            arr = np.concatenate([(i[1] if isinstance(i, (tuple, np.void)) else
-                                   np.concatenate(i['data']))
-                                  for i in pks if i is not None])
+            arr = np.concatenate([np.concatenate(i['data']) for i in pks if len(i)])
             for i, (_, j) in zip(curr, self.__np):
                 i.append(np.full(cnt, j(arr)))
 
@@ -153,9 +151,7 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
     def __aggmeasure(self, meas, peaks, counts):
         curr = [[] for _ in self.__aggs] # type: List[List[np.ndarray]]
         for cnt, (_, pks) in zip(counts, peaks):
-            arrs = [(i[1] if isinstance(i, (tuple, np.void)) else
-                     np.concatenate(i['data']))
-                    for i in pks if i is not None]
+            arrs = [np.concatenate(i['data']) for i in pks if len(i)]
 
             for i, (_, (agg, point)) in zip(curr, self.__aggs):
                 i.append(np.full(cnt, agg([point(i) for i in arrs])))
@@ -168,17 +164,12 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
 
         append = lambda x, y: tmp[x].append(np.array(list(y)))
         for _, pks in peaks:
-            append('cycle', (i for i, j in enumerate(pks) if j is not None))
+            append('cycle',  (i for i, j in enumerate(pks) if len(j)))
+            append('length', (j['start'][-1]+len(j['data'][-1]) - j['start'][0]
+                              for j in pks if len(j)))
+            append('start',  (j['start'][0]  for j in pks if len(j)))
 
-            data = tuple((isinstance(j, (tuple, np.void)), j)
-                         for i, j in enumerate(pks) if j is not None)
-
-            append('length', ((len(j[1]) if i else
-                               j['start'][-1]+len(j['data'][-1]) - j['start'][0])
-                              for i,  j in data))
-            append('start',  (j[0] if i else j['start'][0]  for i,  j in data))
-
-            arrs = tuple((j[1] if i else np.concatenate(j['data'])) for i, j in data)
+            arrs = tuple(np.concatenate(j['data']) for j in pks if len(j))
             for name, fcn in self.__events.items():
                 append(name, (fcn(i) for i in arrs))
 

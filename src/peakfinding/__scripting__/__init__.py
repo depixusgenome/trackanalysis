@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Simpler PeaksDict detection: merging and selecting the sections in the signal detected as flat"
-from   typing                       import Union, Iterator, Iterable, Tuple, List, cast
+from   typing                       import (Union, Iterator, Iterable, Tuple,
+                                            Type, List, cast)
 from   copy                         import copy as shallowcopy
 from   functools                    import partial
 
@@ -66,6 +67,42 @@ class _PeaksDictMixin:
         fcn = self._concatenate_all if alltogether else self._concatenate_iter
         return cast(PeaksDict, self).withaction(fcn)
 
+    def index(self) -> PeaksDict:
+        "Returns indexes at the same key and positions"
+        return cast(PeaksDict, self).withaction(self._index)
+
+    def withmeasure(self, singles = np.nanmean, multiples = None) -> 'PeaksDict':
+        "Returns a measure per events."
+        if multiples is None:
+            multiples = lambda x: singles(np.concatenate(x))
+        return cast(PeaksDict, self).withaction(partial(self._measure, singles, multiples))
+
+    @classmethod
+    def _measure(cls, singles, multiples, _, info):
+        fcn = cls._array2measure
+        return info[0], ((i, fcn(singles, multiples, j)) for i, j in info[1])
+
+    @classmethod
+    def _array2measure(cls, singles, multiples, arr):
+        if arr.dtype == 'O':
+            arr[:] = [None                    if i == 0      else
+                      singles  (i['data'][0]) if len(i) == 1 else
+                      multiples(i['data'])
+                      for i in arr[:]]
+        else:
+            arr['data'] = [singles(i) for i in arr['data']]
+        return arr
+
+    @classmethod
+    def _index(cls, _, info):
+        return info[0], ((i, cls._array2slice(j)) for i, j in info[1])
+
+    @staticmethod
+    def _array2slice(evts):
+        for i, evt in enumerate(evts):
+            evts[i][:] = [slice(k, k+len(l)) for k, l in evt]
+        return evts
+
     @classmethod
     def _swap(cls, data, _, info):
         tmp    = data[info[0]]
@@ -74,10 +111,7 @@ class _PeaksDictMixin:
     @staticmethod
     def _swap_evts(arr, evts):
         for i, evt in enumerate(evts):
-            if isinstance(evt, (tuple, np.void)):
-                evts[i] = (evt[0], arr[evt[0]:evt[0] + len(evt[1])])
-            elif evt is not None:
-                evts[i][:] = [(k, arr[k:k+len(l)]) for k, l in evt]
+            evts[i][:] = [(k, arr[k:k+len(l)]) for k, l in evt]
         return evts
 
     @staticmethod
@@ -86,11 +120,8 @@ class _PeaksDictMixin:
             arr = np.full(lens[-1], np.NaN, dtype = 'f4')
 
         for i, cycle in zip(lens, evts):
-            if isinstance(cycle, (tuple, np.void)):
-                cycle = (cycle,)
-            if cycle is not None:
-                for start, data in cycle:
-                    arr[i+start:i+start+len(data)] = data
+            for start, data in cycle:
+                arr[i+start:i+start+len(data)] = data
         return arr
 
     @classmethod

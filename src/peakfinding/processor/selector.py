@@ -5,13 +5,12 @@ Deals with tasks & processors for finding peaks
 """
 
 from   typing                     import Iterator, Tuple, Optional
-from   functools                  import partial
-import numpy                      as     np
 
 from   model                      import Level, Task
 from   data.views                 import BEADKEY, TaskView, Beads
 from   control.processor.taskview import TaskViewProcessor
-from   ..selector                 import PeakSelector, Output as PeakOutput, PeaksArray
+from   ..peaksarray               import Output as PeakOutput
+from   ..selector                 import PeakSelector
 
 class PeakSelectorTask(PeakSelector, Task):
     """
@@ -70,11 +69,7 @@ class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]):
         ...                info: Tuple[int, Iterator[Tuple[float, PeaksArray]]],
         ...               ) -> Tuple[int, Tuple[Tuple[float, PeaksArray]]]:
         ...     data = np.array(list(info[1]))
-        ...     # iterate over cycles with single events in the peak
-        ...     for i in data[frame.singles(data)]:
-        ...         i[1][:] *= 1.5
-        ...     # iterate over cycles with multiple events in the peak
-        ...     for i in data[frame.multiples(data)]:
+        ...     for i in data:
         ...         for j in i:
         ...             j[1][:] *= 1.5
         ...     return info[0], data
@@ -104,75 +99,9 @@ class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]):
         vals = iter(i for _, i in self.data[ibead,...]) # type: ignore
         yield from self.config(vals, self._precision(ibead, precision))
 
-    def index(self) -> 'PeaksDict':
-        "Returns indexes at the same key and positions"
-        return self.withaction(self.__index)
-
-    def withmeasure(self, singles = np.nanmean, multiples = None) -> 'PeaksDict':
-        "Returns a measure per events."
-        if multiples is None:
-            multiples = lambda x: singles(np.concatenate(x))
-        return self.withaction(partial(self.__measure, singles, multiples))
-
-    @classmethod
-    def measure(cls, itm: PeaksArray, singles = np.nanmean, multiples = None) -> PeaksArray:
-        "Returns a measure per events."
-        if len(itm) == 0:
-            return itm
-
-        if multiples is None:
-            multiples = lambda x: singles(np.concatenate(x))
-
-        if isinstance(itm[0][1], PeaksArray):
-            itm[:] = [(i, cls.__array2measure(singles, multiples, j)) for i, j in itm]
-        else :
-            itm[:] = cls.__array2measure(singles, multiples, itm)
-        return itm
-
-    @staticmethod
-    def singles(arr: PeaksArray) -> np.ndarray:
-        "returns an array indicating where single events are"
-        return np.array([isinstance(i, (tuple, np.void)) for i in arr], dtype = 'bool')
-
-    @staticmethod
-    def multiples(arr: PeaksArray) -> np.ndarray:
-        "returns an array indicating where single events are"
-        return np.array([isinstance(i, (list, np.ndarray)) for i in arr], dtype = 'bool')
-
     @classmethod
     def _transform_ids(cls, sel):
         return cls._transform_to_bead_ids(sel)
-
-    @classmethod
-    def __measure(cls, singles, multiples, _, info):
-        return info[0], ((i, cls.__array2measure(singles, multiples, j)) for i, j in info[1])
-
-    @classmethod
-    def __index(cls, _, info):
-        return info[0], ((i, cls.__array2range(j)) for i, j in info[1])
-
-    @staticmethod
-    def __array2measure(singles, multiples, arr):
-        if arr.dtype == 'O':
-            arr[:] = [None                  if i is None            else
-                      singles  (i[1])       if isinstance(i, tuple) else
-                      multiples(i['data'])
-                      for i in arr[:]]
-        else:
-            arr['data'] = [singles(i) for i in arr['data']]
-        return arr
-
-    @staticmethod
-    def __array2range(arr):
-        if arr.dtype == 'O':
-            return np.array([None                        if i is None            else
-                             range(i[0], i[0]+len(i[1])) if isinstance(i, tuple) else
-                             range(i[0][0], i[-1][0]+len(i[-1][1]))
-                             for i in arr])
-        return np.array([None                        if i is None            else
-                         range(i[0], i[0]+len(i[1])) if np.isscalar(i[1][0]) else
-                         range(i[0][0], i[-1][0]+len(i[-1][1]))
-                         for i in arr])
 
     def _get_data_keys(self):
         if isinstance(self.data, self.__class__):

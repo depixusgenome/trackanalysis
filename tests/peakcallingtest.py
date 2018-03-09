@@ -82,20 +82,18 @@ def test_ref_peaksgrid_2D():
 def test_toref_controller():
     "tests reference comparison"
     peaks = np.array([.1, .5, .6, 1.], dtype = 'f4')
-    root  = ByPeaksEventSimulatorTask(peaks    = peaks,
-                                      brownian = .001,
-                                      stretch  = None,
-                                      bias     = None,
-                                      rates    = None,
-                                      baseline = None,
-                                      nbeads   = 1,
-                                      ncycles  = 5)
+    root  = ByPeaksEventSimulatorTask(bindings       = peaks[::-1],
+                                      brownianmotion = .01,
+                                      onrates        = 1.,
+                                      baseline       = None,
+                                      nbeads         = 1,
+                                      ncycles        = 5)
     ref   = tuple(create(root).run())[0]
     tsk   = FitToReferenceTask(fitalg  = ChiSquareHistogramFit())
     tsk.frompeaks(ref)
 
-    root.peaks = peaks/.99 + .05
-    pair       = create(root, tsk)
+    root.bindings = peaks[::-1]/.99 + .05
+    pair          = create(root, tsk)
 
     beads = tuple(i for i in pair.run())[0][0]
     assert_allclose(beads.params, [.99, 0.05], rtol = 5e-3, atol = 5e-3)
@@ -234,13 +232,12 @@ def test_control():
              np.array([0.,     .5,      1.2, 1.5], dtype = 'f4')/8.8e-4]
     hpins = {'hp100': GaussianProductFit(peaks = truth[0]),
              'hp101': GaussianProductFit(peaks = truth[1])}
-    pair  = create((ByPeaksEventSimulatorTask(peaks    = peaks,
-                                              brownian = .01,
-                                              stretch  = None,
-                                              bias     = None,
-                                              rates    = None,
-                                              nbeads   = 1,
-                                              ncycles  = 5),
+    pair  = create((ByPeaksEventSimulatorTask(bindings       = peaks[::-1],
+                                              brownianmotion = .01,
+                                              baseline       = None,
+                                              onrates        = 1.,
+                                              nbeads         = 1,
+                                              ncycles        = 5),
                     BeadsByHairpinTask(fit = hpins)))
 
     beads = tuple(i for i in pair.run())[0]
@@ -271,4 +268,4 @@ def test_peakiterator():
     assert_allclose([i for _, i in vals], [0., 1./3.], rtol = 1e-3)
 
 if __name__ == '__main__':
-    test_peakiterator()
+    test_ref_peaksgrid()

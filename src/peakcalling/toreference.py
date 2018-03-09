@@ -279,16 +279,9 @@ class CorrectedHistogramFit(HistogramFit):
         return Distance(ret[0], ret[1], ret[2]+right.minv-left.minv/ret[1])
 
     def _chisquarecomputation(self, left, right, params):
-        stre = (self.stretch.center - self.stretch.size,
-                self.stretch.center + self.stretch.size)
-        if self.bias.center is not None:
-            bias = (self.bias.center - self.bias.size,
-                    self.bias.center + self.bias.size)
-        else:
-            bias = None
         res = chisquare(left.peaks[self.firstregpeak:], right.peaks,
                         False, self.symmetry, self.window, params[1], -params[1]*params[2],
-                        stretchcstr = stre, biascstr = bias)
+                        *self.constraints())
         return res[0], res[1], -res[2]/res[1]
 
 class ChiSquareHistogramFit(CorrectedHistogramFit):

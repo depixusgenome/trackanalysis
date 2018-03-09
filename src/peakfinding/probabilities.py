@@ -49,10 +49,10 @@
     Moving back to time, with F the frame rate,
     we have (1-p)^{t*F} = exp(t * F ln(1-p)) ⇒ T = 1/(F ln(1-p))
 """
-from    typing  import Union, Sequence
-import  numpy   as np
-from    utils   import initdefaults, EVENTS_TYPE
+import  numpy       as     np
 from    scipy.stats import skew as _skew
+from    utils       import initdefaults
+from    .peaksarray import PeaksArray
 
 class Probability:
     "Computes probabilities"
@@ -67,70 +67,40 @@ class Probability:
     def __init__(self, **_):
         pass
 
-    def __apply(self, dur, last, maxdurs):
-        self.nevents       += len(dur)
-        self.ntoolong      += (last > maxdurs).sum()
-        self.totalduration += np.sum(dur)
-
-    def update(self,
-               events : Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]],
-               maxdurs: Sequence[int]
-              ) -> None:
+    def update(self, events: PeaksArray, maxdurs: np.ndarray) -> None:
         "Updates stats"
-        arrs = np.array([isinstance(i, (list, np.ndarray)) for i in events], dtype = 'bool')
-        if any(arrs):
-            evts = events [arrs]
-            dur  = [i['start'][-1]-i['start'][0]+len(i['data'][-1]) for i in evts]
-            last = np.array([i['start'][-1]+len(i['data'][-1]) for i in evts],
-                            dtype = 'i4')
-            self.__apply(dur, last, maxdurs[arrs])
+        good = [len(i) > 0 for i in events]
+        evts = events[good]
+        last = np.array([i['start'][-1]+len(i['data'][-1]) for i in evts], dtype = 'i4')
 
-        arrs = np.array([isinstance(i, (tuple, np.void)) for i in events])
-        if any(arrs):
-            evts = events [arrs]
-            dur  = np.array([len(i) for _, i in evts], dtype = 'i4')
-            self.__apply(dur, dur + [i for i, _ in evts], maxdurs[arrs])
+        self.nevents       += sum(good)
+        self.ntoolong      += (last > maxdurs[good]).sum()
+        self.totalduration += last.sum() - sum(i['start'][0] for i in evts)
 
         self.ncycles += len(events)
         self.ncycles -= (events.discarded if hasattr(events, 'discarded') else # type: ignore
                          sum(getattr(i, 'discarded', 0) for i in events))
 
     @staticmethod
-    def skew(events):
+    def skew(events: PeaksArray):
         "returns the skew of the population of points"
-        arrs  = np.array([isinstance(i, (list, np.ndarray)) for i in events])
-        skews = [_skew(np.concatenate(list(i['data']))) for i in events[arrs]]
-
-        arrs  = np.array([isinstance(i, (tuple, np.void)) for i in events])
-        if any(arrs):
-            skews.extend(_skew(i[1]) for i in events[arrs])
-
-        return skews
+        return [_skew(np.concatenate(list(i['data']))) for i in events if len(i)]
 
     @classmethod
-    def positionprecision(cls, events):
+    def positionprecision(cls, events: PeaksArray):
         "returns the resolution"
-        nevts = sum(1 for i in events if i is not None) - getattr(events, 'discarded', 0)
+        nevts = sum(len(i) > 0 for i in events) - getattr(events, 'discarded', 0)
         return np.NaN if nevts <= 0 else cls.resolution(events)/np.sqrt(nevts)
 
     @staticmethod
-    def resolution(events):
+    def resolution(events: PeaksArray):
         "returns the resolution"
-        arrs = np.array([isinstance(i, (list, np.ndarray)) for i in events])
         stds = [np.average([np.nanmean(j)    for j in i['data']],
                            weights = [len(j) for j in i['data']])
-                for i in events[arrs]]
-
-        arrs = np.array([isinstance(i, (tuple, np.void)) for i in events])
-        if any(arrs):
-            stds.extend(np.nanmean(i[1]) for i in events[arrs])
-
+                for i in events if len(i)]
         return np.nanstd(stds)
 
-    def __call__(self,
-                 events : Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]],
-                 maxdurs: Sequence[int]
-                ) -> 'Probability':
+    def __call__(self, events : PeaksArray, maxdurs: np.ndarray) -> 'Probability':
         "Returns an object containing stats related to provided events"
         obj = Probability(minduration = self.minduration,
                           framerate   = self.framerate)

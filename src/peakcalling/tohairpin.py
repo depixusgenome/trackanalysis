@@ -151,12 +151,8 @@ class ChiSquareFit(GaussianProductFit):
     def _optimalvalue(self, hpin: np.ndarray, peaks: np.ndarray, # type: ignore
                       stretch:float, bias:float, **_):
         sym = Symmetry.both if self.symmetry is Symmetry.both else Symmetry.left
-        rng = lambda val: ((val.center if val.center else 0.) - val.size,
-                           (val.center if val.center else 0.) + val.size)
-        scstr = rng(self.stretch)
-        bcstr = rng(self.bias)
         return chisquare(hpin, peaks, self.firstpeak, sym, self.window,
-                         stretch, bias, scstr, bcstr)
+                         stretch, bias, *self.constraints())
 
     def _value(self, hpin: np.ndarray, peaks: np.ndarray, # type: ignore
                stretch:float, bias:float, **_):
@@ -218,8 +214,8 @@ class PeakGridFit(HairpinFitter):
 
         itr   = tuple(i for i in _match.PeakIterator(ref, peaks, *args)) + (centr,)
         first = ref, peaks, False, self.symmetry, self.window
-        last  = args[:2], args[2:]
-        minv  = min(chisquare(*first, stretch, -stretch*bias, *last) for stretch, bias in itr)
+        cstr  = self.constraints()
+        minv  = min(chisquare(*first, stretch, -stretch*bias, *cstr) for stretch, bias in itr)
 
         return Distance(minv[0], minv[1], delta-minv[2]/minv[1])
 

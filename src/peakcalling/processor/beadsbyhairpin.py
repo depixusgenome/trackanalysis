@@ -6,7 +6,7 @@ from functools                import partial
 from data.views               import BEADKEY, TrackView
 from control.processor        import Processor
 from control.processor.runner import pooledinput, pooldump
-from peakfinding.selector     import Output as PeakFindingOutput, PeaksArray
+from peakfinding.peaksarray   import Output as PeakFindingOutput, PeaksArray
 from ..tohairpin              import Distance
 from .fittohairpin            import (FitToHairpinTask, FitToHairpinProcessor,
                                       Fitters, Constraints, Matchers, Input,

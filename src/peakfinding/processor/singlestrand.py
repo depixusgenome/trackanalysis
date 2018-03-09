@@ -95,7 +95,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
         ratio  = self.task.percentage*1e-2
         ssevts = self.nonclosingevents(cycles, peaks)
         sspeak = (i for i in range(len(peaks))
-                  if sum(j is not None for j in peaks[i][1])*ratio <= len(ssevts[i]))
+                  if sum(len(j) > 0 for j in peaks[i][1])*ratio <= len(ssevts[i]))
         return next(sspeak, len(peaks))
 
     def removesinglestrandpeak(self,

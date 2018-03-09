@@ -207,10 +207,7 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
         data['peaks'][:] = (data['peaks']-bias)*stretch
 
         for evts in data['events']:
-            for _, i in evts[PeaksDict.singles(evts)]:
-                i[:] = (i[:]-bias)*stretch
-
-            for i in evts[PeaksDict.multiples(evts)]:
+            for i in evts:
                 i['data'][:] = [(j-bias)*stretch for j in i['data']]
         return data
 

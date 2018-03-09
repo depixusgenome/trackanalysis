@@ -64,6 +64,19 @@ class OptimizationParams:
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
+    def constraints(self):
+        "the stretch & bias constraints for the chisquare"
+        scstr = ((self.stretch.center if self.stretch.center else 0.) - self.stretch.size,
+                 (self.stretch.center if self.stretch.center else 0.) + self.stretch.size)
+        if self.bias.center is not None:
+            pots = [(self.bias.center - self.bias.size)*scstr[0],
+                    (self.bias.center - self.bias.size)*scstr[1],
+                    (self.bias.center + self.bias.size)*scstr[0],
+                    (self.bias.center + self.bias.size)*scstr[1]]
+            bcstr = min(pots), max(pots)
+        else:
+            bcstr = None
+        return scstr, bcstr
 
 class GriddedOptimization(OptimizationParams):
     "Optimizes using a rectangular grid"

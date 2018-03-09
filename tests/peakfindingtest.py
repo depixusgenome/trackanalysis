@@ -186,19 +186,16 @@ def test_control():
     vals = tuple(beads[0][1])
     assert_allclose([i for i, _ in vals], [0.]+peaks, atol = .01, rtol = 1e-2)
     for peak, evts in vals:
-        assert evts.dtype == EVENTS_DTYPE
-        tmp = [i.min() for i in evts['data']]
+        assert evts.dtype == 'O'
+        assert all(i.dtype == EVENTS_DTYPE for i in evts)
+        tmp = [i[0]['data'].min() for i in evts]
         assert_allclose(tmp, (peak,)*20, atol = 0.1)
-        tmp = [i.max() for i in evts['data']]
+        tmp = [i[0]['data'].max() for i in evts]
         assert_allclose(tmp, (peak,)*20, atol = 0.1)
 
     # test that things don't crash
-    beads = tuple(next(pair.run()).index()[0])
-    beads = tuple(next(pair.run()).withmeasure()[0])
-
     pair  = create(utfilepath('big_selected'), EventDetectionTask(), PeakSelectorTask())
-    beads = tuple(next(pair.run()).index()[0])
-    beads = tuple(next(pair.run()).withmeasure()[0])
+    beads = tuple(next(pair.run())[0])
 
 def test_reporting():
     "tests processor"

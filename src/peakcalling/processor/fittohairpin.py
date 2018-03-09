@@ -5,7 +5,6 @@ from   typing                      import (Dict, # pylint: disable=unused-import
                                            List, Sequence, NamedTuple, FrozenSet,
                                            Type, Iterator, Tuple, Union, Optional,
                                            Iterable, Any, cast)
-from   copy                        import deepcopy
 
 import numpy                       as     np
 
@@ -15,7 +14,7 @@ from   model                       import Task, Level
 from   control.processor.taskview  import TaskViewProcessor
 from   control.processor.dataframe import DataFrameFactory
 from   data.views                  import BEADKEY, Beads, TaskView
-from   peakfinding.selector        import Output as PeakFindingOutput, PeaksArray
+from   peakfinding.peaksarray      import Output as PeakFindingOutput, PeaksArray
 from   peakfinding.processor       import PeaksDict
 from   ..tohairpin                 import (HairpinFitter, PeakGridFit, Distance,
                                            PeakMatching, PEAKS_TYPE)
@@ -225,12 +224,11 @@ class FitsDataFrameFactory(DataFrameFactory[FitToHairpinDict]):
     def _run(_1, _2, res:FitBead) -> Dict[str, np.ndarray]: # type: ignore
         out = {i: [] for i in ('cycle', 'peak', 'event')}   # type: Dict[str, List[np.ndarray]]
         out.update({i: [] for i in res.distances})
-        for (peak, evts) in PeaksDict.measure(cast(PeaksArray, deepcopy(res.events))):
-            vals = [i for i in enumerate(evts) if i[1] is not None]
-
-            out['cycle'].append(np.array([i for i, _ in vals]))
-            out['peak'].append(np.full(len(vals), peak, dtype = 'f4'))
-            out['event'].append(np.array([i for _, i in vals]))
+        for (peak, evts) in res.events:
+            out['cycle'].append(np.array([i for i, j in enumerate(evts) if len(j)]))
+            out['peak'] .append(np.full (sum(len(i) for i in evts), peak, dtype = 'f4'))
+            out['event'].append(np.array([np.nanmean(np.concatenate(i['data'])) for i in evts
+                                          if len(i)]))
             for i, j in res.distances.items():
                 out[i].append((out['event'][-1]-j.bias)*j.stretch)
         return {i: np.concatenate(j) for i, j in out.items()}

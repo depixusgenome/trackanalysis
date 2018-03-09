@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Selects peaks and yields all events related to each peak"
-from   typing               import (Iterable, Iterator, Tuple, Union, Sequence,
-                                    Callable, cast)
+from   typing               import Iterator, Callable, cast
 import numpy                as      np
 
 from utils                  import (initdefaults, asobjarray, asdataarrays, asview,
-                                    updatecopy, EVENTS_TYPE, EVENTS_DTYPE, EventsArray)
+                                    updatecopy, EVENTS_DTYPE, EventsArray)
 from signalfilter           import PrecisionAlg, PRECISION
 from .alignment             import PeakCorrelationAlignment
 from .histogram             import Histogram
 from .groupby               import (ByHistogram,PeakFinder)
-EventsOutput        = Sequence[Union[None, EVENTS_TYPE, Sequence[EVENTS_TYPE]]]
-Input               = Union[Iterable[Iterable[np.ndarray]], Sequence[EVENTS_TYPE]]
-Output              = Tuple[float, EventsOutput]
+from .peaksarray            import Input, Output, PeaksArray
 
 class PeakSelectorDetails: # pylint: disable=too-many-instance-attributes
     "Information useful to GUI"
@@ -53,11 +50,6 @@ class PeakSelectorDetails: # pylint: disable=too-many-instance-attributes
         self.minvalue  = (self.minvalue-params[1])*params[0]
         self.binwidth *= params[0]
 
-class PeaksArray(EventsArray):
-    """Array with metadata."""
-    _discarded = 0      # type: ignore
-    _dtype     = None
-
 class PeakSelector(PrecisionAlg):
     """
     Find binding positions and selects relevant events.
@@ -94,25 +86,17 @@ class PeakSelector(PrecisionAlg):
             return PeaksArray([], dtype = 'O', discarded = discarded)
 
         if deltas is None:
-            objs = tuple(i if len(i) else None for i in evts)
+            objs = tuple(evts)
 
         else:
             if isinstance(first, tuple) or first.dtype == EVENTS_DTYPE:
                 def _add(evt, delta):
-                    if len(evt) == 0:
-                        return None
-
-                    if len(evt) == 1:
-                        return evt[0][0], evt[0][1]+delta
-
-                    evt['data'] += delta
+                    if len(evt) > 0:
+                        evt['data'] += delta
                     return evt
             else:
                 def _add(evt, delta):
-                    return (None         if len(evt) == 0 else
-                            evt[0]+delta if len(evt) == 1 else
-                            evt + delta)
-
+                    return evt if len(evt) == 0 else evt + delta
             objs = tuple(_add(*item) for item in zip(evts, deltas))
 
         if isinstance(first, tuple) or first.dtype == EVENTS_DTYPE:
