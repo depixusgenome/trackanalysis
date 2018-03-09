@@ -181,9 +181,6 @@ class _EventsMixin:
 
     @staticmethod
     def _concatenate(frame, info):
-        if len(info[1]) == 0 or not Track.isbeadname(info[0][0]):
-            return info
-
         size = frame.track.phase.duration(info[0][1], PHASE.measure)
         arr  = np.full(size, np.NaN, dtype = 'f4')
         for i, j in info[1]:
