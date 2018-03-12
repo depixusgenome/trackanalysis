@@ -497,7 +497,13 @@ def opentrack(track, beadsonly = False):
 
 N_SAVE_THREADS = 4
 def _savetrack(args):
-    PickleIO.save(args[1], args[2])
+    if not isinstance(args[2], dict):
+        try:
+            PickleIO.save(args[1], args[2])
+        except Exception as exc:
+            raise IOError(f"Could not save {args[2].path} [{args[2].key}]") from exc
+    else:
+        PickleIO.save(args[1], args[2])
     new = type(args[2]).__new__(type(args[2])) # type: ignore
     new.__dict__.update(shallowcopy(args[2].__dict__))
     setattr(new, '_path', args[1])

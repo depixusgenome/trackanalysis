@@ -52,7 +52,7 @@ class DELETE(Exception):
 class RESET(DELETE):
     "Reset classes or attributes"
 
-def modifyclasses(data, *args):
+class ModyfyClasses:
     """
     Scans the data applying listed patches.
 
@@ -85,22 +85,24 @@ def modifyclasses(data, *args):
     It's also possible to update the whole dictionary by adding a *__call__* key.
     In such a case, its value should accept a single argument: the dictionnary.
     """
-    assert len(args) % 2 == 0
-    reps  = tuple((re.compile(args[2*i]), args[2*i+1]) for i in range(len(args)//2))
-    def _list_scan(itm):
+    def __init__(self, *args):
+        assert len(args) % 2 == 0
+        self.reps = tuple((re.compile(args[2*i]), args[2*i+1]) for i in range(len(args)//2))
+
+    def _list_scan(self, itm):
         cnt = len(itm)
         for i, val in enumerate(tuple(itm)[::-1]):
             if isinstance(val, (dict, list)):
                 try:
-                    _scan(val)
+                    self.scan(val)
                 except DELETE:
                     itm.pop(cnt-i-1)
 
-    def _dict_scan(itm):
+    def _dict_scan(self, itm):
         cls  = itm.get(TPE, None)
         good = []
         if cls is not None:
-            for patt, cur in reps:
+            for patt, cur in self.reps:
                 if patt.match(cls) is None:
                     continue
 
@@ -117,21 +119,29 @@ def modifyclasses(data, *args):
         for key, val in tuple(itm.items()):
             if isinstance(val, (dict, list)):
                 try:
-                    _scan(val)
+                    self.scan(val)
                 except DELETE:
                     itm.pop(key)
 
         yield from good
 
-    def _attr_update(itm, cur):
+    @staticmethod
+    def _modify_name(itm, cur):
+        fcn = cur.get('__name__', cur.get(TPE, None))
+        if callable(fcn):
+            itm[TPE] = fcn(itm[TPE])
+        elif isinstance(fcn, str):
+            itm[TPE] = fcn
+        elif fcn is not None:
+            assert False
+
+    @classmethod
+    def _attr_update(cls, itm, cur):
         fcn = cur.get('__call__', None)
         if fcn is not None:
             fcn(itm)
 
-        fcn = cur.get('__name__', cur.get(TPE, None))
-        if fcn is not None:
-            assert isinstance(fcn, str)
-            itm[TPE] = fcn
+        cls._modify_name(itm, cur)
 
         # pylint: disable=too-many-nested-blocks
         for key in frozenset(itm) & frozenset(cur):
@@ -155,15 +165,22 @@ def modifyclasses(data, *args):
             else:
                 raise NotImplementedError()
 
-    def _scan(itm):
+    def scan(self, itm):
+        "Scan a dict or list and applies changes"
         if isinstance(itm, list):
-            _list_scan(itm)
+            self._list_scan(itm)
 
         elif isinstance(itm, dict):
-            for cur in _dict_scan(itm):
-                _attr_update(itm, cur)
+            for cur in self._dict_scan(itm):
+                self._attr_update(itm, cur)
 
-    _scan(data)
+def modifyclasses(data, *args):
+    """
+    Scans the data applying listed patches.
+    """
+    ModyfyClasses(*args).scan(data)
+if modifyclasses.__doc__:
+    modifyclasses.__doc__ = ModyfyClasses.__doc__
 
 def modifykeys(data, *args, **kwa):
     """
