@@ -146,7 +146,7 @@ def sankey(left, right, leftWeight=None, rightWeight=None, colorDict=None,
         plt.text(
             -0.05 * xMax,
             widths_left[l]['bottom'] + 0.5 * widths_left[l]['left'],
-            l+str(widths_left[l]['top']-widths_left[l]['bottom']),
+            l+' ('+str(int(widths_left[l]['top']-widths_left[l]['bottom']))+')',
             {'ha': 'right', 'va': 'center'},
             fontsize=fontsize
         )
@@ -159,7 +159,7 @@ def sankey(left, right, leftWeight=None, rightWeight=None, colorDict=None,
         )
         plt.text(
             1.05 * xMax, widths_right[l]['bottom'] + 0.5 * widths_right[l]['right'],
-            l,
+            l+' ('+str(int(widths_right[l]['top']-widths_right[l]['bottom']))+')' ,
             {'ha': 'left', 'va': 'center'},
             fontsize=fontsize
         )

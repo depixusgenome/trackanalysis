@@ -405,11 +405,11 @@ def barBeads(tracks,df_dfGoodBadBeads,dfmsg,ordertracks,orderbeads):
         if is_dict:
             copy = copy.sort_values(['track','typeOfError'])
             #trackcount = N-goodpc.loc['{:.0f}'.format(bead)])
-            mytitle = ("Bad Bead in {trackcount:.0f} out of {alltracks:.0f} ({pc:.1f} %)"
-                        .format(trackcount = N-goodpc.loc['{:.0f}'.format(bead)],
-                                alltracks = N,
-                                pc = (N-goodpc.loc['{:.0f}'.format(bead)])/N*100)
-                        )
+            #mytitle = ("Bad Bead in {trackcount:.0f} out of {alltracks:.0f} ({pc:.1f} %)"
+             #           .format(trackcount = N-goodpc.loc['{:.0f}'.format(bead)],
+             #                   alltracks = N,
+             #                   pc = (N-goodpc.loc['{:.0f}'.format(bead)])/N*100)
+             #           )
 
             #mytitle= 'Bad Bead in '+ '{:.0f}'.format(N-goodpc.loc['{:.0f}'.format(bead)]) + ' out of '+ str(N) + '{:.0f}'.format(goodpc.loc['{:.0f}'.format(bead)]) #
             #mytitle ='Bad Bead in '+'{:.0f}'.format((N-goodpc.loc[bead]))+' out of '+str(N)+' tracks ('+str(round((N-goodpc.loc[bead])/N*100,1))+'%) -' 
@@ -423,7 +423,7 @@ def barBeads(tracks,df_dfGoodBadBeads,dfmsg,ordertracks,orderbeads):
             #barplot = hv.Bars(copy,  ['track','typeOfError'], ['NbErrors'],group='Grouped',label=mytitle).redim.range(NbErrors=(0, 600)) #,group='Stacked'
             #barplot.relabel(group='Stacked')
         else:
-            barplot = hv.Bars(copy,  ['track','typeOfError'], ['NbErrors'],group='Stacked',label=mytitle).redim.range(NbErrors=(0, 600)) #,group='Stacked'
+            barplot = hv.Bars(copy,  ['track','typeOfError'], ['NbErrors'],group='Stacked').redim.range(NbErrors=(0, 600)) #,group='Stacked'
 
         axes_opts = {'xrotation': 45}
         return barplot.opts(plot=axes_opts)#.relabel(group='Grouped')#*hv.Text(0, 400, 'Quadratic Curve')
@@ -436,10 +436,10 @@ def barBeads(tracks,df_dfGoodBadBeads,dfmsg,ordertracks,orderbeads):
     #hvbar_single = barBeads(track,df_dfGoodBadBeads[['bead','AGC']],dfmsg[dfmsg.track=='AGC'],order_tracks_chrono_single,order_beads_normal_single)
     #hvbar_single
     mybeads = [float(i) for i in orderbeads]
-    return dmap.redim.values(bead = mybeads).redim(NbErrors = "Count") #sorted by badfirst
+    return dmap.redim.values(bead = mybeads).redim(NbErrors = "Count")
 
 
-#Function heatmapBeadsByType that outputs seaborn heatmap with the number of good beads per track, and bad goods by type of error
+#Function heatmapBeadsByStatus that outputs seaborn heatmap with the number of good beads per track, and bad goods by type of error
 def heatmapBeadsByStatus(df_resumeBeadsQuality,ordertracks,pc=True, order = 'chrono'):
     """
     (output resumeBeadsQuality, list, bool, str) -> seaborn heatmap
