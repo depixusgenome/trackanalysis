@@ -12,8 +12,11 @@ from control.taskcontrol             import create as _createdata
 from control.taskio                  import (ConfigTrackIO, ConfigGrFilesIO, TaskIO,
                                              currentmodelonly)
 from cleaning.processor              import DataCleaningTask, DataCleaningException
+from peakfinding.processor           import PeakSelectorTask
 from peakfinding.reporting.processor import PeakFindingExcelTask
 from peakcalling.processor           import FitToHairpinTask, BeadsByHairpinTask
+from peakcalling.processor.fittoreference import (FitToReferenceTask, FitToReferenceDict,
+                                                  TaskViewProcessor, BEADKEY)
 
 from view.base                       import spawn, threadmethod
 from view.dialog                     import FileDialog
@@ -48,6 +51,21 @@ class PeaksConfigTrackIO(_PeaksIOMixin, ConfigTrackIO): # type: ignore
 class PeaksConfigGRFilesIO(_PeaksIOMixin, ConfigGrFilesIO): # type: ignore
     "selects the default tasks"
 
+class _SafeTask(FitToReferenceTask):
+    "safe fit to ref"
+
+class _SafeDict(FitToReferenceDict):
+    "iterator over peaks grouped by beads"
+    def _getrefdata(self, key):
+        try:
+            out = super()._getrefdata(key)
+        except DataCleaningException:
+            out = True
+        return out
+
+class _SafeProc(TaskViewProcessor[_SafeTask, _SafeDict, BEADKEY]):
+    "Changes the Z axis to fit the reference"
+
 FileDialog.DEFAULTS['pkz'] = (u'pickled report', '.pkz')
 @currentmodelonly
 class ConfigXlsxIO(TaskIO):
@@ -57,6 +75,7 @@ class ConfigXlsxIO(TaskIO):
     POOLTYPE = ProcessPoolExecutor
     def __init__(self, ctrl):
         super().__init__(ctrl)
+        self.__ctrl  = ctrl
         self.__model = PeaksPlotModelAccess(ctrl)
         self.__msg   = ctrl.globals.project.message
         self.__css   = ctrl.globals.css.title.hybridstatreport
@@ -122,6 +141,13 @@ class ConfigXlsxIO(TaskIO):
             if not isinstance(model[-1], tuple(i.tasktype for i in missing)):
                 return model + [deepcopy(i.configtask.get()) for i in missing]
             missing = missing[1:]
+
+        ref = self.__model.fittoreference.reference
+        ind = next((i for i, j in enumerate(model) if isinstance(j, FitToReferenceTask)),
+                   None)
+        if ref is not None and ind is not None:
+            model[ind]             = _SafeTask(**model[ind].config())
+            model[ind].defaultdata = self.__ctrl.tasks.processors(ref, PeakSelectorTask)
         return model
 
     @classmethod

@@ -4,12 +4,13 @@
 from   typing                           import (Optional, # pylint: disable=unused-import
                                                 Iterable, Sequence, Any, Dict,
                                                 Iterator, Tuple, Union, NamedTuple,
-                                                cast)
+                                                List, cast)
 import numpy                            as     np
 
 from   utils                            import initdefaults
 from   data.views                       import TaskView, BEADKEY
 from   model.task                       import Task, Level
+from   control.processor.runner         import run as _runprocessors
 from   control.processor.taskview       import TaskViewProcessor
 from   eventdetection.data              import Events
 from   peakfinding.histogram            import HistogramData
@@ -62,28 +63,55 @@ class FitToRefArray(np.ndarray):
         self.discarded = vals[1] # pylint: disable=attribute-defined-outside-init
         self.params    = vals[2] # pylint: disable=attribute-defined-outside-init
 
+class _FitDataDescriptor:
+    def __get__(self, inst, _):
+        return inst.__dict__['fitdata'] if inst is not None else {}
+
+    def __set__(self, inst, val):
+        if isinstance(val, PeaksDict):
+            inst.frompeaks(val)
+        elif isinstance(val, Events):
+            inst.fromevents(val)
+        elif isinstance(val, dict):
+            val.update({i: FitData(j, (1., 0.)) # type: ignore
+                        for i, j in cast(dict, val.items())
+                        if not isinstance(j, FitData)})
+            inst.__dict__['fitdata'] = val
+        else:
+            fcn = lambda j: (j if isinstance(j, FitData) else FitData(j, (1., 0)))
+            inst.__dict__['fitdata'] = {i: fcn(j) for i, j in cast(Dict, val).items()}
+
+class _DefaultFitData:
+    def __get__(self, inst, _):
+        "returns the default data"
+        return inst.__dict__.get('defaultdata', None) if inst is not None else None
+
+    def __set__(self, inst, val):
+        "returns the default data"
+        alg = inst.fitalg
+        fcn = lambda j: (j if isinstance(j, FitData) else FitData(j, (1., 0)))
+        out = fcn(alg.frompeaks(next(val.values())) if isinstance(val, PeaksDict) else
+                  alg.fromevents(val)               if isinstance(val, Events)    else
+                  val)
+        inst.__dict__['defaultdata'] = out
+        return out
+
+
 class FitToReferenceTask(Task):
     "Fits a bead to a reference"
     level                  = Level.peak
-    _fitdata: Fitters      = dict()
+    defaultdata            = None
+    fitdata                = cast(Fitters, _FitDataDescriptor())
     fitalg  : ReferenceFit = ChiSquareHistogramFit()
     window  : float        = 10./8.8e-4
-    DEFAULTKEY             = ''
-    @initdefaults(frozenset(locals()) - {'level', '_fitdata'},
+    @initdefaults(frozenset(locals()) - {'level'},
                   peaks       = lambda self, val: self.frompeaks (val),
-                  events      = lambda self, val: self.fromevents(val),
-                  fitdata     = '_',
-                  defaultdata = lambda self, val: setattr(self, 'defaultdata', val))
+                  events      = lambda self, val: self.fromevents(val))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
-    def __getstate__(self):
-        info = self.__dict__.copy()
-        info['fitdata'] = info.pop('_fitdata')
-        return info
-
     def __contains__(self, itms):
-        if self.DEFAULTKEY in self.fitdata:
+        if self.defaultdata is not None:
             return True
 
         if isinstance(itms, str):
@@ -93,72 +121,25 @@ class FitToReferenceTask(Task):
 
         return set(itms).issubset(set(self.fitdata))
 
-    def config(self) -> Dict[str,Any]:
-        "returns a deepcopy of its dict which can be safely used in generators"
-        cnf = super().config()
-        cnf['fitdata']  = cnf.pop('_fitdata')
-        return cnf
-
-    @property
-    def fitdata(self):
-        "returns the fitting data"
-        return self._fitdata
-
-    @fitdata.setter
-    def fitdata(self, val: Union[PeaksDict, Events, Fitters]):
-        "returns the fitting data"
-        if isinstance(val, PeaksDict):
-            self.frompeaks(val)
-        elif isinstance(val, Events):
-            self.fromevents(val)
-        elif isinstance(val, dict):
-            self._fitdata = val
-            self._fitdata.update({i: FitData(j, (1., 0.)) # type: ignore
-                                  for i, j in cast(dict, val.items())
-                                  if not isinstance(j, FitData)})
-        else:
-            fcn = lambda j: (j if isinstance(j, FitData) else FitData(j, (1., 0)))
-            self._fitdata = {i: fcn(j) for i, j in cast(Dict, val).items()}
-
     def frompeaks(self,
                   peaks: Union[PeaksDict, Iterable[Tuple[BEADKEY, PeakOutput]]],
                   update = False) -> 'FitToReferenceTask':
         "creates fit data for references from a PeaksDict"
+        if not update:
+            self.fitdata.clear()
         fcn  = self.fitalg.frompeaks
         info = {i: FitData(fcn(j), (1., 0.)) for i, j in cast(PeaksDict, peaks)}
-        if update:
-            self._fitdata.update(info)
-        else:
-            self._fitdata = info
+        self.fitdata.update(info)
         return self
 
-    def fromevents(self, events: Events) -> 'FitToReferenceTask':
+    def fromevents(self, events: Events, update = False) -> 'FitToReferenceTask':
         "creates fit data for references from a PeaksDict"
-        fcn           = self.fitalg.fromevents
-        keys          = {i for i, _ in events.keys()}
-        self._fitdata = {i: fcn(cast(Events, events[i, ...])) for i in keys}
+        if not update:
+            self.fitdata.clear()
+        fcn  = self.fitalg.fromevents
+        keys = {i for i, _ in events.keys()}
+        self.fitdata.update({i: fcn(cast(Events, events[i, ...])) for i in keys})
         return self
-
-    @property
-    def defaultdata(self) -> Optional[FitData]:
-        "returns the default data"
-        return self._fitdata.get(self.DEFAULTKEY, None)
-
-    @defaultdata.setter
-    def defaultdata(self, val) -> Optional[FitData]:
-        "returns the default data"
-        alg = self.fitalg
-        fcn = lambda j: (j if isinstance(j, FitData) else FitData(j, (1., 0)))
-        out = fcn(alg.frompeaks(next(val.values())) if isinstance(val, PeaksDict) else
-                  alg.fromevents(val)               if isinstance(val, Events)    else
-                  val)
-        self._fitdata[self.DEFAULTKEY] = out
-        return out
-
-    def getdata(self, key) -> FitData:
-        "returns the fitdata"
-        val = self._fitdata.get(key, None)
-        return val if val else self._fitdata.get(self.DEFAULTKEY, None)
 
     @classmethod
     def isslow(cls) -> bool:
@@ -173,23 +154,34 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
         return cls._transform_to_bead_ids(sel)
 
     def _keys(self, sel:Optional[Sequence], _: bool) -> Iterable:
-        if self.config.defaultdata:
+        if self.config.defaultdata is not None:
             return super()._keys(sel, _)
 
-        available = frozenset(self.config.fitdata) - {self.config.DEFAULTKEY}
+        available = frozenset(self.config.fitdata)
         if sel is None:
             return super()._keys(tuple(available), True)
         seq = self._transform_ids(cast(Iterable, sel))
         return super()._keys([i for i in seq if i in available], True)
+
+    def _getrefdata(self, key):
+        ref = self.config.fitdata.get(key, self.config.defaultdata)
+        if not isinstance(ref, (FitData, bool)):
+            view  = next(_runprocessors(ref))
+            if isinstance(view, PeaksDict):
+                return FitData(self.config.fitalg.frompeaks(view[key]), (1., 0.))
+            elif isinstance(view, Events):
+                return FitData(self.config.fitalg.fromevents(view[key,...]), (1., 0.))
+        return ref
 
     def optimize(self, key: BEADKEY, data: FitToRefArray):
         "returns stretch & bias"
         if len(data) == 0:
             return 1., 0.
 
-        ref = self.config.getdata(key)
+        ref = self._getrefdata(key)
         if ref is True or ref.data is True:
             return 1., 0.
+
         fit           = self.config.fitalg
         stretch, bias = fit.optimize(ref.data, fit.frompeaks(data))[1:]
         if ref.params not in ((1., 0.), None):
