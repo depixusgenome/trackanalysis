@@ -112,10 +112,13 @@ class CacheReplacement:
 class Cache(Iterable[Processor], Sized):
     "Contains the track and task-created data"
     __slots__ = ('_items',)
-    def __init__(self, order: Iterable[Union[CacheItem, Processor]] = None) -> None:
+    def __init__(self, order: Iterable[Union[CacheItem, Processor, Task]] = None) -> None:
         if order is None:
             self._items: List[CacheItem] = []
         else:
+            if any(isinstance(i, Task) for i in order):
+                procs = register()
+                order = [procs[type(i)](task = i) if isinstance(i, Task) else i for i in order]
             self._items = [CacheItem(i) if isinstance(i, Processor) else i for i in order]
 
     def index(self, tsk) -> int:
