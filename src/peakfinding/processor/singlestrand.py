@@ -74,12 +74,8 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
             return []
 
         start = self.task.eventstart
-        types = (tuple, np.void)
-        def _good(evt):
-            return (evt is not None
-                    and (evt if isinstance(evt, types) else evt[0])[0] < start)
-        out = [[i for i in cycles if _good(peak[i])] for _, peak in peaks]
-        return out
+        good  = lambda evt: len(evt) and evt[0][0] < start
+        return [[i for i in cycles if good(peak[i])] for _, peak in peaks]
 
     def singlestrandpeakindex(self,
                               frame: 'PeaksDict',
