@@ -264,6 +264,17 @@ class TracksDict(_TracksDict):
         dict.update(cpy, {i: FrozenTrack(j) for i, j in self.items()})
         return cpy
 
+    def changeattributes(self, *_, inplace = True, **kwa) -> 'TracksDict':
+        """
+        change attributes for all tracks
+        """
+        assert len(_) == 0
+        this = self if inplace else self.clone()
+        for track in this.values():
+            for i, j in kwa.items():
+                setattr(track, i, j)
+        return this
+
     dataframe.__doc__ =(
         f"""
         Returns a dataframe which is either:
