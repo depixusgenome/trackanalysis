@@ -3,7 +3,7 @@
 """
 Find the peak corresponding to a single strand DNA
 """
-from   typing             import List, TYPE_CHECKING, Sequence, Tuple, cast
+from   typing             import TYPE_CHECKING, Union, List, Sequence, Tuple, cast
 from   functools          import partial
 
 import numpy                  as np
@@ -11,7 +11,8 @@ import numpy                  as np
 from   utils              import initdefaults
 from   model.task         import Task
 from   model.level        import PHASE, Level
-from   data.views         import Beads, Cycles, BEADKEY
+from   data.track         import Track
+from   data.views         import Beads, Cycles, BEADKEY, TrackView
 from   control.processor  import Processor
 if TYPE_CHECKING:
     from peakfinding.processor.selector import (PeaksDict, # pylint: disable=unused-import
@@ -47,7 +48,19 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
     Find the peak corresponding to a single strand DNA and remove it
     """
     _DTYPE    = np.dtype([('peaks', 'f4'), ('events', 'O')])
-    def nonclosingramps(self, frame:'PeaksDict', beadid:BEADKEY) -> List[int]:
+    def closingindex(self, frame:Union[Track, TrackView], beadid:BEADKEY) -> List[int]:
+        "return the cycle indexes for which `PHASE.rampdown` has no break"
+        delta   = self.task.delta
+        def _greater(arr):
+            arr  = np.diff(arr)
+            good = np.isfinite(arr)
+            return next((i for i in range(len(arr))
+                         if good[i] and arr[i] < delta),
+                        len(arr))
+        return np.array([_greater(i) for i in self.__ramp(frame, beadid).values()],
+                        dtype = 'i4')
+
+    def nonclosingramps(self, frame:Union[Track, TrackView], beadid:BEADKEY) -> List[int]:
         "return the cycle indexes for which `PHASE.rampdown` has no break"
         delta   = self.task.delta
         def _greater(arr):
@@ -56,7 +69,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
             return len(arr) and np.all(arr > delta)
         return [i[1] for i, j in self.__ramp(frame, beadid) if _greater(j)]
 
-    def closingramps(self, frame:'PeaksDict', beadid:BEADKEY) -> List[int]:
+    def closingramps(self, frame: Union[Track, TrackView], beadid:BEADKEY) -> List[int]:
         "return the cycle indexes for which `PHASE.rampdown` has a break"
         delta  = self.task.delta
         def _lesser(arr):
@@ -114,13 +127,16 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
         "updates frames"
         args.apply(self.apply(**self.config()))
 
-    def __ramp(self, frame:'PeaksDict', beadid:BEADKEY) -> Cycles:
+    def __ramp(self, frame: Union[Track, TrackView], beadid:BEADKEY) -> Cycles:
         "return the cycle indexes for which `PHASE.rampdown` has no break"
-        beads = cast(Beads, frame.data)
-        while beads is not None and not isinstance(beads, Beads):
-            beads = cast(Beads, beads.data)
+        if isinstance(frame, Track):
+            beads = cast(Track, frame).beads
+        else:
+            beads = cast(Beads, frame.data)
+            while beads is not None and not isinstance(beads, Beads):
+                beads = cast(Beads, beads.data)
 
-        if beads is None:
-            beads = frame.track.beads
+            if beads is None:
+                beads = frame.track.beads
 
         return cast(Cycles, beads[beadid,:]).withphases(self.task.phase)
