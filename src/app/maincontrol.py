@@ -156,7 +156,6 @@ def createview(main, controls, views):
         def launchkwargs(cls, **kwa) -> Dict[str, Any]:
             "updates kwargs used for launching the application"
             css = cls.MainControl.setupglobals().css
-            print(css.appname.get(), css.appsize.get())
             kwa.setdefault("title",  css.appname.get())
             kwa.setdefault("size",   css.appsize.get())
             return kwa
