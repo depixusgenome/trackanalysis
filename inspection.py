@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # pylint: disable=invalid-name
-u"utils for inspecting objects and frames"
+"utils for inspecting objects and frames"
 import inspect
 from   typing    import Optional, cast
 from   types     import LambdaType, FunctionType, MethodType
@@ -21,11 +21,16 @@ def templateattribute(cls, index) -> type:
     return orig[0].__args__[index]    # type: ignore
 
 def isfunction(fcn) -> bool:
-    u"Returns whether the object is a function"
+    "Returns whether the object is a function"
     return isinstance(fcn, (LambdaType, FunctionType, MethodType, partial))
 
+def parametercount(fcn) -> int:
+    "return the number of *required* parameters"
+    return sum(1 for j in inspect.signature(fcn).parameters.values()
+               if j.kind == j.POSITIONAL_OR_KEYWORD and j.default is j.empty)
+
 def ismethod(fcn) -> bool:
-    u"to be called in method decorators"
+    "to be called in method decorators"
     if isinstance(fcn, cast(type, classmethod)):
         return True
 
@@ -35,7 +40,7 @@ def ismethod(fcn) -> bool:
     return False
 
 def getlocals(ind) -> dict:
-    u"returns the locals from a higher frame"
+    "returns the locals from a higher frame"
     return  inspect.stack()[ind+1][0].f_locals
 
 def getclass(string:str) -> Optional[type]:
