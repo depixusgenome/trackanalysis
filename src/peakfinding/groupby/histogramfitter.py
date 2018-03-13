@@ -113,7 +113,7 @@ class ZeroCrossingPeakFinder:
             inds = self.subpixel(hist, inds)
         return inds * slope + bias
 
-class PeakFlagger: # old name GroupByPeak
+class BaseFlagger: # PeakFlagger: # old name GroupByPeak
     """
     Groups events by peak position.
 
@@ -165,12 +165,13 @@ class PeakFlagger: # old name GroupByPeak
         ret[:] = [ids[i:j] for i, j in sizes]
         return ret
 
-    def __call__(self, peaks, elems, precision = None):
+    def group(self, peaks, elems, precision = None):
+        "assign events to peaks"
         bins, inds = self._bins(peaks, precision)
         tags, cnts = self._counts(elems, bins, inds)
         return self._grouped(elems, tags, np.where(cnts < self.mincount)[0])
 
-class GroupByPeakAndBase(PeakFlagger):
+class GroupByPeakAndBase(BaseFlagger):
     """
     Groups events by peak position, making sure the baseline peak is kept
 
@@ -195,19 +196,61 @@ class GroupByPeakAndBase(PeakFlagger):
             cnts[imin] = self.mincount # make sure peak is accepted
         return tags, cnts
 
-class ByHistogram:
+
+class HistFlagger(BaseFlagger):
+    """
+    Groups events by peak position, making sure the baseline peak is kept
+
+    Attributes:
+
+        * *baserange:* the range starting from the very left where the baseline
+        peak should be, in µm.
+    """
+    baserange = .1
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__(**_)
+
+    def _counts(self, elems, bins, inds):
+        tags, cnts = super()._counts(elems, bins, inds)
+        if len(cnts) < inds[0]+1:
+            cnts = np.append(cnts, -1)
+        imax       = max(inds[1:np.searchsorted(bins, bins[0]+self.baserange)+1],
+                         default = -1, key = cnts.__getitem__)
+        if imax >= 0:
+            imin       = min(i for i in range(imax+1) if cnts[i] == cnts[imax])
+            cnts[imin] = self.mincount # make sure peak is accepted
+        return tags, cnts
+
+class ByHistogram(HistFlagger):
     """
     Finds peaks with a minimum *half*width and threshold
     """
-    finder           = ZeroCrossingPeakFinder()
-    grouper          = GroupByPeakAndBase()
     @initdefaults(frozenset(locals()), subpixel = 'update')
     def __init__(self, **kwa):
-        pass
+        super().__init__(self,**kwa)
+
     def __call__(self,**kwa):
         hist  = kwa.get("hist",(np.array([]),0,1))
-        peaks = self.finder(*hist)
-        ids   = self.grouper(peaks     = peaks,
-                             elems     = kwa.get("pos"),
-                             precision = kwa.get("precision",None))
+        peaks = ZeroCrossingPeakFinder()(*hist)
+        ids   = self.group(peaks     = peaks,
+                           elems     = kwa.get("pos"),
+                           precision = kwa.get("precision",None))
         return peaks, ids
+
+# class ByHistogram(HistFlagger):
+#     """
+#     Finds peaks with a minimum *half*width and threshold
+#     """
+#     finder           = ZeroCrossingPeakFinder()
+#     grouper          = GroupByPeakAndBase()
+#     @initdefaults(frozenset(locals()), subpixel = 'update')
+#     def __init__(self, **kwa):
+#         pass
+#     def __call__(self,**kwa):
+#         hist  = kwa.get("hist",(np.array([]),0,1))
+#         peaks = self.finder(*hist)
+#         ids   = self.grouper(peaks     = peaks,
+#                              elems     = kwa.get("pos"),
+#                              precision = kwa.get("precision",None))
+#         return peaks, ids

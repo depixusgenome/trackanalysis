@@ -1,31 +1,32 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Shows peaks as found by peakfinding vs theory as fit by peakcalling"
-from typing                     import List, Dict, Any
-from pathlib                    import Path
 import os
+from pathlib               import Path
+from typing                import Any, Dict, List
 
+import numpy                 as np
 import bokeh.core.properties as props
-from bokeh.models               import (DataTable, TableColumn, CustomJS,
-                                        Widget, Div, StringFormatter, Paragraph,
-                                        Dropdown)
+from bokeh.models          import (CustomJS, DataTable, Div, Dropdown, Paragraph,
+                                   StringFormatter, TableColumn, Widget)
 
-import numpy                    as     np
+from excelreports.creation import writecolumns
+from modaldialog.view      import T_BODY, AdvancedTaskMixin
+from peakcalling.tohairpin import ChiSquareFit, PeakGridFit
+from peakfinding.groupby   import ByEM, ByHistogram
+from sequences.view        import (OligoListWidget, SequenceHoverMixin,
+                                   SequencePathWidget, SequenceTicker)
+from signalfilter          import rawprecision
+from utils.gui             import startfile
+from utils.logconfig       import getLogger
+from view.dialog           import FileDialog
+from view.pathinput        import PathInput
+from view.plots            import DpxNumberFormatter, WidgetCreator
+from view.toolbar          import FileListMixin
 
-from signalfilter               import rawprecision
+from ._model               import PeaksPlotModelAccess
 
-from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit
-
-from utils.gui                  import startfile
-from excelreports.creation      import writecolumns
-from view.dialog                import FileDialog
-from view.pathinput             import PathInput
-from view.plots                 import DpxNumberFormatter, WidgetCreator
-from view.toolbar               import FileListMixin
-from sequences.view             import (SequenceTicker, SequenceHoverMixin,
-                                        OligoListWidget, SequencePathWidget)
-from modaldialog.view           import AdvancedTaskMixin, T_BODY
-from ._model                    import PeaksPlotModelAccess
+LOGS = getLogger(__name__)
 
 class ReferenceWidget(WidgetCreator[PeaksPlotModelAccess], FileListMixin):
     "Dropdown for choosing the reference"
@@ -425,6 +426,26 @@ class _IdAccessor:
             mdl.identification.updatedefault(self._name, *val)
         mdl.identification.resetmodel(mdl)
 
+class _PeakDescriptor:
+    def getdefault(self,inst)->bool: # pylint: disable=no-self-use
+        "returns default peak finder"
+        LOGS.info(f"in getdefault, {type(inst)}")
+        return not isinstance(getattr(inst, '_model').peakselection.configtask.default().finder,
+                              ByHistogram)
+
+    def __get__(self,inst,owner)->bool:
+        return not isinstance(getattr(inst,'_model').peakselection.task.finder,ByHistogram)
+
+    def __set__(self,inst,value):
+        mdl = getattr(inst,'_model')
+        if value:
+            mdl.peakselection.update(finder=ByEM(mincount=getattr(inst,"_eventcount")))
+            #mdl.peakselection.finder.grouper.eventcount = inst._eventcount # fixme
+            return
+        LOGS.info("set to Hist")
+        mdl.peakselection.update(finder=ByHistogram(mincount=getattr(inst,"_eventcount")))
+        #mdl.peakselection.finder.grouper.eventcount = inst._eventcount # fixme
+
 class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # type: ignore
     "access to the modal dialog"
     @staticmethod
@@ -433,13 +454,14 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # 
 
     @staticmethod
     def _body() -> T_BODY:
-        return (('Minimum frame count per event',    '%(_framecount)d'),
-                ('Minimum event count per peak',     '%(_eventcount)d'),
-                ('Align cycles using peaks',         '%(_align5)b'),
-                ('Peak kernel size (blank ⇒ auto)',  '%(_precision)of'),
-                ('Exhaustive fit algorithm',         '%(_fittype)b'),
-                ('Use a theoretical peak 0 in fits', '%(_peak0)b'),
-                ('Max distance to theoretical peak', '%(_dist2theo)d'),
+        return (('Minimum frame count per event',    ' %(_framecount)d'),
+                ('Minimum event count per peak',     ' %(_eventcount)d'),
+                ('Align cycles using peaks',         ' %(_align5)b'),
+                ('Peak kernel size (blank ⇒ auto)',  ' %(_precision)of'),
+                ('Use EM to find peaks',     '         %(_useem)b'),
+                ('Exhaustive fit algorithm',         ' %(_fittype)b'),
+                ('Use a theoretical peak 0 in fits', ' %(_peak0)b'),
+                ('Max distance to theoretical peak', ' %(_dist2theo)d'),
                )
 
     def __init__(self, model:PeaksPlotModelAccess) -> None:
@@ -448,7 +470,7 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # 
         self._outp: Dict[str, Dict[str, Any]] = {}
 
     def reset(self, resets):
-        "resets the wiget when a new file is opened, ..."
+        "resets the widget when a new file is opened, ..."
         AdvancedTaskMixin.reset(resets)
 
     def create(self, action, _   # type: ignore # pylint: disable=arguments-differ
@@ -457,9 +479,11 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # 
         return AdvancedTaskMixin.create(self, action)
 
     _framecount = AdvancedTaskMixin.attr('eventdetection.events.select.minlength')
-    _eventcount = AdvancedTaskMixin.attr('peakselection.finder.grouper.mincount')
+    #_eventcount = AdvancedTaskMixin.attr('peakselection.finder.grouper.mincount')
+    _eventcount = AdvancedTaskMixin.attr('peakselection.finder.mincount')
     _align5     = AdvancedTaskMixin.none('peakselection.align')
     _precision  = AdvancedTaskMixin.attr('peakselection.precision')
+    _useem      = _PeakDescriptor()
     _peak0      = _IdAccessor('fit', lambda i: i.firstpeak, lambda i: {'firstpeak': i})
     _fittype    = _IdAccessor('fit',
                               lambda i: isinstance(i, PeakGridFit),
