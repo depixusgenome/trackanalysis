@@ -9,6 +9,7 @@ from    pathlib                 import Path
 import  pandas                  as     pd
 import  numpy                   as     np
 
+from    utils.inspection        import parametercount
 from    model.task.dataframe    import DataFrameTask
 from    data.track              import Track
 from    data.views              import TrackView
@@ -18,7 +19,9 @@ Frame = TypeVar('Frame', bound = TrackView)
 class DataFrameFactory(Generic[Frame]):
     "base class for creating dataframes"
     def __init__(self, task: DataFrameTask, _: TrackView) -> None:
-        self.task  = task
+        self.task      = task
+        transf         = list(self.task.transform)  if self.task.transform else []
+        self.transform = [(parametercount(i), i) for i in transf]
 
     @staticmethod
     def adddoc(newcls):
@@ -85,8 +88,10 @@ class DataFrameFactory(Generic[Frame]):
         if len(cols):
             data.set_index(cols, inplace = True)
 
-        for fcn in self.task.transform if self.task.transform else []:
-            itm = fcn(data)
+        for cnt, fcn in self.transform:
+            itm = (fcn(data)        if cnt == 1 else
+                   fcn(frame, data) if cnt == 2 else
+                   fcn(frame, info, data))
             if itm is not None:
                 data = itm
                 assert isinstance(data, pd.DataFrame)
