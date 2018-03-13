@@ -256,7 +256,10 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
         if ind is None or ind >= len(tuple(ovrs)) or len(tuple(ovrs[ind])) == 0:
             return ovrs
 
-        firsts = [next(iter(i)) for i in ovrs]
+        firsts = [next((j for j in i if hasattr(j, 'dpx_label')),
+                       next((j for j in i if not isinstance(j, hv.Text)),
+                            next(iter(i))))
+                  for i in ovrs]
         txt    = [getattr(i, 'dpx_label', None) for i in firsts]
         txt    = [i for i in txt if i]
         if len(txt) == 0 or len(txt) > 4:
