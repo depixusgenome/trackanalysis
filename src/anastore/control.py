@@ -51,8 +51,9 @@ class ConfigAnaIO(AnaIO):
         models = [i for i in models if curr is i[0]]
 
         if len(models):
-            cnf = self._ctrl.writeconfig(None, dict).get('config', {})
-            cnf = {i: j for i, j in cnf.items() if i.startswith("tasks")}
+            ctrl = getattr(self._ctrl, 'globals', self._ctrl)
+            cnf  = ctrl.writeconfig(None, dict).get('config', {})
+            cnf  = {i: j for i, j in cnf.items() if i.startswith("tasks")}
             dump(dict(tasks = models, config = cnf), path, **self._css.getitems(...))
         else:
             raise IOError("Nothing to save", "warning")
