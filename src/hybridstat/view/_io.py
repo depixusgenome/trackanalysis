@@ -137,6 +137,11 @@ class ConfigXlsxIO(TaskIO):
 
         missing = (self.__model.eventdetection,
                    self.__model.peakselection) # type: Tuple
+        if self.__model.fittoreference.task is not None:
+            missing += (self.__model.fittoreference,)
+        if self.__model.identification.task is not None:
+            missing += (self.__model.identification,)
+
         while len(missing):
             if not isinstance(model[-1], tuple(i.tasktype for i in missing)):
                 return model + [deepcopy(i.configtask.get()) for i in missing]
@@ -146,8 +151,9 @@ class ConfigXlsxIO(TaskIO):
         ind = next((i for i, j in enumerate(model) if isinstance(j, FitToReferenceTask)),
                    None)
         if ref is not None and ind is not None:
+            procs                  = self.__ctrl.tasks.processors(ref, PeakSelectorTask)
             model[ind]             = _SafeTask(**model[ind].config())
-            model[ind].defaultdata = self.__ctrl.tasks.processors(ref, PeakSelectorTask)
+            model[ind].defaultdata =  procs.data
         return model
 
     @classmethod
