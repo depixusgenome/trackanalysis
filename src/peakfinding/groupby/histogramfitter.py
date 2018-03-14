@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Creates a histogram from available events"
-from enum import Enum
-from typing import (Callable, Iterable, Optional,
-                    Sequence, Union, cast)
+from enum                    import Enum
+from typing                  import (Callable, Iterable, Optional,
+                                     Sequence, Union, cast)
 
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
-from scipy.signal import find_peaks_cwt
+from scipy.signal            import find_peaks_cwt
 
-from utils import initdefaults
-from utils.logconfig import getLogger
+from utils                   import initdefaults
+from utils.logconfig         import getLogger
 
 
 LOGS       = getLogger(__name__)
@@ -237,20 +237,3 @@ class ByHistogram(HistFlagger):
                            elems     = kwa.get("pos"),
                            precision = kwa.get("precision",None))
         return peaks, ids
-
-# class ByHistogram(HistFlagger):
-#     """
-#     Finds peaks with a minimum *half*width and threshold
-#     """
-#     finder           = ZeroCrossingPeakFinder()
-#     grouper          = GroupByPeakAndBase()
-#     @initdefaults(frozenset(locals()), subpixel = 'update')
-#     def __init__(self, **kwa):
-#         pass
-#     def __call__(self,**kwa):
-#         hist  = kwa.get("hist",(np.array([]),0,1))
-#         peaks = self.finder(*hist)
-#         ids   = self.grouper(peaks     = peaks,
-#                              elems     = kwa.get("pos"),
-#                              precision = kwa.get("precision",None))
-#         return peaks, ids

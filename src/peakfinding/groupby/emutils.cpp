@@ -11,6 +11,24 @@ namespace peakfinding{
     namespace emutils{
 	double PRECISION = 1e-9;
 	double PI=3.14159;
+
+	double llikelihood(const matrix& score, const matrix& rates){
+	    
+	    auto	ones	 = matrix(1,score.size2(),1.);
+	    auto	bigrates = blas::prod(rates,ones);	// can be optimized
+	    matrix	tmp	 = blas::element_prod(score,bigrates);
+
+	    blas::vector<double> rsum(tmp.size2(),0.);
+	    for (unsigned r=0u, nrows=tmp.size1(); r<nrows;++r)
+	    	rsum+=blas::row(tmp,r);
+	    
+	    // std::transform(rsum.data().begin(),rsum.data().begin(),
+	    // 		   rsum.data().begin(),std::log);
+	    double out =0.; // use vector sum from boost instead
+	    for (unsigned c=0u,ncols=rsum.size();c<ncols;c++)
+		out+=std::log(rsum[c]);
+	    return out;
+	}
 	
 	double normpdf(double loc,double var,double pos){
 	    return exp(-0.5*(pow(pos-loc,2)/var))/(sqrt(2*PI*var));
@@ -23,7 +41,7 @@ namespace peakfinding{
 	double pdfparam(blas::vector<double> param,blas::vector<double> datum){
 	    double pdf = 1.;
 	    for (uint it=0;it<param.size()-2;it+=2){
-		pdf *= normpdf(param(it),param(it+1),datum[it/2]); // datum[0] to change
+		pdf *= normpdf(param(it),param(it+1),datum[it/2]);
 	    }
 	    return pdf*exppdf(param[param.size()-2],param[param.size()-1],datum[datum.size()-1]);
 	}
@@ -89,7 +107,7 @@ namespace peakfinding{
 		ncov	   = blas::prod(centered_t,wcentered);
 		// need to add the spatial means and covariance a row at a time
 		for (unsigned dim=0,maxdim=DCOLS-1;dim<maxdim;++dim){
-		    newparams(it,2*dim)   = wspdata(it,dim);	// mean
+		    newparams(it,2*dim) = wspdata(it,dim);	// mean
 		    if (ncov(dim,dim)>uppercov){
 			newparams(it,2*dim+1)=uppercov;
 		    }
@@ -133,9 +151,9 @@ namespace peakfinding{
 	}
 
 	matrix getpz_x(const matrix& score,const  matrix& rates){
-	    auto ones = matrix(1,score.size2(),1.);
-	    auto bigrates  = blas::prod(rates,ones); // can be optimized
-	    matrix pz_x = blas::element_prod(score,bigrates);
+	    auto	ones	 = matrix(1,score.size2(),1.);
+	    auto	bigrates = blas::prod(rates,ones);	// can be optimized
+	    matrix	pz_x	 = blas::element_prod(score,bigrates);
 	    blas::vector<double> norm(pz_x.size2(),0.);
 	    for (unsigned r=0u, nrows=pz_x.size1();r<nrows;++r)
 	    	norm+=blas::row(pz_x,r);
@@ -150,17 +168,54 @@ namespace peakfinding{
 	    return pz_x;
 	}
 	
-	void emstep(matrix &data, matrix &rates, matrix &params,
-		    double uppercov,
-		    double lowercov){
+
+	// bool areparamsfixed(const matrix& prevp,const matrix& nextp){
+	//     // NOT USED
+	//     // WRONG testing condition
+	//     // compares next params with previous parameters
+	//     matrix tmp = nextp-prevp;
+	//     for (unsigned r=0u, nrows=tmp.size1();r<nrows;++r){
+	// 	for (unsigned c=0u, ncols=tmp.size2();c<ncols;++c){
+	// 	    if(abs(tmp(r,c))>PRECISION){
+	// 		std::cout<<"not fixed"<<tmp(r,c)<<std::endl;
+	// 		return false;
+	// 	    }
+	// 	}
+	//     }
+	//     return true;
+	// }
+
+	void oneemstep(matrix &data,
+		       matrix &rates,
+		       matrix &params,
+		       double uppercov,
+		       double lowercov){
 	    // Expectation then Maximization steps of EM
-	    auto score = scoreparams(data,params);
-	    matrix pz_x = getpz_x(score,rates);	    
-	    MaximizedOutput maximized = maximization(data,pz_x,uppercov,lowercov);
-	    rates  = maximized.rates;
-	    params = maximized.params;
+	    matrix score		= scoreparams(data,params);
+	    matrix pz_x			= getpz_x(score,rates);	    
+	    MaximizedOutput maximized	= maximization(data,pz_x,uppercov,lowercov);
+	    rates			= maximized.rates;
+	    params			= maximized.params;
 	    return;
 	}
-	
+
+	void emsteps(matrix &data,
+		     matrix &rates,
+		     matrix &params,
+		     unsigned nsteps,
+		     double uppercov,
+		     double lowercov){
+	    matrix score = scoreparams(data,params);
+	    double prevll=llikelihood(score, rates);
+	    double newll;
+	    for (unsigned ite=0u;ite<nsteps;++ite){
+		oneemstep(data,rates,params,uppercov,lowercov);
+		score = scoreparams(data,params);
+		newll = llikelihood(score, rates);
+		if (newll-prevll<PRECISION) return;
+		prevll=newll;
+	    }
+	}
+
     }
 }

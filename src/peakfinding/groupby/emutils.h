@@ -10,17 +10,21 @@
 
 
 namespace peakfinding{
-namespace emutils{
-namespace blas=boost::numeric::ublas;
-using  matrix = blas::matrix<double>;
-struct MaximizedOutput{matrix rates,params;};
-double normpdf(double loc,double var,double pos);
-double exppdf(double loc,double scale,double pos);
-double pdfparam(blas::vector<double> ,blas::vector<double>);
-void   emstep(matrix&, matrix&, matrix&,double,double);
-double scoreparam(blas::vector<double> ,blas::vector<double>);
-matrix scoreparams(const matrix &, const matrix &);
-matrix maximizeparam(const matrix &, matrix,double,double);
-MaximizedOutput maximization(const matrix &, matrix,double,double);
-}}
+    namespace emutils{
+	namespace blas=boost::numeric::ublas;
+	using  matrix = blas::matrix<double>;
+	double llikelihood(const matrix& ,const matrix&);
+	struct MaximizedOutput{matrix rates,params;};
+	double normpdf(double loc,double var,double pos);
+	double exppdf(double loc,double scale,double pos);
+	double pdfparam(blas::vector<double> ,blas::vector<double>);
+	void   oneemstep(matrix&, matrix&, matrix&,double,double);
+	void   emsteps(matrix&, matrix&, matrix&,unsigned,double,double);
+	double scoreparam(blas::vector<double> ,blas::vector<double>);
+	matrix scoreparams(const matrix &, const matrix &);
+	matrix getpz_x(const matrix &, const matrix &);
+	matrix maximizeparam(const matrix &, matrix,double,double);
+	MaximizedOutput maximization(const matrix &, matrix,double,double);
+    }
+}
 #endif
