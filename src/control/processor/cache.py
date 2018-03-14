@@ -116,10 +116,12 @@ class Cache(Iterable[Processor], Sized):
         if order is None:
             self._items: List[CacheItem] = []
         else:
-            if any(isinstance(i, Task) for i in order):
-                procs = register()
-                order = [procs[type(i)](task = i) if isinstance(i, Task) else i for i in order]
-            self._items = [CacheItem(i) if isinstance(i, Processor) else i for i in order]
+            order       = list(order) # make sure order is not an iterator
+            procs       = register() if any(isinstance(i, Task) for i in order) else {}
+            self._items = [i            if isinstance(i, CacheItem) else
+                           CacheItem(i) if isinstance(i, Processor) else
+                           CacheItem(procs[type(i)](task = i))
+                           for i in order]
 
     def index(self, tsk) -> int:
         "returns the index of the provided task"
