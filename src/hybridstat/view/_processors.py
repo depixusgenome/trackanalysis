@@ -96,6 +96,7 @@ def runrefbead(self, ref: RootTask, bead: BEADKEY
     "runs the reference bead with specific processors"
     dtlstore = [] # type: List[PeakSelectorDetails]
     proc     = GuiPeakSelectorProcessor(dtlstore)
-    with ReplaceProcessors(self.processors(ref, PeakSelectorTask), proc, copy = True) as view:
+    ctrl     = self.tasks.processors(ref, PeakSelectorTask)
+    with ReplaceProcessors(ctrl, proc, copy = True) as view:
         pks = view[bead] if view is not None else ()
     return pks, (dtlstore[0] if dtlstore else None)

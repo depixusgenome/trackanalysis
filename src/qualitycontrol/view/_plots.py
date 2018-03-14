@@ -115,7 +115,7 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         name  = cls.__name__.replace('PlotCreator', '').lower()
         vals  = getattr(track.secondaries, name, None)
         if vals is None or not len(vals):
-            return None
+            return None, None
 
         length = np.nanmean(np.diff(track.phases[:,0]))
         return vals['index']/length, vals['value']

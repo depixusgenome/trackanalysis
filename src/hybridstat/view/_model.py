@@ -129,7 +129,7 @@ class FitToReferenceAccess(TaskAccess):
 
     def __computefitdata(self) -> Tuple[bool, bool]:
         args  = {} # type: Dict[str, Any]
-        ident = pickle.dumps(tuple(self._ctrl.tasls.tasks(self.reference)))
+        ident = pickle.dumps(tuple(self._ctrl.tasks.tasklist(self.reference)))
         if self.__store.id.get() == ident:
             if self.referencepeaks is not None:
                 return False, False
