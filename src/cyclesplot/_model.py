@@ -43,7 +43,7 @@ class CyclesModelAccess(SequencePlotModelAccess):
     def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
         cls = type(self)
-        cls.binwidth    .setdefault(self, 0.003)    # type: ignore
+        cls.binwidth    .setdefault(self, 0.01)     # type: ignore
         cls.minframes   .setdefault(self, 10)       # type: ignore
         cls.stretch     .setdefault(self)           # type: ignore
         cls.bias        .setdefault(self)           # type: ignore

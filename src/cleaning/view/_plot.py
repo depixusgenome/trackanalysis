@@ -114,9 +114,9 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
             items, nans = GuiDataCleaningProcessor.runbead(self._model)
         finally:
             data        = self.__data(items, nans)
-            self._bkmodels[self.__source]['data'] = data
             self.setbounds(self.__fig.x_range, 'x', data['t'])
             self.setbounds(self.__fig.y_range, 'y', data['z'])
+            self._bkmodels[self.__source]['data'] = data
             self._resetwidget()
 
     def __data(self, items, nans) -> Dict[str, np.ndarray]:
