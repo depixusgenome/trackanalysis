@@ -440,7 +440,6 @@ class _PeakDescriptor:
         mdl = getattr(inst,'_model')
         if value:
             mdl.peakselection.update(finder=ByEM(mincount=getattr(inst,"_eventcount")))
-            #mdl.peakselection.finder.grouper.eventcount = inst._eventcount # fixme
             return
         LOGS.info("set to Hist")
         mdl.peakselection.update(finder=ByHistogram(mincount=getattr(inst,"_eventcount")))
