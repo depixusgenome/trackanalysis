@@ -104,7 +104,9 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
         key = info[0][1] if isinstance(info[0], tuple) else None
         sub = None if cache is None else cache.get(key, None)
         if sub is None:
-            cache[key] = sub = cls(task = task).signal(frame, key)
+            sub = cls(task = task).signal(frame, key)
+            if cache is not None:
+                cache[key] = sub
 
         out             = np.copy(info[1])
         out[:len(sub)] -= sub[:len(out)]
