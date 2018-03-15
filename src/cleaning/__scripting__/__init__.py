@@ -20,7 +20,8 @@ from   data.__scripting__.track         import Track
 from   data.__scripting__.tracksdict    import TracksDict
 from   ..processor                      import (DataCleaningProcessor,
                                                 DataCleaningErrorMessage)
-from   ..beadsubtraction                import BeadSubtractionTask
+from   ..beadsubtraction                import (BeadSubtractionTask,
+                                                BeadSubtractionProcessor)
 
 @addto(BeadSubtractionTask, staticmethod)
 def __scripting_save__() -> bool:
@@ -78,8 +79,12 @@ class TrackCleaningScript:
                 beads: Sequence[BEADKEY] = None,
                 **kwa) -> Dict[BEADKEY, Optional[DataCleaningErrorMessage]]:
         "returns a dictionnary of cleaning results"
-        itms = self.track.beadsonly[list(beads)] if beads else self.track.beadsonly
         get  = lambda x: x if x is None else x.args[0]
+
+        itms = self.track.beadsonly[list(beads)] if beads else self.track.beadsonly
+        sub  = self.track.tasks.subtraction # type: ignore
+        if sub is not None:
+            itms = BeadSubtractionProcessor.apply(itms, **sub.config())
 
         dfltask = self.track.tasks.cleaning  # type: ignore
         if dfltask:
