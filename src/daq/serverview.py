@@ -4,13 +4,21 @@
 import socket
 import struct
 import asyncio
-import time
-from   contextlib   import contextmanager, closing, suppress
+
+from   contextlib   import closing, suppress
 from   typing       import Tuple, cast
+
+import websockets
 import numpy        as     np
+
 from   .model       import DAQBead, DAQProtocol, DAQNetwork
 
-async def readserver(cnf, output):
+async def send2daq(cnf, text):
+    "sends a Lua script to the DAQ"
+    async with websockets.connect(cnf.websocket) as websocket:
+        await websocket.send(text)
+
+async def readdaq(cnf, output):
     """
     Reads server data and outputs it
     """
@@ -40,48 +48,48 @@ class DAQServerView:
     Can listen to the server
     """
     _NAME = ''
-    def __init__(self, ctrl):
+    def __init__(self):
         self._task = None
-        self._ctrl = ctrl
 
     def __init_subclass__(cls, **args):
         cls._NAME = args['name']
 
-    def _sanitycheck(self):
+    @classmethod
+    def _sanitycheck(cls, ctrl):
         # for now the network & data configuration should remain the same
         # Otherwise the calls to the controller should be changed
-        dt1   = getattr(self._ctrl.config.network, self._NAME)
-        dt2   = getattr(self._ctrl.config, self._NAME+"data")
+        dt1 = getattr(ctrl.config.network, cls._NAME)
+        dt2 = getattr(ctrl.config, cls._NAME+"data")
         assert [i for _, i in dt1.columns.descr] == [i for _, i in dt2.columns.descr]
 
-    async def _start(self, loop):
+    async def _start(self, ctrl, loop):
         self._task, task = None, cast(asyncio.Task, self._task)
         if task is not None:
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
 
-        if getattr(self._ctrl.data, self._NAME+'started') and self._task is None:
-            self._sanitycheck()
-            cnf  = getattr(self._ctrl.config.network, self._NAME)
-            ctrl = getattr(self._ctrl, f'add{self._NAME}data')
-            self._task = asyncio.ensure_future(readserver(cnf, ctrl), loop = loop)
+        if getattr(ctrl.data, self._NAME+'started') and self._task is None:
+            self._sanitycheck(ctrl)
+            cnf  = getattr(ctrl.config.network, self._NAME)
+            ctrl = getattr(ctrl, f'add{self._NAME}data')
+            self._task = asyncio.ensure_future(readdaq(cnf, ctrl), loop = loop)
 
-    def observe(self):
+    def observe(self, ctrl):
         "setup observers"
         loop = asyncio.get_event_loop()
         data = self._NAME+'started'
         cnf  = self._NAME
 
-        def _onlisten(model = None, old = None):
-            if model is self._ctrl.data and data in old:
-                self._start(loop)
-        self._ctrl.observe(_onlisten)
+        def _onlisten(control = None, model = None, old = None, **_):
+            if model is control.data and data in old:
+                self._start(control, loop)
+        ctrl.observe(_onlisten)
 
-        def _onupdatenetwork(model = None, **_):
-            if model is self._ctrl.config.network or cnf in old:
-                self._start(loop)
-        self._ctrl.observe(_onupdatenetwork)
+        def _onupdatenetwork(control = None, model = None, old = None, **_):
+            if model is control.config.network or cnf in old:
+                self._start(control, loop)
+        ctrl.observe(_onupdatenetwork)
 
 class DAQFoVServerView(DAQServerView, name = 'fov'):
     """
@@ -93,94 +101,122 @@ class DAQBeadsServerView(DAQServerView, name = 'beads'):
     Can listen to the FoV server
     """
 
+class _AwaitableDescriptor:
+    __slots__ = ('_name',)
+    def __init__(self):
+        self._name = None
+
+    def __set_name__(self, _, name):
+        self._name = name
+
+    def __get__(self, inst, owner):
+        if inst is None:
+            return self
+
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(getattr(inst, f'get{self._name}')())
+
+    def __set__(self, inst, val):
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(getattr(inst, f'set{self._name}')(val))
+
 class DAQAdmin:
     """
     Allows sending orders to the DAQ server
     """
+    _MSG   = "local t=hidCommand.new();t.MessageType=82;t.{}={};"
+    _NAMES = dict(zmag = 'Zmag', x = 'X',  y = 'Y',  tsample = "Tsample")
+    _PREC  = dict(zmag = 1e-3,   x = 1e-3, y = 1e-3, tsample = 1e-2)
     def __init__(self, model: DAQNetwork, blocking = False) -> None:
         self.model    = model
         self.blocking = blocking
 
-    @property
-    def beads(self) -> Tuple[DAQBead, ...]:
+    zmag        = _AwaitableDescriptor()
+    temperature = _AwaitableDescriptor()
+    stage       = _AwaitableDescriptor()
+    beads       = _AwaitableDescriptor()
+    protocol    = _AwaitableDescriptor()
+
+    async def getbeads(self) -> Tuple[DAQBead, ...]:
         "get the beads tracked by the server"
         raise NotImplementedError()
 
-    @beads.setter
-    def beads(self, beads: Tuple[DAQBead, ...]):
+    async def setbeads(self, beads: Tuple[DAQBead, ...]):
         "set the beads tracked by the server"
         raise NotImplementedError()
 
-    @property
-    def protocol(self) -> DAQProtocol:
+    async def getprotocol(self) -> DAQProtocol:
         "get info about the current protocol by the server"
         raise NotImplementedError()
 
-    @protocol.setter
-    def protocol(self, protocol: DAQProtocol):
+    async def setprotocol(self, protocol: DAQProtocol):
         "set info about the current protocol by the server"
         raise NotImplementedError()
 
-    def wait(self, name, value = None, delta = 1e-3):
+    async def wait(self, *args):
         "wait for a value to be reached"
-        if value is None:
-            time.sleep(name)
-        elif name == ('time', 'seconds'):
-            time.sleep(value)
+        if len(args) == 1:
+            asyncio.sleep(args[0])
         else:
-            readserver(self.model, lambda i: abs(i[-1][name] - value) < delta)
+            def _done(lines):
+                return all(abs(lines[-1][args[i]]-args[i+1]) < self._PREC[args[i]]
+                           for i in range(0, len(args), 2))
+            await readdaq(self.model, _done)
 
-    zmag        = property() # property is write-only
-    temperature = property() # property is write-only
-    stage       = property() # property is write-only
-
-    @zmag.setter
-    def zmag(self, zmag:float):
+    async def setzmag(self, zmag:float):
         "set the magnet position"
-        self._setalue('zmag', zmag)
+        await self._setvalue('zmag', zmag)
 
-    @stage.setter
-    def stage(self, pos:Tuple[float, float]):
+    async def setstage(self, pos:Tuple[float, float]):
         "set the stage position"
-        self._setalue('x', pos[0])
-        self._setalue('y', pos[1])
+        await self._setvalue('x', pos[0], 'y', pos[1])
 
-    @temperature.setter
-    def temperature(self, tval: float):
+    async def settemperature(self, tval: float):
         "set the sample temperature"
-        self._setalue('tsample', tval)
+        await self._setvalue('tsample', tval)
 
-    def startrecording(self, record: str):
+    async def setstartrecording(self, record: str):
         """
         tell the server to start recording
         """
         raise NotImplementedError()
 
-    def stoprecording(self):
+    async def setstoprecording(self):
         """
         tell the server to stop recording
         """
         raise NotImplementedError()
 
-    def isrecording(self) -> int:
+    async def getisrecording(self) -> int:
         """
         the amount of time left in recording: -1 for no
         """
         raise NotImplementedError()
 
-    @contextmanager
     def record(self, record: str):
         """
         record some actions into the provided file path
         """
-        self.startrecording(record)
-        yield self
-        self.stoprecording()
+        return self._Record(self, record)
 
-    def _setalue(self, name, value, delta = None):
-        raise NotImplementedError()
-        if self.blocking and delta: # pylint: disable=unreachable
-            self.wait(self.model, name, value)
+    class _Record:
+        "allows recording some experiments"
+        def __init__(self, admin, record):
+            self.admin  = admin
+            self.record = record
+        async def __aenter__(self):
+            await self.admin.startrecording(self.record)
+            return self.admin
+
+        async def __aexit__(self):
+            await self.admin.stoprecording()
+
+    async def _setvalue(self, *args):
+        msg = "".join(self._MSG.format(self._MSG[args[i]], args[i+1])
+                      for i in range(0, len(args), 2))
+        await send2daq(self.model, msg)
+        if self.blocking: # pylint: disable=unreachable
+            await self.wait(self.model, *args)
 
 class DAQAdminView:
     """
@@ -191,7 +227,7 @@ class DAQAdminView:
 
     @staticmethod
     def _daq(control):
-        DAQAdmin(control.config.network)
+        return DAQAdmin(control.config.network)
 
     @classmethod
     def _set(cls, control, name, value):

@@ -34,8 +34,9 @@ class DAQNetwork:
     """
     All information related to the current protocol
     """
-    fov   = DAQClient()
-    beads = DAQClient(fields = np.dtype('f4,f4,f4'))
+    websocket: str = "ws://jupyter.depixus.org:9099"
+    fov            = DAQClient()
+    beads          = DAQClient(fields = np.dtype('f4,f4,f4'))
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
