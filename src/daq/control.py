@@ -53,6 +53,9 @@ class DAQController(Controller):
 
     def updatedisplay(self, name, **kwa):
         "update a specific display and emits an event"
+        if not isinstance(name, str):
+            name = getattr(name, 'NAME')
+
         out = self.__update(self.display[name], kwa)
         return self.handle(name, out)
 

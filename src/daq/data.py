@@ -11,17 +11,17 @@ class RoundRobinVector:
     vector for speeding outputs
     """
     _BUFFERSIZE = 3
-    def __init__(self, columns: np.dtype, maxlength: int):
+    def __init__(self, columns: np.dtype, maxlength: int) -> None:
         dtype        = [(i, 'f4') for i in columns]
         self._array  = np.ndarray(maxlength*self._BUFFERSIZE, dtype = dtype)
         self._index  = slice(0, 0)
         self._length = self._array.size//self._BUFFERSIZE
 
-    def view(self) -> np.ndarray:
+    def view(self, name = None) -> np.ndarray: # pylint: disable=arguments-differ
         """
         return the current data
         """
-        return self._array[self._index]
+        return (self._array if name is None else self._array[name])[self._index]
 
     def append(self, lines):
         """
@@ -55,20 +55,24 @@ class BeadsRoundRobinVector(RoundRobinVector):
     Deals with bead data
     """
     def __init__(self, nbeads:int, columns: np.dtype, maxlength: int) -> None:
-        cols = [('time', 'I8')]
-        for i in range(nbeads):
-            cols += [(j+str(i), k) for j, k in columns.decr]
-
-        super().__init__(np.dtype(cols), maxlength)
-        self._ncols = len(columns.names)
-        self._nbeads   = nbeads
+        super().__init__(self.beadstype(nbeads, columns), maxlength)
+        self._ncols  = len(columns.names)
+        self._nbeads = nbeads
     setup = __init__
 
-    def view(self, name = None) -> np.ndarray: # pylint: disable=arguments-differ
-        """
-        return the current data
-        """
-        return (self._array if name is None else self._array[name])[self._index]
+    @staticmethod
+    def beadstype(nbeads, columns):
+        "create the dtype for all beads"
+        cols = columns.descr[:1]
+        for i in range(nbeads):
+            cols += [(j+str(i), k) for j, k in columns.decr[1:]]
+        return np.dtype(cols)
+
+    @property
+    def basetype(self):
+        "create the dtype for all beads"
+        size = (len(self._array.dtype.names)-1)//self._nbeads+1
+        return np.dtype(self._array.dtype.descr[:size])
 
     def removebeads(self, indexes: Iterable[int]):
         "removes some beads"
@@ -83,13 +87,7 @@ class BeadsRoundRobinVector(RoundRobinVector):
     def nbeads(self, nbeads: int):
         "removes or adds beads"
         if nbeads != self._nbeads:
-            cols = np.dtype(self._array.dtype.descr[1:self._ncols+1])
-            self.setup(nbeads, np.dtype(cols), self._length)
-
-    @property
-    def ncols(self) -> int:
-        "return the number of columns per bead"
-        return self._ncols
+            self.setup(nbeads, self.basetype, self._length)
 
 class DAQData:
     """
