@@ -19,28 +19,40 @@ def configemit(fcn:Callable) -> Callable:
         return None if self.config.recording.started else emitfcn(self, *args, **kwa)
     return _wrap
 
+def update(self, model, kwa, force = False):
+    "update the model"
+    kwa  = {i:j for i, j in kwa.items()
+            if hasattr(model, i) and getattr(model, i) != j}
+
+    if len(kwa) == 0 and not force:
+        raise NoEmission()
+
+    old  = {i: getattr(model, i) for i in kwa}
+    for i, j in kwa.items():
+        setattr(model, i, j)
+    return dict(control = self, model = model,  old = old)
+
+class DecentralizedController(Controller):
+    """
+    Controller to which can be added anything
+    """
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+        self.objects: Dict[str, Any] = {}
+
+    def update(self, name, **kwa):
+        "update a specific display and emits an event"
+        name = getattr(name, 'NAME', name)
+        return self.handle(name, update(self, self.objects[name], kwa))
+
 class DAQController(Controller):
     """
     Controller for the DAQ
     """
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self.config                  = DAQConfig()
-        self.data                    = DAQData(self.config)
-        self.display: Dict[str, Any] = {}
-
-    def __update(self, model, kwa, force = False):
-        "update the model"
-        kwa  = {i:j for i, j in kwa.items()
-                if hasattr(model, i) and getattr(model, i) != j}
-
-        if len(kwa) == 0 and not force:
-            raise NoEmission()
-
-        old  = {i: getattr(model, i) for i in kwa}
-        for i, j in kwa.items():
-            setattr(model, i, j)
-        return dict(control = self, model = model,  old = old)
+        self.config = DAQConfig()
+        self.data   = DAQData(self.config)
 
     @staticmethod
     def __newbead(dflt, cnf: Union[Dict[str, Any], DAQBead]) -> DAQBead:
@@ -51,31 +63,23 @@ class DAQController(Controller):
             tmp  = cnf.__dict__
         return DAQBead(**tmp)
 
-    def updatedisplay(self, name, **kwa):
-        "update a specific display and emits an event"
-        if not isinstance(name, str):
-            name = getattr(name, 'NAME')
-
-        out = self.__update(self.display[name], kwa)
-        return self.handle(name, out)
-
     @configemit
     def startrecording(self, path: str, duration: Optional[int]) -> dict:
         "start recording"
         args = dict(started = True, path = path, duration = duration)
-        return self.__update(self.config.recording, args)
+        return update(self, self.config.recording, args)
 
     @Controller.emit
     def stoprecording(self) -> dict:
         "stop recording"
         if not self.config.recording.started:
             raise NoEmission("no recording started")
-        return self.__update(self.config.recording, dict(started = False))
+        return update(self, self.config.recording, dict(started = False))
 
     @configemit
     def updatenetwork(self, force = False, **kwa) -> dict:
         "update the config network"
-        out                          = self.__update(self.config.network, kwa, force = force)
+        out                          = update(self, self.config.network, kwa, force = force)
         self.config.beads            = ()
         self.config.fovdata.columns  = self.config.network.fov.columns
         self.config.beaddata.columns = self.config.network.beads.columns
@@ -133,7 +137,7 @@ class DAQController(Controller):
     @Controller.emit
     def listen(self, fov, beads) -> dict:
         "add lines of data"
-        return self.__update(self.data, dict(fovstarted = fov, beadsstarted = beads))
+        return update(self, self.data, dict(fovstarted = fov, beadsstarted = beads))
 
     @Controller.emit
     def addfovdata(self, lines: np.ndarray) -> dict:
