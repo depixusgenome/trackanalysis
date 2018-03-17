@@ -14,7 +14,7 @@ from bokeh.resources            import DEFAULT_SERVER_PORT
 
 from utils.logconfig            import getLogger
 from .scripting                 import orders
-from .maincontrol               import createview
+from .maincontrol               import createview as _creator
 
 LOGS        = getLogger(__name__)
 CAN_LOAD_JS = True
@@ -127,9 +127,8 @@ class _FunctionHandler(FunctionHandler):
         doc.title = self.view.launchkwargs()['title']
         orders().run(self.view, doc, self.__onloaded)
 
-def setup(locs,
-          mainview        = None,
-          creator         = lambda _: _,
+def setup(locs,           #
+          creator         = _creator,
           defaultcontrols = tuple(),
           defaultviews    = tuple(),
          ):
@@ -163,33 +162,33 @@ def setup(locs,
     See `app.toolbar` for an example which sets-up a toolbar above any view provided
     as a argument.
     """
-    def application(main     = mainview,
+    def application(main,
+                    creator  = creator,
                     controls = defaultcontrols,
-                    views    = defaultviews,
-                    creator  = creator):
+                    views    = defaultviews):
         "Creates a main view"
-        return createview(creator(main), controls, views)
+        return creator(main, controls, views)
 
-    def serve(main     = mainview,
+    def serve(main,
+              creator  = creator,
               controls = defaultcontrols,
               views    = defaultviews,
-              creator  = creator,
               apponly  = False,
               **kwa):
         "Creates a browser app"
-        app = application(main, controls, views, creator)
+        app = application(main, creator, controls, views)
         if apponly:
             return app
         return _FunctionHandler.serveapplication(app, **kwa)
 
-    def launch(main     = mainview,
+    def launch(main,
+               creator  = creator,
                controls = defaultcontrols,
                views    = defaultviews,
-               creator  = creator,
                apponly  = False,
                **kwa):
         "Creates a desktop app"
-        app = application(main, controls, views, creator)
+        app = application(main, creator, controls, views)
         if apponly:
             return app
         return _FunctionHandler.launchflexx(app, **app.launchkwargs(**kwa))

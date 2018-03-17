@@ -151,12 +151,8 @@ def _debug(raiseerr, singlethread):
         _base.SINGLE_THREAD = True
 
     if raiseerr:
-        def _cnf(ctrl):
-            ctrl.globals.config.catcherror.default         = False
-            ctrl.globals.config.catcherror.toolbar.default = False
-
-        from app.scripting import orders
-        orders().default_config = _cnf
+        import app.configuration as _config
+        _config.CATCHERROR = False
 
 def _files(directory, files, bead):
     def _started(_, start = time()):
@@ -188,8 +184,12 @@ def _launch(view, app, desktop, kwa):
     if not app.startswith('app.'):
         app += 'app.'+app
 
-    if 'toolbar' in viewcls.__name__.lower():
+    if 'daq' in viewcls.__name__.lower() or 'daq' in viewcls.__module__:
+        app = 'daq.app.default'
+
+    if 'toolbar' in viewcls.__name__.lower() or 'toolbar' in viewcls.__module__:
         app = 'app.default'
+
 
     if '.' in app and 'A' <= app[app.rfind('.')+1] <= 'Z':
         mod  = app[:app.rfind('.')]
@@ -213,6 +213,24 @@ def _version(ctx, _, value):
     click.echo(' - created on: ' + version.hashdate())
     click.echo(' - compiler:   ' + version.compiler())
     ctx.exit()
+
+def defaultmain(view, gui, port, defaultapp):
+    "Launches an view"
+    _win_opts()
+
+    kwargs = dict(port = _port(port), apponly = False)
+    server = _launch(view, defaultapp, gui == 'firefox', kwargs)
+
+    if gui == 'chrome':
+        server.io_loop.add_callback(lambda: _electron(server, port = kwargs['port']))
+    elif gui == 'default':
+        server.io_loop.add_callback(lambda: server.show("/"))
+
+    log = lambda: LOGS.info(' http://%(address)s:%(port)s',
+                            {'port': kwargs['port'], 'address': 'localhost'})
+    server.io_loop.add_callback(log)
+    server.run_until_shutdown()
+    logging.shutdown()
 
 @click.command()
 @click.option('--version', is_flag = True, callback = _version,
@@ -246,23 +264,8 @@ def main(view, files, tracks, bead,  # pylint: disable=too-many-arguments
          gui, port, raiseerr, singlethread):
     "Launches an view"
     _debug(raiseerr, singlethread)
-    _win_opts()
-
-    kwargs = dict(port = _port(port), apponly = False)
-
     _files(tracks, files, bead)
-    server = _launch(view, 'app.toolbar', gui == 'firefox', kwargs)
-
-    if gui == 'chrome':
-        server.io_loop.add_callback(lambda: _electron(server, port = kwargs['port']))
-    elif gui == 'default':
-        server.io_loop.add_callback(lambda: server.show("/"))
-
-    log = lambda: LOGS.info(' http://%(address)s:%(port)s',
-                            {'port': kwargs['port'], 'address': 'localhost'})
-    server.io_loop.add_callback(log)
-    server.run_until_shutdown()
-    logging.shutdown()
+    return defaultmain(view, gui, port, "app.toolbar")
 
 if __name__ == '__main__':
     main()   # pylint: disable=no-value-for-parameter

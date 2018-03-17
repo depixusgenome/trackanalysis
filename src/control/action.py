@@ -128,7 +128,8 @@ class Action:
     def __exit__(self, tpe, val, bkt):
         assert val is None or isinstance(val, Exception), f"{val} should be None or Exception"
         self._CNT[0] -= 1
-        errvalue = [self._ctrl.globals.config.catcherror.get()]
+        errvalue      = [getattr(self._ctrl, 'CATCHERROR', True)]
+
         try:
             self._ctrl.handle(self._STOPEVT,
                               args = {'type':       tpe,

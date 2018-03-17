@@ -3,17 +3,12 @@
 "The main controller"
 import sys
 from   pathlib                 import Path
-from   typing                  import Dict, Any
-
-import appdirs
 
 from   control.event           import EmitPolicy
 from   control.taskcontrol     import TaskController
 from   control.globalscontrol  import GlobalsController
-from   view.keypress           import DpxKeyEvent
 from   undo.control            import UndoController
-from   utils.inspection        import getclass
-from   utils.logconfig         import logToFile
+from   .configuration          import ConfigurationIO
 from   .scripting              import orders
 
 class SuperController:
@@ -22,6 +17,7 @@ class SuperController:
     These share a common dictionnary of handlers
     """
     APPNAME  = 'Track Analysis'
+    APPSIZE  = [1200, 1000]
     FLEXXAPP = None
     def __init__(self, view):
         self.topview = view
@@ -48,15 +44,13 @@ class SuperController:
     @classmethod
     def configpath(cls, version, stem = None) -> Path:
         "returns the path to the config file"
-        fname = ('autosave' if stem is None else stem)+'.txt'
-        return cls.apppath()/str(version)/fname
+        return ConfigurationIO(cls.APPNAME).configpath(version, stem)
 
     @classmethod
     def __newglobals(cls, **kwa) -> GlobalsController:
         "create new globals control"
         glob  = GlobalsController(**kwa)
-        glob.css.appsize.default = [1200, 1000]
-        glob.css.appname.default = cls.APPNAME.capitalize()
+        glob.css.defaults = {'appsize': cls.APPSIZE, 'appname': cls.APPNAME.capitalize()}
         return glob
 
     @classmethod
@@ -111,54 +105,31 @@ class SuperController:
     @classmethod
     def apppath(cls) -> Path:
         "returns the path to local appdata directory"
-        name = cls.APPNAME.replace(' ', '_').lower()
-        return Path(appdirs.user_config_dir('depixus', 'depixus', name))
+        return ConfigurationIO(cls.APPNAME).apppath()
 
 def createview(main, controls, views):
     "Creates a main view"
-    for i in controls:
-        if isinstance(i, str):
-            getclass(i)
+    cls = ConfigurationIO.createview((SuperController,)+controls, (main,)+views, 'css')
+    def __init__(self):
+        "sets up the controller, then initializes the view"
+        ctrl = self.MainControl(self)
+        keys = self.KeyPressManager(ctrl = ctrl) if self.KeyPressManager else None
+        main.__init__(self, ctrl = ctrl, keys = keys)
+        main.ismain(self)
 
-    views   = tuple(getclass(i) if isinstance(i, str) else i for i in views)
-    appname = next((i.APPNAME for i in (main,)+views if hasattr(i, 'APPNAME')),
-                   'Track Analysis')
-    class Main(*(main,)+views): # type: ignore
-        "The main view"
-        APPNAME         = appname
-        KeyPressManager = DpxKeyEvent
-        class MainControl(SuperController):
-            """
-            Main controller: contains all sub-controllers.
-            These share a common dictionnary of handlers
-            """
-            APPNAME = appname
+        ctrl.startup()
+        for i in cls.__bases__:
+            if hasattr(i, 'observe'):
+                i.observe(self)
+    setattr(cls, '__init__', __init__)
 
-        def __init__(self):
-            "sets up the controller, then initializes the view"
-            ctrl = self.MainControl(self)
-            keys = self.KeyPressManager(ctrl = ctrl) if self.KeyPressManager else None
-            main.__init__(self, ctrl = ctrl, keys = keys)
-            main.ismain(self)
+    def addtodoc(self, doc):
+        "Adds one's self to doc"
+        for mdl in orders().dynloads():
+            getattr(sys.modules.get(mdl, None), 'document', lambda x: None)(doc)
 
-            ctrl.startup()
-            main.observe(self)
-            for cls in views:
-                cls.observe(self)
+        add = next((getattr(i, 'addtodoc') for i in cls.__bases__ if hasattr(i, 'addtodoc')))
+        add(self, doc)
 
-        def addtodoc(self, doc):
-            "Adds one's self to doc"
-            for mdl in orders().dynloads():
-                getattr(sys.modules.get(mdl, None), 'document', lambda x: None)(doc)
-            super().addtodoc(doc)
-
-        @classmethod
-        def launchkwargs(cls, **kwa) -> Dict[str, Any]:
-            "updates kwargs used for launching the application"
-            css = cls.MainControl.setupglobals().css
-            kwa.setdefault("title",  css.appname.get())
-            kwa.setdefault("size",   css.appsize.get())
-            return kwa
-
-    logToFile(str(Main.MainControl.apppath()/"logs.txt"))
-    return Main
+    setattr(cls, 'addtodoc', addtodoc)
+    return cls

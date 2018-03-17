@@ -4,6 +4,7 @@
 from typing           import cast
 from utils.inspection import getclass
 from .launcher        import setup
+from .maincontrol     import createview
 from .default         import VIEWS, CONTROLS
 
 class WithToolbar:
@@ -59,6 +60,6 @@ class WithToolbar:
         return ViewWithToolbar
 
 setup(locals(),
-      creator         = WithToolbar(),
+      creator         = lambda i, j, k: createview(WithToolbar()(i), j, k),
       defaultcontrols = CONTROLS,
       defaultviews    = VIEWS+(WithToolbar.TBAR,))

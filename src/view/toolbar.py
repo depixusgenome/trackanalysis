@@ -161,7 +161,6 @@ class MessagesInput(BokehView):
 
         msg   = ctrl.globals.project.message
         busy  = ctrl.globals.css.message.busy.get(), 'normal'
-        catch = ctrl.globals.config.catcherror.toolbar
 
         @ctrl.observe
         def _onstartaction(recursive = None):      # pylint: disable=unused-variable
@@ -180,7 +179,7 @@ class MessagesInput(BokehView):
             if not recursive and value is not None:
                 LOGS.info('stop')
                 msg.set(value)
-                catcherror[0] = catch.get()
+                catcherror[0] = getattr(ctrl, 'CATCHERROR', True)
         ctrl.observe("stopaction", "stopcomputation", _observer)
 
         templ      = ctrl.globals.css.message.getdict(..., fullnames = False)
