@@ -214,8 +214,10 @@ def _version(ctx, _, value):
     click.echo(' - compiler:   ' + version.compiler())
     ctx.exit()
 
-def defaultmain(view, gui, port, defaultapp):
+# pylint: disable=too-many-arguments
+def defaultmain(view, gui, port, raiseerr, singlethread, defaultapp):
     "Launches an view"
+    _debug(raiseerr, singlethread)
     _win_opts()
 
     kwargs = dict(port = _port(port), apponly = False)
@@ -232,40 +234,51 @@ def defaultmain(view, gui, port, defaultapp):
     server.run_until_shutdown()
     logging.shutdown()
 
-@click.command()
-@click.option('--version', is_flag = True, callback = _version,
-              expose_value = False, is_eager = True)
-@click.argument('view')
-@click.argument('files', nargs = -1, type = click.Path())
-@click.option("--tracks",
-              type       = str,
-              nargs      = 3,
-              help       = 'track path, gr path and match')
-@click.option('-b', "--bead",
-              type       = int,
-              default    = None,
-              help       = 'Opens to this bead')
-@click.option("-g", "--gui",
-              type       = click.Choice(['firefox', 'chrome', 'default', 'none']),
-              default    = 'firefox',
-              help       = 'The type of browser to use.')
-@click.option('-p', "--port",
-              default    = str(DEFAULT_SERVER_PORT),
-              help       = 'Port used: use "random" for any')
-@click.option("--raiseerr",
-              flag_value = True,
-              default    = False,
-              help       = '[DEBUG] Whether errors should be caught')
-@click.option("--singlethread",
-              flag_value = True,
-              default    = False,
-              help       = '[DEBUG] Runs plots in single thread')
+def defaultclick(*others):
+    """
+    sets default command line options
+    """
+    def _wrapper(fcn):
+        fcn = click.option("--singlethread",
+                           flag_value = True,
+                           default    = False,
+                           help       = '[DEBUG] Runs plots in single thread')(fcn)
+        fcn = click.option("--raiseerr",
+                           flag_value = True,
+                           default    = False,
+                           help       = '[DEBUG] Whether errors should be caught')(fcn)
+        fcn = click.option('-p', "--port",
+                           default    = str(DEFAULT_SERVER_PORT),
+                           help       = 'Port used: use "random" for any')(fcn)
+        fcn = click.option("-g", "--gui",
+                           type       = click.Choice(['firefox', 'chrome', 'default', 'none']),
+                           default    = 'firefox',
+                           help       = 'The type of browser to use.')(fcn)
+
+        for i in others:
+            fcn = i(fcn)
+
+        fcn = click.argument('view')(fcn)
+        fcn = click.option('--version', is_flag = True, callback = _version,
+                           expose_value = False, is_eager = True)(fcn)
+
+        return click.command()(fcn)
+    return _wrapper
+
+@defaultclick(click.option('-b', "--bead",
+                           type       = int,
+                           default    = None,
+                           help       = 'Opens to this bead'),
+              click.option("--tracks",
+                           type       = str,
+                           nargs      = 3,
+                           help       = 'track path, gr path and match'),
+              click.argument('files', nargs = -1, type = click.Path()))
 def main(view, files, tracks, bead,  # pylint: disable=too-many-arguments
          gui, port, raiseerr, singlethread):
     "Launches an view"
-    _debug(raiseerr, singlethread)
     _files(tracks, files, bead)
-    return defaultmain(view, gui, port, "app.toolbar")
+    return defaultmain(view, gui, port, raiseerr, singlethread, "app.toolbar")
 
 if __name__ == '__main__':
     main()   # pylint: disable=no-value-for-parameter
