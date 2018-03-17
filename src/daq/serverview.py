@@ -208,7 +208,7 @@ class DAQAdmin:
             await self.admin.startrecording(self.record)
             return self.admin
 
-        async def __aexit__(self):
+        async def __aexit__(self, *_):
             await self.admin.stoprecording()
 
     async def _setvalue(self, *args):
@@ -246,17 +246,20 @@ class DAQAdminView:
 
     def _onstartrecording(self, control = None, **_):
         if not self._listening:
-            self._daq(control).startrecording(control.config.record.path)
+            cor = self._daq(control).setstartrecording(control.config.record.path)
+            asyncio.get_event_loop().run_until_complete(cor)
 
     def _onstoprecording(self, control = None, **_):
         if not self._listening:
-            self._daq(control).stoprecording()
+            cor = self._daq(control).setstoprecording()
+            asyncio.get_event_loop().run_until_complete(cor)
 
     def _onupdatenetwork(self, control = None, **_):
         self._listening = True
         try:
-            daq = self._daq(control)
-            rec = daq.isrecording()
+            loop  = asyncio.get_event_loop().run_until_complete
+            daq   = self._daq(control)
+            rec   = loop(daq.getisrecording())
             if rec > 0:
                 control.startrecording(control.config.record.path, rec)
             else:
