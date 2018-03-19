@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "allows fencing multiple events between 2 *startaction* and *stopaction* events"
 
-from typing             import Callable, Optional, Tuple # pylint: disable=unused-import
+from typing             import Callable, Union, Optional, Tuple # pylint: disable=unused-import
 from pathlib            import Path
 from functools          import wraps
 from inspect            import signature
@@ -154,9 +154,14 @@ class ActionDescriptor:
 
     This can also be as a descriptor, or a decorator
     """
-    def __init__(self, action, test = None):
-        self.type = action
+    def __init__(self, action: Union[str, type] = Action, test = None) -> None:
+        assert action in ('action', 'computation', Action, Computation)
+        self.type = Action if action in (Action, 'action') else Computation
         self.test = test
+
+    def __set_name__(self, _, name):
+        assert name in ('action', 'computation')
+        self.type = Action if name == 'action' else Computation
 
     def __call__(self, fcn, calls = None):
         if calls is None:
