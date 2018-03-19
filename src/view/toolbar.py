@@ -238,7 +238,7 @@ class BeadInput:
         "adds items to doc"
         bdctrl = DataSelectionBeadController(ctrl)
 
-        def _onchange_cb(attr, old, new):
+        def _chg_cb(attr, old, new):
             with ctrl.action:
                 bdctrl.bead = new
             tbar.bead = bdctrl.bead
@@ -256,12 +256,12 @@ class BeadInput:
             else:
                 tbar.bead = bead
 
-        tbar.on_change('bead', _onchange_cb)
+        tbar.on_change('bead', _chg_cb)
         ctrl.globals.project.observe('track', 'bead', _onproject)
         ctrl.observe("updatetask", "addtask", "removetask", lambda **_: _onproject())
-        ctrl.display.update('keystroke',
-                            beadup   = lambda: _onchange_cb('', '', bdctrl.bead+1),
-                            beaddown = lambda: _onchange_cb('', '', bdctrl.bead-1))
+        ctrl.display.updatedefaults('keystroke',
+                                    beadup   = lambda: _chg_cb('', '', bdctrl.bead+1),
+                                    beaddown = lambda: _chg_cb('', '', bdctrl.bead-1))
 
 class RejectedBeadsInput:
     "Text dealing with rejected beads"
@@ -305,7 +305,7 @@ class RejectedBeadsInput:
         tbar.on_change('currentbead',            _ondiscard_currentbead_cb)
         tbar.on_change('discarded',              _ondiscarded_cb)
         tbar.on_change('accepted',               _onaccepted_cb)
-        ctrl.display.update('keystroke', delbead = _ondiscard_currentbead)
+        ctrl.display.updatedefaults('keystroke', delbead = _ondiscard_currentbead)
         ctrl.observe("updatetask", "addtask", "removetask", lambda **_: _onproject())
         ctrl.globals.project.track.observe(_onproject)
 
@@ -431,11 +431,10 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         for cls in self._HELPERS:
             cls.setup(ctrl, tbar, doc)
 
-
-        ctrl.display.update('keystroke',
-                            open = lambda: _onbtn_cb('open', 0, 0),
-                            save = lambda: _onbtn_cb('save', 0, 0),
-                            quit = lambda: _onbtn_cb('save', 0, 0))
+        ctrl.display.updatedefaults('keystroke',
+                                    open = lambda: _onbtn_cb('open', 0, 0),
+                                    save = lambda: _onbtn_cb('save', 0, 0),
+                                    quit = lambda: _onbtn_cb('save', 0, 0))
 
         def _onproject(items):
             if 'track' in items:

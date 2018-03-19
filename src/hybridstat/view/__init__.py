@@ -61,7 +61,7 @@ class HybridStatView(BokehView):
                 if self.__state(panel).get() is PlotState.active:
                     getattr(panel, 'advanced', lambda:None)()
                     break
-        ctrl.display.update('keystroke', advanced = _advanced)
+        ctrl.display.updatedefaults('keystroke', advanced = _advanced)
 
     def getroots(self, ctrl, doc):
         "returns object root"

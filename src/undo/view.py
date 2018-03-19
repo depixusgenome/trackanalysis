@@ -9,8 +9,12 @@ class UndoView(View):
     def __init__(self, ctrl = None, **kwa): # pylint: disable=too-many-locals
         super().__init__(ctrl = ctrl, **kwa)
         self.__curr = [None]
-        ctrl.theme.updatedefaults('keystroke', undo = "Control-z", redo = "Control-y")
-        ctrl.display.update('keystroke', undo = ctrl.undos.undo, redo = ctrl.undos.redo)
+        ctrl.theme.updatedefaults  ('keystroke',
+                                    undo = "Control-z",
+                                    redo = "Control-y")
+        ctrl.display.updatedefaults('keystroke',
+                                    undo = ctrl.undos.undo,
+                                    redo = ctrl.undos.redo)
         ctrl.observe('applicationstarted', partial(self.__observe, ctrl))
 
     def __observe(self, ctrl):

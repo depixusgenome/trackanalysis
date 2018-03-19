@@ -59,6 +59,10 @@ class DecentralizedController(Controller):
 
     def update(self, name, **kwa):
         "update a specific display and emits an event"
+        if isinstance(self._defaults[name], dict):
+            missing = set(self._defaults[name]) & set(kwa)
+            if len(missing):
+                raise KeyError(f"Unknown keys {missing}")
         return self.__update('_objects', name, kwa)
 
     def model(self, name):

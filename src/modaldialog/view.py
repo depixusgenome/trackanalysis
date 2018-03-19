@@ -105,7 +105,7 @@ class AdvancedWidgetMixin(ABC):
 
     def ismain(self, ctrl):
         "setup for when this is the main show"
-        ctrl.display.update('keystroke', advanced = self.on_click)
+        ctrl.display.updatedefaults('keystroke', advanced = self.on_click)
 
 class TaskDescriptor:
     "Access to a task"
