@@ -11,18 +11,18 @@ from    ._model           import QualityControlModelAccess
 class QualityControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
     "Creates plots for discard list"
     _RESET = frozenset()         # type: frozenset
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __init__(self, ctrl = None, *args):
+        super().__init__(ctrl = ctrl, *args)
         self._widgets = QualityControlWidgets(self._model)
-        self._plots   = QualityControlPlots  (self._ctrl, self._model)
+        self._plots   = QualityControlPlots  (ctrl, self._model)
 
-    def observe(self):
+    def observe(self, ctrl):
         "observes the model"
-        super().observe()
-        self._widgets.observe()
-        self._plots  .observe()
+        super().observe(ctrl)
+        self._widgets.observe(ctrl)
+        self._plots  .observe(ctrl)
 
-    def _create(self, doc):
+    def _create(self, _, doc):
         "returns the figure"
         mode    = self.defaultsizingmode()
         widgets = self._widgets.create(self.action, mode)
@@ -37,6 +37,6 @@ class QualityControlView(PlotView[QualityControlPlotCreator]):
     "a widget with all discards messages"
     TASKS       = 'datacleaning', 'extremumalignment'
     PANEL_NAME  = 'Quality Control'
-    def ismain(self):
+    def ismain(self, ctrl):
         "Cleaning and alignment, ... are set-up by default"
-        super()._ismain(tasks = self.TASKS)
+        self._ismain(ctrl, tasks = self.TASKS)

@@ -57,7 +57,7 @@ class PeaksTableWidget(_Widget[CyclesModelAccess]):
         "updates the widget"
         resets[self.__widget.source]['data'] = self.__data()
 
-    def observe(self):
+    def observe(self, _):
         "sets-up config observers"
         fcn = lambda: setattr(self.__widget.source, 'data', self.__data())
         self._model.observeprop('oligos', 'sequencepath', 'sequencekey', fcn)
@@ -161,9 +161,9 @@ class DriftWidget(GroupWidget[CyclesModelAccess]):
 
 class AdvancedWidget(_Widget[CyclesModelAccess], AdvancedWidgetMixin): # type: ignore
     "access to the modal dialog"
-    def __init__(self, model:CyclesModelAccess) -> None:
+    def __init__(self, ctrl, model:CyclesModelAccess) -> None:
         super().__init__(model)
-        AdvancedWidgetMixin.__init__(self)
+        AdvancedWidgetMixin.__init__(self, ctrl)
 
     @staticmethod
     def _title() -> str:
@@ -187,7 +187,7 @@ class AdvancedWidget(_Widget[CyclesModelAccess], AdvancedWidgetMixin): # type: i
 
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"
-    def __init__(self):
+    def __init__(self, ctrl):
         self.__widgets = dict(table    = PeaksTableWidget(self._model),
                               sliders  = ConversionSlidersWidget(self._model),
                               seq      = SequencePathWidget(self._model),
@@ -195,15 +195,15 @@ class WidgetMixin(ABC):
                               align    = AlignmentWidget[CyclesModelAccess](self._model),
                               drift    = DriftWidget(self._model),
                               events   = EventDetectionWidget[CyclesModelAccess](self._model),
-                              advanced = AdvancedWidget(self._model))
+                              advanced = AdvancedWidget(ctrl, self._model))
 
-    def ismain(self, keys):
+    def ismain(self, ctrl):
         "setup for when this is the main show"
-        self.__widgets['advanced'].ismain(keys)
+        self.__widgets['advanced'].ismain(ctrl)
 
-    def _widgetobservers(self):
+    def _widgetobservers(self, ctrl):
         for widget in self.__widgets.values():
-            widget.observe()
+            widget.observe(ctrl)
 
     def _createwidget(self):
         self.__widgets['sliders'].addinfo(self._histsource)

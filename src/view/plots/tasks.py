@@ -10,22 +10,22 @@ class TaskPlotCreator(PlotCreator[TModelType]):
     "Base plotter for tracks"
     def __init__(self, ctrl, *_) -> None:
         super().__init__(ctrl)
-        css = self._ctrl.globals.css.plot.title
+        css = ctrl.globals.css.plot.title
         if css.stretch.get(default = None) is None:
-            self._ctrl.globals.project.bead.default = None
+            ctrl.globals.project.bead.default = None
             css.defaults = {'stretch': u'Stretch (base/µm)', 'bias': u'Bias (µm)'}
 
-    def observe(self):
+    def observe(self, ctrl):
         "sets-up model observers"
-        super().observe()
+        super().observe(ctrl)
 
         if any(isinstance(i, TaskAccess) for i in self._model.__dict__.values()):
             def _ontask(parent = None, task = None, **_):
                 if self._model.impacts(parent, task):
                     self.reset(False)
-            self._ctrl.observe("updatetask", "addtask", "removetask", _ontask)
+            ctrl.observe("updatetask", "addtask", "removetask", _ontask)
 
-    def _create(self, doc):
+    def _create(self, ctrl, doc):
         raise NotImplementedError()
 
     def _reset(self):

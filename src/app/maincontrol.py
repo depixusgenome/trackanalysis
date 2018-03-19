@@ -7,6 +7,8 @@ from   pathlib                 import Path
 from   control.event           import EmitPolicy
 from   control.taskcontrol     import TaskController
 from   control.globalscontrol  import GlobalsController
+from   control.decentralized   import DecentralizedController
+from   control.action          import ActionDescriptor
 from   undo.control            import UndoController
 from   .configuration          import ConfigurationIO
 from   .scripting              import orders
@@ -16,15 +18,19 @@ class SuperController:
     Main controller: contains all sub-controllers.
     These share a common dictionnary of handlers
     """
-    APPNAME  = 'Track Analysis'
-    APPSIZE  = [1200, 1000]
-    FLEXXAPP = None
+    APPNAME     = 'Track Analysis'
+    APPSIZE     = [1200, 1000]
+    FLEXXAPP    = None
+    action      = ActionDescriptor()
+    computation = ActionDescriptor()
     def __init__(self, view):
         self.topview = view
         hdl: dict    = dict()
         self.globals = self.__newglobals(handlers = hdl)
         self.tasks   = TaskController(handlers = hdl)
         self.undos   = UndoController(handlers = hdl)
+        self.theme   = DecentralizedController() # everything static settings
+        self.display = DecentralizedController() # everything dynamic settings
 
     emitpolicy = EmitPolicy
 
@@ -110,26 +116,13 @@ class SuperController:
 def createview(main, controls, views):
     "Creates a main view"
     cls = ConfigurationIO.createview((SuperController,)+controls, (main,)+views, 'css')
-    def __init__(self):
-        "sets up the controller, then initializes the view"
-        ctrl = self.MainControl(self)
-        keys = self.KeyPressManager(ctrl = ctrl) if self.KeyPressManager else None
-        main.__init__(self, ctrl = ctrl, keys = keys)
-        main.ismain(self)
-
-        ctrl.startup()
-        for i in cls.__bases__:
-            if hasattr(i, 'observe'):
-                i.observe(self)
-    setattr(cls, '__init__', __init__)
-
-    def addtodoc(self, doc):
+    def addtodoc(self, ctrl, doc):
         "Adds one's self to doc"
         for mdl in orders().dynloads():
             getattr(sys.modules.get(mdl, None), 'document', lambda x: None)(doc)
 
         add = next((getattr(i, 'addtodoc') for i in cls.__bases__ if hasattr(i, 'addtodoc')))
-        add(self, doc)
+        add(self, ctrl, doc)
 
     setattr(cls, 'addtodoc', addtodoc)
     return cls

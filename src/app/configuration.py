@@ -70,7 +70,6 @@ class ConfigurationIO:
             APPNAME         = appname
             KeyPressManager = DpxKeyEvent
             MainControl     = type('MainControl', (controls[0],), dict(APPNAME = appname))
-
             @classmethod
             def launchkwargs(cls, **kwa) -> Dict[str, Any]:
                 "updates kwargs used for launching the application"
@@ -86,6 +85,36 @@ class ConfigurationIO:
                 kwa.setdefault("title",  maps[name]["appname"])
                 kwa.setdefault("size",   maps[name]['appsize'])
                 return kwa
+
+            @classmethod
+            def open(cls, doc, **kwa):
+                "starts the application"
+                ctrl = cls.MainControl(None)
+                keys = cls.KeyPressManager(ctrl) if cls.KeyPressManager else None
+                self = cls(ctrl, **kwa)
+                ctrl.topview = self
+
+                cls.__bases__[0].ismain(self, ctrl)
+                ctrl.startup()
+
+                if keys:
+                    keys.observe(ctrl)
+                for i in cls.__bases__:
+                    getattr(i, 'observe', lambda *_: None)(self, ctrl)
+
+                if keys:
+                    keys.addtodoc(ctrl, doc)
+                self.addtodoc(ctrl, doc)
+                ctrl.handle('applicationstarted') # pylint: disable=protected-access
+                return self
+
+            def close(self):
+                "closes the application"
+                ctrl = getattr(self, '_ctrl', None)
+                delattr(self, '_ctrl')
+                if ctrl:
+                    ctrl.close()
+                super().close()
 
         logToFile(str(cls(Main).apppath()/"logs.txt"))
         return Main

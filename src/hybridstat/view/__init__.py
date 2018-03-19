@@ -16,19 +16,19 @@ class HybridStatView(BokehView):
     "A view with all plots"
     TASKS = ((lambda lst: tuple(j for i, j in enumerate(lst) if j not in lst[:i]))
              (CleaningView.TASKS+PeaksPlotView.TASKS))
-    def __init__(self, **kwa):
+    def __init__(self, ctrl = None, **kwa):
         "Sets up the controller"
-        super().__init__(**kwa)
+        super().__init__(ctrl = ctrl, **kwa)
         self._tabs   = None
-        self._panels = [FoVPlotView         (**kwa),
-                        QualityControlView  (**kwa),
-                        CleaningView        (**kwa),
-                        CyclesPlotView      (**kwa),
-                        PeaksPlotView       (**kwa)]
+        self._panels = [FoVPlotView         (ctrl = ctrl, **kwa),
+                        QualityControlView  (ctrl = ctrl, **kwa),
+                        CleaningView        (ctrl = ctrl, **kwa),
+                        CyclesPlotView      (ctrl = ctrl, **kwa),
+                        PeaksPlotView       (ctrl = ctrl, **kwa)]
 
-        self._ctrl.globals.css.plot.figure.defaults = dict(sizing_mode = 'fixed')
-        self._ctrl.globals.css.hybridstat.defaults  = dict(width = 500, height = 30)
-        titles = self._ctrl.globals.css.hybridstat.title
+        ctrl.globals.css.plot.figure.defaults = dict(sizing_mode = 'fixed')
+        ctrl.globals.css.hybridstat.defaults  = dict(width = 500, height = 30)
+        titles = ctrl.globals.css.hybridstat.title
         for panel in self._panels:
             key                         = self.__key(panel)
             titles[key].default         = getattr(panel, 'PANEL_NAME', key.capitalize())
@@ -51,24 +51,24 @@ class HybridStatView(BokehView):
     def __select(self, tpe):
         return next(i for i in self._panels if isinstance(i, tpe))
 
-    def ismain(self):
+    def ismain(self, ctrl):
         "Allows setting-up stuff only when the view is the main one"
-        self.__select(CleaningView) .ismain()
-        self.__select(PeaksPlotView).ismain()
-        self._ctrl.globals.config.tasks.default = self.TASKS
+        self.__select(CleaningView) .ismain(ctrl)
+        self.__select(PeaksPlotView).ismain(ctrl)
+        ctrl.globals.config.tasks.default = self.TASKS
         def _advanced():
             for panel in self._panels:
                 if self.__state(panel).get() is PlotState.active:
                     getattr(panel, 'advanced', lambda:None)()
                     break
-        self._keys.addKeyPress(('keypress.advanced', _advanced))
+        ctrl.display.update('keystroke', advanced = _advanced)
 
-    def getroots(self, doc):
+    def getroots(self, ctrl, doc):
         "returns object root"
-        titles = self._ctrl.globals.css.hybridstat.title
+        titles = ctrl.globals.css.hybridstat.title
         mode   = self.defaultsizingmode()
         def _panel(view):
-            ret = view.getroots(doc)
+            ret = view.getroots(ctrl, doc)
             while isinstance(ret, (tuple, list)) and len(ret) == 1:
                 ret = ret[0]
             if isinstance(ret, (tuple, list)):
@@ -88,7 +88,7 @@ class HybridStatView(BokehView):
         for panel in self._panels[ind+1:]:
             self.__state(panel, PlotState.disabled)
 
-        mode.update(self._ctrl.globals.css.hybridstat.getitems('width', 'height'))
+        mode.update(ctrl.globals.css.hybridstat.getitems('width', 'height'))
         tabs = Tabs(tabs   = [_panel(panel) for panel in self._panels],
                     active = ind,
                     name   = 'Hybridstat:Tabs',
@@ -98,15 +98,15 @@ class HybridStatView(BokehView):
         def _py_cb(attr, old, new):
             self._panels[old].activate(False)
             self._panels[new].activate(True)
-            self._ctrl.handle('undoaction',
-                              self._ctrl.emitpolicy.outastuple,
-                              (lambda: setattr(self._tabs, 'active', old),))
+            ctrl.handle('undoaction',
+                        ctrl.emitpolicy.outastuple,
+                        (lambda: setattr(self._tabs, 'active', old),))
         tabs.on_change('active', _py_cb)
         self._tabs = tabs
         return layouts.row(layouts.widgetbox(tabs, **mode), **mode)
 
-    def observe(self):
-        super().observe()
+    def observe(self, ctrl):
+        super().observe(ctrl)
         def _make(ind):
             def _fcn(val):
                 if val.value == PlotState.active and self._tabs is not None:

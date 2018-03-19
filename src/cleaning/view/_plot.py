@@ -82,9 +82,9 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
         self.__source: ColumnDataSource = None
         self.__fig:    Figure           = None
         if TYPE_CHECKING:
-            self._model = DataCleaningModelAccess(self._ctrl, '')
+            self._model = DataCleaningModelAccess(ctrl, '')
 
-    def _create(self, _):
+    def _create(self, ctrl, *_):
         self.__source = ColumnDataSource(data = self.__data(None, None))
 
         self.__fig = fig = figure(**self._figargs(y_range = Range1d,
@@ -108,7 +108,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
         widgets = self._createwidget(fig)
         bottom  = layouts.widgetbox(widgets['align'], **mode)
         left    = layouts.widgetbox(widgets['cleaning']+widgets['table'], **mode)
-        return self._keyedlayout(fig, left = left, bottom = bottom)
+        return self._keyedlayout(ctrl, fig, left = left, bottom = bottom)
 
     def _reset(self):
         items, nans     = None, None
@@ -156,9 +156,14 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
                     tmp[order[value.max]] = color
         return tmp.ravel()
 
+    def observe(self, ctrl):
+        "sets-up model observers"
+        super().observe(ctrl)
+        self._widgetobservers(ctrl)
+
 class CleaningView(PlotView[CleaningPlotCreator]):
     "Peaks plot view"
     TASKS = 'aberrant', 'datacleaning', 'extremumalignment'
-    def ismain(self):
+    def ismain(self, ctrl):
         "Cleaning and alignment, ... are set-up by default"
-        self._ismain(tasks  = self.TASKS)
+        self._ismain(ctrl, tasks  = self.TASKS)

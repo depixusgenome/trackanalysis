@@ -58,7 +58,7 @@ class BeadPlotCreator(TaskPlotCreator[TaskPlotModelAccess]):
         rng.callback = CustomJS(code = ("cb_obj.start = cb_obj.bounds[0];"
                                         "cb_obj.end   = cb_obj.bounds[1];"))
 
-    def _create(self, _) -> DpxKeyedRow:
+    def _create(self, *_) -> DpxKeyedRow:
         "sets-up the figure"
         self._fig    = figure(**self._figargs(x_range = Range1d,
                                               y_range = Range1d,

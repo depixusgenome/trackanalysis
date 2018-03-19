@@ -5,14 +5,14 @@ from . import View
 
 class GlobalsView(View):
     u"View listing all global info"
-    def __init__(self, **kwa):
-        super().__init__(**kwa)
-        self.__ontask()
-        self.__onstartstop()
+    def __init__(self, ctrl = None, **kwa):
+        super().__init__(ctrl = ctrl, **kwa)
+        self.__ontask(ctrl)
+        self.__onstartstop(ctrl)
 
-    def __ontask(self):
-        ctrl         = self._ctrl
-        cnf          = self._ctrl.globals.project
+    @staticmethod
+    def __ontask(ctrl):
+        cnf          = ctrl.globals.project
         cnf.defaults = dict.fromkeys(('track', 'task', 'bead'), None)
 
         # pylint: disable=unused-variable
@@ -44,23 +44,24 @@ class GlobalsView(View):
 
         ctrl.observe([fcn for name, fcn in locals().items() if name[:3] == '_on'])
 
-    def __onstartstop(self):
+    @staticmethod
+    def __onstartstop(ctrl):
         u"Returns the methods for observing user start & stop action delimiters"
         # pylint: disable=unused-variable
         counts = [False]
-        @self._ctrl.observe
+        @ctrl.observe
         def _onstartaction(recursive = None):
             if recursive is False:
                 counts[0]  = False
 
-        @self._ctrl.observe(r"^globals\.(?!.*?project).*$")
+        @ctrl.observe(r"^globals\.(?!.*?project).*$")
         def _onconfig(*_):
             counts[0] = True
 
-        if hasattr(self._ctrl, 'writeuserconfig'):
-            @self._ctrl.observe
+        if hasattr(ctrl, 'writeuserconfig'):
+            @ctrl.observe
             def _onstopaction(recursive = None, **_):
                 if recursive is False:
                     if counts[0]:
                         counts[0] = False
-                        self._ctrl.writeuserconfig()
+                        ctrl.writeuserconfig()

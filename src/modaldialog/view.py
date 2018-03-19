@@ -15,11 +15,11 @@ T_BODY = Tuple[Tuple[str, str],...]
 
 class AdvancedWidgetMixin(ABC):
     "A button to access the modal dialog"
-    def __init__(self):
+    def __init__(self, ctrl):
         self.__widget: Button   = None
         self.__doc:    Document = None
         self.__action: type     = None
-        self.css.root.keypress.advanced.default = 'Alt-a'
+        ctrl.theme.updatedefaults('keystroke', advanced = 'Alt-a')
         self.css.dialog.defaults = dict(title  = self._title(),
                                         button = 'Advanced',
                                         body   = tuple(i for i, _ in self._body()))
@@ -103,9 +103,9 @@ class AdvancedWidgetMixin(ABC):
         "adding callbacks"
         self.__doc = doc
 
-    def ismain(self, keys):
+    def ismain(self, ctrl):
         "setup for when this is the main show"
-        keys.addKeyPress(('keypress.advanced', self.on_click))
+        ctrl.display.update('keystroke', advanced = self.on_click)
 
 class TaskDescriptor:
     "Access to a task"
@@ -162,8 +162,8 @@ class TaskDescriptor:
 
 class AdvancedTaskMixin(AdvancedWidgetMixin):
     "Means for configuring tasks with a modal dialog"
-    def __init__(self):
-        super().__init__()
+    def __init__(self, ctrl):
+        super().__init__(ctrl)
         self.__outp: Dict[str, Dict[str, Any]] = {}
 
     @abstractmethod

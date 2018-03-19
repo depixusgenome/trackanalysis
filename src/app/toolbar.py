@@ -25,14 +25,14 @@ class WithToolbar:
         class ViewWithToolbar(BokehView):
             "A view with the toolbar on top"
             APPNAME = getattr(main, 'APPNAME', main.__name__.lower().replace('view', ''))
-            def __init__(self, **kwa):
-                self._bar      = tbar(**kwa)
-                self._mainview = main(**kwa)
-                super().__init__(**kwa)
+            def __init__(self, ctrl = None, **kwa):
+                self._bar      = tbar(ctrl = ctrl, **kwa)
+                self._mainview = main(ctrl = ctrl, **kwa)
+                super().__init__(ctrl = ctrl, **kwa)
 
-            def ismain(self):
+            def ismain(self, ctrl):
                 "sets-up the main view as main"
-                self._mainview.ismain()
+                self._mainview.ismain(ctrl)
 
             def close(self):
                 "remove controller"
@@ -40,10 +40,10 @@ class WithToolbar:
                 self._bar.close()
                 self._mainview.close()
 
-            def getroots(self, doc):
+            def getroots(self, ctrl, doc):
                 "adds items to doc"
-                tbar   = self._bar.getroots(doc)
-                others = self._mainview.getroots(doc)
+                tbar   = self._bar.getroots(ctrl, doc)
+                others = self._mainview.getroots(ctrl, doc)
                 mode   = self.defaultsizingmode()
                 while isinstance(others, (tuple, list)) and len(others) == 1:
                     others = others[0]

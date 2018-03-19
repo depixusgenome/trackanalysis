@@ -131,10 +131,10 @@ class QualityControlWidgets:
         self.messages = MessagesListWidget(mdl)
         self.summary  = SummaryWidget(mdl)
 
-    def observe(self):
+    def observe(self, ctrl):
         "observes the model"
         for widget in self.__dict__.values():
-            widget.observe()
+            widget.observe(ctrl)
 
     def reset(self, bkmodels):
         "resets the widgets"

@@ -23,7 +23,7 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess], HistMixin, RawMixin,
         super().__init__(ctrl)
         RawMixin       .__init__(self)
         HistMixin      .__init__(self)
-        WidgetMixin    .__init__(self)
+        WidgetMixin    .__init__(self, ctrl)
 
         DpxHoverModel.defaultconfig(self)
         self.css.tools.default  = 'ypan,ybox_zoom,reset,save,dpxhover'
@@ -32,7 +32,7 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess], HistMixin, RawMixin,
         if TYPE_CHECKING:
             self._model = CyclesModelAccess('', '')
 
-    def _create(self, doc):
+    def _create(self, ctrl, doc):
         "returns the figure"
         self._hover = DpxHoverModel()
         doc.add_root(self._hover)
@@ -40,8 +40,8 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess], HistMixin, RawMixin,
         shape = self._createraw()
         self._createhist(self._rawsource.data, shape, self._raw.y_range)
         if 'fixed' in self.defaultsizingmode().values():
-            return [self._keyedlayout(self._raw, self._hist), self._createwidget()]
-        return [self._createwidget(), self._keyedlayout(self._raw, self._hist)]
+            return [self._keyedlayout(ctrl, self._raw, self._hist), self._createwidget()]
+        return [self._createwidget(), self._keyedlayout(ctrl, self._raw, self._hist)]
 
     def _reset(self):
         shape = self._DEFAULT_DATA[1]
@@ -52,14 +52,14 @@ class CyclesPlotCreator(TaskPlotCreator[CyclesModelAccess], HistMixin, RawMixin,
             self._resethist(data, shape)
             self._resetwidget()
 
-    def ismain(self, _):
-        WidgetMixin.ismain(self, _)
+    def ismain(self, ctrl):
+        WidgetMixin.ismain(self, ctrl)
 
-    def observe(self):
+    def observe(self, ctrl):
         "sets-up model observers"
-        super().observe()
+        super().observe(ctrl)
         self._histobservers()
-        self._widgetobservers()
+        self._widgetobservers(ctrl)
         self._model.config.observe('eventdetection.isactive', 'binwidth', 'minframes',
                                    lambda: self.reset(False))
 
@@ -71,6 +71,6 @@ class CyclesPlotView(PlotView[CyclesPlotCreator]):
         "triggers the advanced dialog"
         self._plotter.advanced()
 
-    def ismain(self):
+    def ismain(self, ctrl):
         "Alignment, ... is set-up by default"
-        self._ismain(tasks = self.TASKS)
+        self._ismain(ctrl, tasks = self.TASKS)

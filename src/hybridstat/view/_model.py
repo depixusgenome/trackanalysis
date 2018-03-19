@@ -314,7 +314,7 @@ class PeaksPlotModelAccess(SequencePlotModelAccess):
         self.identification.resetmodel(self)
         return False
 
-    def observe(self):
+    def observe(self, _):
         "observes the global model"
         self.identification.setobservers(self)
         self.fittoreference.setobservers(self)

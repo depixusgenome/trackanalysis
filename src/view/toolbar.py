@@ -16,7 +16,7 @@ from utils.logconfig      import getLogger
 from control.taskio       import TaskIO
 from control.beadscontrol import DataSelectionBeadController
 from .dialog              import FileDialog
-from .base                import BokehView, threadmethod, spawn, Action
+from .base                import BokehView, threadmethod, spawn
 from .static              import ROUTE
 LOGS  = getLogger(__name__)
 
@@ -31,10 +31,6 @@ class TrackFileDialog(FileDialog):
                          storage   = STORAGE[0],
                          config    = ctrl)
 
-        self.__store: Callable = self.config[1]
-        self.__ctrl            = ctrl
-        self.__doc             = None
-
         def _defaultpath(ext, bopen):
             assert bopen
 
@@ -42,35 +38,30 @@ class TrackFileDialog(FileDialog):
             if ctrl.globals.project.track.get(default = None) is None:
                 pot = [i for i in pot if i.suffix != '.gr']
             return self.firstexistingpath(pot)
-        self.config    = _defaultpath, None
 
-    def setup(self, doc):
+        self.__store: Callable = self.config[1]
+        self.config            = _defaultpath, None
+
+    def setup(self, ctrl, _):
         "sets the document"
-        self.__doc = doc
-        assert doc is not None
-        self.filetypes = '*|'+TaskIO.extensions(self.__ctrl, 'openers')
-        self.title     = self.__ctrl.globals.css.title.open.dialog.get()
+        self.filetypes = '*|'+TaskIO.extensions(ctrl, 'openers')
+        self.title     = ctrl.globals.css.title.open.dialog.get()
 
-    async def run(self):
+    async def run(self, ctrl, doc):
         "runs the dialog"
         paths = await threadmethod(self.open)
         if paths is not None:
             def _fcn():
-                with Action(self.__ctrl):
+                with ctrl.action:
                     self.__store(paths, True) # pylint: disable=not-callable
-                    self.__ctrl.tasks.opentrack(paths)
-            self.__doc.add_next_tick_callback(_fcn)
+                    ctrl.tasks.opentrack(paths)
+            doc.add_next_tick_callback(_fcn)
 
 class SaveFileDialog(FileDialog):
     "A file dialog that adds a default save path"
     def __init__(self, ctrl):
         super().__init__(storage = STORAGE[1],
                          config  = ctrl)
-
-        self.__store = self.config[1]
-        self.__ctrl  = ctrl
-        self.__doc   = None
-
         def _defaultpath(ext, bopen):
             assert not bopen
             pot = [i for i in self.storedpaths(ctrl, STORAGE[0], ext) if i.exists()]
@@ -98,23 +89,23 @@ class SaveFileDialog(FileDialog):
             self.defaultextension = sav.suffix[1:] if sav.suffix != '' else None
             return str(sav)
 
+        self.__store = self.config[1]
         self.config  = _defaultpath, None
 
-    def setup(self, doc):
+    def setup(self, ctrl, _):
         "sets the document"
-        self.__doc = doc
-        self.filetypes = TaskIO.extensions(self.__ctrl, 'savers')
-        self.title     = self.__ctrl.globals.css.title.save.dialog.get()
+        self.filetypes = TaskIO.extensions(ctrl, 'savers')
+        self.title     = ctrl.globals.css.title.save.dialog.get()
 
-    async def run(self):
+    async def run(self, ctrl, doc):
         "runs the dialog"
         paths = await threadmethod(self.save)
         if paths is not None:
             def _fcn():
-                with Action(self.__ctrl):
+                with ctrl.action:
                     self.__store(paths, False) # pylint: disable=not-callable
-                    self.__ctrl.tasks.savetrack(paths)
-            self.__doc.add_next_tick_callback(_fcn)
+                    ctrl.tasks.savetrack(paths)
+            doc.add_next_tick_callback(_fcn)
 
 class DpxToolbar(Widget):
     "Toolbar model"
@@ -137,13 +128,13 @@ class DpxToolbar(Widget):
     def __init__(self, **kwa):
         super().__init__(name = 'Main:toolbar', **kwa)
 
-class MessagesInput(BokehView):
+class MessagesInput:
     "Everything related to messages"
-    def __init__(self, **kwargs):
+    @staticmethod
+    def init(ctrl):
         "initializes globals"
-        super().__init__(**kwargs)
-        self._ctrl.globals.project.message.default = None
-        msg = self._ctrl.globals.css.message
+        ctrl.globals.project.message.default = None
+        msg = ctrl.globals.css.message
         siz = 'heigth: 28px; margin-top: 0px;'
         msg.defaults = dict(normal  = '<p style="%s">{}</p>' % siz,
                             warning = '<p style="%s color:blue;">{}</p>' % siz,
@@ -155,10 +146,9 @@ class MessagesInput(BokehView):
                                     error   = 50000,
                                     warning = 50000)
 
-    def setup(self, toolbar: DpxToolbar, doc): # pylint: disable=too-many-locals
+    @staticmethod
+    def setup(ctrl, tbar: DpxToolbar, doc):
         "sets-up the gui"
-        ctrl  = self._ctrl
-
         msg   = ctrl.globals.project.message
         busy  = ctrl.globals.css.message.busy.get(), 'normal'
 
@@ -192,13 +182,13 @@ class MessagesInput(BokehView):
                 return
 
             if last[0] != '':
-                toolbar.message = last[0]
+                tbar.message = last[0]
                 last[0] = ''
                 last[1] = time.time()+last[2]
 
             elif last[1] < time.time():
                 last[0]         = None
-                toolbar.message = ''
+                tbar.message = ''
         doc.add_periodic_callback(_setmsg, ctrl.globals.css.message.period.get())
 
         def _settext(text):
@@ -229,124 +219,111 @@ class MessagesInput(BokehView):
             last[2] = timeout.get(args[1], timeout['normal'])
             if curdoc() is doc:
                 try:
-                    toolbar.message = val
+                    tbar.message = val
                     return
                 except RuntimeError:
                     pass
 
         ctrl.globals.project.message.observe(_settext)
 
-class BeadView(BokehView):
-    "Widget for controlling the current beads"
-    def __init__(self, **kwa):
-        super().__init__(**kwa)
-        self._bdctrl = DataSelectionBeadController(self._ctrl)
-
-    if TYPE_CHECKING:
-        def getroots(self, doc):
-            assert False
-
-class BeadInput(BeadView):
+class BeadInput:
     "Spinner for controlling the current bead"
-    def __init__(self, **kwa):
+    @staticmethod
+    def init(ctrl):
         "Sets up the controller"
-        super().__init__(**kwa)
-        cnf = self._ctrl.globals.css
-        cnf.keypress.defaults = {'beadup'   : 'PageUp',
-                                 'beaddown' : 'PageDown'}
-        self.__toolbar: DpxToolbar = None
+        ctrl.theme.updatedefaults('keystroke', beadup = 'PageUp', beaddown = 'PageDown')
 
-    def setup(self, toolbar: DpxToolbar):
+    @staticmethod
+    def setup(ctrl, tbar: DpxToolbar, _):
         "adds items to doc"
-        self.__toolbar  = toolbar
+        bdctrl = DataSelectionBeadController(ctrl)
 
         def _onchange_cb(attr, old, new):
-            with self.action:
-                self._bdctrl.bead = new
-            self.__toolbar.bead = self._bdctrl.bead
+            with ctrl.action:
+                bdctrl.bead = new
+            tbar.bead = bdctrl.bead
 
         def _onproject(_ = None):
-            bead  = self._bdctrl.bead
-            avail = set(self._bdctrl.availablebeads)
+            bead  = bdctrl.bead
+            avail = set(bdctrl.availablebeads)
             if bead not in avail:
                 if any(i > bead for i in avail):
-                    self._bdctrl.bead = bead+1
+                    bdctrl.bead = bead+1
                 elif any(i < bead for i in avail):
-                    self._bdctrl.bead = bead-1
+                    bdctrl.bead = bead-1
                 else:
-                    self.__toolbar.bead = bead
+                    tbar.bead = bead
             else:
-                self.__toolbar.bead = bead
+                tbar.bead = bead
 
-        toolbar.on_change('bead', _onchange_cb)
-        self._ctrl.globals.project.observe('track', 'bead', _onproject)
-        self._ctrl.observe("updatetask", "addtask", "removetask", lambda **_: _onproject())
+        tbar.on_change('bead', _onchange_cb)
+        ctrl.globals.project.observe('track', 'bead', _onproject)
+        ctrl.observe("updatetask", "addtask", "removetask", lambda **_: _onproject())
+        ctrl.display.update('keystroke',
+                            beadup   = lambda: _onchange_cb('', '', bdctrl.bead+1),
+                            beaddown = lambda: _onchange_cb('', '', bdctrl.bead-1))
 
-        self._keys.addKeyPress(('keypress.beadup',
-                                lambda: _onchange_cb('', '', self._bdctrl.bead+1)),
-                               ('keypress.beaddown',
-                                lambda: _onchange_cb('', '', self._bdctrl.bead-1)))
-
-class RejectedBeadsInput(BeadView):
+class RejectedBeadsInput:
     "Text dealing with rejected beads"
-    def __init__(self, **kwa):
-        super().__init__(**kwa)
-        self.__toolbar: DpxToolbar = None
-        self._ctrl.globals.css.keypress.defaults = {'delbead': 'Shift-Delete'}
+    @staticmethod
+    def init(ctrl):
+        "Sets up the controller"
+        ctrl.theme.updatedefaults('keystroke', delbead = 'Shift-Delete')
 
-    def setup(self, toolbar: DpxToolbar):
+    @staticmethod
+    def setup(ctrl, tbar: DpxToolbar, _):
         "sets-up the gui"
+        bdctrl = DataSelectionBeadController(ctrl)
         def _ondiscard_currentbead(*_):
-            bead = self._bdctrl.bead
+            bead = bdctrl.bead
             if bead is None:
                 return
-            with self.action:
-                self._bdctrl.discarded = set(self._bdctrl.discarded) | {bead}
+            with ctrl.action:
+                bdctrl.discarded = set(bdctrl.discarded) | {bead}
 
         def _ondiscard_currentbead_cb(attr, old, value):
             _ondiscard_currentbead()
 
         def _onaccepted_cb(attr, old, new):
-            beads = set(self._bdctrl.allbeads) - parseints(new)
-            if (not toolbar.seltype) and beads != set(self._bdctrl.discarded):
-                with self.action:
-                    self._bdctrl.discarded = beads
+            beads = set(bdctrl.allbeads) - parseints(new)
+            if (not tbar.seltype) and beads != set(bdctrl.discarded):
+                with ctrl.action:
+                    bdctrl.discarded = beads
 
         def _ondiscarded_cb(attr, old, new):
             beads = parseints(new)
-            if toolbar.seltype and beads != set(self._bdctrl.discarded):
-                with self.action:
-                    self._bdctrl.discarded = beads
+            if tbar.seltype and beads != set(bdctrl.discarded):
+                with ctrl.action:
+                    bdctrl.discarded = beads
 
         def _onproject():
-            disc = set(self._bdctrl.discarded)
-            acc  = set(self._bdctrl.allbeads) - disc
-            self.__toolbar.update(accepted  = ', '.join(str(i) for i in sorted(acc)),
-                                  discarded = ', '.join(str(i) for i in sorted(disc)))
+            disc = set(bdctrl.discarded)
+            acc  = set(bdctrl.allbeads) - disc
+            tbar.update(accepted  = ', '.join(str(i) for i in sorted(acc)),
+                        discarded = ', '.join(str(i) for i in sorted(disc)))
 
-        self._keys.addKeyPress(('keypress.delbead', _ondiscard_currentbead))
-        toolbar.on_change('currentbead',            _ondiscard_currentbead_cb)
-        toolbar.on_change('discarded',              _ondiscarded_cb)
-        toolbar.on_change('accepted',               _onaccepted_cb)
-        self._ctrl.observe("updatetask", "addtask", "removetask", lambda **_: _onproject())
-        self._ctrl.globals.project.track.observe(_onproject)
-        self.__toolbar = toolbar
+        tbar.on_change('currentbead',            _ondiscard_currentbead_cb)
+        tbar.on_change('discarded',              _ondiscarded_cb)
+        tbar.on_change('accepted',               _onaccepted_cb)
+        ctrl.display.update('keystroke', delbead = _ondiscard_currentbead)
+        ctrl.observe("updatetask", "addtask", "removetask", lambda **_: _onproject())
+        ctrl.globals.project.track.observe(_onproject)
 
-class FileListMixin:
+class FileList:
     "Selection of opened files"
-    def __init__(self):
-        if TYPE_CHECKING:
-            self._ctrl: Any = None
-        fnames = self._ctrl.globals.css.filenames
+    def __init__(self, ctrl):
+        self._ctrl: Any = ctrl
+        fnames = ctrl.globals.css.filenames
         fnames.defaults = {'many': '{Path(files[0]).stem} + ...',
                            'single': '{Path(path).stem}'}
 
-    def __pathname(self, task):
+    @staticmethod
+    def __pathname(ctrl, task):
         if task.key:
             return task.key
 
         lst = task.path
-        cnf = self._ctrl.globals.css.filenames
+        cnf = ctrl.globals.css.filenames
         if isinstance(lst, (tuple, list)):
             if len(lst) > 1:
                 # pylint: disable=eval-used
@@ -355,125 +332,126 @@ class FileListMixin:
         # pylint: disable=eval-used
         return eval(f'f"{cnf.single.get()}"', dict(path = lst, Path = Path))
 
-    @property
-    def files(self) -> Iterator[Tuple[str, 'RootTask']]:
+    @classmethod
+    def get(cls, ctrl) -> Iterator[Tuple[str, 'RootTask']]:
         "returns current roots"
-        lst  = [next(i) for i in self._ctrl.tasks.tasklist(...)]
-        return ((self.__pathname(i), i) for i in lst)
+        lst  = [next(i) for i in getattr(ctrl, 'tasks', ctrl).tasklist(...)]
+        return ((cls.__pathname(ctrl, i), i) for i in lst)
 
-class FileListInput(BeadView, FileListMixin):
+    def __call__(self) -> Iterator[Tuple[str, 'RootTask']]:
+        "returns current roots"
+        return self.get(self._ctrl)
+
+class FileListInput:
     "Selection of opened files"
-    def __init__(self, **kwa):
-        super().__init__(**kwa)
-        FileListMixin.__init__(self)
-        self.__toolbar: DpxToolbar = None
+    @staticmethod
+    def init(ctrl):
+        "Sets up the controller"
+        FileList(ctrl = ctrl)
 
-    def setup(self, tbar: DpxToolbar):
+    @staticmethod
+    def setup(ctrl, tbar: DpxToolbar, _):
         "sets-up the gui"
-        self.__toolbar = tbar
-
-        @self._ctrl.observe("opentrack", "closetrack")
+        @ctrl.observe("opentrack", "closetrack")
         def _setfilelist(model = None, **_):
-            vals  = list(self.files)
+            vals  = list(FileList.get(ctrl))
             mdls  = [i for _, i in vals]
             if model[0] in mdls:
                 index = mdls.index(model[0])
             else:
-                cur   = self._ctrl.globals.project.track.get()
+                cur   = ctrl.globals.project.track.get()
                 index = mdls.index(cur) if cur in mdls else 0
 
-            self.__toolbar.update(currentfile = index, filelist = [i for i, _ in vals])
+            tbar.update(currentfile = index, filelist = [i for i, _ in vals])
 
         def _oncurrentfile_cb(attr, old, new):
             new = int(new)
             if new == -1:
                 return
 
-            track = self._ctrl.globals.project.track
-            lst   = list(self.files)
+            track = ctrl.globals.project.track
+            lst   = list(FileList.get(ctrl))
             if new >= len(lst):
                 _setfilelist(model = [track.get()])
             else:
                 track.set(lst[new][1])
 
-        self.__toolbar.on_change('currentfile', _oncurrentfile_cb)
+        tbar.on_change('currentfile', _oncurrentfile_cb)
 
 class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
     "Toolbar"
-    def __init__(self, **kwa):
+    _HELPERS = BeadInput, RejectedBeadsInput, MessagesInput, FileListInput
+
+    def __init__(self, ctrl = None, **kwa):
         "Sets up the controller"
-        super().__init__(**kwa)
-        css          = self._ctrl.globals.css.title
+        super().__init__(ctrl = ctrl, **kwa)
+        css          = ctrl.globals.css.title
         css.defaults = {'open': u'Open', 'save': u'Save', 'quit': u'Quit',
                         'open.dialog': u'Open a track or analysis file',
                         'save.dialog': u'Save an analysis file'}
-        css          = self._ctrl.globals.css.keypress
-        css.defaults = {'open':    "Control-o",
-                        'save':    "Control-s",
-                        'delbead': 'Shift-Delete',
-                        'quit':    "Control-q"}
+        ctrl.theme.updatedefaults('keystroke',
+                                  open    = "Control-o",
+                                  save    = "Control-s",
+                                  delbead = 'Shift-Delete',
+                                  quit    = "Control-q")
 
-        cnf = self._ctrl.globals.config
-        cnf.catcherror.toolbar.default = True
+        for cls in self._HELPERS:
+            cls.init(ctrl)
 
-        self.__bead     = BeadInput(**kwa)
-        self.__rejected = RejectedBeadsInput(**kwa)
-        self.__messages = MessagesInput(**kwa)
-        self.__filelist = FileListInput(**kwa)
-        self.__toolbar  = None
         self.__diagopen = TrackFileDialog(self._ctrl)
         self.__diagsave = SaveFileDialog(self._ctrl)
 
-    def getroots(self, doc):
+    def getroots(self, ctrl, doc):
         "adds items to doc"
         assert doc is not None
         self._doc = doc
-
-        self.__toolbar  = DpxToolbar(hasquit = getattr(self._ctrl, 'FLEXXAPP', None) is not None)
+        tbar   = DpxToolbar(hasquit = getattr(self._ctrl, 'FLEXXAPP', None) is not None)
 
         def _onbtn_cb(attr, old, new):
             if attr == 'open':
-                spawn(self.__diagopen.run)
+                async def _run():
+                    await self.__diagopen.run(ctrl, doc)
+                spawn(_run)
             elif attr == 'save':
-                spawn(self.__diagsave.run)
+                async def _run():
+                    await self.__diagsave.run(ctrl, doc)
+                spawn(_run)
             elif attr == 'quit':
-                self._ctrl.close()
+                ctrl.close()
             else:
                 raise RuntimeError('Unknown toolbar button: '+attr)
 
-        self.__toolbar.on_change('open', _onbtn_cb)
-        self.__toolbar.on_change('save', _onbtn_cb)
-        self.__toolbar.on_change('quit', _onbtn_cb)
-        self._keys.addKeyPress(('keypress.open',  lambda: _onbtn_cb('open', 0, 0)),
-                               ('keypress.save',  lambda: _onbtn_cb('save', 0, 0)),
-                               ('keypress.quit',  lambda: _onbtn_cb('save', 0, 0)))
+        tbar.on_change('open', _onbtn_cb)
+        tbar.on_change('save', _onbtn_cb)
+        tbar.on_change('quit', _onbtn_cb)
 
-        self.__diagopen.setup(doc)
-        self.__diagsave.setup(doc)
-        self.__messages.setup(self.__toolbar, doc)
-        self.__bead    .setup(self.__toolbar)
-        self.__rejected.setup(self.__toolbar)
-        self.__filelist.setup(self.__toolbar)
-        self.__setup_title(doc)
+        self.__diagopen.setup(ctrl, doc)
+        self.__diagsave.setup(ctrl, doc)
+        self.__setup_title(ctrl, doc)
+        for cls in self._HELPERS:
+            cls.setup(ctrl, tbar, doc)
+
+
+        ctrl.display.update('keystroke',
+                            open = lambda: _onbtn_cb('open', 0, 0),
+                            save = lambda: _onbtn_cb('save', 0, 0),
+                            quit = lambda: _onbtn_cb('save', 0, 0))
 
         def _onproject(items):
             if 'track' in items:
-                self.__toolbar.frozen = items['track'].value is items.empty
-        self._ctrl.globals.project.observe(_onproject)
+                tbar.frozen = items['track'].value is items.empty
+        ctrl.globals.project.observe(_onproject)
         mods = self.defaultsizingmode(height = 50)
-        return layouts.row([layouts.widgetbox(self.__toolbar, **mods)], **mods)
+        return layouts.row([layouts.widgetbox(tbar, **mods)], **mods)
 
     def close(self):
         "Sets up the controller"
         super().close()
-        del self.__bead
-        del self.__rejected
-        del self.__messages
-        del self.__toolbar
         del self.__diagopen
         del self.__diagsave
 
-    def __setup_title(self, doc):
+    @staticmethod
+    def __setup_title(ctrl, doc):
         def _title(item):
             path = getattr(item.value, 'path', None)
             if isinstance(path, (list, tuple)):
@@ -483,4 +461,4 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
                 title += ':' + Path(path).stem
             doc.title = title
 
-        self._ctrl.globals.project.track.observe(_title)
+        ctrl.globals.project.track.observe(_title)

@@ -65,7 +65,7 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         trk = self._model.track
         return None if trk is None or trk.fov.image is None else trk.fov
 
-    def _create(self, _):
+    def _create(self, *_):
         self._fig = figure(**self._figargs(name    = 'FoV:Fig',
                                            x_range = Range1d(0, 1),
                                            y_range = Range1d(0, 1),
@@ -226,6 +226,6 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
 class FoVPlotView(PlotView[FoVPlotCreator]):
     "FoV plot view"
     TASKS = ('datacleaning',)
-    def ismain(self):
+    def ismain(self, ctrl):
         "Cleaning is set up by default"
-        self._ismain(tasks = self.TASKS)
+        self._ismain(ctrl, tasks = self.TASKS)

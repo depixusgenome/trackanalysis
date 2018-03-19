@@ -248,7 +248,7 @@ class SequencePathWidget(WidgetCreator[ModelType]):
         self.__widget.on_click(_py_cb)
         return [Paragraph(text = self.css.title.sequence.get()), self.__widget]
 
-    def observe(self):
+    def observe(self, _):
         "sets-up config observers"
         fcn = lambda: self.__widget.update(**self.__data())
         self._model.observeprop('sequencekey', 'sequencepath', fcn)
@@ -337,7 +337,7 @@ class OligoListWidget(WidgetCreator[ModelType]):
         ols  = ', '.join(sorted(j.lower() for j in self._model.oligos))
         return dict(value = ols, completions = lst)
 
-    def observe(self):
+    def observe(self, _):
         "sets-up config observers"
         fcn = lambda: self.__widget.update(**self.__data())
         self._model.observeprop('oligos', fcn)

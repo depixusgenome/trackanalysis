@@ -165,9 +165,9 @@ class WidgetMixin(ABC):
                               align    = align,
                               cleaning = CleaningFilterWidget(self._model))
 
-    def _widgetobservers(self):
+    def _widgetobservers(self, ctrl):
         for widget in self.__widgets.values():
-            widget.observe()
+            widget.observe(ctrl)
 
     def _createwidget(self, fig):
         widgets = {i: j.create(self.action) for i, j in self.__widgets.items()}
