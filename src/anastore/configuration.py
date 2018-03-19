@@ -6,10 +6,13 @@ from utils.logconfig import getLogger
 import anastore
 LOGS = getLogger(__name__)
 
-def writeconfig(maps,
+def writeconfig(maps, # pylint: disable=too-many-arguments
                 configpath: Callable,
-                patchname = 'config',
-                index     = 0,
+                patchname    = 'config',
+                index        = 0,
+                indent       = 4,
+                ensure_ascii = False,
+                sort_keys    = True,
                 **kwa):
     "Writes up the user preferences."
     if maps is None:
@@ -22,7 +25,12 @@ def writeconfig(maps,
     path = configpath(anastore.version(patchname))
     path.parent.mkdir(parents = True, exist_ok = True)
     path.touch(exist_ok = True)
-    anastore.dump(maps, path, patch = patchname, **kwa)
+    anastore.dump(maps, path,
+                  patch        = patchname,
+                  indent       = indent,
+                  ensure_ascii = ensure_ascii,
+                  sort_keys    = sort_keys,
+                  **kwa)
 
 def readconfig(configpath, patchname = 'config', maps = None) -> Optional[dict]:
     "Sets-up the user preferences"
