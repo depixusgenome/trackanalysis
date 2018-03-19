@@ -4,7 +4,7 @@
 from  typing        import Dict, Any
 from  collections   import ChainMap
 from  copy          import deepcopy
-from  .event        import Controller, NoEmission
+from  .event        import Controller
 
 def updatemodel(self, model, kwa, force = False):
     "update the model"
@@ -12,7 +12,7 @@ def updatemodel(self, model, kwa, force = False):
             if hasattr(model, i) and getattr(model, i) != j}
 
     if len(kwa) == 0 and not force:
-        raise NoEmission()
+        return None
 
     old  = {i: getattr(model, i) for i in kwa}
     for i, j in kwa.items():
@@ -22,11 +22,13 @@ def updatemodel(self, model, kwa, force = False):
 def updatedict(self, model, kwa, force = False):
     "updatemodelate the model"
     if len(kwa) == 0 and not force:
-        raise NoEmission()
+        return None
 
-    prev = {i:j for i, j in kwa.items() if i in model and model[i] != j}
-    new  = {i:j for i, j in kwa.items() if i not in model}
-    old  = {i: model[i] for i in prev}
+    new = {i:j         for i, j in kwa.items() if i not in model}
+    old = {i: model[i] for i, j in kwa.items() if i in model and model[i] != j}
+    if len(old) == 0 and len(new) == 0:
+        return None
+
     model.update(**kwa)
     return dict(control = self, model = model,  old = old, new = new)
 
@@ -50,9 +52,13 @@ class DecentralizedController(Controller):
         out = self.__update('_defaults', name, kwa)
         if out is None:
             return
-        obj = self.model(name)
-        fcn = lambda x: getattr(obj, x) if not isinstance(obj, dict) else obj.__getitem__
-        kwa = {i: j for i, j in out['old'].items() if j == fcn(i)}
+        obj  = self._objects[name]
+        dflt = self._defaults[name]
+        if not isinstance(obj, dict):
+            fcn = (lambda x: getattr(obj, x)), (lambda x: getattr(dflt, x))
+        else:
+            fcn = obj.__getitem__, dflt.__getitem__
+        kwa  = {i: fcn[1](i) for i, j in out['old'].items() if j == fcn[0](i)}
         kwa.update(out.get('new', {}))
         self.__update('_objects', name, kwa)
         return out
@@ -60,7 +66,7 @@ class DecentralizedController(Controller):
     def update(self, name, **kwa):
         "update a specific display and emits an event"
         if isinstance(self._defaults[name], dict):
-            missing = set(self._defaults[name]) & set(kwa)
+            missing = set(kwa) - set(self._defaults[name])
             if len(missing):
                 raise KeyError(f"Unknown keys {missing}")
         return self.__update('_objects', name, kwa)
@@ -80,40 +86,34 @@ class DecentralizedController(Controller):
         return self.__get(self._defaults)
 
     @property
-    def changes(self)-> Dict[str, Dict[str, Any]]:
-        "return a dict containing all objects info"
+    def chainmap(self) -> ChainMap:
+        "returns a chainmap with default values & their changes"
         left  = self.defaults
         right = self.current
         ret   = {}
         for i, dflt in left.items():
             cur = right[i]
-            cha = {j: k for j, k in dflt.items() if k != cur[j]}
+            cha = {j: k for j, k in cur.items() if k != dflt[j]}
             if len(cha):
                 ret[i] = cha
-        return cha
 
-    @property
-    def chainmap(self) -> ChainMap:
-        "returns a chainmap with default values & their changes"
-        return ChainMap(self.changes, self.defaults)
+        return ChainMap(ret, left)
 
     @staticmethod
     def __get(dico)-> Dict[str, Dict[str, Any]]:
         "return a dict containing all objects info"
         get = lambda i: i if isinstance(i, dict) else i.__dict__
-        return {i: get(j) for i, j in dico}
+        return {i: get(j) for i, j in dico.items()}
 
     def __update(self, key:str, name, kwa: Dict[str, Any]):
         "update a specific display and emits an event"
         name = getattr(name, 'NAME', name)
         obj  = getattr(self, key)[name]
-        try:
-            out  = (updatedict(self, obj, kwa) if isinstance(obj, dict) else
-                    updatemodel(self, obj, kwa))
-        except NoEmission:
-            return None
+        out  = (updatedict(self, obj, kwa) if isinstance(obj, dict) else
+                updatemodel(self, obj, kwa))
 
-        self.handle(name if key == '_objects' else 'defaults'+name,
-                    self.emitpolicy.outasdict,
-                    out)
+        if out is not None:
+            self.handle(name if key == '_objects' else 'defaults'+name,
+                        self.emitpolicy.outasdict,
+                        out)
         return out
