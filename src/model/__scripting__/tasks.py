@@ -383,7 +383,8 @@ class Tasks(Enum):
         """
         Applies the task to the frame
         """
-        return self.processor(*resets, **kwa).apply(toframe) # type: ignore
+        proc = self.processor(*resets, **kwa)
+        return proc.apply(toframe, **proc.config())
 
     @classmethod
     @_DOCHelper.add(header = "These can be:")
