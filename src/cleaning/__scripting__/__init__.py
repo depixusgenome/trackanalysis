@@ -84,7 +84,8 @@ class TrackCleaningScript:
         itms = self.track.beadsonly[list(beads)] if beads else self.track.beadsonly
         sub  = self.track.tasks.subtraction # type: ignore
         if sub is not None:
-            itms = BeadSubtractionProcessor.apply(itms, **sub.config())
+            cache: dict = {}
+            itms        = BeadSubtractionProcessor.apply(itms, cache = cache, **sub.config())
 
         dfltask = self.track.tasks.cleaning  # type: ignore
         if dfltask:
