@@ -3,7 +3,7 @@
 "Test control"
 # pylint: disable=import-error,missing-docstring
 from    pathlib                 import Path
-from    typing                  import Dict
+from    typing                  import Dict, Callable, cast
 import  tempfile
 import  numpy
 import pytest
@@ -491,7 +491,7 @@ def test_replacement():
 
 def test_decentralized():
     "test decentralized"
-    # pylint: disable=missing-docstring
+    # pylint: disable=too-many-statements,missing-docstring
     class Toto:
         NAME = 'toto'
         aval = 1
@@ -506,17 +506,17 @@ def test_decentralized():
         """
         NAME = 'toto'
 
-    def _test(obj):
+    def _test(obj): # pylint: disable=too-many-statements
         ctrl = DecentralizedController()
         ctrl.add(obj)
         cnt = [0, 0]
-        get = dict.__getitem__  if isinstance(obj, dict) else getattr
+        get = cast(Callable, dict.__getitem__  if isinstance(obj, dict) else getattr)
         def _fcn1(**_):
             cnt[0] += 1
         def _fcn2(**_):
             cnt[1] += 1
-        ctrl.observe("defaultstoto", _fcn1)
-        ctrl.observe("toto", _fcn2)
+        ctrl.observe("totodefaults", _fcn1)
+        ctrl.observe("toto",         _fcn2)
         cmap  = ctrl.chainmap
         assert len(cmap.maps[0]) == 0
         assert cmap.maps[1] == {'toto': {'aval': 2, 'bval': ""}}
@@ -551,16 +551,50 @@ def test_decentralized():
         assert cmap.maps[0] == {'toto': {'aval': 4}}
         assert cmap.maps[1] == {'toto': {'aval': 6, 'bval': ""}}
 
+        try:
+            ctrl.update("toto", newval = 5)
+        except KeyError:
+            pass
+        else:
+            assert False
+
         if isinstance(obj, dict):
+            ctrl.updatedefaults('toto', newval = 5)
+            assert cnt == [3, 3]
+            assert get(ctrl.model('toto'), 'aval') == 4
+            assert get(ctrl.model('toto'), 'bval') == ""
+            assert get(ctrl.model('toto'), 'newval') == 5
+            cmap  = ctrl.chainmap
+            assert cmap.maps[0] == {'toto': {'aval': 4}}
+            assert cmap.maps[1] == {'toto': {'aval': 6, 'bval': "", 'newval': 5}}
+
+            ctrl.update('toto', newval = 10)
+            assert cnt == [3, 4]
+            assert get(ctrl.model('toto'), 'newval') == 10
+
+            ctrl.updatedefaults('toto', newval = ctrl.DELETE)
+            assert cnt == [4, 5]
+            assert get(ctrl.model('toto'), 'aval') == 4
+            assert get(ctrl.model('toto'), 'bval') == ""
+            cmap  = ctrl.chainmap
+            assert cmap.maps[0] == {'toto': {'aval': 4}}
+            assert cmap.maps[1] == {'toto': {'aval': 6, 'bval': ""}}
+        else:
             try:
-                ctrl.update("toto", dummy = None)
-            except KeyError:
+                ctrl.updatedefaults('toto', aval = ctrl.DELETE)
+            except ValueError:
                 pass
             else:
                 assert False
-        else:
-            ctrl.update("toto", dummy = None)
-            assert cnt == [2, 2]
+
+        cnt[0] = cnt[1] = 0
+        ctrl.update('toto', aval = ctrl.DELETE)
+        assert cnt == [0, 1]
+        assert get(ctrl.model('toto'), 'aval') == 6
+        assert get(ctrl.model('toto'), 'bval') == ""
+        cmap  = ctrl.chainmap
+        assert len(cmap.maps[0]) == 0
+        assert cmap.maps[1] == {'toto': {'aval': 6, 'bval': ""}}
 
     _test(Toto())
     _test(Tata(aval = 2, bval = ""))
