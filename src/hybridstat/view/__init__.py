@@ -98,14 +98,15 @@ class HybridStatView(BokehView):
         def _py_cb(attr, old, new):
             self._panels[old].activate(False)
             self._panels[new].activate(True)
-            ctrl.handle('undoaction',
-                        ctrl.emitpolicy.outastuple,
-                        (lambda: setattr(self._tabs, 'active', old),))
+            ctrl.undos.handle('undoaction',
+                              ctrl.emitpolicy.outastuple,
+                              (lambda: setattr(self._tabs, 'active', old),))
         tabs.on_change('active', _py_cb)
         self._tabs = tabs
         return layouts.row(layouts.widgetbox(tabs, **mode), **mode)
 
     def observe(self, ctrl):
+        "observing the controller"
         super().observe(ctrl)
         def _make(ind):
             def _fcn(val):

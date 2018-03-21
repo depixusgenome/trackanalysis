@@ -8,6 +8,7 @@ from  utils         import initdefaults
 from  .event        import Controller
 
 DELETE = type('DELETE', (), {})
+
 def updatemodel(self, model, kwa, force = False, deflt = None):
     "update the model"
     kwa  = {i:j for i, j in kwa.items()
@@ -55,9 +56,9 @@ class DecentralizedController(Controller):
 
     def add(self, obj):
         "add a model to be updated & observed through this controller"
-        assert obj.NAME not in self._objects
-        self._objects[obj.NAME]  = obj
-        self._defaults[obj.NAME] = deepcopy(obj)
+        assert obj.name not in self._objects
+        self._objects[obj.name]  = obj
+        self._defaults[obj.name] = deepcopy(obj)
 
     def keys(self):
         "return the available keys in this controller"
@@ -70,6 +71,10 @@ class DecentralizedController(Controller):
     def items(self, defaults = False):
         "return the available items in this controller"
         return (self._defaults if defaults else self._objects).items()
+
+    def __contains__(self, val):
+        return ((val in self._objects) if isinstance(val, str) else
+                any(i is val for i in self._objects.values()))
 
     def updatedefaults(self, name, **kwa):
         "update a specific display and emits an event"
@@ -122,7 +127,25 @@ class DecentralizedController(Controller):
 
     def model(self, name, defaults = False):
         "return the model associated to a name"
-        return (self._defaults if defaults else self._objects)[getattr(name, 'NAME', name)]
+        return (self._defaults if defaults else self._objects)[getattr(name, 'name', name)]
+
+    def observe(self, *anames, decorate = None, argstest = None, **kwargs):
+        """
+        or, using the model
+        ```python
+
+        class Model:
+            name = "model"
+            ...
+
+        mdl = Model()
+        ctrl.add(mdl)
+        ctrl.observe(mdl, lambda **_: None)
+        """
+        objs   = self._objects.values()
+        anames = tuple((self.name+i.name) if any(i is j for j in objs) else i
+                       for i in anames)
+        super().observe(*anames, decorate = decorate, argstest = argstest, **kwargs)
 
     @property
     def current(self)-> Dict[str, Dict]:
@@ -135,18 +158,12 @@ class DecentralizedController(Controller):
         return self.__get(self._defaults)
 
     @property
-    def chainmap(self) -> ChainMap:
+    def chainmaps(self) -> Dict[str, ChainMap]:
         "returns a chainmap with default values & their changes"
-        left  = self.defaults
         right = self.current
-        ret   = {}
-        for i, dflt in left.items():
-            cur = right[i]
-            cha = {j: k for j, k in cur.items() if k != dflt[j]}
-            if len(cha):
-                ret[i] = cha
-
-        return ChainMap(ret, left)
+        return {i: ChainMap({j: k for j, k in right[i].items() if k != dflt[j]},
+                            dflt)
+                for i, dflt in self.defaults.items()}
 
     @staticmethod
     def __get(dico)-> Dict[str, Dict[str, Any]]:
@@ -156,7 +173,7 @@ class DecentralizedController(Controller):
 
     def __update(self, key:str, name, kwa: Dict[str, Any]):
         "update a specific display and emits an event"
-        name = getattr(name, 'NAME', name)
+        name = getattr(name, 'name', name)
         obj  = getattr(self, key)[name]
 
         out  = (updatedict(self, obj, kwa) if isinstance(obj, dict) else
@@ -168,8 +185,13 @@ class DecentralizedController(Controller):
                         out)
         return out
 
-    def __undo__(self):
+    def __undo__(self, wrapper):
+        @wrapper
         def _undo_method(control = None, model = None, old = None, **_):
             assert control.model(model, True) is model or control.model(model) is model
             control.update(model, defaults = control.model(model) is model, **old)
-        yield from ((i, _undo_method) for i in self._objects)
+
+        easy = set(i for i, j in self._objects.items() if not hasattr(j, '__undo__'))
+        self.observe(*easy, _undo_method)
+        for i in set(self._objects) - easy:
+            self._objects[i].__undo__(wrapper)

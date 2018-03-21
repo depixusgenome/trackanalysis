@@ -493,7 +493,7 @@ def test_decentralized():
     "test decentralized"
     # pylint: disable=too-many-statements,missing-docstring
     class Toto:
-        NAME = 'toto'
+        name = 'toto'
         aval = 1
         bval = ""
         def __init__(self):
@@ -504,7 +504,7 @@ def test_decentralized():
         """
         Model for key bindings
         """
-        NAME = 'toto'
+        name = 'toto'
 
     def _test(obj): # pylint: disable=too-many-statements
         ctrl = DecentralizedController()
@@ -517,17 +517,17 @@ def test_decentralized():
             cnt[1] += 1
         ctrl.observe("totodefaults", _fcn1)
         ctrl.observe("toto",         _fcn2)
-        cmap  = ctrl.chainmap
+        cmap  = ctrl.chainmaps['toto']
         assert len(cmap.maps[0]) == 0
-        assert cmap.maps[1] == {'toto': {'aval': 2, 'bval': ""}}
+        assert cmap.maps[1] == {'aval': 2, 'bval': ""}
 
         ctrl.updatedefaults("toto", aval = 3)
         assert cnt == [1, 1]
         assert get(ctrl.model('toto'), 'aval') == 3
         assert get(ctrl.model('toto'), 'bval') == ""
-        cmap  = ctrl.chainmap
+        cmap  = ctrl.chainmaps['toto']
         assert len(cmap.maps[0]) == 0
-        assert cmap.maps[1] == {'toto': {'aval': 3, 'bval': ""}}
+        assert cmap.maps[1] == {'aval': 3, 'bval': ""}
 
         ctrl.updatedefaults("toto", aval = 3)
         assert cnt == [1, 1]
@@ -539,17 +539,17 @@ def test_decentralized():
         assert cnt == [1, 2]
         assert get(ctrl.model('toto'), 'aval') == 4
         assert get(ctrl.model('toto'), 'bval') == ""
-        cmap  = ctrl.chainmap
-        assert cmap.maps[0] == {'toto': {'aval': 4}}
-        assert cmap.maps[1] == {'toto': {'aval': 3, 'bval': ""}}
+        cmap  = ctrl.chainmaps['toto']
+        assert cmap.maps[0] == {'aval': 4}
+        assert cmap.maps[1] == {'aval': 3, 'bval': ""}
 
         ctrl.updatedefaults("toto", aval = 6)
         assert cnt == [2, 2]
         assert get(ctrl.model('toto'), 'aval') == 4
         assert get(ctrl.model('toto'), 'bval') == ""
-        cmap  = ctrl.chainmap
-        assert cmap.maps[0] == {'toto': {'aval': 4}}
-        assert cmap.maps[1] == {'toto': {'aval': 6, 'bval': ""}}
+        cmap  = ctrl.chainmaps['toto']
+        assert cmap.maps[0] == {'aval': 4}
+        assert cmap.maps[1] == {'aval': 6, 'bval': ""}
 
         try:
             ctrl.update("toto", newval = 5)
@@ -564,9 +564,9 @@ def test_decentralized():
             assert get(ctrl.model('toto'), 'aval') == 4
             assert get(ctrl.model('toto'), 'bval') == ""
             assert get(ctrl.model('toto'), 'newval') == 5
-            cmap  = ctrl.chainmap
-            assert cmap.maps[0] == {'toto': {'aval': 4}}
-            assert cmap.maps[1] == {'toto': {'aval': 6, 'bval': "", 'newval': 5}}
+            cmap  = ctrl.chainmaps['toto']
+            assert cmap.maps[0] == {'aval': 4}
+            assert cmap.maps[1] == {'aval': 6, 'bval': "", 'newval': 5}
 
             ctrl.update('toto', newval = 10)
             assert cnt == [3, 4]
@@ -576,9 +576,9 @@ def test_decentralized():
             assert cnt == [4, 5]
             assert get(ctrl.model('toto'), 'aval') == 4
             assert get(ctrl.model('toto'), 'bval') == ""
-            cmap  = ctrl.chainmap
-            assert cmap.maps[0] == {'toto': {'aval': 4}}
-            assert cmap.maps[1] == {'toto': {'aval': 6, 'bval': ""}}
+            cmap  = ctrl.chainmaps['toto']
+            assert cmap.maps[0] == {'aval': 4}
+            assert cmap.maps[1] == {'aval': 6, 'bval': ""}
         else:
             try:
                 ctrl.updatedefaults('toto', aval = ctrl.DELETE)
@@ -592,9 +592,9 @@ def test_decentralized():
         assert cnt == [0, 1]
         assert get(ctrl.model('toto'), 'aval') == 6
         assert get(ctrl.model('toto'), 'bval') == ""
-        cmap  = ctrl.chainmap
+        cmap  = ctrl.chainmaps['toto']
         assert len(cmap.maps[0]) == 0
-        assert cmap.maps[1] == {'toto': {'aval': 6, 'bval': ""}}
+        assert cmap.maps[1] == {'aval': 6, 'bval': ""}
 
     _test(Toto())
     _test(Tata(aval = 2, bval = ""))

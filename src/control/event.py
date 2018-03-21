@@ -133,18 +133,24 @@ class Event:
 
         This can be called directly:
 
-        > event.observe('event 1', 'event 2',  observing_method)
-        > event.observe(onevent3)
-        > event.observe({'event1': fcn1, 'event2': fcn2})
-        > event.observe(event1 = fcn1, event2 = fcn2)
+        ```python
+        event.observe('event 1', 'event 2',  observing_method)
+        event.observe(onevent3)
+        event.observe({'event1': fcn1, 'event2': fcn2})
+        event.observe(event1 = fcn1, event2 = fcn2)
+        ```
 
         or as a wrapper:
 
-        > @event.observe('event 1', 'event 2')
-        > def observing_method(*args, **kwargs): pass
+        ```python
+        @event.observe('event 1', 'event 2')
+        def observing_method(*args, **kwargs):
+            pass
 
-        > @event.observe
-        > def onevent3(*args, **kwargs): pass
+        @event.observe
+        def onevent3(*args, **kwargs):
+            pass
+        ```
         """
         # Not implemented: could be done by decorating / metaclassing
         # the observer class

@@ -151,8 +151,8 @@ def _debug(raiseerr, singlethread):
         _base.SINGLE_THREAD = True
 
     if raiseerr:
-        import app.configuration as _config
-        _config.CATCHERROR = False
+        from app.maincontrol import DisplayController
+        DisplayController.CATCHERROR = False
 
 def _files(directory, files, bead):
     def _started(_, start = time()):

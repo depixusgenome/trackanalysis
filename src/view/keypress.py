@@ -10,13 +10,13 @@ class KeyStrokes(Dict[str, str]):
     """
     Model for key bindings
     """
-    NAME = 'keystroke'
+    name = 'keystroke'
 
 class KeyCalls(Dict[str, Callable]):
     """
     Model for key bindings
     """
-    NAME = 'keystroke'
+    name = 'keystroke'
 
 class DpxKeyEvent(Model):
     "controls keypress actions"
@@ -28,13 +28,11 @@ class DpxKeyEvent(Model):
         super().__init__()
         self._keys     = KeyCalls()
         self._bindings = KeyStrokes()
-        if ctrl:
-            self.addtocontroller(ctrl)
+        if ctrl is not None:
+            self.observe(ctrl)
 
     def addtocontroller(self, ctrl):
         "adds models to the controller"
-        ctrl.theme  .add(self._bindings)
-        ctrl.display.add(self._keys)
 
     def close(self):
         "Removes the controller"
@@ -53,8 +51,12 @@ class DpxKeyEvent(Model):
 
     def observe(self, ctrl):
         "observe the controller"
-        ctrl.theme  .observe(self._keys.NAME, lambda **_: self._setkeys())
-        ctrl.display.observe(self._keys.NAME, lambda **_: self._setkeys())
+        if self._bindings not in ctrl.theme:
+            fcn = lambda **_: self._setkeys()
+            ctrl.theme  .add    (self._bindings)
+            ctrl.theme  .observe(self._bindings, fcn)
+            ctrl.display.add    (self._keys)
+            ctrl.display.observe(self._keys,     fcn)
         self._setkeys()
 
     def addtodoc(self, ctrl, doc):

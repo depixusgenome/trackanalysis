@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 "Storing global properties"
 from    pathlib                import Path
-from    typing                 import Dict, Any
+from    typing                 import Dict, Any, Type, TYPE_CHECKING, cast
 import  appdirs
 from    utils.logconfig        import logToFile
 from    utils.inspection       import getclass
-from    view.keypress          import DpxKeyEvent
 from    anastore.configuration import readconfig, writeconfig
+if TYPE_CHECKING:
+    # pylint: disable=unused-import
+    from .maincontrol          import BaseSuperController
 
 CATCHERROR = True
 class ConfigurationIO:
@@ -31,30 +33,52 @@ class ConfigurationIO:
 
     def writeuserconfig(self, maps, name = None, saveall = False, **kwa):
         "writes the config"
+        if not maps:
+            maps = {}
         kwa['saveall'] = saveall
         writeconfig(maps, lambda i: self.configpath(i, name), **kwa)
 
-    def readuserconfig(self, maps):
+    def readconfig(self, maps, name = None):
+        "read a config"
+        if name is None:
+            return readconfig(self.configpath, maps = maps)
+        return readconfig(lambda i: self.configpath(i, name), maps = maps)
+
+    def readuserconfig(self, maps, update = False):
         "read the user config"
-        def _upd(left, right):
-            for i in set(left) & set(right):
-                if isinstance(left[i], dict):
-                    _upd(left[i], right[i])
-                else:
-                    left[i] = right[i]
-            return left
 
-        return _upd(_upd(maps, readconfig(self.configpath, maps = maps)),
-                    readconfig(lambda i: self.configpath(i, 'userconfig'), maps = maps))
+        autosave = self.readconfig(maps)
+        userconf = self.readconfig(maps, "userconfig")
+        if update:
+            def _upd(left, right):
+                if right:
+                    left.update({i: j for i, j in right.items()
+                                 if not isinstance(j, dict)})
 
-    def startup(self, maps):
-        "starts the controler"
-        self.writeuserconfig(maps, 'defaults',   index = 1, saveall   = True)
-        self.writeuserconfig(maps, 'userconfig', index = 0, overwrite = False)
-        return self.readuserconfig(maps)
+                    for i, j in right.items():
+                        if isinstance(j, dict):
+                            _upd(left[i], j)
+
+            _upd(maps, autosave)
+            _upd(maps, userconf)
+            return maps
+
+        if not userconf or not autosave:
+            return autosave if autosave else userconf if userconf else {}
+
+        def _agg(left, right):
+            if right:
+                left.update({i: j for i, j in right.items()
+                             if i not in left or not isinstance(j, dict)})
+
+                for i, j in left.items():
+                    if i in right and isinstance(j, dict):
+                        _agg(j, right[i])
+
+        return _agg(autosave, userconf)
 
     @classmethod
-    def createview(cls, controls, views, name) -> type:
+    def createview(cls, controls, views) -> type:
         "imports controls & returns the views & appname"
         get      = lambda i: getclass(i) if isinstance(i, str) else i
         controls = tuple(controls)
@@ -64,49 +88,21 @@ class ConfigurationIO:
         appname  = next((i.APPNAME for i in views if hasattr(i, 'APPNAME')),
                         cls(get(controls[0])))
 
-        cnfcls   = cls
         class Main(*views): # type: ignore
             "The main view"
-            APPNAME         = appname
-            KeyPressManager = DpxKeyEvent
-            MainControl     = type('MainControl', (controls[0],), dict(APPNAME = appname))
+            APPNAME     = appname
+            MainControl = cast(Type['BaseSuperController'],
+                               type('MainControl', controls[:1], dict(APPNAME = appname)))
+
             @classmethod
             def launchkwargs(cls, **kwa) -> Dict[str, Any]:
                 "updates kwargs used for launching the application"
-                cnf   = cnfcls(cls)
-                catch = getattr(cls.MainControl, 'CATCHERROR', CATCHERROR)
-                maps  = {name:     {'appsize': cnf.appsize,
-                                    'appname': cnf.appname.capitalize()},
-                         'config': {'catcherror': catch}
-                        }
-                maps = cnf.readuserconfig(maps)
-
-                setattr(cls.MainControl, 'CATCHERROR', maps['config']['catcherror'])
-                kwa.setdefault("title",  maps[name]["appname"])
-                kwa.setdefault("size",   maps[name]['appsize'])
-                return kwa
+                return cls.MainControl.launchkwargs(**kwa)
 
             @classmethod
             def open(cls, doc, **kwa):
                 "starts the application"
-                ctrl = cls.MainControl(None)
-                keys = cls.KeyPressManager(ctrl) if cls.KeyPressManager else None
-                self = cls(ctrl, **kwa)
-                ctrl.topview = self
-
-                cls.__bases__[0].ismain(self, ctrl)
-                ctrl.startup()
-
-                if keys:
-                    keys.observe(ctrl)
-                for i in cls.__bases__:
-                    getattr(i, 'observe', lambda *_: None)(self, ctrl)
-
-                if keys:
-                    keys.addtodoc(ctrl, doc)
-                self.addtodoc(ctrl, doc)
-                ctrl.handle('applicationstarted') # pylint: disable=protected-access
-                return self
+                return cls.MainControl.open(cls, doc, **kwa)
 
             def close(self):
                 "closes the application"

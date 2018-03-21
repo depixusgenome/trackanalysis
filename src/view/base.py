@@ -22,9 +22,9 @@ class View(ABC):
     "Classes to be passed a controller"
     action      = ActionDescriptor()
     computation = ActionDescriptor()
-    def __init__(self, **kwargs):
+    def __init__(self, ctrl = None, **_):
         "initializes the gui"
-        self._ctrl = kwargs['ctrl']
+        self._ctrl = ctrl
 
     def observe(self, ctrl):
         "whatever needs to be initialized"

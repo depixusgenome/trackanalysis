@@ -15,17 +15,14 @@ def writeconfig(maps, # pylint: disable=too-many-arguments
                 sort_keys    = True,
                 **kwa):
     "Writes up the user preferences."
-    if maps is None:
-        maps = readconfig(configpath, patchname)
-    else:
-        maps = {i: j.maps[index] if hasattr(j, 'maps') else j
-                for i, j in maps.items()}
-        maps = {i: j for i, j in maps.items() if len(j)}
-
     path = configpath(anastore.version(patchname))
     path.parent.mkdir(parents = True, exist_ok = True)
     path.touch(exist_ok = True)
-    anastore.dump(maps, path,
+
+    itr = ((i, j.maps[index] if hasattr(j, 'maps') else j) for i, j in maps.items())
+    tmp = {i: j for i, j in itr if len(j)}
+
+    anastore.dump(tmp, path,
                   patch        = patchname,
                   indent       = indent,
                   ensure_ascii = ensure_ascii,
