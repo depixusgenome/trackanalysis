@@ -125,6 +125,8 @@ def setdefault(self, name, kwargs, roots = ('',), # pylint: disable=too-many-arg
     else:
         if deepcpy is not None:
             setattr(self, fieldname, deepcopy(getattr(cpy, fieldname)))
+        elif isinstance(cpy, dict):
+            setattr(self, fieldname, cpy[fieldname])
         elif cpy is not None:
             setattr(self, fieldname, getattr(cpy, fieldname))
         else:
