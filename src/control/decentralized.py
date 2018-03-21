@@ -11,8 +11,8 @@ DELETE = type('DELETE', (), {})
 
 def updatemodel(self, model, kwa, force = False, deflt = None):
     "update the model"
-    kwa  = {i:j for i, j in kwa.items()
-            if hasattr(model, i) and getattr(model, i) != j}
+    kwa = {i:j for i, j in kwa.items()
+           if hasattr(model, i) and getattr(model, i) != j}
 
     if len(kwa) == 0 and not force:
         return None
@@ -158,7 +158,7 @@ class DecentralizedController(Controller):
         return self.__get(self._defaults)
 
     @property
-    def chainmaps(self) -> Dict[str, ChainMap]:
+    def config(self) -> Dict[str, ChainMap]:
         "returns a chainmap with default values & their changes"
         right = self.current
         return {i: ChainMap({j: k for j, k in right[i].items() if k != dflt[j]},

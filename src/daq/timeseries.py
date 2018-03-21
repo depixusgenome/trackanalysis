@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View module showing one or more time series"
-from typing             import TypeVar, Generic, List, cast
-from bokeh.plotting     import figure, Figure
-from bokeh.models       import ColumnDataSource, LinearAxis, DataRange1d
+from typing           import TypeVar, Generic, List, cast
 
-from utils              import initdefaults
-from view.plots.base    import PlotAttrs
+from bokeh.plotting   import figure, Figure
+from bokeh.models     import ColumnDataSource, LinearAxis, DataRange1d
 
-class TimeSeriesFormat:
+from utils            import initdefaults
+from utils.inspection import templateattribute
+from view.threaded    import ThreadedDisplay, DisplayModel
+from view.plots.base  import PlotAttrs
+
+class TimeSeriesTheme:
     "information about the time series displayed"
     fovnames    = {"zmag":    "Magnets (µm)",
                    "x":       "X (µm)",
@@ -32,72 +35,100 @@ class TimeSeriesFormat:
     def ___init__(self, **_):
         pass
 
-MODEL  = TypeVar("MODEL")
-FORMAT = TypeVar("FORMAT", bound = TimeSeriesFormat)
+DISPLAY = TypeVar("DISPLAY")
+THEME   = TypeVar("THEME", bound = TimeSeriesTheme)
 
-class TimeSeriesView(Generic[MODEL, FORMAT]):
+class TimeSeriesModel(Generic[DISPLAY, THEME], DisplayModel):
+    "Basic model for time series"
+    display: DISPLAY
+    theme:   THEME
+    def __init__(self, **kwa):
+        super().__init__()
+        self.display = cast(DISPLAY, templateattribute(self.__class__, 0)(**kwa))
+        self.theme   = cast(THEME,   templateattribute(self.__class__, 1)(**kwa))
+
+MODEL  = TypeVar("MODEL", bound = TimeSeriesModel)
+
+class TimeSeriesView(ThreadedDisplay[TimeSeriesModel[DISPLAY, THEME]]):
     "Display time series"
     XLEFT        = "xL"
     XRIGHT       = "xR"
     YLEFT        = "yL"
     YRIGHT       = "yR"
-    _format      : FORMAT
-    _model       : MODEL
     _leftsource  : ColumnDataSource
     _rightsource : ColumnDataSource
     _fig         : Figure
-
-    def create(self, _):
-        "sets the plot up"
-        fig = figure(toolbar_sticky   = self._format.toolbar['sticky'],
-                     toolbar_location = self._format.toolbar['location'],
-                     tools            = self._format.toolbar['items'],
-                     plot_width       = self._format.figsize[0],
-                     plot_height      = self._format.figsize[1],
-                     sizing_mode      = self._format.figsize[2],
-                     x_axis_label     = self._format.xlabel,
-                     y_axis_label     = self._format.fovnames[self._model.leftvar])
-
-        self._format.leftattr.addto(fig, x = self.XLEFT, y = self.YLEFT,
-                                    source = self._leftsource)
-
-        fig.extra_y_ranges = {self.YRIGHT: DataRange1d()}
-        fig.add_layout(LinearAxis(y_range_name = self.YRIGHT,
-                                  axis_label   = self._format.fovnames[self._model.rightvar]))
-        self._format.rightattr.addto(fig, x = self.XRIGHT, y = self.YRIGHT,
-                                     source       = self._rightsource,
-                                     y_range_name = self.YRIGHT)
-        self._fig = fig
-        return [fig]
+    def __init__(self, ctrl, **kwa):
+        mdl = cast(MODEL, templateattribute(type(self), 0)(**kwa)) # type: ignore
+        super().__init__(model = mdl)
+        if ctrl:
+            self.observe(ctrl)
 
     def observe(self, ctrl):
         "observe events"
-        assert self._model.NAME not in ctrl.displays
-        ctrl.displays[self._model.NAME] = self._model
-        ctrl.observe(self._model.NAME, self.reset)
+        theme = self._model.theme
+        displ = self._model.display
+        if displ not in ctrl.display:
+            ctrl.theme  .add    (theme)
+            ctrl.display.add    (displ)
+            ctrl.display.observe(displ, self.redisplay)
 
-    def reset(self, _):
+    def _addtodoc(self, *_):
+        "sets the plot up"
+        theme = self._model.theme
+        displ = self._model.display
+        fig   = figure(toolbar_sticky   = theme.toolbar['sticky'],
+                       toolbar_location = theme.toolbar['location'],
+                       tools            = theme.toolbar['items'],
+                       plot_width       = theme.figsize[0],
+                       plot_height      = theme.figsize[1],
+                       sizing_mode      = theme.figsize[2],
+                       x_axis_label     = theme.xlabel,
+                       y_axis_label     = theme.fovnames[displ.leftvar])
+
+        theme.leftattr.addto(fig,
+                             x      = self.XLEFT,
+                             y      = self.YLEFT,
+                             source = self._leftsource)
+
+        fig.extra_y_ranges = {self.YRIGHT: DataRange1d()}
+        fig.add_layout(LinearAxis(y_range_name = self.YRIGHT,
+                                  axis_label   = theme.fovnames[displ.rightvar]))
+        theme.rightattr.addto(fig,
+                              x            = self.XRIGHT,
+                              y            = self.YRIGHT,
+                              source       = self._rightsource,
+                              y_range_name = self.YRIGHT)
+        self._fig = fig
+        return [fig]
+
+    def _reset(self, _, cache):
         "resets the data"
-        names                                            = self._format.fovnames
-        self._fig.y_axis_label                           = names[self._model.leftvar]
-        self._fig.extra_y_ranges[self.YRIGHT].axis_label = names[self._model.rightvar]
+        names = tuple(self._theme.fovnames[getattr(self._model.display, f'{i}var')]
+                      for i in ('left', 'right'))
+        if self._fig.yaxis.axis_label != names[0]:
+            cache[self._fig.yaxis]['axis_label'] = names[0]
+        if self._fig.extra_y_ranges[self.YRIGHT].axis_label != names[1]:
+            cache[self._fig.extra_y_ranges[self.YRIGHT]]['axis_label'] = names[1]
 
-class BeadTimeSeries:
+    def redisplay(self, control = None, **_):
+        "resets the view"
+        self.reset(control)
+
+class BeadTimeSeries(DisplayModel):
     "Information about the current bead displayed"
-    NAME     = "currentbead"
+    name     = "currentbead"
     index    = 0
     leftvar  = "z"
     rightvar = "zmag"
     @initdefaults(frozenset(locals()))
     def ___init__(self, **_):
-        pass
-
-class BeadTimeSeriesView(TimeSeriesView[BeadTimeSeries, TimeSeriesFormat]):
-    "display the current bead"
-    def __init__(self):
         super().__init__()
-        self._model  = BeadTimeSeries()
-        self._format = TimeSeriesFormat()
+
+class BeadTimeSeriesView(TimeSeriesView[BeadTimeSeries, TimeSeriesTheme]):
+    "display the current bead"
+    def __init__(self, ctrl = None):
+        super().__init__(ctrl)
 
         lsrc = dict.fromkeys((self.XLEFT,  self.YLEFT),  cast(List[float], []))
         rsrc = dict.fromkeys((self.YRIGHT, self.YRIGHT), cast(List[float], []))
@@ -110,59 +141,60 @@ class BeadTimeSeriesView(TimeSeriesView[BeadTimeSeries, TimeSeriesFormat]):
         ctrl.observe(self._onbeaddata)
         ctrl.observe(self._onfovdata)
 
-    def reset(self, ctrl):
+    def _reset(self, control, cache):
         "resets the data"
-        super().reset(ctrl)
-        self._onbeaddata(ctrl, ctrl.data.beads)
-        self._onfovdata (ctrl, ctrl.data.fov)
+        super()._reset(control, cache)
+        lines = control.data.fov[:self._theme.maxlength]
+        cache[self._rightsource]['data'] = self.__data(lines, 'RIGHT')
 
-    def _onfovdata(self, control = None, lines = None, **_):
-        time = control.data.fov.dtype.names[0]
-        self._rightsource.stream({self.XRIGHT: lines[time],
-                                  self.YRIGHT: lines[self._model.rightvar]},
-                                 self._format.maxlength)
+        lines = control.data.beads[:self._theme.maxlength]
+        cache[self._leftsource]['data']  = self.__data(lines, 'LEFT')
 
-    def _onbeaddata(self, control = None, lines = None, **_):
-        time = control.data.beads.dtype.names[0]
-        var  = self._model.leftvar+str(self._model.index)
-        self._leftsource.stream({self.XLEFT: lines[time],
-                                 self.YLEFT: lines[var]},
-                                self._format.maxlength)
+    def _onfovdata(self, lines = None, **_):
+        self._rightsource.stream(self.__data(lines, 'RIGHT'), self._theme.maxlength)
 
-class FoVTimeSeries:
+    def _onbeaddata(self, lines = None, **_):
+        self._leftsource.stream(self.__data(lines, 'LEFT'), self._theme.maxlength)
+
+    def __data(self, data, side):
+        var  = 'rightvar' if side == 'RIGHT' else 'leftvar'
+        return {getattr(self, 'X'+side): data[data.dtype.names[0]],
+                getattr(self, 'Y'+side): data[getattr(self._display, var)]}
+
+class FoVTimeSeries(DisplayModel):
     "Information about the current bead displayed"
-    NAME     = "currentfov"
+    name     = "currentfov"
     leftvar  = "tsample"
     rightvar = "zmag"
     @initdefaults(frozenset(locals()))
     def ___init__(self, **_):
-        pass
+        super().__init__(**_)
 
-class FovTimeSeriesView(TimeSeriesView[FoVTimeSeries, TimeSeriesFormat]):
+class FovTimeSeriesView(TimeSeriesView[FoVTimeSeries, TimeSeriesTheme]):
     "display the current bead"
     XLEFT  = XRIGHT = "x"
-    def __init__(self):
-        super().__init__()
+    def __init__(self, ctrl  = None):
         src              = dict.fromkeys((self.XLEFT,  self.YRIGHT, self.YLEFT),
                                          cast(List[float], []))
         self._leftsource = self._rightsource = ColumnDataSource(src)
-        self._model      = FoVTimeSeries   (leftvar   = "tsample") # type: ignore
-        label            = TimeSeriesFormat.fovnames["tsample"]
-        self._format     = TimeSeriesFormat(leftlabel = label)     # type: ignore
+        label            = TimeSeriesTheme.fovnames["tsample"]
+        super().__init__(ctrl, leftvar  = "tsample", leftlabel = label)
 
     def observe(self, ctrl):
         "observe controler events"
         super().observe(ctrl)
         ctrl.observe(self._onfovdata)
 
-    def reset(self, ctrl):
+    def _reset(self, control, cache):
         "resets the data"
-        super().reset(ctrl)
-        self._onfovdata (ctrl, ctrl.data.fov)
+        super()._reset(control, cache)
+        lines = control.data.fov[:self._theme.maxlength]
+        cache[self._leftsource]['data'] = self.__data(lines)
 
-    def _onfovdata(self, control = None, lines = None, **_):
-        time = control.data.fov.dtype.names[0]
-        self._leftsource.stream({self.XLEFT: lines[time],
-                                 self.YLEFT: lines[self._model.leftvar],
-                                 self.YRIGHT: lines[self._model.rightvar]},
-                                self._format.maxlength)
+    def _onfovdata(self, lines = None, **_):
+        self._leftsource.stream(lines, self._theme.maxlength)
+
+    def __data(self, data):
+        return {self.XLEFT:  data[data.dtype.names[0]],
+                self.YLEFT:  data[self._display.leftvar],
+                self.YRIGHT: data[self._display.rightvar]}

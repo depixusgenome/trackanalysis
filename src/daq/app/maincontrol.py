@@ -17,7 +17,7 @@ class DAQSuperController(BaseSuperController):
 
     def _getmaps(self):
         maps                   = super()._getmaps()
-        maps['config.network'] = self.daq.config.network.chainmap
+        maps['config.network'] = self.daq.config.network.config
         return maps
 
     def _setmaps(self, maps):

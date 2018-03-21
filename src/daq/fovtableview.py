@@ -2,7 +2,10 @@
 # -*- coding: utf-8 -*-
 "Display the fov data into a table"
 import re
+from   typing        import List
 from   bokeh.models  import Div
+from   utils         import initdefaults
+from   view.threaded import ThreadedDisplay, DisplayModel
 
 _TEXT = """
 <div class='dpx-span'>
@@ -36,22 +39,26 @@ _TEXT = """
 <p></p>
 """.strip().replace("    ", "").replace("\n", "")
 
-class FoVTableModel:
+class FoVTableTheme(DisplayModel):
     "summary info on the field of view"
     template    = _TEXT
     refreshrate = 5
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
 
-class FoVTableWidget:
+class FoVTableView(ThreadedDisplay[FoVTableTheme]):
     "display summary info on the field of view"
-    def __init__(self):
-        self._model        = FoVTableModel()
-        self.__widget: Div = None
-        self.__columns     = re.findall(r'{\w+}', self._model.template)
-        self.__index       = 0
+    _FIND = re.compile(r'{\w+}')
+    def __init__(self, ctrl):
+        super().__init__(ctrl)
+        self.__widget:  Div       = None
+        self.__columns: List[str] = []
+        self.__index              = 0
 
-    def create(self, _):
+    def _addtodoc(self, *_):
         "creates the widget"
-        self.__columns = re.findall(r'{\w+}', self._model.template)
+        self.__columns = self._FIND.findall(self._model.template)
         text           = self._model.template.format(**dict.fromkeys(self.__columns, 0.))
         self.__widget  = Div(text = text)
         return [self.__widget]
@@ -60,11 +67,17 @@ class FoVTableWidget:
         """
         add observers to the controller
         """
-        ctrl.observe(self._onaddfovlines)
+        ctrl.daq.observe(self._onaddfovlines)
+
+    def _reset(self, control, cache):
+        cache[self.__widget]['text'] = self.__data(control.data.fov)
 
     def _onaddfovlines(self, lines = None, **_):
-        new = self.__index + len(lines)
-        if new // self._model.refreshrate > self.__index // self._model.refreshrate:
-            text = self._model.template.format(**{i: lines[-1][i] for  i in self.__columns})
-            self.__widget.update(text = text)
+        rate = self._model.refreshrate
+        new  = self.__index + len(lines)
+        if new // rate > self.__index // rate:
+            self.__widget.update(text = self.__data(lines))
         self.__index = new
+
+    def __data(self, lines):
+        return self._model.template.format(**{i: lines[-1][i] for  i in self.__columns})

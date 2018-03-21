@@ -145,7 +145,7 @@ class BaseSuperController:
     def _getmaps(self):
         maps = {'theme':  {'appsize': self.APPSIZE, 'appname': self.APPNAME.capitalize()},
                 'config': {'catcherror': DisplayController.CATCHERROR}}
-        for i, j in  self.theme.chainmaps.items():
+        for i, j in  self.theme.config.items():
             maps['theme.'+i] = j
         return maps
 

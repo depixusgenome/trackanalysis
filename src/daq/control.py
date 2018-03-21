@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "DAQ Controller"
-from   typing        import Optional, Dict, Union, Tuple, Any, Callable
-from   functools     import wraps
-import numpy         as     np
-from   control.event import Controller, NoEmission
-from   .model        import DAQConfig, DAQBead
-from   .data         import DAQData
+from   typing                   import Optional, Dict, Union, Tuple, Any, Callable
+from   functools                import wraps
+import numpy                    as     np
+from   control.event            import Controller, NoEmission
+from   control.decentralized    import updatemodel as _updatemodel
+from   .model                   import DAQConfig, DAQBead
+from   .data                    import DAQData
+
+def updatemodel(self, model, kwa, force = False):
+    "update the model"
+    out = _updatemodel(self, model, kwa, force)
+    if out is None:
+        raise NoEmission()
+    return out
 
 def configemit(fcn:Callable) -> Callable:
     """
@@ -18,32 +26,6 @@ def configemit(fcn:Callable) -> Callable:
     def _wrap(self, *args, **kwa):
         return None if self.config.recording.started else emitfcn(self, *args, **kwa)
     return _wrap
-
-def update(self, model, kwa, force = False):
-    "update the model"
-    kwa  = {i:j for i, j in kwa.items()
-            if hasattr(model, i) and getattr(model, i) != j}
-
-    if len(kwa) == 0 and not force:
-        raise NoEmission()
-
-    old  = {i: getattr(model, i) for i in kwa}
-    for i, j in kwa.items():
-        setattr(model, i, j)
-    return dict(control = self, model = model,  old = old)
-
-class DecentralizedController(Controller):
-    """
-    Controller to which can be added anything
-    """
-    def __init__(self, **kwa):
-        super().__init__(**kwa)
-        self.objects: Dict[str, Any] = {}
-
-    def update(self, name, **kwa):
-        "update a specific display and emits an event"
-        name = getattr(name, 'NAME', name)
-        return self.handle(name, update(self, self.objects[name], kwa))
 
 class DAQController(Controller):
     """
@@ -67,19 +49,19 @@ class DAQController(Controller):
     def startrecording(self, path: str, duration: Optional[int]) -> dict:
         "start recording"
         args = dict(started = True, path = path, duration = duration)
-        return update(self, self.config.recording, args)
+        return updatemodel(self, self.config.recording, args)
 
     @Controller.emit
     def stoprecording(self) -> dict:
         "stop recording"
         if not self.config.recording.started:
             raise NoEmission("no recording started")
-        return update(self, self.config.recording, dict(started = False))
+        return updatemodel(self, self.config.recording, dict(started = False))
 
     @configemit
     def updatenetwork(self, force = False, **kwa) -> dict:
         "update the config network"
-        out                          = update(self, self.config.network, kwa, force = force)
+        out                          = updatemodel(self, self.config.network, kwa, force = force)
         self.config.beads            = ()
         self.config.fovdata.columns  = self.config.network.fov.columns
         self.config.beaddata.columns = self.config.network.beads.columns
@@ -114,7 +96,7 @@ class DAQController(Controller):
     @configemit
     def updatebeads(self, *beads: Tuple[int, Union[Dict[str,Any], DAQBead]]) -> dict:
         "update *existing* beads"
-        # find out if there's anything to update
+        # find out if there's anything to updatemodel
         old   = self.config.beads
         new   = {i: self.__newbead(old[i], j) for i, j in dict(beads).items()}
         new   = {i: j for i, j in new.items() if j.__dict__ != old[i].__dict__}
@@ -137,7 +119,7 @@ class DAQController(Controller):
     @Controller.emit
     def listen(self, fov, beads) -> dict:
         "add lines of data"
-        return update(self, self.data, dict(fovstarted = fov, beadsstarted = beads))
+        return updatemodel(self, self.data, dict(fovstarted = fov, beadsstarted = beads))
 
     @Controller.emit
     def addfovdata(self, lines: np.ndarray) -> dict:

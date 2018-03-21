@@ -496,9 +496,9 @@ def test_decentralized():
         name = 'toto'
         aval = 1
         bval = ""
-        def __init__(self):
-            self.aval = 2
-            self.bval = ""
+        def __init__(self, **_):
+            self.aval = _.get('aval', 2)
+            self.bval = _.get("bval", "")
 
     class Tata(Dict):
         """
@@ -517,7 +517,7 @@ def test_decentralized():
             cnt[1] += 1
         ctrl.observe("totodefaults", _fcn1)
         ctrl.observe("toto",         _fcn2)
-        cmap  = ctrl.chainmaps['toto']
+        cmap  = ctrl.config['toto']
         assert len(cmap.maps[0]) == 0
         assert cmap.maps[1] == {'aval': 2, 'bval': ""}
 
@@ -525,7 +525,7 @@ def test_decentralized():
         assert cnt == [1, 1]
         assert get(ctrl.model('toto'), 'aval') == 3
         assert get(ctrl.model('toto'), 'bval') == ""
-        cmap  = ctrl.chainmaps['toto']
+        cmap  = ctrl.config['toto']
         assert len(cmap.maps[0]) == 0
         assert cmap.maps[1] == {'aval': 3, 'bval': ""}
 
@@ -539,7 +539,7 @@ def test_decentralized():
         assert cnt == [1, 2]
         assert get(ctrl.model('toto'), 'aval') == 4
         assert get(ctrl.model('toto'), 'bval') == ""
-        cmap  = ctrl.chainmaps['toto']
+        cmap  = ctrl.config['toto']
         assert cmap.maps[0] == {'aval': 4}
         assert cmap.maps[1] == {'aval': 3, 'bval': ""}
 
@@ -547,7 +547,7 @@ def test_decentralized():
         assert cnt == [2, 2]
         assert get(ctrl.model('toto'), 'aval') == 4
         assert get(ctrl.model('toto'), 'bval') == ""
-        cmap  = ctrl.chainmaps['toto']
+        cmap  = ctrl.config['toto']
         assert cmap.maps[0] == {'aval': 4}
         assert cmap.maps[1] == {'aval': 6, 'bval': ""}
 
@@ -564,7 +564,7 @@ def test_decentralized():
             assert get(ctrl.model('toto'), 'aval') == 4
             assert get(ctrl.model('toto'), 'bval') == ""
             assert get(ctrl.model('toto'), 'newval') == 5
-            cmap  = ctrl.chainmaps['toto']
+            cmap  = ctrl.config['toto']
             assert cmap.maps[0] == {'aval': 4}
             assert cmap.maps[1] == {'aval': 6, 'bval': "", 'newval': 5}
 
@@ -576,7 +576,7 @@ def test_decentralized():
             assert cnt == [4, 5]
             assert get(ctrl.model('toto'), 'aval') == 4
             assert get(ctrl.model('toto'), 'bval') == ""
-            cmap  = ctrl.chainmaps['toto']
+            cmap  = ctrl.config['toto']
             assert cmap.maps[0] == {'aval': 4}
             assert cmap.maps[1] == {'aval': 6, 'bval': ""}
         else:
@@ -592,7 +592,7 @@ def test_decentralized():
         assert cnt == [0, 1]
         assert get(ctrl.model('toto'), 'aval') == 6
         assert get(ctrl.model('toto'), 'bval') == ""
-        cmap  = ctrl.chainmaps['toto']
+        cmap  = ctrl.config['toto']
         assert len(cmap.maps[0]) == 0
         assert cmap.maps[1] == {'aval': 6, 'bval': ""}
 
