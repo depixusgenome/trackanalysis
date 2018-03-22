@@ -5,7 +5,7 @@ import re
 from   typing        import List
 from   bokeh.models  import Div
 from   utils         import initdefaults
-from   view.threaded import ThreadedDisplay, DisplayModel
+from   view.threaded import ThreadedDisplay, BaseModel
 
 _TEXT = """
 <div class='dpx-span'>
@@ -39,7 +39,7 @@ _TEXT = """
 <p></p>
 """.strip().replace("    ", "").replace("\n", "")
 
-class FoVTableTheme(DisplayModel):
+class FoVTableTheme(BaseModel):
     "summary info on the field of view"
     template    = _TEXT
     refreshrate = 5
@@ -51,10 +51,12 @@ class FoVTableView(ThreadedDisplay[FoVTableTheme]):
     "display summary info on the field of view"
     _FIND = re.compile(r'{\w+}')
     def __init__(self, ctrl):
-        super().__init__(ctrl)
+        super().__init__()
         self.__widget:  Div       = None
         self.__columns: List[str] = []
         self.__index              = 0
+        if ctrl is not None:
+            self.observe(ctrl)
 
     def _addtodoc(self, *_):
         "creates the widget"
@@ -67,7 +69,17 @@ class FoVTableView(ThreadedDisplay[FoVTableTheme]):
         """
         add observers to the controller
         """
+        if self._model in ctrl.theme:
+            return
+
+        ctrl.theme.add(self._model)
+        ctrl.theme.observe(self._model, lambda **_: self.reset(ctrl))
         ctrl.daq.observe(self._onaddfovlines)
+
+        @ctrl.daq.observe
+        def _onupdatefov(old = None, **_): # pylint: disable=unused-variable
+            if 'fov' in old:
+                self.reset(ctrl)
 
     def _reset(self, control, cache):
         cache[self.__widget]['text'] = self.__data(control.data.fov)

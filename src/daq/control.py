@@ -132,3 +132,8 @@ class DAQController(Controller):
         "add lines of data"
         self.data.beads.append(lines)
         return dict(control = self, lines = lines)
+
+    def setcurrentbead(self, bead: Optional[int]) -> dict:
+        "changes the current bead"
+        return self.handle("currentbead", self.emitpolicy.outasdict,
+                           dict(control = self, bead = bead))

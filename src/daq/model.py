@@ -46,7 +46,7 @@ class DAQNetwork:
     """
     All information related to the current protocol
     """
-    camera:    str = "rtsp://jupyter.depixus.org:9099"
+    camera:    str = "rtsp://192.168.1.56:8554/mystream"
     websocket: str = "ws://jupyter.depixus.org:9099"
     fov            = DAQClient()
     beads          = DAQClient(columns = [('time', 'i8'), *((i, 'f4') for i in 'xyz')])

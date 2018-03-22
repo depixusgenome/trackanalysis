@@ -6,12 +6,13 @@ from    collections         import OrderedDict
 from    contextlib          import contextmanager
 from    enum                import Enum
 from    time                import time
-from    typing              import TypeVar, Generic
+from    typing              import TypeVar, Generic, cast
 
 from    bokeh.document      import Document
 from    bokeh.models        import Model
 
 from    utils.logconfig     import getLogger
+from    utils.inspection    import templateattribute as _tattr
 from    .base               import threadmethod, spawn, SINGLE_THREAD
 
 LOGS    = getLogger(__name__)
@@ -24,7 +25,7 @@ class DisplayState(Enum):
     disabled     = 'disabled'
     outofdate    = 'outofdate'
 
-class DisplayModel(ABC):
+class BaseModel(ABC):
     "basic display model"
     def reset(self, _):
         "resets the model"
@@ -32,7 +33,17 @@ class DisplayModel(ABC):
     def clear(self):
         "clear the model"
 
-MODEL   = TypeVar('MODEL', bound = DisplayModel)
+MODEL   = TypeVar('MODEL', bound = BaseModel)
+DISPLAY = TypeVar("DISPLAY")
+THEME   = TypeVar("THEME")
+class DisplayModel(Generic[DISPLAY, THEME], BaseModel):
+    "Basic model for time series"
+    display: DISPLAY
+    theme:   THEME
+    def __init__(self, **kwa):
+        super().__init__()
+        self.display = cast(DISPLAY, _tattr(self, 0)(**kwa))
+        self.theme   = cast(THEME,   _tattr(self, 1)(**kwa))
 
 class _OrderedDict(OrderedDict):
     def __missing__(self, key):
@@ -42,10 +53,10 @@ class _OrderedDict(OrderedDict):
 
 class ThreadedDisplay(Generic[MODEL]): # pylint: disable=too-many-public-methods
     "Base plotter class"
-    def __init__(self, model: MODEL, **_) -> None:
+    def __init__(self, model: MODEL = None, **kwa) -> None:
         "sets up this plotter's info"
         super().__init__()
-        self._model          = model
+        self._model: MODEL   = _tattr(self, 0)(**kwa) if model is None else model
         self._doc:  Document = None
         self.state           = DisplayState.active
 
