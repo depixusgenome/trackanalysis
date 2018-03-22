@@ -51,9 +51,6 @@ class DAQServerView:
     def __init__(self):
         self._task = None
 
-    def __init_subclass__(cls, **args):
-        cls._NAME = args['name']
-
     @classmethod
     def _sanitycheck(cls, ctrl):
         # for now the network & data configuration should remain the same
@@ -62,7 +59,22 @@ class DAQServerView:
         dt2 = getattr(ctrl.config, cls._NAME+"data")
         assert [i for _, i in dt1.columns.descr] == [i for _, i in dt2.columns.descr]
 
-    async def _start(self, ctrl, loop):
+    def observe(self, ctrl):
+        "setup observers"
+        loop = asyncio.get_event_loop()
+
+        @ctrl.daq.observe
+        def _onlisten(old = None, **_): # pylint: disable=unused-variable
+            if self._NAME+'started' in old:
+                self.__start(ctrl, loop)
+
+        @ctrl.daq.observe
+        def _onupdatenetwork(old = None, **_): # pylint: disable=unused-variable
+            if self._NAME in old:
+                self.__start(ctrl, loop)
+
+    async def __start(self, ctrl, loop):
+        ctrl             = getattr(ctrl, 'daq', ctrl)
         self._task, task = None, cast(asyncio.Task, self._task)
         if task is not None:
             task.cancel()
@@ -75,31 +87,17 @@ class DAQServerView:
             ctrl = getattr(ctrl, f'add{self._NAME}data')
             self._task = asyncio.ensure_future(readdaq(cnf, ctrl), loop = loop)
 
-    def observe(self, ctrl):
-        "setup observers"
-        loop = asyncio.get_event_loop()
-        data = self._NAME+'started'
-        cnf  = self._NAME
-
-        def _onlisten(control = None, model = None, old = None, **_):
-            if model is control.data and data in old:
-                self._start(control, loop)
-        ctrl.observe(_onlisten)
-
-        def _onupdatenetwork(control = None, model = None, old = None, **_):
-            if model is control.config.network or cnf in old:
-                self._start(control, loop)
-        ctrl.observe(_onupdatenetwork)
-
-class DAQFoVServerView(DAQServerView, name = 'fov'):
+class DAQFoVServerView(DAQServerView):
     """
     Can listen to the FoV server
     """
+    NAME = 'fov'
 
-class DAQBeadsServerView(DAQServerView, name = 'beads'):
+class DAQBeadsServerView(DAQServerView):
     """
     Can listen to the FoV server
     """
+    NAME = 'beads'
 
 class _AwaitableDescriptor:
     __slots__ = ('_name',)
