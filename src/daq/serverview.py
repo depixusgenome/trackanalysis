@@ -25,12 +25,10 @@ async def readdaq(cnf, output):
     """
     Reads server data and outputs it
     """
-    pack     = struct.pack('4sL',
-                           socket.inet_aton(cnf.multicast),
-                           socket.INADDR_ANY)
+    pack     = struct.pack('4sL', socket.inet_aton(cnf.multicast), socket.INADDR_ANY)
     data     = np.zeros(cnf.packet, cnf.columns)
     address  = cnf.address
-    period   = cnf.period
+    period   = 1./cnf.rate
     bytesize = cnf.bytesize
     offset   = cnf.offset
     rng      = range(len(data)-1)

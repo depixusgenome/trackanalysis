@@ -21,15 +21,15 @@ async def writedaq(cnf: DAQClient = None, output = None):
         output = 300
 
     if np.isscalar(output):
-        tmp    = np.sin(np.arange(output, dtype = 'f4'))
+        tmp    = np.sin(np.arange(output, dtype = 'f4')/output*6*np.pi)
 
         cnt    = (cnf.bytesize - cnf.offset -cnf.columns.itemsize)//4
         ncols  = len(cnf.columns.names)
 
         vals   = ([np.empty(output, dtype = 'f4')]*(cnf.offset//4)
-                  + [np.arange(output)]
-                  + [np.roll(tmp*i, i*10) for i in range(ncols-1)]
-                  + [np.empty(output, dtype = 'f4')]*cnt)
+                  + [np.arange(output, dtype = 'i8')])
+        vals  += [np.roll(tmp*(i+1), i*10) for i in range(ncols-1)]
+        vals  += [np.empty(output, dtype = 'f4')]*cnt
 
         dtype  = ([(f'l{i}', 'f4') for i in range(cnf.offset//4)]
                   + cnf.columns.descr
@@ -37,18 +37,17 @@ async def writedaq(cnf: DAQClient = None, output = None):
         output = np.array([tuple(vals[j][i] for j in range(len(vals)))
                            for i in range(output)], dtype = dtype)
 
+    addr   = cnf.multicast, cnf.address[1]
+    period = 1./cnf.rate
     sock   = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     with closing(sock):
-        sock.setsockopt(socket.IPPROTO_IP,
-                        socket.IP_ADD_MEMBERSHIP,
-                        struct.pack('4sL',
-                                    socket.inet_aton(cnf.multicast),
-                                    socket.INADDR_ANY))
-        sock.bind(cnf.address)
-        sock.connect(cnf.address)
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, struct.pack('b', 1))
+        sock.bind(addr)
+        sock.connect(addr)
         while True:
             for data in output:
                 sock.send(data.tobytes())
+                await asyncio.sleep(period)
 
 def runserversimulator(cnf: DAQClient = None, output = None, subprocess = True, **kwa):
     "run the simulator"

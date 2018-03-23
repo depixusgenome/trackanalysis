@@ -28,7 +28,7 @@ class DAQClient:
     All information related to the current protocol
     """
     multicast = '239.255.0.1'
-    period    = 30 # milliseconds
+    rate      = 1./3e-2 # milliseconds
     address   = ('', 30001)
     bytesize  = 64
     offset    = 4
