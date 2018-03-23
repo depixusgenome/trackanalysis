@@ -145,5 +145,23 @@ class DAQController(Controller):
         """
         setup the daq data
         """
-        get       = lambda i: getattr(ctrl.theme.model(i+'memory'),   'maxlength', 10000)
-        self.data = DAQData(self, get("fov"), get("beads"))
+        def _do(name, old):
+            mlen = getattr(ctrl.theme.model(name+'memory'),   'maxlength', 10000)
+            vect = getattr(self.data, name)
+            if mlen != vect.maxlength:
+                old[name] = getattr(self.data, name+'started')
+                setattr(self.data, 'fov', type(vect)(ctrl, mlen))
+
+        def _onupdate(**_):
+            old: Dict[str, bool] = {}
+            _do('fov',   old)
+            _do('beads', old)
+            if old:
+                self.handle("listen", self.emitpolicy.outasdict,
+                            dict(control = self, old = old))
+
+        for i in ("fov", "beads"):
+            if i in ctrl.theme:
+                ctrl.theme.observe(i, _onupdate)
+                ctrl.theme.observe("started"+i, _onupdate)
+        _onupdate()
