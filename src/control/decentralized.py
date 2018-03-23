@@ -59,6 +59,8 @@ class DecentralizedController(Controller):
         assert obj.name not in self._objects
         self._objects[obj.name]  = obj
         self._defaults[obj.name] = deepcopy(obj)
+        self.handle("added"+obj.name, self.emitpolicy.outasdict,
+                    dict(control = self, model = obj))
 
     def keys(self):
         "return the available keys in this controller"
