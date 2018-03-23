@@ -17,6 +17,12 @@ class ColDescriptor:
     def __set__(self, inst, val: Union[np.dtype, List[Tuple[str, str]]]):
         inst.__dict__['columns'] = np.dtype(val)
 
+FOVTYPE  = [("time",  'i8'), ("zmag", 'f4'), ("vmag",    'f4'), ("zobj",    'f4'),
+            ("x",     'f4'), ("y",    'f4'), ("tsample", 'f4'), ("tmagnet", 'f4'),
+            ("tsink", 'f4'), ("led1", 'f4'), ("led2",    'f4')]
+
+BEADTYPE = [('time', 'i8'),  ("x", 'f4'), ("y", 'f4'), ("z", 'f4')]
+
 class DAQClient:
     """
     All information related to the current protocol
@@ -27,17 +33,7 @@ class DAQClient:
     bytesize  = 64
     offset    = 4
     packet    = 3
-    columns   = cast(np.dtype, ColDescriptor([("time",    'i8'),
-                                              ("zmag",    'f4'),
-                                              ("vmag",    'f4'),
-                                              ("zobj",    'f4'),
-                                              ("x",       'f4'),
-                                              ("y",       'f4'),
-                                              ("tsample", 'f4'),
-                                              ("tmagnet", 'f4'),
-                                              ("tsink",   'f4'),
-                                              ("led1",    'f4'),
-                                              ("led2",    'f4')]))
+    columns   = cast(np.dtype, ColDescriptor(FOVTYPE))
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
@@ -48,8 +44,8 @@ class DAQNetwork:
     """
     camera:    str = "rtsp://192.168.1.56:8554/mystream"
     websocket: str = "ws://jupyter.depixus.org:9099"
-    fov            = DAQClient()
-    beads          = DAQClient(columns = [('time', 'i8'), *((i, 'f4') for i in 'xyz')])
+    fov            = DAQClient(columns = FOVTYPE)
+    beads          = DAQClient(columns = BEADTYPE)
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
@@ -151,16 +147,6 @@ class DAQRecording:
     def __init__(self, **kwa):
         pass
 
-class DAQDataConfig:
-    """
-    All global information related to a set of data
-    """
-    columns   = ["x", "y", "z"]
-    maxlength = 5000
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **kwa):
-        pass
-
 class DAQBead:
     """
     All global information related to a bead
@@ -178,8 +164,6 @@ class DAQConfig:
     protocol: DAQProtocol         = DAQIdle()
     beads :   Tuple[DAQBead, ...] = ()
 
-    fovdata     = DAQDataConfig(columns = network.fov.columns,  maxlength = 60000)
-    beaddata    = DAQDataConfig(columns = np.dtype("f4,f4,f4"), maxlength = 60000)
     defaultbead = DAQBead()
     recording   = DAQRecording()
 

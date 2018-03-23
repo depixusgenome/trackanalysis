@@ -10,7 +10,7 @@ class DAQSuperController(BaseSuperController):
     Main controller: contains all sub-controllers.
     These share a common dictionnary of handlers
     """
-    APPNAME    = 'DataAcquisition'
+    APPNAME = 'DataAcquisition'
     def __init__(self, view):
         super().__init__(view)
         self.daq = DAQController()
@@ -21,11 +21,18 @@ class DAQSuperController(BaseSuperController):
         return maps
 
     def _setmaps(self, maps):
-        self.daq.updatenetwork(**maps['config.network'])
+        net = maps.pop('config.network', None)
+        if net:
+            self.daq.updatenetwork(**net)
         super()._setmaps(maps)
 
     def _observeargs(self):
         return (self.daq, "updatenetwork")
+
+    def _observe(self, keys):
+        "starts the controler"
+        self.daq.setup(self)
+        super()._observe(keys)
 
 def createview(main, controls, views):
     "Creates a main view"

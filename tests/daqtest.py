@@ -10,7 +10,7 @@ from daq.control     import DAQController
 def test_roundrobin():
     "test round robin"
     dtype = np.dtype('f4,f4,f4')
-    vect  = RoundRobinVector(dtype, 10)
+    vect  = RoundRobinVector(10, dtype)
     assert vect.view().dtype == dtype
     assert vect.view().size  == 0
 
@@ -34,12 +34,12 @@ def test_roundrobin():
     assert_equal(vect.view(), truth[29:39])
 
     base  = np.dtype([('t', 'I8'), ('x', 'f4'), ('y', 'f4')])
-    beads = BeadsRoundRobinVector.beadstype(3, base)
+    beads = BeadsRoundRobinVector.fulltype(3, base)
     assert beads == np.dtype([('t', 'I8'),
                               ('x0', 'f4'), ('y0', 'f4'),
                               ('x1', 'f4'), ('y1', 'f4'),
                               ('x2', 'f4'), ('y2', 'f4')])
-    vect = BeadsRoundRobinVector(3, base, 10)
+    vect = BeadsRoundRobinVector(10, 3, base)
     assert vect.view().dtype == beads
 
     beads = np.dtype([('t', 'I8'),

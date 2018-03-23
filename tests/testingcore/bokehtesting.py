@@ -154,8 +154,8 @@ class _ManagedServerLoop:
             return amod
 
         if '.' in amod and 'A' <= amod[amod.rfind('.')+1] <= 'Z':
-            modname = amod[:amod.rfind('.')]
-            attr    = (amod[amod.rfind('.')+1:],)
+            modname     = amod[:amod.rfind('.')]
+            attr:tuple  = (amod[amod.rfind('.')+1:],)
         else:
             modname = amod
             attr    = tuple()
@@ -166,13 +166,14 @@ class _ManagedServerLoop:
         return mod
 
     def __patchserver(self, server):
-        @classmethod
-        def _open(_, doc, _func_ = server.MainView.open):
-            self.doc = doc
+        def _open(_, viewcls, doc, _func_ = server.MainView.MainControl.open, **kwa):
             doc.add_root(DpxTestLoaded())
-            self.view = _func_(doc)
+            self.doc  = doc
+            ctrl      = server.MainView.MainControl(None)
+            self.view = getattr(ctrl, '_open')(viewcls, doc, kwa)
+            setattr(self.view, '_ctrl', ctrl)
             return self.view
-        server.MainView.open = _open
+        server.MainView.MainControl.open = classmethod(_open)
 
         def _close(this, _func_ = server.MainView.close):
             self.server = None

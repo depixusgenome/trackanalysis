@@ -60,6 +60,14 @@ class TimeSeriesViewMixin:
         ctrl.display.observe(displ, partial(self.redisplay, ctrl))
 
         ctrl.daq.observe('updatenetwork', self.redisplay)
+
+        @ctrl.daq.observe
+        def _onlisten(**_): # pylint: disable=unused-variable
+            for src in (self._leftsource, self._rightsource):
+                tmp = dict(self._source.data)
+                tmp.clear()
+                src.data = tmp
+
         for i in ('_onbeaddata', '_onfovdata'):
             if hasattr(self, i):
                 ctrl.daq.observe(getattr(self, i))

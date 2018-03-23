@@ -80,7 +80,8 @@ class BaseSuperController:
     def _open(self, viewcls, doc, kwa):
         keys         = DpxKeyEvent(self)
         self.topview = viewcls(self, **kwa)
-        viewcls.__bases__[0].ismain(self.topview, self)
+        if hasattr(viewcls.__bases__[0], 'ismain'):
+            viewcls.__bases__[0].ismain(self.topview, self)
 
         self._configio()
         self._observe(keys)
@@ -124,7 +125,8 @@ class BaseSuperController:
         for mdl in orders().dynloads():
             getattr(sys.modules.get(mdl, None), 'document', lambda x: None)(doc)
         keys.addtodoc(self, doc)
-        self.topview.addtodoc(self, doc)
+        if hasattr(self.topview, 'addtodoc'):
+            self.topview.addtodoc(self, doc)
 
     def _configio(self):
         cnf  = ConfigurationIO(self)
@@ -151,7 +153,7 @@ class BaseSuperController:
 
     def _setmaps(self, maps):
         for i, j in maps.items():
-            if i.startswith('theme.'):
+            if i.startswith('theme.') and i[6:] in self.theme and j:
                 self.theme.update(i[6:], **j)
 
     def _observeargs(self):

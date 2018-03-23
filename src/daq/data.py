@@ -11,9 +11,8 @@ class RoundRobinVector:
     vector for speeding outputs
     """
     _BUFFERSIZE = 3
-    def __init__(self, columns: np.dtype, maxlength: int) -> None:
-        dtype        = [(i, 'f4') for i in columns]
-        self._array  = np.ndarray(maxlength*self._BUFFERSIZE, dtype = dtype)
+    def __init__(self, maxlength:int, columns: np.dtype) -> None:
+        self._array  = np.ndarray(maxlength*self._BUFFERSIZE, dtype = columns)
         self._index  = slice(0, 0)
         self._length = self._array.size//self._BUFFERSIZE
 
@@ -36,32 +35,92 @@ class RoundRobinVector:
         self._index      = slice(max(ind.stop - self._length, 0), ind.stop)
         self._array[ind] = lines
 
-    def reconfigure(self, columns:np.dtype, maxlength:int):
+    def reconfigure(self, maxlength: int, *args):
         "sets a new max length"
-        if self._length == maxlength and self._array.dtype.names == columns:
+        # pylint: disable=no-value-for-parameter
+        samedata = self.fulltype(*args) == self._array.dtype
+        if self._length == maxlength and samedata:
             return self
 
-        copy = self.__class__(columns, maxlength)
-        if self._array.dtype.names == columns:
+        copy = self.__class__(maxlength, *args)
+        if samedata:
             copy.append(self.view()[:maxlength])
         return copy
+
+    @property
+    def basetype(self) -> np.dtype:
+        "return the dtype"
+        return self._array.dtype
+
+    @property
+    def maxlength(self) -> int:
+        "return the max length of the arra"
+        return self._length
+
+    @staticmethod
+    def fulltype(columns, *_):
+        "return the full type of the array (used by child classes)"
+        return columns
 
     def clear(self):
         "removes all data"
         self._index = (0, 0)
 
+class FoVRoundRobinVector(RoundRobinVector):
+    """
+    Deals with fov data
+    """
+    def __init__(self, maxlength:int, offset:int, columns: np.dtype, bytesize:int) -> None:
+        super().__init__(maxlength, self.fulltype(offset, columns, bytesize))
+    setup = __init__
+
+    @staticmethod
+    def fulltype(offset:    int,    # type: ignore # pylint: disable=arguments-differ
+                 columns:   np.dtype,
+                 bytesize:  int,
+                 *_):
+        "create the dtype for all beads"
+        right = bytesize-offset-columns.itemsize
+        assert offset >= 0 and offset % 4 == 0 and right >= 0 and right % 4 == 0
+        cols = [*((f"_l{i}", 'i4') for i in range(offset//4)),
+                *columns.descr,
+                *((f"_r{i}", 'i4') for i in range(right//4))]
+        return np.dtype(cols)
+
+    @property
+    def basetype(self):
+        "create the basic dtype for the fov"
+        left = size = 0
+        for left, name in enumerate(self._array.dtype.names):
+            if name[:2] != 'l_':
+                break
+
+        for size, name in enumerate(self._array.dtype.names[left:]):
+            if name[:2] == 'r_':
+                break
+
+        return np.dtype(self._array.dtype.descr[left:size+left])
+
+    @classmethod
+    def create(cls, config, maxlen) -> 'FoVRoundRobinVector':
+        "create an instance"
+        fov = config.network.fov
+        return cls(maxlen, fov.offset, fov.columns, fov.bytesize)
+
 class BeadsRoundRobinVector(RoundRobinVector):
     """
     Deals with bead data
     """
-    def __init__(self, nbeads:int, columns: np.dtype, maxlength: int) -> None:
-        super().__init__(self.beadstype(nbeads, columns), maxlength)
+    def __init__(self, maxlength:int, nbeads:int, columns: np.dtype) -> None:
+        super().__init__(maxlength, self.fulltype(nbeads, columns))
         self._ncols  = len(columns.names)
         self._nbeads = nbeads
     setup = __init__
 
     @staticmethod
-    def beadstype(nbeads, columns):
+    def fulltype(nbeads:int,    # type: ignore # pylint: disable=arguments-differ
+                 columns: np.dtype,
+                 *_):
         "create the dtype for all beads"
         cols = columns.descr[:1]
         for i in range(nbeads):
@@ -89,15 +148,18 @@ class BeadsRoundRobinVector(RoundRobinVector):
         if nbeads != self._nbeads:
             self.setup(nbeads, self.basetype, self._length)
 
+    @classmethod
+    def create(cls, config, maxlen) -> 'BeadsRoundRobinVector':
+        "create an instance"
+        return cls(maxlen, len(config.beads), config.network.beads.columns)
+
 class DAQData:
     """
     All information related to the DAQ
     """
-    def __init__(self, config):
-        self.fov          = RoundRobinVector(config.fovdata.columns, config.fovdata.maxlength)
-        self.beads        = BeadsRoundRobinVector(len(config.beads),
-                                                  config.beaddata.columns,
-                                                  config.beaddata.maxlength)
+    def __init__(self, config, fovmaxlen  = 10000, beadsmaxlen = 10000):
+        self.fov          = FoVRoundRobinVector  .create(config, fovmaxlen)
+        self.beads        = BeadsRoundRobinVector.create(config, beadsmaxlen)
         self.fovstarted   = False
         self.beadsstarted = False
 

@@ -4,9 +4,12 @@
 Acces to the camera stream
 """
 from   typing                 import Dict, Any
+
+import numpy                  as     np
+import bokeh.core.properties  as     props
+
 from   bokeh.models           import Model, ColumnDataSource
 from   bokeh.plotting         import figure, Figure
-import bokeh.core.properties  as     props
 
 from   utils                  import initdefaults
 from   view.plots.base        import PlotAttrs
@@ -27,6 +30,7 @@ class CameraTheme:
     name        = 'camera'
     xlabel      = "x (µm)"
     ylabel      = "y (µm)"
+    names       = PlotAttrs("lightblue", "text", x_offset = 5)
     position    = PlotAttrs("lightblue", "circle",
                             size                 = 10,
                             alpha                = 0.3,
@@ -56,7 +60,7 @@ class DAQCameraView(ThreadedDisplay[DisplayModel[CameraDisplay, CameraTheme]]):
         self._cam:   DpxDAQCamera     = None
         self._fig:   Figure           = None
 
-        cols = ('x', 'y', 'width', 'height')
+        cols = ('x', 'y', 'width', 'height', "text")
         self._source: ColumnDataSource = ColumnDataSource({i: [] for i in cols})
         if ctrl is not None:
             self.observe(ctrl)
@@ -79,6 +83,7 @@ class DAQCameraView(ThreadedDisplay[DisplayModel[CameraDisplay, CameraTheme]]):
         theme.roi.addto(fig, **{i: i for i in ('x', 'y', 'width', 'height')},
                         source = self._source)
         theme.position.addto(fig, **{i: i for i in ('x', 'y')}, source = self._source)
+        theme.names.addto(fig, **{i: i for i in ('x', 'y', 'text')}, source = self._source)
 
         def _onclickedbead_cb(attr, old, new):
             inds = self._source.selected.get('1d', {}).get('indices', [])
@@ -112,6 +117,12 @@ class DAQCameraView(ThreadedDisplay[DisplayModel[CameraDisplay, CameraTheme]]):
         def _oncurrentbead(bead = None, **_): # pylint: disable=unused-variable
             self.display.model(self._model.display, currentbead = bead)
 
+        @ctrl.daq.observe
+        def _onlisten(**_): # pylint: disable=unused-variable
+            tmp = dict(self._source.data)
+            tmp.clear()
+            self._source.data = tmp
+
         @ctrl.display.observe
         def _oncamera(old = None, **_): # pylint: disable=unused-variable
             if 'currentbead' in old:
@@ -120,8 +131,9 @@ class DAQCameraView(ThreadedDisplay[DisplayModel[CameraDisplay, CameraTheme]]):
     def __data(self, ctrl) -> Dict[str, Any]:
         roi  = lambda i: [j.roi[i] for j in ctrl.daq.config.beads]
         cols = ('x', 'y', 'width', 'height')
-        return {'data': {j: roi(i) for i, j in enumerate(cols)},
-                'selected': self.__selected(ctrl)}
+        data = {j: roi(i) for i, j in enumerate(cols)}
+        data['text'] = np.arange(len(ctrl.daq.config.beads))
+        return {'data': data, 'selected': self.__selected(ctrl)}
 
     def __selected(self, ctrl) -> Dict[str, Any]:
         bead                 = ctrl.display.model('camera').currentbead

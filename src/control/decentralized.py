@@ -126,8 +126,9 @@ class DecentralizedController(Controller):
         return self.__update('_objects', name, kwa)
 
     def model(self, name, defaults = False):
-        "return the model associated to a name"
-        return (self._defaults if defaults else self._objects)[getattr(name, 'name', name)]
+        "return the model associated to a name or `None` if not found"
+        name = getattr(name, 'name', name)
+        return (self._defaults if defaults else self._objects).get(name, None)
 
     def observe(self, *anames, decorate = None, argstest = None, **kwargs):
         """

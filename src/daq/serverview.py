@@ -5,13 +5,16 @@ import socket
 import struct
 import asyncio
 
-from   contextlib   import closing, suppress
-from   typing       import Tuple, cast
+from   contextlib       import closing, suppress
+from   typing           import Tuple, TypeVar, Generic, cast
 
 import websockets
-import numpy        as     np
+import numpy            as     np
 
-from   .model       import DAQBead, DAQProtocol, DAQNetwork
+from   utils            import initdefaults
+from   utils.inspection import templateattribute
+from   .data            import RoundRobinVector, FoVRoundRobinVector, BeadsRoundRobinVector
+from   .model           import DAQBead, DAQProtocol, DAQNetwork
 
 async def send2daq(cnf, text):
     "sends a Lua script to the DAQ"
@@ -43,24 +46,32 @@ async def readdaq(cnf, output):
                 data[i] = sock.recvfrom(bytesize)[0][offset:]
             dontstop = output(data)
 
-class DAQServerView:
+class DAQMemory:
+    """
+    Relative to the amount of raw memory to keep
+    """
+    name      = "memory"
+    maxlength = 10000
+    packet    = 5
+    @initdefaults
+    def __init__(self, **_):
+        pass
+
+DATA = TypeVar('DATA', bound = RoundRobinVector)
+
+class DAQServerView(Generic[DATA]):
     """
     Can listen to the server
     """
     _NAME = ''
-    def __init__(self):
-        self._task = None
-
-    @classmethod
-    def _sanitycheck(cls, ctrl):
-        # for now the network & data configuration should remain the same
-        # Otherwise the calls to the controller should be changed
-        dt1 = getattr(ctrl.config.network, cls._NAME)
-        dt2 = getattr(ctrl.config, cls._NAME+"data")
-        assert [i for _, i in dt1.columns.descr] == [i for _, i in dt2.columns.descr]
+    _data: DATA
+    def __init__(self, **kwa) -> None:
+        self._task  = None
+        self._theme = DAQMemory(name = self._NAME+'memory', **kwa)
 
     def observe(self, ctrl):
         "setup observers"
+        ctrl.theme.add(self._theme)
         loop = asyncio.get_event_loop()
 
         @ctrl.daq.observe
@@ -73,6 +84,34 @@ class DAQServerView:
             if self._NAME in old:
                 self.__start(ctrl, loop)
 
+    async def readdaq(self, ctrl):
+        """
+        Reads server data and outputs it
+        """
+        cnf      = getattr(ctrl.config.network, self._NAME)
+        call     = getattr(ctrl, f'add{self._NAME}data')
+        pack     = struct.pack('4sL',
+                               socket.inet_aton(cnf.multicast),
+                               socket.INADDR_ANY)
+        data     = getattr(ctrl.data, self._NAME)
+
+        address  = cnf.address
+        period   = cnf.period
+        bytesize = cnf.bytesize
+        rng      = range(1, self._theme.packet)
+        dontstop = True
+        while dontstop:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.bind(address)
+            sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, pack)
+            cur = data.nextlines(rng.stop)
+            with closing(sock):
+                sock.recv_into(cur[0], bytesize)
+                for i in rng:
+                    await asyncio.sleep(period)
+                    sock.recv_into(cur[i], bytesize)
+                dontstop = call(cur)
+
     async def __start(self, ctrl, loop):
         ctrl             = getattr(ctrl, 'daq', ctrl)
         self._task, task = None, cast(asyncio.Task, self._task)
@@ -82,22 +121,22 @@ class DAQServerView:
                 await task
 
         if getattr(ctrl.data, self._NAME+'started') and self._task is None:
-            self._sanitycheck(ctrl)
-            cnf  = getattr(ctrl.config.network, self._NAME)
-            ctrl = getattr(ctrl, f'add{self._NAME}data')
-            self._task = asyncio.ensure_future(readdaq(cnf, ctrl), loop = loop)
+            self._task = asyncio.ensure_future(self.readdaq(ctrl), loop = loop)
 
-class DAQFoVServerView(DAQServerView):
+    def _createdata(self, ctrl):
+        templateattribute(self, 0).create(ctrl, self._theme.maxlength) # type: ignore
+
+class DAQFoVServerView(DAQServerView[FoVRoundRobinVector]):
     """
     Can listen to the FoV server
     """
-    NAME = 'fov'
+    _NAME = 'fov'
 
-class DAQBeadsServerView(DAQServerView):
+class DAQBeadsServerView(DAQServerView[BeadsRoundRobinVector]):
     """
     Can listen to the FoV server
     """
-    NAME = 'beads'
+    _NAME = 'beads'
 
 class _AwaitableDescriptor:
     __slots__ = ('_name',)

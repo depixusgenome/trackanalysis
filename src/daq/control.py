@@ -61,11 +61,10 @@ class DAQController(Controller):
     @configemit
     def updatenetwork(self, force = False, **kwa) -> dict:
         "update the config network"
-        out                          = updatemodel(self, self.config.network, kwa, force = force)
-        self.config.beads            = ()
-        self.config.fovdata.columns  = self.config.network.fov.columns
-        self.config.beaddata.columns = self.config.network.beads.columns
-        self.data                    = DAQData(self.config)
+        out               = updatemodel(self, self.config.network, kwa, force = force)
+        self.config.beads = ()
+        self.data.fov.clear()
+        self.data.beads.clear()
         return out
 
     @configemit
@@ -119,21 +118,32 @@ class DAQController(Controller):
     @Controller.emit
     def listen(self, fov, beads) -> dict:
         "add lines of data"
+        if fov:
+            self.data.fov   = self.data.fov  .create(self, self.data.fov.maxlength)
+        if beads:
+            self.data.beads = self.data.beads.create(self, self.data.beads.maxlength)
         return updatemodel(self, self.data, dict(fovstarted = fov, beadsstarted = beads))
 
-    @Controller.emit
     def addfovdata(self, lines: np.ndarray) -> dict:
         "add lines of data"
-        self.data.fov.append(lines)
-        return dict(control = self, lines = lines)
+        return self.handle("addfovdata",
+                           self.emitpolicy.outasdict,
+                           dict(control = self, lines = lines))
 
-    @Controller.emit
     def addbeaddata(self, lines: Dict[int, np.ndarray]) -> dict:
         "add lines of data"
-        self.data.beads.append(lines)
-        return dict(control = self, lines = lines)
+        return self.handle("addbeaddata",
+                           self.emitpolicy.outasdict,
+                           dict(control = self, lines = lines))
 
     def setcurrentbead(self, bead: Optional[int]) -> dict:
         "changes the current bead"
         return self.handle("currentbead", self.emitpolicy.outasdict,
                            dict(control = self, bead = bead))
+
+    def setup(self, ctrl):
+        """
+        setup the daq data
+        """
+        get       = lambda i: getattr(ctrl.theme.model(i+'memory'),   'maxlength', 10000)
+        self.data = DAQData(self, get("fov"), get("beads"))
