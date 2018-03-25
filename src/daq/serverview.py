@@ -5,16 +5,22 @@ import socket
 import struct
 import asyncio
 
-from   contextlib       import closing, suppress
-from   typing           import Tuple, TypeVar, Generic, cast
+from   contextlib       import closing
+from   functools        import partial
+from   typing           import Tuple, TypeVar, Generic
 
 import websockets
 import numpy            as     np
 
+from   tornado.ioloop   import IOLoop
+
 from   utils            import initdefaults
+from   utils.logconfig  import getLogger
 from   utils.inspection import templateattribute
 from   .data            import RoundRobinVector, FoVRoundRobinVector, BeadsRoundRobinVector
 from   .model           import DAQBead, DAQProtocol, DAQNetwork
+
+LOGS = getLogger(__name__)
 
 async def send2daq(cnf, text):
     "sends a Lua script to the DAQ"
@@ -50,7 +56,8 @@ class DAQMemory:
     """
     name      = "memory"
     maxlength = 10000
-    packet    = 5
+    packet    = 1
+    timeout   = .05
     @initdefaults
     def __init__(self, **_):
         pass
@@ -64,62 +71,63 @@ class DAQServerView(Generic[DATA]):
     _NAME = ''
     _data: DATA
     def __init__(self, **kwa) -> None:
-        self._task  = None
+        self._index = 0
         self._theme = DAQMemory(name = self._NAME+'memory', **kwa)
 
     def observe(self, ctrl):
         "setup observers"
         ctrl.theme.add(self._theme)
-        loop = asyncio.get_event_loop()
+        ctrl.daq.observe(listen        = partial(self._onstart, ctrl, 'started'),
+                         updatenetwork = partial(self._onstart, ctrl, ''))
 
-        @ctrl.daq.observe
-        def _onlisten(old = None, **_): # pylint: disable=unused-variable
-            if self._NAME+'started' in old:
-                self.__start(ctrl, loop)
+    def _onstart(self, ctrl, name, old = None, **_):
+        if self._NAME+name in old:
+            async def _start():
+                await self.__start(ctrl)
+            IOLoop.current().spawn_callback(_start)
 
-        @ctrl.daq.observe
-        def _onupdatenetwork(old = None, **_): # pylint: disable=unused-variable
-            if self._NAME in old:
-                self.__start(ctrl, loop)
-
-    async def readdaq(self, ctrl):
+    async def __readdaq(self, index, cnf, data, call):
         """
         Reads server data and outputs it
         """
-        cnf      = getattr(ctrl.config.network, self._NAME)
-        call     = getattr(ctrl, f'add{self._NAME}data')
+        LOGS.info("started " + self._NAME + " client")
         pack     = struct.pack('4sL',
                                socket.inet_aton(cnf.multicast),
                                socket.INADDR_ANY)
-        data     = getattr(ctrl.data, self._NAME)
-
         address  = cnf.address
-        period   = cnf.period
+        period   = 1./cnf.rate
         bytesize = cnf.bytesize
         rng      = range(1, self._theme.packet)
-        dontstop = True
-        while dontstop:
+        tout     = self._theme.timeout
+        while self._index == index:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.bind(address)
             sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, pack)
+            sock.settimeout(tout)
             cur = data.nextlines(rng.stop)
             with closing(sock):
-                sock.recv_into(cur[0], bytesize)
-                for i in rng:
+                try:
+                    sock.recv_into(cur[:1], bytesize)
+                    for i in rng:
+                        await asyncio.sleep(period)
+                        sock.recv_into(cur[i:i+1], bytesize)
+                    call(cur)
                     await asyncio.sleep(period)
-                    sock.recv_into(cur[i], bytesize)
-                dontstop = call(cur)
+                except socket.timeout:
+                    pass
 
-    async def __start(self, ctrl, loop):
-        ctrl             = getattr(ctrl, 'daq', ctrl)
-        self._task, task = None, cast(asyncio.Task, self._task)
-        if task is not None:
-            task.cancel()
-            with suppress(asyncio.CancelledError):
-                await task
+    async def __start(self, ctrl):
+        ctrl        = getattr(ctrl, 'daq', ctrl)
+        self._index = index = self._index+1
+        cnf         = getattr(ctrl.config.network, self._NAME)
+        call        = getattr(ctrl, f'add{self._NAME}data')
+        data        = getattr(ctrl.data, self._NAME)
+        if not (getattr(ctrl.data, self._NAME+'started') or self._index != index):
+            LOGS.info("stopping " + self._NAME + " client")
+            return
 
-        if getattr(ctrl.data, self._NAME+'started') and self._task is None:
-            self._task = asyncio.ensure_future(self.readdaq(ctrl), loop = loop)
+        LOGS.info("starting " + self._NAME + " client")
+        await self.__readdaq(index, cnf, data, call)
 
     def _createdata(self, ctrl):
         templateattribute(self, 0).create(ctrl, self._theme.maxlength) # type: ignore

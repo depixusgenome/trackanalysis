@@ -42,7 +42,6 @@ async def writedaq(cnf: DAQClient = None, output = None):
     sock   = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     with closing(sock):
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, struct.pack('b', 1))
-        sock.bind(addr)
         sock.connect(addr)
         while True:
             for data in output:

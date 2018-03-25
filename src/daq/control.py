@@ -119,9 +119,9 @@ class DAQController(Controller):
     def listen(self, fov, beads) -> dict:
         "add lines of data"
         if fov:
-            self.data.fov   = self.data.fov  .create(self, self.data.fov.maxlength)
+            self.data.fov   = self.data.fov  .create(self.config, self.data.fov.maxlength)
         if beads:
-            self.data.beads = self.data.beads.create(self, self.data.beads.maxlength)
+            self.data.beads = self.data.beads.create(self.config, self.data.beads.maxlength)
         return updatemodel(self, self.data, dict(fovstarted = fov, beadsstarted = beads))
 
     def addfovdata(self, lines: np.ndarray) -> dict:

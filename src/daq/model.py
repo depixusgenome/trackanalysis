@@ -32,7 +32,6 @@ class DAQClient:
     address   = ('', 30001)
     bytesize  = 64
     offset    = 4
-    packet    = 3
     columns   = cast(np.dtype, ColDescriptor(FOVTYPE))
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):

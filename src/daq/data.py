@@ -22,18 +22,24 @@ class RoundRobinVector:
         """
         return (self._array if name is None else self._array[name])[self._index]
 
-    def append(self, lines):
+    def nextlines(self, count):
         """
         add values to the end of the table
         """
-        ind = slice(self._index.stop, self._index.stop+len(lines))
+        ind = slice(self._index.stop, self._index.stop+count)
         if ind.stop > len(self._array):
-            self._index              = slice(0, self._length-len(lines))
+            self._index              = slice(0, self._length-count)
             self._array[self._index] = self._array[-1-self._index.stop:]
             ind                      = slice(self._index.stop, self._length)
 
         self._index      = slice(max(ind.stop - self._length, 0), ind.stop)
-        self._array[ind] = lines
+        return self._array[ind]
+
+    def append(self, lines):
+        """
+        add values to the end of the table
+        """
+        self.nextlines(len(lines))[:] = lines
 
     def reconfigure(self, maxlength: int, *args):
         "sets a new max length"
@@ -104,7 +110,7 @@ class FoVRoundRobinVector(RoundRobinVector):
     @classmethod
     def create(cls, config, maxlen) -> 'FoVRoundRobinVector':
         "create an instance"
-        fov = config.network.fov
+        fov = getattr(getattr(config, 'network', config), 'fov', config)
         return cls(maxlen, fov.offset, fov.columns, fov.bytesize)
 
 class BeadsRoundRobinVector(RoundRobinVector):
