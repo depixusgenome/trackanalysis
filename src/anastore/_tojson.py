@@ -145,7 +145,7 @@ class Runner:
             if isinstance(state, dict):
                 attrs = state.items()
             else:
-                attrs = (STATE, state),
+                attrs = ((STATE, state),)
 
         cls = type(item)
         if self.saveall is False:

@@ -148,7 +148,7 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
         yield sel.saturation(init, meas)
 
     @classmethod
-    def _compute(cls, cnf, frame, info):
+    def _compute(cls, cnf, frame, info): # pylint: disable=inconsistent-return-statements
         res = cls.compute(frame, info, **cnf)
         if res is None:
             return info

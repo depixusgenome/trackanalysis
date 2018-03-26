@@ -23,7 +23,7 @@ _add_sys_paths()
 # pylint: disable=wrong-import-position
 import utils.warningsconfig   #  pylint: disable=unused-import
 from utils.logconfig    import getLogger
-from bokeh.resources    import DEFAULT_SERVER_PORT
+from bokeh.resources    import DEFAULT_SERVER_PORT # pylint: disable=wrong-import-order
 from app.scripting      import INITIAL_ORDERS
 LOGS = getLogger()
 
@@ -51,6 +51,7 @@ def _from_path(view):
 
         mod = str(pview.parent/pview.stem).replace('/', '.').replace('\\', '.')
         return _without_cls(mod, name)
+    return None
 
 def _from_module(view):
     if '/' in view or '\\' in view:

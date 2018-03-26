@@ -86,7 +86,7 @@ class CacheReplacement:
 
     def __enter__(self):
         if self.cache is None:
-            return
+            return None
 
         self.replaced.clear()
         if len(self.options) == 0:

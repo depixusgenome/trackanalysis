@@ -184,7 +184,7 @@ class Event:
             # dealing with tuples and lists
             for val in names:
                 _fromfcn(val)
-            return
+            return None
 
         return add(names[:-1], names[-1])
 
@@ -225,7 +225,7 @@ class Event:
             try:
                 ret = fcn(clsorself, *args, **kwargs)
             except NoEmission:
-                return
+                return None
 
             return this.handle(*cls.__handle_args(lst, myrt, ret, args, kwargs))
         return _wrap
@@ -240,7 +240,7 @@ class Event:
             try:
                 ret = fcn(self, *args, **kwargs)
             except NoEmission:
-                return
+                return None
 
             return self.handle(*cls.__handle_args(lst, myrt, ret, args, kwargs))
         return _wrap
@@ -255,7 +255,7 @@ class Event:
             try:
                 ret = fcn(*args, **kwargs)
             except NoEmission:
-                return
+                return None
 
             return this.handle(*cls.__handle_args(lst, myrt, ret, args, kwargs))
         return _wrap
@@ -277,8 +277,7 @@ class Event:
         if test is not None:
             @wraps(fcn)
             def _fcn(*args, __fcn__ = fcn, __test__ = test, **kwargs):
-                if __test__(*args, **kwargs):
-                    return __fcn__(*args, **kwargs)
+                return __fcn__(*args, **kwargs) if __test__(*args, **kwargs) else None
             fcn = _fcn
 
         for name in lst:

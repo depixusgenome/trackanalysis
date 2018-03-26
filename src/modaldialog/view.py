@@ -179,7 +179,7 @@ class AdvancedTaskMixin(AdvancedWidgetMixin):
         super().__enter__()
 
     def __exit__(self, tpe, val, bkt):
-        LOGS.debug(self._title()+ " output => %s", self.__outp)
+        LOGS.debug("%s output => %s", self._title(), self.__outp)
         for key, elems in self.__outp.items():
             getattr(self._model, key).update(**elems)
 

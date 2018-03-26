@@ -50,7 +50,7 @@ class TrackIO(TaskIO):
             raise NotImplementedError()
 
         if isinstance(path, dict):
-            return
+            return None
 
         if isinstance(path, (list, tuple)) and len(path) == 1:
             path = cast(str, path[0])
@@ -87,7 +87,7 @@ class _GrFilesIOMixin:
     def _open(self, path:OPEN_T, _):
         "opens a track file and adds a alignment"
         if isinstance(path, dict):
-            return
+            return None
 
         trail = topath(path)
         trks  = tuple(i for i in trail if i.suffix[1:] in TrackIO.EXT)
@@ -117,7 +117,7 @@ class GrFilesIO(TrackIO, _GrFilesIOMixin):
 
     def open(self, path:OPEN_T, _:tuple):
         if isinstance(path, dict):
-            return
+            return None
 
         path = self._open(cast(Union[str, Tuple[str,...]], path), _)
         return None if path is None else TrackIO.open(self, path, _)

@@ -81,13 +81,14 @@ class BatchProcessor(Processor[BTaskType]):
     def create(mdl: Sequence[Task], **kwa) -> Iterator:
         "creates a specific model for each path"
         from ..taskcontrol import create
-        return create(tuple(mdl)).run(**kwa)
+        return create(tuple(mdl)).run(**kwa) # type: ignore
 
     @classmethod
     def models(cls, *paths, template = None, **kwa) -> Iterator[Sequence[Task]]:
         "iterates through all instanciated models"
         tsk = cast(Type[BatchTask], cls.tasktype)
         if template is None:
+            # pylint: disable=stop-iteration-return
             template = next((i for i in paths if isinstance(i, tsk.templatetype())), None)
             paths    = tuple(i for i in paths if not isinstance(i, tsk.templatetype()))
 

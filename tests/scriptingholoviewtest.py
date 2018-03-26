@@ -7,7 +7,7 @@ import sys
 from   typing  import TYPE_CHECKING
 sys.modules['ACCEPT_SCRIPTING'] = 'jupyter'
 from scripting import *
-from IPython   import get_ipython # pylint:disable=import-error
+from IPython   import get_ipython # pylint:disable=import-error,wrong-import-order
 
 CLASSES = list(get_ipython().display_formatter.formatters['text/html'].type_printers.keys())
 

@@ -16,18 +16,18 @@ IDS_TYPE = List[ID_TYPE]
 def _id(row, ibead):
     val = row[ibead].value
     if val is None:
-        return
+        return None
 
     if isinstance(val, str):
         try:
             return int(val.split('B')[-1]) if 'B' in val else int(val)
         except ValueError:
-            return
+            return None
 
     try:
         return int(val)
     except ValueError:
-        return
+        return None
 
 def _tofloat(row, ibead):
     val = row[ibead].value
@@ -36,24 +36,26 @@ def _tofloat(row, ibead):
             return float(val)
         except ValueError:
             pass
+    return None
 
 def _add(info, row, ibead, ref):
     val = row[ibead].value
     if val is None:
-        return
+        return None
 
     if isinstance(val, str):
         try:
             beadid = int(val.split('B')[-1]) if 'B' in val else int(val)
         except ValueError:
-            return
+            return None
 
     try:
         beadid = int(val)
     except ValueError:
-        return
+        return None
 
     info.setdefault(ref, []).append(beadid)
+    return None
 
 def _read_summary(rows) -> IDS_TYPE:
     ids   = [None, None, None, None] # type: List[Optional[int]]

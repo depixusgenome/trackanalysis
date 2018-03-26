@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Processors apply tasks to a data flow"
 from    functools               import partial
-from    typing                  import (Generic, TypeVar, Callable, Dict,
+from    typing                  import (Generic, TypeVar, Callable, Dict, Any,
                                         Union, Type, Iterator, Tuple, Optional, cast)
 from    pathlib                 import Path
 
@@ -27,7 +27,7 @@ class DataFrameFactory(Generic[Frame]):
     def adddoc(newcls):
         "Adds the doc to the task"
         if not getattr(newcls, '__doc__', None):
-            return
+            return newcls
 
         tpe = newcls.frametype()
         doc = '\n'.join((newcls.__doc__).split('\n')[2:]).replace('#', '##')
@@ -144,7 +144,8 @@ class SafeDataFrameProcessor(Processor[DataFrameTask]):
         if not isinstance(frame, type):
             frame = type(frame)
 
-        return next((i for i in cls.__iter_subclasses() if frame is i.frametype()), None)
+        return next((i for i in cls.__iter_subclasses()
+                     if frame is cast(Any, i).frametype()), None)
 
     @classmethod
     def _apply(cls, task, frame):

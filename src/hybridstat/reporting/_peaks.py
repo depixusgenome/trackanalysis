@@ -52,7 +52,8 @@ class Probabilities(HasLengthPeak):
         if val is not None:
             return val
 
-        self._values[key] = val = self._proba(bead.events[ipk][1], self._ends)
+        evt = bead.events[ipk][1]  # type: ignore
+        self._values[key] = val = self._proba(evt, self._ends)
         return val
 
     def array(self, name: str, ref:Group, ipk:int):
@@ -79,7 +80,8 @@ class Probabilities(HasLengthPeak):
                 if val.nevents == 0:
                     setattr(val, name, None)
                 else:
-                    setattr(val, name, Probability.resolution(bead.events[ipk][1]))
+                    evt = bead.events[ipk][1]  # type: ignore
+                    setattr(val, name, Probability.resolution(evt))
 
             return getattr(val, name)
 
@@ -144,7 +146,7 @@ class Neighbours(HasLengthPeak):
 class PositionInRef(HasLengthPeak):
     "Deals with positions"
     def __init__(self, peaks:Reporter, peakcols: Columns) -> None:
-        super().__init__(peaks)
+        super().__init__(peaks) # type: ignore
         summ          = peaks.config.sheettype('summary')(peaks.book, peaks.config)
         self._hpins   = peaks.config.hairpins
         self._isxlsx  = peaks.isxlsx()
@@ -189,12 +191,10 @@ class PositionInRef(HasLengthPeak):
         "computes distance to that peak"
         if bead is None or self.isstructural(ref, bead, ipk):
             return None
-        elif self._isxlsx:
+        if self._isxlsx:
             return self._disfmt.format(self._peakrow, self._peakrow, self._peakrow)
-        else:
-            key = bead.peaks['key'][ipk]
-            if key >= 0:
-                return key - self.basevalue(bead, ipk)
+        key = bead.peaks['key'][ipk]
+        return key - self.basevalue(bead, ipk) if key >= 0 else None
 
 @sheet_class("Peaks")
 class PeaksSheet(Reporter):
@@ -334,5 +334,4 @@ class PeaksSheet(Reporter):
 
     @column_method("", exclude = lambda x: not x.isxlsx())
     def _chart(self, ref:Group, bead:Bead, ipk:int):
-        if ipk == 0:
-            return self.charting(ref, bead)
+        return self.charting(ref, bead) if ipk == 0 else None

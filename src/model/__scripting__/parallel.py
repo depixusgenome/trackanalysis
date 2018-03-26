@@ -17,7 +17,7 @@ from .tasks                 import Tasks
 
 class Parallel:
     "Runs tasks in parallel"
-    def __init__(self,
+    def __init__(self, # pylint: disable=keyword-arg-before-vararg
                  roots     : Union[TracksDict, Sequence[RootTask]] = None,
                  *tasks    : Union[Tasks, Task],
                  processors: Dict[Type[Task], Type[Processor]] = None) -> None:

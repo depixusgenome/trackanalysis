@@ -3,7 +3,7 @@
 "Controller for most plots and views"
 from typing             import (Tuple, Optional, # pylint: disable =unused-import
                                 Iterator, List, Union, Any, Callable, Dict,
-                                TypeVar)
+                                TypeVar, Type, cast)
 from copy               import copy as shallowcopy
 from enum               import Enum
 from functools          import wraps
@@ -54,7 +54,8 @@ class ReplaceProcessors(CacheReplacement):
         if isinstance(ctrl, TaskPlotModelAccess):
             ctrl = ctrl.processors()
 
-        super().__init__(ctrl.data if ctrl else None, *options)
+        opt = cast(Tuple[Type[Processor],...], options)
+        super().__init__(ctrl.data if ctrl else None, *opt)
         self.ctrl = ctrl
         self.copy = copy
 
@@ -247,6 +248,7 @@ class TaskAccess(TaskPlotModelAccess):
             if len(kwa):
                 cnf = self.configtask
                 cnf.set(updatecopy(cnf.get(), **kwa))
+        return None
 
     def update(self, **kwa):
         "adds/updates the task"

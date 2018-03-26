@@ -136,7 +136,7 @@ class ThermalDrift:
     zscale = 1e-2
     def __call__(self, cnf:'Experiment', bead, _ = None):
         if None in (self.tscale, self.zscale):
-            return
+            return None
         inds = cnf.phases.indexes('rampup', 'rampdown', 'torelax', 'length')
         size = inds[1]-inds[0]
 

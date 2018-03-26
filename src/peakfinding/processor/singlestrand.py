@@ -53,10 +53,10 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
         delta   = self.task.delta
         def _greater(arr):
             arr  = np.diff(arr)
-            good = np.isfinite(arr)
-            return next((i for i in range(len(arr))
-                         if good[i] and arr[i] < delta),
-                        len(arr))
+            good = np.where(np.isfinite(arr))[0]
+            cond = np.where(arr[good] < delta)[0]
+            return len(arr) if len(cond) == 0 else good[cond[0]]
+
         return np.array([_greater(i) for i in self.__ramp(frame, beadid).values()],
                         dtype = 'i4')
 
@@ -137,6 +137,6 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
                 beads = cast(Beads, beads.data)
 
             if beads is None:
-                beads = frame.track.beads
+                beads = frame.track.beads # type: ignore
 
         return cast(Cycles, beads[beadid,:]).withphases(self.task.phase)

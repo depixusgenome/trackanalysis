@@ -4,11 +4,11 @@
 from typing                     import Dict, List, TYPE_CHECKING, cast
 from abc                        import ABC, abstractmethod
 from itertools                  import product
-from eventdetection.processor   import EventDetectionTask
-from peakcalling.processor      import FitToHairpinTask
 
 import numpy                    as     np
 
+from eventdetection.processor   import EventDetectionTask
+from peakcalling.processor      import FitToHairpinTask
 from peakfinding.probabilities  import Probability
 
 if TYPE_CHECKING:

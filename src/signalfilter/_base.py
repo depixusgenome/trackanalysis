@@ -12,12 +12,14 @@ from utils          import initdefaults
 from ._core.stats   import hfsigma, mediandeviation # pylint: disable=import-error
 
 if TYPE_CHECKING:
-    from data import Track, TrackView   # pylint: disable=unused-import
+    # pylint: disable=unused-import
+    from data.track import Track
+    from data.views import TrackView
 
 def _nanfcn(arr:np.ndarray, ranges, fcn):
     arr = np.asarray(arr).ravel()
     if len(arr) == 0:
-        return
+        return None
 
     if not np.isscalar(arr[0]):
         arr = np.float32(arr) # type: ignore

@@ -88,6 +88,7 @@ class Globals:
         path.touch(exist_ok = True)
 
         protocol.dump(maps, path, patch = patchname, **kwa)
+        return None
 
     def readconfig(self, configpath, protocol, patchname = 'config') -> Optional[dict]:
         "Sets-up the user preferences"

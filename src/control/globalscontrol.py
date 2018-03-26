@@ -214,8 +214,8 @@ class BaseGlobalsController(Controller):
         if patchname is dict:
             return self._model.writeconfig(configpath, dict, index, **kwa)
 
-        self._model.writeconfig(configpath, anastore, patchname,
-                                index, overwrite, **kwa)
+        return self._model.writeconfig(configpath, anastore, patchname,
+                                       index, overwrite, **kwa)
 
     def readconfig(self, configpath, patchname = 'config'):
         "Sets-up the user preferences"
@@ -273,8 +273,8 @@ class GlobalsController(BaseGlobalsController):
             return self._model.writeconfig(configpath, dict, index, **kwa)
 
         css = self.css.config.getdict(..., fullnames = False)
-        self._model.writeconfig(configpath, anastore, patchname,
-                                index, overwrite, **kwa, **css)
+        return self._model.writeconfig(configpath, anastore, patchname,
+                                       index, overwrite, **kwa, **css)
 
     config  = property(lambda self: BaseGlobalsAccess(self, '', 'config'))
     css     = property(lambda self: BaseGlobalsAccess(self, '', 'css'))
@@ -284,8 +284,7 @@ class GlobalsController(BaseGlobalsController):
         "yields all undoable user actions"
         def _onglobals(items):
             vals = {i: j.old for i, j in items.items()}
-            if len(vals):
-                return partial(self.updateGlobal, items.name, **vals)
+            return partial(self.updateGlobal, items.name, **vals) if len(vals) else None
         maps = self._maps
         yield tuple('globals.' + i for i in maps
                     if not i.startswith('project')) + (_onglobals,)

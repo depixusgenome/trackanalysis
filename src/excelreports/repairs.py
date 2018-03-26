@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"read-write existing files"
-from    typing          import Optional, Dict, Any # pylint: disable=unused-import
+from    typing          import Optional, Dict, List, Any # pylint: disable=unused-import
 import  os
 import  re
 import  shutil
@@ -31,7 +31,7 @@ class UpdateableZipFile(ZipFile):
                                                 compression=compression,
                                                 allowZip64=allowZip64)
         # track file to override in zip
-        self._replace = {}
+        self._replace: dict = {}
         # Whether the with statement was called
         self._allow_updates = False
 
@@ -140,7 +140,7 @@ class DataFrame(_DataFrame):
                            % (set(name for name, _ in cols) - set(args)),
                            "warning")
 
-        vals = dict((name, []) for name , iC in cols)
+        vals: Dict[str, List] = dict((name, []) for name , iC in cols)
         inds = []
         for i, row in rows:
             if all(col.value is None for col in row):
@@ -159,7 +159,7 @@ class DataFrame(_DataFrame):
     def paste(self, filename, key):
         u"pastes values into a file"
         if filename == self._fname:
-            return
+            return None
 
         other = DataFrame(filename, self._sheet, self._args)
         keys  = frozenset(self[key].unique()) & frozenset(other[key].unique())
@@ -187,6 +187,7 @@ class DataFrame(_DataFrame):
         for col, icol in self._cols:
             if col == name:
                 return icol
+        return None
 
     def replaceinfile(self, *cols, diffs = None):
         u"replaces values in a file"
@@ -197,7 +198,7 @@ class DataFrame(_DataFrame):
 
         args  = dict(self._cols)
         icols = tuple(args[col] for col in cols)
-        cols  = dict((j,i) for i,j in self._cols)
+        cols  = dict((j,i) for i,j in self._cols) # type: ignore
 
         def _getid():
             book = openpyxl.load_workbook(self._fname,
@@ -209,6 +210,7 @@ class DataFrame(_DataFrame):
 
         def _itercells(tree):
             recol = re.compile(r"([A-Z]+)(\d+)")
+            # pylint: disable=stop-iteration-return
             data  = next(item for item in tree if item.tag.endswith("sheetData"))
 
             for col in iter(col for row in data for col in row):

@@ -33,7 +33,8 @@ def test_constantvalues():
     fin                  =  np.abs(bead-100.) < 1e-5
     fin[[0,10,20,40,41,-3]] = False
 
-    cleaningcore.constant(DataCleaning(), bead)  # pylint: disable=no-member
+    # pylint: disable=c-extension-no-member
+    cleaningcore.constant(DataCleaning(), bead)
 
     assert_equal(np.isnan(bead), fin)
 
@@ -43,7 +44,7 @@ def test_constantvalues():
     bead[40:42] = 100.
     bead[-3:]   = 100.
 
-    cleaningcore.constant(DataCleaning(mindeltarange=5), bead) # pylint: disable=no-member
+    cleaningcore.constant(DataCleaning(mindeltarange=5), bead)
     fin[:] = False
     fin[21:30] = True
     assert_equal(np.isnan(bead), fin)

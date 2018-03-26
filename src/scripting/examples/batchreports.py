@@ -33,9 +33,9 @@ def main(trackfiles, grfiles, reports, nprocs = None):
     itr      = zip(paths[0], repeat(dict(template = template, reporting = reports)))
 
     if len(paths[1]):
-        LOGS.warning('missing its gr files\n\t'+'\n\t'.join(str(i) for i in paths[1]))
+        LOGS.warning('missing its gr files\n\t%s', '\n\t'.join(str(i) for i in paths[1]))
     if len(paths[2]):
-        LOGS.warning('missing its track file\n\t'+'\n\t'.join(str(i) for i in paths[2]))
+        LOGS.warning('missing its track file\n\t%s', '\n\t'.join(str(i) for i in paths[2]))
 
     if nprocs <= 1:
         for args in itr:
@@ -46,6 +46,7 @@ def main(trackfiles, grfiles, reports, nprocs = None):
         with ProcessPoolExecutor(nprocs) as pool:
             for trk in pool.map(run, itr):
                 LOGS.info('done %s', trk)
+    return None
 
 if __name__ == '__main__':
     # pylint: disable=line-too-long

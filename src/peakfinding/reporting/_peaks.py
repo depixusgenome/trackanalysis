@@ -101,6 +101,7 @@ class PeaksSheet(Reporter):
     def _chart(self, bead:int, ipk:int, _):
         if ipk == 0:
             return self.charting(next(j for i, j in self.config.beads if i == bead))
+        return None
 
     @staticmethod
     def linemark(info) -> bool:

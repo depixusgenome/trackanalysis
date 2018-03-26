@@ -80,7 +80,7 @@ class ChartCreator:
     def __call__(self, ref:Group, bead:Bead):
         "returns a chart for this bead if peak is peaks zero"
         if ref.key is None:
-            return
+            return None
 
         chart = self._parent.book.add_chart(dict(type = 'scatter'))
         size  = len(self._peaks(ref, bead))

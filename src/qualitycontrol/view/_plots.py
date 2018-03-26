@@ -189,6 +189,7 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
         if beads is not None:
             cyc, cnt = extensions(cast(Beads, beads), *self.config.phases.get())
             return (np.concatenate(cyc), np.concatenate(cnt)) if len(cnt) else None
+        return None
 
     @staticmethod
     def _xlabel() -> str:

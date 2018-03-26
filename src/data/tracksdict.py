@@ -119,7 +119,7 @@ class TracksDict(dict):
         # pylint: disable=unidiomatic-typecheck
         if type(val) is self._TRACK_TYPE and not allaxes:
             super().__setitem__(key, val)
-            return
+            return None
 
         if isinstance(val, (tuple, list, set)) and len(val) == 1:
             val = str(next(iter(val)))

@@ -83,7 +83,7 @@ class _FunctionHandler(FunctionHandler):
         output = view.APPNAME.lower() + '.js'
         if Path(output).exists() and CAN_LOAD_JS:
             def _bundle():
-                LOGS.info('monkeypatching bokeh compiler with '+output)
+                LOGS.info('monkeypatching bokeh compiler with %s', output)
                 return ''.join(open(output, encoding = 'utf-8'))
             import bokeh.embed.util as embed
             embed.bundle_all_models = _bundle

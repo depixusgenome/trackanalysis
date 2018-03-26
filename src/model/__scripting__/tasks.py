@@ -360,7 +360,7 @@ class Tasks(Enum):
                 obj = getattr(obj, skey)
 
             deflt = getattr(type(obj), lst[-1])
-            if value is self.RESET:
+            if value is getattr(self, 'RESET'):
                 setattr(obj, lst[-1], deepcopy(deflt))
             else:
                 setattr(obj, lst[-1], toenum(deflt, value))
@@ -379,12 +379,13 @@ class Tasks(Enum):
             return tpe._apply_cls if obj is None else obj._apply_self
     apply = _TaskApply()
 
-    def _apply_self(self, toframe: TrackView = None, *resets, **kwa) -> TrackView:
+    def _apply_self(self, toframe: TrackView = None, # pylint: disable=keyword-arg-before-vararg
+                    *resets, **kwa) -> TrackView:
         """
         Applies the task to the frame
         """
         proc = self.processor(*resets, **kwa)
-        return proc.apply(toframe, **proc.config())
+        return getattr(proc, 'apply')(toframe, **proc.config())
 
     @classmethod
     @_DOCHelper.add(header = "These can be:")
@@ -451,7 +452,7 @@ class Tasks(Enum):
         return cls.cyclesampling, cls.selection, cls.subtraction
 
     @classmethod
-    def _missing_(cls, value):
+    def _missing_(cls, value) -> 'Tasks':
         if isinstance(value, Task) and not isinstance(value, DriftTask):
             value = type(value)
 
@@ -467,7 +468,7 @@ class Tasks(Enum):
             return (Tasks.driftperbead if cast(DriftTask, value).onbeads else
                     Tasks.driftpercycle)
 
-        super()._missing_(value) # type: ignore
+        return super()._missing_(value) # type: ignore
 
 
     @classmethod
@@ -511,5 +512,4 @@ def nondefaults(self) -> Dict[str, Any]:
     out = eval(anastore.dumps(self))[1] # pylint: disable=eval-used
     out.pop(anastore.TPE)
     return out
-
 setattr(Tasks, 'RESET', Ellipsis)

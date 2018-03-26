@@ -122,6 +122,7 @@ class Action:
             if test is None or test(*args, **kwargs):
                 with action:
                     return fcn(*args, **kwargs)
+            return None
         return _wrap_normal
 
     def __exit__(self, tpe, val, bkt):
