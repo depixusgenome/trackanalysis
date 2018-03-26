@@ -31,6 +31,7 @@ def toenum(tpe, val):
         return val
     if val is not None:
         raise TypeError('"level" attribute has incorrect type')
+    return None
 
 class ChangeFields:
     "Context within which given fields are momentarily changed"
@@ -143,8 +144,8 @@ class _Updater:
         self.mandatory = mandatory
         kwa            = {i: (j.lower() if isinstance(j, str) else j)
                           for i, j in kwa.items()}
-        self.update    = tuple(i for i in attrs if kwa.get(i, '') == 'update')
-        self.call      = tuple((i, j) for i, j in kwa.items() if callable(j))
+        self.update    = tuple(i for i in attrs if kwa.get(i, '') == 'update') # type: ignore
+        self.call      = tuple((i, j) for i, j in kwa.items() if callable(j)) # type: ignore
         self.ignore    = tuple(i for i in attrs if kwa.get(i, '') == 'ignore')
         self.attrs     = tuple((i, i) for i in attrs if kwa.get(i, '') != 'ignore')
         self.attrs    += tuple((i, j+i if j == '_' else j) for i, j in kwa.items()

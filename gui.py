@@ -32,7 +32,7 @@ def implementation(apath, *args, extra = None, **kwa):
     path = Path(apath).with_suffix('.coffee')
     if not path.exists():
         # Should only happen with the JS compiler hack
-        LOGS.debug(str(path) + ' was not implemented')
+        LOGS.debug('%s was not implemented', path)
         return ""
 
     code = ''.join(open(path))
@@ -104,7 +104,7 @@ class MetaMixin(type):
     @classmethod
     def __addaccesses(mcs, mixins, nspace, kwa):
         match   = re.compile(kwa.get('match', r'^[a-z][a-zA-Z0-9]+$')).match
-        members = dict()
+        members = dict() # type: ignore
         for base in mixins:
             for name, fcn in getmembers(base):
                 if match(name) is None or name in nspace:

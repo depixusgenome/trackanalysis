@@ -81,7 +81,8 @@ class LazyShelf(Dict):
         self[match.group(1) if match else name.__name__] = name
         return name
 
-    def set(self, key, value = _DEFAULT, force = False, *args, **kwa):
+    def set(self, key,  # pylint: disable=keyword-arg-before-vararg
+            value = _DEFAULT, force = False, *args, **kwa):
         "sets and returns the value"
         if value is _DEFAULT:
             key, value = value.__name__, value
