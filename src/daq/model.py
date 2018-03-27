@@ -87,9 +87,9 @@ class DAQProtocol:
     def __cmp__(self, other):
         return self.__class__ is other.__class__ and self.__dict__ == other.__dict__
 
-class DAQIdle(DAQProtocol):
+class DAQManual(DAQProtocol):
     """
-    Idle status
+    Manual status
     """
     def __init__(self, **kwa):
         self.__dict__['phases'] = (DAQPhase(zmag = 10., duration = None),)
@@ -160,7 +160,7 @@ class DAQConfig:
     All information related to the current status
     """
     network                       = DAQNetwork()
-    protocol: DAQProtocol         = DAQIdle()
+    protocol: DAQProtocol         = DAQManual()
     beads :   Tuple[DAQBead, ...] = ()
 
     defaultbead = DAQBead()
