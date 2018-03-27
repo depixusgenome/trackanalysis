@@ -152,12 +152,12 @@ class MessagesInput:
         msg   = ctrl.globals.project.message
         busy  = ctrl.globals.css.message.busy.get(), 'normal'
 
-        @ctrl.observe
+        @ctrl.display.observe
         def _onstartaction(recursive = None):      # pylint: disable=unused-variable
             if not recursive:
                 _settext(busy)
 
-        @ctrl.observe
+        @ctrl.display.observe
         def _onstartcomputation(recursive = None): # pylint: disable=unused-variable
             if recursive:
                 return
@@ -170,7 +170,7 @@ class MessagesInput:
                 LOGS.info('stop')
                 msg.set(value)
                 catcherror[0] = getattr(ctrl, 'CATCHERROR', True)
-        ctrl.observe("stopaction", "stopcomputation", _observer)
+        ctrl.display.observe("stopaction", "stopcomputation", _observer)
 
         templ      = ctrl.globals.css.message.getdict(..., fullnames = False)
         timeout    = ctrl.globals.css.message.timeout.getdict(..., fullnames = False)
