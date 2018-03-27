@@ -62,27 +62,45 @@ class Option(metaclass = ABCMeta):
         fcn = partial(cls._default_apply, model, elems, cnv, storeempty)
         return cast(Callable, fcn)
 
-    @staticmethod
-    def getvalue(mdl, keystr, default):
+    _INDEX = re.compile(r"(\w+)\[([^]*)\]")
+    @classmethod
+    def getvalue(cls, mdl, keystr, default):
         "gets the value in the model"
         if isinstance(mdl, dict):
             return mdl[keystr]
 
         keys = keystr.split('.')
         for key in keys[:-1]:
-            mdl = getattr(mdl, key)
+            match = cls._INDEX.match(key)
+            if match:
+                mdl = getattr(mdl, match.group(1))[match.group(2)]
+            else:
+                mdl = getattr(mdl, key)
+
+        match = cls._INDEX.match(keys[-1])
+        if match:
+            return getattr(mdl, match.group(1), default)[match.group(2)]
         return getattr(mdl, keys[-1], default)
 
-    @staticmethod
-    def setvalue(mdl, keystr, val):
+    @classmethod
+    def setvalue(cls, mdl, keystr, val):
         "sets the value in the model"
         if isinstance(mdl, dict):
             mdl[keystr] = val
         else:
             keys = keystr.split('.')
             for key in keys[:-1]:
-                mdl = getattr(mdl, key)
-            setattr(mdl, keys[-1], val)
+                match = cls._INDEX.match(key)
+                if match:
+                    mdl = getattr(mdl, match.group(1))[match.group(2)]
+                else:
+                    mdl = getattr(mdl, key)
+
+            match = cls._INDEX.match(keys[-1])
+            if match:
+                getattr(mdl, match.group(1))[match.group(2)] = val
+            else:
+                setattr(mdl, keys[-1], val)
 
 class CheckOption(Option):
     "Converts a text tag to an html check"
@@ -195,19 +213,30 @@ class DpxModal(Model):
     title              = props.String("")
     body               = props.String("")
     results            = props.Dict(props.String, props.Any)
+    submitted          = props.Int(0)
     startdisplay       = props.Int(0)
     callback           = props.Instance(Callback)
-    def __init__(self, **kwa):
+    def __init__(self, triggeronsubmit = False, **kwa):
         super().__init__(**kwa)
         self.__handler = None # type: Optional[Callable]
         self.__running = False
-        def _on_apply_cb(attr, old, new):
-            if not self.__running:
-                return
-            self.__running = False
-            if self.__handler is not None and len(new):
-                self.__handler(new)
-        self.on_change('results', _on_apply_cb)
+
+        if triggeronsubmit:
+            def _on_apply_cb(attr, old, new):
+                if not self.__running:
+                    return
+                self.__running = False
+                if self.__handler is not None:
+                    self.__handler(self.results)
+            self.on_change('submitted', _on_apply_cb)
+        else:
+            def _on_apply_cb(attr, old, new):
+                if not self.__running:
+                    return
+                self.__running = False
+                if self.__handler is not None and len(new):
+                    self.__handler(new)
+            self.on_change('results', _on_apply_cb)
 
     def run(self,                                       # pylint: disable=too-many-arguments
             title   : str                       = "",

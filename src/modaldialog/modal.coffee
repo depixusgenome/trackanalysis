@@ -350,6 +350,7 @@ class DpxModalDialogView extends Modal
             vals = @_form_values()
 
         @model.results = vals
+        @model.submitted += 1
         @model.callback?.execute(@model.results)
 
 export class DpxModalView   extends DOMView
@@ -393,6 +394,7 @@ export class DpxModal       extends Model
         title:        [p.String, ""]
         body:         [p.String, ""]
         results:      [p.Any,    {}]
+        submitted:    [p.Number, 0]
         startdisplay: [p.Number, 0]
         callback:     [p.Instance]
     }
