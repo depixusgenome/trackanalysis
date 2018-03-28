@@ -78,6 +78,20 @@ class DecentralizedController(Controller):
         return ((val in self._objects) if isinstance(val, str) else
                 any(i is val for i in self._objects.values()))
 
+    def __getitem__(self, val):
+        return self.model(val)
+
+    def get(self, val, attr, default = '--raise--'):
+        "gets an attribute from a model"
+        if isinstance(attr, str):
+            if default == '--raise--':
+                return getattr(self.model(val), attr)
+            return getattr(self.model(val), attr, default)
+
+        if isinstance(attr, dict):
+            return {i: getattr(self.model(val), i, j) for i, j in attr.items()}
+        return {i: getattr(self.model(val), i) for i in attr}
+
     def updatedefaults(self, name, **kwa):
         "update a specific display and emits an event"
         dflt   = self._defaults[name]
@@ -92,7 +106,7 @@ class DecentralizedController(Controller):
 
         out = self.__update('_defaults', name, kwa)
         if out is None:
-            return
+            return None
 
         obj = self._objects[name]
         if isdict:
