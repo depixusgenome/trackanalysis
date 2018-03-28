@@ -166,7 +166,7 @@ class TracksDict(dict):
     scangrs = staticmethod(LegacyGRFilesIO.scangrs)
     scantrk = staticmethod(LegacyGRFilesIO.scantrk)
 
-    def scan(self, # pylint: disable=too-many-arguments
+    def scan(self, # pylint: disable=too-many-arguments,too-many-locals
              tracks  : Union[str, Sequence[str]],
              grs     : Union[None, str, Sequence[str]] = None,
              cgrdir  : Union[str, Sequence[str]]       = "cgr_dir",

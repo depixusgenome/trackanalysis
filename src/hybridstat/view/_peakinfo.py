@@ -72,7 +72,8 @@ class IdentificationPeakInfo(PeakInfo):
                 dflt[i]  = np.full(len(dflt[i]), ' ', dtype = '<U1')
         return dflt
 
-    def values(self, mdl: 'PeaksPlotModelAccess', peaks) -> Dict[str, np.ndarray]:
+    def values(self,    # pylint: disable=too-many-locals
+               mdl: 'PeaksPlotModelAccess', peaks) -> Dict[str, np.ndarray]:
         "sets current bead peaks and computes the fits"
         zvals = np.array([i for i, _ in peaks], dtype = 'f4')
         if not len(mdl.distances):
