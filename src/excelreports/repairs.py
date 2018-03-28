@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-u"read-write existing files"
+"read-write existing files"
 from    typing          import Optional, Dict, List, Any # pylint: disable=unused-import
 import  os
 import  re
@@ -91,7 +91,7 @@ class UpdateableZipFile(ZipFile):
                 temp_file.close()
 
     def remove_file(self, path):
-        u"removes a file from the archive"
+        "removes a file from the archive"
         self._replace[path] = self.DeleteMarker()
 
     def _rebuild_zip(self):
@@ -126,7 +126,7 @@ class UpdateableZipFile(ZipFile):
             shutil.rmtree(tempdir)
 
 class DataFrame(_DataFrame):
-    u"read-write existing files"
+    "read-write existing files"
     def __init__(self, fname, sheet, args):
         book = openpyxl.load_workbook(fname, read_only = True)#, data_only = True)
         rows = enumerate(book[sheet].iter_rows())
@@ -157,40 +157,36 @@ class DataFrame(_DataFrame):
         self._cols  = cols
 
     def paste(self, filename, key):
-        u"pastes values into a file"
+        "pastes values into a file"
         if filename == self._fname:
             return None
 
-        other = DataFrame(filename, self._sheet, self._args)
-        keys  = frozenset(self[key].unique()) & frozenset(other[key].unique())
-
-        cols  = list(name        for name, _    in  self._cols)
-        dcols = list(name        for name       in cols if name != key)
-        icols = dict((name, ind) for name, ind  in self._cols)
-        diffs = []
-        equ   = lambda i, j: i == j or all((numpy.isnan(i), numpy.isnan(j)))
-        for elem in keys:
+        other      = DataFrame(filename, self._sheet, self._args)
+        cols       = list(name      for name, _ in  self._cols)
+        dcols      = list(name      for name    in cols if name != key)
+        icols      = dict((name, _) for name, _ in self._cols)
+        diffs: set = set()
+        equ        = lambda i, j: i == j or all((numpy.isnan(i), numpy.isnan(j)))
+        for elem in frozenset(self[key].unique()) & frozenset(other[key].unique()):
             vother = other.loc[other[key] == elem, dcols]
-            vself  = self .loc[self [key] == elem, dcols]
-            for icol, name in enumerate(dcols):
-                if equ(vother.values[0][icol], vself.values[0][icol]):
-                    continue
-
-                diffs.append((vother.index[0], icols[name]))
+            vself  = self .loc[self [key] == elem, dcols].values[0]
+            diffs.update((vother.index[0], icols[name])
+                         for _, name in enumerate(dcols)
+                         if not equ(vother.values[0][_], vself[_]))
 
             other.loc[other[key] == elem, dcols] = self .loc[self [key] == elem, cols]
 
         return other.replaceinfile(*dcols, diffs = frozenset(diffs))
 
     def getcolindex(self, name):
-        u"returns the column index"
+        "returns the column index"
         for col, icol in self._cols:
             if col == name:
                 return icol
         return None
 
     def replaceinfile(self, *cols, diffs = None):
-        u"replaces values in a file"
+        "replaces values in a file"
         if diffs is not None and len(diffs) == 0:
             return
         if isinstance(diffs, dict):
