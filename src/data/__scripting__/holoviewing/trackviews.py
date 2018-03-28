@@ -4,7 +4,7 @@
 """
 Adds shortcuts for using holoview
 """
-from   typing            import List
+from   typing            import List, Union
 from   copy              import deepcopy
 import pandas            as     pd
 import numpy             as     np
@@ -17,14 +17,15 @@ displayhook(Beads, Cycles)
 
 class Display(BasicDisplay): # pylint: disable=abstract-method
     "displays the beads or cycles"
-    _kdim    = 'bead'
-    _labels  = None
-    _tpe     = 'curve'
-    _overlay = False
-    _keys    = None
-    _stretch = 1.
-    _bias    = 0.
-    KEYWORDS = BasicDisplay.KEYWORDS | frozenset(locals())
+    _kdim                      = 'bead'
+    _labels  : Union[str,bool] = None
+    _tpe                       = 'curve'
+    _overlay                   = False
+    _keys                      = None
+    _stretch                   = 1.
+    _bias                      = 0.
+    _alpha                     = 1.
+    KEYWORDS                   = BasicDisplay.KEYWORDS | frozenset(locals())
     def __init__(self, items, **opts):
         super().__init__(items, **opts)
         if isinstance(self._tpe, str):
@@ -64,6 +65,9 @@ class Display(BasicDisplay): # pylint: disable=abstract-method
             crvs = [self._tpe(j, label = f'{i}', **opts) for i, j in good]
         else:
             crvs = [self._tpe(j, **opts) for _, j in good]
+
+        if 0. <  self._alpha < 1.:
+            crvs = [i(style = dict(alpha = self._alpha)) for i in crvs]
 
         if not any(isinstance(i, hv.Text) for i in crvs): # dummy text for warnings
             for i in crvs:
@@ -114,7 +118,9 @@ class CycleDisplay(Display, display = Cycles):
     * *overlay*: if *False*, all data is concatenated into one array.
     * *stretch*: applies a stretch to z values
     * *bias*: applies a bias to z values
+    * *alpha*: applies an alpha to all curves
     """
+    _alpha = .1
     def _percycle(self, cyc):
         return self._run(self._items[..., cyc])
 

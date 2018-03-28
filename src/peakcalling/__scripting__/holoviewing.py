@@ -2,9 +2,7 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=too-many-ancestors
 "Updating PeaksDict for oligo mapping purposes"
-from   typing                   import (List, Type, # pylint: disable=unused-import
-                                        Sequence, Tuple, cast, Dict, Optional,
-                                        Callable)
+from   typing                   import List, Sequence, Tuple, Dict, Callable, Union, cast
 from   concurrent.futures       import ProcessPoolExecutor
 from   copy                     import deepcopy
 from   scipy.interpolate        import interp1d
@@ -13,7 +11,8 @@ import numpy                    as np
 import sequences
 
 from   utils.holoviewing            import hv, addproperty, displayhook
-from   peakfinding.processor        import PeaksDict    # pylint: disable=unused-import
+from   peakfinding.processor        import (PeaksDict,   # pylint: disable=unused-import
+                                            SingleStrandProcessor, SingleStrandTask)
 from   peakfinding.__scripting__.holoviewing import (PeaksDisplay as _PeaksDisplay,
                                                      PeaksTracksDictDisplay as _PTDDisplay)
 
@@ -74,9 +73,10 @@ class OligoMappingDisplay(_PeaksDisplay, display = PeaksDict): # type: ignore
     def getmethod(self):
         "Returns the method used by the dynamic map"
         if None not in (self._sequence, self._oligos):
-            if self._fit is True:
-                return _AutoHP(self).run
-            return _ManualHP(self).run
+            out = _AutoHP(self) if self._fit is True else _ManualHP(self)
+            if getattr(out, '_singlestrand') is None:
+                setattr(out, '_singlestrand', True)
+            return out.run
 
         return super().getmethod()
 
@@ -205,7 +205,7 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
     A hv.DynamicMap showing peaks
 
     Attributes are:
-
+    * *singlestrand* will remove the single-strand peak unless set to `False`
     * *format* == '1d': for a given bead, all tracks are overlayed, For a given
       bead, all tracks are overlayed.  Keywords are:
 
@@ -231,16 +231,17 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
         * *reflayout*: can be set to 'top', 'bottom', 'left' or 'right'
         * *fit*: add stretch & bias sliders
     """
-    _format    = "2d"
-    _reftask   = FitToReferenceTask()
-    _refdims   = False
-    _peakstyle = dict(color = 'blue', line_dash = 'dotted')
-    _refstyle  = dict(color = 'gray', line_dash = 'dotted')
-    _logz      = True
-    _loglog    = True
-    _textcolor = 'green'
-    _fit       = False
-    KEYWORDS   = _PTDDisplay.KEYWORDS | frozenset(locals())
+    _singlestrand: Union[SingleStrandTask, bool] = None
+    _format       = "2d"
+    _reftask      = FitToReferenceTask()
+    _refdims      = False
+    _peakstyle    = dict(color = 'blue', line_dash = 'dotted')
+    _refstyle     = dict(color = 'gray', line_dash = 'dotted')
+    _logz         = True
+    _loglog       = True
+    _textcolor    = 'green'
+    _fit          = False
+    KEYWORDS      = _PTDDisplay.KEYWORDS | frozenset(locals())
     def __init__(self, items, **opts):
         super().__init__(items, **opts)
         if self._format in ('1d', '2d'):
@@ -285,12 +286,22 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
         if self._reftask is not None:
             kwa['reftask'] = self._reftask
             if bead not in self._reftask:
-                self._reftask.frompeaks(self._items[self._reference].peaks[bead,...])
+                pks = self._items[self._reference].peaks
+                if self._singlestrand is not False:
+                    if isinstance(self._singlestrand, SingleStrandTask):
+                        sstrand = self._singlestrand
+                    else:
+                        sstrand = Tasks.singlestrand()
+                    pks = SingleStrandProcessor.apply(pks[...], **sstrand.config())
+
+                self._reftask.frompeaks(pks[bead,...])
 
     @staticmethod
     def _frompeaksfcn(args):
-        alg, refpeaks, bead = args
+        sstrand, alg, refpeaks, bead = args
         try:
+            if sstrand:
+                refpeaks = SingleStrandProcessor.apply(refpeaks[...], **sstrand.config())
             return (bead, alg.frompeaks(refpeaks[bead]))
         except DataCleaningException:
             return None, None
@@ -303,19 +314,19 @@ class PeaksTracksDictDisplay(_PTDDisplay, # type: ignore
 
         data    = dict(reftask.fitdata)
 
+        sstrand = (Tasks.singlestrand() if self._singlestrand in (True, None) else
+                   None                 if not self._singlestrand             else
+                   self._singlestrand)
+
+        ref     = self._items[self._reference].peaks
         if len(beads) > 2:
             with ProcessPoolExecutor() as pool:
-                ref  = self._items[self._reference].peaks
-                lst  = [(reftask.fitalg, ref, i) for i in beads]
+                lst  = [(sstrand, reftask.fitalg, ref, i) for i in beads]
                 data.update({i: j for i, j in pool.map(self._frompeaksfcn, lst)
                              if j is not None})
         else:
-            ref  = self._items[self._reference].peaks
             for bead in beads:
-                try:
-                    data[bead] = reftask.fitalg.frompeaks(ref[bead])
-                except DataCleaningException:
-                    continue
+                self._frompeaksfcn((sstrand, reftask.fitalg, ref, bead))
 
         reftask.fitdata = data
         return reftask

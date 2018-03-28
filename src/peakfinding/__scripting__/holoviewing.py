@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Updating PeaksDict for scripting purposes"
-from   typing                import List, Iterator, cast
+from   typing                import List, Union, Iterator, cast
 from   functools             import partial
 from   copy                  import deepcopy
 import numpy                 as     np
 
 from   utils.holoviewing     import addto, displayhook, hv
+from   model.__scripting__   import Tasks
 from   data.__scripting__    import TracksDict # pylint: disable=unused-import
 from   data.__scripting__.holoviewing.trackviews import CycleDisplay as _CycleDisplay
 from   data.__scripting__.holoviewing.tracksdict import TracksDictDisplay
 from   ..probabilities       import Probability
-from   ..processor           import PeaksDict
+from   ..processor           import PeaksDict, SingleStrandProcessor, SingleStrandTask
 from   .                     import Detailed, PeaksTracksDictOperator
 
 displayhook(PeaksDict)
@@ -26,22 +27,17 @@ class PeaksDisplay(_CycleDisplay, display = PeaksDict): # type: ignore
     * *precision* is the noise level used to find peaks
     * *labels*: if *False*, no labels are added. If *None*, labels are added
     if 3 or less beads are shown.
-    * *sequence* and *oligo*: can be used to display dna positions. If
-    *fit* is *False*, then the returned dynamic map will have *sequence*,
-    *stretch* and *bias* widgets as well as *bead*.
     * *stretch* and *bias* values can be provided manually
     * *zero* set to *True* will set the x-axis zero to the first peak position.
-    * *fit*: if used in conjunction with *sequence* and *oligo*, each bead
-    will be displayed with the best fit sequence.
-    * *sequencestyle*, *eventstyle*, *peakstyle* can be used to set the style
-    of corresponding graph elements.
+    * *singlestrand* will remove the single-strand peak unless set to `False`
     """
-    _zero       = True
-    _peakstyle  = dict(size = 5, color = 'green')
-    _eventstyle = dict(size = 3)
-    _norm       = 'events'
-    _precision  = None
-    KEYWORDS    = _CycleDisplay.KEYWORDS | frozenset(locals())
+    _zero                                        = True
+    _peakstyle                                   = dict(size = 5, color = 'green')
+    _eventstyle                                  = dict(size = 3)
+    _norm                                        = 'events'
+    _precision                                   = None
+    _singlestrand: Union[SingleStrandTask, bool] = None
+    KEYWORDS                                     = _CycleDisplay.KEYWORDS | frozenset(locals())
 
     # pylint: disable=too-many-arguments,arguments-differ
     @staticmethod
@@ -146,15 +142,23 @@ class PeaksDisplay(_CycleDisplay, display = PeaksDict): # type: ignore
             _do(Detailed(None, None))
         return itms
 
+    @property
+    def _ssitems(self):
+        if self._singlestrand:
+            sstrand = (Tasks.singlestrand() if self._singlestrand is True else
+                       self._singlestrand)
+            return SingleStrandProcessor.apply(self._items[...], **sstrand.config())
+        return self._items
+
     def _run(self, evts, **opts):
         "shows overlayed Curve items"
         return hv.Overlay(self.elements(evts, **opts))
 
     def _perbead(self, bead, **opts):
-        return self._run(self._items[[bead]], **opts)
+        return self._run(self._ssitems[[bead]], **opts)
 
     def _perall(self, **opts):
-        return self._run(self._items, **opts)
+        return self._run(self._ssitems, **opts)
 
     def getmethod(self):
         "Returns the method used by the dynamic map"

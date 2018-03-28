@@ -16,6 +16,7 @@ from utils                    import update
 from utils.decoration         import addto
 from utils.attrdefaults       import toenum
 from data.views               import TrackView
+from data.track               import Track
 from control.taskcontrol      import create as _create, ProcessorController
 from control.processor.base   import Processor, register
 from control.processor.utils  import ActionTask
@@ -28,13 +29,14 @@ from peakfinding.processor    import (PeakSelectorTask, PeakCorrelationAlignment
 from peakcalling.processor    import (FitToReferenceTask, FitToHairpinTask,
                                       BeadsByHairpinTask)
 from ..level                  import Level
-from ..task                   import (Task, TrackReaderTask, CycleCreatorTask,
-                                      DataSelectionTask)
-from ..task.track             import CycleSamplingTask
+from ..task                   import Task
+from ..task.track             import (CycleSamplingTask, TrackReaderTask,
+                                      DataSelectionTask, CycleCreatorTask)
 from ..task.dataframe         import DataFrameTask
 
 class _DOCHelper(Enum):
     # pylint: disable=bad-continuation
+    trackreader    = ("reads a track file",)
     cyclesampling  = ("transforms a track into one containing only a selection of cycle.",)
     action         = (
         "a Callable[[TrackView, Tuple[KEY, DATA]], Tuple[KEY, Any]]",
@@ -182,6 +184,7 @@ class Tasks(Enum):
     The keyword `pool` allows providing a specific `ProcessPoolExecutor`. If provided with
     `pool == True`, the `ProcessPoolExecutor` instance is created and used.
     """
+    trackreader    = 'trackreader'
     cyclesampling  = 'cyclesampling'
     action         = 'action'
     subtraction    = 'subtraction'
@@ -203,7 +206,8 @@ class Tasks(Enum):
     @staticmethod
     def defaults():
         "returns default tasks"
-        return dict(cleaning       = DataCleaningTask(),
+        return dict(trackreader    = TrackReaderTask(),
+                    cleaning       = DataCleaningTask(),
                     cyclesampling  = CycleSamplingTask(),
                     subtraction    = BeadSubtractionTask(),
                     selection      = DataSelectionTask(),
@@ -335,37 +339,8 @@ class Tasks(Enum):
         task  = self(*resets, **kwa)
         return register(None)[type(task)](task = task)
 
-
     def __call__(self, *resets, **kwa)-> Task:
-        fcn     = getattr(self, '_default_'+self.name, None)
-        if fcn is not None:
-            return fcn(*resets, **kwa)
-
-        current = kwa.pop('current', None)
-        cnf     = self.default() if current is None else deepcopy(current)
-        cls     = type(cnf)
-        if Ellipsis in resets:
-            resets = tuple(i for i in resets if i is not Ellipsis)
-
-        kwa.update({i: getattr(cls, i) for i in resets if isinstance(i, str)})
-
-        state = cnf.__getstate__() if hasattr(cnf, '__getstate__') else deepcopy(cnf.__dict__)
-        state.update(**kwa)
-        task  = cnf.__class__(**state)
-
-        for key, value in next((i for i in resets if isinstance(i, dict)), {}).items():
-            lst = key.split('.')
-            obj = task
-            for skey in lst[:-1]:
-                obj = getattr(obj, skey)
-
-            deflt = getattr(type(obj), lst[-1])
-            if value is getattr(self, 'RESET'):
-                setattr(obj, lst[-1], deepcopy(deflt))
-            else:
-                setattr(obj, lst[-1], toenum(deflt, value))
-
-        return task
+        return getattr(self, '_default_'+self.name, self._default_call)(*resets, **kwa)
 
     class _TaskGetter:
         def __get__(self, obj, tpe):
@@ -418,6 +393,45 @@ class Tasks(Enum):
         if len(args) > 0 or len(kwa):
             call = partial(call, *args, **kwa)
         return ActionTask(call = call)
+
+    def _default_trackreader(self, *args, **kwa):
+        if len(args) == 1 and isinstance(args[0], Track):
+            cnf = args[0].__getstate__()
+            cnf.update(**kwa)
+            kwa = cnf
+
+        paths = [i for i in args if isinstance(i, Path)]
+        args  = tuple(i for i in args if not isinstance(i, Path))
+        if paths:
+            kwa['path'] = paths
+
+        return self._default_call(*args, **kwa)
+
+    def _default_call(self, *resets, **kwa) -> Task:
+        current = kwa.pop('current', None)
+        cnf     = self.default() if current is None else deepcopy(current)
+        if Ellipsis in resets:
+            resets = tuple(i for i in resets if i is not Ellipsis)
+
+        kwa.update({i: getattr(type(cnf), i) for i in resets if isinstance(i, str)})
+
+        state = cnf.__getstate__() if hasattr(cnf, '__getstate__') else deepcopy(cnf.__dict__)
+        state.update(**kwa)
+        task  = cnf.__class__(**state)
+
+        for key, value in next((i for i in resets if isinstance(i, dict)), {}).items():
+            lst = key.split('.')
+            obj = task
+            for skey in lst[:-1]:
+                obj = getattr(obj, skey)
+
+            deflt = getattr(type(obj), lst[-1])
+            if value is getattr(self, 'RESET'):
+                setattr(obj, lst[-1], deepcopy(deflt))
+            else:
+                setattr(obj, lst[-1], toenum(deflt, value))
+
+        return task
 
     def __repr__(self):
         tpe = self.tasktype()
