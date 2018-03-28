@@ -401,10 +401,10 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         self.__diagopen = TrackFileDialog(self._ctrl)
         self.__diagsave = SaveFileDialog(self._ctrl)
 
-    def getroots(self, ctrl, doc):
+    def addtodoc(self, ctrl, doc):
         "adds items to doc"
+        super().addtodoc(ctrl, doc)
         assert doc is not None
-        self._doc = doc
         tbar   = DpxToolbar(hasquit = getattr(self._ctrl, 'FLEXXAPP', None) is not None)
 
         def _onbtn_cb(attr, old, new):
