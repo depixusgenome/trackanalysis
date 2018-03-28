@@ -63,12 +63,14 @@ class HybridStatView(BokehView):
                     break
         ctrl.display.updatedefaults('keystroke', advanced = _advanced)
 
-    def getroots(self, ctrl, doc):
+    def addtodoc(self, ctrl, doc):
         "returns object root"
+        super().addtodoc(ctrl, doc)
+
         titles = ctrl.globals.css.hybridstat.title
         mode   = self.defaultsizingmode()
         def _panel(view):
-            ret = view.getroots(ctrl, doc)
+            ret = view.addtodoc(ctrl, doc)
             while isinstance(ret, (tuple, list)) and len(ret) == 1:
                 ret = ret[0]
             if isinstance(ret, (tuple, list)):

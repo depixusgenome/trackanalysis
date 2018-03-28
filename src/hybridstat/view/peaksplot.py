@@ -80,7 +80,7 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
 
 class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
     "Creates plots for peaks"
-    def __init__(self, ctrl = None, *args):
+    def __init__(self, ctrl = None, *args): # pylint: disable=keyword-arg-before-vararg
         super().__init__(ctrl = ctrl, *args)
         self.css.defaults = {'count'           : PlotAttrs('lightblue', 'line', 1),
                              'figure.width'    : 500,
@@ -122,7 +122,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
 
     @property
     def __foundcolor(self):
-        return self.css.peaks.colors.found[self.css.root.theme.get()]
+        return self.css.peaks.colors.found[self.model.themename]
 
     def __peaks(self, vals = None):
         colors = [tohex(self.__foundcolor.get()),

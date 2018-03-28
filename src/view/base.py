@@ -6,8 +6,6 @@ from abc                  import ABC
 from concurrent.futures   import ThreadPoolExecutor
 
 from bokeh.document       import Document
-from bokeh.themes         import Theme
-from bokeh.layouts        import layout
 
 from tornado.ioloop           import IOLoop
 from tornado.platform.asyncio import to_tornado_future
@@ -85,10 +83,10 @@ def defaultsizingmode(self, kwa:dict = None, ctrl = None, **kwargs) -> dict:
     else:
         kwa.update(kwargs)
 
-    css = getattr(self, 'css', None)
-    if css is None:
-        css = getattr(self, '_ctrl', ctrl).globals.css
-    kwa['sizing_mode'] = css.sizing_mode.get()
+    theme = getattr(self, 'theme', None)
+    if theme is None:
+        theme = getattr(self, '_ctrl', ctrl).theme
+    kwa['sizing_mode'] = theme.get('main', 'sizingmode', 'fixed')
     return kwa
 
 class BokehView(View):
@@ -102,22 +100,6 @@ class BokehView(View):
             BokehView.__CTRL.add(id(ctrl))
             css.button.defaults = {'width': 90, 'height': 20}
             css.input .defaults = {'width': 90, 'height': 20}
-            css.defaults        = {'sizing_mode': 'fixed'}
-
-            dark = { 'attrs': { 'Figure': { 'background_fill_color': '#2F2F2F',
-                                            'border_fill_color': '#2F2F2F',
-                                            'outline_line_color': '#444444' },
-                                'Axis':   { 'axis_line_color': "white",
-                                            'axis_label_text_color': "white",
-                                            'major_label_text_color': "white",
-                                            'major_tick_line_color': "white",
-                                            'minor_tick_line_color': "white"
-                                          },
-                                'Title':  { 'text_color': "white" } } }
-
-            css.theme.dark.default  = dark
-            css.theme.basic.default = {}
-            css.theme.default       = 'dark'
         self._doc:  Document        = None
 
     def close(self):
@@ -129,29 +111,8 @@ class BokehView(View):
         "Enables/disables view elements depending on the track status"
         enableOnTrack(self._ctrl, *itms)
 
-    def addtodoc(self, ctrl, doc):
+    def addtodoc(self, _, doc):
         "Adds one's self to doc"
-        theme = ctrl.globals.css.theme.get(default = None)
-        if isinstance(theme, str):
-            theme = ctrl.globals.css.theme[theme].get(default = None)
-        if theme is not None:
-            doc.theme = Theme(json = theme)
-
-        self._doc = doc
-        roots     = self.getroots(ctrl, doc)
-        while isinstance(roots, (tuple, list)) and len(roots) == 1:
-            roots = roots[0]
-
-        if not isinstance(roots, (tuple, list)):
-            roots = (roots,)
-
-        if isinstance(roots, (tuple, list)) and len(roots) == 1:
-            doc.add_root(roots[0])
-        else:
-            doc.add_root(layout(roots, **self.defaultsizingmode()))
-
-    def getroots(self, _, doc):
-        "returns object root"
         self._doc = doc
 
     def defaultsizingmode(self, kwa = None, **kwargs) -> dict:

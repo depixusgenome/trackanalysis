@@ -80,7 +80,7 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
 
         self.__withbase = dict()
         for name in ('color', 'dash', 'width', 'alpha'):
-            gridprops = cnf.css.grid[cnf.css.theme.get()][name].get()
+            gridprops = cnf.css.grid[self.__model.themename][name].get()
             self.__withbase['grid_line_'+name]       = gridprops[0]
             self.__withbase['minor_grid_line_'+name] = gridprops[1]
 

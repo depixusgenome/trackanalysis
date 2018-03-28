@@ -4,6 +4,9 @@
 import sys
 from   typing                  import Dict, Any
 
+from   bokeh.themes            import Theme
+from   bokeh.layouts           import layout
+
 from   control.event           import EmitPolicy
 from   control.taskcontrol     import TaskController
 from   control.globalscontrol  import GlobalsController
@@ -11,6 +14,7 @@ from   control.decentralized   import DecentralizedController
 from   control.action          import ActionDescriptor
 from   undo.control            import UndoController
 from   view.keypress           import DpxKeyEvent
+from   model.maintheme         import MainTheme
 from   .configuration          import ConfigurationIO
 from   .scripting              import orders
 
@@ -35,8 +39,10 @@ class BaseSuperController:
         self.topview = view
         self.undos   = UndoController(**kwa)
         self.theme   = ThemeController()
+        self.theme.add(MainTheme())
         self.display = DisplayController()
         self._config_counts = [False]
+
 
     emitpolicy = EmitPolicy
 
@@ -124,9 +130,27 @@ class BaseSuperController:
     def _bokeh(self, keys, doc):
         for mdl in orders().dynloads():
             getattr(sys.modules.get(mdl, None), 'document', lambda x: None)(doc)
+
+        roots = getattr(self.topview, 'addtodoc', lambda *_: None)(self, doc)
+        if roots is None:
+            return
+
+        theme = self.theme.model("main").theme
+        if theme:
+            doc.theme = Theme(json = theme)
+
+        while isinstance(roots, (tuple, list)) and len(roots) == 1:
+            roots = roots[0]
+
+        if not isinstance(roots, (tuple, list)):
+            roots = (roots,)
+
         keys.addtodoc(self, doc)
-        if hasattr(self.topview, 'addtodoc'):
-            self.topview.addtodoc(self, doc)
+        if isinstance(roots, (tuple, list)) and len(roots) == 1:
+            doc.add_root(roots[0])
+        else:
+            mode = self.theme.get('main', 'sizingmode', 'fixed')
+            doc.add_root(layout(roots, sizing_mode = mode))
 
     def _configio(self):
         cnf  = ConfigurationIO(self)

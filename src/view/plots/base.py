@@ -640,9 +640,9 @@ class PlotView(Generic[PlotType], BokehView):
         "activates the component: resets can occur"
         self._plotter.activate(val)
 
-    def getroots(self, ctrl, doc):
+    def addtodoc(self, ctrl, doc):
         "adds items to doc"
-        super().getroots(ctrl, doc)
+        super().addtodoc(ctrl, doc)
         ret = self._plotter.create(ctrl, doc)
         self._plotter.observe(ctrl)
         return ret

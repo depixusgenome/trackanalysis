@@ -70,7 +70,7 @@ class DpxHoverModel(Model, SequenceHoverMixin):  # pylint: disable=too-many-inst
         tap  = fig.select(TapTool)
         if tap is not None and len(tap):
             self._rawsource = ColumnDataSource(self._createrawdata(source.data, shape))
-            sel             = css.selection[self._model.css.theme.get()].get()
+            sel             = css.selection[self._model.themename].get()
             self._rawglyph  = sel.addto(fig,  x = 't', y = 'z', source = self._rawsource)
             args = dict(hvr    = self,
                         hvrsrc = self._rawsource,

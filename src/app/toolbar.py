@@ -1,65 +1,64 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Updates app manager so as to deal with controllers and toolbar"
-from typing           import cast
-from utils.inspection import getclass
+from typing           import Generic, TypeVar
+
+from bokeh.layouts    import layout, column
+
+from utils.inspection import getclass, templateattribute
 from .launcher        import setup
-from .maincontrol     import createview
+from .maincontrol     import createview as _createview
 from .default         import VIEWS, CONTROLS
 
-class WithToolbar:
-    "Creates an app with a toolbar"
-    TBAR = "view.toolbar.BeadToolbar"
-    def __init__(self, tbar = None):
-        self.tbar = tbar
 
-    def __call__(self, main):
-        if self.tbar is None:
-            from view.toolbar import BeadToolbar
-            tbar = cast(type, BeadToolbar)
+TOOLBAR = TypeVar("TOOLBAR")
+VIEW    = TypeVar("VIEW")
+
+class ViewWithToolbar(Generic[TOOLBAR, VIEW]):
+    "A view with the toolbar on top"
+    def __init_subclass__(cls, **_):
+        name        = templateattribute(cls, 1).__name__
+        cls.APPNAME = name.lower().replace('view', '')
+
+    def __init__(self, ctrl = None, **kwa):
+        self._bar      = templateattribute(self, 0)(ctrl = ctrl, **kwa)
+        self._mainview = templateattribute(self, 1)(ctrl = ctrl, **kwa)
+
+    def ismain(self, ctrl):
+        "sets-up the main view as main"
+        getattr(self._mainview, 'ismain', lambda _: None)(ctrl)
+
+    def close(self):
+        "remove controller"
+        self._bar.close()
+        self._mainview.close()
+
+    def addtodoc(self, ctrl, doc):
+        "adds items to doc"
+        tbar   = self._bar.addtodoc(ctrl, doc)
+        others = self._mainview.addtodoc(ctrl, doc)
+        mode   = ctrl.theme.get('main', 'sizingmode', 'fixed')
+        while isinstance(others, (tuple, list)) and len(others) == 1:
+            others = others[0]
+
+        if isinstance(others, list):
+            children = [tbar] + others
+        elif isinstance(others, tuple):
+            children = [tbar, layout(others, **mode)]
         else:
-            tbar = cast(type, getclass(self.tbar))
+            children = [tbar, others]
 
-        from bokeh.layouts  import layout, column
-        from view           import BokehView
-        class ViewWithToolbar(BokehView):
-            "A view with the toolbar on top"
-            APPNAME = getattr(main, 'APPNAME', main.__name__.lower().replace('view', ''))
-            def __init__(self, ctrl = None, **kwa):
-                self._bar      = tbar(ctrl = ctrl, **kwa)
-                self._mainview = main(ctrl = ctrl, **kwa)
-                super().__init__(ctrl = ctrl, **kwa)
+        return column(children, **mode)
 
-            def ismain(self, ctrl):
-                "sets-up the main view as main"
-                self._mainview.ismain(ctrl)
+def createview(main, controls, views, tbar = None):
+    "Creates an app with a toolbar"
+    if tbar is None:
+        from view.toolbar     import BeadToolbar
+        tbar = BeadToolbar
+    else:
+        tbar = getclass(tbar)
 
-            def close(self):
-                "remove controller"
-                super().close()
-                self._bar.close()
-                self._mainview.close()
+    cls = ViewWithToolbar[tbar, getclass(main)] # type: ignore
+    return _createview(cls, controls, views)
 
-            def getroots(self, ctrl, doc):
-                "adds items to doc"
-                tbar   = self._bar.getroots(ctrl, doc)
-                others = self._mainview.getroots(ctrl, doc)
-                mode   = self.defaultsizingmode()
-                while isinstance(others, (tuple, list)) and len(others) == 1:
-                    others = others[0]
-
-                if isinstance(others, list):
-                    children = [tbar] + others
-                elif isinstance(others, tuple):
-                    children = [tbar, layout(others, **mode)]
-                else:
-                    children = [tbar, others]
-
-                return column(children, **mode)
-
-        return ViewWithToolbar
-
-setup(locals(),
-      creator         = lambda i, j, k: createview(WithToolbar()(i), j, k),
-      defaultcontrols = CONTROLS,
-      defaultviews    = VIEWS+(WithToolbar.TBAR,))
+setup(locals(), creator = createview, defaultcontrols = CONTROLS, defaultviews = VIEWS)
