@@ -10,7 +10,7 @@ class DpxDAQToolbar(Widget):
     "Toolbar model"
     __css__            = ROUTE+"/view.css"
     __javascript__     = ROUTE+"/jquery.min.js"
-    __implementation__ = 'daqtoolbar.coffee'
+    __implementation__ = '_daqtoolbar.coffee'
     frozen      = props.Bool(True)
     manual      = props.Int(-1)
     ramp        = props.Int(-1)

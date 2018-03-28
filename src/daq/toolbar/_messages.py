@@ -42,18 +42,16 @@ class DAQMessageDisplay:
 
 class DAQMessagesView:
     "Everything related to messages"
-    def __init__(self, ctrl, tbar, **_):
+    def __init__(self, **_):
         self._theme        = DAQMessageTheme(**_)
         self._display      = DAQMessageDisplay(**_)
-        self._tbar         = tbar
         self._last:list    = [None, None, self._theme.timeout['normal']]
+        self._tbar         = None
         self._doc:Document = None
-        if ctrl:
-            self.observe(ctrl)
 
     def observe(self, ctrl):
         "initializes globals"
-        if self._theme in ctrl:
+        if self._theme in ctrl.theme:
             return
 
         ctrl.theme.add(self._theme)

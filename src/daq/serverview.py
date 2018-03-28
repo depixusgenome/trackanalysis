@@ -70,12 +70,17 @@ class DAQServerView(Generic[DATA]):
     """
     _NAME = ''
     _data: DATA
-    def __init__(self, **kwa) -> None:
+    def __init__(self, ctrl = None, **kwa) -> None:
         self._index = 0
         self._theme = DAQMemory(name = self._NAME+'memory', **kwa)
+        if ctrl:
+            self.observe(ctrl)
 
     def observe(self, ctrl):
         "setup observers"
+        if self._theme in ctrl.theme:
+            return
+
         ctrl.theme.add(self._theme)
         ctrl.daq.observe(listen        = partial(self._onstart, ctrl, 'started'),
                          updatenetwork = partial(self._onstart, ctrl, ''))
@@ -90,7 +95,7 @@ class DAQServerView(Generic[DATA]):
         """
         Reads server data and outputs it
         """
-        LOGS.info("started " + self._NAME + " client")
+        LOGS.info("started %s client", self._NAME)
         pack     = struct.pack('4sL',
                                socket.inet_aton(cnf.multicast),
                                socket.INADDR_ANY)
@@ -123,10 +128,10 @@ class DAQServerView(Generic[DATA]):
         call        = getattr(ctrl, f'add{self._NAME}data')
         data        = getattr(ctrl.data, self._NAME)
         if not (getattr(ctrl.data, self._NAME+'started') or self._index != index):
-            LOGS.info("stopping " + self._NAME + " client")
+            LOGS.info("stopping %s client", self._NAME)
             return
 
-        LOGS.info("starting " + self._NAME + " client")
+        LOGS.info("starting %s client", self._NAME)
         await self.__readdaq(index, cnf, data, call)
 
     def _createdata(self, ctrl):

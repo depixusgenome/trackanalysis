@@ -45,9 +45,9 @@ def _without_cls(vname, cname):
 def _from_path(view):
     pview = Path(view)
     if pview.exists():
-        name = pview.stem+'view'
-        if name == 'viewview':
-            name = pview.parent.stem+'view'
+        name = (pview.parent.stem+'view' if pview.stem == 'view'        else
+                pview.stem               if pview.stem.endswith('view') else
+                pview.stem+'view')
 
         mod = str(pview.parent/pview.stem).replace('/', '.').replace('\\', '.')
         return _without_cls(mod, name)
@@ -184,12 +184,11 @@ def _launch(view, app, desktop, kwa):
     if not app.startswith('app.'):
         app += 'app.'+app
 
-    if 'daq' in viewcls.__name__.lower() or 'daq' in viewcls.__module__:
-        app = 'daq.app.default'
-
     if 'toolbar' in viewcls.__name__.lower() or 'toolbar' in viewcls.__module__:
         app = 'app.default'
 
+    if 'daq' in viewcls.__name__.lower() or 'daq' in viewcls.__module__:
+        app = 'daq.'+app
 
     if '.' in app and 'A' <= app[app.rfind('.')+1] <= 'Z':
         mod  = app[:app.rfind('.')]

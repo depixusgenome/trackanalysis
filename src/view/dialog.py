@@ -45,7 +45,7 @@ class FileDialog:
 
         if isinstance(ctrl, (tuple, list)):
             self.config = ctrl
-        else:
+        elif ctrl:
             storage = kwa.get('storage', None)
             if storage is not None:
                 self.globals(ctrl)[storage].default = None

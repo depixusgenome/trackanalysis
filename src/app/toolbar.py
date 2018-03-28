@@ -14,13 +14,16 @@ from .default         import VIEWS, CONTROLS
 TOOLBAR = TypeVar("TOOLBAR")
 VIEW    = TypeVar("VIEW")
 
+class _AppName:
+    def __get__(self, _, owner):
+        name = templateattribute(owner, 1).__name__
+        return name.lower().replace('view', '')
+
 class ViewWithToolbar(Generic[TOOLBAR, VIEW]):
     "A view with the toolbar on top"
-    def __init_subclass__(cls, **_):
-        name        = templateattribute(cls, 1).__name__
-        cls.APPNAME = name.lower().replace('view', '')
-
+    APPNAME = _AppName()
     def __init__(self, ctrl = None, **kwa):
+        assert not isinstance(templateattribute(self, 0), TypeVar)
         self._bar      = templateattribute(self, 0)(ctrl = ctrl, **kwa)
         self._mainview = templateattribute(self, 1)(ctrl = ctrl, **kwa)
 
@@ -50,15 +53,15 @@ class ViewWithToolbar(Generic[TOOLBAR, VIEW]):
 
         return column(children, sizing_mode = mode)
 
-def createview(main, controls, views, tbar = None):
-    "Creates an app with a toolbar"
-    if tbar is None:
-        from view.toolbar     import BeadToolbar
-        tbar = BeadToolbar
-    else:
-        tbar = getclass(tbar)
+def toolbarview(tbar, main) -> type:
+    "return the view with toolbar"
+    class ToolbarView(ViewWithToolbar[getclass(tbar), getclass(main)]): # type: ignore
+        "Toolbar view"
+        pass
+    return ToolbarView
 
-    cls = ViewWithToolbar[tbar, getclass(main)] # type: ignore
-    return _createview(cls, controls, views)
+def createview(main, controls, views):
+    "Creates an app with a toolbar"
+    return _createview(toolbarview('view.toolbar.BeadToolbar', main), controls, views)
 
 setup(locals(), creator = createview, defaultcontrols = CONTROLS, defaultviews = VIEWS)

@@ -81,22 +81,22 @@ class ConfigurationIO:
     def createview(cls, controls, views) -> type:
         "imports controls & returns the views & appname"
         get      = lambda i: getclass(i) if isinstance(i, str) else i
-        controls = tuple(controls)
 
         controls = tuple(get(i) for i in controls)
-        views    = tuple(get(i) for i in views)
+        views    = tuple(get(i) for i in views if get(i))
         appname  = next((i.APPNAME for i in views if hasattr(i, 'APPNAME')), None)
         if appname is None:
-            appname = views[0].__name__.replace('View', '').replace('view', '')
+            appname = views[0].__name__.lower().replace('view', '')
 
-        class Main(*views): # type: ignore
+        class Main: # type: ignore
             "The main view"
             APPNAME     = appname
             MainControl = cast(Type['BaseSuperController'],
-                               type('MainControl', controls[:1], dict(APPNAME = appname)))
+                               type('MainControl', controls[:1],
+                                    dict(APPNAME = appname)))
+            VIEWS       = views
             def __init__(self, ctrl = None, **kwa):
-                for child in views:
-                    child.__init__(self, ctrl = ctrl, **kwa)
+                self.views = tuple(i(ctrl = ctrl, **kwa) for i in self.VIEWS)
 
             @classmethod
             def launchkwargs(cls, **kwa) -> Dict[str, Any]:
@@ -110,11 +110,15 @@ class ConfigurationIO:
 
             def close(self):
                 "closes the application"
-                ctrl = getattr(self, '_ctrl', None)
+                ctrl  = getattr(self, '_ctrl', None)
+                views = getattr(self, 'views', ())
                 delattr(self, '_ctrl')
+                delattr(self, 'views')
                 if ctrl:
                     ctrl.close()
-                super().close()
+
+                for i in views:
+                    i.close()
 
         logToFile(str(cls(Main).apppath()/"logs.txt"))
         return Main

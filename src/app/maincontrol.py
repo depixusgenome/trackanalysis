@@ -86,8 +86,8 @@ class BaseSuperController:
     def _open(self, viewcls, doc, kwa):
         keys         = DpxKeyEvent(self)
         self.topview = viewcls(self, **kwa)
-        if hasattr(viewcls.__bases__[0], 'ismain'):
-            viewcls.__bases__[0].ismain(self.topview, self)
+        if hasattr(self.topview.views[0], 'ismain'):
+            self.topview.views[0].ismain(self)
 
         self._configio()
         self._observe(keys)
@@ -98,8 +98,8 @@ class BaseSuperController:
     def _observe(self, keys):
         "Returns the methods for observing user start & stop action delimiters"
         keys.observe(self)
-        for i in self.topview.__class__.__bases__:
-            getattr(i, 'observe', lambda *_: None)(self.topview, self)
+        for i in self.topview.views:
+            getattr(i, 'observe', lambda *_: None)(self)
 
         # now observe all events that should be saved in the config
         self._config_counts = [False]
@@ -131,7 +131,7 @@ class BaseSuperController:
         for mdl in orders().dynloads():
             getattr(sys.modules.get(mdl, None), 'document', lambda x: None)(doc)
 
-        roots = getattr(self.topview, 'addtodoc', lambda *_: None)(self, doc)
+        roots = getattr(self.topview.views[0], 'addtodoc', lambda *_: None)(self, doc)
         if roots is None:
             return
 

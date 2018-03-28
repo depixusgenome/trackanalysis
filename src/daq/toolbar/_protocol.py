@@ -82,7 +82,7 @@ class ProtocolDisplay(Generic[PROTOCOL]):
     protocol: PROTOCOL
     def __init__(self, protocol):
         self.protocol: PROTOCOL = protocol
-        self.name               = protocol.__class__.__name__
+        self.name               = type(protocol).__name__.lower()
 
 class BaseProtocolButton(Generic[PROTOCOL]):
     "A button to access the modal dialog"
@@ -100,14 +100,16 @@ class BaseProtocolButton(Generic[PROTOCOL]):
 
     def observe(self, ctrl):
         "observe the controller"
-        if self._theme.name not in ctrl.theme:
-            ctrl.theme.add(self._theme)
-            ctrl.display.add(self._display)
+        if self._theme in ctrl.theme:
+            return
 
-            @ctrl.daq.observe
-            def _onupdateprotocol(model = None, **_): # pylint: disable=unused-variable
-                if type(model) is type(self._model):
-                    ctrl.display.update(self._display, *model.__dict__)
+        ctrl.theme.add(self._theme)
+        ctrl.display.add(self._display)
+
+        @ctrl.daq.observe
+        def _onupdateprotocol(model = None, **_): # pylint: disable=unused-variable
+            if type(model) is type(self._model):
+                ctrl.display.update(self._display, *model.__dict__)
 
     def addtodoc(self, tbar, doc, ctrl, name):
         "add action to the toolbar"
@@ -123,12 +125,10 @@ class BaseProtocolButton(Generic[PROTOCOL]):
 
 class ProtocolButton(BaseProtocolButton[PROTOCOL]):
     "A button to access the modal dialog"
-    def __init__(self, ctrl, **kwa):
+    def __init__(self, **kwa):
         self._model   = templateattribute(self, 0)(**kwa)
-        self._theme   = DAQProtocolTheme(**kwa)
         self._display = ProtocolDisplay[PROTOCOL](deepcopy(self._model))
-        if ctrl is not None:
-            self.observe(ctrl)
+        self._theme   = DAQProtocolTheme(name = self._display.name, **kwa)
 
     def _body(self, ctrl) -> Tuple[Tuple[str, ...]]:
         mdl = self._display.protocol
@@ -168,12 +168,10 @@ class DAQRampButton(ProtocolButton[DAQRamp]):
 
 class DAQManualButton(BaseProtocolButton[DAQManualDisplay]):
     "View the DAQ Manual tools"
-    def __init__(self, ctrl, **kwa):
+    def __init__(self, **kwa):
         self._model   = DAQManualDisplay(**kwa)
-        self._theme   = DAQProtocolTheme(**kwa)
         self._display = deepcopy(self._model)
-        if ctrl is not None:
-            self.observe(ctrl)
+        self._theme   = DAQProtocolTheme(name = self._display.name, **kwa)
 
     def _body(self, ctrl) -> Tuple[Tuple[str, ...]]:
         body = deepcopy(self._theme.body)

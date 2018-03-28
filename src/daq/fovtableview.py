@@ -41,6 +41,7 @@ _TEXT = """
 
 class FoVTableTheme(BaseModel):
     "summary info on the field of view"
+    name        = 'fovtable'
     template    = _TEXT
     refreshrate = 5
     @initdefaults(frozenset(locals()))

@@ -22,13 +22,11 @@ class DAQRecordTheme:
 
 class DAQRecordFileDialog(FileDialog):
     "A file dialog that adds a default save path"
-    def __init__(self, ctrl, **kwa):
+    def __init__(self, **kwa):
         self._theme = DAQRecordTheme(**kwa)
         super().__init__(filetypes  = self._theme.filetypes,
                          title      = self._theme.title,
                          initialdir = self._theme.initialdir)
-        if ctrl:
-            self.observe(ctrl)
 
     def observe(self, ctrl):
         "observe the controller"
@@ -58,10 +56,10 @@ class DAQToolbar:
     "DAQ toolbar"
     _widget: DpxDAQToolbar
     def __init__(self, ctrl, **_):
-        self._messages  = DAQMessagesView(**_)
-        self._ramp      = DAQRampButton(**_)
-        self._probing   = DAQProbeButton(**_)
-        self._manual    = DAQManualButton(**_)
+        self._messages  = DAQMessagesView    (**_)
+        self._ramp      = DAQRampButton      (**_)
+        self._probing   = DAQProbeButton     (**_)
+        self._manual    = DAQManualButton    (**_)
         self._record    = DAQRecordFileDialog(**_)
         if ctrl:
             self.observe(ctrl)

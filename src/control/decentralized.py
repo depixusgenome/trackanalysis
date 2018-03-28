@@ -54,12 +54,22 @@ class DecentralizedController(Controller):
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
+    @staticmethod
+    def _objname(obj):
+        if isinstance(obj, str):
+            return obj
+
+        name = getattr(obj, 'name', None)
+        return name if name else type(obj).__name__
+
     def add(self, obj):
         "add a model to be updated & observed through this controller"
-        assert obj.name not in self._objects
-        self._objects[obj.name]  = obj
-        self._defaults[obj.name] = deepcopy(obj)
-        self.handle("added"+obj.name, self.emitpolicy.outasdict,
+        name = self._objname(obj)
+        assert name and name not in self._objects, (name, obj)
+
+        self._objects[name]  = obj
+        self._defaults[name] = deepcopy(obj)
+        self.handle("added"+name, self.emitpolicy.outasdict,
                     dict(control = self, model = obj))
 
     def keys(self):
@@ -160,9 +170,9 @@ class DecentralizedController(Controller):
         ctrl.observe(mdl, lambda **_: None)
         """
         objs   = self._objects.values()
-        anames = tuple((self.name+i.name) if any(i is j for j in objs) else i
+        anames = tuple((self.name+self._objname(i)) if any(i is j for j in objs) else i
                        for i in anames)
-        super().observe(*anames, decorate = decorate, argstest = argstest, **kwargs)
+        return super().observe(*anames, decorate = decorate, argstest = argstest, **kwargs)
 
     @property
     def current(self)-> Dict[str, Dict]:
@@ -190,7 +200,7 @@ class DecentralizedController(Controller):
 
     def __update(self, key:str, name, kwa: Dict[str, Any]):
         "update a specific display and emits an event"
-        name = getattr(name, 'name', name)
+        name = self._objname(name)
         obj  = getattr(self, key)[name]
 
         out  = (updatedict(self, obj, kwa) if isinstance(obj, dict) else
