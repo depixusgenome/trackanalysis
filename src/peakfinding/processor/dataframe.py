@@ -142,11 +142,13 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
     def __npmeasure(self, meas, peaks, counts):
         curr = [[] for _ in self.__np] # type: List[List[np.ndarray]]
         for cnt, (_, pks) in zip(counts, peaks):
-            arr = np.concatenate([np.concatenate(i['data']) for i in pks if len(i)])
+            tmp = [np.concatenate(i['data']) for i in pks if len(i)]
+            arr = np.concatenate(tmp) if len(tmp) else np.empty(0, dtype = 'f4')
             for i, (_, j) in zip(curr, self.__np):
                 i.append(np.full(cnt, j(arr)))
 
-        meas.update({i: np.concatenate(j) for (i, _), j in zip(self.__np, curr)})
+        if len(next(iter(curr), ())):
+            meas.update({i: np.concatenate(j) for (i, _), j in zip(self.__np, curr)})
 
     def __aggmeasure(self, meas, peaks, counts):
         curr = [[] for _ in self.__aggs] # type: List[List[np.ndarray]]
@@ -156,7 +158,8 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
             for i, (_, (agg, point)) in zip(curr, self.__aggs):
                 i.append(np.full(cnt, agg([point(i) for i in arrs])))
 
-        meas.update({i: np.concatenate(j) for (i, _), j in zip(self.__aggs, curr)})
+        if len(next(iter(curr), ())):
+            meas.update({i: np.concatenate(j) for (i, _), j in zip(self.__aggs, curr)})
 
     def __eventmeasure(self, meas, peaks):
         tmp   = {i: [] for i in self.__events.keys()} # type: Dict[str, List[np.ndarray]]
@@ -173,8 +176,10 @@ class PeaksDataFrameFactory(DataFrameFactory[PeaksDict]):
             for name, fcn in self.__events.items():
                 append(name, (fcn(i) for i in arrs))
 
-        meas.update({i: np.concatenate(j) for i, j in tmp.items()})
+        if len(next(iter(tmp.values()), ())):
+            meas.update({i: np.concatenate(j) for i, j in tmp.items()})
 
     @staticmethod
     def __peakmeasure(peaks, cnt, fcn):
-        return np.concatenate([np.full(cnt[i], fcn(j)) for i, j in enumerate(peaks)])
+        tmp = [np.full(cnt[i], fcn(j)) for i, j in enumerate(peaks)]
+        return np.concatenate(tmp) if tmp else np.empty(0, dtype = 'f4')

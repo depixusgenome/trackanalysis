@@ -26,7 +26,7 @@ class TaskDescriptor:
 
     def __set__(self, instance, value: Union[Dict[str, Any], bool, Task]):
         if not value:
-            instance.tasks.pop(self.name)
+            instance.tasks.pop(self.name, None)
             return
 
         if isinstance(value, bool):
