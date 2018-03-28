@@ -16,6 +16,9 @@ def templateattribute(cls, index) -> type:
     if not isinstance(cls, type):
         cls = type(cls)
     cur  = cls
+    if getattr(cur, '__args__', None):
+        return cur.__args__[index]    # type: ignore
+
     orig = getattr(cls, '__orig_bases__')
     while orig is None or orig[0].__args__ is None:
         cur  = getattr(cur, '__base__')
