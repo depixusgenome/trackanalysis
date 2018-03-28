@@ -259,7 +259,7 @@ class GlobalsController(BaseGlobalsController):
         "Sets-up the user preferences"
         cnf = readconfig(configpath, patchname = patchname)
         if cnf is None or len(cnf) == 0:
-            return None
+            return
 
         with Action(self):
             maps = dict(self._model.items())
@@ -274,7 +274,6 @@ class GlobalsController(BaseGlobalsController):
         "observes all undoable user actions"
         def _onglobals(items):
             vals = {i: j.old for i, j in items.items()}
-            if len(vals):
-                return partial(self.updateGlobal, items.name, **vals)
+            return partial(self.updateGlobal, items.name, **vals) if len(vals) else None
 
         self.observe(r"^globals\.(?!.*?project).*$", wrapper(_onglobals))
