@@ -44,11 +44,11 @@ class ViewWithToolbar(Generic[TOOLBAR, VIEW]):
         if isinstance(others, list):
             children = [tbar] + others
         elif isinstance(others, tuple):
-            children = [tbar, layout(others, **mode)]
+            children = [tbar, layout(others, sizing_mode = mode)]
         else:
             children = [tbar, others]
 
-        return column(children, **mode)
+        return column(children, sizing_mode = mode)
 
 def createview(main, controls, views, tbar = None):
     "Creates an app with a toolbar"

@@ -62,7 +62,7 @@ class Option(metaclass = ABCMeta):
         fcn = partial(cls._default_apply, model, elems, cnv, storeempty)
         return cast(Callable, fcn)
 
-    _INDEX = re.compile(r"(\w+)\[([^]*)\]")
+    _INDEX = re.compile(r"(\w+)\[([^]]*)\]")
     @classmethod
     def getvalue(cls, mdl, keystr, default):
         "gets the value in the model"

@@ -15,7 +15,13 @@ def setcolors(mdl,**colors):
 
 def getcolors(mdl):
     "returns the colors in hex format"
-    colors = mdl.css.colors[mdl.themename].getitems(...)
+    theme  = getattr(mdl, 'themename', None)
+    if theme is None:
+        theme  = getattr(getattr(mdl, '_model', None), 'themename', None)
+    if theme is None:
+        theme  = getattr(getattr(mdl, '_ctrl', None), 'themename', None)
+    assert theme is not None
+    colors = mdl.css.colors[theme].getitems(...)
     return {i: tohex(j) for i, j in colors.items()}
 
 def tohex(clr:str):
