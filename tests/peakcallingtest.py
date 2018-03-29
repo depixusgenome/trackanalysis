@@ -18,7 +18,7 @@ from peakfinding.histogram      import HistogramData
 from peakcalling                import cost, match, Range
 from peakcalling.tohairpin      import (PeakMatching, GaussianProductFit,
                                         ChiSquareFit, PeakGridFit, EdgePeaksGridFit)
-from peakcalling.toreference    import HistogramFit, ChiSquareHistogramFit
+from peakcalling.toreference    import HistogramFit, ChiSquareHistogramFit, Pivot
 from peakcalling.processor      import (BeadsByHairpinProcessor, BeadsByHairpinTask,
                                         DistanceConstraint, FitToReferenceTask)
 from testingcore                import DummyPool, path as utpath
@@ -33,6 +33,17 @@ def test_toref():
 
         ret2 = ChiSquareHistogramFit(maxthreshold = .5).optimize((arr1, np.unique(arr1)),
                                                                  (arr2, np.unique(arr2)))
+        assert_allclose(ret2[1:], i, rtol = 5e-4, atol = 5e-4)
+
+        ret2 = ChiSquareHistogramFit(maxthreshold = .5,
+                                     pivot        = Pivot.top
+                                    ).optimize((arr1, np.unique(arr1)),
+                                               (arr2, np.unique(arr2)))
+
+        ret2 = ChiSquareHistogramFit(maxthreshold = .5,
+                                     pivot        = Pivot.absolute
+                                    ).optimize((arr1, np.unique(arr1)),
+                                               (arr2, np.unique(arr2)))
         assert_allclose(ret2[1:], i, rtol = 5e-4, atol = 5e-4)
 
 def test_toref_frompeaks():
@@ -268,4 +279,4 @@ def test_peakiterator():
     assert_allclose([i for _, i in vals], [0., 1./3.], rtol = 1e-3)
 
 if __name__ == '__main__':
-    test_ref_peaksgrid()
+    test_toref()

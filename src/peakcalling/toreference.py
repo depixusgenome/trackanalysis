@@ -6,6 +6,7 @@ Matching experimental peaks to one another
 from    typing                      import (Sequence, NamedTuple, Tuple, Union,
                                             Iterator, cast)
 from    abc                         import ABC, abstractmethod
+from    enum                        import Enum
 from    functools                   import partial
 from    scipy.interpolate           import interp1d
 from    scipy.optimize              import fmin_cobyla
@@ -35,6 +36,11 @@ class ChiSquareData(NamedTuple): # pylint: disable=missing-docstring
     peaks: np.ndarray
 
 FitData  = Union[HistogramFitData, ChiSquareData]
+class Pivot(Enum):
+    "The position of the pivot in the fit"
+    absolute = 'absolute'
+    top      = 'top'
+    bottom   = 'bottom'
 
 class ReferenceFit(ABC):
     "Abstract class for reference fitting"
@@ -56,6 +62,7 @@ class ReferenceFit(ABC):
 class HistogramFit(GriddedOptimization, ReferenceFit):
     "Matching experimental peaks by correlating peak positions in the histograms"
     histogram    = Histogram(precision = 0.001, edge = 4)
+    pivot        = Pivot.bottom
     stretch      = Range(1., .05, .02)
     bias         = Range(0,   .1, .01)
     optim        = CobylaParameters((1e-2, 5e-3), (1e-4, 1e-4), None, None)
@@ -93,8 +100,7 @@ class HistogramFit(GriddedOptimization, ReferenceFit):
         kwa   = self.optimconfig(disp = 0, cons = self._constraints())
         ret   = min((self._optimize(left, right, kwa, i) for i in self.grid),
                     default = (DEFAULT_BEST, 1., 0.))
-
-        return Distance(ret[0], ret[1], ret[2]+right.minv-left.minv/ret[1])
+        return self._pivotedparams(left, right, ret)
 
     def value(self, aleft, aright,
               stretch: Union[float, np.ndarray],
@@ -134,10 +140,13 @@ class HistogramFit(GriddedOptimization, ReferenceFit):
         return (cost(tmp), tmp[0], tmp[1])
 
     def _to_2d(self, left) -> Tuple[HistogramData, Tuple[np.ndarray, np.ndarray]]:
-        left = self.__asprojection(left)
-        vals = (np.arange(len(left.histogram), dtype = 'f4')*left.binwidth,
-                left.histogram)
-        return left, vals
+        left  = self.__asprojection(left)
+        xaxis = np.arange(len(left.histogram), dtype = 'f4')*left.binwidth
+        if self.pivot == Pivot.top:
+            xaxis -= xaxis[-1]
+        elif self.pivot == Pivot.absolute:
+            xaxis += left.minvalue
+        return left, (xaxis, left.histogram)
 
     def _apply_minthreshold(self, vals: Tuple[np.ndarray, np.ndarray]):
         if self.minthreshold not in (None, np.NaN):
@@ -156,6 +165,12 @@ class HistogramFit(GriddedOptimization, ReferenceFit):
                 thr = np.nanmedian(pks)
             if thr not in (None, np.NaN):
                 vals[1][vals[1] > thr] = thr
+
+    def _pivotedparams(self, left, right, ret):
+        bias = (right.minv-left.minv/ret[1]          if self.pivot == Pivot.bottom else
+                -right.xaxis[0]+left.xaxis[0]/ret[1] if self.pivot == Pivot.top    else
+                0)
+        return Distance(ret[0], ret[1], ret[2]+bias)
 
     @classmethod
     def _to_data(cls,
@@ -264,7 +279,10 @@ class CorrectedHistogramFit(HistogramFit):
 
         self._apply_maxthreshold(vals)
         data        = self._to_data(hist, vals)
-        return ChiSquareData(data.fcn, data.xaxis, data.yaxis, data.minv, peaks-data.minv)
+        bias        = (data.minv        if self.pivot == Pivot.bottom else
+                       -data.xaxis[0]   if self.pivot == Pivot.top    else
+                       0.)
+        return ChiSquareData(data.fcn, data.xaxis, data.yaxis, data.minv, peaks-bias)
 
     def optimize(self, aleft, aright) -> Distance:
         "find best stretch & bias to fit right against left"
@@ -275,8 +293,9 @@ class CorrectedHistogramFit(HistogramFit):
 
         first = min((self._optimize(left, right, kwa, i) for i in self.grid),
                     default = (DEFAULT_BEST, 1., 0.))
+
         ret   = self._chisquarecomputation(left, right, first)
-        return Distance(ret[0], ret[1], ret[2]+right.minv-left.minv/ret[1])
+        return self._pivotedparams(left, right, ret)
 
     def _chisquarecomputation(self, left, right, params):
         res = chisquare(left.peaks[self.firstregpeak:], right.peaks,
