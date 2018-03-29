@@ -268,7 +268,9 @@ class TracksDictFovDisplayProperty(TracksDictDisplayProperty):
 @addto(TracksDict)         # type: ignore
 def display(self):
     "Returns a table with some data"
-    return hv.Table(self.dataframe().fillna(""), kdims = ['key'])
+    frame = self.dataframe().fillna('')
+    frame = frame.assign(path = [str(i) for i in frame.path.values])
+    return hv.Table(frame, kdims = ['key'])
 
 @addproperty(TracksDict, 'secondaries')
 class TracksDictSecondariesDisplayProperty(TracksDictDisplayProperty):
