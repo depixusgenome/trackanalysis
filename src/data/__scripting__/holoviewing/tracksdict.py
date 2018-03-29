@@ -164,11 +164,11 @@ class TracksDictDisplay(BasicDisplay,
             crvs = [fcn(i) for i in opts]
         else:
             self._items = self._items.freeze()
-            with ThreadPoolExecutor() as pool:
-                data = list(pool.map(fcn, opts))
+            with ThreadPoolExecutor() as tpool:
+                data = list(tpool.map(fcn, opts))
 
-            with ProcessPoolExecutor() as pool:
-                crvs = list(pool.map(self._process_pooled_display, data))
+            with ProcessPoolExecutor() as ppool:
+                crvs = list(ppool.map(self._process_pooled_display, data))
         return hv.Overlay(self._convert(kdims, crvs))
 
     def _reference_method(self, key, bead):
