@@ -100,7 +100,9 @@ class HistogramFit(GriddedOptimization, ReferenceFit):
         kwa   = self.optimconfig(disp = 0, cons = self._constraints())
         ret   = min((self._optimize(left, right, kwa, i) for i in self.grid),
                     default = (DEFAULT_BEST, 1., 0.))
-        return self._pivotedparams(left, right, ret)
+
+        bias = right.minv-left.minv/ret[1]
+        return Distance(ret[0], ret[1], ret[2]+bias)
 
     def value(self, aleft, aright,
               stretch: Union[float, np.ndarray],
@@ -118,7 +120,15 @@ class HistogramFit(GriddedOptimization, ReferenceFit):
 
     def _get(self, left) -> FitData:
         hist, vals = self._to_2d(left)
-        vals       = self._apply_minthreshold(vals)
+
+        if self.pivot == Pivot.top:
+            minv   = vals[0][-1]
+            vals   = vals[0] - minv,  vals[1]
+        elif self.pivot == Pivot.absolute:
+            minv   = 0.
+            vals   = vals[0] + left.minvalue, vals[1]
+
+        vals = self._apply_minthreshold(vals)
         self._apply_maxthreshold(vals)
         return self._to_data(hist, vals)
 
@@ -142,10 +152,6 @@ class HistogramFit(GriddedOptimization, ReferenceFit):
     def _to_2d(self, left) -> Tuple[HistogramData, Tuple[np.ndarray, np.ndarray]]:
         left  = self.__asprojection(left)
         xaxis = np.arange(len(left.histogram), dtype = 'f4')*left.binwidth
-        if self.pivot == Pivot.top:
-            xaxis -= xaxis[-1]
-        elif self.pivot == Pivot.absolute:
-            xaxis += left.minvalue
         return left, (xaxis, left.histogram)
 
     def _apply_minthreshold(self, vals: Tuple[np.ndarray, np.ndarray]):
@@ -165,12 +171,6 @@ class HistogramFit(GriddedOptimization, ReferenceFit):
                 thr = np.nanmedian(pks)
             if thr not in (None, np.NaN):
                 vals[1][vals[1] > thr] = thr
-
-    def _pivotedparams(self, left, right, ret):
-        bias = (right.minv-left.minv/ret[1]          if self.pivot == Pivot.bottom else
-                -right.xaxis[0]+left.xaxis[0]/ret[1] if self.pivot == Pivot.top    else
-                0)
-        return Distance(ret[0], ret[1], ret[2]+bias)
 
     @classmethod
     def _to_data(cls,
@@ -273,16 +273,27 @@ class CorrectedHistogramFit(HistogramFit):
             peaks       = None
 
         hist, vals  = self._to_2d(left)
+
         vals        = self._apply_minthreshold(vals)
         if peaks is None:
             peaks   = self._getpeaks(left, vals)
 
         self._apply_maxthreshold(vals)
-        data        = self._to_data(hist, vals)
-        bias        = (data.minv        if self.pivot == Pivot.bottom else
-                       -data.xaxis[0]   if self.pivot == Pivot.top    else
-                       0.)
-        return ChiSquareData(data.fcn, data.xaxis, data.yaxis, data.minv, peaks-bias)
+
+        if self.pivot == Pivot.bottom:
+            minv   = peaks[0]
+            vals   = vals[0] - minv,  vals[1]
+            peaks  = peaks   - minv
+        elif self.pivot == Pivot.top:
+            minv   = peaks[-1]
+            vals   = vals[0] - minv,  vals[1]
+            peaks  = peaks   - minv
+        elif self.pivot == Pivot.absolute:
+            vals   = vals[0] + left.minvalue, vals[1]
+            minv   = 0.
+
+        data = self._to_data(hist, vals)
+        return ChiSquareData(data.fcn, data.xaxis, data.yaxis, minv, peaks)
 
     def optimize(self, aleft, aright) -> Distance:
         "find best stretch & bias to fit right against left"
@@ -294,8 +305,10 @@ class CorrectedHistogramFit(HistogramFit):
         first = min((self._optimize(left, right, kwa, i) for i in self.grid),
                     default = (DEFAULT_BEST, 1., 0.))
 
-        ret   = self._chisquarecomputation(left, right, first)
-        return self._pivotedparams(left, right, ret)
+        ret  = self._chisquarecomputation(left, right, first)
+        bias = right.minv-left.minv/ret[1]
+        return Distance(ret[0], ret[1], ret[2]+bias)
+
 
     def _chisquarecomputation(self, left, right, params):
         res = chisquare(left.peaks[self.firstregpeak:], right.peaks,
