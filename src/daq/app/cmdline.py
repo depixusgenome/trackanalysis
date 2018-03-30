@@ -6,7 +6,7 @@ from app.cmdline import defaultclick, defaultmain
 @defaultclick()
 def main(view, gui, port, raiseerr, singlethread):
     "Launches an view"
-    defaultmain(view, gui, port, raiseerr, singlethread, "daq.app.default")
+    defaultmain(view, gui, port, raiseerr, singlethread, "daq.app.toolbar")
 
 if __name__ == '__main__':
     main()   # pylint: disable=no-value-for-parameter

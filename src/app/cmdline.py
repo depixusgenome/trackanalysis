@@ -181,13 +181,14 @@ def _launch(view, app, desktop, kwa):
     if viewcls is None:
         viewcls = _from_module(view)
 
-    if not app.startswith('app.'):
+    if 'app.' not in app:
         app += 'app.'+app
 
     if 'toolbar' in viewcls.__name__.lower() or 'toolbar' in viewcls.__module__:
         app = 'app.default'
 
-    if 'daq' in viewcls.__name__.lower() or 'daq' in viewcls.__module__:
+    if (('daq' in viewcls.__name__.lower() or 'daq' in viewcls.__module__)
+            and 'daq' not in app):
         app = 'daq.'+app
 
     if '.' in app and 'A' <= app[app.rfind('.')+1] <= 'Z':
