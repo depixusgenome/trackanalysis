@@ -3,9 +3,10 @@
 # pylint: disable=invalid-name
 "utils for inspecting objects and frames"
 import inspect
-from   typing    import Optional, cast
-from   types     import LambdaType, FunctionType, MethodType
 from   functools import partial
+from   pickle    import dumps
+from   types     import LambdaType, FunctionType, MethodType
+from   typing    import Optional, cast
 
 signature           = inspect.signature
 getmembers          = inspect.getmembers
@@ -24,6 +25,24 @@ def templateattribute(cls, index) -> type:
         cur  = getattr(cur, '__base__')
         orig = getattr(cur, '__orig_bases__', None)
     return orig[0].__args__[index]    # type: ignore
+
+
+def diffobj(left, right):
+    "return a dictionnary of attributes in `left` which differ from `right`"
+    if not isinstance(right, type(left)):
+        raise TypeError(f"{left} and {right} are different classes")
+
+    if isinstance(left, dict):
+        dleft = left
+    elif hasattr(left, '__getstate__'):
+        dleft = left.__getstate__()
+        if not isinstance(dleft, dict):
+            raise NotImplementedError()
+    else:
+        dleft = left.__dict__()
+
+    itr = ((i, j, getattr(right, i)) for i, j in dleft.items())
+    return {i: j for i, j, k in itr if j != k and dumps(j) != dumps(k)}
 
 def isfunction(fcn) -> bool:
     "Returns whether the object is a function"
