@@ -15,14 +15,24 @@ export class DpxDAQToolbarView extends WidgetView
         val = $(@el).find('#dpx-tb-speed').val()
         @model.speed = parseFloat(val)
 
+    on_change_protocol:  () ->
+        $(@el).find('.dpx-tb-not-stop').prop('disabled', @model.protocol == 'recording')
+        $(@el).find('.dpx-tb-manual-input').prop('disabled', @model.protocol != 'manual')
+        $(@el).find('#dpx-tb-stop').prop('disabled', @model.protocol != 'recording')
+
+        $(@el).find('.dpx-tb-not-stop').removeClass('dpx-protocol-active')
+        $(@el).find('#dpx-tb-stop').removeClass('dpx-protocol-active')
+        $(@el).find("#dpx-tb-#{@model.protocol}").addClass('dpx-protocol-active')
+
     on_change_message: () ->
         $(@el).find('#dpx-tb-message').html(@model.message)
 
     connect_signals: () ->
         super()
         @connect(@model.properties.message.change,   () => @on_change_message())
+        @connect(@model.properties.protocol.change, () => @on_change_protocol())
 
-    make_btn: (name, label, ttip = '', freeze = 'dpx-freeze') ->
+    make_btn: (name, label, ttip = '', freeze = 'dpx-tb-not-stop') ->
         if ttip == ''
             str = "<button type='button' id='dpx-tb-#{name}' "+
                   "class='#{freeze} bk-bs-btn bk-bs-btn-default'>#{label}</button>"
@@ -45,22 +55,22 @@ export class DpxDAQToolbarView extends WidgetView
         ttips = ['Manual mode' ,
                  'Start ramp cycles',
                  'Start probing cycles',
-                 'Start recording',
-                 'Stop recording']
+                 'Start protocol',
+                 'Stop protocol']
 
-        html = @make_btn('manual', 'Manual', ttips[0], '')+
-               "<input id='dpx-tb-zmag'"+
-                   " class='dpx-freeze bk-widget-form-input'"+
+        html = "<label>Z magnet</label><input id='dpx-tb-zmag'"+
+                   " class='dpx-tb-manual-input bk-widget-form-input'"+
                    " type='number' min=#{mdl.zmagmin} max=#{mdl.zmagmax} "+
-                   "step=#{mdl.inc} value=#{mdl.zmag}>Z mag</input>"+
-               "<input id='dpx-tb-speed'"+
-                   " class='dpx-freeze bk-widget-form-input'"+
+                   "step=#{mdl.inc} value=#{mdl.zmag}></input>"+
+               "<label>Z speed</label><input id='dpx-tb-speed'"+
+                   " class='dpx-tb-manual-input bk-widget-form-input'"+
                    " type='number' min=#{mdl.speedmin} max=#{mdl.speedmax} "+
-                   "step=#{mdl.speedinc} value=#{mdl.speed}>Speed</input>"+
+                   "step=#{mdl.speedinc} value=#{mdl.speed}></input>"+
+               @make_btn('manual', 'Manual', ttips[0], '')+
                @make_btn('ramp', 'Ramps', ttips[1])+
                @make_btn('probing', 'Probing', ttips[2])+
                @make_btn('record', 'Record', ttips[3])+
-               @make_btn('stop', 'Stop', ttips[4])+
+               @make_btn('stop', 'Stop', ttips[4], '')+
                "<div id='dpx-tb-message' class='bk-markup'>"+
                    "#{mdl.message}</div>"+
                "#{quit}"
@@ -75,6 +85,8 @@ export class DpxDAQToolbarView extends WidgetView
         elem.find('#dpx-tb-record').click(() => @model.record = @model.record+1)
         elem.find('#dpx-tb-stop').click(() => @model.stop = @model.stop+1)
         elem.find('#dpx-tb-quit').click(() => @model.quit = @model.quit+1)
+
+        @on_change_protocol()
         return @
 
   get_width_height: () ->
@@ -84,7 +96,7 @@ export class DpxDAQToolbarView extends WidgetView
   get_height: () -> 30
 
 export class DpxDAQToolbar extends Widget
-    type: 'DpxToolbar'
+    type: 'DpxDAQToolbar'
     default_view: DpxDAQToolbarView
 
     initialize: (attributes, options) ->
@@ -92,7 +104,7 @@ export class DpxDAQToolbar extends Widget
         @css_classes = ["dpx-row", "dpx-widget", "dpx-tb", "dpx-span"]
 
     @define {
-        frozen:     [p.Bool,    true]
+        protocol:   [p.String,  'manual']
         manual:     [p.Number,  -1]
         ramp:       [p.Number,  -1]
         probing:    [p.Number,  -1]

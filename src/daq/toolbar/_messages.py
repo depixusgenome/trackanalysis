@@ -85,7 +85,7 @@ class DAQMessagesView:
             if 'message' in old:
                 self._settext(self._display.message)
 
-    def addtodoc(self, tbar, doc, _):
+    def addtodoc(self, _, doc, tbar):
         "add to doc"
         self._tbar = tbar
         self._doc  = doc

@@ -6,34 +6,36 @@ Set the protocol
 from abc                import abstractmethod
 from copy               import deepcopy
 from contextlib         import contextmanager
-from typing             import Tuple, TypeVar, Generic, Union, cast
+from typing             import Tuple, TypeVar, Generic, Union, ClassVar, cast
 
 from utils              import initdefaults
 from utils.inspection   import templateattribute
 from utils.logconfig    import getLogger
 from modaldialog        import dialog
 
-from ..model            import DAQProtocol, DAQRamp, DAQProbe
+from ..model            import DAQProtocol, DAQRamp, DAQProbe, ConfigObject
 
 LOGS   = getLogger(__name__)
 
-class DAQProtocolTheme:
+class DAQProtocolTheme(ConfigObject):
     "Basic theme for a modal dialog"
     name     = ""
     title    = ""
     width    = 90
     body     = [["Frame rate", "%(framerate)d"],
-                ["Phase {index}",
-                 "Zmag",     "%(phase[{index}].zmag)3of",
-                 "speed",    "%(phase[{index}].speed)3of",
-                 "duration", "%(phase[{index}].duration)of",
+                ["Phases", "Zmag / speed / duration"],
+                ["{index}",
+                 "%(phases[{index}].zmag).3of",
+                 "%(phases[{index}].speed).3of",
+                 "%(phases[{index}].duration)of",
                 ]]
-    height   = 20
+    firstwidth = 150
+    height     = 20
     @initdefaults
     def __init__(self, **_):
         pass
 
-class DAQAttrRange:
+class DAQAttrRange(ConfigObject):
     "attribute value and range"
     vmin   = 0.
     value  = .5
@@ -42,9 +44,6 @@ class DAQAttrRange:
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
-
-    def __eq__(self, other):
-        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
 
 class DAQManualDisplay:
     """
@@ -59,22 +58,6 @@ class DAQManualDisplay:
     def __init__(self, **_):
         pass
 
-def _getbody(name):
-    return (f'%({name}.vmin)f',
-            "<",    f"%({name}.value)f",
-            '<',    f"%({name}.vmax)f",
-            "+/-",  f"%({name}.inc)")
-
-class DAQManualTheme:
-    """
-    DAQ idle values
-    """
-    name = "daqmanual"
-    body = [['Frame rate', '%(framerate)d'],
-            ['Z mag',      *_getbody("zmag")],
-            ['Speed',      *_getbody("speed")]
-           ]
-
 PROTOCOL = TypeVar('PROTOCOL', bound = Union[DAQProtocol, 'DAQManualDisplay'])
 
 class ProtocolDisplay(Generic[PROTOCOL]):
@@ -86,17 +69,38 @@ class ProtocolDisplay(Generic[PROTOCOL]):
 
 class BaseProtocolButton(Generic[PROTOCOL]):
     "A button to access the modal dialog"
-    _model: PROTOCOL
+    _model:   PROTOCOL
+    _display: Union[ProtocolDisplay[PROTOCOL], DAQManualDisplay]
+    _theme:   DAQProtocolTheme
 
     @abstractmethod
-    def _body(self, ctrl) -> Tuple[Tuple[str, ...]]:
+    def _body(self, ctrl) -> Tuple[Tuple[str,...]]:
+        pass
+
+    def _strbody(self, body: Tuple[Tuple[str,...]]) -> str:
+        theme = self._theme
+        first = (f"<div><p style='margin: 0px; width:{theme.firstwidth}px;'><b>"
+                 +"{}</b>{}</p></div>")
+        txt   = ""
+        for i in body:
+            if '(' in i[0]:
+                ind  = i[0].rfind('(')
+                txt +=  "<div class='dpx-span'>" + first.format(i[0][:ind], i[0][ind:])
+            else:
+                txt +=  "<div class='dpx-span'>" + first.format(i[0], '')
+            txt += ''.join(f"<div><p style='margin: 0px;'>{j}</p></div>" for j in i[1:])
+            txt += '</div>'
+        return txt
+
+    @property
+    @abstractmethod
+    def _protocol(self):
         pass
 
     @contextmanager
     @abstractmethod
     def _context(self, ctrl):
         pass
-
 
     def observe(self, ctrl):
         "observe the controller"
@@ -109,26 +113,33 @@ class BaseProtocolButton(Generic[PROTOCOL]):
         @ctrl.daq.observe
         def _onupdateprotocol(model = None, **_): # pylint: disable=unused-variable
             if type(model) is type(self._model):
-                ctrl.display.update(self._display, *model.__dict__)
+                ctrl.display.update(self._display, **model.config())
 
-    def addtodoc(self, tbar, doc, ctrl, name):
+    def addtodoc(self, ctrl, doc, tbar, name):
         "add action to the toolbar"
         def _onclick_cb(attr, old, new):
             "method to trigger the modal dialog"
-            self._model = deepcopy(self._display.protocol)
+            self._model = deepcopy(self._protocol)
             return dialog(doc,
                           context = self._context(ctrl),
                           title   = self._theme.title,
-                          body    = self._body(ctrl),
+                          body    = self._strbody(self._body(ctrl)),
                           model   = self._model)
         tbar.on_change(name, _onclick_cb)
 
 class ProtocolButton(BaseProtocolButton[PROTOCOL]):
     "A button to access the modal dialog"
+    _display: ProtocolDisplay[PROTOCOL]
+    _TITLE  : ClassVar[str]
     def __init__(self, **kwa):
         self._model   = templateattribute(self, 0)(**kwa)
         self._display = ProtocolDisplay[PROTOCOL](deepcopy(self._model))
-        self._theme   = DAQProtocolTheme(name = self._display.name, **kwa)
+        self._theme   = DAQProtocolTheme(name  = self._display.name,
+                                         title = self._TITLE,
+                                         **kwa)
+    @property
+    def _protocol(self):
+        return self._display.protocol
 
     def _body(self, ctrl) -> Tuple[Tuple[str, ...]]:
         mdl = self._display.protocol
@@ -138,12 +149,12 @@ class ProtocolButton(BaseProtocolButton[PROTOCOL]):
         if mdl.framerate != dfl.framerate:
             fra = [fra[0]+f" ({dfl.framerate})", fra[1]]
 
-        assert len(mdl.phases) == dfl.phases
+        assert len(mdl.phases) == len(dfl.phases)
 
-        body = [fra]
+        body = [fra, *(i for i in self._theme.body[:-1])]
         for i, j in enumerate(dfl.phases):
-            body.append([j.format(index = i) for j in self._theme.body[1]])
-            if j.__dict__ != mdl.phases[i].__dict__:
+            body.append([j.format(index = i) for j in self._theme.body[-1]])
+            if j != mdl.phases[i]:
                 body[-1][0] += f' ({j.zmag}, {j.speed}, {j.duration})'
 
         return cast(Tuple[Tuple[str, ...]], tuple(tuple(i) for i in body))
@@ -153,7 +164,7 @@ class ProtocolButton(BaseProtocolButton[PROTOCOL]):
         yield
 
         cur  = self._display.protocol
-        diff = {i:j for i, j in cur.__dict__.items() if j != getattr(self._model, i)}
+        diff = cur.diff(self._model)
 
         if diff:
             with ctrl.action():
@@ -162,24 +173,39 @@ class ProtocolButton(BaseProtocolButton[PROTOCOL]):
 
 class DAQProbeButton(ProtocolButton[DAQProbe]):
     "View the DAQProbe"
+    _TITLE: ClassVar[str] = "Probe Settings"
 
 class DAQRampButton(ProtocolButton[DAQRamp]):
     "View the DAQRamp"
+    _TITLE: ClassVar[str] = "Ramp Settings"
 
 class DAQManualButton(BaseProtocolButton[DAQManualDisplay]):
     "View the DAQ Manual tools"
+    _display: DAQManualDisplay
+    _TITLE = "Manual Settings"
+    _BODY  = [["Frame rate", "%(framerate)d"],
+              ["", "min / max / increment"],
+              ["Zmag",  *(f'%(zmag.{i}).3f'  for i in ('vmin', 'vmax', 'inc'))],
+              ["Speed", *(f'%(speed.{i}).3f' for i in ('vmin', 'vmax', 'inc'))]]
     def __init__(self, **kwa):
         self._model   = DAQManualDisplay(**kwa)
         self._display = deepcopy(self._model)
-        self._theme   = DAQProtocolTheme(name = self._display.name, **kwa)
+        self._theme   = DAQProtocolTheme(name  = self._display.name,
+                                         body  = self._BODY,
+                                         title = self._TITLE,
+                                         **kwa)
 
     def _body(self, ctrl) -> Tuple[Tuple[str, ...]]:
         body = deepcopy(self._theme.body)
         dfl  = ctrl.display.model(self._display, True)
-        for line in body:
-            val = line[1].split('(')[-1].split(')')[0]
-            if getattr(self._display, val) != getattr(dfl, val):
-                line[0] += f" ({getattr(dfl, val)})"
+
+        if self._display.framerate != dfl.framerate:
+            body[0][0] += f" (dfl.framerate)"
+
+        for line, attr in zip(body[1:], ('zmag', 'speed')):
+            val = getattr(dfl, attr)
+            if getattr(self._display, attr) != val:
+                line[0] += f" ({val.vmin:.3f} / {val.vmax:.3f} / {val.inc:.3f})"
 
         return cast(Tuple[Tuple[str, ...]], tuple(tuple(i) for i in body))
 
@@ -195,9 +221,13 @@ class DAQManualButton(BaseProtocolButton[DAQManualDisplay]):
                 ctrl.display.update(cur, **diff)
         ctrl.daq.updateprotocol(cur)
 
-    def addtodoc(self, tbar, doc, ctrl, name):
+    @property
+    def _protocol(self):
+        return self._display
+
+    def addtodoc(self, ctrl, doc, tbar, name):
         "bokeh stuff"
-        super().addtodoc(tbar, doc, ctrl, name)
+        super().addtodoc(ctrl, doc, tbar, name)
 
         @ctrl.display.observe
         def _ondaqmanual(**_): # pylint: disable=unused-variable
@@ -205,7 +235,8 @@ class DAQManualButton(BaseProtocolButton[DAQManualDisplay]):
 
     def addtodocargs(self, _):
         "return args for the toolbar"
-        return dict(zmagmin  = self.zmag.vmin,   zmagmax  = self.zmag.vmax,
-                    zmag     = self.zmag.value , zinc     = self.zmag.inc,
-                    speedmin = self.speed.vmin,  speedmax = self.speed.vmax,
-                    speed    = self.speed.value, speedinc = self.speed.inc)
+        mdl = self._display
+        return dict(zmagmin  = mdl.zmag.vmin,   zmagmax  = mdl.zmag.vmax,
+                    zmag     = mdl.zmag.value , zinc     = mdl.zmag.inc,
+                    speedmin = mdl.speed.vmin,  speedmax = mdl.speed.vmax,
+                    speed    = mdl.speed.value, speedinc = mdl.speed.inc)

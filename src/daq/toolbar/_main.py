@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "bringing togethe toobar components"
+import bokeh.layouts as layouts
 
 from utils          import initdefaults
 from view.base      import threadmethod, spawn
@@ -43,7 +44,7 @@ class DAQRecordFileDialog(FileDialog):
                     ctrl.daq.startrecording(path, None)
             doc.add_next_tick_callback(_fcn)
 
-    def addtodoc(self, tbar, doc, ctrl, name):
+    def addtodoc(self, ctrl, doc, tbar, name):
         "add action to the toolbar"
         def _onclick_cb(attr, old, new):
             async def _run():
@@ -56,25 +57,30 @@ class DAQToolbar:
     "DAQ toolbar"
     _widget: DpxDAQToolbar
     def __init__(self, ctrl, **_):
-        self._messages  = DAQMessagesView    (**_)
-        self._ramp      = DAQRampButton      (**_)
-        self._probing   = DAQProbeButton     (**_)
-        self._manual    = DAQManualButton    (**_)
-        self._record    = DAQRecordFileDialog(**_)
+        self._messages = DAQMessagesView    (**_)
+        self._ramp     = DAQRampButton      (**_)
+        self._probing  = DAQProbeButton     (**_)
+        self._manual   = DAQManualButton    (**_)
+        self._record   = DAQRecordFileDialog(**_)
+        self._widget   = None
         if ctrl:
             self.observe(ctrl)
 
-    def addtodoc(self, doc, ctrl):
+    def addtodoc(self, ctrl, doc):
         "add the bokeh widgets"
         self._widget    = DpxDAQToolbar(** self._messages.addtodocargs(ctrl),
-                                        ** self._manual.addtodocargs(ctrl))
-        self._messages.addtodoc(self._widget, doc, ctrl)
-        self._ramp    .addtodoc(self._widget, doc, ctrl, "ramp")
-        self._probing .addtodoc(self._widget, doc, ctrl, "probing")
-        self._manual  .addtodoc(self._widget, doc, ctrl, "manual")
-        self._record  .addtodoc(self._widget, doc, ctrl, "record")
+                                        ** self._manual.addtodocargs(ctrl),
+                                        protocol = self.__wprotocol(ctrl))
+        self._messages.addtodoc(ctrl, doc, self._widget)
+        self._ramp    .addtodoc(ctrl, doc, self._widget, "ramp")
+        self._probing .addtodoc(ctrl, doc, self._widget, "probing")
+        self._manual  .addtodoc(ctrl, doc, self._widget, "manual")
+        self._record  .addtodoc(ctrl, doc, self._widget, "record")
         self._widget.on_change("stop", lambda attr, old, new: ctrl.daq.stoprecording())
-        return [self._widget]
+
+        mods = dict(height      = 30,
+                    sizing_mode = ctrl.theme.get('main', 'sizingmode', 'fixed'))
+        return layouts.row([layouts.widgetbox(self._widget, **mods)], **mods)
 
     def observe(self, ctrl):
         "observe the controller"
@@ -83,3 +89,14 @@ class DAQToolbar:
         self._probing .observe(ctrl)
         self._manual  .observe(ctrl)
         self._record  .observe(ctrl)
+
+        @ctrl.daq.observe("startrecording", "stoprecording", "updateprotocol")
+        def _onstoprecording(**_): # pylint: disable=unused-variable
+            if self._widget:
+                self._widget.protocol = self.__wprotocol(ctrl)
+
+    @staticmethod
+    def __wprotocol(ctrl) -> str:
+        if ctrl.daq.config.recording.started:
+            return 'recording'
+        return type(ctrl.daq.config.protocol).__name__[3:].lower()
