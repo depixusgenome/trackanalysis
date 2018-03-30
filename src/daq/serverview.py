@@ -213,15 +213,23 @@ class DAQAdmin:
 
     async def setzmag(self, zmag:float):
         "set the magnet position"
-        await self._setvalue('zmag', zmag)
+        await self.setvalues('zmag', zmag)
+
+    async def setrampspeed(self, rampspeed:float):
+        "set the magnet position"
+        raise NotImplementedError
+
+    async def getrampspeed(self,):
+        "set the magnet position"
+        raise NotImplementedError
 
     async def setstage(self, pos:Tuple[float, float]):
         "set the stage position"
-        await self._setvalue('x', pos[0], 'y', pos[1])
+        await self.setvalues('x', pos[0], 'y', pos[1])
 
     async def settemperature(self, tval: float):
         "set the sample temperature"
-        await self._setvalue('tsample', tval)
+        await self.setvalues('tsample', tval)
 
     async def setstartrecording(self, record: str):
         """
@@ -259,7 +267,8 @@ class DAQAdmin:
         async def __aexit__(self, *_):
             await self.admin.stoprecording()
 
-    async def _setvalue(self, *args):
+    async def setvalues(self, *args):
+        "sets a list of values"
         msg = "".join(self._MSG.format(self._MSG[args[i]], args[i+1])
                       for i in range(0, len(args), 2))
         await send2daq(self.model, msg)
@@ -272,52 +281,69 @@ class DAQAdminView:
     """
     def __init__(self):
         self._listening = True
+        self._doc       = None
 
     @staticmethod
     def _daq(control):
         return DAQAdmin(control.config.network)
 
     @classmethod
-    def _set(cls, control, name, value):
-        setattr(cls._daq(control), name, value)
+    def _set(cls, control, *args):
+        async def _run():
+            await cls._daq(control).setvalues(*args)
+        IOLoop.current().spawn_callback(_run)
 
     def _onupdateprotocol(self, control = None, model = None, **_):
         if self._listening:
             if hasattr(model, "zmag"):
-                self._set(control, "zmag", model.zmag)
+                async def _run():
+                    daq = self._daq(control)
+                    await daq.setvalues("zmag", model.zmag)
+                    await daq.setrampspeed(model.speed)
+                IOLoop.current().spawn_callback(_run)
             else:
-                self._set(control, "protocol", model)
+                async def _run():
+                    await self._daq(control).setprotocol(model)
+                IOLoop.current().spawn_callback(_run)
 
     def _onbeads(self, control = None, **_):
         if not self._listening:
-            self._set(control, "zmag", control.config.beads)
+            async def _run():
+                await self._daq(control).setbeads(control.config.beads)
+            IOLoop.current().spawn_callback(_run)
 
     def _onstartrecording(self, control = None, **_):
         if not self._listening:
-            cor = self._daq(control).setstartrecording(control.config.record.path)
-            asyncio.get_event_loop().run_until_complete(cor)
+            async def _run():
+                await self._daq(control).setstartrecording(control.config.record.path)
+            IOLoop.current().spawn_callback(_run)
 
     def _onstoprecording(self, control = None, **_):
         if not self._listening:
-            cor = self._daq(control).setstoprecording()
-            asyncio.get_event_loop().run_until_complete(cor)
+            async def _run():
+                await self._daq(control).setstoprecording()
+            IOLoop.current().spawn_callback(_run)
 
     def _onupdatenetwork(self, control = None, **_):
-        self._listening = True
-        try:
-            loop  = asyncio.get_event_loop().run_until_complete
-            daq   = self._daq(control)
-            rec   = loop(daq.getisrecording())
-            if rec > 0:
-                control.startrecording(control.config.record.path, rec)
-            else:
-                control.stoprecording()
+        async def _run():
+            daq      = self._daq(control)
+            rec      = await daq.getisrecording()
+            beads    = await daq.getbeads()
+            protocol = await daq.getprotocol()
 
-            control.updateprotocol(daq.protocol)
-            control.removebeads()
-            control.addbeads(daq.beads)
-        finally:
-            self._listening = False
+            def _inform():
+                try:
+                    if rec > 0:
+                        control.startrecording(control.config.record.path, rec)
+                    else:
+                        control.stoprecording()
+                    control.updateprotocol(protocol)
+                    control.removebeads()
+                    control.addbeads(beads)
+                finally:
+                    self._listening = False
+            self._doc.add_next_tick_callback(_inform)
+        IOLoop.current().spawn_callback(_run)
 
     def observe(self, ctrl):
         "setup observers"
