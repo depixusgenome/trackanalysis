@@ -17,7 +17,7 @@ LOGS  = getLogger()
 
 class Option(metaclass = ABCMeta):
     "Converts a text tag to an html input"
-    NAME = r'%\((?P<name>[\w\.]*)\)'
+    NAME = r'%\((?P<name>[\w\.\[\]]*)\)'
     @abstractmethod
     def replace(self, model, body:str) -> str:
         "replaces a pattern by an html tag"
@@ -73,7 +73,7 @@ class Option(metaclass = ABCMeta):
         for key in keys[:-1]:
             match = cls._INDEX.match(key)
             if match:
-                mdl = getattr(mdl, match.group(1))[match.group(2)]
+                mdl = getattr(mdl, match.group(1))[int(match.group(2))]
             else:
                 mdl = getattr(mdl, key)
 
