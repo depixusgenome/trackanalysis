@@ -4,6 +4,7 @@
 import re
 from   typing        import List
 from   bokeh.models  import Div
+from   bokeh.layouts import widgetbox
 from   utils         import initdefaults
 from   view.threaded import ThreadedDisplay, BaseModel
 
@@ -44,6 +45,8 @@ class FoVTableTheme(BaseModel):
     name        = 'fovtable'
     template    = _TEXT
     refreshrate = 5
+    width       = 120
+    height      = 200
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -59,12 +62,17 @@ class FoVTableView(ThreadedDisplay[FoVTableTheme]):
         if ctrl is not None:
             self.observe(ctrl)
 
-    def _addtodoc(self, *_):
+    def _addtodoc(self, ctrl, _):
         "creates the widget"
-        self.__columns = self._FIND.findall(self._model.template)
+        self.__columns = [i[1:-1] for i in self._FIND.findall(self._model.template)]
         text           = self._model.template.format(**dict.fromkeys(self.__columns, 0.))
-        self.__widget  = Div(text = text)
-        return [self.__widget]
+
+        mods = dict(width  = self._model.width,
+                    height = self._model.height)
+        self.__widget  = Div(text   = text, **mods)
+
+        mods['sizing_mode'] = ctrl.theme.get('main', 'sizingmode', 'fixed')
+        return [widgetbox(self.__widget, **mods)]
 
     def observe(self, ctrl):
         """
