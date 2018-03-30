@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 "DAQ Model"
 from   collections          import ChainMap
-from   typing               import Optional, Tuple, Union, List, cast
+from   typing               import Optional, Tuple, Union, Dict, Any, List, cast
 import numpy                as     np
 from   utils                import initdefaults
+from   utils.inspection     import diffobj
 
 class ColDescriptor:
     "easy creation of np.dtype"
@@ -23,7 +24,28 @@ FOVTYPE  = [("time",  'i8'), ("zmag", 'f4'), ("vmag",    'f4'), ("zobj",    'f4'
 
 BEADTYPE = [('time', 'i8'),  ("x", 'f4'), ("y", 'f4'), ("z", 'f4')]
 
-class DAQClient:
+class ConfigObject:
+    """
+    Object with a few helper function for comparison
+    """
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def diff(self, other) -> Dict[str, Any]:
+        "return the diff with `other`"
+        return diffobj(self, other)
+
+    def config(self, tpe = dict):
+        "return a chainmap with default and updated values"
+        if tpe in (dict, 'dict'):
+            return dict(self.__dict__)
+
+        get  = lambda i: getattr(i, '__dict__', i)
+        cur  = {i: get(j)                          for i, j in self.__dict__.items()}
+        dflt = {i: get(getattr(self.__class__, i)) for i in self.__dict__}
+        return ChainMap({i: j for i, j in cur.items() if j != dflt[i]}, dflt)
+
+class DAQClient(ConfigObject):
     """
     All information related to the current protocol
     """
@@ -37,7 +59,7 @@ class DAQClient:
     def __init__(self, **kwa):
         pass
 
-class DAQNetwork:
+class DAQNetwork(ConfigObject):
     """
     All information related to the current protocol
     """
@@ -49,15 +71,7 @@ class DAQNetwork:
     def __init__(self, **kwa):
         pass
 
-    @property
-    def config(self):
-        "return a chainmap with default and updated values"
-        get  = lambda i: getattr(i, '__dict__', i)
-        cur  = {i: get(j)                          for i, j in self.__dict__.items()}
-        dflt = {i: get(getattr(self.__class__, i)) for i in self.__dict__}
-        return ChainMap({i: j for i, j in cur.items() if j != dflt[i]}, dflt)
-
-class DAQPhase:
+class DAQPhase(ConfigObject):
     """
     All information related to one phase in a cycle
     """
@@ -69,10 +83,7 @@ class DAQPhase:
     def __init__(self, **kwa):
         pass
 
-    def __cmp__(self, other):
-        return self.__class__ is other.__class__ and self.__dict__ == other.__dict__
-
-class DAQProtocol:
+class DAQProtocol(ConfigObject):
     """
     All information related to the current protocol
     """
@@ -84,8 +95,8 @@ class DAQProtocol:
     def __init__(self, **kwa):
         pass
 
-    def __cmp__(self, other):
-        return self.__class__ is other.__class__ and self.__dict__ == other.__dict__
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
 
 class DAQManual(DAQProtocol):
     """
@@ -114,13 +125,13 @@ class DAQProbe(DAQProtocol):
     """
     Probe status
     """
-    phases: Tuple[DAQPhase,...] = (DAQPhase(zmag     = 10.),
+    phases: Tuple[DAQPhase,...] = (DAQPhase(zmag     = 10., speed = 1.),
                                    DAQPhase(duration = 20),
-                                   DAQPhase(zmag     = 18),
+                                   DAQPhase(zmag     = 18,  speed = .125),
                                    DAQPhase(duration = 20),
-                                   DAQPhase(zmag     = 10, speed = .1),
+                                   DAQPhase(zmag     = 10,  speed = .125),
                                    DAQPhase(duration = 400),
-                                   DAQPhase(zmag     = 5.),
+                                   DAQPhase(zmag     = 5.,  speed = 1.),
                                    DAQPhase(duration = 20))
     cyclecount                  = 120
     probes: Tuple[str,...]      = ()
@@ -137,7 +148,7 @@ class DAQRamp(DAQProbe):
                                    DAQPhase(zmag     = 10., speed  = .1))
     cyclecount                  = 30
 
-class DAQRecording:
+class DAQRecording(ConfigObject):
     "everything for recording the data"
     path: str     = None
     started       = False
@@ -146,7 +157,7 @@ class DAQRecording:
     def __init__(self, **kwa):
         pass
 
-class DAQBead:
+class DAQBead(ConfigObject):
     """
     All global information related to a bead
     """
@@ -155,7 +166,7 @@ class DAQBead:
     def __init__(self, **kwa):
         pass
 
-class DAQConfig:
+class DAQConfig(ConfigObject):
     """
     All information related to the current status
     """
