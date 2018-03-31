@@ -6,7 +6,8 @@ from app.toolbar  import toolbarview
 from .maincontrol import createview as _createview
 
 VIEWS       = ('daq.serverview.DAQFoVServerView',
-               'daq.serverview.DAQBeadsServerView')
+               'daq.serverview.DAQBeadsServerView',
+              )#'daq.serverview.DAQAdminView')
 CONTROLS    = ()
 
 def createview(main, controls, views):
