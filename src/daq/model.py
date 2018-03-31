@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 "DAQ Model"
 from   collections          import ChainMap
-from   typing               import Optional, Tuple, Union, Dict, Any, List, cast
+from   typing               import (Optional, Tuple, Union, Dict, Any, List,
+                                    Iterable, cast)
 import numpy                as     np
 from   utils                import initdefaults
 from   utils.inspection     import diffobj
@@ -176,6 +177,19 @@ class DAQBead(ConfigObject):
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
+
+    @staticmethod
+    def toarray(beads: Iterable['DAQBead']) -> np.ndarray:
+        "returns all beads in the shape of an array"
+        return np.array([i.roi for i in beads],
+                        dtype = [('x', 'f4'), ('y', 'f4'),
+                                 ('w', 'f4'), ('h', 'f4')])
+
+    @classmethod
+    def todict(cls, beads: Iterable['DAQBead']) -> Dict[str, np.ndarray]:
+        "returns all beads in the shape of an array"
+        roi = cls.todict(beads)
+        return {i: roi[i] for i in roi.dtype.names}
 
 class DAQConfig(ConfigObject):
     """

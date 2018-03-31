@@ -15,6 +15,7 @@ from   utils                  import initdefaults
 from   view.plots.base        import PlotAttrs
 from   view.threaded          import DisplayModel, ThreadedDisplay
 from   view.static            import ROUTE
+from   .model                 import DAQBead
 
 class DpxDAQCamera(Model):
     """
@@ -60,7 +61,7 @@ class DAQCameraView(ThreadedDisplay[DisplayModel[CameraDisplay, CameraTheme]]):
         self._cam:   DpxDAQCamera     = None
         self._fig:   Figure           = None
 
-        cols = ('x', 'y', 'width', 'height', "text")
+        cols = ('x', 'y', 'w', 'h', "text")
         self._source: ColumnDataSource = ColumnDataSource({i: [] for i in cols})
         if ctrl is not None:
             self.observe(ctrl)
@@ -80,7 +81,7 @@ class DAQCameraView(ThreadedDisplay[DisplayModel[CameraDisplay, CameraTheme]]):
                        x_axis_label     = theme.xlabel,
                        y_axis_label     = theme.ylabel)
 
-        theme.roi.addto(fig, **{i: i for i in ('x', 'y', 'width', 'height')},
+        theme.roi.addto(fig, **{i: i for i in ('x', 'y', 'w', 'h')},
                         source = self._source)
         theme.position.addto(fig, **{i: i for i in ('x', 'y')}, source = self._source)
         theme.names.addto(fig, **{i: i for i in ('x', 'y', 'text')}, source = self._source)
@@ -129,9 +130,7 @@ class DAQCameraView(ThreadedDisplay[DisplayModel[CameraDisplay, CameraTheme]]):
                 self._source.selected = self.__selected(ctrl)
 
     def __data(self, ctrl) -> Dict[str, Any]:
-        roi  = lambda i: [j.roi[i] for j in ctrl.daq.config.beads]
-        cols = ('x', 'y', 'width', 'height')
-        data = {j: roi(i) for i, j in enumerate(cols)}
+        data         = DAQBead.todict(ctrl.daq.config.beads)
         data['text'] = np.arange(len(ctrl.daq.config.beads))
         return {'data': data, 'selected': self.__selected(ctrl)}
 
