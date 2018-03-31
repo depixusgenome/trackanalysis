@@ -39,7 +39,7 @@ def diffobj(left, right):
         if not isinstance(dleft, dict):
             raise NotImplementedError()
     else:
-        dleft = left.__dict__()
+        dleft = left.__dict__
 
     itr = ((i, j, getattr(right, i)) for i, j in dleft.items())
     return {i: j for i, j, k in itr if j != k and dumps(j) != dumps(k)}
