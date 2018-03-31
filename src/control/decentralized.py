@@ -104,6 +104,7 @@ class DecentralizedController(Controller):
 
     def updatedefaults(self, name, **kwa):
         "update a specific display and emits an event"
+        name   = self._objname(name)
         dflt   = self._defaults[name]
         isdict = isinstance(dflt, dict)
         if not isdict:
@@ -133,6 +134,7 @@ class DecentralizedController(Controller):
 
     def update(self, name, defaults = False, **kwa):
         "update a specific display and emits an event"
+        name = self._objname(name)
         if defaults:
             return self.updatedefaults(name, **kwa)
 
