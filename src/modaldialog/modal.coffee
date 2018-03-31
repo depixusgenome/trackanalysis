@@ -349,7 +349,7 @@ class DpxModalDialogView extends Modal
         else
             vals = @_form_values()
 
-        @model.results = vals
+        @model.results    = vals
         @model.submitted += 1
         @model.callback?.execute(@model.results)
 

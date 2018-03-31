@@ -66,9 +66,9 @@ export class DpxDAQToolbarView extends WidgetView
                    " class='dpx-tb-manual-input bk-widget-form-input'"+
                    " type='number' min=#{mdl.speedmin} max=#{mdl.speedmax} "+
                    "step=#{mdl.speedinc} value=#{mdl.speed}></input>"+
-               @make_btn('manual', 'Manual', ttips[0], '')+
+               @make_btn('manual', 'Manual', ttips[0])+
                @make_btn('ramp', 'Ramps', ttips[1])+
-               @make_btn('probing', 'Probing', ttips[2])+
+               @make_btn('probe', 'Probing', ttips[2])+
                @make_btn('record', 'Record', ttips[3])+
                @make_btn('stop', 'Stop', ttips[4], '')+
                "<div id='dpx-tb-message' class='bk-markup'>"+
@@ -81,7 +81,7 @@ export class DpxDAQToolbarView extends WidgetView
         elem.find('#dpx-tb-speed').change(() => @on_speed())
         elem.find('#dpx-tb-manual').click(() => @model.manual = @model.manual+1)
         elem.find('#dpx-tb-ramp').click(() => @model.ramp = @model.ramp+1)
-        elem.find('#dpx-tb-probing').click(() => @model.probing = @model.probing+1)
+        elem.find('#dpx-tb-probe').click(() => @model.probing = @model.probing+1)
         elem.find('#dpx-tb-record').click(() => @model.record = @model.record+1)
         elem.find('#dpx-tb-stop').click(() => @model.stop = @model.stop+1)
         elem.find('#dpx-tb-quit').click(() => @model.quit = @model.quit+1)

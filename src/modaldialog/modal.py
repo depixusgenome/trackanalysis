@@ -216,36 +216,35 @@ class DpxModal(Model):
     submitted          = props.Int(0)
     startdisplay       = props.Int(0)
     callback           = props.Instance(Callback)
-    def __init__(self, triggeronsubmit = False, **kwa):
+    def __init__(self, **kwa):
         super().__init__(**kwa)
         self.__handler = None # type: Optional[Callable]
         self.__running = False
+        self.__always  = False
 
-        if triggeronsubmit:
-            def _on_apply_cb(attr, old, new):
-                if not self.__running:
-                    return
-                self.__running = False
-                if self.__handler is not None:
-                    self.__handler(self.results)
-            self.on_change('submitted', _on_apply_cb)
-        else:
-            def _on_apply_cb(attr, old, new):
-                if not self.__running:
-                    return
-                self.__running = False
-                if self.__handler is not None and len(new):
-                    self.__handler(new)
-            self.on_change('results', _on_apply_cb)
+        self.on_change('submitted', self._onsubmitted_cb)
+        self.on_change('results',   self._onresults_cb)
+
+    def _onresults_cb(self, attr, old, new):
+        if self.__running and not self.__always and len(new) and self.__handler:
+            self.__handler(new)
+
+    def _onsubmitted_cb(self, attr, old, new):
+        if self.__running and self.__always and self.__handler:
+            self.__handler(self.results)
+
+        self.__running = False
 
     def run(self,                                       # pylint: disable=too-many-arguments
             title   : str                       = "",
             body    : Union[Sequence[str],str]  = "",
             callback: Union[Callable, Callback] = None,
             context : Callable[[str], Any]      = None,
-            model                               = None):
+            model                               = None,
+            always                              = False):
         "runs the modal dialog"
         self.__handler = self._build_handler(callback, title, body, model, context)
+        self.__always  = always
         self.__running = False
         self.update(title    = title,
                     body     = self._build_body(body, model),

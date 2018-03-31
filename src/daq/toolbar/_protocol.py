@@ -4,8 +4,8 @@
 Set the protocol
 """
 from abc                import abstractmethod
-from copy               import deepcopy
 from contextlib         import contextmanager
+from copy               import deepcopy
 from typing             import Tuple, TypeVar, Generic, Union, ClassVar, cast
 
 from utils              import initdefaults
@@ -13,7 +13,7 @@ from utils.inspection   import templateattribute
 from utils.logconfig    import getLogger
 from modaldialog        import dialog
 
-from ..model            import DAQProtocol, DAQRamp, DAQProbe, ConfigObject
+from ..model            import DAQProtocol, DAQRamp, DAQProbe, DAQManual, ConfigObject
 
 LOGS   = getLogger(__name__)
 
@@ -45,7 +45,7 @@ class DAQAttrRange(ConfigObject):
     def __init__(self, **_):
         pass
 
-class DAQManualDisplay:
+class DAQManualDisplay(ConfigObject):
     """
     DAQ manual values
     """
@@ -97,34 +97,38 @@ class BaseProtocolButton(Generic[PROTOCOL]):
     def _protocol(self):
         pass
 
-    @contextmanager
+    @staticmethod
     @abstractmethod
-    def _context(self, ctrl):
+    def _context(cur):
         pass
 
     def observe(self, ctrl):
         "observe the controller"
-        if self._theme in ctrl.theme:
-            return
-
-        ctrl.theme.add(self._theme)
-        ctrl.display.add(self._display)
-
-        @ctrl.daq.observe
-        def _onupdateprotocol(model = None, **_): # pylint: disable=unused-variable
-            if type(model) is type(self._model):
-                ctrl.display.update(self._display, **model.config())
+        if self._theme not in ctrl.theme:
+            ctrl.theme.add(self._theme)
+            ctrl.display.add(self._display)
 
     def addtodoc(self, ctrl, doc, tbar, name):
         "add action to the toolbar"
+        @contextmanager
+        def _context(_):
+            yield
+            cur  = self._protocol
+            diff = cur.diff(self._model)
+            if diff:
+                with ctrl.action():
+                    ctrl.display.update(cur, **diff)
+            ctrl.daq.updateprotocol(self._context(cur))
+
         def _onclick_cb(attr, old, new):
             "method to trigger the modal dialog"
             self._model = deepcopy(self._protocol)
             return dialog(doc,
-                          context = self._context(ctrl),
+                          context = _context,
                           title   = self._theme.title,
                           body    = self._strbody(self._body(ctrl)),
-                          model   = self._model)
+                          model   = self._model,
+                          always  = True)
         tbar.on_change(name, _onclick_cb)
 
 class ProtocolButton(BaseProtocolButton[PROTOCOL]):
@@ -137,6 +141,18 @@ class ProtocolButton(BaseProtocolButton[PROTOCOL]):
         self._theme   = DAQProtocolTheme(name  = self._display.name,
                                          title = self._TITLE,
                                          **kwa)
+
+    def observe(self, ctrl):
+        "observe the controller"
+        if self._theme in ctrl.theme:
+            return
+        super().observe(ctrl)
+
+        @ctrl.daq.observe
+        def _onupdateprotocol(model = None, **_): # pylint: disable=unused-variable
+            if type(model) is type(self._model):
+                ctrl.display.update(self._display, protocol = model)
+
     @property
     def _protocol(self):
         return self._display.protocol
@@ -159,17 +175,9 @@ class ProtocolButton(BaseProtocolButton[PROTOCOL]):
 
         return cast(Tuple[Tuple[str, ...]], tuple(tuple(i) for i in body))
 
-    @contextmanager
-    def _context(self, ctrl):
-        yield
-
-        cur  = self._display.protocol
-        diff = cur.diff(self._model)
-
-        if diff:
-            with ctrl.action():
-                ctrl.display.update(cur, **diff)
-        ctrl.daq.updateprotocol(cur)
+    @staticmethod
+    def _context(cur):
+        return cur
 
 class DAQProbeButton(ProtocolButton[DAQProbe]):
     "View the DAQProbe"
@@ -209,21 +217,31 @@ class DAQManualButton(BaseProtocolButton[DAQManualDisplay]):
 
         return cast(Tuple[Tuple[str, ...]], tuple(tuple(i) for i in body))
 
-    @contextmanager
-    def _context(self, ctrl):
-        yield
-
-        cur  = self._display
-        diff = {i:j for i, j in cur.__dict__.items() if j != getattr(self._model, i)}
-
-        if diff:
-            with ctrl.action():
-                ctrl.display.update(cur, **diff)
-        ctrl.daq.updateprotocol(cur)
+    @staticmethod
+    def _context(cur):
+        return DAQManual(zmag = cur.zmag.value, speed = cur.speed.value)
 
     @property
     def _protocol(self):
         return self._display
+
+    def observe(self, ctrl):
+        "observe the controller"
+        if self._theme in ctrl.theme:
+            return
+        super().observe(ctrl)
+
+        @ctrl.daq.observe
+        def _onupdateprotocol(model = None, **_): # pylint: disable=unused-variable
+            if isinstance(model, DAQManual):
+                zmag        = deepcopy(self._display.zmag)
+                zmag.value  = model.zmag
+                speed       = deepcopy(self._display.speed)
+                speed.value = model.speed
+                ctrl.display.update(self._display,
+                                    framerate = model.framerate,
+                                    zmag      = zmag,
+                                    speed     = speed)
 
     def addtodoc(self, ctrl, doc, tbar, name):
         "bokeh stuff"
