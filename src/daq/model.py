@@ -103,9 +103,20 @@ class DAQManual(DAQProtocol):
     Manual status
     """
     def __init__(self, **kwa):
-        self.__dict__['phases'] = (DAQPhase(zmag = 10., duration = None),)
-        self.zmag = kwa.get('zmag', self.zmag)
+        self.__dict__['phases'] = (DAQPhase(zmag = 10., duration = None, speed = 1.),)
+        self.zmag  = kwa.pop('zmag',  self.zmag)
+        self.speed = kwa.pop('speed', self.speed)
         super().__init__(**kwa)
+
+    @property
+    def speed(self) -> float:
+        "return the requested speed"
+        return self.__dict__['phases'][0].speed
+
+    @speed.setter
+    def speed(self, value: float):
+        "set the requested speed"
+        self.__dict__['phases'][0].speed = value
 
     @property
     def zmag(self) -> float:
