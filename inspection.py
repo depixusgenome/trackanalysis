@@ -20,11 +20,21 @@ def templateattribute(cls, index) -> type:
     if getattr(cur, '__args__', None):
         return cur.__args__[index]    # type: ignore
 
-    orig = getattr(cls, '__orig_bases__')
-    while orig is None or orig[0].__args__ is None:
-        cur  = getattr(cur, '__base__')
-        orig = getattr(cur, '__orig_bases__', None)
-    return orig[0].__args__[index]    # type: ignore
+    def _get(itm):
+        orig = getattr(itm, '__orig_bases__', None)
+        if orig is not None:
+            return next((i for i in orig if hasattr(i, '__args__')), None)
+        return None
+
+    orig = _get(cls)
+    while orig is None or orig.__args__ is None:
+        for cur in cur.__bases__:
+            orig = _get(cur)
+            if orig:
+                break
+        else:
+            return None
+    return orig.__args__[index]    # type: ignore
 
 
 def diffobj(left, right):
