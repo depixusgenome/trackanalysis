@@ -188,7 +188,7 @@ class DAQBead(ConfigObject):
     @classmethod
     def todict(cls, beads: Iterable['DAQBead']) -> Dict[str, np.ndarray]:
         "returns all beads in the shape of an array"
-        roi = cls.todict(beads)
+        roi = cls.toarray(beads)
         return {i: roi[i] for i in roi.dtype.names}
 
 class DAQConfig(ConfigObject):

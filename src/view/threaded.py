@@ -45,6 +45,16 @@ class DisplayModel(Generic[DISPLAY, THEME], BaseModel):
         self.display = cast(DISPLAY, _tattr(self, 0)(**kwa))
         self.theme   = cast(THEME,   _tattr(self, 1)(**kwa))
 
+    def observe(self, ctrl) -> bool:
+        """
+        observe the controller
+        """
+        if self.theme in ctrl.theme:
+            return True
+        ctrl.theme.add(self.theme)
+        ctrl.display.add(self.display)
+        return False
+
 class _OrderedDict(OrderedDict):
     def __missing__(self, key):
         value: dict = OrderedDict()

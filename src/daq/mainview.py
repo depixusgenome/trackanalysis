@@ -22,7 +22,7 @@ class MainView:
         for i in self.__dict__.items():
             i.observe(ctrl)
 
-    def ismain(self):
+    def ismain(self, ctrl):
         "nothing to do"
 
     def addtodoc(self, ctrl, doc):
@@ -33,5 +33,5 @@ class MainView:
         assert all(len(i) == 1 for i in itms.values())
 
         mod  = dict(sizing_mode = ctrl.theme.get('main', 'sizingmode', 'fixed'))
-        return [layouts.layout([(itms["series"][0], itms["fov"][0]),
-                                (itms["cam"][0],    itms["beads"][0])], **mod)]
+        return [layouts.layout([[itms["series"][0], itms["fov"][0]],
+                                [itms["beads"][0],  itms["cam"][0]]], **mod)]

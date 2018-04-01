@@ -1,2 +1,6 @@
 require(python = dict(websockets = '4.0.1'))
 make(locals())
+
+@patch
+def postfix_build(bld):
+    bld.transfer_static_html()

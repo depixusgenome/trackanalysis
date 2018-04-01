@@ -4,7 +4,6 @@
 from   typing           import List, cast
 from   functools        import partial
 
-import numpy                as np
 from   bokeh.plotting   import figure, Figure
 from   bokeh.models     import ColumnDataSource, LinearAxis, DataRange1d
 
@@ -14,50 +13,46 @@ from   view.plots.base  import PlotAttrs
 
 class TimeSeriesTheme:
     "information about the time series displayed"
-    name        = "timeseries"
-    fovnames    = {"zmag":    "Magnets (µm)",
-                   "x":       "X (µm)",
-                   "y":       "Y (µm)",
-                   "z":       "Z (µm)",
-                   "tsample": "Sample (°C)",
-                   "tsink":   "Sink (°C)",
-                   "tmagnet": "Magnets (°C)",
-                   "vmag":    "Magnets (V)",
-                   "led1":    "Led 1 intensity",
-                   "led2":    "Led 2 intensity"
-                  }
-    xlabel      = "Frames"
-    leftlabel   = "Bead    (µm)"
-    leftattr    = PlotAttrs("lightblue", "circle", 1)
-    rightattr   = PlotAttrs("red",       "line",   1)
-    figsize     = 800, 400, 'fixed'
-    maxlength   = 5000
-    toolbar     = dict(sticky = False, location = 'right', items = "")
+    name      = "timeseries"
+    labels    = {"zmag":    "Magnets (µm)",
+                 "x":       "X (µm)",
+                 "y":       "Y (µm)",
+                 "z":       "Z (µm)",
+                 "tsample": "Sample (°C)",
+                 "tsink":   "Sink (°C)",
+                 "tmagnet": "Magnets (°C)",
+                 "vmag":    "Magnets (V)",
+                 "led1":    "Led 1 intensity",
+                 "led2":    "Led 2 intensity"
+                }
+    xlabel    = "Frames"
+    leftlabel = "Bead    (µm)"
+    leftattr  = PlotAttrs("lightblue", "circle", 1)
+    rightattr = PlotAttrs("red",       "line",   1)
+    figsize   = 800, 400, 'fixed'
+    maxlength = 5000
+    toolbar   = dict(sticky = False, location = 'right', items = "")
     @initdefaults(frozenset(locals()))
-    def ___init__(self, **_):
+    def __init__(self, **_):
         pass
 
 class TimeSeriesViewMixin:
     "Display time series"
-    XLEFT        = "xL"
-    XRIGHT       = "xR"
-    YLEFT        = "yL"
-    YRIGHT       = "yR"
+    XLEFT        = "xl"
+    XRIGHT       = "xr"
+    YLEFT        = "yl"
+    YRIGHT       = "yr"
     _leftsource  : ColumnDataSource
     _rightsource : ColumnDataSource
     _fig         : Figure
     def observe(self, ctrl):
         "observe events"
-        displ = self._model.display
-        if displ in ctrl.display:
+        if self._model.observe(ctrl):
             return
 
-        theme = self._model.theme
-        ctrl.theme  .add    (theme)
-        ctrl.theme.observe  (theme, partial(self.redisplay, ctrl))
-
-        ctrl.display.add    (displ)
-        ctrl.display.observe(displ, partial(self.redisplay, ctrl))
+        fcn = partial(self.redisplay, ctrl)
+        ctrl.theme.observe  (self._model.theme,   fcn)
+        ctrl.display.observe(self._model.display, fcn)
 
         ctrl.daq.observe('updatenetwork', self.redisplay)
 
@@ -82,7 +77,6 @@ class TimeSeriesViewMixin:
     def _addtodoc(self, *_):
         "sets the plot up"
         theme = self._model.theme
-        displ = self._model.display
         fig   = figure(toolbar_sticky   = theme.toolbar['sticky'],
                        toolbar_location = theme.toolbar['location'],
                        tools            = theme.toolbar['items'],
@@ -90,7 +84,7 @@ class TimeSeriesViewMixin:
                        plot_height      = theme.figsize[1],
                        sizing_mode      = theme.figsize[2],
                        x_axis_label     = theme.xlabel,
-                       y_axis_label     = theme.fovnames[displ.leftvar])
+                       y_axis_label     = self._leftlabel())
 
         theme.leftattr.addto(fig,
                              x      = self.XLEFT,
@@ -99,7 +93,7 @@ class TimeSeriesViewMixin:
 
         fig.extra_y_ranges = {self.YRIGHT: DataRange1d()}
         fig.add_layout(LinearAxis(y_range_name = self.YRIGHT,
-                                  axis_label   = theme.fovnames[displ.rightvar]))
+                                  axis_label   = self._rightlabel()))
         theme.rightattr.addto(fig,
                               x            = self.XRIGHT,
                               y            = self.YRIGHT,
@@ -110,37 +104,46 @@ class TimeSeriesViewMixin:
 
     def _reset(self, _, cache):
         "resets the data"
-        names = tuple(self._theme.fovnames[getattr(self._model.display, f'{i}var')]
-                      for i in ('left', 'right'))
-        if self._fig.yaxis.axis_label != names[0]:
+        names = self._leftlabel(), self._rightlabel()
+        if self._fig.yaxis.axis_label != names[0]: # pylint: disable=no-member
             cache[self._fig.yaxis]['axis_label'] = names[0]
         if self._fig.extra_y_ranges[self.YRIGHT].axis_label != names[1]:
             cache[self._fig.extra_y_ranges[self.YRIGHT]]['axis_label'] = names[1]
+
+    def _leftlabel(self):
+        return self._model.theme.labels[self._model.display.leftvar]
+
+    def _rightlabel(self):
+        return self._model.theme.labels[self._model.display.rightvar]
 
     def redisplay(self, control = None, **_):
         "resets the view"
         self.reset(control)
 
-class BeadTimeSeries:
+class BeadTimeSeriesDisplay:
     "Information about the current bead displayed"
-    name     = "currentbead"
+    name     = "beadtimeseries"
     index    = 0
     leftvar  = "z0"
     rightvar = "zmag"
     @initdefaults(frozenset(locals()))
-    def ___init__(self, **_):
+    def __init__(self, **_):
         pass
 
-class BeadTimeSeriesView(TimeSeriesViewMixin,
-                         ThreadedDisplay[DisplayModel[BeadTimeSeries, TimeSeriesTheme]]):
+class BeadTimeSeriesModel(DisplayModel[BeadTimeSeriesDisplay, TimeSeriesTheme]):
+    "model for display the time series"
+    def __init__(self, **_):
+        super().__init__(name = 'beadtimeseries', **_)
+
+class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesModel]):
     "display the current bead"
-    def __init__(self, ctrl = None):
-        self.__class__.__bases__[1].__init__(self, ctrl, name = 'beadtimeseries')
+    def __init__(self, ctrl = None, **_):
+        super().__init__(ctrl = ctrl, **_)
 
         lsrc = dict.fromkeys((self.XLEFT,  self.YLEFT),  cast(List[float], []))
-        rsrc = dict.fromkeys((self.YRIGHT, self.YRIGHT), cast(List[float], []))
-        self._leftsource:  ColumnDataSource = ColumnDataSource(rsrc)
-        self._rightsource: ColumnDataSource = ColumnDataSource(lsrc)
+        rsrc = dict.fromkeys((self.XRIGHT, self.YRIGHT), cast(List[float], []))
+        self._leftsource  = ColumnDataSource(lsrc)
+        self._rightsource = ColumnDataSource(rsrc)
 
         if ctrl:
             self.observe(ctrl)
@@ -170,44 +173,46 @@ class BeadTimeSeriesView(TimeSeriesViewMixin,
     def _onbeaddata(self, lines = None, **_):
         self._leftsource.stream(self.__dataleft(lines), self._theme.maxlength)
 
-    _DEFLEFT  = {TimeSeriesViewMixin.XLEFT:  np.empty(0, dtype = 'f4'),
-                 TimeSeriesViewMixin.YLEFT:  np.empty(0, dtype = 'f4')}
+    def _leftlabel(self):
+        return self._model.theme.labels[self._model.display.leftvar[0]]
+
     def __dataleft(self, data):
         names = data.dtype.names
         if self._model.leftvar in names:
             return {self.XLEFT: data[names[0]],
                     self.YLEFT: data[self._model.display.leftvar]}
-        return self._DEFLEFT
+        return {self.XLEFT: [], self.YLEFT: []}
 
-    _DEFRIGHT = {TimeSeriesViewMixin.XRIGHT: np.empty(0, dtype = 'f4'),
-                 TimeSeriesViewMixin.YRIGHT: np.empty(0, dtype = 'f4')}
     def __dataright(self, data):
         names = data.dtype.names
-        if self._model.rightvar in names:
+        if len(data) and self._model.rightvar in names:
             return {self.XRIGHT: data[names[0]],
                     self.YRIGHT: data[self._model.display.rightvar]}
-        return self._DEFRIGHT
+        return {self.XRIGHT: [], self.YRIGHT: []}
 
-class FoVTimeSeries:
-    "Information about the current bead displayed"
-    name     = "currentfov"
+class FoVTimeSeriesDisplay:
+    "Information about the current fov parameter displayed"
+    name     = "fovtimeseries"
     leftvar  = "tsample"
     rightvar = "zmag"
     @initdefaults(frozenset(locals()))
-    def ___init__(self, **_):
+    def __init__(self, **_):
         pass
 
-class FoVTimeSeriesView(TimeSeriesViewMixin,
-                        ThreadedDisplay[DisplayModel[FoVTimeSeries, TimeSeriesTheme]]):
-    "display the current bead"
+class FoVTimeSeriesModel(DisplayModel[FoVTimeSeriesDisplay, TimeSeriesTheme]):
+    "model for display the time series"
+    def __init__(self, **_):
+        super().__init__(name = 'fovtimeseries', **_)
+
+class FoVTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[FoVTimeSeriesModel]):
+    "display the current fov parameter"
     XLEFT  = XRIGHT = "x"
     def __init__(self, ctrl  = None):
         src              = dict.fromkeys((self.XLEFT,  self.YRIGHT, self.YLEFT),
                                          cast(List[float], []))
         self._leftsource = self._rightsource = ColumnDataSource(src)
-        label            = TimeSeriesTheme.fovnames["tsample"]
+        label            = TimeSeriesTheme.labels["tsample"]
         super().__init__(ctrl,
-                         name      = 'fovtimeseries',
                          leftvar   = "tsample",
                          leftlabel = label)
 

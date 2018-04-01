@@ -42,6 +42,7 @@ class CameraTheme:
                             line_color           = 'lightblue')
     figsize     = 800, 400, 'fixed'
     toolbar     = dict(sticky = False, location = 'right', items = "")
+
     @initdefaults(frozenset(locals()) - {'name'})
     def ___init__(self, **_):
         pass
@@ -50,18 +51,23 @@ class CameraDisplay:
     "information about the current bead, ..."
     name        = 'camera'
     currentbead = 0
+
     @initdefaults(frozenset(locals()) - {'name'})
     def ___init__(self, **_):
         pass
 
-class DAQCameraView(ThreadedDisplay[DisplayModel[CameraDisplay, CameraTheme]]):
+class DAQCameraModel(DisplayModel[CameraDisplay, CameraTheme]):
+    "DAQ Camera model"
+    pass
+
+class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
     "viewing the camera & beads"
     def __init__(self, ctrl = None, **kwa):
         super().__init__(**kwa)
         self._cam:   DpxDAQCamera     = None
         self._fig:   Figure           = None
 
-        cols = ('x', 'y', 'w', 'h', "text")
+        cols = ('x', 'y', 'width', 'height', "text")
         self._source: ColumnDataSource = ColumnDataSource({i: [] for i in cols})
         if ctrl is not None:
             self.observe(ctrl)
@@ -81,7 +87,7 @@ class DAQCameraView(ThreadedDisplay[DisplayModel[CameraDisplay, CameraTheme]]):
                        x_axis_label     = theme.xlabel,
                        y_axis_label     = theme.ylabel)
 
-        theme.roi.addto(fig, **{i: i for i in ('x', 'y', 'w', 'h')},
+        theme.roi.addto(fig, **{i: i for i in ('x', 'y', 'width', 'height')},
                         source = self._source)
         theme.position.addto(fig, **{i: i for i in ('x', 'y')}, source = self._source)
         theme.names.addto(fig, **{i: i for i in ('x', 'y', 'text')}, source = self._source)
@@ -90,6 +96,9 @@ class DAQCameraView(ThreadedDisplay[DisplayModel[CameraDisplay, CameraTheme]]):
             inds = self._source.selected.get('1d', {}).get('indices', [])
             ctrl.daq.setcurrentbead(inds[0] if len(inds) else None)
         self._source.on_change('selected', _onclickedbead_cb)
+
+        self._fig = fig
+        return [self._fig]
 
     def _reset(self, ctrl, cache):
         if self._cam.address != ctrl.daq.config.network.camera:
@@ -100,10 +109,8 @@ class DAQCameraView(ThreadedDisplay[DisplayModel[CameraDisplay, CameraTheme]]):
         """
         observe the controller
         """
-        if self._model.theme in self.theme:
+        if self._model.observe(ctrl):
             return
-        self.theme.add(self._model.theme)
-        self.display.add(self._model.display)
 
         @ctrl.daq.observe
         def _onupdatenetwork(model = None, old = None, **_): # pylint: disable=unused-variable
@@ -130,8 +137,10 @@ class DAQCameraView(ThreadedDisplay[DisplayModel[CameraDisplay, CameraTheme]]):
                 self._source.selected = self.__selected(ctrl)
 
     def __data(self, ctrl) -> Dict[str, Any]:
-        data         = DAQBead.todict(ctrl.daq.config.beads)
-        data['text'] = np.arange(len(ctrl.daq.config.beads))
+        roi  = DAQBead.toarray(ctrl.daq.config.beads)
+        data = dict(x     = roi['x'], y      = roi['y'],
+                    width = roi['w'], height = roi['h'],
+                    text  = np.arange(len(ctrl.daq.config.beads)))
         return {'data': data, 'selected': self.__selected(ctrl)}
 
     def __selected(self, ctrl) -> Dict[str, Any]:

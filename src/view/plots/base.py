@@ -132,6 +132,11 @@ class PlotAttrs:
 
     _quad = _line
 
+    @classmethod
+    def _rect(cls, args):
+        cls._default(args)
+        args.pop('size')
+
     @staticmethod
     def _image(args):
         color = args.pop('color')
