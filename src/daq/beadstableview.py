@@ -12,7 +12,7 @@ from   .model        import DAQBead
 class BeadsTableTheme(BaseModel):
     "summary info on the field of view"
     name        = 'beadstable'
-    width       = 40
+    width       = 80
     height      = 200
     columns     = [['x', 'X (µm)',      '0.0'],
                    ['y', 'Y (µm)',      '0.0'],

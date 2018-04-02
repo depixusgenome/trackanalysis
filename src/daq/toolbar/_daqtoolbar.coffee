@@ -91,9 +91,9 @@ export class DpxDAQToolbarView extends WidgetView
 
   get_width_height: () ->
       [width, height] = LayoutDOMView::get_width_height()
-      return [width, 30]
+      return [width, 50]
 
-  get_height: () -> 30
+  get_height: () -> 50
 
 export class DpxDAQToolbar extends Widget
     type: 'DpxDAQToolbar'

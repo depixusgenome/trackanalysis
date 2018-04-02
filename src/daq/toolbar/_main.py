@@ -78,7 +78,7 @@ class DAQToolbar:
         self._record  .addtodoc(ctrl, doc, self._widget, "record")
         self._widget.on_change("stop", lambda attr, old, new: ctrl.daq.stoprecording())
 
-        mods = dict(height      = 30,
+        mods = dict(height      = 50,
                     sizing_mode = ctrl.theme.get('main', 'sizingmode', 'fixed'))
         return layouts.row([layouts.widgetbox(self._widget, **mods)], **mods)
 

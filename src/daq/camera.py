@@ -8,7 +8,8 @@ from   typing                 import Dict, Any
 import numpy                  as     np
 import bokeh.core.properties  as     props
 
-from   bokeh.models           import Model, ColumnDataSource
+import bokeh.layouts          as     layouts
+from   bokeh.models           import ColumnDataSource
 from   bokeh.plotting         import figure, Figure
 
 from   utils                  import initdefaults
@@ -17,14 +18,25 @@ from   view.threaded          import DisplayModel, ThreadedDisplay
 from   view.static            import ROUTE
 from   .model                 import DAQBead
 
-class DpxDAQCamera(Model):
+class DpxDAQCamera(layouts.Row): # pylint: disable=too-many-ancestors
     """
     Access to the camera stream
     """
     __css__            = ROUTE+"/daqcamera.css"
     __implementation__ = 'camera.coffee'
-    address  = props.String("rtsp://192.168.1.56:8554/mystream")
-    figclass = props.String("dpxdaqcamera")
+    address   = props.String("rtsp://192.168.1.56:8554/mystream")
+    figwidth  = props.Int(800)
+    figheight = props.Int(400)
+    start     = props.Int(-1)
+    stop      = props.Int(-1)
+    def __init__(self, fig, address, **kwa):
+        col = layouts.column(children = [fig], css_classes = ['dxpdaqplayer'])
+        super().__init__(children    = [col],
+                         address     = address,
+                         figwidth    = fig.width,
+                         figheight   = fig.height,
+                         css_classes = ['dpxdaqcontainer'],
+                         **kwa)
 
 class CameraTheme:
     "how to display the beads"
@@ -72,11 +84,8 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
         if ctrl is not None:
             self.observe(ctrl)
 
-    def _addtodoc(self, ctrl, doc):
+    def _addtodoc(self, ctrl, _):
         "create the bokeh view"
-        self._cam = DpxDAQCamera(address = ctrl.daq.config.network.camera)
-        doc.add_root(self._cam)
-
         theme = self._model.theme
         fig   = figure(toolbar_sticky   = theme.toolbar['sticky'],
                        toolbar_location = theme.toolbar['location'],
@@ -85,7 +94,8 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
                        plot_height      = theme.figsize[1],
                        sizing_mode      = theme.figsize[2],
                        x_axis_label     = theme.xlabel,
-                       y_axis_label     = theme.ylabel)
+                       y_axis_label     = theme.ylabel,
+                       css_classes      = ['dpxdaqcamera'])
 
         theme.roi.addto(fig, **{i: i for i in ('x', 'y', 'width', 'height')},
                         source = self._source)
@@ -98,7 +108,9 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
         self._source.on_change('selected', _onclickedbead_cb)
 
         self._fig = fig
-        return [self._fig]
+        self._cam = DpxDAQCamera(fig, address = ctrl.daq.config.network.camera,
+                                 sizing_mode = ctrl.theme.get('main', 'sizingmode', 'fixed'))
+        return [self._cam]
 
     def _reset(self, ctrl, cache):
         if self._cam.address != ctrl.daq.config.network.camera:
@@ -115,7 +127,8 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
         @ctrl.daq.observe
         def _onupdatenetwork(model = None, old = None, **_): # pylint: disable=unused-variable
             if any(i in old for i in ('camera', 'beads')):
-                self._cam.address = model.camera
+                self._cam.update(address = model.camera,
+                                 start   = self._cam.start+1)
 
         @ctrl.daq.observe("addbeads", "removebeads", "updatebeads")
         def _onchangedbeads(**_): # pylint: disable=unused-variable
@@ -130,6 +143,7 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
             tmp = dict(self._source.data)
             tmp.clear()
             self._source.data = tmp
+            self._cam.start  += 1
 
         @ctrl.display.observe
         def _oncamera(old = None, **_): # pylint: disable=unused-variable
