@@ -35,13 +35,12 @@ class BeadsTableView(ThreadedDisplay[BeadsTableTheme]):
         "creates the widget"
         self._source = ColumnDataSource(data = self.__data(ctrl))
         cols  = self.__columns(ctrl)
-        self._widget = DataTable(source       = self._source,
-                                 columns     = cols,
-                                 editable    = False,
-                                 row_headers = True,
-                                 width       = self._model.width*len(cols),
-                                 height      = self._model.height,
-                                 name        = "Beads:List")
+        self._widget = DataTable(source   = self._source,
+                                 columns  = cols,
+                                 editable = False,
+                                 width    = self._model.width*len(cols),
+                                 height   = self._model.height,
+                                 name     = "Beads:List")
         mods = dict(sizing_mode = ctrl.theme.get('main', 'sizingmode', 'fixed'),
                     width       = self._model.width*(len(cols)+1),
                     height      = self._model.height)

@@ -33,6 +33,6 @@ class MainView:
         assert all(len(i) == 1 for i in itms.values())
 
         mod  = dict(sizing_mode = ctrl.theme.get('main', 'sizingmode', 'fixed'))
-        row  = layouts.row([itms['beads'][0], layouts.gridplot([[itms["fov"][0]]])], **mod)
+        row  = layouts.row([itms['beads'][0], itms["fov"][0]], **mod)
         col  = layouts.column([itms['series'][0], row], **mod)
         return [layouts.row([col, itms['cam'][0]], **mod)]

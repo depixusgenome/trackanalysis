@@ -6,8 +6,17 @@ export class DpxDAQCameraView extends RowView
     className: "dpx-bk-grid-row"
     build_child_views: () ->
         super()
+        w   = @model.figsizes[0]
+        h   = @model.figsizes[1]
+        l   = @model.figsizes[2]
+        t   = @model.figsizes[3]
+
         cnt = document.createElement("div");   cnt.id  = 'dpxdaqcontainer'
-        cam = document.createElement("div");   cam.id  = 'dpxdaqwrapper'
+        cnt.style = 'position: relative;'
+
+        cam       = document.createElement("div");   cam.id  = 'dpxdaqwrapper'
+        cam.style = "top: #{t}px; left: #{l}px; width: #{w}px; height: #{h}px; position: absolute;"
+
         emb = document.createElement("embed"); emb.id  = 'dpxdaqvlc'
         emb.setAttribute('type',        'application/x-vlc-plugin')
         emb.setAttribute('pluginspage', 'http://www.videolan.org')
@@ -16,7 +25,11 @@ export class DpxDAQCameraView extends RowView
         emb.setAttribute('autoplay',    'yes')
         emb.setAttribute('loop',        'no')
         emb.setAttribute('windowless',  'true')
+        emb.setAttribute('width',       "#{w}")
+        emb.setAttribute('height',      "#{h}")
         cam.appendChild(emb)
+
+        @el.children[0].style = 'position: absolute;'
         @el.appendChild(cam)
 
     connect_signals: () ->
@@ -40,8 +53,7 @@ export class DpxDAQCamera extends Row
     type: "DpxDAQCamera"
     @define {
         address:   [p.String, "rtsp://192.168.1.56:8554/mystream"],
-        figwidth:  [p.Number, 800],
-        figheight: [p.Number, 400],
+        figsizes:  [p.Array,  [800, 400, 28, 5]],
         start:     [p.Number, -1],
         stop:      [p.Number, -1],
     }

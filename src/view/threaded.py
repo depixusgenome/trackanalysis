@@ -130,7 +130,7 @@ class ThreadedDisplay(Generic[MODEL]): # pylint: disable=too-many-public-methods
         if val and (old is DisplayState.outofdate):
             self.__doreset(ctrl)
 
-    def reset(self, ctrl, clear: bool):
+    def reset(self, ctrl, clear: bool = False):
         "Updates the data"
         if clear is True:
             self._model.clear()
@@ -174,7 +174,7 @@ class ThreadedDisplay(Generic[MODEL]): # pylint: disable=too-many-public-methods
             else:
                 LOGS.debug(*msg)
 
-        async def _reset_without_render(self, ctrl, old, cache):
+        def _reset_without_render(self, ctrl, old, cache):
             try:
                 self.state = DisplayState.resetting
                 with ctrl.computation.type(ctrl, calls = self.__doreset):

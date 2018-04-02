@@ -113,6 +113,8 @@ class DecentralizedController(Controller):
 
             missing = set(kwa) - set(dflt.__dict__)
             if len(missing):
+                import traceback
+                traceback.print_stack()
                 raise KeyError(f"Unknown keys {missing}")
 
         out = self.__update('_defaults', name, kwa)
@@ -149,6 +151,8 @@ class DecentralizedController(Controller):
             kwa.update({i: getattr(dflt, i) for i in dels})
 
         if len(missing):
+            import traceback
+            traceback.print_stack()
             raise KeyError(f"Unknown keys {missing}")
 
         return self.__update('_objects', name, kwa)

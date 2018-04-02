@@ -70,6 +70,11 @@ class Action:
         else:
             self._calls = _Calls(None)
 
+    @property
+    def type(self):
+        "return the action type"
+        return type(self)
+
     def _logstart(self):
         if self._CNT[0] == 1:
             LOGS.debug("current action is %s", self._calls)

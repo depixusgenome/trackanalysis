@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 "View module showing one or more time series"
 from   typing           import List, cast
-from   functools        import partial
 
 from   bokeh.plotting   import figure, Figure
 from   bokeh.models     import ColumnDataSource, LinearAxis, DataRange1d
@@ -31,7 +30,9 @@ class TimeSeriesTheme:
     rightattr = PlotAttrs("red",       "line",   1)
     figsize   = 800, 400, 'fixed'
     maxlength = 5000
-    toolbar   = dict(sticky = False, location = 'right', items = "")
+    toolbar   = dict(sticky   = False,
+                     location = 'right',
+                     items    = ['pan,wheel_zoom,box_zoom,save,reset'])
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -50,7 +51,7 @@ class TimeSeriesViewMixin:
         if self._model.observe(ctrl):
             return
 
-        fcn = partial(self.redisplay, ctrl)
+        fcn = lambda **_: self.redisplay(ctrl)
         ctrl.theme.observe  (self._model.theme,   fcn)
         ctrl.display.observe(self._model.display, fcn)
 
@@ -93,7 +94,7 @@ class TimeSeriesViewMixin:
 
         fig.extra_y_ranges = {self.YRIGHT: DataRange1d()}
         fig.add_layout(LinearAxis(y_range_name = self.YRIGHT,
-                                  axis_label   = self._rightlabel()))
+                                  axis_label   = self._rightlabel()), 'right')
         theme.rightattr.addto(fig,
                               x            = self.XRIGHT,
                               y            = self.YRIGHT,
@@ -105,10 +106,9 @@ class TimeSeriesViewMixin:
     def _reset(self, _, cache):
         "resets the data"
         names = self._leftlabel(), self._rightlabel()
-        if self._fig.yaxis.axis_label != names[0]: # pylint: disable=no-member
-            cache[self._fig.yaxis]['axis_label'] = names[0]
-        if self._fig.extra_y_ranges[self.YRIGHT].axis_label != names[1]:
-            cache[self._fig.extra_y_ranges[self.YRIGHT]]['axis_label'] = names[1]
+        for i, j in zip(names, self._fig.yaxis):
+            if j.axis_label != i:
+                cache[j]['axis_label'] = i
 
     def _leftlabel(self):
         return self._model.theme.labels[self._model.display.leftvar]
@@ -161,24 +161,26 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
     def _reset(self, control, cache):
         "resets the data"
         super()._reset(control, cache)
-        lines = control.data.fov[:self._theme.maxlength]
+        data  = getattr(control, 'daq', control).data
+
+        lines = data.fov.view()[:self._model.theme.maxlength]
         cache[self._rightsource]['data'] = self.__dataright(lines)
 
-        lines = control.data.beads[:self._theme.maxlength]
+        lines = data.beads.view()[:self._model.theme.maxlength]
         cache[self._leftsource]['data']  = self.__dataleft(lines)
 
     def _onfovdata(self, lines = None, **_):
-        self._rightsource.stream(self.__dataright(lines), self._theme.maxlength)
+        self._rightsource.stream(self.__dataright(lines), self._model.theme.maxlength)
 
     def _onbeaddata(self, lines = None, **_):
-        self._leftsource.stream(self.__dataleft(lines), self._theme.maxlength)
+        self._leftsource.stream(self.__dataleft(lines), self._model.theme.maxlength)
 
     def _leftlabel(self):
         return self._model.theme.labels[self._model.display.leftvar[0]]
 
     def __dataleft(self, data):
         names = data.dtype.names
-        if self._model.leftvar in names:
+        if self._model.display.leftvar in names:
             return {self.XLEFT: data[names[0]],
                     self.YLEFT: data[self._model.display.leftvar]}
         return {self.XLEFT: [], self.YLEFT: []}
@@ -219,11 +221,11 @@ class FoVTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[FoVTimeSeriesModel]
     def _reset(self, control, cache):
         "resets the data"
         super()._reset(control, cache)
-        lines = control.data.fov[:self._theme.maxlength]
+        lines = control.data.fov[:self._model.theme.maxlength]
         cache[self._leftsource]['data'] = self.__data(lines)
 
     def _onfovdata(self, lines = None, **_):
-        self._leftsource.stream(lines, self._theme.maxlength)
+        self._leftsource.stream(lines, self._model.theme.maxlength)
 
     def __data(self, data):
         disp = self._model.display
