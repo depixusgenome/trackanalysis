@@ -93,11 +93,12 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
                                               tooltips  = self.css.tooltip.get())
 
         def _onselect_cb(attr, old, new):
-            inds = new.get('1d', {}).get('indices', [])
+            inds = new.indices
             if len(inds) != 1:
                 self._beadssource.update(selected = self.__SELECTED)
                 return
 
+            # pylint: disable=unsubscriptable-object
             bead = int(self._beadssource.data['text'][inds[0]])
 
             if bead == self._model.bead:

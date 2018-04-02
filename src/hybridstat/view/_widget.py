@@ -287,13 +287,13 @@ class PeakListWidget(WidgetCreator[PeaksPlotModelAccess]):
         "creates the widget"
         width = self.css.peaks.columns.width.get()
         cols  = self.__cols()
-        self.__widget = DataTable(source      = src,
-                                  columns     = cols,
-                                  editable    = False,
-                                  row_headers = False,
-                                  width       = width*len(cols),
-                                  height      = self.css.peaks.height.get(),
-                                  name        = "Peaks:List")
+        self.__widget = DataTable(source         = src,
+                                  columns        = cols,
+                                  editable       = False,
+                                  index_position = None,
+                                  width          = width*len(cols),
+                                  height         = self.css.peaks.height.get(),
+                                  name           = "Peaks:List")
         return [self.__widget]
 
     def reset(self, resets):

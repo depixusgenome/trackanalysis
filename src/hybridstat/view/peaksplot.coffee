@@ -42,12 +42,12 @@
             if stats.data[menu.value]?
                 stats.text = stats.data[menu.value]
 
-            emit = False
+            emit = false
             for key in ['id', 'bases', 'distance', 'orient', 'color']
                 col = peaks.source.data[menu.value+key]
                 if col?
                     peaks.source.data[key] = col
-                    emit                   = True
+                    emit                   = true
             if emit
                 peaks.source.change.emit()
 

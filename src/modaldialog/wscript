@@ -1,6 +1,6 @@
 import wafbuilder
 
-require(python = dict(bokeh = '0.12.9'), rtime = True)
+require(python = dict(bokeh = '0.12.15'), rtime = True)
 require(coffee = '1.10.0', rtime = False)
 make(builders = ['python', 'coffee'])
 

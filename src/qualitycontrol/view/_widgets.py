@@ -93,13 +93,13 @@ class MessagesListWidget(WidgetCreator[QualityControlModelAccess]):
                                  width      = i[3])
                      for i in cnf.get())
 
-        self.__widget = DataTable(source      = ColumnDataSource(self.__data()),
-                                  columns     = cols,
-                                  editable    = False,
-                                  row_headers = False,
-                                  width       = sum([i[-1] for i in cnf.get()]),
-                                  height      = self.__config.height.get(),
-                                  name        = "Messages:List")
+        self.__widget = DataTable(source         = ColumnDataSource(self.__data()),
+                                  columns        = cols,
+                                  editable       = False,
+                                  index_position = None,
+                                  width          = sum([i[-1] for i in cnf.get()]),
+                                  height         = self.__config.height.get(),
+                                  name           = "Messages:List")
         return [self.__widget]
 
     def reset(self, resets):

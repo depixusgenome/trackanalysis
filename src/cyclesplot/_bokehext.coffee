@@ -16,11 +16,11 @@
     launch_hover: (rawsrc, hvrsrc, glyph) ->
         if @shape[1] == 2
             return
-        if not rawsrc.selected['1d']?
+        if not rawsrc.selected?
             return
 
         @_hvr_cnt = if @_hvr_cnt? then @_hvr_cnt + 1 else 0
-        inds      = rawsrc.selected['1d'].indices
+        inds      = rawsrc.selected.indices
         if (not inds?) || inds.length == 0
             if glyph.visible
                 glyph.visible = false
@@ -31,7 +31,6 @@
 
     on_change_hist_bounds: (fig, src)->
         if not fig.y_range?
-            console.log("******")
             return
 
         yrng = fig.y_range

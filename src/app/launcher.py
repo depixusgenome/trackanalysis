@@ -80,6 +80,17 @@ class _FunctionHandler(FunctionHandler):
 
     @staticmethod
     def __monkeypatch_bokeh(view):
+        from bokeh.core.properties import Seq
+        # pylint: disable=missing-docstring
+        def from_json(self, json, models=None, __old__ = Seq.from_json):
+            if isinstance(json, dict):
+                json = {int(i): j for i, j in json.items()}
+                keys = sorted(json)
+                assert keys == list(range(max(json)+1))
+                json = [json[i] for i in keys]
+            return __old__(self, json, models = models)
+        Seq.from_json = from_json
+
         output = view.APPNAME.lower() + '.js'
         if Path(output).exists() and CAN_LOAD_JS:
             def _bundle():

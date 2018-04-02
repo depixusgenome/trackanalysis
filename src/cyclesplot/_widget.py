@@ -43,13 +43,13 @@ class PeaksTableWidget(_Widget[CyclesModelAccess]):
                               formatter = fmt,
                               width     = width//2)]
 
-        self.__widget = DataTable(source      = ColumnDataSource(self.__data()),
-                                  columns     = cols,
-                                  editable    = True,
-                                  row_headers = False,
-                                  width       = width,
-                                  height      = height,
-                                  name        = "Cycles:Peaks")
+        self.__widget = DataTable(source         = ColumnDataSource(self.__data()),
+                                  columns        = cols,
+                                  editable       = True,
+                                  index_position = None,
+                                  width          = width,
+                                  height         = height,
+                                  name           = "Cycles:Peaks")
 
         return [Paragraph(text = css.title.get()), self.__widget]
 

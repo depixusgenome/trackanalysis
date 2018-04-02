@@ -52,13 +52,13 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
                                  formatter  = fmt(i[2]))
                      for i in cnf.get())
 
-        self.__widget = DataTable(source      = ColumnDataSource(self.__data()),
-                                  columns     = cols,
-                                  editable    = False,
-                                  row_headers = False,
-                                  width       = width*len(cols),
-                                  height      = self.__config.height.get(),
-                                  name        = "Cleaning:List")
+        self.__widget = DataTable(source         = ColumnDataSource(self.__data()),
+                                  columns        = cols,
+                                  editable       = False,
+                                  index_position = None,
+                                  width          = width*len(cols),
+                                  height         = self.__config.height.get(),
+                                  name           = "Cleaning:List")
         return [self.__widget]
 
     def reset(self, resets):
