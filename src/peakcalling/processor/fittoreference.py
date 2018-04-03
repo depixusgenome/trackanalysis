@@ -15,7 +15,7 @@ from   control.processor.taskview       import TaskViewProcessor
 from   eventdetection.data              import Events
 from   peakfinding.histogram            import HistogramData
 from   peakfinding.processor.dataframe  import PeaksDataFrameFactory, DataFrameFactory
-from   peakfinding.processor.selector   import PeakOutput, PeaksDict
+from   peakfinding.processor.selector   import PeakListArray, PeaksDict
 from   ..toreference                    import ReferenceFit, ChiSquareHistogramFit
 from   ..tohairpin                      import HairpinFitter
 from   .._core                          import match as _match # pylint: disable=import-error
@@ -122,7 +122,7 @@ class FitToReferenceTask(Task):
         return set(itms).issubset(set(self.fitdata))
 
     def frompeaks(self,
-                  peaks: Union[PeaksDict, Iterable[Tuple[BEADKEY, PeakOutput]]],
+                  peaks: Union[PeaksDict, PeakListArray],
                   update = False) -> 'FitToReferenceTask':
         "creates fit data for references from a PeaksDict"
         if not update:
@@ -190,9 +190,8 @@ class FitToReferenceDict(TaskView[FitToReferenceTask, BEADKEY]):
 
     def compute(self, key: BEADKEY) -> np.ndarray:
         "Action applied to the frame"
-        data = FitToRefArray(list(cast(Iterator[PeakOutput], self.data[key])))
-        if len(data):
-            data.discarded = getattr(data[0][1], 'discarded', 0)
+        tmp  = cast(np.ndarray, self.data[key])
+        data = FitToRefArray(tmp, discarded = getattr(tmp, 'discarded', 0))
 
         stretch, bias    = self.optimize(key, data)
         data.params      = stretch, bias

@@ -22,7 +22,7 @@ from data.__scripting__.dataframe   import adddataframe
 from data.__scripting__.tracksdict  import TracksDictOperator
 from ..selector                     import PeakSelectorDetails
 from ..probabilities                import Probability
-from ..processor.selector           import PeaksDict, PeakOutput
+from ..processor.selector           import PeaksDict, PeakListArray
 from ..processor                    import (PeakSelectorTask, PeakCorrelationAlignmentTask,
                                             PeakProbabilityTask)
 
@@ -171,10 +171,10 @@ class Detailed:
         self.details.transform(params)
 
     @property
-    def output(self) -> Iterator[PeakOutput]:
+    def output(self) -> PeakListArray:
         "yields results from precomputed details"
         if self.frame is None:
-            return iter(tuple())
+            return PeakListArray([], discarded = 0)
         return self.frame.config.details2output(self.details)
 
     @property

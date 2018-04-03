@@ -4,12 +4,12 @@
 Deals with tasks & processors for finding peaks
 """
 
-from   typing                     import Iterator, Tuple, Optional
+from   typing                     import Optional
 
 from   model                      import Level, Task
 from   data.views                 import BEADKEY, TaskView, Beads
 from   control.processor.taskview import TaskViewProcessor
-from   ..peaksarray               import Output as PeakOutput
+from   ..peaksarray               import PeakListArray
 from   ..selector                 import PeakSelector
 
 class PeakSelectorTask(PeakSelector, Task):
@@ -36,7 +36,7 @@ class PeakSelectorTask(PeakSelector, Task):
         Task.__init__(self)
         PeakSelector.__init__(self, **kwa)
 
-Output = Tuple[BEADKEY, Iterator[PeakOutput]]
+Output = PeakListArray
 class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]):
     """
     * `withmeasure` allows computing whatever one wants on events in a peak. One
@@ -66,8 +66,8 @@ class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]):
         ...     assert all(isinstance(i, PeaksArray) for _, i in data)""",
                                        actioncode = """
         >>> def myfunction(frame: PeaksDict,
-        ...                info: Tuple[int, Iterator[Tuple[float, PeaksArray]]],
-        ...               ) -> Tuple[int, Tuple[Tuple[float, PeaksArray]]]:
+        ...                info: Tuple[int, PeakListArray],
+        ...               ) -> Tuple[int, PeakListArray]:
         ...     data = np.array(list(info[1]))
         ...     for i in data:
         ...         for j in i:
@@ -94,10 +94,10 @@ class PeaksDict(TaskView[PeakSelectorTask,BEADKEY]):
             * `peaks.selecting([1, 2])` selects bead 1 and 2""",
                                        views      = "peaks")
     level  = Level.peak
-    def compute(self, ibead, precision: float = None) -> Iterator[PeakOutput]:
+    def compute(self, ibead, precision: float = None) -> PeakListArray:
         "Computes values for one bead"
         vals = iter(i for _, i in self.data[ibead,...]) # type: ignore
-        yield from self.config(vals, self._precision(ibead, precision))
+        return self.config(vals, self._precision(ibead, precision))
 
     @classmethod
     def _transform_ids(cls, sel):

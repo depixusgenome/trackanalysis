@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Selects peaks and yields all events related to each peak"
-from   typing               import Iterator, Callable, cast
-import numpy                as      np
+from   typing               import Callable, cast
+import numpy                as     np
 
 from utils                  import (initdefaults, asobjarray, asdataarrays, asview,
                                     updatecopy, EVENTS_DTYPE, EventsArray)
 from signalfilter           import PrecisionAlg, PRECISION
-from .alignment             import PeakCorrelationAlignment
+from .alignment             import PeakCorrelationAlignment, MinBiasPeakAlignment
 from .histogram             import Histogram
 from .groupby               import (ByHistogram,PeakFinder)
-from .peaksarray            import Input, Output, PeaksArray
+from .peaksarray            import (Input, Output, # pylint: disable=unused-import
+                                    PeaksArray, PeakListArray)
 
 class PeakSelectorDetails: # pylint: disable=too-many-instance-attributes
     "Information useful to GUI"
@@ -63,10 +64,11 @@ class PeakSelector(PrecisionAlg):
     *aligned* events.
     """
 
-    rawfactor          = 2.
-    histogram          = Histogram(edge = 2)
-    align              = PeakCorrelationAlignment()
-    finder: PeakFinder = ByHistogram()
+    rawfactor                       = 2.
+    histogram                       = Histogram(edge = 2)
+    align: PeakCorrelationAlignment = None
+    peakalign                       = MinBiasPeakAlignment()
+    finder: PeakFinder              = ByHistogram()
 
     if __doc__:
         __doc__ += "\n    # Default algorithms\n"
@@ -157,22 +159,33 @@ class PeakSelector(PrecisionAlg):
         else:
             delta  = None
 
-        histdata   = projector.projection(pos, zmeasure = None)
-        peaks, ids = self.finder(events    = events,
-                                 hist      = histdata,
-                                 pos       = pos,
-                                 precision = precision)
-        return PeakSelectorDetails(pos, histdata[0], histdata[1], histdata[2],
-                                   delta, peaks, orig, ids)
+        def _findpeaks():
+            histdata   = projector.projection(pos, zmeasure = None)
+            peaks, ids = self.finder(events    = events,
+                                     hist      = histdata,
+                                     pos       = pos,
+                                     precision = precision)
+            return PeakSelectorDetails(pos, histdata[0], histdata[1], histdata[2],
+                                       delta, peaks, orig, ids)
+        out = _findpeaks()
+        if self.peakalign:
+            pkdlt = self.peakalign(self.peakalign.tostats(self.details2output(out)))
+            pos  += pkdlt
+            if delta is not None:
+                delta += pkdlt
+            out   = _findpeaks()
+        return out
 
-    def details2output(self, dtl:PeakSelectorDetails) -> Iterator[Output]:
+    def details2output(self, dtl:PeakSelectorDetails) -> PeakListArray:
         "yields results from precomputed details"
+        vals = []
         for label, peak in enumerate(dtl.peaks):
             good = tuple(orig[pks == label]
                          for orig, pks in zip(dtl.events, dtl.ids)) # type: ignore
             if any(len(i) for i in good):
                 evts = self.__move(good, dtl.corrections, dtl.events.discarded)
-                yield (self.__measure(peak, evts), evts)
+                vals.append((self.__measure(peak, evts), evts))
+        return PeakListArray(vals, discarded = dtl.events.discarded)
 
-    def __call__(self, evts: Input, precision: PRECISION = None) -> Iterator[Output]:
-        yield from self.details2output(self.detailed(evts, precision))
+    def __call__(self, evts: Input, precision: PRECISION = None) -> PeakListArray:
+        return self.details2output(self.detailed(evts, precision))

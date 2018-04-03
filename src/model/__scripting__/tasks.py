@@ -25,7 +25,7 @@ from cleaning.beadsubtraction import BeadSubtractionTask
 from cordrift.processor       import DriftTask
 from eventdetection.processor import ExtremumAlignmentTask, EventDetectionTask
 from peakfinding.processor    import (PeakSelectorTask, PeakCorrelationAlignmentTask,
-                                      SingleStrandTask)
+                                      SingleStrandTask, MinBiasPeakAlignmentTask)
 from peakcalling.processor    import (FitToReferenceTask, FitToHairpinTask,
                                       BeadsByHairpinTask)
 from ..level                  import Level
@@ -69,6 +69,7 @@ class _DOCHelper(Enum):
     peakselector   = (
         "events are grouped per peak. The list of peaks",
         "is returned per bead.")
+    minbiasalignment = ("Aligns cycles using events in peaks",)
     singlestrand   = (
         "The single-strand peak is detected (using the closing patterns in",
         "the `PHASE.rampdown`) and removed from the list of peaks")
@@ -184,45 +185,47 @@ class Tasks(Enum):
     The keyword `pool` allows providing a specific `ProcessPoolExecutor`. If provided with
     `pool == True`, the `ProcessPoolExecutor` instance is created and used.
     """
-    trackreader    = 'trackreader'
-    cyclesampling  = 'cyclesampling'
-    action         = 'action'
-    subtraction    = 'subtraction'
-    cleaning       = 'cleaning'
-    selection      = 'selection'
-    alignment      = 'alignment'
-    driftperbead   = 'driftperbead'
-    driftpercycle  = 'driftpercycle'
-    cycles         = 'cycles'
-    eventdetection = 'eventdetection'
-    peakalignment  = 'peakalignment'
-    peakselector   = 'peakselector'
-    singlestrand   = 'singlestrand'
-    fittohairpin   = 'fittohairpin'
-    fittoreference = 'fittoreference'
-    beadsbyhairpin = 'beadsbyhairpin'
-    dataframe      = 'dataframe'
+    trackreader      = 'trackreader'
+    cyclesampling    = 'cyclesampling'
+    action           = 'action'
+    subtraction      = 'subtraction'
+    cleaning         = 'cleaning'
+    selection        = 'selection'
+    alignment        = 'alignment'
+    driftperbead     = 'driftperbead'
+    driftpercycle    = 'driftpercycle'
+    cycles           = 'cycles'
+    eventdetection   = 'eventdetection'
+    peakalignment    = 'peakalignment'
+    peakselector     = 'peakselector'
+    minbiasalignment = 'minbiasalignment'
+    singlestrand     = 'singlestrand'
+    fittohairpin     = 'fittohairpin'
+    fittoreference   = 'fittoreference'
+    beadsbyhairpin   = 'beadsbyhairpin'
+    dataframe        = 'dataframe'
 
     @staticmethod
     def defaults():
         "returns default tasks"
-        return dict(trackreader    = TrackReaderTask(),
-                    cleaning       = DataCleaningTask(),
-                    cyclesampling  = CycleSamplingTask(),
-                    subtraction    = BeadSubtractionTask(),
-                    selection      = DataSelectionTask(),
-                    alignment      = ExtremumAlignmentTask(),
-                    driftperbead   = DriftTask(onbeads = True),
-                    driftpercycle  = DriftTask(onbeads = False),
-                    cycles         = CycleCreatorTask(),
-                    eventdetection = EventDetectionTask(),
-                    peakalignment  = PeakCorrelationAlignmentTask(),
-                    peakselector   = PeakSelectorTask(),
-                    singlestrand   = SingleStrandTask(),
-                    fittoreference = FitToReferenceTask(),
-                    fittohairpin   = FitToHairpinTask(),
-                    beadsbyhairpin = BeadsByHairpinTask(),
-                    dataframe      = DataFrameTask())
+        return dict(trackreader      = TrackReaderTask(),
+                    cleaning         = DataCleaningTask(),
+                    cyclesampling    = CycleSamplingTask(),
+                    subtraction      = BeadSubtractionTask(),
+                    selection        = DataSelectionTask(),
+                    alignment        = ExtremumAlignmentTask(),
+                    driftperbead     = DriftTask(onbeads = True),
+                    driftpercycle    = DriftTask(onbeads = False),
+                    cycles           = CycleCreatorTask(),
+                    eventdetection   = EventDetectionTask(),
+                    peakalignment    = PeakCorrelationAlignmentTask(),
+                    peakselector     = PeakSelectorTask(),
+                    minbiasalignment = MinBiasPeakAlignmentTask(),
+                    singlestrand     = SingleStrandTask(),
+                    fittoreference   = FitToReferenceTask(),
+                    fittohairpin     = FitToHairpinTask(),
+                    beadsbyhairpin   = BeadsByHairpinTask(),
+                    dataframe        = DataFrameTask())
 
     def default(self) -> Task:
         "returns default tasks"

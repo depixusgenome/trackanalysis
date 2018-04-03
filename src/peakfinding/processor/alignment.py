@@ -10,7 +10,7 @@ from   model                import Task, Level
 from   control.processor    import Processor
 from   signalfilter         import rawprecision
 from   data.views           import BEADKEY  # pylint: disable=unused-import
-from   ..alignment          import PeakCorrelationAlignment
+from   ..alignment          import PeakCorrelationAlignment, MinBiasPeakAlignment
 
 class PeakCorrelationAlignmentTask(PeakCorrelationAlignment, Task):
     """
@@ -52,6 +52,48 @@ class PeakCorrelationAlignmentProcessor(Processor[PeakCorrelationAlignmentTask])
         cache = dict() # type: Dict[BEADKEY, np.ndarray]
         tsk   = PeakCorrelationAlignment(**cnf)
         return toframe.new().withaction(partial(cls._action, tsk, cache), beadsonly = True)
+
+    def run(self, args):
+        "updates frames"
+        args.apply(self.apply(**self.config()))
+
+class MinBiasPeakAlignmentTask(MinBiasPeakAlignment, Task):
+    """
+    Aligns cycles.
+    """
+    if __doc__:
+        __doc__ += getattr(MinBiasPeakAlignment, '__doc__')
+    level   = Level.peak
+    def __init__(self, **kwa):
+        Task.__init__(self)
+        super().__init__(**kwa)
+
+class MinBiasPeakAlignmentProcessor(Processor[MinBiasPeakAlignmentTask]):
+    """
+    Aligns cycles.
+    """
+    if __doc__:
+        __doc__ += getattr(MinBiasPeakAlignment, '__doc__')
+
+    @classmethod
+    def _action(cls, tsk, _, info):
+        stats  = tsk.tostats(info[1])
+        deltas = tsk(stats)
+
+        info[1]['peaks'] = np.average(stats['mean']+deltas, 1, stats['weight'])
+        for i in info[1]['events']:
+            for j, k in zip(i, deltas):
+                j['data'][:] += k
+        return info
+
+    @classmethod
+    def apply(cls, toframe = None, **cnf):
+        "applies the task to a frame or returns a function that does so"
+        # pylint: disable=not-callable
+        if toframe is None:
+            return partial(cls.apply, **cnf)
+        tsk = MinBiasPeakAlignment(**cnf)
+        return toframe.new().withaction(partial(cls._action, tsk), beadsonly = True)
 
     def run(self, args):
         "updates frames"

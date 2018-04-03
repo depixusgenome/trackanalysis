@@ -3,6 +3,7 @@
 "Tests histogram  creation and analysis"
 from pathlib                     import Path
 from tempfile                    import mktemp, gettempdir
+from typing                      import cast
 import numpy  as np
 from numpy.testing               import assert_equal, assert_allclose
 
@@ -18,7 +19,8 @@ from simulator.bindings          import Experiment
 from eventdetection.processor    import EventDetectionTask
 from peakfinding.selector        import PeakSelector, EVENTS_DTYPE
 from peakfinding.processor       import (PeakSelectorTask, PeakProbabilityTask,
-                                         SingleStrandTask, SingleStrandProcessor)
+                                         SingleStrandTask, SingleStrandProcessor,
+                                         MinBiasPeakAlignmentTask)
 from peakfinding.histogram       import Histogram
 from peakfinding.groupby         import CWTPeakFinder,ZeroCrossingPeakFinder, PeakFlagger
 from peakfinding.alignment       import PeakCorrelationAlignment
@@ -241,7 +243,7 @@ def test_precision():
     exp   = np.array([i.hybridisationrate for _, i in vals[1:]])
     assert_allclose(exp, truth, rtol = 1e-3, atol = 1e-3)
 
-    truth = [np.mean(i[i>=5]) for i in sim.T]
+    truth = [np.mean(i[i>=5]) for i in cast(np.ndarray, sim).T]
     exp   = np.array([i.averageduration for _, i in vals[1:]])
     assert_allclose(exp, truth, rtol = 1.5e-2, atol = 1e-3)
 
@@ -284,5 +286,31 @@ def test_singlestrandpeak():
     out2  = [i for i, _ in next(create(*lst[:-1]).run())[0]]
     assert out1 == out2[:-1]
 
+def test_minbiasalignment():
+    "test min bias alignment of peaks"
+    data  = Experiment(baseline = None, thermaldrift = None).track(seed = 1)
+    track = Track(**data)
+    lst   = (InMemoryTrackTask(track), EventDetectionTask(),
+             PeakSelectorTask(peakalign = None),
+             MinBiasPeakAlignmentTask())
+    peaks = next(create(*lst).run())
+    _     = peaks[0]  # test everything runs
+
+    cycles = np.array([(1. if i > 5 else 0., 0.) for i in range(10)],
+                      dtype  = MinBiasPeakAlignmentTask.DTYPE)
+    stats  = np.array([np.roll(cycles, i) for i in range(4)],
+                      dtype  = MinBiasPeakAlignmentTask.DTYPE)
+    for i in range(4):
+        stats[i,:]['mean'][:] += i*10
+
+    truth  = np.arange(10, dtype = 'f4')*.1
+    truth -= np.median(truth)
+    for i in range(10):
+        stats[:,i]['mean'][:] -= truth[i]
+    found = lst[-1](stats)
+    truth = np.array([-0.5248518, -0.42470455, -0.32455826,  0.,  0., 0.,
+                      0.07456262,  0.17470905,  0.27485523,  0.37500241], dtype='f4')
+    assert_allclose(found, truth)
+
 if __name__ == '__main__':
-    test_singlestrandpeak()
+    test_minbiasalignment()

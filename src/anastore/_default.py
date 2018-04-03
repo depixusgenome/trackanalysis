@@ -3,7 +3,7 @@
 """
 Default patches for tasks and configs
 """
-from ._patches  import Patches, modifyclasses, RESET
+from ._patches  import Patches, modifyclasses, RESET, DELETE
 
 def _v0task(data:dict) -> dict:
     modifyclasses(data,
@@ -26,10 +26,14 @@ def _v2(data:dict) -> dict:
     modifyclasses(data, r"peakfinding.histogram.(\w+)", dict(__name__ = repl))
     return data
 
-__TASKS__   = Patches(_v0task, _v1, _v2)
+def _v3(data:dict) -> dict:
+    modifyclasses(data, "peakfinding.selector.PeakSelector", dict(align = DELETE))
+    return data
+
+__TASKS__   = Patches(_v0task, _v1, _v2, _v3)
 
 def _v0cnf(data:dict) -> dict:
     data = _v0task(data)
     data.get('config', {}).pop('precision.max', None)
     return data
-__CONFIGS__ = Patches(_v0cnf, _v1, _v2)
+__CONFIGS__ = Patches(_v0cnf, _v1, _v2, _v3)
