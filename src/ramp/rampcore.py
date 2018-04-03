@@ -66,6 +66,7 @@ class RampData: # pylint: disable=too-many-public-methods
         self.bcids = None # type: List[Tuple[int,int]]
         self.ncycles = None # type: int
         self.det = None # type: Optional[pd.DataFrame]
+        self.track = kwargs.get("track", None)
         if self.dataz is not None :
             self._setup()
             if self.model is not None :
@@ -76,8 +77,10 @@ class RampData: # pylint: disable=too-many-public-methods
         ''' creates ramp from track
         '''
         trkd = Track(path = trk, beadsonly = False) if isinstance(trk,str) else trk
-        return cls(data = pd.DataFrame({k:pd.Series(v) for k, v in dict(trkd.cycles).items()})
-                   , model = model)
+
+        return cls(data = pd.DataFrame({k:pd.Series(v) for k, v in dict(trkd.cycles).items()}),
+                   model = model,
+                   track = trkd)
 
 
     def beads(self)->set:
@@ -85,6 +88,7 @@ class RampData: # pylint: disable=too-many-public-methods
         returns the set of bead ids
         '''
         return {i[0] for i in self.bcids}
+
     def zmagids(self):
         '''
         returns all pairs (zmag,cycleid)
@@ -102,6 +106,7 @@ class RampData: # pylint: disable=too-many-public-methods
         changes the data using trk
         '''
         trkd = Track(path = trk, beadsonly = False) if isinstance(trk,str) else trk
+        self.track = trkd
         self.dataz = pd.DataFrame({k:pd.Series(v) for k, v in dict(trkd.cycles).items()})
         self._setup()
         if self.model is not None :
