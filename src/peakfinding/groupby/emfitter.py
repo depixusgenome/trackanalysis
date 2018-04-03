@@ -80,16 +80,23 @@ class ByEM(EMFlagger):
         peaks, ids   = self.group(rates.ravel()*data.shape[0],params,events)
         return peaks * slope + bias , ids
 
-    # working on
+    # working on (to test)
     def __fromzestimate(self,data:np.ndarray,zpeaks:np.ndarray):
         'estimates other params values from first estimates in z postion'
-        pass
+        # group peaks too close
+        window = 0.005 # to change
 
-    # check for duplicated code
-    def initialize(self,data:np.ndarray,maxbins:int=1):
-        'initialize using density'
-        bins      = np.histogram(data[:,0],bins=maxbins)[1]
-        bins[-1] += 0.1
+        tomerge = np.where(np.diff(zpeaks)>window)[0]
+        bins    = [zpeaks[-1]-0.1]+[np.mean(zpeaks[i:i+2]) for i in tomerge]+[zpeaks[-1]+0.1]
+
+        # estimate rates, params using merged
+        rates  = np.ones(len(bins)-1)/(len(bins)-1)
+        params = self.paramsfromzbins(data,bins)
+         # return rates, params
+        return self.splitter(data,rates,params,upperbound=self.upperbound)[-2:]
+
+    def paramsfromzbins(self,data,bins):
+        "given a list of bins along z axis, estimates the parameters"
         digi      = np.digitize(data[:,:-1].ravel(),bins)
         clas      = {idx:np.array([data[_1] for _1,_2 in enumerate(digi) if _2==idx])
                      for idx in set(digi)}
@@ -101,14 +108,26 @@ class ByEM(EMFlagger):
         params[:,-1] = [np.nanstd(clas[idx][-1])
                         for idx in set(digi)
                         if len(clas[idx])>self.mincount]
+        return params
 
+    def initialize(self,data:np.ndarray,maxbins:int=1):
+        'initialize using density'
+        bins       = np.histogram(data[:,0],bins=maxbins)[1]
+        bins[-1]  += 0.1
+        params     = self.paramsfromzbins(data,bins)
         return 1/len(params)*np.ones((len(params),1)), params
 
     # working on
-    def kernelinitializer(self,events:np.ndarray):
+    #def kernelinitializer(self,events:np.ndarray,bias,slope):
+    def kernelinitializer(self,**kwa):
         'uses ZeroCrossing for initialization (much faster)'
-        estimates = ZeroCrossingPeakFinder()(events,bias=0,slope=1.)
+        estimates = np.array(ZeroCrossingPeakFinder()(**kwa))
+        estimates.sort() # should already be sorted
         # can merge close zpeaks from later subdivision by EM
+        events = kwa["events"]
+        data = np.array([[np.nanmean(evt),len(evt)]
+                         for cycle in events
+                         for evt in cycle])
         self.__fromzestimate(data,estimates)
 
     @staticmethod
