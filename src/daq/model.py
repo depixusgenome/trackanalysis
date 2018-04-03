@@ -60,14 +60,62 @@ class DAQClient(ConfigObject):
     def __init__(self, **kwa):
         pass
 
+class DAQCamera(ConfigObject):
+    """
+    camera information: address & pixel size
+    """
+    address = "rtsp://192.168.1.56:8554/mystream"
+    pixels  = 1216, 1936
+    dim     = (0.08368080109357834, 0), (0.08368080109357834, 0)
+
+    def bounds(self, pixel = False):
+        "image bounds in nm (*pixel == False*) or pixels"
+        rng = self.pixels[1], self.pixels[0]
+        return (0, 0) + rng if pixel else self.tonm((0,0))+ self.tonm(rng)
+
+    def size(self, pixel = False):
+        "image size in nm (*pixel == False*) or pixels"
+        rng = self.pixels[1], self.pixels[0]
+        return rng if pixel else self.tonm(rng)
+
+    def tonm(self, arr):
+        "converts pixels to nm"
+        return self.__convert(arr, self.dim)
+
+    def topixel(self, arr):
+        "converts pixels to nm"
+        return self.__convert(arr, tuple((1./i, -j/i) for i, j in self.dim))
+
+    @property
+    def scale(self):
+        "The pixel scale: error occurs if the pixel is not square"
+        if abs(self.dim[0][0]-self.dim[1][0]) > 1e-6:
+            raise ValueError("Pixel is not square")
+        return self.dim[0][0]
+
+    @staticmethod
+    def __convert(arr, dim):
+        if len(arr) == 0:
+            return arr
+
+        (sl1, int1), (sl2, int2) = dim
+        if isinstance(arr, np.ndarray):
+            return [sl1, sl2] * arr + [int1, int2]
+
+        if isinstance(arr, tuple) and len(arr) == 2 and np.isscalar(arr[0]):
+            return tuple(i*k+j for (i, j), k in zip(dim, arr))
+
+        tpe = iter if hasattr(arr, '__next__') else type(arr)
+        return tpe([(sl1*i+int1, sl2*j+int2) for i, j in arr]) # type: ignore
+
 class DAQNetwork(ConfigObject):
     """
     All information related to the current protocol
     """
-    camera:    str = "rtsp://192.168.1.56:8554/mystream"
-    websocket: str = "ws://jupyter.depixus.org:9099"
-    fov            = DAQClient(columns = FOVTYPE)
-    beads          = DAQClient(columns = BEADTYPE)
+    camera    = DAQCamera()
+    websocket = "ws://jupyter.depixus.org:9099"
+    fov       = DAQClient(columns = FOVTYPE)
+    beads     = DAQClient(columns = BEADTYPE)
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
