@@ -119,8 +119,9 @@ class BeadsRoundRobinVector(RoundRobinVector):
     """
     def __init__(self, maxlength:int, nbeads:int, columns: np.dtype) -> None:
         super().__init__(maxlength, self.fulltype(nbeads, columns))
-        self._ncols  = len(columns.names)
-        self._nbeads = nbeads
+        self._ncols    = len(columns.names)
+        self._basetype = columns
+        self._nbeads   = nbeads
     setup = __init__
 
     @staticmethod
@@ -130,18 +131,28 @@ class BeadsRoundRobinVector(RoundRobinVector):
         "create the dtype for all beads"
         cols = columns.descr[:1]
         for i in range(nbeads):
-            cols += [(j+str(i), k) for j, k in columns.decr[1:]]
+            cols += [(j+str(i), k) for j, k in columns.descr[1:]]
         return np.dtype(cols)
 
     @property
     def basetype(self):
         "create the dtype for all beads"
-        size = (len(self._array.dtype.names)-1)//self._nbeads+1
-        return np.dtype(self._array.dtype.descr[:size])
+        return self._basetype
 
     def removebeads(self, indexes: Iterable[int]):
         "removes some beads"
-        self.nbeads = self._nbeads - len(frozenset(indexes))
+        indexes = {i for i in indexes if i < self._nbeads}
+        if len(indexes) == 0:
+            return
+
+        old = self._array
+        self.setup(self._length, self._nbeads - len(indexes), self.basetype)
+
+        names = [old.dtype.names[0],
+                 *(i for i in old.dtype.names[1:] if int(i[1:]) not in indexes)]
+        assert len(names) == len(self._array.dtype.names)
+        for i, j in zip(self._array.dtype.names, names):
+            self._array[i] = old[j]
 
     @property
     def nbeads(self) -> int:
@@ -151,8 +162,15 @@ class BeadsRoundRobinVector(RoundRobinVector):
     @nbeads.setter
     def nbeads(self, nbeads: int):
         "removes or adds beads"
-        if nbeads != self._nbeads:
-            self.setup(nbeads, self.basetype, self._length)
+        if nbeads == self._nbeads:
+            return
+
+        old = self._array
+        self.setup(self._length, nbeads, self.basetype)
+        names = (old if old.dtype.itemsize < self._array.dtype.itemsize else
+                 self._array).dtype.names
+        for i in names:
+            self._array[i] = old[i]
 
     @classmethod
     def create(cls, config, maxlen) -> 'BeadsRoundRobinVector':
