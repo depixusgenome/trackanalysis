@@ -73,7 +73,7 @@ class PeakSelector(PrecisionAlg):
     if __doc__:
         __doc__ += "\n    # Default algorithms\n"
         __doc__ += f"\n    ## `{type(align).__module__}.{type(align).__qualname__}`\n"
-        __doc__ += type(align).__doc__.replace("\n    #", "\n    ##")
+        __doc__ += type(PeakCorrelationAlignment).__doc__.replace("\n    #", "\n    ##")
         __doc__ += f"\n    ## `{type(finder).__module__}.{type(finder).__qualname__}`\n"
         __doc__ += type(finder).__doc__.replace("\n    #", "\n    ##")
 
@@ -153,8 +153,8 @@ class PeakSelector(PrecisionAlg):
         projector = updatecopy(self.histogram, True, precision = precision)
 
         pos       = projector.eventpositions(events)
-        if self.align is not None:
-            delta  = self.align(pos, projector = projector)
+        if callable(self.align):
+            delta  = self.align(pos, projector = projector) # pylint: disable=not-callable
             pos   += delta
         else:
             delta  = None
