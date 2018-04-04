@@ -2,16 +2,14 @@
 # -*- coding: utf-8 -*-
 "Creates a histogram from available events"
 import itertools
-import pickle
 from functools        import partial
 from typing           import Dict, Tuple
-
 import numpy as np
 
 from utils            import initdefaults
 
 from .._core          import empz_x, emrunner, emscore  # pylint: disable = import-error
-from .histogramfitter import ZeroCrossingPeakFinder  # pylint: disable = unused-import
+from .histogramfitter import ByHistogram  # pylint: disable = unused-import
 # create abstract class with different fitting algorithms
 
 class EMFlagger:
@@ -46,7 +44,7 @@ class EMFlagger:
         asort  = np.argsort(params[:,0])
         return self.__strip(params[asort],events)
 
-class ByEM(EMFlagger):
+class ByEM(EMFlagger):# needs cleaning
     '''
     finds peaks and groups events using Expectation Maximization
     the number of components is estimated using BIC criteria
@@ -63,40 +61,55 @@ class ByEM(EMFlagger):
         super().__init__(**_)
 
     def __call__(self,**kwa):
-        _, bias, slope = kwa.get("hist",(0,0,1))
-        return self.find(kwa.get("events",None), bias, slope) #, kwa["precision"]) # use precision
+        return self.find(**kwa)
 
     def _findpeaks(self,data):
         rates,params = self.initialize(data,maxbins=1)
         return self.splitter(data,rates,params,upperbound=self.upperbound)[-2:]
 
-    def find(self, events: np.ndarray, bias=0., slope=1.): #, precision=None):
-        'find peaks along z axis'
-        data         = np.array([[np.nanmean(evt),len(evt)]
-                                 for cycle in events
-                                 for evt in cycle])
-        pickle.dump(data,open("data.dbg","wb"))
-        rates,params = self._findpeaks(data)
-        peaks, ids   = self.group(rates.ravel()*data.shape[0],params,events)
+    def findfromzestimates(self,**kwa):
+        "estimates starting parameters using kernel density"
+        rates, params = self.kernelinitializer(**kwa)
+        events = kwa.get("events",None)
+        data   = np.array([[np.nanmean(evt),len(evt)]
+                           for cycle in events
+                           for evt in cycle])
+        return self.splitter(data,rates,params,upperbound=self.upperbound)[-2:]
+
+    def find(self, **kwa):
+        """
+        find peaks along z axis
+        keyword arguments are :
+        hist,
+        events,
+        pos,
+        precision, hf sigma
+        """
+        rates, params = self.findfromzestimates(**kwa) # after
+        events        = kwa.get("events",None)
+        data          = np.array([[np.nanmean(evt),len(evt)]
+                                  for cycle in events
+                                  for evt in cycle])
+        #rates,params = self._findpeaks(data) # before
+        peaks, ids    = self.group(rates.ravel()*data.shape[0],params,events)
+        _, bias,slope = kwa.get("hist",(np.array([]),0,1))
         return peaks * slope + bias , ids
 
-    # working on (to test)
     def __fromzestimate(self,data:np.ndarray,zpeaks:np.ndarray):
         'estimates other params values from first estimates in z postion'
         # group peaks too close
         window = 0.005 # to change
 
         tomerge = np.where(np.diff(zpeaks)>window)[0]
-        bins    = [zpeaks[-1]-0.1]+[np.mean(zpeaks[i:i+2]) for i in tomerge]+[zpeaks[-1]+0.1]
+        bins    = [zpeaks[0]-0.1]+[np.mean(zpeaks[i:i+2]) for i in tomerge]+[zpeaks[-1]+0.1]
 
         # estimate rates, params using merged
-        rates  = np.ones(len(bins)-1)/(len(bins)-1)
-        params = self.paramsfromzbins(data,bins)
-         # return rates, params
-        return self.splitter(data,rates,params,upperbound=self.upperbound)[-2:]
+        params = self.paramsfromzbins(data,bins,mincount=0)
+        return np.ones(params.shape[0]).reshape(-1,1)/params.shape[0], params
 
-    def paramsfromzbins(self,data,bins):
+    def paramsfromzbins(self,data,bins,mincount=None):
         "given a list of bins along z axis, estimates the parameters"
+        mincount  = self.mincount if mincount is None else mincount
         digi      = np.digitize(data[:,:-1].ravel(),bins)
         clas      = {idx:np.array([data[_1] for _1,_2 in enumerate(digi) if _2==idx])
                      for idx in set(digi)}
@@ -117,18 +130,16 @@ class ByEM(EMFlagger):
         params     = self.paramsfromzbins(data,bins)
         return 1/len(params)*np.ones((len(params),1)), params
 
-    # working on
-    #def kernelinitializer(self,events:np.ndarray,bias,slope):
     def kernelinitializer(self,**kwa):
         'uses ZeroCrossing for initialization (much faster)'
-        estimates = np.array(ZeroCrossingPeakFinder()(**kwa))
+        estimates = ByHistogram()(**kwa)[0]
         estimates.sort() # should already be sorted
+        events    = kwa.get("events",None)
         # can merge close zpeaks from later subdivision by EM
-        events = kwa["events"]
         data = np.array([[np.nanmean(evt),len(evt)]
                          for cycle in events
                          for evt in cycle])
-        self.__fromzestimate(data,estimates)
+        return self.__fromzestimate(data,estimates)
 
     @staticmethod
     def score(data:np.ndarray,params:np.ndarray)->np.ndarray:

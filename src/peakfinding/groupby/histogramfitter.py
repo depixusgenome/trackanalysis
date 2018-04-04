@@ -4,7 +4,6 @@
 from enum                    import Enum
 from typing                  import (Callable, Iterable, Optional,
                                      Sequence, Union, cast)
-
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
 from scipy.signal            import find_peaks_cwt
