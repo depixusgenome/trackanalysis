@@ -155,7 +155,7 @@ class MessagesInput(BokehView):
                                     error   = 50000,
                                     warning = 50000)
 
-    def setup(self, toolbar: DpxToolbar, doc):
+    def setup(self, toolbar: DpxToolbar, doc): # pylint: disable=too-many-locals
         "sets-up the gui"
         ctrl  = self._ctrl
 
@@ -461,7 +461,7 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
             if 'track' in items:
                 self.__toolbar.frozen = items['track'].value is items.empty
         self._ctrl.globals.project.observe(_onproject)
-        mods = self.defaultsizingmode(height = 30)
+        mods = self.defaultsizingmode(height = 50)
         return layouts.row([layouts.widgetbox(self.__toolbar, **mods)], **mods)
 
     def close(self):
