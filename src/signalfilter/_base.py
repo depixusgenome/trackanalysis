@@ -50,8 +50,9 @@ PRECISION = Union[float, Tuple[DATATYPE, int], None]
 
 class PrecisionAlg(ABC):
     "Implements precision extraction from data"
-    precision = None # type: float
-    rawfactor = 1.
+    precision    = None # type: float
+    rawfactor    = 1.
+    MINPRECISION = .5e-3
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -72,13 +73,15 @@ class PrecisionAlg(ABC):
             precision = self.precision
 
         if np.isscalar(precision) and precision > 0.:
-            return float(precision)
+            return max(self.MINPRECISION, float(precision))
 
         if beadid is not None:
-            return cast(float, self.rawprecision(data, beadid))*self.rawfactor # type: ignore
+            return max(self.MINPRECISION,
+                       cast(float, self.rawprecision(data, beadid)) # type: ignore
+                      )*self.rawfactor
 
         if isinstance(data, (float, int)):
-            return float(data)
+            return max(self.MINPRECISION, float(data))
 
         if isinstance(data, (Sequence, np.ndarray)):
             if len(data) == 0:
@@ -94,9 +97,9 @@ class PrecisionAlg(ABC):
                                               for i in data if len(i)))
                     else:
                         ret = np.median(tuple(nanhfsigma(i) for i in data if len(i)))
-                    return ret*self.rawfactor
+                    return max(self.MINPRECISION, ret)*self.rawfactor
             else:
-                return nanhfsigma(data)*self.rawfactor
+                return max(self.MINPRECISION, nanhfsigma(data))*self.rawfactor
 
         raise AttributeError('Could not extract precision: no data or set value')
 
