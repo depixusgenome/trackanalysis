@@ -229,7 +229,7 @@ class DAQBead(ConfigObject):
     @staticmethod
     def toarray(beads: Iterable['DAQBead']) -> np.ndarray:
         "returns all beads in the shape of an array"
-        return np.array([i.roi for i in beads],
+        return np.array([tuple(i.roi) for i in beads],
                         dtype = [('x', 'f4'), ('y', 'f4'),
                                  ('w', 'f4'), ('h', 'f4')])
 

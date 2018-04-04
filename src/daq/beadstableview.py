@@ -14,10 +14,10 @@ class BeadsTableTheme(BaseModel):
     name        = 'beadstable'
     width       = 80
     height      = 200
-    columns     = [['x', 'X (µm)',      '0.0'],
-                   ['y', 'Y (µm)',      '0.0'],
-                   ['w', 'Width (µm)',  '0.000'],
-                   ['h', 'Height (µm)', '0.000']]
+    columns     = [['x', 'X (µm)',         '0.000'],
+                   ['y', 'Y (µm)',         '0.000'],
+                   ['w', 'Width (pixel)',  '0'],
+                   ['h', 'Height (pixel)', '0']]
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -65,7 +65,7 @@ class BeadsTableView(ThreadedDisplay[BeadsTableTheme]):
             self._source.data = tmp
 
     def _reset(self, ctrl, cache):
-        cache[self.__widget]['text'] = self.__data(ctrl)
+        cache[self._source]['data'] = self.__data(ctrl)
 
     def __columns(self, _):
         return [TableColumn(field     = i[0],
