@@ -200,12 +200,14 @@ class MinPopulationRule(DataCleaningRule):
 
 class MinExtentRule(DataCleaningRule):
     """
-    Remove cycles which don't open.
+    Remove cycles with a range of Z values which are outside the accepted range.
 
-    That the bead hasn't opened is extracted directly from too low a z range between
-    the phases `PHASE.initial` and `PHASE.pull`.
+    The range of Z values is estimated using percentiles robustness purposes. It
+    is estimated from phases `PHASE.initial` to `PHASE.measure`.
     """
-    minextent                    = .5
+    minextent   = .25
+    maxextent   = 2.
+    percentiles = [5., 95.]
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__()
@@ -213,7 +215,11 @@ class MinExtentRule(DataCleaningRule):
     def extent(self, cycs: np.ndarray) -> Partial:
         "computes too short or too long cycles"
         maxv = np.finfo('f4').max
-        test = [np.nanmax(i)-np.nanmin(i) if any(np.isfinite(i)) else maxv for i in cycs]
+        if self.percentiles == [0., 100.]:
+            test = [np.nanmax(i)-np.nanmin(i) if any(np.isfinite(i)) else maxv for i in cycs]
+        else:
+            test = [np.diff(np.nanpercentile(i, self.percentiles))[0]
+                    if any(np.isfinite(i)) else maxv for i in cycs]
         return self._test('extent', test)
 
 class SaturationRule:
@@ -287,9 +293,10 @@ class DataCleaning(AberrantValuesRule,
     <br>
     For a track trk, cleaning proceeds as follows:
     * for bd in Beads(trk):
+        * remove aberrant values
         * for cy in Cycles(bd):
             * evaluate criteria for cy:
-                1. extent < 0.5
+                1. 0.25 < extent < 2.
                 2. hfsigma < 0.0001
                 3. hfsigma > 0.01
                 4. population (not aberrant Points(cy)/Points(cy)) > 80%

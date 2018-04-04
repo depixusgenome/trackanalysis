@@ -107,10 +107,11 @@ class TrackCleaningScript:
     def fixed(self,
               beads: Sequence[BEADKEY] = None,
               forceclean               = False,
-              extent                   = 0.15,
+              extent                   = 0.2,
               **kwa) -> List[int]:
         "a list of potential fixed beads"
-        data = self.messages(beads, forceclean, minextent = extent, **kwa)
+        data = self.messages(beads, forceclean, minextent = extent,
+                             maxextent = 100., **kwa)
         data = data[data.types  == 'extent']
         data = data[data.cycles >= self.track.ncycles]
         return sorted(data.reset_index().bead.unique())

@@ -96,7 +96,8 @@ class DataCleaningErrorMessage:
                  ('population', '< %.0f%%', 'min'),
                  ('hfsigma',    '< %.4f',   'min'),
                  ('hfsigma',    '> %.4f',   'max'),
-                 ('extent',     '< %.2f',   'min'))
+                 ('extent',     '< %.2f',   'min'),
+                 ('extent',     '> %.2f',   'max'))
 
         vals  = ((get1(i[0], i[-1]), i[0], i[1] % get2(i[0], i[-1])) for i in msg)
         return [i for i in vals if i[0]]
@@ -115,7 +116,8 @@ class DataCleaningErrorMessage:
                  '%d cycles: %%good < %.0f%%'      % get('population', 'min'),
                  '%d cycles: σ[HF] < %.4f'         % get('hfsigma',    'min'),
                  '%d cycles: σ[HF] > %.4f'         % get('hfsigma',    'max'),
-                 '%d cycles: Δz < %.2f'            % get('extent',     'min'))
+                 '%d cycles: Δz < %.2f'            % get('extent',     'min'),
+                 '%d cycles: Δz > %.2f'            % get('extent',     'max'))
 
         return '\n'.join(i for i in msg if i[0] != '0')
 

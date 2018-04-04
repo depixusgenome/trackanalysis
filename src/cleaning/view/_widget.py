@@ -103,6 +103,7 @@ class DpxCleaning(Widget):
     minhfsigma         = props.Float(DataCleaningTask.minhfsigma)
     maxhfsigma         = props.Float(DataCleaningTask.maxhfsigma)
     minextent          = props.Float(DataCleaningTask.minextent)
+    maxextent          = props.Float(DataCleaningTask.maxextent)
     maxsaturation       = props.Float(DataCleaningTask.maxsaturation)
 
 class CleaningFilterWidget(WidgetCreator[DataCleaningModelAccess]):
