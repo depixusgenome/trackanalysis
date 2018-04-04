@@ -63,7 +63,7 @@ class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
     populationphases = PHASE.measure, PHASE.measure
     extentphases     = PHASE.initial, PHASE.measure
     saturationphases = PHASE.initial, PHASE.measure
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
         Task.__init__(self, **kwa)

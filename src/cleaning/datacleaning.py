@@ -39,7 +39,7 @@ class LocalNaNPopulation(NaNDensity):
     "Removes frames which have NaN values to their right and their left"
     window = 5
     ratio  = 20
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__()
 
@@ -61,7 +61,7 @@ class DerivateIslands(NaNDensity):
     islandwidth = 10
     ratio       = 80
     maxderivate = .1
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__()
 

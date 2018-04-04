@@ -245,7 +245,7 @@ class NonLinearities(Translator):
     singlestrand = .55  # nm
     doublestrand = .34  # nm
     orientation  = None
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         super().__init__()
 

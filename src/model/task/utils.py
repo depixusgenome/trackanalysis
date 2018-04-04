@@ -11,7 +11,7 @@ class ActionTask(Task):
     level          = Level.none
     call: Callable = None
 
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
@@ -20,6 +20,6 @@ class ExceptionCatchingTask(Task):
     level                       = Level.none
     exceptions: List[Exception] = []
 
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         super().__init__(**kwa)
