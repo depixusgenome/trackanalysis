@@ -58,7 +58,7 @@ class DAQMemory:
     maxlength = 10000
     packet    = 1
     timeout   = .05
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 
@@ -70,11 +70,9 @@ class DAQServerView(Generic[DATA]):
     """
     _NAME = ''
     _data: DATA
-    def __init__(self, ctrl = None, **kwa) -> None:
+    def __init__(self, **kwa) -> None:
         self._index = 0
         self._theme = DAQMemory(name = self._NAME+'memory', **kwa)
-        if ctrl:
-            self.observe(ctrl)
 
     def observe(self, ctrl):
         "setup observers"
@@ -168,7 +166,7 @@ class _AwaitableDescriptor:
         loop = asyncio.get_event_loop()
         return loop.run_until_complete(getattr(inst, f'set{self._name}')(val))
 
-class DAQAdmin:
+class DAQAdmin: # pylint: disable=too-many-public-methods
     """
     Allows sending orders to the DAQ server
     """
@@ -184,6 +182,18 @@ class DAQAdmin:
     stage       = _AwaitableDescriptor()
     beads       = _AwaitableDescriptor()
     protocol    = _AwaitableDescriptor()
+
+    async def getconfig(self) -> dict:
+        "get the beads tracked by the server"
+        raise NotImplementedError()
+
+    async def getcamera(self) -> dict:
+        "get the beads tracked by the server"
+        cnf = await self.getconfig()
+        cam = cnf['daqserver']['devices']['camera']
+        return {'pixels'    : (cam['aoiwidth'], cam['aoiheight']),
+                'framerate' : cam['framerate']
+               }
 
     async def getbeads(self) -> Tuple[DAQBead, ...]:
         "get the beads tracked by the server"

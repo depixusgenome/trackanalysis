@@ -137,16 +137,13 @@ class BeadTimeSeriesModel(DisplayModel[BeadTimeSeriesDisplay, TimeSeriesTheme]):
 
 class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesModel]):
     "display the current bead"
-    def __init__(self, ctrl = None, **_):
-        super().__init__(ctrl = ctrl, **_)
+    def __init__(self, **_):
+        super().__init__(**_)
 
         lsrc = dict.fromkeys((self.XLEFT,  self.YLEFT),  cast(List[float], []))
         rsrc = dict.fromkeys((self.XRIGHT, self.YRIGHT), cast(List[float], []))
         self._leftsource  = ColumnDataSource(lsrc)
         self._rightsource = ColumnDataSource(rsrc)
-
-        if ctrl:
-            self.observe(ctrl)
 
     def observe(self, ctrl):
         "observe controller events"
@@ -209,14 +206,12 @@ class FoVTimeSeriesModel(DisplayModel[FoVTimeSeriesDisplay, TimeSeriesTheme]):
 class FoVTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[FoVTimeSeriesModel]):
     "display the current fov parameter"
     XLEFT  = XRIGHT = "x"
-    def __init__(self, ctrl  = None):
+    def __init__(self, **_):
         src              = dict.fromkeys((self.XLEFT,  self.YRIGHT, self.YLEFT),
                                          cast(List[float], []))
         self._leftsource = self._rightsource = ColumnDataSource(src)
         label            = TimeSeriesTheme.labels["tsample"]
-        super().__init__(ctrl,
-                         leftvar   = "tsample",
-                         leftlabel = label)
+        super().__init__(leftvar   = "tsample", leftlabel = label)
 
     def _reset(self, control, cache):
         "resets the data"

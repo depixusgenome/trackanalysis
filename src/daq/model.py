@@ -65,7 +65,7 @@ class DAQCamera(ConfigObject):
     camera information: address & pixel size
     """
     address = "rtsp://192.168.1.56:8554/mystream"
-    pixels  = 1216, 1936
+    pixels  = 1936, 1216
     dim     = (0.08368080109357834, 0), (0.08368080109357834, 0)
 
     def bounds(self, pixel = False):

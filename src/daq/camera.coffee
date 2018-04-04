@@ -30,7 +30,7 @@ export class DpxDAQCameraView extends RowView
         cam.appendChild(emb)
 
         @el.children[0].style = 'position: absolute;'
-        @el.appendChild(cam)
+        @el.insertBefore(cam, @el.firstChild)
 
     connect_signals: () ->
         super()

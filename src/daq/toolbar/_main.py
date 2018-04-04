@@ -56,15 +56,13 @@ class DAQRecordFileDialog(FileDialog):
 class DAQToolbar:
     "DAQ toolbar"
     _widget: DpxDAQToolbar
-    def __init__(self, ctrl, **_):
+    def __init__(self, **_):
         self._messages = DAQMessagesView    (**_)
         self._ramp     = DAQRampButton      (**_)
         self._probing  = DAQProbeButton     (**_)
         self._manual   = DAQManualButton    (**_)
         self._record   = DAQRecordFileDialog(**_)
         self._widget   = None
-        if ctrl:
-            self.observe(ctrl)
 
     def addtodoc(self, ctrl, doc):
         "add the bokeh widgets"

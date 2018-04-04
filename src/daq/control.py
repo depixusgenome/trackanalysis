@@ -105,15 +105,17 @@ class DAQController(Controller):
         self.config.beads = tuple(new.get(i, j) for i, j in enumerate(self.config.beads))
         return dict(control = self, beads = new)
 
-    @configemit
-    def addbeads(self, *beads: Union[Dict[str, Any], DAQBead]) -> dict:
+    def addbeads(self, *beads: Union[Dict[str, Any], DAQBead]):
         "add *new* beads"
         if len(beads) == 0:
-            raise NoEmission()
+            return
 
         self.config.beads     += tuple(self.__newbead(self.config.defaultbead, i) for i in beads)
         self.data.beads.nbeads = len(self.config.beads)
-        return dict(control = self, added = len(beads))
+        self.handle("addbeads",
+                    self.emitpolicy.outasdict,
+                    dict(control = self, added = len(beads)))
+        self.setcurrentbead(len(self.config.beads)-1)
 
     @Controller.emit
     def listen(self, fov, beads) -> dict:

@@ -24,12 +24,10 @@ class BeadsTableTheme(BaseModel):
 
 class BeadsTableView(ThreadedDisplay[BeadsTableTheme]):
     "display summary info on the field of view"
-    def __init__(self, ctrl, **_):
+    def __init__(self, **_):
         super().__init__()
         self._widget:  DataTable        = None
         self._source:  ColumnDataSource = None
-        if ctrl is not None:
-            self.observe(ctrl)
 
     def _addtodoc(self, ctrl, _):
         "creates the widget"

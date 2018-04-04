@@ -36,6 +36,11 @@ class ViewWithToolbar(Generic[TOOLBAR, VIEW]):
         self._bar.close()
         self._mainview.close()
 
+    def observe(self, ctrl):
+        "observe the controller"
+        self._bar.observe(ctrl)
+        self._mainview.observe(ctrl)
+
     def addtodoc(self, ctrl, doc):
         "adds items to doc"
         tbar   = self._bar.addtodoc(ctrl, doc)

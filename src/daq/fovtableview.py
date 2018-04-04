@@ -54,13 +54,11 @@ class FoVTableTheme(BaseModel):
 class FoVTableView(ThreadedDisplay[FoVTableTheme]):
     "display summary info on the field of view"
     _FIND = re.compile(r'{\w+}')
-    def __init__(self, ctrl):
+    def __init__(self, **_):
         super().__init__()
         self.__widget:  Div       = None
         self.__columns: List[str] = []
         self.__index              = 0
-        if ctrl is not None:
-            self.observe(ctrl)
 
     def _addtodoc(self, ctrl, _):
         "creates the widget"

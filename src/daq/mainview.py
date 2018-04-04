@@ -9,17 +9,17 @@ from .timeseries     import BeadTimeSeriesView
 
 class MainView:
     "All view pieces are brought together"
-    def __init__(self, ctrl = None):
-        self._beads  = BeadsTableView    (ctrl = ctrl)
-        self._cam    = DAQCameraView     (ctrl = ctrl)
-        self._fov    = FoVTableView      (ctrl = ctrl)
-        self._series = BeadTimeSeriesView(ctrl = ctrl)
+    def __init__(self, **_):
+        self._beads  = BeadsTableView    (**_)
+        self._cam    = DAQCameraView     (**_)
+        self._fov    = FoVTableView      (**_)
+        self._series = BeadTimeSeriesView(**_)
 
     def observe(self, ctrl):
         """
         observe the controller
         """
-        for i in self.__dict__.items():
+        for i in self.__dict__.values():
             i.observe(ctrl)
 
     def ismain(self, ctrl):

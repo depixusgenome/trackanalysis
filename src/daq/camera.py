@@ -9,14 +9,15 @@ import numpy                  as     np
 import bokeh.core.properties  as     props
 
 import bokeh.layouts          as     layouts
-from   bokeh.models           import (ColumnDataSource, PointDrawTool, Range1d,
-                                      LinearAxis)
+from   bokeh.models           import (ColumnDataSource, PointDrawTool, Range1d, LinearAxis)
 from   bokeh.plotting         import figure, Figure
 
 from   utils                  import initdefaults
+from   utils.logconfig        import getLogger
 from   view.plots.base        import PlotAttrs
 from   view.threaded          import DisplayModel, ThreadedDisplay
 from   .model                 import DAQBead
+LOGS = getLogger(__name__)
 
 class DpxDAQCamera(layouts.Row): # pylint: disable=too-many-ancestors
     """
@@ -50,8 +51,8 @@ class CameraTheme:
                           fill_alpha           = 0.,
                           line_color           = 'lightblue')
     figsize   = 800, 600, 'fixed'
-    figborder = 2*28, 28+5
-    figstart  = 28, 5
+    figborder = 52+61, 25+44
+    figstart  = 52, 25
     toolbar   = dict(sticky   = False,
                      location = 'right',
                      items    = 'pan,wheel_zoom,box_zoom,save,reset')
@@ -75,7 +76,7 @@ class DAQCameraModel(DisplayModel[CameraDisplay, CameraTheme]):
 
 class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
     "viewing the camera & beads"
-    def __init__(self, ctrl = None, **kwa):
+    def __init__(self, **kwa):
         super().__init__(**kwa)
         self._cam:   DpxDAQCamera     = None
         self._fig:   Figure           = None
@@ -83,8 +84,6 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
         cols = ('x', 'y', 'width', 'height', "text")
         self._source:   ColumnDataSource = ColumnDataSource({i: [] for i in cols})
         self._ptsource: ColumnDataSource = ColumnDataSource({i: [] for i in ('x', 'y', 'id')})
-        if ctrl is not None:
-            self.observe(ctrl)
 
     def _addtodoc(self, ctrl, _):
         "create the bokeh view"
@@ -93,14 +92,14 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
         fig   = self.__figure(ctrl)
         theme.roi.addto(fig, **{i: i for i in ('x', 'y', 'width', 'height')},
                         source = self._source)
-
-        rend = theme.position.addto(fig, **{i: i for i in ('x', 'y')}, source = self._ptsource)
-        fig.select(PointDrawTool)[0].renderers = [rend]
-
         theme.names.addto(fig, **{i: i for i in ('x', 'y', 'text')}, source = self._source)
 
+        rend = theme.position.addto(fig, **{i: i for i in ('x', 'y')}, source = self._ptsource)
+        tool = PointDrawTool(renderers = [rend], empty_value = -1)
+        fig.add_tools(tool)
+
         self._ptsource.on_change('selected', lambda attr, old, new: self.__onselect(ctrl))
-        self._ptsource.on_change('data',     lambda attr, old, new: self.__ondraw(ctrl))
+        self._ptsource.on_change('data',     lambda attr, old, new: self.__onselect(ctrl))
 
         self._fig = fig
         self._cam = DpxDAQCamera(fig, self.__figsize(ctrl),
@@ -117,7 +116,7 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
 
         @ctrl.daq.observe
         def _onupdatenetwork(model = None, old = None, **_): # pylint: disable=unused-variable
-            if 'camera' not in old:
+            if 'camera' not in old or self._cam is None:
                 return
 
             if model.camera.address != self._cam.address:
@@ -175,25 +174,23 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
 
     def __figure(self, ctrl):
         theme   = self._model.theme
-        tools   = list(theme.toolbar['items'].split(',')) + [PointDrawTool(empty_value = -1)]
         figsize = self.__figsize(ctrl)
-        bounds  = ctrl.daq.network.camera.bounds()
+        bounds  = ctrl.daq.config.network.camera.bounds(False)
         fig     = figure(toolbar_sticky   = theme.toolbar['sticky'],
                          toolbar_location = theme.toolbar['location'],
-                         tools            = tools,
+                         tools            = theme.toolbar['items'],
                          plot_width       = figsize[0]+theme.figborder[0],
                          plot_height      = figsize[1]+theme.figborder[1],
                          sizing_mode      = theme.figsize[2],
-                         x_range          = Range1d(bounds[0][0], bounds[1][0]),
-                         y_range          = Range1d(bounds[0][1], bounds[1][1]),
+                         x_range          = Range1d(bounds[0], bounds[2]),
+                         y_range          = Range1d(bounds[1], bounds[3]),
                          x_axis_label     = theme.xlabel,
-                         y_axis_label     = theme.ylabel,
-                         css_classes      = ['dpxdaqcamera'])
+                         y_axis_label     = theme.ylabel)
 
-        bounds  = ctrl.daq.network.camera.bounds(False)
-        fig.extra_x_ranges = {'xpixel': Range1d(bounds[0][0], bounds[1][0])}
-        fig.extra_y_ranges = {'ypixel': Range1d(bounds[0][1], bounds[1][1])}
-        fig.add_layout(LinearAxis(x_range_name = 'xpixel'), 'top')
+        bounds  = ctrl.daq.config.network.camera.bounds(True)
+        fig.extra_x_ranges = {'xpixel': Range1d(bounds[0], bounds[2])}
+        fig.extra_y_ranges = {'ypixel': Range1d(bounds[1], bounds[3])}
+        fig.add_layout(LinearAxis(x_range_name = 'xpixel'), 'above')
         fig.add_layout(LinearAxis(y_range_name = 'ypixel'), 'right')
         return fig
 
@@ -211,23 +208,22 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
         return pix+list(self._model.theme.figstart)
 
     def __onselect(self, ctrl):
-        inds = self._ptsource.selected.indices
-        ctrl.daq.setcurrentbead(inds[0] if inds else None)
+        src    = self._ptsource
+        ids    = src.data['id']
+        nbeads = len(ctrl.daq.config.beads)
 
-    def __ondraw(self, ctrl):
-        ids   = self._ptsource.data['id']
-        dels  = set(range(len(ctrl.daq.config.beads))) - set(ids)
-        if -1 in dels:
-            dels.discard(-1)
-            base  = ctrl.daq.defaultbead.roi
-            xvals = self._ptsource.data['x']
-            yvals = self._ptsource.data['y']
-            added = [{'roi': [xvals[i], yvals[i], base[2], base[3]]}
-                     for i, j in enumerate(ids) if j == -1]
-        else:
-            added = []
+        assert -1 not in ids[:nbeads]
+        if len(ids) > nbeads:
+            base = ctrl.daq.defaultbead.roi
+            adds = [{'roi': [i, j, base[2], base[3]]}
+                    for i, j in zip(src.data['x'][nbeads:], src.data['y'][nbeads:])]
+            ctrl.daq.addbeads(adds)
+            return
 
-        if len(dels):
-            ctrl.daq.removebeads(list(self))
-        if len(added):
-            ctrl.daq.addbeads(added)
+        if len(ids) < nbeads:
+            dels = set(range(len(ctrl.daq.config.beads))) - set(ids)
+            ctrl.daq.removebeads(list(dels))
+
+        bead = src.selected.indices[0] if src.selected.indices else None
+        if self._model.display.currentbead != bead:
+            ctrl.daq.setcurrentbead(bead)

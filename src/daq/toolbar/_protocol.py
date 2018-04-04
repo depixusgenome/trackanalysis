@@ -31,7 +31,7 @@ class DAQProtocolTheme(ConfigObject):
                 ]]
     firstwidth = 150
     height     = 20
-    @initdefaults
+    @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 
