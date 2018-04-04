@@ -123,14 +123,14 @@ class ThreadedDisplay(Generic[MODEL]): # pylint: disable=too-many-public-methods
         with self.resetting():
             return self._addtodoc(ctrl, doc)
 
-    def activate(self, ctrl, val):
+    def activate(self, ctrl, val, now = False):
         "activates the component: resets can occur"
         old        = self.state
         self.state = DisplayState.active if val else DisplayState.disabled
         if val and (old is DisplayState.outofdate):
-            self.__doreset(ctrl)
+            self.__doreset(ctrl, now)
 
-    def reset(self, ctrl, clear: bool = False):
+    def reset(self, ctrl, clear = False, now = False):
         "Updates the data"
         if clear is True:
             self._model.clear()
@@ -140,7 +140,7 @@ class ThreadedDisplay(Generic[MODEL]): # pylint: disable=too-many-public-methods
             self.state = DisplayState.outofdate
 
         elif state is DisplayState.active:
-            self.__doreset(ctrl)
+            self.__doreset(ctrl, now)
 
         elif state is DisplayState.abouttoreset:
             with self.resetting():
@@ -149,14 +149,22 @@ class ThreadedDisplay(Generic[MODEL]): # pylint: disable=too-many-public-methods
     if SINGLE_THREAD: # pylint: disable=using-constant-test
         # use this for single-thread debugging
         LOGS.info("Running in single-thread mode")
-        def __doreset(self, ctrl):
+        def __doreset(self, ctrl, now): # pylint: disable=unused-argument
             start = time()
             with self.resetting() as cache:
                 self._model.reset(ctrl)
                 self._reset(ctrl, cache)
             LOGS.debug("%s.reset done in %.3f", type(self).__qualname__, time() - start)
     else:
-        def __doreset(self, ctrl):
+        def __doreset(self, ctrl, now):
+            if now:
+                start = time()
+                with self.resetting() as cache:
+                    self._model.reset(ctrl)
+                    self._reset(ctrl, cache)
+                LOGS.debug("%s.reset done in %.3f", type(self).__qualname__, time() - start)
+                return
+
             with self.resetting():
                 self._model.reset(ctrl)
 
