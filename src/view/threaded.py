@@ -68,27 +68,27 @@ class ThreadedDisplay(Generic[MODEL]): # pylint: disable=too-many-public-methods
         super().__init__()
         self._model: MODEL   = _tattr(self, 0)(**kwa) if model is None else model
         self._doc:  Document = None
-        self.state           = DisplayState.active
+        self._state           = DisplayState.active
 
     def action(self, ctrl, fcn = None):
         "decorator which starts a user action but only if state is set to active"
-        test   = lambda *_1, **_2: self.state is DisplayState.active
+        test   = lambda *_1, **_2: self._state is DisplayState.active
         action = ctrl.action.type(ctrl, test = test)
         return action if fcn is None else action(fcn)
 
     def delegatereset(self, ctrl, cache):
         "Stops on_change events for a time"
-        old, self.state = self.state, DisplayState.resetting
+        old, self._state = self._state, DisplayState.resetting
         try:
             self._reset(ctrl, cache)
         finally:
-            self.state     = old
+            self._state     = old
 
     @contextmanager
     def resetting(self):
         "Stops on_change events for a time"
         mdls            = _OrderedDict()
-        old, self.state = self.state, DisplayState.resetting
+        old, self._state = self._state, DisplayState.resetting
         i = j = None
         try:
             yield mdls
@@ -106,7 +106,7 @@ class ThreadedDisplay(Generic[MODEL]): # pylint: disable=too-many-public-methods
             else:
                 raise ValueError(f'Error updating') from exc
         finally:
-            self.state = old
+            self._state = old
 
     def close(self):
         "Removes the controller"
@@ -125,8 +125,8 @@ class ThreadedDisplay(Generic[MODEL]): # pylint: disable=too-many-public-methods
 
     def activate(self, ctrl, val, now = False):
         "activates the component: resets can occur"
-        old        = self.state
-        self.state = DisplayState.active if val else DisplayState.disabled
+        old        = self._state
+        self._state = DisplayState.active if val else DisplayState.disabled
         if val and (old is DisplayState.outofdate):
             self.__doreset(ctrl, now)
 
@@ -135,9 +135,9 @@ class ThreadedDisplay(Generic[MODEL]): # pylint: disable=too-many-public-methods
         if clear is True:
             self._model.clear()
 
-        state = self.state
+        state = self._state
         if   state is DisplayState.disabled:
-            self.state = DisplayState.outofdate
+            self._state = DisplayState.outofdate
 
         elif state is DisplayState.active:
             self.__doreset(ctrl, now)
@@ -168,7 +168,7 @@ class ThreadedDisplay(Generic[MODEL]): # pylint: disable=too-many-public-methods
             with self.resetting():
                 self._model.reset(ctrl)
 
-            old, self.state = self.state, DisplayState.abouttoreset
+            old, self._state = self._state, DisplayState.abouttoreset
             spawn(self._reset_and_render, ctrl, old)
 
         async def _reset_and_render(self, ctrl, old):
@@ -184,11 +184,11 @@ class ThreadedDisplay(Generic[MODEL]): # pylint: disable=too-many-public-methods
 
         def _reset_without_render(self, ctrl, old, cache):
             try:
-                self.state = DisplayState.resetting
+                self._state = DisplayState.resetting
                 with ctrl.computation.type(ctrl, calls = self.__doreset):
                     self._reset(ctrl, cache)
             finally:
-                self.state = old
+                self._state = old
             return cache
 
         def _render(self, ctrl, cache, msg):
@@ -200,6 +200,16 @@ class ThreadedDisplay(Generic[MODEL]): # pylint: disable=too-many-public-methods
                             inp.update(cache)
             finally:
                 LOGS.debug(msg[0]+"+%.3f", *msg[1:], time() - start)
+
+    def _waitfornextreset(self) -> bool:
+        """
+        can be used in observed events to tell whether to update the view
+        or wait for the next update
+        """
+        if self._state == DisplayState.disabled:
+            self._state = DisplayState.outofdate
+            return True
+        return self._state != DisplayState.active
 
     @abstractmethod
     def _addtodoc(self, ctrl, doc):
