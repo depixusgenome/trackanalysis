@@ -24,7 +24,7 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
         super().__init__(model)
         self.__widget: DataTable  = None
         css                       = self.__config
-        css.lines.order.default   = ('extent', 'hfsigma', 'population', 'aberrant',
+        css.lines.order.default   = ('population', 'hfsigma', 'extent', 'aberrant',
                                      'saturation', 'good')
         css.columns.width.default = 65
         css.height.default        = 500

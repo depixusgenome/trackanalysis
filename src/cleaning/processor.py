@@ -59,8 +59,8 @@ class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
     "Task for removing incorrect points or cycles or even the whole bead"
     __doc__          = DataCleaning.__doc__
     level            = Level.bead
-    hfsigmaphases    = PHASE.measure, PHASE.measure
-    populationphases = PHASE.measure, PHASE.measure
+    hfsigmaphases    = PHASE.initial, PHASE.measure
+    populationphases = PHASE.initial, PHASE.measure
     extentphases     = PHASE.initial, PHASE.measure
     saturationphases = PHASE.initial, PHASE.measure
     @initdefaults(frozenset(locals()))
@@ -141,8 +141,11 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
     @classmethod
     def __test(cls, frame, cnf):
         sel = cls.tasktype(**cnf)
+        pha = cycs = None
         for name in sel.CYCLES:
-            cycs = tuple(frame.withphases(*cls.__get(name+'phases', cnf)).values())
+            cur = cls.__get(name+'phases', cnf)
+            if cycs is None or pha != cur:
+                pha, cycs = cur, tuple(frame.withphases(*cur).values())
             yield getattr(sel, name)(cycs)
 
         init = list(frame.withphases(cls.__get('saturationphases', cnf)[0]).values())

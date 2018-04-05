@@ -315,7 +315,7 @@ class DataCleaning(AberrantValuesRule,
         * endif
     * endfor
     """
-    CYCLES  = 'hfsigma', 'extent', 'population'
+    CYCLES  = 'population', 'hfsigma', 'extent'
     def __init__(self, **_):
         for base in DataCleaning.__bases__:
             base.__init__(self, **_) # type: ignore
