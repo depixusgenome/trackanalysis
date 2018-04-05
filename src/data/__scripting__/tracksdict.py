@@ -206,7 +206,7 @@ class TracksDict(_TracksDict):
                         for i in ('pathcount', 'modification', 'megabytes')})
         return pd.DataFrame(frame).sort_values('modification')
 
-    def trackdataframe(self, *tasks,
+    def trackdataframe(self, *tasks, # pylint: disable=too-many-locals
                        transform = None,
                        assign    = None,
                        process   = True,
@@ -243,7 +243,26 @@ class TracksDict(_TracksDict):
         for j in self.values():
             par.extend([j], *Tasks.defaulttasklist(j, tasks[0], j.cleaned),
                        *created, dframe, processors = procs)
-        return par.process(None, 'concat') if process else par
+        if process:
+            out  = par.process(None, 'concat')
+            if 'track' not in getattr(out.index, 'names', ()):
+                return out
+
+            ind = out.index.names
+            out = (out
+                   .reset_index()
+                   .set_index('track')
+                   .join(self
+                         .dataframe()[['key', 'modification']]
+                         .rename(columns = dict(key = 'track'))
+                         .set_index('track'))
+                   .reset_index('track')
+                   .sort_values(['modification'])
+                  )
+            if 'index' in out.columns:
+                del out['index']
+            return out.assign(bead = out.bead.astype(int)).set_index(ind)
+        return par
 
     def dataframe(self, *tasks,
                   loadall   = False,
