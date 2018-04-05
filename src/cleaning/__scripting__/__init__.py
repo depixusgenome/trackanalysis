@@ -116,9 +116,9 @@ class TrackCleaningScript:
         data = data[data.cycles >= self.track.ncycles]
         return sorted(data.reset_index().bead.unique())
 
-    def messages(self,
+    def messages(self,  # pylint: disable = too-many-locals
                  beads: Sequence[BEADKEY] = None,
-                 forceclean                  = False,
+                 forceclean               = False,
                  **kwa) -> pd.DataFrame:
         "returns beads and warnings where applicable"
         ids   = [] # type: List[int]
@@ -127,7 +127,12 @@ class TrackCleaningScript:
         msgs  = [] # type: List[str]
 
         if forceclean or self.track.cleaned is False: # type: ignore
-            for i, j in self.process(**kwa).items():
+            if beads:
+                good = set(self.track.beadsonly.keys())
+                cur  = [i for i in beads if i in good]
+            else:
+                cur  = None
+            for i, j in self.process(cur, **kwa).items():
                 if j is None:
                     continue
                 itms = j.data()
