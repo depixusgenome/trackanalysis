@@ -15,7 +15,8 @@ export class DpxDAQCameraView extends RowView
         cnt.style = 'position: relative;'
 
         cam       = document.createElement("div");   cam.id  = 'dpxdaqwrapper'
-        cam.style = "top: #{t}px; left: #{l}px; width: #{w}px; height: #{h}px; position: absolute;"
+        cam.style = "top: #{t}px; left: #{l}px; width: #{w}px;"+
+                    " height: #{h}px; position: absolute; overflow: hidden"
 
         emb = document.createElement("embed"); emb.id  = 'dpxdaqvlc'
         emb.setAttribute('type',        'application/x-vlc-plugin')
@@ -36,21 +37,37 @@ export class DpxDAQCameraView extends RowView
         super()
         @connect(@model.properties.start.change, @on_start_cam)
         @connect(@model.properties.stop.change, @on_stop_cam)
+        return
 
-    @on_start_cam: () ->
+    on_start_cam: () ->
         emb = document.getElementById("dpxdaqvlc")
         emb.playlist.items.clear()
         arr = Array(":rtsp-caching=0", ":network-caching=200")
         emb.playlist.add(@model.addresss, "livedaqcamera", arr)
         emb.playlist.play()
 
-    @on_stop_cam: () ->
+        fig = @model.get_layoutable_children()[0].get_layoutable_children()[0]
+        rng = [fig.extra_x_ranges['xpixel'], fig.extra_y_ranges['ypixel']]
+        @on_zoom(rng[0], rng[1])
+        return
+
+    on_stop_cam: () ->
         emb = document.getElementById("dpxdaqvlc")
         emb.playlist.items.clear()
 
 export class DpxDAQCamera extends Row
     default_view: DpxDAQCameraView
     type: "DpxDAQCamera"
+
+    on_zoom: (xax, yax)->
+        emb   = document.getElementById("dpxdaqvlc")
+        if emb?
+            xvals = [Math.round(xax.start), Math.round(xax.end)]
+            yvals = [Math.round(yax.start), Math.round(yax.end)]
+            txt   = "#{xvals[1]-xvals[0]}x#{yvals[1]-yvals[0]}+#{xvals[0]}+#{yvals[0]}"
+            emb.video?.crop = txt
+            return
+
     @define {
         address:   [p.String, "rtsp://192.168.1.56:8554/mystream"],
         figsizes:  [p.Array,  [800, 400, 28, 5]],

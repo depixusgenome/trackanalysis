@@ -9,7 +9,8 @@ import numpy                  as     np
 import bokeh.core.properties  as     props
 
 import bokeh.layouts          as     layouts
-from   bokeh.models           import ColumnDataSource, PointDrawTool, Range1d, LinearAxis
+from   bokeh.models           import (ColumnDataSource, PointDrawTool, Range1d,
+                                      LinearAxis, CustomJS)
 from   bokeh.plotting         import figure, Figure
 
 from   utils                  import initdefaults
@@ -60,7 +61,7 @@ class CameraTheme:
     figstart  = 52, 25
     toolbar   = dict(sticky   = False,
                      location = 'right',
-                     items    = 'pan,wheel_zoom,box_zoom,save,reset')
+                     items    = 'pan,wheel_zoom,box_zoom,reset')
     decimals  = 3
 
     @initdefaults(frozenset(locals()) - {'name'})
@@ -113,6 +114,24 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
         self._cam = DpxDAQCamera(fig, self.__figsize(ctrl),
                                  ctrl.daq.config.network.camera.address,
                                  sizing_mode = ctrl.theme.get('main', 'sizingmode', 'fixed'))
+
+        code = """
+               var emb, ref, txt, xvals, yvals;
+               emb = document.getElementById("dpxdaqvlc");
+               if (emb != null) {
+                   xvals = [Math.round(xax.start), Math.round(xax.end)];
+                   yvals = [Math.round(yax.start), Math.round(yax.end)];
+                   txt = `${xvals[1] - xvals[0]}x${yvals[1] - yvals[0]}+${xvals[0]}+${yvals[0]}`;
+                   if ((ref = emb.video) != null) {
+                      ref.crop = txt;
+                   }
+               }
+               """
+        rng = [fig.extra_x_ranges['xpixel'], fig.extra_y_ranges['ypixel']]
+        rng[0].callback = CustomJS(code = code,
+                                   args = dict(xax = rng[0], yax = rng[1]))
+        rng[1].callback = rng[1].callback
+
         import bokeh
         if bokeh.__version__ == '0.12.15':
             from bokeh.models import DataTable
