@@ -43,10 +43,15 @@ class CameraTheme:
     ylabel    = "y (µm)"
     names     = PlotAttrs("lightblue", "text", x_offset = 5)
     position  = PlotAttrs("lightblue", "circle",
-                          size                 = 10,
-                          alpha                = 0.3,
-                          selection_color      = 'green',
-                          selection_alpha      = .7)
+                          size                    = 10,
+                          line_color              = 'lightblue',
+                          fill_alpha              = 0.,
+                          selection_color         = 'green',
+                          selection_alpha         = .7,
+                          nonselection_line_color = 'lightblue',
+                          nonselection_fill_alpha = .0,
+                          nonselection_line_alpha = 1.,
+                         )
     roi       = PlotAttrs("lightblue", "rect",
                           fill_alpha           = 0.,
                           line_color           = 'lightblue')
@@ -91,11 +96,13 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
         theme = self._model.theme
 
         fig   = self.__figure(ctrl)
-        theme.roi.addto(fig, **{i: i for i in ('x', 'y', 'width', 'height')},
-                        source = self._source)
-        theme.names.addto(fig, **{i: i for i in ('x', 'y')}, text = 'beadid', source = self._source)
+        args  = {i: i for i in ('x', 'y', 'width', 'height')}
+        theme.roi.addto(fig, **args, source = self._source)
 
-        rend = theme.position.addto(fig, **{i: i for i in ('x', 'y')}, source = self._ptsource)
+        args  = {i: i for i in ('x', 'y')}
+        theme.names.addto(fig, **args, text = 'beadid', source = self._source)
+
+        rend = theme.position.addto(fig, **args, source = self._ptsource)
         tool = PointDrawTool(renderers = [rend], empty_value = -1)
         fig.add_tools(tool)
 
@@ -127,7 +134,7 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
 
         @ctrl.daq.observe
         def _onupdatenetwork(model = None, old = None, **_): # pylint: disable=unused-variable
-            if 'camera' not in old or self._cam is None:
+            if 'camera' not in old or self._waitfornextreset() or self._cam is None:
                 return
 
             if model.camera.address != self._cam.address:
@@ -140,7 +147,8 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
 
         @ctrl.daq.observe("addbeads", "removebeads", "updatebeads")
         def _onchangedbeads(**_): # pylint: disable=unused-variable
-            self.reset(ctrl)
+            if not self._waitfornextreset() or self._cam is None:
+                self.reset(ctrl)
 
         @ctrl.daq.observe
         def _oncurrentbead(bead = None, **_): # pylint: disable=unused-variable
@@ -149,6 +157,9 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
 
         @ctrl.daq.observe
         def _onlisten(**_): # pylint: disable=unused-variable
+            if self._cam is None:
+                return
+
             tmp = dict(self._source.data)
             tmp.clear()
             self._source.data = tmp
@@ -156,8 +167,9 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
 
         @ctrl.display.observe
         def _oncamera(old = None, **_): # pylint: disable=unused-variable
-            if 'currentbead' not in old:
+            if 'currentbead' not in old or self._waitfornextreset() or self._cam is None:
                 return
+
             inds = self._ptsource.selected.indices[:1]
             bead = self._model.display.currentbead
             if bead is None and len(inds):
@@ -166,8 +178,18 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
                 self._ptsource.selected.indices = [bead] + [i for i in inds if i != bead]
 
     def _reset(self, ctrl, cache):
+        if self._cam is None:
+            return
+
         if self._cam.address != ctrl.daq.config.network.camera.address:
-            cache[self._cam]['address'] = ctrl.daq.config.network.camera.address
+            cache[self._cam].update(address = ctrl.daq.config.network.camera.address,
+                                    start   = self._cam.start+1)
+
+        # pylint: disable=unsubscriptable-object
+        if self.__figsize(ctrl) != self._cam.figsizes:
+            ctrl.theme.update("message",
+                              NotImplementedError("Please restart the gui", "error"))
+
         data = self.__data(ctrl)
         cache[self._source]  .update(data = data[0])
         cache[self._ptsource].update(data = data[1])
@@ -187,7 +209,6 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
         np.round(roi['x'], self._model.theme.decimals, roi['x'])
         roi['w'] *= ctrl.daq.config.network.camera.dim[0][0]
         roi['h'] *= ctrl.daq.config.network.camera.dim[1][0]
-        print(roi['w'], roi['h'])
 
         data = dict(x      = roi['x'], y      = roi['y'],
                     width  = roi['w'], height = roi['h'],
