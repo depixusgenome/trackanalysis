@@ -89,7 +89,7 @@ class DAQServerView(Generic[DATA]):
                 await self.__start(ctrl)
             IOLoop.current().spawn_callback(_start)
 
-    async def __readdaq(self, index, cnf, data, call):
+    async def __readdaq(self, index, cnf, data, call): # pylint: disable=too-many-locals
         """
         Reads server data and outputs it
         """
@@ -107,13 +107,14 @@ class DAQServerView(Generic[DATA]):
             sock.bind(address)
             sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, pack)
             sock.settimeout(tout)
-            cur = data.nextlines(rng.stop)
+            cur, ind = data.getnextlines(rng.stop)
             with closing(sock):
                 try:
                     sock.recv_into(cur[:1], bytesize)
                     for i in rng:
                         await asyncio.sleep(period)
                         sock.recv_into(cur[i:i+1], bytesize)
+                    data.applynextlines(ind)
                     call(cur)
                     await asyncio.sleep(period)
                 except socket.timeout:

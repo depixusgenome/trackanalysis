@@ -3,7 +3,7 @@
 """
 The database
 """
-from   typing  import Iterable
+from   typing  import Iterable, Tuple
 import numpy   as     np
 
 class RoundRobinVector:
@@ -22,24 +22,31 @@ class RoundRobinVector:
         """
         return (self._array if name is None else self._array[name])[self._index]
 
-    def nextlines(self, count):
+    def getnextlines(self, count) -> Tuple[np.ndarray, slice]:
         """
         add values to the end of the table
         """
         ind = slice(self._index.stop, self._index.stop+count)
         if ind.stop > len(self._array):
             self._index              = slice(0, self._length-count)
-            self._array[self._index] = self._array[-1-self._index.stop:]
+            self._array[self._index] = self._array[count-self._length:]
             ind                      = slice(self._index.stop, self._length)
 
-        self._index      = slice(max(ind.stop - self._length, 0), ind.stop)
-        return self._array[ind]
+        return self._array[ind], slice(max(ind.stop - self._length, 0), ind.stop)
+
+    def applynextlines(self, ind):
+        """
+        add values to the end of the table
+        """
+        self._index = ind
 
     def append(self, lines):
         """
         add values to the end of the table
         """
-        self.nextlines(len(lines))[:] = lines
+        arr, ind = self.getnextlines(len(lines))
+        arr[:]   = lines
+        self.applynextlines(ind)
 
     def reconfigure(self, maxlength: int, *args):
         "sets a new max length"

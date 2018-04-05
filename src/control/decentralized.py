@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Decentralized controller"
-from  typing        import Dict, Any
-from  collections   import ChainMap
-from  copy          import deepcopy
-from  utils         import initdefaults
-from  .event        import Controller
-
+from  typing            import Dict, Any
+from  collections       import ChainMap
+from  copy              import deepcopy
+from  utils             import initdefaults
+from  utils.logconfig   import getLogger
+from  .event            import Controller
+LOGS   = getLogger(__name__)
 DELETE = type('DELETE', (), {})
 
 def updatemodel(self, model, kwa, force = False, deflt = None):
@@ -109,13 +110,15 @@ class DecentralizedController(Controller):
         isdict = isinstance(dflt, dict)
         if not isdict:
             if any(i is DELETE for i in kwa.values()):
-                raise ValueError("No deleting of attributes allowed")
+                exc  = ValueError("No deleting of attributes allowed")
+                LOGS.debug(str(exc), stack_info = True)
+                raise exc
 
             missing = set(kwa) - set(dflt.__dict__)
             if len(missing):
-                import traceback
-                traceback.print_stack()
-                raise KeyError(f"Unknown keys {missing}")
+                exck  = KeyError(f"Unknown keys {missing}")
+                LOGS.debug(str(exck), stack_info = True)
+                raise exck
 
         out = self.__update('_defaults', name, kwa)
         if out is None:
@@ -151,9 +154,9 @@ class DecentralizedController(Controller):
             kwa.update({i: getattr(dflt, i) for i in dels})
 
         if len(missing):
-            import traceback
-            traceback.print_stack()
-            raise KeyError(f"Unknown keys {missing}")
+            exc  = KeyError(f"Unknown keys {missing}")
+            LOGS.debug(str(exc), stack_info = True)
+            raise exc
 
         return self.__update('_objects', name, kwa)
 

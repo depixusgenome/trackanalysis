@@ -4,7 +4,7 @@
 import numpy         as     np
 from   numpy.testing import assert_equal
 from daq.data        import RoundRobinVector, BeadsRoundRobinVector
-from daq.model       import DAQRamp, DAQIdle
+from daq.model       import DAQRamp, DAQManual
 from daq.control     import DAQController
 
 def test_roundrobin():
@@ -14,7 +14,7 @@ def test_roundrobin():
     assert vect.view().dtype == dtype
     assert vect.view().size  == 0
 
-    truth = np.arange(160, dtype = 'f4').view('f4,f4,f4')
+    truth = np.arange(180, dtype = 'f4').view('f4,f4,f4')
     vect.append(truth[:1])
     assert_equal(vect.view(), truth[:1])
 
@@ -33,22 +33,22 @@ def test_roundrobin():
     vect.append(truth[30:39])
     assert_equal(vect.view(), truth[29:39])
 
-    base  = np.dtype([('t', 'I8'), ('x', 'f4'), ('y', 'f4')])
+    base  = np.dtype([('t', 'i8'), ('x', 'f4'), ('y', 'f4')])
     beads = BeadsRoundRobinVector.fulltype(3, base)
-    assert beads == np.dtype([('t', 'I8'),
+    assert beads == np.dtype([('t', 'i8'),
                               ('x0', 'f4'), ('y0', 'f4'),
                               ('x1', 'f4'), ('y1', 'f4'),
                               ('x2', 'f4'), ('y2', 'f4')])
     vect = BeadsRoundRobinVector(10, 3, base)
     assert vect.view().dtype == beads
 
-    beads = np.dtype([('t', 'I8'),
+    beads = np.dtype([('t', 'i8'),
                       ('x0', 'f4'), ('y0', 'f4'),
                       ('x1', 'f4'), ('y1', 'f4')])
     vect.nbeads = 2
     assert vect.view().dtype == beads
 
-    beads = np.dtype([('t', 'I8'),
+    beads = np.dtype([('t', 'i8'),
                       ('x0', 'f4'), ('y0', 'f4'),
                       ('x1', 'f4'), ('y1', 'f4'),
                       ('x2', 'f4'), ('y2', 'f4'),
@@ -70,7 +70,6 @@ def test_controller():
     for i in range(1,3):
         ctrl.addfovdata(data)
         assert cnt[0] == i
-        assert ctrl.data.fov.view().size == data.size*(i)
 
     cnt = [0]
     def _onaddbeaddata(**_):
@@ -80,14 +79,17 @@ def test_controller():
     for i in range(1,3):
         ctrl.addbeaddata(data)
         assert cnt[0] == i
-        assert ctrl.data.beads.view().size == data.size*i
 
     cnt = [0]
     def _onupdateprotocol(**_):
         cnt[0] += 1
     ctrl.observe(_onupdateprotocol)
 
-    assert isinstance(ctrl.config.protocol, DAQIdle)
+    assert isinstance(ctrl.config.protocol, DAQManual)
     ctrl.updateprotocol(DAQRamp())
     assert isinstance(ctrl.config.protocol, DAQRamp)
     assert cnt[0] == 1
+
+if __name__ == '__main__':
+    test_roundrobin()
+    test_controller()
