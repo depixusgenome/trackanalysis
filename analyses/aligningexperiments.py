@@ -120,7 +120,8 @@ class PeaksAlignment:
         data = self.setpivot(data)
         data = self.correct(data, ref)
 
-        out  = pd.concat([i for _, i in data]).sort_values(['bead', 'track', 'peakposition', 'avg'])
+        out  = pd.concat([i for _, i in data]).sort_values(['bead', 'modification',
+                                                            'peakposition', 'avg'])
         if isinstance(ref, int):
             return out.assign(identity = out.bead.astype(str))
         return out
@@ -137,7 +138,7 @@ class PeaksAlignment:
             data = self(data, ref, discarded=discarded, masks=masks)
             ref  = None
 
-        data = data.sort_values(['bead', 'track', 'peakposition', 'avg'])
+        data = data.sort_values(['bead', 'modification', 'peakposition', 'avg'])
         if ref is None:
             ref  = 'identity' if 'identity' in data.columns else 'track'
         cols = ['peakposition', 'resolution']
