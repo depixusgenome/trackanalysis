@@ -3,89 +3,21 @@
 """
 Scripts for aligning beads & tracks
 """
-from   concurrent.futures      import ProcessPoolExecutor, as_completed
-from   typing                  import Tuple, List
-
 import pandas                  as     pd
 import numpy                   as     np
 import holoviews               as     hv
 
-from   utils                   import initdefaults
-from   utils.logconfig         import getLogger
-from   peakfinding.processor   import SingleStrandProcessor, SingleStrandTask
 from   peakcalling.toreference import (CorrectedHistogramFit, # pylint: disable=unused-import
                                        Range, Pivot)
 from   peakcalling.tohairpin   import ChiSquareFit
 
-LOGS = getLogger()
-
-class PeaksDataFrameCreator:
-    "Create the datafame"
-    dataframe    = dict(events = dict(std = 'std'), resolution = 'resolution')
-    singlestrand = SingleStrandTask()
-
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
-
-    def _create(self, trk) -> Tuple[pd.DataFrame, List[int]]:
-        trk.tasks.selection = None
-        pks    = SingleStrandProcessor.apply(trk.peaks, **self.singlestrand.config())
-        create = lambda i: (pks[[i]].dataframe(**self.dataframe)).reset_index()
-        good   = []
-        bad    = []
-        for i in trk.cleaning.good():
-            try:
-                good.append(create(i))
-            except: # pylint: disable=bare-except
-                bad.append(i)
-        return pd.concat(good), bad
-
-    @staticmethod
-    def _dataframe(tracks, full):
-        data = (pd.concat(full)
-                .reset_index()
-                .set_index('track')
-                .join(tracks
-                      .dataframe()[['key', 'modification']]
-                      .rename(columns = dict(key = 'track'))
-                      .set_index('track'))
-                .reset_index('track')
-                .sort_values(['modification'])
-               )
-
-        data = data.assign(bead = data.bead.astype(int))
-        if 'index' in data.columns:
-            del data['index']
-
-        return data
-
-    def __call__(self, tracks) -> pd.DataFrame:
-        full = []
-        with ProcessPoolExecutor() as pool:
-            futs = [pool.submit(self._create, i) for i in tracks.values()]
-            for fut in as_completed(futs):
-                try:
-                    data, err = fut.result()
-                    full.append(data)
-                    if len(err):
-                        track = data.reset_index().track.unique()
-                        if len(track):
-                            LOGS.info("error in %s: %s", track[0], err)
-                        else:
-                            LOGS.info("error beads: %s", err)
-                except Exception as exc: # pylint: disable=broad-except
-                    LOGS.info("error: %s", exc)
-
-        return self._dataframe(tracks, full)
-
-    @classmethod
-    def create(cls, tracks):
-        "create peaks for all tracks"
-        import scripting
-        return cls(singlestrand = getattr(scripting, 'Tasks').singlestrand())(tracks)
-
-createpeaks = PeaksDataFrameCreator.create # pylint: disable=invalid-name
+def createpeaks(tracks):
+    "create peaks for all tracks"
+    import scripting
+    singlestrand = getattr(scripting, 'Tasks').singlestrand()
+    return tracks.peaks.dataframe(singlestrand,
+                                  events     = dict(std = 'std'),
+                                  resolution = 'resolution')
 
 class PeaksAlignment:
     """
