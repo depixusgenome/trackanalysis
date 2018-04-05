@@ -81,11 +81,12 @@ class TrackCleaningScript:
         "returns a dictionnary of cleaning results"
         get  = lambda x: x if x is None else x.args[0]
 
-        itms = self.track.beadsonly[list(beads)] if beads else self.track.beadsonly
+        itms = self.track.beadsonly
         sub  = self.track.tasks.subtraction # type: ignore
         if sub is not None:
             cache: dict = {}
             itms        = BeadSubtractionProcessor.apply(itms, cache = cache, **sub.config())
+        itms = itms[list(beads)] if beads else itms
 
         dfltask = self.track.tasks.cleaning  # type: ignore
         if dfltask:
