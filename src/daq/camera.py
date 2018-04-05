@@ -9,7 +9,7 @@ import numpy                  as     np
 import bokeh.core.properties  as     props
 
 import bokeh.layouts          as     layouts
-from   bokeh.models           import (ColumnDataSource, PointDrawTool, Range1d, LinearAxis)
+from   bokeh.models           import ColumnDataSource, PointDrawTool, Range1d, LinearAxis
 from   bokeh.plotting         import figure, Figure
 
 from   utils                  import initdefaults
@@ -56,7 +56,7 @@ class CameraTheme:
                           fill_alpha           = 0.,
                           line_color           = 'lightblue')
     figsize   = 800, 600, 'fixed'
-    figborder = 52+61, 25+44
+    figborder = 52+66, 25+44
     figstart  = 52, 25
     toolbar   = dict(sticky   = False,
                      location = 'right',
