@@ -70,12 +70,12 @@ class DAQCamera(ConfigObject):
 
     def bounds(self, pixel = False):
         "image bounds in nm (*pixel == False*) or pixels"
-        rng = self.pixels[1], self.pixels[0]
+        rng = self.pixels[0], self.pixels[1]
         return (0, 0) + rng if pixel else self.tonm((0,0))+ self.tonm(rng)
 
     def size(self, pixel = False):
         "image size in nm (*pixel == False*) or pixels"
-        rng = self.pixels[1], self.pixels[0]
+        rng = self.pixels[0], self.pixels[1]
         return rng if pixel else self.tonm(rng)
 
     def tonm(self, arr):
