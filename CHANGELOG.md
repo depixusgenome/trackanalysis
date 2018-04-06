@@ -1,3 +1,41 @@
+# tag cycles_v4.12
+## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
+
+### Cleaning
+
+Tests were made more stringent:
+
+* σ[HF] is tested over phases 1 to 5 instead of 5 only
+* the min population is tested over phases 1 to 5 instead of 5 only
+
+A new test was added. It is noted as `Σ|dz|` and does the following:
+* computes the absolute value of the derivative of z in time,
+* discards values lower 1e-2 (~ 3 times the usual precision),
+* sums the remaining values.
+
+Discarding small values meanst that the brownian motion is ignored. What
+remains are the movements due to the magnets and the hybridizations. The sum of
+those should be twice the dynamic range. We discard cycles for which the sum
+exceeds 3 times the dynamic range. This should only occur when the bead tracking
+is not working.
+
+### Alignment on phase 5
+
+The alignment on phase 5 uses events only. Cycles are aligned such that the
+event density is locally increased. Unfortunatly, the algorithm failed in cases
+when 2 zero positions coexist in a file. In such a case, cycles were sometimes
+moved such that only one zero position remained, doubling the number of other
+peaks. The algorithm is no longer used.
+
+A new algorithm for aligning on phase 5 has been set up:
+
+* peaks are found, without any prior phase 5 alignment.
+* cycles are aligned on those peaks, peak positions are recomputed.
+* step 2 is repeated 10 times.
+* peaks are found anew using aligned cycles.
+
+The advantage of the new algorithm is that peaks cannot merge anymore.
+
 # tag cycles_v4.11
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
 
@@ -139,7 +177,7 @@ havn't been solved.
 
     1. the width of the interval is less than 10,
     2. there are 2 missing values on each side,
-    3. more than 80 percent of the interval derivates are above 0.1 µm
+    3. more than 80 percent of the interval derivatives are above 0.1 µm
 
 The settings can be changed only by editing the user configuration file.
 
