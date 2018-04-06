@@ -73,7 +73,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
 
         cnf.colors.order.default  = ('aberrant', 'hfsigma', 'extent', 'population',
                                      'pingpong', 'saturation', 'good')
-        self.css.widgets.width.default = 400
+        self.css.widgets.width.default = 470
         self.css.figure.defaults  = dict(width    = 600,
                                          height   = 800,
                                          tooltips = [(u'(cycle, t, z)',

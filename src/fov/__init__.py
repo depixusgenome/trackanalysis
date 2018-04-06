@@ -95,15 +95,12 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
 
         def _onselect_cb(attr, old, new):
             inds = new.indices
-            if len(inds) != 1:
-                self._beadssource.update(selected = self.__SELECTED)
+            if len(inds) == 0:
                 return
 
             # pylint: disable=unsubscriptable-object
             bead = int(self._beadssource.data['text'][inds[0]])
-
             if bead == self._model.bead:
-                self._beadssource.update(selected = self.__SELECTED)
                 return
 
             with Action(self._ctrl):
@@ -115,9 +112,6 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
             self.fixreset(rng)
         return self._fig
 
-    __SELECTED: Dict[str, Dict[str, Any]] = {'0d': {'glyph': None, 'indices': []},
-                                             '1d': {'indices': []},
-                                             '2d': {'indices': []}}
     def _reset(self):
         fov = self.__fov
         if fov is not None and self.__idfov != id(fov):
@@ -125,9 +119,13 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
             self.__imagedata()
 
         self._bkmodels[self._beadssource].update(self.__beadsdata())
-        self._bkmodels[self._beadssource].update(selected = self.__SELECTED)
-        self._bkmodels[self._cursource].update(self.__curdata())
-        self._bkmodels[self._cursource].update(selected = self.__SELECTED)
+        sel = self._beadssource.selected
+        if getattr(sel, 'indices'):
+            self._bkmodels[sel].update(indices = [])
+        sel = self._cursource.selected
+        if getattr(sel, 'indices'):
+            self._bkmodels[sel].update(indices = [])
+
         self.__calibdata()
 
     def __calibdata(self):
