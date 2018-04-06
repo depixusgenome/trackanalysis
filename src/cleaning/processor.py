@@ -11,49 +11,16 @@ from    utils                   import initdefaults
 from    model                   import Task, Level, PHASE
 from    data.views              import BEADKEY
 from    control.processor       import Processor, ProcessorException
-from    .datacleaning           import DataCleaning
+from    .datacleaning           import DataCleaning, AberrantValuesRule
 
-class PostAlignmentDataCleaning:
-    """
-    Remove incorrect points or cycles after the cycles have been aligned
-
-    # `aberrant`
-    Removes aberrant values.
-
-    A value at position *n* is aberrant if any:
-
-        *  z[n] < percentile(z, percentiles[0]) - percentilerange
-        *  z[n] > percentile(z, percentiles[1]) + percentilerange
-    """
-    percentiles       = 5., 95.
-    percentilerange   = .1
+class AberrantValuesTask(AberrantValuesRule, Task): # pylint: disable=too-many-ancestors
+    "Task for removing incorrect points or cycles or even the whole bead"
+    __doc__ = DataCleaning.__doc__
+    level   = Level.bead
     @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
-
-    def aberrant(self, bead:np.ndarray, clip = False):
-        """
-        Removes aberrant values.
-
-        Aberrant values are replaced by:
-
-            * *NaN* if *clip* is true,
-            * *maxabsvalue ± median*, whichever is closest, if *clip* is false.
-
-        returns: *True* if the number of remaining values is too low
-        """
-        fin  = np.isfinite(bead)
-        good = bead[fin]
-        thr  = (np.percentile(good, self.percentiles)
-                + [-self.percentilerange, self.percentilerange])
-
-        if clip:
-            good[good < thr[0]] = thr[0]
-            good[good > thr[1]] = thr[1]
-        else:
-            good[good < thr[0]] = np.NaN
-            good[good > thr[1]] = np.NaN
-        bead[fin] = good
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+        Task.__init__(self, **kwa)
 
 class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
     "Task for removing incorrect points or cycles or even the whole bead"
@@ -131,6 +98,23 @@ class DataCleaningException(ProcessorException):
 
     def __str__(self):
         return f"{self.args[0].parents}: {self.args[0].beadid}\n{self.args[0]}"
+
+class AberrantValuesProcessor(Processor[AberrantValuesTask]):
+    "Processor for cleaning the data"
+    @staticmethod
+    def _compute(cnf, _, info):
+        cnf.aberrant(info[1])
+
+    @classmethod
+    def apply(cls, toframe = None, **cnf):
+        "applies the task to a frame or returns a method that will"
+        cleaning = AberrantValuesRule(**cnf)
+        return toframe.withaction(partial(cls._compute, cleaning))
+
+    def run(self, args):
+        "updates the frames"
+        cache = args.data.setCacheDefault(self, dict())
+        return args.apply(partial(self.apply, cache = cache, **self.config()))
 
 class DataCleaningProcessor(Processor[DataCleaningTask]):
     "Processor for cleaning the data"

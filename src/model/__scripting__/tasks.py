@@ -20,7 +20,7 @@ from data.track               import Track
 from control.taskcontrol      import create as _create, ProcessorController
 from control.processor.base   import Processor, register
 from control.processor.utils  import ActionTask
-from cleaning.processor       import DataCleaningTask
+from cleaning.processor       import DataCleaningTask, AberrantValuesTask
 from cleaning.beadsubtraction import BeadSubtractionTask
 from cordrift.processor       import DriftTask
 from eventdetection.processor import ExtremumAlignmentTask, EventDetectionTask
@@ -46,8 +46,11 @@ class _DOCHelper(Enum):
         "if one or more fixed beads has been indicated,",
         "subtracts from the current bead the median signal per frame of the",
         "fixed beads.")
+    aberrant       = (
+        "aberrant values are discarded using the",
+        "the rules defined in the `cleaning.processor.AberrantValuesTask` task.")
     cleaning       = (
-        "aberrant values and cycles are discarded using the",
+        "aberrant cycles are discarded using the",
         "the rules defined in the `cleaning.processor.DataCleaningTask` task.")
     selection      = ("allows selecting/discarding specific beads and or cycles",)
     alignment      = (
@@ -188,6 +191,7 @@ class Tasks(Enum):
     trackreader      = 'trackreader'
     cyclesampling    = 'cyclesampling'
     action           = 'action'
+    aberrant         = 'aberrant'
     subtraction      = 'subtraction'
     cleaning         = 'cleaning'
     selection        = 'selection'
@@ -209,6 +213,7 @@ class Tasks(Enum):
     def defaults():
         "returns default tasks"
         return dict(trackreader      = TrackReaderTask(),
+                    aberrant         = AberrantValuesTask(),
                     cleaning         = DataCleaningTask(),
                     cyclesampling    = CycleSamplingTask(),
                     subtraction      = BeadSubtractionTask(),
@@ -450,10 +455,10 @@ class Tasks(Enum):
 
     @classmethod
     def __base_cleaning__(cls):
-        return cls.subtraction, cls.cleaning, cls.alignment
+        return cls.aberrant, cls.subtraction, cls.cleaning, cls.alignment
 
     @classmethod
-    @_DOCHelper.add('subtraction', 'cleaning', 'alignment',
+    @_DOCHelper.add('aberrant', 'subtraction', 'cleaning', 'alignment',
                     header = "Cleaning consists in the following tasks:")
     def __cleaning__(cls):
         return cls.__base_cleaning__()
@@ -461,8 +466,9 @@ class Tasks(Enum):
     @classmethod
     def __tasklist__(cls):
         cleaning = cls.__cleaning__()
-        assert cleaning[0] is cls.subtraction
-        return (cls.cyclesampling, cleaning[0], cls.selection) + cleaning[1:] + cls.__taskorder__()
+        assert cleaning[1] is cls.subtraction
+        return ((cls.cyclesampling, cleaning[0], cleaning[1], cls.selection)
+                + cleaning[2:] + cls.__taskorder__())
 
     @classmethod
     def __nodefault__(cls):
