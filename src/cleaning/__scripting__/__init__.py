@@ -156,6 +156,33 @@ class TrackCleaningScript:
                                  cycles  = np.array(cycs, dtype = 'i4'),
                                  message = msgs)).set_index(['bead', 'key'])
 
+    def dataframe(self, beads: Sequence[BEADKEY] = None, **kwa) -> Optional[pd.DataFrame]:
+        """
+        return a dataframe with all test values
+        """
+        if beads:
+            good = set(self.track.beadsonly.keys())
+            cur  = [i for i in beads if i in good]
+        else:
+            cur  = None
+
+        cache: dict = {}
+        tuple(self.process(cur, cache = cache, **kwa))
+        if len(cache) == 0:
+            return None
+
+        name       = DataFrameFactory.trackname(self.track)
+        info: dict = {'track': [], 'bead': [], 'cycle': []}
+        info.update((i.name, []) for i in next(iter(cache.values()))[0])
+        for beadid, (vals, _) in cache.items():
+            info['bead'].append(np.full(self.track.ncycles, beadid, dtype = 'i4'))
+            info['track'].append(np.full(self.track.ncycles, name))
+            info['cycle'].append(np.arange(self.track.ncycles, dtype = 'i4'))
+            for stat in vals:
+                info[stat.name].append(stat.values)
+
+        return pd.DataFrame({i: np.concatenate(j) for i, j in info.items()})
+
     def dropbad(self, **kwa) -> Track:
         "removes bad beads *forever*"
         return dropbeads(self.track, *self.bad(**kwa)) # type: ignore
@@ -252,6 +279,15 @@ class TracksDictCleaningScript:
         if beads is None:
             beads = self.tracks.availablebeads()
         return pd.concat([TrackCleaningScript(i).messages(beads, forceclean, **kwa)
+                          for i in self.tracks.values()])
+
+    def dataframe(self, beads: Sequence[BEADKEY] = None, **kwa) -> Optional[pd.DataFrame]:
+        """
+        return a dataframe with all test values
+        """
+        if beads is None:
+            beads = self.tracks.availablebeads()
+        return pd.concat([TrackCleaningScript(i).dataframe(beads, **kwa)
                           for i in self.tracks.values()])
 
     def good(self, **kwa) -> List[BEADKEY]:
