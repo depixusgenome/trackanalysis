@@ -5,7 +5,7 @@ import bokeh.layouts as layouts
 
 from utils          import initdefaults
 from view.base      import threadmethod, spawn
-from view.dialog    import FileDialog
+from view.dialog    import BaseFileDialog
 from ._protocol     import DAQProbeButton, DAQRampButton, DAQManualButton
 from ._daqtoolbar   import DpxDAQToolbar
 from ._messages     import DAQMessagesView
@@ -15,13 +15,14 @@ class DAQRecordTheme:
     name            = "recording"
     title           = "Record path"
     filetypes       = "h5"
+    description     = 'record files'
     initialdir: str = None
 
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
 
-class DAQRecordFileDialog(FileDialog):
+class DAQRecordFileDialog(BaseFileDialog):
     "A file dialog that adds a default save path"
     def __init__(self, **kwa):
         self._theme = DAQRecordTheme(**kwa)
@@ -51,6 +52,8 @@ class DAQRecordFileDialog(FileDialog):
                 await self.run(ctrl, doc)
             spawn(_run)
 
+        theme                          = self._theme
+        self.defaults[theme.filetypes] = (theme.description, '.'+theme.filetypes)
         tbar.on_change(name, _onclick_cb)
 
 class DAQToolbar:
