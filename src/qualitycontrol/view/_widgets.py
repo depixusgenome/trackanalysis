@@ -69,6 +69,7 @@ class MessagesListWidget(WidgetCreator[QualityControlModelAccess]):
         css                        = self.__config
         css.height.default   = 500
         css.type.defaults    = {'extent'     : 'Δz',
+                                'pingpong'   : 'Σ|dz|',
                                 'hfsigma'    : 'σ[HF]',
                                 'population' : '% good',
                                 'saturation' : 'non-closing'}

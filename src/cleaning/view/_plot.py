@@ -67,11 +67,12 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
                   hfsigma    = 'gold',
                   extent     = 'orange',
                   population = 'hotpink',
+                  pingpong   = 'hotpink',
                   saturation = 'chocolate',
                   aberrant   = 'red')
 
         cnf.colors.order.default  = ('aberrant', 'hfsigma', 'extent', 'population',
-                                     'saturation', 'good')
+                                     'pingpong', 'saturation', 'good')
         self.css.widgets.width.default = 400
         self.css.figure.defaults  = dict(width    = 600,
                                          height   = 800,
@@ -157,7 +158,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
 
 class CleaningView(PlotView[CleaningPlotCreator]):
     "Peaks plot view"
-    TASKS = 'datacleaning', 'extremumalignment'
+    TASKS = 'aberrant', 'datacleaning', 'extremumalignment'
     def ismain(self):
         "Cleaning and alignment, ... are set-up by default"
         self._ismain(tasks  = self.TASKS)

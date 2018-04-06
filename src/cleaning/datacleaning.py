@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Removing aberrant points and cycles"
-import  warnings
 from    typing                  import NamedTuple, List, Union
 from    abc                     import ABC, abstractmethod
 
@@ -102,13 +101,20 @@ _ZERO = np.zeros(0, dtype = 'i4')
 class DataCleaningRule:
     "Base for cleaning"
     def _test(self, name, test:list) -> Partial:
-        test = np.asarray(test, 'f4')
-        low  = np.nonzero(test <= getattr(self, 'min'+name))[0]
-        if hasattr(self, 'max'+name):
-            high = np.nonzero(test >= getattr(self, 'max'+name))[0]
-        else:
-            high = _ZERO
+        test  = np.asarray(test, 'f4')
+        vlow  = getattr(self, f'min{name}', None)
+        vhigh = getattr(self, f'max{name}', None)
+        low   = np.nonzero(test <= vlow) [0] if vlow  is not None else _ZERO
+        high  = np.nonzero(test >= vhigh)[0] if vhigh is not None else _ZERO
         return Partial(name, low, high, test)
+
+    @staticmethod
+    def _extent(cycs: np.ndarray, percentiles: List[float]) -> np.ndarray:
+        "computes too short or too long cycles"
+        if percentiles == [0., 100.]:
+            return np.array([np.nanmax(i)-np.nanmin(i) for i in cycs], dtype = 'f4')
+        diff = np.diff([np.nanpercentile(i, percentiles) for i in cycs], 1).ravel()
+        return np.abs(diff)
 
 class AberrantValuesRule:
     """
@@ -188,7 +194,7 @@ class HFSigmaRule(DataCleaningRule):
         """
         return self._test('hfsigma', [nanhfsigma(i) for i in cycs])
 
-class MinPopulationRule(DataCleaningRule):
+class PopulationRule(DataCleaningRule):
     """
     Remove cycles with too few good points.
 
@@ -205,7 +211,7 @@ class MinPopulationRule(DataCleaningRule):
         test = [ 0. if len(i) == 0 else np.isfinite(i).sum()/len(i)*100. for i in cycs]
         return self._test('population', test)
 
-class MinExtentRule(DataCleaningRule):
+class ExtentRule(DataCleaningRule):
     """
     Remove cycles with a range of Z values which are outside the accepted range.
 
@@ -221,13 +227,33 @@ class MinExtentRule(DataCleaningRule):
 
     def extent(self, cycs: np.ndarray) -> Partial:
         "computes too short or too long cycles"
-        maxv = np.finfo('f4').max
-        if self.percentiles == [0., 100.]:
-            test = [np.nanmax(i)-np.nanmin(i) if any(np.isfinite(i)) else maxv for i in cycs]
-        else:
-            test = [np.diff(np.nanpercentile(i, self.percentiles))[0]
-                    if any(np.isfinite(i)) else maxv for i in cycs]
-        return self._test('extent', test)
+        return self._test('extent', self._extent(cycs, self.percentiles))
+
+class PingPongRule(DataCleaningRule):
+    """
+    Remove cycles which play ping-pong instead of going up once, then down again
+    """
+    mindifference = .01
+    maxpingpong   = 3.
+    scheme        = [-1/12, 2/3, 0, -2/3, 1/12]
+    percentiles   = [5., 95.]
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        super().__init__()
+
+    def _compute(self, cycle, scheme):
+        val = np.abs(np.convolve(cycle, scheme, 'valid'))
+        val[val < self.mindifference] = 0.
+        return np.nansum(val)
+
+    def pingpong(self, cycles):
+        """
+        Remove cycles which play ping-pong instead of going up once, then down again
+        """
+        scheme = np.array(self.scheme, dtype = 'f4')
+        vals   = np.array([self._compute(i, scheme) for i in cycles], dtype = 'f4')
+        vals  /= np.clip(self._extent(cycles, self.percentiles), self.mindifference, 1e5)
+        return self._test('pingpong', vals)
 
 class SaturationRule:
     """
@@ -258,10 +284,7 @@ class SaturationRule:
         window   = self.satwindow
         med      = np.nanmedian
         itr      = zip(initials, measures)
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', category = RuntimeWarning,
-                                    message = '.*All-NaN slice encountered.*')
-            deltas   = np.array([med(j[window:])-med(i) for i, j in itr], dtype = 'f4')
+        deltas   = np.array([med(j[window:])-med(i) for i, j in itr], dtype = 'f4')
 
         fin      = np.isfinite(deltas)
         low      = np.zeros(len(deltas), dtype = 'bool')
@@ -270,10 +293,11 @@ class SaturationRule:
             return Partial('saturation', _ZERO, np.nonzero(low)[0], deltas)
         return Partial('saturation', _ZERO, _ZERO, deltas)
 
-class DataCleaning(AberrantValuesRule,
+class DataCleaning(AberrantValuesRule, # pylint: disable=too-many-ancestors
                    HFSigmaRule,
-                   MinPopulationRule,
-                   MinExtentRule,
+                   PopulationRule,
+                   ExtentRule,
+                   PingPongRule,
                    SaturationRule):
     """
     Remove specific points, cycles or even the whole bead depending on a number
@@ -291,8 +315,12 @@ class DataCleaning(AberrantValuesRule,
     # `extent`
     {}
 
+    # `pingpong`
+    {}
+
     # `saturation`
     {}
+
     # `pseudo code cleaning`
     Beads(trk) = set of all beads of the track trk <br>
     Cycles(bd) = set of all cycles in bead bd <br>
@@ -303,11 +331,12 @@ class DataCleaning(AberrantValuesRule,
         * remove aberrant values
         * for cy in Cycles(bd):
             * evaluate criteria for cy:
-                1. 0.25 < extent < 2.
-                2. hfsigma < 0.0001
-                3. hfsigma > 0.01
-                4. population (not aberrant Points(cy)/Points(cy)) > 80%
-            * if 1. or 2. or 3. or 4. are FALSE:
+                1. population (not aberrant Points(cy)/Points(cy)) > 80%
+                2. 0.25 < extent < 2.
+                3. hfsigma < 0.0001
+                4. hfsigma > 0.01
+                5. the series doesn't bounce between 2 values
+            * if 1. or 2. or 3. or 4. or 5. are FALSE:
                 * remove cy from Cycles(bd)
             * else:
                 * keep cy in Cycles(bd)
@@ -322,7 +351,7 @@ class DataCleaning(AberrantValuesRule,
         * endif
     * endfor
     """
-    CYCLES  = 'population', 'hfsigma', 'extent'
+    CYCLES  = 'population', 'hfsigma', 'extent', 'pingpong'
     def __init__(self, **_):
         for base in DataCleaning.__bases__:
             base.__init__(self, **_) # type: ignore

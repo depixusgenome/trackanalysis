@@ -25,15 +25,16 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
         self.__widget: DataTable  = None
         css                       = self.__config
         css.lines.order.default   = ('population', 'hfsigma', 'extent', 'aberrant',
-                                     'saturation', 'good')
+                                     'pingpong', 'saturation', 'good')
         css.columns.width.default = 65
         css.height.default        = 500
-        css.columns.default       = [['cycle',      u'Cycle',     '0'],
-                                     ['population', u'% good',    '0.'],
-                                     ['hfsigma',    u'σ[HF]',     '0.0000'],
-                                     ['extent',     u'Δz',        '0.0'],
+        css.columns.default       = [['cycle',      u'Cycle',       '0'],
+                                     ['population', u'% good',      '0.'],
+                                     ['hfsigma',    u'σ[HF]',       '0.0000'],
+                                     ['extent',     u'Δz',          '0.0'],
+                                     ['pingpong',   u'Σ|dz|',       '0.0'],
                                      ['saturation', u'Non-closing', ''],
-                                     ['discarded',  u'Discarded', '']]
+                                     ['discarded',  u'Discarded',   '']]
 
     @property
     def __config(self):
@@ -104,7 +105,7 @@ class DpxCleaning(Widget):
     maxhfsigma         = props.Float(DataCleaningTask.maxhfsigma)
     minextent          = props.Float(DataCleaningTask.minextent)
     maxextent          = props.Float(DataCleaningTask.maxextent)
-    maxsaturation       = props.Float(DataCleaningTask.maxsaturation)
+    maxsaturation      = props.Float(DataCleaningTask.maxsaturation)
 
 class CleaningFilterWidget(WidgetCreator[DataCleaningModelAccess]):
     "All inputs for cleaning"
@@ -122,7 +123,7 @@ class CleaningFilterWidget(WidgetCreator[DataCleaningModelAccess]):
 
         for name in ('maxabsvalue', 'maxderivate', 'minpopulation',
                      'minhfsigma',  'maxhfsigma',  'minextent',
-                     'maxsaturation'):
+                     'maxextent',   'maxsaturation'):
             self.__widget.on_change(name, _on_cb)
 
         @action

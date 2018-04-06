@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Selecting beads"
+import  warnings
 from    typing                  import Optional, Dict, Any, List, Tuple, Type
 from    itertools               import repeat
 from    functools               import partial
@@ -11,16 +12,7 @@ from    utils                   import initdefaults
 from    model                   import Task, Level, PHASE
 from    data.views              import BEADKEY
 from    control.processor       import Processor, ProcessorException
-from    .datacleaning           import DataCleaning, AberrantValuesRule
-
-class AberrantValuesTask(AberrantValuesRule, Task): # pylint: disable=too-many-ancestors
-    "Task for removing incorrect points or cycles or even the whole bead"
-    __doc__ = DataCleaning.__doc__
-    level   = Level.bead
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **kwa):
-        super().__init__(**kwa)
-        Task.__init__(self, **kwa)
+from    .datacleaning           import DataCleaning
 
 class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
     "Task for removing incorrect points or cycles or even the whole bead"
@@ -29,6 +21,7 @@ class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
     hfsigmaphases    = PHASE.initial, PHASE.measure
     populationphases = PHASE.initial, PHASE.measure
     extentphases     = PHASE.initial, PHASE.measure
+    pingpongphases   = PHASE.initial, PHASE.measure
     saturationphases = PHASE.initial, PHASE.measure
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
@@ -64,7 +57,8 @@ class DataCleaningErrorMessage:
                  ('hfsigma',    '< %.4f',   'min'),
                  ('hfsigma',    '> %.4f',   'max'),
                  ('extent',     '< %.2f',   'min'),
-                 ('extent',     '> %.2f',   'max'))
+                 ('extent',     '> %.2f',   'max'),
+                 ('pingpong',   '> %.1f',   'max'))
 
         vals  = ((get1(i[0], i[-1]), i[0], i[1] % get2(i[0], i[-1])) for i in msg)
         return [i for i in vals if i[0]]
@@ -84,7 +78,8 @@ class DataCleaningErrorMessage:
                  '%d cycles: σ[HF] < %.4f'         % get('hfsigma',    'min'),
                  '%d cycles: σ[HF] > %.4f'         % get('hfsigma',    'max'),
                  '%d cycles: Δz < %.2f'            % get('extent',     'min'),
-                 '%d cycles: Δz > %.2f'            % get('extent',     'max'))
+                 '%d cycles: Δz > %.2f'            % get('extent',     'max'),
+                 '%d cycles: Σ|dz| > %.1f'         % get('pingpong',   'max'))
 
         return '\n'.join(i for i in msg if i[0] != '0')
 
@@ -99,23 +94,6 @@ class DataCleaningException(ProcessorException):
     def __str__(self):
         return f"{self.args[0].parents}: {self.args[0].beadid}\n{self.args[0]}"
 
-class AberrantValuesProcessor(Processor[AberrantValuesTask]):
-    "Processor for cleaning the data"
-    @staticmethod
-    def _compute(cnf, _, info):
-        cnf.aberrant(info[1])
-
-    @classmethod
-    def apply(cls, toframe = None, **cnf):
-        "applies the task to a frame or returns a method that will"
-        cleaning = AberrantValuesRule(**cnf)
-        return toframe.withaction(partial(cls._compute, cleaning))
-
-    def run(self, args):
-        "updates the frames"
-        cache = args.data.setCacheDefault(self, dict())
-        return args.apply(partial(self.apply, cache = cache, **self.config()))
-
 class DataCleaningProcessor(Processor[DataCleaningTask]):
     "Processor for cleaning the data"
     @classmethod
@@ -126,15 +104,20 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
     def __test(cls, frame, cnf):
         sel = cls.tasktype(**cnf)
         pha = cycs = None
-        for name in sel.CYCLES:
-            cur = cls.__get(name+'phases', cnf)
-            if cycs is None or pha != cur:
-                pha, cycs = cur, tuple(frame.withphases(*cur).values())
-            yield getattr(sel, name)(cycs)
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category = RuntimeWarning,
+                                    message = '.*All-NaN slice encountered.*')
+            warnings.filterwarnings('ignore', category = RuntimeWarning,
+                                    message = '.*invalid value encountered in [gl][re].*')
+            for name in sel.CYCLES:
+                cur = cls.__get(name+'phases', cnf)
+                if cycs is None or pha != cur:
+                    pha, cycs = cur, tuple(frame.withphases(*cur).values())
+                yield getattr(sel, name)(cycs)
 
-        init = list(frame.withphases(cls.__get('saturationphases', cnf)[0]).values())
-        meas = list(frame.withphases(cls.__get('saturationphases', cnf)[1]).values())
-        yield sel.saturation(init, meas)
+            init = list(frame.withphases(cls.__get('saturationphases', cnf)[0]).values())
+            meas = list(frame.withphases(cls.__get('saturationphases', cnf)[1]).values())
+            yield sel.saturation(init, meas)
 
     @classmethod
     def _compute(cls, cnf, frame, info): # pylint: disable=inconsistent-return-statements

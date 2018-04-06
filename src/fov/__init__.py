@@ -39,6 +39,7 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
                                           'size'   : 6./16}
         self.css.tooltip.default       = '<table>@ttips{safe}</table>'
         self.css.tooltip.type.defaults = {'extent'     : 'Δz',
+                                          'pingpong'   : 'Σ|dz|',
                                           'hfsigma'    : 'σ[HF]',
                                           'population' : '% good',
                                           'saturation' : 'non-closing'}
