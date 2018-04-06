@@ -73,7 +73,8 @@ def _configure_hv(hvmod, locs):
             width = opts.get("width", 700)
             bcolor= opts.get("box_color", "lightblue")
             for i in opts.get("elements", ('Curve', 'Scatter', 'Distribution',
-                                           'Spikes', 'Points', 'BoxWhisker')):
+                                           'Spikes', 'Points', 'BoxWhisker',
+                                           'Histogram')):
                 string = f"{i} [width={width}] {{+framewise}}"
                 if i == 'BoxWhisker':
                     string = string.replace("]",  f"] (box_color='{bcolor}') ")
