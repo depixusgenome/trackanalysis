@@ -57,8 +57,7 @@ class CameraTheme:
                           fill_alpha           = 0.,
                           line_color           = 'lightblue')
     figsize   = 800, 600, 'fixed'
-    figborder = 52+66, 25+44
-    figstart  = 52, 25
+    figborder = 60, 40, 70, 50
     toolbar   = dict(sticky   = False,
                      location = 'right',
                      items    = 'pan,wheel_zoom,box_zoom,reset')
@@ -239,17 +238,22 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
     def __figure(self, ctrl):
         theme   = self._model.theme
         figsize = self.__figsize(ctrl)
+        borders = theme.figborder
         bounds  = ctrl.daq.config.network.camera.bounds(False)
-        fig     = figure(toolbar_sticky   = theme.toolbar['sticky'],
-                         toolbar_location = theme.toolbar['location'],
-                         tools            = theme.toolbar['items'],
-                         plot_width       = figsize[0]+theme.figborder[0],
-                         plot_height      = figsize[1]+theme.figborder[1],
-                         sizing_mode      = theme.figsize[2],
-                         x_range          = Range1d(bounds[0], bounds[2]),
-                         y_range          = Range1d(bounds[1], bounds[3]),
-                         x_axis_label     = theme.xlabel,
-                         y_axis_label     = theme.ylabel)
+        fig     = figure(toolbar_sticky    = theme.toolbar['sticky'],
+                         toolbar_location  = theme.toolbar['location'],
+                         tools             = theme.toolbar['items'],
+                         plot_width        = figsize[0]+borders[0]+borders[2],
+                         plot_height       = figsize[1]+borders[1]+borders[3],
+                         min_border_left   = borders[0],
+                         min_border_top    = borders[1],
+                         min_border_right  = borders[2],
+                         min_border_bottom = borders[3],
+                         sizing_mode       = theme.figsize[2],
+                         x_range           = Range1d(bounds[0], bounds[2]),
+                         y_range           = Range1d(bounds[1], bounds[3]),
+                         x_axis_label      = theme.xlabel,
+                         y_axis_label      = theme.ylabel)
 
         bounds  = ctrl.daq.config.network.camera.bounds(True)
         fig.extra_x_ranges = {'xpixel': Range1d(bounds[0], bounds[2])}
@@ -269,7 +273,7 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
             pix[0] = int(round(self._model.theme.figsize[1] / ratio))
             pix[1] = self._model.theme.figsize[1]
 
-        return pix+list(self._model.theme.figstart)
+        return pix+list(self._model.theme.figborder[:2])
 
     def __onselect(self, ctrl):
         src    = self._ptsource
