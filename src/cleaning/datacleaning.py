@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "Removing aberrant points and cycles"
 import  warnings
-from    typing                  import NamedTuple, List
+from    typing                  import NamedTuple, List, Union
 from    abc                     import ABC, abstractmethod
 
 import  numpy                   as     np
@@ -22,7 +22,11 @@ Partial = NamedTuple('Partial',
 class NaNDensity(ABC):
     "removes frames affected by NaN value in their neighborhood"
     @staticmethod
-    def _countnans(bead, width, cnt):
+    def _countnans(bead: np.ndarray, width: int, cnt: Union[float, int]) -> np.ndarray:
+        """
+        provide the first index of intervals of at least `cnt` NaN values in an
+        interval `width` long.
+        """
         tmp = np.asarray(np.isnan(bead), dtype = 'i1')
         if width > 1:
             tmp = np.sum(as_strided(tmp,
@@ -142,8 +146,11 @@ class AberrantValuesRule:
 
         returns: *True* if the number of remaining values is too low
         """
+        # remove values outside an absolute range and derivatives outside an absolute range
         _cleaningclip(self, clip, np.nanmedian(bead), bead)
+        # remove stretches of constant values
         _cleaningcst(self, bead)
+        # remove NaN features
         self.localpopulation(bead)
 
     def localpopulation(self, bead:np.ndarray):
