@@ -60,6 +60,24 @@ class DAQClient(ConfigObject):
     def __init__(self, **kwa):
         pass
 
+    def fovtype(self) -> np.dtype:
+        "create the dtype for all fov data"
+        right = self.bytesize-self.offset-self.columns.itemsize
+        assert self.offset >= 0 and self.offset % 4 == 0 and right >= 0 and right % 4 == 0
+        cols = [*((f"_l{i}", 'i4') for i in range(self.offset//4)),
+                *self.columns.descr,
+                *((f"_r{i}", 'i4') for i in range(right//4))]
+        return np.dtype(cols)
+
+    def beadstype(self, nbeads:int):
+        "create the dtype for all beads"
+        if self.offset:
+            raise NotImplementedError()
+        cols = self.columns.descr[:1]
+        for i in range(nbeads):
+            cols += [(j+str(i), k) for j, k in self.columns.descr[1:]]
+        return np.dtype(cols)
+
 class DAQCamera(ConfigObject):
     """
     camera information: address & pixel size

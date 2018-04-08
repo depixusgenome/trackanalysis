@@ -132,9 +132,9 @@ class DAQController(Controller):
                            self.emitpolicy.outasdict,
                            dict(control = self, lines = lines))
 
-    def addbeaddata(self, lines: Dict[int, np.ndarray]) -> dict:
+    def addbeadsdata(self, lines: Dict[int, np.ndarray]) -> dict:
         "add lines of data"
-        return self.handle("addbeaddata",
+        return self.handle("addbeadsdata",
                            self.emitpolicy.outasdict,
                            dict(control = self, lines = lines))
 

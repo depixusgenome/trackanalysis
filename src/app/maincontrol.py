@@ -92,7 +92,7 @@ class BaseSuperController:
         self._configio()
         self._observe(keys)
         self._bokeh(keys, doc)
-        self.display.handle('applicationstarted')
+        self.display.handle('applicationstarted', self.display.emitpolicy.nothing)
         return self
 
     def _observe(self, keys):
@@ -225,4 +225,6 @@ class SuperController(BaseSuperController):
 
 def createview(main, controls, views):
     "Creates a main view"
+    controls = (SuperController,)+tuple(controls)
+    views    = (main,)+tuple(views)
     return ConfigurationIO.createview((SuperController,)+controls, (main,)+views)

@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Runs an app"
-from app.cmdline import defaultclick, defaultmain
+from app.cmdline import defaultclick, defaultmain, click
 
 @defaultclick()
-def main(view, gui, port, raiseerr, singlethread):
+@click.option("--sim",
+              flag_value = True,
+              default    = False,
+              help       = '[DEBUG] adds a server simulator')
+def main(view, gui, port, raiseerr, singlethread, sim): # pylint: disable=too-many-arguments
     "Launches an view"
+    from  daq.app.default import VIEWS
+    if sim:
+        VIEWS.append("daq.server.simulator.ServerSimulatorView")
+    else:
+        VIEWS.append("daq.server.adminview.DAQAdminView")
     defaultmain(view, gui, port, raiseerr, singlethread, "daq.app.toolbar")
 
 if __name__ == '__main__':

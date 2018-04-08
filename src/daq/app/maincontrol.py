@@ -36,4 +36,6 @@ class DAQSuperController(BaseSuperController):
 
 def createview(main, controls, views):
     "Creates a main view"
-    return ConfigurationIO.createview((DAQSuperController,)+controls, (main,)+views)
+    controls = (DAQSuperController,)+tuple(controls)
+    views    = (main,)+tuple(views)
+    return ConfigurationIO.createview(controls, views)

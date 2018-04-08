@@ -60,15 +60,13 @@ class TimeSeriesViewMixin:
         @ctrl.daq.observe
         def _onlisten(**_): # pylint: disable=unused-variable
             for src in (self._leftsource, self._rightsource):
-                tmp = dict(self._source.data)
-                tmp.clear()
-                src.data = tmp
+                src.data = {i: [] for i in src.data}
 
-        for i in ('_onbeaddata', '_onfovdata'):
+        for i in ('_onbeadsdata', '_onfovdata'):
             if hasattr(self, i):
                 ctrl.daq.observe(getattr(self, i))
 
-        names = ['fov'] + ['beads'] if hasattr(self, '_onbeaddata') else []
+        names = ['fov'] + ['beads'] if hasattr(self, '_onbeadsdata') else []
 
         @ctrl.daq.observe
         def _onupdatenetwork(old = None, **_): # pylint: disable=unused-variable
@@ -166,11 +164,13 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
         lines = data.beads.view()[:self._model.theme.maxlength]
         cache[self._leftsource]['data']  = self.__dataleft(lines)
 
-    def _onfovdata(self, lines = None, **_):
-        self._rightsource.stream(self.__dataright(lines), self._model.theme.maxlength)
+    def _onfovdata(self, control = None, lines = None, **_):
+        if len(control.config.beads):
+            self._rightsource.stream(self.__dataright(lines), self._model.theme.maxlength)
 
-    def _onbeaddata(self, lines = None, **_):
-        self._leftsource.stream(self.__dataleft(lines), self._model.theme.maxlength)
+    def _onbeadsdata(self, control = None, lines = None, **_):
+        if len(control.config.beads):
+            self._leftsource.stream(self.__dataleft(lines), self._model.theme.maxlength)
 
     def _leftlabel(self):
         return self._model.theme.labels[self._model.display.leftvar[0]]

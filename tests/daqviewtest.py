@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Testing DAQ view"
-from daq.serversimulator      import runserversimulator
+from daq.server.simulator      import runfovsimulator
 
 def test_serverview(bokehaction):
     "test the view"
-    with bokehaction.launch('daq.serverview.DAQFoVServerView',
+    with bokehaction.launch('daq.server.dataview.DAQFoVServerView',
                             'daq.app.default') as server:
 
         daq  = server.ctrl.daq
@@ -16,7 +16,7 @@ def test_serverview(bokehaction):
         def _onaddfovdata(**_): # pylint: disable=unused-variable
             cnt[0] += pack
 
-        proc = runserversimulator(daq.config.network.fov)
+        proc = runfovsimulator(daq.config.network.fov)
         proc.start()
         server.wait()
         assert cnt[0] == 0

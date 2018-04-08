@@ -1,26 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"DAQ server's clients"
+"Sending orders to the server"
 import socket
 import struct
 import asyncio
 
-from   contextlib       import closing
-from   functools        import partial
-from   typing           import Tuple, TypeVar, Generic
+from   contextlib           import closing
+from   enum                 import Enum
+from   typing               import Tuple
 
 import websockets
-import numpy            as     np
+import numpy                as     np
 
-from   tornado.ioloop   import IOLoop
+from   tornado.ioloop       import IOLoop
 
-from   utils            import initdefaults
-from   utils.logconfig  import getLogger
-from   utils.inspection import templateattribute
-from   .data            import RoundRobinVector, FoVRoundRobinVector, BeadsRoundRobinVector
-from   .model           import DAQBead, DAQProtocol, DAQNetwork
-
-LOGS = getLogger(__name__)
+from   ..model              import DAQBead, DAQProtocol, DAQNetwork
 
 async def send2daq(cnf, text):
     "sends a Lua script to the DAQ"
@@ -50,139 +44,27 @@ async def readdaq(cnf, output):
                 data[i] = sock.recvfrom(bytesize)[0][offset:]
             dontstop = output(data)
 
-class DAQMemory:
+class Teensy(Enum):
     """
-    Relative to the amount of raw memory to keep
+    all attributes that can be set in the Teensy
     """
-    name      = "memory"
-    maxlength = 10000
-    packet    = 1
-    timeout   = .05
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
-
-DATA = TypeVar('DATA', bound = RoundRobinVector)
-
-class DAQServerView(Generic[DATA]):
-    """
-    Can listen to the server
-    """
-    _NAME = ''
-    _data: DATA
-    def __init__(self, **kwa) -> None:
-        self._index = 0
-        self._theme = DAQMemory(name = self._NAME+'memory', **kwa)
-
-    def observe(self, ctrl):
-        "setup observers"
-        if self._theme in ctrl.theme:
-            return
-
-        ctrl.theme.add(self._theme)
-        ctrl.daq.observe(listen        = partial(self._onstart, ctrl, 'started'),
-                         updatenetwork = partial(self._onstart, ctrl, ''))
-
-    def _onstart(self, ctrl, name, old = None, **_):
-        if self._NAME+name in old:
-            async def _start():
-                await self.__start(ctrl)
-            IOLoop.current().spawn_callback(_start)
-
-    async def __readdaq(self, index, cnf, data, call): # pylint: disable=too-many-locals
-        """
-        Reads server data and outputs it
-        """
-        LOGS.info("started %s client", self._NAME)
-        pack     = struct.pack('4sL',
-                               socket.inet_aton(cnf.multicast),
-                               socket.INADDR_ANY)
-        address  = cnf.address
-        period   = 1./cnf.rate
-        bytesize = cnf.bytesize
-        rng      = range(1, self._theme.packet)
-        tout     = self._theme.timeout
-        while self._index == index:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.bind(address)
-            sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, pack)
-            sock.settimeout(tout)
-            cur, ind = data.getnextlines(rng.stop)
-            with closing(sock):
-                try:
-                    sock.recv_into(cur[:1], bytesize)
-                    for i in rng:
-                        await asyncio.sleep(period)
-                        sock.recv_into(cur[i:i+1], bytesize)
-                    data.applynextlines(ind)
-                    call(cur)
-                    await asyncio.sleep(period)
-                except socket.timeout:
-                    pass
-
-    async def __start(self, ctrl):
-        ctrl        = getattr(ctrl, 'daq', ctrl)
-        self._index = index = self._index+1
-        cnf         = getattr(ctrl.config.network, self._NAME)
-        call        = getattr(ctrl, f'add{self._NAME}data')
-        data        = getattr(ctrl.data, self._NAME)
-        if not (getattr(ctrl.data, self._NAME+'started') or self._index != index):
-            LOGS.info("stopping %s client", self._NAME)
-            return
-
-        LOGS.info("starting %s client", self._NAME)
-        await self.__readdaq(index, cnf, data, call)
-
-    def _createdata(self, ctrl):
-        templateattribute(self, 0).create(ctrl, self._theme.maxlength) # type: ignore
-
-class DAQFoVServerView(DAQServerView[FoVRoundRobinVector]):
-    """
-    Can listen to the FoV server
-    """
-    _NAME = 'fov'
-
-class DAQBeadsServerView(DAQServerView[BeadsRoundRobinVector]):
-    """
-    Can listen to the FoV server
-    """
-    _NAME = 'beads'
-
-class _AwaitableDescriptor:
-    __slots__ = ('_name',)
-    def __init__(self):
-        self._name = None
-
-    def __set_name__(self, _, name):
-        self._name = name
-
-    def __get__(self, inst, owner):
-        if inst is None:
-            return self
-
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(getattr(inst, f'get{self._name}')())
-
-    def __set__(self, inst, val):
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(getattr(inst, f'set{self._name}')(val))
+    zmag        = "Zmag"
+    zobj        = "Zobj"
+    zspeed      = "Zspeed"
+    xstage      = "Xstage"
+    ystage      = "Ystage"
+    temperature = "T0"
+    led1        = "Led1"
+    led2        = "Led2"
 
 class DAQAdmin: # pylint: disable=too-many-public-methods
     """
     Allows sending orders to the DAQ server
     """
-    _MSG   = "local t=hidCommand.new();t.MessageType=82;t.{}={};"
-    _NAMES = dict(zmag = 'Zmag', x = 'X',  y = 'Y',  tsample = "Tsample")
+    _MSG   = "local t=hidCommand.new();t.MessageType=82;"
     _PREC  = dict(zmag = 1e-3,   x = 1e-3, y = 1e-3, tsample = 1e-2)
-    def __init__(self, model: DAQNetwork, blocking = False) -> None:
+    def __init__(self, model: DAQNetwork) -> None:
         self.model    = model
-        self.blocking = blocking
-
-    zmag        = _AwaitableDescriptor()
-    temperature = _AwaitableDescriptor()
-    stage       = _AwaitableDescriptor()
-    beads       = _AwaitableDescriptor()
-    protocol    = _AwaitableDescriptor()
 
     async def getconfig(self) -> dict:
         "get the beads tracked by the server"
@@ -222,26 +104,6 @@ class DAQAdmin: # pylint: disable=too-many-public-methods
                            for i in range(0, len(args), 2))
             await readdaq(self.model, _done)
 
-    async def setzmag(self, zmag:float):
-        "set the magnet position"
-        await self.setvalues('zmag', zmag)
-
-    async def setrampspeed(self, rampspeed:float):
-        "set the magnet position"
-        raise NotImplementedError
-
-    async def getrampspeed(self,):
-        "set the magnet position"
-        raise NotImplementedError
-
-    async def setstage(self, pos:Tuple[float, float]):
-        "set the stage position"
-        await self.setvalues('x', pos[0], 'y', pos[1])
-
-    async def settemperature(self, tval: float):
-        "set the sample temperature"
-        await self.setvalues('tsample', tval)
-
     async def setstartrecording(self, record: str):
         """
         tell the server to start recording
@@ -280,11 +142,10 @@ class DAQAdmin: # pylint: disable=too-many-public-methods
 
     async def setvalues(self, *args):
         "sets a list of values"
-        msg = "".join(self._MSG.format(self._MSG[args[i]], args[i+1])
-                      for i in range(0, len(args), 2))
+        msg  = self._MSG
+        for i in range(0, len(args), 2):
+            msg += "{}={};".format(Teensy(args[i]).value, args[i+1])
         await send2daq(self.model, msg)
-        if self.blocking: # pylint: disable=unreachable
-            await self.wait(self.model, *args)
 
 class DAQAdminView:
     """
@@ -309,8 +170,8 @@ class DAQAdminView:
             if hasattr(model, "zmag"):
                 async def _run():
                     daq = self._daq(control)
-                    await daq.setvalues("zmag", model.zmag)
-                    await daq.setrampspeed(model.speed)
+                    await daq.setvalues(Teensy.zmag,   model.zmag,
+                                        Teensy.zspeed, model.speed)
                 IOLoop.current().spawn_callback(_run)
             else:
                 async def _run():

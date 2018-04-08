@@ -4,11 +4,7 @@
 from app.launcher import setup
 from app.toolbar  import toolbarview
 from .maincontrol import createview as _createview
-
-VIEWS       = ('daq.serverview.DAQFoVServerView',
-               'daq.serverview.DAQBeadsServerView',
-              )#'daq.serverview.DAQAdminView')
-CONTROLS    = ()
+from .default     import VIEWS, CONTROLS
 
 def createview(main, controls, views):
     "Creates an app with a toolbar"

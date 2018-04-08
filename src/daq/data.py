@@ -5,6 +5,7 @@ The database
 """
 from   typing  import Iterable, Tuple
 import numpy   as     np
+from   .model  import DAQClient
 
 class RoundRobinVector:
     """
@@ -91,14 +92,9 @@ class FoVRoundRobinVector(RoundRobinVector):
     def fulltype(offset:    int,    # type: ignore # pylint: disable=arguments-differ
                  columns:   np.dtype,
                  bytesize:  int,
-                 *_):
+                 *_) -> np.dtype:
         "create the dtype for all beads"
-        right = bytesize-offset-columns.itemsize
-        assert offset >= 0 and offset % 4 == 0 and right >= 0 and right % 4 == 0
-        cols = [*((f"_l{i}", 'i4') for i in range(offset//4)),
-                *columns.descr,
-                *((f"_r{i}", 'i4') for i in range(right//4))]
-        return np.dtype(cols)
+        return DAQClient(offset = offset, columns = columns, bytesize = bytesize).fovtype()
 
     @property
     def basetype(self):
@@ -136,10 +132,7 @@ class BeadsRoundRobinVector(RoundRobinVector):
                  columns: np.dtype,
                  *_):
         "create the dtype for all beads"
-        cols = columns.descr[:1]
-        for i in range(nbeads):
-            cols += [(j+str(i), k) for j, k in columns.descr[1:]]
-        return np.dtype(cols)
+        return DAQClient(offset = 0, columns = columns).beadstype(nbeads)
 
     @property
     def basetype(self):
