@@ -135,7 +135,7 @@ class MessagesInput:
         "initializes globals"
         ctrl.globals.project.message.default = None
         msg = ctrl.globals.css.message
-        siz = 'heigth: 28px; margin-top: 0px;'
+        siz = 'height: 28px; margin-top: 0px;'
         msg.defaults = dict(normal  = '<p style="%s">{}</p>' % siz,
                             warning = '<p style="%s color:blue;">{}</p>' % siz,
                             error   = '<p style="%s color:red;"> {}</p>' % siz,

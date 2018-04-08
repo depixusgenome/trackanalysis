@@ -13,7 +13,7 @@ LOGS  = getLogger(__name__)
 
 class DAQMessageTheme:
     "Message theme"
-    _SIZ    = 'heigth: 28px; margin-top: 0px;'
+    _SIZ    = 'height: 28px; margin-top: 0px;'
     name    = "message"
     period  = 50
     width   = 350
