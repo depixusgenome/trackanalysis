@@ -88,15 +88,18 @@ class PeaksAlignment:
         pks     = {i: self.refalign.frompeaks(frompks(j)) for i, j in data}
         return {i: self.refalign.optimize(pks[ref], j) for i, j in pks.items()}
 
-    def tohairpin(self, data, ref, corr):
+    def tohairpin(self, data, ref = None, corr = None):
         """
         normalize to a given hairpin
         """
         if not self.hpalign:
             return corr
-        pks = np.sort(next(j for i, j in data if i == ref).peakposition.unique())
-        out = self.hpalign.optimize(pks)
-        return {i: (j[0], j[1]*out[1], j[1]*j[2]+out[2]/j[1]) for i, j in corr.items()}
+
+        align = lambda x: self.hpalign.optimize(np.sort(x.peakposition.unique()))
+        if self.refalign is not None:
+            out = align(next(j for i, j in data if i == ref))
+            return {i: (j[0], j[1]*out[1], j[1]*j[2]+out[2]/j[1]) for i, j in corr.items()}
+        return {i: align(j) for i, j in data}
 
     def correct(self, data, ref):
         """
