@@ -12,6 +12,15 @@ from   model              import Task, Level, PHASE
 from   control.processor  import Processor
 from   ..alignment        import ExtremumAlignment, PhaseEdgeAlignment
 
+def _min_extension():
+    try:
+        from cleaning.datacleaning import ExtentRule
+    except ImportError:
+        from utils.logconfig import getLogger
+        getLogger(__name__).warning("Could not obtain min extension from the cleaning module")
+        return .25
+    return ExtentRule.minextent
+
 class AlignmentTactic(Enum):
     "possible alignments"
     onlyinitial = 'onlyinitial'
@@ -74,7 +83,7 @@ class ExtremumAlignmentTask(Task):
     fiveratio  = .4
     outlier    = .9
     pull       = .1
-    opening    = .5
+    opening    = _min_extension()
     delta      = .2
     minrelax   = .1
     delete     = True
@@ -138,7 +147,8 @@ class ExtremumAlignmentProcessor(Processor[ExtremumAlignmentTask]):
     @classmethod
     def _apply_pull(cls, kwa, frame, info):
         args = cls.__args(kwa, frame, info, True)
-        bias = args.pull + np.nanmedian(args.initial-args.pull)
+        bias = args.pull + np.nanpercentile(args.initial-args.pull,
+                                            100.-cls._get(kwa, 'percentile'))
 
         bad  = cls.__less(args.measure-args.pull, kwa, 'opening')
         bad &= cls.__less(args.initial-args.pull, kwa, 'opening')

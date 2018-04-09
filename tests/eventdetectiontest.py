@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 "Tests interval detection"
 import pickle
+from   typing                 import cast
 
 import pandas as pd
 import numpy  as np
@@ -247,7 +248,7 @@ def test_population_merge():
     merged    = PopulationMerger(percentile = 75.)(data, intervals)
     assert tuple(tuple(i) for i in merged) == ((0,10), (5,20), (30,41))
 
-    data  = pickle.load(open(utfilepath("eventsdata.pk"), 'rb'))
+    data  = pickle.load(open(cast(str, utfilepath("eventsdata.pk")), 'rb'))
     intervals = np.array([[  1,  11], [ 12,  15], [ 16,  25], [ 26,  52],
                           [ 55, 121], [125, 136], [138, 453]])
     merged    = PopulationMerger()(data, intervals)
@@ -269,14 +270,14 @@ def test_select():
     assert det(0, 5, ((0,0),(1,1),(5,10)))          == ((5,10),)
     assert det(1, 5, ((0,0),(1,1),(5,10), (20,30))) == ((21,29),)
 
-    det         = EventSelector(edgelength = 0, minlength = 5)
+    fcn         = EventSelector(edgelength = 0, minlength = 5)
     data        = np.ones(50)
     data[:5]    = np.NaN
     data[10:15] = np.NaN
     data[:5]    = np.NaN
     data[19:20] = np.NaN
 
-    val = det(data, np.array(((0,15), (10, 20))))
+    val = fcn(data, np.array(((0,15), (10, 20))))
     assert [tuple(i) for i in val] == [(0, 15)]
 
 def test_minmaxalign():
@@ -338,18 +339,18 @@ def test_pull_alignment():
         ini -= ini.mean()
 
         pull  = track.cycles.withphases(PHASE.pull)[0,i]
-        pull += .3 - pull.mean()
+        pull += .2 - pull.mean()
 
         meas    = track.cycles.withphases(PHASE.measure)[0,i]
         meas[:] = 0.
 
     pull    = track.cycles.withphases(PHASE.pull)[0,3].mean()
     meas    = track.cycles.withphases(PHASE.measure)[0,3]
-    meas[:] = pull.mean()-.3
+    meas[:] = pull.mean()-.2
 
     pull    = track.cycles.withphases(PHASE.pull)[0,4].mean()
     meas    = track.cycles.withphases(PHASE.initial)[0,4]
-    meas[:] = pull.mean()-.3
+    meas[:] = pull.mean()-.2
 
     bead    = ExtremumAlignmentProcessor.apply(track.beads, phase = AlignmentTactic.pull)
     inipos  = [i.mean() for i in track.beads[0,...].withphases(PHASE.pull).values()]
