@@ -5,8 +5,8 @@ import asyncio
 import socket
 import struct
 from   functools        import partial
-from   multiprocessing  import Process
-from   typing           import Union, Optional
+from   multiprocessing  import Process, Value
+from   typing           import Union, Optional, Tuple
 
 import numpy        as     np
 
@@ -15,7 +15,7 @@ from   daq.model        import DAQClient
 
 LOGS = getLogger(__name__)
 
-async def writedaq(nbeads: int, cnf: DAQClient, output = None):
+async def writedaq(nbeads: int, cnf: DAQClient, output = None, state = None):
     """
     Reads server data and outputs it
     """
@@ -34,8 +34,8 @@ async def writedaq(nbeads: int, cnf: DAQClient, output = None):
     period = 1./cnf.rate
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, struct.pack('b', 1))
-        LOGS.info("Running simulator on %s T=%s", addr, period)
-        while True:
+        LOGS.info("Running simulator on %s T=%s S=%s", addr, period, dtype.itemsize)
+        while state is None or state.value:
             for data in output:
                 sock.sendto(data.tobytes(), addr)
                 await asyncio.sleep(period)
@@ -44,29 +44,34 @@ async def writedaq(nbeads: int, cnf: DAQClient, output = None):
 def _runsimulator(nbeads: int,
                   cnf: DAQClient,
                   output: Union[int, np.ndarray] = None,
-                  subprocess: bool               = True) -> Optional[Process]:
+                  subprocess: bool               = True,
+                  state                          = None) -> Optional[Tuple[Process, Value]]:
     "run the simulator"
     if subprocess:
         LOGS.info("running in another process")
-        return Process(target = _runsimulator, args = (nbeads, cnf, output, False))
+        state = Value('i', 1)
+        proc  = Process(target = _runsimulator, args = (nbeads, cnf, output, False, state))
+        return proc, state
 
     policy = asyncio.get_event_loop_policy()
     policy.set_event_loop(policy.new_event_loop())
     loop   = asyncio.get_event_loop()
-    loop.run_until_complete(writedaq(nbeads, cnf, output))
+    loop.run_until_complete(writedaq(nbeads, cnf, output, state))
     loop.close()
     return None
 
 def runbeadssimulator(nbeads: int,
                       cnf: DAQClient                 = None,
                       output: Union[int, np.ndarray] = None,
-                      subprocess: bool               = True) -> Optional[Process]:
+                      subprocess: bool               = True
+                     ) -> Optional[Tuple[Process, Value]]:
     "run the simulator"
     return _runsimulator(max(0, nbeads), cnf, output, subprocess)
 
 def runfovsimulator(cnf: DAQClient                 = None,
                     output: Union[int, np.ndarray] = None,
-                    subprocess: bool               = True) -> Optional[Process]:
+                    subprocess: bool               = True
+                   ) -> Optional[Tuple[Process, Value]]:
     "run the simulator"
     return _runsimulator(-1, cnf, output, subprocess)
 
@@ -75,8 +80,8 @@ class ServerSimulatorView:
     view for simulating the server
     """
     def __init__(self, **_):
-        self._fov:   Process = None
-        self._beads: Process = None
+        self._fov:   Tuple[Process, Value] = None
+        self._beads: Tuple[Process, Value] = None
 
     def observe(self, ctrl):
         "observe the controller"
@@ -91,9 +96,14 @@ class ServerSimulatorView:
             startfov()
             startbeads()
 
-        ctrl.daq.observe("addbeads", "removebeads", startbeads)
-        ctrl.theme.observe("beads", startbeads)
-        ctrl.theme.observe("fov",   startfov)
+        @ctrl.daq.observe
+        def _onaddbeads(**_):
+            ctrl.daq.listen(beads = True)
+
+        @ctrl.daq.observe
+        def _onremovebeads(**_):
+            ctrl.daq.listen(beads = len(ctrl.daq.config.beads) > 0)
+
         ctrl.display.observe("guiloaded", lambda: ctrl.daq.listen(True, True))
 
     @staticmethod
@@ -104,19 +114,20 @@ class ServerSimulatorView:
     def _startfov(self, ctrl, **_):
         proc, self._fov = self._fov, None
         if proc:
-            proc.terminate()
+            proc[1].value = 0
+            proc[0].join()
 
         if ctrl.daq.data.fovstarted:
             self._fov = runfovsimulator(ctrl.daq.config.network.fov)
-            LOGS.info("starting fov simulator")
-            self._fov.start()
+            self._fov[0].start()
 
     def _startbeads(self, ctrl, **_):
         proc, self._beads = self._beads, None
         if proc:
-            proc.terminate()
+            proc[1].value = 0
+            proc[0].join()
+
         nbeads = len(ctrl.daq.config.beads)
         if nbeads and ctrl.daq.data.beadsstarted:
             self._beads = runbeadssimulator(nbeads, ctrl.daq.config.network.beads)
-            LOGS.info("starting beads simulator")
-            self._beads.start()
+            self._beads[0].start()

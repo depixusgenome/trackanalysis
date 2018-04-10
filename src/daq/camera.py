@@ -175,13 +175,13 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
 
         @ctrl.daq.observe
         def _onlisten(**_): # pylint: disable=unused-variable
-            if self._cam is None:
-                return
-
-            tmp = dict(self._source.data)
-            tmp.clear()
-            self._source.data = tmp
-            self._cam.start  += 1
+            if self._cam is not None:
+                def _run():
+                    tmp = dict(self._source.data)
+                    tmp.clear()
+                    self._source.data = tmp
+                    self._cam.start  += 1
+                self._doc.add_next_tick_callback(_run)
 
         @ctrl.display.observe
         def _oncamera(old = None, **_): # pylint: disable=unused-variable

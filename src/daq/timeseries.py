@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View module showing one or more time series"
+from   functools        import partial
 from   typing           import List, cast
 
 from   bokeh.plotting   import figure, Figure
 from   bokeh.models     import ColumnDataSource, LinearAxis, DataRange1d
 
 from   utils            import initdefaults
+from   utils.logconfig  import getLogger
 from   view.threaded    import ThreadedDisplay, DisplayModel
 from   view.plots.base  import PlotAttrs
+LOGS = getLogger(__name__)
 
 class TimeSeriesTheme:
     "information about the time series displayed"
     name      = "timeseries"
     labels    = {"zmag":    "Magnets (µm)",
+                 "time":    "Frames",
                  "x":       "X (µm)",
                  "y":       "Y (µm)",
                  "z":       "Z (µm)",
@@ -24,9 +28,7 @@ class TimeSeriesTheme:
                  "led1":    "Led 1 intensity",
                  "led2":    "Led 2 intensity"
                 }
-    xlabel    = "Frames"
-    leftlabel = "Bead    (µm)"
-    leftattr  = PlotAttrs("lightblue", "circle", 1)
+    leftattr  = PlotAttrs("lightblue", "circle", size=5)
     rightattr = PlotAttrs("red",       "line",   1)
     figsize   = 800, 400, 'fixed'
     maxlength = 5000
@@ -51,27 +53,11 @@ class TimeSeriesViewMixin:
         if self._model.observe(ctrl):
             return
 
-        fcn = lambda **_: self.redisplay(ctrl)
+        fcn = partial(self._onmodel, ctrl)
         ctrl.theme.observe  (self._model.theme,   fcn)
         ctrl.display.observe(self._model.display, fcn)
-
-        ctrl.daq.observe('updatenetwork', self.redisplay)
-
-        @ctrl.daq.observe
-        def _onlisten(**_): # pylint: disable=unused-variable
-            for src in (self._leftsource, self._rightsource):
-                src.data = {i: [] for i in src.data}
-
-        for i in ('_onbeadsdata', '_onfovdata'):
-            if hasattr(self, i):
-                ctrl.daq.observe(getattr(self, i))
-
-        names = ['fov'] + ['beads'] if hasattr(self, '_onbeadsdata') else []
-
-        @ctrl.daq.observe
-        def _onupdatenetwork(old = None, **_): # pylint: disable=unused-variable
-            if any(i in old for i in names):
-                self.redisplay(ctrl)
+        ctrl.daq.observe(self._onlisten)
+        ctrl.daq.observe(partial(self._onupdatenetwork, ctrl))
 
     def _addtodoc(self, *_):
         "sets the plot up"
@@ -82,7 +68,7 @@ class TimeSeriesViewMixin:
                        plot_width       = theme.figsize[0],
                        plot_height      = theme.figsize[1],
                        sizing_mode      = theme.figsize[2],
-                       x_axis_label     = theme.xlabel,
+                       x_axis_label     = self._xlabel(),
                        y_axis_label     = self._leftlabel())
 
         theme.leftattr.addto(fig,
@@ -108,21 +94,35 @@ class TimeSeriesViewMixin:
             if j.axis_label != i:
                 cache[j]['axis_label'] = i
 
+    def _xlabel(self):
+        return self._model.theme.labels[self._model.display.xvar]
+
     def _leftlabel(self):
         return self._model.theme.labels[self._model.display.leftvar]
 
     def _rightlabel(self):
         return self._model.theme.labels[self._model.display.rightvar]
 
-    def redisplay(self, control = None, **_):
-        "resets the view"
-        self.reset(control)
+    def _onmodel(self, ctrl, **_):
+        self.reset(ctrl)
+
+    def _onlisten(self, **_): # pylint: disable=unused-variable
+        def _run():
+            for src in (self._leftsource, self._rightsource):
+                src.data = {i: [] for i in src.data}
+        self._doc.add_next_tick_callback(_run)
+
+    def _onupdatenetwork(self, ctrl, old = None, **_): # pylint: disable=unused-variable
+        names = ['fov'] + ['beads'] if hasattr(self, '_onbeadsdata') else []
+        if any(i in old for i in names):
+            self._onmodel(ctrl)
 
 class BeadTimeSeriesDisplay:
     "Information about the current bead displayed"
     name     = "beadtimeseries"
     index    = 0
-    leftvar  = "z0"
+    xvar     = 'time'
+    leftvar  = "z"
     rightvar = "zmag"
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -150,52 +150,62 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
         @ctrl.daq.observe
         def _oncurrentbead(bead = None, **_): # pylint: disable=unused-variable
             mdl  = self._model.display
-            name = '' if bead is None else str(bead)
-            ctrl.display.update(mdl, leftvar = mdl.leftvar[:1]+name)
+            name = mdl.leftvar[:1]+('' if bead is None else str(bead))
+            ctrl.display.update(mdl, leftvar = name)
 
     def _reset(self, control, cache):
         "resets the data"
         super()._reset(control, cache)
         data  = getattr(control, 'daq', control).data
+        disp  = self._model.display
 
-        lines = data.fov.view()[:self._model.theme.maxlength]
-        cache[self._rightsource]['data'] = self.__dataright(lines)
+        attrs = disp.xvar, disp.leftvar, disp.rightvar
+        right = data.fov  .view()[:self._model.theme.maxlength]
+        left  = data.beads.view()[:self._model.theme.maxlength]
+        if (len(control.daq.config.beads)
+                and len({attrs[0], attrs[2]} - set(right.dtype.names)) == 0
+                and len({attrs[0], attrs[1]} - set(left.dtype.names)) == 0):
+            cache[self._leftsource] ['data'] = {self.XLEFT:  left[attrs[0]],
+                                                self.YLEFT:  left[attrs[1]]}
+            cache[self._rightsource]['data'] = {self.XRIGHT: right[attrs[0]],
+                                                self.YRIGHT: right[attrs[2]]}
+            print(cache[self._rightsource]['data'])
+            def _obs():
+                control.daq.observe(self._onbeadsdata)
+                control.daq.observe(self._onfovdata)
+            cache[self] = _obs
+        else:
+            control.daq.remove(self._onbeadsdata)
+            control.daq.remove(self._onfovdata)
+            cache[self._rightsource]['data'] = {self.XLEFT:  [], self.YLEFT: []}
+            cache[self._leftsource]['data']  = {self.XRIGHT: [], self.YRIGHT: []}
 
-        lines = data.beads.view()[:self._model.theme.maxlength]
-        cache[self._leftsource]['data']  = self.__dataleft(lines)
+    def _onfovdata(self, lines = None, **_):
+        disp = self._model.display
+        try:
+            data = {self.XRIGHT: lines[disp.xvar], self.YRIGHT: lines[disp.rightvar]}
+        except ValueError:
+            return
+        fcn  = lambda: self._rightsource.stream(data, self._model.theme.maxlength)
+        self._doc.add_next_tick_callback(fcn)
 
-    def _onfovdata(self, control = None, lines = None, **_):
-        if len(control.config.beads):
-            data = self.__dataright(lines)
-            fcn  = lambda: self._rightsource.stream(data, self._model.theme.maxlength)
-            self._doc.add_next_tick_callback(fcn)
-
-    def _onbeadsdata(self, control = None, lines = None, **_):
-        if len(control.config.beads):
-            data = self.__dataleft(lines)
-            fcn  = lambda: self._leftsource.stream(data, self._model.theme.maxlength)
-            self._doc.add_next_tick_callback(fcn)
+    def _onbeadsdata(self, lines = None, **_):
+        LOGS.info("%s", lines)
+        disp = self._model.display
+        try:
+            data = {self.XLEFT: lines[disp.xvar], self.YLEFT: lines[disp.leftvar]}
+        except ValueError:
+            return
+        fcn  = lambda: self._leftsource.stream(data, self._model.theme.maxlength)
+        self._doc.add_next_tick_callback(fcn)
 
     def _leftlabel(self):
         return self._model.theme.labels[self._model.display.leftvar[0]]
 
-    def __dataleft(self, data):
-        names = data.dtype.names
-        if self._model.display.leftvar in names:
-            return {self.XLEFT: data[names[0]],
-                    self.YLEFT: data[self._model.display.leftvar]}
-        return {self.XLEFT: [], self.YLEFT: []}
-
-    def __dataright(self, data):
-        names = data.dtype.names
-        if len(data) and self._model.rightvar in names:
-            return {self.XRIGHT: data[names[0]],
-                    self.YRIGHT: data[self._model.display.rightvar]}
-        return {self.XRIGHT: [], self.YRIGHT: []}
-
 class FoVTimeSeriesDisplay:
     "Information about the current fov parameter displayed"
     name     = "fovtimeseries"
+    xvar     = 'time'
     leftvar  = "tsample"
     rightvar = "zmag"
     @initdefaults(frozenset(locals()))
@@ -214,8 +224,7 @@ class FoVTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[FoVTimeSeriesModel]
         src              = dict.fromkeys((self.XLEFT,  self.YRIGHT, self.YLEFT),
                                          cast(List[float], []))
         self._leftsource = self._rightsource = ColumnDataSource(src)
-        label            = TimeSeriesTheme.labels["tsample"]
-        super().__init__(leftvar   = "tsample", leftlabel = label)
+        super().__init__(leftvar   = "tsample")
 
     def _reset(self, control, cache):
         "resets the data"
@@ -229,10 +238,9 @@ class FoVTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[FoVTimeSeriesModel]
 
     def __data(self, data):
         disp = self._model.display
-        if len(disp.leftvar) == 0:
-            return {self.XLEFT:  [],
-                    self.YLEFT:  [],
-                    self.YRIGHT: []}
-        return {self.XLEFT:  data[data.dtype.names[0]],
-                self.YLEFT:  data[disp.leftvar],
-                self.YRIGHT: data[disp.rightvar]}
+        try:
+            return {self.XLEFT:  data[disp.xvar],
+                    self.YLEFT:  data[disp.leftvar],
+                    self.YRIGHT: data[disp.rightvar]}
+        except ValueError:
+            return {self.XLEFT:  [], self.YLEFT:  [], self.YRIGHT: []}

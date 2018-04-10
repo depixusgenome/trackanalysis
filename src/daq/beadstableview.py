@@ -60,9 +60,11 @@ class BeadsTableView(ThreadedDisplay[BeadsTableTheme]):
 
         @ctrl.daq.observe
         def _onlisten(**_): # pylint: disable=unused-variable
-            tmp = dict(self._source.data)
-            tmp.clear()
-            self._source.data = tmp
+            def _run():
+                tmp = dict(self._source.data)
+                tmp.clear()
+                self._source.data = tmp
+            self._doc.add_next_tick_callback(_run)
 
     def _reset(self, ctrl, cache):
         cache[self._source]['data'] = self.__data(ctrl)
