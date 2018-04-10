@@ -4,7 +4,7 @@
 import re
 
 from itertools          import product
-from functools          import wraps
+from functools          import wraps, partial
 from enum               import Enum, unique
 from typing             import (Dict, Union, Sequence, # pylint: disable=unused-import
                                 Callable, Tuple, Any, Set, Optional, cast)
@@ -73,11 +73,24 @@ class Event:
     def __init__(self, **kwargs):
         self._handlers: _HANDLERS = kwargs.get('handlers', dict())
 
-    def remove(self, name:str, fcn:Callable):
+    def remove(self, *args):
         "removes an event"
-        itm = self._handlers.get(name, None)
+        if all(isfunction(i) for i in args):
+            for arg in args:
+                fcn  = arg.func if isinstance(arg, partial) else arg
+                name = self.__OBS_NAME(fcn.__name__).group(1)
+                itm  = self._handlers.get(name, None)
+                if isinstance(itm, Set):
+                    tmp  = {arg, fcn}
+                    itm -= {i for i in itm if i in tmp or getattr(i, 'func', None) in tmp}
+            return
+
+        name = args[0]
+        assert isinstance(name, str)
+        itm  = self._handlers.get(name, None)
         if isinstance(itm, Set):
-            itm.discard(fcn)
+            tmp  = set(args[1:]) | set(i.func if isinstance(i, partial) else i for i in args[1:])
+            itm -= {i for i in itm if i in tmp or getattr(i, 'func', None) in tmp}
 
     def getobservers(self, lst:Union[str,Set[str]]) -> Set[Callable]:
         "returns the list of observers"
@@ -158,7 +171,7 @@ class Event:
 
         def _fromfcn(fcn:Callable, name = None):
             if name is None:
-                name  = fcn.__name__
+                name  = (fcn.func if isinstance(fcn, partial) else fcn).__name__
             match = self.__OBS_NAME(name)
 
             return add((name,), fcn) if match is None else add((match.group(1),), fcn)
@@ -203,7 +216,8 @@ class Event:
     def __emit_list(cls, names, fcn = None) -> frozenset:
         "creates a list of emissions"
         if len(names) == 0 or names[0] is fcn:
-            tmp = (cls.__EM_NAME(fcn.__name__).group(1),)
+            fname = (fcn.func if isinstance(fcn, partial) else fcn).__name__
+            tmp   = (cls.__EM_NAME(fname).group(1),)
             return frozenset(name.lower().strip() for name in tmp)
 
         return frozenset(name.lower().strip() for name in names)
