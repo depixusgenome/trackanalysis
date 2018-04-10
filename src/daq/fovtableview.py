@@ -81,7 +81,7 @@ class FoVTableView(ThreadedDisplay[FoVTableTheme]):
 
         ctrl.theme.add(self._model)
         ctrl.theme.observe(self._model, lambda **_: self.reset(ctrl))
-        ctrl.daq.observe(self._onaddfovlines)
+        ctrl.daq.observe(self._onfovdata)
 
         @ctrl.daq.observe
         def _onupdatefov(old = None, **_): # pylint: disable=unused-variable
@@ -91,7 +91,7 @@ class FoVTableView(ThreadedDisplay[FoVTableTheme]):
     def _reset(self, control, cache):
         cache[self.__widget]['text'] = self.__data(control.data.fov)
 
-    def _onaddfovlines(self, lines = None, **_):
+    def _onfovdata(self, lines = None, **_):
         rate = self._model.refreshrate
         new  = self.__index + len(lines)
         if new // rate > self.__index // rate:

@@ -128,13 +128,13 @@ class DAQController(Controller):
 
     def addfovdata(self, lines: np.ndarray) -> dict:
         "add lines of data"
-        return self.handle("addfovdata",
+        return self.handle("fovdata",
                            self.emitpolicy.outasdict,
                            dict(control = self, lines = lines))
 
     def addbeadsdata(self, lines: Dict[int, np.ndarray]) -> dict:
         "add lines of data"
-        return self.handle("addbeadsdata",
+        return self.handle("beadsdata",
                            self.emitpolicy.outasdict,
                            dict(control = self, lines = lines))
 
