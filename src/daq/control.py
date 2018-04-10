@@ -118,12 +118,18 @@ class DAQController(Controller):
         self.setcurrentbead(len(self.config.beads)-1)
 
     @Controller.emit
-    def listen(self, fov, beads) -> dict:
+    def listen(self, fov = None, beads = None) -> dict:
         "add lines of data"
-        if fov:
+        if fov is None:
+            fov             = self.data.fovstarted
+        elif fov and not self.data.fovstarted:
             self.data.fov   = self.data.fov  .create(self.config, self.data.fov.maxlength)
-        if beads:
+
+        if beads is None:
+            beads           = self.data.fovstarted
+        elif beads and not self.data.beadsstarted:
             self.data.beads = self.data.beads.create(self.config, self.data.beads.maxlength)
+
         return updatemodel(self, self.data, dict(fovstarted = fov, beadsstarted = beads))
 
     def addfovdata(self, lines: np.ndarray) -> dict:

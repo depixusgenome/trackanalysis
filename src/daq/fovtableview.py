@@ -8,37 +8,20 @@ from   bokeh.layouts import widgetbox
 from   utils         import initdefaults
 from   view.threaded import ThreadedDisplay, BaseModel
 
-_TEXT = """
-<div class='dpx-span'>
-    <div><p style='margin: 0px; width:100px;'><b>Magnet µm:</b></p></div>
-    <div><p style='margin: 0px;'>{zmag}</p></div>
-</div>
-<div class='dpx-span'>
-    <div><p style='margin: 0px; width:100px;'><b>Objective µm:</b></p></div>
-    <div><p style='margin: 0px;'>{zobj}</p></div>
-</div>
-<div class='dpx-span'>
-    <div><p style='margin: 0px; width:100px;'><b>X µm:</b></p></div>
-    <div><p style='margin: 0px;'>{x}</p></div>
-</div>
-<div class='dpx-span'>
-    <div><p style='margin: 0px; width:100px;'><b>Y µm:</b></p></div>
-    <div><p style='margin: 0px;'>{y}</p></div>
-</div>
-<div class='dpx-span'>
-    <div><p style='margin: 0px; width:100px;'><b>Sample °C:</b></p></div>
-    <div><p style='margin: 0px;'>{tsample}</p></div>
-</div>
-<div class='dpx-span'>
-    <div><p style='margin: 0px; width:100px;'><b>Magnet °C:</b></p></div>
-    <div><p style='margin: 0px;'>{tmagnet}</p></div>
-</div>
-<div class='dpx-span'>
-    <div><p style='margin: 0px; width:100px;'><b>Sink °C:</b></p></div>
-    <div><p style='margin: 0px;'>{tsink}</p></div>
-</div>
-<p></p>
-""".strip().replace("    ", "").replace("\n", "")
+_BASE = """
+        <div class='dpx-span'>
+            <div><p style='margin: 0px; width:100px;'><b>%s</b></p></div>
+            <div><p style='margin: 0px;'>{%s}</p></div>
+        </div>
+        """.strip().replace("\n", "").replace("    ", "").replace("    ", "").replace("    ", "")
+
+_TEXT = "".join(_BASE % i for i in (("Magnet µm", "zmag:.3f"),
+                                    ("Objective µm", "zobj:.3f"),
+                                    ("X µm", "x:.3f"),
+                                    ("Y µm", "y:.3f"),
+                                    ("Sample °C", "tsample:.3f"),
+                                    ("Box °C", "tsink:.3f"),
+                                    ("Magnet °C", "tmagnet:.3f")))+"<p></p>"
 
 class FoVTableTheme(BaseModel):
     "summary info on the field of view"
@@ -53,7 +36,7 @@ class FoVTableTheme(BaseModel):
 
 class FoVTableView(ThreadedDisplay[FoVTableTheme]):
     "display summary info on the field of view"
-    _FIND = re.compile(r'{\w+}')
+    _FIND = re.compile(r'{(\w+)[:}]')
     def __init__(self, **_):
         super().__init__()
         self.__widget:  Div       = None
@@ -62,7 +45,7 @@ class FoVTableView(ThreadedDisplay[FoVTableTheme]):
 
     def _addtodoc(self, ctrl, _):
         "creates the widget"
-        self.__columns = [i[1:-1] for i in self._FIND.findall(self._model.template)]
+        self.__columns = [i for i in self._FIND.findall(self._model.template)]
         text           = self._model.template.format(**dict.fromkeys(self.__columns, 0.))
 
         mods = dict(width  = self._model.width,
@@ -95,7 +78,8 @@ class FoVTableView(ThreadedDisplay[FoVTableTheme]):
         rate = self._model.refreshrate
         new  = self.__index + len(lines)
         if new // rate > self.__index // rate:
-            self.__widget.update(text = self.__data(lines))
+            text = self.__data(lines)
+            self._doc.add_next_tick_callback(lambda: setattr(self.__widget, 'text', text))
         self.__index = new
 
     def __data(self, lines):

@@ -4,10 +4,10 @@
 import socket
 import struct
 import asyncio
+import time
 
-from   contextlib         import closing
 from   functools          import partial
-from   typing             import TypeVar, Generic
+from   typing             import TypeVar, Generic, List, Tuple, Any
 
 from   tornado.ioloop     import IOLoop
 
@@ -22,10 +22,12 @@ class DAQMemory:
     """
     Relative to the amount of raw memory to keep
     """
-    name      = "memory"
-    maxlength = 10000
-    packet    = 1
-    timeout   = .05
+    name        = "memory"
+    maxlength   = 10000
+    packet      = 1
+    maxerrcount = 5
+    maxerrtime  = 1.
+    timeout     = .05
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -52,7 +54,8 @@ class DAQServerView(Generic[DATA]):
                          updatenetwork = partial(self._onstart, ctrl, ''))
 
     def _onstart(self, ctrl, name, old = None, **_):
-        if self._NAME+name in old:
+        name = self._NAME+name
+        if name in old and getattr(ctrl.daq.data, name):
             async def _start():
                 await self.__start(ctrl)
             IOLoop.current().spawn_callback(_start)
@@ -61,32 +64,45 @@ class DAQServerView(Generic[DATA]):
         """
         Reads server data and outputs it
         """
-        LOGS.info("started %s client", self._NAME)
         pack     = struct.pack('4sL',
                                socket.inet_aton(cnf.multicast),
                                socket.INADDR_ANY)
         address  = cnf.address
+        timeout  = self._theme.timeout
         period   = 1./cnf.rate
         bytesize = data.view().dtype.itemsize
         rng      = range(1, self._theme.packet)
-        while self._index == index:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.bind(address)
-            sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, pack)
-            sock.setblocking(False)
+        errs: List[Tuple[float, Any]] = []
+        def _err(errs, *args):
+            errs.append((time.time(),)+args)
+            if len(errs) >= self._theme.maxerrcount:
+                return [i for i in errs if errs[-1][0]-i[0] < self._theme.maxerrtime]
+            return errs
+
+        while self._index == index and len(errs) < self._theme.maxerrcount:
             cur, ind = data.getnextlines(rng.stop)
-            with closing(sock):
-                try:
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                    sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, pack)
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    sock.settimeout(timeout)
+                    sock.bind(address)
+
                     sock.recv_into(cur[:1], bytesize)
                     for i in rng:
                         await asyncio.sleep(period)
                         sock.recv_into(cur[i:i+1], bytesize)
                     data.applynextlines(ind)
                     call(cur)
-                except socket.error:
-                    pass
-                finally:
-                    await asyncio.sleep(period)
+            except InterruptedError as exc:
+                errs = _err(errs, exc)
+            except socket.timeout as exc:
+                errs = _err(errs, exc)
+            except socket.error as exc:
+                errs = _err(errs, exc)
+            finally:
+                await asyncio.sleep(period)
+        return errs[-1][1] if self._theme.maxerrcount <= len(errs) else None
 
     async def __start(self, ctrl):
         ctrl        = getattr(ctrl, 'daq', ctrl)
@@ -95,11 +111,19 @@ class DAQServerView(Generic[DATA]):
         call        = getattr(ctrl, f'add{self._NAME}data')
         data        = getattr(ctrl.data, self._NAME)
         if not (getattr(ctrl.data, self._NAME+'started') or self._index != index):
-            LOGS.info("stopping %s client", self._NAME)
+            LOGS.info("Forced stop on %s[%d]@%s", self._NAME, index-1, cnf.address)
             return
 
-        LOGS.info("starting %s client", self._NAME)
-        await self.__readdaq(index, cnf, data, call)
+        LOGS.info("starting %s[%d]@%s", self._NAME, index, cnf.address)
+        err = await self.__readdaq(index, cnf, data, call)
+        if err:
+            LOGS.info("Too many errors on %s[%d]@%s: last is '%s'",
+                      self._NAME, index, cnf.address, err)
+            async def _err():
+                ctrl.listen(**{self._NAME:False})
+            await _err()
+        else:
+            LOGS.info("Stopped %s[%d]@%s", self._NAME, index, cnf.address)
 
     def _createdata(self, ctrl):
         templateattribute(self, 0).create(ctrl, self._theme.maxlength) # type: ignore

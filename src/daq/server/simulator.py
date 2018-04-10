@@ -4,60 +4,55 @@
 import asyncio
 import socket
 import struct
-from   contextlib       import closing
 from   functools        import partial
 from   multiprocessing  import Process
 from   typing           import Union, Optional
 
 import numpy        as     np
 
-from   daq.model        import DAQClient, DAQNetwork
+from   utils.logconfig  import getLogger
+from   daq.model        import DAQClient
 
-async def writedaq(nbeads: int, cnf: DAQClient = None, output = None):
+LOGS = getLogger(__name__)
+
+async def writedaq(nbeads: int, cnf: DAQClient, output = None):
     """
     Reads server data and outputs it
     """
-    if cnf is None:
-        cnf = DAQNetwork.fov if nbeads < 0 else DAQNetwork.beads
-
     if output is None:
         output = 300
-
     if np.isscalar(output):
         tmp    = np.sin(np.arange(output, dtype = 'f4')/output*6*np.pi)
         dtype  = cnf.fovtype() if nbeads < 0 else cnf.beadstype(nbeads)
         vals   = [np.empty(output, dtype = 'f4')  if j == '_' else
                   np.arange(output, dtype = 'i8') if k.endswith('i8') else
-                  np.roll(tmp*(i+1), i*10) for i, (j, k) in enumerate(dtype.desc)]
+                  np.roll(tmp*(i+1), i*10) for i, (j, k) in enumerate(dtype.descr)]
         output = np.array([tuple(vals[j][i] for j in range(len(vals)))
                            for i in range(output)], dtype = dtype)
 
-    addr   = cnf.multicast, cnf.address[1]
+    addr   = (cnf.multicast, cnf.address[1])
     period = 1./cnf.rate
-    sock   = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    with closing(sock):
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, struct.pack('b', 1))
-        sock.connect(addr)
+        LOGS.info("Running simulator on %s T=%s", addr, period)
         while True:
             for data in output:
-                sock.send(data.tobytes())
+                sock.sendto(data.tobytes(), addr)
                 await asyncio.sleep(period)
+    LOGS.info("Stopping simulator on %s T=%s", addr, period)
 
-def runsimulator(nbeads: int,
-                 cnf: DAQClient                 = None,
-                 output: Union[int, np.ndarray] = None,
-                 subprocess: bool               = True,
-                 **kwa) -> Optional[Process]:
+def _runsimulator(nbeads: int,
+                  cnf: DAQClient,
+                  output: Union[int, np.ndarray] = None,
+                  subprocess: bool               = True) -> Optional[Process]:
     "run the simulator"
-    if cnf is None and len(kwa) == 0:
-        cnf = DAQNetwork.fov if nbeads < 0 else DAQNetwork.beads
-    elif cnf is None:
-        cnf = DAQClient(**kwa)
-
     if subprocess:
-        return Process(target = runsimulator, args = (nbeads, cnf, output, False))
+        LOGS.info("running in another process")
+        return Process(target = _runsimulator, args = (nbeads, cnf, output, False))
 
-    loop = asyncio.get_event_loop()
+    policy = asyncio.get_event_loop_policy()
+    policy.set_event_loop(policy.new_event_loop())
+    loop   = asyncio.get_event_loop()
     loop.run_until_complete(writedaq(nbeads, cnf, output))
     loop.close()
     return None
@@ -65,17 +60,15 @@ def runsimulator(nbeads: int,
 def runbeadssimulator(nbeads: int,
                       cnf: DAQClient                 = None,
                       output: Union[int, np.ndarray] = None,
-                      subprocess: bool               = True,
-                      **kwa) -> Optional[Process]:
+                      subprocess: bool               = True) -> Optional[Process]:
     "run the simulator"
-    return runsimulator(max(0, nbeads), cnf, output, subprocess, **kwa)
+    return _runsimulator(max(0, nbeads), cnf, output, subprocess)
 
 def runfovsimulator(cnf: DAQClient                 = None,
                     output: Union[int, np.ndarray] = None,
-                    subprocess: bool               = True,
-                    **kwa) -> Optional[Process]:
+                    subprocess: bool               = True) -> Optional[Process]:
     "run the simulator"
-    return runsimulator(-1, cnf, output, subprocess, **kwa)
+    return _runsimulator(-1, cnf, output, subprocess)
 
 class ServerSimulatorView:
     """
@@ -91,40 +84,39 @@ class ServerSimulatorView:
         startbeads = partial(self._startbeads, ctrl)
 
         @ctrl.daq.observe
-        def _onlisten(fovstarted   = False, # pylint: disable=unused-variable
-                      beadsstarted = False,
-                      **_):
-            if fovstarted:
-                startfov()
-            if beadsstarted:
-                startbeads()
+        def _onlisten(**_):
+            LOGS.info("Simulators FoV(%s), Beads(%s)",
+                      ctrl.daq.data.fovstarted,
+                      ctrl.daq.data.beadsstarted)
+            startfov()
+            startbeads()
 
         ctrl.daq.observe("addbeads", "removebeads", startbeads)
         ctrl.theme.observe("beads", startbeads)
         ctrl.theme.observe("fov",   startfov)
-        ctrl.display.observe("applicationstarted", lambda: ctrl.daq.listen(True, True))
+        ctrl.display.observe("guiloaded", lambda: ctrl.daq.listen(True, True))
 
     @staticmethod
     def addtodoc(*_):
         "nothing to do"
         return
 
-    def _startfov(self, ctrl):
+    def _startfov(self, ctrl, **_):
         proc, self._fov = self._fov, None
         if proc:
             proc.terminate()
 
-        self._fov = runfovsimulator(ctrl.daq.config.network.fov)
-        self._fov.start()
+        if ctrl.daq.data.fovstarted:
+            self._fov = runfovsimulator(ctrl.daq.config.network.fov)
+            LOGS.info("starting fov simulator")
+            self._fov.start()
 
-    def _startbeads(self, ctrl):
+    def _startbeads(self, ctrl, **_):
         proc, self._beads = self._beads, None
         if proc:
             proc.terminate()
         nbeads = len(ctrl.daq.config.beads)
-        if nbeads:
+        if nbeads and ctrl.daq.data.beadsstarted:
             self._beads = runbeadssimulator(nbeads, ctrl.daq.config.network.beads)
+            LOGS.info("starting beads simulator")
             self._beads.start()
-
-if __name__ == '__main__':
-    runsimulator(-1, subprocess=False)
