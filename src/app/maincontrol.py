@@ -7,6 +7,8 @@ from   typing                  import Dict, Any
 from   bokeh.themes            import Theme
 from   bokeh.layouts           import layout
 
+from tornado.platform.asyncio import AsyncIOMainLoop
+
 from   control.event           import EmitPolicy
 from   control.taskcontrol     import TaskController
 from   control.globalscontrol  import GlobalsController
@@ -17,6 +19,8 @@ from   view.keypress           import DpxKeyEvent
 from   model.maintheme         import MainTheme
 from   .configuration          import ConfigurationIO
 from   .scripting              import orders
+
+AsyncIOMainLoop().install()
 
 class DisplayController(DecentralizedController):
     "All temporary information related to one application run"
