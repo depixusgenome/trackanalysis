@@ -166,11 +166,15 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
 
     def _onfovdata(self, control = None, lines = None, **_):
         if len(control.config.beads):
-            self._rightsource.stream(self.__dataright(lines), self._model.theme.maxlength)
+            data = self.__dataright(lines)
+            fcn  = lambda: self._rightsource.stream(data, self._model.theme.maxlength)
+            self._doc.add_next_tick_callback(fcn)
 
     def _onbeadsdata(self, control = None, lines = None, **_):
         if len(control.config.beads):
-            self._leftsource.stream(self.__dataleft(lines), self._model.theme.maxlength)
+            data = self.__dataleft(lines)
+            fcn  = lambda: self._leftsource.stream(data, self._model.theme.maxlength)
+            self._doc.add_next_tick_callback(fcn)
 
     def _leftlabel(self):
         return self._model.theme.labels[self._model.display.leftvar[0]]
@@ -220,7 +224,8 @@ class FoVTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[FoVTimeSeriesModel]
         cache[self._leftsource]['data'] = self.__data(lines)
 
     def _onfovdata(self, lines = None, **_):
-        self._leftsource.stream(lines, self._model.theme.maxlength)
+        fcn  = lambda: self._leftsource.stream(lines, self._model.theme.maxlength)
+        self._doc.add_next_tick_callback(fcn)
 
     def __data(self, data):
         disp = self._model.display
