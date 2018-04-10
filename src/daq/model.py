@@ -132,8 +132,14 @@ class DAQNetwork(ConfigObject):
     """
     camera    = DAQCamera()
     websocket = "ws://jupyter.depixus.org:9099"
-    fov       = DAQClient(columns = FOVTYPE)
-    beads     = DAQClient(columns = BEADTYPE)
+    fov       = DAQClient(columns   = FOVTYPE,
+                          address   = ('', 30001),
+                          multicast = '239.255.0.1'
+                         )
+    beads     = DAQClient(columns   = BEADTYPE,
+                          address   = ('', 30002),
+                          multicast = '239.255.0.2'
+                         )
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
