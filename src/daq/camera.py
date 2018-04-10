@@ -240,20 +240,21 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
         figsize = self.__figsize(ctrl)
         borders = theme.figborder
         bounds  = ctrl.daq.config.network.camera.bounds(False)
-        fig     = figure(toolbar_sticky    = theme.toolbar['sticky'],
-                         toolbar_location  = theme.toolbar['location'],
-                         tools             = theme.toolbar['items'],
-                         plot_width        = figsize[0]+borders[0]+borders[2],
-                         plot_height       = figsize[1]+borders[1]+borders[3],
-                         min_border_left   = borders[0],
-                         min_border_top    = borders[1],
-                         min_border_right  = borders[2],
-                         min_border_bottom = borders[3],
-                         sizing_mode       = theme.figsize[2],
-                         x_range           = Range1d(bounds[0], bounds[2]),
-                         y_range           = Range1d(bounds[1], bounds[3]),
-                         x_axis_label      = theme.xlabel,
-                         y_axis_label      = theme.ylabel)
+        fig     = figure(toolbar_sticky        = theme.toolbar['sticky'],
+                         toolbar_location      = theme.toolbar['location'],
+                         tools                 = theme.toolbar['items'],
+                         plot_width            = figsize[0]+borders[0]+borders[2],
+                         plot_height           = figsize[1]+borders[1]+borders[3],
+                         background_fill_alpha = 0.,
+                         min_border_left       = borders[0],
+                         min_border_top        = borders[1],
+                         min_border_right      = borders[2],
+                         min_border_bottom     = borders[3],
+                         sizing_mode           = theme.figsize[2],
+                         x_range               = Range1d(bounds[0], bounds[2]),
+                         y_range               = Range1d(bounds[1], bounds[3]),
+                         x_axis_label          = theme.xlabel,
+                         y_axis_label          = theme.ylabel)
 
         bounds  = ctrl.daq.config.network.camera.bounds(True)
         fig.extra_x_ranges = {'xpixel': Range1d(bounds[0], bounds[2])}
