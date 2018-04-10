@@ -19,11 +19,12 @@ class Orders(list):
         self.default_config: Callable  = lambda x: None
         self.dyn_loads:      List[str] = []
 
-    def __script(self, view, doc = None):
+    def __script(self, ctrl, doc = None):
         "creates a function for running the orders"
-        ctrl    = getattr(view, '_ctrl', view)
         nextfcn = getattr(doc, 'add_next_tick_callback', lambda i: i())
         lst     = list(self)
+        lst.insert(0, lambda x: x.display.handle('guiloaded',
+                                                 x.display.emitpolicy.nothing))
         def _cmd():
             if len(lst):
                 with Action(ctrl):
@@ -36,8 +37,8 @@ class Orders(list):
         if doc is None:
             doc = DummyDoc()
 
-        view   = viewcls.open(doc)
-        script = self.__script(view, doc)
+        ctrl   = viewcls.open(doc)
+        script = self.__script(ctrl, doc)
         if isinstance(doc, DummyDoc):
             if onload is not None:
                 onload()
@@ -51,7 +52,7 @@ class Orders(list):
                 loaded.on_change('done', lambda attr, old, new: (onload(), script()))
             else:
                 loaded.on_change('done', lambda attr, old, new: script())
-        return view
+        return ctrl
 
     def dynloads(self):
         "returns dynamic loads"
@@ -74,7 +75,7 @@ def addload(*names):
 class DummyDoc:
     "dummy document used for scripting"
     def __init__(self):
-        self.roots = []
+        self.roots: list = []
         self.title = ''
 
     def add_root(self, i):
