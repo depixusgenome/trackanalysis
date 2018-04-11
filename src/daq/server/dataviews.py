@@ -25,9 +25,10 @@ class DAQMemory:
     name        = "memory"
     maxlength   = 10000
     packet      = 1
+    period      = 1/50. # seconds
+    timeout     = .05
     maxerrcount = 5
     maxerrtime  = 1.
-    timeout     = .05
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -69,9 +70,9 @@ class DAQServerView(Generic[DATA]):
                                socket.INADDR_ANY)
         address  = cnf.address
         timeout  = self._theme.timeout
-        period   = 1./cnf.rate
+        period   = self._theme.period
         bytesize = data.view().dtype.itemsize
-        rng      = range(1, self._theme.packet)
+        rng      = tuple(slice(i,i+1) for i in range(self._theme.packet))
         errs: List[Tuple[float, Any]] = []
         def _err(errs, *args):
             errs.append((time.time(),)+args)
@@ -80,18 +81,15 @@ class DAQServerView(Generic[DATA]):
             return errs
 
         while self._index == index and len(errs) < self._theme.maxerrcount:
-            cur, ind = data.getnextlines(rng.stop)
+            cur, ind = data.getnextlines(rng[-1].stop)
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
                     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, pack)
                     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                     sock.settimeout(timeout)
                     sock.bind(address)
-
-                    sock.recv_into(cur[:1], bytesize)
                     for i in rng:
-                        await asyncio.sleep(period)
-                        sock.recv_into(cur[i:i+1], bytesize)
+                        sock.recv_into(cur[i], bytesize)
                     data.applynextlines(ind)
                     call(cur)
             except InterruptedError as exc:

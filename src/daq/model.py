@@ -51,7 +51,6 @@ class DAQClient(ConfigObject):
     All information related to the current protocol
     """
     multicast = '239.255.0.1'
-    rate      = 1./3e-2 # milliseconds
     address   = ('', 30001)
     bytesize  = 64
     offset    = 4
@@ -138,7 +137,8 @@ class DAQNetwork(ConfigObject):
                          )
     beads     = DAQClient(columns   = BEADTYPE,
                           address   = ('', 30002),
-                          multicast = '239.255.0.2'
+                          multicast = '239.255.0.2',
+                          offset    = 0
                          )
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):

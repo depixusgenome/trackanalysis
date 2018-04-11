@@ -188,7 +188,7 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
             if 'currentbead' not in old or self._waitfornextreset() or self._cam is None:
                 return
 
-            inds = self._ptsource.selected.indices[:1]
+            inds = self._ptsource.selected.indices
             bead = self._model.display.currentbead
             if bead is None and len(inds):
                 self._ptsource.selected.indices = []
@@ -213,7 +213,7 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
         cache[self._ptsource].update(data = data[1])
 
         nbeads = len(ctrl.daq.config.beads)
-        inds   = [i for i in self._ptsource.selected.indices[:1] if i < nbeads]
+        inds   = [i for i in self._ptsource.selected.indices if i < nbeads]
         bead   = self._model.display.currentbead
         if bead is None and len(inds):
             cache[self._ptsource.selected].update(indices = [])

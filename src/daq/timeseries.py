@@ -4,8 +4,10 @@
 from   functools        import partial
 from   typing           import List, cast
 
+import numpy            as     np
 from   bokeh.plotting   import figure, Figure
 from   bokeh.models     import ColumnDataSource, LinearAxis, DataRange1d
+
 
 from   utils            import initdefaults
 from   utils.logconfig  import getLogger
@@ -138,10 +140,8 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
     def __init__(self, **_):
         super().__init__(**_)
 
-        lsrc = dict.fromkeys((self.XLEFT,  self.YLEFT),  cast(List[float], []))
-        rsrc = dict.fromkeys((self.XRIGHT, self.YRIGHT), cast(List[float], []))
-        self._leftsource  = ColumnDataSource(lsrc)
-        self._rightsource = ColumnDataSource(rsrc)
+        self._leftsource  = ColumnDataSource(self._leftdata())
+        self._rightsource = ColumnDataSource(self._rightdata())
 
     def observe(self, ctrl):
         "observe controller events"
@@ -156,29 +156,38 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
     def _reset(self, control, cache):
         "resets the data"
         super()._reset(control, cache)
-        data  = getattr(control, 'daq', control).data
-        disp  = self._model.display
-
-        attrs = disp.xvar, disp.leftvar, disp.rightvar
-        right = data.fov  .view()[:self._model.theme.maxlength]
-        left  = data.beads.view()[:self._model.theme.maxlength]
-        if (len(control.daq.config.beads)
-                and len({attrs[0], attrs[2]} - set(right.dtype.names)) == 0
-                and len({attrs[0], attrs[1]} - set(left.dtype.names)) == 0):
-            cache[self._leftsource] ['data'] = {self.XLEFT:  left[attrs[0]],
-                                                self.YLEFT:  left[attrs[1]]}
-            cache[self._rightsource]['data'] = {self.XRIGHT: right[attrs[0]],
-                                                self.YRIGHT: right[attrs[2]]}
-            print(cache[self._rightsource]['data'])
+        data   = getattr(control, 'daq', control).data
+        length = self._model.theme.maxlength
+        good   = lambda x: all(i is not self._ZERO for i in x.values())
+        right  = self._rightdata(data.fov  .view()[:length])
+        left   = self._leftdata (data.beads.view()[:length])
+        if len(control.daq.config.beads) and good(right) and good(left):
             def _obs():
                 control.daq.observe(self._onbeadsdata)
                 control.daq.observe(self._onfovdata)
-            cache[self] = _obs
+            cache[self._rightsource]['data'] = right
+            cache[self._leftsource]['data']  = left
+            cache[self]                      = _obs
         else:
             control.daq.remove(self._onbeadsdata)
             control.daq.remove(self._onfovdata)
-            cache[self._rightsource]['data'] = {self.XLEFT:  [], self.YLEFT: []}
-            cache[self._leftsource]['data']  = {self.XRIGHT: [], self.YRIGHT: []}
+            cache[self._rightsource]['data'] = self._leftdata()
+            cache[self._leftsource]['data']  = self._rightdata()
+
+    _ZERO = np.empty(0, dtype = [('_','f4')])
+    def _rightdata(self, lines = _ZERO):
+        disp = self._model.display
+        try:
+            return {self.XRIGHT: lines[disp.xvar], self.YRIGHT: lines[disp.rightvar]}
+        except ValueError:
+            return {self.XRIGHT: [], self.YRIGHT: []}
+
+    def _leftdata(self, lines = _ZERO):
+        disp = self._model.display
+        try:
+            return {self.XLEFT: lines[disp.xvar], self.YLEFT: lines[disp.leftvar]}
+        except ValueError:
+            return {self.XLEFT: [], self.YLEFT: []}
 
     def _onfovdata(self, lines = None, **_):
         disp = self._model.display
