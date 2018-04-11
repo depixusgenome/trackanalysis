@@ -48,8 +48,9 @@ class EmitPolicy(Enum):
     def run(self, allfcns: Set[Callable], args):
         "runs provided observers"
         if   self is self.outasdict:
+            dargs = cast(Dict, args)
             for hdl in allfcns:
-                hdl(**cast(Dict, args))
+                hdl(**dargs)
         elif self is self.outastuple:
             for hdl in allfcns:
                 hdl(*args)
@@ -117,8 +118,9 @@ class Event:
         if len(allfcns):
             global _CNT # pylint: disable=global-statement
             _CNT += 1
+            policy = EmitPolicy.get(policy, args)
             LOGS.debug("[%d] Handling %s", _CNT, lst)
-            EmitPolicy.get(policy, args).run(allfcns, args)
+            policy.run(allfcns, args)
             LOGS.debug("[%d] Handled", _CNT)
         return args
 
