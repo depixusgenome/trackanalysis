@@ -3,18 +3,19 @@
 "DAQ server's clients"
 import socket
 import struct
-import asyncio
 import time
 
-from   functools          import partial
-from   typing             import TypeVar, Generic, List, Tuple, Any
+from   concurrent.futures       import ThreadPoolExecutor
+from   functools                import partial
+from   typing                   import TypeVar, Generic, List, Tuple, Any
 
-from   tornado.ioloop     import IOLoop
+from   tornado.ioloop           import IOLoop
+from   tornado.platform.asyncio import to_tornado_future
 
-from   utils              import initdefaults
-from   utils.logconfig    import getLogger
-from   utils.inspection   import templateattribute
-from   ..data             import RoundRobinVector, FoVRoundRobinVector, BeadsRoundRobinVector
+from   utils                    import initdefaults
+from   utils.logconfig          import getLogger
+from   utils.inspection         import templateattribute
+from   ..data                   import RoundRobinVector, FoVRoundRobinVector, BeadsRoundRobinVector
 
 LOGS = getLogger(__name__)
 
@@ -62,7 +63,7 @@ class DAQServerView(Generic[DATA]):
                 await self.__start(ctrl)
             IOLoop.current().spawn_callback(_start)
 
-    async def __readdaq(self, index, cnf, data, call): # pylint: disable=too-many-locals
+    def __readdaq(self, index, cnf, data): # pylint: disable=too-many-locals
         """
         Reads server data and outputs it
         """
@@ -78,7 +79,8 @@ class DAQServerView(Generic[DATA]):
         def _err(errs, *args):
             errs.append((time.time(),)+args)
             if len(errs) >= self._theme.maxerrcount:
-                return [i for i in errs if errs[-1][0]-i[0] < self._theme.maxerrtime]
+                errs = [i for i in errs if errs[-1][0]-i[0] < self._theme.maxerrtime]
+            time.sleep(self._theme.errsleep)
             return errs
 
         while self._index == index and len(errs) < self._theme.maxerrcount:
@@ -92,32 +94,29 @@ class DAQServerView(Generic[DATA]):
                     for i in rng:
                         sock.recv_into(cur[i], bytesize)
                     data.applynextlines(ind)
-                    call(cur)
             except InterruptedError as exc:
                 errs = _err(errs, exc)
-                await asyncio.sleep(self._theme.errsleep)
             except socket.timeout as exc:
                 errs = _err(errs, exc)
-                await asyncio.sleep(self._theme.errsleep)
             except socket.error as exc:
                 errs = _err(errs, exc)
-                await asyncio.sleep(self._theme.errsleep)
             else:
-                await asyncio.sleep(period)
+                time.sleep(period)
         return errs[-1][1] if self._theme.maxerrcount <= len(errs) else None
 
     async def __start(self, ctrl):
         ctrl        = getattr(ctrl, 'daq', ctrl)
         self._index = index = self._index+1
         cnf         = getattr(ctrl.config.network, self._NAME)
-        call        = getattr(ctrl, f'add{self._NAME}data')
         data        = getattr(ctrl.data, self._NAME)
         if not (getattr(ctrl.data, self._NAME+'started') or self._index != index):
             LOGS.info("Forced stop on %s[%d]@%s", self._NAME, index-1, cnf.address)
             return
 
         LOGS.info("starting %s[%d]@%s", self._NAME, index, cnf.address)
-        err = await self.__readdaq(index, cnf, data, call)
+        with ThreadPoolExecutor(1) as pool:
+            err = await to_tornado_future(pool.submit(self.__readdaq, index, cnf, data))
+
         if err:
             LOGS.info("Too many errors on %s[%d]@%s: last is '%s'",
                       self._NAME, index, cnf.address, err)

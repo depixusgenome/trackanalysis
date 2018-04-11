@@ -132,18 +132,6 @@ class DAQController(Controller):
 
         return updatemodel(self, self.data, dict(fovstarted = fov, beadsstarted = beads))
 
-    def addfovdata(self, lines: np.ndarray) -> dict:
-        "add lines of data"
-        return self.handle("fovdata",
-                           self.emitpolicy.outasdict,
-                           dict(control = self, lines = lines))
-
-    def addbeadsdata(self, lines: Dict[int, np.ndarray]) -> dict:
-        "add lines of data"
-        return self.handle("beadsdata",
-                           self.emitpolicy.outasdict,
-                           dict(control = self, lines = lines))
-
     def setcurrentbead(self, bead: Optional[int]) -> dict:
         "changes the current bead"
         return self.handle("currentbead", self.emitpolicy.outasdict,
