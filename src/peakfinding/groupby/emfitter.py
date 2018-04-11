@@ -57,8 +57,9 @@ class ByEM(EMFlagger):# needs cleaning
     upperbound = 0.005**2 # in microns**2
 
     @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        super().__init__(**_)
+    def __init__(self, **kwa):
+        self.kwargs = kwa
+        super().__init__(**kwa)
 
     def __call__(self,**kwa):
         return self.find(**kwa)
@@ -98,14 +99,17 @@ class ByEM(EMFlagger):# needs cleaning
     def __fromzestimate(self,data:np.ndarray,zpeaks:np.ndarray):
         'estimates other params values from first estimates in z postion'
         # group peaks too close
-        window = 0.005 # to change
+        window   = 0.005 # to change
 
-        tomerge = np.where(np.diff(zpeaks)>window)[0]
-        bins    = [zpeaks[0]-0.1]+[np.mean(zpeaks[i:i+2]) for i in tomerge]+[zpeaks[-1]+0.1]
+        tomerge  = np.where(np.diff(zpeaks)>window)[0]
+        bins     = [zpeaks[0]-0.1]+[np.mean(zpeaks[i:i+2]) for i in tomerge]+[zpeaks[-1]+0.1]
 
         # estimate rates, params using merged
-        params = self.paramsfromzbins(data,bins,mincount=0)
-        return np.ones(params.shape[0]).reshape(-1,1)/params.shape[0], params
+        params   = self.paramsfromzbins(data,bins,mincount=0)
+        assig    = self.assign(self.score(data,params))
+        rates    = np.array([len(assig[idx])/data.shape[0]
+                             for idx in range(params.shape[0])]).reshape(-1,1)
+        return rates , params
 
     def paramsfromzbins(self,data,bins,mincount=None):
         "given a list of bins along z axis, estimates the parameters"
@@ -132,14 +136,13 @@ class ByEM(EMFlagger):# needs cleaning
 
     def kernelinitializer(self,**kwa):
         'uses ZeroCrossing for initialization (much faster)'
-        estimates = ByHistogram()(**kwa)[0]
-        estimates.sort() # should already be sorted
+        peaks = ByHistogram(**self.kwargs)(**kwa)[0]
         events    = kwa.get("events",None)
         # can merge close zpeaks from later subdivision by EM
         data = np.array([[np.nanmean(evt),len(evt)]
                          for cycle in events
                          for evt in cycle])
-        return self.__fromzestimate(data,estimates)
+        return self.__fromzestimate(data,peaks)
 
     @staticmethod
     def score(data:np.ndarray,params:np.ndarray)->np.ndarray:
@@ -275,8 +278,3 @@ class ByEmMutu(ByEM):
     def _findpeaks(self,data):
         rates,params = self.initialize(data,maxbins=1)
         return self.mutualsplit(data,rates,params)[-2:]
-
-
-    # the longest steps are done by finding the number of peaks
-    # -> solution run ByHist() and find the peaks
-    # regroup the closest ones (those in  a window of 5nm) then apply ByEM
