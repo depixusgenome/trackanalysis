@@ -140,9 +140,9 @@ class Data:
         '''
         updates data if the filename changes
         '''
-        self.rpdata.setTrack(filename)
+        self.rpdata.settrack(filename)
         self.rpdata.clean()
-        self.rpfulldata.setTrack(filename)
+        self.rpfulldata.settrack(filename)
 
 class Select:
     '''
