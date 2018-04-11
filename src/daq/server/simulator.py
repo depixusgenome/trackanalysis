@@ -5,7 +5,6 @@ import asyncio
 import socket
 import struct
 from   abc              import ABC, abstractmethod
-from   functools        import partial
 from   multiprocessing  import Process, Value
 from   typing           import Union, Optional, Tuple
 
@@ -106,7 +105,11 @@ class BaseServerSimulatorView(ABC):
             return True
 
         ctrl.theme.add(self._model)
-        ctrl.daq.observe("listen", partial(self._start,   ctrl))
+
+        @ctrl.daq.observe
+        def _onlisten(old = None, **_):
+            if f"{self._NAME}started" in old:
+                self._start(ctrl)
 
         @ctrl.display.observe
         def _onguiloaded():

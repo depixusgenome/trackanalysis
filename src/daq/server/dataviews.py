@@ -24,11 +24,12 @@ class DAQMemory:
     """
     name        = "memory"
     maxlength   = 10000
-    packet      = 1
-    period      = 1/50. # seconds
+    packet      = 3
+    period      = 1/15. # seconds
     timeout     = .05
     maxerrcount = 5
-    maxerrtime  = 1.
+    maxerrtime  = 5.
+    errsleep    = .3
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -94,11 +95,14 @@ class DAQServerView(Generic[DATA]):
                     call(cur)
             except InterruptedError as exc:
                 errs = _err(errs, exc)
+                await asyncio.sleep(self._theme.errsleep)
             except socket.timeout as exc:
                 errs = _err(errs, exc)
+                await asyncio.sleep(self._theme.errsleep)
             except socket.error as exc:
                 errs = _err(errs, exc)
-            finally:
+                await asyncio.sleep(self._theme.errsleep)
+            else:
                 await asyncio.sleep(period)
         return errs[-1][1] if self._theme.maxerrcount <= len(errs) else None
 

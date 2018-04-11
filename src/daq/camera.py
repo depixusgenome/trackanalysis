@@ -176,12 +176,15 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
         @ctrl.daq.observe
         def _onlisten(**_): # pylint: disable=unused-variable
             if self._cam is not None:
-                def _run():
-                    tmp = dict(self._source.data)
-                    tmp.clear()
-                    self._source.data = tmp
-                    self._cam.start  += 1
-                self._doc.add_next_tick_callback(_run)
+                if len(next(iter(self._source.data.values()))):
+                    @self._doc.add_next_tick_callback
+                    def _run():
+                        self._source.data = {i: [] for i in self._source.data}
+                        self._cam.start  += 1
+                else:
+                    @self._doc.add_next_tick_callback
+                    def _run2():
+                        self._cam.start  += 1
 
         @ctrl.display.observe
         def _oncamera(old = None, **_): # pylint: disable=unused-variable
@@ -307,6 +310,8 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
             yval  = src.data['y']
             roi   = [(i, [round(xval[i], deci), round(yval[i], deci)]+ beads[i].roi[2:])
                      for i in range(len(xval))]
-            roi   = [(i, j) for i, j in roi if beads[i].roi[:2] != j[:2]]
+            maxv  = 10**-deci
+            roi   = [(i, j) for i, j in roi
+                     if any(abs(x[0]-x[1]) > maxv for x in zip(j[:2], beads[i].roi[:2]))]
             if len(roi):
                 ctrl.daq.updatebeads(*((i, {'roi': j}) for i, j in roi))

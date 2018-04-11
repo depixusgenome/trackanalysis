@@ -12,7 +12,8 @@ def main(view, gui, port, raiseerr, singlethread, sim): # pylint: disable=too-ma
     "Launches an view"
     from  daq.app.default import VIEWS
     if sim:
-        VIEWS.append("daq.server.simulator.ServerSimulatorView")
+        VIEWS.insert(0, "daq.server.simulator.DAQFoVServerSimulatorView")
+        VIEWS.insert(0, "daq.server.simulator.DAQBeadsServerSimulatorView")
     else:
         VIEWS.append("daq.server.adminview.DAQAdminView")
     defaultmain(view, gui, port, raiseerr, singlethread, "daq.app.toolbar")

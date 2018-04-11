@@ -10,10 +10,8 @@ from   bokeh.models     import ColumnDataSource, LinearAxis, DataRange1d
 
 
 from   utils            import initdefaults
-from   utils.logconfig  import getLogger
 from   view.threaded    import ThreadedDisplay, DisplayModel
 from   view.plots.base  import PlotAttrs
-LOGS = getLogger(__name__)
 
 class TimeSeriesTheme:
     "information about the time series displayed"
@@ -109,10 +107,12 @@ class TimeSeriesViewMixin:
         self.reset(ctrl)
 
     def _onlisten(self, **_): # pylint: disable=unused-variable
-        def _run():
-            for src in (self._leftsource, self._rightsource):
-                src.data = {i: [] for i in src.data}
-        self._doc.add_next_tick_callback(_run)
+        if any(len(next(iter(src.data.values())))
+               for src in (self._leftsource, self._rightsource)):
+            @self._doc.add_next_tick_callback
+            def _run():
+                for src in (self._leftsource, self._rightsource):
+                    src.data = {i: [] for i in src.data}
 
     def _onupdatenetwork(self, ctrl, old = None, **_): # pylint: disable=unused-variable
         names = ['fov'] + ['beads'] if hasattr(self, '_onbeadsdata') else []
@@ -199,7 +199,6 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
         self._doc.add_next_tick_callback(fcn)
 
     def _onbeadsdata(self, lines = None, **_):
-        LOGS.info("%s", lines)
         disp = self._model.display
         try:
             data = {self.XLEFT: lines[disp.xvar], self.YLEFT: lines[disp.leftvar]}
