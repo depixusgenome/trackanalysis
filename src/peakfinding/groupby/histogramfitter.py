@@ -91,7 +91,7 @@ class ZeroCrossingPeakFinder:
     Finds peaks with a minimum *half*width and threshold
     """
     subpixel         = SubPixelPeakPosition()
-    peakwidth        = 1
+    peakwidth        = 3
     threshold: float = getattr(np.finfo('f4'), 'resolution')
     @initdefaults(frozenset(locals()), subpixel = 'update')
     def __init__(self, **_):
@@ -123,8 +123,8 @@ class PeakFlagger: # old name GroupByPeak
         * *window:*   The maximum distance of an event to the peak position, in
         units of precision.
     """
-    window       = 3
-    mincount     = 5
+    window       = 2.5
+    mincount     = 3
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
