@@ -294,7 +294,8 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
         beads  = ctrl.daq.config.beads
         nbeads = len(beads)
 
-        assert -1 not in ids[:nbeads]
+        if -1 in ids[:nbeads]:
+            LOGS.warning("wrong ids? %s %s", ids[:nbeads], ids[nbeads:])
         deci   = self._model.theme.decimals
         if len(ids) > nbeads:
             base = ctrl.daq.config.defaultbead.roi
