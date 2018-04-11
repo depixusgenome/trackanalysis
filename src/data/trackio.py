@@ -440,6 +440,7 @@ class Handler:
     def __data(state, kwargs, beadsonly):
         if kwargs is None:
             data = {} # type: Dict[str, Union[float, np.ndarray, str]]
+            sec  = {} # type: Dict[str, np.ndarray]
         else:
             dtpe = np.dtype([('index', 'i4'), ('value', 'f4')])
             vtpe = [('index', 'f4'), ('zmag',  'f4'), ('vcap',  'f4')]
