@@ -24,12 +24,12 @@ class DAQMemory:
     """
     name        = "memory"
     maxlength   = 10000
-    packet      = 3
-    period      = 1/15. # seconds
+    packet      = 15
+    period      = 1. # seconds
     timeout     = .05
     maxerrcount = 5
-    maxerrtime  = 5.
-    errsleep    = .3
+    maxerrtime  = 60.
+    errsleep    = 5.
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass

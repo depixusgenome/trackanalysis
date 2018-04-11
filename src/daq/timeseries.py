@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View module showing one or more time series"
+from   abc              import ABC, abstractmethod
 from   functools        import partial
-from   typing           import List, cast
 
-import numpy            as     np
-from   bokeh.plotting   import figure, Figure
-from   bokeh.models     import ColumnDataSource, LinearAxis, DataRange1d
+import numpy                  as     np
+from   bokeh.plotting         import figure, Figure
+from   bokeh.server.callbacks import PeriodicCallback
+from   bokeh.models           import ColumnDataSource, LinearAxis, DataRange1d
 
 
 from   utils            import initdefaults
 from   view.threaded    import ThreadedDisplay, DisplayModel
 from   view.plots.base  import PlotAttrs
+
+_ZERO = np.empty(0, dtype = [('_','f4')])
 
 class TimeSeriesTheme:
     "information about the time series displayed"
@@ -32,6 +35,7 @@ class TimeSeriesTheme:
     rightattr = PlotAttrs("red",       "line",   1)
     figsize   = 800, 400, 'fixed'
     maxlength = 5000
+    period    = 1. # seconds
     toolbar   = dict(sticky   = False,
                      location = 'right',
                      items    = ['pan,wheel_zoom,box_zoom,save,reset'])
@@ -39,7 +43,7 @@ class TimeSeriesTheme:
     def __init__(self, **_):
         pass
 
-class TimeSeriesViewMixin:
+class TimeSeriesViewMixin(ABC):
     "Display time series"
     XLEFT        = "xl"
     XRIGHT       = "xr"
@@ -48,16 +52,18 @@ class TimeSeriesViewMixin:
     _leftsource  : ColumnDataSource
     _rightsource : ColumnDataSource
     _fig         : Figure
+    _callback    : PeriodicCallback
+    _first       : bool
     def observe(self, ctrl):
         "observe events"
         if self._model.observe(ctrl):
             return
 
         fcn = partial(self._onmodel, ctrl)
-        ctrl.theme.observe  (self._model.theme,   fcn)
+        ctrl.theme  .observe(self._model.theme,   fcn)
         ctrl.display.observe(self._model.display, fcn)
-        ctrl.daq.observe(self._onlisten)
-        ctrl.daq.observe(partial(self._onupdatenetwork, ctrl))
+        ctrl.daq    .observe("listen",            fcn)
+        ctrl.daq    .observe(partial(self._onupdatenetwork, ctrl))
 
     def _addtodoc(self, *_):
         "sets the plot up"
@@ -71,28 +77,44 @@ class TimeSeriesViewMixin:
                        x_axis_label     = self._xlabel(),
                        y_axis_label     = self._leftlabel())
 
-        theme.leftattr.addto(fig,
-                             x      = self.XLEFT,
-                             y      = self.YLEFT,
-                             source = self._leftsource)
+        rend = theme.leftattr.addto(fig,
+                                    x      = self.XLEFT,
+                                    y      = self.YLEFT,
+                                    source = self._leftsource)
+        fig.y_range.renderers = [rend]
 
         fig.extra_y_ranges = {self.YRIGHT: DataRange1d()}
         fig.add_layout(LinearAxis(y_range_name = self.YRIGHT,
                                   axis_label   = self._rightlabel()), 'right')
-        theme.rightattr.addto(fig,
-                              x            = self.XRIGHT,
-                              y            = self.YRIGHT,
-                              source       = self._rightsource,
-                              y_range_name = self.YRIGHT)
+        rend = theme.rightattr.addto(fig,
+                                     x            = self.XRIGHT,
+                                     y            = self.YRIGHT,
+                                     source       = self._rightsource,
+                                     y_range_name = self.YRIGHT)
+        fig.extra_y_ranges[self.YRIGHT].renderers = [rend]
         self._fig = fig
         return [fig]
 
-    def _reset(self, _, cache):
+    def _reset(self, ctrl, cache):
         "resets the data"
         names = self._leftlabel(), self._rightlabel()
         for i, j in zip(names, self._fig.yaxis):
             if j.axis_label != i:
                 cache[j]['axis_label'] = i
+
+        doadd                 = self._doadd(ctrl)
+        cback, self._callback = self._callback, (True if doadd else None)
+        if cback is True:
+            return
+
+        if cback is not None:
+            self._doc.remove_periodic_callback(cback)
+
+        fcn    = partial(self._onupdatelines, ctrl)
+        period = self._model.theme.period*1e3
+        if self._callback is True:
+            self._first    = True
+            self._callback = self._doc.add_periodic_callback(fcn, period)
 
     def _xlabel(self):
         return self._model.theme.labels[self._model.display.xvar]
@@ -106,18 +128,18 @@ class TimeSeriesViewMixin:
     def _onmodel(self, ctrl, **_):
         self.reset(ctrl)
 
-    def _onlisten(self, **_): # pylint: disable=unused-variable
-        if any(len(next(iter(src.data.values())))
-               for src in (self._leftsource, self._rightsource)):
-            @self._doc.add_next_tick_callback
-            def _run():
-                for src in (self._leftsource, self._rightsource):
-                    src.data = {i: [] for i in src.data}
-
     def _onupdatenetwork(self, ctrl, old = None, **_): # pylint: disable=unused-variable
         names = ['fov'] + ['beads'] if hasattr(self, '_onbeadsdata') else []
-        if any(i in old for i in names):
+        if any(i in old for i in names) and not self._waitfornextreset():
             self._onmodel(ctrl)
+
+    @abstractmethod
+    def _doadd(self, ctrl) -> bool:
+        pass
+
+    @abstractmethod
+    def _onupdatelines(self, ctrl):
+        pass
 
 class BeadTimeSeriesDisplay:
     "Information about the current bead displayed"
@@ -140,8 +162,11 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
     def __init__(self, **_):
         super().__init__(**_)
 
-        self._leftsource  = ColumnDataSource(self._leftdata())
-        self._rightsource = ColumnDataSource(self._rightdata())
+        self._leftsource                 = ColumnDataSource(self._leftdata())
+        self._rightsource                = ColumnDataSource(self._rightdata())
+        self._leftindex                  = slice(0,0)
+        self._rightindex                 = slice(0,0)
+        self._callback: PeriodicCallback = None
 
     def observe(self, ctrl):
         "observe controller events"
@@ -153,28 +178,14 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
             name = mdl.leftvar[:1]+('' if bead is None else str(bead))
             ctrl.display.update(mdl, leftvar = name)
 
-    def _reset(self, control, cache):
+    def _doadd(self, ctrl):
         "resets the data"
-        super()._reset(control, cache)
-        data   = getattr(control, 'daq', control).data
-        length = self._model.theme.maxlength
-        good   = lambda x: all(i is not self._ZERO for i in x.values())
-        right  = self._rightdata(data.fov  .view()[:length])
-        left   = self._leftdata (data.beads.view()[:length])
-        if len(control.daq.config.beads) and good(right) and good(left):
-            def _obs():
-                control.daq.observe(self._onbeadsdata)
-                control.daq.observe(self._onfovdata)
-            cache[self._rightsource]['data'] = right
-            cache[self._leftsource]['data']  = left
-            cache[self]                      = _obs
-        else:
-            control.daq.remove(self._onbeadsdata)
-            control.daq.remove(self._onfovdata)
-            cache[self._rightsource]['data'] = self._leftdata()
-            cache[self._leftsource]['data']  = self._rightdata()
+        data = ctrl.daq.data
+        disp = self._model.display
+        return (ctrl.daq.config.beads and data.fovstarted and data.beadsstarted
+                and not {disp.xvar, disp.rightvar}.difference(data.fov.view().dtype.names)
+                and not {disp.xvar, disp.leftvar }.difference(data.beads.view().dtype.names))
 
-    _ZERO = np.empty(0, dtype = [('_','f4')])
     def _rightdata(self, lines = _ZERO):
         disp = self._model.display
         try:
@@ -189,23 +200,19 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
         except ValueError:
             return {self.XLEFT: [], self.YLEFT: []}
 
-    def _onfovdata(self, lines = None, **_):
-        disp = self._model.display
-        try:
-            data = {self.XRIGHT: lines[disp.xvar], self.YRIGHT: lines[disp.rightvar]}
-        except ValueError:
-            return
-        fcn  = lambda: self._rightsource.stream(data, self._model.theme.maxlength)
-        self._doc.add_next_tick_callback(fcn)
+    def _onupdatelines(self, ctrl):
+        first, self._first = self._first, False
+        if first:
+            self._leftindex  = slice(0, 0)
+            self._rightindex = slice(0, 0)
 
-    def _onbeadsdata(self, lines = None, **_):
-        disp = self._model.display
-        try:
-            data = {self.XLEFT: lines[disp.xvar], self.YLEFT: lines[disp.leftvar]}
-        except ValueError:
-            return
-        fcn  = lambda: self._leftsource.stream(data, self._model.theme.maxlength)
-        self._doc.add_next_tick_callback(fcn)
+        self._leftindex,  left = ctrl.daq.data.beads.since(self._leftindex)
+        maxlen                 = len(left) if first else self._model.theme.maxlength
+        self._leftsource .stream(self._leftdata(left), maxlen)
+
+        self._rightindex, right = ctrl.daq.data.fov.since(self._rightindex)
+        maxlen                  = len(right) if first else self._model.theme.maxlength
+        self._rightsource.stream(self._rightdata(right), maxlen)
 
     def _leftlabel(self):
         return self._model.theme.labels[self._model.display.leftvar[0]]
@@ -229,22 +236,28 @@ class FoVTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[FoVTimeSeriesModel]
     "display the current fov parameter"
     XLEFT  = XRIGHT = "x"
     def __init__(self, **_):
-        src              = dict.fromkeys((self.XLEFT,  self.YRIGHT, self.YLEFT),
-                                         cast(List[float], []))
-        self._leftsource = self._rightsource = ColumnDataSource(src)
+        self._leftsource = self._rightsource = ColumnDataSource(self.__data())
         super().__init__(leftvar   = "tsample")
+        self._index                      = slice(0,0)
+        self._callback: PeriodicCallback = None
 
-    def _reset(self, control, cache):
+    def _doadd(self, ctrl):
         "resets the data"
-        super()._reset(control, cache)
-        lines = control.data.fov[:self._model.theme.maxlength]
-        cache[self._leftsource]['data'] = self.__data(lines)
+        disp  = self._model.display
+        data  = ctrl.daq.data
+        names = data.fov.view().dtype.names
+        return (data.fovstarted
+                and not {disp.xvar, disp.rightvar, disp.leftvar}.difference(names))
 
-    def _onfovdata(self, lines = None, **_):
-        fcn  = lambda: self._leftsource.stream(lines, self._model.theme.maxlength)
-        self._doc.add_next_tick_callback(fcn)
+    def _onupdatelines(self, ctrl):
+        first, self._first = self._first, False
+        if first:
+            self._index = slice(0, 0)
+        self._index, lines = ctrl.daq.data.fov.since(self._index)
+        self._leftsource .stream(self.__data(lines),
+                                 len(lines) if first else self._model.theme.maxlength)
 
-    def __data(self, data):
+    def __data(self, data = _ZERO):
         disp = self._model.display
         try:
             return {self.XLEFT:  data[disp.xvar],

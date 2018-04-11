@@ -20,28 +20,32 @@ async def writedaq(nbeads: int, cnf: DAQClient, period, output = None, state = N
     """
     Reads server data and outputs it
     """
-    if output is None:
-        output = 300
+    while state is None or state.value != 0:
+        if output is None:
+            output = 300
 
-    if np.isscalar(output):
-        tmp    = np.sin(np.arange(output, dtype = 'f4')/output*6*np.pi)
-        dtype  = cnf.fovtype() if nbeads < 0 else cnf.beadstype(nbeads)
-        vals   = [np.empty(output, dtype = 'f4')  if j == '_' else
-                  np.arange(output, dtype = 'i8') if k.endswith('i8') else
-                  np.roll(tmp*(i+1), i*10) for i, (j, k) in enumerate(dtype.descr)]
-        output = np.array([tuple(vals[j][i] for j in range(len(vals)))
-                           for i in range(output)], dtype = dtype)
-    else:
-        output = np.asarray(output)
+        if np.isscalar(output):
+            tmp    = np.sin(np.arange(output, dtype = 'f4')/output*6*np.pi)
+            dtype  = cnf.fovtype() if nbeads < 0 else cnf.beadstype(nbeads)
+            vals   = [np.empty(output, dtype = 'f4')  if j == '_' else
+                      np.arange(output, dtype = 'i8') if k.endswith('i8') else
+                      np.roll(tmp*(i+1), i*10) for i, (j, k) in enumerate(dtype.descr)]
+            output = np.array([tuple(vals[j][i] for j in range(len(vals)))
+                               for i in range(output)], dtype = dtype)
+        else:
+            output = np.asarray(output)
 
-    addr   = (cnf.multicast, cnf.address[1])
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, struct.pack('b', 1))
-        LOGS.info("Running simulator on %s T=%s S=%s", addr, period, output.dtype.itemsize)
-        while state is None or state.value:
-            for data in output:
-                sock.sendto(data.tobytes(), addr)
-                await asyncio.sleep(period)
+        addr   = (cnf.multicast, cnf.address[1])
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, struct.pack('b', 1))
+            LOGS.info("Running simulator on %s T=%s S=%s", addr, period, output.dtype.itemsize)
+            cur = None if state is None else state.value
+            while state is None or state.value == cur:
+                for data in output:
+                    sock.sendto(data.tobytes(), addr)
+                    await asyncio.sleep(period)
+            if state is not None:
+                nbeads = state.value
     LOGS.info("Stopping simulator on %s T=%s", addr, period)
 
 def _runsimulator(nbeads: int, # pylint: disable=too-many-arguments
@@ -66,17 +70,19 @@ def _runsimulator(nbeads: int, # pylint: disable=too-many-arguments
 def runbeadssimulator(nbeads: int,
                       cnf: DAQClient                 = None,
                       output: Union[int, np.ndarray] = None,
+                      period                         = 1./30.,
                       subprocess: bool               = True
                      ) -> Optional[Tuple[Process, Value]]:
     "run the simulator"
-    return _runsimulator(max(0, nbeads), cnf, output, subprocess)
+    return _runsimulator(max(0, nbeads), cnf, period, output, subprocess)
 
 def runfovsimulator(cnf: DAQClient                 = None,
                     output: Union[int, np.ndarray] = None,
+                    period                         = 1./30.,
                     subprocess: bool               = True
                    ) -> Optional[Tuple[Process, Value]]:
     "run the simulator"
-    return _runsimulator(-1, cnf, output, subprocess)
+    return _runsimulator(-1, cnf, period, output, subprocess)
 
 class DAQSimulator:
     """
@@ -122,14 +128,13 @@ class BaseServerSimulatorView(ABC):
         return
 
     def _start(self, ctrl, **_):
-        proc, self._proc = self._proc, None
-        if proc:
-            self._state.value = 0
-            self._state       = None
-            proc.join()
-
         nbeads = self._nbeads(ctrl)
         if getattr(ctrl.daq.data, f'{self._NAME}started') and nbeads != 0:
+            if self._proc:
+                if nbeads > 0:
+                    self._state.value = nbeads
+                return
+
             self._proc, self._state = _runsimulator(nbeads,
                                                     getattr(ctrl.daq.config.network,
                                                             self._NAME),
@@ -138,6 +143,11 @@ class BaseServerSimulatorView(ABC):
                                                     subprocess = True)
             LOGS.info("Simulator %s in another process", self._NAME)
             self._proc.start()
+
+        elif self._proc:
+            self._state.value = 0
+            self._proc        = None
+            return
 
     @staticmethod
     @abstractmethod
@@ -169,8 +179,15 @@ class DAQBeadsServerSimulatorView(BaseServerSimulatorView):
 
         @ctrl.daq.observe
         def _onaddbeads(**_):
-            ctrl.daq.listen(beads = True)
+            if not ctrl.daq.data.beadsstarted:
+                ctrl.daq.listen(beads = True)
+            else:
+                self._start(ctrl)
 
         @ctrl.daq.observe
         def _onremovebeads(**_):
-            ctrl.daq.listen(beads = len(ctrl.daq.config.beads) > 0)
+            nbeads = len(ctrl.daq.config.beads) > 0
+            if ctrl.daq.data.beadsstarted != nbeads:
+                ctrl.daq.listen(beads = nbeads)
+            else:
+                self._start(ctrl)

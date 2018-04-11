@@ -23,17 +23,28 @@ class RoundRobinVector:
         """
         return (self._array if name is None else self._array[name])[self._index]
 
+    def since(self, old: slice)-> Tuple[slice, np.ndarray]:
+        """
+        return the new lines since the last call
+        """
+        arr = self._array
+        cur = self._index
+        return cur, arr[old.stop:cur.stop] if old.start <= cur.start < old.stop else arr[cur]
+
     def getnextlines(self, count) -> Tuple[np.ndarray, slice]:
         """
         add values to the end of the table
         """
-        ind = slice(self._index.stop, self._index.stop+count)
-        if ind.stop > len(self._array):
-            self._index              = slice(0, self._length-count)
-            self._array[self._index] = self._array[count-self._length:]
-            ind                      = slice(self._index.stop, self._length)
+        arr  = self._array
+        cur  = self._index
+        size = self._length
+        ind  = slice(cur.stop, cur.stop+count)
+        if ind.stop > len(arr):
+            cur      = slice(0, size-count)
+            arr[cur] = arr[count-size:]
+            ind      = slice(cur.stop, size)
 
-        return self._array[ind], slice(max(ind.stop - self._length, 0), ind.stop)
+        return arr[ind], slice(max(ind.stop - size, 0), ind.stop)
 
     def applynextlines(self, ind):
         """

@@ -27,7 +27,7 @@ class FoVTableTheme(BaseModel):
     "summary info on the field of view"
     name        = 'fovtable'
     template    = _TEXT
-    refreshrate = 5
+    period      = 1.
     width       = 120
     height      = 200
     @initdefaults(frozenset(locals()))
@@ -41,7 +41,7 @@ class FoVTableView(ThreadedDisplay[FoVTableTheme]):
         super().__init__()
         self.__widget:  Div       = None
         self.__columns: List[str] = []
-        self.__index              = 0
+        self.__callback           = None
 
     def _addtodoc(self, ctrl, _):
         "creates the widget"
@@ -50,7 +50,7 @@ class FoVTableView(ThreadedDisplay[FoVTableTheme]):
 
         mods = dict(width  = self._model.width,
                     height = self._model.height)
-        self.__widget  = Div(text   = text, **mods)
+        self.__widget = Div(text   = text, **mods)
 
         mods['sizing_mode'] = ctrl.theme.get('main', 'sizingmode', 'fixed')
         return [widgetbox(self.__widget, **mods)]
@@ -64,23 +64,35 @@ class FoVTableView(ThreadedDisplay[FoVTableTheme]):
 
         ctrl.theme.add(self._model)
         ctrl.theme.observe(self._model, lambda **_: self.reset(ctrl))
-        ctrl.daq.observe(self._onfovdata)
 
         @ctrl.daq.observe
         def _onupdatefov(old = None, **_): # pylint: disable=unused-variable
             if 'fov' in old:
                 self.reset(ctrl)
 
-    def _reset(self, control, cache):
-        cache[self.__widget]['text'] = self.__data(control.data.fov)
+        @ctrl.daq.observe
+        def _onlisten(old = None, **_): # pylint: disable=unused-variable
+            if 'fovstarted' in old:
+                self.reset(ctrl)
 
-    def _onfovdata(self, lines = None, **_):
-        rate = self._model.refreshrate
-        new  = self.__index + len(lines)
-        if new // rate > self.__index // rate:
-            text = self.__data(lines)
-            self._doc.add_next_tick_callback(lambda: setattr(self.__widget, 'text', text))
-        self.__index = new
+    def _reset(self, control, _):
+        data                   = control.daq.data
+        doadd                  = data.fovstarted
+        cback, self.__callback = self.__callback, (True if doadd else None)
+        if cback is True:
+            return
+
+        if cback is not None:
+            self._doc.remove_periodic_callback(cback)
+
+        def _fcn():
+            lines = data.fov.view()
+            if len(lines):
+                self.__widget.text =  self.__data(lines)
+        period = self._model.period*1e3
+
+        if self.__callback is True:
+            self.__callback = self._doc.add_periodic_callback(_fcn, period)
 
     def __data(self, lines):
         return self._model.template.format(**{i: lines[-1][i] for  i in self.__columns})
