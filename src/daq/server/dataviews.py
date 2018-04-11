@@ -56,6 +56,10 @@ class DAQServerView(Generic[DATA]):
         ctrl.daq.observe(listen        = partial(self._onstart, ctrl, 'started'),
                          updatenetwork = partial(self._onstart, ctrl, ''))
 
+    def close(self):
+        "stop reading the daq"
+        self._index += 1
+
     def _onstart(self, ctrl, name, old = None, **_):
         name = self._NAME+name
         if name in old and getattr(ctrl.daq.data, name):
@@ -73,7 +77,6 @@ class DAQServerView(Generic[DATA]):
         address  = cnf.address
         timeout  = self._theme.timeout
         period   = self._theme.period
-        bytesize = data.view().dtype.itemsize
         rng      = tuple(slice(i,i+1) for i in range(self._theme.packet))
         errs: List[Tuple[float, Any]] = []
         def _err(errs, *args):
@@ -85,6 +88,7 @@ class DAQServerView(Generic[DATA]):
 
         while self._index == index and len(errs) < self._theme.maxerrcount:
             cur, ind = data.getnextlines(rng[-1].stop)
+            bytesize = cur.dtype.itemsize
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
                     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, pack)

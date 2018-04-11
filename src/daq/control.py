@@ -3,7 +3,6 @@
 "DAQ Controller"
 from   typing                   import Optional, Dict, Union, Tuple, Any, Callable
 from   functools                import wraps
-import numpy                    as     np
 from   control.event            import Controller, NoEmission
 from   control.decentralized    import updatemodel as _updatemodel
 from   .model                   import DAQConfig, DAQBead

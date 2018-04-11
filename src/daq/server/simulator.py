@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Simulate the server"
-import asyncio
 import socket
 import struct
+import time
 from   abc              import ABC, abstractmethod
 from   multiprocessing  import Process, Value
 from   typing           import Union, Optional, Tuple
@@ -16,7 +16,7 @@ from   utils.logconfig  import getLogger
 
 LOGS = getLogger(__name__)
 
-async def writedaq(nbeads: int, cnf: DAQClient, period, output = None, state = None):
+def writedaq(nbeads: int, cnf: DAQClient, period, output = None, state = None):
     """
     Reads server data and outputs it
     """
@@ -24,28 +24,29 @@ async def writedaq(nbeads: int, cnf: DAQClient, period, output = None, state = N
         if output is None:
             output = 300
 
-        if np.isscalar(output):
-            tmp    = np.sin(np.arange(output, dtype = 'f4')/output*6*np.pi)
-            dtype  = cnf.fovtype() if nbeads < 0 else cnf.beadstype(nbeads)
-            vals   = [np.empty(output, dtype = 'f4')  if j == '_' else
-                      np.arange(output, dtype = 'i8') if k.endswith('i8') else
-                      np.roll(tmp*(i+1), i*10) for i, (j, k) in enumerate(dtype.descr)]
-            output = np.array([tuple(vals[j][i] for j in range(len(vals)))
-                               for i in range(output)], dtype = dtype)
-        else:
-            output = np.asarray(output)
+        tmp    = np.sin(np.arange(output, dtype = 'f4')/output*6*np.pi)
+        dtype  = cnf.fovtype() if nbeads < 0 else cnf.beadstype(nbeads)
+        vals   = [np.empty(output, dtype = 'f4')  if j == '_' else
+                  np.arange(output, dtype = 'i8') if k.endswith('i8') else
+                  np.roll(tmp*(i+1), i*10) for i, (j, k) in enumerate(dtype.descr)]
+        output = np.array([tuple(vals[j][i] for j in range(len(vals)))
+                           for i in range(output)], dtype = dtype)
 
         addr   = (cnf.multicast, cnf.address[1])
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, struct.pack('b', 1))
-            LOGS.info("Running simulator on %s T=%s S=%s", addr, period, output.dtype.itemsize)
+            LOGS.info("Running simulator on %s T=%s S=%s N=%s",
+                      addr, period, output.dtype.itemsize, nbeads)
+            LOGS.info("%s", output.dtype.descr)
             cur = None if state is None else state.value
-            while state is None or state.value == cur:
-                for data in output:
-                    sock.sendto(data.tobytes(), addr)
-                    await asyncio.sleep(period)
-            if state is not None:
-                nbeads = state.value
+            for data in output:
+                if state is not None and state.value != cur:
+                    nbeads = state.value
+                    output = len(output)
+                    break
+                sock.sendto(data.tobytes(), addr)
+                time.sleep(period)
+
     LOGS.info("Stopping simulator on %s T=%s", addr, period)
 
 def _runsimulator(nbeads: int, # pylint: disable=too-many-arguments
@@ -60,11 +61,7 @@ def _runsimulator(nbeads: int, # pylint: disable=too-many-arguments
         proc  = Process(target = _runsimulator, args = (nbeads, cnf, period, output, False, state))
         return proc, state
 
-    policy = asyncio.get_event_loop_policy()
-    policy.set_event_loop(policy.new_event_loop())
-    loop   = asyncio.get_event_loop()
-    loop.run_until_complete(writedaq(nbeads, cnf, period, output, state))
-    loop.close()
+    writedaq(nbeads, cnf, period, output, state)
     return None
 
 def runbeadssimulator(nbeads: int,
@@ -148,6 +145,12 @@ class BaseServerSimulatorView(ABC):
             self._state.value = 0
             self._proc        = None
             return
+
+    def close(self):
+        "stop simulating the daq"
+        if self._proc:
+            self._state.value = 0
+            self._proc        = None
 
     @staticmethod
     @abstractmethod
