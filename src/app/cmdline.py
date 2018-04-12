@@ -145,8 +145,8 @@ def _win_opts():
             return subprocess.Popen(*args, **kwargs)
         compiler.Popen = _Popen
 
-def _debug(raiseerr, singlethread):
-    if singlethread:
+def _debug(raiseerr, nothreading):
+    if nothreading:
         import view.base as _base
         _base.SINGLE_THREAD = True
 
@@ -215,9 +215,9 @@ def _version(ctx, _, value):
     ctx.exit()
 
 # pylint: disable=too-many-arguments
-def defaultmain(view, gui, port, raiseerr, singlethread, defaultapp):
+def defaultmain(view, gui, port, raiseerr, nothreading, defaultapp):
     "Launches an view"
-    _debug(raiseerr, singlethread)
+    _debug(raiseerr, nothreading)
     _win_opts()
 
     kwargs = dict(port = _port(port), apponly = False)
@@ -239,7 +239,7 @@ def defaultclick(*others):
     sets default command line options
     """
     def _wrapper(fcn):
-        fcn = click.option("--singlethread",
+        fcn = click.option("--nothreading",
                            flag_value = True,
                            default    = False,
                            help       = '[DEBUG] Runs plots in single thread')(fcn)
@@ -275,10 +275,10 @@ def defaultclick(*others):
                            help       = 'track path, gr path and match'),
               click.argument('files', nargs = -1, type = click.Path()))
 def main(view, files, tracks, bead,  # pylint: disable=too-many-arguments
-         gui, port, raiseerr, singlethread):
+         gui, port, raiseerr, nothreading):
     "Launches an view"
     _files(tracks, files, bead)
-    return defaultmain(view, gui, port, raiseerr, singlethread, "app.toolbar")
+    return defaultmain(view, gui, port, raiseerr, nothreading, "app.toolbar")
 
 if __name__ == '__main__':
     main()   # pylint: disable=no-value-for-parameter

@@ -26,7 +26,7 @@ class DAQMemory:
     name        = "memory"
     maxlength   = 10000
     packet      = 15
-    period      = 1. # seconds
+    contigs     = 15
     timeout     = .05
     maxerrcount = 5
     maxerrtime  = 60.
@@ -67,68 +67,63 @@ class DAQServerView(Generic[DATA]):
                 await self.__start(ctrl)
             IOLoop.current().spawn_callback(_start)
 
-    def __readdaq(self, index, cnf, data): # pylint: disable=too-many-locals
+    def __readdaq(self, index, ctrl):
         """
         Reads server data and outputs it
         """
-        pack     = struct.pack('4sL',
-                               socket.inet_aton(cnf.multicast),
-                               socket.INADDR_ANY)
-        address  = cnf.address
-        timeout  = self._theme.timeout
-        period   = self._theme.period
-        rng      = tuple(slice(i,i+1) for i in range(self._theme.packet))
+        theme                         = self._theme
         errs: List[Tuple[float, Any]] = []
-        def _err(errs, *args):
-            errs.append((time.time(),)+args)
-            if len(errs) >= self._theme.maxerrcount:
-                errs = [i for i in errs if errs[-1][0]-i[0] < self._theme.maxerrtime]
-            time.sleep(self._theme.errsleep)
-            return errs
-
-        while self._index == index and len(errs) < self._theme.maxerrcount:
-            cur, ind = data.getnextlines(rng[-1].stop)
-            bytesize = cur.dtype.itemsize
+        while self._index == index and len(errs) < theme.maxerrcount:
             try:
-                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-                    sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, pack)
-                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                    sock.settimeout(timeout)
-                    sock.bind(address)
-                    for i in rng:
-                        sock.recv_into(cur[i], bytesize)
+                cnf         = getattr(ctrl.config.network, self._NAME)
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP,
+                                struct.pack('4sL',
+                                            socket.inet_aton(cnf.multicast),
+                                            socket.INADDR_ANY))
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                sock.settimeout(theme.timeout)
+                sock.bind      (cnf.address)
+
+                for _ in range(theme.contigs):
+                    data     = getattr(ctrl.data, self._NAME)
+                    cur, ind = data.getnextlines(theme.packet)
+                    bytesize = cur.dtype.itemsize
+                    for i in range(theme.packet):
+                        sock.recv_into(cur[i:i+1], bytesize)
                     data.applynextlines(ind)
-            except InterruptedError as exc:
-                errs = _err(errs, exc)
-            except socket.timeout as exc:
-                errs = _err(errs, exc)
-            except socket.error as exc:
-                errs = _err(errs, exc)
-            else:
-                time.sleep(period)
-        return errs[-1][1] if self._theme.maxerrcount <= len(errs) else None
+
+            except OSError as exc:
+                errs.append((time.time(),exc))
+                if len(errs) >= theme.maxerrcount:
+                    errs = [i for i in errs if errs[-1][0]-i[0] < theme.maxerrtime]
+                time.sleep(theme.errsleep)
+
+            finally:
+                sock.close()
+
+        return errs[-1][1] if theme.maxerrcount <= len(errs) else None
 
     async def __start(self, ctrl):
         ctrl        = getattr(ctrl, 'daq', ctrl)
         self._index = index = self._index+1
-        cnf         = getattr(ctrl.config.network, self._NAME)
-        data        = getattr(ctrl.data, self._NAME)
+        addr        = getattr(ctrl.config.network, self._NAME).address
         if not (getattr(ctrl.data, self._NAME+'started') or self._index != index):
-            LOGS.info("Forced stop on %s[%d]@%s", self._NAME, index-1, cnf.address)
+            LOGS.info("Forced stop on %s[%d]@%s", self._NAME, index-1, addr)
             return
 
-        LOGS.info("starting %s[%d]@%s", self._NAME, index, cnf.address)
+        LOGS.info("starting %s[%d]@%s", self._NAME, index, addr)
         with ThreadPoolExecutor(1) as pool:
-            err = await to_tornado_future(pool.submit(self.__readdaq, index, cnf, data))
+            err = await to_tornado_future(pool.submit(self.__readdaq, index, ctrl))
 
         if err:
             LOGS.info("Too many errors on %s[%d]@%s: last is '%s'",
-                      self._NAME, index, cnf.address, err)
+                      self._NAME, index, addr, err)
             async def _err():
                 ctrl.listen(**{self._NAME:False})
             await _err()
         else:
-            LOGS.info("Stopped %s[%d]@%s", self._NAME, index, cnf.address)
+            LOGS.info("Stopped %s[%d]@%s", self._NAME, index, addr)
 
     def _createdata(self, ctrl):
         templateattribute(self, 0).create(ctrl, self._theme.maxlength) # type: ignore
