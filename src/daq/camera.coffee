@@ -21,7 +21,7 @@ export class DpxDAQCameraView extends RowView
         emb = document.createElement("embed"); emb.id  = 'dpxdaqvlc'
         emb.setAttribute('type',        'application/x-vlc-plugin')
         emb.setAttribute('pluginspage', 'http://www.videolan.org')
-        emb.setAttribute('controls',    'false')
+        emb.setAttribute('controls',    'no')
         emb.setAttribute('branding',    'false')
         emb.setAttribute('autoplay',    'yes')
         emb.setAttribute('loop',        'no')
@@ -29,6 +29,12 @@ export class DpxDAQCameraView extends RowView
         emb.setAttribute('width',       "#{w}")
         emb.setAttribute('height',      "#{h}")
         cam.appendChild(emb)
+
+        codeobj = document.createElement("object")
+        codeobj.setAttribute("classid",  "clsid:9BE31822-FDAD-461B-AD51-BE1D1C159921")
+        codeobj.setAttribute("codebase", "http://download.videolan.org/pub/videolan/vlc/last/win32/axvlc.cab")
+        codeobj.setAttribute("style",    "display:none;")
+        cam.appendChild(codeobj)
 
         @el.children[0].style = 'position: absolute;'
         @el.insertBefore(cam, @el.firstChild)
@@ -41,14 +47,15 @@ export class DpxDAQCameraView extends RowView
 
     on_start_cam: () ->
         emb = document.getElementById("dpxdaqvlc")
-        emb.playlist.items.clear()
-        arr = Array(":rtsp-caching=0", ":network-caching=200")
-        emb.playlist.add(@model.addresss, "livedaqcamera", arr)
-        emb.playlist.play()
+        if emb.playlist?
+            emb.playlist.items.clear()
+            arr = Array(":rtsp-caching=0", ":network-caching=200")
+            emb.playlist.add(@model.address, "live", arr)
+            emb.playlist.play()
 
-        fig = @model.get_layoutable_children()[0].get_layoutable_children()[0]
-        rng = [fig.extra_x_ranges['xpixel'], fig.extra_y_ranges['ypixel']]
-        @on_zoom(rng[0], rng[1])
+            fig = @model.get_layoutable_children()[0].get_layoutable_children()[0]
+            rng = [fig.extra_x_ranges['xpixel'], fig.extra_y_ranges['ypixel']]
+            @model.on_zoom(rng[0], rng[1])
         return
 
     on_stop_cam: () ->
