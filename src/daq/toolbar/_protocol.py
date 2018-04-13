@@ -6,6 +6,7 @@ Set the protocol
 from abc                import abstractmethod
 from contextlib         import contextmanager
 from copy               import deepcopy
+from functools          import partial
 from typing             import Tuple, TypeVar, Generic, Union, ClassVar, cast
 
 from utils              import initdefaults
@@ -13,7 +14,8 @@ from utils.inspection   import templateattribute
 from utils.logconfig    import getLogger
 from modaldialog        import dialog
 
-from ..model            import DAQProtocol, DAQRamp, DAQProbe, DAQManual, ConfigObject
+from ..model            import (DAQConfig, DAQProtocol, DAQManual, DAQRamp, DAQProbe,
+                                ConfigObject)
 
 LOGS   = getLogger(__name__)
 
@@ -22,14 +24,15 @@ class DAQProtocolTheme(ConfigObject):
     name     = ""
     title    = ""
     width    = 90
-    body     = [["Frame rate", "%(framerate)d"],
+    body     = [["Cycles", "%(cyclecount)d"],
+                ["Frame rate", "%(framerate)d"],
                 ["Phases", "Zmag / speed / duration"],
                 ["{index}",
                  "%(phases[{index}].zmag).3of",
                  "%(phases[{index}].speed).3of",
                  "%(phases[{index}].duration)of",
                 ]]
-    firstwidth = 150
+    firstwidth = 250
     height     = 20
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -45,12 +48,13 @@ class DAQAttrRange(ConfigObject):
     def __init__(self, **_):
         pass
 
-class DAQManualDisplay(ConfigObject):
+class DAQManualConfig(ConfigObject):
     """
     DAQ manual values
     """
     name      = "daqmanual"
     framerate = 30
+    roi       = list(DAQConfig.defaultbead.roi)
     zmag      = DAQAttrRange(vmin = 0.,    vmax = 1., value = .5,   inc = .1)
     speed     = DAQAttrRange(vmin = 0.125, vmax = 1., value = .125, inc = .1)
 
@@ -58,24 +62,44 @@ class DAQManualDisplay(ConfigObject):
     def __init__(self, **_):
         pass
 
-PROTOCOL = TypeVar('PROTOCOL', bound = Union[DAQProtocol, 'DAQManualDisplay'])
-
-class ProtocolDisplay(Generic[PROTOCOL]):
-    "Basic theme for a modal dialog"
-    protocol: PROTOCOL
-    def __init__(self, protocol):
-        self.protocol: PROTOCOL = protocol
-        self.name               = type(protocol).__name__.lower()
+PROTOCOL = TypeVar('PROTOCOL', bound = Union[DAQProtocol, 'DAQManualConfig'])
 
 class BaseProtocolButton(Generic[PROTOCOL]):
     "A button to access the modal dialog"
-    _model:   PROTOCOL
-    _display: Union[ProtocolDisplay[PROTOCOL], DAQManualDisplay]
-    _theme:   DAQProtocolTheme
+    _model: Union[DAQProtocol, DAQManualConfig]
+    _theme: DAQProtocolTheme
+    def observe(self, ctrl) -> bool:
+        "observe the controller"
+        if self._theme not in ctrl.theme:
+            ctrl.theme.add(self._theme)
+            ctrl.theme.add(self._model)
+            ctrl.daq.observe(partial(self._onupdateprotocol, ctrl))
+            return False
+        return True
 
-    @abstractmethod
-    def _body(self, ctrl) -> Tuple[Tuple[str,...]]:
-        pass
+    def addtodoc(self, ctrl, doc, tbar, name):
+        "add action to the toolbar"
+        transient = deepcopy(self._model)
+
+        @contextmanager
+        def _context(_):
+            yield
+            diff = transient.diff(self._model)
+            if diff:
+                with ctrl.action:
+                    ctrl.theme.update(self._model, **diff)
+            self._context(ctrl, transient, diff)
+
+        def _onclick_cb(attr, old, new):
+            "method to trigger the modal dialog"
+            transient.__dict__.update(deepcopy(self._model.__dict__))
+            return dialog(doc,
+                          context = _context,
+                          title   = self._theme.title,
+                          body    = self._strbody(self._body(ctrl)),
+                          model   = transient,
+                          always  = True)
+        tbar.on_change(name, _onclick_cb)
 
     def _strbody(self, body: Tuple[Tuple[str,...]]) -> str:
         theme = self._theme
@@ -92,92 +116,57 @@ class BaseProtocolButton(Generic[PROTOCOL]):
             txt += '</div>'
         return txt
 
-    @property
-    @abstractmethod
-    def _protocol(self):
-        pass
-
     @staticmethod
     @abstractmethod
-    def _context(cur):
+    def _context(ctrl, transient, diff):
         pass
 
-    def observe(self, ctrl):
-        "observe the controller"
-        if self._theme not in ctrl.theme:
-            ctrl.theme.add(self._theme)
-            ctrl.display.add(self._display)
+    @abstractmethod
+    def _body(self, ctrl) -> Tuple[Tuple[str,...]]:
+        pass
 
-    def addtodoc(self, ctrl, doc, tbar, name):
-        "add action to the toolbar"
-        @contextmanager
-        def _context(_):
-            yield
-            cur  = self._protocol
-            diff = cur.diff(self._model)
-            if diff:
-                with ctrl.action():
-                    ctrl.display.update(cur, **diff)
-            ctrl.daq.updateprotocol(self._context(cur))
-
-        def _onclick_cb(attr, old, new):
-            "method to trigger the modal dialog"
-            self._model = deepcopy(self._protocol)
-            return dialog(doc,
-                          context = _context,
-                          title   = self._theme.title,
-                          body    = self._strbody(self._body(ctrl)),
-                          model   = self._model,
-                          always  = True)
-        tbar.on_change(name, _onclick_cb)
+    @abstractmethod
+    def _onupdateprotocol(self, ctrl, model = None, **_):
+        pass
 
 class ProtocolButton(BaseProtocolButton[PROTOCOL]):
     "A button to access the modal dialog"
-    _display: ProtocolDisplay[PROTOCOL]
-    _TITLE  : ClassVar[str]
+    _model: DAQProtocol
+    _TITLE: ClassVar[str]
     def __init__(self, **kwa):
-        self._model   = templateattribute(self, 0)(**kwa)
-        self._display = ProtocolDisplay[PROTOCOL](deepcopy(self._model))
-        self._theme   = DAQProtocolTheme(name  = self._display.name,
-                                         title = self._TITLE,
-                                         **kwa)
+        self._model = templateattribute(self, 0)(**kwa)
+        self._theme = DAQProtocolTheme(name  = self._model.name+"theme",
+                                       title = self._TITLE,
+                                       **kwa)
 
-    def observe(self, ctrl):
-        "observe the controller"
-        if self._theme in ctrl.theme:
-            return
-        super().observe(ctrl)
+    def _onupdateprotocol(self, ctrl, model = None, **_):
+        if model.name == self._model.name:
+            ctrl.theme.update(self._model, **model.diff(self._model))
 
-        @ctrl.daq.observe
-        def _onupdateprotocol(model = None, **_): # pylint: disable=unused-variable
-            if type(model) is type(self._model):
-                ctrl.display.update(self._display, protocol = model)
-
-    @property
-    def _protocol(self):
-        return self._display.protocol
+    @staticmethod
+    def _context(ctrl, transient, _):
+        ctrl.daq.updateprotocol(deepcopy(transient))
 
     def _body(self, ctrl) -> Tuple[Tuple[str, ...]]:
-        mdl = self._display.protocol
-        dfl = ctrl.display.model(self._display, True).protocol
+        mdl = self._model
+        dfl = ctrl.theme.model(self._model, True)
 
-        fra = list(self._theme.body[0])
+        cnt = list(self._theme.body[0])
+        if mdl.cyclecount != dfl.cyclecount:
+            cnt = [cnt[0]+f" ({dfl.cyclecount})", cnt[1]]
+        fra = list(self._theme.body[1])
         if mdl.framerate != dfl.framerate:
             fra = [fra[0]+f" ({dfl.framerate})", fra[1]]
 
         assert len(mdl.phases) == len(dfl.phases)
 
-        body = [fra, *(i for i in self._theme.body[:-1])]
+        body = [cnt, fra, *(i for i in self._theme.body[2:-1])]
         for i, j in enumerate(dfl.phases):
             body.append([j.format(index = i) for j in self._theme.body[-1]])
             if j != mdl.phases[i]:
-                body[-1][0] += f' ({j.zmag}, {j.speed}, {j.duration})'
+                body[-1][0] += f' ({round(j.zmag,3)}, {round(j.speed,3)}, {round(j.duration,3)})'
 
         return cast(Tuple[Tuple[str, ...]], tuple(tuple(i) for i in body))
-
-    @staticmethod
-    def _context(cur):
-        return cur
 
 class DAQProbeButton(ProtocolButton[DAQProbe]):
     "View the DAQProbe"
@@ -187,74 +176,84 @@ class DAQRampButton(ProtocolButton[DAQRamp]):
     "View the DAQRamp"
     _TITLE: ClassVar[str] = "Ramp Settings"
 
-class DAQManualButton(BaseProtocolButton[DAQManualDisplay]):
+class DAQManualButton(BaseProtocolButton[DAQManualConfig]):
     "View the DAQ Manual tools"
-    _display: DAQManualDisplay
+    _model: DAQManualConfig
     _TITLE = "Manual Settings"
     _BODY  = [["Frame rate", "%(framerate)d"],
+              ["Bead ROI",  "width/height"],
+              ["", "%(roi[2])d", "%(roi[3])d"],
               ["", "min / max / increment"],
               ["Zmag",  *(f'%(zmag.{i}).3f'  for i in ('vmin', 'vmax', 'inc'))],
               ["Speed", *(f'%(speed.{i}).3f' for i in ('vmin', 'vmax', 'inc'))]]
     def __init__(self, **kwa):
-        self._model   = DAQManualDisplay(**kwa)
-        self._display = deepcopy(self._model)
-        self._theme   = DAQProtocolTheme(name  = self._display.name,
-                                         body  = self._BODY,
-                                         title = self._TITLE,
-                                         **kwa)
+        self._model = DAQManualConfig(**kwa)
+        self._theme = DAQProtocolTheme(name  = self._model.name+"theme",
+                                       body  = self._BODY,
+                                       title = self._TITLE,
+                                       **kwa)
 
-    def _body(self, ctrl) -> Tuple[Tuple[str, ...]]:
-        body = deepcopy(self._theme.body)
-        dfl  = ctrl.display.model(self._display, True)
-
-        if self._display.framerate != dfl.framerate:
-            body[0][0] += f" (dfl.framerate)"
-
-        for line, attr in zip(body[1:], ('zmag', 'speed')):
-            val = getattr(dfl, attr)
-            if getattr(self._display, attr) != val:
-                line[0] += f" ({val.vmin:.3f} / {val.vmax:.3f} / {val.inc:.3f})"
-
-        return cast(Tuple[Tuple[str, ...]], tuple(tuple(i) for i in body))
-
-    @staticmethod
-    def _context(cur):
-        return DAQManual(zmag = cur.zmag.value, speed = cur.speed.value)
-
-    @property
-    def _protocol(self):
-        return self._display
-
-    def observe(self, ctrl):
+    def observe(self, ctrl) -> bool:
         "observe the controller"
-        if self._theme in ctrl.theme:
-            return
-        super().observe(ctrl)
+        if super().observe(ctrl):
+            return True
 
-        @ctrl.daq.observe
-        def _onupdateprotocol(model = None, **_): # pylint: disable=unused-variable
-            if isinstance(model, DAQManual):
-                zmag        = deepcopy(self._display.zmag)
-                zmag.value  = model.zmag
-                speed       = deepcopy(self._display.speed)
-                speed.value = model.speed
-                ctrl.display.update(self._display,
-                                    framerate = model.framerate,
-                                    zmag      = zmag,
-                                    speed     = speed)
+        @ctrl.theme.observe("daqmanual", "addedaqmanual")
+        def _ontheme(**_):
+            if self._model.roi[2:] != list(ctrl.daq.config.defaultbead.roi[2:]):
+                ctrl.daq.updatedefaultbead(roi = tuple(self._model.roi))
+        return False
 
     def addtodoc(self, ctrl, doc, tbar, name):
         "bokeh stuff"
         super().addtodoc(ctrl, doc, tbar, name)
 
-        @ctrl.display.observe
+        @ctrl.theme.observe
         def _ondaqmanual(**_): # pylint: disable=unused-variable
             tbar.update(**self.addtodocargs(ctrl))
 
     def addtodocargs(self, _):
         "return args for the toolbar"
-        mdl = self._display
+        mdl = self._model
         return dict(zmagmin  = mdl.zmag.vmin,   zmagmax  = mdl.zmag.vmax,
                     zmag     = mdl.zmag.value , zinc     = mdl.zmag.inc,
                     speedmin = mdl.speed.vmin,  speedmax = mdl.speed.vmax,
                     speed    = mdl.speed.value, speedinc = mdl.speed.inc)
+
+    def _body(self, ctrl) -> Tuple[Tuple[str, ...]]:
+        body = deepcopy(self._theme.body)
+        dfl  = ctrl.theme.model(self._model, True)
+
+        if self._model.framerate != dfl.framerate:
+            body[0][0] += f" ({dfl.framerate})"
+
+        if self._model.roi != dfl.roi:
+            body[2][0] += f" ({dfl.roi[2]}, {dfl.roi[3]})"
+
+        for line, attr in zip(body[-2:], ('zmag', 'speed')):
+            val = getattr(dfl, attr)
+            if getattr(self._model, attr) != val:
+                line[0] += f" ({round(val.vmin, 3)} / {round(val.vmax, 3)} / {round(val.inc,3)})"
+
+        return cast(Tuple[Tuple[str, ...]], tuple(tuple(i) for i in body))
+
+    @staticmethod
+    def _context(ctrl, transient, diff):
+        if 'roi' in diff:
+            ctrl.daq.updatedefaultbead(roi = tuple(transient.roi))
+        ctrl.daq.updateprotocol(DAQManual(zmag      = transient.zmag.value,
+                                          speed     = transient.speed.value,
+                                          framerate = transient.framerate))
+
+    def _onupdateprotocol(self, ctrl, model = None, **_):
+        if not model.ismanual():
+            return
+
+        zmag        = deepcopy(self._model.zmag)
+        zmag.value  = model.zmag
+        speed       = deepcopy(self._model.speed)
+        speed.value = model.speed
+        ctrl.theme.update(self._model,
+                          framerate = model.framerate,
+                          zmag      = zmag,
+                          speed     = speed)

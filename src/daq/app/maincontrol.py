@@ -29,11 +29,6 @@ class DAQSuperController(BaseSuperController):
     def _observeargs(self):
         return (self.daq, "updatenetwork")
 
-    def _observe(self, keys):
-        "starts the controler"
-        self.daq.setup(self)
-        super()._observe(keys)
-
 def createview(main, controls, views):
     "Creates a main view"
     controls = (DAQSuperController,)+tuple(controls)

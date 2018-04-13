@@ -7,14 +7,14 @@ import asyncio
 
 from   contextlib           import closing
 from   enum                 import Enum
-from   typing               import Tuple
+from   typing               import Tuple, Coroutine, Optional, cast
 
 import websockets
 import numpy                as     np
 
 from   tornado.ioloop       import IOLoop
 
-from   ..model              import DAQBead, DAQProtocol, DAQNetwork
+from   ..model              import DAQBead, DAQProtocol, DAQNetwork, DAQManual
 
 async def send2daq(cnf, text):
     "sends a Lua script to the DAQ"
@@ -48,23 +48,34 @@ class Teensy(Enum):
     """
     all attributes that can be set in the Teensy
     """
-    zmag        = "Zmag"
-    zobj        = "Zobj"
-    zspeed      = "Zspeed"
-    xstage      = "Xstage"
-    ystage      = "Ystage"
-    temperature = "T0"
-    led1        = "Led1"
-    led2        = "Led2"
+    zmag        = "zmag"
+    zobj        = "zobj"
+    vmag        = "vmag"
+    x           = "x"   # pylint: disable=invalid-name
+    y           = "y"   # pylint: disable=invalid-name
+    startTime   = "startTime"
+    tbox        = "tbox"
+    intLed1     = "intLed1"
+    intLed2     = "intLed2"
 
 class DAQAdmin: # pylint: disable=too-many-public-methods
     """
     Allows sending orders to the DAQ server
     """
-    _MSG   = "local t=hidCommand.new();t.MessageType=82;"
-    _PREC  = dict(zmag = 1e-3,   x = 1e-3, y = 1e-3, tsample = 1e-2)
+    _CMD    = "local {} = hidCommand.new();"
+    _SCRIPT = "local {} = hidCommandScript.new();"
+    _BEGIN  = "{}.beginPhase({});"
+    _ADD    = "{}.addPhase({});"
+    _SEND   = "daq_sendCommand({});"
+    _PREC   = dict(zmag = 1e-3,   x = 1e-3, y = 1e-3, tsample = 1e-2)
     def __init__(self, model: DAQNetwork) -> None:
         self.model    = model
+
+    @staticmethod
+    def run(coro: Optional[Coroutine]):
+        "runs a coroutine"
+        if coro is not None:
+            IOLoop.current().spawn_callback(coro)
 
     async def getconfig(self) -> dict:
         "get the beads tracked by the server"
@@ -86,18 +97,14 @@ class DAQAdmin: # pylint: disable=too-many-public-methods
         "set the beads tracked by the server"
         raise NotImplementedError()
 
-    async def getprotocol(self) -> DAQProtocol:
-        "get info about the current protocol by the server"
-        raise NotImplementedError()
-
-    async def setprotocol(self, protocol: DAQProtocol):
+    def setprotocol(self, protocol: DAQProtocol) -> Coroutine:
         "set info about the current protocol by the server"
-        raise NotImplementedError()
+        return send2daq(self.model, self._setprotocol(protocol))
 
     async def wait(self, *args):
         "wait for a value to be reached"
         if len(args) == 1:
-            asyncio.sleep(args[0])
+            await asyncio.sleep(args[0])
         else:
             def _done(lines):
                 return all(abs(lines[-1][args[i]]-args[i+1]) < self._PREC[args[i]]
@@ -108,17 +115,13 @@ class DAQAdmin: # pylint: disable=too-many-public-methods
         """
         tell the server to start recording
         """
+        if not record:
+            return
         raise NotImplementedError()
 
     async def setstoprecording(self):
         """
         tell the server to stop recording
-        """
-        raise NotImplementedError()
-
-    async def getisrecording(self) -> int:
-        """
-        the amount of time left in recording: -1 for no
         """
         raise NotImplementedError()
 
@@ -140,87 +143,92 @@ class DAQAdmin: # pylint: disable=too-many-public-methods
         async def __aexit__(self, *_):
             await self.admin.stoprecording()
 
-    async def setvalues(self, *args):
+    def setvalues(self, *args) -> Coroutine:
         "sets a list of values"
-        msg  = self._MSG
+        msg = self._setvalues("t", *args)+self._SEND.format("t")
+        return send2daq(self.model, msg)
+
+    def _setprotocol(self, protocol: DAQProtocol) -> str:
+        if isinstance(protocol, DAQManual):
+            msg = self._setvalues("s",
+                                  Teensy.zmag, protocol.zmag,
+                                  Teensy.vmag, protocol.speed)
+        else:
+            phase = [i for i in protocol.phases if i.zmag is not None][-1]
+            msg   = (self._setvalues("f", Teensy.zmag, phase.zmag, Teensy.vmag, phase.speed)
+                     +self._SCRIPT.format("s"))
+            for i, phase in enumerate(protocol.phases):
+                msg += (self._setvalues(f"p{i}",
+                                        Teensy.zmag,      phase.zmag,
+                                        Teensy.vmag,      phase.speed,
+                                        Teensy.startTime, protocol.phases[i-1].duration)
+                        +(self._BEGIN if i == 0 else self._ADD).format("s", f"p{i}"))
+
+        return msg + self._SEND.format("s")
+
+    def _setvalues(self, name, *args) -> str:
+        "sets a list of values"
+        msg  = self._CMD.format(name)
         for i in range(0, len(args), 2):
-            msg += "{}={};".format(Teensy(args[i]).value, args[i+1])
-        await send2daq(self.model, msg)
+            if args[i+1] is not None:
+                msg += "{}.{}={};".format(name, Teensy(args[i]).value, args[i+1])
+        return msg
 
 class DAQAdminView:
     """
     Listen to the gui and warn the server
     """
-    def __init__(self):
+    def __init__(self, **_):
         self._listening = True
         self._doc       = None
 
-    @staticmethod
-    def _daq(control):
-        return DAQAdmin(control.config.network)
-
-    @classmethod
-    def _set(cls, control, *args):
-        async def _run():
-            await cls._daq(control).setvalues(*args)
-        IOLoop.current().spawn_callback(_run)
-
-    def _onupdateprotocol(self, control = None, model = None, **_):
-        if self._listening:
-            if hasattr(model, "zmag"):
-                async def _run():
-                    daq = self._daq(control)
-                    await daq.setvalues(Teensy.zmag,   model.zmag,
-                                        Teensy.zspeed, model.speed)
-                IOLoop.current().spawn_callback(_run)
-            else:
-                async def _run():
-                    await self._daq(control).setprotocol(model)
-                IOLoop.current().spawn_callback(_run)
-
-    def _onbeads(self, control = None, **_):
-        if not self._listening:
-            async def _run():
-                await self._daq(control).setbeads(control.config.beads)
-            IOLoop.current().spawn_callback(_run)
-
-    def _onstartrecording(self, control = None, **_):
-        if not self._listening:
-            async def _run():
-                await self._daq(control).setstartrecording(control.config.record.path)
-            IOLoop.current().spawn_callback(_run)
-
-    def _onstoprecording(self, control = None, **_):
-        if not self._listening:
-            async def _run():
-                await self._daq(control).setstoprecording()
-            IOLoop.current().spawn_callback(_run)
-
-    def _onupdatenetwork(self, control = None, **_):
-        async def _run():
-            daq      = self._daq(control)
-            rec      = await daq.getisrecording()
-            beads    = await daq.getbeads()
-            protocol = await daq.getprotocol()
-
-            def _inform():
-                try:
-                    if rec > 0:
-                        control.startrecording(control.config.record.path, rec)
-                    else:
-                        control.stoprecording()
-                    control.updateprotocol(protocol)
-                    control.removebeads()
-                    control.addbeads(beads)
-                finally:
-                    self._listening = False
-            self._doc.add_next_tick_callback(_inform)
-        IOLoop.current().spawn_callback(_run)
-
     def observe(self, ctrl):
-        "setup observers"
-        ctrl.observe(self._onupdateprotocol)
-        ctrl.observe("updatebeads", "removebeads", "addbeads", self._onbeads)
-        ctrl.observe(self._onstartrecording)
-        ctrl.observe(self._onstoprecording)
-        ctrl.observe(self._onupdatenetwork)
+        "observe the controller"
+
+        def observe(fcn):
+            "create an observe method"
+            @ctrl.daq.observe(fcn.__name__[3:])
+            def _wrapped(self, control = None, **kwa):
+                if not self._listening:
+                    daq  = DAQAdmin(control.config.network)
+                    coro = cast(Optional[Coroutine], fcn(daq, control = control, **kwa))
+                    daq.run(coro)
+
+        @observe
+        def _onupdateprotocol(daq, model = None, **_):
+            return (daq.setprotocol(model) if not model.ismanual() else
+                    daq.setvalues(Teensy.zmag, model.zmag, Teensy.vmag, model.speed))
+
+        @observe
+        def _onupdatebeads(daq, control = None, **_):
+            return daq.setbeads(control.config.beads)
+
+        @observe
+        def _onaddbeads(daq, control = None, **_):
+            return daq.setbeads(control.config.beads)
+
+        @observe
+        def _onremovebeads(daq, control = None, **_):
+            return daq.setbeads(control.config.beads)
+
+        @observe
+        def _onstartrecording(daq, control = None, **_):
+            return daq.setstartrecording(control.config.record.path)
+
+        @observe
+        def _onstoprecording(daq, **_):
+            return daq.setstoprecording()
+
+        @observe
+        def _onupdatenetwork(daq, control = None, **_):
+            async def _run():
+                beads = await daq.getbeads()
+                def _inform():
+                    self._listening = True
+                    try:
+                        control.removebeads()
+                        control.addbeads(beads)
+                    finally:
+                        self._listening = False
+                self._doc.add_next_tick_callback(_inform)
+            return _run()

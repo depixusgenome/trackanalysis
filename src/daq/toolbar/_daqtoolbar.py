@@ -12,6 +12,7 @@ class DpxDAQToolbar(Widget):
     __javascript__     = ROUTE+"/jquery.min.js"
     __implementation__ = '_daqtoolbar.coffee'
     protocol    = props.String("manual")
+    recording   = props.Bool(False)
     manual      = props.Int(-1)
     ramp        = props.Int(-1)
     probing     = props.Int(-1)

@@ -76,6 +76,29 @@ class DAQController(Controller):
         return dict(control = self, model = self.config.protocol, old = old)
 
     @configemit
+    def updatedefaultbead(self, **kwa) -> dict:
+        "update the config network"
+        return updatemodel(self, self.config.defaultbead, kwa)
+
+    @configemit
+    def updatedatamaxlength(self, fov = None, beads = None) -> dict:
+        "update the config network"
+        old: Dict[str, int] = dict()
+        if fov is not None and fov != self.data.fov.maxlength:
+            assert not self.data.fovstarted
+            old['fov']    = self.data.fov.maxlength
+            self.data.fov = self.data.fov.create(self.config, fov)
+
+        if beads is not None and beads != self.data.beads.maxlength:
+            assert not self.data.beadsstarted
+            old['beads']    = self.data.beads.maxlength
+            self.data.beads = self.data.beads.create(self.config, beads)
+
+        if not old:
+            raise NoEmission()
+        return old
+
+    @configemit
     def removebeads(self, *beads: int) -> dict:
         "remove *existing* beads"
         if len(beads) == 0:
@@ -135,28 +158,3 @@ class DAQController(Controller):
         "changes the current bead"
         return self.handle("currentbead", self.emitpolicy.outasdict,
                            dict(control = self, bead = bead))
-
-    def setup(self, ctrl):
-        """
-        setup the daq data
-        """
-        def _do(name, old):
-            mlen = getattr(ctrl.theme.model(name+'memory'),   'maxlength', 10000)
-            vect = getattr(self.data, name)
-            if mlen != vect.maxlength:
-                old[name] = getattr(self.data, name+'started')
-                setattr(self.data, 'fov', type(vect)(ctrl, mlen))
-
-        def _onupdate(**_):
-            old: Dict[str, bool] = {}
-            _do('fov',   old)
-            _do('beads', old)
-            if old:
-                self.handle("listen", self.emitpolicy.outasdict,
-                            dict(control = self, old = old))
-
-        for i in ("fov", "beads"):
-            if i in ctrl.theme:
-                ctrl.theme.observe(i, _onupdate)
-                ctrl.theme.observe("started"+i, _onupdate)
-        _onupdate()

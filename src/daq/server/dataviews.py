@@ -27,6 +27,7 @@ class DAQMemory:
     maxlength   = 10000
     packet      = 15
     contigs     = 15
+    wait        = 0
     timeout     = .05
     maxerrcount = 5
     maxerrtime  = 60.
@@ -55,6 +56,10 @@ class DAQServerView(Generic[DATA]):
         ctrl.theme.add(self._theme)
         ctrl.daq.observe(listen        = partial(self._onstart, ctrl, 'started'),
                          updatenetwork = partial(self._onstart, ctrl, ''))
+
+        @ctrl.theme.observe(self._theme.name, f"added{self._theme.name}")
+        def _ontheme(**_):
+            ctrl.daq.updatedatamaxlength(**{self._NAME: self._model.maxlength})
 
     def close(self):
         "stop reading the daq"
@@ -92,6 +97,8 @@ class DAQServerView(Generic[DATA]):
                     for i in range(theme.packet):
                         sock.recv_into(cur[i:i+1], bytesize)
                     data.applynextlines(ind)
+                if theme.wait > 0:
+                    time.sleep(theme.wait)
 
             except OSError as exc:
                 errs.append((time.time(),exc))
@@ -133,6 +140,8 @@ class DAQFoVServerView(DAQServerView[FoVRoundRobinVector]):
     Can listen to the FoV server
     """
     _NAME = 'fov'
+    def __init__(self, **_):
+        super().__init__(wait = 1/30., packet = 3, contigs=1)
 
 class DAQBeadsServerView(DAQServerView[BeadsRoundRobinVector]):
     """

@@ -3,7 +3,7 @@
 "DAQ Model"
 from   collections          import ChainMap
 from   typing               import (Optional, Tuple, Union, Dict, Any, List,
-                                    Iterable, cast)
+                                    Iterable, ClassVar, cast)
 import numpy                as     np
 from   utils                import initdefaults
 from   utils.inspection     import diffobj
@@ -160,21 +160,27 @@ class DAQProtocol(ConfigObject):
     """
     All information related to the current protocol
     """
+    name: ClassVar[str]          = ""
     framerate                    = 30
-    roi                          = None
-    cyclecount: int              = None
+    cyclecount                   = 120
     phases: Tuple[DAQPhase, ...] = ()
-    @initdefaults(frozenset(locals()) - {'cyclecount', 'phases'})
+    @initdefaults(frozenset(locals()) - {'cyclecount', 'phases', 'name'})
     def __init__(self, **kwa):
         pass
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
 
+    @classmethod
+    def ismanual(cls):
+        "return whether this protocol is manual"
+        return cls.name == 'daqmanual'
+
 class DAQManual(DAQProtocol):
     """
     Manual status
     """
+    name: ClassVar[str] = "daqmanual"
     def __init__(self, **kwa):
         self.__dict__['phases'] = (DAQPhase(zmag = 10., duration = None, speed = 1.),)
         self.zmag  = kwa.pop('zmag',  self.zmag)
@@ -209,6 +215,7 @@ class DAQProbe(DAQProtocol):
     """
     Probe status
     """
+    name  : ClassVar[str]       = "daqprobe"
     phases: Tuple[DAQPhase,...] = (DAQPhase(zmag     = 10., speed = 1.),
                                    DAQPhase(duration = 20),
                                    DAQPhase(zmag     = 18,  speed = .125),
@@ -219,7 +226,7 @@ class DAQProbe(DAQProtocol):
                                    DAQPhase(duration = 20))
     cyclecount                  = 120
     probes: Tuple[str,...]      = ()
-    @initdefaults(frozenset(locals()))
+    @initdefaults(frozenset(locals())-{'name'})
     def __init__(self, **kwa):
         super().__init__(**kwa)
 
@@ -227,6 +234,7 @@ class DAQRamp(DAQProbe):
     """
     Ramp status
     """
+    name  : ClassVar[str]       = "daqramp"
     phases: Tuple[DAQPhase,...] = (DAQPhase(zmag     = 20., speed  = .1),
                                    DAQPhase(duration = 30),
                                    DAQPhase(zmag     = 10., speed  = .1))
@@ -236,7 +244,6 @@ class DAQRecording(ConfigObject):
     "everything for recording the data"
     path: str     = None
     started       = False
-    duration: int = None
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass

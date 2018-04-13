@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "bringing togethe toobar components"
+from typing         import Dict, Any
 import bokeh.layouts as layouts
 
 from utils          import initdefaults
@@ -71,7 +72,7 @@ class DAQToolbar:
         "add the bokeh widgets"
         self._widget    = DpxDAQToolbar(** self._messages.addtodocargs(ctrl),
                                         ** self._manual.addtodocargs(ctrl),
-                                        protocol = self.__wprotocol(ctrl))
+                                        ** self.__statusargs(ctrl))
         self._messages.addtodoc(ctrl, doc, self._widget)
         self._ramp    .addtodoc(ctrl, doc, self._widget, "ramp")
         self._probing .addtodoc(ctrl, doc, self._widget, "probing")
@@ -92,12 +93,12 @@ class DAQToolbar:
         self._record  .observe(ctrl)
 
         @ctrl.daq.observe("startrecording", "stoprecording", "updateprotocol")
-        def _onstoprecording(**_): # pylint: disable=unused-variable
+        def _onstoprecording(**_):
             if self._widget:
-                self._widget.protocol = self.__wprotocol(ctrl)
+                self._widget.update(**self.__statusargs(ctrl))
 
     @staticmethod
-    def __wprotocol(ctrl) -> str:
-        if ctrl.daq.config.recording.started:
-            return 'recording'
-        return type(ctrl.daq.config.protocol).__name__[3:].lower()
+    def __statusargs(ctrl) -> Dict[str, Any]:
+        daq = ctrl.daq.config
+        return dict(protocol  = type(daq.protocol).__name__[3:].lower(),
+                    recording = daq.recording.started)

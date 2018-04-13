@@ -16,13 +16,26 @@ export class DpxDAQToolbarView extends WidgetView
         @model.speed = parseFloat(val)
 
     on_change_protocol:  () ->
-        $(@el).find('.dpx-tb-not-stop').prop('disabled', @model.protocol == 'recording')
+        $(@el).find('.dpx-tb-protocol').prop('disabled', @model.protocol != 'manual')
         $(@el).find('.dpx-tb-manual-input').prop('disabled', @model.protocol != 'manual')
-        $(@el).find('#dpx-tb-stop').prop('disabled', @model.protocol != 'recording')
+        $(@el).find('#dpx-tb-record').prop('disabled',
+                                            @model.protocol != 'manual' || @model.recording)
+        $(@el).find('#dpx-tb-stop').prop('disabled', !@model.recording)
 
-        $(@el).find('.dpx-tb-not-stop').removeClass('dpx-protocol-active')
-        $(@el).find('#dpx-tb-stop').removeClass('dpx-protocol-active')
+        $(@el).find('.dpx-tb-protocol').removeClass('dpx-protocol-active')
         $(@el).find("#dpx-tb-#{@model.protocol}").addClass('dpx-protocol-active')
+
+    on_change_zranges: () ->
+        itm = document.getElementById("dpx-tb-zmag")
+        itm.setAttribute("min",  @model.zmagmin)
+        itm.setAttribute("max",  @model.zmagmax)
+        itm.setAttribute("step", @model.zinc)
+
+    on_change_sranges: () ->
+        itm = document.getElementById("dpx-tb-speed")
+        itm.setAttribute("min",  @model.speedmin)
+        itm.setAttribute("max",  @model.speedmax)
+        itm.setAttribute("step", @model.speedinc)
 
     on_change_message: () ->
         $(@el).find('#dpx-tb-message').html(@model.message)
@@ -30,9 +43,16 @@ export class DpxDAQToolbarView extends WidgetView
     connect_signals: () ->
         super()
         @connect(@model.properties.message.change,   () => @on_change_message())
-        @connect(@model.properties.protocol.change, () => @on_change_protocol())
+        @connect(@model.properties.protocol.change,  () => @on_change_protocol())
+        @connect(@model.properties.recording.change, () => @on_change_protocol())
+        @connect(@model.properties.zmagmin.change,   () => @on_change_zranges())
+        @connect(@model.properties.zmagmax.change,   () => @on_change_zranges())
+        @connect(@model.properties.zinc.change,      () => @on_change_zranges())
+        @connect(@model.properties.speedmin.change,  () => @on_change_sranges())
+        @connect(@model.properties.speedmax.change,  () => @on_change_sranges())
+        @connect(@model.properties.speedinc.change,  () => @on_change_sranges())
 
-    make_btn: (name, label, ttip = '', freeze = 'dpx-tb-not-stop') ->
+    make_btn: (name, label, ttip = '', freeze = 'dpx-tb-protocol') ->
         if ttip == ''
             str = "<button type='button' id='dpx-tb-#{name}' "+
                   "class='#{freeze} bk-bs-btn bk-bs-btn-default'>#{label}</button>"
@@ -61,7 +81,7 @@ export class DpxDAQToolbarView extends WidgetView
         html = "<label>Z magnet</label><input id='dpx-tb-zmag'"+
                    " class='dpx-tb-manual-input bk-widget-form-input'"+
                    " type='number' min=#{mdl.zmagmin} max=#{mdl.zmagmax} "+
-                   "step=#{mdl.inc} value=#{mdl.zmag}></input>"+
+                   "step=#{mdl.zinc} value=#{mdl.zmag}></input>"+
                "<label>Z speed</label><input id='dpx-tb-speed'"+
                    " class='dpx-tb-manual-input bk-widget-form-input'"+
                    " type='number' min=#{mdl.speedmin} max=#{mdl.speedmax} "+
@@ -69,7 +89,7 @@ export class DpxDAQToolbarView extends WidgetView
                @make_btn('manual', 'Manual', ttips[0])+
                @make_btn('ramp', 'Ramps', ttips[1])+
                @make_btn('probe', 'Probing', ttips[2])+
-               @make_btn('record', 'Record', ttips[3])+
+               @make_btn('record', 'Record', ttips[3], '')+
                @make_btn('stop', 'Stop', ttips[4], '')+
                "<div id='dpx-tb-message' class='bk-markup'>"+
                    "#{mdl.message}</div>"+
@@ -105,6 +125,7 @@ export class DpxDAQToolbar extends Widget
 
     @define {
         protocol:   [p.String,  'manual']
+        recording:  [p.Bool,    false]
         manual:     [p.Number,  -1]
         ramp:       [p.Number,  -1]
         probing:    [p.Number,  -1]
