@@ -62,7 +62,7 @@ class Option(metaclass = ABCMeta):
         fcn = partial(cls._default_apply, model, elems, cnv, storeempty)
         return cast(Callable, fcn)
 
-    _INDEX = re.compile(r"(\w+)\[([^]]*)\]")
+    _INDEX = re.compile(r"(\w+)\[(\d+)\]")
     @classmethod
     def getvalue(cls, mdl, keystr, default):
         "gets the value in the model"
@@ -79,7 +79,7 @@ class Option(metaclass = ABCMeta):
 
         match = cls._INDEX.match(keys[-1])
         if match:
-            return getattr(mdl, match.group(1), default)[match.group(2)]
+            return getattr(mdl, match.group(1), default)[int(match.group(2))]
         return getattr(mdl, keys[-1], default)
 
     @classmethod
@@ -92,13 +92,13 @@ class Option(metaclass = ABCMeta):
             for key in keys[:-1]:
                 match = cls._INDEX.match(key)
                 if match:
-                    mdl = getattr(mdl, match.group(1))[match.group(2)]
+                    mdl = getattr(mdl, match.group(1))[int(match.group(2))]
                 else:
                     mdl = getattr(mdl, key)
 
             match = cls._INDEX.match(keys[-1])
             if match:
-                getattr(mdl, match.group(1))[match.group(2)] = val
+                getattr(mdl, match.group(1))[int(match.group(2))] = val
             else:
                 setattr(mdl, keys[-1], val)
 
