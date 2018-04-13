@@ -3,6 +3,7 @@
 """
 Acces to the camera stream
 """
+from   functools              import partial
 from   typing                 import Dict, Any, Tuple
 
 import numpy                  as     np
@@ -84,8 +85,9 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
     "viewing the camera & beads"
     def __init__(self, **kwa):
         super().__init__(**kwa)
-        self._cam:   DpxDAQCamera     = None
-        self._fig:   Figure           = None
+        self._cam:   DpxDAQCamera  = None
+        self._fig:   Figure        = None
+        self._tool:  PointDrawTool = None
 
         cols = ('x', 'y', 'width', 'height', "beadid")
         self._source:   ColumnDataSource = ColumnDataSource({i: [] for i in cols})
@@ -102,9 +104,9 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
         args  = {i: i for i in ('x', 'y')}
         theme.names.addto(fig, **args, text = 'beadid', source = self._source)
 
-        rend = theme.position.addto(fig, **args, source = self._ptsource)
-        tool = PointDrawTool(renderers = [rend], empty_value = -1)
-        fig.add_tools(tool)
+        rend       = theme.position.addto(fig, **args, source = self._ptsource)
+        self._tool = PointDrawTool(renderers = [rend], empty_value = -1)
+        fig.add_tools(self._tool)
 
         self._ptsource.on_change('selected', lambda attr, old, new: self.__onselect(ctrl))
         self._ptsource.on_change('data',     lambda attr, old, new: self.__ondraw(ctrl))
@@ -150,53 +152,13 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
         if self._model.observe(ctrl):
             return
 
-        @ctrl.daq.observe
-        def _onupdatenetwork(model = None, old = None, **_): # pylint: disable=unused-variable
-            if 'camera' not in old or self._waitfornextreset() or self._cam is None:
-                return
-
-            if model.camera.address != self._cam.address:
-                self._cam.update(address = model.camera.address,
-                                 start   = self._cam.start+1)
-            # pylint: disable=unsubscriptable-object
-            if self.__figsize(ctrl) != self._cam.figsizes:
-                ctrl.theme.update("message",
-                                  NotImplementedError("Please restart the gui", "error"))
-
-        @ctrl.daq.observe("addbeads", "removebeads", "updatebeads")
-        def _onchangedbeads(**_): # pylint: disable=unused-variable
-            if not self._waitfornextreset() or self._cam is None:
-                self.reset(ctrl)
-
-        @ctrl.daq.observe
-        def _oncurrentbead(bead = None, **_): # pylint: disable=unused-variable
-            if bead != self._model.display.currentbead:
-                ctrl.display.update(self._model.display, currentbead = bead)
-
-        @ctrl.daq.observe
-        def _onlisten(**_): # pylint: disable=unused-variable
-            if self._cam is not None:
-                if len(next(iter(self._source.data.values()))):
-                    @self._doc.add_next_tick_callback
-                    def _run():
-                        self._source.data = {i: [] for i in self._source.data}
-                        self._cam.start  += 1
-                else:
-                    @self._doc.add_next_tick_callback
-                    def _run2():
-                        self._cam.start  += 1
-
-        @ctrl.display.observe
-        def _oncamera(old = None, **_): # pylint: disable=unused-variable
-            if 'currentbead' not in old or self._waitfornextreset() or self._cam is None:
-                return
-
-            inds = self._ptsource.selected.indices
-            bead = self._model.display.currentbead
-            if bead is None and len(inds):
-                self._ptsource.selected.indices = []
-            elif bead is not None and bead not in inds[:1]:
-                self._ptsource.selected.indices = [bead] + [i for i in inds if i != bead]
+        ctrl.daq.observe(partial(self.__onupdatenetwork,  ctrl))
+        ctrl.daq.observe(partial(self.__onupdateprotocol, ctrl))
+        ctrl.daq.observe("addbeads", "removebeads", "updatebeads",
+                         partial(self.__onchangedbeads,   ctrl))
+        ctrl.daq.observe(partial(self.__oncurrentbead,    ctrl))
+        ctrl.daq.observe(self.__onlisten)
+        ctrl.display.observe(self.__oncamera)
 
     def _reset(self, ctrl, cache):
         if self._cam is None:
@@ -205,6 +167,10 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
         if self._cam.address != ctrl.daq.config.network.camera.address:
             cache[self._cam].update(address = ctrl.daq.config.network.camera.address,
                                     start   = self._cam.start+1)
+
+        manual = ctrl.daq.config.protocol.ismanual()
+        if self._tool.drag != manual:
+            cache[self._tool].update(drag = manual, add = manual)
 
         # pylint: disable=unsubscriptable-object
         if self.__figsize(ctrl) != self._cam.figsizes:
@@ -316,3 +282,52 @@ class DAQCameraView(ThreadedDisplay[DAQCameraModel]):
                      if any(abs(x[0]-x[1]) > maxv for x in zip(j[:2], beads[i].roi[:2]))]
             if len(roi):
                 ctrl.daq.updatebeads(*((i, {'roi': j}) for i, j in roi))
+
+    def __onupdateprotocol(self, ctrl, **_):
+        if self._waitfornextreset() or self._cam is None:
+            return
+        good = ctrl.daq.config.protocol.ismanual()
+        self._tool.update(drag = good, add = good)
+
+    def __onupdatenetwork(self, ctrl, model = None, old = None, **_):
+        if 'camera' not in old or self._waitfornextreset() or self._cam is None:
+            return
+
+        if model.camera.address != self._cam.address:
+            self._cam.update(address = model.camera.address,
+                             start   = self._cam.start+1)
+        # pylint: disable=unsubscriptable-object
+        if self.__figsize(ctrl) != self._cam.figsizes:
+            ctrl.theme.update("message",
+                              NotImplementedError("Please restart the gui", "error"))
+
+    def __onchangedbeads(self, ctrl, **_):
+        if not self._waitfornextreset() or self._cam is None:
+            self.reset(ctrl)
+
+    def __oncurrentbead(self, ctrl, bead = None, **_):
+        if bead != self._model.display.currentbead:
+            ctrl.display.update(self._model.display, currentbead = bead)
+
+    def __onlisten(self, **_):
+        if self._cam is not None:
+            if len(next(iter(self._source.data.values()))):
+                @self._doc.add_next_tick_callback
+                def _run():
+                    self._source.data = {i: [] for i in self._source.data}
+                    self._cam.start  += 1
+            else:
+                @self._doc.add_next_tick_callback
+                def _run2():
+                    self._cam.start  += 1
+
+    def __oncamera(self, old = None, **_):
+        if 'currentbead' not in old or self._waitfornextreset() or self._cam is None:
+            return
+
+        inds = self._ptsource.selected.indices
+        bead = self._model.display.currentbead
+        if bead is None and len(inds):
+            self._ptsource.selected.indices = []
+        elif bead is not None and bead not in inds[:1]:
+            self._ptsource.selected.indices = [bead] + [i for i in inds if i != bead]
