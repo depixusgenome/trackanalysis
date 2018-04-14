@@ -7,7 +7,7 @@ import asyncio
 
 from   contextlib           import closing
 from   enum                 import Enum
-from   typing               import Tuple, Coroutine, Optional, cast
+from   typing               import Tuple, Optional, cast
 
 import websockets
 import numpy                as     np
@@ -71,11 +71,12 @@ class DAQAdmin: # pylint: disable=too-many-public-methods
     def __init__(self, model: DAQNetwork) -> None:
         self.model    = model
 
-    @staticmethod
-    def run(coro: Optional[Coroutine]):
+    def run(self, fcn, *args):
         "runs a coroutine"
-        if coro is not None:
-            IOLoop.current().spawn_callback(coro)
+        if fcn is not None:
+            if isinstance(fcn, str):
+                fcn = getattr(self, fcn)
+            IOLoop.current().spawn_callback(fcn, *args)
 
     async def getconfig(self) -> dict:
         "get the beads tracked by the server"
@@ -191,33 +192,32 @@ class DAQAdminView:
             def _wrapped(self, control = None, **kwa):
                 if not self._listening:
                     daq  = DAQAdmin(control.config.network)
-                    coro = cast(Optional[Coroutine], fcn(daq, control = control, **kwa))
-                    daq.run(coro)
+                    daq.run(*fcn(daq, control = control, **kwa))
 
         @observe
-        def _onupdateprotocol(daq, model = None, **_):
-            return (daq.setprotocol(model) if not model.ismanual() else
-                    daq.setvalues(Teensy.zmag, model.zmag, Teensy.vmag, model.speed))
+        def _onupdateprotocol(_1, model = None, **_2):
+            return (('setprotocol', model) if not model.ismanual() else
+                    ('setvalues', Teensy.zmag, model.zmag, Teensy.vmag, model.speed))
 
         @observe
-        def _onupdatebeads(daq, control = None, **_):
-            return daq.setbeads(control.config.beads)
+        def _onupdatebeads(_1, control = None, **_2):
+            return ('setbeads', control.config.beads)
 
         @observe
-        def _onaddbeads(daq, control = None, **_):
-            return daq.setbeads(control.config.beads)
+        def _onaddbeads(_1, control = None, **_2):
+            return ('setbeads', control.config.beads)
 
         @observe
-        def _onremovebeads(daq, control = None, **_):
-            return daq.setbeads(control.config.beads)
+        def _onremovebeads(_1, control = None, **_2):
+            return ('setbeads', control.config.beads)
 
         @observe
-        def _onstartrecording(daq, control = None, **_):
-            return daq.setstartrecording(control.config.record.path)
+        def _onstartrecording(_1, control = None, **_2):
+            return ('setstartrecording', control.config.record.path)
 
         @observe
-        def _onstoprecording(daq, **_):
-            return daq.setstoprecording()
+        def _onstoprecording(_1, **_2):
+            return ('setstoprecording',)
 
         @observe
         def _onupdatenetwork(daq, control = None, **_):
@@ -231,4 +231,4 @@ class DAQAdminView:
                     finally:
                         self._listening = False
                 self._doc.add_next_tick_callback(_inform)
-            return _run()
+            return (_run,)
