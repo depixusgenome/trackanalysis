@@ -7,6 +7,7 @@ from typing             import (KeysView, List, Dict, Any, # pylint: disable=unu
                                 Iterator, Tuple, TypeVar, Union, Set, Optional,
                                 Sequence, cast)
 from pathlib            import Path
+from anastore           import LocalPatch
 from concurrent.futures import ThreadPoolExecutor
 from copy               import copy as shallowcopy
 import re
@@ -360,11 +361,18 @@ class TracksDict(dict):
 
         return sorted(keys)
 
-    def load(self) -> 'TracksDict':
-        "Loads all the data"
+    def load(self, *args, **kwa) -> 'TracksDict':
+        "Loads all the data. Args and kwargs are passed to a local patch mechanism."
         unloaded = [i for i in self.values() if not i.isloaded]
-        if len(unloaded):
+        def _run():
             with ThreadPoolExecutor(self._NTHREADS) as pool:
                 for _ in pool.map(Track.load, unloaded):
                     pass
+
+        if len(unloaded):
+            if args or kwa:
+                with LocalPatch(*args, **kwa):
+                    _run()
+            else:
+                _run()
         return self
