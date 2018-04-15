@@ -83,8 +83,8 @@ class BaseFileDialog:
         info = {key: getattr(self, key)
                 for key in self.__dict__
                 if getattr(self, key) is not None and key[0] != '_'}
-        info.pop('defaults')
-        info.pop('config')
+        info.pop('defaults', None)
+        info.pop('config',   None)
 
         self._parse_filetypes(info)
         self._parse_extension(info)

@@ -94,8 +94,13 @@ class DAQToolbar:
 
         @ctrl.daq.observe("startrecording", "stoprecording", "updateprotocol")
         def _onstoprecording(**_):
-            if self._widget:
-                self._widget.update(**self.__statusargs(ctrl))
+            if not self._widget:
+                return
+            out = self.__statusargs(ctrl)
+            if ctrl.daq.config.protocol.ismanual():
+                out.update(zmag  = ctrl.daq.config.protocol.zmag,
+                           speed = ctrl.daq.config.protocol.speed)
+            self._widget.update(**out)
 
     @staticmethod
     def __statusargs(ctrl) -> Dict[str, Any]:

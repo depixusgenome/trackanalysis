@@ -48,6 +48,12 @@ class DAQAttrRange(ConfigObject):
     def __init__(self, **_):
         pass
 
+    def move(self, moveup) -> float:
+        """
+        incremented or decremented value
+        """
+        return min(self.vmax, max(self.vmin, self.value + (1 if moveup else -1)*self.inc))
+
 class DAQManualConfig(ConfigObject):
     """
     DAQ manual values
@@ -61,6 +67,15 @@ class DAQManualConfig(ConfigObject):
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
+
+    def new(self, **kwa) -> DAQManual:
+        "return a new daq protocol"
+        newval = DAQManual(zmag      = self.zmag.value,
+                           speed     = self.speed.value,
+                           framerate = self.framerate)
+        for i, j in kwa.items():
+            setattr(newval, i, j)
+        return newval
 
 PROTOCOL = TypeVar('PROTOCOL', bound = Union[DAQProtocol, 'DAQManualConfig'])
 
@@ -85,10 +100,11 @@ class BaseProtocolButton(Generic[PROTOCOL]):
         def _context(_):
             yield
             diff = transient.diff(self._model)
-            if diff:
-                with ctrl.action:
-                    ctrl.theme.update(self._model, **diff)
-            self._context(ctrl, transient, diff)
+            with ctrl.action:
+                if diff:
+                    with ctrl.action:
+                        ctrl.theme.update(self._model, **diff)
+                self._context(ctrl, transient, diff)
 
         def _onclick_cb(attr, old, new):
             "method to trigger the modal dialog"
@@ -198,6 +214,11 @@ class DAQManualButton(BaseProtocolButton[DAQManualConfig]):
         if super().observe(ctrl):
             return True
 
+        ctrl.theme  .updatedefaults('keystroke', zmagup   = 'Shift-Z', zmagdown = 'z')
+        ctrl.display.updatedefaults('keystroke',
+                                    zmagup   = lambda: self._onkeyzmag(ctrl, True),
+                                    zmagdown = lambda: self._onkeyzmag(ctrl, False))
+
         @ctrl.theme.observe("daqmanual", "addedaqmanual")
         def _ontheme(**_):
             if self._model.roi[2:] != list(ctrl.daq.config.defaultbead.roi[2:]):
@@ -207,6 +228,12 @@ class DAQManualButton(BaseProtocolButton[DAQManualConfig]):
     def addtodoc(self, ctrl, doc, tbar, name):
         "bokeh stuff"
         super().addtodoc(ctrl, doc, tbar, name)
+
+        def _on_cb(attr, old, new):
+            if getattr(self._model, attr).value != new:
+                with ctrl.action:
+                    ctrl.daq.updateprotocol(self._model.new(**{attr: new}))
+        tbar.on_change("zmag", _on_cb)
 
         @ctrl.theme.observe
         def _ondaqmanual(**_): # pylint: disable=unused-variable
@@ -241,9 +268,7 @@ class DAQManualButton(BaseProtocolButton[DAQManualConfig]):
     def _context(ctrl, transient, diff):
         if 'roi' in diff:
             ctrl.daq.updatedefaultbead(roi = tuple(transient.roi))
-        ctrl.daq.updateprotocol(DAQManual(zmag      = transient.zmag.value,
-                                          speed     = transient.speed.value,
-                                          framerate = transient.framerate))
+        ctrl.daq.updateprotocol(transient.new())
 
     def _onupdateprotocol(self, ctrl, model = None, **_):
         if not model.ismanual():
@@ -257,3 +282,8 @@ class DAQManualButton(BaseProtocolButton[DAQManualConfig]):
                           framerate = model.framerate,
                           zmag      = zmag,
                           speed     = speed)
+
+    def _onkeyzmag(self, ctrl, moveup):
+        zmag = self._model.zmag.move(moveup)
+        if zmag != self._model.zmag.value:
+            ctrl.daq.updateprotocol(self._model.new(zmag = zmag))

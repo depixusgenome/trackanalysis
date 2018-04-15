@@ -28,15 +28,17 @@ export class DpxDAQToolbarView extends WidgetView
 
     on_change_zranges: () ->
         itm = document.getElementById("dpx-tb-zmag")
-        itm.setAttribute("min",  @model.zmagmin)
-        itm.setAttribute("max",  @model.zmagmax)
-        itm.setAttribute("step", @model.zinc)
+        itm.setAttribute("min",   @model.zmagmin.toFixed(3))
+        itm.value = @model.zmag.toFixed(3)
+        itm.setAttribute("max",   @model.zmagmax.toFixed(3))
+        itm.setAttribute("step",  @model.zinc.toFixed(3))
 
     on_change_sranges: () ->
         itm = document.getElementById("dpx-tb-speed")
-        itm.setAttribute("min",  @model.speedmin)
-        itm.setAttribute("max",  @model.speedmax)
-        itm.setAttribute("step", @model.speedinc)
+        itm.setAttribute("min",   @model.speedmin)
+        itm.value = @model.speed.toFixed(4)
+        itm.setAttribute("max",   @model.speedmax)
+        itm.setAttribute("step",  @model.speedinc)
 
     on_change_message: () ->
         $(@el).find('#dpx-tb-message').html(@model.message)
@@ -47,9 +49,11 @@ export class DpxDAQToolbarView extends WidgetView
         @connect(@model.properties.protocol.change,  () => @on_change_protocol())
         @connect(@model.properties.recording.change, () => @on_change_protocol())
         @connect(@model.properties.zmagmin.change,   () => @on_change_zranges())
+        @connect(@model.properties.zmag.change,      () => @on_change_zranges())
         @connect(@model.properties.zmagmax.change,   () => @on_change_zranges())
         @connect(@model.properties.zinc.change,      () => @on_change_zranges())
         @connect(@model.properties.speedmin.change,  () => @on_change_sranges())
+        @connect(@model.properties.speed.change,     () => @on_change_sranges())
         @connect(@model.properties.speedmax.change,  () => @on_change_sranges())
         @connect(@model.properties.speedinc.change,  () => @on_change_sranges())
 
