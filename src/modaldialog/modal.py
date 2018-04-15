@@ -8,6 +8,7 @@ from    typing                  import (Optional,  # pylint: disable=unused-impo
 from    functools               import partial
 from    abc                     import ABCMeta, abstractmethod
 import  re
+import  random
 
 import  bokeh.core.properties   as props
 from    bokeh.models            import Model, Callback
@@ -101,6 +102,31 @@ class Option(metaclass = ABCMeta):
                 getattr(mdl, match.group(1))[int(match.group(2))] = val
             else:
                 setattr(mdl, keys[-1], val)
+
+class ChoiceOption(Option):
+    "Converts a text tag to an html check"
+    _PATT = re.compile(r'%\((?P<name>[\w\.\[\]]*)(?P<cols>(?:\|[^:]+\:[^|)]+)*)\)c')
+    @classmethod
+    def converter(cls, model, body:str) -> Callable:
+        "returns a method which sets values in a model"
+        elems = frozenset(i.group('name') for i in cls._PATT.finditer(body))
+        return cls._converter(model, elems, lambda x: x, AssertionError())
+
+    @classmethod
+    def replace(cls, model, body:str) -> str:
+        "replaces a pattern by an html tag"
+        def _replace(match):
+            key   = match.group('name')
+            ident = key+str(random.randint(0,100000))
+            out   = '<select name="{}" id="{}">'.format(key, ident)
+            first = None
+            for i in match.group('cols')[1:].split("|"):
+                if first is None:
+                    first = i.split(":")[0]
+                out += '<option value="{}">{}</option>'.format(*i.split(':'))
+            out += '</select><script>document.getElementById("{}").value = "{}"</script>'
+            return out.format(ident, cls.getvalue(model, key, first))
+        return cls._PATT.sub(_replace, body)
 
 class CheckOption(Option):
     "Converts a text tag to an html check"
@@ -204,7 +230,8 @@ class DpxModal(Model):
                           TextOption(str,   _OPT+r's',       None),
                           CSVOption(int,    _OPT+r'csv[id]'),
                           CSVOption(float,  _OPT+r'csvf'),
-                          CSVOption(str,    _OPT+r'csv'))
+                          CSVOption(str,    _OPT+r'csv'),
+                          ChoiceOption())
     __css__            = [ROUTE+"/backbone.modal.css",
                           ROUTE+"/backbone.modal.theme.css"]
     __javascript__     = [ROUTE+"/underscore-min.js",
@@ -279,7 +306,7 @@ class DpxModal(Model):
                 bdy = ' '.join(' '.join(i) for i in bdy)
 
             converters = [i.converter(model, bdy) for i in self.__OPTIONS]
-            ordered    = sorted(itms.items(), key = lambda i: bdy.index('%('+i[0]+')'))
+            ordered    = sorted(itms.items(), key = lambda i: bdy.index('%('+i[0]))
             if context is None:
                 for i in ordered:
                     any(cnv(*i) for cnv in converters)

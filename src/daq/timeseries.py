@@ -4,6 +4,9 @@
 import re
 from   abc              import ABC, abstractmethod
 from   functools        import partial
+from   contextlib       import contextmanager
+from   copy             import deepcopy
+from   typing           import Optional
 
 import numpy                  as     np
 from   bokeh.plotting         import figure, Figure
@@ -12,8 +15,11 @@ from   bokeh.models           import ColumnDataSource, LinearAxis, DataRange1d
 
 
 from   utils            import initdefaults
+from   utils.inspection import diffobj
 from   view.threaded    import ThreadedDisplay, DisplayModel
 from   view.plots.base  import PlotAttrs
+from   modaldialog      import dialog
+from   .toolbarconfig   import ConfigTool
 
 _ZERO = np.empty(0, dtype = [('_','f4')])
 
@@ -44,6 +50,12 @@ class TimeSeriesTheme:
     def __init__(self, **_):
         pass
 
+    _ISBEADS = re.compile(r"^[xyz]\d*$").match
+    @classmethod
+    def isbeads(cls, val):
+        "whether we are looking at beads"
+        return cls._ISBEADS(val) is not None
+
 class TimeSeriesViewMixin(ABC):
     "Display time series"
     XLEFT        = "xl"
@@ -66,7 +78,7 @@ class TimeSeriesViewMixin(ABC):
         ctrl.display.observe(self._model.display, partial(self._ondisplay, ctrl))
         ctrl.daq    .observe(partial(self._onupdatenetwork, ctrl))
 
-    def _addtodoc(self, *_):
+    def _addtodoc(self, ctrl, doc):
         "sets the plot up"
         theme = self._model.theme
         fig   = figure(toolbar_sticky   = theme.toolbar['sticky'],
@@ -77,6 +89,9 @@ class TimeSeriesViewMixin(ABC):
                        sizing_mode      = theme.figsize[2],
                        x_axis_label     = self._xlabel(),
                        y_axis_label     = self._leftlabel())
+        tool  = self._configdialog(ctrl, doc) # pylint: disable=assignment-from-none
+        if tool:
+            fig.add_tools(tool)
 
         rend = theme.leftattr.addto(fig,
                                     x      = self.XLEFT,
@@ -126,6 +141,10 @@ class TimeSeriesViewMixin(ABC):
     def _rightlabel(self):
         return self._model.theme.labels[self._model.display.rightvar]
 
+    @abstractmethod
+    def _configdialog(self, ctrl, doc) -> Optional[ConfigTool]:
+        return None
+
     def _onmodel(self, ctrl, **_):
         self.reset(ctrl)
 
@@ -147,10 +166,11 @@ class TimeSeriesViewMixin(ABC):
 
 class BeadTimeSeriesDisplay:
     "Information about the current bead displayed"
-    name     = "beadtimeseries"
-    xvar     = 'time'
-    leftvar  = "z"
-    rightvar = "zmag"
+    name         = "beadtimeseries"
+    xvar         = 'time'
+    leftvar      = "z"
+    rightvar     = "zmag"
+    current: int = None
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
         pass
@@ -171,10 +191,9 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
         self._rightindex                 = slice(0,0)
         self._callback: PeriodicCallback = None
 
-    _ISBEADS = re.compile(r"^[xyz]\d*$").match
     def isbeads(self):
         "whether we are looking at beads"
-        return self._ISBEADS(self._model.display.leftvar[:1])
+        return self._model.theme.isbeads(self._model.display.leftvar)
 
     def observe(self, ctrl):
         "observe controller events"
@@ -185,7 +204,9 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
             mdl = self._model.display
             if self.isbeads():
                 name = mdl.leftvar[:1]+('' if bead is None else str(bead))
-                ctrl.display.update(mdl, leftvar = name)
+                ctrl.display.update(mdl, leftvar = name, current = bead)
+            else:
+                ctrl.display.update(mdl, current = bead)
 
     def _doadd(self, ctrl):
         "resets the data"
@@ -238,8 +259,45 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
             self._fig.title.text = ""
 
     def _leftlabel(self):
-        name = self._model.display.leftvar[0 if self.isbeads else slice(None)]
+        name = self._model.display.leftvar[0 if self.isbeads() else slice(None)]
         return self._model.theme.labels[name]
+
+    def _configdialog(self, ctrl, doc) -> Optional[ConfigTool]:
+        transient = deepcopy(self._model.display)
+
+        @contextmanager
+        def _context(_):
+            yield
+            diff = diffobj(transient, self._model.display)
+            if not diff:
+                return
+
+            with ctrl.action:
+                ctrl.display.update(self._model.display, **diff)
+
+        def _body():
+            info  = dict(self._model.theme.labels)
+            if self._model.display.current is not None:
+                for i in 'xyz':
+                    info[f'{i}{self._model.display.current}'] = info.pop(i)
+            info.pop('time')
+            info = {i: j.replace('(','[').replace(')', ']') for i, j in info.items()}
+            opts = "%(leftvar|{})c".format('|'.join(f"{i}:{j}" for i, j in info.items()))
+            return [['Left y-axis:',  opts]]
+
+        def _onclick_cb(attr, old, new):
+            "method to trigger the modal dialog"
+            transient.__dict__.update(deepcopy(self._model.display.__dict__))
+            return dialog(doc,
+                          context = _context,
+                          title   = "Configuration",
+                          body    = _body(),
+                          model   = transient,
+                          always  = True)
+
+        tbar = ConfigTool()
+        tbar.on_change("configclick", _onclick_cb)
+        return tbar
 
 class FoVTimeSeriesDisplay:
     "Information about the current fov parameter displayed"
@@ -289,3 +347,6 @@ class FoVTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[FoVTimeSeriesModel]
                     self.YRIGHT: data[disp.rightvar]}
         except ValueError:
             return {self.XLEFT:  [], self.YLEFT:  [], self.YRIGHT: []}
+
+    def _configdialog(self, ctrl, doc) -> Optional[ConfigTool]:
+        return None

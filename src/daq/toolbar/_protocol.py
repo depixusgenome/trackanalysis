@@ -102,8 +102,7 @@ class BaseProtocolButton(Generic[PROTOCOL]):
             diff = transient.diff(self._model)
             with ctrl.action:
                 if diff:
-                    with ctrl.action:
-                        ctrl.theme.update(self._model, **diff)
+                    ctrl.theme.update(self._model, **diff)
                 self._context(ctrl, transient, diff)
 
         def _onclick_cb(attr, old, new):
