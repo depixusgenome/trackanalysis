@@ -38,7 +38,7 @@ class TimeSeriesTheme:
     maxlength = 5000
     period    = 1. # seconds
     toolbar   = dict(sticky   = False,
-                     location = 'right',
+                     location = 'above',
                      items    = ['pan,wheel_zoom,box_zoom,save,reset'])
     @initdefaults(frozenset(locals()))
     def __init__(self, **_):
@@ -231,6 +231,11 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
                 src.data = data
             else:
                 src.stream(data, self._model.theme.maxlength)
+
+        if self.isbeads():
+            self._fig.title.text = "Bead %s" % self._model.display.leftvar[1:]
+        else:
+            self._fig.title.text = ""
 
     def _leftlabel(self):
         name = self._model.display.leftvar[0 if self.isbeads else slice(None)]

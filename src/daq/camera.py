@@ -60,7 +60,7 @@ class CameraTheme:
     figsize   = 800, 600, 'fixed'
     figborder = 60, 40, 70, 50
     toolbar   = dict(sticky   = False,
-                     location = 'right',
+                     location = 'above',
                      items    = 'pan,wheel_zoom,box_zoom,reset')
     decimals  = 3
 
