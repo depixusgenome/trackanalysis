@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "View module showing one or more time series"
+import re
 from   abc              import ABC, abstractmethod
 from   functools        import partial
 
@@ -61,8 +62,8 @@ class TimeSeriesViewMixin(ABC):
 
         fcn = partial(self._onmodel, ctrl)
         ctrl.theme  .observe(self._model.theme,   fcn)
-        ctrl.display.observe(self._model.display, fcn)
         ctrl.daq    .observe("listen",            fcn)
+        ctrl.display.observe(self._model.display, partial(self._ondisplay, ctrl))
         ctrl.daq    .observe(partial(self._onupdatenetwork, ctrl))
 
     def _addtodoc(self, *_):
@@ -133,6 +134,9 @@ class TimeSeriesViewMixin(ABC):
         if any(i in old for i in names) and not self._waitfornextreset():
             self._onmodel(ctrl)
 
+    def _ondisplay(self, ctrl, **_):
+        self.reset(ctrl)
+
     @abstractmethod
     def _doadd(self, ctrl) -> bool:
         pass
@@ -144,7 +148,6 @@ class TimeSeriesViewMixin(ABC):
 class BeadTimeSeriesDisplay:
     "Information about the current bead displayed"
     name     = "beadtimeseries"
-    index    = 0
     xvar     = 'time'
     leftvar  = "z"
     rightvar = "zmag"
@@ -168,23 +171,36 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
         self._rightindex                 = slice(0,0)
         self._callback: PeriodicCallback = None
 
+    _ISBEADS = re.compile(r"^[xyz]\d*$").match
+    def isbeads(self):
+        "whether we are looking at beads"
+        return self._ISBEADS(self._model.display.leftvar[:1])
+
     def observe(self, ctrl):
         "observe controller events"
         super().observe(ctrl)
 
         @ctrl.daq.observe
         def _oncurrentbead(bead = None, **_): # pylint: disable=unused-variable
-            mdl  = self._model.display
-            name = mdl.leftvar[:1]+('' if bead is None else str(bead))
-            ctrl.display.update(mdl, leftvar = name)
+            mdl = self._model.display
+            if self.isbeads():
+                name = mdl.leftvar[:1]+('' if bead is None else str(bead))
+                ctrl.display.update(mdl, leftvar = name)
 
     def _doadd(self, ctrl):
         "resets the data"
-        data = ctrl.daq.data
+        data  = ctrl.daq.data
+        if not data.fovstarted:
+            return False
+
         disp = self._model.display
-        return (ctrl.daq.config.beads and data.fovstarted and data.beadsstarted
-                and not {disp.xvar, disp.rightvar}.difference(data.fov.view().dtype.names)
-                and not {disp.xvar, disp.leftvar }.difference(data.beads.view().dtype.names))
+        fov  = data.fov.view().dtype.names
+        if self.isbeads():
+            beads = data.beads.view().dtype.names
+            return (ctrl.daq.config.beads and data.beadsstarted
+                    and not {disp.xvar, disp.rightvar}.difference(fov)
+                    and not {disp.xvar, disp.leftvar }.difference(beads))
+        return not {disp.xvar, disp.rightvar, disp.leftvar}.difference(fov)
 
     def _rightdata(self, lines = _ZERO):
         disp = self._model.display
@@ -202,20 +218,23 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
 
     def _onupdatelines(self, ctrl):
         first, self._first = self._first, False
-        if first:
-            self._leftindex  = slice(0, 0)
-            self._rightindex = slice(0, 0)
+        for name, tpe in (('left', 'beads' if self.isbeads() else 'fov'),
+                          ('right', 'fov')):
+            if first:
+                setattr(self, f"_{name}index", slice(0, 0))
+            ind, out = getattr(ctrl.daq.data, tpe).since(getattr(self, f"_{name}index"))
+            setattr(self, f"_{name}index", ind)
 
-        self._leftindex,  left = ctrl.daq.data.beads.since(self._leftindex)
-        maxlen                 = len(left) if first else self._model.theme.maxlength
-        self._leftsource .stream(self._leftdata(left), maxlen)
-
-        self._rightindex, right = ctrl.daq.data.fov.since(self._rightindex)
-        maxlen                  = len(right) if first else self._model.theme.maxlength
-        self._rightsource.stream(self._rightdata(right), maxlen)
+            data     = getattr(self, f"_{name}data")(out)
+            src      = getattr(self, f"_{name}source")
+            if first:
+                src.data = data
+            else:
+                src.stream(data, self._model.theme.maxlength)
 
     def _leftlabel(self):
-        return self._model.theme.labels[self._model.display.leftvar[0]]
+        name = self._model.display.leftvar[0 if self.isbeads else slice(None)]
+        return self._model.theme.labels[name]
 
 class FoVTimeSeriesDisplay:
     "Information about the current fov parameter displayed"

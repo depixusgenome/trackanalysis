@@ -16,10 +16,11 @@ export class DpxDAQToolbarView extends WidgetView
         @model.speed = parseFloat(val)
 
     on_change_protocol:  () ->
-        $(@el).find('.dpx-tb-protocol').prop('disabled', @model.protocol != 'manual')
+        $(@el).find('.dpx-tb-protocol')    .prop('disabled', @model.protocol != 'manual')
+        $(@el).find('#dpx-tb-manual')      .prop('disabled', false)
         $(@el).find('.dpx-tb-manual-input').prop('disabled', @model.protocol != 'manual')
-        $(@el).find('#dpx-tb-record').prop('disabled',
-                                            @model.protocol != 'manual' || @model.recording)
+        $(@el).find('#dpx-tb-record')      .prop('disabled',
+                                                 @model.protocol != 'manual' || @model.recording)
         $(@el).find('#dpx-tb-stop').prop('disabled', !@model.recording)
 
         $(@el).find('.dpx-tb-protocol').removeClass('dpx-protocol-active')

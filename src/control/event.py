@@ -68,8 +68,8 @@ class Event:
     "Event handler class"
     emitpolicy  = EmitPolicy
     __SIMPLE    = cast(Callable, re.compile(r'^(\w|\.)+$',   re.IGNORECASE).match)
-    __EM_NAME   = re.compile(r'^_?(\w+)',     re.IGNORECASE).match
-    __OBS_NAME  = re.compile(r'^_?on_?(\w+)', re.IGNORECASE).match
+    __EM_NAME   = re.compile(r'^_*?(\w+)',     re.IGNORECASE).match
+    __OBS_NAME  = re.compile(r'^_*?on_*?(\w+)', re.IGNORECASE).match
 
     def __init__(self, **kwargs):
         self._handlers: _HANDLERS = kwargs.get('handlers', dict())

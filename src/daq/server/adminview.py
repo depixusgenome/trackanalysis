@@ -7,7 +7,7 @@ import asyncio
 
 from   contextlib           import closing
 from   enum                 import Enum
-from   typing               import Tuple, Optional, cast
+from   typing               import Tuple, Coroutine
 
 import websockets
 import numpy                as     np
