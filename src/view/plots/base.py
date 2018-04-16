@@ -231,7 +231,7 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
                             'input.width'        : 205,
                             'figure.width'       : 800,
                             'figure.height'      : 200}
-            css.figure.sizing_mode.default = 'scale_width'
+            css.figure.sizing_mode.default = 'fixed'
 
         key = type(self).key()
         for name in 'config', 'project', 'css':

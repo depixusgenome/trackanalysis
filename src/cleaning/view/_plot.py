@@ -89,8 +89,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
 
         self.__fig = fig = figure(**self._figargs(y_range = Range1d,
                                                   x_range = Range1d,
-                                                  name    = 'Clean:Cycles',
-                                                  css_classes= ["DDDDDDD"]))
+                                                  name    = 'Clean:Cycles'))
         glyph = self.css.points.addto(fig, x = 't', y = 'z', source = self.__source)
         hover = fig.select(DpxHoverTool)
         if hover:
