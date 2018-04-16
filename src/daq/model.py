@@ -8,23 +8,6 @@ import numpy                as     np
 from   utils                import initdefaults
 from   utils.inspection     import diffobj
 
-class ColDescriptor:
-    "easy creation of np.dtype"
-    def __init__(self, val: Union[np.dtype, List[Tuple[str, str]]]) -> None:
-        self.defaults = np.dtype(val)
-
-    def __get__(self, inst, owner) -> np.dtype:
-        return  self.defaults if inst is None else inst.__dict__['columns']
-
-    def __set__(self, inst, val: Union[np.dtype, List[Tuple[str, str]]]):
-        inst.__dict__['columns'] = np.dtype(val)
-
-FOVTYPE  = [("time",  'i8'), ("zmag", 'f4'), ("vmag",    'f4'), ("zobj",    'f4'),
-            ("x",     'f4'), ("y",    'f4'), ("tsample", 'f4'), ("tmagnet", 'f4'),
-            ("tsink", 'f4'), ("led1", 'f4'), ("led2",    'f4')]
-
-BEADTYPE = [('time', 'i8'),  ("x", 'f4'), ("y", 'f4'), ("z", 'f4')]
-
 class ConfigObject:
     """
     Object with a few helper function for comparison
@@ -46,32 +29,95 @@ class ConfigObject:
         dflt = {i: get(getattr(self.__class__, i)) for i in self.__dict__}
         return ChainMap({i: j for i, j in cur.items() if j != dflt[i]}, dflt)
 
+FOVTYPE  = [('msg',  'B'),      ('err',     'uint16'), ('ttype',    'B'),
+            ('time', 'uint64'), ('zstatus', 'B'),      ('xystatus', 'B'),
+            ('zmag', 'f4'),     ('vmag',    'f4'),     ('zobj',    'f4'),
+            ('x',    'f4'),     ('y',       'f4'),     ('t1',      'f4'),
+            ('t2',   'f4'),     ('t3',      'f4'),     ('led1',    'f4'),
+            ('led2', 'f4'),     ('phase',   'uint32'), ('cycle',   'uint32'),
+            ('_r0',  'uint32'), ('_r1',     'uint16')]
+
+BEADTYPE = [('time', 'uint32'),  ("x", 'f4'), ("y", 'f4'), ("z", 'f4')]
+
+class ColDescriptor:
+    "easy creation of np.dtype"
+    def __init__(self, val: Union[np.dtype, List[Tuple[str, str]]]) -> None:
+        self.defaults = np.dtype(val)
+
+    def __get__(self, inst, owner) -> np.dtype:
+        return  self.defaults if inst is None else inst.__dict__['columns']
+
+    def __set__(self, inst, val: Union[np.dtype, List[Tuple[str, str]]]):
+        inst.__dict__['columns'] = np.dtype(val)
+
 class DAQClient(ConfigObject):
     """
     All information related to the current protocol
     """
-    multicast = '239.255.0.1'
-    address   = ('', 30001)
-    bytesize  = 64
-    offset    = 4
-    columns   = cast(np.dtype, ColDescriptor(FOVTYPE))
+    multicast    = '239.255.0.1'
+    address      = ('', 30001)
+    columns      = cast(np.dtype, ColDescriptor(FOVTYPE))
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass
 
-    def fovtype(self) -> np.dtype:
-        "create the dtype for all fov data"
-        right = self.bytesize-self.offset-self.columns.itemsize
-        assert self.offset >= 0 and self.offset % 4 == 0 and right >= 0 and right % 4 == 0
-        cols = [*((f"_l{i}", 'i4') for i in range(self.offset//4)),
-                *self.columns.descr,
-                *((f"_r{i}", 'i4') for i in range(right//4))]
-        return np.dtype(cols)
+    def dtype(self, *_) -> np.dtype:
+        "create the dtype for the whole data"
+        return self.columns
 
-    def beadstype(self, nbeads:int):
+class TemperatureStatus:
+    """
+    Deals with the fact that temperatures are stored in the same fov data field
+    """
+    flags = {'tbox':    1<<0, 'tsample': 1<<1, 'tmagnet':  1<<2,
+             'ttresse': 1<<3, 'tsink':   1<<4, 'tmagsink': 1<<5,
+             'tair':    1<<6, 'rh':      1<<7}
+    field = {'tbox':    't1', 'tsample': 't1',
+             'tmagnet': 't2', 'ttresse': 't2',
+             'tsink':   't3', 'tmagsink': 't3', 'tair': 't3', 'rh': 't3'}
+    state = 'ttype'
+    @initdefaults(frozenset(locals()))
+    def __init__(self,**_):
+        pass
+
+    @property
+    def names(self):
+        "return the names of the temperatures"
+        return iter(self.flags)
+
+    def indexes(self, name, lines) -> Union[np.ndarray, slice]:
+        "return an array of booleans indicating which index is good"
+        flag = self.flags.get(name, None)
+        if flag is None:
+            return slice(None, None)
+        return np.bitwise_and(lines[self.state], self.flags[name]) != 0
+
+    def data   (self, name, lines) -> np.ndarray:
+        "return an array of booleans indicating which index is good"
+        return lines[self.field[name]][self.indexes(name, lines)]
+
+class DAQFoVClient(DAQClient):
+    """
+    All information related to the current protocol
+    """
+    columns      = cast(np.dtype, ColDescriptor(FOVTYPE))
+    address      = ('', 30001)
+    multicast    = '239.255.0.1'
+    temperatures = TemperatureStatus()
+
+    @initdefaults("temperatures")
+    def __init__(self, **kwa):
+        super().__init__(**kwa)
+
+class DAQBeadsClient(DAQClient):
+    """
+    All information related to the current protocol
+    """
+    columns   = cast(np.dtype, ColDescriptor(BEADTYPE))
+    address   = ('', 30002)
+    multicast = '239.255.0.2'
+    def dtype(self, nbeads:int) -> np.dtype: # type: ignore # pylint: disable=arguments-differ
         "create the dtype for all beads"
-        if self.offset:
-            raise NotImplementedError()
         cols = self.columns.descr[:1]
         for i in range(nbeads):
             cols += [(j+str(i), k) for j, k in self.columns.descr[1:]]
@@ -131,15 +177,9 @@ class DAQNetwork(ConfigObject):
     """
     camera    = DAQCamera()
     websocket = "ws://jupyter.depixus.org:9099"
-    fov       = DAQClient(columns   = FOVTYPE,
-                          address   = ('', 30001),
-                          multicast = '239.255.0.1'
-                         )
-    beads     = DAQClient(columns   = BEADTYPE,
-                          address   = ('', 30002),
-                          multicast = '239.255.0.2',
-                          offset    = 0
-                         )
+    fov       = DAQFoVClient()
+    beads     = DAQBeadsClient()
+
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
         pass

@@ -43,7 +43,7 @@ class DAQRecordFileDialog(BaseFileDialog):
             def _fcn():
                 with ctrl.action:
                     ctrl.theme.update(self._theme, initialdir = self.initialdir)
-                    ctrl.daq.startrecording(path, None)
+                    ctrl.daq.record(True, path)
             doc.add_next_tick_callback(_fcn)
 
     def addtodoc(self, ctrl, doc, tbar, name):
@@ -78,7 +78,7 @@ class DAQToolbar:
         self._probing .addtodoc(ctrl, doc, self._widget, "probing")
         self._manual  .addtodoc(ctrl, doc, self._widget, "manual")
         self._record  .addtodoc(ctrl, doc, self._widget, "record")
-        self._widget.on_change("stop", lambda attr, old, new: ctrl.daq.stoprecording())
+        self._widget.on_change("stop", lambda attr, old, new: ctrl.daq.record(False))
 
         mods = dict(height      = 50,
                     sizing_mode = ctrl.theme.get('main', 'sizingmode', 'fixed'))
@@ -92,7 +92,7 @@ class DAQToolbar:
         self._manual  .observe(ctrl)
         self._record  .observe(ctrl)
 
-        @ctrl.daq.observe("startrecording", "stoprecording", "updateprotocol")
+        @ctrl.daq.observe("record", "updateprotocol")
         def _onstoprecording(**_):
             if not self._widget:
                 return

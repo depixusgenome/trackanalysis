@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 "Display the fov data into a table"
 import re
-from   typing        import List
+from   typing        import Set
+from   functools     import partial
 from   bokeh.models  import Div
 from   bokeh.layouts import widgetbox
 from   utils         import initdefaults
@@ -15,13 +16,14 @@ _BASE = """
         </div>
         """.strip().replace("\n", "").replace("    ", "").replace("    ", "").replace("    ", "")
 
-_TEXT = "".join(_BASE % i for i in (("Magnet µm", "zmag:.3f"),
+_TEXT = "".join(_BASE % i for i in (("Cycle",        "cycle"),
+                                    ("Magnet µm",    "zmag:.3f"),
                                     ("Objective µm", "zobj:.3f"),
-                                    ("X µm", "x:.3f"),
-                                    ("Y µm", "y:.3f"),
-                                    ("Sample °C", "tsample:.3f"),
-                                    ("Box °C", "tsink:.3f"),
-                                    ("Magnet °C", "tmagnet:.3f")))+"<p></p>"
+                                    ("X µm",         "x:.3f"),
+                                    ("Y µm",         "y:.3f"),
+                                    ("Sample °C",    "tsample:.3f"),
+                                    ("Box °C",       "tbox:.3f"),
+                                    ("Magnet °C",    "tmagnet:.3f")))+"<p></p>"
 
 class FoVTableTheme(BaseModel):
     "summary info on the field of view"
@@ -39,14 +41,19 @@ class FoVTableView(ThreadedDisplay[FoVTableTheme]):
     _FIND = re.compile(r'{(\w+)[:}]')
     def __init__(self, **_):
         super().__init__()
-        self.__widget:  Div       = None
-        self.__columns: List[str] = []
-        self.__callback           = None
+        self.__widget:  Div      = None
+        self.__direct:  Set[str] = []
+        self.__temps:   Set[str] = []
+        self.__cycle             = False
+        self.__callback          = None
 
     def _addtodoc(self, ctrl, _):
         "creates the widget"
-        self.__columns = [i for i in self._FIND.findall(self._model.template)]
-        text           = self._model.template.format(**dict.fromkeys(self.__columns, 0.))
+        names         = set(self._FIND.findall(self._model.template))
+        self.__direct = names - {'tsample', 'tbox', 'tmagnet', 'cycle'}
+        self.__temps  = names & {'tsample', 'tbox', 'tmagnet'}
+        self.__cycle  = 'cycle' in names
+        text          = self._model.template.format(**{i: 0. for i in names})
 
         mods = dict(width  = self._model.width,
                     height = self._model.height)
@@ -85,14 +92,23 @@ class FoVTableView(ThreadedDisplay[FoVTableTheme]):
         if cback is not None:
             self._doc.remove_periodic_callback(cback)
 
-        def _fcn():
-            lines = data.fov.view()
-            if len(lines):
-                self.__widget.text =  self.__data(lines)
-        period = self._model.period*1e3
-
         if self.__callback is True:
-            self.__callback = self._doc.add_periodic_callback(_fcn, period)
+            self.__callback = self._doc.add_periodic_callback(partial(self.__data, control),
+                                                              self._model.period*1e3)
 
-    def __data(self, lines):
-        return self._model.template.format(**{i: lines[-1][i] for  i in self.__columns})
+    def __data(self, ctrl):
+        lines = ctrl.daq.data.fov.view()
+        if len(lines) == 0:
+            return
+
+        out = {i: lines[-1][i] for  i in self.__direct}
+        if self.__cycle:
+            if lines[-1]['cycle']:
+                out['cycle'] = f'{lines[-1]["cycle"]}/{ctrl.daq.config.protocol.cyclecount}'
+            else:
+                out['cycle'] = '--'
+
+        for i in self.__temps:
+            out[i] = ctrl.daq.config.network.fov.temperatures.data(i, lines)[-1]
+
+        self.__widget.text = self._model.template.format(**out)

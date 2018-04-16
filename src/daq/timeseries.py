@@ -126,10 +126,10 @@ class TimeSeriesViewMixin(ABC):
         if cback is not None:
             self._doc.remove_periodic_callback(cback)
 
-        fcn    = partial(self._onupdatelines, ctrl)
-        period = self._model.theme.period*1e3
+        fcn         = partial(self._onupdatelines, ctrl)
+        period      = self._model.theme.period*1e3
+        self._first = True
         if self._callback is True:
-            self._first    = True
             self._callback = self._doc.add_periodic_callback(fcn, period)
 
     def _xlabel(self):
@@ -215,7 +215,8 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
             return False
 
         disp = self._model.display
-        fov  = data.fov.view().dtype.names
+        fov  = (set(data.fov.view().dtype.names)
+                | set(ctrl.daq.config.network.fov.temperatures.names))
         if self.isbeads():
             beads = data.beads.view().dtype.names
             return (ctrl.daq.config.beads and data.beadsstarted
@@ -223,22 +224,25 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
                     and not {disp.xvar, disp.leftvar }.difference(beads))
         return not {disp.xvar, disp.rightvar, disp.leftvar}.difference(fov)
 
-    def _rightdata(self, lines = _ZERO):
+    def _rightdata(self, lines = _ZERO, var = None):
         disp = self._model.display
         try:
-            return {self.XRIGHT: lines[disp.xvar], self.YRIGHT: lines[disp.rightvar]}
+            return {self.XRIGHT: lines[disp.xvar],
+                    self.YRIGHT: lines[var if var else disp.rightvar]}
         except ValueError:
             return {self.XRIGHT: [], self.YRIGHT: []}
 
-    def _leftdata(self, lines = _ZERO):
+    def _leftdata(self, lines = _ZERO, var = None):
         disp = self._model.display
         try:
-            return {self.XLEFT: lines[disp.xvar], self.YLEFT: lines[disp.leftvar]}
+            return {self.XLEFT: lines[disp.xvar],
+                    self.YLEFT: lines[var if var else disp.leftvar]}
         except ValueError:
             return {self.XLEFT: [], self.YLEFT: []}
 
     def _onupdatelines(self, ctrl):
         first, self._first = self._first, False
+        temps              = ctrl.daq.config.network.fov.temperatures
         for name, tpe in (('left', 'beads' if self.isbeads() else 'fov'),
                           ('right', 'fov')):
             if first:
@@ -246,7 +250,12 @@ class BeadTimeSeriesView(TimeSeriesViewMixin, ThreadedDisplay[BeadTimeSeriesMode
             ind, out = getattr(ctrl.daq.data, tpe).since(getattr(self, f"_{name}index"))
             setattr(self, f"_{name}index", ind)
 
-            data     = getattr(self, f"_{name}data")(out)
+            var = getattr(self._model.display, f'{name}var')
+            if tpe == 'fov' and var in temps.names:
+                out  = out[temps.indexes(var, out)]
+                var  = temps.field[var]
+
+            data     = getattr(self, f"_{name}data")(out, var)
             src      = getattr(self, f"_{name}source")
             if first:
                 src.data = data

@@ -45,17 +45,13 @@ class DAQController(Controller):
         return DAQBead(**tmp)
 
     @configemit
-    def startrecording(self, path: str, duration: Optional[int]) -> dict:
+    def record(self, start, path: str = None) -> dict:
         "start recording"
-        args = dict(started = True, path = path, duration = duration)
+        if start:
+            args = dict(started = True, path = path)
+        else:
+            args = dict(started = False)
         return updatemodel(self, self.config.recording, args)
-
-    @Controller.emit
-    def stoprecording(self) -> dict:
-        "stop recording"
-        if not self.config.recording.started:
-            raise NoEmission("no recording started")
-        return updatemodel(self, self.config.recording, dict(started = False))
 
     @configemit
     def updatenetwork(self, force = False, **kwa) -> dict:

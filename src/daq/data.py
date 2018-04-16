@@ -5,7 +5,7 @@ The database
 """
 from   typing  import Iterable, Tuple
 import numpy   as     np
-from   .model  import DAQClient
+from   .model  import DAQBeadsClient
 
 class RoundRobinVector:
     """
@@ -95,37 +95,15 @@ class FoVRoundRobinVector(RoundRobinVector):
     """
     Deals with fov data
     """
-    def __init__(self, maxlength:int, offset:int, columns: np.dtype, bytesize:int) -> None:
-        super().__init__(maxlength, self.fulltype(offset, columns, bytesize))
-    setup = __init__
-
-    @staticmethod
-    def fulltype(offset:    int,    # type: ignore # pylint: disable=arguments-differ
-                 columns:   np.dtype,
-                 bytesize:  int,
-                 *_) -> np.dtype:
-        "create the dtype for all beads"
-        return DAQClient(offset = offset, columns = columns, bytesize = bytesize).fovtype()
-
-    @property
-    def basetype(self):
-        "create the basic dtype for the fov"
-        left = size = 0
-        for left, name in enumerate(self._array.dtype.names):
-            if name[:2] != 'l_':
-                break
-
-        for size, name in enumerate(self._array.dtype.names[left:]):
-            if name[:2] == 'r_':
-                break
-
-        return np.dtype(self._array.dtype.descr[left:size+left])
+    def setup(self, maxlength:int, columns: np.dtype):
+        "reset the data"
+        self.__dict__.update(type(self)(maxlength, columns).__dict__)
 
     @classmethod
     def create(cls, config, maxlen) -> 'FoVRoundRobinVector':
         "create an instance"
         fov = getattr(getattr(config, 'network', config), 'fov', config)
-        return cls(maxlen, fov.offset, fov.columns, fov.bytesize)
+        return cls(maxlen, fov.columns)
 
 class BeadsRoundRobinVector(RoundRobinVector):
     """
@@ -143,7 +121,7 @@ class BeadsRoundRobinVector(RoundRobinVector):
                  columns: np.dtype,
                  *_):
         "create the dtype for all beads"
-        return DAQClient(offset = 0, columns = columns).beadstype(nbeads)
+        return DAQBeadsClient(columns = columns).dtype(nbeads)
 
     @property
     def basetype(self):

@@ -64,8 +64,7 @@ class DAQAdmin: # pylint: disable=too-many-public-methods
     """
     _CMD    = "local {} = hidCommand.new();"
     _SCRIPT = "local {} = hidCommandScript.new();"
-    _BEGIN  = "{}.beginPhase({});"
-    _ADD    = "{}.addPhase({});"
+    _ADD    = "{}.insert({});"
     _SEND   = "daq_sendCommand({});"
     _PREC   = dict(zmag = 1e-3,   x = 1e-3, y = 1e-3, tsample = 1e-2)
     def __init__(self, model: DAQNetwork) -> None:
@@ -102,6 +101,10 @@ class DAQAdmin: # pylint: disable=too-many-public-methods
         "set info about the current protocol by the server"
         return send2daq(self.model, self._setprotocol(protocol))
 
+    def getprotocol(self) -> DAQProtocol:
+        "set info about the current protocol by the server"
+        raise NotImplementedError()
+
     async def wait(self, *args):
         "wait for a value to be reached"
         if len(args) == 1:
@@ -112,17 +115,15 @@ class DAQAdmin: # pylint: disable=too-many-public-methods
                            for i in range(0, len(args), 2))
             await readdaq(self.model, _done)
 
-    async def setstartrecording(self, record: str):
+    async def setrecording(self, start: bool, record: str):
         """
         tell the server to start recording
         """
-        if not record:
-            return
         raise NotImplementedError()
 
-    async def setstoprecording(self):
+    async def getrecording(self):
         """
-        tell the server to stop recording
+        tell the server to start recording
         """
         raise NotImplementedError()
 
@@ -138,11 +139,11 @@ class DAQAdmin: # pylint: disable=too-many-public-methods
             self.admin  = admin
             self.record = record
         async def __aenter__(self):
-            await self.admin.startrecording(self.record)
+            await self.admin.setrecording(True, self.record)
             return self.admin
 
         async def __aexit__(self, *_):
-            await self.admin.stoprecording()
+            await self.admin.setrecording(False)
 
     def setvalues(self, *args) -> Coroutine:
         "sets a list of values"
@@ -150,22 +151,21 @@ class DAQAdmin: # pylint: disable=too-many-public-methods
         return send2daq(self.model, msg)
 
     def _setprotocol(self, protocol: DAQProtocol) -> str:
+        setv  = lambda n, x, y: self._setvalues(n,
+                                                Teensy.zmag,      x.zmag,
+                                                Teensy.vmag,      x.vmag,
+                                                Teensy.startTime, y)
         if isinstance(protocol, DAQManual):
-            msg = self._setvalues("s",
-                                  Teensy.zmag, protocol.zmag,
-                                  Teensy.vmag, protocol.speed)
-        else:
-            phase = [i for i in protocol.phases if i.zmag is not None][-1]
-            msg   = (self._setvalues("f", Teensy.zmag, phase.zmag, Teensy.vmag, phase.speed)
-                     +self._SCRIPT.format("s"))
-            for i, phase in enumerate(protocol.phases):
-                msg += (self._setvalues(f"p{i}",
-                                        Teensy.zmag,      phase.zmag,
-                                        Teensy.vmag,      phase.speed,
-                                        Teensy.startTime, protocol.phases[i-1].duration)
-                        +(self._BEGIN if i == 0 else self._ADD).format("s", f"p{i}"))
+            return setv("s", protocol, None) + self._SEND.format("s")
 
-        return msg + self._SEND.format("s")
+        lst   = protocol.phases
+        phase = [i for i in lst if i.zmag is not None][-1]
+        return (setv("f", phase, None)
+                + self._SEND.format("f")
+                + ''.join(setv(f"p{i}", cur, lst[i-1].duration) for i, cur in enumerate(lst))
+                + self._SCRIPT.format("s")
+                + ''.join(self._ADD.format("s", f"p{i}") for i in range(len(lst)))
+                + self._SEND.format("s"))
 
     def _setvalues(self, name, *args) -> str:
         "sets a list of values"
@@ -180,8 +180,9 @@ class DAQAdminView:
     Listen to the gui and warn the server
     """
     def __init__(self, **_):
-        self._listening = True
-        self._doc       = None
+        self._started = False
+        self._busy    = True
+        self._doc     = None
 
     def observe(self, ctrl):
         "observe the controller"
@@ -190,14 +191,13 @@ class DAQAdminView:
             "create an observe method"
             @ctrl.daq.observe(fcn.__name__[3:])
             def _wrapped(self, control = None, **kwa):
-                if not self._listening:
+                if not self._busy and self._started:
                     daq  = DAQAdmin(control.config.network)
                     daq.run(*fcn(daq, control = control, **kwa))
 
         @observe
         def _onupdateprotocol(_1, model = None, **_2):
-            return (('setprotocol', model) if not model.ismanual() else
-                    ('setvalues', Teensy.zmag, model.zmag, Teensy.vmag, model.speed))
+            return 'setprotocol', model
 
         @observe
         def _onupdatebeads(_1, control = None, **_2):
@@ -219,16 +219,28 @@ class DAQAdminView:
         def _onstoprecording(_1, **_2):
             return ('setstoprecording',)
 
+        async def _init(daq, control):
+            if not (control.daq.data.fovstarted or control.daq.data.beadsstarted):
+                return
+
+            rec      = await daq.getrecording()
+            protocol = await daq.getprotocol()
+            beads    = await daq.getbeads()
+            def _inform():
+                self._busy = True
+                try:
+                    control.record(True if rec else False, rec)
+                    control.removebeads()
+                    control.addbeads(beads)
+                    control.updateprotocol(protocol)
+                finally:
+                    self._busy = False
+            self._doc.add_next_tick_callback(_inform)
+
+        @observe
+        def _onlisten(daq, control = None, **_):
+            return (_init, daq, control)
+
         @observe
         def _onupdatenetwork(daq, control = None, **_):
-            async def _run():
-                beads = await daq.getbeads()
-                def _inform():
-                    self._listening = True
-                    try:
-                        control.removebeads()
-                        control.addbeads(beads)
-                    finally:
-                        self._listening = False
-                self._doc.add_next_tick_callback(_inform)
-            return (_run,)
+            return (_init, daq, control)

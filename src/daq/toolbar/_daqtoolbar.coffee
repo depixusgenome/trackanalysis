@@ -19,9 +19,8 @@ export class DpxDAQToolbarView extends WidgetView
         $(@el).find('.dpx-tb-protocol')    .prop('disabled', @model.protocol != 'manual')
         $(@el).find('#dpx-tb-manual')      .prop('disabled', false)
         $(@el).find('.dpx-tb-manual-input').prop('disabled', @model.protocol != 'manual')
-        $(@el).find('#dpx-tb-record')      .prop('disabled',
-                                                 @model.protocol != 'manual' || @model.recording)
-        $(@el).find('#dpx-tb-stop').prop('disabled', !@model.recording)
+        $(@el).find('#dpx-tb-record')      .prop('disabled', @model.recording)
+        $(@el).find('#dpx-tb-stop')        .prop('disabled', !@model.recording)
 
         $(@el).find('.dpx-tb-protocol').removeClass('dpx-protocol-active')
         $(@el).find("#dpx-tb-#{@model.protocol}").addClass('dpx-protocol-active')
