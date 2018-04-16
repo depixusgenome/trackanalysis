@@ -3,31 +3,46 @@
 """
 Scripts for aligning beads & tracks
 """
+from   typing       import Dict
 import pandas                  as     pd
 import numpy                   as     np
 import holoviews               as     hv
 
-from   peakcalling.toreference import (CorrectedHistogramFit, # pylint: disable=unused-import
-                                       Range, Pivot)
-from   peakcalling.tohairpin   import ChiSquareFit
+from   peakcalling.toreference             import (Range, # pylint: disable=unused-import
+                                                   CorrectedHistogramFit, Pivot)
+from   peakcalling.tohairpin               import ChiSquareFit
+from   peakfinding.groupby.histogramfitter import PeakFlagger
 
 def createpeaks(tracks):
     "create peaks for all tracks"
     import scripting
     singlestrand = getattr(scripting, 'Tasks').singlestrand()
-    return tracks.peaks.dataframe(singlestrand,
-                                  events     = dict(std = 'std'),
-                                  resolution = 'resolution')
+    data         = tracks.peaks.dataframe(singlestrand,
+                                          events     = dict(std = 'std'),
+                                          resolution = 'resolution')
+    data         = data.reset_index()
+    trkcount     = (data
+                    .groupby(['bead', 'track'])
+                    .peakposition.first()
+                    .reset_index()
+                    .groupby('bead')
+                    .track.count()
+                    .rename('trackcount'))
+    return data.set_index('bead').join(trkcount).reset_index()
 
 class PeaksAlignment:
     """
     Align beads or tracks
     """
-    def __init__(self, **kwa):
-        self.hpalign  = kwa['hpalign']  if 'hpalign'  in kwa else ChiSquareFit(**kwa)
-        self.refalign = kwa['refalign'] if 'refalign' in kwa else CorrectedHistogramFit(**kwa)
+    def __init__(self, individually = False, **kwa):
+        self.hpalign      = kwa.get('hpalign',     ChiSquareFit(**kwa))
+        self.refalign     = kwa.get('refalign',    CorrectedHistogramFit(**kwa))
+        self.peakflagger  = kwa.get('peakflagger', PeakFlagger(mincount = 1, window = 15))
+        self.individually = individually
+
         if self.refalign and 'pivot' not in kwa:
             self.refalign.pivot = Pivot.absolute
+
         if self.hpalign and 'firstpeak' not in kwa:
             self.hpalign.firstpeak = False
 
@@ -63,6 +78,26 @@ class PeaksAlignment:
             return [(i, _maskpeaks(j, mask.get(i, None))) for i, j in data]
         return _maskpeaks(data, mask)
 
+    def flagpeaks(self, ref, data, attr = 'peakposition'):
+        """
+        Return pairs of peaks per bead and track.
+        The peak & event positions should already be aligned
+        """
+        inf                   = np.iinfo('i4').max
+        cols: Dict[str, list] = {i: [] for i in ('track', 'bead', attr, 'reference')}
+        for bead, track in {k[1:] for k in data[['bead', 'track']].itertuples()}:
+            thisref  = ref[track] if isinstance(ref, dict) else ref
+            tmp      = data[data.bead==bead]
+            peaks    = np.sort(tmp[tmp.track == track][attr].unique())
+            flags    = self.peakflagger(thisref, [peaks])[0]
+
+            cols['reference'].append(thisref[flags[flags < inf]])
+            cols[attr].append(peaks[flags < inf])
+            cols['track'].append([track]*len(cols[attr][-1]))
+            cols['bead'].append(np.full(len(cols[attr][-1]), bead, dtype = 'i4'))
+
+        return pd.DataFrame({i: np.concatenate(j) for i, j in cols.items()})
+
     @staticmethod
     def setpivot(data, position = 'max'):
         "moves peakposition and avg to a new position"
@@ -96,9 +131,16 @@ class PeaksAlignment:
             return corr
 
         align = lambda x: self.hpalign.optimize(np.sort(x.peakposition.unique()))
-        if self.refalign is not None:
+        if self.individually:
+            data = [(i, j.assign(peakposition = (j.peakposition-corr[i][2])*corr[i][1]))
+                    for i, j in data]
+            new  = {i: align(j) for i, j in data}
+            return {i: (j[0], j[1]*new[i][1], j[1]*j[2]+new[i][2]/j[1]) for i, j in corr.items()}
+
+        elif self.refalign is not None:
             out = align(next(j for i, j in data if i == ref))
             return {i: (j[0], j[1]*out[1], j[1]*j[2]+out[2]/j[1]) for i, j in corr.items()}
+
         return {i: align(j) for i, j in data}
 
     def correct(self, data, ref):
