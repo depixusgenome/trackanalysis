@@ -7,14 +7,14 @@ from typing             import (KeysView, List, Dict, Any, # pylint: disable=unu
                                 Iterator, Tuple, TypeVar, Union, Set, Optional,
                                 Sequence, cast)
 from pathlib            import Path
-from anastore           import LocalPatch
 from concurrent.futures import ThreadPoolExecutor
 from copy               import copy as shallowcopy
 import re
 
-from .views   import isellipsis, BEADKEY
-from .track   import Track
-from .trackio import LegacyGRFilesIO, LegacyTrackIO, PATHTYPES
+from anastore           import LocalPatch
+from .views             import isellipsis, BEADKEY
+from .track             import Track
+from .trackio           import LegacyGRFilesIO, LegacyTrackIO, PATHTYPES
 
 TDictType = TypeVar('TDictType', bound = 'TracksDict')
 TrackType = TypeVar('TrackType', bound = 'Track')
