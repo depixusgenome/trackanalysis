@@ -11,12 +11,10 @@ from bokeh.models               import (DataTable, TableColumn, CustomJS,
                                         Widget, Div, StringFormatter, Paragraph,
                                         Dropdown)
 
-import numpy                    as     np
-
 from signalfilter               import rawprecision
 
 from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit
-
+from peakfinding.groupby        import ByEM, ByHistogram
 from utils.gui                  import startfile
 from excelreports.creation      import writecolumns
 from view.dialog                import FileDialog
@@ -429,7 +427,6 @@ class _IdAccessor:
 class _PeakDescriptor:
     def getdefault(self,inst)->bool: # pylint: disable=no-self-use
         "returns default peak finder"
-        LOGS.info(f"in getdefault, {type(inst)}")
         return not isinstance(getattr(inst, '_model').peakselection.configtask.default().finder,
                               ByHistogram)
 
@@ -441,9 +438,7 @@ class _PeakDescriptor:
         if value:
             mdl.peakselection.update(finder=ByEM(mincount=getattr(inst,"_eventcount")))
             return
-        LOGS.info("set to Hist")
         mdl.peakselection.update(finder=ByHistogram(mincount=getattr(inst,"_eventcount")))
-        #mdl.peakselection.finder.grouper.eventcount = inst._eventcount # fixme
 
 class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # type: ignore
     "access to the modal dialog"
