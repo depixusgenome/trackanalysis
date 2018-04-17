@@ -54,6 +54,7 @@ class BeadPlotCreator(TaskPlotCreator[TaskPlotModelAccess]):
 
     def _addcallbacks(self, fig):
         super()._addcallbacks(fig)
+        # pylint: disable=unsubscriptable-object
         rng          = self._fig.extra_y_ranges['zmag']
         rng.callback = CustomJS(code = ("cb_obj.start = cb_obj.bounds[0];"
                                         "cb_obj.end   = cb_obj.bounds[1];"))
@@ -70,14 +71,16 @@ class BeadPlotCreator(TaskPlotCreator[TaskPlotModelAccess]):
         self._addylayout  ()
         self._addglyph    ('zmag', y_range_name = 'zmag')
         self._addglyph    ('z')
+        # pylint: disable=unsubscriptable-object
         for rng in self._fig.x_range, self._fig.y_range, self._fig.extra_y_ranges['zmag']:
             self.fixreset(rng)
 
         self._addcallbacks(self._fig)
-        return DpxKeyedRow(self, self._fig)
+        return DpxKeyedRow(self._ctrl, self, self._fig)
 
     def _reset(self):
         self._bkmodels[self._source]['data'] = data = self.__data()
+        # pylint: disable=unsubscriptable-object
         self.setbounds(self._fig.extra_y_ranges['zmag'], None, data['zmag'])
         self.setbounds(self._fig.x_range,                 'x', data['t'])
         self.setbounds(self._fig.y_range,                 'y', data['z'])

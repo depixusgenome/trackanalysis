@@ -60,26 +60,6 @@ def test_controller():
     "test controller"
     ctrl = DAQController()
     assert ctrl.data.fov.view().size == 0
-    data = np.zeros(5, dtype = ctrl.data.fov.view().dtype)
-
-    cnt = [0]
-    def _onaddfovdata(**_):
-        cnt[0] += 1
-    ctrl.observe(_onaddfovdata)
-
-    for i in range(1,3):
-        ctrl.addfovdata(data)
-        assert cnt[0] == i
-
-    cnt = [0]
-    def _onaddbeaddata(**_):
-        cnt[0] += 1
-    ctrl.observe(_onaddbeaddata)
-
-    for i in range(1,3):
-        ctrl.addbeaddata(data)
-        assert cnt[0] == i
-
     cnt = [0]
     def _onupdateprotocol(**_):
         cnt[0] += 1

@@ -35,7 +35,7 @@ class HistMixin(ABC):
         self._ticker                       = SequenceTicker()
 
     @checksizes
-    def __data(self, data, shape):
+    def __data(self, data, shape): # pylint: disable=too-many-locals
         bins  = np.array([-1, 1])
         zeros = np.zeros((1,), dtype = 'f4')
         items = (zeros,)

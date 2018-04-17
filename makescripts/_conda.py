@@ -40,7 +40,7 @@ def setup(cnf):
 class _CondaApp(BuildContext):
     fun = cmd = 'app'
     DOALL     = True
-    EXCLUDED  = 'tests','scripting', 'ramp'
+    EXCLUDED  = 'tests','scripting', 'ramp', 'daq'
 
     def __clean(self):
         self.options.APP_PATH = self.bldnode.make_node("OUTPUT_PY")

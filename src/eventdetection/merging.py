@@ -220,7 +220,8 @@ class PopulationMerger(EventMerger):
             self.__apply(data, intervals, rem)
         return intervals[rem]
 
-    def __apply(self, data, intervals, rem):
+    def __apply(self, data, # pylint: disable=too-many-locals
+                intervals, rem):
         stats = lambda i: (data[i[0]:i[1]],
                            np.nanmin(data[i[0]:i[1]]),
                            np.nanmax(data[i[0]:i[1]]))

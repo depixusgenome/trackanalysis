@@ -16,7 +16,7 @@ def test_serverview(bokehaction):
         def _onaddfovdata(**_): # pylint: disable=unused-variable
             cnt[0] += pack
 
-        proc = runfovsimulator(daq.config.network.fov)
+        proc, state = runfovsimulator(daq.config.network.fov)
         proc.start()
         server.wait()
         assert cnt[0] == 0
@@ -24,7 +24,8 @@ def test_serverview(bokehaction):
 
         daq.listen(True, False)
         server.wait()
-        proc.terminate()
+        state.value = 0
+        proc.join()
 
         assert cnt[0] > 0
         assert len(daq.data.fov.view()) == cnt[0]

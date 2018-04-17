@@ -40,8 +40,8 @@ namespace peakfinding{
 	
 	double pdfparam(blas::vector<double> param,blas::vector<double> datum){
 	    double pdf = 1.;
-	    for (uint it=0;it<param.size()-2;it+=2){
-		pdf *= normpdf(param(it),param(it+1),datum[it/2]);
+	    for (unsigned int it=0;it<param.size()-2;it+=2){
+		pdf *= normpdf(param(it),param(it+1),datum[it/2]); // datum[0] to change
 	    }
 	    return pdf*exppdf(param[param.size()-2],param[param.size()-1],datum[datum.size()-1]);
 	}
@@ -168,22 +168,6 @@ namespace peakfinding{
 	    return pz_x;
 	}
 	
-
-	// bool areparamsfixed(const matrix& prevp,const matrix& nextp){
-	//     // NOT USED
-	//     // WRONG testing condition
-	//     // compares next params with previous parameters
-	//     matrix tmp = nextp-prevp;
-	//     for (unsigned r=0u, nrows=tmp.size1();r<nrows;++r){
-	// 	for (unsigned c=0u, ncols=tmp.size2();c<ncols;++c){
-	// 	    if(abs(tmp(r,c))>PRECISION){
-	// 		std::cout<<"not fixed"<<tmp(r,c)<<std::endl;
-	// 		return false;
-	// 	    }
-	// 	}
-	//     }
-	//     return true;
-	// }
 
 	void oneemstep(matrix &data,
 		       matrix &rates,
