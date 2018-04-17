@@ -243,6 +243,13 @@ class BeadInput:
                 bdctrl.bead = new
             tbar.bead = bdctrl.bead
 
+        def _chg_cb2(step):
+            if bdctrl.bead is not None:
+                new = bdctrl.bead+step
+                with ctrl.action:
+                    bdctrl.bead = new
+                tbar.bead = bdctrl.bead
+
         def _onproject(_ = None):
             bead  = bdctrl.bead
             avail = set(bdctrl.availablebeads)
@@ -260,8 +267,8 @@ class BeadInput:
         ctrl.globals.project.observe('track', 'bead', _onproject)
         ctrl.observe("updatetask", "addtask", "removetask", lambda **_: _onproject())
         ctrl.display.updatedefaults('keystroke',
-                                    beadup   = lambda: _chg_cb('', '', bdctrl.bead+1),
-                                    beaddown = lambda: _chg_cb('', '', bdctrl.bead-1))
+                                    beadup   = lambda: _chg_cb2(1),
+                                    beaddown = lambda: _chg_cb2(-1))
 
 class RejectedBeadsInput:
     "Text dealing with rejected beads"
