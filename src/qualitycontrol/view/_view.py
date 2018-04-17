@@ -11,7 +11,7 @@ from    ._model           import QualityControlModelAccess
 class QualityControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
     "Creates plots for discard list"
     _RESET = frozenset()         # type: frozenset
-    def __init__(self, ctrl = None, *args):
+    def __init__(self, ctrl = None, *args): # pylint: disable=keyword-arg-before-vararg
         super().__init__(ctrl = ctrl, *args)
         self._widgets = QualityControlWidgets(self._model)
         self._plots   = QualityControlPlots  (ctrl, self._model)

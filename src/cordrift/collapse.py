@@ -165,7 +165,8 @@ class CollapseToMean(_CollapseAlg):
         fcn = getattr(np, self.weight)
         return lambda _, i: fcn(i)
 
-    def _run(self, inter:Sequence[Range], prof:Profile, precision: float = None) -> Profile:
+    def _run(self, inter:Sequence[Range], # pylint: disable=too-many-locals
+             prof:Profile, precision: float = None) -> Profile:
         key    = lambda i: (-i.start-len(i.values), -len(i.values))
         cnt    = np.array(prof.count, dtype = 'f4')
         edge   = self._edge

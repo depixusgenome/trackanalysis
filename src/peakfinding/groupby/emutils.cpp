@@ -22,7 +22,7 @@ namespace peakfinding{
 	
 	double pdfparam(blas::vector<double> param,blas::vector<double> datum){
 	    double pdf = 1.;
-	    for (uint it=0;it<param.size()-2;it+=2){
+	    for (unsigned int it=0;it<param.size()-2;it+=2){
 		pdf *= normpdf(param(it),param(it+1),datum[it/2]); // datum[0] to change
 	    }
 	    return pdf*exppdf(param[param.size()-2],param[param.size()-1],datum[datum.size()-1]);

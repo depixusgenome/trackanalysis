@@ -142,7 +142,8 @@ class Histogram(PrecisionAlg):
         "runs the algorithm"
         return cls()(*args, **kwa)
 
-    def variablekernelsize(self, peaks) -> HistogramData:
+    def variablekernelsize(self, # pylint: disable=too-many-locals
+                           peaks) -> HistogramData:
         "computes a histogram where the kernel size may vary"
         osamp  = (int(self.oversampling)//2) * 2 + 1
         bwidth = self.getprecision(self.precision)/osamp

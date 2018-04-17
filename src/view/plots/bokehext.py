@@ -45,9 +45,11 @@ class DpxKeyedRow(Row): # pylint: disable=too-many-ancestors
             plts  = layouts.gridplot([[*figs]], **kwa,
                                      toolbar_location = plot.css.toolbar_location.get())
 
+            # pylint: disable=not-an-iterable
+            tbar  = next(i for i in plts.children if isinstance(i, ToolbarBox))
             keyed = cls(ctrl, plot, main,
                         children = [plts],
-                        toolbar  = next(i for i in plts.children if isinstance(i, ToolbarBox)),
+                        toolbar  = tbar
                         **kwa)
 
         if {left, right, bottom} == {None}:

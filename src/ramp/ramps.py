@@ -5,7 +5,7 @@
 Interface between Jupyter and rampcore
 """
 import numpy     as np
-import holoviews as hv
+import holoviews as hv # pylint:disable=import-error
 
 from .rampcore import RampData , RampModel # pylint: disable=unused-import
 

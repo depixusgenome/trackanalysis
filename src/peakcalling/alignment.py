@@ -5,20 +5,22 @@ from  typing                import Union, Iterable
 
 import numpy as np
 
-from  peakfinding.alignment import PeakCorrelationAlignment
+from  peakfinding.alignment import (PeakCorrelationAlignment,
+                                    PeakCorrelationAlignmentWorkTable,
+                                    PeakCorrelationAlignmentAction)
 from .tohairpin             import HairpinFitter
 
 
 class HairpinCycleAlignment(PeakCorrelationAlignment, HairpinFitter):
     "Aligns each cycle to the sequence"
-    class WorkTable(PeakCorrelationAlignment.WorkTable):
+    class WorkTable(PeakCorrelationAlignmentWorkTable):
         "Contains data to be saved from action to action"
         def __init__(self, *args, **kwa):
             super().__init__(*args)
             self.stretch = kwa['stretch']
             self.bias    = kwa['bias']
 
-    class Action(PeakCorrelationAlignment.Action):
+    class Action(PeakCorrelationAlignmentAction):
         "Container class for computing a bias with given options."
         def reference(self, wtab, projector, hists):
             ref = wtab.parent.expectedpeaks/wtab.stretch + wtab.bias

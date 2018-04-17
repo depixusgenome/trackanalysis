@@ -114,7 +114,7 @@ class _BeadDriftAction:
 
         return beads.data
 
-    def poolOnCycles(self, pool, pickled, frame):
+    def poolOnCycles(self, pool, pickled, frame): # pylint: disable=too-many-locals
         "Applies the cordrift subtraction to parallel cycles"
         rawprecision(frame.track, frame[...].withbeadsonly().keys()) # compute & freeze precisions
         if getattr(frame.cycles, 'start', None) is not None:

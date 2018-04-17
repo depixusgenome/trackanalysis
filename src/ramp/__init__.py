@@ -3,4 +3,4 @@
 u"""
 Module for ramp analysis
 """
-from .ramp_module import RampData, RampModel
+from .rampcore import RampData, RampModel
