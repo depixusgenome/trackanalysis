@@ -112,8 +112,10 @@ class ConfigurationIO:
                 "closes the application"
                 ctrl  = getattr(self, '_ctrl', None)
                 views = getattr(self, 'views', ())
-                delattr(self, '_ctrl')
-                delattr(self, 'views')
+                if hasattr(self, '_ctrl'):
+                    delattr(self, '_ctrl')
+                if hasattr(self, 'views'):
+                    delattr(self, 'views')
                 if ctrl:
                     ctrl.close()
 

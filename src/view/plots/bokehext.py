@@ -47,10 +47,7 @@ class DpxKeyedRow(Row): # pylint: disable=too-many-ancestors
 
             # pylint: disable=not-an-iterable
             tbar  = next(i for i in plts.children if isinstance(i, ToolbarBox))
-            keyed = cls(ctrl, plot, main,
-                        children = [plts],
-                        toolbar  = tbar
-                        **kwa)
+            keyed = cls(ctrl, plot, main, children = [plts], toolbar  = tbar, **kwa)
 
         if {left, right, bottom} == {None}:
             return keyed
