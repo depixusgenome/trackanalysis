@@ -324,15 +324,18 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
         over  = self.css.boundary.overshoot.get()
 
         if isinstance(arr, np.ndarray):
-            if all(np.isnan(i) for i in arr):
+            if all(np.isnan(i) for i in arr) or len(arr) == 0:
                 vmin = 0.
                 vmax = 1.
             else:
                 vmin = np.nanmin(arr)
                 vmax = np.nanmax(arr)
+        elif len(arr):
+            vmin = min(arr)
+            vmax = max(arr)
         else:
-            vmin  = min(arr)
-            vmax  = max(arr)
+            vmin = 0.
+            vmax = 1.
 
         delta = max(1e-5, (vmax-vmin))*over*.5
         vmin -= delta
@@ -434,7 +437,7 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
                 self._model.reset()
 
             old, self.state = self.state, PlotState.abouttoreset
-            durations       = []
+            durations       = [0.]
             async def _reset_and_render():
                 def _reset():
                     start = time()
@@ -464,7 +467,7 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
                                 self._bkmodels.update(ret)
                     ctrl.handle('rendered', args = {'plot': self})
                     LOGS.debug("%s.reset done in %.3f+%.3f",
-                               type(self).__qualname__, durations[0], time() - start)
+                               type(self).__qualname__, durations[-1], time() - start)
                 self._doc.add_next_tick_callback(_render)
 
             spawn(_reset_and_render)

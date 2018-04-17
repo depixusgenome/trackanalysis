@@ -69,7 +69,7 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
                 ix2 = i
                 break
 
-        end = lambda x: (0. if len(zval) < 2 or ix1 == ix2 else max(src[x][ix1:ix2])+1)
+        end = lambda x: (0. if len(zval) < 2 or ix1 >= ix2 else max(src[x][ix1:ix2])+1)
         resets[fig.extra_x_ranges['duration']].update(start = 0., end = end('duration'))
         resets[fig.x_range]                   .update(start = 0., end = end('count'))
 
@@ -81,7 +81,7 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
 class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
     "Creates plots for peaks"
     def __init__(self, ctrl = None, *args): # pylint: disable=keyword-arg-before-vararg
-        super().__init__(ctrl = ctrl, *args)
+        super().__init__(ctrl, *args)
         self.css.defaults = {'count'           : PlotAttrs('lightblue', 'line', 1),
                              'figure.width'    : 500,
                              'figure.height'   : 750,
@@ -137,7 +137,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
                     continue
                 peaks[key+'color'] = np.where(np.isfinite(peaks[key+'id']), *colors[:2])
 
-            if self._model.sequencekey not in alldist:
+            if self._model.sequencekey not in alldist and alldist:
                 self._model.sequencekey = max(tuple(alldist),
                                               key = lambda x: alldist[x].value)
             peaks['color'] = peaks[self._model.sequencekey+'color']
