@@ -22,8 +22,8 @@ class SecondariesDisplay(ItemsDisplay, display = Secondaries):
         "displays the temperatures"
         get = lambda i, j: getattr(self._items, i)[j]
         fcn = lambda i, j: hv.Curve((get(i, 'index'), get(i, 'value')),
-                                    'image id', '°C', label = j)
-        return fcn('tservo', 'T° Servo')*fcn('tsink', 'T° Sink')*fcn('tsample', 'T° Sample')
+                                    'image id', 'Â°C', label = j)
+        return fcn('tservo', 'TÂ° Servo')*fcn('tsink', 'TÂ° Sink')*fcn('tsample', 'TÂ° Sample')
 
     def vcap(self):
         "displays the bead calibration"
@@ -52,10 +52,10 @@ class TrackQualityControlDisplay(ItemsDisplay, qc = Track):
         length = np.nanmean(np.diff(self._items.phases[:,0]))
         get = lambda i, j: getattr(self._items.secondaries, i)[j]
         fcn = lambda i, j: hv.Curve((get(i, 'index')/length, get(i, 'value')),
-                                    'cycle', '°C', label = j)
-        return (fcn('tservo', 'T° Servo')
-                *fcn('tsink', 'T° Sink')
-                *fcn('tsample', 'T° Sample'))
+                                    'cycle', 'Â°C', label = j)
+        return (fcn('tservo', 'TÂ° Servo')
+                *fcn('tsink', 'TÂ° Sink')
+                *fcn('tsample', 'TÂ° Sample'))
 
     def vcap(self):
         "displays the bead calibration"
@@ -111,7 +111,7 @@ class TracksDictQualityControlDisplay(ItemsDisplay, qc = TracksDict):
 
     def temperatures(self, name = "Tsample", axisrange = (1., 99.)) -> hv.BoxWhisker:
         """
-        Temperatures, especially the samples should be within 0.5°C of one another
+        Temperatures, especially the samples should be within .5Â°C of one another
         """
         secs   = {i: j['value'] for i, j in self.secondaries(name).items()}
         tolist = lambda i: list(chain.from_iterable(i))
@@ -120,18 +120,18 @@ class TracksDictQualityControlDisplay(ItemsDisplay, qc = TracksDict):
         rng    = tuple(np.nanpercentile(frame[name], axisrange))
         return (hv.BoxWhisker(frame, "track", name)
                 .redim.range(**{name: rng})
-                .redim(**{name: hv.Dimension(name, unit = "°C")}))
+                .redim(**{name: hv.Dimension(name, unit = "Â°C")}))
 
     def tsample(self, axisrange = (1., 99.)) -> hv.BoxWhisker:
         """
-        All sample temperatures should stay within a 0.5°C range
+        All sample temperatures should stay within a 0.5Â°C range
         """
         return self.temperatures("Tsample", axisrange)
 
     def tsink(self, axisrange = (1., 99.)) -> hv.BoxWhisker:
         """
-        All sink temperatures should stay within a 0.5°C range and below 40°C.
-        Above 40°C, the Peltiers will be unable to keep the sample at constant
+        All sink temperatures should stay within a 0.5Â°C range and below 40Â°C.
+        Above 40Â°C, the Peltiers will be unable to keep the sample at constant
         temperature.
         """
         return self.temperatures("Tsink", axisrange)
@@ -171,13 +171,13 @@ class TracksDictQualityControlDisplay(ItemsDisplay, qc = TracksDict):
                                         for i in (tsample, vcap, beadextent))
     __doc__          = display.__doc__.replace('        ', '    ')
 
-    def _beadextent(self, bead): # pylint: disable=too-many-locals
+    def _beadextent(self, bead):
         act  = lambda _, info: (info[0], np.nanmedian(info[1]))
         extr = lambda i, j: {k[0][1]: k[1] for k in (i.cleancycles[bead, ...]
                                                      .withphases(j)
                                                      .withaction(act))}
         ovr = {}
-        dim = hv.Dimension('extents', unit = 'µm')
+        dim = hv.Dimension('extents', unit = 'Âµm')
         for key, track in self.tracks.items():
             if bead in set(track.beadsonly.keys()):
                 mins          = extr(track, PHASE.initial)
