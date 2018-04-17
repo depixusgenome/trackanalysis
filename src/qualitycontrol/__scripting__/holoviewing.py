@@ -171,7 +171,7 @@ class TracksDictQualityControlDisplay(ItemsDisplay, qc = TracksDict):
                                         for i in (tsample, vcap, beadextent))
     __doc__          = display.__doc__.replace('        ', '    ')
 
-    def _beadextent(self, bead):
+    def _beadextent(self, bead): # pylint: disable=too-many-locals
         act  = lambda _, info: (info[0], np.nanmedian(info[1]))
         extr = lambda i, j: {k[0][1]: k[1] for k in (i.cleancycles[bead, ...]
                                                      .withphases(j)

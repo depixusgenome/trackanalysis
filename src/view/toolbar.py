@@ -441,7 +441,7 @@ class BeadToolbar(BokehView): # pylint: disable=too-many-instance-attributes
         ctrl.display.updatedefaults('keystroke',
                                     open = lambda: _onbtn_cb('open', 0, 0),
                                     save = lambda: _onbtn_cb('save', 0, 0),
-                                    quit = lambda: _onbtn_cb('save', 0, 0))
+                                    quit = lambda: _onbtn_cb('quit', 0, 0))
 
         def _onproject(items):
             if 'track' in items:
