@@ -10,7 +10,8 @@ from .gaussianfitter  import ByGaussianMix
 from .histogramfitter import (ZeroCrossingPeakFinder,
                               SubPixelPeakPosition,
                               ByHistogram,
-                              CWTPeakFinder)
+                              CWTPeakFinder,
+                              PeakFlagger)
 
 
 PeakFinder= Union[ByHistogram,ByGaussianMix,ByEM]
