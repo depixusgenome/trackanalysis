@@ -20,7 +20,7 @@ def test_readFromTrk():
     '''
     mod = RampModel()
     mod.needsCleaning = False
-    ramp = RampData.openTrack(path("ramp_legacy"),mod)
+    ramp = RampData.opentrack(path("ramp_legacy"),mod)
     beads = {i for i in range(56)}
     assert ramp.beads()==beads
     assert ramp.ncycles==13
@@ -28,7 +28,7 @@ def test_readFromTrk():
 def test_sanitize():
     u''' check that some beads are excluded from further analysis '''
     mod = RampModel()
-    ramp = RampData.openTrack(path("ramp_legacy"),mod)
+    ramp = RampData.opentrack(path("ramp_legacy"),mod)
     ramp.clean()
     # largest set of good beads, i.e. no clean set should contain more than these
     lgoodbeads={2, 3, 6, 7, 8, 10, 13, 14, 16, 19, 23, 24, 25, 26, 27, 28, 29,

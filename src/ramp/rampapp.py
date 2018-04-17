@@ -344,9 +344,9 @@ class MyDisplay: # pylint: disable=too-many-instance-attributes
         return self.doc
 
     def _update_rpdata_from_file(self,filename:str)->None:
-        self.data.rpdata.setTrack(filename)
+        self.data.rpdata.settrack(filename)
         self.data.rpdata.clean()
-        self.data.rpfulldata.setTrack(filename)
+        self.data.rpfulldata.settrack(filename)
 
     def _update_text_info(self):
         good = {} if self.data.rpfulldata is None\

@@ -5,13 +5,13 @@
 from typing import Union
 
 from .._core          import exppdf, normpdf # pylint:disable=import-error
-from .emfitter        import ByEM
+from .emfitter        import ByEM, ByEmMutu
 from .gaussianfitter  import ByGaussianMix
 from .histogramfitter import (ZeroCrossingPeakFinder,
                               SubPixelPeakPosition,
                               ByHistogram,
-                              PeakFlagger,
-                              CWTPeakFinder)
+                              CWTPeakFinder,
+                              PeakFlagger)
 
 
 PeakFinder= Union[ByHistogram,ByGaussianMix,ByEM]

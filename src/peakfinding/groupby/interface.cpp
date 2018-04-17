@@ -37,9 +37,10 @@ namespace peakfinding{
 	    matrix    rates	= arraytomatrix(pyrates);
 	    matrix    data	= arraytomatrix(pydata);
 	    
-	    for (unsigned it=0;it<nsteps;++it){
-	    	emstep(data,rates,params,uppercov,lowercov);
-	    }
+	    // for (unsigned it=0;it<nsteps;++it){
+	    // 	oneemstep(data,rates,params,uppercov,lowercov);
+	    // }
+	    emsteps(data,rates,params,nsteps,uppercov,lowercov);
 	    // updated score to match with rates & params
 	    auto    score = scoreparams(data,params);
 	    // back to numpy array
@@ -73,6 +74,17 @@ namespace peakfinding{
 	    return outscore;
 	}
 
+	ndarray pypz_x(ndarray pyscore,ndarray pyrates){
+	    matrix	score	  = arraytomatrix(pyscore);
+	    matrix	rates	  = arraytomatrix(pyrates);
+	    auto	pz_x	  = getpz_x(score,rates);
+	    ndarray outpz_x({pz_x.size1(),pz_x.size2()},
+	    		     {pz_x.size2()*sizeof(double),sizeof(double)},
+	    		     &(pz_x.data()[0]));
+
+	    return outpz_x;
+	}
+
 	void pymodule(py::module &mod){
 	    auto doc = R"_(Runs Expectation Maximization N times)_";
 	    mod.def("emrunner",[](ndarray data,ndarray rates,ndarray params,unsigned nsteps,double upper,double lower)
@@ -83,6 +95,8 @@ namespace peakfinding{
 		    R"_(compute pdf of exponential distribution)_");
 	    mod.def("emscore",[](ndarray data,ndarray params){return pyscore(data,params);},
 		    R"_(returns score matrix)_");
+	    mod.def("empz_x",[](ndarray score,ndarray rates){return pypz_x(score,rates);},
+		    R"_(returns pz_x matrix)_");
 
 	    pybind11::class_<OutputPy>(mod, "OutputPy")
 		.def(pybind11::init<>())
