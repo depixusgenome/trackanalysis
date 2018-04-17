@@ -7,6 +7,9 @@ class GlobalsView(View):
     u"View listing all global info"
     def __init__(self, ctrl = None, **kwa):
         super().__init__(ctrl = ctrl, **kwa)
+        if ctrl:
+            cnf          = ctrl.globals.project
+            cnf.defaults = dict.fromkeys(('track', 'bead'), None)
 
     def observe(self, ctrl):
         "observing the controller"
