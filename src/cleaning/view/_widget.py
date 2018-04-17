@@ -7,7 +7,7 @@ from    abc             import ABC
 import  bokeh.core.properties as props
 from    bokeh.plotting  import Figure
 from    bokeh.models    import (ColumnDataSource, DataTable, TableColumn,
-                                Widget, StringFormatter, CustomJS)
+                                Widget, StringFormatter, CustomJS, Slider)
 
 import  numpy       as     np
 
@@ -88,6 +88,44 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
         info['cycle'] = order
         return info
 
+class DownsamplingWidget(WidgetCreator[DataCleaningModelAccess]):
+    "allows downsampling the graph for greater speed"
+    def __init__(self, model:DataCleaningModelAccess) -> None:
+        super().__init__(model)
+        self.__widget: Slider  = None
+        css                       = self.__config
+        css.defaults = {"title": "Downsampling",
+                        "tooltips": "Display only 1 out of every few data points",
+                        "start": 0,
+                        "end":   5}
+
+    @property
+    def __config(self):
+        return self.css.downsampling
+
+    def create(self, action) -> List[Widget]:
+        "creates the widget"
+        cnf   = self.__config
+        self.__widget = Slider(title    = cnf.title.get(),
+                               value    = cnf.get(),
+                               start    = cnf.start.get(),
+                               end      = cnf.end.get(),
+                               callback_policy = "mouseup")
+        @action
+        def _onchange_cb(attr, old, new):
+            cnf.set(new)
+
+        self.__widget.on_change("value", _onchange_cb)
+        return [self.__widget]
+
+    def observe(self, ctrl):
+        "observe the controller"
+
+    def reset(self, resets):
+        "this widget has a source in common with the plots"
+        itm  = self.__widget if resets is None else resets[self.__widget]
+        itm.update(value = self.__config.get())
+
 class DpxCleaning(Widget):
     "Interface to filters needed for cleaning"
     __css__            = ROUTE+"/cleaning.css"
@@ -160,14 +198,16 @@ class CleaningFilterWidget(WidgetCreator[DataCleaningModelAccess]):
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"
     def __init__(self):
-        align = AlignmentWidget[DataCleaningModelAccess](self._model)
+        align  = AlignmentWidget[DataCleaningModelAccess](self._model)
         self.__widgets = dict(table    = CyclesListWidget(self._model),
                               align    = align,
-                              cleaning = CleaningFilterWidget(self._model))
+                              cleaning = CleaningFilterWidget(self._model),
+                              sampling = DownsamplingWidget(self._model))
 
     def _widgetobservers(self, ctrl):
         for widget in self.__widgets.values():
             widget.observe(ctrl)
+        self.css.observe("downsampling", lambda: self.reset(False))
 
     def _createwidget(self, fig):
         widgets = {i: j.create(self.action) for i, j in self.__widgets.items()}

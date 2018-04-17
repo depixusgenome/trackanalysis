@@ -73,6 +73,7 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
 
         cnf.colors.order.default  = ('aberrant', 'hfsigma', 'extent', 'population',
                                      'pingpong', 'saturation', 'good')
+        self.css.downsampling.default  = 5
         self.css.tools.default         = 'ypan,ybox_zoom,reset,save,dpxhover'
         self.css.widgets.width.default = 470
         self.css.figure.defaults  = dict(width    = 600,
@@ -106,9 +107,10 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
 
         mode    = self.defaultsizingmode(width = self.css.widgets.width.get())
         widgets = self._createwidget(fig)
-        bottom  = layouts.widgetbox(widgets['align'], **mode)
-        left    = layouts.widgetbox(widgets['cleaning']+widgets['table'], **mode)
-        return self._keyedlayout(ctrl, fig, left = left, bottom = bottom)
+        left    = layouts.widgetbox(widgets['cleaning']+widgets['table']
+                                    +widgets['align']+widgets['sampling'],
+                                    **mode)
+        return self._keyedlayout(ctrl, fig, left = left)
 
     def _reset(self):
         items, nans     = None, None
@@ -136,6 +138,8 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
                    cycle = repeat([i[-1] for i, _ in items], val.shape[1], 1),
                    color = self.__color(order, nans, val))
         assert all(len(i) == val.size for  i in res.values())
+        if self.css.downsampling.get():
+            res = {i: j[::self.css.downsampling.get()] for i, j in res.items()}
         return res
 
     def __color(self, order, nancache, items) -> np.ndarray:
