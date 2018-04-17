@@ -19,6 +19,11 @@ those should be twice the dynamic range. We discard cycles for which the sum
 exceeds 3 times the dynamic range. This should only occur when the bead tracking
 is not working.
 
+A *downsampling* slider was added. The effect is to reduce the number of points
+displayed: a value of 5 means that only 1 out of 5 points are considered. The
+downsampling is performed on *displayed points*, after computations. It has an
+effect on the display only.
+
 ### Alignment on phase 5
 
 The alignment on phase 5 uses events only. Cycles are aligned such that the
@@ -35,6 +40,12 @@ A new algorithm for aligning on phase 5 has been set up:
 * peaks are found anew using aligned cycles.
 
 The advantage of the new algorithm is that peaks cannot merge anymore.
+
+### Speed
+
+The mechanics for displaying tabs have changed. These display much faster. The
+downside is that bugs will occur if the user switches between tabs too fast. Any
+visible bug can be cured by *slowly* switching tabs a couple of times.
 
 # tag cycles_v4.11
 ## Tagger: Pol d'Avezac <pol.davezac@depixus.com>
