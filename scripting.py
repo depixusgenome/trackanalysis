@@ -66,7 +66,7 @@ def _configure_hv(hvmod, locs):
 
         try:
             import holoviews  as     hv
-            from   IPython    import get_ipython
+            from   IPython    import get_ipython # pylint: disable=import-error
             get_ipython().magic('output size=150')
 
             opts  = locs.get("HV_OPTS", {})
@@ -145,7 +145,7 @@ def run(locs, direct, star, jupyter):
         if _isjupyter():
             def tutorial():
                 "clues for the beginner"
-                from IPython.display import display, Markdown
+                from IPython.display import display, Markdown # pylint: disable=import-error
                 display(Markdown(locs['TUTORIAL']))
             locs['tutorial'] = tutorial
         else:

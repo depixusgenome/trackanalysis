@@ -41,6 +41,7 @@ class LazyDict:
     def update(self, _lazy_args_ = None, **kwargs):
         u"as for dict"
         if _lazy_args_ is not None:
+            # pylint: disable=not-an-iterable
             for key, val in getattr(_lazy_args_, 'items', lambda: _lazy_args_)():
                 self[key] = LazyInstanciator(val)
 
