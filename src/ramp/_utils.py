@@ -4,7 +4,7 @@
 u'''
 Defines a set of utilitiray functions to analyse ramp data
 '''
-from . import ramp_module as ramp
+from . import rampcore as ramp
 
 def get_beadids_not_closing(data:ramp.RampData,zthreshold,acc_ratio:float=0.9):
     u'''
