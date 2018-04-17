@@ -19,34 +19,33 @@ class DpxKeyedRow(Row): # pylint: disable=too-many-ancestors
     zoomrate           = props.Float()
     panrate            = props.Float()
     __implementation__ = 'keyedrow.coffee'
-    def __init__(self, plotter, fig, **kwa):
-        vals  = ('.'.join(i) for i in product(('pan', 'zoom'), ('x', 'y'), ('low', 'high')))
-        cnf   = plotter.css.keypress
-
-        keys  = dict((cnf[key].get(), key) for key in vals)
-        keys[cnf.reset.get()] = 'reset'
-        keys.update({cnf[tool].activate.get(): tool for tool in ('pan', 'zoom')})
+    def __init__(self, ctrl, plotter, fig, **kwa):
+        vals  = (''.join(i) for i in product(('pan', 'zoom'), ('x', 'y'), ('low', 'high')))
+        mdl   = ctrl.theme.model('keystroke')
+        keys  = dict((mdl[key], key) for key in vals)
+        keys[mdl['reset']] = 'reset'
+        keys.update({mdl[tool+'activate']: tool for tool in ('pan', 'zoom')})
 
         children = kwa.pop('children', [fig])
         super().__init__(children = children,
                          fig      = fig,
                          keys     = keys,
-                         zoomrate = cnf.zoom.rate.get(),
-                         panrate  = cnf.pan.rate.get(),
-                         **defaultsizingmode(plotter, kwa))
+                         zoomrate = mdl['zoomrate'],
+                         panrate  = mdl['panrate'],
+                         **defaultsizingmode(plotter, kwa, ctrl = ctrl))
     @classmethod
-    def keyedlayout(cls, plot, main, *figs, bottom = None, left = None, right = None):
+    def keyedlayout(cls, ctrl, plot, main, *figs, bottom = None, left = None, right = None):
         "sets up a DpxKeyedRow layout"
         assert left is None or right is None
         kwa = plot.defaultsizingmode()
         if len(figs) == 0:
-            keyed = cls(plot, main)
+            keyed = cls(ctrl, plot, main)
         else:
             figs  = (main,) + figs
             plts  = layouts.gridplot([[*figs]], **kwa,
                                      toolbar_location = plot.css.toolbar_location.get())
 
-            keyed = cls(plot, main,
+            keyed = cls(ctrl, plot, main,
                         children = [plts],
                         toolbar  = next(i for i in plts.children if isinstance(i, ToolbarBox)),
                         **kwa)

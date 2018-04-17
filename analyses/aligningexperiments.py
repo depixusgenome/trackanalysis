@@ -3,99 +3,46 @@
 """
 Scripts for aligning beads & tracks
 """
-from   concurrent.futures      import ProcessPoolExecutor, as_completed
-from   typing                  import Tuple, List
-
+from   typing       import Dict
 import pandas                  as     pd
 import numpy                   as     np
 import holoviews               as     hv
 
-from   utils                   import initdefaults
-from   utils.logconfig         import getLogger
-from   peakfinding.processor   import SingleStrandProcessor, SingleStrandTask
-from   peakcalling.toreference import (CorrectedHistogramFit, # pylint: disable=unused-import
-                                       Range, Pivot)
-from   peakcalling.tohairpin   import ChiSquareFit
+from   peakcalling.toreference             import (Range, # pylint: disable=unused-import
+                                                   CorrectedHistogramFit, Pivot)
+from   peakcalling.tohairpin               import ChiSquareFit
+from   peakfinding.groupby.histogramfitter import PeakFlagger
 
-LOGS = getLogger()
-
-class PeaksDataFrameCreator:
-    "Create the datafame"
-    dataframe    = dict(events = dict(std = 'std'), resolution = 'resolution')
-    singlestrand = SingleStrandTask()
-
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
-
-    def _create(self, trk) -> Tuple[pd.DataFrame, List[int]]:
-        trk.tasks.selection = None
-        pks    = SingleStrandProcessor.apply(trk.peaks, **self.singlestrand.config())
-        create = lambda i: (pks[[i]].dataframe(**self.dataframe)).reset_index()
-        good   = []
-        bad    = []
-        for i in trk.cleaning.good():
-            try:
-                good.append(create(i))
-            except: # pylint: disable=bare-except
-                bad.append(i)
-        return pd.concat(good), bad
-
-    @staticmethod
-    def _dataframe(tracks, full):
-        data = (pd.concat(full)
-                .reset_index()
-                .set_index('track')
-                .join(tracks
-                      .dataframe()[['key', 'modification']]
-                      .rename(columns = dict(key = 'track'))
-                      .set_index('track'))
-                .reset_index('track')
-                .sort_values(['modification'])
-               )
-
-        data = data.assign(bead = data.bead.astype(int))
-        if 'index' in data.columns:
-            del data['index']
-
-        return data
-
-    def __call__(self, tracks) -> pd.DataFrame:
-        full = []
-        with ProcessPoolExecutor() as pool:
-            futs = [pool.submit(self._create, i) for i in tracks.values()]
-            for fut in as_completed(futs):
-                try:
-                    data, err = fut.result()
-                    full.append(data)
-                    if len(err):
-                        track = data.reset_index().track.unique()
-                        if len(track):
-                            LOGS.info("error in %s: %s", track[0], err)
-                        else:
-                            LOGS.info("error beads: %s", err)
-                except Exception as exc: # pylint: disable=broad-except
-                    LOGS.info("error: %s", exc)
-
-        return self._dataframe(tracks, full)
-
-    @classmethod
-    def create(cls, tracks):
-        "create peaks for all tracks"
-        import scripting
-        return cls(singlestrand = getattr(scripting, 'Tasks').singlestrand())(tracks)
-
-createpeaks = PeaksDataFrameCreator.create # pylint: disable=invalid-name
+def createpeaks(tracks):
+    "create peaks for all tracks"
+    import scripting
+    singlestrand = getattr(scripting, 'Tasks').singlestrand()
+    data         = tracks.peaks.dataframe(singlestrand,
+                                          events     = dict(std = 'std'),
+                                          resolution = 'resolution')
+    data         = data.reset_index()
+    trkcount     = (data
+                    .groupby(['bead', 'track'])
+                    .peakposition.first()
+                    .reset_index()
+                    .groupby('bead')
+                    .track.count()
+                    .rename('trackcount'))
+    return data.set_index('bead').join(trkcount).reset_index()
 
 class PeaksAlignment:
     """
     Align beads or tracks
     """
-    def __init__(self, **kwa):
-        self.hpalign  = kwa['hpalign']  if 'hpalign'  in kwa else ChiSquareFit(**kwa)
-        self.refalign = kwa['refalign'] if 'refalign' in kwa else CorrectedHistogramFit(**kwa)
+    def __init__(self, individually = False, **kwa):
+        self.hpalign      = kwa.get('hpalign',     ChiSquareFit(**kwa))
+        self.refalign     = kwa.get('refalign',    CorrectedHistogramFit(**kwa))
+        self.peakflagger  = kwa.get('peakflagger', PeakFlagger(mincount = 1, window = 15))
+        self.individually = individually
+
         if self.refalign and 'pivot' not in kwa:
             self.refalign.pivot = Pivot.absolute
+
         if self.hpalign and 'firstpeak' not in kwa:
             self.hpalign.firstpeak = False
 
@@ -131,6 +78,26 @@ class PeaksAlignment:
             return [(i, _maskpeaks(j, mask.get(i, None))) for i, j in data]
         return _maskpeaks(data, mask)
 
+    def flagpeaks(self, ref, data, attr = 'peakposition'):
+        """
+        Return pairs of peaks per bead and track.
+        The peak & event positions should already be aligned
+        """
+        inf                   = np.iinfo('i4').max
+        cols: Dict[str, list] = {i: [] for i in ('track', 'bead', attr, 'reference')}
+        for bead, track in {k[1:] for k in data[['bead', 'track']].itertuples()}:
+            thisref  = ref[track] if isinstance(ref, dict) else ref
+            tmp      = data[data.bead==bead]
+            peaks    = np.sort(tmp[tmp.track == track][attr].unique())
+            flags    = self.peakflagger(thisref, [peaks])[0]
+
+            cols['reference'].append(thisref[flags[flags < inf]])
+            cols[attr].append(peaks[flags < inf])
+            cols['track'].append([track]*len(cols[attr][-1]))
+            cols['bead'].append(np.full(len(cols[attr][-1]), bead, dtype = 'i4'))
+
+        return pd.DataFrame({i: np.concatenate(j) for i, j in cols.items()})
+
     @staticmethod
     def setpivot(data, position = 'max'):
         "moves peakposition and avg to a new position"
@@ -156,15 +123,25 @@ class PeaksAlignment:
         pks     = {i: self.refalign.frompeaks(frompks(j)) for i, j in data}
         return {i: self.refalign.optimize(pks[ref], j) for i, j in pks.items()}
 
-    def tohairpin(self, data, ref, corr):
+    def tohairpin(self, data, ref = None, corr = None):
         """
         normalize to a given hairpin
         """
         if not self.hpalign:
             return corr
-        pks = np.sort(next(j for i, j in data if i == ref).peakposition.unique())
-        out = self.hpalign.optimize(pks)
-        return {i: (j[0], j[1]*out[1], j[1]*j[2]+out[2]/j[1]) for i, j in corr.items()}
+
+        align = lambda x: self.hpalign.optimize(np.sort(x.peakposition.unique()))
+        if self.individually:
+            data = [(i, j.assign(peakposition = (j.peakposition-corr[i][2])*corr[i][1]))
+                    for i, j in data]
+            new  = {i: align(j) for i, j in data}
+            return {i: (j[0], j[1]*new[i][1], j[1]*j[2]+new[i][2]/j[1]) for i, j in corr.items()}
+
+        elif self.refalign is not None:
+            out = align(next(j for i, j in data if i == ref))
+            return {i: (j[0], j[1]*out[1], j[1]*j[2]+out[2]/j[1]) for i, j in corr.items()}
+
+        return {i: align(j) for i, j in data}
 
     def correct(self, data, ref):
         """
@@ -188,7 +165,8 @@ class PeaksAlignment:
         data = self.setpivot(data)
         data = self.correct(data, ref)
 
-        out  = pd.concat([i for _, i in data]).sort_values(['bead', 'track', 'peakposition', 'avg'])
+        out  = pd.concat([i for _, i in data]).sort_values(['bead', 'modification',
+                                                            'peakposition', 'avg'])
         if isinstance(ref, int):
             return out.assign(identity = out.bead.astype(str))
         return out
@@ -205,7 +183,7 @@ class PeaksAlignment:
             data = self(data, ref, discarded=discarded, masks=masks)
             ref  = None
 
-        data = data.sort_values(['bead', 'track', 'peakposition', 'avg'])
+        data = data.sort_values(['bead', 'modification', 'peakposition', 'avg'])
         if ref is None:
             ref  = 'identity' if 'identity' in data.columns else 'track'
         cols = ['peakposition', 'resolution']

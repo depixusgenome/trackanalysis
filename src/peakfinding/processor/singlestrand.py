@@ -3,7 +3,7 @@
 """
 Find the peak corresponding to a single strand DNA
 """
-from   typing             import TYPE_CHECKING, Union, List, Sequence, Tuple, cast
+from   typing             import TYPE_CHECKING, Union, List, Tuple, cast
 from   functools          import partial
 
 import numpy                  as np
@@ -15,8 +15,8 @@ from   data.track         import Track
 from   data.views         import Beads, Cycles, BEADKEY, TrackView
 from   control.processor  import Processor
 if TYPE_CHECKING:
-    from peakfinding.processor.selector import (PeaksDict, # pylint: disable=unused-import
-                                                Output, PeakOutput)
+    from peakfinding.processor.selector import PeaksDict, Output # pylint: disable=unused-import
+    from peakfinding.peaksarray         import PeakListArray     # pylint: disable=unused-import
 
 class SingleStrandTask(Task):
     """
@@ -78,7 +78,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
             return len(arr) and np.any(arr <= delta)
         return [i[1] for i, j in self.__ramp(frame, beadid) if _lesser(j)]
 
-    def nonclosingevents(self, cycles:List[int], peaks: Sequence['PeakOutput']) -> List[List[int]]:
+    def nonclosingevents(self, cycles:List[int], peaks: 'PeakListArray') -> List[List[int]]:
         """
         Return the cycle indexes for which `PHASE.rampdown` has no break and an
         event is detected `eventstart` frames within `PHASE.measure`
@@ -93,7 +93,7 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
     def singlestrandpeakindex(self,
                               frame: 'PeaksDict',
                               beadid: BEADKEY,
-                              peaks:  Sequence['PeakOutput']) -> int:
+                              peaks:  'PeakListArray') -> int:
         """
         Removes the single strand peak if detected
         """
@@ -102,10 +102,10 @@ class SingleStrandProcessor(Processor[SingleStrandTask]):
             return len(peaks)
 
         ratio  = self.task.percentage*1e-2
-        ssevts = self.nonclosingevents(cycles, peaks)
-        sspeak = (i for i in range(len(peaks))
-                  if sum(len(j) > 0 for j in peaks[i][1])*ratio <= len(ssevts[i]))
-        return next(sspeak, len(peaks))
+        ssevts = [len(i) for i in self.nonclosingevents(cycles, peaks)]
+        sspeak = (i for i in range(len(peaks)-1, -1, -1)
+                  if sum(len(j) > 0 for j in peaks[i][1])*ratio > ssevts[i])
+        return next(sspeak, len(peaks)-1)+1
 
     def removesinglestrandpeak(self,
                                frame: 'PeaksDict',

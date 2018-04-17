@@ -39,6 +39,7 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
                                           'size'   : 6./16}
         self.css.tooltip.default       = '<table>@ttips{safe}</table>'
         self.css.tooltip.type.defaults = {'extent'     : 'Δz',
+                                          'pingpong'   : 'Σ|dz|',
                                           'hfsigma'    : 'σ[HF]',
                                           'population' : '% good',
                                           'saturation' : 'non-closing'}
@@ -64,7 +65,7 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         trk = self._model.track
         return None if trk is None or trk.fov.image is None else trk.fov
 
-    def _create(self, _):
+    def _create(self, *_):
         self._fig = figure(**self._figargs(name    = 'FoV:Fig',
                                            x_range = Range1d(0, 1),
                                            y_range = Range1d(0, 1),
@@ -94,15 +95,12 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
 
         def _onselect_cb(attr, old, new):
             inds = new.indices
-            if len(inds) != 1:
-                self._beadssource.update(selected = self.__SELECTED)
+            if len(inds) == 0:
                 return
 
             # pylint: disable=unsubscriptable-object
             bead = int(self._beadssource.data['text'][inds[0]])
-
             if bead == self._model.bead:
-                self._beadssource.update(selected = self.__SELECTED)
                 return
 
             with Action(self._ctrl):
@@ -114,9 +112,6 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
             self.fixreset(rng)
         return self._fig
 
-    __SELECTED: Dict[str, Dict[str, Any]] = {'0d': {'glyph': None, 'indices': []},
-                                             '1d': {'indices': []},
-                                             '2d': {'indices': []}}
     def _reset(self):
         fov = self.__fov
         if fov is not None and self.__idfov != id(fov):
@@ -124,9 +119,13 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
             self.__imagedata()
 
         self._bkmodels[self._beadssource].update(self.__beadsdata())
-        self._bkmodels[self._beadssource].update(selected = self.__SELECTED)
-        self._bkmodels[self._cursource].update(self.__curdata())
-        self._bkmodels[self._cursource].update(selected = self.__SELECTED)
+        sel = self._beadssource.selected
+        if getattr(sel, 'indices', None):
+            self._bkmodels[sel].update(indices = [])
+        sel = self._cursource.selected
+        if getattr(sel, 'indices', None):
+            self._bkmodels[sel].update(indices = [])
+
         self.__calibdata()
 
     def __calibdata(self):
@@ -227,6 +226,6 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
 class FoVPlotView(PlotView[FoVPlotCreator]):
     "FoV plot view"
     TASKS = ('datacleaning',)
-    def ismain(self):
+    def ismain(self, ctrl):
         "Cleaning is set up by default"
-        self._ismain(tasks = self.TASKS)
+        self._ismain(ctrl, tasks = self.TASKS)

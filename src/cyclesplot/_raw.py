@@ -74,7 +74,7 @@ class RawMixin(ABC):
         res['cycle'] = (as_strided(tmp, shape = shape, strides = (tmp.strides[0], 0))
                         .ravel())
 
-        tmp          = np.array(self.css.raw[self.css.theme.get()].get().listpalette(shape[0]))
+        tmp          = np.array(self.css.raw[self._model.themename].get().listpalette(shape[0]))
         res['color'] = (as_strided(tmp, shape = shape, strides = (tmp.strides[0], 0))
                         .ravel())
 
@@ -96,7 +96,7 @@ class RawMixin(ABC):
         raw, shape      = self.__data()
         self._rawsource = ColumnDataSource(data = raw)
 
-        css.raw[css.theme.get()].addto(self._raw, x = 't', y = 'z', source = self._rawsource)
+        css.raw[self._model.themename].addto(self._raw, x = 't', y = 'z', source = self._rawsource)
 
         self._hover.createraw(self._raw, self._rawsource, shape, self._model)
         self._raw.extra_x_ranges = {"time": Range1d(start = 0., end = 0.)}

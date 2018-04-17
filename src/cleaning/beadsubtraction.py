@@ -13,6 +13,7 @@ from   data.views                   import Cycles, Beads
 from   model                        import Task, Level, PHASE
 from   signalfilter.noisereduction  import Filter
 from   utils                        import initdefaults
+from   ._core                       import constant as _cleaningcst # pylint: disable=import-error
 
 class SubtractAverageSignal:
     """
@@ -83,10 +84,17 @@ class SubtractMedianSignal:
 AGG_TYPE = Union[SubtractAverageSignal, SubtractMedianSignal]
 
 class BeadSubtractionTask(Task):
-    "Task for subtracting an average signal from beads"
+    """
+    Task for subtracting an average signal from beads.
+
+    Stretches of constant values are also removed prior to the subtraction.
+    See `AberrantValuesRule` for a documentation.
+    """
     filter: Filter    = None
     beads:  List[int] = []
     agg:    AGG_TYPE  = SubtractMedianSignal()
+    mindeltavalue     = 1e-6
+    mindeltarange     = 3
     level             = Level.none
     def __delayed_init__(self, _):
         if isinstance(self.agg, str):
@@ -109,6 +117,7 @@ class BeadSubtractionProcessor(Processor[BeadSubtractionTask]):
                 cache[key] = sub
 
         out             = np.copy(info[1])
+        _cleaningcst(task, out)
         out[:len(sub)] -= sub[:len(out)]
         return info[0], out
 

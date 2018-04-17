@@ -23,7 +23,7 @@ class QualityControlModelAccess(TaskPlotModelAccess):
     def __init__(self, ctrl, key: str = None) -> None:
         super().__init__(ctrl, key)
         self.cleaning   = TaskAccess(self, DataCleaningTask)
-        self.config.root.fixedbead.minextent.default = 0.15
+        self.config.root.fixedbead.minextent.default = 0.2
         self.__messages = self.project.messages
         self.__messages.setdefault(None)
 

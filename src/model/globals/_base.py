@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Storing global properties"
-from typing          import Dict, Callable, Optional
+from typing          import Dict
 
 from utils.logconfig import getLogger
 from ._child         import GlobalsChild, delete
@@ -54,73 +54,15 @@ class Globals:
         "removes view information"
         return self.__maps[key].pop(*args)
 
-    def getGlobal(self, key, *args, default = delete):
+    def getGlobal(self, key, *args, default = delete, model = False):
         "returns values associated to the keys"
         if key is Ellipsis:
             return self
 
         if len(args) == 0 or len(args) == 1 and args[0] == '':
+            if model:
+                return self.__maps[key]
             return SingleMapAccess(self.__maps[key], '')
         return self.__maps[key].get(*args, default = default)
-
-    def writeconfig(self, configpath:Callable, protocol, # pylint: disable=too-many-arguments
-                    patchname = 'config',
-                    index     = 0,
-                    overwrite = True,
-                    **kwa):
-        """
-        Writes up the user preferences.
-
-        If *overwrite* is *False*, the preferences are first read from file, then
-        written again. Notwithstanding version patches, this is a no-change operation.
-        """
-        maps = None if overwrite else self.readconfig(configpath, protocol, patchname)
-        if maps is None:
-            maps = {i: j.maps[index] for i, j in self.__maps.items() if 'project' not in i}
-            maps = {i: j for i, j in maps.items() if len(j)}
-
-        if protocol is dict:
-            return (maps        if configpath is None else
-                    {i: j for i, j in maps.items() if configpath(i)})
-
-        path = configpath(protocol.version(patchname))
-        path.parent.mkdir(parents = True, exist_ok = True)
-        path.touch(exist_ok = True)
-
-        protocol.dump(maps, path, patch = patchname, **kwa)
-        return None
-
-    def readconfig(self, configpath, protocol, patchname = 'config') -> Optional[dict]:
-        "Sets-up the user preferences"
-        if protocol is dict:
-            cnf = configpath
-        else:
-            cnf   = None
-            first = True
-            for version in protocol.iterversions(patchname):
-                path = configpath(version)
-                if not path.exists():
-                    continue
-                try:
-                    cnf = protocol.load(path, patch = patchname)
-                except Exception as exc: # pylint: disable=broad-except
-                    LOGS.warning("Failed loading %s", path, exc_info = exc)
-                    first = False
-                    continue
-                (LOGS.debug if first else LOGS.info)("Loaded %s", path)
-                break
-
-        if cnf is None:
-            return None
-
-        for root in frozenset(cnf) - frozenset(self.__maps):
-            cnf.pop(root)
-
-        for root, values in tuple(cnf.items()):
-            for key in frozenset(values) - frozenset(self.__maps[root]):
-                values.pop(key)
-            if len(values) == 0:
-                cnf.pop(root)
-        return cnf
 
 __all__ = ['Globals']

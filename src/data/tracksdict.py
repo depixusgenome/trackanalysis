@@ -11,9 +11,10 @@ from concurrent.futures import ThreadPoolExecutor
 from copy               import copy as shallowcopy
 import re
 
-from .views   import isellipsis, BEADKEY
-from .track   import Track
-from .trackio import LegacyGRFilesIO, LegacyTrackIO, PATHTYPES
+from anastore           import LocalPatch
+from .views             import isellipsis, BEADKEY
+from .track             import Track
+from .trackio           import LegacyGRFilesIO, LegacyTrackIO, PATHTYPES
 
 TDictType = TypeVar('TDictType', bound = 'TracksDict')
 TrackType = TypeVar('TrackType', bound = 'Track')
@@ -360,11 +361,18 @@ class TracksDict(dict):
 
         return sorted(keys)
 
-    def load(self) -> 'TracksDict':
-        "Loads all the data"
+    def load(self, *args, **kwa) -> 'TracksDict':
+        "Loads all the data. Args and kwargs are passed to a local patch mechanism."
         unloaded = [i for i in self.values() if not i.isloaded]
-        if len(unloaded):
+        def _run():
             with ThreadPoolExecutor(self._NTHREADS) as pool:
                 for _ in pool.map(Track.load, unloaded):
                     pass
+
+        if len(unloaded):
+            if args or kwa:
+                with LocalPatch(*args, **kwa):
+                    _run()
+            else:
+                _run()
         return self

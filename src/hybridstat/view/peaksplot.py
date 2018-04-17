@@ -69,7 +69,7 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
                 ix2 = i
                 break
 
-        end = lambda x: (0. if len(zval) < 2 or ix1 == ix2 else max(src[x][ix1:ix2])+1)
+        end = lambda x: (0. if len(zval) < 2 or ix1 >= ix2 else max(src[x][ix1:ix2])+1)
         resets[fig.extra_x_ranges['duration']].update(start = 0., end = end('duration'))
         resets[fig.x_range]                   .update(start = 0., end = end('count'))
 
@@ -80,8 +80,8 @@ class PeaksSequenceHover(Model, SequenceHoverMixin):
 
 class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
     "Creates plots for peaks"
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __init__(self, ctrl = None, *args): # pylint: disable=keyword-arg-before-vararg
+        super().__init__(ctrl, *args)
         self.css.defaults = {'count'           : PlotAttrs('lightblue', 'line', 1),
                              'figure.width'    : 500,
                              'figure.height'   : 750,
@@ -111,7 +111,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
 
         self._src: Dict[str, ColumnDataSource] = {}
         self._fig: Figure                      = None
-        self._widgets                          = createwidgets(self._model)
+        self._widgets                          = createwidgets(ctrl, self._model)
         self._ticker                           = SequenceTicker()
         self._hover                            = PeaksSequenceHover()
 
@@ -122,7 +122,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
 
     @property
     def __foundcolor(self):
-        return self.css.peaks.colors.found[self.css.root.theme.get()]
+        return self.css.peaks.colors.found[self.model.themename]
 
     def __peaks(self, vals = None):
         colors = [tohex(self.__foundcolor.get()),
@@ -137,7 +137,7 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
                     continue
                 peaks[key+'color'] = np.where(np.isfinite(peaks[key+'id']), *colors[:2])
 
-            if self._model.sequencekey not in alldist:
+            if self._model.sequencekey not in alldist and alldist:
                 self._model.sequencekey = max(tuple(alldist),
                                               key = lambda x: alldist[x].value)
             peaks['color'] = peaks[self._model.sequencekey+'color']
@@ -170,19 +170,19 @@ class PeaksPlotCreator(TaskPlotCreator[PeaksPlotModelAccess]):
                        count = interpolator(data['z'], data['count'], fit2ref.hmin)(pos))
         return {'': data, 'events': events, 'peaks': self.__peaks(dtl)}
 
-    def _create(self, doc):
+    def _create(self, ctrl, doc):
         "returns the figure"
         self.__create_fig()
         rends = self.__add_curves()
         self.__setup_tools(doc, rends)
-        return self._keyedlayout(self._fig, left = self.__setup_widgets(doc))
+        return self._keyedlayout(ctrl, self._fig, left = self.__setup_widgets(doc))
 
-    def observe(self):
+    def observe(self, ctrl):
         "observes the model"
-        super().observe()
-        self._model.observe()
+        super().observe(ctrl)
+        self._model.observe(ctrl)
         for widget in self._widgets.values():
-            widget.observe()
+            widget.observe(ctrl)
 
     def ismain(self, _):
         "specific setup for when this view is the main one"
@@ -289,6 +289,6 @@ class PeaksPlotView(PlotView[PeaksPlotCreator]):
         "triggers the advanced dialog"
         self._plotter.advanced()
 
-    def ismain(self):
+    def ismain(self, ctrl):
         "Alignment, ... is set-up by default"
-        self._ismain(tasks = self.TASKS, **setupio(self._plotter.model))
+        self._ismain(ctrl, tasks = self.TASKS, **setupio(self._plotter.model))

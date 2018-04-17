@@ -45,9 +45,9 @@ def _without_cls(vname, cname):
 def _from_path(view):
     pview = Path(view)
     if pview.exists():
-        name = pview.stem+'view'
-        if name == 'viewview':
-            name = pview.parent.stem+'view'
+        name = (pview.parent.stem+'view' if pview.stem == 'view'        else
+                pview.stem               if pview.stem.endswith('view') else
+                pview.stem+'view')
 
         mod = str(pview.parent/pview.stem).replace('/', '.').replace('\\', '.')
         return _without_cls(mod, name)
@@ -145,18 +145,14 @@ def _win_opts():
             return subprocess.Popen(*args, **kwargs)
         compiler.Popen = _Popen
 
-def _debug(raiseerr, singlethread):
-    if singlethread:
+def _debug(raiseerr, nothreading):
+    if nothreading:
         import view.base as _base
         _base.SINGLE_THREAD = True
 
     if raiseerr:
-        def _cnf(ctrl):
-            ctrl.globals.config.catcherror.default         = False
-            ctrl.globals.config.catcherror.toolbar.default = False
-
-        from app.scripting import orders
-        orders().default_config = _cnf
+        from app.maincontrol import DisplayController
+        DisplayController.CATCHERROR = False
 
 def _files(directory, files, bead):
     def _started(_, start = time()):
@@ -185,11 +181,15 @@ def _launch(view, app, desktop, kwa):
     if viewcls is None:
         viewcls = _from_module(view)
 
-    if not app.startswith('app.'):
+    if 'app.' not in app:
         app += 'app.'+app
 
-    if 'toolbar' in viewcls.__name__.lower():
+    if 'toolbar' in viewcls.__name__.lower() or 'toolbar' in viewcls.__module__:
         app = 'app.default'
+
+    if (('daq' in viewcls.__name__.lower() or 'daq' in viewcls.__module__)
+            and 'daq' not in app):
+        app = 'daq.'+app
 
     if '.' in app and 'A' <= app[app.rfind('.')+1] <= 'Z':
         mod  = app[:app.rfind('.')]
@@ -214,44 +214,14 @@ def _version(ctx, _, value):
     click.echo(' - compiler:   ' + version.compiler())
     ctx.exit()
 
-@click.command()
-@click.option('--version', is_flag = True, callback = _version,
-              expose_value = False, is_eager = True)
-@click.argument('view')
-@click.argument('files', nargs = -1, type = click.Path())
-@click.option("--tracks",
-              type       = str,
-              nargs      = 3,
-              help       = 'track path, gr path and match')
-@click.option('-b', "--bead",
-              type       = int,
-              default    = None,
-              help       = 'Opens to this bead')
-@click.option("-g", "--gui",
-              type       = click.Choice(['firefox', 'chrome', 'default', 'none']),
-              default    = 'firefox',
-              help       = 'The type of browser to use.')
-@click.option('-p', "--port",
-              default    = str(DEFAULT_SERVER_PORT),
-              help       = 'Port used: use "random" for any')
-@click.option("--raiseerr",
-              flag_value = True,
-              default    = False,
-              help       = '[DEBUG] Whether errors should be caught')
-@click.option("--singlethread",
-              flag_value = True,
-              default    = False,
-              help       = '[DEBUG] Runs plots in single thread')
-def main(view, files, tracks, bead,  # pylint: disable=too-many-arguments
-         gui, port, raiseerr, singlethread):
+# pylint: disable=too-many-arguments
+def defaultmain(view, gui, port, raiseerr, nothreading, defaultapp):
     "Launches an view"
-    _debug(raiseerr, singlethread)
+    _debug(raiseerr, nothreading)
     _win_opts()
 
     kwargs = dict(port = _port(port), apponly = False)
-
-    _files(tracks, files, bead)
-    server = _launch(view, 'app.toolbar', gui == 'firefox', kwargs)
+    server = _launch(view, defaultapp, gui == 'firefox', kwargs)
 
     if gui == 'chrome':
         server.io_loop.add_callback(lambda: _electron(server, port = kwargs['port']))
@@ -263,6 +233,52 @@ def main(view, files, tracks, bead,  # pylint: disable=too-many-arguments
     server.io_loop.add_callback(log)
     server.run_until_shutdown()
     logging.shutdown()
+
+def defaultclick(*others):
+    """
+    sets default command line options
+    """
+    def _wrapper(fcn):
+        fcn = click.option("--nothreading",
+                           flag_value = True,
+                           default    = False,
+                           help       = '[DEBUG] Runs plots in single thread')(fcn)
+        fcn = click.option("--raiseerr",
+                           flag_value = True,
+                           default    = False,
+                           help       = '[DEBUG] Whether errors should be caught')(fcn)
+        fcn = click.option('-p', "--port",
+                           default    = str(DEFAULT_SERVER_PORT),
+                           help       = 'Port used: use "random" for any')(fcn)
+        fcn = click.option("-g", "--gui",
+                           type       = click.Choice(['firefox', 'chrome', 'default', 'none']),
+                           default    = 'firefox',
+                           help       = 'The type of browser to use.')(fcn)
+
+        for i in others:
+            fcn = i(fcn)
+
+        fcn = click.argument('view')(fcn)
+        fcn = click.option('--version', is_flag = True, callback = _version,
+                           expose_value = False, is_eager = True)(fcn)
+
+        return click.command()(fcn)
+    return _wrapper
+
+@defaultclick(click.option('-b', "--bead",
+                           type       = int,
+                           default    = None,
+                           help       = 'Opens to this bead'),
+              click.option("--tracks",
+                           type       = str,
+                           nargs      = 3,
+                           help       = 'track path, gr path and match'),
+              click.argument('files', nargs = -1, type = click.Path()))
+def main(view, files, tracks, bead,  # pylint: disable=too-many-arguments
+         gui, port, raiseerr, nothreading):
+    "Launches an view"
+    _files(tracks, files, bead)
+    return defaultmain(view, gui, port, raiseerr, nothreading, "app.toolbar")
 
 if __name__ == '__main__':
     main()   # pylint: disable=no-value-for-parameter

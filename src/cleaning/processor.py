@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Selecting beads"
+import  warnings
 from    typing                  import Optional, Dict, Any, List, Tuple, Type
 from    itertools               import repeat
 from    functools               import partial
@@ -13,55 +14,14 @@ from    data.views              import BEADKEY
 from    control.processor       import Processor, ProcessorException
 from    .datacleaning           import DataCleaning
 
-class PostAlignmentDataCleaning:
-    """
-    Remove incorrect points or cycles after the cycles have been aligned
-
-    # `aberrant`
-    Removes aberrant values.
-
-    A value at position *n* is aberrant if any:
-
-        *  z[n] < percentile(z, percentiles[0]) - percentilerange
-        *  z[n] > percentile(z, percentiles[1]) + percentilerange
-    """
-    percentiles       = 5., 95.
-    percentilerange   = .1
-    @initdefaults(frozenset(locals()))
-    def __init__(self, **_):
-        pass
-
-    def aberrant(self, bead:np.ndarray, clip = False):
-        """
-        Removes aberrant values.
-
-        Aberrant values are replaced by:
-
-            * *NaN* if *clip* is true,
-            * *maxabsvalue ± median*, whichever is closest, if *clip* is false.
-
-        returns: *True* if the number of remaining values is too low
-        """
-        fin  = np.isfinite(bead)
-        good = bead[fin]
-        thr  = (np.percentile(good, self.percentiles)
-                + [-self.percentilerange, self.percentilerange])
-
-        if clip:
-            good[good < thr[0]] = thr[0]
-            good[good > thr[1]] = thr[1]
-        else:
-            good[good < thr[0]] = np.NaN
-            good[good > thr[1]] = np.NaN
-        bead[fin] = good
-
 class DataCleaningTask(DataCleaning, Task): # pylint: disable=too-many-ancestors
     "Task for removing incorrect points or cycles or even the whole bead"
     __doc__          = DataCleaning.__doc__
     level            = Level.bead
-    hfsigmaphases    = PHASE.measure, PHASE.measure
-    populationphases = PHASE.measure, PHASE.measure
+    hfsigmaphases    = PHASE.initial, PHASE.measure
+    populationphases = PHASE.initial, PHASE.measure
     extentphases     = PHASE.initial, PHASE.measure
+    pingpongphases   = PHASE.initial, PHASE.measure
     saturationphases = PHASE.initial, PHASE.measure
     @initdefaults(frozenset(locals()))
     def __init__(self, **kwa):
@@ -96,7 +56,9 @@ class DataCleaningErrorMessage:
                  ('population', '< %.0f%%', 'min'),
                  ('hfsigma',    '< %.4f',   'min'),
                  ('hfsigma',    '> %.4f',   'max'),
-                 ('extent',     '< %.2f',   'min'))
+                 ('extent',     '< %.2f',   'min'),
+                 ('extent',     '> %.2f',   'max'),
+                 ('pingpong',   '> %.1f',   'max'))
 
         vals  = ((get1(i[0], i[-1]), i[0], i[1] % get2(i[0], i[-1])) for i in msg)
         return [i for i in vals if i[0]]
@@ -115,7 +77,9 @@ class DataCleaningErrorMessage:
                  '%d cycles: %%good < %.0f%%'      % get('population', 'min'),
                  '%d cycles: σ[HF] < %.4f'         % get('hfsigma',    'min'),
                  '%d cycles: σ[HF] > %.4f'         % get('hfsigma',    'max'),
-                 '%d cycles: Δz < %.2f'            % get('extent',     'min'))
+                 '%d cycles: Δz < %.2f'            % get('extent',     'min'),
+                 '%d cycles: Δz > %.2f'            % get('extent',     'max'),
+                 '%d cycles: Σ|dz| > %.1f'         % get('pingpong',   'max'))
 
         return '\n'.join(i for i in msg if i[0] != '0')
 
@@ -139,13 +103,21 @@ class DataCleaningProcessor(Processor[DataCleaningTask]):
     @classmethod
     def __test(cls, frame, cnf):
         sel = cls.tasktype(**cnf)
-        for name in sel.CYCLES:
-            cycs = tuple(frame.withphases(*cls.__get(name+'phases', cnf)).values())
-            yield getattr(sel, name)(cycs)
+        pha = cycs = None
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', category = RuntimeWarning,
+                                    message = '.*All-NaN slice encountered.*')
+            warnings.filterwarnings('ignore', category = RuntimeWarning,
+                                    message = '.*invalid value encountered in [gl][re].*')
+            for name in sel.CYCLES:
+                cur = cls.__get(name+'phases', cnf)
+                if cycs is None or pha != cur:
+                    pha, cycs = cur, tuple(frame.withphases(*cur).values())
+                yield getattr(sel, name)(cycs)
 
-        init = list(frame.withphases(cls.__get('saturationphases', cnf)[0]).values())
-        meas = list(frame.withphases(cls.__get('saturationphases', cnf)[1]).values())
-        yield sel.saturation(init, meas)
+            init = list(frame.withphases(cls.__get('saturationphases', cnf)[0]).values())
+            meas = list(frame.withphases(cls.__get('saturationphases', cnf)[1]).values())
+            yield sel.saturation(init, meas)
 
     @classmethod
     def _compute(cls, cnf, frame, info): # pylint: disable=inconsistent-return-statements

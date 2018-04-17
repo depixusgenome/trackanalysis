@@ -10,9 +10,18 @@ Patch mechanism
 {}
 
 """
-from typing  import Callable, List # pylint: disable=unused-import
+from copy    import copy
+from typing  import Callable, List, Sequence, cast# pylint: disable=unused-import
 import re
-from ._utils import TPE
+
+from utils   import initdefaults
+from ._utils import TPE, CNT
+
+class DELETE(Exception):
+    "Delete classes or attributes"
+
+class RESET(DELETE):
+    "Reset classes or attributes"
 
 class Patches:
     "This must contain json patches up to the app's versions number"
@@ -46,11 +55,47 @@ class Patches:
             raise IOError("Anastore file version is too high", "warning")
         return data
 
-class DELETE(Exception):
-    "Delete classes or attributes"
+class LocalPatch:
+    """
+    define a local patch. NOT THREADSAFE
+    """
+    modifications    = ("peakcalling.processor.fittoreference.FitToReferenceTask", DELETE,
+                        "peakcalling.processor.fittohairpin.FitToHairpinTask",     DELETE)
+    path: Callable[[Sequence[str]], Sequence[str]] = None
+    patches: Patches = None
+    _old:    Patches
 
-class RESET(DELETE):
-    "Reset classes or attributes"
+    @initdefaults(frozenset(locals()))
+    def __init__(self, **_):
+        pass
+
+    def _modify(self, data:dict) -> dict:
+        mods = tuple(self.modifications)
+        if self.path is not None: # type: ignore
+            def _pathpatch(val):
+                # pylint: disable=not-callable
+                val[CNT] = self.path(cast(Sequence[str], val[CNT])) # type: ignore
+                return val
+            mods += "model.task.track.TrackReaderTask", dict(path = _pathpatch)
+        modifyclasses(data, *mods)
+        return data
+
+    def __enter__(self):
+        if self.patches is None:
+            from ._default import __TASKS__ as patches
+        else:
+            patches = self.patches
+
+        self._old = copy(patches)
+        patches.patch(self._modify)
+        return patches
+
+    def __exit__(self, *_):
+        if self.patches is None:
+            from ._default import __TASKS__ as patches
+        else:
+            patches = self.patches
+        patches.__dict__.update(self._old.__dict__)
 
 class ModyfyClasses:
     """

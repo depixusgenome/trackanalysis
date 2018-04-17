@@ -132,6 +132,11 @@ class PlotAttrs:
 
     _quad = _line
 
+    @classmethod
+    def _rect(cls, args):
+        cls._default(args)
+        args.pop('size')
+
     @staticmethod
     def _image(args):
         color = args.pop('color')
@@ -160,7 +165,7 @@ class WidgetCreator(GlobalsAccess, Generic[ModelType]):
         self._model = model
         self._ctrl  = getattr(model, '_ctrl')
 
-    def observe(self):
+    def observe(self, _):
         "sets-up config observers"
 
     @abstractmethod
@@ -226,7 +231,7 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
                             'input.width'        : 205,
                             'figure.width'       : 800,
                             'figure.height'      : 200}
-            css.figure.sizing_mode.default = 'scale_width'
+            css.figure.sizing_mode.default = 'fixed'
 
         key = type(self).key()
         for name in 'config', 'project', 'css':
@@ -319,15 +324,18 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
         over  = self.css.boundary.overshoot.get()
 
         if isinstance(arr, np.ndarray):
-            if all(np.isnan(i) for i in arr):
+            if all(np.isnan(i) for i in arr) or len(arr) == 0:
                 vmin = 0.
                 vmax = 1.
             else:
                 vmin = np.nanmin(arr)
                 vmax = np.nanmax(arr)
+        elif len(arr):
+            vmin = min(arr)
+            vmax = max(arr)
         else:
-            vmin  = min(arr)
-            vmax  = max(arr)
+            vmin = 0.
+            vmax = 1.
 
         delta = max(1e-5, (vmax-vmin))*over*.5
         vmin -= delta
@@ -370,19 +378,19 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
         vmax += delta
         return vmin, vmax
 
-    def create(self, doc):
+    def create(self, ctrl, doc):
         "returns the figure"
         self._doc = doc
         self._model.create(doc)
         with self.resetting():
-            return self._create(doc)
+            return self._create(ctrl, doc)
 
     def activate(self, val):
         "activates the component: resets can occur"
         old        = self.state
         self.state = PlotState.active if val else PlotState.disabled
         if val and (old is PlotState.outofdate):
-            self.__doreset()
+            self.__doreset(self._ctrl)
 
     def ismain(self, _):
         "Set-up things if this view is the main one"
@@ -404,43 +412,43 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
             self.state = PlotState.outofdate
 
         elif state is PlotState.active:
-            self.__doreset()
+            self.__doreset(self._ctrl)
 
         elif state is PlotState.abouttoreset:
             with self.resetting():
                 self._model.reset()
 
-    def observe(self):
+    def observe(self, _):
         "sets-up model observers"
         self.project.root.observe(self.reset)
 
     if SINGLE_THREAD: # pylint: disable=using-constant-test
         # use this for single-thread debugging
         LOGS.info("Running in single-thread mode")
-        def __doreset(self):
+        def __doreset(self, ctrl):
             with self.resetting():
                 self._model.reset()
                 self._reset()
-            self._ctrl.handle('rendered', args = {'plot': self})
+            ctrl.handle('rendered', args = {'plot': self})
     else:
-        def __doreset(self):
+        def __doreset(self, ctrl):
             with self.resetting():
                 self._bkmodels.clear()
                 self._model.reset()
 
             old, self.state = self.state, PlotState.abouttoreset
-            durations       = []
+            durations       = [0.]
             async def _reset_and_render():
                 def _reset():
                     start = time()
                     self.state = PlotState.resetting
-                    with BokehView.computation.type(self._ctrl, calls = self.__doreset):
+                    with BokehView.computation.type(ctrl, calls = self.__doreset):
                         try:
                             self._reset()
                         except Exception as exc: # pylint: disable=broad-except
                             args = getattr(exc, 'args', tuple())
                             if len(args) == 2 and args[1] == "warning":
-                                self._ctrl.globals.project.message.set(exc)
+                                ctrl.globals.project.message.set(exc)
                             else:
                                 raise
                         finally:
@@ -454,12 +462,12 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
                     ret   = tuple(self._bkmodels.items())
                     self._bkmodels.clear()
                     if ret:
-                        with BokehView.computation.type(self._ctrl, calls = self.__doreset):
+                        with BokehView.computation.type(ctrl, calls = self.__doreset):
                             with self.resetting():
                                 self._bkmodels.update(ret)
-                    self._ctrl.handle('rendered', args = {'plot': self})
+                    ctrl.handle('rendered', args = {'plot': self})
                     LOGS.debug("%s.reset done in %.3f+%.3f",
-                               type(self).__qualname__, durations[0], time() - start)
+                               type(self).__qualname__, durations[-1], time() - start)
                 self._doc.add_next_tick_callback(_render)
 
             spawn(_reset_and_render)
@@ -562,14 +570,14 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
                 args[name] = Range1d(start = 0., end = 1.)
         return args
 
-    def _keyedlayout(self, main, *figs, left = None, bottom = None, right = None):
-        return DpxKeyedRow.keyedlayout(self, main, *figs,
+    def _keyedlayout(self, ctrl, main, *figs, left = None, bottom = None, right = None):
+        return DpxKeyedRow.keyedlayout(ctrl, self, main, *figs,
                                        left   = left,
                                        right  = right,
                                        bottom = bottom,)
 
     @abstractmethod
-    def _create(self, doc):
+    def _create(self, ctrl, doc):
         "creates the plot structure"
 
     @abstractmethod
@@ -579,24 +587,25 @@ class PlotCreator(Generic[ModelType], GlobalsAccess): # pylint: disable=too-many
 PlotType = TypeVar('PlotType', bound = PlotCreator)
 class PlotView(Generic[PlotType], BokehView):
     "plot view"
-    def __init__(self, **kwa):
-        super().__init__(**kwa)
+    def __init__(self, ctrl = None, **kwa):
+        super().__init__(ctrl, **kwa)
 
-        def _gesture(meta):
-            return {'rate'    : .2,
-                    'activate': meta[:-1],
-                    'x.low'   : meta+'ArrowLeft',
-                    'x.high'  : meta+'ArrowRight',
-                    'y.low'   : meta+'ArrowDown',
-                    'y.high'  : meta+'ArrowUp'}
+        def _gesture(name, meta):
+            return {name+'rate'    : .2,
+                    name+'activate': meta[:-1],
+                    name+'xlow'    : meta+'ArrowLeft',
+                    name+'xhigh'   : meta+'ArrowRight',
+                    name+'ylow'    : meta+'ArrowDown',
+                    name+'yhigh'   : meta+'ArrowUp'}
 
-        plt = self._ctrl.globals.css.plot
+        plt = ctrl.globals.css.plot
         plt.boundary.overshoot .default  =.001
-        plt.keypress.reset     .default  ='Shift- '
-        plt.keypress.pan       .defaults = _gesture('Alt-')
-        plt.keypress.zoom      .defaults = _gesture('Shift-')
         plt.tools              .default  ='xpan,box_zoom,reset,save'
-        self._plotter = self.plottype()(self._ctrl)
+        ctrl.theme.updatedefaults('keystroke',
+                                  reset = 'Shift -',
+                                  **_gesture('pan', 'Alt-'),
+                                  **_gesture('zoom', 'Shift-'))
+        self._plotter = self.plottype()(ctrl)
 
     @classmethod
     def plottype(cls) -> Type[PlotCreator]:
@@ -608,11 +617,11 @@ class PlotView(Generic[PlotType], BokehView):
         "returns the plot creator"
         return self._plotter
 
-    def _ismain(self, tasks = None, ioopen = None, iosave = None):
+    def _ismain(self, ctrl, tasks = None, ioopen = None, iosave = None):
         "Set-up things if this view is the main one"
-        self._plotter.ismain(self._keys)
+        self._plotter.ismain(ctrl)
 
-        cnf = self._ctrl.globals.config.tasks
+        cnf = ctrl.globals.config.tasks
         if tasks is not None:
             cnf.default = tasks
 
@@ -639,9 +648,9 @@ class PlotView(Generic[PlotType], BokehView):
         "activates the component: resets can occur"
         self._plotter.activate(val)
 
-    def getroots(self, doc):
+    def addtodoc(self, ctrl, doc):
         "adds items to doc"
-        super().getroots(doc)
-        ret = self._plotter.create(doc)
-        self._plotter.observe()
+        super().addtodoc(ctrl, doc)
+        ret = self._plotter.create(ctrl, doc)
+        self._plotter.observe(ctrl)
         return ret

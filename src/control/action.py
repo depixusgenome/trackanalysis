@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 "allows fencing multiple events between 2 *startaction* and *stopaction* events"
 
-from typing             import Callable, Optional, Tuple # pylint: disable=unused-import
+from typing             import Callable, Union, Optional, Tuple # pylint: disable=unused-import
 from pathlib            import Path
 from functools          import wraps
 from inspect            import signature
@@ -58,8 +58,10 @@ class Action:
     _STOPEVT  = 'stopaction'
 
     def __init__(self, ctrl = None, calls = None, test = None) -> None:
-        self._ctrl  = getattr(ctrl, '_ctrl', ctrl)
-        assert hasattr(self._ctrl, 'handle'), f"{ctrl} has not handle method"
+        ctrl        = getattr(ctrl, '_ctrl', ctrl)
+        ctrl        = getattr(ctrl, 'display', ctrl)
+        self._ctrl  = ctrl
+        assert hasattr(ctrl, 'handle'), f"{ctrl} has not handle method"
         self._test  = test
         if calls is not None:
             self._calls = _Calls(calls)
@@ -67,6 +69,11 @@ class Action:
             self._calls = _Calls(LOGS.findCaller()[:3])
         else:
             self._calls = _Calls(None)
+
+    @property
+    def type(self):
+        "return the action type"
+        return type(self)
 
     def _logstart(self):
         if self._CNT[0] == 1:
@@ -128,7 +135,8 @@ class Action:
     def __exit__(self, tpe, val, bkt):
         assert val is None or isinstance(val, Exception), f"{val} should be None or Exception"
         self._CNT[0] -= 1
-        errvalue = [self._ctrl.globals.config.catcherror.get()]
+        errvalue      = [getattr(self._ctrl, 'CATCHERROR', True)]
+
         try:
             self._ctrl.handle(self._STOPEVT,
                               args = {'type':       tpe,
@@ -153,9 +161,14 @@ class ActionDescriptor:
 
     This can also be as a descriptor, or a decorator
     """
-    def __init__(self, action, test = None):
-        self.type = action
+    def __init__(self, action: Union[str, type] = Action, test = None) -> None:
+        assert action in ('action', 'computation', Action, Computation)
+        self.type = Action if action in (Action, 'action') else Computation
         self.test = test
+
+    def __set_name__(self, _, name):
+        assert name in ('action', 'computation')
+        self.type = Action if name == 'action' else Computation
 
     def __call__(self, fcn, calls = None):
         if calls is None:

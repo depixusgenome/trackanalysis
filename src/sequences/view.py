@@ -80,7 +80,7 @@ class SequenceTicker(BasicTicker): # pylint: disable=too-many-ancestors
 
         self.__withbase = dict()
         for name in ('color', 'dash', 'width', 'alpha'):
-            gridprops = cnf.css.grid[cnf.css.theme.get()][name].get()
+            gridprops = cnf.css.grid[self.__model.themename][name].get()
             self.__withbase['grid_line_'+name]       = gridprops[0]
             self.__withbase['minor_grid_line_'+name] = gridprops[1]
 
@@ -248,7 +248,7 @@ class SequencePathWidget(WidgetCreator[ModelType]):
         self.__widget.on_click(_py_cb)
         return [Paragraph(text = self.css.title.sequence.get()), self.__widget]
 
-    def observe(self):
+    def observe(self, _):
         "sets-up config observers"
         fcn = lambda: self.__widget.update(**self.__data())
         self._model.observeprop('sequencekey', 'sequencepath', fcn)
@@ -337,7 +337,7 @@ class OligoListWidget(WidgetCreator[ModelType]):
         ols  = ', '.join(sorted(j.lower() for j in self._model.oligos))
         return dict(value = ols, completions = lst)
 
-    def observe(self):
+    def observe(self, _):
         "sets-up config observers"
         fcn = lambda: self.__widget.update(**self.__data())
         self._model.observeprop('oligos', fcn)

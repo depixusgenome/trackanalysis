@@ -8,6 +8,7 @@ from    typing                  import (Optional,  # pylint: disable=unused-impo
 from    functools               import partial
 from    abc                     import ABCMeta, abstractmethod
 import  re
+import  random
 
 import  bokeh.core.properties   as props
 from    bokeh.models            import Model, Callback
@@ -17,7 +18,7 @@ LOGS  = getLogger()
 
 class Option(metaclass = ABCMeta):
     "Converts a text tag to an html input"
-    NAME = r'%\((?P<name>[\w\.]*)\)'
+    NAME = r'%\((?P<name>[\w\.\[\]]*)\)'
     @abstractmethod
     def replace(self, model, body:str) -> str:
         "replaces a pattern by an html tag"
@@ -62,27 +63,70 @@ class Option(metaclass = ABCMeta):
         fcn = partial(cls._default_apply, model, elems, cnv, storeempty)
         return cast(Callable, fcn)
 
-    @staticmethod
-    def getvalue(mdl, keystr, default):
+    _INDEX = re.compile(r"(\w+)\[(\d+)\]")
+    @classmethod
+    def getvalue(cls, mdl, keystr, default):
         "gets the value in the model"
         if isinstance(mdl, dict):
             return mdl[keystr]
 
         keys = keystr.split('.')
         for key in keys[:-1]:
-            mdl = getattr(mdl, key)
+            match = cls._INDEX.match(key)
+            if match:
+                mdl = getattr(mdl, match.group(1))[int(match.group(2))]
+            else:
+                mdl = getattr(mdl, key)
+
+        match = cls._INDEX.match(keys[-1])
+        if match:
+            return getattr(mdl, match.group(1), default)[int(match.group(2))]
         return getattr(mdl, keys[-1], default)
 
-    @staticmethod
-    def setvalue(mdl, keystr, val):
+    @classmethod
+    def setvalue(cls, mdl, keystr, val):
         "sets the value in the model"
         if isinstance(mdl, dict):
             mdl[keystr] = val
         else:
             keys = keystr.split('.')
             for key in keys[:-1]:
-                mdl = getattr(mdl, key)
-            setattr(mdl, keys[-1], val)
+                match = cls._INDEX.match(key)
+                if match:
+                    mdl = getattr(mdl, match.group(1))[int(match.group(2))]
+                else:
+                    mdl = getattr(mdl, key)
+
+            match = cls._INDEX.match(keys[-1])
+            if match:
+                getattr(mdl, match.group(1))[int(match.group(2))] = val
+            else:
+                setattr(mdl, keys[-1], val)
+
+class ChoiceOption(Option):
+    "Converts a text tag to an html check"
+    _PATT = re.compile(r'%\((?P<name>[\w\.\[\]]*)(?P<cols>(?:\|[^:]+\:[^|)]+)*)\)c')
+    @classmethod
+    def converter(cls, model, body:str) -> Callable:
+        "returns a method which sets values in a model"
+        elems = frozenset(i.group('name') for i in cls._PATT.finditer(body))
+        return cls._converter(model, elems, lambda x: x, AssertionError())
+
+    @classmethod
+    def replace(cls, model, body:str) -> str:
+        "replaces a pattern by an html tag"
+        def _replace(match):
+            key   = match.group('name')
+            ident = key+str(random.randint(0,100000))
+            out   = '<select name="{}" id="{}">'.format(key, ident)
+            first = None
+            for i in match.group('cols')[1:].split("|"):
+                if first is None:
+                    first = i.split(":")[0]
+                out += '<option value="{}">{}</option>'.format(*i.split(':'))
+            out += '</select><script>document.getElementById("{}").value = "{}"</script>'
+            return out.format(ident, cls.getvalue(model, key, first))
+        return cls._PATT.sub(_replace, body)
 
 class CheckOption(Option):
     "Converts a text tag to an html check"
@@ -186,7 +230,8 @@ class DpxModal(Model):
                           TextOption(str,   _OPT+r's',       None),
                           CSVOption(int,    _OPT+r'csv[id]'),
                           CSVOption(float,  _OPT+r'csvf'),
-                          CSVOption(str,    _OPT+r'csv'))
+                          CSVOption(str,    _OPT+r'csv'),
+                          ChoiceOption())
     __css__            = [ROUTE+"/backbone.modal.css",
                           ROUTE+"/backbone.modal.theme.css"]
     __javascript__     = [ROUTE+"/underscore-min.js",
@@ -195,28 +240,38 @@ class DpxModal(Model):
     title              = props.String("")
     body               = props.String("")
     results            = props.Dict(props.String, props.Any)
+    submitted          = props.Int(0)
     startdisplay       = props.Int(0)
     callback           = props.Instance(Callback)
     def __init__(self, **kwa):
         super().__init__(**kwa)
         self.__handler = None # type: Optional[Callable]
         self.__running = False
-        def _on_apply_cb(attr, old, new):
-            if not self.__running:
-                return
-            self.__running = False
-            if self.__handler is not None and len(new):
-                self.__handler(new)
-        self.on_change('results', _on_apply_cb)
+        self.__always  = False
+
+        self.on_change('submitted', self._onsubmitted_cb)
+        self.on_change('results',   self._onresults_cb)
+
+    def _onresults_cb(self, attr, old, new):
+        if self.__running and not self.__always and len(new) and self.__handler:
+            self.__handler(new)
+
+    def _onsubmitted_cb(self, attr, old, new):
+        if self.__running and self.__always and self.__handler:
+            self.__handler(self.results)
+
+        self.__running = False
 
     def run(self,                                       # pylint: disable=too-many-arguments
             title   : str                       = "",
             body    : Union[Sequence[str],str]  = "",
             callback: Union[Callable, Callback] = None,
             context : Callable[[str], Any]      = None,
-            model                               = None):
+            model                               = None,
+            always                              = False):
         "runs the modal dialog"
         self.__handler = self._build_handler(callback, title, body, model, context)
+        self.__always  = always
         self.__running = False
         self.update(title    = title,
                     body     = self._build_body(body, model),
@@ -251,7 +306,7 @@ class DpxModal(Model):
                 bdy = ' '.join(' '.join(i) for i in bdy)
 
             converters = [i.converter(model, bdy) for i in self.__OPTIONS]
-            ordered    = sorted(itms.items(), key = lambda i: bdy.index('%('+i[0]+')'))
+            ordered    = sorted(itms.items(), key = lambda i: bdy.index('%('+i[0]))
             if context is None:
                 for i in ordered:
                     any(cnv(*i) for cnv in converters)

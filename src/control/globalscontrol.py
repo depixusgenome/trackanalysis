@@ -28,7 +28,7 @@ from    functools     import partial
 from    itertools     import product
 import  inspect
 
-import  anastore
+from    anastore.configuration import readconfig, writeconfig
 
 from    model.globals import (GlobalsChild, GlobalsAccess, SingleMapAccess,
                               EventData, delete, Globals, BaseGlobalsAccess)
@@ -192,44 +192,19 @@ class BaseGlobalsController(Controller):
         "removes view information"
         return self._maps[key].pop(*args)
 
-    def getGlobal(self, key, *args, default = delete):
+    def keys(self):
+        "return the names of the maps"
+        return self._maps.keys()
+
+    def getGlobal(self, key, *args, default = delete, model = False):
         "returns values associated to the keys"
         if key is Ellipsis:
             return self
         if len(args) == 0 or len(args) == 1 and args[0] == '':
+            if model:
+                return self._model.getGlobal(key, model = True)
             return SingleMapAccessController(self._maps[key], '')
         return self._maps[key].get(*args, default = default)
-
-    def writeconfig(self, configpath: Callable,
-                    patchname = 'config',
-                    index     = 0,
-                    overwrite = True,
-                    ** kwa):
-        """
-        Writes up the user preferences.
-
-        If *overwrite* is *False*, the preferences are first read from file, then
-        written again. Notwithstanding version patches, this is a no-change operation.
-        """
-        if patchname is dict:
-            return self._model.writeconfig(configpath, dict, index, **kwa)
-
-        return self._model.writeconfig(configpath, anastore, patchname,
-                                       index, overwrite, **kwa)
-
-    def readconfig(self, configpath, patchname = 'config'):
-        "Sets-up the user preferences"
-        if patchname is dict:
-            cnf = self._model.readconfig(configpath, patchname)
-        else:
-            cnf = self._model.readconfig(configpath, anastore, patchname)
-
-        if cnf is None or len(cnf) == 0:
-            return
-
-        with Action(self):
-            for root, values in cnf.items():
-                self._maps[root].update(values)
 
 class GlobalsController(BaseGlobalsController):
     """
@@ -269,22 +244,36 @@ class GlobalsController(BaseGlobalsController):
         If *overwrite* is *False*, the preferences are first read from file, then
         written again. Notwithstanding version patches, this is a no-change operation.
         """
-        if patchname is dict:
-            return self._model.writeconfig(configpath, dict, index, **kwa)
+        if configpath is dict:
+            return {i: j.maps[index] for i, j in self._model.items() if len(j.maps[index])}
 
-        css = self.css.config.getdict(..., fullnames = False)
-        return self._model.writeconfig(configpath, anastore, patchname,
-                                       index, overwrite, **kwa, **css)
+        maps = None if overwrite else readconfig(configpath, patchname = patchname)
+        if maps is None:
+            maps = {i: j.maps[index] for i, j in self._model.items() if 'project' not in i}
+            maps = {i: j for i, j in maps.items() if len(j)}
+
+        kwa.update(self.css.config.getdict(..., fullnames = False))
+        return writeconfig(maps, configpath, index = index, patchname = patchname, **kwa)
+
+    def readconfig(self, configpath, patchname = 'config'):
+        "Sets-up the user preferences"
+        cnf = readconfig(configpath, patchname = patchname)
+        if cnf is None or len(cnf) == 0:
+            return
+
+        with Action(self):
+            maps = dict(self._model.items())
+            for root, values in cnf.items():
+                maps[root].update(values)
 
     config  = property(lambda self: BaseGlobalsAccess(self, '', 'config'))
     css     = property(lambda self: BaseGlobalsAccess(self, '', 'css'))
     project = property(lambda self: BaseGlobalsAccess(self, '', 'project'))
 
-    def __undos__(self):
-        "yields all undoable user actions"
+    def __undos__(self, wrapper):
+        "observes all undoable user actions"
         def _onglobals(items):
             vals = {i: j.old for i, j in items.items()}
             return partial(self.updateGlobal, items.name, **vals) if len(vals) else None
-        maps = self._maps
-        yield tuple('globals.' + i for i in maps
-                    if not i.startswith('project')) + (_onglobals,)
+
+        self.observe(r"^globals\.(?!.*?project).*$", wrapper(_onglobals))

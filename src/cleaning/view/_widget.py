@@ -7,7 +7,7 @@ from    abc             import ABC
 import  bokeh.core.properties as props
 from    bokeh.plotting  import Figure
 from    bokeh.models    import (ColumnDataSource, DataTable, TableColumn,
-                                Widget, StringFormatter, CustomJS)
+                                Widget, StringFormatter, CustomJS, Slider)
 
 import  numpy       as     np
 
@@ -24,16 +24,17 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
         super().__init__(model)
         self.__widget: DataTable  = None
         css                       = self.__config
-        css.lines.order.default   = ('extent', 'hfsigma', 'population', 'aberrant',
-                                     'saturation', 'good')
+        css.lines.order.default   = ('population', 'hfsigma', 'extent', 'aberrant',
+                                     'pingpong', 'saturation', 'good')
         css.columns.width.default = 65
         css.height.default        = 500
-        css.columns.default       = [['cycle',      u'Cycle',     '0'],
-                                     ['population', u'% good',    '0.'],
-                                     ['hfsigma',    u'σ[HF]',     '0.0000'],
-                                     ['extent',     u'Δz',        '0.0'],
+        css.columns.default       = [['cycle',      u'Cycle',       '0'],
+                                     ['population', u'% good',      '0.'],
+                                     ['hfsigma',    u'σ[HF]',       '0.0000'],
+                                     ['extent',     u'Δz',          '0.0'],
+                                     ['pingpong',   u'Σ|dz|',       '0.0'],
                                      ['saturation', u'Non-closing', ''],
-                                     ['discarded',  u'Discarded', '']]
+                                     ['discarded',  u'Discarded',   '']]
 
     @property
     def __config(self):
@@ -87,6 +88,44 @@ class CyclesListWidget(WidgetCreator[DataCleaningModelAccess]):
         info['cycle'] = order
         return info
 
+class DownsamplingWidget(WidgetCreator[DataCleaningModelAccess]):
+    "allows downsampling the graph for greater speed"
+    def __init__(self, model:DataCleaningModelAccess) -> None:
+        super().__init__(model)
+        self.__widget: Slider  = None
+        css                       = self.__config
+        css.defaults = {"title": "Downsampling",
+                        "tooltips": "Display only 1 out of every few data points",
+                        "start": 0,
+                        "end":   5}
+
+    @property
+    def __config(self):
+        return self.css.downsampling
+
+    def create(self, action) -> List[Widget]:
+        "creates the widget"
+        cnf   = self.__config
+        self.__widget = Slider(title    = cnf.title.get(),
+                               value    = cnf.get(),
+                               start    = cnf.start.get(),
+                               end      = cnf.end.get(),
+                               callback_policy = "mouseup")
+        @action
+        def _onchange_cb(attr, old, new):
+            cnf.set(new)
+
+        self.__widget.on_change("value", _onchange_cb)
+        return [self.__widget]
+
+    def observe(self, ctrl):
+        "observe the controller"
+
+    def reset(self, resets):
+        "this widget has a source in common with the plots"
+        itm  = self.__widget if resets is None else resets[self.__widget]
+        itm.update(value = self.__config.get())
+
 class DpxCleaning(Widget):
     "Interface to filters needed for cleaning"
     __css__            = ROUTE+"/cleaning.css"
@@ -103,7 +142,8 @@ class DpxCleaning(Widget):
     minhfsigma         = props.Float(DataCleaningTask.minhfsigma)
     maxhfsigma         = props.Float(DataCleaningTask.maxhfsigma)
     minextent          = props.Float(DataCleaningTask.minextent)
-    maxsaturation       = props.Float(DataCleaningTask.maxsaturation)
+    maxextent          = props.Float(DataCleaningTask.maxextent)
+    maxsaturation      = props.Float(DataCleaningTask.maxsaturation)
 
 class CleaningFilterWidget(WidgetCreator[DataCleaningModelAccess]):
     "All inputs for cleaning"
@@ -121,7 +161,7 @@ class CleaningFilterWidget(WidgetCreator[DataCleaningModelAccess]):
 
         for name in ('maxabsvalue', 'maxderivate', 'minpopulation',
                      'minhfsigma',  'maxhfsigma',  'minextent',
-                     'maxsaturation'):
+                     'maxextent',   'maxsaturation'):
             self.__widget.on_change(name, _on_cb)
 
         @action
@@ -158,14 +198,16 @@ class CleaningFilterWidget(WidgetCreator[DataCleaningModelAccess]):
 class WidgetMixin(ABC):
     "Everything dealing with changing the config"
     def __init__(self):
-        align = AlignmentWidget[DataCleaningModelAccess](self._model)
+        align  = AlignmentWidget[DataCleaningModelAccess](self._model)
         self.__widgets = dict(table    = CyclesListWidget(self._model),
                               align    = align,
-                              cleaning = CleaningFilterWidget(self._model))
+                              cleaning = CleaningFilterWidget(self._model),
+                              sampling = DownsamplingWidget(self._model))
 
-    def _widgetobservers(self):
+    def _widgetobservers(self, ctrl):
         for widget in self.__widgets.values():
-            widget.observe()
+            widget.observe(ctrl)
+        self.css.observe("downsampling", lambda: self.reset(False))
 
     def _createwidget(self, fig):
         widgets = {i: j.create(self.action) for i, j in self.__widgets.items()}

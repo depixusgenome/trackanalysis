@@ -489,14 +489,15 @@ class Track:
         val   = cache.get(ibead, None)
 
         if val is None:
-            from signalfilter import nanhfsigma
+            from signalfilter import nanhfsigma, PrecisionAlg
             first  = (self.phases[:,PHASE.initial if first is None else first]
                       - self.phases[0,0])
             last   = (self.phases[:,PHASE.measure+1 if last is None else last]
                       - self.phases[0,0])
             if np.isscalar(ibead):
                 beads        = self.beads
-                cache[ibead] = val = nanhfsigma(beads[ibead], zip(first, last))
+                cache[ibead] = val = max(PrecisionAlg.MINPRECISION,
+                                         nanhfsigma(beads[ibead], zip(first, last)))
             else:
                 if ibead is None or ibead is Ellipsis:
                     beads = self.beadsonly
@@ -506,7 +507,8 @@ class Track:
                     ibead = set(ibead)
 
                 if len(ibead-set(cache)) > 0:
-                    cache.update((i, nanhfsigma(beads[i], zip(first, last)))
+                    cache.update((i, max(PrecisionAlg.MINPRECISION,
+                                         nanhfsigma(beads[i], zip(first, last))))
                                  for i in ibead-set(cache))
                 val = iter((i, cache[i]) for i in ibead)
         return val

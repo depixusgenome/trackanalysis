@@ -7,32 +7,32 @@ from typing                import Any, Dict, List
 
 import numpy                 as np
 import bokeh.core.properties as props
-from bokeh.models          import (CustomJS, DataTable, Div, Dropdown, Paragraph,
-                                   StringFormatter, TableColumn, Widget)
+from bokeh.models               import (DataTable, TableColumn, CustomJS,
+                                        Widget, Div, StringFormatter, Paragraph,
+                                        Dropdown)
 
-from excelreports.creation import writecolumns
-from modaldialog.view      import T_BODY, AdvancedTaskMixin
-from peakcalling.tohairpin import ChiSquareFit, PeakGridFit
-from peakfinding.groupby   import ByEM, ByHistogram
-from sequences.view        import (OligoListWidget, SequenceHoverMixin,
-                                   SequencePathWidget, SequenceTicker)
-from signalfilter          import rawprecision
-from utils.gui             import startfile
-from utils.logconfig       import getLogger
-from view.dialog           import FileDialog
-from view.pathinput        import PathInput
-from view.plots            import DpxNumberFormatter, WidgetCreator
-from view.toolbar          import FileListMixin
+import numpy                    as     np
 
-from ._model               import PeaksPlotModelAccess
+from signalfilter               import rawprecision
 
-LOGS = getLogger(__name__)
+from peakcalling.tohairpin      import PeakGridFit, ChiSquareFit
 
-class ReferenceWidget(WidgetCreator[PeaksPlotModelAccess], FileListMixin):
+from utils.gui                  import startfile
+from excelreports.creation      import writecolumns
+from view.dialog                import FileDialog
+from view.pathinput             import PathInput
+from view.plots                 import DpxNumberFormatter, WidgetCreator
+from view.toolbar               import FileList
+from sequences.view             import (SequenceTicker, SequenceHoverMixin,
+                                        OligoListWidget, SequencePathWidget)
+from modaldialog.view           import AdvancedTaskMixin, T_BODY
+from ._model                    import PeaksPlotModelAccess
+
+class ReferenceWidget(WidgetCreator[PeaksPlotModelAccess]):
     "Dropdown for choosing the reference"
-    def __init__(self, model) -> None:
+    def __init__(self, ctrl, model) -> None:
         super().__init__(model)
-        FileListMixin.__init__(self)
+        self.__files = FileList(ctrl)
         self.__widget: Dropdown  = None
         self.css.title.reference.default      = 'Reference Track'
         self.css.title.reference.none.default = 'None'
@@ -45,7 +45,7 @@ class ReferenceWidget(WidgetCreator[PeaksPlotModelAccess], FileListMixin):
         @action
         def _py_cb(new):
             inew = int(new)
-            val  = None if inew < 0 else [i for _, i in self.files][inew]
+            val  = None if inew < 0 else [i for _, i in self.__files()][inew]
             self._model.fittoreference.reference = val
 
         self.__widget.on_click(_py_cb)
@@ -61,7 +61,7 @@ class ReferenceWidget(WidgetCreator[PeaksPlotModelAccess], FileListMixin):
         return self.__widget
 
     def __data(self) -> dict:
-        lst   = list(self.files)
+        lst   = list(self.__files())
         menu  = [(j, str(i)) for i, j in enumerate(i for i, _ in lst)]
         menu += [None, (self.css.title.reference.none.get(), '-1')]
 
@@ -463,9 +463,9 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # 
                 ('Max distance to theoretical peak', ' %(_dist2theo)d'),
                )
 
-    def __init__(self, model:PeaksPlotModelAccess) -> None:
+    def __init__(self, ctrl, model:PeaksPlotModelAccess) -> None:
         super().__init__(model)
-        AdvancedTaskMixin.__init__(self)
+        AdvancedTaskMixin.__init__(self, ctrl)
         self._outp: Dict[str, Dict[str, Any]] = {}
 
     def reset(self, resets):
@@ -489,12 +489,12 @@ class AdvancedWidget(WidgetCreator[PeaksPlotModelAccess], AdvancedTaskMixin): # 
                               lambda i: ((ChiSquareFit, PeakGridFit)[i](),))
     _dist2theo  = _IdAccessor('match', lambda i: i.window, lambda i: {'window': i})
 
-def createwidgets(mdl: PeaksPlotModelAccess) -> Dict[str, WidgetCreator]:
+def createwidgets(ctrl, mdl: PeaksPlotModelAccess) -> Dict[str, WidgetCreator]:
     "returns a dictionnary of widgets"
     return dict(seq      = PeaksSequencePathWidget(mdl),
-                ref      = ReferenceWidget(mdl),
+                ref      = ReferenceWidget(ctrl, mdl),
                 oligos   = PeaksOligoListWidget(mdl),
                 stats    = PeaksStatsWidget(mdl),
                 peaks    = PeakListWidget(mdl),
                 cstrpath = PeakIDPathWidget(mdl),
-                advanced = AdvancedWidget(mdl))
+                advanced = AdvancedWidget(ctrl, mdl))

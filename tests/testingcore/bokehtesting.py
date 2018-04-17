@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 "Utils for testing views"
-from   typing    import Optional, Union, Sequence, Any
+from   typing    import Optional, Union, Sequence, Any, cast
 import sys
 import tempfile
 import warnings
@@ -96,7 +96,7 @@ class WidgetAccess:
                     return val
             return next(i for doc in self._docs for i in doc.select({'type': value}))
         else:
-            itms = tuple()
+            itms: tuple = tuple()
             for doc in self._docs:
                 itms += tuple(doc.select({'name': value}))
             if len(itms) > 0:
@@ -108,7 +108,10 @@ class WidgetAccess:
         return super().__getattribute__(key) if key[0] == '_' else getattr(self(), key)
 
     def __setattr__(self, key, value):
-        return super().__setattr__(key, value) if key[0] == '_' else setattr(self(), key, value)
+        if key[0] == '_':
+            super().__setattr__(key, value)
+        else:
+            setattr(self(), key, value)
 
     def __call__(self):
         if self._key is not None:
@@ -154,8 +157,8 @@ class _ManagedServerLoop:
             return amod
 
         if '.' in amod and 'A' <= amod[amod.rfind('.')+1] <= 'Z':
-            modname = amod[:amod.rfind('.')]
-            attr    = (amod[amod.rfind('.')+1:],)
+            modname     = amod[:amod.rfind('.')]
+            attr:tuple  = (amod[amod.rfind('.')+1:],)
         else:
             modname = amod
             attr    = tuple()
@@ -166,13 +169,14 @@ class _ManagedServerLoop:
         return mod
 
     def __patchserver(self, server):
-        @classmethod
-        def _open(_, doc, _func_ = server.MainView.open):
-            self.doc = doc
+        def _open(_, viewcls, doc, _func_ = server.MainView.MainControl.open, **kwa):
             doc.add_root(DpxTestLoaded())
-            self.view = _func_(doc)
+            self.doc  = doc
+            ctrl      = server.MainView.MainControl(None)
+            self.view = getattr(ctrl, '_open')(viewcls, doc, kwa).topview
+            setattr(self.view, '_ctrl', ctrl)
             return self.view
-        server.MainView.open = _open
+        server.MainView.MainControl.open = classmethod(_open)
 
         def _close(this, _func_ = server.MainView.close):
             self.server = None
@@ -349,7 +353,7 @@ class _ManagedServerLoop:
         else:
             assert isinstance(attrs, str)
             def _cb():
-                setattr(mdl, attrs, value)
+                setattr(mdl, cast(str, attrs), value)
             self.cmd(_cb)
 
     @property

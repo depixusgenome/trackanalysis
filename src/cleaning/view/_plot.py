@@ -67,12 +67,15 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
                   hfsigma    = 'gold',
                   extent     = 'orange',
                   population = 'hotpink',
+                  pingpong   = 'hotpink',
                   saturation = 'chocolate',
                   aberrant   = 'red')
 
         cnf.colors.order.default  = ('aberrant', 'hfsigma', 'extent', 'population',
-                                     'saturation', 'good')
-        self.css.widgets.width.default = 400
+                                     'pingpong', 'saturation', 'good')
+        self.css.downsampling.default  = 5
+        self.css.tools.default         = 'ypan,ybox_zoom,reset,save,dpxhover'
+        self.css.widgets.width.default = 470
         self.css.figure.defaults  = dict(width    = 600,
                                          height   = 800,
                                          tooltips = [(u'(cycle, t, z)',
@@ -81,15 +84,14 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
         self.__source: ColumnDataSource = None
         self.__fig:    Figure           = None
         if TYPE_CHECKING:
-            self._model = DataCleaningModelAccess(self._ctrl, '')
+            self._model = DataCleaningModelAccess(ctrl, '')
 
-    def _create(self, _):
+    def _create(self, ctrl, *_):
         self.__source = ColumnDataSource(data = self.__data(None, None))
 
         self.__fig = fig = figure(**self._figargs(y_range = Range1d,
                                                   x_range = Range1d,
-                                                  name    = 'Clean:Cycles',
-                                                  css_classes= ["DDDDDDD"]))
+                                                  name    = 'Clean:Cycles'))
         glyph = self.css.points.addto(fig, x = 't', y = 'z', source = self.__source)
         hover = fig.select(DpxHoverTool)
         if hover:
@@ -105,9 +107,10 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
 
         mode    = self.defaultsizingmode(width = self.css.widgets.width.get())
         widgets = self._createwidget(fig)
-        bottom  = layouts.widgetbox(widgets['align'], **mode)
-        left    = layouts.widgetbox(widgets['cleaning']+widgets['table'], **mode)
-        return self._keyedlayout(fig, left = left, bottom = bottom)
+        left    = layouts.widgetbox(widgets['cleaning']+widgets['table']
+                                    +widgets['align']+widgets['sampling'],
+                                    **mode)
+        return self._keyedlayout(ctrl, fig, left = left)
 
     def _reset(self):
         items, nans     = None, None
@@ -135,6 +138,8 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
                    cycle = repeat([i[-1] for i, _ in items], val.shape[1], 1),
                    color = self.__color(order, nans, val))
         assert all(len(i) == val.size for  i in res.values())
+        if self.css.downsampling.get():
+            res = {i: j[::self.css.downsampling.get()] for i, j in res.items()}
         return res
 
     def __color(self, order, nancache, items) -> np.ndarray:
@@ -155,9 +160,14 @@ class CleaningPlotCreator(TaskPlotCreator[DataCleaningModelAccess], WidgetMixin)
                     tmp[order[value.max]] = color
         return tmp.ravel()
 
+    def observe(self, ctrl):
+        "sets-up model observers"
+        super().observe(ctrl)
+        self._widgetobservers(ctrl)
+
 class CleaningView(PlotView[CleaningPlotCreator]):
     "Peaks plot view"
-    TASKS = 'datacleaning', 'extremumalignment'
-    def ismain(self):
+    TASKS = 'aberrant', 'datacleaning', 'extremumalignment'
+    def ismain(self, ctrl):
         "Cleaning and alignment, ... are set-up by default"
-        self._ismain(tasks  = self.TASKS)
+        self._ismain(ctrl, tasks  = self.TASKS)

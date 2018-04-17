@@ -46,7 +46,7 @@ class DriftControlPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
         self._src: ColumnDataSource           = {}
         self._fig: Figure                     = None
 
-    def _create(self, _):
+    def _create(self, *_):
         "returns the figure"
         args = self._figargs(y_range            = Range1d(start = 0., end = 20.),
                              x_range            = Range1d(start = 0., end = 1e2),
@@ -150,7 +150,7 @@ class ExtensionPlotCreator(DriftControlPlotCreator):
         self.config.warningthreshold.default  = 1.5e-2
         self.config.ybars.percentiles.default = [25, 75]
 
-    def _create(self, _):
+    def _create(self, *_):
         fig  = super()._create(_)
         args = dict(x = 'cycles', width  = self.css.ybars.width.get(), source = self._src[-1])
         self.css.ybars.addto(fig, top = 'top',    bottom = 'bottom', **args)
@@ -203,7 +203,7 @@ class QualityControlPlots:
         self.tservo  = TServoPlotCreator(ctrl, mdl)
         self.ext     = ExtensionPlotCreator(ctrl, mdl)
 
-    def observe(self):
+    def observe(self, _):
         "observations are delegated to the main PlotCreator"
 
     def reset(self, bkmodels):

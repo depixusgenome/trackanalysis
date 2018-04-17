@@ -43,10 +43,10 @@ class ScriptingView:
         if self._ctrl.globals.config.scripting.save.get():
             self._ctrl.writeuserconfig()
 
-    def observe(self):
+    def observe(self, _):
         "whatever needs to be initialized"
 
-    def ismain(self):
+    def ismain(self, _):
         "Allows setting-up stuff only when the view is the main one"
 
     def close(self):

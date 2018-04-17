@@ -46,6 +46,13 @@ class PlotModelAccess(GlobalsAccess):
         "resets the model"
         return False
 
+    @property
+    def themename(self) -> str:
+        "return the theme name"
+        ctrl = getattr(self._ctrl, 'theme', None)
+        mdl  = getattr(ctrl, 'model', lambda _: None)('main')
+        return getattr(mdl, 'themename', 'dark')
+
 class ReplaceProcessors(CacheReplacement):
     """
     Context for replacing processors but keeping their cache

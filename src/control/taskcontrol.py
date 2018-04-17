@@ -392,23 +392,27 @@ class TaskController(BaseTaskController):
             index = self.defaulttaskindex(parent, cast(Type[Task], task), side)
         return super().addtask(parent, task, index)
 
-    @staticmethod
-    def __undos__():
-        "yields all undoable user actions"
+    def __undos__(self, wrapper):
+        "observes all undoable user actions"
         # pylint: disable=unused-variable
-        def _onopentrack (controller = None, model = None, **_2):
+        observe = lambda x: self.observe(wrapper(x))
+
+        @observe
+        def _onopentrack (controller = None, model = None, **_):
             return partial(controller.closetrack, model[0])
 
-        def _onclosetrack(controller = None, model = None, **_2):
+        @observe
+        def _onclosetrack(controller = None, model = None, **_):
             return partial(controller.opentrack, model[0], model)
 
-        def _onaddtask   (controller = None, parent = None, task = None, **_2):
+        @observe
+        def _onaddtask   (controller = None, parent = None, task = None, **_):
             return partial(controller.removetask, parent, task)
 
+        @observe
         def _onupdatetask(controller = None, parent = None, task = None, old = None, **_):
             return partial(controller.updatetask, parent, task, **old)
 
+        @observe
         def _onremovetask(controller = None, parent = None, task = None, old = None, **_):
             return partial(controller.addtask, parent, task, old.index(task))
-
-        yield from (fcn for name, fcn in locals().items() if name[:3] == '_on')

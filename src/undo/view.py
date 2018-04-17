@@ -6,65 +6,43 @@ from view           import View
 
 class UndoView(View):
     'View listing all undos'
-    def __init__(self, **kwa): # pylint: disable=too-many-locals
-        super().__init__(**kwa)
+    def __init__(self, ctrl = None, **kwa): # pylint: disable=too-many-locals
+        super().__init__(ctrl = ctrl, **kwa)
         self.__curr = [None]
-        self._ctrl.globals.css.keypress.defaults = {'undo'     : "Control-z",
-                                                    'redo'     : "Control-y"}
+        ctrl.theme.updatedefaults  ('keystroke',
+                                    undo = "Control-z",
+                                    redo = "Control-y")
+        ctrl.display.updatedefaults('keystroke',
+                                    undo = ctrl.undos.undo,
+                                    redo = ctrl.undos.redo)
 
-        if 'keys' in kwa:
-            kwa['keys'].addKeyPress('keypress',
-                                    undo = self._ctrl.undos.undo,
-                                    redo = self._ctrl.undos.redo)
-
-        self._ctrl.observe('applicationstarted', self.__observe)
-
-    def __observe(self):
-        'sets up the observations'
-        def _do(fcn):
-            @wraps(fcn)
-            def _wrap(*args, **kwargs):
-                if self.__curr[0] is None:
-                    return # could be a bug or just bokeh-startup
-
+    def __wrapper(self, fcn):
+        @wraps(fcn)
+        def _wrap(*args, **kwargs):
+            if self.__curr[0] is not None:
                 val = fcn(*args, **kwargs)
-                if val is None:
-                    return
+                if val is not None:
+                    self.__curr[0].append(val)
+        return _wrap
 
-                self.__curr[0].append(val)
-            return _wrap
+    def observe(self, ctrl):
+        'sets up the observations'
+        ctrl.__undos__(self.__wrapper)
 
-        undos = tuple(self._ctrl.__undos__())
-        self._ctrl.observe([_do(fcn) for fcn in undos if callable(fcn)])
-        for und in undos:
-            if not callable(und):
-                assert sum(1 for i in und if not isinstance(i, str)) == 1
-                fcn = next(i for i in und if not isinstance(i, str))
-                und = tuple(i for i in und if isinstance(i, str))
-                self._ctrl.observe(*und, _do(fcn))
-
-        self.__onstartstop()
-
-    def __onstartstop(self):
-        'Returns the methods for observing user start & stop action delimiters'
         # pylint: disable=unused-variable
-        @self._ctrl.observe
+        @ctrl.display.observe
         def _onstartaction(recursive = None):
             assert (self.__curr[0] is not None) is recursive
             if not recursive:
                 self.__curr[0] = []
 
-        @self._ctrl.observe
+        @ctrl.display.observe
         def _onstopaction(recursive = None, **_):
             assert recursive is not None
             if not recursive:
                 self._ctrl.undos.appendundos(self.__curr[0])
                 self.__curr[0] = None
 
-        @self._ctrl.observe
+        @ctrl.undos.observe
         def _onundoaction(fcn):
             self.__curr[0].append(fcn)
-
-    def close(self):
-        'Removes the controller'
-        del self._ctrl
