@@ -197,6 +197,6 @@ def grfiles(self):
     self.__init__(path = ((old,) if isinstance(old, str) else old)+paths)
 
 # pylint: disable=no-member,invalid-name
-scriptapp = default.application(main = ScriptingView, creator = lambda x: x)() # type: ignore
+scriptapp = default.application(ScriptingView).open(None).topview
 
 __all__ = ['scriptapp', 'Tasks', 'localcontext']

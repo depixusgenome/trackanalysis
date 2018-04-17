@@ -88,12 +88,14 @@ class BaseSuperController:
         return kwa
 
     def _open(self, viewcls, doc, kwa):
-        keys         = DpxKeyEvent(self)
+        keys = DpxKeyEvent(self)
         self.topview = viewcls(self, **kwa)
         if hasattr(self.topview.views[0], 'ismain'):
             self.topview.views[0].ismain(self)
 
         self._configio()
+        if doc is None:
+            return self
         self._observe(keys)
         self._bokeh(keys, doc)
         self.display.handle('applicationstarted', self.display.emitpolicy.nothing)
@@ -101,7 +103,8 @@ class BaseSuperController:
 
     def _observe(self, keys):
         "Returns the methods for observing user start & stop action delimiters"
-        keys.observe(self)
+        if keys:
+            keys.observe(self)
         for i in self.topview.views:
             getattr(i, 'observe', lambda *_: None)(self)
 
