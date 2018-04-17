@@ -120,10 +120,10 @@ class FoVPlotCreator(TaskPlotCreator[QualityControlModelAccess]):
 
         self._bkmodels[self._beadssource].update(self.__beadsdata())
         sel = self._beadssource.selected
-        if getattr(sel, 'indices'):
+        if getattr(sel, 'indices', None):
             self._bkmodels[sel].update(indices = [])
         sel = self._cursource.selected
-        if getattr(sel, 'indices'):
+        if getattr(sel, 'indices', None):
             self._bkmodels[sel].update(indices = [])
 
         self.__calibdata()
