@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 u"all view aspects here"
-from bokeh.models           import Tabs, Panel
+from bokeh.models           import Tabs, Panel, Spacer
 from bokeh                  import layouts
 from view.base              import BokehView
 from view.plots             import PlotState
@@ -20,6 +20,7 @@ class HybridStatView(BokehView):
         "Sets up the controller"
         super().__init__(ctrl = ctrl, **kwa)
         self._tabs   = None
+        self._roots  = [] # type: ignore
         self._panels = [FoVPlotView         (ctrl = ctrl, **kwa),
                         QualityControlView  (ctrl = ctrl, **kwa),
                         CleaningView        (ctrl = ctrl, **kwa),
@@ -27,7 +28,7 @@ class HybridStatView(BokehView):
                         PeaksPlotView       (ctrl = ctrl, **kwa)]
 
         ctrl.globals.css.plot.figure.defaults = dict(sizing_mode = 'fixed')
-        ctrl.globals.css.hybridstat.defaults  = dict(width = 500, height = 30)
+        ctrl.globals.css.hybridstat.defaults  = dict(width = 500, height = 60)
         titles = ctrl.globals.css.hybridstat.title
         for panel in self._panels:
             key                         = self.__key(panel)
@@ -75,7 +76,8 @@ class HybridStatView(BokehView):
                 ret = ret[0]
             if isinstance(ret, (tuple, list)):
                 ret = layouts.column(ret, **mode)
-            return Panel(title = titles[self.__key(view)].get(), child = ret, **mode)
+            self._roots.append(ret)
+            return Panel(title = titles[self.__key(view)].get(), child = Spacer(), **mode)
 
         ind = next((i for i, j in enumerate(self._panels)
                     if self.__state(j).get() is PlotState.active),
@@ -96,10 +98,16 @@ class HybridStatView(BokehView):
                     name   = 'Hybridstat:Tabs',
                     **mode)
 
+        @ctrl.display.observe
+        def _onapplicationstarted():
+            doc.add_root(self._roots[ind])
+
         @self.action
         def _py_cb(attr, old, new):
             self._panels[old].activate(False)
+            doc.remove_root(self._roots[old])
             self._panels[new].activate(True)
+            doc.add_root(self._roots[new])
             ctrl.undos.handle('undoaction',
                               ctrl.emitpolicy.outastuple,
                               (lambda: setattr(self._tabs, 'active', old),))
