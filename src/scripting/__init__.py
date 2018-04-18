@@ -5,6 +5,7 @@
 Used for scripting: something similar to matplotlib's pyplot.
 """
 import shutil
+import sys
 from pathlib         import Path
 from utils.scripting import run
 TUTORIAL = f"""
@@ -35,9 +36,10 @@ run(locals(),
                for i in ("data", "cleaning", "eventdetection", "peakfinding", "peakcalling",
                          "qualitycontrol", "ramp", "model")))
 
+
 if Path("Tutorial.ipynb").exists():
     TUTORIAL += """
-You can access a full tutorial [here](Tutorial.ipynb)
+You can access a full tutorial [here](Tutorial.ipynb) and [here](aligningexperiments.ipynb)
 """
 else:
     TUTORIAL += f"""
@@ -45,7 +47,14 @@ A jupyter tutorial is available in jupyter. Do:
 
 ```python
 shutil.copyfile("{__file__[:__file__.rfind("/")+1]+"Tutorial.ipynb"}", "Tutorial.ipynb")
+shutil.copyfile("{__file__[:__file__.rfind("/")+1]+"/aligningexperiments.ipynb"}",
+                "aligningexperiments.ipynb")
 ```
 
-and follow this link: [Jupyter tutorial](Tutorial.ipynb)
+and follow the links:
+* [Jupyter tutorial](Tutorial.ipynb)
+* [Aligning experiments](aligningexperiments.ipynb)
 """
+
+if __file__[:__file__.rfind("/")] not in sys.path:
+    sys.path.append(__file__[:__file__.rfind("/")])
