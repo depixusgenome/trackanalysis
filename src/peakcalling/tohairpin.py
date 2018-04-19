@@ -391,6 +391,23 @@ class EdgePeaksGridFit(HairpinFitter):
         chi2 += (npeaksexpected-sum(len(i) for i in inds))**2
         return np.sqrt(max(0., chi2)/npeaksexpected), stretch, biases
 
+def matchpeaks(ref, peaks, window):
+    """"
+    return a list of indexes of matched peaks in ref
+
+    ```python
+    out = matchpeaks([1,2,3,4,5], [2,4, 5, 10], .5)
+    assert tuple(out) == (1, 3, 4, np.iinfo('i4').max)
+
+    out = matchpeaks([2,5], [2,4, 5, 10], .5)
+    assert tuple(out) == (0, np.iinfo('i4').max, 1, np.iinfo('i4').max)
+    ```
+    """
+    ids = _match.compute(ref, peaks, window)
+    arr = np.full(len(peaks), np.iinfo('i4').max, dtype = 'i4')
+    arr[ids[:,1]] = ids[:,0]
+    return arr
+
 PEAKS_DTYPE = np.dtype([('zvalue', 'f4'), ('key', 'i4')])
 PEAKS_TYPE  = Union[Sequence[Tuple[float,int]],np.ndarray]
 class PeakMatching(HairpinFitter, PointwiseOptimization):

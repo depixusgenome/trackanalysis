@@ -3,41 +3,31 @@
 """
 Scripts for aligning beads & tracks
 """
-from   typing       import Dict
-import pandas                  as     pd
-import numpy                   as     np
-import holoviews               as     hv
+from   typing                               import Dict
+import pandas                               as     pd
+import numpy                                as     np
+import holoviews                            as     hv # pylint: disable=import-error
 
 from   peakcalling.toreference             import (Range, # pylint: disable=unused-import
                                                    CorrectedHistogramFit, Pivot)
-from   peakcalling.tohairpin               import ChiSquareFit
+from   peakcalling.tohairpin               import ChiSquareFit, matchpeaks
 from   peakfinding.groupby.histogramfitter import PeakFlagger
+from   model.__scripting__.tasks           import Tasks
 
 def createpeaks(tracks):
     "create peaks for all tracks"
-    import scripting
-    singlestrand = getattr(scripting, 'Tasks').singlestrand()
-    data         = tracks.peaks.dataframe(singlestrand,
-                                          events     = dict(std = 'std'),
-                                          resolution = 'resolution')
-    data         = data.reset_index()
-    trkcount     = (data
-                    .groupby(['bead', 'track'])
-                    .peakposition.first()
-                    .reset_index()
-                    .groupby('bead')
-                    .track.count()
-                    .rename('trackcount'))
-    return data.set_index('bead').join(trkcount).reset_index()
+    return PeaksAlignment().peaks(tracks)
 
 class PeaksAlignment:
     """
     Align beads or tracks
     """
     def __init__(self, individually = False, **kwa):
-        self.hpalign      = kwa.get('hpalign',     ChiSquareFit(**kwa))
-        self.refalign     = kwa.get('refalign',    CorrectedHistogramFit(**kwa))
-        self.peakflagger  = kwa.get('peakflagger', PeakFlagger(mincount = 1, window = 15))
+        self.hpalign      = kwa.get('hpalign',      ChiSquareFit(**kwa))
+        self.refalign     = kwa.get('refalign',     CorrectedHistogramFit(**kwa))
+        self.peakflagger  = kwa.get('peakflagger',  PeakFlagger(mincount = 1, window = 15))
+        self.peakselector = kwa.get('peakselector', Tasks.peakselector())
+        self.singlestrand = kwa.get('singlestrand', Tasks.singlestrand())
         self.individually = individually
 
         if self.refalign and 'pivot' not in kwa:
@@ -45,6 +35,16 @@ class PeaksAlignment:
 
         if self.hpalign and 'firstpeak' not in kwa:
             self.hpalign.firstpeak = False
+
+    def peaks(self, tracks) -> pd.DataFrame:
+        """
+        creates a peaks dataframe
+        """
+        return (tracks
+                .dataframe(self.peakselector, self.singlestrand,
+                           events     = dict(std = 'std'),
+                           resolution = 'resolution')
+                .reset_index())
 
     @staticmethod
     def split(data, discarded = None, attribute = 'bead'):
@@ -89,14 +89,23 @@ class PeaksAlignment:
             thisref  = ref[track] if isinstance(ref, dict) else ref
             tmp      = data[data.bead==bead]
             peaks    = np.sort(tmp[tmp.track == track][attr].unique())
-            flags    = self.peakflagger(thisref, [peaks])[0]
+            if attr == 'peakposition':
+                flags = matchpeaks(thisref, peaks, self.peakflagger.window)
+            else:
+                flags = self.peakflagger(thisref, [peaks])[0]
 
             cols['reference'].append(thisref[flags[flags < inf]])
             cols[attr].append(peaks[flags < inf])
             cols['track'].append([track]*len(cols[attr][-1]))
             cols['bead'].append(np.full(len(cols[attr][-1]), bead, dtype = 'i4'))
 
-        return pd.DataFrame({i: np.concatenate(j) for i, j in cols.items()})
+        out = pd.DataFrame({i: np.concatenate(j) for i, j in cols.items()})
+        out = out.assign(delta = out.peakposition-out.reference)
+        return out.join(out
+                        .groupby('bead')
+                        .agg(dict(reference = 'count', delta = lambda x: np.abs(x).mean()))
+                        .rename(columns = dict(reference = 'peakcount', delta = 'residual')),
+                        on = ['bead'])
 
     @staticmethod
     def setpivot(data, position = 'max'):
@@ -158,6 +167,9 @@ class PeaksAlignment:
     def __call__(self, tracks, ref,
                  discarded = None,
                  masks     = None):
+        if not isinstance(tracks, pd.DataFrame):
+            tracks = self.peaks(tracks)
+
         data = self.split(tracks,
                           discarded = discarded,
                           attribute = 'bead' if isinstance(ref, int) else 'track')
@@ -179,6 +191,9 @@ class PeaksAlignment:
                 align     = True,
                 **seqs):
         "display the data"
+        if not isinstance(data, pd.DataFrame):
+            data = self.peaks(data)
+
         if align:
             data = self(data, ref, discarded=discarded, masks=masks)
             ref  = None
